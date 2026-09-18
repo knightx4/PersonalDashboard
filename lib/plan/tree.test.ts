@@ -1104,7 +1104,8 @@ describe('tallyHealth', () => {
   it('counts the leaves by state and leaves the rest at zero', () => {
     const section = shopping(
       tree([
-        at('done', 'a'),
+        at('in_progress', 'f'),
+        at('done', 'a', { parentId: 'f' }),
         at('blocked', 'b'),
         at('proposed', 'c'),
         at('not_started', 'q', { kind: 'decision' }),
@@ -1129,6 +1130,33 @@ describe('tallyHealth', () => {
     const total = Object.values(section.tally).reduce((sum, n) => sum + n, 0);
     expect(total).toBe(2);
     expect(section.tally.done).toBe(2);
+  });
+
+  it('leaves out a plan that is closed top to bottom', () => {
+    // What the heading counts is work still in hand. 101 of this plan's 110
+    // features are finished, and counting their steps held every module at
+    // nine tenths forever -- a fact about the archive rather than about the
+    // work. The filter is at the plan, not at the step: a done step inside a
+    // plan still being worked is exactly what the bar is for.
+    const section = shopping(
+      tree([
+        at('done', 'shipped'),
+        at('done', 'shipped-step', { parentId: 'shipped' }),
+        at('in_progress', 'live'),
+        at('done', 'live-step', { parentId: 'live' }),
+        at('not_started', 'live-step-2', { parentId: 'live' }),
+      ]),
+    );
+
+    expect(section.tally.done).toBe(1);
+    expect(section.bands).toEqual([
+      { health: 'done', count: 1 },
+      { health: 'ready', count: 1 },
+    ]);
+    expect(section.progress).toMatchObject({ done: 1, live: 2 });
+    // The rows themselves are untouched -- the finished plan is still listed
+    // and still foldable; it is the counting it left.
+    expect(section.nodes.map((node) => node.id)).toEqual(['shipped', 'live']);
   });
 
   it('is over the whole module, not the view', () => {
@@ -1386,7 +1414,13 @@ describe('blockRefusal', () => {
 describe('planBands', () => {
   it('splits the live leaves by state', () => {
     const section = shopping(
-      tree([at('done', 'a'), at('done', 'b'), at('in_progress', 'c'), at('blocked', 'd')]),
+      tree([
+        at('not_started', 'f'),
+        at('done', 'a', { parentId: 'f' }),
+        at('done', 'b', { parentId: 'f' }),
+        at('in_progress', 'c'),
+        at('blocked', 'd'),
+      ]),
     );
 
     expect(section.bands).toEqual([
@@ -1416,13 +1450,20 @@ describe('planBands', () => {
   });
 
   it('leaves out what the fraction leaves out', () => {
-    const section = shopping(tree([at('done', 'a'), at('dropped', 'b'), at('proposed', 'c')]));
+    const section = shopping(
+      tree([
+        at('not_started', 'f'),
+        at('done', 'a', { parentId: 'f' }),
+        at('dropped', 'b'),
+        at('proposed', 'c'),
+      ]),
+    );
 
     expect(section.bands).toEqual([{ health: 'done', count: 1 }]);
   });
 
   it('draws no band for a state nothing is in', () => {
-    const section = shopping(tree([at('done', 'a')]));
+    const section = shopping(tree([at('not_started', 'f'), at('done', 'a', { parentId: 'f' })]));
 
     expect(section.bands).toHaveLength(1);
   });
@@ -1431,7 +1472,12 @@ describe('planBands', () => {
     // Fixed, never sorted by size: a bar whose bands moved around as the
     // counts changed would be a different picture every week.
     const section = shopping(
-      tree([at('not_started', 'a'), at('done', 'b'), at('in_progress', 'c')]),
+      tree([
+        at('not_started', 'a'),
+        at('not_started', 'f'),
+        at('done', 'b', { parentId: 'f' }),
+        at('in_progress', 'c'),
+      ]),
     );
 
     // 'a' waits on nothing, so it reads as ready rather than not started --

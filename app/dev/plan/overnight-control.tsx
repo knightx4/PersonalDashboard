@@ -193,9 +193,29 @@ export function OvernightControl({
   canSend,
   night,
   push,
+  label = 'Overnight',
+  bare = false,
 }: {
   run: OvernightRun | null;
   canSend: boolean;
+  /**
+   * What to call the runner here.
+   *
+   * "Overnight" on the plan, where it is the night you set going before bed.
+   * On Dash it is one row of a Status panel standing beside the notes routine,
+   * and there the useful name is the queue it works rather than the hour it
+   * usually works it -- a runner you started at ten in the morning is still
+   * this one.
+   */
+  label?: string;
+  /**
+   * Drop the card around it, for a caller that is already a card.
+   *
+   * The Status panel on Dash holds a row per routine, and a card inside a card
+   * is the outer one saying "these belong together" with the inner one arguing
+   * (law 11).
+   */
+  bare?: boolean;
   /**
    * The night so far, as `nightFrom` reads it. Null when there is no night
    * running -- a stopped night's account is the morning digest's job, and this
@@ -246,12 +266,12 @@ export function OvernightControl({
   return (
     <section
       aria-label="The overnight runner"
-      className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}
+      className={cn(!bare && cardVariants({ padding: 'dense' }), 'space-y-2')}
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="inline-flex items-center gap-1.5 text-ui font-medium text-ink">
           <Moon className="size-4 text-ink-muted" aria-hidden />
-          Overnight
+          {label}
         </span>
         <OvernightState standing={standing} />
         {/* The totals are the headline while a night is on; a night that is

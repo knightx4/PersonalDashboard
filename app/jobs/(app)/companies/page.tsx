@@ -9,7 +9,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
-import { SearchField } from '@/components/jobs/shell/search-field';
+import { SearchField } from '@/components/shell/search-field';
+import { SearchEmpty } from '@/components/shell/search-empty';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { matchesSearch, searchTerms } from '@/lib/jobs/search';
 import { IN_PROCESS_OR_LATER, type ApplicationStatus } from '@/lib/jobs/pipeline';
@@ -142,7 +143,6 @@ export default async function CompaniesPage({
         actions={
           <>
             <DisplayMenu menu={menu} />
-            <SearchField placeholder="Search companies" />
             <Link href="/jobs/roles/new" className={buttonVariants({ size: 'sm' })}>
               Add a role
             </Link>
@@ -185,79 +185,94 @@ export default async function CompaniesPage({
         </LeftRail>
 
         <div className="min-w-0 flex-1">
-          <div className="space-y-5">
-            {sections.map((section) => (
-              <div key={section.key} className="space-y-2">
-                {display.group !== NO_GROUP && (
-                  <GroupHeader label={section.label} count={section.count} />
-                )}
-                <Table>
-                  <THead>
-                    <TR>
-                      <TH>Company</TH>
-                      {!display.hidden.includes('priority') && <TH>Priority</TH>}
-                      {!display.hidden.includes('activity') && <TH>Activity</TH>}
-                      {!display.hidden.includes('roles') && <TH num>Roles</TH>}
-                      {!display.hidden.includes('domains') && <TH>Domains</TH>}
-                    </TR>
-                  </THead>
-                  <TBody>
-                    {section.rows.map((company) => (
-                      <TR key={company.id} href={`/jobs/companies/${company.slug}`}>
-                        <TD primary>
-                          <span className="flex items-center gap-2">
-                            <CompanyAvatar
-                              company={{
-                                name: company.name,
-                                logoUrl: company.logo_url,
-                                domains: company.domains,
-                                website: company.website,
-                                careersUrl: company.careers_url,
-                              }}
-                              className="size-5 rounded"
-                              imageClassName="size-4"
-                            />
-                            <span className="min-w-0">
-                              {company.name}
-                              {company.hq_location && (
-                                <span className="ml-1.5 font-normal text-ink-muted">
-                                  {company.hq_location}
-                                </span>
-                              )}
-                            </span>
-                          </span>
-                        </TD>
-                        {!display.hidden.includes('priority') && (
-                          <TD label="Priority" muted>
-                            {company.priority}
-                          </TD>
-                        )}
-                        {!display.hidden.includes('activity') && (
-                          <TD label="Activity" muted>
-                            {company.status.replace(/_/g, ' ')}
-                          </TD>
-                        )}
-                        {!display.hidden.includes('roles') && (
-                          <TD label="Roles" num muted>
-                            {company.roles.length}
-                          </TD>
-                        )}
-                        {!display.hidden.includes('domains') && (
-                          <TD label="Domains" muted>
-                            {company.domains.length > 0 ? company.domains.join(', ') : '—'}
-                          </TD>
-                        )}
-                      </TR>
-                    ))}
-                  </TBody>
-                </Table>
-              </div>
-            ))}
+          {/* Directly above the table it narrows, like every other list in the
+              app. It sat in the header row beside Add a role until now. The
+              priority and pursuing rails, the sort, the grouping and the
+              hidden columns are all on the URL and the field carries them, so
+              searching from a narrowed table stays narrowed. */}
+          <div className="mb-4">
+            <SearchField placeholder="Search company, industry, location or domain" />
           </div>
-          <p className="mt-2 text-small text-ink-muted">
-            Domains are what let a recruiter&rsquo;s personal work address find its company. Add
-            them on the company page when mail is not linking.
-          </p>
+
+          {filtered.length === 0 && terms.length > 0 ? (
+            <SearchEmpty query={params.q ?? ''} />
+          ) : (
+            <>
+              <div className="space-y-5">
+                {sections.map((section) => (
+                  <div key={section.key} className="space-y-2">
+                    {display.group !== NO_GROUP && (
+                      <GroupHeader label={section.label} count={section.count} />
+                    )}
+                    <Table>
+                      <THead>
+                        <TR>
+                          <TH>Company</TH>
+                          {!display.hidden.includes('priority') && <TH>Priority</TH>}
+                          {!display.hidden.includes('activity') && <TH>Activity</TH>}
+                          {!display.hidden.includes('roles') && <TH num>Roles</TH>}
+                          {!display.hidden.includes('domains') && <TH>Domains</TH>}
+                        </TR>
+                      </THead>
+                      <TBody>
+                        {section.rows.map((company) => (
+                          <TR key={company.id} href={`/jobs/companies/${company.slug}`}>
+                            <TD primary>
+                              <span className="flex items-center gap-2">
+                                <CompanyAvatar
+                                  company={{
+                                    name: company.name,
+                                    logoUrl: company.logo_url,
+                                    domains: company.domains,
+                                    website: company.website,
+                                    careersUrl: company.careers_url,
+                                  }}
+                                  className="size-5 rounded"
+                                  imageClassName="size-4"
+                                />
+                                <span className="min-w-0">
+                                  {company.name}
+                                  {company.hq_location && (
+                                    <span className="ml-1.5 font-normal text-ink-muted">
+                                      {company.hq_location}
+                                    </span>
+                                  )}
+                                </span>
+                              </span>
+                            </TD>
+                            {!display.hidden.includes('priority') && (
+                              <TD label="Priority" muted>
+                                {company.priority}
+                              </TD>
+                            )}
+                            {!display.hidden.includes('activity') && (
+                              <TD label="Activity" muted>
+                                {company.status.replace(/_/g, ' ')}
+                              </TD>
+                            )}
+                            {!display.hidden.includes('roles') && (
+                              <TD label="Roles" num muted>
+                                {company.roles.length}
+                              </TD>
+                            )}
+                            {!display.hidden.includes('domains') && (
+                              <TD label="Domains" muted>
+                                {company.domains.length > 0 ? company.domains.join(', ') : '—'}
+                              </TD>
+                            )}
+                          </TR>
+                        ))}
+                      </TBody>
+                    </Table>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-small text-ink-muted">
+                Domains are what let a recruiter&rsquo;s personal work address find its company. Add
+                them on the company page when mail is not linking.
+              </p>
+            </>
+          )}
         </div>
       </div>
     </>

@@ -557,6 +557,45 @@ describe('PlanView', () => {
     expect(render('all')).not.toContain('Not yet specified');
   });
 
+  it('gives a feature that is only fog an arrow to fold it away', () => {
+    // #386's shape: real enough to name, not yet real enough to break into
+    // steps. The fold used to be drawn off the sub-steps alone, so a row like
+    // this one had its fog pinned open with no control anywhere on it.
+    const stepless = buildPlanTree({
+      items: [
+        item({
+          id: 'defence',
+          title: 'Test each concept at three rungs',
+          fog: 'The defence rung still cannot be written as steps.',
+        }),
+        item({ id: 'plain', title: 'A feature with neither steps nor fog' }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(stepless, 'all')}
+        finished={[]}
+        summary={summarize(stepless)}
+        view="all"
+        catalog={[]}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        queued={0}
+      />,
+    );
+
+    // Unfolded to start, so scanning the plan still reads the fog without a
+    // press -- the arrow is what is new, not the hiding.
+    expect(html).toContain('The defence rung still cannot be written as steps.');
+    expect(html).toContain('Fold what is not yet specified');
+    // Exactly one control: the row with nothing under it gets no arrow, and
+    // the fog row gets one rather than two.
+    expect((html.match(/what is not yet specified/g) ?? []).length).toBe(2);
+  });
+
   it('says nothing about a patch of fog that has been put aside', () => {
     const aside = buildPlanTree({
       items: [
