@@ -5,6 +5,7 @@ import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import type { DevComment } from '@/lib/comments/load';
 import type { SpecSectionWithThread } from '@/lib/specs/load';
+import { specLinkHref } from '@/lib/specs/links';
 
 /**
  * One section of a spec, and the thread under it.
@@ -27,10 +28,16 @@ function Prose({ markdown }: { markdown: string }) {
         remarkPlugins={[remarkGfm]}
         components={{
           a({ href, children, ...props }) {
-            const external = /^https?:\/\//i.test(href ?? '');
+            const resolved = specLinkHref(href);
+            // A link to a repository file with no page of its own. The text is
+            // kept and the link is not, which says what it points at without
+            // offering a click that 404s.
+            if (resolved === null) return <span className="text-ink-muted">{children}</span>;
+
+            const external = /^https?:\/\//i.test(resolved);
             return (
               <a
-                href={href}
+                href={resolved}
                 {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                 {...props}
               >

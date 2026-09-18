@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   budgetSpentReason,
+  dashActivityLine,
   loadOvernightRun,
   overnightLine,
   overnightRunFromRow,
@@ -441,3 +442,56 @@ function rowFor(run: OvernightRun): Record<string, unknown> {
     updated_at: run.updatedAt,
   };
 }
+
+/**
+ * The line the status bar draws for Dash.
+ *
+ * It exists because the bar said "gmail synced" on a night the runner was
+ * working through six features, so the properties that matter are all about
+ * not going quiet and not lying: it says something whenever something is
+ * running, it says nothing when nothing is, and a `started` row that has gone
+ * quiet for hours stops counting as work.
+ */
+describe('dashActivityLine', () => {
+  const NOW = new Date('2026-09-18T02:00:00.000Z').getTime();
+  const minutesAgo = (n: number) => new Date(NOW - n * 60_000).toISOString();
+
+  it('says nothing when nothing is running', () => {
+    expect(dashActivityLine({ run: null, session: null }, NOW)).toBeNull();
+    expect(
+      dashActivityLine({ run: night({ running: false, endedReason: 'It stopped.' }), session: null }, NOW),
+    ).toBeNull();
+  });
+
+  it('names the night and what is left of its budget', () => {
+    expect(dashActivityLine({ run: night({ featuresLeft: 4 }), session: null }, NOW)).toBe(
+      'dash · overnight run on · 4 of 6 features left',
+    );
+  });
+
+  it('names the session that is actually running, and the night behind it', () => {
+    const session = { job: 'notes' as const, startedAt: minutesAgo(5) };
+    expect(dashActivityLine({ run: night({ featuresLeft: 2 }), session }, NOW)).toBe(
+      'dash · notes run running · overnight, 2 of 6 features left',
+    );
+    expect(dashActivityLine({ run: null, session }, NOW)).toBe('dash · notes run running');
+  });
+
+  it('says a held night is held, whether or not a session is finishing', () => {
+    expect(dashActivityLine({ run: night({ paused: true }), session: null }, NOW)).toBe(
+      'dash · overnight run held',
+    );
+    expect(
+      dashActivityLine(
+        { run: night({ paused: true }), session: { job: 'feature', startedAt: minutesAgo(3) } },
+        NOW,
+      ),
+    ).toBe('dash · feature batch running · overnight run held');
+  });
+
+  it('stops counting a run that has been quiet for hours as work', () => {
+    const stale = { job: 'step' as const, startedAt: minutesAgo(300) };
+    expect(dashActivityLine({ run: null, session: stale }, NOW)).toBeNull();
+    expect(dashActivityLine({ run: null, session: { job: 'step', startedAt: 'nonsense' } }, NOW)).toBeNull();
+  });
+});

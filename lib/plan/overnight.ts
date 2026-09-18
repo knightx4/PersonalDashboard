@@ -23,6 +23,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { elapsedSince } from './elapsed';
+import { RUN_JOB_NOUN, RUN_QUIET_AFTER_MINUTES, type RunJob } from './run-end';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, 'public'>;
@@ -427,4 +428,62 @@ export async function recordOvernightFire(input: {
     .maybeSingle();
 
   return wrote(result);
+}
+
+/**
+ * What Dash is doing, for the status line at the bottom of every page.
+ *
+ * The bar was ingestion and nothing else, so on a night the runner was working
+ * its way through six features the app's own line said "gmail synced". The one
+ * thing happening was the one thing not on it.
+ *
+ * Machine voice: lower case, no full stop, no article, which is why it is not
+ * `overnightLine` with different words. That one is a sentence for a control
+ * you are standing in front of; this is a glance from another workspace.
+ *
+ * It says nothing at all when nothing is running. A night that ended is not
+ * what Dash is doing, and a line that reports the last thing it did forever is
+ * the repetition this bar already had too much of.
+ *
+ * A session is counted as live only while it is inside the quiet window, which
+ * is the same two hours `endQuietRuns` gives a run before it is written off.
+ * Past that the row says `started` and nothing is: the honest reading is that
+ * nothing is running, not that something has been running since lunchtime.
+ */
+export function dashActivityLine(
+  input: {
+    run: OvernightRun | null;
+    session: { job: RunJob; startedAt: string } | null;
+  },
+  now: number,
+): string | null {
+  const standing = overnightStanding(input.run);
+  const session = liveSession(input.session, now);
+
+  const night =
+    standing === 'running' && input.run
+      ? `${input.run.featuresLeft} of ${input.run.featuresBudget} features left`
+      : null;
+
+  if (session) {
+    const noun = RUN_JOB_NOUN[session.job];
+    if (standing === 'paused') return `dash · ${noun} running · overnight run held`;
+    return night ? `dash · ${noun} running · overnight, ${night}` : `dash · ${noun} running`;
+  }
+
+  if (standing === 'paused') return 'dash · overnight run held';
+  // Nothing fired at this moment, but the runner is on and the next tick will.
+  if (night) return `dash · overnight run on · ${night}`;
+  return null;
+}
+
+/** A started run is only evidence of work while it is inside the quiet window. */
+function liveSession(
+  session: { job: RunJob; startedAt: string } | null,
+  now: number,
+): { job: RunJob; startedAt: string } | null {
+  if (!session) return null;
+  const at = new Date(session.startedAt).getTime();
+  if (!Number.isFinite(at)) return null;
+  return (now - at) / 60_000 < RUN_QUIET_AFTER_MINUTES ? session : null;
 }

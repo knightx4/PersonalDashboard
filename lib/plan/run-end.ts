@@ -66,6 +66,26 @@ export const RUN_JOB_LABEL: Record<RunJob, string> = {
 };
 
 /**
+ * The same press, as a bare noun in machine voice.
+ *
+ * The status line is lower case with no full stop and no article, so
+ * `RUN_JOB_LABEL` cannot be reused there: "A notes run running" is not a line
+ * anybody wrote. Two records rather than one string mangled at the call site,
+ * because a tenth job should fail the typecheck in both places.
+ */
+export const RUN_JOB_NOUN: Record<RunJob, string> = {
+  step: 'step run',
+  feature: 'feature batch',
+  queue: 'queue run',
+  reshape: 're-shape',
+  shape: 'shaping run',
+  notes: 'notes run',
+  review: 'ui review',
+  comment: 'comment reply',
+  raise: 'raise answer',
+};
+
+/**
  * How long a run may say nothing before it is counted as gone.
  *
  * The same two hours a claim on a step gets, because it is the same question
