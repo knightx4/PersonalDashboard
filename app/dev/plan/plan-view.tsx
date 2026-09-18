@@ -851,7 +851,7 @@ function TheQuestion({ node }: { node: PlanNode }) {
     <div className="space-y-0.5">
       <QuestionPartLabel>The question</QuestionPartLabel>
       <p className="text-ui font-medium text-ink">
-        <span className="tabular mr-1.5 font-normal text-small text-ink-ghost">#{node.number}</span>
+        <span className="tabular mr-1.5 font-normal text-small text-ink-ghost">#{node.outline}</span>
         {node.title}
       </p>
     </div>
@@ -1184,7 +1184,7 @@ function QuestionRow({ node, titles }: { node: PlanNode; titles?: PlanRefTitles 
               and none of the apparatus for answering it applies. */}
           {node.status === 'dropped' ? (
             <p className="text-ui text-ink-muted line-through">
-              <span className="tabular mr-1.5 text-small text-ink-ghost">#{node.number}</span>
+              <span className="tabular mr-1.5 text-small text-ink-ghost">#{node.outline}</span>
               {node.title}
             </p>
           ) : (
@@ -2679,7 +2679,15 @@ function PlanRow({
                 trail.length === 0 ? 'font-medium text-ink' : 'text-ink',
               )}
             >
-              <span className="tabular shrink-0 text-small text-ink-ghost">#{node.number}</span>
+              {/* Where the row sits, not just what it is called: a feature
+                  reads #595 and its second step reads #595.2, so a step says
+                  which feature it belongs to and how far through it is
+                  without the tree guides having to be traced up by eye.
+                  `number` is still the handle -- it is what the commits, the
+                  comments and the CLI say, it is the anchor a `#597` link
+                  lands on, and the button around this says "Open #597" -- and
+                  the search box takes either. */}
+              <span className="tabular shrink-0 text-small text-ink-ghost">#{node.outline}</span>
               {/* Truncated closed, whole open. A row is a line and a long title
                 * has to give way to keep it one; but opening the step is the
                 * gesture that means "show me this one", and a name still cut

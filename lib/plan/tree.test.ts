@@ -135,6 +135,45 @@ describe('buildPlanTree', () => {
     expect(tree([item({ id: 'a', module: null })]).some((s) => s.module === null)).toBe(true);
   });
 
+  it('numbers a step as its place under its feature, and keeps its handle', () => {
+    // Note 4ff04135: #125's steps should read 125.1, 125.2, 125.3.
+    const sections = tree([
+      item({ id: 'feature', number: 125 }),
+      item({ id: 'one', number: 131, parentId: 'feature', position: 10 }),
+      item({ id: 'two', number: 128, parentId: 'feature', position: 20 }),
+      item({ id: 'under', number: 140, parentId: 'two', position: 10 }),
+    ]);
+    const [feature] = shopping(sections).nodes;
+
+    expect(feature.outline).toBe('125');
+    expect(feature.children.map((n) => n.outline)).toEqual(['125.1', '125.2']);
+    expect(feature.children[1].children[0].outline).toBe('125.2.1');
+    // The number is the identity and does not move.
+    expect(feature.children.map((n) => n.number)).toEqual([131, 128]);
+  });
+
+  it('does not renumber the steps a view or a search hid', () => {
+    const items = [
+      item({ id: 'feature', number: 200 }),
+      item({ id: 'one', number: 201, parentId: 'feature', position: 10, status: 'done' }),
+      item({ id: 'two', number: 202, parentId: 'feature', position: 20 }),
+    ];
+    const open = applyView(tree(items), 'open');
+    const [feature] = shopping(open).nodes;
+
+    expect(feature.children.map((n) => n.outline)).toEqual(['200.2']);
+  });
+
+  it('finds a step by the outline it is read by as well as by its number', () => {
+    const sections = tree([
+      item({ id: 'feature', number: 300, title: 'The feature' }),
+      item({ id: 'step', number: 307, title: 'The step', parentId: 'feature' }),
+    ]);
+
+    expect(countMatches(searchSections(sections, '300.1'))).toBe(1);
+    expect(countMatches(searchSections(sections, '#307'))).toBe(1);
+  });
+
   it('nests steps under their parent, to any depth', () => {
     const sections = tree([
       item({ id: 'feature' }),
