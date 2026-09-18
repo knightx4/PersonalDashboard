@@ -1579,18 +1579,70 @@ export const SURFACES: readonly Surface[] = [
   {
     /* The thread on a dev row, in the middle of an exchange. The waiting line
      * is up as well: it is only on screen while a tagged comment is being
-     * answered, which is a few seconds nobody can hold still for a shot. */
+     * answered, which is a few seconds nobody can hold still for a shot.
+     *
+     * In a card, because the thread's ground is a well inside one: every
+     * caller draws it there, and the whole point of the ground is the step
+     * down from the card behind it. Shot on the page ground alone it would be
+     * a panel floating on a bench, which is not a thing the app has. */
     id: 'dev-comment-thread',
     label: 'Comments · a thread on a plan step',
     module: 'dev',
     width: 'narrow',
     render: () => (
-      <CommentThread
-        target="step"
-        id="00000000-0000-4000-8000-000000000412"
-        thread={commentThread}
-        awaitingReply
-      />
+      <div className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}>
+        <p className="text-body text-ink">
+          The filter and the count disagree on who a step is handed to.
+        </p>
+        <CommentThread
+          target="step"
+          id="00000000-0000-4000-8000-000000000412"
+          thread={commentThread}
+          awaitingReply
+        />
+      </div>
+    ),
+  },
+  {
+    /* The same component on a row nobody has written on, which is the state
+     * that draws no panel at all: a ground round a single Add a comment button
+     * is a section announcing it has nothing in it -- law 1. Worth its own
+     * surface because it is what the thread looks like on most rows. */
+    id: 'dev-comment-thread-empty',
+    label: 'Comments · a row with nothing on it',
+    module: 'dev',
+    width: 'narrow',
+    render: () => (
+      <div className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}>
+        <p className="text-body text-ink">
+          The filter and the count disagree on who a step is handed to.
+        </p>
+        <CommentThread target="step" id="00000000-0000-4000-8000-000000000413" thread={[]} />
+      </div>
+    ),
+  },
+  {
+    /* The box, open, which is the only state the send control can be looked at
+     * in: it is a trigger until it is pressed, so nothing in the app renders
+     * it standing open and `composerOpen` is the only way a shot reaches it.
+     * Empty, so the send control is in its disabled state and the line under
+     * the words says a note reaches nobody until it is tagged. */
+    id: 'dev-comment-thread-composer',
+    label: 'Comments · the box you send from',
+    module: 'dev',
+    width: 'narrow',
+    render: () => (
+      <div className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}>
+        <p className="text-body text-ink">
+          The filter and the count disagree on who a step is handed to.
+        </p>
+        <CommentThread
+          target="step"
+          id="00000000-0000-4000-8000-000000000414"
+          thread={commentThread}
+          composerOpen
+        />
+      </div>
     ),
   },
   {

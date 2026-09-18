@@ -151,16 +151,40 @@ export function ComposeTitle({ className, ref, ...props }: React.ComponentProps<
   );
 }
 
-export function ComposeBody({
-  className,
-  ...props
-}: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function ComposeBody({ className, ref, ...props }: React.ComponentProps<'textarea'>) {
   return (
     <textarea
+      ref={ref}
       className={cn(
         // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
         'field-sizing-content max-h-64 w-full resize-none border-0 bg-transparent p-0 text-base text-ink outline-none sm:text-ui',
         'placeholder:text-ink-ghost',
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+/**
+ * The border a compose surface wears when it is a box you send from.
+ *
+ * What goes inside is a ComposeBody and a row of controls under it, both
+ * borderless, so the words and the control that sends them read as one object
+ * instead of a field with buttons standing beneath it. The ring is
+ * `focus-within` for the same reason: the caret is in the textarea, but what
+ * lights up is the box.
+ *
+ * Same border, radius and inset as the `control` above, because it is the same
+ * kind of thing. Only what sits inside it differs.
+ */
+export function ComposeBox({ className, ref, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        'rounded-control border border-control bg-surface px-(--control-px) py-1.5',
+        'focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/40',
         className,
       )}
       {...props}

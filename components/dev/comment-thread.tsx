@@ -1,12 +1,12 @@
 'use client';
 
 import { useActionState, useOptimistic, useRef, useState } from 'react';
-import { Bot, CircleUser, X } from 'lucide-react';
+import { ArrowUp, Bot, CircleUser, X } from 'lucide-react';
 import { addComment, deleteComment, type CommentActionState } from '@/app/dev/comment-actions';
 import { CommentBody } from '@/components/dev/comment-body';
 import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/ui/disclosure';
-import { FieldError, Textarea } from '@/components/ui/field';
+import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
 import { awaitingDash } from '@/lib/comments/awaiting';
 import { MENTION, mentionsDash } from '@/lib/comments/mention';
 import { commentWhen, exactTime } from '@/lib/comments/when';
@@ -170,6 +170,7 @@ export function CommentThread({
   submit,
   placeholder = 'A note on this row, or a question for Dash.',
   awaitingReply = false,
+  composerOpen = false,
   titles,
 }: {
   target: CommentTarget;
@@ -191,12 +192,21 @@ export function CommentThread({
    * otherwise reach. Left off everywhere in the app.
    */
   awaitingReply?: boolean;
+  /**
+   * Open the box with nothing typed in it, for the surface gallery.
+   *
+   * The box is a trigger until it is pressed -- law 14 -- so it is only ever
+   * on screen while somebody is part-way through a sentence, which is a state
+   * a fixture cannot reach and a screenshot cannot catch. Left off everywhere
+   * in the app.
+   */
+  composerOpen?: boolean;
 }) {
   // The write is not waited on: the comment is in the thread the moment it is
   // written, and a failure puts the words back in the box. Nothing on screen
   // is keyed to the request being in flight any more.
   const [state, action] = useActionState(submit?.action ?? addComment, {} as CommentActionState);
-  const [writing, setWriting] = useState(false);
+  const [writing, setWriting] = useState(composerOpen);
   const [draft, setDraft] = useState('');
   const box = useRef<HTMLTextAreaElement>(null);
   /** So Enter can send without the button being the only way to submit. */
@@ -225,6 +235,8 @@ export function CommentThread({
 
   const now = useClockNow();
   const trigger = submit?.label ?? label ?? (thread.length === 0 ? 'Add a comment' : 'Add another');
+  /** The send control has no words on it, so its name is read rather than seen. */
+  const sendLabel = submit?.label ?? 'Send';
   // A raise is a question put to you, so anything you write on one reaches
   // Dash whether or not it carries the tag -- #541. Everywhere else the tag is
   // what does it.
@@ -304,83 +316,111 @@ export function CommentThread({
             showOptimistically(body);
             action(formData);
           }}
-          className="space-y-2"
+          // Escape is the way out from the keyboard, and there is no Cancel
+          // button any more, so an empty box also closes when focus leaves it
+          // -- which is the only way out a phone has. Words already typed keep
+          // the box open: closing it because you tapped something else would
+          // throw them away.
+          onBlur={(event) => {
+            if (draft.trim()) return;
+            if (event.currentTarget.contains(event.relatedTarget)) return;
+            setWriting(false);
+          }}
         >
           <input type="hidden" name="target" value={target} />
           <input type="hidden" name="id" value={id} />
-          {/* Enter sends and shift-Enter breaks the line, which is what every
-              chat window does and what makes this one feel like a message
-              rather than a field with a Save under it. Escape puts the box
-              away, so the pointer's Cancel is not the only way out. Neither
-              replaces the buttons below: they are what says the two are
-              there. */}
-          <Textarea
-            ref={box}
-            name="body"
-            rows={2}
-            className="min-h-12"
-            autoFocus
-            placeholder={placeholder}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                event.preventDefault();
-                setWriting(false);
-                return;
-              }
-              if (event.key !== 'Enter' || event.shiftKey) return;
-              // A composing keystroke is part of typing a character, not a
-              // send: an IME candidate confirmed with Enter would post the
-              // half-written word otherwise.
-              if (event.nativeEvent.isComposing) return;
-              if (!draft.trim()) return;
-              event.preventDefault();
-              form.current?.requestSubmit();
-            }}
-          />
 
-          {/* Which of the two things you are writing, while you are writing it.
-              The only sign used to be the save button changing to Asking once
-              it was already sending, by which point the choice had been made.
-              Left off a box writing somewhere else: a note answering a blocked
-              bug goes back in the queue whatever is in it, and nothing here
-              would be reading the tag. */}
-          {!submit && (
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-small text-ink-muted">
-                {target === 'raise'
-                  ? 'This is your answer. A session acts on it and replies in the thread.'
-                  : tagged
-                    ? 'Dash will read this and reply in the thread.'
-                    : 'A note on the row. Nothing reads it.'}
-              </p>
-              {!tagged && (
+          {/* One box: the words, what they will reach, and the control that
+              sends them. A Send and a Cancel standing underneath were two
+              buttons for what a chat window does with one glyph and the
+              Escape key, and they made a message read as a form being
+              filled in -- #591. */}
+          <ComposeBox>
+            {/* Enter sends and shift-Enter breaks the line, which is what
+                every chat window does and what makes this one feel like a
+                message rather than a field with a Save under it. Escape puts
+                the box away. */}
+            <ComposeBody
+              ref={box}
+              name="body"
+              rows={1}
+              autoFocus
+              placeholder={placeholder}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  setWriting(false);
+                  return;
+                }
+                if (event.key !== 'Enter' || event.shiftKey) return;
+                // A composing keystroke is part of typing a character, not a
+                // send: an IME candidate confirmed with Enter would post the
+                // half-written word otherwise.
+                if (event.nativeEvent.isComposing) return;
+                if (!draft.trim()) return;
+                event.preventDefault();
+                form.current?.requestSubmit();
+              }}
+            />
+
+            <div className="mt-1 flex items-end gap-1">
+              {/* Which of the two things you are writing, while you are
+                  writing it. The only sign used to be the save button changing
+                  to Asking once it was already sending, by which point the
+                  choice had been made. Left off a box writing somewhere else:
+                  a note answering a blocked bug goes back in the queue
+                  whatever is in it, and nothing here would be reading the
+                  tag. */}
+              {!submit && (
+                <p className="min-w-0 flex-1 text-small text-ink-muted">
+                  {target === 'raise'
+                    ? 'This is your answer. A session acts on it and replies in the thread.'
+                    : tagged
+                      ? 'Dash will read this and reply in the thread.'
+                      : 'A note on the row. Nothing reads it.'}
+                </p>
+              )}
+              {!submit && !tagged && (
                 <button
                   type="button"
+                  // Keeps the caret where it is. Without this the box loses
+                  // focus on the press, and a browser that does not focus a
+                  // button on click -- Safari, Firefox on a Mac -- hands the
+                  // blur no target inside the form, so an empty box would
+                  // close under the tag before the tag ran.
+                  onMouseDown={(event) => event.preventDefault()}
                   // In front of what you have written, which is where a comment
                   // addressed to somebody starts.
                   onClick={() => {
                     setDraft((current) => (current ? `${MENTION} ${current}` : `${MENTION} `));
                     box.current?.focus();
                   }}
-                  className="press rounded-control px-1.5 py-0.5 text-small text-ink-ghost hover:bg-sunken hover:text-ink"
+                  className="press shrink-0 rounded-control px-1.5 py-0.5 text-small text-ink-ghost hover:bg-sunken hover:text-ink"
                 >
                   Tag {MENTION}
                 </button>
               )}
+              {/* A glyph, so the send control is the same size wherever it
+                  sits. What a caller's own action is called -- "Answer and
+                  reopen" on a blocked bug note -- is what a screen reader
+                  reads and what the tooltip says, rather than words printed
+                  over the arrow. */}
+              <Button
+                type="submit"
+                size="sm"
+                className="ml-auto size-7 shrink-0 px-0"
+                disabled={!draft.trim()}
+                title={sendLabel}
+              >
+                <ArrowUp className="size-4" strokeWidth={2} aria-hidden />
+                <span className="sr-only">{sendLabel}</span>
+              </Button>
             </div>
-          )}
+          </ComposeBox>
 
-          <div className="flex flex-wrap items-center gap-1">
-            <Button type="submit" size="sm" disabled={!draft.trim()}>
-              {submit?.label ?? 'Send'}
-            </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setWriting(false)}>
-              Cancel
-            </Button>
-            <FieldError>{state.error}</FieldError>
-          </div>
+          <FieldError>{state.error}</FieldError>
         </form>
       )}
 
@@ -400,9 +440,20 @@ export function CommentThread({
   // above it needed. The closed line carries the count and the last turn, so
   // opening it is a choice rather than a check -- law 10. Open by default,
   // because a comment you cannot see is a comment nobody answers.
+  //
+  // The fold sits on a recessed ground so you can see where the row stops and
+  // the conversation starts; before this it was text on the same background as
+  // everything above it. A ground and not a frame: all five callers --
+  // plan-view, ideas-view, raised-view, conversations-view, feedback-list --
+  // already draw this inside a card, and a border inside that border is what
+  // law 11 rules out. `bg-canvas` is the well inside a card rather than the
+  // page ground, which is what makes it recede in all four themes.
+  //
+  // The summary is inside the panel rather than over it, so the count and the
+  // last turn are the panel's heading instead of a line floating above it.
   return (
     <Disclosure
-      className="mt-1"
+      className="mt-1 rounded-lg bg-canvas card-pad-dense"
       defaultOpen
       title={`${shown.length} ${shown.length === 1 ? 'comment' : 'comments'}`}
       meta={
