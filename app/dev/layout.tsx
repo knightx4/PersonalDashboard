@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient, getUser } from '@/lib/auth/server';
+import { isOwner } from '@/lib/dev/owner';
+import { NoPermission } from '@/components/shell/no-permission';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
@@ -28,6 +30,28 @@ export default async function DevLayout({ children }: { children: React.ReactNod
   if (!user) redirect('/login');
 
   const supabase = await createClient();
+
+  /**
+   * The gate for the whole workspace, and it is deliberately the first thing
+   * after the session rather than a check on each of the seven pages.
+   *
+   * Before the loaders, too. Everything below this line reads the owner's
+   * plan, his bug queue and his raises, and a layout that loaded them and then
+   * declined to draw them would have put them in the response of a person who
+   * may not see them -- the answer would be right and the page would still be
+   * a leak. Nothing behind here is fetched for anybody else.
+   *
+   * Not the whole of the wall, though. A layout is rendered once and does not
+   * re-run for every navigation beneath it, and the buttons inside these pages
+   * post to server actions that can be called without rendering anything at
+   * all. Those are refused in their own right -- that is #417 -- and this
+   * check is what stops the workspace being drawn, not what stops it being
+   * reached.
+   */
+  if (!(await isOwner({ user, supabase }))) {
+    return <NoPermission what="The Dev workspace" />;
+  }
+
   const [settings, counts, activity, raised, plan, mainCheck] = await Promise.all([
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
@@ -99,6 +123,8 @@ export default async function DevLayout({ children }: { children: React.ReactNod
         displayName={settings.displayName}
         email={user.email ?? ''}
         enabledModules={settings.enabledModules}
+        // Proved above: a non-owner never reaches this line.
+        isOwner
         counts={switcherCounts(counts)}
         theme={settings.theme}
         notifications={raised}

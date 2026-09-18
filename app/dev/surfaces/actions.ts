@@ -2,7 +2,8 @@
 
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
-import { createClient, requireUser } from '@/lib/auth/server';
+import { createClient } from '@/lib/auth/server';
+import { requireOwner } from '@/lib/dev/owner';
 import { surfacePath } from '@/lib/feedback/surfaces';
 
 /**
@@ -34,8 +35,8 @@ export async function noteOnSurface(
   _prev: SurfaceNoteState,
   formData: FormData,
 ): Promise<SurfaceNoteState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const parsed = schema.safeParse({
     surface: String(formData.get('surface') ?? ''),

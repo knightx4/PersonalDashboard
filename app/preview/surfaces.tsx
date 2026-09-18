@@ -1889,6 +1889,9 @@ export const SURFACES: readonly Surface[] = [
         feedbackHref="/dev/bugs"
         displayName="Chris"
         email="chris@example.com"
+        // The picture is of the owner's shell, which is the one with every
+        // workspace in the switcher.
+        isOwner
         counts={{ jobs: '12', shopping: '3', todo: '8' }}
         theme={{ kind: 'written', id: 'paper' }}
         brief={null}
