@@ -4,7 +4,7 @@
  * Law 4 tells whoever draws the next surface to use "ink and a shape" and
  * never says anywhere what the shapes are. These are them: a glyph for each of
  * the eleven application statuses, each of the three task states, each of the
- * thirteen states a plan step can be in, and each state of the four other dev
+ * fourteen states a plan step can be in, and each state of the four other dev
  * queues. The names are shapes rather than statuses, because
  * components/ui/status-glyph.tsx draws them and knows nothing about pipelines,
  * todo lists or plans.
@@ -120,6 +120,12 @@ export const TASK_STATUS_GLYPHS: Record<TaskStatus, StatusGlyph> = {
  * tone and the word say. `abandoned` is the one that leaves the ladder -- a
  * run that stopped without closing its step -- so it takes the cross.
  *
+ * `setup` shares the bar with `blocked` on the same grounds. To the eye they
+ * are one thing -- stopped, and only you can clear it -- and what separates
+ * them is whether anybody was building when it stopped, which the word and
+ * the section carry. Every other shape in the set already means something
+ * else, and a shape that means two things is worse than one honestly shared.
+ *
  * A `Record`, like the two above, so a health added to PLAN_HEALTHS fails the
  * typecheck here rather than drawing itself as a proposal.
  */
@@ -135,6 +141,7 @@ export const PLAN_HEALTH_GLYPHS: Record<PlanHealth, StatusGlyph> = {
   answered: 'check',
   dropped: 'slash',
   blocked: 'bar',
+  setup: 'bar',
   waiting: 'dashed',
   unanswered: 'question',
 };

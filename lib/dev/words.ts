@@ -198,7 +198,10 @@ export function planState(health: PlanHealth): DevState | null {
     case 'dropped':
       return 'dropped';
     // A claim whose run stopped without closing the step. Nothing else has a
-    // run to stop, so this one has no shared word either.
+    // run to stop, so this one has no shared word either. Nor does a setup
+    // job: no other queue has a row that is work and is yours and cannot be
+    // handed anywhere, so there is nothing for it to read alike with.
+    case 'setup':
     case 'abandoned':
     case 'unanswered':
     case 'answered':
@@ -212,15 +215,22 @@ export function planState(health: PlanHealth): DevState | null {
 /**
  * Why a plan step is on your desk, on the Dash tab.
  *
- * Three of the thirteen plan healths, and the only three `needsThePerson`
+ * Four of the fourteen plan healths, and the only four `needsThePerson`
  * admits.
  * They take their own words rather than the shared ones because the shared
  * `Waiting on you` is the section they sit in: repeating it on every row would
- * say the same thing four times and tell you nothing about which of the three
+ * say the same thing four times and tell you nothing about which of the four
  * this is (law 1).
+ *
+ * `Setup` is the one that is a job rather than a judgement -- the other three
+ * are cleared by deciding something, and this one by going and doing it.
  */
-export const WAITING_WORD: Record<'blocked' | 'unanswered' | 'proposed', string> = {
+export const WAITING_WORD: Record<
+  'blocked' | 'unanswered' | 'proposed' | 'setup',
+  string
+> = {
   blocked: 'Stopped',
   unanswered: 'Question',
   proposed: 'To approve',
+  setup: 'Setup',
 };

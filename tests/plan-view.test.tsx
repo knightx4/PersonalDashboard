@@ -921,3 +921,69 @@ describe('what the page says when GitHub refuses the key', () => {
     expect(html).not.toContain('GITHUB_READ_TOKEN');
   });
 });
+
+/**
+ * #598: a setup job is a row on the plan like any other, and the one thing you
+ * can do to it is say you have done it.
+ */
+describe('a setup step on the plan', () => {
+  function drawSetup(status: PlanItem['status'] = 'not_started') {
+    const feature = item({ id: 'f', title: 'Send the weekly digest', module: 'dev' });
+    const job = item({
+      id: 's',
+      title: 'Put the Resend API key in Vercel',
+      parentId: 'f',
+      module: 'dev',
+      kind: 'setup',
+      status,
+      detail: 'Make a key at resend.com, then add RESEND_API_KEY to the Vercel project.',
+    });
+    const tree = buildPlanTree({ items: [feature, job], dependencies: [] });
+    return renderToStaticMarkup(
+      <PlanView
+        sections={applyView(tree, 'all')}
+        finished={[]}
+        summary={summarize(tree)}
+        view="all"
+        catalog={catalogOf(tree)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        queued={0}
+        unfolded
+        opened
+      />,
+    );
+  }
+
+  it('shows what to set and the press that closes it, under its own feature', () => {
+    const html = drawSetup();
+
+    // Under the feature it belongs to, as an ordinary row in the tree.
+    expect(html).toContain('Send the weekly digest');
+    expect(html).toContain('Put the Resend API key in Vercel');
+    // What to actually go and do, labelled rather than left as a paragraph.
+    expect(html).toContain('What to set up');
+    expect(html).toContain('add RESEND_API_KEY to the Vercel project');
+    // One press, and it says no commit is recorded against it.
+    expect(html).toContain('I have set this up');
+    expect(html).toContain('This closes the step. Nothing is committed against it.');
+    // Its own health, not a blocked build's.
+    expect(html).toContain('Setup');
+  });
+
+  it('says the detail once, not once in the box and once above it', () => {
+    const html = drawSetup();
+    const detail = 'Make a key at resend.com';
+    expect(html.split(detail)).toHaveLength(2);
+  });
+
+  it('offers nothing to press once the errand has been run', () => {
+    const html = drawSetup('done');
+    expect(html).not.toContain('I have set this up');
+    expect(html).not.toContain('What to set up');
+    // The detail comes back as an ordinary step's does.
+    expect(html).toContain('Make a key at resend.com');
+  });
+});

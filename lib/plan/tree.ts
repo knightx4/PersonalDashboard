@@ -449,13 +449,13 @@ export function leavesOf(nodes: readonly PlanNode[]): PlanNode[] {
  * keeps the shape; the rule is here.
  */
 /**
- * The thirteen, and why each one is here.
+ * The fourteen, and why each one is here.
  *
  * #505 asked whether the set had outgrown what anybody reads: `not_started`,
  * `ready` and `waiting` look like three shapes for "not started, and here is
  * why". It was measured against one bar -- a health stays only if some surface
  * does something different with it, rather than merely wording it differently
- * -- and all thirteen cleared it. Four pairs were close enough to argue about:
+ * -- and all fourteen cleared it. Five pairs were close enough to argue about:
  *
  * - `ready` against `not_started`. `ready` is what the Send button takes, what
  *   `workOrder` lists and what the overnight chooser fires. Merging them puts
@@ -473,9 +473,16 @@ export function leavesOf(nodes: readonly PlanNode[]): PlanNode[] {
  * - `answered` against `done`. A settled question carries a resolution and no
  *   commit, its tooltip is that resolution, and it is the one state the counts
  *   beside a module heading leave out.
+ * - `setup` against `blocked`. Both are stopped on you and neither moves until
+ *   you act, but they are not the same thing to read: a blocked step is a
+ *   build that ran into a wall, and a setup step is a job that was always
+ *   yours and was written as one. The difference is what Dash does with them
+ *   -- #599 asked for a section you can finish a setup job from without
+ *   leaving the tab -- and a job on your list reading as a build somebody got
+ *   stuck on is what this whole feature is about.
  *
  * Every `Record<PlanHealth, ...>` is exhaustive -- the glyphs, the words, the
- * tally, `planState` -- so a fourteenth fails the typecheck at each surface
+ * tally, `planState` -- so a fifteenth fails the typecheck at each surface
  * rather than drawing itself as a proposal. The same bar applies to it.
  */
 export const PLAN_HEALTHS = [
@@ -488,6 +495,11 @@ export const PLAN_HEALTHS = [
   // denominator and out of the bands, which is what separates it from
   // `not_started`.
   'proposed',
+  // A job that is yours: an account to open, a key to paste, a switch to flip
+  // somewhere outside the repo. Open until you have done it, and no session
+  // can do it for you -- which is why it is a state of its own rather than a
+  // step that reads `ready` and gets claimed by the next routine to look.
+  'setup',
   // The four readings of a claim. `in_progress` is a claimed row with nothing
   // known about the run behind it; the other three are what the run says,
   // through `claimLiveness`. `abandoned` is the one that leaves the ladder --
@@ -553,6 +565,10 @@ export function planLiveness(
  */
 const OPEN_HEALTH_RANK: readonly PlanHealth[] = [
   'unanswered',
+  // Beside the question and above the block, because both are on your desk
+  // and this is the one you can finish tonight: nothing is being worked out,
+  // there is a job with your name on it.
+  'setup',
   'blocked',
   // A claim nobody is working is more pressing than a proposal: the step has
   // been handed over and stopped, so it needs sending again, and a feature
@@ -622,6 +638,19 @@ export function healthOf(
     return 'unanswered';
   }
   if (node.kind === 'decision' && node.status === 'done') return 'answered';
+
+  // A setup job you have not done is a setup job, whatever the status column
+  // says. "Ready" on one would read as ready for a session to pick up, which
+  // is the one thing it is not: it is an account to open or a key to paste,
+  // and nothing happens to it until you do it.
+  //
+  // Except while it is genuinely blocked, which is the same exception a
+  // decision makes. A block carries the one sentence saying what the step
+  // needs right now, and that is more specific than "this is a setup job". A
+  // stale block is not that case -- `isBlocked` is already false once the
+  // steps it named have closed -- so the step goes back to reading `setup`
+  // rather than falling through to `ready`.
+  if (node.kind === 'setup' && !isClosed(node.status) && !isBlocked(node)) return 'setup';
 
   // A block on steps that have all closed is reported as the step it now is,
   // not as the block it used to be. See `isStaleBlock`: leaving it as
@@ -874,7 +903,8 @@ export function tallyHealth(nodes: readonly PlanNode[], liveness?: PlanLiveness)
  *
  * Finished at the left and untouched at the right, with everything else
  * between them in the order work actually moves: done, an answered question,
- * underway, ready to pick up, then the two stuck states, then not reached.
+ * underway, ready to pick up, then the stuck states and the ones sitting on
+ * you, then not reached.
  * A bar whose bands moved around as the counts changed would be a different
  * picture every week, so the order is fixed here and never sorted by size.
  *
@@ -895,6 +925,10 @@ export const PLAN_BAND_ORDER: readonly PlanHealth[] = [
   'abandoned',
   'blocked',
   'unanswered',
+  // In the bar, not out of it like `proposed`: a setup job is agreed work in
+  // the denominator, and leaving it out would make the bands stop summing to
+  // the "8 of 12" beside them.
+  'setup',
   'waiting',
   'not_started',
 ];
@@ -970,17 +1004,22 @@ export function ancestorsOf(sections: readonly PlanSection[], id: string): PlanN
 /**
  * A step that cannot move until the person does something about it.
  *
- * Three kinds, and the test for each is "would anybody else be allowed to
+ * Four kinds, and the test for each is "would anybody else be allowed to
  * settle this": an unanswered question is theirs by definition and a session
  * that answered one would be guessing with a paper trail; a proposal is a
  * session's suggestion and nothing happens to it until somebody says yes; a
  * blocked step is blocked with the exact thing it needs written on it, and
- * that thing is nearly always a person's to supply.
+ * that thing is nearly always a person's to supply; a setup step is a job
+ * outside the repo -- an account, a key, a switch -- and it is theirs from the
+ * moment it is written rather than from the moment a session runs into it.
  *
  * A ready step assigned to them is deliberately not here. That is work they
  * could do, and mixing it in would make "everything waiting on you" a list you
  * cannot clear in an evening -- which is how a list like this stops being
- * opened.
+ * opened. A setup step is the one piece of work that is here, and it is here
+ * because nothing else can do it and something on the plan is waiting on it:
+ * it was written as the person's job, which is exactly what a ready step
+ * assigned to them was not.
  */
 export function needsThePerson(
   node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn' | 'blockKind'> & {
@@ -991,7 +1030,12 @@ export function needsThePerson(
   // Dismissing is how a row stops being on you without being settled.
   if (isDismissed({ dismissedAt: node.dismissedAt ?? null })) return false;
   const health = healthOf(node);
-  return health === 'unanswered' || health === 'proposed' || health === 'blocked';
+  return (
+    health === 'unanswered' ||
+    health === 'proposed' ||
+    health === 'blocked' ||
+    health === 'setup'
+  );
 }
 
 function matchesView(node: PlanNode, view: PlanView): boolean {
@@ -1234,12 +1278,17 @@ export function countMatches(sections: readonly PlanSection[]): number {
  * two steps of equal weight are taken in the order the plan was written. The
  * sort is stable, which is what makes "in reading order" true.
  *
- * With one exception: a decision is never Claude's work, however it is
- * assigned. A decision is a question put to the person, and a session that
- * could pick one up would answer its own question — which is the whole thing
- * decisions exist to prevent. It stays ready, and it stays in the unfiltered
- * order, so it shows on the page and holds up everything waiting on it until
- * somebody settles it.
+ * With the exceptions `isWaitingOnThePerson` names, which is where the rule
+ * lives rather than here. A decision is a question put to the person, and a
+ * session that could pick one up would answer its own question — the whole
+ * thing decisions exist to prevent. A setup step is a job only the person can
+ * do, so a routine that claimed one would sit in front of an account nobody
+ * has made and block itself to say so. (The third state it names, a live
+ * block, never reaches this filter: a blocked step is not `ready` in the
+ * first place.)
+ *
+ * Both stay ready and stay in the unfiltered order, so they show on the page
+ * and hold up everything waiting on them until somebody settles them.
  */
 export function workOrder(
   sections: readonly PlanSection[],
@@ -1249,7 +1298,7 @@ export function workOrder(
     .filter((node) => node.ready)
     .filter((node) => !isDismissed(node))
     .filter((node) => (options.assignee ? node.assignee === options.assignee : true))
-    .filter((node) => (options.assignee === 'claude' ? node.kind !== 'decision' : true))
+    .filter((node) => (options.assignee === 'claude' ? !isWaitingOnThePerson(node) : true))
     .sort((a, b) => a.priority - b.priority);
 }
 
@@ -1279,11 +1328,14 @@ export function handedToClaude(sections: readonly PlanSection[]): PlanNode[] {
 /**
  * A step that is waiting on the person, and so cannot be Claude's.
  *
- * Two states, and both mean the same thing: nothing a session does moves this.
- * An unanswered decision is a question put to the person, and a session that
- * picked one up would be answering its own question. A blocked step said what
- * it needs and it is outside the repo -- a credential, an account, a choice --
- * so handing it over sends a session to sit in front of the same wall.
+ * Three states, and all three mean the same thing: nothing a session does
+ * moves this. An unanswered decision is a question put to the person, and a
+ * session that picked one up would be answering its own question. A blocked
+ * step said what it needs and it is outside the repo -- a credential, an
+ * account, a choice -- so handing it over sends a session to sit in front of
+ * the same wall. An open setup step is that same wall written down in advance:
+ * the job is the person's, and a session sent at it can do nothing but block
+ * itself.
  *
  * This is why a hand-over skips them and why they are unhanded when they get
  * there: a queue that lists work nobody can do is a queue that stops being
@@ -1302,6 +1354,7 @@ export function isWaitingOnThePerson(
   },
 ): boolean {
   if (isBlocked(node)) return true;
+  if (node.kind === 'setup' && !isClosed(node.status)) return true;
   return node.kind === 'decision' && !isClosed(node.status);
 }
 

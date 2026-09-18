@@ -33,7 +33,27 @@ update ideas set plan_item_id = '<the feature id>' where id = '<the idea id>';
 insert into plan_items (user_id, module, parent_id, title, detail, kind, status, position)
 values ('…', 'shopping', '<the feature id>', '…?', '…', 'decision', 'proposed', 20);
 
--- start (never on a proposed step, never on a decision)
+-- needs: something only the person can supply, written as a job of theirs
+-- rather than as a block on the step that ran into it. Two writes, and both
+-- are the command `needs "…" --for <n>`: the setup row under the parent of the
+-- stopped step (that step itself when it has no parent), and the dependency
+-- from the stopped step to it. Title is the one-line summary, detail is what
+-- to actually go and do. Always `me`, never proposed, never claude. Closing it
+-- is the person's move -- they press "I have set this up" -- and it carries no
+-- commit.
+insert into plan_items (user_id, module, parent_id, title, detail, kind, priority,
+                        assignee, status, position)
+values ('…', 'dev', '<the parent of the stopped step>', 'Set … in …', '…', 'setup', 2,
+        'me', 'not_started', 40)
+returning id, number;
+insert into plan_dependencies (user_id, item_id, depends_on_id)
+values ('…', '<the stopped step>', '<the setup step>');
+-- and a step blocked on this very thing is not blocked any more: the
+-- dependency now says what it waits for.
+update plan_items set status = 'not_started', block_ask = null, block_kind = null
+where id = '<the stopped step>';
+
+-- start (never on a proposed step, never on a decision, never on a setup step)
 update plan_items set status = 'in_progress' where id = '…';
 
 -- done (after committing, so HEAD is the commit that did it)
@@ -76,7 +96,8 @@ values ('…', 'dev', '<the feature id>', '…', '…', 's', 'proposed', 30,
 -- `block_kind` says who clears it and the database refuses a blocked row
 -- without one: 'steps' when the block is waiting on the steps it names, which
 -- clears itself when they close, and 'outside' when it is waiting for the
--- person -- a key, an account, an answer. Use 'steps' only with the
+-- person to answer or decide something. A key or an account is not a block at
+-- all now; it is a setup step, above. Use 'steps' only with the
 -- dependency rows to match; 'outside' otherwise. Cleared with the ask.
 update plan_items
 set status = 'blocked', block_ask = '<what it needs, in one sentence>',

@@ -10,6 +10,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { raisedQueueFrom, raisedRowFrom, type RaisedRow } from '@/lib/raised/load';
+import type { WaitingRow } from '@/lib/plan/waiting';
 
 // The server actions pull in the session client, which has no business in a
 // render test; the view only needs them to exist to hand to its forms.
@@ -17,6 +18,10 @@ vi.mock('@/app/dev/raised/actions', () => {
   const noop = async () => ({});
   return { closeRaise: noop, decideRaise: noop, dismissRaise: noop, reopenRaise: noop };
 });
+
+// The plan's own action, for the same reason: the setup row's Done button
+// drives it, and the render only needs it to be a function.
+vi.mock('@/app/dev/plan/actions', () => ({ setPlanItemStatus: async () => ({}) }));
 
 const { RaisedView } = await import('@/app/dev/raised/raised-view');
 
@@ -37,8 +42,20 @@ function raise(over: Record<string, unknown> = {}): RaisedRow {
   });
 }
 
-function render(rows: RaisedRow[]): string {
-  return renderToStaticMarkup(<RaisedView queue={raisedQueueFrom(rows)} waiting={[]} />);
+function render(rows: RaisedRow[], waiting: WaitingRow[] = []): string {
+  return renderToStaticMarkup(<RaisedView queue={raisedQueueFrom(rows)} waiting={waiting} />);
+}
+
+function waitingRow(over: Partial<WaitingRow> = {}): WaitingRow {
+  return {
+    id: 'p1',
+    number: 610,
+    title: 'Put the Resend API key in Vercel',
+    module: 'dev',
+    health: 'setup',
+    ask: 'Make a key at resend.com, then add RESEND_API_KEY to the Vercel project and redeploy.',
+    ...over,
+  };
 }
 
 describe('a raise on the page', () => {
@@ -143,5 +160,30 @@ describe('a raise on the page', () => {
     expect(html).toContain('Answered, nothing done');
     expect(html).toContain('Yes, do it');
     expect(html).toContain('Close with a reason');
+  });
+});
+
+/**
+ * #599: a setup job is read here as well as under its feature, and closing it
+ * must not mean going to the plan and finding the row again.
+ */
+describe('a setup job on the page', () => {
+  it('gives the one-line summary, what to do, and a press that closes it', () => {
+    const html = render([], [waitingRow()]);
+
+    // The title is the summary; the detail is the errand itself.
+    expect(html).toContain('#610 Put the Resend API key in Vercel');
+    expect(html).toContain('add RESEND_API_KEY to the Vercel project');
+    expect(html).toContain('I have set this up');
+    // Its own word, rather than the one a stopped build takes.
+    expect(html).toContain('Setup');
+    expect(html).not.toContain('Stopped');
+  });
+
+  it('offers no such press on the three that are closed by words', () => {
+    for (const health of ['blocked', 'unanswered', 'proposed'] as const) {
+      const html = render([], [waitingRow({ health })]);
+      expect(html).not.toContain('I have set this up');
+    }
   });
 });

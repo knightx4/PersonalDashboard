@@ -310,15 +310,16 @@ const TASK_STATES = [
 /**
  * The third ladder: a step on /dev/plan. The five fills first, then the marks.
  *
- * Thirteen states on eleven shapes. Which one a step is in is worked out in
+ * Fourteen states on eleven shapes. Which one a step is in is worked out in
  * lib/plan/tree.ts and is not its status column -- a question nobody has
  * answered is not "not started", "ready" is read off what the step waits on,
  * and the three readings of a claim are read off the run behind it rather than
  * off the column, which cannot tell a session that is pushing from one that
  * died an hour ago. Three of those readings share the three-quarter fill
  * because they are the same rung: the step is claimed, and the word and the
- * tone say what the session is doing. lib/plan/tree.ts carries the reason each
- * of the thirteen is kept.
+ * tone say what the session is doing, and a setup job shares the bar with a
+ * blocked step for the same kind of reason -- both are stopped on you.
+ * lib/plan/tree.ts carries the reason each of the fourteen is kept.
  */
 const PLAN_STATES = [
   ['proposed', 'Proposed', 'Written by a session and waiting on you. The empty hexagon a lead is.'],
@@ -343,6 +344,11 @@ const PLAN_STATES = [
     'blocked',
     'Waiting on you',
     'Stopped on something only you can settle. Barred, like a closed role.',
+  ],
+  [
+    'setup',
+    'Setup',
+    'A job that was always yours -- an account, a key. Barred like a blocked step, because it stops the same work.',
   ],
   ['waiting', 'Waiting', 'Waits on another step. Dashed, like an application nobody answered.'],
   ['dropped', 'Dropped', 'Decided against. The same shape as a withdrawal.'],

@@ -1,10 +1,16 @@
 # Raising something that belongs to no step
 
-Four places take something a session has to say, and they are not
+Five places take something a session has to say, and they are not
 interchangeable:
 
 - **A plan decision** — a `decision` step under one feature. A question about
   that feature, answered before it is built.
+- **A setup step** — a `setup` step under the feature that ran into it, written
+  with `needs "…" --for <n>`. Something only the person can supply for work
+  already on the plan: an API key, an account, a value set somewhere you cannot
+  reach. The command writes the dependency too, so the step that stopped is
+  waiting on a row they can close rather than on a sentence buried in its own
+  ask.
 - **The notes queue** — `feedback_items`, `.claude/skills/notes`. What the user
   reported as wrong, or asked for.
 - **An idea** — `ideas`, read on `/dev/ideas`, written with
@@ -23,9 +29,16 @@ interchangeable:
   Claude.
 
 The test is what the answer would change. If it changes how one feature gets
-built, it is a decision under that feature. If it is something already shipped
-being wrong, it is a note. If it is more work rather than a question, it is an
-idea. If it is none of those and it still needs the person, it is a raise.
+built, it is a decision under that feature. If it is not a question at all but
+an errand you could write the instructions for, and a step is stopped until it
+is done, it is a setup step. If it is something already shipped being wrong, it
+is a note. If it is more work rather than a question, it is an idea. If it is
+none of those and it still needs the person, it is a raise.
+
+A decision and a setup step are told apart by what closes them: a decision
+closes on what the person says, a setup step on their having gone and done
+something. Asking them to choose between two libraries is a decision; asking
+them to put a token in Vercel is a setup step.
 
 **Read the raises at the start of a run**, before claiming a step:
 
@@ -72,7 +85,9 @@ thread and the answer. If that is the run you are, the turn says so.
 
 A raise is not a way past a step that needs a decision. A step blocked on a
 question about the feature it belongs to gets that decision written under the
-feature, per **When you reach something you should not decide** in `building.md`.
+feature, per **When you reach something you should not decide** in
+`building.md`. Nor is it the place for a missing key: that is a setup step,
+per the section after it.
 
 Say in the report, by title, anything raised during the run — a question
 nobody knows is waiting is the failure this exists to prevent.

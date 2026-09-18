@@ -90,6 +90,38 @@ describe('waitingOnYou', () => {
 
     expect(found.map((row) => row.health)).toEqual(['blocked', 'unanswered', 'proposed']);
   });
+
+  it('lists a setup job with its detail as what you have to do', () => {
+    // #599: the title is the one-line summary, the detail is the instructions.
+    const [row] = rows([
+      item({
+        id: 'h',
+        kind: 'setup',
+        title: 'Make a Vercel token',
+        detail: 'Vercel > Account Settings > Tokens > Create, scope it to this project.',
+      }),
+    ]);
+
+    expect(row.health).toBe('setup');
+    expect(row.title).toBe('Make a Vercel token');
+    expect(row.ask).toBe('Vercel > Account Settings > Tokens > Create, scope it to this project.');
+  });
+
+  it('drops a setup job once it is done', () => {
+    expect(rows([item({ id: 'i', kind: 'setup', status: 'done' })])).toEqual([]);
+    expect(rows([item({ id: 'j', kind: 'setup', status: 'dropped' })])).toEqual([]);
+  });
+
+  it('puts a setup job under what has stopped and above what is only to read', () => {
+    const found = rows([
+      item({ id: 'k', status: 'proposed' }),
+      item({ id: 'l', kind: 'decision' }),
+      item({ id: 'm', kind: 'setup' }),
+      item({ id: 'n', status: 'blocked', blockAsk: 'Say which of the two names to use.' }),
+    ]);
+
+    expect(found.map((row) => row.health)).toEqual(['blocked', 'setup', 'unanswered', 'proposed']);
+  });
 });
 
 describe('latestBlockNote', () => {

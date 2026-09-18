@@ -25,6 +25,10 @@ npx tsx scripts/plan.ts block <n> --ask "…" [--on-steps] [--note "…"]
                                                # --on-steps: waiting on the steps it names, so
                                                # it clears itself when they close. Without it
                                                # the block waits for the person.
+npx tsx scripts/plan.ts needs "<what to set>" --for <n> [--detail "…"]
+                                               # something only the person can supply: writes a
+                                               # setup step of theirs under the same feature and
+                                               # makes <n> wait on it
 npx tsx scripts/plan.ts reopen <n>             # put it back to not started
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
@@ -146,9 +150,10 @@ npx tsx scripts/plan.ts block <your step> --on-steps \
 `--on-steps` is what makes that block clear itself: the step is waiting on the
 question you just wrote, the dependency edge names it, and answering it puts
 the step back in the ready list without anybody unblocking it by hand. Leave
-`--on-steps` off when the step is waiting on something only the person can
-supply — a key, an account, a record in DNS — and it stays blocked until they
-say otherwise.
+`--on-steps` off when the step is waiting on the person for something no row on
+the plan will produce, and it stays blocked until they say otherwise. A key or
+an account is not one of those: that is `needs`, in the next section, and it
+writes the row and the edge for you.
 
 Then report the block. Do not move on to another step; that is not your call.
 
@@ -182,14 +187,46 @@ B — Ship it as JSON. Keeps everything, needs something to read it.
 Recommend A: the nesting is one column and nobody has asked for it."
 ```
 
-A step that turns out to need something else from the user — an API key, an
-account, a thing outside the repo — is `block <n> --ask "the question"`, with
-the exact question in one sentence and no `--on-steps`, since nothing on the
-plan will produce it. The ask is rewritten on every block, so it
-is what the step needs now; `--note` is for anything else worth recording, and
-that is appended to the history in the comment. A step that should not be done is `drop <n> --note "why"`;
-say "out of scope: …" when that is the reason, since there is no status for it.
-Never delete a step; deleting is the user's.
+A step that should not be done is `drop <n> --note "why"`; say "out of scope:
+…" when that is the reason, since there is no status for it. Never delete a
+step; deleting is the user's.
+
+## When the step needs something only the user can supply
+
+An API key, an account, a value set in somebody else's dashboard, a record in
+DNS. That is not a wall you block on — it is a job of theirs that nobody has
+written down. Write it:
+
+```
+npx tsx scripts/plan.ts needs "Set GITHUB_TOKEN in Vercel" --for <your step> \
+  --detail "<where to go, what to click, what the value has to be>"
+```
+
+That writes two things. A `setup` step, assigned to the person, under the same
+feature as your step, so it sits beside the work it is holding up. And the
+`plan_dependencies` row from your step to it, so your step reads as waiting on
+a row on the plan rather than as a session stuck. Closing the setup step is
+then the whole of freeing your step: nothing has to be unblocked by hand. If
+your step was already `blocked`, `needs` puts it back to not started and clears
+the ask. Report both numbers.
+
+**The title is the one-line summary and `--detail` is what to actually go and
+do.** The page shows the title in a list and the detail in a box labelled
+"What to set up", so instructions written as the title leave that box saying
+nothing the heading did not.
+
+A setup step is never yours. It closes when the person says they have done it,
+on `/dev/plan` or in the Dash tab's "Waiting on you", and it carries no commit.
+`start` refuses one, the same as a decision, and `next --claude` never lists
+one.
+
+`block <n> --ask "…"` without `--on-steps` is still right for the rest: the
+person has to decide something or say what they want, and there is nothing you
+could write instructions for. That is the test — if you can say what doing it
+involves, it is a setup step; if what you need is their opinion, it is a block.
+The ask is rewritten on every block, so it is what the step needs now; `--note`
+is for anything else worth recording, and that is appended to the history in
+the comment.
 
 ## The other two files you may need
 
@@ -216,8 +253,11 @@ and it clears itself when the other step is done. Do not mark a step `blocked`
 for that; add the dependency instead. "Out of scope" is not a status either: it
 is `drop <n> --note "out of scope: …"`.
 
-**Kind** is `build` or `decision`. A decision is a question put to the person.
-It is never yours to answer, however it is assigned and whoever named it.
+**Kind** is `build`, `decision` or `setup`. A decision is a question put to the
+person, and it is never yours to answer, however it is assigned and whoever
+named it. A setup step is a job of theirs outside the repo, written with
+`needs`; it closes when they say they have done it and carries no commit.
+Neither is ever closed by a session.
 
 **Fog** is one sentence on a feature: what cannot be seen yet about finishing
 it. `done` refuses a feature that still carries fog, so fog is cleared by

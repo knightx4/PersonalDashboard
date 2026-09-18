@@ -9,8 +9,9 @@
  *
  * Derived rather than filed. A session does not have to remember to raise
  * anything: `needsThePerson` already decides this for the plan page, and the
- * three kinds it names -- an unanswered decision, a proposal nobody approved,
- * a blocked step -- are exactly what belongs on Dash. Reading the same
+ * four kinds it names -- an unanswered decision, a proposal nobody approved,
+ * a blocked step, a setup job that was yours from the day it was written --
+ * are exactly what belongs on Dash. Reading the same
  * function is what stops the two pages disagreeing by next month, and it
  * covers every row already sitting blocked rather than only ones filed from
  * here on.
@@ -29,12 +30,19 @@ export type WaitingRow = {
   number: number;
   title: string;
   module: PlanNode['module'];
-  /** `unanswered`, `proposed` or `blocked` -- what kind of waiting it is. */
-  health: 'unanswered' | 'proposed' | 'blocked';
+  /**
+   * `unanswered`, `proposed`, `blocked` or `setup` -- what kind of waiting it
+   * is. The same names `healthOf` uses, because this reads it rather than
+   * deciding again.
+   */
+  health: 'unanswered' | 'proposed' | 'blocked' | 'setup';
   /**
    * The one thing it needs, where the row says. A blocked step's ask; a
-   * decision's own detail, which is the question. Null on a proposal, where
-   * the title is the whole of it.
+   * decision's own detail, which is the question; a setup step's own detail,
+   * which is what you actually have to go and do -- #599 asked for the title
+   * to be the one-line summary and the detail to be the instructions, and this
+   * is the second half of that. Null on a proposal, where the title is the
+   * whole of it.
    */
   ask: string | null;
 };
@@ -63,16 +71,19 @@ export function latestBlockNote(comment: string | null): string | null {
 }
 
 /**
- * Most pressing first: blocked, then unanswered, then proposed.
+ * Most pressing first: blocked, then setup, then unanswered, then proposed.
  *
- * Blocked leads because it is the only one where work has already stopped. A
- * question can sit for a day without costing anything; a proposal costs
- * nothing at all until you want it.
+ * Blocked leads because it is the only one where work has already stopped
+ * mid-build. A setup job comes next: nothing has stopped yet, but it is the
+ * one entry here that is a job rather than a judgement, and it is done by
+ * doing it. A question can sit for a day without costing anything; a proposal
+ * costs nothing at all until you want it.
  */
 const ORDER: Record<WaitingRow['health'], number> = {
   blocked: 0,
-  unanswered: 1,
-  proposed: 2,
+  setup: 1,
+  unanswered: 2,
+  proposed: 3,
 };
 
 export function waitingOnYou(sections: readonly PlanSection[]): WaitingRow[] {
@@ -81,7 +92,14 @@ export function waitingOnYou(sections: readonly PlanSection[]): WaitingRow[] {
   for (const node of flattenSections(sections)) {
     if (!needsThePerson(node)) continue;
     const health = healthOf(node);
-    if (health !== 'blocked' && health !== 'unanswered' && health !== 'proposed') continue;
+    if (
+      health !== 'blocked' &&
+      health !== 'unanswered' &&
+      health !== 'proposed' &&
+      health !== 'setup'
+    ) {
+      continue;
+    }
 
     rows.push({
       id: node.id,
@@ -92,7 +110,7 @@ export function waitingOnYou(sections: readonly PlanSection[]): WaitingRow[] {
       ask:
         health === 'blocked'
           ? (node.blockAsk?.trim() || latestBlockNote(node.comment))
-          : health === 'unanswered'
+          : health === 'unanswered' || health === 'setup'
             ? (node.detail?.trim() || null)
             : null,
     });
