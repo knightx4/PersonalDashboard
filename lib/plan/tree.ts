@@ -263,7 +263,7 @@ export function isStaleBlock(node: {
   blockKind?: PlanBlockKind | null;
 }): boolean {
   if (node.status !== 'blocked') return false;
-  if ((node.blockKind ?? DEFAULT_BLOCK_KIND) !== 'steps') return false;
+  if (!waitsOnItsSteps(node)) return false;
   const dependsOn = node.dependsOn ?? [];
   return dependsOn.length > 0 && dependsOn.every((link) => isClosed(link.item.status));
 }
@@ -304,13 +304,23 @@ export function isBlocked(node: {
  *  - None of its own steps are still open. A feature with steps outstanding
  *    is worked through those steps; the feature itself is what you close when
  *    they are all done.
- *  - Nothing above it is blocked, dropped or still proposed. A step under a
- *    dropped feature is dropped in all but the column, one under a blocked
- *    feature waits with it, and one under a proposal has not been agreed to.
+ *  - Nothing above it is dropped, still proposed, or blocked on something
+ *    outside the plan. A step under a dropped feature is dropped in all but
+ *    the column, one under a proposal has not been agreed to, and one under a
+ *    feature waiting on a credential nobody has made is waiting on it too.
+ *
+ *    A feature blocked on its own steps is the case that does not carry down.
+ *    That block is waiting on the rows beneath it, so taking them out of the
+ *    ready list is what keeps it blocked: #494 and #578 were each marked
+ *    blocked over a question on one step, and between them they hid five
+ *    priority-one features from the runner for a day. What a step actually
+ *    waits on is on record as a dependency and is inherited down the tree by
+ *    `buildPlanTree`, so the steps genuinely held up stay held up without the
+ *    parent's status standing in for all of them.
  */
 export function isReady(
   node: Pick<PlanNode, 'status' | 'waitingOn' | 'children' | 'dependsOn' | 'blockKind'>,
-  ancestors: readonly Pick<PlanItem, 'status'>[],
+  ancestors: readonly Pick<PlanItem, 'status' | 'blockKind'>[],
 ): boolean {
   if (node.status !== 'not_started' && !isStaleBlock(node)) return false;
   if (node.waitingOn.length > 0) return false;
@@ -318,8 +328,21 @@ export function isReady(
   // put aside would hold its feature open for good, which is the opposite of
   // what dismissing it was for.
   if (node.children.some((child) => !isClosed(child.status) && !isDismissed(child))) return false;
-  if (ancestors.some((a) => ['blocked', 'dropped', 'proposed'].includes(a.status))) return false;
+  if (ancestors.some((a) => a.status === 'dropped' || a.status === 'proposed')) return false;
+  if (ancestors.some((a) => a.status === 'blocked' && !waitsOnItsSteps(a))) return false;
   return true;
+}
+
+/**
+ * A block that the steps beneath it can clear.
+ *
+ * The same reading `isStaleBlock` takes of a step's own block, asked of a
+ * parent: `steps` means the wait is on rows that are on the plan, and every
+ * other kind -- including a kind this build does not recognise, which reads
+ * back as null -- means the wait is on the person.
+ */
+function waitsOnItsSteps(node: { blockKind?: PlanBlockKind | null }): boolean {
+  return (node.blockKind ?? DEFAULT_BLOCK_KIND) === 'steps';
 }
 
 /**
@@ -640,6 +663,19 @@ export function healthOf(
       return 'dropped';
     case 'not_started':
       if (node.waitingOn.length > 0) return 'waiting';
+      // A feature is blocked when nothing beneath it can move.
+      //
+      // Since `isReady` stopped letting a feature's own blocked column hold
+      // its steps down, that column is no longer where a feature's block
+      // comes from -- it comes from the steps, the same way progress and
+      // "started" already do. A feature whose every open step is blocked has
+      // nothing anybody can pick up, and reading "Not started" over five
+      // stopped steps is the plan describing itself wrongly on the one screen
+      // that is opened to find what is stuck.
+      //
+      // Every open step, not any: one blocked step beside a step that can be
+      // worked leaves the feature open, which is the whole point.
+      if (blockedBeneath(node)) return 'blocked';
       // Work has plainly started once some of it is finished.
       //
       // A feature's own status column is set by hand and mostly never is: it
@@ -665,6 +701,24 @@ export function healthOf(
  * Dismissed rows are excluded for the reason they always are -- putting a row
  * aside is how it stops counting.
  */
+/**
+ * Every open row beneath this one is blocked, and there is at least one.
+ *
+ * `isBlocked` rather than the status column, so a step whose block named steps
+ * that have all since closed counts as one that can move -- it is about to be
+ * offered to the runner, and a feature reading blocked over it would be
+ * reporting a wait the plan no longer has a record of.
+ *
+ * Dismissed rows are out for the reason they always are: putting a row aside
+ * is how it stops counting.
+ */
+function blockedBeneath(node: { children?: readonly PlanNode[] }): boolean {
+  const open = descendantsOf(node).filter(
+    (child) => !isClosed(child.status) && !isDismissed(child),
+  );
+  return open.length > 0 && open.every((child) => isBlocked(child));
+}
+
 function startedBeneath(node: { children?: readonly PlanNode[] }): boolean {
   return descendantsOf(node).some(
     (child) =>
