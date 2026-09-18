@@ -5,5 +5,10 @@
       "schedule": "0 12 * * *"
     }
   ],
-  "fluid": true
+  "fluid": true,
+  "git": {
+    "deploymentEnabled": {
+      "claude/**": false
+    }
+  }
 }
