@@ -238,13 +238,48 @@ describe('rewording the row a comment is on', () => {
     expect(Object.keys(writes[0].row)).toEqual(['body']);
   });
 
-  it('will not reword a raise', async () => {
-    const { writes, supabase } = db({ row: { title: 'A row' } });
+  // A raise has no wording of its own, and "put this in the plan" is what
+  // arrives as a reword on one. Refusing it was a dead end over a name (#604).
+  it('puts a reword aimed at a raise on the plan instead of refusing it', async () => {
+    const { writes, supabase } = db({ rows: [{ position: 20 }] });
     const outcome = await carryOut(
-      input({ supabase, target: 'raise', action: action({ name: 'reword', text: 'Something else' }) }),
+      input({
+        supabase,
+        target: 'raise',
+        id: 'raise-1',
+        action: action({ name: 'reword', text: 'Say which actions apply on which row', module: 'dev' }),
+      }),
+    );
+
+    expect(outcome.ok).toBe(true);
+    expect(writes).toEqual([
+      {
+        table: 'plan_items',
+        op: 'insert',
+        row: {
+          user_id: 'user-1',
+          module: 'dev',
+          parent_id: null,
+          title: 'Say which actions apply on which row',
+          detail: null,
+          status: 'proposed',
+          kind: 'build',
+          position: 30,
+        },
+      },
+    ]);
+    expect(outcome.ok && outcome.said).toContain('no wording of its own');
+    expect(outcome.ok && outcome.said).toContain('Say which actions apply on which row');
+    expect(outcome.ok && outcome.redraw).toBe('/dev/plan');
+  });
+
+  it('writes nothing from a reword on a raise it cannot name', async () => {
+    const { writes, supabase } = db();
+    const outcome = await carryOut(
+      input({ supabase, target: 'raise', id: 'raise-1', action: action({ name: 'reword' }) }),
     );
     expect(writes).toHaveLength(0);
-    expect(outcome.ok === false && outcome.why).toContain('a raise');
+    expect(outcome.ok).toBe(false);
   });
 });
 
@@ -367,6 +402,38 @@ describe('adding a step from a comment', () => {
     );
     expect(writes[0].row).toMatchObject({ parent_id: null, module: 'vault', position: 10 });
     expect(outcome.ok && outcome.said).toContain('Vault');
+  });
+
+  // The done-when this file is checked against: a comment on a raise asking for
+  // the plan to be updated leaves a proposal on the plan page, and the line
+  // written back names it.
+  it('adds a proposal at the top of a workspace from a comment on a raise', async () => {
+    const { writes, supabase } = db({ rows: [{ position: 60 }] });
+    const outcome = await carryOut(
+      input({
+        supabase,
+        target: 'raise',
+        id: 'raise-1',
+        action: action({
+          name: 'add_step',
+          text: 'Name the actions a raise takes',
+          detail: 'The prompt says which of the five apply on which kind of row.',
+          module: 'dev',
+        }),
+      }),
+    );
+
+    expect(outcome.ok).toBe(true);
+    expect(writes[0].row).toMatchObject({
+      parent_id: null,
+      module: 'dev',
+      status: 'proposed',
+      title: 'Name the actions a raise takes',
+      position: 70,
+    });
+    expect(outcome.ok && outcome.said).toContain('Name the actions a raise takes');
+    expect(outcome.ok && outcome.said).toContain('Dev');
+    expect(outcome.ok && outcome.redraw).toBe('/dev/plan');
   });
 
   it('adds nothing when it cannot tell what to call it', async () => {

@@ -332,11 +332,14 @@ async function addStep(input: ActInput): Promise<ActOutcome> {
 /**
  * Rewrite the wording of the row the comment is on.
  *
- * An idea's text, or a step's title, detail or done-when, and nothing else.
- * The old wording goes back into the thread with the new: that is what makes
- * this reversible by hand, and it is the whole of why acting straight away is
- * safe -- a misread instruction costs a copy and paste rather than a row
- * nobody can reconstruct.
+ * An idea's text, a bug note's report, or a step's title, detail or done-when,
+ * and nothing else. The old wording goes back into the thread with the new:
+ * that is what makes this reversible by hand, and it is the whole of why
+ * acting straight away is safe -- a misread instruction costs a copy and paste
+ * rather than a row nobody can reconstruct.
+ *
+ * A raise is the one target with no wording to rewrite, and it falls through
+ * to `addStep` rather than to a refusal -- see the comment at the end.
  */
 async function reword(input: ActInput): Promise<ActOutcome> {
   const text = input.action.text?.trim();
@@ -417,9 +420,16 @@ async function reword(input: ActInput): Promise<ActOutcome> {
     return { ok: true, said: rewritten('the note', text, was) };
   }
 
+  // A raise is a message, not a row with wording of its own, so there is
+  // nothing on it to rewrite -- and what "put this in the plan" arrives as,
+  // when the fast reply reads it as a rewording, is this. Refusing it was a
+  // dead end over a name: the thing asked for is a row this file can write, so
+  // it writes it and the thread says the rewording became a step (#604).
+  const added = await addStep(input);
+  if (!added.ok) return added;
   return {
-    ok: false,
-    why: 'I can only reword an idea, a plan step or a bug note, and this is a raise, so nothing was changed.',
+    ...added,
+    said: `A raise has no wording of its own to rewrite, so I put it on the plan instead.\n\n${added.said}`,
   };
 }
 

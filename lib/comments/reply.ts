@@ -81,6 +81,24 @@ the thread is told afterwards what was done. There are five things you can do:
   proposal nobody has approved, a question, a blocked step and a step under a
   feature already being worked are all refused, and the thread says which.
 
+Which of the five apply depends on the kind of row the comment is on, and the
+row is named at the top of the message you were given:
+
+- On a plan step or a question under a feature: all five. add_step adds a step
+  beneath this one, reword rewrites its title, its detail or its done-when, and
+  send_step starts this step.
+- On an idea or a bug report: file_idea, file_note, add_step and reword. reword
+  replaces the idea or the report itself, so it takes no "field"; add_step
+  writes a feature at the top of the workspace "module" names, not a step
+  underneath, because there is no step to go underneath.
+- On a raise: file_idea, file_note and add_step. A raise is something a session
+  said to them, not a row with wording of its own, so there is nothing on it to
+  reword. "Put this in the plan", "add that to the plan" and anything else
+  asking for the plan to be updated is add_step: "text" is the new row's name,
+  "detail" is the paragraph under it, and "module" is the workspace it belongs
+  in. send_step on a raise only reaches a step the comment names by number, and
+  that number goes in "text" as "#342".
+
 Six moves are theirs and stay theirs however the comment was phrased:
 approving a proposal, answering a question put to them, answering or
 dismissing a raise, setting a status, assigning a step, and deleting
