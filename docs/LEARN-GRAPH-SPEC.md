@@ -4,6 +4,13 @@ The second half of the learn module. The first half ([LEARN-SPEC.md](LEARN-SPEC.
 answers *where do I read this*. This answers *what do I actually know, what am I
 missing, and what is the one next thing worth learning*.
 
+**Four decisions here are revised by [LEARN-MAP-SPEC.md](LEARN-MAP-SPEC.md)**,
+which works out how the map is actually shaped and built: a node is a *position*
+rather than only a claim, subjects are labels rather than containers, an
+authored orphan is allowed where an extracted one is not, and the per-note
+extraction budget is dropped. Each is marked there with its reason. Everything
+else below stands.
+
 It exists because the queue has a hole in it. A reading list is a list of things
 somebody thought were good. It has no opinion about you. It cannot tell you that
 you are about to read chapter 9 of a book whose chapter 3 you needed, or that

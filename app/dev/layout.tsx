@@ -107,6 +107,7 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
     { href: '/dev/plan', label: 'Plan', icon: 'plan' },
     { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },
+    { href: '/dev/specs', label: 'Specs', icon: 'specs' },
     { href: '/dev/ui', label: 'UI', icon: 'ui' },
     { href: '/dev/surfaces', label: 'Surfaces', icon: 'surfaces' },
     { href: '/dev/changelog', label: 'Changelog', icon: 'changelog' },
