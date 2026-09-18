@@ -143,9 +143,14 @@ vi.mock('@/lib/feedback/routine', () => ({
   reviewRoutine: () => ({ id: 'r', token: 't' }),
 }));
 
-// The submit code the header panel carries. Right, so that a refusal is never
-// the code's refusal wearing the owner check's clothes.
-vi.mock('@/lib/feedback/code', () => ({ codeMatches: () => true }));
+// The submit code the header panel carries. Answered rather than always-yes,
+// because the code is now half of what `submitFeedback` decides: the owner is
+// still asked for it and nobody else is. Every locked action below sends the
+// right one, so a refusal there is never the code's refusal wearing the owner
+// check's clothes.
+vi.mock('@/lib/feedback/code', () => ({
+  codeMatches: (given: string) => given === 'right',
+}));
 
 const { NotTheOwnerError } = await import('@/lib/dev/owner');
 const bugs = await import('@/app/dev/bugs/actions');
@@ -268,6 +273,47 @@ describe('filing a note', () => {
     const result = await (bugs.submitFeedback as Action)(
       {},
       form({ kind: 'bug', body: 'the page went blank', page_path: '/vault', code: 'right' }),
+    );
+
+    expect(result).toEqual({ message: 'Bug report saved.' });
+    expect(state.writes).toEqual(['feedback_items']);
+  });
+
+  /**
+   * And without a code, which is the real shape of it after #418: the panel
+   * another account sees has no code box, so nothing is posted in that field.
+   * A note filed with an empty one has to save, or the capture is locked to
+   * the owner by the back door.
+   */
+  it('takes a note from another account with no code at all', async () => {
+    const result = await (bugs.submitFeedback as Action)(
+      {},
+      form({ kind: 'feature', body: 'a button for it on the phone', page_path: '/todo' }),
+    );
+
+    expect(result).toEqual({ message: 'Feature request saved.' });
+    expect(state.writes).toEqual(['feedback_items']);
+  });
+
+  /** The owner is still asked. Dropping that would weaken a working check. */
+  it('still asks the owner for the code', async () => {
+    state.session = { id: OWNER_ID, email: 'owner@example.com' };
+
+    const result = await (bugs.submitFeedback as Action)(
+      {},
+      form({ kind: 'bug', body: 'the page went blank', code: 'wrong' }),
+    );
+
+    expect(result).toEqual({ error: 'That code is not right.' });
+    expect(state.writes).toEqual([]);
+  });
+
+  it("files the owner's note when the code is right", async () => {
+    state.session = { id: OWNER_ID, email: 'owner@example.com' };
+
+    const result = await (bugs.submitFeedback as Action)(
+      {},
+      form({ kind: 'bug', body: 'the page went blank', code: 'right' }),
     );
 
     expect(result).toEqual({ message: 'Bug report saved.' });

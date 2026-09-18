@@ -659,7 +659,7 @@ export function AppShell({
                   <CaptureButton />
                   <ThemePicker value={theme} />
                   <NotificationsButton notifications={notifications} />
-                  <FeedbackButton allHref={feedbackHref} />
+                  <FeedbackButton allHref={feedbackHref} isOwner={isOwner} />
 
                   <Link
                     href="/account"
