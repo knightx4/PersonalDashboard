@@ -54,6 +54,9 @@ function waitingRow(over: Partial<WaitingRow> = {}): WaitingRow {
     module: 'dev',
     health: 'setup',
     ask: 'Make a key at resend.com, then add RESEND_API_KEY to the Vercel project and redeploy.',
+    detail: 'Make a key at resend.com, then add RESEND_API_KEY to the Vercel project and redeploy.',
+    resolution: null,
+    proposedBeneath: 0,
     ...over,
   };
 }
