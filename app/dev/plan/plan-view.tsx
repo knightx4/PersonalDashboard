@@ -15,6 +15,7 @@ import {
   Pencil,
   Play,
   Scale,
+  Wrench,
   X,
 } from 'lucide-react';
 import {
@@ -1007,6 +1008,57 @@ function AnswerDecision({
 }
 
 /**
+ * A setup job, and the one press that closes it.
+ *
+ * Shaped like the answer box above and not like the status dropdown, because
+ * it is the same kind of row: something only the person can clear, closed by
+ * their word rather than by a commit. The dropdown is where you say where a
+ * piece of work has got to; this is not a piece of work that got anywhere, it
+ * is an errand, and pressing Done on it through a menu made it look like one
+ * more status to keep up to date.
+ *
+ * The title is the one-line summary and the detail is what to actually go and
+ * do -- #599 asked for both, so the detail is drawn here, labelled, rather
+ * than left as the unlabelled paragraph every other step's detail is. The
+ * paragraph is suppressed while this is showing so it is not said twice.
+ *
+ * Closing writes `done` through `setPlanItemStatus`, which records no commit,
+ * the same as answering a decision: `commit_sha` stays null, because nothing
+ * was built.
+ */
+function SetupJob({
+  node,
+  action,
+  pending,
+  error,
+}: {
+  node: PlanNode;
+  action: (formData: FormData) => void;
+  pending: boolean;
+  error?: string;
+}) {
+  return (
+    <div className="space-y-2.5 rounded-lg bg-caution-tint/40 px-3 py-2.5">
+      <div className="space-y-0.5">
+        <QuestionPartLabel>What to set up</QuestionPartLabel>
+        <p className="whitespace-pre-wrap text-ui text-ink">
+          {node.detail?.trim() || node.title}
+        </p>
+      </div>
+      <form action={action} className="space-y-2">
+        <input type="hidden" name="id" value={node.id} />
+        <input type="hidden" name="status" value="done" />
+        <FieldHint>This closes the step. Nothing is committed against it.</FieldHint>
+        <Button type="submit" size="sm" pending={pending}>
+          I have set this up
+        </Button>
+        <FieldError>{error}</FieldError>
+      </form>
+    </div>
+  );
+}
+
+/**
  * Raise a question against a step, from the step.
  *
  * One field, because a question is one sentence. It becomes a decision beneath
@@ -1895,7 +1947,7 @@ const HEALTH: Record<PlanHealth, Health> = {
   setup: {
     word: 'Setup',
     tone: 'caution',
-    title: 'Something only you can set up. The detail says what to do; mark it done when you have.',
+    title: 'Something only you can set up. Open it for what to do, and say so when you have.',
   },
   // A step waiting on another step, which clears itself. Nothing else to say
   // "on you" about, and the plan is the only queue that has it.
@@ -2325,6 +2377,13 @@ function PlanRow({
     answerPlanDecision,
     {} as PlanActionState,
   );
+  // The one press that closes a setup job. Held by the row for the same reason
+  // the hand-over is: the status dropdown drives the same action, and what
+  // came back should be said once rather than under each control.
+  const [setupState, setupAction, setupPending] = useActionState(
+    setPlanItemStatus,
+    {} as PlanActionState,
+  );
   // The same rope pulled the other way: re-read this feature against what has
   // been answered beneath it, and propose what has changed.
   const [reshapeState, reshapeAction, reshapePending] = useActionState(
@@ -2349,6 +2408,9 @@ function PlanRow({
   const descendants = flatten([node]).length - 1;
   const closed = isClosed(node.status);
   const isDecision = node.kind === 'decision';
+  // A setup job still open. Closed, it is an ordinary finished row -- the
+  // errand is run, and a box inviting you to run it again would be a lie.
+  const setupOpen = node.kind === 'setup' && !closed;
   // What the runs say about the claims on this row and everything under it.
   //
   // Recomputed as the clock ticks, so a session that goes quiet while you are
@@ -2580,6 +2642,21 @@ function PlanRow({
               )}
             >
               ?<span className="sr-only">Decision</span>
+            </span>
+          ) : setupOpen ? (
+            // The same slot, for the other row that is not a piece of work.
+            // A setup job is an errand, closed by going and doing it, and the
+            // row should say so before the health column is read -- the same
+            // argument as the question mark above.
+            <span
+              title="A setup job: something only you can set up, closed when you have."
+              className={cn(
+                LEVEL,
+                'flex h-5 shrink-0 select-none items-center justify-center self-center text-caution',
+              )}
+            >
+              <Wrench className="size-3.5" strokeWidth={1.75} aria-hidden />
+              <span className="sr-only">Setup</span>
             </span>
           ) : (
             <span className={cn(LEVEL, 'shrink-0')} aria-hidden />
@@ -2900,8 +2977,10 @@ function PlanRow({
             <div className="space-y-3 border-l-2 border-accent bg-canvas px-3 py-2.5">
             {/* Not on a decision: there the detail is the options, and it is
                 shown as options inside the question block below rather than
-                twice -- once as a paragraph here and once as itself. */}
-            {node.detail && !isDecision && (
+                twice -- once as a paragraph here and once as itself. Nor on an
+                open setup job, where the detail is the instructions and is
+                drawn inside the box that closes them, for the same reason. */}
+            {node.detail && !isDecision && !setupOpen && (
               <p className="whitespace-pre-wrap text-ui text-ink-muted">{node.detail}</p>
             )}
             {node.acceptance && (
@@ -2938,6 +3017,15 @@ function PlanRow({
                 action={answerAction}
                 pending={answerPending}
                 autoFocus={answering}
+              />
+            )}
+
+            {setupOpen && (
+              <SetupJob
+                node={node}
+                action={setupAction}
+                pending={setupPending}
+                error={setupState.error}
               />
             )}
 

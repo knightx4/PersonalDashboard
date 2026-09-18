@@ -1,5 +1,11 @@
+'use client';
+
 import Link from 'next/link';
+import { useActionState } from 'react';
+import { setPlanItemStatus, type PlanActionState } from '@/app/dev/plan/actions';
+import { Button } from '@/components/ui/button';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
+import { FieldError } from '@/components/ui/field';
 import { RefText } from '@/components/dev/ref-text';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { MODULES, type ModuleId } from '@/lib/modules';
@@ -40,6 +46,8 @@ const TONE: Record<WaitingRow['health'], DevTone> = {
  * second place stops being read.
  */
 export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRefTitles }) {
+  const setup = row.health === 'setup';
+
   return (
     <li className="space-y-1 p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -56,15 +64,60 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
         />
       </div>
 
+      {/* The title above is the one-line summary and this is what you have to
+          actually go and do -- #599 asked for both, and on a setup row the two
+          are the whole of the errand, so the instructions keep their line
+          breaks rather than being run together into a gloss. */}
       {row.ask && (
-        <p className="text-small text-ink-muted">
+        <p className={setup ? 'whitespace-pre-wrap text-small text-ink' : 'text-small text-ink-muted'}>
           <RefText text={row.ask} titles={titles} />
         </p>
       )}
 
-      <p className="text-micro text-ink-ghost">
-        {row.module ? MODULE_LABEL[row.module] : 'Everything'}
-      </p>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-micro text-ink-ghost">
+          {row.module ? MODULE_LABEL[row.module] : 'Everything'}
+        </p>
+        {setup && <SetupDone row={row} />}
+      </div>
     </li>
+  );
+}
+
+/**
+ * The press that closes a setup job, on the page where you read it.
+ *
+ * #599 settled that a setup row is read here as well as under its feature, and
+ * that closing it should not mean going to the plan and finding the row again:
+ * the whole cost of one of these is that it is small and you are somewhere
+ * else. So the same action the plan page's box drives is driven from here.
+ *
+ * The other three kinds get no button, and that is the difference between them.
+ * A question and a proposal are closed by words -- an answer, an approval --
+ * and a one-press Done on either would be closing a decision with nothing
+ * recorded against it. A blocked step is cleared by whatever it was blocked on
+ * arriving, not by saying it is fine. A setup job is the one that is finished
+ * by you having gone and done it, and "I have" is the whole of what there is
+ * to record.
+ *
+ * `setPlanItemStatus` writes `done` and no commit, which is right: nothing was
+ * built, and `commit_sha` stays null the same way it does on an answered
+ * decision.
+ */
+function SetupDone({ row }: { row: WaitingRow }) {
+  const [state, action, pending] = useActionState(
+    setPlanItemStatus,
+    {} as PlanActionState,
+  );
+
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-2">
+      <input type="hidden" name="id" value={row.id} />
+      <input type="hidden" name="status" value="done" />
+      <FieldError>{state.error}</FieldError>
+      <Button type="submit" size="sm" pending={pending}>
+        I have set this up
+      </Button>
+    </form>
   );
 }

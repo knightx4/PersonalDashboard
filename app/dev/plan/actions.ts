@@ -62,8 +62,19 @@ export type PlanActionState = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, 'public'>;
 
+/**
+ * Both pages that read the plan, because two of them do.
+ *
+ * Dash derives its "Waiting on you" list from the plan tree rather than from a
+ * table of its own (lib/plan/waiting.ts), and the dev tab's count comes from
+ * the same function. So a plan row moving changes that page too, and
+ * revalidating only /dev/plan left Dash showing a question already answered or
+ * a setup job already done -- which matters now that #598 lets you close one
+ * from Dash without leaving it.
+ */
 function revalidatePlan(): void {
   revalidatePath('/dev/plan');
+  revalidatePath('/dev/raised');
 }
 
 /** Empty string means "the app as a whole", the same as the ideas list. */
