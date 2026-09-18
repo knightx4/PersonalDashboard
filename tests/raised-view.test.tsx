@@ -293,6 +293,47 @@ describe('a question on the page', () => {
 });
 
 /**
+ * #627: a step stopped on something only you can do is started again from here,
+ * rather than from the plan page's status control.
+ */
+describe('a stopped step on the page', () => {
+  const stopped = (over: Partial<WaitingRow> = {}) =>
+    waitingRow({
+      id: 'b1',
+      number: 611,
+      title: 'Send the weekly digest by email',
+      health: 'blocked',
+      ask: 'A Resend API key, so a send can be tried against a real inbox.',
+      ...over,
+    });
+
+  it('says what the step needs and offers the press that starts it again', () => {
+    const html = render([], [stopped()]);
+
+    expect(html).toContain('#611 Send the weekly digest by email');
+    expect(html).toContain('A Resend API key, so a send can be tried against a real inbox.');
+    expect(html).toContain('I have done this');
+    expect(html).toContain('Stopped');
+  });
+
+  // Nothing was built, and what the step was stopped part-way through is still
+  // outstanding for whoever picks it up.
+  it('sends the step back to not started rather than closing it', () => {
+    const html = render([], [stopped()]);
+
+    expect(html).toContain('name="status" value="not_started"');
+    expect(html).not.toContain('value="done"');
+  });
+
+  it('offers no such press on the three that are not stopped', () => {
+    for (const health of ['setup', 'unanswered', 'proposed'] as const) {
+      const html = render([], [waitingRow({ health })]);
+      expect(html).not.toContain('I have done this');
+    }
+  });
+});
+
+/**
  * #625: one heading with three groups under it, instead of one list sorted by
  * how pressing each row is.
  */

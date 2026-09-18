@@ -53,6 +53,7 @@ const TONE: Record<WaitingRow['health'], DevTone> = {
 export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRefTitles }) {
   const setup = row.health === 'setup';
   const question = row.health === 'unanswered';
+  const blocked = row.health === 'blocked';
 
   return (
     <li className="space-y-1 p-3">
@@ -97,6 +98,7 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
           {row.module ? MODULE_LABEL[row.module] : 'Everything'}
         </p>
         {setup && <SetupDone row={row} />}
+        {blocked && <BlockedDone row={row} />}
       </div>
     </li>
   );
@@ -110,12 +112,12 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
  * the whole cost of one of these is that it is small and you are somewhere
  * else. So the same action the plan page's box drives is driven from here.
  *
- * A one-press Done is the right control for this one kind and the wrong one for
- * the rest. A question is closed by words and gets the answering box below
- * instead; a proposal is closed by an approval. A blocked step is cleared by
- * whatever it was blocked on arriving, not by saying it is fine. A setup job is
- * the one that is finished by you having gone and done it, and "I have" is the
- * whole of what there is to record.
+ * A one-press Done is the right control for this kind and the wrong one for the
+ * two that are closed by words: a question gets the answering box above
+ * instead, and a proposal is closed by an approval. A blocked step gets its own
+ * press, `BlockedDone` below, which writes a different status for a different
+ * reason. A setup job is finished by you having gone and done it, and "I have"
+ * is the whole of what there is to record.
  *
  * `setPlanItemStatus` writes `done` and no commit, which is right: nothing was
  * built, and `commit_sha` stays null the same way it does on an answered
@@ -134,6 +136,45 @@ function SetupDone({ row }: { row: WaitingRow }) {
       <FieldError>{state.error}</FieldError>
       <Button type="submit" size="sm" pending={pending}>
         I have set this up
+      </Button>
+    </form>
+  );
+}
+
+/**
+ * The press that starts a stopped step again, on the page where you read it.
+ *
+ * A blocked step is work that began and stopped on something outside the repo
+ * -- a token to add, a setting to change -- and the sentence saying what it
+ * needs is already on the card above. Until now the only way to say you had
+ * done that thing was the plan page's status control, which meant leaving Dash,
+ * finding the number and picking a status out of a list. The thing you want to
+ * say is one word, so it is one press.
+ *
+ * Not `done`: nothing was built. `not_started` is what the step becomes -- the
+ * work it was blocked mid-way through is still outstanding and is now somebody's
+ * to pick up. `setPlanItemStatus` writes that through `blockPatch`, which drops
+ * both the ask and the kind of block on the way out, so the row stops being
+ * blocked, stops being drawn here, and reads on the plan page as a step nobody
+ * has claimed.
+ *
+ * It says "I have done this" rather than "Unblock" because that is the claim
+ * being made. Pressing it does not mean the block was wrong; it means the thing
+ * it was waiting for has happened.
+ */
+function BlockedDone({ row }: { row: WaitingRow }) {
+  const [state, action, pending] = useActionState(
+    setPlanItemStatus,
+    {} as PlanActionState,
+  );
+
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-2">
+      <input type="hidden" name="id" value={row.id} />
+      <input type="hidden" name="status" value="not_started" />
+      <FieldError>{state.error}</FieldError>
+      <Button type="submit" size="sm" pending={pending}>
+        I have done this
       </Button>
     </form>
   );
