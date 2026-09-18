@@ -84,28 +84,17 @@ describe('the activity feed', () => {
     expect(entries.map((e) => e.source)).toEqual(['sweep', 'auto']);
   });
 
-  it('folds the nightly nudges in as the sweep', () => {
+  it('leaves the nightly nudges out: the feed is what changed, not what is asked of you', () => {
+    // They used to be folded in as the sweep, which made the feed largely a
+    // list of being asked to chase people who had not written back. A nudge
+    // lives on This week; this page says what the syncs actually changed.
     const entries = activityEntries({
-      newRoles: [],
-      events: [],
-      reminders: [
-        {
-          id: 'n1',
-          body: 'Nothing back for 21 days.',
-          created_at: '2026-09-02T04:00:00Z',
-          applications: { roles: role('r9', 'Engineering Manager', 'Canonical') },
-        },
-        { id: 'n2', body: 'Write up last night.', created_at: '2026-09-01T04:00:00Z', applications: null },
-      ],
+      newRoles: [newRole('a', '2026-09-02T09:00:00Z')],
+      events: [event({ id: 'w', created_at: '2026-09-02T06:00:00Z', kind: 'withdrawal' })],
     });
 
-    expect(entries.map((e) => e.source)).toEqual(['sweep', 'sweep']);
-    expect(entries[0].label).toBe('Nudge');
-    expect(entries[0].subject).toBe('Canonical · Engineering Manager');
-    expect(entries[0].detail).toBe('Nothing back for 21 days.');
-    expect(entries[1].label).toBe('Nudge');
-    expect(entries[1].subject).toBeNull();
-    expect(entries[1].roleId).toBeNull();
+    expect(entries.map((e) => e.label)).toEqual(['New role', 'withdrawal']);
+    expect(entries.map((e) => e.label)).not.toContain('Nudge');
   });
 
   it('reads an event kind and a new role as a sentence', () => {
@@ -141,14 +130,6 @@ describe('the activity feed', () => {
         // Closing a cold lead is a decision, not a rejection.
         event({ id: 'w', created_at: '2026-09-02T06:00:00Z', kind: 'withdrawal' }),
       ],
-      reminders: [
-        {
-          id: 'n1',
-          body: 'Nothing back for 21 days.',
-          created_at: '2026-09-02T04:00:00Z',
-          applications: { roles: role('r9', 'Engineering Manager', 'Canonical') },
-        },
-      ],
     });
 
     expect(entries.map((e) => e.tone)).toEqual([
@@ -159,7 +140,6 @@ describe('the activity feed', () => {
       'muted',
       'muted',
       'info',
-      'muted',
     ]);
   });
 

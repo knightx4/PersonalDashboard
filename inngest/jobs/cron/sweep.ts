@@ -4,10 +4,9 @@ import { DEBRIEF_NUDGE_WINDOW_DAYS } from '@/lib/jobs/pipeline';
 /**
  * The nightly sweep: ghosting and rule-generated reminders.
  *
- * Three rules, all of them things a clock can see and a person cannot: an
- * application that has gone unanswered, an interview that has happened and not
- * been written up, and one about to happen with no preparation. They surface
- * on /jobs/today.
+ * Two rules, both of them things a clock can see and a person cannot: an
+ * interview that has happened and not been written up, and one about to happen
+ * with no preparation. They surface on /jobs/today and on /todo.
  *
  * Ghosting is a view over silence, so it has to be re-derived on a clock
  * rather than only when something happens -- an application goes quiet
@@ -126,6 +125,21 @@ async function closeColdLeads(
 /**
  * Rule-generated reminders. Idempotent on rule_key, so running the sweep twice
  * in a day does not produce two of anything.
+ *
+ * There used to be a third, first in the list: a submitted application with no
+ * reply after ten days raised a "follow up or let it go" nudge. It is gone.
+ * It fired on every quiet application and nothing ever made it stop, so it
+ * became the whole of the to-do list -- 27 of them at once, all saying the
+ * same thing about companies that were simply not going to write back. Being
+ * told that repeatedly is not information, and the pipeline already shows
+ * which applications have gone quiet without asking anything of you.
+ *
+ * The two left are both about an interview, which is a thing with a date and
+ * a piece of work attached: they can be finished, and they stop.
+ *
+ * `follow_up` stays a reminder kind. The rows this rule wrote still exist and
+ * are still read, and the follow-up composer on /todo and This week is what
+ * makes one actionable.
  */
 async function generateReminders(
   supabase: ReturnType<typeof createServiceSupabase>,
@@ -133,36 +147,7 @@ async function generateReminders(
   let created = 0;
   const now = Date.now();
 
-  // 1. A submitted application with no response after ten days is worth a nudge.
-  const { data: silent } = await supabase
-    .from('applications')
-    .select('id, user_id, submitted_at, roles!inner ( title, companies!inner ( name ) )')
-    .in('status', ['submitted', 'acknowledged'])
-    .is('first_human_response_at', null)
-    .not('submitted_at', 'is', null)
-    .lt('submitted_at', new Date(now - 10 * DAY_MS).toISOString())
-    .limit(500);
-
-  type Row = {
-    id: string;
-    user_id: string;
-    submitted_at: string;
-    roles: { title: string; companies: { name: string } };
-  };
-
-  for (const application of (silent ?? []) as unknown as Row[]) {
-    const { error } = await supabase.from('reminders').insert({
-      user_id: application.user_id,
-      application_id: application.id,
-      kind: 'follow_up',
-      due_at: new Date().toISOString(),
-      body: `No reply from ${application.roles.companies.name} on ${application.roles.title} after ten days. Follow up or let it go.`,
-      rule_key: `follow_up:${application.id}`,
-    });
-    if (!error) created += 1;
-  }
-
-  // 2. A completed interview with no debrief. Asked for the same evening,
+  // 1. A completed interview with no debrief. Asked for the same evening,
   //    because a debrief written three days later is worth very little.
   const { data: interviews } = await supabase
     .from('interviews')
@@ -185,7 +170,7 @@ async function generateReminders(
     if (!error) created += 1;
   }
 
-  // 3. An interview tomorrow, with nothing written down for it.
+  // 2. An interview tomorrow, with nothing written down for it.
   //
   //    Asked the day before rather than the morning of: prep you think of an
   //    hour beforehand is not prep. Only interviews with no prep notes are

@@ -93,12 +93,14 @@ export type PlanSection = {
   module: ModuleId | null;
   label: string;
   nodes: PlanNode[];
-  /** Over the leaf steps of the whole module, filtered or not. */
-  progress: PlanProgress;
   /**
-   * The states of those same steps, counted. Also over the whole module: a
-   * view narrows what is listed, not what is true of the module.
+   * Over the leaf steps of every plan in the module still being worked,
+   * whatever the view is filtered to. A view narrows what is listed, not what
+   * is true of the module; a plan closed top to bottom leaves the count
+   * altogether, because it is archive rather than work.
    */
+  progress: PlanProgress;
+  /** The states of those same steps, counted. */
   tally: PlanTally;
   /** Those same states again, as the bands of the progress bar. */
   bands: PlanBand[];
@@ -439,13 +441,22 @@ export function buildPlanTree(data: PlanData, liveness?: PlanLiveness): PlanSect
   return scopes
     .map((scope) => {
       const nodes = roots.filter((node) => node.module === scope);
+      // The heading counts what is still being worked, not what the module has
+      // ever contained. A plan that is closed top to bottom leaves the icons
+      // and the bar entirely -- 101 of the 110 features here are in that state,
+      // and counting them made every module read as nine tenths finished
+      // forever, which is a fact about the archive rather than about the work.
+      //
+      // The filter is at the plan, not at the step: a done step inside a plan
+      // still being worked is exactly what the bar is for, and it stays.
+      const working = nodes.filter((node) => !isFinishedFeature(node));
       return {
         module: scope,
         label: scope ? (MODULES.find((m) => m.id === scope)?.label ?? scope) : 'The app as a whole',
         nodes,
-        progress: planProgress(leavesOf(nodes)),
-        tally: tallyHealth(nodes, liveness),
-        bands: planBands(nodes, liveness),
+        progress: planProgress(leavesOf(working)),
+        tally: tallyHealth(working, liveness),
+        bands: planBands(working, liveness),
       };
     })
     .filter((section) => section.module !== null || section.nodes.length > 0);
@@ -1176,9 +1187,9 @@ function finishedAt(node: PlanNode): string {
  *
  * They come back as one list across every module, newest first, because that
  * is the order you look for them in: the thing you finished last week is the
- * thing you are trying to remember. Each module keeps its progress and its
- * tally, which are over the whole module either way -- lifting the rows out
- * changes where they are drawn, not what is true of the module.
+ * thing you are trying to remember. The module's progress and tally do not
+ * move with them: `buildPlanTree` already leaves a finished plan out of both,
+ * so what the heading says is what is still in hand either way.
  *
  * Only worth calling on "Everything". Every other view has already dropped a
  * finished feature in `prune`, so there is nothing to lift out of it.

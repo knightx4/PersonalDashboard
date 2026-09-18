@@ -6,9 +6,15 @@ import { buildPlanTree } from '@/lib/plan/tree';
 import { waitingOnYou } from '@/lib/plan/waiting';
 import { loadDigest } from '@/lib/digest/load';
 import { loadConversations } from '@/lib/comments/recent';
+import { loadFeatureFires, loadLastRuns } from '@/lib/plan/runs';
+import { lastStoredPush } from '@/lib/plan/liveness';
+import { loadOvernightRun, overnightStanding } from '@/lib/plan/overnight';
+import { nightFrom } from '@/lib/digest/night';
+import { planRoutine } from '@/lib/feedback/routine';
 import { ConversationsView } from './conversations-view';
 import { DigestPanel } from './digest-panel';
 import { RaisedView } from './raised-view';
+import { StatusPanel } from './status-panel';
 
 export const metadata = { title: 'Dash' };
 
@@ -27,18 +33,47 @@ export const metadata = { title: 'Dash' };
  * to be visible only from the row it was written on, which meant finding an
  * answer by remembering where the question was asked.
  *
+ * Above all three, what is running. The two routines' states were on two other
+ * pages, so the first question of the morning was the one this page could not
+ * answer -- see `StatusPanel`.
+ *
  * The route stays /dev/raised though the tab is called Dash -- #431 -- because
  * every notification, comment and old summary already links to it.
  */
 export default async function DevRaisedPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  const [queue, digest, conversations, plan] = await Promise.all([
-    loadRaised(supabase, user.id),
-    loadDigest(supabase, user.id),
-    loadConversations(supabase, user.id),
-    loadPlan(supabase, user.id),
-  ]);
+  const [queue, digest, conversations, plan, overnight, fires, lastRuns, openNotes] =
+    await Promise.all([
+      loadRaised(supabase, user.id),
+      loadDigest(supabase, user.id),
+      loadConversations(supabase, user.id),
+      loadPlan(supabase, user.id),
+      // The runner's standing intention, and the presses its night has made:
+      // the same rows and the same loaders /dev/plan reads, so the two pages
+      // cannot come to different answers about what is running.
+      loadOvernightRun(supabase, user.id),
+      loadFeatureFires(supabase, user.id),
+      loadLastRuns(supabase, user.id),
+      // A count, not the rows: what makes "run it" answerable is how many are
+      // waiting, and the queue itself is one link away.
+      supabase
+        .from('feedback_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .in('status', ['open', 'in_progress', 'blocked', 'planned']),
+    ]);
+
+  // The night as `nightFrom` reads it, exactly as the plan page reads it: the
+  // control's totals come from the same rows the morning report is written
+  // from, so nothing here can disagree with the digest below it.
+  const standing = overnightStanding(overnight);
+  const startedAt = overnight?.startedAt ?? null;
+  const live = (standing === 'running' || standing === 'paused') && startedAt !== null;
+  const night = live
+    ? nightFrom({ run: overnight, fires, items: plan.items, since: startedAt })
+    : null;
+  const nightPush = live ? lastStoredPush(Object.values(lastRuns), startedAt) : null;
 
   // The plan's own half of "waiting on you": a blocked step, an unanswered
   // decision, a proposal nobody approved. Derived here rather than filed by a
@@ -56,6 +91,13 @@ export default async function DevRaisedPage() {
       <PageHeader
         title="Dash"
         description="What happened in the last day, the questions waiting on you, and every conversation you have had with Dash. Answer a question and the next run reads it; reply to a conversation and it goes back on the row it was started on."
+      />
+      <StatusPanel
+        run={overnight}
+        canSend={Boolean(planRoutine().token)}
+        night={night}
+        push={nightPush}
+        openNotes={openNotes.count ?? 0}
       />
       <DigestPanel digest={digest} />
       <RaisedView queue={queue} waiting={waiting} titles={titles} />

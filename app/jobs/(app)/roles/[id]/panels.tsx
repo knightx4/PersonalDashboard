@@ -1032,6 +1032,7 @@ function Posting({
           compMinCents={compMinCents}
           compMaxCents={compMaxCents}
           compSource={compSource}
+          jdText={jdText}
         />
 
         <JobDescriptionCard roleId={roleId} jdText={jdText} jdLookupNote={jdLookupNote} />
@@ -1182,6 +1183,14 @@ function ShareCaseCard({
 /**
  * The link, the ATS requisition id, and the comp band -- editable, because
  * none of them arrive from mail as reliably as the description itself does.
+ *
+ * "Look it up" lives here rather than on the description below it. Three of
+ * the fields on this card are what the board fills -- the posting link, the
+ * requisition id and the comp band -- so this is where you are standing when
+ * you notice they are blank and want them found. It was on the description
+ * card because the description is the largest thing the lookup writes, which
+ * is a fact about the implementation rather than about the person reading a
+ * row of dashes.
  */
 function RoleDetailsCard({
   roleId,
@@ -1190,6 +1199,7 @@ function RoleDetailsCard({
   compMinCents,
   compMaxCents,
   compSource,
+  jdText,
 }: {
   roleId: string;
   jdUrl: string | null;
@@ -1197,6 +1207,8 @@ function RoleDetailsCard({
   compMinCents: number | null;
   compMaxCents: number | null;
   compSource: string | null;
+  /** Only to know whether the lookup is offered: it never overwrites one. */
+  jdText: string;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -1210,8 +1222,21 @@ function RoleDetailsCard({
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [lookup, setLookup] = useState<JdLookupResult | null>(null);
+  const [looking, startLooking] = useTransition();
 
   const compBand = formatCompBand(compMinCents, compMaxCents);
+
+  // The nightly pass walks six companies a night. A role you are looking at now
+  // should not wait behind two hundred you are not, and the answer arrives in
+  // about the time the board takes to reply.
+  const lookItUp = () => {
+    setLookup(null);
+    startLooking(async () => {
+      setLookup(await lookUpJobDescription(roleId));
+      router.refresh();
+    });
+  };
 
   const save = () => {
     setError(null);
@@ -1246,15 +1271,26 @@ function RoleDetailsCard({
       <CardSection
         title="Details"
         action={
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            title="Edit posting details"
-            className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
-          >
-            <Pencil className="size-4" strokeWidth={1.75} aria-hidden />
-            <span className="sr-only">Edit posting details</span>
-          </button>
+          <div className="flex items-center gap-1">
+            {/* Offered only on a role with no description, which is the one
+                rule the action itself enforces: the board's text would replace
+                anything pasted here, and automated work never argues with
+                what a person wrote. */}
+            {!jdText && (
+              <Button type="button" size="sm" variant="ghost" pending={looking} onClick={lookItUp}>
+                {looking ? 'Looking…' : 'Look it up'}
+              </Button>
+            )}
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              title="Edit posting details"
+              className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
+            >
+              <Pencil className="size-4" strokeWidth={1.75} aria-hidden />
+              <span className="sr-only">Edit posting details</span>
+            </button>
+          </div>
         }
       >
         <dl className="space-y-1.5 text-ui">
@@ -1289,6 +1325,36 @@ function RoleDetailsCard({
             </dd>
           </div>
         </dl>
+
+        {/* What this lookup just did, beside the button that did it. */}
+        {lookup && (
+          <div className="mt-3 border-t border-border pt-3">
+            <p className="text-small text-ink-muted">{lookup.message}</p>
+            {/* The ambiguous case is the one worth spending pixels on: the
+                board knows which postings these are, so linking them turns "go
+                and find it" into one click away from the right page. */}
+            {lookup.candidates && lookup.candidates.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {lookup.candidates.map((candidate) => (
+                  <li key={`${candidate.title}-${candidate.url ?? ''}`} className="text-small">
+                    {candidate.url ? (
+                      <a
+                        href={candidate.url}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-ink"
+                      >
+                        {candidate.title}
+                      </a>
+                    ) : (
+                      <span className="text-ink-muted">{candidate.title}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </CardSection>
     );
   }
@@ -1361,9 +1427,7 @@ function JobDescriptionCard({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(jdText);
   const [error, setError] = useState<string | null>(null);
-  const [lookup, setLookup] = useState<JdLookupResult | null>(null);
   const [pending, startTransition] = useTransition();
-  const [looking, startLooking] = useTransition();
 
   const save = () => {
     setError(null);
@@ -1378,40 +1442,22 @@ function JobDescriptionCard({
     });
   };
 
-  // The nightly pass walks six companies a night. A role you are looking at now
-  // should not wait behind two hundred you are not, and the answer arrives in
-  // about the time the board takes to reply.
-  const lookItUp = () => {
-    setLookup(null);
-    startLooking(async () => {
-      setLookup(await lookUpJobDescription(roleId));
-      router.refresh();
-    });
-  };
-
   return (
     <CardSection
       title="Job description"
       action={
         !editing && (
-          <div className="flex items-center gap-1">
-            {!jdText && (
-              <Button type="button" size="sm" variant="ghost" pending={looking} onClick={lookItUp}>
-                {looking ? 'Looking…' : 'Look it up'}
-              </Button>
-            )}
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setDraft(jdText);
-                setEditing(true);
-              }}
-            >
-              {jdText ? 'Edit' : 'Add description'}
-            </Button>
-          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setDraft(jdText);
+              setEditing(true);
+            }}
+          >
+            {jdText ? 'Edit' : 'Add description'}
+          </Button>
         )
       }
     >
@@ -1447,50 +1493,20 @@ function JobDescriptionCard({
         </pre>
       ) : (
         <p className="text-ui text-ink-muted">
-          Nothing saved. Add the description to build the requirement map and fill in the comp band
-          automatically.
+          Nothing saved. Paste it here, or press Look it up under Details to read it off the
+          employer&rsquo;s own board. Either builds the requirement map and fills in the comp band.
         </p>
       )}
 
-      {/* What this lookup just did. Shown instead of the stored note, which it
-          has only this second replaced -- two lines saying almost the same
-          thing is how a panel stops being read. */}
-      {!editing && lookup && (
-        <div className="mt-3 border-t border-border pt-3">
-          <p className={cn('text-small', lookup.ok ? 'text-ink-muted' : 'text-ink-muted')}>
-            {lookup.message}
-          </p>
-          {/* The ambiguous case is the one worth spending pixels on: the board
-              knows which postings these are, so linking them turns "go and find
-              it" into one click away from the right page. */}
-          {lookup.candidates && lookup.candidates.length > 0 && (
-            <ul className="mt-2 space-y-1">
-              {lookup.candidates.map((candidate) => (
-                <li key={`${candidate.title}-${candidate.url ?? ''}`} className="text-small">
-                  {candidate.url ? (
-                    <a
-                      href={candidate.url}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-ink"
-                    >
-                      {candidate.title}
-                    </a>
-                  ) : (
-                    <span className="text-ink-muted">{candidate.title}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      {/* Why a board lookup did not fill this in, or which posting it picked
+          when the match was on a title rather than an id. An empty panel on its
+          own asks you for nothing and explains nothing. Hidden while editing,
+          where the box you are typing in is the answer.
 
-      {/* Why the nightly board lookup did not fill this in, or which posting it
-          picked when the match was on a title rather than an id. An empty panel
-          on its own asks you for nothing and explains nothing. Hidden while
-          editing, where the box you are typing in is the answer. */}
-      {!editing && !lookup && jdLookupNote && (
+          What a lookup you just pressed did is reported under Details, beside
+          the button -- this is the stored note, which that press replaces on
+          the next render. */}
+      {!editing && jdLookupNote && (
         <p className="mt-3 border-t border-border pt-3 text-small text-ink-muted">{jdLookupNote}</p>
       )}
     </CardSection>
@@ -3026,10 +3042,10 @@ function InterviewCard({
         {/* Prep and the debrief are one each -- they are fields on the round,
             not a list -- so each offers itself only while it is not already
             there. A custom note has no such limit. */}
-        {/* No caption over them. "Create note" above three buttons reading
-            "+ Prep", "+ Interview" and "+ Custom" is the heading explained
-            underneath itself (law 15) -- it is read once and skipped forever,
-            and the buttons already say what they make. */}
+        {/* No caption over them. "Create note" above three triggers reading
+            Prep, Interview and Custom is the heading explained underneath
+            itself (law 15) -- it is read once and skipped forever, and the
+            triggers already say what they make. */}
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
           {!showPrep && <NoteKindButton label="Prep" onClick={() => setShowPrep(true)} />}
           {!showDebrief && (
@@ -3109,16 +3125,19 @@ function InterviewCard({
 /**
  * One of the kinds of note a round can be given.
  *
- * A button, so it is drawn as one. It used to spell its own box -- a container
- * hairline around a control, at a height nothing else on the row shared -- and
- * three of them in a line read as three little cards rather than as a choice.
+ * `AddTrigger`, the same line that opens every other compose surface in this
+ * file -- "Add a to-do" on the to-dos panel, "Paste the questions" on the
+ * answers one. It was a bordered secondary button with a typed "+" in front of
+ * the label, and three of those in a row inside the interview card, inside the
+ * round card, read as three little boxes competing with the round itself.
+ *
+ * That is law 14 rather than a matter of taste: what these open is a compose
+ * surface, and a bordered button standing in for one is the empty box again
+ * wearing a different shape. The trigger is an offer, so it is drawn as an
+ * offer -- ink-ghost, no border, no ground until it is pointed at.
  */
 function NoteKindButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <Button type="button" variant="secondary" size="sm" onClick={onClick}>
-      + {label}
-    </Button>
-  );
+  return <AddTrigger label={label} onClick={onClick} />;
 }
 
 /** A labeled section that opens and closes, stacked rather than side by side. */

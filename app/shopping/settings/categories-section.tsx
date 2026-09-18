@@ -8,6 +8,7 @@ import {
   type CategoryActionState,
 } from '@/app/shopping/settings/actions';
 import { Button } from '@/components/ui/button';
+import { AddTrigger } from '@/components/ui/add-trigger';
 import { FieldError, InlineInput, Input } from '@/components/ui/field';
 import { Group } from '@/components/ui/disclosure';
 import { UNSET_SWATCH } from '@/lib/lists/gradients';
@@ -83,9 +84,11 @@ export function CategoriesSection({ categories }: { categories: SettingsCategory
         </form>
       ) : (
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="button" size="sm" variant="secondary" onClick={() => setCreating(true)}>
-            New category
-          </Button>
+          {/* A trigger for a compose surface, not a button competing with the
+              list above it (law 14): the form it opens is the point, and a
+              bordered control standing in for one is the empty box again
+              wearing a different shape. */}
+          <AddTrigger label="New category" onClick={() => setCreating(true)} />
           {createState.message && (
             <p className="text-body text-positive">{createState.message}</p>
           )}

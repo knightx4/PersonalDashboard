@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Moon } from 'lucide-react';
 import { OvernightState } from '@/components/dev/overnight-state';
 import { Card } from '@/components/ui/card';
-import { SectionFold } from '@/components/ui/disclosure';
+import { Disclosure, SectionFold } from '@/components/ui/disclosure';
 import { groupHappened, type DigestEvent, type DigestGroup, type DigestPointer } from '@/lib/digest/build';
 import type { Digest } from '@/lib/digest/load';
 import { nightBudgetLine, nightLine, nightRows, type DigestNight } from '@/lib/digest/night';
@@ -18,17 +18,21 @@ import { nightBudgetLine, nightLine, nightRows, type DigestNight } from '@/lib/d
  * would say "nothing happened" on a day nobody has looked at yet, which is a
  * different and stronger claim than the page has any evidence for.
  *
- * What closed opens with the night the runner had, then the written account of
- * the day, and is then grouped under the feature each row closed under,
- * fifteen rows at most. Flat and uncapped it was fifty-four lines on a busy
- * day, which is a list rather than a summary; the rest are on the changelog
- * and the last line says how many.
+ * The written account of the day is the whole of what is shown: one paragraph,
+ * and then a fold. Everything under it -- the night the runner had, and what
+ * closed grouped under the feature it closed beneath -- is the evidence for
+ * that paragraph rather than a second telling of it, and reading it is a
+ * choice. It used to be laid out flat, which made the one thing worth reading
+ * every morning the third thing on the card and put fifty-four lines of rows
+ * above the questions waiting underneath.
  *
- * The night is first because it is the thing you went to bed wondering about:
- * the runner worked while you were asleep and nothing else on the page says
- * what it did. Every word of it is the runner's own -- the state word and the
- * shape are the ones the control on the plan page draws, and the sentence
- * saying why it stopped is the sentence the row carries, printed verbatim.
+ * Inside the fold the night is first, because it is the thing you went to bed
+ * wondering about: the runner worked while you were asleep and nothing else on
+ * the page says what it did. Every word of it is the runner's own -- the state
+ * word and the shape are the ones the control on the plan page draws, and the
+ * sentence saying why it stopped is the sentence the row carries, printed
+ * verbatim. What closed is fifteen rows at most; the rest are on the changelog
+ * and the last line says how many.
  */
 
 const EVENT_LABEL: Record<DigestEvent['kind'], string> = {
@@ -237,34 +241,60 @@ export function DigestPanel({ digest }: { digest: Digest | null }) {
       <Card padding="dense">
         <SectionFold title="What happened" hint={`In the 24 hours to ${formatDay(digest.day)}`}>
           <div className="space-y-3">
-            {digest.night && <Night night={digest.night} />}
-
-            {/* The account of the day, above the rows it is an account of. Absent
-                on a summary written before there was one, and on a day the model
-                call did not happen. */}
-            {digest.summary && (
+            {/* The paragraph, and nothing else above the fold. Absent on a
+                summary written before there was one, and on a day the model
+                call did not happen -- and then the fold is the whole card,
+                which is why it says what is in it on its closed line. */}
+            {digest.summary ? (
               <p className="whitespace-pre-wrap text-body text-ink">{digest.summary}</p>
-            )}
-
-            {groups.length > 0 ? (
-              <div className="space-y-3">
-                {groups.map((group) => (
-                  <Group key={group.key} group={group} />
-                ))}
-              </div>
             ) : (
-              <p className="text-body text-ink-muted">Nothing closed.</p>
+              <p className="text-body text-ink-muted">No account was written for this day.</p>
             )}
 
-            {more > 0 && (
-              <p className="text-small text-ink-muted">
-                {more} more closed.{' '}
-                <Link href="/dev/changelog" className="underline underline-offset-2 hover:text-ink">
-                  See the changelog
-                </Link>
-                .
-              </p>
-            )}
+            {/* Everything the paragraph is an account of, folded (law 10). The
+                closed line carries the counts, so opening it is a choice
+                rather than a check: a night that fired two features and a day
+                that closed none are both legible without it. */}
+            <Disclosure
+              title="The detail"
+              meta={[
+                digest.night ? nightBudgetLine(digest.night) : null,
+                // `more` is the remainder past the cut, so `happened` is
+                // already the whole count and adding it would say it twice.
+                digest.happened.length > 0
+                  ? `${digest.happened.length} closed`
+                  : 'nothing closed',
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            >
+              <div className="space-y-3">
+                {digest.night && <Night night={digest.night} />}
+
+                {groups.length > 0 ? (
+                  <div className="space-y-3">
+                    {groups.map((group) => (
+                      <Group key={group.key} group={group} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-body text-ink-muted">Nothing closed.</p>
+                )}
+
+                {more > 0 && (
+                  <p className="text-small text-ink-muted">
+                    {more} more closed.{' '}
+                    <Link
+                      href="/dev/changelog"
+                      className="underline underline-offset-2 hover:text-ink"
+                    >
+                      See the changelog
+                    </Link>
+                    .
+                  </p>
+                )}
+              </div>
+            </Disclosure>
           </div>
         </SectionFold>
       </Card>
