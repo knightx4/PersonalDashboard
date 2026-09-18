@@ -428,12 +428,34 @@
    * it, which reads as a tint applied to a theme rather than as the theme
    * being that colour.
    *
+   * The pools turn by their own rule, which is the one thing in the palette
+   * that is not rotated at the light it was reflecting. See `turnWash` in
+   * lib/theme/palette.ts: holding a pool's luminance is right for anything
+   * carrying text and wrong for a decoration, because a yellow held down to a
+   * blue's luminance is olive. A pool's lightness follows where its new hue
+   * peaks instead, its chroma sits on the gamut edge, and it may spend at most
+   * a third again the light the written pool threw.
+   *
    * Every layer only ADDS light, and that is load-bearing rather than tidy: a
    * sheet is 20% bench, so a layer that darkens the bench darkens every sheet
    * on it and takes the ink with it, somewhere scripts/check-contrast.ts
    * cannot see -- it composites sheets over the flat --c-page. Checked by
    * compositing all of them at full strength: the flat bench stays the darkest
-   * case, so the gate is a conservative bound rather than a blind spot.
+   * case, so the gate is a conservative bound for anything that reads DARKER
+   * than the flat bench.
+   *
+   * What it is not a bound for is the other direction, and that is worth
+   * writing down because it is a live gap rather than a solved one. Sampling
+   * the field as the browser actually paints it -- every hue, both glass
+   * rooms, the brightest pixel of the viewport -- the bench's own text lands
+   * at 3.0:1 against it at the worst hue, where the gate reads the flat bench
+   * and sees AA. That is not new and the lift did not cause it: the same
+   * sampling puts today's shipped wash at 3.4:1, and the count of pairs under
+   * 4.5:1 at the brightest pixel is 72 either way. It is why the pools have a
+   * light budget at all -- without one the lift trebles the peak and takes
+   * that 72 to 90. Sidebar text over the brightest corner of the wash is the
+   * thing to fix next, and it wants either a darker wash under the rail or a
+   * scrim behind the text, not a smaller budget.
    *
    * Fixed to the viewport at <body>, so it reads as depth the page slides over
    * rather than a pattern that scrolls. */

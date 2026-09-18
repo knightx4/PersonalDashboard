@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { readTheme, THEME_SELECTORS } from '@/lib/theme/css';
-import { hexToOklch, oklchToHex, relativeLuminance } from '@/lib/theme/oklch';
+import {
+  gamutChroma,
+  hexToOklch,
+  oklchToHex,
+  relativeLuminance,
+  withLuminance,
+} from '@/lib/theme/oklch';
 import { accentHueFor, generatePalette, MEANING_FLOOR, meaningGaps } from '@/lib/theme/palette';
 import {
   HUE_TOKENS,
@@ -10,6 +16,7 @@ import {
   LIGHTBOX_HUE_TOKENS,
   REFERENCE_HUE,
   REFERENCE_PALETTES,
+  WASH_TOKENS,
 } from '@/lib/theme/reference';
 
 /** A colour the reference tables are allowed to hold: flat, or flat with alpha. */
@@ -245,8 +252,18 @@ describe('generatePalette', () => {
 
 describe('generatePalette on Lightbox', () => {
   /** The bench tokens that are flat hex, which is all of them but the outline. */
-  const BENCH = LIGHTBOX_HUE_TOKENS.filter((token) =>
-    HEX.test(REFERENCE_PALETTES.lightbox[token]),
+  /*
+   * The bench tokens that are held to the light they were written at.
+   *
+   * Everything on the bench except the wash's pools. A token here either
+   * carries text or sits behind it, so holding its luminance is what makes a
+   * generated room exactly as readable as the written one. The pools carry
+   * nothing and are deliberately allowed to spend more light than they were
+   * written with -- that is what takes the brown out of a warm room -- so they
+   * are held to a budget instead, two tests below.
+   */
+  const BENCH = LIGHTBOX_HUE_TOKENS.filter(
+    (token) => HEX.test(REFERENCE_PALETTES.lightbox[token]) && !WASH_TOKENS.includes(token),
   );
 
   it('gives back Lightbox with no colour, and at the hue read off its bench', () => {
@@ -434,4 +451,96 @@ describe('the accent and the colours that carry a meaning', () => {
       }
     }
   });
+
+  it("lifts a turned pool towards its own hue's cusp, so a warm room is not brown", () => {
+    // The defect this fixes: every `--c-*` token is rotated at the light it was
+    // reflecting, which is right for anything carrying text and wrong for the
+    // bench's pools. A blue throws about a tenth of the light a screen can; a
+    // yellow held down to a tenth is olive, because that is what a dark yellow
+    // is. Two screenshots of an orange room and a gold one, both mud, are what
+    // started this.
+    //
+    // So a pool's lightness follows where its new hue actually peaks. The test
+    // is against the rule it replaced -- the same rotation with the luminance
+    // held -- and only in the half of the circle where the two differ: a hue
+    // whose cusp sits near blue's has nothing to lift.
+    for (const hue of [25, 45, 65, 95, 125]) {
+      const palette = generatePalette('darkroom', hue);
+      for (const token of WASH_TOKENS) {
+        const written = REFERENCE_PALETTES.darkroom[token];
+        const from = hexToOklch(written);
+        const turned = hexToOklch(palette[token]);
+        const held = hexToOklch(
+          withLuminance({ ...from, h: from.h + hue - REFERENCE_HUE.darkroom }, relativeLuminance(written)),
+        );
+        // Chroma rather than lightness, because that is the part that holds for
+        // every pool at every warm hue. Most of them come back lighter too, but
+        // not all: a hue whose cusp sits about where blue's does -- red, for the
+        // darkest pool of the four -- has nowhere to lift to, and buys its way
+        // out of the mud on colour alone.
+        expect(`${hue} ${token} ${turned.c > held.c}`).toBe(`${hue} ${token} true`);
+      }
+    }
+  });
+
+  it('spends no more than a third again the light the written pool threw', () => {
+    // The one thing in the wash that can cost readability. The bench carries
+    // the sidebar's text, a sheet is a fifth bench, and every layer of the wash
+    // only adds light -- so a pool that brightens without limit closes the gap
+    // between the bench and the pale ink on it. Measured on the rendered field,
+    // unbounded lifting nearly trebles the light at its brightest point and
+    // takes eighteen more pairs under 4.5:1; a third again costs none of them.
+    for (const mode of ['lightbox', 'darkroom'] as const) {
+      for (const hue of SWEEP) {
+        const palette = generatePalette(mode, hue);
+        for (const token of WASH_TOKENS) {
+          const budget = relativeLuminance(REFERENCE_PALETTES[mode][token]) * 1.3;
+          const spent = relativeLuminance(palette[token]);
+          expect(`${mode} ${hue} ${token} ${spent <= budget + 1e-6}`).toBe(
+            `${mode} ${hue} ${token} true`,
+          );
+        }
+      }
+    }
+  });
+
+  it('leaves a pool alone when the colour asked for is the one it was written at', () => {
+    // The wheel has to be smooth. Lifting is a move from one hue's cusp to
+    // another's, so a hue that does not move must not lift -- otherwise the
+    // palette either side of the written hue is not the palette written there.
+    for (const mode of ['lightbox', 'darkroom'] as const) {
+      const palette = generatePalette(mode, REFERENCE_HUE[mode]);
+      for (const token of WASH_TOKENS) {
+        expect(`${mode} ${token} ${palette[token]}`).toBe(
+          `${mode} ${token} ${REFERENCE_PALETTES[mode][token]}`,
+        );
+      }
+    }
+  });
+
+  it('keeps every pool a colour rather than a grey, all the way round', () => {
+    // Chroma sits on the gamut edge at whatever lightness the lift lands on,
+    // which is the other half of the fix: holding the chroma number reads as
+    // vivid at blue, where sRGB is generous, and as dust at gold, where it is
+    // not. A pool is seen through a 26-to-34 percent mix, so what reaches the
+    // glass is a third of this.
+    for (const mode of ['lightbox', 'darkroom'] as const) {
+      for (const hue of SWEEP) {
+        const palette = generatePalette(mode, hue);
+        for (const token of WASH_TOKENS) {
+          const pool = hexToOklch(palette[token]);
+          expect(`${mode} ${hue} ${token} ${pool.c > 0.05}`).toBe(`${mode} ${hue} ${token} true`);
+          // On the edge at its own lightness, not merely inside it. Measured at
+          // the pool's exact hue: `cuspOf` answers by whole degree, which is as
+          // fine as choosing a lightness needs and a hair coarser than checking
+          // a chroma against the boundary.
+          const edge = gamutChroma(pool.l, pool.h);
+          expect(`${mode} ${hue} ${token} edge ${Math.abs(pool.c - edge) < 0.004}`).toBe(
+            `${mode} ${hue} ${token} edge true`,
+          );
+        }
+      }
+    }
+  });
+
 });
