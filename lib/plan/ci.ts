@@ -25,7 +25,7 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ask, readToken, REPO, REPO_KEY, refusalFor } from './github';
+import { ask, commitOnMain, readToken, REPO, REPO_KEY, refusalFor } from './github';
 import { pushesFrom, type ActivityRow, type Push } from './liveness';
 import {
   carriedBy,
@@ -58,6 +58,17 @@ const PAGE_CAP = 8;
 /** How many merges one call will read checks for. */
 const MERGE_BUDGET = 25;
 
+/**
+ * How many commits one call will ask about by comparison.
+ *
+ * The listing above answers most of them, so this is only ever the commits it
+ * did not reach: something closed minutes ago that is still on its branch, or
+ * something older than the page cap. Smaller than `MERGE_BUDGET` because one
+ * request answers one commit here, where one request answers every commit a
+ * merge carried.
+ */
+const LANDING_BUDGET = 10;
+
 /** How many of those are in flight at once. */
 const LANES = 5;
 
@@ -66,18 +77,22 @@ type CommitRow = { sha: string; parents?: Array<{ sha?: string }> };
 /**
  * Main's commits, newest first, until every commit asked about has been seen.
  *
- * `exhausted` says the walk reached the start of the history rather than the
- * page cap, which is what makes "not in here" mean "never reached main" rather
- * than "older than we looked".
+ * A commit the listing does not reach is not answered here, either way. It
+ * used to be: the walk reported whether it had read the whole history, and
+ * "not in here, and we read all of it" was taken for "never reached main".
+ * That reading could not be had at this repository's size -- main passed the
+ * cap's eight hundred commits, so the walk never reached the start of history
+ * again and `unmerged` stopped being written at all. `commitOnMain` asks the
+ * question exactly and at any depth instead, so the walk is left to do the one
+ * thing it is good at: naming the merge, for the commits it does reach.
  */
 async function listMain(
   wanted: ReadonlySet<string>,
   token: string,
   doFetch: typeof globalThis.fetch,
-): Promise<{ commits: CommitNode[]; exhausted: boolean }> {
+): Promise<CommitNode[]> {
   const commits: CommitNode[] = [];
   const outstanding = new Set(wanted);
-  let exhausted = false;
 
   for (let page = 1; page <= PAGE_CAP; page += 1) {
     const rows = await ask<CommitRow[]>(
@@ -91,14 +106,11 @@ async function listMain(
         if (row.sha.startsWith(sha)) outstanding.delete(sha);
       }
     }
-    if (rows.length < PAGE_SIZE) {
-      exhausted = true;
-      break;
-    }
+    if (rows.length < PAGE_SIZE) break;
     if (outstanding.size === 0) break;
   }
 
-  return { commits, exhausted };
+  return commits;
 }
 
 /**
@@ -283,25 +295,38 @@ export async function refreshCommitChecks(input: {
   if (wanted.size === 0) return { checked: 0, error: null };
 
   try {
-    const { commits, exhausted } = await listMain(wanted, token, doFetch);
-    const carrier = carriedBy(commits);
+    const carrier = carriedBy(await listMain(wanted, token, doFetch));
 
     // Which merge each commit needs an answer from, and which commits are
-    // answered by each merge.
-    const unmerged: string[] = [];
+    // answered by each merge. A commit the listing did not reach gets no merge
+    // and no answer from here; it is asked about below instead.
+    const missing: string[] = [];
     const byMerge = new Map<string, string[]>();
     for (const sha of wanted) {
       const merge = carrierFor(carrier, sha);
-      if (merge) {
-        const sharing = byMerge.get(merge);
-        if (sharing) sharing.push(sha);
-        else byMerge.set(merge, [sha]);
+      if (!merge) {
+        missing.push(sha);
         continue;
       }
-      // Only when the whole history was read. Otherwise nothing is known about
-      // this commit yet, and nothing is written.
-      if (exhausted) unmerged.push(sha);
+      const sharing = byMerge.get(merge);
+      if (sharing) sharing.push(sha);
+      else byMerge.set(merge, [sha]);
     }
+
+    // Whether main carries each of those, asked one comparison at a time.
+    // Only a definite no is written down: main carrying a commit the listing
+    // never reached says nothing about which merge ran the checks, and an
+    // answer GitHub would not give is not an answer. Both leave the commit
+    // unwritten and asked again next time, which reads as "not checked" --
+    // true, where "never reached main" would be a guess.
+    const unmerged = (
+      await inLanes(missing.slice(0, LANDING_BUDGET), async (sha) => ({
+        sha,
+        landing: await commitOnMain({ sha, fetch: doFetch }),
+      }))
+    )
+      .filter(({ landing }) => landing.onMain === false)
+      .map(({ sha }) => sha);
 
     const merges = [...byMerge.keys()].slice(0, MERGE_BUDGET);
     const conclusions = await inLanes(merges, (sha) => checkCommit(sha, token, doFetch));
