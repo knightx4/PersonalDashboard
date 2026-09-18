@@ -173,8 +173,8 @@ in three parts:
 - **The options go in `--detail`, lettered, one option per line**, starting at
   `A` and running in order: `A — …`, then `B — …`. The letters are what turn
   the paragraph into options on the page and into one-click answers; prose
-  options are shown as the prose they are. `(a)`, `A)` and `A.` are read too.
-  See `lib/plan/options.ts` for exactly what is recognised.
+  options are shown as the prose they are. `(a)`, `A)`, `A.` and `A --` are
+  read too. See `lib/plan/options.ts` for exactly what is recognised.
 - **Each option opens with its own name in one short sentence.** That first
   sentence is what appears as the option; the cost and the reasoning follow it
   in the same paragraph and go under the fold.
