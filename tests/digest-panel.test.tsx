@@ -35,6 +35,7 @@ function digest(over: Partial<Digest> = {}): Digest {
       { kind: 'suggestion', title: 'Two questions hold up #338', ref: null, detail: 'Nobody has answered them in a fortnight.' },
       { kind: 'ready', title: 'Build it', ref: '#1', detail: null },
     ],
+    ideasFiled: 0,
     night: null,
     createdAt: '2026-09-17T04:05:00Z',
     ...over,
@@ -54,6 +55,30 @@ describe('DigestPanel', () => {
     expect(html).not.toContain('Worth a look');
     expect(html).not.toContain('Two questions hold up #338');
     expect(html).not.toContain('Nobody has answered them in a fortnight.');
+  });
+
+  it('says how many ideas the night filed, and links to the page they are on', () => {
+    const html = renderToStaticMarkup(<DigestPanel digest={digest({ ideasFiled: 3 })} />);
+    expect(html).toContain('3 new ideas were filed overnight.');
+    expect(html).toContain('They are on the');
+    expect(html).toContain('href="/dev/ideas"');
+    expect(html).toContain('ideas page');
+  });
+
+  it('says one idea in the singular', () => {
+    const html = renderToStaticMarkup(<DigestPanel digest={digest({ ideasFiled: 1 })} />);
+    expect(html).toContain('One new idea was filed overnight.');
+    expect(html).toContain('It is on the');
+  });
+
+  /**
+   * The ordinary day. A line saying none were filed would be on the page every
+   * morning the night found nothing worth writing down, which is most of them.
+   */
+  it('draws no line on a day nothing was filed', () => {
+    const html = renderToStaticMarkup(<DigestPanel digest={digest()} />);
+    expect(html).not.toContain('filed overnight');
+    expect(html).not.toContain('href="/dev/ideas"');
   });
 
   it('draws nothing before the first summary is written', () => {

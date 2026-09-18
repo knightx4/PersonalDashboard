@@ -32,6 +32,12 @@ export type Digest = {
   happened: DigestEvent[];
   attention: DigestPointer[];
   /**
+   * How many ideas the overnight run filed on the ideas page in the window
+   * this summary covers. Zero on a night that filed none, and on every
+   * summary written before the column existed.
+   */
+  ideasFiled: number;
+  /**
    * What the overnight runner did, on a day it did anything. Null on every
    * ordinary day and on every summary written before #585.
    */
@@ -44,6 +50,17 @@ const POINTER_KINDS: readonly DigestPointerKind[] = ['decision', 'ready', 'sugge
 
 function text(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+/**
+ * A whole count, and zero for anything that is not one. A row written before
+ * the column existed reads back as none filed, which is what the page draws
+ * nothing for -- the same as a night that filed none, and the same as the
+ * truth in both cases.
+ */
+function countFrom(value: unknown): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
 }
 
 /**
@@ -186,6 +203,7 @@ export function digestFromRow(row: Record<string, unknown>): Digest {
     summary: text(row.summary),
     happened: eventsFrom(row.happened),
     attention: pointersFrom(row.attention),
+    ideasFiled: countFrom(row.ideas_filed),
     night: nightFrom(row.night),
     createdAt: String(row.created_at ?? ''),
   };
@@ -199,7 +217,7 @@ export async function loadDigest(
 ): Promise<Digest | null> {
   const { data } = await supabase
     .from('dev_digests')
-    .select('id, day, since, summary, happened, attention, night, created_at')
+    .select('id, day, since, summary, happened, attention, ideas_filed, night, created_at')
     .eq('user_id', userId)
     .order('day', { ascending: false })
     .limit(1)

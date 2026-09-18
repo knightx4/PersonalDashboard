@@ -14,10 +14,13 @@ import { nightBudgetLine, nightLine, nightRows, type DigestNight } from '@/lib/d
  * the same thing all day however often the page is opened. Nothing on it is
  * computed at render time -- see `inngest/dev/digest.ts` for why.
  *
- * It draws the day only. The stored summary also carries an attention list --
- * what the night noticed about the board -- which used to be a second card
- * here called "Worth a look". #623 moved those lines to the ideas page, so
- * this file no longer reads `digest.attention`; the night still writes it.
+ * It draws the day, and above it one line on what the night filed. The stored
+ * summary also carries an attention list -- what the night noticed about the
+ * board -- which used to be a second card here called "Worth a look". #623
+ * moved those lines to the ideas page, so this file no longer reads
+ * `digest.attention`; the night still writes it. What it reads instead is the
+ * count of ideas that reading turned into, because otherwise nothing on Dash
+ * says they arrived.
  *
  * Nothing is drawn at all before the first one is written. An empty summary
  * would say "nothing happened" on a day nobody has looked at yet, which is a
@@ -206,6 +209,33 @@ function Night({ night }: { night: DigestNight }) {
   );
 }
 
+/**
+ * What the night filed, above the account of the day.
+ *
+ * Drawn only when there is a number to say. A line reading "0 new ideas" is a
+ * report on nothing having happened, and it would be on the page every day the
+ * reading found nothing worth writing down -- which is most of them.
+ *
+ * It says how many and where they are, and not what they were. Naming them
+ * here would be the Worth a look card again, in a thinner font: the ideas page
+ * is where a suggestion is read, put aside or shaped, and this line exists to
+ * send you there.
+ */
+function IdeasFiled({ count }: { count: number }) {
+  if (count < 1) return null;
+
+  return (
+    <p className="text-body text-ink">
+      {count === 1 ? 'One new idea was' : `${count} new ideas were`} filed overnight.{' '}
+      {count === 1 ? 'It is' : 'They are'} on the{' '}
+      <Link href="/dev/ideas" className="underline underline-offset-2 hover:text-ink">
+        ideas page
+      </Link>
+      .
+    </p>
+  );
+}
+
 export function DigestPanel({ digest }: { digest: Digest | null }) {
   if (!digest) return null;
 
@@ -221,6 +251,11 @@ export function DigestPanel({ digest }: { digest: Digest | null }) {
     <Card padding="dense">
       <SectionFold title="What happened" hint={`In the 24 hours to ${formatDay(digest.day)}`}>
         <div className="space-y-3">
+          {/* Above the account of the day, because it is the only new thing on
+              the page that is not a question: the account says what closed,
+              and an idea filed last night closed nothing. */}
+          <IdeasFiled count={digest.ideasFiled} />
+
           {/* The paragraph, and nothing else above the fold. Absent on a
               summary written before there was one, and on a day the model
               call did not happen -- and then the fold is the whole card,
