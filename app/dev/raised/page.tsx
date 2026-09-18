@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { loadRaised } from '@/lib/raised/load';
 import { loadPlan, planRefTitles } from '@/lib/plan/load';
 import { buildPlanTree } from '@/lib/plan/tree';
-import { waitingOnYou } from '@/lib/plan/waiting';
+import { waitingGroups } from '@/lib/plan/waiting';
 import { loadDigest } from '@/lib/digest/load';
 import { loadConversations } from '@/lib/comments/recent';
 import { loadFeatureFires, loadLastRuns } from '@/lib/plan/runs';
@@ -75,11 +75,14 @@ export default async function DevRaisedPage() {
     : null;
   const nightPush = live ? lastStoredPush(Object.values(lastRuns), startedAt) : null;
 
-  // The plan's own half of "waiting on you": a blocked step, an unanswered
-  // decision, a proposal nobody approved. Derived here rather than filed by a
-  // session, so a step blocked on a credential reaches this page without
-  // anybody remembering to raise it as well.
-  const waiting = waitingOnYou(buildPlanTree(plan));
+  // Everything waiting on you, in the three groups the section is drawn in:
+  // what you have to go and do, what you have to answer, what you only have to
+  // say yes to. Both halves in one call -- the plan's own (a blocked step, an
+  // unanswered decision, a proposal nobody approved, all derived here rather
+  // than filed by a session, so a step blocked on a credential reaches this
+  // page without anybody remembering to raise it as well) and the raises the
+  // queue is holding open.
+  const groups = waitingGroups(buildPlanTree(plan), queue);
 
   // What every "#494" on this page is called. Built once here rather than
   // looked up where each one is drawn: a raise with nine references in it
@@ -100,7 +103,7 @@ export default async function DevRaisedPage() {
         openNotes={openNotes.count ?? 0}
       />
       <DigestPanel digest={digest} />
-      <RaisedView queue={queue} waiting={waiting} titles={titles} />
+      <RaisedView queue={queue} groups={groups} titles={titles} />
       <ConversationsView conversations={conversations} titles={titles} />
     </div>
   );

@@ -14,7 +14,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { needsFollowThrough, type RaisedQueue, type RaisedRow } from '@/lib/raised/load';
-import type { WaitingRow } from '@/lib/plan/waiting';
+import type { WaitingGroup } from '@/lib/plan/waiting';
 import { WaitingCard } from './waiting-view';
 import { cardVariants } from '@/components/ui/card';
 import { CommentCount } from '@/components/dev/comment-count';
@@ -22,7 +22,7 @@ import { CommentThread } from '@/components/dev/comment-thread';
 import { RefText } from '@/components/dev/ref-text';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
-import { Disclosure, SectionFold } from '@/components/ui/disclosure';
+import { Disclosure, Group, SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import { raisedHealth, type RaisedHealth } from '@/lib/dev/health';
 import { RAISED_HEALTH_WORD } from '@/lib/dev/words';
@@ -333,15 +333,21 @@ function RaiseCard({ row, titles }: { row: RaisedRow; titles?: PlanRefTitles }) 
  */
 export function RaisedView({
   queue,
-  waiting,
+  groups,
   titles,
 }: {
   queue: RaisedQueue;
-  waiting: WaitingRow[];
+  /**
+   * Everything waiting on you, already sorted into your actions, questions for
+   * you and to approve. All three arrive whether or not they hold anything,
+   * and an empty one is not drawn: a heading over nothing is a heading that
+   * has to be read before it can be skipped.
+   */
+  groups: readonly WaitingGroup[];
   /** What each step number in a raise is called, for the hover text. */
   titles?: PlanRefTitles;
 }) {
-  const onYou = waiting.length + queue.open.length;
+  const onYou = groups.reduce((total, group) => total + group.entries.length, 0);
 
   return (
     <div className="space-y-6">
@@ -355,16 +361,39 @@ export function RaisedView({
 
       {onYou > 0 && (
         <SectionFold title="Waiting on you" count={onYou}>
-          <ul className={cn(cardVariants(), 'divide-y divide-border')}>
-            {/* Plan steps first: a step that has stopped is work already begun
-                and not moving, where a raise is a question that can wait. */}
-            {waiting.map((row) => (
-              <WaitingCard key={row.id} row={row} titles={titles} />
+          {/* One heading and three groups under it, rather than one list sorted
+              by how pressing each row is. That list asked you to work out, row
+              by row, whether the thing in front of you was a job, a question or
+              a yes -- and the three want different amounts of you, so they are
+              worth telling apart before you start. */}
+          {groups
+            .filter((group) => group.entries.length > 0)
+            .map((group) => (
+              <Group
+                key={group.key}
+                title={
+                  <>
+                    {group.title}
+                    <span className="tabular ml-2 font-normal text-ink-muted">
+                      {group.entries.length}
+                    </span>
+                  </>
+                }
+              >
+                <ul className={cn(cardVariants(), 'divide-y divide-border')}>
+                  {/* A plan row and a raise sit in the same group when the same
+                      thing finishes them, so which card is drawn comes off the
+                      entry rather than off which list it arrived in. */}
+                  {group.entries.map((entry) =>
+                    entry.kind === 'plan' ? (
+                      <WaitingCard key={entry.id} row={entry.row} titles={titles} />
+                    ) : (
+                      <RaiseCard key={entry.id} row={entry.raise} titles={titles} />
+                    ),
+                  )}
+                </ul>
+              </Group>
             ))}
-            {queue.open.map((row) => (
-              <RaiseCard key={row.id} row={row} titles={titles} />
-            ))}
-          </ul>
         </SectionFold>
       )}
 

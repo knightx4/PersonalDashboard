@@ -10,7 +10,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { raisedQueueFrom, raisedRowFrom, type RaisedRow } from '@/lib/raised/load';
-import type { WaitingRow } from '@/lib/plan/waiting';
+import type { WaitingGroup, WaitingGroupKey, WaitingRow } from '@/lib/plan/waiting';
 
 // The server actions pull in the session client, which has no business in a
 // render test; the view only needs them to exist to hand to its forms.
@@ -42,8 +42,46 @@ function raise(over: Record<string, unknown> = {}): RaisedRow {
   });
 }
 
+/**
+ * The three groups as the page is handed them, built here rather than derived.
+ *
+ * Which group a row belongs in is `waitingGroups`' job and is tested against
+ * the plan tree in lib/plan/waiting.test.ts. These tests are about the markup,
+ * so the placement is stated outright: plan rows by what finishes them, raises
+ * by whether they named an action, and all three groups present whether or not
+ * they hold anything, which is what the real function returns.
+ */
+const TITLE: Record<WaitingGroupKey, string> = {
+  actions: 'Your actions',
+  questions: 'Questions for you',
+  approve: 'To approve',
+};
+
+const OF_HEALTH: Record<WaitingRow['health'], WaitingGroupKey> = {
+  blocked: 'actions',
+  setup: 'actions',
+  unanswered: 'questions',
+  proposed: 'approve',
+};
+
+function groupsFrom(waiting: WaitingRow[], open: readonly RaisedRow[]): WaitingGroup[] {
+  return (['actions', 'questions', 'approve'] as const).map((key) => ({
+    key,
+    title: TITLE[key],
+    entries: [
+      ...waiting
+        .filter((row) => OF_HEALTH[row.health] === key)
+        .map((row) => ({ kind: 'plan' as const, id: row.id, row })),
+      ...open
+        .filter((raise) => (raise.consequence ? 'approve' : 'questions') === key)
+        .map((raise) => ({ kind: 'raise' as const, id: raise.id, raise })),
+    ],
+  }));
+}
+
 function render(rows: RaisedRow[], waiting: WaitingRow[] = []): string {
-  return renderToStaticMarkup(<RaisedView queue={raisedQueueFrom(rows)} waiting={waiting} />);
+  const queue = raisedQueueFrom(rows);
+  return renderToStaticMarkup(<RaisedView queue={queue} groups={groupsFrom(waiting, queue.open)} />);
 }
 
 function waitingRow(over: Partial<WaitingRow> = {}): WaitingRow {
@@ -188,5 +226,48 @@ describe('a setup job on the page', () => {
       const html = render([], [waitingRow({ health })]);
       expect(html).not.toContain('I have set this up');
     }
+  });
+});
+
+/**
+ * #625: one heading with three groups under it, instead of one list sorted by
+ * how pressing each row is.
+ */
+describe('the three groups', () => {
+  it('names each group it draws and says how many rows are in it', () => {
+    const html = render(
+      [raise({ id: 'r1' })],
+      [
+        waitingRow({ id: 'p1', number: 610 }),
+        waitingRow({ id: 'p2', number: 611, health: 'blocked', ask: 'A token for the repo.' }),
+        waitingRow({ id: 'p3', number: 612, health: 'proposed', ask: null }),
+      ],
+    );
+
+    expect(html).toContain('Your actions');
+    expect(html).toContain('Questions for you');
+    expect(html).toContain('To approve');
+    // Two actions, one question, one to approve -- and four on the section
+    // above them, which is the number the tab badge carries.
+    expect(html).toContain('Waiting on you');
+    expect(html).toMatch(/Your actions<span[^>]*>2</);
+    expect(html).toMatch(/Questions for you<span[^>]*>1</);
+    expect(html).toMatch(/To approve<span[^>]*>1</);
+    expect(html).toContain('(4)');
+  });
+
+  it('leaves out a group with nothing in it', () => {
+    const html = render([], [waitingRow()]);
+
+    expect(html).toContain('Your actions');
+    expect(html).not.toContain('Questions for you');
+    expect(html).not.toContain('To approve');
+  });
+
+  it('still says nothing is waiting when all three are empty', () => {
+    const html = render([], []);
+
+    expect(html).toContain('Nothing waiting on you');
+    expect(html).not.toContain('Your actions');
   });
 });
