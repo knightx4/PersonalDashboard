@@ -32,7 +32,7 @@ export type PlanOption = {
  * "A fired session…" is prose and not option A.
  */
 const MARKER =
-  /^(?:\(([A-Za-z])\)|\[([A-Za-z])\]|([A-Za-z])[).:]|([A-Za-z])\s*[—–-])\s+(\S.*)$/;
+  /^(?:\(([A-Za-z])\)|\[([A-Za-z])\]|([A-Za-z])[).:]|([A-Za-z])\s*(?:[—–]|-{1,2}))\s+(\S.*)$/;
 
 /** Long enough to say which option it is, short enough to sit on a button. */
 const LABEL_MAX = 120;
