@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { createClient, requireUser } from '@/lib/auth/server';
+import { createClient } from '@/lib/auth/server';
+import { requireOwner } from '@/lib/dev/owner';
 import { askDash } from '@/lib/comments/ask';
 import {
   COMMENT_TARGETS,
@@ -64,8 +65,8 @@ export async function addComment(
   _prev: CommentActionState,
   formData: FormData,
 ): Promise<CommentActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const target = targetSchema.safeParse(String(formData.get('target') ?? ''));
   const id = idSchema.safeParse(formData.get('id'));
@@ -137,8 +138,8 @@ export async function deleteComment(
   _prev: CommentActionState,
   formData: FormData,
 ): Promise<CommentActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const target = targetSchema.safeParse(String(formData.get('target') ?? ''));
   const id = idSchema.safeParse(formData.get('id'));

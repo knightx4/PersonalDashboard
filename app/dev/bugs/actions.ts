@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { requireOwner } from '@/lib/dev/owner';
 import { codeMatches } from '@/lib/feedback/code';
 import { notesRoutine } from '@/lib/feedback/routine';
 import { OUTSTANDING_STATUSES } from '@/lib/feedback/load';
@@ -24,6 +25,20 @@ const submitSchema = z.object({
   pagePath: z.string().max(300).nullable(),
 });
 
+/**
+ * File a note -- a bug or a request -- from the header panel.
+ *
+ * The one action in this file that is open to every signed-in account, and the
+ * one exception #417 makes. The button that posts it is in the header on every
+ * page of the app, not inside /dev, so locking it to the owner would take the
+ * capture away from the two accounts most likely to hit something and least
+ * able to do anything else about it. Everything else here is triage -- reading,
+ * rewording, closing and deleting other people's notes, and starting the run
+ * that works them -- and that is the owner's, so it goes through `requireOwner`
+ * below.
+ *
+ * `requireUser`, not `requireOwner`, on purpose. Do not "fix" it.
+ */
 // latency: pending
 export async function submitFeedback(
   _prev: FeedbackActionState,
@@ -76,8 +91,8 @@ export async function updateFeedbackStatus(
   _prev: FeedbackActionState,
   formData: FormData,
 ): Promise<FeedbackActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   const status = statusSchema.safeParse(formData.get('status'));
@@ -124,8 +139,8 @@ export async function editFeedback(
   _prev: FeedbackActionState,
   formData: FormData,
 ): Promise<FeedbackActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const parsed = editSchema.safeParse({
     id: formData.get('id'),
@@ -186,8 +201,8 @@ export async function respondToFeedback(
   _prev: FeedbackActionState,
   formData: FormData,
 ): Promise<FeedbackActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const parsed = respondSchema.safeParse({
     id: formData.get('id'),
@@ -234,8 +249,8 @@ export async function deleteFeedback(
   _prev: FeedbackActionState,
   formData: FormData,
 ): Promise<FeedbackActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing item.' };
@@ -264,8 +279,8 @@ export async function runFeatureRoutine(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _prev: FeedbackActionState, _formData: FormData,
 ): Promise<FeedbackActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const result = await startRoutineRun({
     supabase,
@@ -306,8 +321,8 @@ const STALE_AFTER_MS = 2 * 60 * 60 * 1000;
 
 // latency: instant -- a read for the button's badge, fetched without anything waiting
 export async function routineRun(): Promise<RoutineRun | null> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const { data } = await supabase
     .from('feedback_items')
@@ -338,8 +353,8 @@ export async function routineRun(): Promise<RoutineRun | null> {
  */
 // latency: instant -- a read for the header badge, fetched without anything waiting
 export async function openFeedbackCount(): Promise<number> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const { count } = await supabase
     .from('feedback_items')
@@ -355,8 +370,8 @@ export async function setFeedbackPriority(
   _prev: FeedbackActionState,
   formData: FormData,
 ): Promise<FeedbackActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   const priority = z.coerce.number().int().min(1).max(3).safeParse(formData.get('priority'));
