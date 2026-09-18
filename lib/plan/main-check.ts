@@ -135,3 +135,26 @@ export function mainCheckTitle(
 
   return `${commit} ${said}.${when}`;
 }
+
+/**
+ * What each colour means, for the panel behind the dot.
+ *
+ * The sentence above says what this particular reading is; these say what the
+ * four colours are, which is the thing a dot cannot tell you and a hover title
+ * has no room for. Written as the state rather than as an instruction, in the
+ * same machine voice as the line they sit in.
+ *
+ * `unknown` carries its four causes because it is the one that looks like a
+ * fault and usually is not: nothing read yet, GitHub refusing, a reading gone
+ * stale, and a commit no workflow touched all land on grey.
+ */
+export const MAIN_DOT_MEANING: Record<MainDot, string> = {
+  passed: 'Green: main built and its checks passed.',
+  failed: 'Red: a check on main failed. This is the one worth acting on.',
+  running: 'Amber: main is still being checked.',
+  unknown:
+    'Grey: nothing is known. Not read yet, GitHub would not say, the reading is over six minutes old, or main ran no checks.',
+};
+
+/** The colours in the order the panel lists them: best news first. */
+export const MAIN_DOT_ORDER: readonly MainDot[] = ['passed', 'running', 'failed', 'unknown'];

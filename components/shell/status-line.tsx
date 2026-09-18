@@ -1,10 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Activity } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { Popover } from '@/components/ui/popover';
+import { usePopover } from '@/lib/use-popover';
 import type { ActivityLine } from '@/lib/shell/activity';
-import { mainCheckTitle, mainDot, type MainCheck, type MainDot } from '@/lib/plan/main-check';
+import {
+  MAIN_DOT_MEANING,
+  MAIN_DOT_ORDER,
+  mainCheckTitle,
+  mainDot,
+  type MainCheck,
+  type MainDot,
+} from '@/lib/plan/main-check';
 
 /**
  * The status line.
@@ -111,12 +120,13 @@ function Timestamp() {
  * hexagon in the corner of every page would read as a control.
  *
  * But law 4 does not let a state be a hue and nothing else, so the dot says it
- * twice. The sentence is the first channel -- `title` hands it to a mouse and
- * `aria-label` hands the same words to a screen reader, and it names the
- * commit and when it was read, which is what makes the colour worth trusting
- * rather than merely worth looking at. The halo is the second: red is the only
- * state that gets one, so the one reading that needs somebody carries a mark
- * nothing else on the line has, in greyscale as much as in colour.
+ * twice. The sentence is the first channel -- `title` hands it to a mouse, the
+ * button's own text hands the same words to a screen reader, and the panel
+ * below hands them to a click. It names the commit and when it was read, which
+ * is what makes the colour worth trusting rather than merely worth looking at.
+ * The halo is the second: red is the only state that gets one, so the one
+ * reading that needs somebody carries a mark nothing else on the line has, in
+ * greyscale as much as in colour.
  *
  * A ring rather than a border, because a rounded box with a bare `border` is
  * what `npm run check:ui` calls a hand-rolled box -- rightly, everywhere that
@@ -126,6 +136,18 @@ function Timestamp() {
  * is server-rendered as it stands, and only the staleness test and the time in
  * the sentence wait for `useNow`. The dot keeps its size and its place either
  * way, so the line does not change shape on hydration.
+ *
+ * -- Why it is a button --
+ *
+ * The sentence used to be reachable only by hovering, which is a mouse asking
+ * a question and getting an answer at the cursor rather than at the dot. And
+ * the sentence is only half of what somebody standing in front of a coloured
+ * dot wants: the other half is what the colours are, which no `title` has room
+ * for. Clicking opens both, above the dot, where the dot is. The `title` stays,
+ * because a hover that already worked is not worth taking away.
+ *
+ * The button is padded to a real target and the padding is pulled back out
+ * again, so the dot is still an 8px dot in the same place on the line.
  */
 function MainDotMark({ check }: { check: MainCheck | null }) {
   const now = useNow();
@@ -135,13 +157,63 @@ function MainDotMark({ check }: { check: MainCheck | null }) {
   const read = now === null || !check ? null : clock(new Date(check.checkedAt).getTime());
   const said = mainCheckTitle(check, now, read);
 
+  const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  usePopover({ open, onClose: () => setOpen(false), panelRef, triggerRef });
+
   return (
-    <span
-      role="img"
-      aria-label={said}
-      title={said}
-      className={cn('pointer-events-auto size-2 shrink-0 rounded-full', DOT[state])}
-    />
+    <span className="pointer-events-auto relative shrink-0">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        title={said}
+        className="-m-1.5 flex items-center rounded-full p-1.5 transition-colors hover:bg-shell-hover"
+      >
+        <span className={cn('size-2 rounded-full', DOT[state])} aria-hidden />
+        <span className="sr-only">{`CI on main. ${said}`}</span>
+      </button>
+
+      {open && (
+        <Popover
+          ref={panelRef}
+          role="dialog"
+          aria-label="CI on main"
+          tabIndex={-1}
+          anchor="trigger-above-end"
+          padding="panel"
+          className="w-72 font-sans"
+        >
+          <p className="text-ui text-ink">{said}</p>
+          <ul className="mt-3 space-y-2 border-t border-border pt-3">
+            {MAIN_DOT_ORDER.map((dot) => (
+              <li key={dot} className="flex items-start gap-2">
+                <span
+                  className={cn('mt-1.5 size-2 shrink-0 rounded-full', DOT[dot])}
+                  aria-hidden
+                />
+                {/*
+                  The state being drawn right now is in full ink and the other
+                  three are muted, so the legend answers "which one am I looking
+                  at" without being read end to end.
+                */}
+                <span
+                  className={cn(
+                    'text-caption',
+                    dot === state ? 'font-semibold text-ink' : 'text-ink-muted',
+                  )}
+                >
+                  {MAIN_DOT_MEANING[dot]}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Popover>
+      )}
+    </span>
   );
 }
 

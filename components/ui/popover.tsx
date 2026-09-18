@@ -91,6 +91,12 @@ const popover = cva(`${popoverSurface} z-overlay`, {
        * scrolls it back.
        */
       'trigger-below-end': 'absolute right-0 top-full mt-1.5',
+      /**
+       * The same, upwards: hung from the trigger's right edge and standing on
+       * top of it. For a trigger in the bottom bar, where there is no room
+       * below by definition -- the bar is the bottom of the window.
+       */
+      'trigger-above-end': 'absolute bottom-full right-0 mb-1.5',
     },
     /**
      * `menu` is a list of rows that carry their own padding, so the panel

@@ -12,10 +12,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   MAIN_CHECK_STALE_MINUTES,
+  MAIN_DOT_MEANING,
+  MAIN_DOT_ORDER,
   mainCheckStale,
   mainCheckTitle,
   mainDot,
   type MainCheck,
+  type MainDot,
 } from '@/lib/plan/main-check';
 
 const NOW = Date.parse('2026-09-18T21:40:00.000Z');
@@ -108,5 +111,24 @@ describe('mainCheckTitle', () => {
 
   it('says nothing has been read when nothing has', () => {
     expect(mainCheckTitle(null, NOW, '22:39')).toBe('CI on main has not been read yet.');
+  });
+});
+
+/**
+ * The legend behind the dot: the panel a click opens has to cover every colour
+ * the dot can be, or a reader meets one the panel does not explain.
+ */
+describe('the dot legend', () => {
+  it('explains every state the dot can take, once each', () => {
+    const dots: MainDot[] = ['passed', 'failed', 'running', 'unknown'];
+    expect([...MAIN_DOT_ORDER].sort()).toEqual([...dots].sort());
+    for (const dot of dots) expect(MAIN_DOT_MEANING[dot]).toMatch(/\S/);
+  });
+
+  it('names the colour, since the legend is what maps a hue to a meaning', () => {
+    expect(MAIN_DOT_MEANING.passed).toContain('Green');
+    expect(MAIN_DOT_MEANING.failed).toContain('Red');
+    expect(MAIN_DOT_MEANING.running).toContain('Amber');
+    expect(MAIN_DOT_MEANING.unknown).toContain('Grey');
   });
 });
