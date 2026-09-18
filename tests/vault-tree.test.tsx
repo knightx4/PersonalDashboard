@@ -131,3 +131,58 @@ describe('the column once a search has narrowed it', () => {
     expect(searched('Money/Rent.md')).not.toContain('onclick');
   });
 });
+
+/**
+ * The folders you left open (#576) are an OR on top of the view #557 chose,
+ * never a replacement for it: the folder being read stays open whatever was
+ * remembered, and a search still opens every folder it left a match in, or a
+ * remembered fold would hide the results that were searched for.
+ */
+describe('the column with folders remembered from last time', () => {
+  function withOpen(currentPath: string, openFolders: string[], openAll = false): string {
+    return renderToStaticMarkup(
+      <VaultTree
+        groups={GROUPS}
+        currentPath={currentPath}
+        openFolders={openFolders}
+        openAll={openAll}
+      />,
+    );
+  }
+
+  it('opens a folder that was left open', () => {
+    expect(folders(withOpen('Money/Rent.md', ['Recipes'])).map((f) => f.open)).toEqual([
+      false,
+      true,
+      true,
+    ]);
+  });
+
+  it('remembers the vault root by its empty name', () => {
+    expect(folders(withOpen('Money/Rent.md', [''])).map((f) => f.open)).toEqual([
+      true,
+      true,
+      false,
+    ]);
+  });
+
+  it('keeps the folder being read open even when it was not remembered', () => {
+    expect(folders(withOpen('Money/Rent.md', ['Recipes']))[1].open).toBe(true);
+  });
+
+  it('leaves every other folder shut', () => {
+    expect(folders(withOpen('Inbox.md', [])).map((f) => f.open)).toEqual([true, false, false]);
+  });
+
+  it('never folds a search shut, whatever was remembered', () => {
+    expect(folders(withOpen('Inbox.md', ['Money'], true)).map((f) => f.open)).toEqual([
+      true,
+      true,
+      true,
+    ]);
+  });
+
+  it('still folds without JavaScript, since remembering is two props and no state', () => {
+    expect(withOpen('Money/Rent.md', ['Recipes'])).not.toContain('onclick');
+  });
+});

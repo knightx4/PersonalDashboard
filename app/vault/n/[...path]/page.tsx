@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { NoteBody } from '@/components/vault/note-body';
 import { NoteProperties } from '@/components/vault/note-properties';
-import { VaultTree } from '@/components/vault/vault-tree';
+import { RememberedVaultTree } from '@/components/vault/vault-tree-remembered';
 import { SearchEmpty } from '@/components/shell/search-empty';
 import { SearchField } from '@/components/shell/search-field';
 import { createVaultClient } from '@/lib/vault/auth/server';
@@ -27,9 +27,11 @@ export const dynamic = 'force-dynamic';
  *
  * The vault itself sits beside the note from `lg` up, as #468 and #557 settled:
  * every folder, only the one you are reading in open, so the next note is one
- * click away rather than a trip back to the list. It is drawn here rather than
- * in `app/vault/layout.tsx` because a layout cannot read the address bar, and
- * the search box at the top of the column has to.
+ * click away rather than a trip back to the list. Any other folder you left
+ * open comes back open too, out of the browser you are reading in and nowhere
+ * else, which is #567's answer. It is drawn here rather than in
+ * `app/vault/layout.tsx` because a layout cannot read the address bar, and the
+ * search box at the top of the column has to.
  *
  * That box is #468's answer to searching the vault while reading a note: it
  * narrows the column in place, against the same full-text index the note list
@@ -95,8 +97,14 @@ export default async function NotePage({
                 <SearchEmpty query={search} className="px-3 py-8" />
               ) : (
                 // Searching opens every folder it left in the column: a match
-                // folded out of sight has not been reached.
-                <VaultTree groups={groups} currentPath={note.path} openAll={Boolean(search)} />
+                // folded out of sight has not been reached. Anything else the
+                // reader left open is opened on top of that, never instead of
+                // it (#576).
+                <RememberedVaultTree
+                  groups={groups}
+                  currentPath={note.path}
+                  openAll={Boolean(search)}
+                />
               )}
             </div>
           </div>

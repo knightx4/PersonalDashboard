@@ -18,9 +18,10 @@ export type VaultFolderGroup = { folder: string; notes: NoteSummary[] };
  *
  * Each folder is a `Disclosure`, which is a native `<details>`: the folds work
  * before JavaScript does, which is law 6 and the reason nothing here is
- * stateful. #576 hangs remembering what you left open off the `onToggle` that
- * component already takes, from a client wrapper around this one; nothing in
- * this file has to change for it.
+ * stateful. Remembering what you left open (#576) is two optional props and no
+ * state -- `components/vault/vault-tree-remembered.tsx` reads the browser's
+ * storage and passes them down, and without that wrapper this is still plain
+ * markup that folds on its own.
  *
  * Headerless and width-agnostic on purpose. The note page frames it as a
  * column from `lg` up, and #577 puts the same tree inside a phone sheet.
@@ -29,6 +30,8 @@ export function VaultTree({
   groups,
   currentPath,
   openAll = false,
+  openFolders,
+  onToggleFolder,
   className,
 }: {
   groups: VaultFolderGroup[];
@@ -41,9 +44,23 @@ export function VaultTree({
    * match folded out of sight has not been reached.
    */
   openAll?: boolean;
+  /**
+   * Folders left open last time, from the browser the reader is in (#567).
+   * Strictly extra: it is an OR on top of the folder being read and on top of
+   * `openAll`, never a replacement for either, or a remembered fold would
+   * shut a search's own results away.
+   */
+  openFolders?: readonly string[];
+  /**
+   * A folder was folded open or shut, for the client wrapper that records it.
+   * Without it this stays what it is: markup that folds before JavaScript
+   * loads.
+   */
+  onToggleFolder?: (folder: string, open: boolean) => void;
   className?: string;
 }) {
   const currentFolder = folderOf(currentPath);
+  const remembered = new Set(openFolders ?? []);
 
   return (
     <nav aria-label="All notes" className={cn('space-y-0.5', className)}>
@@ -53,7 +70,10 @@ export function VaultTree({
         return (
           <Disclosure
             key={group.folder || '(root)'}
-            defaultOpen={openAll || reading}
+            defaultOpen={openAll || reading || remembered.has(group.folder)}
+            onToggle={
+              onToggleFolder ? (open) => onToggleFolder(group.folder, open) : undefined
+            }
             // Law 10's second half: the shut line says whether opening it is
             // worth it, and for a folder that is how much is inside.
             meta={group.notes.length}
