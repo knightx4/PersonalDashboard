@@ -27,6 +27,7 @@ function concept(id: string, state: KnowledgeState = 'unknown'): Concept {
     established: state === 'known' ? 'tested' : 'inferred',
     misconception: null,
     testedAt: null,
+    declaredAt: null,
   };
 }
 

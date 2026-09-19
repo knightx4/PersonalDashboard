@@ -42,6 +42,7 @@ function concept(id: string, state: KnowledgeState = 'unknown'): Concept {
     established: 'inferred',
     misconception: state === 'misconception' ? `A wrong idea about ${id}.` : null,
     testedAt: null,
+    declaredAt: null,
   };
 }
 

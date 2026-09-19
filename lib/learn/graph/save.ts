@@ -257,15 +257,19 @@ export async function declareKnown(
 ): Promise<void> {
   if (conceptIds.length === 0) return;
 
+  const declaredAt = new Date().toISOString();
   const { error } = await supabase.from('concept_state').upsert(
     conceptIds.map((conceptId) => ({
       concept_id: conceptId,
       user_id: userId,
       state: 'known',
       established: 'declared',
-      // Not tested, so not dated. `tested_at` is what "not checked since
+      // Not tested, so no `tested_at`. That column is what "not checked since
       // March" is read off, and a declaration has never been checked at all.
+      // The day you declared it goes in its own column, which is what lets a
+      // claim settled on your word come back for a question later.
       tested_at: null,
+      declared_at: declaredAt,
     })),
     { onConflict: 'concept_id' },
   );
@@ -302,9 +306,11 @@ export async function declareConceptKnown(
       state: 'known',
       established: 'declared',
       misconception: null,
-      // Nothing was answered, so there is no date to write. The re-check
-      // schedule reads `tested_at` and passes over a claim that has none.
+      // Nothing was answered, so there is no tested date to write. What the
+      // row does carry is the day it was waved through, which is what the
+      // re-check schedule reads when a claim has no `tested_at`.
       tested_at: null,
+      declared_at: new Date().toISOString(),
     },
     { onConflict: 'concept_id' },
   );

@@ -47,6 +47,7 @@ function concept(id: string, state: KnowledgeState = 'unknown', testedAt: string
     established: testedAt === null ? 'inferred' : 'tested',
     misconception: null,
     testedAt,
+    declaredAt: null,
   };
 }
 

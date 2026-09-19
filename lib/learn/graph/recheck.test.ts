@@ -22,6 +22,7 @@ function concept(
   state: KnowledgeState,
   established: StateBasis,
   testedAt: string | null,
+  declaredAt: string | null = null,
 ): Concept {
   return {
     id,
@@ -36,6 +37,7 @@ function concept(
     established,
     misconception: null,
     testedAt,
+    declaredAt,
   };
 }
 

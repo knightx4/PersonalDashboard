@@ -3,6 +3,7 @@ import {
   nextConcept,
   nextMasteryCheck,
   nextRung,
+  setMisconception,
   settledStateFor,
   type AskedRung,
 } from './session';
@@ -31,6 +32,7 @@ function concept(id: string, state: KnowledgeState, kind: Concept['kind'] = null
     established: 'inferred',
     misconception: state === 'misconception' ? 'A wrong idea.' : null,
     testedAt: null,
+    declaredAt: null,
   };
 }
 
@@ -327,5 +329,44 @@ describe('where an answer leaves the concept', () => {
     expect(settledStateFor('recognise', false)).toBe('shaky');
     expect(settledStateFor('apply', false)).toBe('shaky');
     expect(settledStateFor('defend', false)).toBe('shaky');
+  });
+});
+
+
+/**
+ * A stand-in for the session client, recording what the upsert was handed.
+ *
+ * Enough of the builder for the one write under test, the same way
+ * save.test.ts stubs the chain writes.
+ */
+function clientRecordingUpserts() {
+  const rows: Record<string, unknown>[] = [];
+  const client = {
+    from() {
+      return {
+        upsert: (written: unknown) => {
+          for (const row of Array.isArray(written) ? written : [written]) {
+            rows.push(row as Record<string, unknown>);
+          }
+          return { then: (resolve: (v: { error: null }) => void) => resolve({ error: null }) };
+        },
+      };
+    },
+  };
+
+  return { client: client as never, rows };
+}
+
+describe('what a graded answer writes on the row', () => {
+  it('dates the claim as tested and drops the date you declared it', async () => {
+    const { client, rows } = clientRecordingUpserts();
+    await setMisconception(client, 'user-1', 'concept-1', 'Thinks marginal means average.');
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].established).toBe('tested');
+    expect(rows[0].tested_at).not.toBeNull();
+    // Answered about, so it no longer rests on your word. The database refuses
+    // a row carrying both dates, so this null is not optional.
+    expect(rows[0].declared_at).toBeNull();
   });
 });

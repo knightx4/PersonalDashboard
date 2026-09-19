@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { declareConceptKnown, saveChain } from './save';
+import { declareConceptKnown, declareKnown, saveChain } from './save';
 import type { ProposedChain } from './chain-payload';
 
 /**
@@ -269,18 +269,21 @@ describe('a chain that adds nothing new', () => {
   });
 });
 
+type StateRow = {
+  concept_id: string;
+  state: string;
+  established: string;
+  misconception?: string | null;
+  tested_at: string | null;
+  declared_at: string | null;
+};
+
 describe('waving a case through', () => {
-  it('writes known on your word, with no date and no misconception left on the row', async () => {
+  it('writes known on your word, dated today, with no tested date beside it', async () => {
     const { client, inserts } = clientReturningIds('subject-1');
     await declareConceptKnown(client, 'user-1', 'concept-1');
 
-    const rows = rowsFor(inserts, 'concept_state') as {
-      concept_id: string;
-      state: string;
-      established: string;
-      misconception: string | null;
-      tested_at: string | null;
-    }[];
+    const rows = rowsFor(inserts, 'concept_state') as StateRow[];
     expect(rows).toHaveLength(1);
     expect(rows[0].concept_id).toBe('concept-1');
     expect(rows[0].state).toBe('known');
@@ -288,6 +291,24 @@ describe('waving a case through', () => {
     // The check constraint ties the sentence to the state, so a concept that
     // was carrying one cannot move to known unless this write clears it.
     expect(rows[0].misconception).toBeNull();
+    // Nothing was answered, so the tested date stays empty and the date the
+    // re-check schedule reads is the one this write puts on the row. Another
+    // check constraint refuses a row holding both.
     expect(rows[0].tested_at).toBeNull();
+    expect(rows[0].declared_at).not.toBeNull();
+    expect(new Date(rows[0].declared_at!).toDateString()).toBe(new Date().toDateString());
+  });
+
+  it('dates the pasted claims the same way', async () => {
+    const { client, inserts } = clientReturningIds('subject-1');
+    await declareKnown(client, 'user-1', ['concept-1', 'concept-2']);
+
+    const rows = rowsFor(inserts, 'concept_state') as StateRow[];
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.established).toBe('declared');
+      expect(row.tested_at).toBeNull();
+      expect(new Date(row.declared_at!).toDateString()).toBe(new Date().toDateString());
+    }
   });
 });
