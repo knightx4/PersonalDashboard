@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { Activity } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Popover } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
 import type { ActivityLine } from '@/lib/shell/activity';
+import type { Brief } from '@/lib/shell/brief';
 import {
   MAIN_DOT_MEANING,
   MAIN_DOT_ORDER,
@@ -36,12 +38,21 @@ import {
  * at it, never be stopped by it -- and because this line is already on every
  * page. It is read from a stored row, never from GitHub; see
  * `lib/shell/main-check.ts`.
+ *
+ * The workspace's one-line summary reads at the left of this line from lg up,
+ * where the middle of the top bar used to carry it. It is the one thing here
+ * about your data rather than about the system, so it stays on its own side of
+ * the activity notes with a rule between them. Below lg this line is not drawn
+ * and the top bar still carries the summary; see components/shell/app-shell.tsx.
  */
 export function StatusLine({
   lines,
+  brief = null,
   main = null,
 }: {
   lines: ActivityLine[];
+  /** The one thing this workspace would say if it could say only one thing. */
+  brief?: Brief | null;
   main?: MainCheck | null;
 }) {
   const [settled, setSettled] = useState(false);
@@ -55,9 +66,9 @@ export function StatusLine({
   // The bar used to exist only for the activity lines, so no lines meant no
   // bar. The dot is the second reason for it to be here and it is the one that
   // matters on a quiet day -- main goes red on the nights nothing else is
-  // happening -- so the line now stands for either. With neither there is
-  // still nothing to draw.
-  if (lines.length === 0 && !main) return null;
+  // happening -- and the summary is the third, on a workspace where nothing has
+  // happened yet at all. With none of the three there is still nothing to draw.
+  if (lines.length === 0 && !main && !brief) return null;
 
   return (
     <div className="pointer-events-none sticky bottom-0 z-status hidden border-t border-shell-border bg-shell/85 backdrop-blur lg:block">
@@ -67,7 +78,22 @@ export function StatusLine({
           settled ? 'text-shell-muted/70' : 'text-shell-muted',
         )}
       >
-        <Activity className="size-3 shrink-0" strokeWidth={1.75} aria-hidden />
+        {brief && (
+          <>
+            <BriefMark brief={brief} />
+            {lines.length > 0 && (
+              <span className="h-3 w-px shrink-0 bg-shell-border" aria-hidden />
+            )}
+          </>
+        )}
+        {/* The icon marks where the activity notes start, so it is drawn only
+        when there are some. Without this it sat in front of the summary and
+        read as labelling it. */}
+        {lines.length > 0 && (
+          <Activity className="size-3 shrink-0" strokeWidth={1.75} aria-hidden />
+        )}
+        {/* Empty when there are no notes, and still the flexible cell: it is
+        what holds the dot and the clock in the right corner. */}
         <span className="min-w-0 flex-1 truncate">
           {lines.map((line) => line.text).join('  ·  ')}
         </span>
@@ -75,6 +101,42 @@ export function StatusLine({
         <Timestamp />
       </div>
     </div>
+  );
+}
+
+/**
+ * The workspace's summary, on the status line.
+ *
+ * Capped at half the line and truncated past that, so a long summary and long
+ * activity notes each keep half rather than one of them squeezing the other to
+ * an ellipsis.
+ *
+ * The line as a whole is `pointer-events-none` -- it is read, not used, and a
+ * strip across the foot of every page that swallows clicks is a strip in the
+ * way. A summary that links somewhere has to take its clicks back, the same as
+ * the dot above.
+ *
+ * No pill here. In the top bar the caution tone was a tinted chip, which is
+ * the right weight in a 56px bar and too much in a line this thin; the colour
+ * alone carries it, and the underline on hover says the rest is a link.
+ */
+function BriefMark({ brief }: { brief: Brief }) {
+  const box = 'min-w-0 max-w-1/2 shrink-0 truncate';
+  const tone = brief.tone === 'caution' ? 'text-caution' : undefined;
+
+  if (!brief.href) return <span className={cn(box, tone)}>{brief.text}</span>;
+
+  return (
+    <Link
+      href={brief.href}
+      className={cn(
+        box,
+        'pointer-events-auto underline-offset-2 transition-colors hover:underline',
+        tone ?? 'hover:text-shell-ink',
+      )}
+    >
+      {brief.text}
+    </Link>
   );
 }
 
