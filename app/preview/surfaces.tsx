@@ -33,6 +33,8 @@ import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
 import type { Concept } from '@/lib/learn/graph/model';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
+import { CaptureProvider } from '@/components/shell/capture';
+import { SearchBar } from '@/components/shell/search-bar';
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
 import {
@@ -1868,6 +1870,33 @@ export const SURFACES: readonly Surface[] = [
     module: 'shopping',
     width: 'wide',
     render: () => <SharedDisplayOptions />,
+  },
+
+  {
+    /* The top bar's search field and its chip, on their own, because this is
+     * where they can be typed into before the shell has anywhere to put them.
+     * The chip starts on the workspace the bar is standing in, and pressing it
+     * widens the list to everything the account holds.
+     *
+     * The capture provider is here because a search box offers the things you
+     * can start as well as the things you own, and choosing one of those opens
+     * the capture panel. In the app the shell provides it. */
+    id: 'shell-search-bar',
+    label: 'Top bar · Search and its workspace chip',
+    module: 'jobs',
+    width: 'narrow',
+    render: () => (
+      <CaptureProvider>
+        <div className="py-4">
+          <SearchBar
+            account="preview"
+            module="jobs"
+            sections={shellSections}
+            theme={{ kind: 'written', id: 'paper' }}
+          />
+        </div>
+      </CaptureProvider>
+    ),
   },
 
   {

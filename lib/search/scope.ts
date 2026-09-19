@@ -1,4 +1,4 @@
-import { isModuleId, type ModuleId } from '@/lib/modules';
+import { isModuleId, moduleById, type ModuleId } from '@/lib/modules';
 import type { SearchHit } from '@/lib/search/sources';
 
 /**
@@ -31,6 +31,35 @@ export const SCOPE_PARAM = 'in';
  */
 export function scopeForModule(module: ModuleId | null): SearchScope {
   return module ?? 'everything';
+}
+
+/**
+ * What the bar's chip says it is searching.
+ *
+ * The workspace's own name, or "Everything" for the whole account. The word
+ * is the chip's whole content, so it has to name the wider setting rather
+ * than describe it: "Everything" is what the person gets when they press it,
+ * and a scope naming a workspace that no longer exists falls back to the same
+ * thing `parseScope` does.
+ */
+export function scopeLabel(scope: SearchScope): string {
+  return scope === 'everything' ? 'Everything' : (moduleById(scope)?.label ?? 'Everything');
+}
+
+/**
+ * What pressing the chip switches to.
+ *
+ * Two states and no more: the workspace the page is in, and everything you
+ * own. `module` is where the page stands, so a bar switched to everything
+ * goes back to the workspace it is sitting in rather than to whichever
+ * workspace it was last narrowed to -- which matters because the chip is in
+ * the top bar of every workspace and the page underneath changes.
+ *
+ * Outside a workspace there is nothing to narrow to, so both states are
+ * `'everything'` and the bar draws no chip at all.
+ */
+export function toggleScope(scope: SearchScope, module: ModuleId | null): SearchScope {
+  return scope === 'everything' ? scopeForModule(module) : 'everything';
 }
 
 /**
