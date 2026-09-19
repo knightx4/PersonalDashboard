@@ -2,6 +2,7 @@ import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { escapeLike } from '@/lib/search/sources/map';
 
 /**
  * Reading the queue.
@@ -196,17 +197,34 @@ const READING_COLUMNS =
   'sources!readings_source_fk ( id, title, author, kind, year, canonical_url, access, price_cents, page_count )';
 
 /**
- * Every track, with its progress.
+ * Every track, with its progress. With a search, the ones it matches.
  *
  * One query for the tracks and one for their readings' statuses, rather than a
  * count per track: a personal queue is tens of tracks, and two round trips
- * beat N.
+ * beat N. The second query is looked up by track id, so a narrowed list still
+ * costs the same two.
+ *
+ * A search matches the title or the question, which are the two strings a
+ * track is remembered by. Blank or whitespace is no search at all rather than
+ * a match on nothing, so clearing the box gives the whole list back.
  */
-export async function loadTracks(supabase: LearnSupabaseClient): Promise<TrackSummary[]> {
-  const { data, error } = await supabase
+export async function loadTracks(
+  supabase: LearnSupabaseClient,
+  search?: string,
+): Promise<TrackSummary[]> {
+  let read = supabase
     .from('tracks')
-    .select('id, title, question, status, created_at, branched_from')
-    .order('created_at', { ascending: false });
+    .select('id, title, question, status, created_at, branched_from');
+
+  const term = search?.trim();
+  if (term) {
+    // Escaped, so a % or an _ somebody typed is the character they typed
+    // rather than a wildcard matching everything from there.
+    const pattern = `%${escapeLike(term)}%`;
+    read = read.or(`title.ilike.${pattern},question.ilike.${pattern}`);
+  }
+
+  const { data, error } = await read.order('created_at', { ascending: false });
 
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw new Error(`Reading your tracks failed: ${error.message}`);
