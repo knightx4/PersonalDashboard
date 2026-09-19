@@ -37,6 +37,7 @@ export const LEARN_OPERATIONS = [
   'write-probe',
   'name-misconception',
   'propose-floor',
+  'classify-note',
   'concepts-from-note',
   'concepts-from-prior',
   'concepts-from-brief',
