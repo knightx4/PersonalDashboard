@@ -52,7 +52,7 @@ describe('planBrief', () => {
         detail: 'A page a person with no account can open.',
         acceptance: 'Opens without a session. Shows only owned items.',
         comment: 'Waiting on the RPC review.',
-        assignee: 'claude',
+        assignee: 'me',
         size: 'm',
       }),
       item({ id: 'form', title: 'The form', parentId: 'page' }),
@@ -77,7 +77,7 @@ describe('planBrief', () => {
 
   it('says where the step sits and who holds it', () => {
     expect(brief).toContain('Module: Shopping');
-    expect(brief).toContain('Assigned: Claude');
+    expect(brief).toContain('Assigned: me');
     expect(brief).toContain('Size: M');
     expect(brief).toContain('Part of: #2 Share links');
   });
@@ -387,5 +387,19 @@ describe('planBrief, on a claimed step', () => {
     expect(brief).toContain(
       'Somebody else is on this (claimed by a run that ended without closing it)',
     );
+  });
+});
+
+describe('planBrief, on a step whose assignee column still says claude', () => {
+  const sections = buildPlanTree({
+    items: [item({ id: 'old-send', title: 'Sent before #672', assignee: 'claude' })],
+    dependencies: [],
+  });
+
+  it('says nothing about who it is for', () => {
+    // Nothing hands a step to Dash any more, so a `claude` here is a value
+    // left by a hand-over that no longer happens, and the brief skips it the
+    // way it skips an empty column.
+    expect(planBrief(sections, findNode(sections, 'old-send')!)).not.toContain('Assigned');
   });
 });

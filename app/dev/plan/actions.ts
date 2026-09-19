@@ -1338,7 +1338,7 @@ export async function startOvernightRunner(
     return {
       message:
         'Running, with no limit. It keeps firing features while there is work ' +
-        'handed over and ready, and stops when you stop it. The next tick picks the first one.',
+        'you have approved that is ready, and stops when you stop it. The next tick picks the first one.',
     };
   }
 
