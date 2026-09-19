@@ -2,6 +2,7 @@ import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { escapeLike } from '@/lib/search/sources/map';
 
 /**
  * Reading the queue.
@@ -196,17 +197,45 @@ const READING_COLUMNS =
   'sources!readings_source_fk ( id, title, author, kind, year, canonical_url, access, price_cents, page_count )';
 
 /**
- * Every track, with its progress.
+ * What to narrow the list of tracks to.
+ *
+ * An object rather than a bare string because matching is going to grow: a
+ * search is meant to find readings inside a track as well, and that lands as
+ * another field here rather than another positional argument.
+ */
+export type TrackListFilter = {
+  /**
+   * Keep only the tracks whose title or question contains this, ignoring case.
+   * Empty or blank is no search at all, and every track comes back.
+   */
+  search?: string;
+};
+
+/**
+ * Every track, with its progress. With a search, the ones that match it.
  *
  * One query for the tracks and one for their readings' statuses, rather than a
  * count per track: a personal queue is tens of tracks, and two round trips
- * beat N.
+ * beat N. The statuses query is not narrowed alongside the tracks -- it is read
+ * by track id and the rows a search left out are simply never looked up.
  */
-export async function loadTracks(supabase: LearnSupabaseClient): Promise<TrackSummary[]> {
-  const { data, error } = await supabase
+export async function loadTracks(
+  supabase: LearnSupabaseClient,
+  filter: TrackListFilter = {},
+): Promise<TrackSummary[]> {
+  let tracksRead = supabase
     .from('tracks')
-    .select('id, title, question, status, created_at, branched_from')
-    .order('created_at', { ascending: false });
+    .select('id, title, question, status, created_at, branched_from');
+
+  const search = filter.search?.trim();
+  if (search) {
+    // Escaped, so a % or a _ somebody typed is the character they typed rather
+    // than "match anything from here".
+    const pattern = `%${escapeLike(search)}%`;
+    tracksRead = tracksRead.or(`title.ilike.${pattern},question.ilike.${pattern}`);
+  }
+
+  const { data, error } = await tracksRead.order('created_at', { ascending: false });
 
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw new Error(`Reading your tracks failed: ${error.message}`);
