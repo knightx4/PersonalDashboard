@@ -276,29 +276,48 @@ export function isResolvingAnswers(
 }
 
 /**
+ * Whether a stamp on a step is one that ended the run fired at it.
+ *
+ * A close and a block both say the session finished with that step: it either
+ * did the work or wrote down the question it could not answer, and no more
+ * comes from it either way. A stamp from before the run was fired belongs to
+ * an earlier run and says nothing about this one.
+ *
+ * One function because four readers ask it -- `runEnd` below, `runLiveness`,
+ * the overnight tick and the claim sweep -- and the fourth copy of a date
+ * comparison is the one that drifts.
+ */
+export function endsRun(stamp: string | null | undefined, firedAt: string): boolean {
+  if (!stamp) return false;
+  const at = new Date(stamp).getTime();
+  return Number.isFinite(at) && at >= new Date(firedAt).getTime();
+}
+
+/**
  * What a run that still reads `started` should be written back as, or null
  * while it may still be working.
  *
- * A step closing after the run was fired is the one piece of evidence a
- * session leaves: it was sent at that step, and that step is now closed, so
- * the run did what it was for. Everything else is the clock — past the cutoff
- * with no step closed, nothing has been heard from it and it is not coming
- * back.
+ * A step closing after the run was fired is the evidence a session leaves: it
+ * was sent at that step, and that step is now closed, so the run did what it
+ * was for. A block counts the same from #679: the session stopped at that step
+ * and wrote down what it needs, so nothing more is coming from it either.
+ * Everything else is the clock — past the cutoff with the step neither closed
+ * nor blocked, nothing has been heard from it and it is not coming back.
  *
  * `now` of 0 is the clock's pre-mount value, so nothing ends at that instant.
  */
 export function runEnd(
   run: { status: string; createdAt: string },
-  step: { completedAt: string | null } | null,
+  step: { completedAt: string | null; blockedAt?: string | null } | null,
   now: number,
 ): RunEnd | null {
   if (run.status !== 'started') return null;
   if (now === 0) return null;
 
-  const fired = new Date(run.createdAt).getTime();
-  const closed = step?.completedAt ? new Date(step.completedAt).getTime() : null;
-  if (closed !== null && closed >= fired) return 'finished';
+  if (endsRun(step?.completedAt, run.createdAt)) return 'finished';
+  if (endsRun(step?.blockedAt, run.createdAt)) return 'finished';
 
+  const fired = new Date(run.createdAt).getTime();
   return (now - fired) / 60_000 >= RUN_QUIET_AFTER_MINUTES ? 'failed' : null;
 }
 
