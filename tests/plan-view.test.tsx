@@ -781,21 +781,90 @@ describe('health and status, as two columns', () => {
     expect(row).not.toContain('Not started');
   });
 
-  it('says a step handed over is for Dash', () => {
-    expect(render('all')).toContain('For Dash');
-  });
-
   it('says a blocked step and a proposal need you', () => {
     const html = render('all');
     expect(html).toContain('Needs you');
   });
 
-  it('says a step nobody has handed anywhere is yours', () => {
-    expect(render('all')).toContain('Yours');
-  });
-
   it('says a step held up by another is held up', () => {
     expect(render('all')).toContain('Held up');
+  });
+
+  // #694. The runner takes anything approved that is not yours, so "handed
+  // over" is no longer a state a row can be in and the word for it is gone
+  // from the page in both places it was written.
+  it('says nothing about an approved step waiting its turn', () => {
+    const html = render('all');
+    expect(html).not.toContain('For Dash');
+    expect(html).not.toContain('Handed to Dash');
+  });
+
+  it('says Yours for a step you marked, underway or not', () => {
+    const marked = buildPlanTree({
+      items: [
+        item({ id: 'resting', title: 'Outlook ingestion', assignee: 'me' }),
+        item({
+          id: 'going',
+          title: 'Account deletion',
+          assignee: 'me',
+          status: 'in_progress',
+          startedAt: '2026-02-01T09:30:00Z',
+        }),
+        // The runner's own step, in the same render, saying nothing.
+        item({ id: 'queued', title: 'Receipts by photo' }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(marked, 'open')}
+        finished={[]}
+        summary={summarize(marked)}
+        view="open"
+        catalog={catalogOf(marked)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+    // Both marked rows say it, and the underway one is not read as a
+    // session's: marking a step is what holds the runner off it, whoever
+    // started it.
+    expect((html.match(/>Yours</g) ?? []).length).toBe(2);
+    expect(html).not.toContain('With Dash');
+    expect(html).toContain('You kept this one, so the runner will not take it.');
+  });
+
+  it('says With Dash for an underway step you did not mark', () => {
+    const running = buildPlanTree({
+      items: [
+        item({
+          id: 'session',
+          title: 'Outlook ingestion',
+          status: 'in_progress',
+          startedAt: '2026-02-01T09:30:00Z',
+        }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(running, 'open')}
+        finished={[]}
+        summary={summarize(running)}
+        view="open"
+        catalog={catalogOf(running)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+    expect(html).toContain('With Dash');
+    expect(html).not.toContain('>Yours<');
   });
 });
 

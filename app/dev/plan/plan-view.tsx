@@ -1816,11 +1816,9 @@ function healthOf(
  * "Needs you" takes caution, which is the tone every dev queue already spends
  * on a row stopped on the person. "With Dash" takes the accent because a
  * session running right now is the one thing on this page that is changing
- * while you look at it. "For Dash" takes the same blue "Ready" does in the
- * health column beside it -- the two are saying the same thing from two sides,
- * and a step that is ready and handed over should not read as two unrelated
- * facts. The rest are ink: nothing is claimed about work that is simply yours
- * or simply waiting its turn.
+ * while you look at it. The rest are ink: nothing is claimed about a step you
+ * kept or one another step is holding up, and a step waiting its turn has no
+ * word to tone.
  *
  * The tooltip is where the rollup is explained. A feature reporting "With Dash"
  * because its third step is with a session would otherwise be a word with no
@@ -1832,9 +1830,9 @@ const MOVE_TONE: Record<PlanMove, Health['tone']> = {
   resolving: 'accent',
   on_you: 'caution',
   with_dash: 'accent',
-  for_dash: 'info',
   waiting: 'quiet',
   yours: 'quiet',
+  none: 'ghost',
   settled: 'ghost',
 };
 
@@ -1843,9 +1841,9 @@ const MOVE_TITLE: Record<PlanMove, string> = {
     'Re-reading this feature against the answers you just gave. What it proposes will be here when it is done; sending it anywhere until then would send a plan that is mid-edit.',
   on_you: 'Stopped on you: a question to answer, a proposal to approve, or something only you can supply.',
   with_dash: 'A session is working on this now.',
-  for_dash: 'Handed to Dash, waiting for a session to pick it up.',
   waiting: 'Held up by another step that has not closed.',
-  yours: 'Nobody has handed this anywhere. It is yours to pick up or hand over.',
+  yours: 'You kept this one, so the runner will not take it.',
+  none: 'Approved and waiting its turn. Nothing is on it and nothing is needed from you.',
   settled: 'Nothing left to do on this one.',
 };
 

@@ -1653,20 +1653,29 @@ describe('healthOf, over a subtree that has started', () => {
 describe('moveOf', () => {
   const only = (items: PlanItem[]) => shopping(tree(items)).nodes[0];
 
-  it('is yours when nobody has handed it anywhere', () => {
-    expect(moveOf(only([at('not_started', 'a')]))).toBe('yours');
+  // #694: the column says a word only when something is happening to the row,
+  // and an approved step in the queue is the ordinary case on this page.
+  it('says nothing about an approved step waiting its turn', () => {
+    expect(moveOf(only([at('not_started', 'a')]))).toBe('none');
   });
 
-  it('is for Dash once it is assigned', () => {
-    expect(moveOf(only([at('not_started', 'a', { assignee: 'claude' })]))).toBe('for_dash');
+  // The column left over from the old hand-over. Nothing clears it, so the
+  // rows that still carry 'claude' have to read as the ordinary steps they
+  // are rather than as a queue nobody is working.
+  it('says nothing about a step left assigned to Dash by an old hand-over', () => {
+    expect(moveOf(only([at('not_started', 'a', { assignee: 'claude' })]))).toBe('none');
   });
 
   it('is with Dash while a session is on it', () => {
-    expect(moveOf(only([at('in_progress', 'a', { assignee: 'claude' })]))).toBe('with_dash');
+    expect(moveOf(only([at('in_progress', 'a')]))).toBe('with_dash');
   });
 
-  it('is still yours when you are the one working on it', () => {
-    expect(moveOf(only([at('in_progress', 'a')]))).toBe('yours');
+  it('is yours once you mark it, before anything has started', () => {
+    expect(moveOf(only([at('not_started', 'a', { assignee: 'me' })]))).toBe('yours');
+  });
+
+  it('is still yours once a step you marked is underway', () => {
+    expect(moveOf(only([at('in_progress', 'a', { assignee: 'me' })]))).toBe('yours');
   });
 
   it('needs you for a question nobody has answered', () => {
@@ -1700,16 +1709,33 @@ describe('moveOf', () => {
       shopping(tree([at('not_started', 'f'), ...children])).nodes[0];
 
     it('reports a session working beneath it', () => {
+      expect(moveOf(feature([at('in_progress', 's1', { parentId: 'f' })]))).toBe('with_dash');
+    });
+
+    it('reports a step you marked yours beneath it', () => {
+      expect(moveOf(feature([at('not_started', 's1', { parentId: 'f', assignee: 'me' })]))).toBe(
+        'yours',
+      );
+    });
+
+    // The other half of #694: a feature is the rollup of its steps, so one
+    // whose steps are all waiting their turn has nothing to say either.
+    it('says nothing when every step beneath it is waiting its turn', () => {
       expect(
-        moveOf(feature([at('in_progress', 's1', { parentId: 'f', assignee: 'claude' })])),
-      ).toBe('with_dash');
+        moveOf(
+          feature([
+            at('not_started', 's1', { parentId: 'f' }),
+            at('not_started', 's2', { parentId: 'f' }),
+          ]),
+        ),
+      ).toBe('none');
     });
 
     it('reports the most pressing of several', () => {
       expect(
         moveOf(
           feature([
-            at('in_progress', 's1', { parentId: 'f', assignee: 'claude' }),
+            at('in_progress', 's1', { parentId: 'f' }),
             at('not_started', 'q', { parentId: 'f', kind: 'decision' }),
           ]),
         ),
@@ -1745,7 +1771,7 @@ describe('moveOf', () => {
             }),
           ]),
         ),
-      ).toBe('yours');
+      ).toBe('none');
     });
   });
 
@@ -1783,8 +1809,8 @@ describe('moveOf', () => {
     });
 
     it('is not claimed of a feature no re-shape is running against', () => {
-      expect(moveOf(feature(), { resolving: new Set(['somebody-else']) })).toBe('yours');
-      expect(moveOf(feature())).toBe('yours');
+      expect(moveOf(feature(), { resolving: new Set(['somebody-else']) })).toBe('none');
+      expect(moveOf(feature())).toBe('none');
     });
 
     // The set holds the feature the run was fired at. A step beneath it is not
@@ -1792,7 +1818,7 @@ describe('moveOf', () => {
     it('does not spread down to the steps beneath it', () => {
       const sections = shopping(tree([at('not_started', 'f'), at('not_started', 's1', { parentId: 'f' })]));
       const step = findNode([sections], 's1')!;
-      expect(moveOf(step, whileResolving)).toBe('yours');
+      expect(moveOf(step, whileResolving)).toBe('none');
     });
   });
 });
