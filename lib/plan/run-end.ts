@@ -272,8 +272,29 @@ export function isResolvingAnswers(
   now: number,
 ): boolean {
   if (!run || run.job !== 'reshape') return false;
-  return runEnd(run, null, now) === null && run.status === 'started';
+  if (run.status !== 'started') return false;
+  if (now === 0) return true;
+  return (now - new Date(run.createdAt).getTime()) / 60_000 < RESHAPE_UNDERWAY_MINUTES;
 }
+
+/**
+ * How long a re-shape holds its feature before the guard lets go.
+ *
+ * Its own mark rather than `RUN_QUIET_AFTER_MINUTES`, which is two hours. That
+ * number is for a build: a session working a feature can go quiet for a long
+ * stretch and firing a second one at it would be worse than waiting. A
+ * re-shape reads a feature against the answers under it and proposes what they
+ * changed, which takes minutes -- and while the guard holds, the feature
+ * refuses every send, so a re-shape that died takes its feature out of the
+ * night for two hours.
+ *
+ * It did. On 19 September the re-shapes fired at #669 and #656 were still
+ * `started` after nearly two hours, both features refused, and the run stopped
+ * with five others waiting behind them. Thirty minutes is well past what a
+ * re-shape takes and short enough that a dead one costs one feature a few
+ * ticks rather than an evening.
+ */
+export const RESHAPE_UNDERWAY_MINUTES = 30;
 
 /**
  * Whether a stamp on a step is one that ended the run fired at it.

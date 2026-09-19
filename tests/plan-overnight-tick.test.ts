@@ -425,7 +425,7 @@ describe('overnightTick', () => {
     expect(calls.stopped).toEqual([]);
   });
 
-  it('ends the night naming every feature that refused', async () => {
+  it('keeps the night running, naming every feature that refused', async () => {
     const sections = tree(twoFeatures());
     const first = findNode(sections, 'first')!;
     const second = findNode(sections, 'second')!;
@@ -441,14 +441,19 @@ describe('overnightTick', () => {
       }),
     });
 
-    const ended = await overnightTick(p);
+    const tick = await overnightTick(p);
 
-    expect(ended.act).toBe('ended');
-    const reason = ended.act === 'ended' ? ended.reason : '';
+    // A refusal is a reading of one instant like any other. Two of the three
+    // reasons a send refuses -- a re-shape rewriting the feature, a claim still
+    // live beneath it -- clear themselves with nobody watching, and on
+    // 19 September a run with no limit stopped twenty-one minutes in because
+    // two features refused for a re-shape that had died.
+    expect(tick.act).toBe('nothing-ready');
+    const reason = tick.act === 'nothing-ready' ? tick.reason : '';
     expect(reason).toContain(`#${first.number} is only a proposal.`);
     // The refusal that names no feature gets the number put in front of it.
     expect(reason).toContain(`#${second.number}: Nothing open under that step`);
-    expect(calls.stopped).toEqual([reason]);
+    expect(calls.stopped).toEqual([]);
     expect(calls.recorded).toEqual([]);
   });
 

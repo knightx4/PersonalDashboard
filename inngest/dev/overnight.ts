@@ -365,16 +365,21 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
       const reason =
         refused.length > 0 ? overnightRefusedReason(refused, choice.reason) : choice.reason;
       // Nothing ready is a reading of one instant, so the night keeps its
-      // clock and asks again in four minutes. Every other reason the chooser
-      // ends on -- the budget, the stop time, every ready feature tried
-      // without one closing -- is settled and does end it.
+      // clock and asks again in four minutes. The budget and the stop time are
+      // settled and do end it; this is not.
       //
-      // Only when nothing refused, which is what makes this tick free: the
-      // chooser found no ready step and the send was never called, so asking
-      // again costs one read of the tree. Once features have refused, waiting
-      // would mean offering each of them the send again every four minutes for
-      // the rest of the night, and a refusal is mostly the person's to clear.
-      if (choice.reason === OVERNIGHT_NOTHING_READY && refused.length === 0) {
+      // Refusals are the same reading. A feature refuses the send because a
+      // re-shape is rewriting it, because a claim beneath it is still live, or
+      // because it is only a proposal -- and the first two clear themselves
+      // while nobody is watching. On 19 September a run with no limit ended
+      // twenty-one minutes in: #669 and #656 both refused for a re-shape that
+      // had been sitting in `started` for nearly two hours, and five other
+      // features were waiting behind that.
+      //
+      // Retrying them costs a few queries a tick. The send refuses before it
+      // starts a routine, so no session is fired and no tokens are spent, and
+      // that is a much smaller price than a night that stops.
+      if (choice.reason === OVERNIGHT_NOTHING_READY) {
         return { act: 'nothing-ready', reason };
       }
       await ports.stop(reason);

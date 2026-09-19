@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   RUN_QUIET_AFTER_MINUTES,
   isResolvingAnswers,
+  RESHAPE_UNDERWAY_MINUTES,
   lastRunLine,
   readingColumns,
   readingFor,
@@ -123,11 +124,19 @@ describe('isResolvingAnswers', () => {
 
   it('is true while the re-shape the answer fired is still going', () => {
     expect(isResolvingAnswers(reshape(), at(1))).toBe(true);
-    expect(isResolvingAnswers(reshape(), at(RUN_QUIET_AFTER_MINUTES - 1))).toBe(true);
+    expect(isResolvingAnswers(reshape(), at(RESHAPE_UNDERWAY_MINUTES - 1))).toBe(true);
   });
 
   it('clears once the run is past the cutoff', () => {
-    expect(isResolvingAnswers(reshape(), at(RUN_QUIET_AFTER_MINUTES))).toBe(false);
+    expect(isResolvingAnswers(reshape(), at(RESHAPE_UNDERWAY_MINUTES))).toBe(false);
+  });
+
+  it('lets go long before a build session would, because a re-shape takes minutes', () => {
+    // While the guard holds, the feature refuses every send. A re-shape that
+    // died on 19 September held #669 and #656 for nearly two hours and stopped
+    // a run that had five other features waiting.
+    expect(RESHAPE_UNDERWAY_MINUTES).toBeLessThan(RUN_QUIET_AFTER_MINUTES);
+    expect(isResolvingAnswers(reshape(), at(RUN_QUIET_AFTER_MINUTES - 1))).toBe(false);
   });
 
   it('clears the moment the run is written back as over', () => {
