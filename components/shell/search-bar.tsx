@@ -154,10 +154,16 @@ export function SearchBar({
         reset();
       }}
     >
-      {/* The field's own box, drawn here rather than taken from Input: this is
-          a field with a control sitting inside it, so the border has to belong
-          to the pair. The tokens are the shared control's, and the ring is
-          focus-within so the box lights up while the chip has the cursor. */}
+      {/* ui-ok: hand-rolled-box -- a control's own edge rather than a frame
+        * around a group. `border-control` is the 3:1 token an input owes under
+        * WCAG 1.4.11, and here it is the only thing saying where you can type.
+        * Card and Group are content surfaces. Card has the card radius and no
+        * border, Group draws nothing at all, and neither has a focus state.
+        *
+        * Drawn here rather than taken from Input because a control sits inside
+        * the field, so the border has to belong to the pair. The tokens are
+        * the shared control's, and the ring is focus-within so the box lights
+        * up while the chip has the cursor. */}
       <div className="flex h-(--control-h) items-center gap-2 rounded-control border border-control bg-surface px-(--control-px) focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/40">
         <Search className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
         <input
@@ -212,6 +218,13 @@ export function SearchBar({
             // Named by what it is searching and by what pressing it does,
             // because the word on it is a state rather than an instruction.
             aria-label={`Searching ${scopeLabel(scope)}. Search ${scopeLabel(toggleScope(scope, module))} instead`}
+            // ui-ok: hand-rolled-box -- the pill is the button, so its edge is
+            // the control rather than a frame around a group. It stands on the
+            // field's own ground, so neither a shared ground nor space can say
+            // that it is something you press. No primitive draws this shape:
+            // Button is rounded-control and its smallest size is the height of
+            // the box this sits inside, and ChipSelect and ChipInput wrap a
+            // select and an input.
             className="press flex shrink-0 items-center gap-1.5 rounded-full border border-border py-0.5 pl-1 pr-2 text-small text-ink-muted transition-colors hover:bg-sunken hover:text-ink"
           >
             {/* The mark of what is being searched: a workspace's own, or the
