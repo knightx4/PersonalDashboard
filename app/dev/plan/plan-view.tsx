@@ -3,7 +3,6 @@
 import { useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  Bot,
   Check,
   Circle,
   CircleAlert,
@@ -32,7 +31,6 @@ import {
   dismissPlanDecision,
   dismissPlanFog,
   sendPlanItemToClaude,
-  sendPlanQueueToClaude,
   setPlanItemAssignee,
   setPlanItemPriority,
   setPlanItemStatus,
@@ -333,52 +331,6 @@ const chipOn = 'bg-accent text-surface';
 const chipOff = 'text-ink-muted hover:bg-accent-tint hover:text-accent';
 
 /**
- * The numbers across the plan, and the views over it.
- *
- * The counts are links where a view answers them: "3 ready" is the question
- * "which three", and the view is the answer. The views are search parameters
- * rather than state so that "the ready steps" is something you can keep.
- */
-/**
- * The queue, sent.
- *
- * Beside the count of what is Claude's, because that number is the question
- * this button answers: you have spent a while going down the plan handing
- * things over, and what you want at the end of it is not to press Send on each
- * of them. Absent when nothing is handed over, since there would be nothing to
- * send and an always-present button that usually refuses teaches people not to
- * press it.
- */
-function SendTheQueue({ count }: { count: number }) {
-  const [state, action, pending] = useActionState(sendPlanQueueToClaude, {} as PlanActionState);
-
-  if (count === 0) return null;
-
-  return (
-    <>
-      <form action={action}>
-        <Button
-          type="submit"
-          size="sm"
-          variant="secondary"
-          pending={pending}
-          title="Hand the whole queue to one routine, worked in order"
-        >
-          <Play className="size-3.5" aria-hidden />
-          {pending ? 'Sending…' : `Send all ${count} to Dash`}
-        </Button>
-      </form>
-      {(state.error ?? state.message) && (
-        <p className="basis-full text-small">
-          <FieldError>{state.error}</FieldError>
-          {!state.error && <span className="text-ink-muted">{state.message}</span>}
-        </p>
-      )}
-    </>
-  );
-}
-
-/**
  * What a narrowed view says when it finds nothing.
  *
  * Empty is the good state for most of these, so each one says what it means
@@ -418,16 +370,19 @@ const EMPTY_VIEW: Partial<Record<View, { title: string; description: string }>> 
   },
 };
 
+/**
+ * The numbers across the plan, and the views over it.
+ *
+ * The counts are links where a view answers them: "3 ready" is the question
+ * "which three", and the view is the answer. The views are search parameters
+ * rather than state so that "the ready steps" is something you can keep.
+ */
 function SummaryStrip({
   summary,
   view,
-  queued,
 }: {
   summary: PlanSummary;
   view: View;
-  /** What the send-all button would actually send: not every step marked as
-      Claude's, since an unanswered question is nobody's to build. */
-  queued: number;
 }) {
   const facts: Array<{ view: View | null; value: number; noun: string }> = [
     { view: 'open', value: summary.open, noun: 'open' },
@@ -466,7 +421,6 @@ function SummaryStrip({
           ),
         )}
       </p>
-      <SendTheQueue count={queued} />
       <nav aria-label="View" className="ml-auto flex flex-wrap items-center gap-1">
         {PLAN_VIEW_CHIPS.map((candidate) => (
           <Link
@@ -1289,10 +1243,10 @@ function Dependencies({
 }
 
 /**
- * What pressing Send actually hands over, said before it is pressed.
+ * What pressing Send actually sends, said before it is pressed.
  *
  * The brief carries the step's whole subtree under "## Steps", so Send on a
- * feature hands over the feature and everything beneath it. The button read
+ * feature sends the feature and everything beneath it. The button read
  * "Send to Claude" whichever row it sat on, so pressing it on #197 looked like
  * sending one step and sent ten. The action already says so afterwards; this
  * is the same count, in the label, before you commit to it.
@@ -1309,7 +1263,7 @@ function sendLabel(node: PlanNode): string {
 }
 
 /**
- * Hand it over and start the routine now.
+ * Start the routine on it now.
  *
  * The button is offered whether or not the deployment can start a routine,
  * because the action says exactly what is missing when it cannot, and a
@@ -1412,14 +1366,14 @@ function SendToClaude({
             variant="ghost"
             pending={batchPending}
             disabled={resolving}
-            title={held ?? 'Hand every open step beneath this one to Dash, worked in order'}
+            title={held ?? 'Start one session on every open step beneath this one, worked in order'}
           >
             {batchPending ? 'Sending…' : `Send all ${beneath} beneath`}
           </Button>
         </form>
       )}
-      {/* The return trip, and the only button here that does not hand work
-          over: it asks for the feature to be re-read against what has been
+      {/* The return trip, and the only button here that starts no build: it
+          asks for the feature to be re-read against what has been
           settled beneath it, and everything that comes back is a proposal
           waiting on the same approve as anything else. Offered wherever there
           is something beneath to re-read. */}
@@ -1695,7 +1649,10 @@ function Underway({
           ? `Claimed ${since} and its run stopped without closing the step — close it or put it back.`
           : claim === 'quiet'
             ? `Claimed ${since}. Its run has pushed nothing for a while; it may still be reading or waiting on a build.`
-            : `${assignee === 'claude' ? 'Dash has been on this' : 'Underway'} since ${since}`
+            : // A session can start on anything approved, so an underway step
+              // is a session's unless you kept it back. The column used to be
+              // read the other way, when only a step handed over was Dash's.
+              `${assignee === 'me' ? 'Underway' : 'Dash has been on this'} since ${since}`
       }
       className={cn(
         'tabular inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-small font-medium',
@@ -1859,11 +1816,9 @@ function healthOf(
  * "Needs you" takes caution, which is the tone every dev queue already spends
  * on a row stopped on the person. "With Dash" takes the accent because a
  * session running right now is the one thing on this page that is changing
- * while you look at it. "For Dash" takes the same blue "Ready" does in the
- * health column beside it -- the two are saying the same thing from two sides,
- * and a step that is ready and handed over should not read as two unrelated
- * facts. The rest are ink: nothing is claimed about work that is simply yours
- * or simply waiting its turn.
+ * while you look at it. The rest are ink: nothing is claimed about a step you
+ * kept or one another step is holding up, and a step waiting its turn has no
+ * word to tone.
  *
  * The tooltip is where the rollup is explained. A feature reporting "With Dash"
  * because its third step is with a session would otherwise be a word with no
@@ -1875,9 +1830,9 @@ const MOVE_TONE: Record<PlanMove, Health['tone']> = {
   resolving: 'accent',
   on_you: 'caution',
   with_dash: 'accent',
-  for_dash: 'info',
   waiting: 'quiet',
   yours: 'quiet',
+  none: 'ghost',
   settled: 'ghost',
 };
 
@@ -1886,9 +1841,9 @@ const MOVE_TITLE: Record<PlanMove, string> = {
     'Re-reading this feature against the answers you just gave. What it proposes will be here when it is done; sending it anywhere until then would send a plan that is mid-edit.',
   on_you: 'Stopped on you: a question to answer, a proposal to approve, or something only you can supply.',
   with_dash: 'A session is working on this now.',
-  for_dash: 'Handed to Dash, waiting for a session to pick it up.',
   waiting: 'Held up by another step that has not closed.',
-  yours: 'Nobody has handed this anywhere. It is yours to pick up or hand over.',
+  yours: 'You kept this one, so the runner will not take it.',
+  none: 'Approved and waiting its turn. Nothing is on it and nothing is needed from you.',
   settled: 'Nothing left to do on this one.',
 };
 
@@ -2386,25 +2341,29 @@ function PlanRow({
     formFields: { id: node.id, priority: String(priority) },
   }));
 
-  // The open steps beneath this one, which a hand-over covers as well. Said in
+  // The open steps beneath this one, which the press covers as well. Said in
   // the label rather than found out afterwards.
   const openBeneath = flatten([node]).filter(
     (step) => step.id !== node.id && !isClosed(step.status),
   ).length;
   const beneath = openBeneath > 0 ? `, with ${openBeneath} beneath` : '';
-  const handOver = node.assignee !== 'claude';
-  const assignLabel = handOver
-    ? `Hand to Dash${beneath}`
-    : `Take back from Dash${beneath}`;
+  // The row's assignee press is what you keep a step back with. The runner
+  // takes anything approved that is not yours, so marking a step Mine holds it
+  // until you press again; clearing the column gives it back. Until #670 that
+  // press was Hand to Dash, from when the runner could only see a step somebody
+  // had handed it, and setting a step to Me meant opening Edit.
+  const mine = node.assignee === 'me';
+  const assignLabel = mine ? `Not mine${beneath}` : `Mine${beneath}`;
+  const assignValue = mine ? '' : 'me';
 
   const menu: ActionMenuItem[] = [
     {
-      // First, because marking a step as Claude's is the move this page exists
-      // to make and it should not need the step opened first.
+      // First, because keeping a step back is the move this page exists to make
+      // and it should not need the step opened first.
       id: 'assign',
       label: assignLabel,
       formAction: (formData: FormData) => setPlanItemAssignee({}, formData),
-      formFields: { id: node.id, assignee: handOver ? 'claude' : '' },
+      formFields: { id: node.id, assignee: assignValue },
     },
     // The quick icons are only there from sm up and only under a pointer, so
     // the menu carries the same two actions for a phone and for a keyboard.
@@ -2622,27 +2581,31 @@ function PlanRow({
               )}
               {/* And whether anything has been said about it. */}
               <CommentCount count={node.thread.length} />
-              {/* Whose it is, on the row.
-                * The "Who" column was dropped for being a column of dashes,
-                * and it was right to go -- but with it went any way of seeing
-                * that a step is Claude's without opening it, hovering it, or
-                * switching to the Claude's view. Handing a step over is the
-                * move this page exists to make, and the page said nothing
-                * about the result. A mark, not a column: it appears only on
-                * the steps that have been handed over, which is what makes it
-                * worth reading. */}
-              {node.assignee === 'claude' && (
+              {/* The steps you kept, on the row.
+                * The runner takes anything approved that is not yours, so the
+                * fact worth reading off a resting row is which steps it will
+                * skip. It used to be the other way round: the mark was a robot
+                * on every step handed to Dash, from when a session could only
+                * work a step somebody had handed it.
+                *
+                * The row's Mine press carries the same fact in its accented
+                * icon, but that icon is drawn only under the pointer and not
+                * at all below sm, so this is the only place a plan at rest
+                * says it. Steps still holding the old 'claude' value are not
+                * read here and nothing clears them.
+                *
+                * A mark, not a column: it appears on the few steps you held
+                * back, which is what makes it worth reading. */}
+              {mine && (
                 <span
-                  title="Handed to Dash"
+                  title="Yours. The runner will not take this one."
                   className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1 py-0.5 text-accent"
                 >
-                  {/* A bot and not a person. This mark said "handed over" with
-                      the same head-and-shoulders the assignee picker uses for
-                      anybody at all, so the one thing it had to say -- that it
-                      went to Claude rather than onto your own list -- was the
-                      one thing it did not. */}
-                  <Bot className="size-3" strokeWidth={2} aria-hidden />
-                  <span className="sr-only">Handed to Dash</span>
+                  {/* The head-and-shoulders from the assignee picker, the same
+                      icon the Mine press uses, so the mark and the press that
+                      sets it are recognisably one thing. */}
+                  <CircleUser className="size-3" strokeWidth={2} aria-hidden />
+                  <span className="sr-only">Marked yours</span>
                 </span>
               )}
               {/* And whether the checks passed on what it shipped in. */}
@@ -2775,10 +2738,10 @@ function PlanRow({
         </span>
 
         {/* No "Who" column. It was a column of dashes with the occasional
-            "Claude" in it -- one fact, on a plan whose every step is yours
-            unless you hand it over, and handing it over is a button. The one
-            value it carried is now a mark beside the title, on the steps that
-            have it; the rest is on the open step, in the summary's "Claude's"
+            name in it -- one fact, on a plan whose every approved step the
+            runner takes unless you keep it, and keeping it is a button. The
+            one value it carried is now a mark beside the title, on the steps
+            you kept; the rest is on the open step, in the summary's "Claude's"
             view, and in the menu that changes it. */}
         <span className="hidden sm:block">
           <Breakdown node={node} />
@@ -2810,12 +2773,13 @@ function PlanRow({
               ))}
             <form action={assignAction}>
               <input type="hidden" name="id" value={node.id} />
-              <input type="hidden" name="assignee" value={handOver ? 'claude' : ''} />
+              <input type="hidden" name="assignee" value={assignValue} />
               <RowIconButton type="submit" label={assignLabel} pending={assignPending}>
-                {/* The same bot as the mark: this button is specifically the
-                    hand-to-Claude toggle, not a general "who is on it". */}
-                <Bot
-                  className={cn('size-3.5', !handOver && 'text-accent')}
+                {/* The head-and-shoulders the assignee picker uses for Me, and
+                    accented while the step is yours, so the icon says which way
+                    the next press goes. */}
+                <CircleUser
+                  className={cn('size-3.5', mine && 'text-accent')}
                   strokeWidth={1.75}
                   aria-hidden
                 />
@@ -3073,11 +3037,7 @@ function PlanRow({
               </Button>
               <form action={assignAction}>
                 <input type="hidden" name="id" value={node.id} />
-                <input
-                  type="hidden"
-                  name="assignee"
-                  value={node.assignee === 'claude' ? '' : 'claude'}
-                />
+                <input type="hidden" name="assignee" value={assignValue} />
                 <Button type="submit" size="sm" variant="ghost" pending={assignPending}>
                   {assignLabel}
                 </Button>
@@ -3313,7 +3273,6 @@ export function PlanView({
   commitChecks,
   empty,
   canSend,
-  queued,
   unfolded = false,
   opened = false,
 }: {
@@ -3343,7 +3302,6 @@ export function PlanView({
   commitChecks: Record<string, CommitCheck>;
   empty: boolean;
   canSend: boolean;
-  queued: number;
   /**
    * Render every feature with its sub-steps already showing.
    *
@@ -3421,7 +3379,7 @@ export function PlanView({
         </Banner>
       )}
 
-      <SummaryStrip summary={summary} view={view} queued={queued} />
+      <SummaryStrip summary={summary} view={view} />
 
       <SearchThePlan query={query} onQuery={setQuery} hits={hits} searching={searching} />
 

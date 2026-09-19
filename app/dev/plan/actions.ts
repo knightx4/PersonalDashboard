@@ -13,7 +13,6 @@ import {
   PLAIN_ENGLISH_RULE,
   dismissedUnder,
   planBrief,
-  planQueueBrief,
 } from '@/lib/plan/brief';
 import { loadDismissedSuggestions } from '@/lib/ideas/load';
 import {
@@ -50,7 +49,6 @@ import {
   buildPlanTree,
   findNode,
   flatten,
-  handedToClaude,
   isWaitingOnThePerson,
   topFeatureOf,
   type PlanNode,
@@ -641,12 +639,17 @@ export async function approveProposals(
 }
 
 /**
- * Hand a step to Claude, or take it back, in one click.
+ * Who a step is for, in one click.
+ *
+ * The row's press is Mine and Not mine (#686): the runner takes anything
+ * approved that is not yours, so marking a step Mine is how you hold it back
+ * and clearing the column is how you give it back. `claude` is still written
+ * here -- by the single Send, which claims the row for the session it starts.
  *
  * The step and every open step beneath it, for the same reason approving works
- * that way: work is handed over as a whole, and marking five sub-steps one at
- * a time is how four of them get missed. Closed steps are left alone -- who
- * was going to do a finished thing is history, not an instruction.
+ * that way: work is assigned as a whole, and marking five sub-steps one at a
+ * time is how four of them get missed. Closed steps are left alone -- who was
+ * going to do a finished thing is history, not an instruction.
  *
  * A proposed step can be handed over. This column says who a step is for, not
  * that it has been agreed to, and nothing picks up a proposal: `next --claude`
@@ -703,8 +706,11 @@ export async function setPlanItemAssignee(
   if (error) return { error: error.message };
 
   revalidatePlan();
-  if (assignee.data !== 'claude') {
-    return { message: ids.length === 1 ? 'Taken back.' : `Took back ${ids.length} steps.` };
+  if (assignee.data === 'me') {
+    return { message: ids.length === 1 ? 'Marked yours.' : `Marked ${ids.length} steps yours.` };
+  }
+  if (assignee.data === null) {
+    return { message: ids.length === 1 ? 'Given back.' : `Gave ${ids.length} steps back.` };
   }
 
   const left = skipped.length === 0 ? '' : ` ${skipped.length} left with you: ${skipped.map((step) => `#${step.number}`).join(', ')}.`;
@@ -1040,14 +1046,12 @@ export async function sendPlanItemToClaude(
 }
 
 /**
- * Hand a whole feature over and start the routine on it now.
+ * Start the routine on a whole feature, now.
  *
  * The step-at-a-time button is right when you are watching; a feature of seven
- * steps pressed seven times is not. So this one cascades -- every open step
- * beneath becomes Claude's, the way approving cascades -- and fires once with
- * the feature's brief, which already carries its steps and what each waits on.
- * The session works them in order and stops at the first thing it should not
- * decide alone.
+ * steps pressed seven times is not. So this one fires once with the feature's
+ * brief, which already carries its steps and what each waits on. The session
+ * works them in order and stops at the first thing it should not decide alone.
  *
  * It refuses a proposal, because a proposal is not work yet, and it refuses a
  * feature with nothing open beneath it, because there would be nothing to do.
@@ -1065,12 +1069,15 @@ export async function sendPlanFeatureToClaude(
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing step.' };
 
-  // Every rule about what may be sent, the cascade and the instruction itself
-  // are in lib/plan/handover.ts, because the overnight tick now fires the same
-  // send with nobody watching and the two must not drift apart.
+  // Every rule about what may be sent and the instruction itself are in
+  // lib/plan/handover.ts, because the overnight tick now fires the same send
+  // with nobody watching and the two must not drift apart.
   const sent = await handFeatureToClaude({ supabase, userId: user.id, id: id.data });
   if (!sent.ok) return { error: sent.error };
-  if (sent.changed) revalidatePlan();
+  // No row changed -- the send writes none now -- but the run it started is on
+  // the page, in the health column and in what the buttons on the feature will
+  // refuse next.
+  revalidatePlan();
 
   return {
     message: `Sent #${sent.number} and its ${sent.steps === 1 ? 'step' : `${sent.steps} steps`}. ${sent.detail}`,
@@ -1222,78 +1229,6 @@ export async function reshapePlanFeature(
       `Re-shaping #${node.number} against ` +
       `${answered === 0 ? 'no answers yet' : `${answered} ${answered === 1 ? 'answer' : 'answers'}`}` +
       `${node.fog ? ' and its fog' : ''}. What comes back is proposed. ${result.detail}`,
-  };
-}
-
-/**
- * Send everything handed to Claude, in one press.
- *
- * The step button is right when you are watching one step; the feature button
- * is right when you are looking at one feature. Neither is what you want after
- * an afternoon spent going down the plan marking things as Claude's, which is
- * the state this button is for: a queue built up over a session and sent when
- * you get up from the desk.
- *
- * Nothing is assigned here. Being handed over is exactly what these steps
- * already are -- that is how they got into the queue -- so nothing is dragged
- * into the queue by pressing this, and pressing it twice sends the same queue
- * again.
- *
- * Nothing is marked in progress either. That is the session's to set, one step
- * at a time as it claims them, and a press that marked the whole queue underway
- * described eleven steps nothing was on. `handedToClaude` has already left out
- * the decisions and the proposals, so what is left is exactly what a session
- * will build.
- *
- * `handedToClaude` decides what is in it: open, approved, not a decision, most
- * urgent first. One routine works the lot in that order, because two sessions
- * on one plan would take the same step twice.
- */
-// latency: pending
-export async function sendPlanQueueToClaude(
-  // Signature is fixed by useActionState; the button sends nothing.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _prev: PlanActionState, _formData: FormData,
-): Promise<PlanActionState> {
-  const supabase = await createClient();
-  const user = await requireOwner({ supabase });
-
-  const sections = buildPlanTree(await loadPlan(supabase, user.id));
-  const queue = handedToClaude(sections);
-  if (queue.length === 0) {
-    return { error: 'Nothing is handed to Dash right now. Hand a step over and it lands here.' };
-  }
-
-  // Nothing is marked underway here either, for the reason the feature send
-  // gives: one session works the queue one step at a time, so marking all
-  // twelve on the press describes eleven steps nothing is on. The queue is
-  // built from `assignee`, which these steps already carry -- that is how they
-  // got into it -- so the press changes no state at all. It sends.
-  const text =
-    `Work the ${queue.length} plan ${queue.length === 1 ? 'step' : 'steps'} handed to Claude, ` +
-    'following .claude/skills/plan/SKILL.md. This is a batch, so it is orchestrated: send each ' +
-    'step to its own subagent, in the order below, and do not read the steps\' source files or ' +
-    'make the edits yourself. Keep the carry-forward between them. A step whose brief says it ' +
-    'waits on another is worked after that one, not skipped. Stop at the first step that needs ' +
-    'a decision from me: block it with the exact question rather than guessing, and carry on ' +
-    'with the rest. Merge each step to main as it closes, before you send the next one. The ' +
-    'Building section says how. Report every step you closed, ' +
-    'by number and title.\n\nThe briefs are below; they are the plan as the app holds it right now, and the ' +
-    'plan is the source of truth.\n\n' +
-    planQueueBrief(sections, queue, { thread: true });
-
-  const result = await startRoutineRun({
-    supabase,
-    userId: user.id,
-    job: 'queue',
-    routine: planRoutine(),
-    // No step: the queue is the whole of what was handed over, and naming the
-    // first of twelve would say the run was about that one.
-    text,
-  });
-  if (!result.ok) return { error: result.error };
-  return {
-    message: `Sent ${queue.length === 1 ? '1 step' : `all ${queue.length} steps`}. ${result.detail}`,
   };
 }
 

@@ -14,7 +14,6 @@ import {
   applyView,
   buildPlanTree,
   flattenSections,
-  handedToClaude,
   isPlanView,
   planLiveness,
   splitFinished,
@@ -233,7 +232,6 @@ export default async function DevPlanPage({
         commitChecks={commitChecks}
         empty={data.items.length === 0}
         canSend={Boolean(planRoutine().token)}
-        queued={handedToClaude(whole).length}
       />
     </div>
   );

@@ -1419,16 +1419,16 @@ const commentThread: DevComment[] = [
     author: 'claude',
     body: `The filter reads \`assignee\` off the row itself. The tree only rolls it up for the counts in the strip at the top of the page, so the view and the count can disagree and neither is wrong.
 
-#412 is there because its parent was handed over, and handing a feature over cascades the same way approving does:
+#412 is there because approving a step is what puts it in that view -- nothing has to be handed over separately:
 
-- \`handStepToClaude\` sets the assignee on the step and on every open step beneath it.
-- The queue the send-all button works is \`handedToClaude\`, which leaves out decisions and anything already closed.
-- The badge on the row is the column and nothing else, which is why it appears on children you did not press anything on.
+- \`handStepToClaude\` sets the assignee on the step it was pressed on.
+- The runner's list is \`workOrder\`, which leaves out decisions and anything already closed.
+- The badge on the row is the column and nothing else, which is why it appears on rows you did not press anything on.
 
 If you want the child back, take it back from its own menu -- that writes the column on that one row and leaves the parent alone:
 
 \`\`\`ts
-const queue = handedToClaude(sections);
+const ready = workOrder(sections, { assignee: 'claude' });
 \`\`\`
 
 The rule is written down in [the plan spec](https://example.com/docs/PLAN-SPEC.md), under how a feature is worked. Anything pasted in, <b>markup included</b>, is shown as the text it is.`,

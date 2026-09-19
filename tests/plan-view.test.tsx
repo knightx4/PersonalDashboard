@@ -19,7 +19,6 @@ import {
   buildPlanTree,
   splitFinished,
   flattenSections,
-  handedToClaude,
   planLiveness,
   summarize,
 } from '@/lib/plan/tree';
@@ -42,7 +41,6 @@ vi.mock('@/app/dev/plan/actions', () => {
     seedPlan: noop,
     sendPlanFeatureToClaude: noop,
     sendPlanItemToClaude: noop,
-    sendPlanQueueToClaude: noop,
     setPlanItemAssignee: noop,
     setPlanItemPriority: noop,
     setPlanItemStatus: noop,
@@ -153,7 +151,6 @@ function render(
       canSend={false}
       lastRuns={{}}
       commitChecks={{}}
-      queued={handedToClaude(whole).length}
       unfolded={unfolded}
     />,
   );
@@ -202,6 +199,119 @@ describe('PlanView', () => {
     expect(html).toContain('>Someday</span>');
   });
 
+  it('marks a step yours from the row, and gives it back on the next press', () => {
+    // #686: the runner takes anything approved that is not yours, so the press
+    // that holds a step back is Mine. It used to be Hand to Dash, and setting a
+    // step to Me meant opening Edit.
+    const held = buildPlanTree({
+      items: [
+        item({ id: 'runners', title: 'Outlook ingestion' }),
+        item({ id: 'held', title: 'Account deletion', assignee: 'me' }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(held, 'open')}
+        finished={[]}
+        summary={summarize(held)}
+        view="open"
+        catalog={catalogOf(held)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+    // Both presses are on the page: the runner's step offers Mine, and the one
+    // already held offers the press that gives it back.
+    expect(html).toContain('title="Mine"');
+    expect(html).toContain('title="Not mine"');
+    // And the values those forms send are the two the action takes.
+    expect(html).toContain('name="assignee" value="me"');
+    expect(html).toContain('name="assignee" value=""');
+    expect(html).not.toContain('Hand to Dash');
+  });
+
+  it('marks the steps you kept, and leaves the runner\'s own rows unmarked', () => {
+    // #693: the mark used to be a robot on every step handed to Dash. The
+    // runner now takes anything approved that is not yours, so the fact worth
+    // reading off a resting row is which steps it will skip.
+    const rows = buildPlanTree({
+      items: [
+        item({ id: 'runners', title: 'Outlook ingestion' }),
+        item({ id: 'held', title: 'Account deletion', assignee: 'me' }),
+        // A hand-over from before this feature. Nothing clears the column, so
+        // the row has to stop being read rather than stop holding the value.
+        item({ id: 'stale', title: 'Receipts by photo', assignee: 'claude' }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(rows, 'open')}
+        finished={[]}
+        summary={summarize(rows)}
+        view="open"
+        catalog={catalogOf(rows)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+    // One mark across the three rows, and it sits beside the title of the one
+    // you kept -- not on the runner's step, and not on the old hand-over.
+    expect((html.match(/Marked yours/g) ?? []).length).toBe(1);
+    expect(html).toContain(
+      '>Account deletion</span><span title="Yours. The runner will not take this one."',
+    );
+    // The robot that marked a handed-over step is gone with it.
+    expect(html).not.toContain('lucide-bot');
+  });
+
+  it('reads an underway step as a session\'s unless you kept it', () => {
+    // #693: the tooltip used to say "Dash has been on this" only for a step
+    // handed over. A session can start on anything approved, so the reading
+    // flips -- underway is Dash's unless the step is yours.
+    const running = buildPlanTree({
+      items: [
+        item({
+          id: 'dashs',
+          title: 'Outlook ingestion',
+          status: 'in_progress',
+          startedAt: '2026-02-01T09:30:00Z',
+        }),
+        item({
+          id: 'yours',
+          title: 'Account deletion',
+          status: 'in_progress',
+          assignee: 'me',
+          startedAt: '2026-02-01T09:30:00Z',
+        }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(running, 'open')}
+        finished={[]}
+        summary={summarize(running)}
+        view="open"
+        catalog={catalogOf(running)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+    expect(html).toContain('Dash has been on this since 2026-02-01 09:30');
+    expect(html).toContain('Underway since 2026-02-01 09:30');
+  });
+
   it('gathers the finished features into the fold at the foot of Everything', () => {
     const closed = buildPlanTree({
       items: [
@@ -237,7 +347,6 @@ describe('PlanView', () => {
         canSend={false}
         lastRuns={{}}
         commitChecks={{}}
-        queued={0}
         unfolded
       />,
     );
@@ -328,7 +437,9 @@ describe('PlanView', () => {
     }
     expect(html).toContain('href="/dev/plan"');
     expect(html).toMatch(/>2<\/span> ready/);
-    expect(html).toMatch(/>1<\/span> Dash/);
+    // Four of the five open steps: everything but the blocked one, since
+    // approving a step is what makes it Dash's and only `stuck` is on you.
+    expect(html).toMatch(/>4<\/span> Dash/);
   });
 
   it('draws five views as chips and leaves the rest to the menu', () => {
@@ -342,33 +453,6 @@ describe('PlanView', () => {
     // so the row itself carries only the trigger.
     expect(row).toContain('More views');
     expect(row).not.toContain('Not specified');
-  });
-
-  it('offers the whole queue in one press, and only when there is one', () => {
-    // One step is handed over in the fixture, so the button says so rather
-    // than making you count.
-    expect(render('open')).toContain('Send all 1 to Dash');
-
-    const nobodys = buildPlanTree({
-      items: [item({ id: 'mine', title: 'Mine to do' })],
-      dependencies: [],
-    });
-    const html = renderToStaticMarkup(
-      <PlanView
-        sections={applyView(nobodys, 'all')}
-        finished={[]}
-        summary={summarize(nobodys)}
-        view="all"
-        catalog={[]}
-        empty={false}
-        canSend={false}
-        lastRuns={{}}
-        commitChecks={{}}
-        queued={handedToClaude(nobodys).length}
-        unfolded
-      />,
-    );
-    expect(html).not.toContain('to Claude</button>');
   });
 
   it('says on the row which answer produced a step a re-shape wrote', () => {
@@ -397,7 +481,6 @@ describe('PlanView', () => {
         canSend={false}
         lastRuns={{}}
         commitChecks={{}}
-        queued={0}
         unfolded
       />,
     );
@@ -427,7 +510,6 @@ describe('PlanView', () => {
         canSend={false}
         lastRuns={{}}
         commitChecks={{}}
-        queued={0}
         unfolded
       />,
     );
@@ -458,7 +540,6 @@ describe('PlanView', () => {
         canSend={false}
         lastRuns={{}}
         commitChecks={{}}
-        queued={0}
         unfolded
       />,
     );
@@ -501,7 +582,6 @@ describe('PlanView', () => {
         canSend={false}
         lastRuns={{}}
         commitChecks={{}}
-        queued={0}
         unfolded
       />,
     );
@@ -542,7 +622,6 @@ describe('PlanView', () => {
         canSend={false}
         lastRuns={{}}
         commitChecks={{}}
-        queued={0}
         unfolded
       />,
     );
@@ -583,7 +662,6 @@ describe('PlanView', () => {
         canSend={false}
         lastRuns={{}}
         commitChecks={{}}
-        queued={0}
       />,
     );
 
@@ -620,7 +698,6 @@ describe('PlanView', () => {
           canSend={false}
           lastRuns={{}}
           commitChecks={{}}
-          queued={0}
           unfolded
         />,
       );
@@ -657,7 +734,6 @@ describe('PlanView', () => {
           canSend={false}
           lastRuns={{}}
           commitChecks={{}}
-          queued={0}
           unfolded
         />,
       );
@@ -705,21 +781,90 @@ describe('health and status, as two columns', () => {
     expect(row).not.toContain('Not started');
   });
 
-  it('says a step handed over is for Dash', () => {
-    expect(render('all')).toContain('For Dash');
-  });
-
   it('says a blocked step and a proposal need you', () => {
     const html = render('all');
     expect(html).toContain('Needs you');
   });
 
-  it('says a step nobody has handed anywhere is yours', () => {
-    expect(render('all')).toContain('Yours');
-  });
-
   it('says a step held up by another is held up', () => {
     expect(render('all')).toContain('Held up');
+  });
+
+  // #694. The runner takes anything approved that is not yours, so "handed
+  // over" is no longer a state a row can be in and the word for it is gone
+  // from the page in both places it was written.
+  it('says nothing about an approved step waiting its turn', () => {
+    const html = render('all');
+    expect(html).not.toContain('For Dash');
+    expect(html).not.toContain('Handed to Dash');
+  });
+
+  it('says Yours for a step you marked, underway or not', () => {
+    const marked = buildPlanTree({
+      items: [
+        item({ id: 'resting', title: 'Outlook ingestion', assignee: 'me' }),
+        item({
+          id: 'going',
+          title: 'Account deletion',
+          assignee: 'me',
+          status: 'in_progress',
+          startedAt: '2026-02-01T09:30:00Z',
+        }),
+        // The runner's own step, in the same render, saying nothing.
+        item({ id: 'queued', title: 'Receipts by photo' }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(marked, 'open')}
+        finished={[]}
+        summary={summarize(marked)}
+        view="open"
+        catalog={catalogOf(marked)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+    // Both marked rows say it, and the underway one is not read as a
+    // session's: marking a step is what holds the runner off it, whoever
+    // started it.
+    expect((html.match(/>Yours</g) ?? []).length).toBe(2);
+    expect(html).not.toContain('With Dash');
+    expect(html).toContain('You kept this one, so the runner will not take it.');
+  });
+
+  it('says With Dash for an underway step you did not mark', () => {
+    const running = buildPlanTree({
+      items: [
+        item({
+          id: 'session',
+          title: 'Outlook ingestion',
+          status: 'in_progress',
+          startedAt: '2026-02-01T09:30:00Z',
+        }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(running, 'open')}
+        finished={[]}
+        summary={summarize(running)}
+        view="open"
+        catalog={catalogOf(running)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+    expect(html).toContain('With Dash');
+    expect(html).not.toContain('>Yours<');
   });
 });
 
@@ -754,7 +899,6 @@ describe('the CI mark on a closed step', () => {
         aaaaaaa: { mergeSha: 'f12facc', conclusion: 'failed', checkedAt: '2026-09-17T03:00:00Z' },
         bbbbbbb: { mergeSha: 'f12facc', conclusion: 'passed', checkedAt: '2026-09-17T03:00:00Z' },
       }}
-      queued={0}
       unfolded
     />,
   );
@@ -811,7 +955,6 @@ describe('a claim, drawn from what its run did', () => {
         lastRuns={{}}
         liveness={liveness}
         commitChecks={{}}
-        queued={0}
         unfolded
       />,
     );
@@ -876,7 +1019,6 @@ describe('what an opened step says its run has done', () => {
         runRaises={raises(child.number)}
         liveness={liveness}
         commitChecks={{}}
-        queued={0}
         unfolded
         opened
       />,
@@ -965,7 +1107,6 @@ describe('what the page says when GitHub refuses the key', () => {
         keyRefusal={keyRefusal}
         liveness={liveness}
         commitChecks={{}}
-        queued={0}
       />,
     );
   }
@@ -1014,7 +1155,6 @@ describe('a setup step on the plan', () => {
         canSend={false}
         lastRuns={{}}
         commitChecks={{}}
-        queued={0}
         unfolded
         opened
       />,

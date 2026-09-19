@@ -52,7 +52,7 @@ beside them.
 | `comment` | Your own note on it: why it stalled, what changed. The CLI appends a dated line when it closes or blocks a step. |
 | `priority` | 1 next, 2 normal, 3 someday — the same three the notes queue uses. |
 | `size` | `s`, `m` or `l`. Coarse on purpose: "one sitting or not", not hours. |
-| `assignee` | `me` or `claude`. A step handed to Claude is one a routine may pick up on its own. |
+| `assignee` | `me`, `claude`, or nothing at all. `me` is a step you kept for yourself; every other approved step is one a routine may pick up on its own, which is what approving it did. `claude` reads the same as an empty column. Every hand-over used to write it; the feature Send stopped in #672, and the Send on one step still writes it so that the claim sweep does not take the step back (#712). |
 | `commit_sha` | The commit that shipped it. |
 | `position` | Order among siblings. Sparse; re-dealt in tens when a step is moved. |
 | `started_at`, `completed_at` | Kept by a trigger from the status. Done and dropped both count as finished; a reopened step loses its completion time. |
@@ -474,11 +474,12 @@ The plan routine's standing prompt is the frame; the turn a button appends
 says what this firing is for, and wins:
 
 - ***Send to Claude*** on a step — build that one step, then stop.
-- ***Send all n beneath*** on a feature — every open step under it becomes
-  Claude's, the way approving cascades, and one session works them in plan
-  order, each verified, committed and closed before the next is claimed. It
-  stops at the first step that needs a decision, blocking it with the question
-  rather than skipping to a later one. Push and merge happen once, at the end.
+- ***Send all n beneath*** on a feature — one session works every open step
+  under it in plan order, each verified, committed and closed before the next
+  is claimed. It stops at the first step that needs a decision, blocking it
+  with the question rather than skipping to a later one. Push and merge happen
+  once, at the end. The press writes no row: it starts the session and nothing
+  else, because approving is what the runner reads now (#672).
 - ***Shape into a plan*** on an idea — write the proposal and nothing else.
 
 The batch button is the one to think twice about. There is no review point
@@ -618,7 +619,7 @@ decision is ready for the person, not for a session.
 
 **Views.** `?view=` narrows the page to `open` (the default), `you`, `ready`,
 `proposed`, `blocked` (blocked by hand or waiting on another), `claude`
-(open steps handed to Claude), `fog`, `dismissed` or `all`. A step that does
+(approved steps you did not keep for yourself), `fog`, `dismissed` or `all`. A step that does
 not match stays, dimmed, when something beneath it does, so a ready sub-step is
 seen in its place. A dismissed step is the one thing `all` does not show:
 `dismissed` is where it is, and hiding it everywhere else is what dismissing it
