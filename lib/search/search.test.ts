@@ -222,6 +222,99 @@ describe('asking for only some kinds', () => {
   });
 });
 
+describe('asking for one workspace', () => {
+  // What the search bar at the top of a workspace asks for. Narrowed here as
+  // well as in the browser, so a source in another workspace is never read
+  // from and the caps are spent on rows the bar can show.
+  const pair = () => ({
+    jobs: source('jobs', [hit('Acme')]),
+    shopping: source('shopping', [hit('Acme order', { module: 'shopping' })], 'shopping'),
+  });
+
+  it('never asks a source outside the workspace it was asked for', async () => {
+    const { jobs, shopping } = pair();
+    const result = await searchEverything({
+      userId: 'user-1',
+      query: 'ac',
+      sources: [jobs, shopping],
+      enabledModules: ALL,
+      scope: 'jobs',
+    });
+
+    expect(shopping.find).not.toHaveBeenCalled();
+    expect(result.hits.map((h) => h.title)).toEqual(['Acme']);
+  });
+
+  it('drops a hit stamped with another workspace, whoever returned it', async () => {
+    // A source says which workspace it belongs to; it is not trusted to only
+    // return hits from there.
+    const sloppy = source('jobs', [hit('Acme'), hit('Acme order', { module: 'shopping' })]);
+
+    const result = await searchEverything({
+      userId: 'user-1',
+      query: 'ac',
+      sources: [sloppy],
+      enabledModules: ALL,
+      scope: 'jobs',
+    });
+
+    expect(result.hits.map((h) => h.module)).toEqual(['jobs']);
+  });
+
+  it('finds nothing in a workspace no source covers', async () => {
+    // News and dev have no search source yet, so their bar finds nothing
+    // rather than quietly finding somebody else's rows.
+    const { jobs, shopping } = pair();
+    const result = await searchEverything({
+      userId: 'user-1',
+      query: 'ac',
+      sources: [jobs, shopping],
+      enabledModules: [...ALL, 'news'],
+      scope: 'news',
+    });
+
+    expect(jobs.find).not.toHaveBeenCalled();
+    expect(shopping.find).not.toHaveBeenCalled();
+    expect(result.hits).toEqual([]);
+  });
+
+  it('leaves a switched-off workspace out even when it is the one asked for', async () => {
+    // Narrowing to a workspace is not a way round the setting that turned it
+    // off: off wins, and the answer is empty.
+    const off = source('shopping', [hit('Acme', { module: 'shopping' })], 'shopping');
+    const result = await searchEverything({
+      userId: 'user-1',
+      query: 'ac',
+      sources: [off],
+      enabledModules: ['jobs'],
+      scope: 'shopping',
+    });
+
+    expect(off.find).not.toHaveBeenCalled();
+    expect(result.hits).toEqual([]);
+  });
+
+  it('asks everybody for everything, which is what the command box asks', async () => {
+    const { jobs, shopping } = pair();
+    const result = await searchEverything({
+      userId: 'user-1',
+      query: 'ac',
+      sources: [jobs, shopping],
+      enabledModules: ALL,
+      scope: 'everything',
+    });
+
+    expect(result.hits.map((h) => h.title).sort()).toEqual(['Acme', 'Acme order']);
+  });
+
+  it('asks everybody when no scope is named', async () => {
+    const { jobs, shopping } = pair();
+    const result = await run([jobs, shopping]);
+
+    expect(result.hits.map((h) => h.title).sort()).toEqual(['Acme', 'Acme order']);
+  });
+});
+
 describe('the whole list, with no query', () => {
   // What the palette fetches when it opens. The same three rules as a search
   // -- a broken workspace costs only itself, a switched-off one contributes
