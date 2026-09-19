@@ -3,9 +3,17 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
 import { suggestForDigest, type DigestContext } from '@/inngest/dev/suggest';
-import { oneLine, whatHappened, whatIsReady, withSuggestions, type DigestEvent } from '@/lib/digest/build';
+import {
+  MAX_SUGGESTIONS,
+  oneLine,
+  whatHappened,
+  whatIsReady,
+  withSuggestions,
+  type DigestEvent,
+} from '@/lib/digest/build';
 import { nightFrom } from '@/lib/digest/night';
 import { loadFeedbackQueue } from '@/lib/feedback/load';
+import { fileNightIdeas } from '@/lib/ideas/file';
 import { loadIdeas } from '@/lib/ideas/load';
 import { moduleById } from '@/lib/modules';
 import { hasLiveFog, isDismissed, loadPlan, type PlanData, type PlanItem } from '@/lib/plan/load';
@@ -185,12 +193,27 @@ export async function writeDigestFor(
       })
     : { summary: null, suggestions: [] };
 
-  // How many ideas the night filed, recorded beside the summary so the morning
-  // can say they arrived. Nothing writes them yet: #623 settled that what the
-  // night notices becomes ideas on the ideas page, and #645 is the step that
-  // makes this run write them and hand back how many it wrote. Until that
-  // lands the honest count is none, and a summary carrying none draws no line.
-  const ideasFiled = 0;
+  // What the run noticed, written to the ideas page under the person's own
+  // list (#623). Best effort, the same as the reading above it: a summary
+  // without the count is still worth writing, and nothing is filed twice if
+  // this run is retried, because the ideas the first attempt wrote are on the
+  // page the second one compares against.
+  //
+  // The count goes on the row so the morning can say how many arrived (#631).
+  //
+  // The same lines the stored attention list carries, cut to the same three:
+  // the model is asked for at most three and the schema would take ten, and
+  // filing ten ideas in one night is what that cap is against.
+  let ideasFiled = 0;
+  try {
+    ideasFiled = await fileNightIdeas(
+      supabase,
+      userId,
+      reading.suggestions.slice(0, MAX_SUGGESTIONS),
+    );
+  } catch (error) {
+    console.error('[dev digest] ideas', error instanceof Error ? error.message : error);
+  }
 
   const { error } = await supabase.from('dev_digests').insert({
     user_id: userId,

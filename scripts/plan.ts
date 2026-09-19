@@ -61,6 +61,7 @@ import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
 import { findDuplicateIdea, ideaFirstLine } from '../lib/ideas/duplicate';
+import { FILED_IDEAS_SQL } from '../lib/ideas/load';
 import { IDEA_WINDOW_MINUTES, ideaAllowance, ideaCapRefusal } from '../lib/ideas/rate';
 import { MODULES, isModuleId } from '../lib/modules';
 import { planBrief, STATUS_WORD } from '../lib/plan/brief';
@@ -504,14 +505,12 @@ async function main(): Promise<void> {
         fail('Give the idea: idea "…" [--module <id>] [--from <n>], or idea --file <path> with a "## " heading per idea.');
       }
       /**
-       * What is open on the page, which is what a new idea is checked
-       * against. A shaped idea is in the plan and a dismissed one was put
-       * aside, and neither is a row this would be adding to.
+       * What a new idea is checked against, read through the statement in
+       * lib/ideas/load.ts so this command and the nightly run compare against
+       * the same list. An idea you put aside is in it (#646), so a session
+       * cannot file by hand the suggestion you turned down last week.
        */
-      const filed = await sql<{ id: string; body: string }[]>`
-        select id, body from ideas
-        where user_id = ${userId} and plan_item_id is null and dismissed_at is null
-        order by created_at desc`;
+      const filed = await sql.unsafe<{ id: string; body: string }[]>(FILED_IDEAS_SQL, [userId]);
       /**
        * What the cap is counted against: every idea a session wrote inside
        * the window, whatever became of it since. Shaped and dismissed rows
