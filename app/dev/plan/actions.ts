@@ -641,12 +641,17 @@ export async function approveProposals(
 }
 
 /**
- * Hand a step to Claude, or take it back, in one click.
+ * Who a step is for, in one click.
+ *
+ * The row's press is Mine and Not mine (#686): the runner takes anything
+ * approved that is not yours, so marking a step Mine is how you hold it back
+ * and clearing the column is how you give it back. `claude` is still written
+ * here -- by the single Send, which claims the row for the session it starts.
  *
  * The step and every open step beneath it, for the same reason approving works
- * that way: work is handed over as a whole, and marking five sub-steps one at
- * a time is how four of them get missed. Closed steps are left alone -- who
- * was going to do a finished thing is history, not an instruction.
+ * that way: work is assigned as a whole, and marking five sub-steps one at a
+ * time is how four of them get missed. Closed steps are left alone -- who was
+ * going to do a finished thing is history, not an instruction.
  *
  * A proposed step can be handed over. This column says who a step is for, not
  * that it has been agreed to, and nothing picks up a proposal: `next --claude`
@@ -703,8 +708,11 @@ export async function setPlanItemAssignee(
   if (error) return { error: error.message };
 
   revalidatePlan();
-  if (assignee.data !== 'claude') {
-    return { message: ids.length === 1 ? 'Taken back.' : `Took back ${ids.length} steps.` };
+  if (assignee.data === 'me') {
+    return { message: ids.length === 1 ? 'Marked yours.' : `Marked ${ids.length} steps yours.` };
+  }
+  if (assignee.data === null) {
+    return { message: ids.length === 1 ? 'Given back.' : `Gave ${ids.length} steps back.` };
   }
 
   const left = skipped.length === 0 ? '' : ` ${skipped.length} left with you: ${skipped.map((step) => `#${step.number}`).join(', ')}.`;

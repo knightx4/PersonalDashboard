@@ -2386,25 +2386,29 @@ function PlanRow({
     formFields: { id: node.id, priority: String(priority) },
   }));
 
-  // The open steps beneath this one, which a hand-over covers as well. Said in
+  // The open steps beneath this one, which the press covers as well. Said in
   // the label rather than found out afterwards.
   const openBeneath = flatten([node]).filter(
     (step) => step.id !== node.id && !isClosed(step.status),
   ).length;
   const beneath = openBeneath > 0 ? `, with ${openBeneath} beneath` : '';
-  const handOver = node.assignee !== 'claude';
-  const assignLabel = handOver
-    ? `Hand to Dash${beneath}`
-    : `Take back from Dash${beneath}`;
+  // The row's assignee press is what you keep a step back with. The runner
+  // takes anything approved that is not yours, so marking a step Mine holds it
+  // until you press again; clearing the column gives it back. Until #670 that
+  // press was Hand to Dash, from when the runner could only see a step somebody
+  // had handed it, and setting a step to Me meant opening Edit.
+  const mine = node.assignee === 'me';
+  const assignLabel = mine ? `Not mine${beneath}` : `Mine${beneath}`;
+  const assignValue = mine ? '' : 'me';
 
   const menu: ActionMenuItem[] = [
     {
-      // First, because marking a step as Claude's is the move this page exists
-      // to make and it should not need the step opened first.
+      // First, because keeping a step back is the move this page exists to make
+      // and it should not need the step opened first.
       id: 'assign',
       label: assignLabel,
       formAction: (formData: FormData) => setPlanItemAssignee({}, formData),
-      formFields: { id: node.id, assignee: handOver ? 'claude' : '' },
+      formFields: { id: node.id, assignee: assignValue },
     },
     // The quick icons are only there from sm up and only under a pointer, so
     // the menu carries the same two actions for a phone and for a keyboard.
@@ -2810,12 +2814,13 @@ function PlanRow({
               ))}
             <form action={assignAction}>
               <input type="hidden" name="id" value={node.id} />
-              <input type="hidden" name="assignee" value={handOver ? 'claude' : ''} />
+              <input type="hidden" name="assignee" value={assignValue} />
               <RowIconButton type="submit" label={assignLabel} pending={assignPending}>
-                {/* The same bot as the mark: this button is specifically the
-                    hand-to-Claude toggle, not a general "who is on it". */}
-                <Bot
-                  className={cn('size-3.5', !handOver && 'text-accent')}
+                {/* The head-and-shoulders the assignee picker uses for Me, and
+                    accented while the step is yours, so the icon says which way
+                    the next press goes. */}
+                <CircleUser
+                  className={cn('size-3.5', mine && 'text-accent')}
                   strokeWidth={1.75}
                   aria-hidden
                 />
@@ -3073,11 +3078,7 @@ function PlanRow({
               </Button>
               <form action={assignAction}>
                 <input type="hidden" name="id" value={node.id} />
-                <input
-                  type="hidden"
-                  name="assignee"
-                  value={node.assignee === 'claude' ? '' : 'claude'}
-                />
+                <input type="hidden" name="assignee" value={assignValue} />
                 <Button type="submit" size="sm" variant="ghost" pending={assignPending}>
                   {assignLabel}
                 </Button>

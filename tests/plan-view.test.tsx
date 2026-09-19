@@ -202,6 +202,42 @@ describe('PlanView', () => {
     expect(html).toContain('>Someday</span>');
   });
 
+  it('marks a step yours from the row, and gives it back on the next press', () => {
+    // #686: the runner takes anything approved that is not yours, so the press
+    // that holds a step back is Mine. It used to be Hand to Dash, and setting a
+    // step to Me meant opening Edit.
+    const held = buildPlanTree({
+      items: [
+        item({ id: 'runners', title: 'Outlook ingestion' }),
+        item({ id: 'held', title: 'Account deletion', assignee: 'me' }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(held, 'open')}
+        finished={[]}
+        summary={summarize(held)}
+        view="open"
+        catalog={catalogOf(held)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        queued={0}
+        unfolded
+      />,
+    );
+    // Both presses are on the page: the runner's step offers Mine, and the one
+    // already held offers the press that gives it back.
+    expect(html).toContain('title="Mine"');
+    expect(html).toContain('title="Not mine"');
+    // And the values those forms send are the two the action takes.
+    expect(html).toContain('name="assignee" value="me"');
+    expect(html).toContain('name="assignee" value=""');
+    expect(html).not.toContain('Hand to Dash');
+  });
+
   it('gathers the finished features into the fold at the foot of Everything', () => {
     const closed = buildPlanTree({
       items: [
