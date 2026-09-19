@@ -78,14 +78,17 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
    done.
 
    **Do not run the full suite and do not run `next build`.** The session that
-   sent you runs both once, after the last step, before it pushes; CI runs them
-   again on main. Running them here costs three minutes a step and catches
-   nothing the batch gate will not. The exception is a step whose done-when is
-   about the build or about a test that the narrow run cannot reach — then run
-   what the done-when needs and say so in your report.
+   sent you runs both when it merges your step to main, which is as soon as you
+   close it; CI runs them again on main. Running them here first would only run
+   them twice. The exception is a step whose done-when is about the build or
+   about a test that the narrow run cannot reach: run what the done-when needs
+   and say so in your report.
 7. **Commit the step on its own.** One step per commit. End the subject with
-   the step: `Add the anonymous share page (plan #14)`. **Do not push.** The
-   session that sent you pushes once for the whole batch.
+   the step: `Add the anonymous share page (plan #14)`. **Do not push and do
+   not merge.** The session that sent you puts your commit on main before it
+   sends the next step, so stop at the commit and say in your report that you
+   made it. If nobody sent you and this step is the whole job, the merge is
+   yours: the procedure is step 4 of the Building section in `SKILL.md`.
 8. **Before closing, look up once.** If the feature above your step carries
    fog, and what you just learned makes it specifiable, write those steps now
    — `add "…" --parent <the feature> --proposed --done-when "…" --size s|m|l` —

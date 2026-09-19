@@ -99,8 +99,8 @@ you close when they are all done.
 ## Building
 
 **One step, on its own** — "do #12", or one step named in a brief. Read
-`reference/building.md` and follow it yourself. A subagent for a single step is
-pure overhead.
+`reference/building.md` and follow it yourself, then put the commit on main as
+in step 4 below. A subagent for a single step is pure overhead.
 
 **A feature, or more than one step** — you are the orchestrator, not the
 builder. Send each step to its own subagent and keep your own context for the
@@ -123,37 +123,49 @@ thousand tokens, and gets to the end.
 3. **Send each step to a subagent, one at a time.** The prompt is short:
 
    > Build plan step #N. Read `.claude/skills/plan/reference/building.md` and
-   > follow it exactly. Do not push.
+   > follow it exactly.
    >
    > What earlier steps in this batch worked out: <the carry-forward, below>
 
    **Do not read the step's source files yourself, and do not make the edit.**
    Every file you open is a file you carry for the rest of the batch. Reading
    "just to check" is how the batch runs out of room.
-4. **Keep the carry-forward.** Each subagent reports what the next step needs
-   to know. Append it to a running list and pass it into the next prompt. That
-   list is the whole memory of the batch, and it is the reason the steps do not
-   re-derive each other's findings. Keep it to what is load-bearing; drop a
-   line once the steps it was for are closed.
-5. **Stop when the plan says stop.** A subagent that reports a block has
-   written a decision and blocked its step. Do not build around it and do not
-   send a later step that depends on it. Other steps in the batch that do not
-   depend on it are still yours to send.
-6. **Run the gate once, at the end.** After the last step closes, before
-   pushing:
+4. **Put the step on main before you send the next one.** A subagent commits
+   and stops there, so the merge is yours, and it runs as soon as the step
+   closes:
+
+   - `git fetch origin`, with no refs named. Naming them aborts the whole fetch
+     when one of them is missing, which is the normal state of a branch nobody
+     has pushed yet, and leaves `origin/main` stale.
+   - Merge `origin/main` into the working branch and resolve anything that
+     conflicts.
    - `npx eslint app lib components scripts --max-warnings 0`
    - `npx vitest run lib` (two FX tests fail without network — that is
      pre-existing, everything else must pass)
    - `npx next build`
+   - Merge the working branch into `main` with `--no-ff`, subject `Merge plan
+     step #N: <title>`, and push.
 
-   These are the checks the subagents were told to skip, because running them
-   after every step costs minutes a step and catches nothing this will not.
-   Anything that fails here belongs to whichever step broke it: fix it, and
-   amend or add a commit against that step's number.
-7. **Push once**, then report: every step closed **by number and title**, what
-   became ready, what is blocked and on what, and anything raised on
+   Anything that fails belongs to whichever step broke it: fix it, and amend or
+   add a commit against that step's number, before the merge. Running the
+   checks before every merge costs about three minutes a step. Decision #674
+   chose that over the old arrangement, where a closed step sat on an unpushed
+   branch until the batch ended.
+
+5. **Keep the carry-forward.** Each subagent reports what the next step needs
+   to know. Append it to a running list and pass it into the next prompt. That
+   list is the whole memory of the batch, and it is the reason the steps do not
+   re-derive each other's findings. Keep it to what is load-bearing; drop a
+   line once the steps it was for are closed.
+6. **Stop when the plan says stop.** A subagent that reports a block has
+   written a decision and blocked its step. Do not build around it and do not
+   send a later step that depends on it. Other steps in the batch that do not
+   depend on it are still yours to send.
+7. **Report when the batch ends**: every step closed **by number and title**,
+   what became ready, what is blocked and on what, and anything raised on
    `/dev/raised`, by title. A report that says "closed four steps" makes the
-   person go and look.
+   person go and look. Every step is already on main by then, so there is no
+   push left to make.
 
 If the batch ends before the steps do — something blocked, or you are running
 short — say exactly which steps are left and that they are still handed over.
