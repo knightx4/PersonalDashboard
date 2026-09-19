@@ -87,3 +87,32 @@ describe('the closed box', () => {
     expect(html).toContain('Add a comment');
   });
 });
+
+describe('a grouped message', () => {
+  const run = [
+    { id: 'a', author: 'claude' as const, body: 'First of the run.', createdAt: '2026-09-10T09:00:00Z' },
+    { id: 'b', author: 'claude' as const, body: 'Second of the run.', createdAt: '2026-09-10T09:05:00Z' },
+  ];
+
+  it('carries a short time in the strip, with the whole one on the title', () => {
+    const html = renderToStaticMarkup(<CommentThread target="step" id={ROW} thread={run} />);
+
+    // The clock reads zero on a server render, so both times are the date.
+    expect(html).toContain('title="2026-09-10 09:05"');
+    expect(html).toContain('>10 Sep</time>');
+    // Out of the flow, so the 16px column does not grow when it appears.
+    expect(html).toContain('absolute');
+
+    // The first of the run keeps the header it has, in the wording it had.
+    expect(html).toContain('>Dash</span>');
+    expect(html).toContain('>2026-09-10</time>');
+  });
+
+  it('leaves the strip to the author mark when nothing is grouped', () => {
+    const html = renderToStaticMarkup(
+      <CommentThread target="step" id={ROW} thread={[run[0]!]} />,
+    );
+
+    expect(html).not.toContain('>10 Sep</time>');
+  });
+});
