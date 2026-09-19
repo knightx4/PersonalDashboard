@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Image as ImageIcon } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardBody } from '@/components/ui/card';
@@ -30,6 +30,9 @@ export const dynamic = 'force-dynamic';
  * and costs no script: `?pictures=1` is the reader asking for them, and until
  * it is there nothing in the issue is fetched from the sender. That is what
  * keeps a tracking pixel from reporting the issue as opened.
+ *
+ * Unsubscribe is shown only for an issue whose sender offered a link in its
+ * List-Unsubscribe header, and it opens that link in a new tab.
  *
  * An issue with no HTML half is shown as the text it was sent as.
  */
@@ -90,6 +93,29 @@ export default async function IssuePage({
                 Mark unread
               </Button>
             </form>
+            {/*
+              A plain link rather than a form, because nothing is sent on your
+              behalf: the publisher's own page does the unsubscribing, and all
+              this does is open it. No confirm either -- #683 asks before a
+              mail goes, and there is no mail here to send.
+
+              Only for an issue that carried a link. An issue that carried only
+              an address is #667's, which sends the mail through Mailgun; an
+              issue that carried neither gets no button, and that is most of
+              the list, since only issues delivered after #614 shipped kept the
+              header at all.
+            */}
+            {issue.unsubscribeUrl && (
+              <a
+                href={issue.unsubscribeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}
+              >
+                <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
+                Unsubscribe
+              </a>
+            )}
           </>
         }
       />
