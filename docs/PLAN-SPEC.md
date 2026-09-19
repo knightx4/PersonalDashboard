@@ -52,7 +52,7 @@ beside them.
 | `comment` | Your own note on it: why it stalled, what changed. The CLI appends a dated line when it closes or blocks a step. |
 | `priority` | 1 next, 2 normal, 3 someday — the same three the notes queue uses. |
 | `size` | `s`, `m` or `l`. Coarse on purpose: "one sitting or not", not hours. |
-| `assignee` | `me`, `claude`, or nothing at all. `me` is a step you kept for yourself; every other approved step is one a routine may pick up on its own, which is what approving it did. `claude` reads the same as an empty column. Every hand-over used to write it; the feature Send stopped in #672 and the Send on one step in #714, so nothing writes this column when a step is claimed. |
+| `assignee` | `me`, or nothing at all. `me` is a step you kept for yourself; every other approved step is one a routine may pick up on its own, which is what approving it did. Nothing can set it to anything else since #718: the page offers Me and Nobody, `plan.ts assign` takes `me` and `none`, and the rows a hand-over wrote still hold `claude`, which `planItemFromRow` reads back as nobody's. |
 | `commit_sha` | The commit that shipped it. |
 | `position` | Order among siblings. Sparse; re-dealt in tens when a step is moved. |
 | `started_at`, `completed_at` | Kept by a trigger from the status. Done and dropped both count as finished; a reopened step loses its completion time. |
@@ -169,7 +169,7 @@ what to end the night with when it may not.
 The chooser is `chooseOvernightFeature` in `lib/plan/overnight-choice.ts`: the
 row's verdict and the plan tree composed into one answer, either the feature to
 fire or the sentence to stop on. It picks what a person would — the first row
-of `workOrder(sections, { assignee: 'claude' })`, and the top-level feature
+of `workOrder(sections, { only: 'runner' })`, and the top-level feature
 above it — so a feature it names always has a ready step beneath it, and
 nothing about blocked, waiting or unapproved work is restated here. Still being
 built around it: the tick route, the schedule, the page control and the report.
@@ -224,8 +224,8 @@ the code. So the shaping is Claude's job and the approving is the person's.
    waiting. Three cheap moves are the whole review: drop a step, reorder or
    reprioritise, and **Approve** — the first choice in a proposal's health
    menu, which moves the step and every proposed step beneath it to not
-   started in one click. Handing a step to Claude is the fourth move, and
-   the one that makes the routine pick it up.
+   started in one click. Approving is also what puts the step in front of the
+   runner: there is no separate hand-over.
 4. From there the building loop applies. The idea's button has become the
    link "in the plan as #n".
 
@@ -311,8 +311,8 @@ as being further along than it is.
 
 **Never answered by a session.** `workOrder` withholds a decision from
 `--claude` however it is assigned, `scripts/plan.ts start` refuses one and
-says where it is answered instead, `add` withholds `--claude` from one, and
-the skill says it twice. The guarantee is worth the four locks: a routine
+says where it is answered instead, and the skill says it twice. The guarantee
+is worth the three locks: a routine
 that can answer its own questions has no questions, only guesses with a paper
 trail. The cost is real and accepted — a decision nobody answers stalls
 everything that depends on it until the person looks at the page.
@@ -690,8 +690,8 @@ that matter — *Next* or *Someday*, the size, *Claude*, *Ready*, *Waits on
 #n*, and *done/live steps* on a feature. The chevron folds the sub-steps,
 closed by default on a finished step. The title opens the detail: what it
 involves, done when, your note, what it waits on and unblocks, dates, the
-commit, and the actions — edit, add a sub-step, hand to Claude, send to
-Claude. The menu on the line adds a sub-step, edits, moves the step up or
+commit, and the actions — edit, add a sub-step, mark it yours or give it
+back, send to Claude. The menu on the line adds a sub-step, edits, moves the step up or
 down among its siblings, or deletes it with its count of sub-steps in the
 confirm.
 
@@ -782,7 +782,7 @@ list [--all]        the tree, per module
 show <n>            the brief
 ideas               ideas not yet shaped into the plan, dismissals left out
 idea "…" [--module <id>] [--from <n>]   a follow-on, filed as a suggestion
-add "…" --parent <n> [--done-when "…"] [--size s|m|l] [--claude] [--proposed] [--idea <id>]
+add "…" --parent <n> [--done-when "…"] [--size s|m|l] [--proposed] [--idea <id>]
                     [--fog "…"] [--kind decision|setup]
 needs "…" --for <n> [--detail "…"]   a setup job of the person's, and the edge to it
 approve <n>         a person's move: the step and the proposed steps beneath it
@@ -848,8 +848,8 @@ the first through every turn of the last, and runs out of room around the
 third. The subagents also skip the full test suite and `next build` — the
 orchestrator runs both once before it pushes, and CI runs them again on main.
 
-A step assigned to Claude is Claude's to pick up; a step named by the user is
-Claude's whoever holds it; anything else, ask. The plan must always tell the
+An approved step you did not keep is Claude's to pick up; a step named by the
+user is Claude's whoever holds it; anything else, ask. The plan must always tell the
 truth: a step that cannot be finished is blocked with the question, never left
 in progress and never closed to look tidy.
 
