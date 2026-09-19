@@ -120,6 +120,12 @@ export function serverEnv() {
       NEWS_MAIL_DOMAIN: z.string().min(3).optional(),
       /** Optional. Mailgun's HTTP webhook signing key. Not the API key. */
       MAILGUN_SIGNING_KEY: z.string().min(1).optional(),
+      /**
+       * Optional. Mailgun's sending API key, which is a different value from
+       * the signing key above. Without it the app can receive newsletters but
+       * cannot send the unsubscribe mail a publisher asked for by address.
+       */
+      MAILGUN_API_KEY: z.string().min(1).optional(),
     })
     .parse(process.env);
 }
