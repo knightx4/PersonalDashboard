@@ -7,7 +7,7 @@ import {
   modeOf,
   parseTheme,
   THEME_CHOICE_ATTRIBUTE,
-  THEME_COLOURS,
+  COLOURWAYS,
   THEME_ROOMS,
   type Theme,
 } from '@/lib/theme';
@@ -34,8 +34,8 @@ function describe(theme: Theme): string {
   if (theme.kind === 'written') return `${theme.id[0]!.toUpperCase()}${theme.id.slice(1)}`;
   const mode = THEME_ROOMS.find((option) => option.id === theme.mode)?.label ?? theme.mode;
   if (theme.hue === null) return `${mode}, no colour`;
-  const preset = THEME_COLOURS.find((colour) => colour.hue === theme.hue);
-  return preset ? `${mode}, ${preset.label.toLowerCase()}` : `${mode}, ${theme.hue}°`;
+  const way = COLOURWAYS.find((colour) => colour.id === theme.way);
+  return way ? `${mode}, ${way.label.toLowerCase()}` : `${mode}, ${theme.hue}°`;
 }
 
 export function ActivePalette() {

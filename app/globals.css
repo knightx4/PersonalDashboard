@@ -157,7 +157,7 @@
    * and dark enough to look like a void needs one, so the default is none. */
   /* The four colours the bench's pools are made of.
    *
-   * Tokens rather than literals inside --page-wash, and that is the whole
+   * Tokens rather than literals inside the wash, and that is the whole
    * point: the generator rotates `--c-*` tokens and cannot see anything
    * written inline in a gradient. They were literals, so picking a colour
    * turned the bench and left the pools where they were -- a red room with a
@@ -171,13 +171,21 @@
    *
    * Defined in every theme because the palette has to be uniform -- the token
    * set is read off Paper and cleared by name -- but only the glass rooms
-   * paint with them; the solid rooms set --page-wash to none. */
+   * paint with them; the solid rooms paint no wash at all. */
   --c-wash-near: #3a74d6;
   --c-wash-mid: #8260fa;
   --c-wash-far: #dd78e6;
   --c-wash-floor: #175cb0;
 
-  --page-wash: none;
+  /* How much of each pool reaches the bench, against the percentages written
+   * into the wash. One is those percentages. A named colourway sets its own
+   * (see lib/theme/colourway.ts): the pools are seen through a third of a mix
+   * over a near-black bench, and a third of a deep magenta is not magenta, so
+   * a colourway built from deep colours needs more of itself through to read
+   * as the colour it is. Each one's is measured against the light the free-hue
+   * wash already spends, so raising it is not free and is not guessed. */
+  --wash-lift: 1;
+
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
 
   /* ---- The page ground, as a scope of its own -------------------------
@@ -256,6 +264,15 @@
   --c-wash-mid: #8260fa;
   --c-wash-far: #dd78e6;
   --c-wash-floor: #175cb0;
+
+  /* How much of each pool reaches the bench, against the percentages written
+   * into the wash. One is those percentages. A named colourway sets its own
+   * (see lib/theme/colourway.ts): the pools are seen through a third of a mix
+   * over a near-black bench, and a third of a deep magenta is not magenta, so
+   * a colourway built from deep colours needs more of itself through to read
+   * as the colour it is. Each one's is measured against the light the free-hue
+   * wash already spends, so raising it is not free and is not guessed. */
+  --wash-lift: 1;
 
   --c-fill-ink: #0f1011;
   color-scheme: dark;
@@ -463,34 +480,15 @@
   --c-wash-mid: #8260fa;
   --c-wash-far: #dd78e6;
   --c-wash-floor: #175cb0;
-  --page-wash:
-    radial-gradient(
-      105% 72% at 10% -8%,
-      color-mix(in oklab, var(--c-wash-near) 34%, transparent),
-      transparent 60%
-    ),
-    radial-gradient(
-      82% 78% at 88% -2%,
-      color-mix(in oklab, var(--c-wash-far) 30%, transparent),
-      transparent 62%
-    ),
-    radial-gradient(
-      75% 62% at 78% 48%,
-      color-mix(in oklab, var(--c-wash-mid) 26%, transparent),
-      transparent 64%
-    ),
-    linear-gradient(
-      155deg,
-      color-mix(in oklab, var(--c-wash-near) 22%, transparent) 0%,
-      color-mix(in oklab, var(--c-wash-mid) 15%, transparent) 36%,
-      color-mix(in oklab, var(--c-wash-far) 12%, transparent) 62%,
-      transparent 86%
-    ),
-    radial-gradient(
-      130% 110% at 42% 118%,
-      color-mix(in oklab, var(--c-wash-floor) 34%, transparent),
-      transparent 68%
-    );
+
+  /* How much of each pool reaches the bench, against the percentages written
+   * into the wash. One is those percentages. A named colourway sets its own
+   * (see lib/theme/colourway.ts): the pools are seen through a third of a mix
+   * over a near-black bench, and a third of a deep magenta is not magenta, so
+   * a colourway built from deep colours needs more of itself through to read
+   * as the colour it is. Each one's is measured against the light the free-hue
+   * wash already spends, so raising it is not free and is not guessed. */
+  --wash-lift: 1;
   --c-page-positive: #6fe0b0;
   --c-page-caution: #f5b459;
   --c-page-danger: #ff9d9d;
@@ -657,6 +655,15 @@
   --c-wash-far: #dd78e6;
   --c-wash-floor: #175cb0;
 
+  /* How much of each pool reaches the bench, against the percentages written
+   * into the wash. One is those percentages. A named colourway sets its own
+   * (see lib/theme/colourway.ts): the pools are seen through a third of a mix
+   * over a near-black bench, and a third of a deep magenta is not magenta, so
+   * a colourway built from deep colours needs more of itself through to read
+   * as the colour it is. Each one's is measured against the light the free-hue
+   * wash already spends, so raising it is not free and is not guessed. */
+  --wash-lift: 1;
+
   --c-fill-ink: #191426;
   color-scheme: dark;
   --c-sheet-scheme: dark;
@@ -780,34 +787,15 @@
   --c-wash-mid: #8260fa;
   --c-wash-far: #dd78e6;
   --c-wash-floor: #175cb0;
-  --page-wash:
-    radial-gradient(
-      105% 72% at 10% -8%,
-      color-mix(in oklab, var(--c-wash-near) 34%, transparent),
-      transparent 60%
-    ),
-    radial-gradient(
-      82% 78% at 88% -2%,
-      color-mix(in oklab, var(--c-wash-far) 30%, transparent),
-      transparent 62%
-    ),
-    radial-gradient(
-      75% 62% at 78% 48%,
-      color-mix(in oklab, var(--c-wash-mid) 26%, transparent),
-      transparent 64%
-    ),
-    linear-gradient(
-      155deg,
-      color-mix(in oklab, var(--c-wash-near) 22%, transparent) 0%,
-      color-mix(in oklab, var(--c-wash-mid) 15%, transparent) 36%,
-      color-mix(in oklab, var(--c-wash-far) 12%, transparent) 62%,
-      transparent 86%
-    ),
-    radial-gradient(
-      130% 110% at 42% 118%,
-      color-mix(in oklab, var(--c-wash-floor) 34%, transparent),
-      transparent 68%
-    );
+
+  /* How much of each pool reaches the bench, against the percentages written
+   * into the wash. One is those percentages. A named colourway sets its own
+   * (see lib/theme/colourway.ts): the pools are seen through a third of a mix
+   * over a near-black bench, and a third of a deep magenta is not magenta, so
+   * a colourway built from deep colours needs more of itself through to read
+   * as the colour it is. Each one's is measured against the light the free-hue
+   * wash already spends, so raising it is not free and is not guessed. */
+  --wash-lift: 1;
 
   --c-accent-base-lit: #a6b4ff;
   --c-accent-hover-lit: #bcc6ff;
@@ -1135,8 +1123,6 @@ body,
  * background instead of letting <body> show through -- so wherever it appears
  * it goes back to the page scope, even if some sheet happens to be above it. */
 .bg-page {
-  /* It is standing in for <body>, so it carries the same wash. */
-  background-image: var(--page-wash);
   --c-ink: var(--c-page-ink);
   --c-ink-muted: var(--c-page-ink-muted);
   --c-ink-ghost: var(--c-page-ink-ghost);
@@ -1309,9 +1295,6 @@ body,
 
 body {
   background-color: var(--c-page);
-  /* Fixed, so the wash is a light source the page moves under rather than a
-   * pattern that scrolls away. `none` in every theme that does not set one. */
-  background-image: var(--page-wash);
   background-attachment: fixed;
   color: var(--c-ink);
   font-family: var(--font-sans);
@@ -2027,6 +2010,77 @@ form[data-auto-submit] [data-fallback-submit] {
     rgb(var(--wash-a) / 0.30),
     transparent 62%
   );
+}
+
+/* The wash: the pools, laid out across whatever is painting them.
+ *
+ * Written as a background-image on each painter rather than stored in a custom
+ * property they all read, and that is forced rather than chosen. A var() inside
+ * a custom property is substituted where the property is DECLARED, not where it
+ * is used, so a `--page-wash` built at :root bakes in :root's pools and every
+ * element that inherits it paints those -- which is fine for the two rooms,
+ * whose pools are written onto <html> by the theme and so are :root's, and
+ * wrong for anything else. A colourway chip sets its own pools on itself; it
+ * has to declare the gradient on itself too, or it inherits a finished picture
+ * of somebody else's colours. Listing the painters together is what keeps one
+ * copy of the stack.
+ *
+ * Only the glass rooms are here. The solid two paint no wash, which is now
+ * said by their not matching rather than by a token set to none.
+ *
+ * On <body> it is fixed to the viewport, so it reads as depth the page slides
+ * over rather than a pattern that scrolls away; `.bg-page` is a layout drawing
+ * the page ground itself, standing in for <body>, so it carries the same wash.
+ */
+[data-theme='lightbox'] body,
+[data-theme='darkroom'] body,
+[data-theme='lightbox'] .bg-page,
+[data-theme='darkroom'] .bg-page,
+.wash-chip {
+  background-image:
+    radial-gradient(
+      105% 72% at 10% -8%,
+      color-mix(in oklab, var(--c-wash-near) calc(var(--wash-lift) * 34%), transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      82% 78% at 88% -2%,
+      color-mix(in oklab, var(--c-wash-far) calc(var(--wash-lift) * 30%), transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      75% 62% at 78% 48%,
+      color-mix(in oklab, var(--c-wash-mid) calc(var(--wash-lift) * 26%), transparent),
+      transparent 64%
+    ),
+    linear-gradient(
+      155deg,
+      color-mix(in oklab, var(--c-wash-near) calc(var(--wash-lift) * 22%), transparent) 0%,
+      color-mix(in oklab, var(--c-wash-mid) calc(var(--wash-lift) * 15%), transparent) 36%,
+      color-mix(in oklab, var(--c-wash-far) calc(var(--wash-lift) * 12%), transparent) 62%,
+      transparent 86%
+    ),
+    radial-gradient(
+      130% 110% at 42% 118%,
+      color-mix(in oklab, var(--c-wash-floor) calc(var(--wash-lift) * 34%), transparent),
+      transparent 68%
+    );
+}
+
+/**
+ * A colourway, small enough to click.
+ *
+ * Draws the same gradient the bench does, from pool tokens set on the chip
+ * itself, so the swatch in the picker is the room rather than a drawing of it.
+ * It carries its own background colour too, because the bench a colourway
+ * turns to is part of what it looks like.
+ *
+ * Painted in every room, including the solid two that paint no wash of their
+ * own: a person choosing a colourway in Solid should still see what they are
+ * picking, even though nothing will paint it until they switch surface.
+ */
+.wash-chip {
+  background-size: cover;
 }
 
 .shell-ground {
