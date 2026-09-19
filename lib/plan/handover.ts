@@ -238,7 +238,7 @@ export async function handStepToClaude(input: {
       '.claude/skills/plan/reference/building.md. The brief is below; it is the plan as the ' +
       'app holds it right now, and the plan is the source of truth -- claim the step, build ' +
       'it, verify, commit with the step number in the subject, and close it with a note. ' +
-      'Push when it is closed.\n\n' +
+      'Merge it to main when it is closed.\n\n' +
       planBrief(sections, node, { thread: true, liveness })
     : `Build plan step #${node.number}, "${node.title}", and the steps beneath it, following ` +
       '.claude/skills/plan/SKILL.md -- the Building section, which has more than one step to ' +
@@ -431,8 +431,9 @@ export async function handFeatureToClaude(input: {
     'to its own subagent, in the order the plan gives, and do not read the steps\' source ' +
     'files or make the edits yourself. Keep the carry-forward between them. Stop at the ' +
     'first step that needs a decision from me: block it with the exact question rather ' +
-    'than guessing, and do not skip past it to a later step that depends on it. Run the ' +
-    'gate once at the end, push once, and report every step you closed, by number and ' +
+    'than guessing, and do not skip past it to a later step that depends on it. Merge ' +
+    'each step to main as it closes, before you send the next one. The Building section ' +
+    'says how. Report every step you closed, by number and ' +
     'title.\n\nThe brief is below; it is the plan as the app holds it right now, and ' +
     'the plan is the source of truth.\n\n' +
     planBrief(sections, node, { thread: true, liveness });

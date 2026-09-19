@@ -1276,7 +1276,8 @@ export async function sendPlanQueueToClaude(
     'make the edits yourself. Keep the carry-forward between them. A step whose brief says it ' +
     'waits on another is worked after that one, not skipped. Stop at the first step that needs ' +
     'a decision from me: block it with the exact question rather than guessing, and carry on ' +
-    'with the rest. Run the gate once at the end, push once, and report every step you closed, ' +
+    'with the rest. Merge each step to main as it closes, before you send the next one. The ' +
+    'Building section says how. Report every step you closed, ' +
     'by number and title.\n\nThe briefs are below; they are the plan as the app holds it right now, and the ' +
     'plan is the source of truth.\n\n' +
     planQueueBrief(sections, queue, { thread: true });
