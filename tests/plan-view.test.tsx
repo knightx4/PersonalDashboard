@@ -234,6 +234,84 @@ describe('PlanView', () => {
     expect(html).not.toContain('Hand to Dash');
   });
 
+  it('marks the steps you kept, and leaves the runner\'s own rows unmarked', () => {
+    // #693: the mark used to be a robot on every step handed to Dash. The
+    // runner now takes anything approved that is not yours, so the fact worth
+    // reading off a resting row is which steps it will skip.
+    const rows = buildPlanTree({
+      items: [
+        item({ id: 'runners', title: 'Outlook ingestion' }),
+        item({ id: 'held', title: 'Account deletion', assignee: 'me' }),
+        // A hand-over from before this feature. Nothing clears the column, so
+        // the row has to stop being read rather than stop holding the value.
+        item({ id: 'stale', title: 'Receipts by photo', assignee: 'claude' }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(rows, 'open')}
+        finished={[]}
+        summary={summarize(rows)}
+        view="open"
+        catalog={catalogOf(rows)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+    // One mark across the three rows, and it sits beside the title of the one
+    // you kept -- not on the runner's step, and not on the old hand-over.
+    expect((html.match(/Marked yours/g) ?? []).length).toBe(1);
+    expect(html).toContain(
+      '>Account deletion</span><span title="Yours. The runner will not take this one."',
+    );
+    // The robot that marked a handed-over step is gone with it.
+    expect(html).not.toContain('lucide-bot');
+  });
+
+  it('reads an underway step as a session\'s unless you kept it', () => {
+    // #693: the tooltip used to say "Dash has been on this" only for a step
+    // handed over. A session can start on anything approved, so the reading
+    // flips -- underway is Dash's unless the step is yours.
+    const running = buildPlanTree({
+      items: [
+        item({
+          id: 'dashs',
+          title: 'Outlook ingestion',
+          status: 'in_progress',
+          startedAt: '2026-02-01T09:30:00Z',
+        }),
+        item({
+          id: 'yours',
+          title: 'Account deletion',
+          status: 'in_progress',
+          assignee: 'me',
+          startedAt: '2026-02-01T09:30:00Z',
+        }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(running, 'open')}
+        finished={[]}
+        summary={summarize(running)}
+        view="open"
+        catalog={catalogOf(running)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+    expect(html).toContain('Dash has been on this since 2026-02-01 09:30');
+    expect(html).toContain('Underway since 2026-02-01 09:30');
+  });
+
   it('gathers the finished features into the fold at the foot of Everything', () => {
     const closed = buildPlanTree({
       items: [

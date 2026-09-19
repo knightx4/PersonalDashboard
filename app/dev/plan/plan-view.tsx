@@ -3,7 +3,6 @@
 import { useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  Bot,
   Check,
   Circle,
   CircleAlert,
@@ -1650,7 +1649,10 @@ function Underway({
           ? `Claimed ${since} and its run stopped without closing the step — close it or put it back.`
           : claim === 'quiet'
             ? `Claimed ${since}. Its run has pushed nothing for a while; it may still be reading or waiting on a build.`
-            : `${assignee === 'claude' ? 'Dash has been on this' : 'Underway'} since ${since}`
+            : // A session can start on anything approved, so an underway step
+              // is a session's unless you kept it back. The column used to be
+              // read the other way, when only a step handed over was Dash's.
+              `${assignee === 'me' ? 'Underway' : 'Dash has been on this'} since ${since}`
       }
       className={cn(
         'tabular inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-small font-medium',
@@ -2581,27 +2583,31 @@ function PlanRow({
               )}
               {/* And whether anything has been said about it. */}
               <CommentCount count={node.thread.length} />
-              {/* Whose it is, on the row.
-                * The "Who" column was dropped for being a column of dashes,
-                * and it was right to go -- but with it went any way of seeing
-                * that a step is Claude's without opening it, hovering it, or
-                * switching to the Claude's view. Handing a step over is the
-                * move this page exists to make, and the page said nothing
-                * about the result. A mark, not a column: it appears only on
-                * the steps that have been handed over, which is what makes it
-                * worth reading. */}
-              {node.assignee === 'claude' && (
+              {/* The steps you kept, on the row.
+                * The runner takes anything approved that is not yours, so the
+                * fact worth reading off a resting row is which steps it will
+                * skip. It used to be the other way round: the mark was a robot
+                * on every step handed to Dash, from when a session could only
+                * work a step somebody had handed it.
+                *
+                * The row's Mine press carries the same fact in its accented
+                * icon, but that icon is drawn only under the pointer and not
+                * at all below sm, so this is the only place a plan at rest
+                * says it. Steps still holding the old 'claude' value are not
+                * read here and nothing clears them.
+                *
+                * A mark, not a column: it appears on the few steps you held
+                * back, which is what makes it worth reading. */}
+              {mine && (
                 <span
-                  title="Handed to Dash"
+                  title="Yours. The runner will not take this one."
                   className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1 py-0.5 text-accent"
                 >
-                  {/* A bot and not a person. This mark said "handed over" with
-                      the same head-and-shoulders the assignee picker uses for
-                      anybody at all, so the one thing it had to say -- that it
-                      went to Claude rather than onto your own list -- was the
-                      one thing it did not. */}
-                  <Bot className="size-3" strokeWidth={2} aria-hidden />
-                  <span className="sr-only">Handed to Dash</span>
+                  {/* The head-and-shoulders from the assignee picker, the same
+                      icon the Mine press uses, so the mark and the press that
+                      sets it are recognisably one thing. */}
+                  <CircleUser className="size-3" strokeWidth={2} aria-hidden />
+                  <span className="sr-only">Marked yours</span>
                 </span>
               )}
               {/* And whether the checks passed on what it shipped in. */}
@@ -2734,10 +2740,10 @@ function PlanRow({
         </span>
 
         {/* No "Who" column. It was a column of dashes with the occasional
-            "Claude" in it -- one fact, on a plan whose every step is yours
-            unless you hand it over, and handing it over is a button. The one
-            value it carried is now a mark beside the title, on the steps that
-            have it; the rest is on the open step, in the summary's "Claude's"
+            name in it -- one fact, on a plan whose every approved step the
+            runner takes unless you keep it, and keeping it is a button. The
+            one value it carried is now a mark beside the title, on the steps
+            you kept; the rest is on the open step, in the summary's "Claude's"
             view, and in the menu that changes it. */}
         <span className="hidden sm:block">
           <Breakdown node={node} />
