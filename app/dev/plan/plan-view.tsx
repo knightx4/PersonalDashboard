@@ -1289,10 +1289,10 @@ function Dependencies({
 }
 
 /**
- * What pressing Send actually hands over, said before it is pressed.
+ * What pressing Send actually sends, said before it is pressed.
  *
  * The brief carries the step's whole subtree under "## Steps", so Send on a
- * feature hands over the feature and everything beneath it. The button read
+ * feature sends the feature and everything beneath it. The button read
  * "Send to Claude" whichever row it sat on, so pressing it on #197 looked like
  * sending one step and sent ten. The action already says so afterwards; this
  * is the same count, in the label, before you commit to it.
@@ -1309,7 +1309,7 @@ function sendLabel(node: PlanNode): string {
 }
 
 /**
- * Hand it over and start the routine now.
+ * Start the routine on it now.
  *
  * The button is offered whether or not the deployment can start a routine,
  * because the action says exactly what is missing when it cannot, and a
@@ -1412,14 +1412,14 @@ function SendToClaude({
             variant="ghost"
             pending={batchPending}
             disabled={resolving}
-            title={held ?? 'Hand every open step beneath this one to Dash, worked in order'}
+            title={held ?? 'Start one session on every open step beneath this one, worked in order'}
           >
             {batchPending ? 'Sending…' : `Send all ${beneath} beneath`}
           </Button>
         </form>
       )}
-      {/* The return trip, and the only button here that does not hand work
-          over: it asks for the feature to be re-read against what has been
+      {/* The return trip, and the only button here that starts no build: it
+          asks for the feature to be re-read against what has been
           settled beneath it, and everything that comes back is a proposal
           waiting on the same approve as anything else. Offered wherever there
           is something beneath to re-read. */}

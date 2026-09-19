@@ -1040,14 +1040,12 @@ export async function sendPlanItemToClaude(
 }
 
 /**
- * Hand a whole feature over and start the routine on it now.
+ * Start the routine on a whole feature, now.
  *
  * The step-at-a-time button is right when you are watching; a feature of seven
- * steps pressed seven times is not. So this one cascades -- every open step
- * beneath becomes Claude's, the way approving cascades -- and fires once with
- * the feature's brief, which already carries its steps and what each waits on.
- * The session works them in order and stops at the first thing it should not
- * decide alone.
+ * steps pressed seven times is not. So this one fires once with the feature's
+ * brief, which already carries its steps and what each waits on. The session
+ * works them in order and stops at the first thing it should not decide alone.
  *
  * It refuses a proposal, because a proposal is not work yet, and it refuses a
  * feature with nothing open beneath it, because there would be nothing to do.
@@ -1065,12 +1063,15 @@ export async function sendPlanFeatureToClaude(
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing step.' };
 
-  // Every rule about what may be sent, the cascade and the instruction itself
-  // are in lib/plan/handover.ts, because the overnight tick now fires the same
-  // send with nobody watching and the two must not drift apart.
+  // Every rule about what may be sent and the instruction itself are in
+  // lib/plan/handover.ts, because the overnight tick now fires the same send
+  // with nobody watching and the two must not drift apart.
   const sent = await handFeatureToClaude({ supabase, userId: user.id, id: id.data });
   if (!sent.ok) return { error: sent.error };
-  if (sent.changed) revalidatePlan();
+  // No row changed -- the send writes none now -- but the run it started is on
+  // the page, in the health column and in what the buttons on the feature will
+  // refuse next.
+  revalidatePlan();
 
   return {
     message: `Sent #${sent.number} and its ${sent.steps === 1 ? 'step' : `${sent.steps} steps`}. ${sent.detail}`,
