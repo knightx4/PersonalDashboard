@@ -6,6 +6,7 @@ import {
   approvedChainSchemaWith,
   chainPayloadSchema,
   normaliseChain,
+  whyMalformed,
   placeMentions,
   wouldCycle,
   MAX_CHAIN,
@@ -319,7 +320,7 @@ async function readSection(input: {
   }
 
   const safe = chainPayloadSchema.safeParse(block.input);
-  if (!safe.success) return { kind: 'error', detail: 'That came back malformed.' };
+  if (!safe.success) return { kind: 'error', detail: whyMalformed(safe.error) };
 
   const chain = normaliseChain(safe.data, input.existing);
   return chain ? { kind: 'chain', chain } : { kind: 'nothing' };

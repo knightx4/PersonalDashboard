@@ -5,6 +5,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
   chainPayloadSchema,
   normaliseChain,
+  whyMalformed,
   type ExistingConcept,
   type ProposedChain,
 } from '@/lib/learn/graph/chain-payload';
@@ -170,7 +171,7 @@ export async function proposeFloor(input: {
 
   const safe = chainPayloadSchema.safeParse(block.input);
   if (!safe.success) {
-    return { ok: false, reason: 'error', detail: 'That came back malformed.' };
+    return { ok: false, reason: 'error', detail: whyMalformed(safe.error) };
   }
 
   // The concept itself is already in the subject, so it matches by name and

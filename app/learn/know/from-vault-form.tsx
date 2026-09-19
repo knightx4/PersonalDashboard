@@ -76,7 +76,18 @@ export function FromVaultForm({
         id="vault-note"
         hint="Notes long enough to be arguing something. What it claims becomes concepts; what it merely records does not."
       >
-        <Select id="vault-note" name="notePath" defaultValue="" required>
+        {/*
+          The note that was read stays chosen. A proposal that failed is
+          usually retried on the same note, and a picker that empties itself
+          makes that a hunt through five hundred paths.
+        */}
+        <Select
+          id="vault-note"
+          name="notePath"
+          key={state.verdict?.notePath ?? 'none'}
+          defaultValue={state.verdict?.notePath ?? ''}
+          required
+        >
           <option value="" disabled>
             Pick a note
           </option>

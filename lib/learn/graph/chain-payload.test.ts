@@ -5,6 +5,7 @@ import {
   keepTicked,
   MAX_CHAIN,
   normaliseChain,
+  whyMalformed,
   type ChainNode,
   type ExistingConcept,
   type ProposedChain,
@@ -522,5 +523,42 @@ describe('which nodes are doors', () => {
       nodes: chain!.nodes.map((n, i) => (i === 0 ? { ...n, kind: 'door' } : n)),
     };
     expect(approvedChainSchema.parse(tampered).nodes[0].kind).toBeNull();
+  });
+});
+
+describe('whyMalformed', () => {
+  const parse = (value: unknown) => {
+    const result = chainPayloadSchema.safeParse(value);
+    if (result.success) throw new Error('expected this payload to fail');
+    return whyMalformed(result.error);
+  };
+
+  const good = {
+    subject: 'Economics',
+    goal_concept: 'Gini coefficient',
+    concepts: [{ name: 'Gini', claim: 'It measures dispersion.', basis: 'Stated in the note.' }],
+    edges: [],
+  };
+
+  it('names a missing top-level field', () => {
+    const why = parse({ ...good, subject: undefined });
+    expect(why).toContain('subject');
+  });
+
+  it('names the field inside the concept that failed, with its index', () => {
+    const why = parse({
+      ...good,
+      concepts: [good.concepts[0], { ...good.concepts[0], claim: 'x'.repeat(2000) }],
+    });
+    expect(why).toContain('concepts[1].claim');
+  });
+
+  it('carries what was wrong with it, not only where', () => {
+    const why = parse({ ...good, goal_concept: '' });
+    expect(why.length).toBeGreaterThan('That came back malformed: goal_concept — '.length);
+  });
+
+  it('says something usable when the payload is not an object at all', () => {
+    expect(parse('nope')).toContain('malformed');
   });
 });

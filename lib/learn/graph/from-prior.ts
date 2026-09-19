@@ -5,6 +5,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
   chainPayloadSchema,
   normaliseChain,
+  whyMalformed,
   MAX_CHAIN,
   type ExistingConcept,
   type ProposedChain,
@@ -191,7 +192,7 @@ export async function conceptsFromPrior(input: {
 
   const safe = chainPayloadSchema.safeParse(block.input);
   if (!safe.success) {
-    return { ok: false, reason: 'error', detail: 'That came back malformed.' };
+    return { ok: false, reason: 'error', detail: whyMalformed(safe.error) };
   }
 
   const chain = normaliseChain(safe.data, input.existing);

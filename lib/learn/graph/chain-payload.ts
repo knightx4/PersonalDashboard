@@ -516,3 +516,27 @@ export function keepTicked(
     unplaced,
   };
 }
+
+/**
+ * Which part of a proposal did not survive the schema, in one sentence.
+ *
+ * Every caller that parses a chain used to answer "that came back malformed"
+ * and throw the reason away, which left a failure nobody could act on: the
+ * screen said something went wrong, the ledger said the call was paid for, and
+ * the field that was too long or missing was nowhere. Reading a vault note hit
+ * exactly that and there was nothing to go on.
+ *
+ * The first issue only. A payload that fails in nine places fails for one
+ * reason most of the time, and nine of these on a screen is a stack trace.
+ */
+export function whyMalformed(error: z.ZodError): string {
+  const issue = error.issues[0];
+  if (!issue) return 'That came back malformed.';
+
+  const path = issue.path.reduce<string>((built, step) => {
+    if (typeof step === 'number') return `${built}[${step}]`;
+    return built === '' ? String(step) : `${built}.${String(step)}`;
+  }, '');
+
+  return `That came back malformed: ${path || 'the whole payload'} — ${issue.message}`;
+}
