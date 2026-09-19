@@ -300,51 +300,66 @@ time it is used, never generated once and frozen.
   (20–23) shipped for the note half of it; nothing else in the block depends on
   another block.
 
-## The knowledge foundation
+## The vault map
 
-Specified in [KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md), which sits above the vault
-spec and both learn specs. The vault is the record and the graph is a layer on
-top of it: read-only in, no write path out, and everything the graph holds is
-either derived from the notes or produced by using the app.
+Specified in [KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md), which sits over the vault
+spec and both learn specs. The vault stops being only a viewer and gains a map
+of itself: themes, the positions under them, and what points at what, derived
+from the notes and stored beside them in `obsidian`.
 
-The ordering argument is that every item is cheap at the few dozen concepts in
-the graph today and painful at the 1,500 to 2,500 the vault sweep is projected
-to produce, so all of it comes before the sweep rather than after.
+The ordering argument is different from the earlier draft of this block. That
+one put a learn-schema realignment first, on the grounds that eight
+disagreements were cheap at forty rows and painful at 1,800. Most of that list
+existed because vault-extracted concepts were going to land in
+`learn.concepts`. They are not — the map is the vault's and makes no claim
+about what anybody knows — so the realignment stops gating the sweep and the
+map's tables are greenfield.
 
 54. **The privacy page, and the journal exclusion list.** Before another note
     reaches a model. Two paths already send vault content to one and the policy
     describes mail only, which the vault spec said had to change first.
-55. **The realignment migrations.** Subjects demoted from containers to labels,
-    the four node kinds, typed edges absorbing `concept_mentions`, the
-    `claimed` state, stance, a provenance table keyed on `blob_sha` with a
-    verified quote, disagreements, centrality, and the overlays pair.
-    `concept_subjects` is superseded and comes back out.
-56. **One extraction seam.** The node test, the kinds, the edge vocabulary and
-    the quote rule in the shared prompt fragment the five chain-writing calls
-    already draw on, so a change to what an atom is is made once.
+55. **The map's tables.** Themes, positions, position edges, provenance rows
+    carrying the note, its `blob_sha` and a verified quote, tensions, and a
+    centrality score. New tables in `obsidian`, RLS on all of them, and the
+    cross-user isolation test extended **before any feature code** — build
+    step 2's rule for the sixth time and the same reason.
+56. **One extraction seam.** The node test, the four kinds, the edge
+    vocabulary and the verbatim-quote rule in the shared prompt fragment the
+    chain-writing calls already draw on, so a change to what a position is is
+    made once.
 57. **The sweep at scale.** A background job, a budget and a resume point,
-    which the one-note slice deliberately has none of.
-58. **The review queue.** Accept, merge or reject, highest centrality first.
-59. **Centrality and the frontier floor.** Graph arithmetic, no model call.
-60. **Disagreements.** The neighbourhood sweep, the six kinds, the crux, and
-    the resolution atom that `qualifies` both originals.
-61. **Overlays in the interface.** Interests and open questions, and the button
-    that turns an unanswered question into a track in the reading queue.
-62. **The export.** One markdown file per atom, on demand. An atom you typed
-    into the app is the one thing here the vault cannot give back, since
-    nothing is ever written to it.
+    which the one-note slice deliberately has none of. The chunker is the
+    thing to fix first: it stops after ten sections, which leaves 40.7% of the
+    text in headed notes unread and punishes well-structured notes hardest.
+58. **The map on screen.** `/vault` gains themes by strength, a theme's
+    positions, and a position's notes and quotes. The deliverable, and worth
+    having whether or not Learn ever reads it.
+59. **The merge pass and the review queue.** Themes and positions reconciled
+    across notes, then accept, merge or reject, highest centrality first.
+60. **Tensions and open questions.** The neighbourhood sweep, the six kinds,
+    the proposed crux, the resolution that `qualifies` both originals.
+61. **The seam into Learn.** A theme's strength ranks what Learn offers, a
+    theme's positions go into the generation prompt as context, and an open
+    question becomes a track in the reading queue. Nothing crosses back, and
+    nothing read out of the vault writes a knowledge state.
+62. **The export.** One markdown file per theme, on demand, since the map
+    lives in Postgres and nothing writes it back.
 
 ### Ordering notes worth respecting
 
-- Steps 54 and 55 block everything else here. 54 is not bookkeeping: the app
-  is already doing the thing the policy does not describe.
-- 55 before 56 before 57, for the reason every block here repeats. A shape
-  settled after 1,800 rows are written is a data migration rather than a
-  migration.
-- 61 is the one that closes the loop between the two modules: an interest with
-  no atoms under it is the best input the reading queue can get.
-- 62 depends on nothing and blocks nothing. It is last because there is
-  nothing worth exporting until the rest has run.
+- Step 54 blocks everything else here. It is not bookkeeping: the app is
+  already doing the thing the policy does not describe.
+- 55 before 56 before 57, for the reason every block here repeats. A missing
+  policy has to fail immediately, and a shape settled after 1,800 rows are
+  written is a data migration rather than a migration.
+- 57 needs the chunking fix or it reads a third of the vault and says nothing
+  about the rest.
+- 58 is the point at which this is worth having. Everything after it is
+  improvement on something real.
+- 61 is the one that makes both modules worth more than either, and it comes
+  late deliberately: Learn has four working ways into a graph already, and the
+  map has to be good before it is allowed to steer them.
+- 62 depends on nothing and blocks nothing.
 
 ## Open questions, still open
 

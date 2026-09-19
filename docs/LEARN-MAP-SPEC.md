@@ -16,13 +16,26 @@ Written to [WRITING-GUIDE.md](WRITING-GUIDE.md).
 
 ---
 
-**What moved.** [KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md) now owns the questions
-this document raised and could not settle from inside extraction: where the
-writing lives, what happens to an atom the app produces, and where an interest
-that holds no position goes. It also turns provenance from a sentence into a
-table keyed on the note's blob hash, with the supporting quote verified present
-in the note. Node kinds, edge types, the disagreement lifecycle and the
-procedure below are unchanged.
+**What moved.** [KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md) now owns the seam this
+document could not settle from inside extraction, and one decision there
+changes what this procedure is *for*.
+
+**This builds a map of the vault, not a map of what its owner knows.** The
+output belongs to the vault module, it is descriptive, and it never writes a
+knowledge state. So the `claimed` state in "Provenance and state" below is not
+being built, and the whole state column moves to Learn, where everything
+starts at `unknown`.
+
+Two consequences for the procedure. There is now a **theme** level above the
+nodes — a loose label over a body of writing, which needs no node test and is
+what carries interest — and the strict two-part test applies only to the
+positions beneath it. And `stance` stops being evidence about belief: all
+three values mean interest, and they differ only in how much the writing is
+its author's own voice.
+
+Node kinds, edge types, the disagreement lifecycle and the extraction
+procedure are otherwise unchanged, and the provenance table keyed on the
+note's blob hash with a verified quote is as the foundation describes.
 
 ## Why the vault is the starting point
 

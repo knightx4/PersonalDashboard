@@ -38,14 +38,14 @@ export const SPECS: readonly SpecDoc[] = [
   },
   {
     slug: 'knowledge',
-    title: 'Knowledge: the record, and the map over it',
+    title: 'The vault map',
     blurb:
-      'The foundation under the vault and both learn specs: a graph built on top of the notes and never into them, what an atom is, and the overlays that hold interests and open questions.',
+      'The foundation under the vault and both learn specs: a map of what you write about, derived from the notes and never written back, and the rule that it says what you are interested in rather than what you know.',
     file: 'KNOWLEDGE-SPEC.md',
-    // Filed under learn rather than app-wide because it is read alongside the
-    // map and the graph. It describes the vault as much as it does learn, and
-    // VAULT-SPEC.md points here for the decisions that moved.
-    module: 'learn',
+    // Filed under vault: the map it specifies is derived from the notes and
+    // belongs to that module. It also governs what Learn may assume from the
+    // map, and all three learn specs point here for the decisions that moved.
+    module: 'vault',
   },
   {
     slug: 'learn-map',

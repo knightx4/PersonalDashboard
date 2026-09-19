@@ -5,16 +5,19 @@ it. v1 is a viewer and nothing more. It is specified in full here because what
 it is *for* only makes sense at the end, and the shape of v1 is chosen to make
 that end cheap rather than to make v1 impressive.
 
-> **[KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md) now sits over this document,** and
-> settles what the vault is the record *for* rather than only how it is
-> mirrored. Two notes on how it reads the rules below.
+> **[KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md) now sits over this document.** The
+> vault is no longer only a viewer: it owns a **map of itself** — themes, the
+> positions under them, and what points at what — derived from these notes and
+> stored beside them in `obsidian`. That is new scope for this module and the
+> foundation spec holds it.
 >
-> - **"Not an editor" stands, without qualification.** The knowledge graph is
->   built on top of the vault and never writes into it. The `outbox/` idea this
->   document floated below is not being built, the stored PAT stays
->   `Contents: Read-only`, and the provider keeps no write path. The cost is
->   that an atom typed into the app lives only in Postgres, which the
->   foundation states plainly and answers with an export rather than a sync.
+> - **"Not an editor" stands, without qualification.** The map is derived from
+>   the notes and never written back. The `outbox/` idea floated below is not
+>   being built, the stored PAT stays `Contents: Read-only`, and the provider
+>   keeps no write path.
+> - **The map makes no claim about what its owner knows.** It says what is
+>   written and how much of it there is. What somebody knows is Learn's, and
+>   Learn starts everything at unknown.
 > - **"No LLM pass over vault content in v1" has been crossed twice,** by quiz
 >   generation and by the note classifier, and the privacy policy has not
 >   caught up. This document said that had to happen first, and it is now the
