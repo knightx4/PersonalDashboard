@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { popoverSurface } from '@/components/ui/popover';
@@ -15,6 +15,20 @@ import { scopeForModule, toggleScope, type SearchScope } from '@/lib/search/scop
 import type { ModuleId } from '@/lib/modules';
 import type { Theme } from '@/lib/theme';
 import type { NavSection } from '@/components/shell/app-shell';
+
+/**
+ * What the shell can do to the bar from outside it: put the cursor in the
+ * field.
+ *
+ * `focus` reports back whether the cursor actually landed there. Below lg the
+ * bar is drawn with `display: none`, and an input inside a hidden box cannot
+ * take focus, so a `false` answers "is the bar on screen" without a second
+ * copy of the breakpoint anywhere (#663). Nothing else is exposed: the query,
+ * the scope and the list stay the bar's own.
+ */
+export type SearchBarHandle = {
+  focus: () => boolean;
+};
 
 /**
  * The search bar, with the chip that says what it is searching.
@@ -37,6 +51,9 @@ import type { NavSection } from '@/components/shell/app-shell';
  * Nothing is fetched until the field has the cursor. The hook takes `active`
  * for exactly that, so a page carrying this bar costs no request until
  * somebody means to search.
+ *
+ * The one way in from outside is the `SearchBarHandle` above, which the shell
+ * holds so the keyboard shortcut can land here.
  */
 export function SearchBar({
   account,
@@ -45,6 +62,7 @@ export function SearchBar({
   enabledModules,
   theme,
   className,
+  ref,
 }: {
   /** Whose pages these are. The held list is only searched when it is theirs. */
   account: string;
@@ -59,6 +77,8 @@ export function SearchBar({
   theme: Theme;
   /** The width the bar is given, which is the top bar's business rather than this file's. */
   className?: string;
+  /** Held by the shell, so the keyboard shortcut can put the cursor in the field. */
+  ref?: React.Ref<SearchBarHandle>;
 }) {
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<SearchScope>(() => scopeForModule(module));
@@ -68,6 +88,22 @@ export function SearchBar({
   /** Escape was pressed: the list is shut while the text stays where it is. */
   const [dismissed, setDismissed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus() {
+        const input = inputRef.current;
+        if (!input) return false;
+        input.focus();
+        // Asked of the document rather than assumed: `focus()` on an input
+        // inside a `display: none` box is a no-op that throws nothing, and
+        // this is how the caller finds out.
+        return document.activeElement === input;
+      },
+    }),
+    [],
+  );
 
   const { rows, looking, run, reset } = useSearchRows({
     account,

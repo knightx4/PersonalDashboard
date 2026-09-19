@@ -37,10 +37,14 @@ import type { NavSection } from '@/components/shell/app-shell';
  * it to everything you own and narrows it back, the same chip the bar carries
  * and the same two states.
  *
- * Whether it is open is the shell's, not this file's, because on a phone the
- * magnifier in the top row opens it as well as the shortcut. The shortcut is
- * still listened for here and still toggles; #663 is the step that moves it
- * into the bar and retires this box.
+ * Below lg this is the whole of search: the magnifier in the top row opens it
+ * and so does ⌘K (#713). From lg up the field in the top bar is the way in
+ * and the shortcut goes there instead (#662), which leaves this box open to
+ * nothing on a wide window except a press that was made on a narrow one.
+ *
+ * Whether it is open is the shell's, not this file's: the magnifier opens it,
+ * and since #663 the shortcut is listened for there too, because the shell is
+ * the only place that can see both surfaces and pick between them.
  */
 export function CommandPalette({
   account,
@@ -106,17 +110,6 @@ export function CommandPalette({
     setScope(scopeForModule(module));
     setActive(0);
   }, [module]);
-
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        onOpenChange(!open);
-      }
-    }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open, onOpenChange]);
 
   useEffect(() => {
     if (!open) return;

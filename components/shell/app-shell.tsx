@@ -18,7 +18,7 @@ import { NotificationsButton, type Notification } from '@/components/shell/notif
 import { ThemePicker } from '@/components/shell/theme-picker';
 import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
-import { SearchBar } from '@/components/shell/search-bar';
+import { SearchBar, type SearchBarHandle } from '@/components/shell/search-bar';
 import { CaptureButton, CaptureProvider } from '@/components/shell/capture';
 import { KeyHintsProvider, Kbd } from '@/components/shell/key-hints';
 import { ToastProvider } from '@/components/ui/toast';
@@ -149,10 +149,12 @@ export function AppShell({
    *
    * Held here rather than inside the box, because below lg there is no field
    * in the top bar and the magnifier beside the account icons is how search
-   * opens (#701, #703). The box still listens for the shortcut itself, so
-   * pressing it and pressing the magnifier reach the same box (#713).
+   * opens (#701, #703). The shortcut is listened for here too, and below lg it
+   * reaches this same box (#713); see the effect further down.
    */
   const [searching, setSearching] = useState(false);
+  /** The field in the top bar, so the shortcut can put the cursor in it. */
+  const searchBar = useRef<SearchBarHandle>(null);
   const [collapsed, setCollapsed] = useState(false);
   const initial = (displayName || email).charAt(0).toUpperCase();
 
@@ -240,6 +242,40 @@ export function AppShell({
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [sections, router]);
+
+  /**
+   * ⌘K goes to the search, whichever search is on screen.
+   *
+   * From lg up that is the field in the top bar: the key puts the cursor in
+   * it and nothing else happens until a character is typed, which is what a
+   * click into the field does too (#662, #717). Below lg there is no field,
+   * so the key opens the box, the same box the magnifier opens (#713). An
+   * open box closes on the key, which is what the shortcut has always done to
+   * it.
+   *
+   * Which surface is decided by asking the bar rather than by restating 1024:
+   * `focus()` reports whether the cursor landed, and below lg the bar's root
+   * is `display: none`, so it cannot. The only statement of the breakpoint
+   * stays the `lg:block` on the bar in the top row.
+   *
+   * It is here rather than in either surface because the shell is the only
+   * place that can see both -- the bar is a child of this file and the box's
+   * open state is held above.
+   */
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'k') return;
+      event.preventDefault();
+      if (searching) {
+        setSearching(false);
+        return;
+      }
+      if (searchBar.current?.focus()) return;
+      setSearching(true);
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [searching]);
 
   const active = sections.find(isActive);
   // The top bar names the page. Falling back to the workspace rather than to
@@ -668,12 +704,17 @@ export function AppShell({
                 move to another one; on Home and the account page `module` is
                 null, there is no chip, and the bar searches everything.
 
-                Below lg there is no field here at all: the magnifier further
-                along this row opens the box instead, and ⌘K still does too.
-                1024 is where the column appears, and a field competing with
-                the page title for a phone's width would leave neither of them
-                readable. */}
+                From lg up ⌘K lands in this field. Below lg there is no field
+                here at all: the magnifier further along this row opens the box
+                instead, and ⌘K opens it too. 1024 is where the column appears,
+                and a field competing with the page title for a phone's width
+                would leave neither of them readable.
+
+                `lg:block` is the only place that width is written down. The
+                shortcut asks this bar whether the cursor landed in it rather
+                than reading the breakpoint again; see the effect above. */}
                 <SearchBar
+                  ref={searchBar}
                   account={account}
                   module={module}
                   sections={sections}
