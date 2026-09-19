@@ -130,9 +130,9 @@ thousand tokens, and gets to the end.
    **Do not read the step's source files yourself, and do not make the edit.**
    Every file you open is a file you carry for the rest of the batch. Reading
    "just to check" is how the batch runs out of room.
-4. **Put the step on main before you send the next one.** A subagent commits
-   and stops there, so the merge is yours, and it runs as soon as the step
-   closes:
+4. **Put the step on main before it closes.** A subagent commits and stops
+   there, so the merge is yours, and it runs as soon as the subagent reports
+   its commit:
 
    - `git fetch origin`, with no refs named. Naming them aborts the whole fetch
      when one of them is missing, which is the normal state of a branch nobody
@@ -145,12 +145,24 @@ thousand tokens, and gets to the end.
    - `npx next build`
    - Merge the working branch into `main` with `--no-ff`, subject `Merge plan
      step #N: <title>`, and push.
+   - Then close the step: `done <n> --note "…"`, with the note the subagent
+     wrote. `done` refuses a commit that is not on main, so the merge comes
+     first; a subagent cannot close its own step and does not try.
 
    Anything that fails belongs to whichever step broke it: fix it, and amend or
    add a commit against that step's number, before the merge. Running the
    checks before every merge costs about three minutes a step. Decision #674
    chose that over the old arrangement, where a closed step sat on an unpushed
    branch until the batch ended.
+
+   **When the merge will not go through** — a conflict you cannot resolve from
+   what you have read, or a check you cannot get passing — push the working
+   branch first, so what the step built survives this session, then `block <n>
+   --ask "…"` with that branch named in the ask. Stop the batch there: do not
+   send the next step, and do not close the blocked one, because its commit is
+   on a branch and that is what the guard on `done` is for. Decisions #685 and
+   #695 are why. The next session starts from main as it then stands, and can
+   read the branch rather than build the step again.
 
 5. **Keep the carry-forward.** Each subagent reports what the next step needs
    to know. Append it to a running list and pass it into the next prompt. That
@@ -164,8 +176,9 @@ thousand tokens, and gets to the end.
 7. **Report when the batch ends**: every step closed **by number and title**,
    what became ready, what is blocked and on what, and anything raised on
    `/dev/raised`, by title. A report that says "closed four steps" makes the
-   person go and look. Every step is already on main by then, so there is no
-   push left to make.
+   person go and look. Say which steps reached main and which did not: a closed
+   step is on main already, and a step blocked on a failed merge is on the
+   branch the block names, which the report names too.
 
 If the batch ends before the steps do — something blocked, or you are running
 short — say exactly which steps are left and that they are still handed over.
