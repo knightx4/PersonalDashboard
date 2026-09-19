@@ -412,8 +412,10 @@ export async function setReadingNote(
 /**
  * Write back what the locate pass established.
  *
- * The only path that may set `locator_confidence` to verified, because it is
- * the only one that holds the document.
+ * The only path that may promote a locator it was handed, because it is the
+ * only one that holds the document. The other way a reading can start out
+ * verified is a segment queued from the catalogue, where the ingest held the
+ * document and the anchor or the offsets came off it.
  */
 export async function setReadingLocation(
   supabase: LearnSupabaseClient,
