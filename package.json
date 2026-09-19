@@ -16,7 +16,8 @@
     "shoot": "tsx scripts/shoot.ts",
     "check:ebay": "tsx scripts/check-ebay.ts",
     "typecheck": "tsc --noEmit",
-    "share:add": "tsx scripts/share-add.ts"
+    "share:add": "tsx scripts/share-add.ts",
+    "catalogue": "tsx --conditions=react-server scripts/learn-catalogue.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

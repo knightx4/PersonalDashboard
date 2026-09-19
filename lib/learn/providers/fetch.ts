@@ -33,14 +33,26 @@ const MAX_REDIRECTS = 5;
 /**
  * What a source can be. Anything else is dropped unread -- an image is not a
  * reading, and a zip is not something this ever wants to have downloaded.
+ *
+ * `application/json` is here for the catalogue sweeps rather than for a
+ * reading: Wikipedia's API answers in JSON and there is no second way out of
+ * this module to fetch it with. It widens what a body may be and nothing else
+ * -- the address check, the redirect check, the size cap and the timeout all
+ * run first and are untouched.
  */
-const ALLOWED_TYPES = ['text/html', 'application/xhtml+xml', 'application/pdf', 'text/plain'];
+const ALLOWED_TYPES = [
+  'text/html',
+  'application/xhtml+xml',
+  'application/pdf',
+  'text/plain',
+  'application/json',
+];
 
 export type FetchedDocument = {
   /** Where it actually came from, after redirects. Not what was asked for. */
   url: string;
-  contentType: 'html' | 'pdf' | 'text';
-  /** Decoded for html and text; empty for pdf, whose bytes are in `bytes`. */
+  contentType: 'html' | 'pdf' | 'text' | 'json';
+  /** Decoded for html, text and json; empty for pdf, whose bytes are in `bytes`. */
   text: string;
   bytes: Uint8Array | null;
   byteLength: number;
@@ -72,6 +84,7 @@ function classify(contentType: string): FetchedDocument['contentType'] | null {
   if (type === 'application/pdf') return 'pdf';
   if (type === 'text/html' || type === 'application/xhtml+xml') return 'html';
   if (type === 'text/plain') return 'text';
+  if (type === 'application/json') return 'json';
   return null;
 }
 
