@@ -226,9 +226,34 @@ export function overnightLine(run: OvernightRun | null, now: number): string {
     : `It last fired a feature ${elapsedSince(run.lastFiredAt, now)} ago. The next one goes once that session has ended.`;
 }
 
-/** What the start form offers before you touch it: a night, and a sleep. */
+/**
+ * The duration that means there is no duration.
+ *
+ * Zero rather than a word, because the field it travels in is a number and a
+ * union of "a count of hours or the string `none`" would have to be taken
+ * apart by everything that reads it. Zero is safe as the sentinel here in a
+ * way it is not for the budget: a night of no hours is not a night anybody
+ * could have meant, whereas a budget of zero is what a spent night holds.
+ *
+ * Choosing it turns both brakes off. A cap with no clock still stops after its
+ * last feature, which is not what leaving the runner on means.
+ */
+export const OVERNIGHT_NO_LIMIT = 0;
+
+/**
+ * What the start form offers before you touch it.
+ *
+ * No limit, because that is the ordinary press: leave it on and let it work
+ * through what has been approved. A night with a cap and a bedtime is the
+ * narrower case -- watching it do a couple of features, or keeping a lid on a
+ * run while something is being changed underneath it -- and it is one choice
+ * away in the same field.
+ *
+ * `OVERNIGHT_DEFAULT_FEATURES` is what the features box shows once a length in
+ * hours is chosen, so it appears with a sensible number already in it.
+ */
 export const OVERNIGHT_DEFAULT_FEATURES = 6;
-export const OVERNIGHT_DEFAULT_HOURS = 8;
+export const OVERNIGHT_DEFAULT_HOURS = OVERNIGHT_NO_LIMIT;
 
 /**
  * The lengths of night the control offers, in hours.
@@ -248,20 +273,6 @@ export const OVERNIGHT_HOUR_CHOICES = [1, 2, 4, 6, 8, 10, 12] as const;
 
 /** The longest a night may be given. Past this it is not an overnight run. */
 export const OVERNIGHT_HOUR_CAP = 24;
-
-/**
- * The duration that means there is no duration.
- *
- * Zero rather than a word, because the field it travels in is a number and a
- * union of "a count of hours or the string `none`" would have to be taken
- * apart by everything that reads it. Zero is safe as the sentinel here in a
- * way it is not for the budget: a night of no hours is not a night anybody
- * could have meant, whereas a budget of zero is what a spent night holds.
- *
- * Choosing it turns both brakes off. A cap with no clock still stops after its
- * last feature, which is not what leaving the runner on means.
- */
-export const OVERNIGHT_NO_LIMIT = 0;
 
 /**
  * The instant a night of this many hours should stop by.

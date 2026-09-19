@@ -367,12 +367,13 @@ export function OvernightControl({
                 aria-label="How long it may run for"
                 className="w-auto"
               >
+                {/* First, because it is the default and the ordinary press. */}
+                <option value={OVERNIGHT_NO_LIMIT}>until I stop it</option>
                 {OVERNIGHT_HOUR_CHOICES.map((choice) => (
                   <option key={choice} value={choice}>
                     {choice === 1 ? '1 hour' : `${choice} hours`}
                   </option>
                 ))}
-                <option value={OVERNIGHT_NO_LIMIT}>until I stop it</option>
               </Select>
               <Button type="submit" size="sm" pending={starting} disabled={!canSend}>
                 {starting ? 'Starting…' : 'Start'}
