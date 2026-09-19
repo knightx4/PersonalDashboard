@@ -6,7 +6,8 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { defaultViewHref, savedViewsFor } from '@/lib/saved-views/store';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
-import { SearchField } from '@/components/jobs/shell/search-field';
+import { SearchField } from '@/components/shell/search-field';
+import { SearchEmpty } from '@/components/shell/search-empty';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { matchesSearch, searchTerms } from '@/lib/jobs/search';
@@ -111,7 +112,6 @@ export default async function RolesPage({
         actions={
           <>
             <DisplayMenu menu={menu} />
-            <SearchField />
             <Link href="/jobs/roles/new" className={buttonVariants({ size: 'sm' })}>
               Add a role
             </Link>
@@ -157,14 +157,25 @@ export default async function RolesPage({
         </LeftRail>
 
         <div className="min-w-0 flex-1 space-y-5">
-          {sections.map((section) => (
-            <div key={section.key} className="space-y-2">
-              {display.group !== NO_GROUP && (
-                <GroupHeader label={section.label} count={section.count} />
-              )}
-              <RolesTable rows={section.rows} sorts={menu.sorts} hidden={display.hidden} />
-            </div>
-          ))}
+          {/* Directly above the table it narrows, like every other list in the
+              app. It sat in the header row beside Add a role until now. The
+              status and source rails, the sort, the grouping and the hidden
+              columns are all on the URL and the field carries them, so
+              searching from a narrowed table stays narrowed. */}
+          <SearchField placeholder="Search company or role" />
+
+          {filtered.length === 0 && terms.length > 0 ? (
+            <SearchEmpty query={params.q ?? ''} />
+          ) : (
+            sections.map((section) => (
+              <div key={section.key} className="space-y-2">
+                {display.group !== NO_GROUP && (
+                  <GroupHeader label={section.label} count={section.count} />
+                )}
+                <RolesTable rows={section.rows} sorts={menu.sorts} hidden={display.hidden} />
+              </div>
+            ))
+          )}
         </div>
       </div>
     </>

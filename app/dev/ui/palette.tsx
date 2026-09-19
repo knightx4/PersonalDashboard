@@ -7,7 +7,8 @@ import {
   modeOf,
   parseTheme,
   THEME_CHOICE_ATTRIBUTE,
-  THEME_COLOURS,
+  COLOURWAYS,
+  THEME_ROOMS,
   type Theme,
 } from '@/lib/theme';
 import { generatePalette } from '@/lib/theme/palette';
@@ -31,10 +32,10 @@ import { FIXED_STRIP, HUE_SWEEP, PALETTE_STRIP } from './palette-tokens';
 function describe(theme: Theme): string {
   if (theme.kind === 'system') return 'Following the system';
   if (theme.kind === 'written') return `${theme.id[0]!.toUpperCase()}${theme.id.slice(1)}`;
-  const mode = theme.mode === 'light' ? 'Light' : 'Dark';
+  const mode = THEME_ROOMS.find((option) => option.id === theme.mode)?.label ?? theme.mode;
   if (theme.hue === null) return `${mode}, no colour`;
-  const preset = THEME_COLOURS.find((colour) => colour.hue === theme.hue);
-  return preset ? `${mode}, ${preset.label.toLowerCase()}` : `${mode}, ${theme.hue}°`;
+  const way = COLOURWAYS.find((colour) => colour.id === theme.way);
+  return way ? `${mode}, ${way.label.toLowerCase()}` : `${mode}, ${theme.hue}°`;
 }
 
 export function ActivePalette() {
@@ -79,11 +80,13 @@ export function ActivePalette() {
 }
 
 /**
- * Every thirtieth degree of the circle, in the polarity you are in.
+ * Every thirtieth degree of the circle, in the room you are in.
  *
  * The accent rather than the ground, for the reason the picker's swatches give:
  * the grounds are near-greys a few thousandths of chroma apart, and a row of
- * them would say nothing about what choosing a colour does.
+ * them would say nothing about what choosing a colour does. The lit accent, so
+ * that the row means the same thing on Lightbox, where the bench takes the
+ * colour and the sheets do not.
  */
 function HueSweep({ theme }: { theme: Theme }) {
   const mode = modeOf(theme);
@@ -91,9 +94,7 @@ function HueSweep({ theme }: { theme: Theme }) {
 
   return (
     <div className="space-y-1.5">
-      <p className="text-ui font-medium text-ink">
-        The circle, in {mode === 'light' ? 'light' : 'dark'}
-      </p>
+      <p className="text-ui font-medium text-ink">The circle, in {mode}</p>
       <div className="flex gap-1">
         {HUE_SWEEP.map((degrees) => {
           const palette = generatePalette(mode, degrees);
@@ -108,7 +109,7 @@ function HueSweep({ theme }: { theme: Theme }) {
               )}
               // ui-ok: raw-hex -- the generated colour itself, which is the one
               // thing on this page that cannot be a token.
-              style={{ background: palette['--c-accent-base'] }}
+              style={{ background: palette['--c-accent-base-lit'] }}
             />
           );
         })}

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MAX_SUGGESTIONS, suggestSources } from './suggest';
+import type { Aim } from '@/lib/learn/graph/aim';
 import type { Rooting } from '@/lib/learn/graph/rooting';
 
 /**
@@ -225,5 +226,72 @@ describe('rooting the search in what you know', () => {
     const prompt = await search(null);
     expect(prompt).toContain('how central banks set rates');
     expect(prompt).not.toMatch(/settled/i);
+  });
+});
+
+/**
+ * What the search is told to aim at.
+ *
+ * Same kind of check as the rooting one below it, and for the same reason: the
+ * aim is invisible from the result, so it is checked in the message the call
+ * was made with. The two cases are genuinely different searches. Shaky is
+ * "teach me this claim"; a named wrong belief is "argue me out of this", and a
+ * source that only does the first leaves the wrong belief exactly where it
+ * was. A search with no aim has to build the prompt it built before any of
+ * this existed, because that is every subject somebody typed for themselves.
+ */
+describe('aiming the search at a claim', () => {
+  const SHAKY: Aim = {
+    claim: 'A central bank sets one rate and the rest follow it.',
+    state: 'shaky',
+    misconception: null,
+  };
+
+  async function search(aim: Aim | null) {
+    const client = {
+      messages: {
+        create: vi.fn().mockResolvedValue({
+          content: [{ type: 'tool_use', name: 'report_sources', input: { sources: [HAYEK] } }],
+        }),
+      },
+    };
+    await suggestSources({
+      subject: 'how central banks set rates',
+      aim,
+      anthropicApiKey: 'test',
+      client: client as never,
+    });
+    const call = client.messages.create.mock.calls[0][0] as {
+      messages: Array<{ content: string }>;
+    };
+    return call.messages[0].content;
+  }
+
+  it('sends the claim and where they stand on it', async () => {
+    const prompt = await search(SHAKY);
+    expect(prompt).toContain('A central bank sets one rate and the rest follow it.');
+    expect(prompt).toContain('it did not land');
+  });
+
+  it('sends what they believe instead when there is one', async () => {
+    const prompt = await search({
+      claim: 'A central bank sets one rate and the rest follow it.',
+      state: 'misconception',
+      misconception: 'That the central bank sets mortgage rates directly.',
+    });
+    expect(prompt).toContain('What they believe instead:');
+    expect(prompt).toContain('That the central bank sets mortgage rates directly.');
+  });
+
+  it('says nothing about a wrong belief when there is not one', async () => {
+    const prompt = await search(SHAKY);
+    expect(prompt).not.toMatch(/believe instead/i);
+  });
+
+  it('builds the prompt it built before, when there is no aim', async () => {
+    const prompt = await search(null);
+    expect(prompt).toContain('Subject: how central banks set rates');
+    expect(prompt).not.toMatch(/stuck on/i);
+    expect(prompt).not.toMatch(/where they stand/i);
   });
 });

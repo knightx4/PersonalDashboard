@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lastAnsweredLine, lastCheckedLine } from './last-answered';
+import { claimWordingLine, lastAnsweredLine, lastCheckedLine } from './last-answered';
 
 /**
  * The line is about days in the account's timezone, not about hours elapsed,
@@ -72,5 +72,27 @@ describe('when a claim was last checked', () => {
     expect(lastCheckedLine('2026-09-12T22:00:00Z', NOW, 'Europe/London')).toBe(
       'Last checked on 12 September.',
     );
+  });
+});
+
+describe('whose words a claim is in', () => {
+  it('says the app wrote it when nobody has rewritten it', () => {
+    expect(claimWordingLine(null, NOW, 'Europe/London')).toBe('In the app\u2019s words.');
+  });
+
+  it('says today when it was rewritten today', () => {
+    expect(claimWordingLine('2026-09-13T07:30:00Z', NOW, 'Europe/London')).toBe(
+      'In your words, written today.',
+    );
+  });
+
+  it('gives the date when it was rewritten earlier', () => {
+    expect(claimWordingLine('2026-03-14T10:00:00Z', NOW, 'Europe/London')).toBe(
+      'In your words, written on 14 March.',
+    );
+  });
+
+  it('still says whose words it is when the date will not parse', () => {
+    expect(claimWordingLine('not a date', NOW, 'Europe/London')).toBe('In your words.');
   });
 });

@@ -9,7 +9,7 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
           {/* The shell's own mark, not a gradient tile of its own: the mark is
               the one thing that says "same app" before the shell exists. */}
           <ModuleMark module="jobs" size="sm" />
-          <span className="text-lead font-semibold tracking-tight text-ink">
+          <span className="text-body font-semibold tracking-tight text-ink">
             Job search
           </span>
         </Link>

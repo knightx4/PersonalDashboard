@@ -11,44 +11,32 @@ import {
 } from '@/app/dev/bugs/actions';
 import { Button } from '@/components/ui/button';
 import { CommentThread } from '@/components/dev/comment-thread';
+import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { cardVariants } from '@/components/ui/card';
 import { FieldError, Select, Textarea } from '@/components/ui/field';
 import { SubmitOnChange } from '@/components/shell/submit-on-change';
 import { cn } from '@/lib/cn';
-import { isOutstanding, type FeedbackRow, type FeedbackStatus } from '@/lib/feedback/load';
+import { feedbackHealth, type FeedbackHealth } from '@/lib/dev/health';
+import { FEEDBACK_HEALTH_WORD } from '@/lib/dev/words';
+import { FEEDBACK_HEALTH_GLYPHS } from '@/lib/status-glyphs';
+import { isOutstanding, type FeedbackRow } from '@/lib/feedback/load';
 import { surfaceOf } from '@/lib/feedback/surfaces';
 
 // Defined in lib/feedback so both workspaces' pages and this component agree
 // on one shape.
 export type { FeedbackRow, FeedbackStatus } from '@/lib/feedback/load';
 
-// The tint tokens rather than colour/10: the tints are tuned per theme, and a
-// 10% alpha over a dark surface is not the same thing as a tint.
-const STATUS_STYLE: Record<FeedbackStatus, string> = {
-  open: 'bg-caution-tint text-caution',
-  in_progress: 'bg-accent-tint text-accent',
-  blocked: 'bg-danger-tint text-danger',
-  planned: 'bg-canvas text-ink-muted',
-  done: 'bg-positive-tint text-positive',
-  declined: 'bg-canvas text-ink-muted',
-};
-
-/**
- * What each status is called on the row.
- *
- * Every one is its own word except `in_progress`, which is the interesting
- * one: a note is only ever in progress because a run claimed it, so the honest
- * label is who has it rather than the column's name. It carries the same bot
- * the plan page marks a handed-over step with -- the page said nothing about
- * work going to Claude beyond a status word that reads like any other.
- */
-const STATUS_LABEL: Record<FeedbackStatus, string> = {
-  open: 'open',
-  in_progress: 'Dash is on this',
-  blocked: 'blocked',
-  planned: 'planned',
-  done: 'done',
-  declined: 'declined',
+// A tone rather than a tinted lozenge. The plan has drawn its states as a
+// hexagon and a word for a while; this queue drew a capsule, so the same fact
+// looked like two different kinds of thing on two tabs.
+const HEALTH_TONE: Record<FeedbackHealth, DevTone> = {
+  waiting: 'caution',
+  answered: 'positive',
+  ready: 'info',
+  planned: 'quiet',
+  working: 'accent',
+  done: 'positive',
+  dropped: 'ghost',
 };
 
 const PRIORITY_LABEL: Record<number, string> = {
@@ -81,6 +69,10 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
    */
   const [editing, setEditing] = useState(false);
   const canEdit = isOutstanding(row);
+
+  // What the note means, not what its column says. `blocked` is two states and
+  // only the thread tells them apart.
+  const health = feedbackHealth(row);
 
   /**
    * The form stays open on an error so the text is not lost, and closes when a
@@ -119,17 +111,22 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
         >
           {row.kind}
         </span>
-        <span
-          className={cn(
-            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-micro font-medium',
-            STATUS_STYLE[row.status],
-          )}
+        <StateLabel
+          glyph={FEEDBACK_HEALTH_GLYPHS[health]}
+          word={FEEDBACK_HEALTH_WORD[health]}
+          tone={HEALTH_TONE[health]}
+          title={
+            health === 'answered'
+              ? 'You replied, so it is a session\'s again. The status column still says blocked.'
+              : undefined
+          }
         >
-          {row.status === 'in_progress' && (
+          {/* Who has it, which the word deliberately does not say. The same bot
+              the plan marks a handed-over step with. */}
+          {health === 'working' && (
             <Bot className="size-3 shrink-0" strokeWidth={2} aria-hidden />
           )}
-          {STATUS_LABEL[row.status]}
-        </span>
+        </StateLabel>
         <span className="text-small text-ink-muted">
           {row.createdAt.slice(0, 10)} · p{row.priority} {PRIORITY_LABEL[row.priority] ?? ''}
           {/* A note filed from /dev/surfaces is a design note, and it read here

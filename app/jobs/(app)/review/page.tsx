@@ -42,10 +42,14 @@ export default async function ReviewPage({
   const withCandidates = rows.map((row) => {
     if (row.kind !== 'message') return row;
 
+    // Everything the held message still has. The four below it are genuinely
+    // gone -- bodies are never stored and the extractor's output is not
+    // persisted -- but the thread id and reply-to are on the row, and scoring
+    // without them offered worse suggestions than the mailbox supports.
     const input: LinkInput = {
-      threadId: null,
+      threadId: row.threadId,
       fromAddress: row.fromAddress,
-      replyToAddress: null,
+      replyToAddress: row.replyToAddress,
       subject: row.subject,
       bodyPreview: null,
       receivedAt: row.receivedAt ? new Date(row.receivedAt) : null,

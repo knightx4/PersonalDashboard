@@ -24,6 +24,17 @@ const MOVED_TO_SHOPPING = [
 ];
 
 const nextConfig: NextConfig = {
+  /**
+   * /dev/specs reads the documents in `docs/` off disk at request time, and
+   * nothing imports them, so the tracer is right to leave them out of the
+   * deployment unless told otherwise. Without this the page is empty in
+   * production and correct everywhere else, which is the worst shape a bug
+   * can take.
+   */
+  outputFileTracingIncludes: {
+    '/dev/specs/[slug]': ['./docs/**/*.md'],
+  },
+
   async redirects() {
     return MOVED_TO_SHOPPING.map((section) => ({
       source: `/${section}/:path*`,

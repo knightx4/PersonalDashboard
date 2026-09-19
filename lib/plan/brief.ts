@@ -2,7 +2,13 @@ import { commentLine } from '@/lib/comments/context';
 import { MODULES } from '@/lib/modules';
 import { hasLiveFog, isClosed, isDismissed, type PlanStatus } from './load';
 import { reshapeOrigin } from './origin';
-import { ancestorsOf, flatten, type PlanNode, type PlanSection } from './tree';
+import {
+  ancestorsOf,
+  flatten,
+  type PlanLiveness,
+  type PlanNode,
+  type PlanSection,
+} from './tree';
 
 /**
  * A step written out for whoever is about to build it.
@@ -103,10 +109,38 @@ function moduleLabel(module: PlanNode['module']): string {
   return module ? (MODULES.find((m) => m.id === module)?.label ?? module) : 'The app as a whole';
 }
 
-function line(node: Pick<PlanNode, 'number' | 'title' | 'status'>): string {
+/**
+ * What a claim on a step is worth saying about it.
+ *
+ * The three readings of `in_progress`, in the words a session needs rather
+ * than the page's: it is about to decide whether to leave that step alone.
+ * Empty for a claim nothing has looked into, which is what the status word on
+ * its own already says.
+ */
+const CLAIM_PHRASE: Record<string, string> = {
+  working: 'in progress, its run still pushing',
+  quiet: 'in progress, its run quiet',
+  abandoned: 'claimed by a run that ended without closing it',
+};
+
+/** How a step's state reads, with the run behind a claim taken into account. */
+function stateWord(
+  node: Pick<PlanNode, 'id' | 'status'>,
+  liveness: PlanLiveness | undefined,
+): string {
+  const claim = liveness?.[node.id];
+  return (claim && CLAIM_PHRASE[claim]) || STATUS_WORD[node.status];
+}
+
+function line(
+  node: Pick<PlanNode, 'id' | 'number' | 'title' | 'status'>,
+  liveness?: PlanLiveness,
+): string {
   const box = node.status === 'done' ? '[x]' : node.status === 'dropped' ? '[-]' : '[ ]';
   return `- ${box} #${node.number} ${node.title}${
-    node.status === 'in_progress' || node.status === 'blocked' ? ` (${STATUS_WORD[node.status]})` : ''
+    node.status === 'in_progress' || node.status === 'blocked'
+      ? ` (${stateWord(node, liveness)})`
+      : ''
   }`;
 }
 
@@ -115,10 +149,17 @@ function line(node: Pick<PlanNode, 'number' | 'title' | 'status'>): string {
  * everything beneath it: the brief is what a session works from, and a
  * question put aside is not part of the job.
  */
-function steps(nodes: readonly PlanNode[], indent = ''): string[] {
+function steps(
+  nodes: readonly PlanNode[],
+  indent = '',
+  liveness?: PlanLiveness,
+): string[] {
   return nodes
     .filter((node) => !isDismissed(node))
-    .flatMap((node) => [indent + line(node), ...steps(node.children, indent + '  ')]);
+    .flatMap((node) => [
+      indent + line(node, liveness),
+      ...steps(node.children, indent + '  ', liveness),
+    ]);
 }
 
 /**
@@ -164,13 +205,23 @@ function decidedSoFar(feature: PlanNode, node: PlanNode): PlanNode[] {
  * The thread is off by default because most callers already have it or do not
  * want it: the `@dash` path prints the exchange in its own section with the
  * question taken out of it, and the CLI reads plan rows over a direct
- * connection that asks for no comments at all. The four hand-over buttons on
+ * connection that asks for no comments at all. The three hand-over buttons on
  * the plan page turn it on, because there the comments are the only place some
  * of what the person decided was ever written down.
  */
 export type BriefOptions = {
   /** Print the comments on the step and on the steps beneath it. */
   thread?: boolean;
+  /**
+   * What the runs say about the claimed steps, from `planLiveness`.
+   *
+   * A brief is read by a session about to work the step, and "in progress" is
+   * the one fact on it that can be false: the row says a session has this and
+   * says nothing about whether that session is still going. With this the
+   * brief says which, off the same reading the page and the send guard use.
+   * Without it, a claim reads as the status column reads.
+   */
+  liveness?: PlanLiveness;
 };
 
 /**
@@ -194,44 +245,6 @@ function saidOn(node: PlanNode): string[] {
     for (const comment of row.thread) out.push(`- ${commentLine(comment)}`);
   }
   return out;
-}
-
-/**
- * Several steps written out as one hand-over.
- *
- * The order is the running order, so the checklist at the top is both the
- * contents and the instruction: work them down the list. Then each step's own
- * brief in full, because the session on the other end cannot be assumed to be
- * able to read the plan for itself — that is why briefs are carried in the
- * message at all — and a queue of names with no detail behind them would leave
- * it guessing at every one.
- *
- * A step that waits on another is included and says so in its own brief. It is
- * part of what was handed over, and dropping it here would mean a batch that
- * quietly did less than it was asked to.
- */
-export function planQueueBrief(
-  sections: readonly PlanSection[],
-  nodes: readonly PlanNode[],
-  options: BriefOptions = {},
-): string {
-  const out: string[] = [];
-
-  out.push(`# ${nodes.length} plan ${nodes.length === 1 ? 'step' : 'steps'}, in order`);
-  out.push('');
-  for (const [index, node] of nodes.entries()) {
-    const facts = [moduleLabel(node.module), PRIORITY_WORD[node.priority]];
-    if (node.waitingOn.length > 0) {
-      facts.push(`waits on ${node.waitingOn.map((ref) => `#${ref.number}`).join(', ')}`);
-    }
-    out.push(`${index + 1}. #${node.number} ${node.title} — ${facts.join(' · ')}`);
-  }
-
-  for (const node of nodes) {
-    out.push('', '---', '', planBrief(sections, node, options).trimEnd());
-  }
-
-  return out.join('\n') + '\n';
 }
 
 /**
@@ -298,7 +311,7 @@ export function planBrief(
 
   const facts = [
     `Module: ${moduleLabel(node.module)}`,
-    `Status: ${STATUS_WORD[node.status]}`,
+    `Status: ${stateWord(node, options.liveness)}`,
     `Priority: ${PRIORITY_WORD[node.priority]}`,
   ];
   if (node.size) facts.push(`Size: ${node.size.toUpperCase()}`);
@@ -362,12 +375,19 @@ export function planBrief(
   }
 
   if (node.children.length > 0) {
-    out.push('', '## Steps', '', ...steps(node.children));
+    out.push('', '## Steps', '', ...steps(node.children, '', options.liveness));
   }
 
   if (node.blocks.length > 0) {
     out.push('', '## Unblocks', '');
     for (const ref of node.blocks) out.push(`- #${ref.number} ${ref.title}`);
+  }
+
+  // What it needs, above the record of every time it has been asked for. A
+  // session handed a blocked step should read the sentence rather than work
+  // out which paragraph of the notes still stands.
+  if (node.blockAsk) {
+    out.push('', '## Blocked on', '', node.blockAsk);
   }
 
   if (node.comment) {

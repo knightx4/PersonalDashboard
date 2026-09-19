@@ -2,8 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { createClient, requireUser } from '@/lib/auth/server';
-import { fireFeatureRoutine, reviewRoutine } from '@/lib/feedback/routine';
+import { createClient } from '@/lib/auth/server';
+import { requireOwner } from '@/lib/dev/owner';
+import { reviewRoutine } from '@/lib/feedback/routine';
+import { startRoutineRun } from '@/lib/plan/runs';
 import { isUiScope, type UiScope } from '@/lib/ui-review/scope';
 
 export type UiReviewActionState = {
@@ -48,7 +50,8 @@ export async function startUiReview(
   _prev: UiReviewActionState,
   formData: FormData,
 ): Promise<UiReviewActionState> {
-  await requireUser();
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const scope = scopeSchema.safeParse(formData.get('module'));
   if (!scope.success) return { error: 'Missing module.' };
@@ -63,9 +66,11 @@ export async function startUiReview(
     };
   }
 
-  const result = await fireFeatureRoutine({
-    apiKey: routine.token,
-    routineId: routine.id,
+  const result = await startRoutineRun({
+    supabase,
+    userId: user.id,
+    job: 'review',
+    routine,
     text: reviewText(scope.data as UiScope),
   });
   if (!result.ok) return { error: result.error };
@@ -85,8 +90,8 @@ export async function decideUiFinding(
   _prev: UiReviewActionState,
   formData: FormData,
 ): Promise<UiReviewActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = idSchema.safeParse(formData.get('id'));
   const decision = decisionSchema.safeParse(formData.get('decision'));

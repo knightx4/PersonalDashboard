@@ -1,0 +1,51 @@
+import 'server-only';
+
+import { createClient } from '@/lib/auth/server';
+import { REPO_KEY } from '@/lib/plan/ci';
+import type { CheckConclusion } from '@/lib/plan/checks';
+import type { MainCheck } from '@/lib/plan/main-check';
+
+/**
+ * Whether main is green, as the shell reads it.
+ *
+ * One primary-key lookup of one row, and nothing else. The status line is
+ * rendered on every page in the app, so this is the read that has to stay
+ * cheap no matter what else is happening: it never talks to GitHub, never
+ * counts anything and never joins. The asking is the overnight tick's job
+ * (`lib/plan/ci.ts` `refreshMainCheck`, every four minutes), and this only
+ * reads what it wrote down.
+ *
+ * Best-effort, the same as `loadActivity` beside it and for the same reason: a
+ * status line that can take a page down is a status line that should not
+ * exist. A table that is not there yet, a read that is refused, a session that
+ * has expired -- all of them come back as null, which the dot draws as "not
+ * read", which is true.
+ */
+export async function loadMainCheck(): Promise<MainCheck | null> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from('plan_main_checks')
+      .select('head_sha, conclusion, checked_at, error')
+      .eq('repo', REPO_KEY)
+      .maybeSingle();
+    if (error || !data) return null;
+
+    const row = data as {
+      head_sha: string | null;
+      conclusion: string | null;
+      checked_at: string;
+      error: string | null;
+    };
+    return {
+      sha: row.head_sha,
+      // The column is constrained to the conclusions main's head can take, so
+      // the cast is the constraint restated rather than a hope.
+      conclusion: (row.conclusion as CheckConclusion | null) ?? null,
+      checkedAt: row.checked_at,
+      error: row.error,
+    };
+  } catch {
+    return null;
+  }
+}

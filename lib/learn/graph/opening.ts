@@ -363,6 +363,10 @@ export async function seedFromSweep(
         state: seeded.state,
         established: 'tested',
         tested_at: testedAt,
+        // Nulled rather than left alone: the upsert can land on a concept
+        // already declared known, and the database refuses a row carrying both
+        // dates.
+        declared_at: null,
       })),
       { onConflict: 'concept_id' },
     );

@@ -37,6 +37,7 @@ export const LEARN_OPERATIONS = [
   'write-probe',
   'name-misconception',
   'propose-floor',
+  'classify-note',
   'concepts-from-note',
   'concepts-from-prior',
   'concepts-from-brief',
@@ -46,6 +47,8 @@ export const LEARN_OPERATIONS = [
   'grade-opening-answer',
   'write-quiz-questions',
   'grade-quiz-answer',
+  'write-applied-case',
+  'grade-applied-answer',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

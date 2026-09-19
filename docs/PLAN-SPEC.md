@@ -28,11 +28,11 @@ not read at runtime and are not kept in sync: the app is the working copy,
 and the two are expected to drift. Migration 0052 made the flat list a tree
 and gave a step the rest of what is described here. Migration 0054 added
 `kind`, `fog` and `resolution`, borrowed from the wayfinder planning skill —
-see *Decisions and fog*.
+see *Decisions, setup and fog*. Migration 0084 added the third kind.
 
 ## The model
 
-Two tables in `public`, both under row level security, and `dev_comments`
+Three tables in `public`, all under row level security, and `dev_comments`
 beside them.
 
 ### `plan_items`
@@ -45,14 +45,14 @@ beside them.
 | `title`, `detail` | What it is, and what it involves. |
 | `acceptance` | *Done when.* Written before the work, it is what the work is checked against. A step without one is closed on somebody's opinion. |
 | `status` | `proposed`, `not_started`, `in_progress`, `blocked`, `done`, `dropped`. A proposed step was written by a session from an idea and is waiting on the person; see *Proposals* below. |
-| `kind` | `build` or `decision`. A build step closes on a commit; a decision closes on an answer. See *Decisions and fog* below. |
+| `kind` | `build`, `decision` or `setup`. A build step closes on a commit; a decision closes on an answer; a setup step is a job of the person's outside the repo and closes when they say they have done it, with no commit. See *Decisions, setup and fog* below. |
 | `fog` | The *not yet specified* note: one paragraph admitting what cannot yet be seen well enough to write steps for. Allowed on any step, meaningful mostly on a feature. |
 | `dismissed_at`, `fog_dismissed_at` | Put aside as not right now — the row, and the patch of fog on it, separately. Not a status: nothing has been settled, it is only out of sight. See *Not right now* below. |
 | `resolution` | The answer a decision closed with, in the person's words. Null on a build step and on a decision nobody has settled. |
 | `comment` | Your own note on it: why it stalled, what changed. The CLI appends a dated line when it closes or blocks a step. |
 | `priority` | 1 next, 2 normal, 3 someday — the same three the notes queue uses. |
 | `size` | `s`, `m` or `l`. Coarse on purpose: "one sitting or not", not hours. |
-| `assignee` | `me` or `claude`. A step handed to Claude is one a routine may pick up on its own. |
+| `assignee` | `me`, `claude`, or nothing at all. `me` is a step you kept for yourself; every other approved step is one a routine may pick up on its own, which is what approving it did. `claude` reads the same as an empty column. Every hand-over used to write it; the feature Send stopped in #672, and the Send on one step still writes it so that the claim sweep does not take the step back (#712). |
 | `commit_sha` | The commit that shipped it. |
 | `position` | Order among siblings. Sparse; re-dealt in tens when a step is moved. |
 | `started_at`, `completed_at` | Kept by a trigger from the status. Done and dropped both count as finished; a reopened step loses its completion time. |
@@ -96,6 +96,84 @@ changes no column on it — the reply is a comment like any other. A reply that
 cannot be produced at all says so in the thread, and the question stays where it
 was written.
 
+### `plan_runs`
+
+Every routine a dev button starts, and what Anthropic answered. One row per
+press: the step it is about where there is one, which button fired it (`job` —
+`step`, `feature`, `queue`, `reshape`, `shape`, `notes`, `review`, `comment`),
+the routine the request went to, and the response body kept whole in
+`response`. `external_id` is whatever in that body looks like a name for the
+run; it is null until it is known what the endpoint returns, which is why the
+body is stored beside it.
+
+A press that never started is a row too — `status = 'failed'` with the reason
+in `error` — because "the token was wrong" and "nobody pressed it" are
+different facts and looked identical before this table existed.
+
+Written by `lib/plan/runs.ts`, which is the only way a routine is fired: the
+fire and the record are one call, so a new button cannot start a run the app
+does not know about. Recording a run never fails the press — by then the
+routine is already going, and saying it is not would be the worse lie.
+
+The row also keeps what GitHub last said about the run, so every surface reads
+one answer instead of each asking or falling back to the clock:
+`github_checked_at` when it was last asked, `last_push_at`, `last_push_sha` and
+`last_push_subject` for the newest push it had made by then, and `github_error`
+for a refusal — a missing or rejected key, or a repository GitHub will not
+show. `github_checked_at` is the test of whether there is a reading at all: null
+means nobody has asked, and set with `last_push_at` null means somebody asked
+and the run had pushed nothing. `github_error` is separate from `error`, which
+is Anthropic refusing the fire and is tied to `status = 'failed'`; a rejected
+GitHub key says nothing about whether the run started. `storedReading` in
+`lib/plan/run-end.ts` turns the five columns into the shape the app reads, and
+`readingFor` and `readingColumns` beside it turn a reading back into the
+columns, so the write and the read are worked out in one place.
+
+`app/api/plan/runs` is the only thing that asks GitHub about a run.
+`refreshRunReadings` in `lib/plan/runs.ts` does the work: the reader from
+`readRunLiveness` gets the claimed steps, the runs behind them and one activity
+listing; the listing says which branch moved and to what sha and nothing about
+what the commit said, so `commitSubjects` looks the message up separately and
+is allowed to come back with nothing. Then the runs are written back and the
+same listing goes to `endQuietRuns`, which is what stops a run that pushed four
+minutes ago being written off for being five hours old. A refusal is written to
+`github_error` and carries no push beside it: a reading is what GitHub said
+this time, not a push from the last time somebody got through.
+
+### `plan_overnight_runs`
+
+One row per account, holding what the overnight runner is doing. You press one
+button before bed and a cron tick fires one feature at a time — the existing
+feature send — waiting for each to finish before starting the next. None of
+that can live in the page, because the tick runs with nobody's tab open, so the
+intention is a row: `running`, `paused`, `features_budget` and `features_left`,
+`stop_by`, `started_at`, `last_fired_at`, and `ended_at` with `ended_reason`.
+
+The budget counts down at the fire rather than at the finish — a feature that
+fell over cost the night the same as one that worked. Pausing is not stopping:
+the budget and the stop time survive it, so resuming carries on the same night
+rather than starting a second one.
+
+`ended_reason` is a written sentence, not a code, because the morning report
+reads it back to a person: *It fired every one of the 6 features you allowed.*
+The set of reasons is not closed — the budget and the clock are decided from
+the row, you stopped it is decided by the page, and nothing being ready to
+build is decided by the tick — so no enum could name them all for long. A
+constraint pairs it with `ended_at`: a night that ended carries the reason it
+ended, and a reason without an end is a sentence about nothing.
+
+Written only by `lib/plan/overnight.ts`, which also holds `overnightVerdict` —
+the pure reading of the row that says whether another feature may be fired, and
+what to end the night with when it may not.
+
+The chooser is `chooseOvernightFeature` in `lib/plan/overnight-choice.ts`: the
+row's verdict and the plan tree composed into one answer, either the feature to
+fire or the sentence to stop on. It picks what a person would — the first row
+of `workOrder(sections, { assignee: 'claude' })`, and the top-level feature
+above it — so a feature it names always has a ready step beneath it, and
+nothing about blocked, waiting or unapproved work is restated here. Still being
+built around it: the tick route, the schedule, the page control and the report.
+
 ### `plan_dependencies`
 
 `item_id` cannot start until `depends_on_id` is done. One direction; the
@@ -106,7 +184,28 @@ belonging to another account. Deleting either step deletes the row.
 Waiting on another step is a relation rather than a status because it
 clears itself: the moment the other step is done, this one is ready, and
 nobody has to remember to come back and unblock it. `blocked` is for waiting
-on the outside world — an answer, an API key, a decision.
+on the person — an answer, a decision. An API key or an account is a setup
+step and therefore a dependency like any other; see *Setup steps*.
+
+Rows given both — blocked, and with dependencies naming what they wait for —
+record which they mean in `plan_items.block_kind`, settled by #525 and added
+by migration 0081. `steps` is a block on the rows it names, and it clears
+itself when they all close. `outside` is a block on something only the person
+can supply, and it stays blocked however much else closes. The database
+refuses a row that says `blocked` without one, every path that blocks a step
+writes it (the status control, the edit form, `plan.ts block --on-steps`), and
+it is cleared whenever the step stops being blocked, like `block_ask`. A block
+written without saying which is taken as `outside`: a block that outlives its
+reason is a row somebody looks at, and one that clears itself too early is an
+afternoon a session loses.
+
+`isStaleBlock` in `lib/plan/tree.ts` is the one place that reads it, and every
+surface reads through that: the health on the row, the Ready and Waiting views,
+the counts on the summary strip, a feature's roll-up, "On you", and the Send
+button's refusal. A `steps` block whose named steps have all closed reports the
+step it now is -- ready, or not started -- and is handed over like any other. An
+`outside` block reports `blocked` on all of them however much else closes, and
+Send refuses it until the person moves it.
 
 ## Proposals: from an idea to the plan
 
@@ -155,7 +254,7 @@ bottom of the page, out of every count above it and out of `plan.ts ideas`,
 which is what stops the next session offering it again. Bring back returns it
 to the list. Delete is still there for a row that should not exist at all.
 
-## Decisions and fog
+## Decisions, setup and fog
 
 ### When a re-shape starts
 
@@ -235,7 +334,7 @@ none of them stopped their own feature being finished. They sat where nothing
 reads them again: the feature ships, the patch stays, and the thought is lost
 more thoroughly than if it had been dropped. `FOG_RULE` in
 `lib/plan/brief.ts` carries the test into both turns that write fog, the
-shaping one and the re-shaping one, and `.claude/skills/plan/SKILL.md` says it
+shaping one and the re-shaping one, and `.claude/skills/plan/reference/shaping.md` says it
 at length.
 
 **One patch per feature**, because it is one column: a second `fog --note`
@@ -263,6 +362,45 @@ without being told again, and never asks the same question twice.
 **Out of scope** was considered as a sixth status and left out. It is
 `drop <n> --note "out of scope: …"`, which reads the same and costs no
 column.
+
+### Setup steps
+
+The third kind, added by migration 0084. A setup step is something only the
+person can supply — an API key, an account, a value in somebody else's
+dashboard — held as a row of theirs on the plan rather than as a sentence in
+the ask of the step that ran into it. It closes when they say they have done
+it, on `/dev/plan` or in the Dash tab's *Waiting on you*, and carries no
+commit.
+
+What it replaces: a session marked the step it was on `blocked`, wrote the
+request for the key into that row's ask, and the request then lived inside work
+the person was never going to open. Setting the key afterwards moved nothing,
+because a block on something outside the plan waits for somebody to clear it by
+hand.
+
+`scripts/plan.ts needs "<what to set>" --for <n>` writes both halves: the row,
+and the `plan_dependencies` edge from the stopped step to it. #599 settled
+where the row goes — under the parent of the step that is stopped, so it sits
+beside the work it is holding up, and two features needing the same key get a
+row each rather than sharing one somewhere else in the tree. A step that was
+`blocked` goes back to `not_started` with its ask cleared, since the edge now
+says what it waits for and a step saying it twice would need clearing twice.
+Closing the setup step frees the work on its own, because `isReady` already
+frees a step once everything it waits on is done. The title is the one-line
+summary and the detail is the instructions; the plan row and the Dash tab draw
+them in those two roles.
+
+No routine can pick one up. `healthOf` reads an open setup step as a health of
+its own, `isWaitingOnThePerson` covers it along with a live block and an open
+decision, and `workOrder` filters those out of `--claude`. `needs` refuses a
+step that is closed and refuses a setup step waiting on a setup step, which
+would say a job of theirs is stopping another job of theirs. The rules with no
+database in them are `lib/plan/needs.ts`, tested in `lib/plan/needs.test.ts`.
+
+**What stays a block.** Something the person has to decide or supply that is
+not an errand with a done state. The line between them is whether the
+instructions can be written: a setup step is a job that can be finished, a
+block is a question waiting on an answer.
 
 ## Not right now
 
@@ -305,7 +443,7 @@ aside under that feature, and the instruction not to write any of them back —
 not as a proposal, not as the same question in different words, not as fog, not
 as an idea. Without that list the next re-shape reads the same code, reaches
 the same thought and writes it again, which is the loop dismissal exists to
-end. `.claude/skills/plan/SKILL.md` says the same thing at length.
+end. `.claude/skills/plan/reference/dismissed.md` says the same thing at length.
 
 ## The routines
 
@@ -336,17 +474,107 @@ The plan routine's standing prompt is the frame; the turn a button appends
 says what this firing is for, and wins:
 
 - ***Send to Claude*** on a step — build that one step, then stop.
-- ***Send all n beneath*** on a feature — every open step under it becomes
-  Claude's, the way approving cascades, and one session works them in plan
-  order, each verified, committed and closed before the next is claimed. It
-  stops at the first step that needs a decision, blocking it with the question
-  rather than skipping to a later one. Push and merge happen once, at the end.
+- ***Send all n beneath*** on a feature — one session works every open step
+  under it in plan order, each verified, committed and closed before the next
+  is claimed. It stops at the first step that needs a decision, blocking it
+  with the question rather than skipping to a later one. Push and merge happen
+  once, at the end. The press writes no row: it starts the session and nothing
+  else, because approving is what the runner reads now (#672).
 - ***Shape into a plan*** on an idea — write the proposal and nothing else.
 
 The batch button is the one to think twice about. There is no review point
 between its steps, so a step that gets something wrong early has the rest
 built on top of it before anybody looks. Send a migration on its own; batch
 the rest once you have seen what it did.
+
+### Claims, and giving them back
+
+`in_progress` means one thing: somebody has this step in hand right now. A
+session writes it when it claims a step and clears it when it closes one, and
+a session that dies does neither — so the row went on saying underway for the
+rest of the day, which is note 60a0ad01 and the reason #494 exists.
+
+Two halves. `lib/plan/liveness.ts` reads the claim against the run behind it,
+so the page stops drawing a dead claim as live and the send guard stops
+refusing work under a feature nothing is touching. `inngest/dev/claims.ts` is
+the other half: a stage of the daily cron that writes those rows back to
+`not_started` with a dated line in `comment` saying the claim expired. Without
+it the reading is only on the page, and the CLI, the brief and the next session
+all still take the status at its word.
+
+A claim is taken back for one of two reasons, both in `lib/plan/claims.ts`:
+nothing has touched it for two hours, or it has no assignee at all. The second
+is why both the page's status control and `plan.ts start` now name who holds a
+step they mark underway — a claim nobody is on is one nothing is working.
+
+Two hours is a threshold and not evidence, and a long batch is called stale
+while it is still going. So the claim is read off the run behind it instead.
+
+**What a claim reads as.** `lib/plan/liveness.ts` has `claimLiveness(step,
+run, now)`, and it answers one of four things about a step marked
+`in_progress`, or `null` when the row is not claimed at all:
+
+| | |
+|---|---|
+| `claimed` | The row says a session has it and nothing says what that session is doing: no run recorded, or one nobody has asked GitHub about, and the clock has not run out either. |
+| `working` | Its run has pushed something within the last twenty minutes. |
+| `quiet` | Nothing pushed for twenty minutes. It may still be reading files or waiting on a build. |
+| `abandoned` | Nothing pushed for two hours, with the step still open. Nobody is on it and it was never closed. |
+
+The two marks are `QUIET_AFTER_MINUTES` and `ENDED_AFTER_MINUTES` (#524),
+counted from the run's last push or from when it was fired if it has not
+pushed. The reading comes off the `plan_runs` row that #568 added columns for,
+written by `app/api/plan/runs`, which the plan page calls once it has drawn
+(#563) -- so the page appears with what was last stored and updates a moment
+later, and the terminal tool, the brief and the send guard read the same answer
+without a request of their own. A reading older than the ended mark is not
+trusted (#570) and neither is one carrying a GitHub refusal, and in both cases
+the clock in `elapsed.ts` answers instead. That fallback is also what a claim
+with no run recorded against it gets.
+
+`healthOf` turns those into the healths `working`, `quiet` and `abandoned`, so
+the health column, the module counts and bands, the terminal's facts column,
+the brief's status line and the send guard all read one function. The guard
+counts `quiet` as live: the twenty-minute mark reads wrong on a session that
+is reading rather than writing, and #574 settled that a quiet step is re-sent
+by asking first.
+
+**What the asking is.** `sendOverClaim` in `lib/plan/liveness.ts` is the whole
+rule: a claim nothing is reading and one whose run has stopped go straight
+through, a run still pushing is refused as it always was, and a quiet run is
+asked about. The question is `quietSendAsk`, and it carries the evidence rather
+than the verdict — how long the silence has run and what the last push was —
+because "its run is quiet" alone cannot tell a dead session from one waiting on
+a build. The guard in `handover.ts` and the three Send doors on the plan page
+(the quick icon, the button on the opened row, the row menu) all read that one
+function, so the page cannot arm a confirmation the guard would refuse outright
+or send something the guard would have asked about. Confirming carries
+`confirm=quiet` on the press; the guard takes that as the answer and nothing
+else, so a form that never saw the question cannot set it. The run being
+replaced is written off first — `endRunsOnStep`, status `failed` with
+`runReplacedNote` — because a row still reading `started` under a fresh
+session's claim is the older run answering for the newer one. Only the step's
+own claim is asked about; another step under the same feature with a quiet run
+still refuses, which is #587's answer and #590's step.
+
+**What a run has to show for itself.** One word is the right size for the
+health column and the wrong size for a step you opened because it says somebody
+is working it. So the opened row carries the evidence behind the word: which
+press started the run and when, what it last pushed, which steps closed after
+it was fired and what it raised. `lib/plan/work.ts` has those rules --
+`runWork` gathers them and `runStartedLine`, `pushLine`, `closedLine`,
+`raisedLine` and `nothingToShowLine` are the wording -- pure and browser-safe,
+so the terminal and a brief can say the same thing from the same rows.
+
+Nothing there asks GitHub. The push is the reading stored on the run row, and
+`github_checked_at` keeps the two kinds of silence apart: a run nobody has
+asked about says that rather than reading as a run that pushed nothing, and a
+reading carrying a refusal says GitHub would not answer. The closures are read
+from the page's catalog rather than from the tree the row is drawn in, because
+a view like Open has already filtered out the step a run closed an hour ago.
+The raises are the rows whose `source` names one of the run's steps and that
+were filed after it was fired -- both halves, since the time alone would hand a
+run every raise anybody filed while it was going.
 
 ## The reading
 
@@ -362,9 +590,22 @@ steps. Done and dropped dependencies are out of the way; a dropped one is
 shown plainly rather than freezing the dependent forever.
 
 **Ready.** A step could be picked up now when it is not started, waits on
-nothing, has no open sub-steps, and nothing above it is blocked or dropped.
+nothing, has no open sub-steps, and nothing above it is dropped, still
+proposed, or blocked on something outside the plan. A
+step blocked on the steps it names is ready once every one of them has closed;
+a step blocked on something outside the plan never is.
 A feature with open sub-steps is worked through them; the feature is what
 you close when they are all done — and at that point it is itself ready.
+
+A feature blocked on its own steps is the one block that does not carry down,
+settled by #638. A question on one step stops that step, and marking the
+feature blocked over it used to take every other step beneath it out of the
+runner's reach — #494 and #578 did that on the same day and hid five
+priority-one features. What a step really waits on is already a dependency and
+is inherited, so the steps genuinely held up stay held up without the parent's
+status standing in for all of them. The other direction is read from the steps
+instead: a feature whose every open step is blocked reports `blocked` itself,
+so nothing is lost by not marking it.
 
 **Roll-up.** A feature's progress is over the leaf steps beneath it, not the
 containers in between, and a module's progress is over its leaves, so a
@@ -378,7 +619,7 @@ decision is ready for the person, not for a session.
 
 **Views.** `?view=` narrows the page to `open` (the default), `you`, `ready`,
 `proposed`, `blocked` (blocked by hand or waiting on another), `claude`
-(open steps handed to Claude), `fog`, `dismissed` or `all`. A step that does
+(approved steps you did not keep for yourself), `fog`, `dismissed` or `all`. A step that does
 not match stays, dimmed, when something beneath it does, so a ready sub-step is
 seen in its place. A dismissed step is the one thing `all` does not show:
 `dismissed` is where it is, and hiding it everywhere else is what dismissing it
@@ -392,6 +633,53 @@ default view to be worth landing on.
 questions, proposals nobody has decided on, and blocked steps. Not their ready
 steps — that is work they could do rather than something being asked of them,
 and folding it in makes "waiting on you" a list that cannot be cleared.
+
+### What a row reads as
+
+`healthOf` is the one word the page, the counts, the bands, the CLI and the
+brief all put on a row, and it is not the `status` column. A question and a
+step share that column and do not mean the same things by it, "ready" is worked
+out from what a step waits on, and the reading of a claim comes off the run
+behind it. `PLAN_HEALTHS` in `lib/plan/tree.ts` is the set, thirteen of them:
+
+| | |
+|---|---|
+| `unanswered` | An open question. Not "not started" — nothing happens to it until it is answered, and it closes on an answer rather than a commit. One of the three states the *On you* view is made of. |
+| `answered` | A settled question. It carries the resolution and no commit, the resolution is its tooltip, and it is the one state the counts beside a module heading leave out: a decision recorded is neither work outstanding nor work that shipped. |
+| `proposed` | Written by a session, waiting on the person. Out of the progress denominator and out of the bands, which is what keeps it from being `not_started`. |
+| `in_progress` | Claimed, with nothing known about the run behind it: none recorded, or one nobody has asked GitHub about, and the clock has not run out. What every caller that hands in no liveness gets, which is all the status column supports on its own. |
+| `working` | Claimed, and the run pushed something inside the twenty-minute mark. |
+| `quiet` | Claimed, and nothing pushed since. The guard counts it as live and #574 settled that re-sending it asks first. |
+| `abandoned` | Claimed, and the run ended without closing the step. Nobody is on it and it needs handing over again. The one claim reading that leaves the ladder, and it ranks with the stuck states rather than the underway ones. |
+| `blocked` | Stopped on something only the person can settle — `block_kind` of `outside`. It stays blocked however much else closes, and Send refuses it. A feature reads it too, when every open step beneath it is blocked and so nothing under it can be picked up. |
+| `waiting` | Waits on another step, which clears itself when that step closes. The tooltip names which steps. |
+| `ready` | Not started, with nothing in the way. What the Send button takes, `workOrder` lists and the overnight chooser fires. |
+| `not_started` | Not started and not ready either: open sub-steps beneath it, or something above it dropped, proposed or blocked on something outside the plan. The right-hand end of the progress bar — work not reached. |
+| `done` | Closed against its done-when. The one state that carries a commit. |
+| `dropped` | Decided against, and out of the denominator with the proposals. |
+
+**Why thirteen.** #505 asked whether the set had outgrown what anybody reads:
+`not_started`, `ready` and `waiting` look like three shapes for "not started,
+and here is why". It was measured against one bar — a state stays only if some
+surface does something different with it, rather than merely wording it
+differently — and all thirteen cleared it. Four pairs were close enough to
+argue about. `ready` is what the Send button, the work order and the overnight
+chooser read, so merging it into `not_started` puts the one state that is an
+invitation to start behind a tooltip. `blocked` and `waiting` stopped being one
+fact read twice at #565, which made a `blocked` row reachable with every
+dependency closed: one clears itself, the other waits for the person.
+`in_progress` and `working` are worded the same and drawn the same on purpose —
+they are the same rung, and the live indicator on the row says which — but
+dropping `in_progress` means calling a claim nobody has looked into "working",
+which is the dot the page used to draw on a step nobody was working. And
+`answered` is a closed row with a resolution and no commit, which `done` cannot
+say.
+
+The same bar applies to a fourteenth. Every `Record<PlanHealth, …>` is
+exhaustive — the glyphs in `lib/status-glyphs.ts`, the words and tones on the
+page, the tally, `planState` in `lib/dev/words.ts` — so adding one fails the
+typecheck at each surface rather than drawing itself as a proposal, and
+`/dev/ui` lists all thirteen with their shapes.
 
 ## The page
 
@@ -494,15 +782,16 @@ show <n>            the brief
 ideas               ideas not yet shaped into the plan, dismissals left out
 idea "…" [--module <id>] [--from <n>]   a follow-on, filed as a suggestion
 add "…" --parent <n> [--done-when "…"] [--size s|m|l] [--claude] [--proposed] [--idea <id>]
-                    [--fog "…"] [--kind decision]
+                    [--fog "…"] [--kind decision|setup]
+needs "…" --for <n> [--detail "…"]   a setup job of the person's, and the edge to it
 approve <n>         a person's move: the step and the proposed steps beneath it
 answer <n> --note   a person's move: closes a decision on its answer, no commit
 start | done | block | drop | reopen | assign | priority | depends | undepend
 ```
 
 `done` records the HEAD commit and names the steps that became ready;
-`answer` does the same without a commit. `start` refuses a proposal and
-refuses a decision. `next` and `list` mark a decision `(?)` rather than with
+`answer` does the same without a commit. `start` refuses a proposal, and
+refuses a decision or a setup step, naming where each is closed instead. `next` and `list` mark a decision `(?)` rather than with
 a checkbox, and print a step's fog beneath it.
 
 **The brief.** `lib/plan/brief.ts` writes a step out for whoever is about
@@ -538,15 +827,30 @@ it proposes is started; the plan adapts continuously and still changes only
 on an approve. It refuses a proposal, which has nothing agreed to adapt,
 and a leaf step, which has nothing beneath it to re-read.
 
-**The skill.** `.claude/skills/plan/SKILL.md` is the procedure: read the
-brief, check what it waits on, claim it, break it down if it is large, build
-to the done-when, verify, commit with `(plan #n)` in the subject, close with
-a note. It carries the re-shape job too, which
-writes proposals and nothing else. A step assigned to Claude is Claude's to
-pick up; a step named by the user is Claude's whoever holds it; anything
-else, ask. The plan must
-always tell the truth: a step that cannot be finished is blocked with the
-question, never left in progress and never closed to look tidy.
+**The skill.** `.claude/skills/plan/SKILL.md` is the front door: which steps
+are Claude's, how a batch is run, and where each job is written down. The jobs
+themselves are one file each under `reference/` — building a step, shaping an
+idea, re-shaping a feature, answering an `@dash` comment, plus the wording
+rules and the SQL for when the CLI cannot run. A session reads the front door
+and the one file it was sent for, rather than all seven jobs to do one of them.
+
+`reference/building.md` is the per-step procedure: read the brief, check what
+it waits on, claim it, break it down if it is large, build to the done-when,
+verify, commit with `(plan #n)` in the subject, close with a note.
+
+A batch is not built by the session that receives it. More than one step means
+each step goes to its own subagent, which reads `reference/building.md`, builds
+that one step and reports back a paragraph. The orchestrating session never
+opens the step's source files. This is what stops a long feature ending
+halfway: a session that builds nine steps itself carries everything it read for
+the first through every turn of the last, and runs out of room around the
+third. The subagents also skip the full test suite and `next build` — the
+orchestrator runs both once before it pushes, and CI runs them again on main.
+
+A step assigned to Claude is Claude's to pick up; a step named by the user is
+Claude's whoever holds it; anything else, ask. The plan must always tell the
+truth: a step that cannot be finished is blocked with the question, never left
+in progress and never closed to look tidy.
 
 ## What is deliberately not here
 

@@ -8,6 +8,8 @@ import {
   type ResolvedSource,
 } from '@/lib/learn/import/resolve-payload';
 import { isRooted, type Rooting } from '@/lib/learn/graph/rooting';
+import type { KnowledgeState } from '@/lib/learn/graph/model';
+import type { Aim } from '@/lib/learn/graph/aim';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 
 /**
@@ -78,6 +80,21 @@ IF THE SUBJECT IS TOO VAGUE to search usefully -- "business", "history" -- set
 too_vague true and return no sources. Guessing at what somebody meant and
 handing back a reading list for it wastes more of their time than saying so.
 
+WHEN YOU ARE TOLD WHICH CLAIM THEY ARE STUCK ON
+Some of these searches name the one claim the reading is for, and where the
+person stands on it. When that is there, the subject is only where the claim
+sits -- aim at the claim.
+
+Shaky means they have met this claim already and it did not land. Find the
+thing that teaches the claim itself. An introduction to the area around it is
+what they read the first time, and returning one spends an evening getting
+them back to where they already are.
+
+A named wrong belief is stronger than not knowing: something is steering them
+wrong, and a source that never mentions it leaves it where it is. Prefer one
+that takes that belief on directly -- names it, or argues against the position
+it comes from -- and say in the why field how it does.
+
 WHEN YOU ARE TOLD WHAT THEY ALREADY KNOW
 Some of these searches come with two lists: the claims this person has settled
 in the subject, and the claims they are ready to take on next. When they are
@@ -101,6 +118,37 @@ so treat them as evidence rather than as a complete account.`;
 export type SuggestResult =
   | { ok: true; sources: ResolvedSource[] }
   | { ok: false; reason: 'too-vague' | 'nothing-good' | 'error'; detail: string };
+
+/** How each state reads in a prompt. The word alone does not carry it. */
+const STANDING: Record<KnowledgeState, string> = {
+  unknown: 'They have not met this claim yet.',
+  shaky: 'They have met this claim and it did not land.',
+  recognised: 'They can pick this claim out of a list and have not yet used it.',
+  known: 'They have settled this claim and are reading past it.',
+  sharp: 'They have settled this claim and defended it against the objection to it.',
+  misconception: 'Something is actively steering them wrong here.',
+};
+
+/**
+ * The claim, and where they stand on it.
+ *
+ * Left out entirely for a search with no graph behind it, which is every
+ * subject somebody typed for themselves. The misconception is a separate line
+ * rather than folded into the claim so the prompt's rule about taking a belief
+ * on directly has something to fire on.
+ */
+function aimLines(aim: Aim): string[] {
+  const lines = [
+    '',
+    `The claim they are stuck on: ${aim.claim}`,
+    `Where they stand on it: ${STANDING[aim.state]}`,
+  ];
+  if (aim.misconception) {
+    lines.push(`What they believe instead: ${aim.misconception}`);
+  }
+  lines.push('Aim at that claim, not at the subject around it.');
+  return lines;
+}
 
 /**
  * The two lists, when there are two lists.
@@ -135,6 +183,7 @@ function rootingLines(rooting: Rooting): string[] {
 function buildPrompt(
   subject: string,
   question: string | null,
+  aim: Aim | null,
   rooting: Rooting | null,
 ): string {
   const lines = [`Subject: ${subject}`];
@@ -142,6 +191,7 @@ function buildPrompt(
     lines.push('', `The larger question they are working on: ${question}`);
     lines.push('Aim these at that, not at the subject in general.');
   }
+  if (aim) lines.push(...aimLines(aim));
   if (rooting) lines.push(...rootingLines(rooting));
   lines.push('', `Search, then call ${TOOL_NAME}.`);
   return lines.join('\n');
@@ -157,6 +207,11 @@ function buildPrompt(
 export async function suggestSources(input: {
   subject: string;
   question?: string | null;
+  /**
+   * The claim this search is for, when it came from a gap in a graph. Null for
+   * a subject you typed, which is about a topic and not about a claim.
+   */
+  aim?: Aim | null;
   /**
    * What the subject's graph holds, when this search came from a gap in one.
    * Null for a subject you typed, which has no graph behind it.
@@ -228,7 +283,12 @@ export async function suggestSources(input: {
       messages: [
         {
           role: 'user',
-          content: buildPrompt(input.subject, input.question ?? null, input.rooting ?? null),
+          content: buildPrompt(
+            input.subject,
+            input.question ?? null,
+            input.aim ?? null,
+            input.rooting ?? null,
+          ),
         },
       ],
     });

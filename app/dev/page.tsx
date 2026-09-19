@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-/** The workspace opens on the list with work in it. */
+/** The workspace opens on Dash, which carries everything waiting on you. */
 export default function DevPage() {
-  redirect('/dev/bugs');
+  redirect('/dev/raised');
 }

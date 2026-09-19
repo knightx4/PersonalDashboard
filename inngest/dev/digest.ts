@@ -3,11 +3,22 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
 import { suggestForDigest, type DigestContext } from '@/inngest/dev/suggest';
-import { oneLine, whatHappened, whatIsReady, withSuggestions, type DigestEvent } from '@/lib/digest/build';
+import {
+  MAX_SUGGESTIONS,
+  oneLine,
+  whatHappened,
+  whatIsReady,
+  withSuggestions,
+  type DigestEvent,
+} from '@/lib/digest/build';
+import { nightFrom } from '@/lib/digest/night';
 import { loadFeedbackQueue } from '@/lib/feedback/load';
+import { fileNightIdeas } from '@/lib/ideas/file';
 import { loadIdeas } from '@/lib/ideas/load';
 import { moduleById } from '@/lib/modules';
 import { hasLiveFog, isDismissed, loadPlan, type PlanData, type PlanItem } from '@/lib/plan/load';
+import { loadOvernightRun } from '@/lib/plan/overnight';
+import { loadFeatureFires } from '@/lib/plan/runs';
 import { loadRaised } from '@/lib/raised/load';
 
 /**
@@ -152,13 +163,21 @@ export async function writeDigestFor(
   if (existing) return false;
 
   const since = new Date(now.getTime() - DAY_MS).toISOString();
-  const [plan, notes] = await Promise.all([
+  const [plan, notes, run, fires] = await Promise.all([
     loadPlan(supabase, userId),
     loadFeedbackQueue(supabase, userId),
+    loadOvernightRun(supabase, userId),
+    loadFeatureFires(supabase, userId),
   ]);
 
   const happened = whatHappened({ plan, notes: notes.rows, since });
   const ready = whatIsReady(plan);
+
+  // The night, on the days there was one. Not shown to the model: the five
+  // sentences a night can end with are written to be read back verbatim, and
+  // the surest way to have one reworded is to put it in front of something
+  // that writes prose.
+  const night = nightFrom({ run, fires, items: plan.items, since });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const reading = apiKey
@@ -174,6 +193,28 @@ export async function writeDigestFor(
       })
     : { summary: null, suggestions: [] };
 
+  // What the run noticed, written to the ideas page under the person's own
+  // list (#623). Best effort, the same as the reading above it: a summary
+  // without the count is still worth writing, and nothing is filed twice if
+  // this run is retried, because the ideas the first attempt wrote are on the
+  // page the second one compares against.
+  //
+  // The count goes on the row so the morning can say how many arrived (#631).
+  //
+  // The same lines the stored attention list carries, cut to the same three:
+  // the model is asked for at most three and the schema would take ten, and
+  // filing ten ideas in one night is what that cap is against.
+  let ideasFiled = 0;
+  try {
+    ideasFiled = await fileNightIdeas(
+      supabase,
+      userId,
+      reading.suggestions.slice(0, MAX_SUGGESTIONS),
+    );
+  } catch (error) {
+    console.error('[dev digest] ideas', error instanceof Error ? error.message : error);
+  }
+
   const { error } = await supabase.from('dev_digests').insert({
     user_id: userId,
     day,
@@ -181,6 +222,8 @@ export async function writeDigestFor(
     summary: reading.summary,
     happened,
     attention: withSuggestions(ready, reading.suggestions),
+    ideas_filed: ideasFiled,
+    night,
   });
 
   // A second cron tick racing the first loses the insert and that is the

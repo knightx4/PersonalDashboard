@@ -1,8 +1,9 @@
 import Link from 'next/link';
-import { FileText, FolderTree, Search } from 'lucide-react';
+import { FileText, FolderTree } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
+import { SearchEmpty } from '@/components/shell/search-empty';
+import { SearchField } from '@/components/shell/search-field';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/field';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { groupByFolder, loadConnection, loadNotes } from '@/lib/vault/notes/load';
 import { VaultStatusBanner } from '@/components/vault/status-banner';
@@ -58,35 +59,18 @@ export default async function VaultPage({
 
       <VaultStatusBanner connection={connection} />
 
-      <form className="mb-5" role="search">
-        <div className="relative max-w-md">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted"
-            strokeWidth={2}
-            aria-hidden
-          />
-          <Input
-            type="search"
-            name="q"
-            defaultValue={search}
-            placeholder="Search your notes"
-            aria-label="Search your notes"
-            className="pl-9"
-          />
-        </div>
-      </form>
+      <div className="mb-5 max-w-md">
+        <SearchField placeholder="Search your notes" />
+      </div>
 
-      {notes.length === 0 ? (
+      {notes.length === 0 && search ? (
+        <SearchEmpty query={search} />
+      ) : notes.length === 0 ? (
         <EmptyState
           icon={FileText}
-          title={search ? 'Nothing matched' : 'No notes yet'}
-          description={
-            search
-              ? `Nothing in the vault matches “${search}”. Search covers note titles and their full text.`
-              : 'The first sync runs on the daily schedule. You can start one now from settings.'
-          }
-          action={search ? { label: 'Clear the search', href: '/vault' } : undefined}
-          secondaryAction={search ? undefined : { label: 'Vault settings', href: '/vault/settings' }}
+          title="No notes yet"
+          description="The first sync runs on the daily schedule. You can start one now from settings."
+          secondaryAction={{ label: 'Vault settings', href: '/vault/settings' }}
         />
       ) : (
         <>

@@ -73,6 +73,17 @@ export function folderOf(vaultPath: string): string {
   return cut === -1 ? '' : vaultPath.slice(0, cut);
 }
 
+/**
+ * Where a stored note path is read in the app.
+ *
+ * Each segment is encoded on its own, so the slashes that make a vault path a
+ * tree survive into the catch-all route while spaces, hashes and everything
+ * else in an Obsidian filename do not break the link.
+ */
+export function noteHref(vaultPath: string): string {
+  return `/vault/n/${vaultPath.split('/').map(encodeURIComponent).join('/')}`;
+}
+
 /** The filename without its extension -- Obsidian's own idea of a note's name. */
 export function basenameOf(vaultPath: string): string {
   const file = vaultPath.slice(vaultPath.lastIndexOf('/') + 1);

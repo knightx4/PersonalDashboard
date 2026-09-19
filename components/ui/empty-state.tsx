@@ -71,7 +71,7 @@ export function EmptyState({
       <h3
         className={cn(
           'font-semibold text-ink',
-          finished ? 'font-display text-title tracking-tight' : 'text-lead',
+          finished ? 'font-display text-title tracking-tight' : 'text-body',
         )}
       >
         {title}

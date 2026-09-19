@@ -26,6 +26,10 @@ import {
   type OpeningSweep,
 } from '@/lib/learn/graph/opening';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
+import { classifyNote } from '@/lib/learn/vault/classify';
+import { goesToExtraction, type NoteClass } from '@/lib/learn/vault/classify-payload';
+import { createVaultClient } from '@/lib/vault/auth/server';
+import { loadNote } from '@/lib/vault/notes/load';
 import {
   approvedChainSchema,
   keepTicked,
@@ -507,4 +511,100 @@ export async function approveBrief(
   revalidatePath('/learn/know');
   revalidatePath(`/learn/s/${saved.subjectId}`);
   redirect(`/learn/s/${saved.subjectId}`);
+}
+
+// ---------------------------------------------------------------- from a note
+
+export type FromNoteState = BriefState & {
+  /** What the classifier decided, shown whether or not the note was read. */
+  verdict?: { noteClass: NoteClass; reason: string; notePath: string };
+};
+
+const FromNoteInput = z.object({
+  notePath: z.string().trim().min(1, 'Pick a note.'),
+  subjectId: z.string().uuid().nullable(),
+});
+
+/**
+ * Read one note in the vault for the claims it makes.
+ *
+ * The first slice of the vault pass in LEARN-MAP-SPEC.md, running over one
+ * note that you pick rather than over all 1,244. Every stage the full sweep
+ * needs is here and none of the machinery for surviving 1,244 of them is, so
+ * what comes out can be looked at before anything runs at that scale.
+ *
+ * Stage 0 is `classifyNote`. Stages 1 to 3 are `conceptsFromBrief`, unchanged:
+ * it already cuts prose on its headings, extracts per section, and drops what
+ * the subject already holds. A vault note and a pasted briefing are the same
+ * problem, and the only reason this is a separate action is the classifier in
+ * front of it and the note it reads instead of a textarea.
+ *
+ * Approval is `approveBrief`. The chain is the same shape, so there is no
+ * second save path and nothing new can go wrong on the way in.
+ */
+// latency: pending
+export async function proposeFromNote(
+  _prev: FromNoteState,
+  formData: FormData,
+): Promise<FromNoteState> {
+  const user = await requireUser();
+
+  const raw = formData.get('subjectId');
+  const parsed = FromNoteInput.safeParse({
+    notePath: formData.get('notePath') ?? '',
+    subjectId: typeof raw === 'string' && raw.length > 0 ? raw : null,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Could not read that note.' };
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'Reading a note needs ANTHROPIC_API_KEY to be set.' };
+
+  const note = await loadNote(await createVaultClient(), parsed.data.notePath);
+  if (!note) return { error: 'That note is not in the vault any more.' };
+
+  const spend = collectSpend();
+  const verdict = await classifyNote({
+    title: note.title,
+    body: note.body,
+    anthropicApiKey: apiKey,
+    onSpend: spend.sink,
+  });
+  await recordLearnSpend(user.id, 'classify-note', spend.reports);
+
+  const seen = { noteClass: verdict.noteClass, reason: verdict.reason, notePath: note.path };
+
+  // Said rather than done. A note the classifier turns down is the case worth
+  // seeing on a screen, because a wrong call here is what the full sweep would
+  // make 1,244 times over.
+  if (!goesToExtraction(verdict.noteClass)) {
+    return {
+      verdict: seen,
+      message: `Not read: this looks like ${verdict.noteClass}. ${verdict.reason}`,
+    };
+  }
+
+  const supabase = await createLearnClient();
+  const subject = parsed.data.subjectId
+    ? await loadSubject(supabase, parsed.data.subjectId)
+    : null;
+  const existing = subject ? await existingConcepts(supabase, subject.id) : [];
+
+  const reading = collectSpend();
+  const result = await conceptsFromBrief({
+    subject: subject?.name ?? null,
+    briefing: note.body,
+    existing,
+    anthropicApiKey: apiKey,
+    onSpend: reading.sink,
+  });
+  await recordLearnSpend(user.id, 'concepts-from-brief', reading.reports);
+
+  if (!result.ok) {
+    return result.reason === 'nothing-in-it'
+      ? { verdict: seen, message: result.detail }
+      : { verdict: seen, error: result.detail };
+  }
+  return { verdict: seen, chain: result.chain };
 }

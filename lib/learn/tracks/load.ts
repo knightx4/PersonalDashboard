@@ -2,6 +2,12 @@ import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { escapeLike } from '@/lib/search/sources/map';
+import {
+  mergeTrackMatches,
+  type MatchedReading,
+  type TrackReadingMatch,
+} from '@/lib/learn/tracks/matches';
 
 /**
  * Reading the queue.
@@ -36,6 +42,12 @@ export type TrackSummary = {
   /** The broader track this one was kept out of, if it was. */
   branchedFrom: string | null;
   progress: TrackProgress;
+  /**
+   * The readings inside this track that the search matched, listed under the
+   * row. Empty without a search, and empty for a track the search reached by
+   * its own title or question alone.
+   */
+  matches: MatchedReading[];
 };
 
 export type ReadingRow = {
@@ -189,37 +201,174 @@ function toReading(row: ReadingRecord): ReadingRow {
   };
 }
 
+const TRACK_COLUMNS = 'id, title, question, status, created_at, branched_from';
+
 const READING_COLUMNS =
   'id, position, status, title, why, note, locator_kind, locator_label, locator_basis, ' +
   'locator_confidence, open_url, text_anchor, page_from, page_to, finished_at, read_now_at, ' +
   'concept_id, ' +
   'sources!readings_source_fk ( id, title, author, kind, year, canonical_url, access, price_cents, page_count )';
 
+type TrackRecord = {
+  id: string;
+  title: string;
+  question: string | null;
+  status: TrackStatus;
+  created_at: string;
+  branched_from: string | null;
+};
+
+type ReadingMatchRecord = {
+  id: string;
+  track_id: string;
+  title: string | null;
+  sources: { title: string } | { title: string }[] | null;
+};
+
+function toMatch(row: ReadingMatchRecord): TrackReadingMatch {
+  const source = Array.isArray(row.sources) ? row.sources[0] : row.sources;
+  // The same fallback toReading makes, so a reading is called the same thing
+  // under a track row as it is on its own page.
+  return { id: row.id, trackId: row.track_id, subject: source?.title ?? row.title ?? 'Untitled' };
+}
+
 /**
- * Every track, with its progress.
+ * The readings a search matches, and the track each one sits in.
  *
- * One query for the tracks and one for their readings' statuses, rather than a
- * count per track: a personal queue is tens of tracks, and two round trips
- * beat N.
+ * Two reads, because the two strings a reading is remembered by live in
+ * different tables: the words you wrote down when you queued it, and the title
+ * of the source it was resolved to. "the Hayek essay" and "how prices
+ * coordinate" are the same row reached from opposite ends, which is why
+ * lib/search/sources/learn.ts makes the same pair for the command palette. A
+ * reading both reads return is de-duplicated in mergeTrackMatches.
+ *
+ * These filters are `ilike` rather than `or`, so the comma that splits an `or`
+ * expression is not a problem here.
  */
-export async function loadTracks(supabase: LearnSupabaseClient): Promise<TrackSummary[]> {
-  const { data, error } = await supabase
-    .from('tracks')
-    .select('id, title, question, status, created_at, branched_from')
-    .order('created_at', { ascending: false });
+async function loadReadingMatches(
+  supabase: LearnSupabaseClient,
+  pattern: string,
+): Promise<TrackReadingMatch[]> {
+  const [{ data: byTitle, error: titleError }, { data: bySource, error: sourceError }] =
+    await Promise.all([
+      supabase
+        .from('readings')
+        .select('id, track_id, title, sources ( title )')
+        .ilike('title', pattern)
+        .order('position'),
+      supabase
+        .from('readings')
+        .select('id, track_id, title, sources!inner ( title )')
+        .ilike('sources.title', pattern)
+        .order('position'),
+    ]);
+
+  assertSchemaExposed(titleError, LEARN_SCHEMA);
+  if (titleError) throw new Error(`Searching your readings failed: ${titleError.message}`);
+
+  assertSchemaExposed(sourceError, LEARN_SCHEMA);
+  if (sourceError) throw new Error(`Searching by source title failed: ${sourceError.message}`);
+
+  return [
+    ...((byTitle ?? []) as unknown as ReadingMatchRecord[]),
+    ...((bySource ?? []) as unknown as ReadingMatchRecord[]),
+  ].map(toMatch);
+}
+
+/**
+ * What to narrow the list of tracks to.
+ *
+ * An object rather than a bare string because matching grows: the search here
+ * already reaches the readings inside a track as well as the track's own title
+ * and question, and anything narrower lands as another field rather than
+ * another positional argument.
+ */
+export type TrackListFilter = {
+  /**
+   * Keep only the tracks whose title or question contains this, ignoring case,
+   * along with the tracks holding a reading that contains it. Empty or blank is
+   * no search at all, and every track comes back.
+   */
+  search?: string;
+};
+
+/**
+ * Every track, with its progress. With a search, the ones that match it.
+ *
+ * A search matches the title or the question, which are the two strings a
+ * track is remembered by, and it matches the readings inside a track, which is
+ * how a track comes back from the title of a book in it. The track holding a
+ * matching reading is pulled in even when nothing about the track itself
+ * matched, and the readings that matched come back on it for the list to draw.
+ * Blank or whitespace is no search at all rather than a match on nothing, so
+ * clearing the box gives the whole list back.
+ *
+ * The tracks come back whole and the search is applied to them here, in
+ * memory. Narrowing them in the query took an `or` expression, and PostgREST
+ * reads a comma inside one as the separator between its two sides, so
+ * searching for "value, price" sent a filter that does not parse and the page
+ * failed. Nothing more comes over the wire for matching here: the read has no
+ * limit and the page draws every track anyway.
+ *
+ * Without a search that is one query for the tracks and one for their
+ * readings' statuses, rather than a count per track: a personal queue is tens
+ * of tracks, and two round trips beat N. The statuses query is not narrowed
+ * alongside the tracks -- it is read by track id and the rows a search left out
+ * are simply never looked up. A search costs two more reads for the readings it
+ * matches, neither of which grows with the number of tracks.
+ */
+export async function loadTracks(
+  supabase: LearnSupabaseClient,
+  filter: TrackListFilter = {},
+): Promise<TrackSummary[]> {
+  const search = filter.search?.trim();
+  // The readings are still read with `ilike`, so their pattern is escaped: a %
+  // or a _ somebody typed is the character they typed rather than "match
+  // anything from here". The tracks need no escaping, since the substring test
+  // below has no wildcards to confuse.
+  const pattern = search ? `%${escapeLike(search)}%` : null;
+
+  const [{ data, error }, matches] = await Promise.all([
+    supabase.from('tracks').select(TRACK_COLUMNS).order('created_at', { ascending: false }),
+    pattern ? loadReadingMatches(supabase, pattern) : Promise.resolve([]),
+  ]);
 
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw new Error(`Reading your tracks failed: ${error.message}`);
 
-  const tracks = (data ?? []) as Array<{
-    id: string;
-    title: string;
-    question: string | null;
-    status: TrackStatus;
-    created_at: string;
-    branched_from: string | null;
-  }>;
-  if (tracks.length === 0) return [];
+  const all = (data ?? []) as TrackRecord[];
+
+  // Lower-cased on both sides, which is the `ilike` this replaces for the
+  // strings people actually type. Plain substring: what was typed is what is
+  // looked for, spaces, commas and all.
+  const needle = search?.toLowerCase();
+  const found = needle
+    ? all.filter(
+        (track) =>
+          track.title.toLowerCase().includes(needle) ||
+          (track.question?.toLowerCase().includes(needle) ?? false),
+      )
+    : all;
+
+  // The tracks a matching reading is in that the search did not find on its
+  // own. They are among the rows already read, under the same policies, so
+  // this picks them out rather than asking for them a second time.
+  const foundIds = new Set(found.map((track) => track.id));
+  const holding = new Set(matches.map((match) => match.trackId));
+  const holders = all.filter((track) => holding.has(track.id) && !foundIds.has(track.id));
+
+  const merged = mergeTrackMatches(
+    [...found, ...holders].map((track) => ({
+      id: track.id,
+      title: track.title,
+      question: track.question,
+      status: track.status,
+      createdAt: track.created_at,
+      branchedFrom: track.branched_from,
+    })),
+    matches,
+  );
+  if (merged.length === 0) return [];
 
   const { data: statusRows, error: statusError } = await supabase
     .from('readings')
@@ -235,13 +384,8 @@ export async function loadTracks(supabase: LearnSupabaseClient): Promise<TrackSu
     else byTrack.set(row.track_id, [row.status]);
   }
 
-  return tracks.map((track) => ({
-    id: track.id,
-    title: track.title,
-    question: track.question,
-    status: track.status,
-    createdAt: track.created_at,
-    branchedFrom: track.branched_from,
+  return merged.map((track) => ({
+    ...track,
     progress: progressOf(byTrack.get(track.id) ?? []),
   }));
 }
@@ -301,6 +445,9 @@ export async function loadTrack(
     branchedFrom: track.branched_from,
     branchedFromTitle,
     progress: progressOf(readings.map((r) => r.status)),
+    // Nothing was searched for to reach this page; the readings below are the
+    // whole track rather than the ones a search picked out.
+    matches: [],
     readings,
   };
 }

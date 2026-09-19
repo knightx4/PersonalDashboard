@@ -102,3 +102,34 @@ export function askMessage(input: {
   parts.push(['## The question', '', input.question].join('\n'));
   return parts.join('\n\n') + '\n';
 }
+
+/**
+ * A section of a specification, with the document it belongs to.
+ *
+ * The section's own prose is included in full rather than summarised, because
+ * a question asked on a spec is almost always about the exact wording — "why
+ * does this rule out X" is unanswerable from a paraphrase. The documents cap at
+ * a few thousand characters per section, so this is affordable.
+ *
+ * The surrounding document is named but not included. A section is the unit
+ * somebody argues with, and handing over 650 lines to answer a question about
+ * one heading is how a cheap call becomes an expensive one.
+ */
+export function specContext(spec: {
+  title: string;
+  file: string;
+  heading: string;
+  body: string;
+}): string {
+  return (
+    [
+      `# ${spec.heading}`,
+      '',
+      `A section of ${spec.title}, which is \`docs/${spec.file}\` in the repository.`,
+      '',
+      'The section, in full:',
+      '',
+      spec.body,
+    ].join('\n') + '\n'
+  );
+}

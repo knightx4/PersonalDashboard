@@ -223,7 +223,7 @@ npx tsx scripts/plan.ts raise "…" --ask "…" --consequence "<action>: <what>"
 ```
 
 `DATABASE_URL` is not set on the web, so the SQL for both is in
-`.claude/skills/plan/SKILL.md` under **When the CLI cannot run**.
+`.claude/skills/plan/reference/offline.md`.
 
 `--ask` is required: the move you want back, in one sentence the user can
 answer in one line. The detail is the evidence for it, not the ask itself.

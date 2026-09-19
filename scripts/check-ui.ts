@@ -312,7 +312,7 @@ const RULES: Rule[] = [
     id: 'off-scale-text',
     law: '-',
     says: 'a font size outside the named scale',
-    instead: 'text-micro | text-small | text-ui | text-body | text-lead | text-title | text-figure',
+    instead: 'text-micro | text-small | text-ui | text-body | text-title | text-figure',
     find: (line) => [...line.matchAll(/\btext-\[[\d.]+(?:px|rem|em)\]/g)].map((m) => m[0]),
   },
   {

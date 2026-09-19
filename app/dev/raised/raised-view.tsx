@@ -1,18 +1,32 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { ChevronRight, MessageCircleQuestion } from 'lucide-react';
-import { decideRaise, dismissRaise, reopenRaise, type RaisedActionState } from './actions';
+import { MessageCircleQuestion } from 'lucide-react';
+import {
+  closeRaise,
+  decideRaise,
+  dismissRaise,
+  reopenRaise,
+  type RaisedActionState,
+} from './actions';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { needsFollowThrough, type RaisedQueue, type RaisedRow } from '@/lib/raised/load';
+import type { WaitingGroup } from '@/lib/plan/waiting';
+import { ApproveAll, WaitingCard } from './waiting-view';
 import { cardVariants } from '@/components/ui/card';
 import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
-import { Disclosure } from '@/components/ui/disclosure';
+import { RefText } from '@/components/dev/ref-text';
+import type { PlanRefTitles } from '@/lib/comments/refs';
+import { StateLabel, type DevTone } from '@/components/dev/state-label';
+import { Disclosure, Group, SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
+import { raisedHealth, type RaisedHealth } from '@/lib/dev/health';
+import { RAISED_HEALTH_WORD } from '@/lib/dev/words';
+import { RAISED_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -28,13 +42,15 @@ function scopeLabel(module: ModuleId | null): string {
  * it. The label is there so a row reads as a request rather than as a report:
  * a page of paragraphs is a page nobody can clear.
  */
-function Ask({ ask }: { ask: string }) {
+function Ask({ ask, titles }: { ask: string; titles?: PlanRefTitles }) {
   return (
     <div className="space-y-0.5">
       <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">
         Needs from you
       </p>
-      <p className="whitespace-pre-wrap text-body text-ink">{ask}</p>
+      <p className="whitespace-pre-wrap text-body text-ink">
+        <RefText text={ask} titles={titles} />
+      </p>
     </div>
   );
 }
@@ -45,13 +61,15 @@ function Ask({ ask }: { ask: string }) {
  * answer worth something. A raise filed before there was a column for it shows
  * nothing here.
  */
-function Consequence({ said }: { said: string }) {
+function Consequence({ said, titles }: { said: string; titles?: PlanRefTitles }) {
   return (
     <div className="space-y-0.5">
       <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">
         Answering yes
       </p>
-      <p className="whitespace-pre-wrap text-body text-ink-muted">{said}</p>
+      <p className="whitespace-pre-wrap text-body text-ink-muted">
+        <RefText text={said} titles={titles} />
+      </p>
     </div>
   );
 }
@@ -67,12 +85,42 @@ function lead(detail: string): string {
   return first.length > 90 ? `${first.slice(0, 89).trimEnd()}…` : first;
 }
 
+/**
+ * A raise that is no longer open, worded the way the other dev queues word it.
+ *
+ * "Answered" is this queue's own -- a raise closes on a reply, which is not the
+ * same as the work being finished. A raise you turned down is the same fact as
+ * a step dropped or a note declined, so it takes the shared word, and so does
+ * one you are finished with.
+ *
+ * `closed` is quiet rather than positive: it is the row you have read and put
+ * away, and the green is for the state that still wants looking at.
+ *
+ * Nothing on an open one: they are all under a heading that already says
+ * "Waiting on you", and repeating it on every row would be the same fact twice.
+ */
+const HEALTH_TONE: Record<RaisedHealth, DevTone> = {
+  waiting: 'caution',
+  unfinished: 'caution',
+  answered: 'positive',
+  closed: 'quiet',
+  dropped: 'ghost',
+};
+
 function StatusLabel({ row }: { row: RaisedRow }) {
   if (row.status === 'open') return null;
+  const health = raisedHealth(row);
   return (
-    <span className="text-small text-ink-muted">
-      {row.status === 'answered' ? 'Answered' : 'Dismissed'}
-    </span>
+    <StateLabel
+      glyph={RAISED_HEALTH_GLYPHS[health]}
+      word={RAISED_HEALTH_WORD[health]}
+      tone={HEALTH_TONE[health]}
+      title={
+        health === 'unfinished'
+          ? 'Answered, and nothing was recorded as coming of it. Run what it asked for, or close it with the reason nothing was needed.'
+          : undefined
+      }
+    />
   );
 }
 
@@ -102,6 +150,9 @@ function Decide({ row }: { row: RaisedRow }) {
       <form action={action} className="w-full space-y-2">
         <input type="hidden" name="id" value={row.id} />
         <input type="hidden" name="answer" value="no" />
+        {/* ui-ok: composer-always-open -- this whole branch renders only after
+          * "No, and here is why" is pressed. The guard is an early return on
+          * `saying`, which the gate reads only in its `if (!open)` shape. */}
         <Textarea
           name="body"
           rows={2}
@@ -126,6 +177,8 @@ function Decide({ row }: { row: RaisedRow }) {
       <input type="hidden" name="id" value={row.id} />
       <input type="hidden" name="answer" value="yes" />
       {saying === 'more' && (
+        // ui-ok: composer-always-open -- opened by "Yes, and…" and closed
+        // otherwise. The gate reads `{flag && (` and not a comparison.
         <Textarea
           name="body"
           rows={2}
@@ -158,15 +211,24 @@ function Decide({ row }: { row: RaisedRow }) {
   );
 }
 
-function RaiseCard({ row }: { row: RaisedRow }) {
+function RaiseCard({ row, titles }: { row: RaisedRow; titles?: PlanRefTitles }) {
   const [dismissState, dismissAction, dismissPending] = useActionState(
     dismissRaise,
+    {} as RaisedActionState,
+  );
+  const [closeState, closeAction, closePending] = useActionState(
+    closeRaise,
     {} as RaisedActionState,
   );
   const [reopenState, reopenAction, reopenPending] = useActionState(
     reopenRaise,
     {} as RaisedActionState,
   );
+
+  // Answered and something came of it, so the only thing left is you saying
+  // you have read it. An answered raise with nothing recorded is not this: it
+  // is offered the Decide form above instead, because it still owes an outcome.
+  const canClose = row.status === 'answered' && Boolean(row.outcome);
 
   return (
     <li className="flex flex-col gap-2 px-4 py-3">
@@ -187,30 +249,38 @@ function RaiseCard({ row }: { row: RaisedRow }) {
           so it keeps it open rather than hiding itself behind a fold. */}
       {row.ask ? (
         <>
-          <Ask ask={row.ask} />
-          {row.consequence && <Consequence said={row.consequence.said} />}
+          <Ask ask={row.ask} titles={titles} />
+          {row.consequence && <Consequence said={row.consequence.said} titles={titles} />}
           {row.detail && (
             <Disclosure title="Why it came up" meta={lead(row.detail)}>
-              <p className="whitespace-pre-wrap text-body text-ink">{row.detail}</p>
+              <p className="whitespace-pre-wrap text-body text-ink">
+                <RefText text={row.detail} titles={titles} />
+              </p>
             </Disclosure>
           )}
         </>
       ) : (
-        row.detail && <p className="whitespace-pre-wrap text-body text-ink">{row.detail}</p>
+        row.detail && (
+          <p className="whitespace-pre-wrap text-body text-ink">
+            <RefText text={row.detail} titles={titles} />
+          </p>
+        )
       )}
 
       {/* Which run raised it. Without this a raise is a voice from nowhere, and
           the first thing you want to know is what it was doing at the time. */}
       {row.source && <p className="text-small text-ink-muted">Raised by {row.source}</p>}
 
-      {/* One thread, two ways into it. Answering closes the raise; a comment
-          says something about it and leaves it open. */}
+      {/* One thread, two ways into it. The buttons answer the ask it named;
+          what you write here is an answer in your own words, and it starts a
+          session that acts on it and replies under you. */}
       <CommentThread
         target="raise"
         id={row.id}
         thread={row.thread}
-        label="Add a comment"
-        placeholder="Something about this raise that is not the answer to it. Tag @dash to ask; it stays open."
+        label="Answer in your own words"
+        placeholder="What you want done about this. A session reads it, does it, and replies here."
+        titles={titles}
       />
 
       {/* Also on one that reached answered with nothing recorded: that raise is
@@ -226,14 +296,24 @@ function RaiseCard({ row }: { row: RaisedRow }) {
             </Button>
           </form>
         ) : (
-          <form action={reopenAction}>
-            <input type="hidden" name="id" value={row.id} />
-            <Button type="submit" size="sm" variant="ghost" pending={reopenPending}>
-              Reopen
-            </Button>
-          </form>
+          <>
+            {canClose && (
+              <form action={closeAction}>
+                <input type="hidden" name="id" value={row.id} />
+                <Button type="submit" size="sm" variant="secondary" pending={closePending}>
+                  Close it
+                </Button>
+              </form>
+            )}
+            <form action={reopenAction}>
+              <input type="hidden" name="id" value={row.id} />
+              <Button type="submit" size="sm" variant="ghost" pending={reopenPending}>
+                Reopen
+              </Button>
+            </form>
+          </>
         )}
-        <FieldError>{dismissState.error ?? reopenState.error}</FieldError>
+        <FieldError>{dismissState.error ?? closeState.error ?? reopenState.error}</FieldError>
       </div>
     </li>
   );
@@ -251,10 +331,27 @@ function RaiseCard({ row }: { row: RaisedRow }) {
  * kept so that a session can read the answer back rather than so you can read
  * it again.
  */
-export function RaisedView({ queue }: { queue: RaisedQueue }) {
+export function RaisedView({
+  queue,
+  groups,
+  titles,
+}: {
+  queue: RaisedQueue;
+  /**
+   * Everything waiting on you, already sorted into your actions, questions for
+   * you and to approve. All three arrive whether or not they hold anything,
+   * and an empty one is not drawn: a heading over nothing is a heading that
+   * has to be read before it can be skipped.
+   */
+  groups: readonly WaitingGroup[];
+  /** What each step number in a raise is called, for the hover text. */
+  titles?: PlanRefTitles;
+}) {
+  const onYou = groups.reduce((total, group) => total + group.entries.length, 0);
+
   return (
     <div className="space-y-6">
-      {queue.open.length === 0 && (
+      {onYou === 0 && (
         <EmptyState
           icon={MessageCircleQuestion}
           title="Nothing waiting on you"
@@ -262,53 +359,74 @@ export function RaisedView({ queue }: { queue: RaisedQueue }) {
         />
       )}
 
-      {queue.open.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="text-body font-semibold text-ink">
-            Waiting on you <span className="font-normal text-ink-muted">({queue.open.length})</span>
-          </h2>
-          <ul className={cn(cardVariants(), 'divide-y divide-border')}>
-            {queue.open.map((row) => (
-              <RaiseCard key={row.id} row={row} />
+      {onYou > 0 && (
+        <SectionFold title="Waiting on you" count={onYou}>
+          {/* One heading and three groups under it, rather than one list sorted
+              by how pressing each row is. That list asked you to work out, row
+              by row, whether the thing in front of you was a job, a question or
+              a yes -- and the three want different amounts of you, so they are
+              worth telling apart before you start. */}
+          {groups
+            .filter((group) => group.entries.length > 0)
+            .map((group) => (
+              <Group
+                key={group.key}
+                title={
+                  <>
+                    {group.title}
+                    <span className="tabular ml-2 font-normal text-ink-muted">
+                      {group.entries.length}
+                    </span>
+                  </>
+                }
+                /* Opposite the heading rather than on a row of its own: it
+                   acts on the whole group, and a button sitting inside the
+                   list would read as belonging to whichever row it landed
+                   next to. Only this group has one -- the other two are
+                   finished a row at a time, in words. */
+                action={group.key === 'approve' ? <ApproveAll entries={group.entries} /> : undefined}
+              >
+                <ul className={cn(cardVariants(), 'divide-y divide-border')}>
+                  {/* A plan row and a raise sit in the same group when the same
+                      thing finishes them, so which card is drawn comes off the
+                      entry rather than off which list it arrived in. */}
+                  {group.entries.map((entry) =>
+                    entry.kind === 'plan' ? (
+                      <WaitingCard key={entry.id} row={entry.row} titles={titles} />
+                    ) : (
+                      <RaiseCard key={entry.id} row={entry.raise} titles={titles} />
+                    ),
+                  )}
+                </ul>
+              </Group>
             ))}
-          </ul>
-        </section>
+        </SectionFold>
       )}
 
       {queue.unfinished.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="text-body font-semibold text-ink">
-            Answered, nothing done{' '}
-            <span className="font-normal text-ink-muted">({queue.unfinished.length})</span>
-          </h2>
+        <SectionFold title="Answered, nothing done" count={queue.unfinished.length}>
           <p className="text-small text-ink-muted">
             These closed without anything coming of them. Run what they asked for, or close one
             with the reason nothing was needed.
           </p>
           <ul className={cn(cardVariants(), 'divide-y divide-border')}>
             {queue.unfinished.map((row) => (
-              <RaiseCard key={row.id} row={row} />
+              <RaiseCard key={row.id} row={row} titles={titles} />
             ))}
           </ul>
-        </section>
+        </SectionFold>
       )}
 
+      {/* Shut, where the other two open: this one is history rather than work,
+          and it is the section the hand-rolled fold was written for. */}
       {queue.closed.length > 0 && (
-        <details className="group">
-          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
-            <ChevronRight
-              className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open:rotate-90"
-              strokeWidth={1.75}
-              aria-hidden
-            />
-            Closed <span className="font-normal text-ink-muted">({queue.closed.length})</span>
-          </summary>
-          <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+        <SectionFold title="Closed" count={queue.closed.length} defaultOpen={false}>
+          <ul className={cn(cardVariants(), 'divide-y divide-border')}>
             {queue.closed.map((row) => (
-              <RaiseCard key={row.id} row={row} />
+              <RaiseCard key={row.id} row={row} titles={titles} />
             ))}
           </ul>
-        </details>
+        </SectionFold>
       )}
     </div>
   );

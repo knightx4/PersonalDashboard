@@ -95,8 +95,9 @@ export function isUnread(
  */
 export const CONVERSATION_COLUMNS =
   `${COMMENT_COLUMNS}, idea_id, plan_item_id, raised_item_id, feedback_item_id, ` +
+  'spec_section_id, ' +
   'idea:ideas(body), step:plan_items(number, title), raise:raised_items(title), ' +
-  'note:feedback_items(kind, body)';
+  'note:feedback_items(kind, body), spec:spec_sections(slug, heading)';
 
 /** Long enough to tell two rows apart, short enough to sit on one line. */
 const ONE_LINE = 80;
@@ -121,9 +122,10 @@ const UNNAMED: Record<CommentTarget, string> = {
   step: 'A plan step',
   raise: 'A raise',
   note: 'A note',
+  spec: 'A spec section',
 };
 
-/** Exactly one of the four columns is set — `dev_comments_one_target_ck`. */
+/** Exactly one of the five columns is set — `dev_comments_one_target_ck`. */
 function targetOf(row: Record<string, unknown>): CommentTarget | null {
   return COMMENT_TARGETS.find((target) => row[TARGET_COLUMN[target]]) ?? null;
 }
@@ -140,12 +142,30 @@ function aboutFrom(target: CommentTarget, parent: Record<string, unknown> | null
 
   if (target === 'raise') return firstLine(parent.title) ?? UNNAMED.raise;
 
+  // The heading, which is what somebody was actually arguing with.
+  if (target === 'spec') return firstLine(parent.heading) ?? UNNAMED.spec;
+
   // A note has no title, so the sentence you filed is the name of it.
   if (target === 'note') {
     return firstLine(parent.body) ?? (parent.kind === 'feature' ? 'A feature request' : 'A bug report');
   }
 
   return firstLine(parent.body) ?? UNNAMED.idea;
+}
+
+/**
+ * Where the conversation is read.
+ *
+ * Every target but one is a list, so its path is fixed. A spec section lives on
+ * its own document's page, and which document that is can only be read off the
+ * embedded row -- so a thread whose section has gone falls back to the index
+ * rather than to a 404.
+ */
+function hrefFor(target: CommentTarget, parent: Record<string, unknown> | null): string {
+  if (target === 'spec' && typeof parent?.slug === 'string') {
+    return `${TARGET_PATH.spec}/${parent.slug}`;
+  }
+  return TARGET_PATH[target];
 }
 
 /**
@@ -184,7 +204,7 @@ export function conversationsFrom(
         target,
         rowId,
         about: aboutFrom(target, (row[target] as Record<string, unknown> | null) ?? null),
-        href: TARGET_PATH[target],
+        href: hrefFor(target, (row[target] as Record<string, unknown> | null) ?? null),
       },
       comments: [row],
     });

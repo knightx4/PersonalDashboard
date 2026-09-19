@@ -5,10 +5,11 @@ import Link from 'next/link';
 import { markConversationRead } from './actions';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { cardVariants } from '@/components/ui/card';
-import { Disclosure } from '@/components/ui/disclosure';
+import { Disclosure, SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import type { CommentTarget } from '@/lib/comments/load';
 import type { Conversation } from '@/lib/comments/recent';
+import type { PlanRefTitles } from '@/lib/comments/refs';
 import { commentWhen, exactTime } from '@/lib/comments/when';
 import { useClockNow } from '@/lib/use-clock-now';
 
@@ -51,7 +52,7 @@ const ELSEWHERE: Partial<Record<CommentTarget, string>> = {
   note: 'Open it on the bugs page',
 };
 
-function Line({ conversation }: { conversation: Conversation }) {
+function Line({ conversation, titles }: { conversation: Conversation; titles?: PlanRefTitles }) {
   const now = useClockNow();
   const [opened, setOpened] = useState(false);
   const who = conversation.lastAuthor === 'claude' ? 'Dash' : 'You';
@@ -112,6 +113,7 @@ function Line({ conversation }: { conversation: Conversation }) {
             thread={conversation.thread}
             label="Reply"
             placeholder="A reply on this row. Tag @dash to ask for an answer."
+            titles={titles}
           />
           {elsewhere && (
             <Link
@@ -127,18 +129,21 @@ function Line({ conversation }: { conversation: Conversation }) {
   );
 }
 
-export function ConversationsView({ conversations }: { conversations: Conversation[] }) {
+export function ConversationsView({
+  conversations,
+  titles,
+}: {
+  conversations: Conversation[];
+  /** What each step number in a comment is called, for the hover text. */
+  titles?: PlanRefTitles;
+}) {
   const shown = conversations.slice(0, CONVERSATIONS_SHOWN);
 
   return (
-    <section className="space-y-2">
-      <h2 className="text-body font-semibold text-ink">
-        Conversations{' '}
-        {conversations.length > 0 && (
-          <span className="font-normal text-ink-muted">({conversations.length})</span>
-        )}
-      </h2>
-
+    <SectionFold
+      title="Conversations"
+      count={conversations.length > 0 ? conversations.length : undefined}
+    >
       {shown.length === 0 ? (
         <p className="text-small text-ink-muted">
           Nothing said yet. Anything written on an idea, a plan step, a raise or a bug note shows
@@ -148,7 +153,11 @@ export function ConversationsView({ conversations }: { conversations: Conversati
         <>
           <ul className={cn(cardVariants(), 'divide-y divide-border')}>
             {shown.map((conversation) => (
-              <Line key={`${conversation.target}:${conversation.rowId}`} conversation={conversation} />
+              <Line
+                key={`${conversation.target}:${conversation.rowId}`}
+                conversation={conversation}
+                titles={titles}
+              />
             ))}
           </ul>
           {conversations.length > shown.length && (
@@ -159,6 +168,6 @@ export function ConversationsView({ conversations }: { conversations: Conversati
           )}
         </>
       )}
-    </section>
+    </SectionFold>
   );
 }

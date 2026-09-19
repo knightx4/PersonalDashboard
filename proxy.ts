@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { sessionUser } from '@/lib/auth/session-user';
 
 /**
  * Session refresh and route protection (Next 16 proxy convention; this file
@@ -42,6 +43,10 @@ const PUBLIC_PATHS = [
   // ownership with a hash of EBAY_VERIFICATION_TOKEN, and the POST only ever
   // acknowledges. Required for the production keyset to stay enabled.
   '/api/ebay/account-deletion',
+  // Inbound newsletter delivery. Mailgun carries no session; the post is
+  // authenticated by an HMAC over the fields it signs, checked in
+  // lib/news/providers/mailgun.ts before anything is read out of the body.
+  '/api/news/inbound',
   // The shared case page. Authorized by an unguessable, expiring slug and read
   // through one security definer function that checks both; see
   // supabase/migrations-job-search/0017_public_case_page.sql.
@@ -81,11 +86,13 @@ export default async function proxy(request: NextRequest) {
     },
   );
 
-  // getUser(), not getSession(): this revalidates the token against the auth
-  // server. Do not put any logic between createServerClient and this call.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims(), not getSession(): this verifies the token's signature rather
+  // than trusting whatever the cookie decodes to, and does it here instead of
+  // at the auth server -- see the comment on getUser() in lib/auth/server.ts.
+  // It still refreshes an expiring session first, which is the other half of
+  // what this file is for, so do not put any logic between createServerClient
+  // and this call.
+  const user = await sessionUser(supabase);
 
   const { pathname } = request.nextUrl;
 

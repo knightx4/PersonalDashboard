@@ -71,8 +71,12 @@ export function RunRoutineButton({
    * the placement: below the list the rule is above, above the list it is
    * below. A section with a rule on the wrong side reads as belonging to
    * whatever is on the other side of it.
+   *
+   * `none` is for a caller that has already drawn the separation -- the Status
+   * panel on Dash puts one rule between its rows, and a second from in here
+   * would be a line under a line.
    */
-  divider?: 'top' | 'bottom';
+  divider?: 'top' | 'bottom' | 'none';
 }) {
   const [state, action, pending] = useActionState(
     runFeatureRoutine,
@@ -126,7 +130,8 @@ export function RunRoutineButton({
       action={action}
       className={cn(
         'space-y-2 border-border',
-        divider === 'top' ? 'border-t pt-4' : 'border-b pb-4',
+        divider === 'top' && 'border-t pt-4',
+        divider === 'bottom' && 'border-b pb-4',
       )}
     >
       <div className="flex flex-wrap items-center gap-3">

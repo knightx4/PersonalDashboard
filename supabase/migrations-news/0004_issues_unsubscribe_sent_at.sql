@@ -1,0 +1,31 @@
+-- When the unsubscribe was asked for, kept with the issue it was asked from.
+--
+-- Planned as #666, under #607. 0003 keeps what the publisher offered; this
+-- keeps what was done with it. Neither an opened link nor a sent mail comes
+-- back with an answer, so without a mark of our own the reading page offers
+-- the button again every time the issue is opened, and a newsletter that has
+-- already been written to looks exactly like one that has not.
+--
+-- A timestamp rather than a boolean, because the useful thing to read later is
+-- how long ago it went out: a publisher still sending a fortnight afterwards
+-- is ignoring the request, and one sending the next morning may simply not
+-- have processed it yet.
+--
+-- Null on every row already in the table, and null on every issue that arrives
+-- from now on. Nothing is backfilled: no unsubscribe request has ever gone out
+-- of this app, so there is nothing to backfill from.
+--
+-- No check constraint here, unlike the two columns 0003 added. There is no
+-- value the column can hold that is wrong on its face; the times worth
+-- refusing are ones before the issue arrived, and received_at is the sender's
+-- own clock, so a check against it would refuse honest rows.
+--
+-- Row level security on news.issues is a policy over the whole row
+-- (`issues_all` in 0001), so it covers this column as it stands and no policy
+-- changes.
+
+alter table news.issues
+  -- When this account asked to be unsubscribed from this issue's newsletter,
+  -- by whichever of the two offers the header carried, or null while it has
+  -- not asked. #667 is the step that writes it; nothing writes it yet.
+  add column unsubscribe_sent_at timestamptz;

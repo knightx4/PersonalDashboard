@@ -2,11 +2,13 @@ import { redirect } from 'next/navigation';
 import { createClient, getUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import { isOwner } from '@/lib/dev/owner';
 import { loadInboxBannerState } from '@/lib/core/inbox/banner';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
 import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadActivity } from '@/lib/shell/activity';
+import { loadMainCheck } from '@/lib/shell/main-check';
 import { loadJobsBrief } from '@/lib/shell/brief';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { InboxSyncBanner } from '@/components/shell/inbox-sync-banner';
@@ -36,8 +38,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/jobs/onboarding');
   }
 
-  const [{ data: profile }, reviewCount, inbox, settings, counts, activity, raised] =
-    await Promise.all([
+  const [
+    { data: profile },
+    reviewCount,
+    inbox,
+    settings,
+    counts,
+    activity,
+    raised,
+    mainCheck,
+    owner,
+  ] = await Promise.all([
     supabase.from('profiles').select('display_name').eq('id', user.id).single(),
     countReviewItems(supabase, core, user.id),
     loadInboxBannerState(user.id),
@@ -45,6 +56,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     loadModuleCounts(user.id),
     loadActivity(),
     loadRaisedNotifications(user.id),
+    loadMainCheck(),
+    isOwner({ user }),
   ]);
 
   const brief = await loadJobsBrief(user.id, reviewCount);
@@ -73,6 +86,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div data-workspace="jobs">
       <AppShell
+        account={user.id}
         module="jobs"
         sections={sections}
         settingsHref="/jobs/settings"
@@ -81,10 +95,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         displayName={profile?.display_name ?? null}
         email={user.email ?? ''}
         enabledModules={settings.enabledModules}
+        isOwner={owner}
         counts={switcherCounts(counts)}
         theme={settings.theme}
         notifications={raised}
         activity={activity}
+        mainCheck={mainCheck}
         brief={brief}
         banner={<InboxSyncBanner accountIds={accountIds} initialJob={initialJob} />}
       >

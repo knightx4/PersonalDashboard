@@ -28,7 +28,9 @@ if it is not free, and pointed at the chapter or paragraph worth reading rather
 than at a 350-page book. Specified in
 [docs/LEARN-SPEC.md](docs/LEARN-SPEC.md). The half after that — a graph of what
 you know, probed rather than assumed — is in
-[docs/LEARN-GRAPH-SPEC.md](docs/LEARN-GRAPH-SPEC.md).
+[docs/LEARN-GRAPH-SPEC.md](docs/LEARN-GRAPH-SPEC.md), and how that map is
+shaped and built from the vault is in
+[docs/LEARN-MAP-SPEC.md](docs/LEARN-MAP-SPEC.md).
 
 **Dev** (`/dev`) is the app looking at itself: the bugs and requests filed
 from the header button, the build plan as a tree of features and the steps
@@ -186,6 +188,16 @@ These are enforced by tests and lint rules, not by convention.
 - **Notes render without raw HTML.** `rehype-raw` is not installed and must not
   be: with raw HTML disabled, `react-markdown` will not render the arbitrary
   markup a web-clipper note carries. That absence is the sanitizer.
+- **A newsletter is the one thing rendered as HTML, and it is cleaned first.**
+  #445 settled that an issue should look the way its sender designed it, which
+  the rule above cannot give. `lib/news/issues/sanitize.ts` runs every issue
+  through `sanitize-html` on the way out — script, event handlers,
+  `javascript:` links, forms, frames and stylesheets all go, and every picture
+  is held back until the reader asks for it — and what survives is shown in a
+  sandboxed frame that cannot reach the page around it. Neither half is trusted
+  alone. `lib/news/issues/sanitize.test.ts` asserts the first half. The rule
+  above is unchanged: `rehype-raw` is still not installed, and notes still
+  render without raw HTML.
 - **A foreign key is not an ownership check.** Referential integrity in
   Postgres bypasses RLS, so every cross-schema link in `todo.task_links` is
   checked by a trigger as well, and `tests/rls-todo.test.ts` asserts a link to

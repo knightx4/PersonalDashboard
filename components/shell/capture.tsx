@@ -373,7 +373,7 @@ function DayChip({
       onClick={() => onPick(on ? '' : day)}
       className={cn(
         'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-150',
-        on ? 'bg-accent text-surface' : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
+        on ? 'bg-accent text-fill-ink' : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
       )}
     >
       {label}

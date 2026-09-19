@@ -3,37 +3,52 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { createClient, requireUser } from '@/lib/auth/server';
+import { createClient } from '@/lib/auth/server';
+import { requireOwner } from '@/lib/dev/owner';
 import { isModuleId, type ModuleId } from '@/lib/modules';
-import { fireFeatureRoutine, planRoutine, type FireRoutineResult } from '@/lib/feedback/routine';
+import { planRoutine, type FireRoutineResult } from '@/lib/feedback/routine';
 import {
   DISMISSAL_RULE,
   FOG_RULE,
   PLAIN_ENGLISH_RULE,
   dismissedUnder,
   planBrief,
-  planQueueBrief,
 } from '@/lib/plan/brief';
 import { loadDismissedSuggestions } from '@/lib/ideas/load';
 import {
   PLAN_ASSIGNEES,
   PLAN_KINDS,
   PLAN_PRIORITIES,
+  PLAN_PRIORITY_LABEL,
   PLAN_SIZES,
   PLAN_STATUSES,
+  blockPatch,
   isClosed,
   isDismissed,
+  isPlanBlockKind,
   loadPlan,
   type PlanStatus,
 } from '@/lib/plan/load';
-import { hasLiveClaim } from '@/lib/plan/elapsed';
-import { handStepToClaude } from '@/lib/plan/handover';
+import { handFeatureToClaude, handStepToClaude } from '@/lib/plan/handover';
+import {
+  OVERNIGHT_FEATURE_CAP,
+  OVERNIGHT_NO_LIMIT,
+  OVERNIGHT_HOUR_CAP,
+  OVERNIGHT_STOPPED_BY_HAND,
+  overnightStopBy,
+  overnightVerdict,
+  pauseOvernightRun,
+  resumeOvernightRun,
+  startOvernightRun,
+  stopOvernightRun,
+} from '@/lib/plan/overnight';
+import { nextPlanPosition } from '@/lib/plan/position';
+import { reshapeUnderway, startRoutineRun } from '@/lib/plan/runs';
 import { PLAN_SEED } from '@/lib/plan/seed';
 import {
   buildPlanTree,
   findNode,
   flatten,
-  handedToClaude,
   isWaitingOnThePerson,
   topFeatureOf,
   type PlanNode,
@@ -48,8 +63,19 @@ export type PlanActionState = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, 'public'>;
 
+/**
+ * Both pages that read the plan, because two of them do.
+ *
+ * Dash derives its "Waiting on you" list from the plan tree rather than from a
+ * table of its own (lib/plan/waiting.ts), and the dev tab's count comes from
+ * the same function. So a plan row moving changes that page too, and
+ * revalidating only /dev/plan left Dash showing a question already answered or
+ * a setup job already done -- which matters now that #598 lets you close one
+ * from Dash without leaving it.
+ */
 function revalidatePlan(): void {
   revalidatePath('/dev/plan');
+  revalidatePath('/dev/raised');
 }
 
 /** Empty string means "the app as a whole", the same as the ideas list. */
@@ -108,38 +134,6 @@ function field(formData: FormData, name: string, fallback = ''): string {
   return value === null ? fallback : String(value);
 }
 
-/**
- * The end of a sibling list.
- *
- * A new step goes after its siblings rather than among them: the plan is
- * read top to bottom, a new step is almost always the next thing rather than
- * a forgotten early one, and anything else can be moved once it exists.
- * Positions are spaced by ten so that one can later be slotted between two
- * others without renumbering the rest.
- *
- * Siblings are the steps under the same parent, or -- at the top of a module
- * -- the module's other top-level steps. `.is(null)` rather than `.eq('')`
- * for the app-wide module: matching null against the empty string would find
- * nothing and restart the numbering at 10 on every add.
- */
-async function nextPosition(
-  supabase: Db,
-  userId: string,
-  module: ModuleId | null,
-  parentId: string | null,
-): Promise<number> {
-  let query = supabase.from('plan_items').select('position').eq('user_id', userId);
-  if (parentId) {
-    query = query.eq('parent_id', parentId);
-  } else {
-    query = query.is('parent_id', null);
-    query = module ? query.eq('module', module) : query.is('module', null);
-  }
-  const { data } = await query.order('position', { ascending: false }).limit(1);
-  const last = (data ?? [])[0]?.position as number | undefined;
-  return (last ?? 0) + 10;
-}
-
 /** The module a step's parent is in -- what a step under it must be in too. */
 async function parentModule(
   supabase: Db,
@@ -182,8 +176,8 @@ export async function addPlanItem(
   _prev: PlanActionState,
   formData: FormData,
 ): Promise<PlanActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const parsed = addSchema.safeParse({
     module: field(formData, 'module'),
@@ -206,7 +200,7 @@ export async function addPlanItem(
     scope = parent.module;
   }
 
-  const position = await nextPosition(supabase, user.id, scope, parsed.data.parent);
+  const position = await nextPlanPosition(supabase, user.id, scope, parsed.data.parent);
 
   const { error } = await supabase.from('plan_items').insert({
     user_id: user.id,
@@ -217,6 +211,9 @@ export async function addPlanItem(
     acceptance: parsed.data.acceptance || null,
     status: parsed.data.status,
     kind: parsed.data.kind,
+    // A step written straight into blocked still has to say which kind of
+    // block it is; the form does not ask, so it takes the default.
+    ...blockPatch(parsed.data.status),
     priority: parsed.data.priority,
     size: parsed.data.size,
     assignee: parsed.data.assignee,
@@ -256,8 +253,8 @@ export async function updatePlanItem(
   _prev: PlanActionState,
   formData: FormData,
 ): Promise<PlanActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const parsed = updateSchema.safeParse({
     id: formData.get('id'),
@@ -277,11 +274,18 @@ export async function updatePlanItem(
 
   const { data: current } = await supabase
     .from('plan_items')
-    .select('parent_id, module, fog')
+    .select('parent_id, module, fog, block_kind')
     .eq('user_id', user.id)
     .eq('id', parsed.data.id)
     .maybeSingle();
   if (!current) return { error: 'That step no longer exists.' };
+
+  // A step already blocked keeps the kind it was blocked with. This form saves
+  // the whole row at once, and rewriting the kind because somebody fixed a
+  // typo in the detail would turn a block that clears itself into one that
+  // does not.
+  const storedKind = current.block_kind as string | null;
+  const blockKind = storedKind && isPlanBlockKind(storedKind) ? storedKind : null;
 
   const patch: Record<string, unknown> = {
     title: parsed.data.title,
@@ -294,6 +298,9 @@ export async function updatePlanItem(
     comment: parsed.data.comment || null,
     commit_sha: parsed.data.commit || null,
     status: parsed.data.status,
+    // The same rule the status control follows: a blocked row carries a kind,
+    // and a step saved out of blocked loses the ask and the kind together.
+    ...blockPatch(parsed.data.status, blockKind),
     priority: parsed.data.priority,
     size: parsed.data.size,
     assignee: parsed.data.assignee,
@@ -320,7 +327,7 @@ export async function updatePlanItem(
     }
     patch.parent_id = parsed.data.parent;
     patch.module = scope;
-    patch.position = await nextPosition(supabase, user.id, scope, parsed.data.parent);
+    patch.position = await nextPlanPosition(supabase, user.id, scope, parsed.data.parent);
   }
 
   const { error } = await supabase
@@ -346,12 +353,24 @@ export async function setPlanItemStatus(
   _prev: PlanActionState,
   formData: FormData,
 ): Promise<PlanActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   const status = statusField.safeParse(formData.get('status'));
   if (!id.success || !status.success) return { error: 'Missing step or status.' };
+
+  // Two of the statuses need the row as it stands: done reads its fog, and
+  // in progress reads who has it. The rest are one write and no read.
+  const needsCurrent = status.data === 'done' || status.data === 'in_progress';
+  const { data: current } = needsCurrent
+    ? await supabase
+        .from('plan_items')
+        .select('number, fog, fog_dismissed_at, assignee')
+        .eq('user_id', user.id)
+        .eq('id', id.data)
+        .maybeSingle()
+    : { data: null };
 
   // Fog says part of this step was never specified. Closing it as done
   // leaves that admission sitting on finished work, where nothing looks at
@@ -359,18 +378,10 @@ export async function setPlanItemStatus(
   // Graduate it into steps, or clear it, then close.
   // Unless you have put that patch aside, which is the other way out: "not
   // right now" said about the gap itself, recorded and findable.
-  if (status.data === 'done') {
-    const { data: current } = await supabase
-      .from('plan_items')
-      .select('number, fog, fog_dismissed_at')
-      .eq('user_id', user.id)
-      .eq('id', id.data)
-      .maybeSingle();
-    if (current?.fog && !current.fog_dismissed_at) {
-      return {
-        error: `#${current.number} still says part of it is not specified. Write the steps that patch covers, or clear it, then close this.`,
-      };
-    }
+  if (status.data === 'done' && current?.fog && !current.fog_dismissed_at) {
+    return {
+      error: `#${current.number} still says part of it is not specified. Write the steps that patch covers, or clear it, then close this.`,
+    };
   }
 
   // Blocking a step takes it back off Claude in the same write.
@@ -379,8 +390,30 @@ export async function setPlanItemStatus(
   // session does will move it -- and a row left assigned sits in the Claude's
   // view carrying the reason it cannot be worked. Whoever blocks it should not
   // have to remember to unhand it as a second step.
-  const patch: Record<string, string | null> = { status: status.data };
+  // Blocking from here records the kind of block as well, because the
+  // database will not take a blocked row without one. It is `outside` — the
+  // default in lib/plan/load.ts — and that is what this control has always
+  // meant: the comment above says the step needs something outside the repo.
+  // A block that really is waiting on other steps is a row in
+  // plan_dependencies, or `plan.ts block --on-steps` from a session parking
+  // its own step behind a question.
+  //
+  // Moving a step off blocked drops both: the sentence saying what it needed
+  // and the word saying who could supply it. Both are claims about work that
+  // has stopped, and this control is one of the ways it starts again; the
+  // dated line in the comment is the record either way.
+  const patch: Record<string, string | null> = { status: status.data, ...blockPatch(status.data) };
   if (status.data === 'blocked') patch.assignee = null;
+
+  // Marking a step underway yourself puts it in your queue, if it was in
+  // nobody's.
+  //
+  // `in_progress` means somebody has this step in hand right now, and the
+  // daily cron puts back a claim with no assignee on exactly that reading --
+  // nothing is working it. Moving the row here is you working it, so the row
+  // says so and the sweep leaves it alone. A step already handed to Claude
+  // keeps its assignee: pressing the status control is not taking it back.
+  if (status.data === 'in_progress' && !current?.assignee) patch.assignee = 'me';
 
   const { error } = await supabase
     .from('plan_items')
@@ -418,8 +451,8 @@ export async function dismissPlanDecision(
   _prev: PlanActionState,
   formData: FormData,
 ): Promise<PlanActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing step.' };
@@ -476,8 +509,8 @@ export async function dismissPlanFog(
   _prev: PlanActionState,
   formData: FormData,
 ): Promise<PlanActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing step.' };
@@ -521,8 +554,8 @@ export async function approvePlanItem(
   _prev: PlanActionState,
   formData: FormData,
 ): Promise<PlanActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing step.' };
@@ -548,12 +581,75 @@ export async function approvePlanItem(
 }
 
 /**
- * Hand a step to Claude, or take it back, in one click.
+ * Say yes to a whole list of proposals, in one press.
+ *
+ * What Dash's "To approve" group is drawn from, where the alternative is a
+ * press per row on a list that is mostly one feature's steps. Each id is
+ * approved the way `approvePlanItem` approves one -- the row and everything
+ * proposed beneath it -- and the ids are collected into a set before the
+ * write, because that list holds a proposed feature and its proposed steps as
+ * separate rows and the feature already takes the steps with it. Without the
+ * set the same row is updated twice and counted twice.
+ *
+ * A row that has gone since the page was drawn is passed over rather than
+ * failing the press: approving one on the plan page in another tab is an
+ * ordinary thing to have done, and it should not stop the rest.
+ *
+ * #630 settled what this covers: plan proposals only. A request from a session
+ * is a different move -- a yes on one runs what it named, there and then -- so
+ * it keeps the buttons on its own row even when it is drawn in the same group.
+ */
+// latency: pending
+export async function approveProposals(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const asked = z
+    .array(z.string().uuid())
+    .min(1)
+    .safeParse(formData.getAll('id').map((value) => String(value)));
+  if (!asked.success) return { error: 'Nothing to approve.' };
+
+  const sections = buildPlanTree(await loadPlan(supabase, user.id));
+
+  const ids = new Set<string>();
+  for (const id of asked.data) {
+    const node = findNode(sections, id);
+    if (!node) continue;
+    for (const step of flatten([node])) {
+      if (step.status === 'proposed') ids.add(step.id);
+    }
+  }
+  if (ids.size === 0) return { message: 'Nothing left to approve.' };
+
+  const { error } = await supabase
+    .from('plan_items')
+    .update({ status: 'not_started' })
+    .in('id', [...ids])
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePlan();
+  return {
+    message: ids.size === 1 ? 'Approved 1 proposal.' : `Approved ${ids.size} proposals.`,
+  };
+}
+
+/**
+ * Who a step is for, in one click.
+ *
+ * The row's press is Mine and Not mine (#686): the runner takes anything
+ * approved that is not yours, so marking a step Mine is how you hold it back
+ * and clearing the column is how you give it back. `claude` is still written
+ * here -- by the single Send, which claims the row for the session it starts.
  *
  * The step and every open step beneath it, for the same reason approving works
- * that way: work is handed over as a whole, and marking five sub-steps one at
- * a time is how four of them get missed. Closed steps are left alone -- who
- * was going to do a finished thing is history, not an instruction.
+ * that way: work is assigned as a whole, and marking five sub-steps one at a
+ * time is how four of them get missed. Closed steps are left alone -- who was
+ * going to do a finished thing is history, not an instruction.
  *
  * A proposed step can be handed over. This column says who a step is for, not
  * that it has been agreed to, and nothing picks up a proposal: `next --claude`
@@ -564,8 +660,8 @@ export async function setPlanItemAssignee(
   _prev: PlanActionState,
   formData: FormData,
 ): Promise<PlanActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   const assignee = assigneeField.safeParse(field(formData, 'assignee'));
@@ -610,8 +706,11 @@ export async function setPlanItemAssignee(
   if (error) return { error: error.message };
 
   revalidatePlan();
-  if (assignee.data !== 'claude') {
-    return { message: ids.length === 1 ? 'Taken back.' : `Took back ${ids.length} steps.` };
+  if (assignee.data === 'me') {
+    return { message: ids.length === 1 ? 'Marked yours.' : `Marked ${ids.length} steps yours.` };
+  }
+  if (assignee.data === null) {
+    return { message: ids.length === 1 ? 'Given back.' : `Gave ${ids.length} steps back.` };
   }
 
   const left = skipped.length === 0 ? '' : ` ${skipped.length} left with you: ${skipped.map((step) => `#${step.number}`).join(', ')}.`;
@@ -619,6 +718,42 @@ export async function setPlanItemAssignee(
     message:
       (ids.length === 1 ? 'Handed to Dash.' : `Handed ${ids.length} steps to Dash.`) + left,
   };
+}
+
+/**
+ * Priority, set from the row.
+ *
+ * Note 3bfb2749: the word was a label you had to open the step and go through
+ * the edit form to change, which is three presses and a form for one of three
+ * values. The status beside it has been a word you click since the row was
+ * built, and this is the same move -- see the menu on the health.
+ *
+ * The one row, and nothing beneath it. A hand-over carries down because the
+ * steps under a feature are worked by whoever holds it; how soon you want a
+ * thing is decided per row, and a feature marked Next does not make every step
+ * under it Next.
+ */
+// latency: pending
+export async function setPlanItemPriority(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  const priority = priorityField.safeParse(field(formData, 'priority'));
+  if (!id.success || !priority.success) return { error: 'Missing step or priority.' };
+
+  const { error } = await supabase
+    .from('plan_items')
+    .update({ priority: priority.data })
+    .eq('id', id.data)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePlan();
+  return { message: `Set to ${PLAN_PRIORITY_LABEL[priority.data]}.` };
 }
 
 /**
@@ -635,8 +770,8 @@ export async function movePlanItem(
   _prev: PlanActionState,
   formData: FormData,
 ): Promise<PlanActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   const direction = z.enum(['up', 'down']).safeParse(formData.get('direction'));
@@ -710,8 +845,8 @@ export async function answerPlanDecision(
   _prev: PlanActionState,
   formData: FormData,
 ): Promise<PlanActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing step.' };
@@ -778,6 +913,8 @@ export async function answerPlanDecision(
   // A re-shape that will not start loses nothing: the answer is already
   // recorded, and the button is still there.
   const started = await startReshape(
+    supabase,
+    user.id,
     after,
     feature,
     dismissedUnder(feature, await loadDismissedSuggestions(supabase, user.id, feature.id)),
@@ -795,8 +932,8 @@ export async function deletePlanItem(
   _prev: PlanActionState,
   formData: FormData,
 ): Promise<PlanActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing step.' };
@@ -818,8 +955,8 @@ export async function addPlanDependency(
   _prev: PlanActionState,
   formData: FormData,
 ): Promise<PlanActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const item = z.string().uuid().safeParse(formData.get('item'));
   const dependsOn = z.string().uuid().safeParse(formData.get('depends_on'));
@@ -842,8 +979,8 @@ export async function removePlanDependency(
   _prev: PlanActionState,
   formData: FormData,
 ): Promise<PlanActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing dependency.' };
@@ -862,7 +999,7 @@ export async function removePlanDependency(
 /**
  * Hand a step to Claude and start the routine on it now.
  *
- * The same rope the notes queue pulls -- `fireFeatureRoutine` -- with the
+ * The same rope the notes queue pulls -- `startRoutineRun` -- with the
  * step's brief as the extra turn, so the session that wakes up knows which
  * step it is for and everything the plan says about it. The step is marked
  * as Claude's first, whatever happens to the request after: a routine that
@@ -874,8 +1011,8 @@ export async function sendPlanItemToClaude(
   _prev: PlanActionState,
   formData: FormData,
 ): Promise<PlanActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing step.' };
@@ -883,7 +1020,18 @@ export async function sendPlanItemToClaude(
   // Every rule about what may be sent is in lib/plan/handover.ts, because a
   // comment can now ask for the same thing and the two ways in have to refuse
   // the same steps.
-  const sent = await handStepToClaude({ supabase, userId: user.id, id: id.data });
+  //
+  // `confirm` is the answer to the one refusal that is a question: a step whose
+  // run has gone quiet is asked about rather than turned away (#574). The page
+  // puts the question in front of the press, and the press that comes back
+  // carries this. It is read as a flag and nothing else, so a form that has
+  // never seen the question cannot set it by accident.
+  const sent = await handStepToClaude({
+    supabase,
+    userId: user.id,
+    id: id.data,
+    confirmQuiet: formData.get('confirm') === 'quiet',
+  });
   if (!sent.ok) return { error: sent.error };
   if (sent.changed) revalidatePlan();
 
@@ -898,14 +1046,12 @@ export async function sendPlanItemToClaude(
 }
 
 /**
- * Hand a whole feature over and start the routine on it now.
+ * Start the routine on a whole feature, now.
  *
  * The step-at-a-time button is right when you are watching; a feature of seven
- * steps pressed seven times is not. So this one cascades -- every open step
- * beneath becomes Claude's, the way approving cascades -- and fires once with
- * the feature's brief, which already carries its steps and what each waits on.
- * The session works them in order and stops at the first thing it should not
- * decide alone.
+ * steps pressed seven times is not. So this one fires once with the feature's
+ * brief, which already carries its steps and what each waits on. The session
+ * works them in order and stops at the first thing it should not decide alone.
  *
  * It refuses a proposal, because a proposal is not work yet, and it refuses a
  * feature with nothing open beneath it, because there would be nothing to do.
@@ -917,93 +1063,24 @@ export async function sendPlanFeatureToClaude(
   _prev: PlanActionState,
   formData: FormData,
 ): Promise<PlanActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing step.' };
 
-  const data = await loadPlan(supabase, user.id);
-  const sections = buildPlanTree(data);
-  const node = findNode(sections, id.data);
-  if (!node) return { error: 'That step no longer exists.' };
+  // Every rule about what may be sent and the instruction itself are in
+  // lib/plan/handover.ts, because the overnight tick now fires the same send
+  // with nobody watching and the two must not drift apart.
+  const sent = await handFeatureToClaude({ supabase, userId: user.id, id: id.data });
+  if (!sent.ok) return { error: sent.error };
+  // No row changed -- the send writes none now -- but the run it started is on
+  // the page, in the health column and in what the buttons on the feature will
+  // refuse next.
+  revalidatePlan();
 
-  if (node.status === 'proposed') {
-    return { error: `#${node.number} is only a proposal. Approve it first.` };
-  }
-
-  // The same one-at-a-time rule as the single send. A batch started on top of
-  // a running session is the worse version of the same collision, since it
-  // hands the whole feature to a second run.
-  const running = flatten([node]).find((step) => hasLiveClaim(step, Date.now()));
-  if (running) {
-    return {
-      error: `#${running.number} ${running.title} is already underway. Wait for it, or put it back to not started if its session is gone.`,
-    };
-  }
-
-  // Itself included: a feature is closed when its steps are, and the session
-  // needs it to be its own to close.
-  //
-  // Minus whatever is waiting on the person. A batch that swept up the
-  // feature's unanswered questions and its blocked steps handed a session rows
-  // it could do nothing with, and left them sitting in the Claude's view saying
-  // why they could not be worked.
-  const open = flatten([node]).filter(
-    (step) =>
-      !isClosed(step.status) && step.status !== 'proposed' && !isWaitingOnThePerson(step),
-  );
-  if (open.length === 0) return { error: 'Nothing open under that step that is not waiting on you.' };
-
-  const toHandOver = open.filter((step) => step.assignee !== 'claude').map((step) => step.id);
-  if (toHandOver.length > 0) {
-    const { error } = await supabase
-      .from('plan_items')
-      .update({ assignee: 'claude' })
-      .in('id', toHandOver)
-      .eq('user_id', user.id);
-    if (error) return { error: error.message };
-    revalidatePlan();
-  }
-
-  // Handed over, and that is all. Nothing here is marked underway.
-  //
-  // This used to set every open step in the feature to `in_progress` on the
-  // press, so that the plan showed the batch as work in hand. What it actually
-  // showed was six lies and one truth: the session works the steps one at a
-  // time, and everything it had not reached yet -- everything it never reached,
-  // when a batch ran short or the run died -- sat there reading "in progress"
-  // with nothing on it. That is the bug behind note 60a0ad01, and there is no
-  // clock that fixes it, because the rows were never true in the first place.
-  //
-  // `in_progress` now means one thing: a session has claimed this step and is
-  // on it. The session sets it when it claims, one at a time, and clears it
-  // when it closes the step -- which is what the plan skill already tells it to
-  // do. "Handed to Claude" is a separate fact and has its own state:
-  // `assignee`, set above, which is exactly what this press changes and what
-  // the queue is built from.
-  const steps = open.length - 1;
-  const text =
-    `Work plan feature #${node.number}, "${node.title}", to completion, following ` +
-    '.claude/skills/plan/SKILL.md. Build its steps ONE AT A TIME in the order the plan ' +
-    'gives, each verified, committed and closed before the next is claimed, and keep ' +
-    'going until every step beneath it is closed, something blocks, or the session is ' +
-    'running short. Stop at the first step that needs a decision from me: block it with ' +
-    'the exact question rather than guessing, and do not skip past it to a later step. ' +
-    'Push once at the end of the batch and report every step you closed, by number and ' +
-    'title.\n\nThe brief is below; it is the plan as the app holds it right now, and ' +
-    'the plan is the source of truth.\n\n' +
-    planBrief(sections, node, { thread: true });
-
-  const routine = planRoutine();
-  const result = await fireFeatureRoutine({
-    apiKey: routine.token,
-    routineId: routine.id,
-    text,
-  });
-  if (!result.ok) return { error: result.error };
   return {
-    message: `Sent #${node.number} and its ${steps === 1 ? 'step' : `${steps} steps`}. ${result.detail}`,
+    message: `Sent #${sent.number} and its ${sent.steps === 1 ? 'step' : `${sent.steps} steps`}. ${sent.detail}`,
   };
 }
 
@@ -1037,6 +1114,8 @@ export async function sendPlanFeatureToClaude(
  * instruction and a change to it cannot apply to only one of them.
  */
 async function startReshape(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
   sections: readonly PlanSection[],
   node: PlanNode,
   /** What has been put aside under this feature, written out. Empty for none. */
@@ -1056,7 +1135,7 @@ async function startReshape(
 
   const text =
     `Re-shape plan feature #${node.number}, "${node.title}", following ` +
-    '.claude/skills/plan/SKILL.md. This is the re-shape job, not the build job: read the ' +
+    '.claude/skills/plan/reference/reshaping.md. This is the re-shape job, not the build job: read the ' +
     'feature against every answer settled beneath it and against what the code now says, ' +
     'and write what has changed.\n\n' +
     (closed
@@ -1085,8 +1164,14 @@ async function startReshape(
     planBrief(sections, node, { thread: true }) +
     (dismissed ? `\n${dismissed}` : '');
 
-  const routine = planRoutine();
-  return fireFeatureRoutine({ apiKey: routine.token, routineId: routine.id, text });
+  return startRoutineRun({
+    supabase,
+    userId,
+    job: 'reshape',
+    routine: planRoutine(),
+    planItemId: node.id,
+    text,
+  });
 }
 
 // latency: pending
@@ -1094,8 +1179,8 @@ export async function reshapePlanFeature(
   _prev: PlanActionState,
   formData: FormData,
 ): Promise<PlanActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing step.' };
@@ -1116,11 +1201,24 @@ export async function reshapePlanFeature(
     };
   }
 
+  // Two re-shapes at one feature within three minutes is what raise b1d138ce
+  // recorded: the second read the tree before the first had written anything,
+  // and both wrote the same question. A re-shape claims nothing, so the live-
+  // claim guard above never saw it; this is the guard it needed, off the run
+  // row the first one wrote.
+  if (await reshapeUnderway(supabase, user.id, node.id, Date.now())) {
+    return {
+      error: `#${node.number} is already being re-read. Wait for that to finish rather than starting a second one over the top of it.`,
+    };
+  }
+
   const answered = flatten([node]).filter(
     (step) => step.kind === 'decision' && step.status === 'done' && step.resolution,
   ).length;
 
   const result = await startReshape(
+    supabase,
+    user.id,
     sections,
     node,
     dismissedUnder(node, await loadDismissedSuggestions(supabase, user.id, node.id)),
@@ -1131,75 +1229,6 @@ export async function reshapePlanFeature(
       `Re-shaping #${node.number} against ` +
       `${answered === 0 ? 'no answers yet' : `${answered} ${answered === 1 ? 'answer' : 'answers'}`}` +
       `${node.fog ? ' and its fog' : ''}. What comes back is proposed. ${result.detail}`,
-  };
-}
-
-/**
- * Send everything handed to Claude, in one press.
- *
- * The step button is right when you are watching one step; the feature button
- * is right when you are looking at one feature. Neither is what you want after
- * an afternoon spent going down the plan marking things as Claude's, which is
- * the state this button is for: a queue built up over a session and sent when
- * you get up from the desk.
- *
- * Nothing is assigned here. Being handed over is exactly what these steps
- * already are -- that is how they got into the queue -- so nothing is dragged
- * into the queue by pressing this, and pressing it twice sends the same queue
- * again.
- *
- * Nothing is marked in progress either. That is the session's to set, one step
- * at a time as it claims them, and a press that marked the whole queue underway
- * described eleven steps nothing was on. `handedToClaude` has already left out
- * the decisions and the proposals, so what is left is exactly what a session
- * will build.
- *
- * `handedToClaude` decides what is in it: open, approved, not a decision, most
- * urgent first. One routine works the lot in that order, because two sessions
- * on one plan would take the same step twice.
- */
-// latency: pending
-export async function sendPlanQueueToClaude(
-  // Signature is fixed by useActionState; the button sends nothing.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _prev: PlanActionState, _formData: FormData,
-): Promise<PlanActionState> {
-  const user = await requireUser();
-  const supabase = await createClient();
-
-  const sections = buildPlanTree(await loadPlan(supabase, user.id));
-  const queue = handedToClaude(sections);
-  if (queue.length === 0) {
-    return { error: 'Nothing is handed to Dash right now. Hand a step over and it lands here.' };
-  }
-
-  // Nothing is marked underway here either, for the reason the feature send
-  // gives: one session works the queue one step at a time, so marking all
-  // twelve on the press describes eleven steps nothing is on. The queue is
-  // built from `assignee`, which these steps already carry -- that is how they
-  // got into it -- so the press changes no state at all. It sends.
-  const text =
-    `Work the ${queue.length} plan ${queue.length === 1 ? 'step' : 'steps'} handed to Claude, ` +
-    'following .claude/skills/plan/SKILL.md. Work them ONE AT A TIME in the order below, each ' +
-    'claimed, built, verified, committed with the step number in the subject and closed with a ' +
-    'note before the next is claimed. A step whose brief says it waits on another is worked ' +
-    'after that one, not skipped. Stop at the first step that needs a decision from me: block ' +
-    'it with the exact question rather than guessing, and carry on with the rest. Keep going ' +
-    'until every step is closed, something blocks the batch as a whole, or the session is ' +
-    'running short. Push once at the end and report every step you closed, by number and ' +
-    'title.\n\nThe briefs are below; they are the plan as the app holds it right now, and the ' +
-    'plan is the source of truth.\n\n' +
-    planQueueBrief(sections, queue, { thread: true });
-
-  const routine = planRoutine();
-  const result = await fireFeatureRoutine({
-    apiKey: routine.token,
-    routineId: routine.id,
-    text,
-  });
-  if (!result.ok) return { error: result.error };
-  return {
-    message: `Sent ${queue.length === 1 ? '1 step' : `all ${queue.length} steps`}. ${result.detail}`,
   };
 }
 
@@ -1225,8 +1254,8 @@ export async function seedPlan(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _prev: PlanActionState, _formData: FormData,
 ): Promise<PlanActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const { count } = await supabase
     .from('plan_items')
@@ -1260,6 +1289,206 @@ export async function seedPlan(
 
   revalidatePlan();
   return { message: `Imported ${rows.length} steps from the build order.` };
+}
+
+/**
+ * Set the runner going before bed.
+ *
+ * Two brakes at the press, because the check constraint insists on both and
+ * because a night with only one of them is the night nobody wants to have had:
+ * a budget with no clock runs until it has spent everything, and a clock with
+ * no budget spends whatever it can reach before morning. `startOvernightRun`
+ * clamps both, so nothing a form can send reaches the constraint as a 500 --
+ * the checks here are for the message, not for the safety.
+ *
+ * Pressing it again over a night already running is deliberately allowed. The
+ * row is the account's rather than the night's, so a second press is "start
+ * again with these numbers", which is what somebody changing their mind at
+ * midnight means. Nothing is cancelled by it: whatever session is building
+ * finishes, and the new night's budget governs what is fired after that.
+ */
+// latency: pending
+export async function startOvernightRunner(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  // `OVERNIGHT_NO_LIMIT` in the duration field is the one choice that turns
+  // both brakes off: no bedtime and no budget. They go together because a cap
+  // with no clock still stops after its last feature, which is not what "keep
+  // going" means -- and the features field is not rendered in that mode, so
+  // there is nothing to read for it.
+  const keepGoing = field(formData, 'hours') === String(OVERNIGHT_NO_LIMIT);
+
+  if (keepGoing) {
+    const now = new Date();
+    const { run, error } = await startOvernightRun({
+      supabase,
+      userId: user.id,
+      features: null,
+      stopBy: null,
+      now,
+    });
+    if (error) return { error };
+    if (!run) return { error: 'The runner could not be started.' };
+
+    revalidatePlan();
+    return {
+      message:
+        'Running, with no limit. It keeps firing features while there is work ' +
+        'handed over and ready, and stops when you stop it. The next tick picks the first one.',
+    };
+  }
+
+  const features = z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(OVERNIGHT_FEATURE_CAP)
+    .safeParse(field(formData, 'features'));
+  if (!features.success) {
+    return { error: `A night runs between 1 and ${OVERNIGHT_FEATURE_CAP} features.` };
+  }
+
+  const hours = z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(OVERNIGHT_HOUR_CAP)
+    .safeParse(field(formData, 'hours'));
+  if (!hours.success) {
+    return { error: `A night runs between 1 and ${OVERNIGHT_HOUR_CAP} hours.` };
+  }
+
+  const now = new Date();
+  const { run, error } = await startOvernightRun({
+    supabase,
+    userId: user.id,
+    features: features.data,
+    stopBy: overnightStopBy(hours.data, now.getTime()),
+    now,
+  });
+  if (error) return { error };
+  if (!run) return { error: 'The runner could not be started.' };
+
+  revalidatePlan();
+  return {
+    message:
+      `Running. Up to ${run.featuresBudget} ${run.featuresBudget === 1 ? 'feature' : 'features'}, ` +
+      `and it stops in ${hours.data} ${hours.data === 1 ? 'hour' : 'hours'} whatever is left. ` +
+      'The next tick picks the first one.',
+  };
+}
+
+/**
+ * Hold it, without touching what is already building.
+ *
+ * There is no way to call a Claude Code session back -- `/fire` is the only
+ * endpoint there is -- so pause is graceful by construction rather than by
+ * effort: the row says held, the next tick declines to fire, and the session
+ * that is running finishes its feature, commits and closes exactly as it
+ * would have. The button says so, because a pause that looked like a stop
+ * would have somebody watching the branch wondering why it kept committing.
+ *
+ * A null row back is not a failure. It means no night was running to hold --
+ * the clock ran out while the page was open, most likely -- so the page is
+ * revalidated to show what is actually there rather than arguing with it.
+ */
+// latency: pending
+export async function pauseOvernightRunner(
+  // Signature is fixed by useActionState; the button sends nothing.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _prev: PlanActionState, _formData: FormData,
+): Promise<PlanActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const { run, error } = await pauseOvernightRun({ supabase, userId: user.id });
+  if (error) return { error };
+
+  revalidatePlan();
+  if (!run) return { message: 'Nothing was running, so there was nothing to hold.' };
+  return {
+    message:
+      'Held. Whatever is building finishes and commits; nothing new is fired until you resume.',
+  };
+}
+
+/**
+ * Carry on from wherever the plan has got to.
+ *
+ * Nothing is picked up where it was left, because nothing was left: the budget
+ * and the stop time are still on the row, and the next tick chooses the most
+ * urgent ready feature as it would have anyway. So a resume at six in the
+ * morning resumes a night with minutes left rather than starting one with
+ * hours, and it says so when those minutes have already gone -- the tick will
+ * end it rather than fire, and being told that now is better than finding it
+ * out at breakfast.
+ */
+// latency: pending
+export async function resumeOvernightRunner(
+  // Signature is fixed by useActionState; the button sends nothing.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _prev: PlanActionState, _formData: FormData,
+): Promise<PlanActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const { run, error } = await resumeOvernightRun({ supabase, userId: user.id });
+  if (error) return { error };
+
+  revalidatePlan();
+  if (!run) return { message: 'There is no night to carry on with. Start one and it runs again.' };
+
+  const verdict = overnightVerdict(run, Date.now());
+  if (verdict.act === 'end') return { message: `Resumed, but it is over: ${verdict.reason}` };
+  return { message: 'Running again. The next tick picks up from wherever the plan now is.' };
+}
+
+/**
+ * Stop it for the night, by hand.
+ *
+ * The one of the five reasons a night can carry that nothing else can write:
+ * the tick knows about the budget, the clock and the plan, and only the page
+ * knows you pressed the button. It is the same sentence every time, because
+ * the morning report prints what it finds and "You stopped it." is what
+ * happened.
+ *
+ * Stopping is not cancelling either -- the same limit pause has. The feature
+ * already building finishes; what stopping means is that nothing follows it
+ * and the night is closed with its reason.
+ */
+// latency: pending
+export async function stopOvernightRunner(
+  // Signature is fixed by useActionState; the button sends nothing.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _prev: PlanActionState, _formData: FormData,
+): Promise<PlanActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const { run, error } = await stopOvernightRun({
+    supabase,
+    userId: user.id,
+    reason: OVERNIGHT_STOPPED_BY_HAND,
+  });
+  if (error) return { error };
+
+  revalidatePlan();
+  if (!run) return { message: 'Nothing was running, so there was nothing to stop.' };
+  return {
+    message:
+      `${
+        run.featuresLeft === null
+          ? 'Stopped. It was running with no limit'
+          : `Stopped with ${run.featuresLeft} of ${run.featuresBudget} ${
+              run.featuresBudget === 1 ? 'feature' : 'features'
+            } unspent`
+      }. Anything already building ` +
+      'finishes on its own; nothing follows it.',
+  };
 }
 
 /**

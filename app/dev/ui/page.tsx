@@ -27,8 +27,13 @@ import { MODULES } from '@/lib/modules';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import {
   APPLICATION_STATUS_GLYPHS,
+  FEEDBACK_HEALTH_GLYPHS,
+  FINDING_HEALTH_GLYPHS,
+  IDEA_HEALTH_GLYPHS,
   PLAN_HEALTH_GLYPHS,
+  RAISED_HEALTH_GLYPHS,
   TASK_STATUS_GLYPHS,
+  type StatusGlyph as GlyphName,
 } from '@/lib/status-glyphs';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { PlanHealth } from '@/lib/plan/tree';
@@ -234,6 +239,7 @@ const WORKSPACE_HUES: Record<(typeof MODULES)[number]['id'], string> = {
   todo: 'bg-w-todo',
   vault: 'bg-w-vault',
   learn: 'bg-w-learn',
+  news: 'bg-w-news',
   dev: 'bg-w-dev',
 };
 
@@ -304,15 +310,29 @@ const TASK_STATES = [
 /**
  * The third ladder: a step on /dev/plan. The five fills first, then the marks.
  *
- * Which state a step is in is worked out in lib/plan/tree.ts and is not its
- * status column -- a question nobody has answered is not "not started", and
- * "ready" is read off what the step waits on.
+ * Fourteen states on eleven shapes. Which one a step is in is worked out in
+ * lib/plan/tree.ts and is not its status column -- a question nobody has
+ * answered is not "not started", "ready" is read off what the step waits on,
+ * and the three readings of a claim are read off the run behind it rather than
+ * off the column, which cannot tell a session that is pushing from one that
+ * died an hour ago. Three of those readings share the three-quarter fill
+ * because they are the same rung: the step is claimed, and the word and the
+ * tone say what the session is doing, and a setup job shares the bar with a
+ * blocked step for the same kind of reason -- both are stopped on you.
+ * lib/plan/tree.ts carries the reason each of the fourteen is kept.
  */
 const PLAN_STATES = [
   ['proposed', 'Proposed', 'Written by a session and waiting on you. The empty hexagon a lead is.'],
   ['not_started', 'Not started', 'You accepted it. Nobody has picked it up.'],
   ['ready', 'Ready', 'Nothing it waits on is still open, so it can be started now.'],
-  ['in_progress', 'In progress', 'Claimed by a session right now.'],
+  ['in_progress', 'In progress', 'Claimed, and nothing has looked into what the session is doing.'],
+  ['working', 'In progress', 'Claimed, and its run has pushed something recently.'],
+  ['quiet', 'Quiet', 'Claimed, and its run has pushed nothing for twenty minutes.'],
+  [
+    'abandoned',
+    'Stopped',
+    'A session claimed it and its run ended without closing it. The cross, because it leaves the ladder.',
+  ],
   ['done', 'Done', 'Built and verified. The row carries the commit that did it.'],
   [
     'unanswered',
@@ -320,17 +340,109 @@ const PLAN_STATES = [
     'A question waiting on you. The one letterform in the set, because no fill said it.',
   ],
   ['answered', 'Answered', 'You answered it, and every step beneath is built against it.'],
-  ['blocked', 'Blocked', 'Stopped on something outside the step. Barred, like a closed role.'],
+  [
+    'blocked',
+    'Waiting on you',
+    'Stopped on something only you can settle. Barred, like a closed role.',
+  ],
+  [
+    'setup',
+    'Setup',
+    'A job that was always yours -- an account, a key. Barred like a blocked step, because it stops the same work.',
+  ],
   ['waiting', 'Waiting', 'Waits on another step. Dashed, like an application nobody answered.'],
   ['dropped', 'Dropped', 'Decided against. The same shape as a withdrawal.'],
 ] as const satisfies readonly (readonly [PlanHealth, string, string])[];
+
+/**
+ * The four queues beside the plan, all on /dev.
+ *
+ * They are one section rather than four because the interesting thing about
+ * them is where they agree: a note nobody has picked up and a confirmed finding
+ * are both half filled, a question waiting on you is a question mark whether it
+ * was raised by a session or filed by a pass, and everything nobody is doing is
+ * struck through. Each queue keeps a shape of its own only where it knows
+ * something the others do not.
+ */
+const DEV_QUEUE_STATES = [
+  [
+    'Bugs and requests',
+    [
+      [FEEDBACK_HEALTH_GLYPHS.ready, 'Ready', 'Filed, nobody on it. Half filled, like a ready step.'],
+      [
+        FEEDBACK_HEALTH_GLYPHS.planned,
+        'Planned',
+        'Written into the build plan and worked from there. Dashed, like a step waiting on another.',
+      ],
+      [FEEDBACK_HEALTH_GLYPHS.working, 'In progress', 'A run has claimed it.'],
+      [
+        FEEDBACK_HEALTH_GLYPHS.waiting,
+        'Waiting on you',
+        'Stopped on an answer only you have, and you have not given it.',
+      ],
+      [
+        FEEDBACK_HEALTH_GLYPHS.answered,
+        'Answered',
+        'Blocked, and you replied in the thread. It is a session\u2019s again, and the column still says blocked.',
+      ],
+      [FEEDBACK_HEALTH_GLYPHS.done, 'Done', 'Fixed and committed.'],
+      [FEEDBACK_HEALTH_GLYPHS.dropped, 'Dropped', 'You decided against it.'],
+    ],
+  ],
+  [
+    'Raised',
+    [
+      [
+        RAISED_HEALTH_GLYPHS.waiting,
+        'Waiting on you',
+        'A session asked you something. The question mark, not the bar: a raise is a question.',
+      ],
+      [
+        RAISED_HEALTH_GLYPHS.unfinished,
+        'Nothing done',
+        'Answered, with no action and no reason for none. Work a session still owes.',
+      ],
+      [RAISED_HEALTH_GLYPHS.answered, 'Answered', 'You replied and something came of it.'],
+      [RAISED_HEALTH_GLYPHS.closed, 'Done', 'You read what came of it and filed the row.'],
+      [RAISED_HEALTH_GLYPHS.dropped, 'Dropped', 'You turned it down.'],
+    ],
+  ],
+  [
+    'UI findings',
+    [
+      [FINDING_HEALTH_GLYPHS.waiting, 'Waiting on you', 'A pass proposed it. Confirm it or dismiss it.'],
+      [FINDING_HEALTH_GLYPHS.ready, 'Confirmed', 'You agreed it is real, and nobody is on it yet.'],
+      [FINDING_HEALTH_GLYPHS.dropped, 'Dropped', 'You looked and left it alone.'],
+    ],
+  ],
+  [
+    'Ideas',
+    [
+      [IDEA_HEALTH_GLYPHS.open, 'Not shaped', 'A sentence, and nothing has happened to it.'],
+      [
+        IDEA_HEALTH_GLYPHS.waiting,
+        'Waiting on you',
+        'A session shaped it into a proposal. Nothing happens until you approve it.',
+      ],
+      [IDEA_HEALTH_GLYPHS.shaped, 'Shaped', 'It is a feature being built on the plan page.'],
+      [IDEA_HEALTH_GLYPHS.done, 'Done', 'The feature it became has shipped.'],
+      [
+        IDEA_HEALTH_GLYPHS.dropped,
+        'Dismissed',
+        'Put aside, and one press brings it back. The word is what keeps it apart from dropped.',
+      ],
+    ],
+  ],
+] as const satisfies readonly (readonly [
+  string,
+  readonly (readonly [GlyphName, string, string])[],
+])[];
 
 const TYPE_SCALE = [
   ['text-micro', '11px', 'Dense table cells, badges, keycaps. The floor.'],
   ['text-small', '12px', 'Labels, captions, hints, row metadata.'],
   ['text-ui', '13px', 'Interface chrome: buttons, controls, nav, rows.'],
-  ['text-body', '14px', 'Prose and content.'],
-  ['text-lead', '15px', 'A page description; a compose title; the workspace label.'],
+  ['text-body', '14px', 'Prose, content, page descriptions, compose titles.'],
   ['text-title', '20px', 'A page or section heading. Display face, tracking-tight.'],
   ['text-figure', '32px', 'A number a card is about.'],
   ['text-figure-lg', '48px', 'The one figure a page is about, on a phone.'],
@@ -957,7 +1069,7 @@ export default function DevUiPage() {
           </CardSection>
           <CardSection
             title="Plan states"
-            hint="The third ladder, and the one that borrows most: five fills from a proposal to a finished step, and marks for the five states that are not on that ladder. The question mark is the only shape the plan brought with it."
+            hint="The third ladder, and the one that borrows most: five fills from a proposal to a finished step, and marks for the six states that are not on that ladder. Three readings of a claim share the three-quarter fill, because all three are a step somebody has in hand. The question mark is the only shape the plan brought with it."
           >
             <div className="space-y-3">
               {PLAN_STATES.map(([health, name, note]) => (
@@ -967,6 +1079,27 @@ export default function DevUiPage() {
                     <p className="text-ui font-medium text-ink">{name}</p>
                     <p className="text-small text-ink-muted">{note}</p>
                   </div>
+                </div>
+              ))}
+            </div>
+          </CardSection>
+          <CardSection
+            title="The other dev queues"
+            hint="Bugs, raises, findings and ideas drew their own pills until #503, and printed their status column until #504. Each reads what its row means now \u2014 a note you have replied to is not still waiting on you \u2014 and the shapes and the words are shared."
+          >
+            <div className="space-y-4">
+              {DEV_QUEUE_STATES.map(([queue, states]) => (
+                <div key={queue} className="space-y-3">
+                  <p className="text-small font-semibold text-ink">{queue}</p>
+                  {states.map(([glyph, name, note]) => (
+                    <div key={`${queue}-${name}`} className="flex items-center gap-3">
+                      <StatusGlyph glyph={glyph} size={20} className="text-ink" />
+                      <div className="min-w-0">
+                        <p className="text-ui font-medium text-ink">{name}</p>
+                        <p className="text-small text-ink-muted">{note}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>

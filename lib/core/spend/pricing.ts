@@ -45,6 +45,17 @@ export const MODEL_PRICES: Record<string, ModelPrice> = {
   'claude-haiku-4-5': { input: 1, cachedInput: 0.1, cacheWrite: 1.25, output: 5 },
   // The dated id is the same model, and both spellings are in this codebase.
   'claude-haiku-4-5-20251001': { input: 1, cachedInput: 0.1, cacheWrite: 1.25, output: 5 },
+
+  // Voyage, the embedding provider chosen in #724. An embedding call has no
+  // output tokens and no prompt cache, so three of the four rates are zero as
+  // a fact about the call rather than as a missing figure: there is no way to
+  // accrue a token at those rates. The first 200 million tokens of the Voyage
+  // 4 generation are free on every account, which this table does not model --
+  // it would have to know the running total, and a ledger that reads high
+  // until the free tier runs out is the safer of the two errors.
+  'voyage-4-lite': { input: 0.02, cachedInput: 0, cacheWrite: 0, output: 0 },
+  'voyage-4': { input: 0.06, cachedInput: 0, cacheWrite: 0, output: 0 },
+  'voyage-4-large': { input: 0.12, cachedInput: 0, cacheWrite: 0, output: 0 },
 };
 
 /** Tokens as the API reports them. */

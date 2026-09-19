@@ -3,16 +3,27 @@ import type { PlanDependency, PlanItem, PlanStatus } from '@/lib/plan/load';
 import {
   ancestorsOf,
   applyView,
+  blockRefusal,
   buildPlanTree,
+  splitFinished,
+  searchNodes,
+  PLAN_VIEWS,
+  PLAN_VIEW_CHIPS,
+  PLAN_VIEW_MENU,
   findNode,
   flattenSections,
   isReady,
   isWaitingOnThePerson,
   leavesOf,
   healthOf,
+  moveOf,
+  needsThePerson,
+  planBands,
+  planLiveness,
+  PLAN_BAND_ORDER,
+  tallyHealth,
   planProgress,
   subtreeIds,
-  handedToClaude,
   summarize,
   workOrder,
   searchSections,
@@ -38,6 +49,8 @@ function item(over: Partial<PlanItem> & { id: string }): PlanItem {
     dismissedAt: null,
     fogDismissedAt: null,
     comment: null,
+    blockAsk: null,
+    blockKind: null,
     thread: [],
     priority: 2,
     size: null,
@@ -47,6 +60,7 @@ function item(over: Partial<PlanItem> & { id: string }): PlanItem {
     startedAt: null,
     completedAt: null,
     createdAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
+    updatedAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
     ...over,
   };
 }
@@ -119,6 +133,45 @@ describe('buildPlanTree', () => {
   it('shows the app-wide section only once something is in it', () => {
     expect(tree([item({ id: 'a' })]).some((s) => s.module === null)).toBe(false);
     expect(tree([item({ id: 'a', module: null })]).some((s) => s.module === null)).toBe(true);
+  });
+
+  it('numbers a step as its place under its feature, and keeps its handle', () => {
+    // Note 4ff04135: #125's steps should read 125.1, 125.2, 125.3.
+    const sections = tree([
+      item({ id: 'feature', number: 125 }),
+      item({ id: 'one', number: 131, parentId: 'feature', position: 10 }),
+      item({ id: 'two', number: 128, parentId: 'feature', position: 20 }),
+      item({ id: 'under', number: 140, parentId: 'two', position: 10 }),
+    ]);
+    const [feature] = shopping(sections).nodes;
+
+    expect(feature.outline).toBe('125');
+    expect(feature.children.map((n) => n.outline)).toEqual(['125.1', '125.2']);
+    expect(feature.children[1].children[0].outline).toBe('125.2.1');
+    // The number is the identity and does not move.
+    expect(feature.children.map((n) => n.number)).toEqual([131, 128]);
+  });
+
+  it('does not renumber the steps a view or a search hid', () => {
+    const items = [
+      item({ id: 'feature', number: 200 }),
+      item({ id: 'one', number: 201, parentId: 'feature', position: 10, status: 'done' }),
+      item({ id: 'two', number: 202, parentId: 'feature', position: 20 }),
+    ];
+    const open = applyView(tree(items), 'open');
+    const [feature] = shopping(open).nodes;
+
+    expect(feature.children.map((n) => n.outline)).toEqual(['200.2']);
+  });
+
+  it('finds a step by the outline it is read by as well as by its number', () => {
+    const sections = tree([
+      item({ id: 'feature', number: 300, title: 'The feature' }),
+      item({ id: 'step', number: 307, title: 'The step', parentId: 'feature' }),
+    ]);
+
+    expect(countMatches(searchSections(sections, '300.1'))).toBe(1);
+    expect(countMatches(searchSections(sections, '#307'))).toBe(1);
   });
 
   it('nests steps under their parent, to any depth', () => {
@@ -247,7 +300,7 @@ describe('dependencies', () => {
 });
 
 describe('isReady', () => {
-  const bare = { waitingOn: [], children: [], dependsOn: [] };
+  const bare = { waitingOn: [], children: [], dependsOn: [], blockKind: null };
 
   it('is a step not yet started, waiting on nothing, with nothing open beneath it', () => {
     expect(isReady({ status: 'not_started', ...bare }, [])).toBe(true);
@@ -259,16 +312,38 @@ describe('isReady', () => {
     }
   });
 
-  it('is a blocked step whose every named dependency has since closed', () => {
+  it('is a step blocked on steps whose every named dependency has since closed', () => {
     // #20 sat blocked on #127 for a day after #127 shipped. A block that
     // records dependencies has told the plan what it was waiting for, and once
     // those are closed there is nothing on record holding it.
-    const sections = tree([at('done', 'a'), at('blocked', 'b')], [dep('b', 'a')]);
+    const sections = tree(
+      [at('done', 'a'), at('blocked', 'b', { blockKind: 'steps' })],
+      [dep('b', 'a')],
+    );
     expect(findNode(sections, 'b')!.ready).toBe(true);
   });
 
+  it('is not a step blocked on something outside the plan, whatever has closed', () => {
+    // #499's three dependencies all closed and its block was about a GitHub
+    // token. Nothing on the plan produces the token, so nothing on the plan
+    // makes the step ready.
+    const sections = tree(
+      [at('done', 'a'), at('blocked', 'b', { blockKind: 'outside' })],
+      [dep('b', 'a')],
+    );
+    expect(findNode(sections, 'b')!.ready).toBe(false);
+  });
+
+  it('is not a blocked step with no kind recorded, which reads as outside', () => {
+    const sections = tree([at('done', 'a'), at('blocked', 'b')], [dep('b', 'a')]);
+    expect(findNode(sections, 'b')!.ready).toBe(false);
+  });
+
   it('is not a blocked step with a dependency still open', () => {
-    const sections = tree([item({ id: 'a' }), at('blocked', 'b')], [dep('b', 'a')]);
+    const sections = tree(
+      [item({ id: 'a' }), at('blocked', 'b', { blockKind: 'steps' })],
+      [dep('b', 'a')],
+    );
     expect(findNode(sections, 'b')!.ready).toBe(false);
   });
 
@@ -328,18 +403,58 @@ describe('isReady', () => {
     expect(findNode(sections, 'under-maybe')!.ready).toBe(false);
     expect(findNode(sections, 'under-live')!.ready).toBe(true);
   });
+
+  it('is a step under a feature blocked on its own steps', () => {
+    // #494 and #578 were each marked blocked over a question on one step, and
+    // between them took five priority-one features out of the runner's reach.
+    // A feature waiting on the rows beneath it cannot also be what hides them.
+    const sections = tree([
+      at('blocked', 'feature', { blockKind: 'steps' }),
+      at('blocked', 'stuck', { parentId: 'feature', blockKind: 'outside' }),
+      item({ id: 'free', parentId: 'feature' }),
+    ]);
+    expect(findNode(sections, 'free')!.ready).toBe(true);
+    expect(findNode(sections, 'stuck')!.ready).toBe(false);
+  });
+
+  it('is not a step under a feature blocked on something outside the plan', () => {
+    // The feature is waiting on a credential, and so is everything under it.
+    const sections = tree([
+      at('blocked', 'feature', { blockKind: 'outside' }),
+      item({ id: 'step', parentId: 'feature' }),
+    ]);
+    expect(findNode(sections, 'step')!.ready).toBe(false);
+  });
+
+  it('keeps a step ready under a feature whose own dependencies are all open', () => {
+    // The feature's wait is inherited as a dependency, so a step under it is
+    // held by that and not by the parent's status column.
+    const sections = tree(
+      [
+        item({ id: 'other' }),
+        at('blocked', 'feature', { blockKind: 'steps' }),
+        item({ id: 'step', parentId: 'feature' }),
+      ],
+      [dep('feature', 'other')],
+    );
+    expect(findNode(sections, 'step')!.ready).toBe(false);
+  });
 });
 
 describe('applyView', () => {
   const fixture = () =>
     tree(
       [
-        item({ id: 'feature' }),
+        // Kept for yourself, both of them, because the Dash view needs a row
+        // that does not match and a module with nothing to show for the two
+        // tests below to have a subject. Approving is the hand-over now, so a
+        // step with nobody on it is Dash's.
+        item({ id: 'feature', assignee: 'me' }),
         at('done', 'done-step', { parentId: 'feature' }),
         at('not_started', 'open-step', { parentId: 'feature', assignee: 'claude' }),
         at('blocked', 'stuck', { parentId: 'feature' }),
         at('done', 'finished-feature', { module: 'jobs' }),
-        item({ id: 'waits', module: 'jobs' }),
+        item({ id: 'waits', module: 'jobs', assignee: 'me' }),
       ],
       [dep('waits', 'feature')],
     );
@@ -395,10 +510,178 @@ describe('applyView', () => {
     expect(applyView(fixture(), 'claude').map((s) => s.module)).toEqual(['shopping']);
   });
 
-  it('keeps every module under "open", because that is where a plan gets written', () => {
-    expect(applyView(fixture(), 'open').map((s) => s.module)).toEqual(
+  it('shows a step nobody was assigned under "claude", and no proposal', () => {
+    const sections = tree([
+      item({ id: 'nobody' }),
+      item({ id: 'kept', assignee: 'me' }),
+      at('proposed', 'suggested'),
+      at('proposed', 'suggested-to-claude', { assignee: 'claude' }),
+    ]);
+    expect(flattenSections(applyView(sections, 'claude')).map((n) => n.id)).toEqual(['nobody']);
+    expect(summarize(sections).claude).toBe(1);
+  });
+
+  it('drops a module with nothing open from "open" as well', () => {
+    // 'jobs' holds one finished feature and one step waiting on another, so it
+    // stays; the modules with nothing at all in them go. The two that stay
+    // keep the fixed module order they came in.
+    expect(applyView(fixture(), 'open').map((s) => s.module)).toEqual(['shopping', 'jobs']);
+  });
+
+  it('keeps every module under "all", because that is where a plan gets written', () => {
+    expect(applyView(fixture(), 'all').map((s) => s.module)).toEqual(
       fixture().map((s) => s.module),
     );
+  });
+});
+
+describe('the chip row', () => {
+  it('draws five views and keeps every other one in the menu', () => {
+    expect([...PLAN_VIEW_CHIPS]).toEqual(['open', 'ready', 'you', 'claude', 'all']);
+    expect([...PLAN_VIEW_CHIPS, ...PLAN_VIEW_MENU].sort()).toEqual([...PLAN_VIEWS].sort());
+    expect(PLAN_VIEW_MENU.some((view) => (PLAN_VIEW_CHIPS as readonly string[]).includes(view)))
+      .toBe(false);
+  });
+});
+
+describe('ordering the features inside a section', () => {
+  const fixture = () =>
+    tree([
+      item({ id: 'first', position: 10, updatedAt: '2026-01-01T00:00:00Z' }),
+      item({ id: 'first-step', parentId: 'first', position: 10, updatedAt: '2026-01-01T00:00:00Z' }),
+      item({ id: 'second', position: 20, updatedAt: '2026-02-01T00:00:00Z' }),
+      item({ id: 'third', position: 30, updatedAt: '2026-01-15T00:00:00Z' }),
+      // Closed this morning. It used to lift its feature to the top of the
+      // section; nothing moves for it now.
+      at('done', 'third-step', {
+        parentId: 'third',
+        position: 10,
+        updatedAt: '2026-03-01T00:00:00Z',
+      }),
+      item({ id: 'third-next', parentId: 'third', position: 20, updatedAt: '2026-01-15T00:00:00Z' }),
+    ]);
+
+  it('keeps the plan’s own order in a working view, whatever was touched last', () => {
+    expect(shopping(applyView(fixture(), 'open')).nodes.map((node) => node.id)).toEqual([
+      'first',
+      'second',
+      'third',
+    ]);
+  });
+
+  it('leaves the steps under a feature in the order they are built in', () => {
+    const third = shopping(applyView(fixture(), 'open')).nodes[2];
+    expect(third.children.map((node) => node.id)).toEqual(['third-next']);
+    expect(shopping(applyView(fixture(), 'all')).nodes[2].children.map((n) => n.id)).toEqual([
+      'third-step',
+      'third-next',
+    ]);
+  });
+
+  it('keeps "all" in that same order', () => {
+    expect(shopping(applyView(fixture(), 'all')).nodes.map((node) => node.id)).toEqual([
+      'first',
+      'second',
+      'third',
+    ]);
+  });
+});
+
+describe('ordering the module sections', () => {
+  // The app-wide section is fixed last and stays last, whatever was worked in
+  // it this morning.
+  const fixture = () =>
+    tree([
+      item({ id: 'shop', module: 'shopping', updatedAt: '2026-01-01T00:00:00Z' }),
+      item({
+        id: 'shop-step',
+        parentId: 'shop',
+        module: 'shopping',
+        updatedAt: '2026-01-01T00:00:00Z',
+      }),
+      item({ id: 'job', module: 'jobs', updatedAt: '2026-01-10T00:00:00Z' }),
+      item({ id: 'job-step', parentId: 'job', module: 'jobs', updatedAt: '2026-01-10T00:00:00Z' }),
+      item({ id: 'wide', module: null, updatedAt: '2026-02-01T00:00:00Z' }),
+      item({ id: 'wide-step', parentId: 'wide', module: null, updatedAt: '2026-02-01T00:00:00Z' }),
+    ]);
+
+  it('draws the modules in their fixed order, newest work or not', () => {
+    // 'wide' is the newest row in the fixture and the app-wide section is
+    // still last, which is the whole of what #517 used to undo.
+    expect(applyView(fixture(), 'open').map((section) => section.module)).toEqual([
+      'shopping',
+      'jobs',
+      null,
+    ]);
+  });
+
+  it('does not move a module for a step the view has dropped either', () => {
+    const sections = tree([
+      item({ id: 'shop', module: 'shopping', updatedAt: '2026-01-01T00:00:00Z' }),
+      at('done', 'shop-step', {
+        parentId: 'shop',
+        module: 'shopping',
+        updatedAt: '2026-03-01T00:00:00Z',
+      }),
+      item({ id: 'job', module: 'jobs', updatedAt: '2026-02-01T00:00:00Z' }),
+    ]);
+    expect(applyView(sections, 'open').map((section) => section.module)).toEqual([
+      'shopping',
+      'jobs',
+    ]);
+  });
+
+  it('leaves the features and steps inside a section as they were', () => {
+    const wide = applyView(fixture(), 'open').find((section) => section.module === null)!;
+    expect(wide.nodes.map((node) => node.id)).toEqual(['wide']);
+    expect(wide.nodes[0].children.map((node) => node.id)).toEqual(['wide-step']);
+  });
+
+  it('leaves "Everything" in the fixed module order', () => {
+    expect(applyView(fixture(), 'all').map((section) => section.module)).toEqual(
+      fixture().map((section) => section.module),
+    );
+  });
+});
+
+describe('splitFinished', () => {
+  const fixture = () =>
+    tree([
+      at('done', 'shipped', { position: 10, completedAt: '2026-02-01T00:00:00Z' }),
+      at('done', 'shipped-step', { parentId: 'shipped' }),
+      at('done', 'older', { position: 20, completedAt: '2026-01-01T00:00:00Z' }),
+      at('dropped', 'abandoned', { position: 30, completedAt: '2026-03-01T00:00:00Z' }),
+      at('done', 'half', { position: 40, completedAt: '2026-02-15T00:00:00Z' }),
+      at('not_started', 'half-step', { parentId: 'half' }),
+      item({ id: 'live', position: 50 }),
+    ]);
+
+  it('lifts the features with nothing left in them, newest first', () => {
+    const { finished } = splitFinished(applyView(fixture(), 'all'));
+    expect(finished.map((node) => node.id)).toEqual(['abandoned', 'shipped', 'older']);
+  });
+
+  it('leaves the modules holding what is still being worked', () => {
+    const { sections } = splitFinished(applyView(fixture(), 'all'));
+    expect(sections.flatMap((section) => section.nodes).map((node) => node.id)).toEqual([
+      'half',
+      'live',
+    ]);
+  });
+
+  it('leaves a module its progress, which is over the whole module either way', () => {
+    const before = shopping(fixture()).progress;
+    const { sections } = splitFinished(applyView(fixture(), 'all'));
+    expect(sections.find((section) => section.module === 'shopping')!.progress).toEqual(before);
+  });
+
+  it('finds a folded feature by number, title or detail', () => {
+    const { finished } = splitFinished(applyView(fixture(), 'all'));
+    const shipped = finished.find((node) => node.id === 'shipped')!;
+    expect(searchNodes(finished, `#${shipped.number}`).map((node) => node.id)).toEqual(['shipped']);
+    // Every term has to match the same row, as it does in a module section.
+    expect(searchNodes(finished, 'shipped older').map((node) => node.id)).toEqual([]);
+    expect(searchNodes(finished, '').map((node) => node.id)).toEqual(finished.map((n) => n.id));
   });
 });
 
@@ -421,64 +704,36 @@ describe('workOrder', () => {
     ]);
   });
 
-  it('can be narrowed to what Claude holds', () => {
+  it('can be narrowed to every approved step but the ones you kept', () => {
+    // The two halves of one question: `me` is what you held back, and
+    // everything else approved is the runner's, whether or not anybody ever
+    // pressed Send on it.
     const sections = tree([
       item({ id: 'mine', assignee: 'me' }),
       item({ id: 'theirs', assignee: 'claude' }),
       item({ id: 'nobody' }),
     ]);
-    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['theirs']);
-  });
-});
-
-describe('handedToClaude', () => {
-  const mine = (id: string, over: Partial<PlanItem> = {}) =>
-    item({ id, assignee: 'claude', ...over });
-
-  it('takes every open step handed over, most urgent first', () => {
-    const sections = tree([
-      mine('normal', { position: 10 }),
-      mine('someday', { priority: 3, position: 20 }),
-      mine('urgent', { priority: 1, position: 30 }),
-      item({ id: 'not-handed-over', position: 40 }),
-      item({ id: 'mine-to-do', assignee: 'me', position: 50 }),
+    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual([
+      'theirs',
+      'nobody',
     ]);
-    expect(handedToClaude(sections).map((n) => n.id)).toEqual(['urgent', 'normal', 'someday']);
+    expect(workOrder(sections, { assignee: 'me' }).map((n) => n.id)).toEqual(['mine']);
   });
 
-  it('keeps a step that is only waiting on another, unlike workOrder', () => {
-    const sections = tree(
-      [mine('first'), mine('second')],
-      [dep('second', 'first')],
-    );
-    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['first']);
-    expect(handedToClaude(sections).map((n) => n.id)).toEqual(['first', 'second']);
-  });
-
-  it('leaves out what is finished, only proposed, or waiting on the person', () => {
+  it('still offers the steps of a feature blocked over one question beneath it', () => {
+    // What the overnight runner reaches for. A question on one step stops that
+    // step; the two beside it are work, and the feature being marked blocked
+    // over the question used to take them out of this list entirely.
     const sections = tree([
-      mine('open'),
-      mine('done', { status: 'done' }),
-      mine('dropped', { status: 'dropped' }),
-      mine('proposal', { status: 'proposed' }),
-      mine('question', { kind: 'decision' }),
-      // A block names something outside the repo, so a session sent at it
-      // meets the same wall -- and it sat in the Claude's view saying so.
-      mine('stuck', { status: 'blocked' }),
+      at('blocked', 'feature', { blockKind: 'steps', assignee: 'claude' }),
+      at('blocked', 'asked', { parentId: 'feature', blockKind: 'outside', assignee: 'claude' }),
+      item({ id: 'next', parentId: 'feature', assignee: 'claude', position: 20 }),
+      item({ id: 'after', parentId: 'feature', assignee: 'claude', position: 30 }),
     ]);
-    expect(handedToClaude(sections).map((n) => n.id)).toEqual(['open']);
-  });
-
-  it('takes an answered decision back, since nothing is waiting on the person now', () => {
-    const sections = tree([mine('settled', { kind: 'decision', status: 'done' })]);
-    // Closed, so still not work -- but for being closed, not for being a
-    // question.
-    expect(handedToClaude(sections)).toEqual([]);
-    expect(isWaitingOnThePerson({ kind: 'decision', status: 'done' })).toBe(false);
-  });
-
-  it('is empty when nothing has been handed over', () => {
-    expect(handedToClaude(tree([item({ id: 'a' }), item({ id: 'b', assignee: 'me' })]))).toEqual([]);
+    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual([
+      'next',
+      'after',
+    ]);
   });
 
   it('never hands Claude a decision, however it is assigned', () => {
@@ -526,14 +781,16 @@ describe('summarize', () => {
       // d alone: the feature has open steps and f is waiting.
       ready: 1,
       done: 1,
-      claude: 2,
+      // Everything open that you did not keep: the feature itself, b, d and
+      // f. c is blocked, so it is on you; g is a proposal.
+      claude: 4,
       fog: 0,
       dismissed: 0,
     });
   });
 });
 
-describe('a block whose dependencies have all closed', () => {
+describe('a block on steps whose dependencies have all closed', () => {
   // The note from /dev/plan: "still says blocked. But it looks like everything
   // it waits on is done." The badge already read Ready -- healthOf had been
   // taught this -- while the strip went on counting it under "waiting" and the
@@ -543,7 +800,7 @@ describe('a block whose dependencies have all closed', () => {
     tree(
       [
         item({ id: 'feature' }),
-        at('blocked', 'stale', { parentId: 'feature' }),
+        at('blocked', 'stale', { parentId: 'feature', blockKind: 'steps' }),
         at('done', 'shipped'),
       ],
       [dep('stale', 'shipped')],
@@ -564,7 +821,7 @@ describe('a block whose dependencies have all closed', () => {
 
   it('still counts a block that is waiting on something open', () => {
     const sections = tree(
-      [at('blocked', 'stuck'), item({ id: 'pending' })],
+      [at('blocked', 'stuck', { blockKind: 'steps' }), item({ id: 'pending' })],
       [dep('stuck', 'pending')],
     );
     expect(summarize(sections).waiting).toBe(1);
@@ -577,6 +834,36 @@ describe('a block whose dependencies have all closed', () => {
     const sections = tree([at('blocked', 'stuck')]);
     expect(summarize(sections).waiting).toBe(1);
     expect(flattenSections(applyView(sections, 'blocked')).map((n) => n.id)).toEqual(['stuck']);
+  });
+
+  // The other kind, on the same surfaces. #499 named three steps, all three
+  // closed, and the token it was actually blocked on was never on the plan to
+  // close -- so every one of these readings has to stay where it was.
+  it('reads as blocked everywhere when the block was on something outside the plan', () => {
+    const sections = tree(
+      [
+        item({ id: 'feature' }),
+        at('blocked', 'stuck', { parentId: 'feature', blockKind: 'outside' }),
+        at('done', 'shipped'),
+      ],
+      [dep('stuck', 'shipped')],
+    );
+
+    expect(summarize(sections).waiting).toBe(1);
+    expect(summarize(sections).ready).toBe(0);
+    // Two: the step, and the feature above it, which has nothing left beneath
+    // it that anybody can pick up and so reads blocked itself. `waiting`
+    // counts the status column and stays at the one row that carries it.
+    expect(summarize(sections).onYou).toBe(2);
+    // The feature is in the Waiting view as the container it is shown in; the
+    // step itself is what the view matched.
+    expect(flattenSections(applyView(sections, 'blocked')).filter((n) => n.matches).map((n) => n.id))
+      .toEqual(['stuck']);
+    expect(flattenSections(applyView(sections, 'ready')).map((n) => n.id)).toEqual([]);
+    expect(findNode(sections, 'stuck')!.ready).toBe(false);
+    expect(healthOf(findNode(sections, 'stuck')!)).toBe('blocked');
+    expect(findNode(sections, 'feature')!.rollup).toMatchObject({ blocked: 1, live: 1 });
+    expect(moveOf(findNode(sections, 'stuck')!)).toBe('on_you');
   });
 });
 
@@ -655,21 +942,132 @@ describe('healthOf', () => {
     expect(healthOf(byId.get('a')!)).toBe('not_started');
   });
 
-  it('stops saying blocked once every dependency the block named is closed', () => {
-    const sections = tree([at('done', 'a'), at('blocked', 'b')], [dep('b', 'a')]);
+  it('stops saying blocked once every step a block on steps named is closed', () => {
+    const sections = tree(
+      [at('done', 'a'), at('blocked', 'b', { blockKind: 'steps' })],
+      [dep('b', 'a')],
+    );
     const byId = new Map(flattenSections(sections).map((node) => [node.id, node]));
 
     expect(healthOf(byId.get('b')!)).toBe('ready');
   });
 
   it('goes on saying blocked while a dependency is open, or when none was named', () => {
-    const sections = tree([at('not_started', 'a'), at('blocked', 'b'), at('blocked', 'c')], [
-      dep('b', 'a'),
-    ]);
+    const sections = tree(
+      [
+        at('not_started', 'a'),
+        at('blocked', 'b', { blockKind: 'steps' }),
+        at('blocked', 'c', { blockKind: 'steps' }),
+      ],
+      [dep('b', 'a')],
+    );
     const byId = new Map(flattenSections(sections).map((node) => [node.id, node]));
 
     expect(healthOf(byId.get('b')!)).toBe('blocked');
     expect(healthOf(byId.get('c')!)).toBe('blocked');
+  });
+
+  it('goes on saying blocked for a block on something outside the plan', () => {
+    const sections = tree(
+      [at('done', 'a'), at('blocked', 'b', { blockKind: 'outside' }), at('blocked', 'c')],
+      [dep('b', 'a'), dep('c', 'a')],
+    );
+    const byId = new Map(flattenSections(sections).map((node) => [node.id, node]));
+
+    // 'c' records no kind, which reads as outside for the same reason.
+    expect(healthOf(byId.get('b')!)).toBe('blocked');
+    expect(healthOf(byId.get('c')!)).toBe('blocked');
+  });
+});
+
+describe('a setup step', () => {
+  // The whole point of the kind: a job that is yours reads as a job on your
+  // list, not as a build somebody got stuck on. Everything below is one line
+  // of #597's done-when.
+  const setup = (id: string, over: Partial<PlanItem> = {}) =>
+    item({ id, kind: 'setup', ...over });
+
+  const only = (sections: ReturnType<typeof tree>, id: string) =>
+    findNode(sections, id)!;
+
+  it('reports setup while it is open, whatever the status column says', () => {
+    const sections = tree([
+      setup('fresh'),
+      setup('claimed', { status: 'in_progress' }),
+      setup('offered', { status: 'proposed' }),
+    ]);
+
+    expect(healthOf(only(sections, 'fresh'))).toBe('setup');
+    // A claim on a setup job is somebody saying they will do it, not a session
+    // building it, so it is still the job it was.
+    expect(healthOf(only(sections, 'claimed'))).toBe('setup');
+    expect(healthOf(only(sections, 'offered'))).toBe('setup');
+  });
+
+  it('stops reporting setup once it is closed', () => {
+    const sections = tree([
+      setup('done', { status: 'done' }),
+      setup('cut', { status: 'dropped' }),
+    ]);
+
+    expect(healthOf(only(sections, 'done'))).toBe('done');
+    expect(healthOf(only(sections, 'cut'))).toBe('dropped');
+    expect(needsThePerson(only(sections, 'done'))).toBe(false);
+    expect(needsThePerson(only(sections, 'cut'))).toBe(false);
+  });
+
+  it('says blocked while it is blocked, because the ask is more specific', () => {
+    // Same exception a decision makes: the block carries the one sentence
+    // saying what the step needs right now.
+    const sections = tree([setup('stuck', { status: 'blocked', blockKind: 'outside' })]);
+    expect(healthOf(only(sections, 'stuck'))).toBe('blocked');
+  });
+
+  it('goes back to setup once a block on steps has gone stale', () => {
+    const sections = tree(
+      [at('done', 'first'), setup('after', { status: 'blocked', blockKind: 'steps' })],
+      [dep('after', 'first')],
+    );
+    // Without the setup rule this reads 'ready', which is the one thing it is
+    // not -- no session can pick it up.
+    expect(healthOf(only(sections, 'after'))).toBe('setup');
+  });
+
+  it('is on the person, and shows in the On you view', () => {
+    const sections = tree([setup('job'), item({ id: 'build' })]);
+
+    expect(needsThePerson(only(sections, 'job'))).toBe(true);
+    expect(isWaitingOnThePerson(only(sections, 'job'))).toBe(true);
+    const ids = flattenSections(applyView(sections, 'you')).map((node) => node.id);
+    expect(ids).toEqual(['job']);
+  });
+
+  it('is never handed to Claude, however it is assigned', () => {
+    // A routine that claimed one would sit in front of an account nobody has
+    // made and block itself to say so.
+    const sections = tree([
+      item({ id: 'work', assignee: 'claude' }),
+      setup('job', { assignee: 'claude' }),
+    ]);
+
+    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['work']);
+    // Still ready, and still listed unfiltered, so the page shows it.
+    expect(only(sections, 'job').ready).toBe(true);
+    expect(workOrder(sections).map((n) => n.id)).toEqual(['work', 'job']);
+  });
+
+  it('is withheld from Claude even when nobody was assigned it', () => {
+    const sections = tree([setup('job', { assignee: null })]);
+    expect(workOrder(sections, { assignee: 'claude' })).toEqual([]);
+  });
+
+  it('is a band and a tally entry like any other live step', () => {
+    // Not `proposed`: an agreed setup job is in the denominator, so the bands
+    // have to be able to draw it or they stop summing to the count beside them.
+    expect(PLAN_BAND_ORDER).toContain('setup');
+    const section = shopping(tree([setup('job'), at('done', 'built')]));
+    expect(tallyHealth(section.nodes)).toMatchObject({ setup: 1, done: 1 });
+    expect(planBands(section.nodes)).toContainEqual({ health: 'setup', count: 1 });
   });
 });
 
@@ -677,7 +1075,8 @@ describe('tallyHealth', () => {
   it('counts the leaves by state and leaves the rest at zero', () => {
     const section = shopping(
       tree([
-        at('done', 'a'),
+        at('in_progress', 'f'),
+        at('done', 'a', { parentId: 'f' }),
         at('blocked', 'b'),
         at('proposed', 'c'),
         at('not_started', 'q', { kind: 'decision' }),
@@ -702,6 +1101,33 @@ describe('tallyHealth', () => {
     const total = Object.values(section.tally).reduce((sum, n) => sum + n, 0);
     expect(total).toBe(2);
     expect(section.tally.done).toBe(2);
+  });
+
+  it('leaves out a plan that is closed top to bottom', () => {
+    // What the heading counts is work still in hand. 101 of this plan's 110
+    // features are finished, and counting their steps held every module at
+    // nine tenths forever -- a fact about the archive rather than about the
+    // work. The filter is at the plan, not at the step: a done step inside a
+    // plan still being worked is exactly what the bar is for.
+    const section = shopping(
+      tree([
+        at('done', 'shipped'),
+        at('done', 'shipped-step', { parentId: 'shipped' }),
+        at('in_progress', 'live'),
+        at('done', 'live-step', { parentId: 'live' }),
+        at('not_started', 'live-step-2', { parentId: 'live' }),
+      ]),
+    );
+
+    expect(section.tally.done).toBe(1);
+    expect(section.bands).toEqual([
+      { health: 'done', count: 1 },
+      { health: 'ready', count: 1 },
+    ]);
+    expect(section.progress).toMatchObject({ done: 1, live: 2 });
+    // The rows themselves are untouched -- the finished plan is still listed
+    // and still foldable; it is the counting it left.
+    expect(section.nodes.map((node) => node.id)).toEqual(['shipped', 'live']);
   });
 
   it('is over the whole module, not the view', () => {
@@ -845,7 +1271,6 @@ describe('put aside as not right now', () => {
       dependencies: [],
     });
     expect(workOrder(sections)).toEqual([]);
-    expect(handedToClaude(sections)).toEqual([]);
   });
 });
 
@@ -860,11 +1285,25 @@ describe('isWaitingOnThePerson', () => {
     expect(isWaitingOnThePerson({ kind: 'build', status: 'blocked' })).toBe(true);
   });
 
-  it('is not a block whose every named dependency has since closed', () => {
+  it('is not a block on steps whose every named step has since closed', () => {
     // It is the plan's own record that says nothing is holding it, so handing
     // it to Claude sends a session at a wall that is no longer there.
-    const sections = tree([at('blocked', 'stale'), at('done', 'dep')], [dep('stale', 'dep')]);
+    const sections = tree(
+      [at('blocked', 'stale', { blockKind: 'steps' }), at('done', 'dep')],
+      [dep('stale', 'dep')],
+    );
     expect(isWaitingOnThePerson(findNode(sections, 'stale')!)).toBe(false);
+  });
+
+  it('is a block on something outside the plan whose named steps have closed', () => {
+    // The other half, and the one the Send button reads: #499's dependencies
+    // were all closed and the token it was blocked on still did not exist.
+    // Three sessions were sent at it and came back having found the same wall.
+    const sections = tree(
+      [at('blocked', 'stuck', { blockKind: 'outside' }), at('done', 'dep')],
+      [dep('stuck', 'dep')],
+    );
+    expect(isWaitingOnThePerson(findNode(sections, 'stuck')!)).toBe(true);
   });
 
   it('is not ordinary work, and not a settled question', () => {
@@ -881,10 +1320,77 @@ describe('isWaitingOnThePerson', () => {
   });
 });
 
+describe('blockRefusal', () => {
+  it('names the steps a block on steps is still waiting for', () => {
+    const sections = tree(
+      [
+        at('blocked', 'held', { number: 634, blockKind: 'steps' }),
+        at('not_started', 'first', { number: 601 }),
+        at('done', 'shipped', { number: 602 }),
+        at('in_progress', 'second', { number: 603 }),
+      ],
+      [dep('held', 'first'), dep('held', 'shipped'), dep('held', 'second')],
+    );
+    expect(blockRefusal(findNode(sections, 'held')!)).toBe(
+      '#634 is blocked on #601 and #603, which are still open. It clears itself when they close.',
+    );
+  });
+
+  it('reads as one step when only one is left open', () => {
+    const sections = tree(
+      [
+        at('blocked', 'held', { number: 634, blockKind: 'steps' }),
+        at('not_started', 'first', { number: 601 }),
+        at('done', 'shipped', { number: 602 }),
+      ],
+      [dep('held', 'first'), dep('held', 'shipped')],
+    );
+    expect(blockRefusal(findNode(sections, 'held')!)).toBe(
+      '#634 is blocked on #601, which is still open. It clears itself when that step closes.',
+    );
+  });
+
+  it('keeps the sentence it had for a block on something outside the plan', () => {
+    // The refusal #499 got every time, and the one direction this must not
+    // change: a token nobody has made is not a step that can close.
+    const sections = tree(
+      [
+        at('blocked', 'stuck', { number: 499, blockKind: 'outside' }),
+        at('done', 'shipped', { number: 498 }),
+      ],
+      [dep('stuck', 'shipped')],
+    );
+    expect(blockRefusal(findNode(sections, 'stuck')!)).toBe(
+      '#499 is blocked on something outside the repo. ' +
+        'Clear what it is waiting on first -- its note says what.',
+    );
+  });
+
+  it('reads a block with no kind recorded as one outside the plan', () => {
+    expect(blockRefusal({ number: 12, blockKind: null })).toBe(
+      '#12 is blocked on something outside the repo. ' +
+        'Clear what it is waiting on first -- its note says what.',
+    );
+  });
+
+  it('says so when a block on steps names no steps at all', () => {
+    expect(blockRefusal({ number: 12, blockKind: 'steps' })).toBe(
+      '#12 is blocked on other steps, and none are recorded against it. ' +
+        'Say what it is waiting for, or put it back to not started.',
+    );
+  });
+});
+
 describe('planBands', () => {
   it('splits the live leaves by state', () => {
     const section = shopping(
-      tree([at('done', 'a'), at('done', 'b'), at('in_progress', 'c'), at('blocked', 'd')]),
+      tree([
+        at('not_started', 'f'),
+        at('done', 'a', { parentId: 'f' }),
+        at('done', 'b', { parentId: 'f' }),
+        at('in_progress', 'c'),
+        at('blocked', 'd'),
+      ]),
     );
 
     expect(section.bands).toEqual([
@@ -914,13 +1420,20 @@ describe('planBands', () => {
   });
 
   it('leaves out what the fraction leaves out', () => {
-    const section = shopping(tree([at('done', 'a'), at('dropped', 'b'), at('proposed', 'c')]));
+    const section = shopping(
+      tree([
+        at('not_started', 'f'),
+        at('done', 'a', { parentId: 'f' }),
+        at('dropped', 'b'),
+        at('proposed', 'c'),
+      ]),
+    );
 
     expect(section.bands).toEqual([{ health: 'done', count: 1 }]);
   });
 
   it('draws no band for a state nothing is in', () => {
-    const section = shopping(tree([at('done', 'a')]));
+    const section = shopping(tree([at('not_started', 'f'), at('done', 'a', { parentId: 'f' })]));
 
     expect(section.bands).toHaveLength(1);
   });
@@ -929,7 +1442,12 @@ describe('planBands', () => {
     // Fixed, never sorted by size: a bar whose bands moved around as the
     // counts changed would be a different picture every week.
     const section = shopping(
-      tree([at('not_started', 'a'), at('done', 'b'), at('in_progress', 'c')]),
+      tree([
+        at('not_started', 'a'),
+        at('not_started', 'f'),
+        at('done', 'b', { parentId: 'f' }),
+        at('in_progress', 'c'),
+      ]),
     );
 
     // 'a' waits on nothing, so it reads as ready rather than not started --
@@ -1044,5 +1562,327 @@ describe('searchSections', () => {
 
   it('ignores case', () => {
     expect(countMatches(searchSections(plan(), 'SHELF'))).toBe(1);
+  });
+});
+
+/**
+ * Health says how far along; the move says whose it is. The two were one word
+ * until #fa32dfaa, and these are the cases that separate them.
+ */
+describe('healthOf, over a subtree that has started', () => {
+  const feature = (children: PlanItem[]) =>
+    shopping(tree([at('not_started', 'f'), ...children]));
+
+  it('calls a feature in progress once a step beneath it is done', () => {
+    const sections = feature([
+      at('done', 's1', { parentId: 'f' }),
+      at('not_started', 's2', { parentId: 'f' }),
+    ]);
+    expect(healthOf(sections.nodes[0])).toBe('in_progress');
+  });
+
+  it('calls it in progress while a step beneath it is being worked', () => {
+    const sections = feature([at('in_progress', 's1', { parentId: 'f' })]);
+    expect(healthOf(sections.nodes[0])).toBe('in_progress');
+  });
+
+  it('leaves a feature nobody has touched not started', () => {
+    const sections = feature([
+      at('not_started', 's1', { parentId: 'f' }),
+      at('not_started', 's2', { parentId: 'f' }),
+    ]);
+    expect(healthOf(sections.nodes[0])).toBe('not_started');
+  });
+
+  // Answering the opening question is not building the thing.
+  it('does not count an answered question as work started', () => {
+    const sections = feature([
+      at('done', 'q', { parentId: 'f', kind: 'decision' }),
+      at('not_started', 's1', { parentId: 'f' }),
+    ]);
+    expect(healthOf(sections.nodes[0])).toBe('not_started');
+  });
+
+  // 'ready' rather than 'not_started' because a feature with no live work
+  // beneath it is startable; what matters here is that it is not in_progress.
+  it('does not count a step that was put aside', () => {
+    const sections = feature([
+      at('done', 's1', { parentId: 'f', dismissedAt: '2026-01-02T00:00:00Z' }),
+    ]);
+    expect(healthOf(sections.nodes[0])).toBe('ready');
+  });
+
+  it('leaves a leaf step alone', () => {
+    expect(healthOf(shopping(tree([at('not_started', 'a')])).nodes[0])).toBe('ready');
+  });
+
+  it('calls a feature blocked when every open step beneath it is', () => {
+    const sections = feature([
+      at('done', 's1', { parentId: 'f' }),
+      at('blocked', 's2', { parentId: 'f', blockKind: 'outside' }),
+      at('blocked', 's3', { parentId: 'f', blockKind: 'outside' }),
+    ]);
+    expect(healthOf(sections.nodes[0])).toBe('blocked');
+  });
+
+  it('leaves it open while one step beneath it can still be worked', () => {
+    const sections = feature([
+      at('blocked', 's1', { parentId: 'f', blockKind: 'outside' }),
+      at('not_started', 's2', { parentId: 'f' }),
+    ]);
+    expect(healthOf(sections.nodes[0])).toBe('not_started');
+  });
+
+  it('does not call it blocked over a step whose named steps have all closed', () => {
+    // `isStaleBlock`: nothing on record is holding s2, so the feature has a
+    // step to offer and is not stopped.
+    const sections = shopping(
+      tree(
+        [
+          at('not_started', 'f'),
+          at('done', 's1', { parentId: 'f' }),
+          at('blocked', 's2', { parentId: 'f', blockKind: 'steps' }),
+        ],
+        [dep('s2', 's1')],
+      ),
+    );
+    expect(healthOf(sections.nodes[0])).toBe('in_progress');
+  });
+});
+
+describe('moveOf', () => {
+  const only = (items: PlanItem[]) => shopping(tree(items)).nodes[0];
+
+  // #694: the column says a word only when something is happening to the row,
+  // and an approved step in the queue is the ordinary case on this page.
+  it('says nothing about an approved step waiting its turn', () => {
+    expect(moveOf(only([at('not_started', 'a')]))).toBe('none');
+  });
+
+  // The column left over from the old hand-over. Nothing clears it, so the
+  // rows that still carry 'claude' have to read as the ordinary steps they
+  // are rather than as a queue nobody is working.
+  it('says nothing about a step left assigned to Dash by an old hand-over', () => {
+    expect(moveOf(only([at('not_started', 'a', { assignee: 'claude' })]))).toBe('none');
+  });
+
+  it('is with Dash while a session is on it', () => {
+    expect(moveOf(only([at('in_progress', 'a')]))).toBe('with_dash');
+  });
+
+  it('is yours once you mark it, before anything has started', () => {
+    expect(moveOf(only([at('not_started', 'a', { assignee: 'me' })]))).toBe('yours');
+  });
+
+  it('is still yours once a step you marked is underway', () => {
+    expect(moveOf(only([at('in_progress', 'a', { assignee: 'me' })]))).toBe('yours');
+  });
+
+  it('needs you for a question nobody has answered', () => {
+    expect(moveOf(only([at('not_started', 'a', { kind: 'decision' })]))).toBe('on_you');
+  });
+
+  it('needs you for a proposal nobody has approved', () => {
+    expect(moveOf(only([at('proposed', 'a')]))).toBe('on_you');
+  });
+
+  // Assigned to Dash and blocked is still yours: a session sent there would
+  // sit in front of the same wall. Same rule `isWaitingOnThePerson` enforces.
+  it('needs you for a blocked step even when it is assigned to Dash', () => {
+    expect(moveOf(only([at('blocked', 'a', { assignee: 'claude' })]))).toBe('on_you');
+  });
+
+  it('is held up when another step is in the way', () => {
+    const sections = shopping(
+      tree([at('not_started', 'a'), at('not_started', 'b')], [dep('a', 'b')]),
+    );
+    expect(moveOf(findNode([sections], 'a')!)).toBe('waiting');
+  });
+
+  it('is settled once it closes', () => {
+    expect(moveOf(only([at('done', 'a')]))).toBe('settled');
+    expect(moveOf(only([at('dropped', 'a')]))).toBe('settled');
+  });
+
+  describe('over a subtree', () => {
+    const feature = (children: PlanItem[]) =>
+      shopping(tree([at('not_started', 'f'), ...children])).nodes[0];
+
+    it('reports a session working beneath it', () => {
+      expect(moveOf(feature([at('in_progress', 's1', { parentId: 'f' })]))).toBe('with_dash');
+    });
+
+    it('reports a step you marked yours beneath it', () => {
+      expect(moveOf(feature([at('not_started', 's1', { parentId: 'f', assignee: 'me' })]))).toBe(
+        'yours',
+      );
+    });
+
+    // The other half of #694: a feature is the rollup of its steps, so one
+    // whose steps are all waiting their turn has nothing to say either.
+    it('says nothing when every step beneath it is waiting its turn', () => {
+      expect(
+        moveOf(
+          feature([
+            at('not_started', 's1', { parentId: 'f' }),
+            at('not_started', 's2', { parentId: 'f' }),
+          ]),
+        ),
+      ).toBe('none');
+    });
+
+    it('reports the most pressing of several', () => {
+      expect(
+        moveOf(
+          feature([
+            at('in_progress', 's1', { parentId: 'f' }),
+            at('not_started', 'q', { parentId: 'f', kind: 'decision' }),
+          ]),
+        ),
+      ).toBe('on_you');
+    });
+
+    // The same rule healthOf keeps: closed on top of something open is not
+    // closed, and a question added under a shipped feature is still a question.
+    it('reports a question added under a finished feature', () => {
+      const sections = shopping(
+        tree([
+          at('done', 'f'),
+          at('done', 's1', { parentId: 'f' }),
+          at('not_started', 'q', { parentId: 'f', kind: 'decision' }),
+        ]),
+      );
+      expect(moveOf(sections.nodes[0])).toBe('on_you');
+    });
+
+    it('is settled when everything beneath it is', () => {
+      const sections = shopping(tree([at('done', 'f'), at('done', 's1', { parentId: 'f' })]));
+      expect(moveOf(sections.nodes[0])).toBe('settled');
+    });
+
+    it('ignores a step that was put aside', () => {
+      expect(
+        moveOf(
+          feature([
+            at('not_started', 'q', {
+              parentId: 'f',
+              kind: 'decision',
+              dismissedAt: '2026-01-02T00:00:00Z',
+            }),
+          ]),
+        ),
+      ).toBe('none');
+    });
+  });
+
+  describe('resolving', () => {
+    const feature = (children: PlanItem[] = []) =>
+      shopping(tree([at('not_started', 'f'), ...children])).nodes[0];
+    const whileResolving = { resolving: new Set(['f']) };
+
+    it('says so while a re-shape is re-reading the feature', () => {
+      expect(moveOf(feature(), whileResolving)).toBe('resolving');
+    });
+
+    // The run writes proposed rows as it goes, and each one is something to
+    // approve. Ranked under "on you", the feature would flip to "Needs you"
+    // halfway through a run that is still rewriting it.
+    it('outranks a proposal the run itself has just written', () => {
+      expect(moveOf(feature([at('proposed', 's1', { parentId: 'f' })]), whileResolving)).toBe(
+        'resolving',
+      );
+    });
+
+    it('outranks a question left open beneath it', () => {
+      expect(
+        moveOf(
+          feature([at('not_started', 'q', { parentId: 'f', kind: 'decision' })]),
+          whileResolving,
+        ),
+      ).toBe('resolving');
+    });
+
+    // A re-shape can be asked for on a feature that already shipped.
+    it('outranks settled', () => {
+      const sections = shopping(tree([at('done', 'f'), at('done', 's1', { parentId: 'f' })]));
+      expect(moveOf(sections.nodes[0], whileResolving)).toBe('resolving');
+    });
+
+    it('is not claimed of a feature no re-shape is running against', () => {
+      expect(moveOf(feature(), { resolving: new Set(['somebody-else']) })).toBe('none');
+      expect(moveOf(feature())).toBe('none');
+    });
+
+    // The set holds the feature the run was fired at. A step beneath it is not
+    // itself being re-read, and it is the feature's buttons that shut.
+    it('does not spread down to the steps beneath it', () => {
+      const sections = shopping(tree([at('not_started', 'f'), at('not_started', 's1', { parentId: 'f' })]));
+      const step = findNode([sections], 's1')!;
+      expect(moveOf(step, whileResolving)).toBe('none');
+    });
+  });
+});
+
+describe('healthOf, on a claim read against its run', () => {
+  const NOW = Date.parse('2026-09-17T12:00:00Z');
+  const minutesAgo = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
+
+  /** A step marked underway, claimed `minutes` ago. */
+  const claimed = (id: string, minutes = 10) =>
+    at('in_progress', id, { startedAt: minutesAgo(minutes) });
+
+  const run = (minutes: number, pushed: number | null) => ({
+    status: 'started',
+    createdAt: minutesAgo(minutes),
+    reading: {
+      checkedAt: minutesAgo(1),
+      lastPush: pushed === null ? null : { at: minutesAgo(pushed), sha: 'abc', subject: 'A push' },
+      refusal: null,
+    },
+  });
+
+  it('says in progress and no more when no run is recorded against it', () => {
+    const section = shopping(tree([claimed('a')]));
+    expect(healthOf(section.nodes[0], planLiveness([claimed('a')], {}, NOW))).toBe('in_progress');
+  });
+
+  it('says working, quiet or abandoned from what the run pushed', () => {
+    const section = shopping(tree([claimed('a')]));
+    const node = section.nodes[0];
+    const liveness = (pushed: number | null, fired = 30) =>
+      planLiveness([{ id: node.id, status: 'in_progress', startedAt: node.startedAt }],
+        { [node.id]: run(fired, pushed) }, NOW);
+
+    expect(healthOf(node, liveness(2))).toBe('working');
+    expect(healthOf(node, liveness(25))).toBe('quiet');
+    expect(healthOf(node, liveness(150, 200))).toBe('abandoned');
+  });
+
+  it('reads the claim as abandoned on the clock alone once it is two hours old', () => {
+    const step = claimed('a', 130);
+    const section = shopping(tree([step]));
+    expect(healthOf(section.nodes[0], planLiveness([step], {}, NOW))).toBe('abandoned');
+  });
+
+  it('counts the module by the same reading, so the tally cannot disagree', () => {
+    const step = claimed('a', 130);
+    const liveness = planLiveness([step], {}, NOW);
+    const section = shopping(buildPlanTree({ items: [step], dependencies: [] }, liveness));
+    expect(section.tally.abandoned).toBe(1);
+    expect(section.tally.in_progress).toBe(0);
+    expect(section.bands).toEqual([{ health: 'abandoned', count: 1 }]);
+    // And without the reading it counts what the column says, as it always did.
+    expect(tallyHealth(section.nodes).in_progress).toBe(1);
+  });
+
+  it('reports an abandoned step from the feature closed above it', () => {
+    // The closed-over-open rule, with the new reading in it: a feature marked
+    // done over a claim nothing is working reports the claim, and reports it
+    // as stopped rather than as underway.
+    const step = claimed('s', 200);
+    const items = [at('done', 'f'), { ...step, parentId: 'f' }];
+    const liveness = planLiveness(items, {}, NOW);
+    const section = shopping(buildPlanTree({ items, dependencies: [] }, liveness));
+    expect(healthOf(section.nodes[0], liveness)).toBe('abandoned');
   });
 });

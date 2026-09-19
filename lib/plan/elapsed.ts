@@ -25,6 +25,11 @@
  * enough to catch the same afternoon. It is a reading of the row, not a state
  * written to it: only the person can say whether the work happened, so the
  * page says nobody has touched it and leaves the row alone.
+ *
+ * It is the fallback rather than the answer now. `claimLiveness` in
+ * `liveness.ts` reads a claim off what its run pushed and falls back to this
+ * mark when there is no run to read, which is why the two numbers are the
+ * same: #524 set the ended mark here deliberately.
  */
 export const STALLED_AFTER_MINUTES = 120;
 
@@ -42,29 +47,14 @@ export function isStalledClaim(startedAt: string, now: number): boolean {
 }
 
 /**
- * Whether a step is genuinely being worked right now.
+ * A number of minutes as the coarsest unit that still says it.
  *
- * `in_progress` on its own does not answer that, because nothing releases the
- * status when the session holding it stops. The page has read the clock
- * alongside the status for a while; the guards that refuse a second session
- * did not, so one dead run left a feature refusing work forever. Both read
- * this now, and they agree about what "underway" means.
- *
- * A claim with no `startedAt` counts as live: the column is stamped by a
- * trigger, so a row without one was claimed this instant.
+ * Shared between the two directions on purpose: a step that has been going
+ * `2h 40m` and a night that stops in `2h 40m` are the same quantity read from
+ * either side, and two vocabularies for it on one page would make the reader
+ * do the conversion.
  */
-export function hasLiveClaim(
-  step: { status: string; startedAt: string | null },
-  now: number,
-): boolean {
-  if (step.status !== 'in_progress') return false;
-  if (!step.startedAt) return true;
-  return !isStalledClaim(step.startedAt, now);
-}
-
-export function elapsedSince(startedAt: string, now: number): string {
-  const minutes = Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 60_000));
-  if (minutes < 1) return 'just now';
+function coarse(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
 
   const hours = Math.floor(minutes / 60);
@@ -76,4 +66,23 @@ export function elapsedSince(startedAt: string, now: number): string {
   const days = Math.floor(hours / 24);
   const rest = hours % 24;
   return rest === 0 ? `${days}d` : `${days}d ${rest}h`;
+}
+
+export function elapsedSince(startedAt: string, now: number): string {
+  const minutes = Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 60_000));
+  return minutes < 1 ? 'just now' : coarse(minutes);
+}
+
+/**
+ * How long there is left until an instant, in the same words.
+ *
+ * Written for the overnight runner's stop time, which is the first thing on
+ * the plan that is read forwards rather than backwards. Never negative: an
+ * instant already past reads as under a minute, and whoever is drawing it has
+ * to say something different about a deadline that has gone by anyway -- a
+ * `-2h` left to run would let them not.
+ */
+export function remainingUntil(at: string, now: number): string {
+  const minutes = Math.max(0, Math.floor((new Date(at).getTime() - now) / 60_000));
+  return minutes < 1 ? 'under a minute' : coarse(minutes);
 }

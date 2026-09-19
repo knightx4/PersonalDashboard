@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { elapsedSince, hasLiveClaim, isStalledClaim, STALLED_AFTER_MINUTES } from './elapsed';
+import {
+  elapsedSince,
+  isStalledClaim,
+  remainingUntil,
+  STALLED_AFTER_MINUTES,
+} from './elapsed';
 
 const start = '2026-09-09T10:00:00.000Z';
 const at = (minutes: number) => new Date(start).getTime() + minutes * 60_000;
@@ -54,28 +59,19 @@ describe('isStalledClaim', () => {
   });
 });
 
-describe('hasLiveClaim', () => {
-  it('is false for anything not underway', () => {
-    for (const status of ['not_started', 'blocked', 'proposed', 'done', 'dropped']) {
-      expect(hasLiveClaim({ status, startedAt: start }, at(0))).toBe(false);
-    }
+describe('remainingUntil', () => {
+  const stopBy = '2026-09-18T07:00:00.000Z';
+  const clock = (iso: string) => Date.parse(iso);
+
+  it('reads forwards in the same words elapsed time reads backwards', () => {
+    expect(remainingUntil(stopBy, clock('2026-09-18T06:20:00.000Z'))).toBe('40m');
+    expect(remainingUntil(stopBy, clock('2026-09-17T23:00:00.000Z'))).toBe('8h');
+    expect(remainingUntil(stopBy, clock('2026-09-17T22:40:00.000Z'))).toBe('8h 20m');
   });
 
-  it('is true for a step claimed just now', () => {
-    expect(hasLiveClaim({ status: 'in_progress', startedAt: start }, at(1))).toBe(true);
-  });
-
-  // The point of the whole helper: a session that died holds nothing, so the
-  // guard that refuses a second send must let this one through.
-  it('is false once the claim has stalled', () => {
-    expect(hasLiveClaim({ status: 'in_progress', startedAt: start }, at(STALLED_AFTER_MINUTES))).toBe(
-      false,
-    );
-  });
-
-  // `started_at` is stamped by a trigger, so a row without one was claimed this
-  // instant and the clock has nothing to say about it yet.
-  it('treats a claim with no clock as live', () => {
-    expect(hasLiveClaim({ status: 'in_progress', startedAt: null }, at(60 * 9))).toBe(true);
+  // Never negative: whoever draws a deadline has to say something different
+  // about one that has gone by, and "-2h left" would let them not.
+  it('does not go negative once the instant has passed', () => {
+    expect(remainingUntil(stopBy, clock('2026-09-18T09:00:00.000Z'))).toBe('under a minute');
   });
 });
