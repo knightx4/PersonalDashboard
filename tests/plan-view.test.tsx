@@ -19,7 +19,6 @@ import {
   buildPlanTree,
   splitFinished,
   flattenSections,
-  handedToClaude,
   planLiveness,
   summarize,
 } from '@/lib/plan/tree';
@@ -42,7 +41,6 @@ vi.mock('@/app/dev/plan/actions', () => {
     seedPlan: noop,
     sendPlanFeatureToClaude: noop,
     sendPlanItemToClaude: noop,
-    sendPlanQueueToClaude: noop,
     setPlanItemAssignee: noop,
     setPlanItemPriority: noop,
     setPlanItemStatus: noop,
@@ -153,7 +151,6 @@ function render(
       canSend={false}
       lastRuns={{}}
       commitChecks={{}}
-      queued={handedToClaude(whole).length}
       unfolded={unfolded}
     />,
   );
@@ -224,7 +221,6 @@ describe('PlanView', () => {
         canSend={false}
         lastRuns={{}}
         commitChecks={{}}
-        queued={0}
         unfolded
       />,
     );
@@ -273,7 +269,6 @@ describe('PlanView', () => {
         canSend={false}
         lastRuns={{}}
         commitChecks={{}}
-        queued={0}
         unfolded
       />,
     );
@@ -382,33 +377,6 @@ describe('PlanView', () => {
     expect(row).not.toContain('Not specified');
   });
 
-  it('offers the whole queue in one press, and only when there is one', () => {
-    // One step is handed over in the fixture, so the button says so rather
-    // than making you count.
-    expect(render('open')).toContain('Send all 1 to Dash');
-
-    const nobodys = buildPlanTree({
-      items: [item({ id: 'mine', title: 'Mine to do' })],
-      dependencies: [],
-    });
-    const html = renderToStaticMarkup(
-      <PlanView
-        sections={applyView(nobodys, 'all')}
-        finished={[]}
-        summary={summarize(nobodys)}
-        view="all"
-        catalog={[]}
-        empty={false}
-        canSend={false}
-        lastRuns={{}}
-        commitChecks={{}}
-        queued={handedToClaude(nobodys).length}
-        unfolded
-      />,
-    );
-    expect(html).not.toContain('to Claude</button>');
-  });
-
   it('says on the row which answer produced a step a re-shape wrote', () => {
     const reshaped = buildPlanTree({
       items: [
@@ -435,7 +403,6 @@ describe('PlanView', () => {
         canSend={false}
         lastRuns={{}}
         commitChecks={{}}
-        queued={0}
         unfolded
       />,
     );
@@ -465,7 +432,6 @@ describe('PlanView', () => {
         canSend={false}
         lastRuns={{}}
         commitChecks={{}}
-        queued={0}
         unfolded
       />,
     );
@@ -496,7 +462,6 @@ describe('PlanView', () => {
         canSend={false}
         lastRuns={{}}
         commitChecks={{}}
-        queued={0}
         unfolded
       />,
     );
@@ -539,7 +504,6 @@ describe('PlanView', () => {
         canSend={false}
         lastRuns={{}}
         commitChecks={{}}
-        queued={0}
         unfolded
       />,
     );
@@ -580,7 +544,6 @@ describe('PlanView', () => {
         canSend={false}
         lastRuns={{}}
         commitChecks={{}}
-        queued={0}
         unfolded
       />,
     );
@@ -621,7 +584,6 @@ describe('PlanView', () => {
         canSend={false}
         lastRuns={{}}
         commitChecks={{}}
-        queued={0}
       />,
     );
 
@@ -658,7 +620,6 @@ describe('PlanView', () => {
           canSend={false}
           lastRuns={{}}
           commitChecks={{}}
-          queued={0}
           unfolded
         />,
       );
@@ -695,7 +656,6 @@ describe('PlanView', () => {
           canSend={false}
           lastRuns={{}}
           commitChecks={{}}
-          queued={0}
           unfolded
         />,
       );
@@ -792,7 +752,6 @@ describe('the CI mark on a closed step', () => {
         aaaaaaa: { mergeSha: 'f12facc', conclusion: 'failed', checkedAt: '2026-09-17T03:00:00Z' },
         bbbbbbb: { mergeSha: 'f12facc', conclusion: 'passed', checkedAt: '2026-09-17T03:00:00Z' },
       }}
-      queued={0}
       unfolded
     />,
   );
@@ -849,7 +808,6 @@ describe('a claim, drawn from what its run did', () => {
         lastRuns={{}}
         liveness={liveness}
         commitChecks={{}}
-        queued={0}
         unfolded
       />,
     );
@@ -914,7 +872,6 @@ describe('what an opened step says its run has done', () => {
         runRaises={raises(child.number)}
         liveness={liveness}
         commitChecks={{}}
-        queued={0}
         unfolded
         opened
       />,
@@ -1003,7 +960,6 @@ describe('what the page says when GitHub refuses the key', () => {
         keyRefusal={keyRefusal}
         liveness={liveness}
         commitChecks={{}}
-        queued={0}
       />,
     );
   }
@@ -1052,7 +1008,6 @@ describe('a setup step on the plan', () => {
         canSend={false}
         lastRuns={{}}
         commitChecks={{}}
-        queued={0}
         unfolded
         opened
       />,

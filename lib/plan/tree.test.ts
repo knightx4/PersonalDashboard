@@ -24,7 +24,6 @@ import {
   tallyHealth,
   planProgress,
   subtreeIds,
-  handedToClaude,
   summarize,
   workOrder,
   searchSections,
@@ -736,57 +735,6 @@ describe('workOrder', () => {
       'after',
     ]);
   });
-});
-
-describe('handedToClaude', () => {
-  const mine = (id: string, over: Partial<PlanItem> = {}) =>
-    item({ id, assignee: 'claude', ...over });
-
-  it('takes every open step handed over, most urgent first', () => {
-    const sections = tree([
-      mine('normal', { position: 10 }),
-      mine('someday', { priority: 3, position: 20 }),
-      mine('urgent', { priority: 1, position: 30 }),
-      item({ id: 'not-handed-over', position: 40 }),
-      item({ id: 'mine-to-do', assignee: 'me', position: 50 }),
-    ]);
-    expect(handedToClaude(sections).map((n) => n.id)).toEqual(['urgent', 'normal', 'someday']);
-  });
-
-  it('keeps a step that is only waiting on another, unlike workOrder', () => {
-    const sections = tree(
-      [mine('first'), mine('second')],
-      [dep('second', 'first')],
-    );
-    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['first']);
-    expect(handedToClaude(sections).map((n) => n.id)).toEqual(['first', 'second']);
-  });
-
-  it('leaves out what is finished, only proposed, or waiting on the person', () => {
-    const sections = tree([
-      mine('open'),
-      mine('done', { status: 'done' }),
-      mine('dropped', { status: 'dropped' }),
-      mine('proposal', { status: 'proposed' }),
-      mine('question', { kind: 'decision' }),
-      // A block names something outside the repo, so a session sent at it
-      // meets the same wall -- and it sat in the Claude's view saying so.
-      mine('stuck', { status: 'blocked' }),
-    ]);
-    expect(handedToClaude(sections).map((n) => n.id)).toEqual(['open']);
-  });
-
-  it('takes an answered decision back, since nothing is waiting on the person now', () => {
-    const sections = tree([mine('settled', { kind: 'decision', status: 'done' })]);
-    // Closed, so still not work -- but for being closed, not for being a
-    // question.
-    expect(handedToClaude(sections)).toEqual([]);
-    expect(isWaitingOnThePerson({ kind: 'decision', status: 'done' })).toBe(false);
-  });
-
-  it('is empty when nothing has been handed over', () => {
-    expect(handedToClaude(tree([item({ id: 'a' }), item({ id: 'b', assignee: 'me' })]))).toEqual([]);
-  });
 
   it('never hands Claude a decision, however it is assigned', () => {
     // The one thing a routine must not do is answer its own question.
@@ -1103,7 +1051,6 @@ describe('a setup step', () => {
     ]);
 
     expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['work']);
-    expect(handedToClaude(sections).map((n) => n.id)).toEqual(['work']);
     // Still ready, and still listed unfiltered, so the page shows it.
     expect(only(sections, 'job').ready).toBe(true);
     expect(workOrder(sections).map((n) => n.id)).toEqual(['work', 'job']);
@@ -1324,7 +1271,6 @@ describe('put aside as not right now', () => {
       dependencies: [],
     });
     expect(workOrder(sections)).toEqual([]);
-    expect(handedToClaude(sections)).toEqual([]);
   });
 });
 

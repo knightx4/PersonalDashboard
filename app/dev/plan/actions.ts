@@ -13,7 +13,6 @@ import {
   PLAIN_ENGLISH_RULE,
   dismissedUnder,
   planBrief,
-  planQueueBrief,
 } from '@/lib/plan/brief';
 import { loadDismissedSuggestions } from '@/lib/ideas/load';
 import {
@@ -50,7 +49,6 @@ import {
   buildPlanTree,
   findNode,
   flatten,
-  handedToClaude,
   isWaitingOnThePerson,
   topFeatureOf,
   type PlanNode,
@@ -1231,77 +1229,6 @@ export async function reshapePlanFeature(
       `Re-shaping #${node.number} against ` +
       `${answered === 0 ? 'no answers yet' : `${answered} ${answered === 1 ? 'answer' : 'answers'}`}` +
       `${node.fog ? ' and its fog' : ''}. What comes back is proposed. ${result.detail}`,
-  };
-}
-
-/**
- * Send everything handed to Claude, in one press.
- *
- * The step button is right when you are watching one step; the feature button
- * is right when you are looking at one feature. Neither is what you want after
- * an afternoon spent going down the plan marking things as Claude's, which is
- * the state this button is for: a queue built up over a session and sent when
- * you get up from the desk.
- *
- * Nothing is assigned here. Being handed over is exactly what these steps
- * already are -- that is how they got into the queue -- so nothing is dragged
- * into the queue by pressing this, and pressing it twice sends the same queue
- * again.
- *
- * Nothing is marked in progress either. That is the session's to set, one step
- * at a time as it claims them, and a press that marked the whole queue underway
- * described eleven steps nothing was on. `handedToClaude` has already left out
- * the decisions and the proposals, so what is left is exactly what a session
- * will build.
- *
- * `handedToClaude` decides what is in it: open, approved, not a decision, most
- * urgent first. One routine works the lot in that order, because two sessions
- * on one plan would take the same step twice.
- */
-// latency: pending
-export async function sendPlanQueueToClaude(
-  // Signature is fixed by useActionState; the button sends nothing.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _prev: PlanActionState, _formData: FormData,
-): Promise<PlanActionState> {
-  const supabase = await createClient();
-  const user = await requireOwner({ supabase });
-
-  const sections = buildPlanTree(await loadPlan(supabase, user.id));
-  const queue = handedToClaude(sections);
-  if (queue.length === 0) {
-    return { error: 'Nothing is handed to Dash right now. Hand a step over and it lands here.' };
-  }
-
-  // Nothing is marked underway here either, for the reason the feature send
-  // gives: one session works the queue one step at a time, so marking all
-  // twelve on the press describes eleven steps nothing is on. The queue is
-  // built from `assignee`, which these steps already carry -- that is how they
-  // got into it -- so the press changes no state at all. It sends.
-  const text =
-    `Work the ${queue.length} plan ${queue.length === 1 ? 'step' : 'steps'} handed to Claude, ` +
-    'following .claude/skills/plan/SKILL.md. This is a batch, so it is orchestrated: send each ' +
-    'step to its own subagent, in the order below, and do not read the steps\' source files or ' +
-    'make the edits yourself. Keep the carry-forward between them. A step whose brief says it ' +
-    'waits on another is worked after that one, not skipped. Stop at the first step that needs ' +
-    'a decision from me: block it with the exact question rather than guessing, and carry on ' +
-    'with the rest. Run the gate once at the end, push once, and report every step you closed, ' +
-    'by number and title.\n\nThe briefs are below; they are the plan as the app holds it right now, and the ' +
-    'plan is the source of truth.\n\n' +
-    planQueueBrief(sections, queue, { thread: true });
-
-  const result = await startRoutineRun({
-    supabase,
-    userId: user.id,
-    job: 'queue',
-    routine: planRoutine(),
-    // No step: the queue is the whole of what was handed over, and naming the
-    // first of twelve would say the run was about that one.
-    text,
-  });
-  if (!result.ok) return { error: result.error };
-  return {
-    message: `Sent ${queue.length === 1 ? '1 step' : `all ${queue.length} steps`}. ${result.detail}`,
   };
 }
 

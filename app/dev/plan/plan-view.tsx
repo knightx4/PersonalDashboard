@@ -32,7 +32,6 @@ import {
   dismissPlanDecision,
   dismissPlanFog,
   sendPlanItemToClaude,
-  sendPlanQueueToClaude,
   setPlanItemAssignee,
   setPlanItemPriority,
   setPlanItemStatus,
@@ -333,52 +332,6 @@ const chipOn = 'bg-accent text-surface';
 const chipOff = 'text-ink-muted hover:bg-accent-tint hover:text-accent';
 
 /**
- * The numbers across the plan, and the views over it.
- *
- * The counts are links where a view answers them: "3 ready" is the question
- * "which three", and the view is the answer. The views are search parameters
- * rather than state so that "the ready steps" is something you can keep.
- */
-/**
- * The queue, sent.
- *
- * Beside the count of what is Claude's, because that number is the question
- * this button answers: you have spent a while going down the plan handing
- * things over, and what you want at the end of it is not to press Send on each
- * of them. Absent when nothing is handed over, since there would be nothing to
- * send and an always-present button that usually refuses teaches people not to
- * press it.
- */
-function SendTheQueue({ count }: { count: number }) {
-  const [state, action, pending] = useActionState(sendPlanQueueToClaude, {} as PlanActionState);
-
-  if (count === 0) return null;
-
-  return (
-    <>
-      <form action={action}>
-        <Button
-          type="submit"
-          size="sm"
-          variant="secondary"
-          pending={pending}
-          title="Hand the whole queue to one routine, worked in order"
-        >
-          <Play className="size-3.5" aria-hidden />
-          {pending ? 'Sending…' : `Send all ${count} to Dash`}
-        </Button>
-      </form>
-      {(state.error ?? state.message) && (
-        <p className="basis-full text-small">
-          <FieldError>{state.error}</FieldError>
-          {!state.error && <span className="text-ink-muted">{state.message}</span>}
-        </p>
-      )}
-    </>
-  );
-}
-
-/**
  * What a narrowed view says when it finds nothing.
  *
  * Empty is the good state for most of these, so each one says what it means
@@ -418,16 +371,19 @@ const EMPTY_VIEW: Partial<Record<View, { title: string; description: string }>> 
   },
 };
 
+/**
+ * The numbers across the plan, and the views over it.
+ *
+ * The counts are links where a view answers them: "3 ready" is the question
+ * "which three", and the view is the answer. The views are search parameters
+ * rather than state so that "the ready steps" is something you can keep.
+ */
 function SummaryStrip({
   summary,
   view,
-  queued,
 }: {
   summary: PlanSummary;
   view: View;
-  /** What the send-all button would actually send: not every step marked as
-      Claude's, since an unanswered question is nobody's to build. */
-  queued: number;
 }) {
   const facts: Array<{ view: View | null; value: number; noun: string }> = [
     { view: 'open', value: summary.open, noun: 'open' },
@@ -466,7 +422,6 @@ function SummaryStrip({
           ),
         )}
       </p>
-      <SendTheQueue count={queued} />
       <nav aria-label="View" className="ml-auto flex flex-wrap items-center gap-1">
         {PLAN_VIEW_CHIPS.map((candidate) => (
           <Link
@@ -3314,7 +3269,6 @@ export function PlanView({
   commitChecks,
   empty,
   canSend,
-  queued,
   unfolded = false,
   opened = false,
 }: {
@@ -3344,7 +3298,6 @@ export function PlanView({
   commitChecks: Record<string, CommitCheck>;
   empty: boolean;
   canSend: boolean;
-  queued: number;
   /**
    * Render every feature with its sub-steps already showing.
    *
@@ -3422,7 +3375,7 @@ export function PlanView({
         </Banner>
       )}
 
-      <SummaryStrip summary={summary} view={view} queued={queued} />
+      <SummaryStrip summary={summary} view={view} />
 
       <SearchThePlan query={query} onQuery={setQuery} hits={hits} searching={searching} />
 

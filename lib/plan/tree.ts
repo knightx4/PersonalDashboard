@@ -1370,29 +1370,6 @@ export function workOrder(
 }
 
 /**
- * Everything handed to Claude, in the order it should be worked.
- *
- * `workOrder` answers "what could be picked up right now", so it keeps only
- * ready steps. This answers a different question — "what has been handed over"
- * — and a step held up by another is still handed over: it is the second half
- * of a batch, not something to leave behind. The session works them in order
- * and the ones that wait say what they wait on.
- *
- * The two exclusions are the ones `workOrder` makes and for the same reasons. A
- * decision is a question put to the person, and a session that picked one up
- * would answer its own question. A proposal is not work yet — nobody has said
- * yes to it — so it is left for the person to approve, however it is assigned.
- */
-export function handedToClaude(sections: readonly PlanSection[]): PlanNode[] {
-  return flattenSections(sections)
-    .filter((node) => node.assignee === 'claude')
-    .filter((node) => !isDismissed(node))
-    .filter((node) => !isClosed(node.status) && node.status !== 'proposed')
-    .filter((node) => !isWaitingOnThePerson(node))
-    .sort((a, b) => a.priority - b.priority);
-}
-
-/**
  * A step that is waiting on the person, and so cannot be Claude's.
  *
  * Three states, and all three mean the same thing: nothing a session does
