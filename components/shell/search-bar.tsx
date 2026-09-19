@@ -3,15 +3,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { ModuleMark } from '@/components/ui/module-mark';
 import { popoverSurface } from '@/components/ui/popover';
 import { SearchRowLine } from '@/components/shell/search-row';
+import { SearchScopeChip } from '@/components/shell/search-scope-chip';
 import {
   searchRowKey,
   useSearchRows,
   type SearchRow,
 } from '@/components/shell/use-search-rows';
-import { scopeForModule, scopeLabel, toggleScope, type SearchScope } from '@/lib/search/scope';
+import { scopeForModule, toggleScope, type SearchScope } from '@/lib/search/scope';
 import type { ModuleId } from '@/lib/modules';
 import type { Theme } from '@/lib/theme';
 import type { NavSection } from '@/components/shell/app-shell';
@@ -110,8 +110,6 @@ export function SearchBar({
    * as it was until a character is typed.
    */
   const showing = focused && !dismissed && query.trim() !== '';
-  /** Only where there is a workspace to narrow to, which the home page is not. */
-  const chip = module !== null;
 
   function choose(row: SearchRow | undefined) {
     if (!row) return;
@@ -211,28 +209,7 @@ export function SearchBar({
           className="h-full w-full min-w-0 bg-transparent text-base text-ink outline-none placeholder:text-ink-ghost sm:text-ui"
         />
 
-        {chip && (
-          <button
-            type="button"
-            onClick={pressChip}
-            // Named by what it is searching and by what pressing it does,
-            // because the word on it is a state rather than an instruction.
-            aria-label={`Searching ${scopeLabel(scope)}. Search ${scopeLabel(toggleScope(scope, module))} instead`}
-            // ui-ok: hand-rolled-box -- the pill is the button, so its edge is
-            // the control rather than a frame around a group. It stands on the
-            // field's own ground, so neither a shared ground nor space can say
-            // that it is something you press. No primitive draws this shape:
-            // Button is rounded-control and its smallest size is the height of
-            // the box this sits inside, and ChipSelect and ChipInput wrap a
-            // select and an input.
-            className="press flex shrink-0 items-center gap-1.5 rounded-full border border-border py-0.5 pl-1 pr-2 text-small text-ink-muted transition-colors hover:bg-sunken hover:text-ink"
-          >
-            {/* The mark of what is being searched: a workspace's own, or the
-                app's for everything you own. */}
-            <ModuleMark module={scope === 'everything' ? null : scope} size="sm" />
-            <span className="whitespace-nowrap">{scopeLabel(scope)}</span>
-          </button>
-        )}
+        <SearchScopeChip scope={scope} module={module} onPress={pressChip} />
       </div>
 
       {showing && (

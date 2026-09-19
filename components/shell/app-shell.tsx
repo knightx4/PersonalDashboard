@@ -3,7 +3,15 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Settings, X } from 'lucide-react';
+import {
+  Menu,
+  MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Search,
+  Settings,
+  X,
+} from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { FeedbackButton } from '@/components/shell/feedback-button';
 import { NotificationsButton, type Notification } from '@/components/shell/notifications-button';
@@ -136,6 +144,15 @@ export function AppShell({
   const paneRef = useRef<HTMLDivElement>(null);
   const [drawer, setDrawer] = useState(false);
   const [switcher, setSwitcher] = useState(false);
+  /**
+   * Whether the search box is up.
+   *
+   * Held here rather than inside the box, because below lg there is no field
+   * in the top bar and the magnifier beside the account icons is how search
+   * opens (#701, #703). The box still listens for the shortcut itself, so
+   * pressing it and pressing the magnifier reach the same box (#713).
+   */
+  const [searching, setSearching] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const initial = (displayName || email).charAt(0).toUpperCase();
 
@@ -651,7 +668,8 @@ export function AppShell({
                 move to another one; on Home and the account page `module` is
                 null, there is no chip, and the bar searches everything.
 
-                Below lg there is no field here at all and ⌘K is the way in.
+                Below lg there is no field here at all: the magnifier further
+                along this row opens the box instead, and ⌘K still does too.
                 1024 is where the column appears, and a field competing with
                 the page title for a phone's width would leave neither of them
                 readable. */}
@@ -682,6 +700,22 @@ export function AppShell({
                 account. The workspace's own settings moved into its column --
                 see sidebarInner. */}
                 <div className="flex shrink-0 items-center gap-0.5">
+                  {/* Search, below lg, where there is no field in the bar. It
+                  opens the same box the shortcut opens, on the same rows and
+                  the same ranking, with the chip that widens it to everything
+                  you own. From lg up the field is in the bar a few inches to
+                  the left and a second way in beside it would be two controls
+                  for one thing. */}
+                  <button
+                    type="button"
+                    onClick={() => setSearching(true)}
+                    title="Search"
+                    className="press flex size-8 shrink-0 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink lg:hidden"
+                  >
+                    <Search className="size-4" strokeWidth={1.75} aria-hidden />
+                    <span className="sr-only">Search</span>
+                  </button>
+
                   <CaptureButton />
                   <ThemePicker value={theme} />
                   <NotificationsButton notifications={notifications} />
@@ -768,6 +802,8 @@ export function AppShell({
             sections={sections}
             enabledModules={workspaces}
             theme={theme}
+            open={searching}
+            onOpenChange={setSearching}
           />
         </div>
       </CaptureProvider>
