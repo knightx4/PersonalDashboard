@@ -1073,6 +1073,30 @@ export function needsThePerson(
   );
 }
 
+/**
+ * A step the runner may take: one you approved and did not keep.
+ *
+ * The test here used to be `assignee === 'claude'`, so a step had to be handed
+ * over by hand before any routine could see it. On the night of 18 September
+ * sixteen of the twenty-four approved, ready build steps had no assignee at
+ * all, and the run ended at 23:44 saying nothing was ready with two thirds of
+ * the available work in front of it.
+ *
+ * Approving is the hand-over now (#669, #670), which leaves the assignee
+ * column answering the narrower question it is good at: which approved steps
+ * did you keep for yourself. `me` is the whole of that answer, so an empty
+ * assignee and the `claude` every hand-over used to write read the same way.
+ *
+ * `proposed` is the other half of it, and it is what approving means: a
+ * suggestion nobody has said yes to stays out of reach however it is
+ * assigned. Everything past those two -- ready, open, not waiting on the
+ * person -- is the caller's, because the three readers of this rule each want
+ * a different amount of it.
+ */
+export function isClaudes(node: Pick<PlanNode, 'status' | 'assignee'>): boolean {
+  return node.status !== 'proposed' && node.assignee !== 'me';
+}
+
 function matchesView(node: PlanNode, view: PlanView): boolean {
   switch (view) {
     case 'all':
@@ -1086,9 +1110,7 @@ function matchesView(node: PlanNode, view: PlanView): boolean {
     case 'proposed':
       return node.status === 'proposed';
     case 'claude':
-      return (
-        node.assignee === 'claude' && !isClosed(node.status) && !isWaitingOnThePerson(node)
-      );
+      return isClaudes(node) && !isClosed(node.status) && !isWaitingOnThePerson(node);
     case 'blocked':
       return !isClosed(node.status) && (isBlocked(node) || node.waitingOn.length > 0);
     // Closed steps included. A finished feature still carrying fog is the
@@ -1326,6 +1348,11 @@ export function countMatches(sections: readonly PlanSection[]): number {
  *
  * Both stay ready and stay in the unfiltered order, so they show on the page
  * and hold up everything waiting on them until somebody settles them.
+ *
+ * `{ assignee: 'claude' }` asks for what the runner may take, which is
+ * `isClaudes` rather than the column: every approved step but the ones you
+ * kept. `{ assignee: 'me' }` is the column read literally, because those are
+ * the ones you kept.
  */
 export function workOrder(
   sections: readonly PlanSection[],
@@ -1334,8 +1361,11 @@ export function workOrder(
   return flattenSections(sections)
     .filter((node) => node.ready)
     .filter((node) => !isDismissed(node))
-    .filter((node) => (options.assignee ? node.assignee === options.assignee : true))
-    .filter((node) => (options.assignee === 'claude' ? !isWaitingOnThePerson(node) : true))
+    .filter((node) => {
+      if (!options.assignee) return true;
+      if (options.assignee === 'me') return node.assignee === 'me';
+      return isClaudes(node) && !isWaitingOnThePerson(node);
+    })
     .sort((a, b) => a.priority - b.priority);
 }
 
@@ -1486,8 +1516,7 @@ export function summarize(sections: readonly PlanSection[]): PlanSummary {
     waiting: open.filter((node) => isBlocked(node) || node.waitingOn.length > 0).length,
     ready: open.filter((node) => node.ready).length,
     done: nodes.filter((node) => node.status === 'done').length,
-    claude: open.filter((node) => node.assignee === 'claude' && !isWaitingOnThePerson(node))
-      .length,
+    claude: open.filter((node) => isClaudes(node) && !isWaitingOnThePerson(node)).length,
     fog: nodes.filter((node) => hasLiveFog(node)).length,
     dismissed: all.filter((node) => isDismissed(node) || node.fogDismissedAt !== null).length,
   };

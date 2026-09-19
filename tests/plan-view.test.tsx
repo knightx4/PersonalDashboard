@@ -328,7 +328,9 @@ describe('PlanView', () => {
     }
     expect(html).toContain('href="/dev/plan"');
     expect(html).toMatch(/>2<\/span> ready/);
-    expect(html).toMatch(/>1<\/span> Dash/);
+    // Four of the five open steps: everything but the blocked one, since
+    // approving a step is what makes it Dash's and only `stuck` is on you.
+    expect(html).toMatch(/>4<\/span> Dash/);
   });
 
   it('draws five views as chips and leaves the rest to the menu', () => {

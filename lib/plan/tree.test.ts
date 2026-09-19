@@ -446,12 +446,16 @@ describe('applyView', () => {
   const fixture = () =>
     tree(
       [
-        item({ id: 'feature' }),
+        // Kept for yourself, both of them, because the Dash view needs a row
+        // that does not match and a module with nothing to show for the two
+        // tests below to have a subject. Approving is the hand-over now, so a
+        // step with nobody on it is Dash's.
+        item({ id: 'feature', assignee: 'me' }),
         at('done', 'done-step', { parentId: 'feature' }),
         at('not_started', 'open-step', { parentId: 'feature', assignee: 'claude' }),
         at('blocked', 'stuck', { parentId: 'feature' }),
         at('done', 'finished-feature', { module: 'jobs' }),
-        item({ id: 'waits', module: 'jobs' }),
+        item({ id: 'waits', module: 'jobs', assignee: 'me' }),
       ],
       [dep('waits', 'feature')],
     );
@@ -505,6 +509,17 @@ describe('applyView', () => {
 
   it('leaves out modules that have nothing to show, so a narrowed page is short', () => {
     expect(applyView(fixture(), 'claude').map((s) => s.module)).toEqual(['shopping']);
+  });
+
+  it('shows a step nobody was assigned under "claude", and no proposal', () => {
+    const sections = tree([
+      item({ id: 'nobody' }),
+      item({ id: 'kept', assignee: 'me' }),
+      at('proposed', 'suggested'),
+      at('proposed', 'suggested-to-claude', { assignee: 'claude' }),
+    ]);
+    expect(flattenSections(applyView(sections, 'claude')).map((n) => n.id)).toEqual(['nobody']);
+    expect(summarize(sections).claude).toBe(1);
   });
 
   it('drops a module with nothing open from "open" as well', () => {
@@ -690,13 +705,20 @@ describe('workOrder', () => {
     ]);
   });
 
-  it('can be narrowed to what Claude holds', () => {
+  it('can be narrowed to every approved step but the ones you kept', () => {
+    // The two halves of one question: `me` is what you held back, and
+    // everything else approved is the runner's, whether or not anybody ever
+    // pressed Send on it.
     const sections = tree([
       item({ id: 'mine', assignee: 'me' }),
       item({ id: 'theirs', assignee: 'claude' }),
       item({ id: 'nobody' }),
     ]);
-    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['theirs']);
+    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual([
+      'theirs',
+      'nobody',
+    ]);
+    expect(workOrder(sections, { assignee: 'me' }).map((n) => n.id)).toEqual(['mine']);
   });
 
   it('still offers the steps of a feature blocked over one question beneath it', () => {
@@ -811,7 +833,9 @@ describe('summarize', () => {
       // d alone: the feature has open steps and f is waiting.
       ready: 1,
       done: 1,
-      claude: 2,
+      // Everything open that you did not keep: the feature itself, b, d and
+      // f. c is blocked, so it is on you; g is a proposal.
+      claude: 4,
       fog: 0,
       dismissed: 0,
     });

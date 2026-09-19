@@ -95,6 +95,7 @@ import {
   buildPlanTree,
   findNode,
   flattenSections,
+  isClaudes,
   planLiveness,
   summarize,
   workOrder,
@@ -430,7 +431,9 @@ async function main(): Promise<void> {
         if (onlyModule && section.module !== onlyModule) continue;
         const nodes = keep(
           section.nodes,
-          (node) => (all || !isClosed(node.status)) && (!claude || node.assignee === 'claude'),
+          // `--claude` asks the same question the Dash view on the page asks,
+          // and `isClaudes` is where that question is answered.
+          (node) => (all || !isClosed(node.status)) && (!claude || isClaudes(node)),
         );
         if (nodes.length === 0) continue;
         const { done, live } = section.progress;

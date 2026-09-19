@@ -52,7 +52,7 @@ beside them.
 | `comment` | Your own note on it: why it stalled, what changed. The CLI appends a dated line when it closes or blocks a step. |
 | `priority` | 1 next, 2 normal, 3 someday — the same three the notes queue uses. |
 | `size` | `s`, `m` or `l`. Coarse on purpose: "one sitting or not", not hours. |
-| `assignee` | `me` or `claude`. A step handed to Claude is one a routine may pick up on its own. |
+| `assignee` | `me`, `claude`, or nothing at all. `me` is a step you kept for yourself; every other approved step is one a routine may pick up on its own, which is what approving it did. `claude` is what every hand-over used to write and reads the same as an empty column. |
 | `commit_sha` | The commit that shipped it. |
 | `position` | Order among siblings. Sparse; re-dealt in tens when a step is moved. |
 | `started_at`, `completed_at` | Kept by a trigger from the status. Done and dropped both count as finished; a reopened step loses its completion time. |
@@ -618,7 +618,7 @@ decision is ready for the person, not for a session.
 
 **Views.** `?view=` narrows the page to `open` (the default), `you`, `ready`,
 `proposed`, `blocked` (blocked by hand or waiting on another), `claude`
-(open steps handed to Claude), `fog`, `dismissed` or `all`. A step that does
+(approved steps you did not keep for yourself), `fog`, `dismissed` or `all`. A step that does
 not match stays, dimmed, when something beneath it does, so a ready sub-step is
 seen in its place. A dismissed step is the one thing `all` does not show:
 `dismissed` is where it is, and hiding it everywhere else is what dismissing it
