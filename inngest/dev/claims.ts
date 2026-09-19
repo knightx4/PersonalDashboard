@@ -41,6 +41,12 @@ import { subtreeBlockedAt } from '@/lib/plan/subtree';
  * claim the clock has not: the reading is only ever consulted about a step
  * that is already two hours old.
  *
+ * What a refusal does change is the line written on the row. #682: a claim
+ * released after GitHub answered and the run had pushed nothing, and one
+ * released because GitHub could not be asked at all, wrote the same sentence,
+ * and only the second is a reason to go and look at the token. So the refusal
+ * is carried out of the ask and into the note.
+ *
  * A block can take back what the look at GitHub saved. #679 added that second
  * half of the reading: a session that stopped to ask a question has ended,
  * whatever it pushed on the way, so a claim over a subtree carrying a block
@@ -96,6 +102,26 @@ type RunRow = {
 };
 
 /**
+ * What the runs behind a condemned set said, for the pass as a whole.
+ *
+ * Two answers rather than one because a release has two shapes now. `live` is
+ * the claims that stand. `unheard` is the ones released without anything
+ * having been read about them: they had a run to ask about and GitHub refused,
+ * so the clock decided on its own and the line written on the row says so.
+ */
+type ClaimRunEvidence = {
+  /** Steps whose run still reads live, so the claim stands. */
+  live: Set<string>;
+  /** Steps GitHub could not be asked about, against why it refused. */
+  unheard: Map<string, string>;
+};
+
+/** Nothing was read, so every condemned claim goes back on the clock alone. */
+function noEvidence(): ClaimRunEvidence {
+  return { live: new Set(), unheard: new Map() };
+}
+
+/**
  * Which of these condemned claims have a run that is still live, by step id.
  *
  * Only the ones the clock condemned as `stale` are asked about. `unowned` is
@@ -123,9 +149,9 @@ async function claimsWithLiveRuns(
   claims: readonly StaleClaim[],
   now: Date,
   fetchFn?: typeof globalThis.fetch,
-): Promise<Set<string>> {
+): Promise<ClaimRunEvidence> {
   const candidates = claims.filter((claim) => claim.why === 'stale');
-  if (candidates.length === 0) return new Set();
+  if (candidates.length === 0) return noEvidence();
 
   const { data, error } = await supabase
     .from('plan_runs')
@@ -140,7 +166,7 @@ async function claimsWithLiveRuns(
     // read. A sweep that refused to run because one read failed would leave
     // every dead claim standing until tomorrow.
     console.error(`the runs behind the stale claims could not be read: ${error.message}`);
-    return new Set();
+    return noEvidence();
   }
 
   // Newest first, so the first row seen for a step is the run holding it.
@@ -148,16 +174,24 @@ async function claimsWithLiveRuns(
   for (const run of (data ?? []) as RunRow[]) {
     if (run.plan_item_id && !latest.has(run.plan_item_id)) latest.set(run.plan_item_id, run);
   }
-  if (latest.size === 0) return new Set();
+  if (latest.size === 0) return noEvidence();
 
   const oldest = Math.min(...[...latest.values()].map((run) => new Date(run.created_at).getTime()));
   const { pushes, error: refusal } = await listPushes({ since: oldest, fetch: fetchFn });
   const checkedAt = now.toISOString();
 
   const live = new Set<string>();
+  const unheard = new Map<string, string>();
   for (const { row } of candidates) {
     const run = latest.get(row.id);
     if (!run) continue;
+
+    // There was a run to ask about and GitHub would not say what it pushed.
+    // The claim is released on the clock below, the same as it was before
+    // #682; what is recorded here is that nothing was read, so the line on the
+    // row can say the release had no evidence behind it rather than evidence
+    // against it.
+    if (refusal) unheard.set(row.id, refusal);
 
     const push = refusal ? null : lastPushSince(pushes, run.created_at);
     const reading = readingFor({
@@ -189,7 +223,7 @@ async function claimsWithLiveRuns(
     live.add(row.id);
   }
 
-  return live;
+  return { live, unheard };
 }
 
 /**
@@ -229,7 +263,7 @@ export async function releaseStaleClaims(
   }
 
   // Asked once, for the whole condemned set, before anything is written.
-  const live = await claimsWithLiveRuns(supabase, expired, now, options.fetch);
+  const { live, unheard } = await claimsWithLiveRuns(supabase, expired, now, options.fetch);
 
   const steps: number[] = [];
   const kept: number[] = [];
@@ -241,7 +275,7 @@ export async function releaseStaleClaims(
       continue;
     }
 
-    const line = claimExpiredNote(why, row.started_at, now.getTime());
+    const line = claimExpiredNote(why, row.started_at, now.getTime(), unheard.get(row.id) ?? null);
     const { error: writeError } = await supabase
       .from('plan_items')
       .update({
