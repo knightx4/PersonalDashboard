@@ -230,6 +230,33 @@ describe('overnightTick', () => {
     expect(calls.stopped).toEqual([]);
   });
 
+  it('offers a feature again on a new run, however the last one went', async () => {
+    // The zero-progress guard belongs inside one run. Read over all time it
+    // takes a feature out of every night that follows: #532 was excluded from
+    // 18 September onwards by a session that died before claiming its step,
+    // while still handed to Claude and still ready.
+    const { ports: p, calls } = ports({
+      loadRun: async () => night({ startedAt: '2026-09-17T23:00:00.000Z' }),
+      lastFiredAt: async () => ({ feature: YESTERDAY }),
+    });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired' });
+    expect(calls.fired).toEqual([{ feature: 'feature', step: 'step' }]);
+  });
+
+  it('still passes over a feature this run already tried without a close', async () => {
+    const { ports: p, calls } = ports({
+      loadRun: async () => night({ startedAt: '2026-09-17T23:00:00.000Z' }),
+      lastFiredAt: async () => ({ feature: '2026-09-17T23:30:00.000Z' }),
+    });
+
+    const tick = await overnightTick(p);
+
+    expect(tick.act).toBe('nothing-ready');
+    expect(calls.fired).toEqual([]);
+    expect(calls.stopped).toEqual([]);
+  });
+
   it('fires a run with no cap without counting anything down', async () => {
     const { ports: p, calls } = ports({
       loadRun: async () => night({ featuresBudget: null, featuresLeft: null, stopBy: null }),
@@ -462,7 +489,9 @@ describe('overnightTick', () => {
     const first = findNode(sections, 'first')!;
     const { ports: p } = ports({
       loadSections: async () => sections,
-      lastFiredAt: async () => ({ second: YESTERDAY }),
+      // Inside this run's window, so the guard passes it over. A fire from
+      // before the run started is another run's business.
+      lastFiredAt: async () => ({ second: '2026-09-17T23:30:00.000Z' }),
       fire: async () => ({
         ok: false,
         refused: true,
@@ -470,8 +499,8 @@ describe('overnightTick', () => {
       }),
     });
 
-    const ended = await overnightTick(p);
-    const reason = ended.act === 'ended' ? ended.reason : '';
+    const tick = await overnightTick(p);
+    const reason = tick.act === 'nothing-ready' ? tick.reason : '';
 
     // "Every feature left refused" would not be true: one was never offered.
     expect(reason).toContain('what had not already been tried');

@@ -336,7 +336,25 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
   const liveness = await ports.lastRunLiveness(run);
   if (!isOver(liveness)) return { act: 'waiting', liveness: liveness as RunLiveness };
 
-  const [sections, lastFiredAt] = await Promise.all([ports.loadSections(), ports.lastFiredAt()]);
+  const [allFires, sections] = await Promise.all([ports.lastFiredAt(), ports.loadSections()]);
+
+  // Only the fires this run made. The guard below passes over a feature whose
+  // last session closed nothing, and that is the right rule inside one run: it
+  // stops the runner spending the night offering the same stuck feature every
+  // four minutes.
+  //
+  // Read over all time it is a different rule and a much worse one. One
+  // session that died without closing anything takes its feature out of every
+  // night that follows, for good, with nothing on the page to say why. #532
+  // has been excluded since 18 September by a session that never got as far as
+  // claiming its step, and it is still handed to Claude and still ready.
+  const since = run.startedAt ? new Date(run.startedAt).getTime() : null;
+  const lastFiredAt: Record<string, string> =
+    since === null
+      ? allFires
+      : Object.fromEntries(
+          Object.entries(allFires).filter(([, at]) => new Date(at).getTime() >= since),
+        );
 
   // A refused feature is the same case as one whose last run closed nothing:
   // take it out of the tree and ask again.
@@ -379,7 +397,15 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
       // Retrying them costs a few queries a tick. The send refuses before it
       // starts a routine, so no session is fired and no tokens are spent, and
       // that is a much smaller price than a night that stops.
-      if (choice.reason === OVERNIGHT_NOTHING_READY) {
+      // The same goes for every feature having been tried without a close. It
+      // is a fact about this run so far, not about the plan: a claim frees, a
+      // step closes under a neighbouring feature, you approve something, and
+      // the tree reads differently four minutes later.
+      //
+      // Which leaves the budget and the stop time as the only two things that
+      // end a run, and that is the whole rule. A run told to go until you stop
+      // it has neither, so it goes until you stop it.
+      if (choice.reason === OVERNIGHT_NOTHING_READY || choice.reason === OVERNIGHT_NO_PROGRESS) {
         return { act: 'nothing-ready', reason };
       }
       await ports.stop(reason);
