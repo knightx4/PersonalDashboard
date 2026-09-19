@@ -44,9 +44,22 @@ export function parseScope(value: string | null | undefined): SearchScope {
   return value && isModuleId(value) ? value : 'everything';
 }
 
+/**
+ * Whether a row belonging to this workspace may appear in a search asked for
+ * this scope.
+ *
+ * The one rule both halves of a search box are narrowed by. A row with no
+ * workspace -- Home, Account, a theme -- is out of every scope but
+ * `'everything'`, which is what #720 settled: with the chip on a workspace the
+ * list is that workspace's rows and nothing else.
+ */
+export function moduleInScope(module: ModuleId | null | undefined, scope: SearchScope): boolean {
+  return scope === 'everything' || module === scope;
+}
+
 /** Whether one hit belongs in a search asked for this scope. */
 export function inScope(hit: SearchHit, scope: SearchScope): boolean {
-  return scope === 'everything' || hit.module === scope;
+  return moduleInScope(hit.module, scope);
 }
 
 /**
@@ -58,5 +71,26 @@ export function inScope(hit: SearchHit, scope: SearchScope): boolean {
  * first would spend the caps in rank.ts on rows about to be dropped.
  */
 export function hitsInScope(hits: readonly SearchHit[], scope: SearchScope): SearchHit[] {
-  return scope === 'everything' ? [...hits] : hits.filter((hit) => hit.module === scope);
+  return scope === 'everything' ? [...hits] : hits.filter((hit) => inScope(hit, scope));
+}
+
+/**
+ * The places to go and the things to start that a scoped search may show.
+ *
+ * The other half of the same list: the sections of the workspace you are in,
+ * Home, the other workspaces, Account, the themes and the capture actions. A
+ * scoped search keeps only the rows of the workspace it names, so a bar
+ * narrowed to one workspace offers no other workspace by name, no page of one
+ * and nothing you could start in one.
+ *
+ * Structural rather than typed to the command, so the shape that carries these
+ * rows can stay in the component that builds them.
+ */
+export function commandsInScope<T extends { module?: ModuleId | null }>(
+  commands: readonly T[],
+  scope: SearchScope,
+): T[] {
+  return scope === 'everything'
+    ? [...commands]
+    : commands.filter((command) => moduleInScope(command.module, scope));
 }
