@@ -16,19 +16,43 @@
 /**
  * What the app insists on, and no more.
  *
- * `max-width` with `!important` is the rule that matters. Mail is laid out in
- * tables with a fixed pixel width, 600 of them by convention, and on a phone
- * that is wider than the screen -- so the width is capped and the cells reflow,
- * which is how the issue reads down the page instead of off the side of it.
+ * Mail is laid out in tables with a fixed pixel width, 600 of them by
+ * convention, and on a phone that is wider than the screen. Capping the width
+ * is what makes the cells reflow, so the issue reads down the page instead of
+ * off the side of it.
+ *
+ * The cap has to be measured against the viewport rather than written as
+ * `max-width: 100%`. A percentage is measured against the containing block,
+ * and the block containing a newsletter's 600-pixel table is almost always a
+ * cell that is itself sized by its contents. That is circular, so the browser
+ * ignores the percentage and the table keeps its 600 pixels. `100vw` is a
+ * length the browser can resolve, which is why the rule below is written that
+ * way and why the padding is a variable: the cap and the padding it has to
+ * account for cannot be allowed to drift apart.
+ *
+ * A cap cannot take a table below the width of its own contents, so it does
+ * not help the two-column layout, where a 600-pixel shell holds a pair of
+ * 300-pixel tables and the pair is the content. The second rule is for that
+ * one: a table nested inside another, asking for a width in pixels, is given
+ * the width it fits in instead. The outer shell still decides the layout, so
+ * on a wide screen the columns are where the sender put them.
+ *
+ * Both rules only ever narrow an issue. A 600-pixel newsletter on a wide
+ * screen is still 600 pixels, which is the width its sender designed it at.
+ *
+ * `min(100%, …)` would read better than the two rules and does not work: the
+ * percentage inside it resolves against the same circular containing block and
+ * takes the cap with it. It was measured, not assumed.
  */
 /** The stamp on every message the frame sends, so the page can tell them apart. */
 const FRAME_MARK = 'news-frame';
 
 const FRAME_STYLES = `
+  :root { --frame-pad: 16px; }
   html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0;
-    padding: 16px;
+    padding: var(--frame-pad);
     background: #ffffff;
     color: #111111;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -36,7 +60,9 @@ const FRAME_STYLES = `
     line-height: 1.5;
     overflow-wrap: anywhere;
   }
-  img, table, td, th, pre, video { max-width: 100% !important; }
+  td, th, pre, video { max-width: 100% !important; }
+  img, table { max-width: calc(100vw - var(--frame-pad) * 2) !important; }
+  table table[width]:not([width$="%"]) { width: auto !important; }
   img { height: auto; }
   table { border-collapse: collapse; }
   a { color: inherit; }
