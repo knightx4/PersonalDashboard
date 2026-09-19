@@ -159,6 +159,7 @@ type StateRow = {
   established: StateBasis;
   misconception: string | null;
   tested_at: string | null;
+  declared_at: string | null;
 };
 
 /**
@@ -182,6 +183,7 @@ function toConcept(row: ConceptRow, state: StateRow | undefined): Concept {
     established: state?.established ?? 'inferred',
     misconception: state?.misconception ?? null,
     testedAt: state?.tested_at ?? null,
+    declaredAt: state?.declared_at ?? null,
   };
 }
 
@@ -210,7 +212,7 @@ export async function loadConcept(
 
   const { data: stateData, error: stateError } = await supabase
     .from('concept_state')
-    .select('concept_id, state, established, misconception, tested_at')
+    .select('concept_id, state, established, misconception, tested_at, declared_at')
     .eq('concept_id', conceptId)
     .maybeSingle();
 
@@ -264,7 +266,7 @@ export async function loadGraph(
   if (ids.length > 0) {
     const { data, error } = await supabase
       .from('concept_state')
-      .select('concept_id, state, established, misconception, tested_at')
+      .select('concept_id, state, established, misconception, tested_at, declared_at')
       .in('concept_id', ids);
 
     assertSchemaExposed(error, LEARN_SCHEMA);

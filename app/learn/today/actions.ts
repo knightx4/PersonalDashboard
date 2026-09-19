@@ -4,6 +4,7 @@ import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadReadyAndSettled, loadSubjects } from '@/lib/learn/graph/load';
 import { pickOneToAsk, type NothingToAsk } from '@/lib/learn/graph/pick';
+import type { SettledConcept } from '@/lib/learn/graph/recheck';
 import { PROBE_MODEL, writeProbe } from '@/lib/learn/graph/probe';
 import { answeredCount, nextMasteryCheck, probesFor, recordProbe } from '@/lib/learn/graph/session';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
@@ -25,8 +26,12 @@ export type TodayState = AskState & {
   subjectName?: string;
   /** Set instead of a question when there is nothing to ask about. */
   nothing?: NothingToAsk;
-  /** True when this question is about a claim you settled a while ago. */
-  recheck?: boolean;
+  /**
+   * How the claim was settled, when this question is a re-check: by a question
+   * you answered, or by your saying you already knew it. Unset for an ordinary
+   * question, so it reads as a flag as well as naming which of the two.
+   */
+  recheck?: SettledConcept['established'];
 };
 
 // latency: pending
@@ -99,7 +104,7 @@ export async function askTodayQuestion(
     conceptName: concept.name,
     subjectId,
     subjectName,
-    recheck: picked.kind === 'recheck',
+    recheck: picked.kind === 'recheck' ? picked.row.established : undefined,
     question: result.probe.question,
     options: result.probe.options,
   };

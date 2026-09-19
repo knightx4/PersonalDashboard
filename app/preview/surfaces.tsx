@@ -1149,6 +1149,7 @@ const subjectConcepts: Concept[] = [
     misconception: null,
     mastery: [],
     testedAt: '2026-09-02T09:00:00.000Z',
+    declaredAt: null,
   },
   {
     id: 'k2',
@@ -1164,6 +1165,7 @@ const subjectConcepts: Concept[] = [
     misconception: null,
     mastery: [],
     testedAt: null,
+    declaredAt: null,
   },
   {
     id: 'k3',
@@ -1178,6 +1180,7 @@ const subjectConcepts: Concept[] = [
     misconception: 'You treat the amount already spent as part of what continuing is worth.',
     mastery: [],
     testedAt: '2026-09-05T18:30:00.000Z',
+    declaredAt: null,
   },
   {
     id: 'k4',
@@ -1192,6 +1195,7 @@ const subjectConcepts: Concept[] = [
     misconception: null,
     mastery: [],
     testedAt: null,
+    declaredAt: null,
   },
 ];
 

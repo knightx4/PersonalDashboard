@@ -33,7 +33,12 @@ function daysAgo(days: number): string {
   return new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
 }
 
-function concept(id: string, state: KnowledgeState = 'unknown', testedAt: string | null = null): Concept {
+function concept(
+  id: string,
+  state: KnowledgeState = 'unknown',
+  testedAt: string | null = null,
+  declaredAt: string | null = null,
+): Concept {
   return {
     id,
     name: id,
@@ -44,9 +49,10 @@ function concept(id: string, state: KnowledgeState = 'unknown', testedAt: string
     kind: null,
     mastery: [],
     state,
-    established: testedAt === null ? 'inferred' : 'tested',
+    established: declaredAt !== null ? 'declared' : testedAt === null ? 'inferred' : 'tested',
     misconception: null,
     testedAt,
+    declaredAt,
   };
 }
 
@@ -59,7 +65,19 @@ function settled(id: string, testedAt: string, where = subject): SettledConcept 
     concept: concept(id, 'known', testedAt),
     subjectId: where.id,
     subjectName: where.name,
-    testedAt,
+    established: 'tested',
+    settledAt: testedAt,
+  };
+}
+
+/** A claim you said you already knew, on the day you said it. */
+function waved(id: string, declaredAt: string, where = subject): SettledConcept {
+  return {
+    concept: concept(id, 'known', null, declaredAt),
+    subjectId: where.id,
+    subjectName: where.name,
+    established: 'declared',
+    settledAt: declaredAt,
   };
 }
 
@@ -141,6 +159,47 @@ describe('one kind at a time', () => {
     expect(rows).toEqual([]);
   });
 
+  it('mixes a claim you waved through in with the ones you answered about', () => {
+    const rows = rankNext(
+      {
+        ...empty,
+        settled: [
+          settled('answered', '2026-06-01T12:00:00Z'),
+          waved('waved-long-ago', '2025-01-01T12:00:00Z'),
+          waved('waved-in-august', '2026-08-01T12:00:00Z'),
+        ],
+      },
+      NOW,
+    );
+    expect(keys(rows)).toEqual([
+      'recheck:waved-long-ago',
+      'recheck:answered',
+      'recheck:waved-in-august',
+    ]);
+  });
+
+  it('leaves out a claim you waved through this week', () => {
+    const rows = rankNext({ ...empty, settled: [waved('tuesday', '2026-09-10T12:00:00Z')] }, NOW);
+    expect(rows).toEqual([]);
+  });
+
+  it('carries the basis onto the row, so the two kinds read differently', () => {
+    const rows = rankNext(
+      {
+        ...empty,
+        settled: [
+          settled('answered', '2026-08-01T12:00:00Z'),
+          waved('waved', '2026-08-01T12:00:00Z'),
+        ],
+      },
+      NOW,
+    );
+    expect(rows.map((row) => row.reason)).toEqual([
+      'Answered 45 days ago and not asked about since.',
+      'You said so 45 days ago and not asked about since.',
+    ]);
+  });
+
   it('returns queued readings when nothing else is waiting', () => {
     const rows = rankNext(
       { ...empty, readings: [queued('new', '2026-09-01T12:00:00Z'), queued('old', '2026-02-01T12:00:00Z')] },
@@ -210,15 +269,27 @@ describe('what each row says about itself', () => {
     expect(readyReason(null)).toBe('Nothing is missing underneath it.');
   });
 
-  it('says how long a settled claim has gone unchecked', () => {
-    expect(recheckReason('2026-08-01T12:00:00Z', NOW)).toBe(
+  it('says how long a claim you answered about has gone unchecked', () => {
+    expect(recheckReason('tested', '2026-08-01T12:00:00Z', NOW)).toBe(
       'Answered 45 days ago and not asked about since.',
     );
-    expect(recheckReason('2026-01-01T12:00:00Z', NOW)).toBe(
+    expect(recheckReason('tested', '2026-01-01T12:00:00Z', NOW)).toBe(
       'Answered 8 months ago and not asked about since.',
     );
-    expect(recheckReason('2022-09-15T12:00:00Z', NOW)).toBe(
+    expect(recheckReason('tested', '2022-09-15T12:00:00Z', NOW)).toBe(
       'Answered 4 years ago and not asked about since.',
+    );
+  });
+
+  it('says a claim you waved through was taken on your word, and when', () => {
+    expect(recheckReason('declared', '2026-08-01T12:00:00Z', NOW)).toBe(
+      'You said so 45 days ago and not asked about since.',
+    );
+    expect(recheckReason('declared', '2026-01-01T12:00:00Z', NOW)).toBe(
+      'You said so 8 months ago and not asked about since.',
+    );
+    expect(recheckReason('declared', '2022-09-15T12:00:00Z', NOW)).toBe(
+      'You said so 4 years ago and not asked about since.',
     );
   });
 

@@ -80,6 +80,13 @@ export type Concept = {
    */
   mastery: string[];
   testedAt: string | null;
+  /**
+   * When you said you already knew this, without being asked. Null on a claim
+   * you never declared, and never set at the same time as `testedAt`: a claim
+   * carries the date it was answered about or the date you waved it through,
+   * and the database refuses a row holding both.
+   */
+  declaredAt: string | null;
 };
 
 export type ConceptEdge = {
