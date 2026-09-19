@@ -40,6 +40,19 @@ describe('runEnd', () => {
     expect(runEnd({ status: 'started', createdAt: fired }, step, at(60 * 40))).toBe('finished');
   });
 
+  it('counts a run whose step was blocked after it as finished', () => {
+    // The session did what it could and wrote down the question it could not
+    // answer, which is as much an end as a close. #679.
+    const step = { completedAt: null, blockedAt: '2026-09-17T02:40:00.000Z' };
+    expect(runEnd({ status: 'started', createdAt: fired }, step, at(50))).toBe('finished');
+  });
+
+  it('ignores a block from before the run was fired', () => {
+    const step = { completedAt: null, blockedAt: '2026-09-16T22:00:00.000Z' };
+    expect(runEnd({ status: 'started', createdAt: fired }, step, at(10))).toBeNull();
+    expect(runEnd({ status: 'started', createdAt: fired }, step, at(60 * 5))).toBe('failed');
+  });
+
   it('ignores a step that closed before the run was fired', () => {
     const step = { completedAt: '2026-09-16T22:00:00.000Z' };
     expect(runEnd({ status: 'started', createdAt: fired }, step, at(10))).toBeNull();

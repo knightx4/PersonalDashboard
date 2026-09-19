@@ -5,7 +5,8 @@ import { createServiceSupabase } from '@/inngest/supabase-admin';
 import { claimExpiredNote, expiredClaim, type ExpiredClaim } from '@/lib/plan/claims';
 import { listPushes } from '@/lib/plan/ci';
 import { claimIsLive, claimLiveness, lastPushSince } from '@/lib/plan/liveness';
-import { readingFor } from '@/lib/plan/run-end';
+import { endsRun, readingFor } from '@/lib/plan/run-end';
+import { subtreeBlockedAt } from '@/lib/plan/subtree';
 
 /**
  * Putting back the claims that nothing is working.
@@ -36,8 +37,14 @@ import { readingFor } from '@/lib/plan/run-end';
  *
  * A refusal, a rejected key or a step with nothing fired at it leaves the
  * pass exactly as it was: the reading is set aside and the two hours decide,
- * which is the fallback #570 chose. So the new look can only keep a claim,
- * never take one.
+ * which is the fallback #570 chose. Nothing the sweep reads can condemn a
+ * claim the clock has not: the reading is only ever consulted about a step
+ * that is already two hours old.
+ *
+ * A block can take back what the look at GitHub saved. #679 added that second
+ * half of the reading: a session that stopped to ask a question has ended,
+ * whatever it pushed on the way, so a claim over a subtree carrying a block
+ * newer than its run goes back on this pass rather than at the next sweep.
  *
  * `refreshRunReadings` in `lib/plan/runs.ts` is the other caller of the same
  * evidence and is not reused here, because it reads the claimed steps of one
@@ -163,7 +170,23 @@ async function claimsWithLiveRuns(
       { status: run.status, createdAt: run.created_at, reading },
       now.getTime(),
     );
-    if (claimIsLive(liveness)) live.add(row.id);
+    if (!claimIsLive(liveness)) continue;
+
+    // The pushes say a session was working, and a block under this step says
+    // that session has stopped: it wrote down what it needs and there is
+    // nothing more coming from it. #679. So the claim goes back rather than
+    // standing until the two hours are up.
+    //
+    // Only asked of the handful GitHub just saved, so an ordinary sweep makes
+    // no extra request at all. The subtree rather than this row, because a row
+    // holding a claim is never blocked itself -- the trigger clears
+    // `blocked_at` on anything that is not blocked -- so what stopped is a step
+    // beneath it. The newest close is deliberately not read here: a step
+    // closing under a claim is a session working through a batch.
+    const blockedAt = await subtreeBlockedAt(supabase, row.id);
+    if (endsRun(blockedAt, run.created_at)) continue;
+
+    live.add(row.id);
   }
 
   return live;

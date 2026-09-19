@@ -16,6 +16,7 @@ import {
   type OvernightRun,
 } from '@/lib/plan/overnight';
 import { chooseOvernightFeature, OVERNIGHT_NOTHING_READY } from '@/lib/plan/overnight-choice';
+import { subtreeBlockedAt, subtreeClosedAt } from '@/lib/plan/subtree';
 import { buildPlanTree, flatten, type PlanNode, type PlanSection } from '@/lib/plan/tree';
 
 /**
@@ -439,31 +440,6 @@ async function lastFeatureFires(supabase: Db, userId: string): Promise<Record<st
 }
 
 /**
- * The newest close on a step or anything beneath it, or null if nothing has.
- *
- * `plan_subtree_closed_at` (migration 0089) walks the subtree in one indexed
- * statement rather than the tick pulling the tree over the wire every four
- * minutes to answer a question about one branch of it.
- *
- * A function that cannot be reached falls back to the feature row alone. That
- * is the reading this code took before 0089 -- too strict, never wrong -- and
- * a runner that answered `unknown` here would stop firing for the rest of the
- * night over a failed lookup, which is a worse trade than being slow.
- */
-async function subtreeClosedAt(supabase: Db, root: string): Promise<string | null> {
-  const { data, error } = await supabase.rpc('plan_subtree_closed_at', { root });
-  if (!error) return (data as string | null) ?? null;
-
-  console.error(`plan_subtree_closed_at could not be read; falling back: ${error.message}`);
-  const { data: item } = await supabase
-    .from('plan_items')
-    .select('completed_at')
-    .eq('id', root)
-    .maybeSingle();
-  return (item as { completed_at: string | null } | null)?.completed_at ?? null;
-}
-
-/**
  * What the feature this night last fired is doing.
  *
  * Null when the night has fired nothing yet, which is the first tick of every
@@ -516,9 +492,18 @@ async function lastFireLiveness(input: {
   // one blocked or `proposed` step never closes and this test never fired --
   // which sent every run to the two-hour silence fallback below, however well
   // it had gone. See 0089 for the nights that measured it.
+  //
+  // The newest block under the feature is read beside the newest close, and
+  // `runLiveness` treats either as the end of the run. A session that stops to
+  // ask a question closes nothing, so on the close alone it read as silence
+  // and the tick waited out the no-output mark before firing again. #679.
   let closedAt: string | null = null;
+  let blockedAt: string | null = null;
   if (last.plan_item_id) {
-    closedAt = await subtreeClosedAt(supabase, last.plan_item_id);
+    [closedAt, blockedAt] = await Promise.all([
+      subtreeClosedAt(supabase, last.plan_item_id),
+      subtreeBlockedAt(supabase, last.plan_item_id),
+    ]);
   }
 
   const since = new Date(last.created_at).getTime();
@@ -528,6 +513,7 @@ async function lastFireLiveness(input: {
       startedAt: last.created_at,
       lastPush: pushError ? null : lastPushSince(pushes, last.created_at),
       stepClosedAt: closedAt,
+      stepBlockedAt: blockedAt,
       read: !pushError,
     },
     input.now,

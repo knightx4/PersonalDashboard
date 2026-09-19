@@ -293,3 +293,55 @@ describe('the newest close under a step', () => {
     expect(await closedAt(hers.id)).toBeNull();
   });
 });
+
+/**
+ * The other half of that reading. A session that stops to ask a question
+ * closes nothing, so the runner read it as silence and waited out the
+ * no-output mark before firing the next feature, with the session behind the
+ * block already gone. #679.
+ */
+describe('the newest block under a step', () => {
+  async function blockedAt(id: string): Promise<Date | null> {
+    const [row] = await asUser(alice, (tx) =>
+      tx<{ at: Date | null }[]>`select public.plan_subtree_blocked_at(${id}) as at`,
+    );
+    return row.at;
+  }
+
+  it('is null while nothing under it is blocked', async () => {
+    const feature = await addStep(alice, 'Nothing stuck');
+    await addStep(alice, 'Open step', { parentId: feature.id });
+    expect(await blockedAt(feature.id)).toBeNull();
+  });
+
+  it('answers for a feature whose step stopped to ask a question', async () => {
+    const feature = await addStep(alice, 'Stopped');
+    await addStep(alice, 'Built', { parentId: feature.id, status: 'done' });
+    await addStep(alice, 'Asking', { parentId: feature.id, status: 'blocked' });
+    expect(await blockedAt(feature.id)).not.toBeNull();
+  });
+
+  it('reaches a step of a step, not just the children', async () => {
+    const feature = await addStep(alice, 'Deep block');
+    const middle = await addStep(alice, 'Middle', { parentId: feature.id });
+    await addStep(alice, 'Leaf', { parentId: middle.id, status: 'blocked' });
+    expect(await blockedAt(feature.id)).not.toBeNull();
+  });
+
+  it('forgets a block once the step it was on moved on', async () => {
+    // The trigger clears `blocked_at` the moment the row is anything else, so
+    // an answered question leaves the subtree reading as it did before.
+    const feature = await addStep(alice, 'Answered');
+    const step = await addStep(alice, 'Was stuck', { parentId: feature.id, status: 'blocked' });
+    expect(await blockedAt(feature.id)).not.toBeNull();
+
+    await asUser(alice, (tx) => tx`update plan_items set status = 'not_started' where id = ${step.id}`);
+    expect(await blockedAt(feature.id)).toBeNull();
+  });
+
+  it("shows one account nothing of another account's plan", async () => {
+    const hers = await addStep(bob, 'Bob feature');
+    await addStep(bob, 'Bob step', { parentId: hers.id, status: 'blocked' });
+    expect(await blockedAt(hers.id)).toBeNull();
+  });
+});
