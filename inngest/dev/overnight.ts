@@ -204,6 +204,21 @@ export type OvernightTick =
   | { act: 'paused' }
   /** The last session is still going, so nothing was started or written. */
   | { act: 'waiting'; liveness: RunLiveness }
+  /**
+   * Nothing was ready this minute, and the night was left running.
+   *
+   * Not an `ended`. "Ready" is a reading of the tree at one instant and three
+   * ordinary things change it without anybody pushing: a stale claim is swept,
+   * a step closes, the person approves a proposal. Ending on it spends the
+   * rest of the night on a fact that was about to stop being true.
+   *
+   * It did, on 18 September. The night stopped at 23:44 saying nothing was
+   * handed over and ready, with sixteen features of budget and 2h33m of clock
+   * left. Steps #551 and #637 were both held by claims of sessions that had
+   * died, and the sweep that put them back ran at 23:49 -- five minutes after
+   * the night had given up. Waiting costs one read of the tree per tick.
+   */
+  | { act: 'nothing-ready'; reason: string }
   | { act: 'ended'; reason: string }
   | {
       act: 'fired';
@@ -340,6 +355,19 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
       // because the row's sentence is all the morning gets.
       const reason =
         refused.length > 0 ? overnightRefusedReason(refused, choice.reason) : choice.reason;
+      // Nothing ready is a reading of one instant, so the night keeps its
+      // clock and asks again in four minutes. Every other reason the chooser
+      // ends on -- the budget, the stop time, every ready feature tried
+      // without one closing -- is settled and does end it.
+      //
+      // Only when nothing refused, which is what makes this tick free: the
+      // chooser found no ready step and the send was never called, so asking
+      // again costs one read of the tree. Once features have refused, waiting
+      // would mean offering each of them the send again every four minutes for
+      // the rest of the night, and a refusal is mostly the person's to clear.
+      if (choice.reason === OVERNIGHT_NOTHING_READY && refused.length === 0) {
+        return { act: 'nothing-ready', reason };
+      }
       await ports.stop(reason);
       return { act: 'ended', reason };
     }
@@ -668,6 +696,9 @@ export async function runOvernightTick(
         console.log(`overnight: waiting -- the last run reads ${tick.liveness}.`);
       }
       if (tick.act === 'ended') console.log(`overnight: ended -- ${tick.reason}`);
+      if (tick.act === 'nothing-ready') {
+        console.log(`overnight: nothing ready this tick, still running -- ${tick.reason}`);
+      }
     } catch (err) {
       results[userId] = { act: 'failed', error: err instanceof Error ? err.message : 'failed' };
     }

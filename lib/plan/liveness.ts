@@ -43,6 +43,26 @@ export const QUIET_AFTER_MINUTES = 20;
 export const ENDED_AFTER_MINUTES = RUN_QUIET_AFTER_MINUTES;
 
 /**
+ * How long a run that has produced *nothing* may go before it is counted as
+ * gone.
+ *
+ * `ENDED_AFTER_MINUTES` is two hours because a session that is working can go
+ * quiet for a long stretch between pushes and firing a second one at the same
+ * feature is worse than waiting. A session that has pushed nothing at all
+ * since it was fired is a different claim: it has not created its branch, not
+ * committed, not closed a step. Nothing it did would be lost by giving up on
+ * it.
+ *
+ * Thirty minutes because the evidence is not close. `listPushes` reads the
+ * repository's activity across every ref, so a session shows up the moment it
+ * creates its branch -- and the sessions that worked took seven to eleven
+ * minutes to their first push. The one that stalled the runner for 2h07m on
+ * 18 September never pushed at all, and its step was still `not_started` when
+ * the claim was swept.
+ */
+export const NO_OUTPUT_AFTER_MINUTES = 30;
+
+/**
  * What a run is doing.
  *
  * `finished` is the one state that is not read off pushes: the step the run
@@ -239,6 +259,10 @@ export function runLiveness(evidence: RunEvidence, now: number): RunLiveness {
 
   if (!evidence.read) return 'unknown';
   if (now === 0) return 'working';
+
+  // Nothing on any ref since it was fired. Judged sooner than silence between
+  // pushes, because it is a stronger fact: this run never started.
+  if (!evidence.lastPush && (now - fired) / 60_000 >= NO_OUTPUT_AFTER_MINUTES) return 'ended';
 
   return silenceReads(silentFor(evidence.startedAt, evidence.lastPush?.at ?? null, now));
 }

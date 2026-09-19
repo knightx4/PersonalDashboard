@@ -303,16 +303,22 @@ describe('overnightTick', () => {
     expect(calls.fired).toEqual([]);
   });
 
-  it('ends the night with the chooser reason when nothing is ready', async () => {
+  it('keeps the night running when nothing is ready this minute', async () => {
+    // Ready is a reading of one instant. On 18 September the night stopped at
+    // 23:44 saying nothing was handed over and ready, with sixteen features of
+    // budget and 2h33m of clock left; the two steps that would have been ready
+    // were held by claims of dead sessions, and the sweep put them back at
+    // 23:49. Nothing refused here, so asking again costs one read of the tree.
     const { ports: p, calls } = ports({
       loadSections: async () => tree([item({ id: 'mine', assignee: 'me' })]),
     });
 
     await expect(overnightTick(p)).resolves.toEqual({
-      act: 'ended',
+      act: 'nothing-ready',
       reason: OVERNIGHT_NOTHING_READY,
     });
-    expect(calls.stopped).toEqual([OVERNIGHT_NOTHING_READY]);
+    expect(calls.stopped).toEqual([]);
+    expect(calls.fired).toEqual([]);
   });
 
   it('puts back stale claims before it reads the plan', async () => {

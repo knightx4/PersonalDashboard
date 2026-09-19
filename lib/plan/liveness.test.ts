@@ -170,6 +170,25 @@ describe('runLiveness', () => {
     expect(runLiveness(evidence({ startedAt: minutesAgo(150) }), NOW)).toBe('ended');
   });
 
+  it('gives up on a run that pushed nothing at all after half an hour', () => {
+    // A session shows up on the activity listing the moment it creates its
+    // branch, so half an hour of nothing is not a quiet session -- it is one
+    // that never started, and there is nothing of its work to lose.
+    expect(runLiveness(evidence({ startedAt: minutesAgo(35) }), NOW)).toBe('ended');
+  });
+
+  it('still waits the full two hours once a run has pushed something', () => {
+    // The same half hour, but this one got its branch up. Firing a second
+    // session at the feature it is working is worse than waiting for it.
+    expect(
+      runLiveness(evidence({ startedAt: minutesAgo(35), lastPush: push('claude/one', 32) }), NOW),
+    ).toBe('quiet');
+  });
+
+  it('keeps a run that has pushed nothing but is not yet half an hour old', () => {
+    expect(runLiveness(evidence({ startedAt: minutesAgo(25) }), NOW)).toBe('quiet');
+  });
+
   it('is finished when the step it was sent at closed after it was fired', () => {
     expect(
       runLiveness(evidence({ startedAt: minutesAgo(300), stepClosedAt: minutesAgo(200) }), NOW),
