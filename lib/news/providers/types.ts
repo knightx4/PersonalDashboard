@@ -20,6 +20,18 @@ export type InboundMessage = {
   messageId: string;
   textBody: string | null;
   htmlBody: string | null;
+  /**
+   * The https link the publisher offered for unsubscribing, or null when it
+   * offered none. Read from List-Unsubscribe, which is the only place it is
+   * available, and only at delivery.
+   */
+  unsubscribeUrl: string | null;
+  /**
+   * The address to write to instead, without the `mailto:` scheme and with any
+   * `?subject=` the header asked for still on the end. Null when the publisher
+   * offered no address.
+   */
+  unsubscribeEmail: string | null;
 };
 
 /**

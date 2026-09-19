@@ -70,6 +70,8 @@ export function newsStore(client: NewsSupabaseClient): NewsStore {
         subject: message.subject,
         text_body: message.textBody,
         html_body: message.htmlBody,
+        unsubscribe_url: message.unsubscribeUrl,
+        unsubscribe_email: message.unsubscribeEmail,
       });
       if (!error) return 'stored';
       // issues_user_message_key. The service retries anything it did not get a
