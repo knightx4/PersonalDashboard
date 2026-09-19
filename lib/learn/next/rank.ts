@@ -159,9 +159,25 @@ export function readyReason(stepsToGoal: number | null): string {
   return `${stepsToGoal} steps from a goal you named.`;
 }
 
-export function recheckReason(testedAt: string, now: Date): string {
-  const days = Math.floor((now.getTime() - new Date(testedAt).getTime()) / DAY_MS);
-  return `Answered ${ago(Math.max(days, 0))} ago and not asked about since.`;
+/**
+ * Why a settled claim is here: how it came to be settled, and how long ago.
+ *
+ * Two wordings for the two routes, because answering questions about a claim
+ * and saying you already knew it are different amounts of evidence, and one
+ * sentence covering both would overstate the weaker one every time. The
+ * wave-through wording says "you said so", the same words `ESTABLISHED_LABEL`
+ * uses for that basis, rather than naming the act a third way.
+ */
+export function recheckReason(
+  established: SettledConcept['established'],
+  settledAt: string,
+  now: Date,
+): string {
+  const days = Math.floor((now.getTime() - new Date(settledAt).getTime()) / DAY_MS);
+  const when = ago(Math.max(days, 0));
+  return established === 'declared'
+    ? `You said so ${when} ago and not asked about since.`
+    : `Answered ${when} ago and not asked about since.`;
 }
 
 export function readingReason(conceptName: string): string {
@@ -294,7 +310,7 @@ function toRecheckRow(row: SettledConcept, now: Date, record: Digest): NextReche
     key: `recheck:${row.concept.id}`,
     title: row.concept.name,
     href: probeHref(row.subjectId, row.concept.id),
-    reason: recheckReason(row.settledAt, now),
+    reason: recheckReason(row.established, row.settledAt, now),
     subjectId: row.subjectId,
     subjectName: row.subjectName,
     concept: row.concept,
