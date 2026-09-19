@@ -26,6 +26,7 @@ const concept = (over: Partial<Concept> = {}): Concept => ({
   misconception: null,
   mastery: [],
   testedAt: null,
+  declaredAt: null,
   ...over,
 });
 

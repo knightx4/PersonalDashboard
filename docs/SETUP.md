@@ -420,6 +420,22 @@ delivery. `lib/news/inbound/readiness.ts` is what closed that.
 anywhere. It appears in News within a minute. If it does not, Mailgun's Logs
 show whether the message reached the route and what the endpoint answered.
 
+**8. For sending, add the API key.** Only unsubscribing needs it. Some
+publishers put an address in the List-Unsubscribe header rather than a link,
+and the app writes to that address from your own newsletter address
+(`lib/news/unsubscribe/send.ts`). Sending needs two things the receiving half
+does not. One is a sending key, which Mailgun keeps under Send → API keys and
+which is a different value from the signing key in step 5; set
+`MAILGUN_API_KEY` to it. The other is the SPF and DKIM records from step 2,
+verified, since a publisher's mail server checks them before it trusts mail
+claiming to come from your domain. With the key unset, unsubscribing from an
+address-only newsletter says the deployment cannot send, and everything else
+in News works as before.
+
+The sender posts to `api.mailgun.net`. A domain created in Mailgun's EU region
+answers 401 there and needs `api.eu.mailgun.net` instead, which is a change to
+`MAILGUN_API_BASE` in that file rather than a variable.
+
 ---
 
 ## Environment variables
@@ -436,12 +452,13 @@ openssl rand -base64 32
 
 It must not be the anon key or the service role key.
 
-The newsletter workspace adds two of its own, both optional:
+The newsletter workspace adds three of its own, all optional:
 
 | Variable | What it is | Where it comes from |
 |---|---|---|
 | `NEWS_MAIL_DOMAIN` | The domain Mailgun receives newsletters on, e.g. `in.example.com`. Every account's address is a random local part on it. | You choose it, in step 1 above. |
 | `MAILGUN_SIGNING_KEY` | The HTTP webhook signing key every inbound post is checked against. Not the API key. | Mailgun, Sending → Webhooks. |
+| `MAILGUN_API_KEY` | The sending key, used only to send the unsubscribe mail a publisher asked for by address. Not the signing key. | Mailgun, Send → API keys. |
 
 ---
 

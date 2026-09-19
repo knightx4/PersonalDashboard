@@ -16,6 +16,8 @@ function message(over: Partial<InboundMessage> = {}): InboundMessage {
     messageId: '<issue-42@thepaper.com>',
     textBody: 'Morning.',
     htmlBody: '<p>Morning.</p>',
+    unsubscribeUrl: null,
+    unsubscribeEmail: null,
     ...over,
   };
 }

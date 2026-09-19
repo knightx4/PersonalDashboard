@@ -64,6 +64,47 @@ export function parseFrom(from: string): { email: string; name: string | null } 
   return { email, name: raw === '' ? null : raw.slice(0, 300) };
 }
 
+/**
+ * The two things a List-Unsubscribe header can offer.
+ *
+ * RFC 2369 puts each entry in angle brackets and separates them with a comma:
+ * `<https://thepaper.com/u/abc>, <mailto:unsub@thepaper.com?subject=unsub>`. A
+ * publisher may offer either, both, or neither, and may also offer something
+ * this app cannot use -- an ftp: or news: URI is allowed by the RFC -- which is
+ * dropped rather than stored, since nothing downstream could act on it.
+ *
+ * The `mailto:` scheme comes off the address and any `?subject=` stays on it,
+ * which is the shape news.issues stores (issues_unsubscribe_email_ck refuses a
+ * stored scheme) and the shape #615 needs to send the mail from.
+ */
+function parseListUnsubscribe(value: string | null): {
+  url: string | null;
+  email: string | null;
+} {
+  let url: string | null = null;
+  let email: string | null = null;
+
+  for (const entry of value?.match(/<[^>]*>/g) ?? []) {
+    const inner = entry.slice(1, -1).trim();
+    // 2048 is issues_unsubscribe_url_ck's limit. A link past it is dropped
+    // rather than cut, because half a link opens nothing.
+    if (!url && /^https?:\/\//i.test(inner) && inner.length <= 2048) {
+      url = inner;
+      continue;
+    }
+    if (!email && /^mailto:/i.test(inner)) {
+      const address = inner.slice('mailto:'.length).trim();
+      // issues_unsubscribe_email_ck again: a bare `<mailto:>` would otherwise
+      // fail the insert and lose the whole issue.
+      if (address.indexOf('@') > 0 && address.length >= 3 && address.length <= 998) {
+        email = address;
+      }
+    }
+  }
+
+  return { url, email };
+}
+
 /** `[["Message-Id", "<x@y>"], …]` -- what Mailgun sends under message-headers. */
 function headerFrom(form: FormData, name: string): string | null {
   const raw = form.get('message-headers');
@@ -124,6 +165,8 @@ export function createMailgunProvider(options: {
       // is exactly the property the dedupe needs.
       const messageId = field(form, 'Message-Id') ?? headerFrom(form, 'Message-Id') ?? token;
 
+      const unsubscribe = parseListUnsubscribe(headerFrom(form, 'List-Unsubscribe'));
+
       return {
         recipient,
         senderEmail: sender.email,
@@ -132,6 +175,8 @@ export function createMailgunProvider(options: {
         messageId: messageId.slice(0, 998),
         textBody,
         htmlBody,
+        unsubscribeUrl: unsubscribe.url,
+        unsubscribeEmail: unsubscribe.email,
       };
     },
   };

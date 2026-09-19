@@ -45,6 +45,8 @@ describe('the Mailgun provider', () => {
       messageId: '<issue-42@thepaper.com>',
       textBody: 'Morning.',
       htmlBody: '<p>Morning.</p>',
+      unsubscribeUrl: null,
+      unsubscribeEmail: null,
     });
   });
 
@@ -102,6 +104,62 @@ describe('the Mailgun provider', () => {
     const message = await provider.read(form);
     expect(typeof message === 'object' && message.textBody).toBeNull();
     expect(typeof message === 'object' && message.htmlBody).toBe('<p>Morning.</p>');
+  });
+});
+
+describe('the unsubscribe header', () => {
+  /** The delivery, with whatever List-Unsubscribe the publisher sent on it. */
+  async function unsubscribe(header: string) {
+    const message = await provider.read(
+      payload({
+        'message-headers': JSON.stringify([
+          ['Message-Id', '<issue-42@thepaper.com>'],
+          ['List-Unsubscribe', header],
+        ]),
+      }),
+    );
+    if (typeof message !== 'object') throw new Error(`refused as ${message}`);
+    return { url: message.unsubscribeUrl, email: message.unsubscribeEmail };
+  }
+
+  it('takes a link when that is all the publisher offered', async () => {
+    expect(await unsubscribe('<https://thepaper.com/u/abc123>')).toEqual({
+      url: 'https://thepaper.com/u/abc123',
+      email: null,
+    });
+  });
+
+  it('takes an address when that is all the publisher offered', async () => {
+    expect(await unsubscribe('<mailto:unsub@thepaper.com>')).toEqual({
+      url: null,
+      email: 'unsub@thepaper.com',
+    });
+  });
+
+  it('takes both when the publisher offered both', async () => {
+    expect(
+      await unsubscribe('<mailto:unsub@thepaper.com>, <https://thepaper.com/u/abc123>'),
+    ).toEqual({ url: 'https://thepaper.com/u/abc123', email: 'unsub@thepaper.com' });
+  });
+
+  it('keeps the subject the address asked for and drops the scheme', async () => {
+    expect(await unsubscribe('<mailto:unsub@thepaper.com?subject=unsubscribe%20me>')).toEqual({
+      url: null,
+      email: 'unsub@thepaper.com?subject=unsubscribe%20me',
+    });
+  });
+
+  it('stores neither when the header offers nothing that can be acted on', async () => {
+    expect(await unsubscribe('<news://thepaper.com/list>, reply to this mail')).toEqual({
+      url: null,
+      email: null,
+    });
+  });
+
+  it('stores neither when the message carried no such header', async () => {
+    const message = await provider.read(payload());
+    expect(typeof message === 'object' && message.unsubscribeUrl).toBeNull();
+    expect(typeof message === 'object' && message.unsubscribeEmail).toBeNull();
   });
 });
 
