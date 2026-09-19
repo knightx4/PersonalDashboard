@@ -70,6 +70,15 @@ export type NewsIssueDetail = {
    * step that does it, off this field.
    */
   unsubscribeEmail: string | null;
+  /**
+   * When this account asked to be unsubscribed from this newsletter, or null
+   * while it has not asked.
+   *
+   * Nothing writes it yet, and nothing reads it yet either. #667 is the step
+   * that sets it when the button is pressed and shows that it was, instead of
+   * offering the button a second time.
+   */
+  unsubscribeSentAt: string | null;
 };
 
 /**
@@ -82,7 +91,7 @@ export type NewsIssueDetail = {
  * type inside loadIssue are the only places the issue's shape is written down.
  */
 const ISSUE_DETAIL_COLUMNS =
-  'id, sender_id, subject, received_at, read_at, text_body, html_body, unsubscribe_url, unsubscribe_email';
+  'id, sender_id, subject, received_at, read_at, text_body, html_body, unsubscribe_url, unsubscribe_email, unsubscribe_sent_at';
 
 /**
  * One issue, by id, or null when there is no such issue for this account.
@@ -119,6 +128,7 @@ export async function loadIssue(
     html_body: string | null;
     unsubscribe_url: string | null;
     unsubscribe_email: string | null;
+    unsubscribe_sent_at: string | null;
   };
 
   const { data: senderRow } = await client
@@ -137,5 +147,6 @@ export async function loadIssue(
     sender: (senderRow as NewsSender | null) ?? null,
     unsubscribeUrl: row.unsubscribe_url ?? null,
     unsubscribeEmail: row.unsubscribe_email ?? null,
+    unsubscribeSentAt: row.unsubscribe_sent_at ?? null,
   };
 }
