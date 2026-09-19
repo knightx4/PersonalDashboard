@@ -10,7 +10,15 @@ import { useCapture } from '@/components/shell/capture';
 import { matchCaptureActions } from '@/lib/capture/actions';
 import { setTheme } from '@/app/theme-actions';
 import { MODULES, type ModuleId } from '@/lib/modules';
-import { formatTheme, hueOf, modeOf, THEME_COLOURS, THEME_ROOMS, type Theme } from '@/lib/theme';
+import {
+  COLOURWAYS,
+  colourwayOf,
+  formatTheme,
+  hueOf,
+  modeOf,
+  THEME_ROOMS,
+  type Theme,
+} from '@/lib/theme';
 import { applyTheme } from '@/lib/theme/apply';
 import type { NavSection } from '@/components/shell/app-shell';
 
@@ -166,8 +174,8 @@ function applying(next: Theme): SearchCommand['run'] {
 function themeCommands(theme: Theme): SearchCommand[] {
   const mode = modeOf(theme);
   const hue = hueOf(theme);
+  const way = colourwayOf(theme) ?? undefined;
 
-  const here = THEME_ROOMS.find((option) => option.id === mode);
 
   return [
     ...THEME_ROOMS.map((option) => ({
@@ -175,14 +183,14 @@ function themeCommands(theme: Theme): SearchCommand[] {
       label: `Theme: ${option.label}`,
       hint: 'Keeps the colour you are in',
       icon: 'theme' as const,
-      run: applying({ kind: 'generated', mode: option.id, hue }),
+      run: applying({ kind: 'generated', mode: option.id, hue, way }),
     })),
-    ...THEME_COLOURS.map((colour) => ({
+    ...COLOURWAYS.map((colour) => ({
       id: `theme:${colour.id}`,
       label: `Theme: ${colour.label}`,
-      hint: here?.label,
+      hint: colour.mood,
       icon: 'theme' as const,
-      run: applying({ kind: 'generated', mode, hue: colour.hue }),
+      run: applying({ kind: 'generated', mode, hue: colour.hue, way: colour.id }),
     })),
     {
       id: 'theme:none',

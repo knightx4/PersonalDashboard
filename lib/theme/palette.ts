@@ -36,6 +36,7 @@ import {
   relativeLuminance,
   withLuminance,
 } from './oklch';
+import { colourwayById, paintsWash, POOL_TOKENS, type WashPools } from './colourway';
 import {
   ACCENT_TOKENS,
   hueTokensFor,
@@ -85,7 +86,39 @@ const CAST: Record<ThemeMode, 'paper' | 'dusk' | 'lightbox' | 'darkroom'> = {
  *
  * `hue` is in degrees and may be anything; it is wrapped, so 400 is 40.
  */
-export function generatePalette(mode: ThemeMode, hue: number | null): Palette {
+export function generatePalette(
+  mode: ThemeMode,
+  hue: number | null,
+  way?: string | null,
+): Palette {
+  const base = generateBase(mode, hue);
+  return way ? withColourway(base, mode, way) : base;
+}
+
+/**
+ * The pools a named colourway asks for, in place of the turned ones.
+ *
+ * Only in a room that paints a wash. In Solid light and Solid dark
+ * `--page-wash` is none, so the pools are never read, and writing a
+ * colourway's magenta into a palette that will not paint it would leave the
+ * tokens disagreeing with the screen for no gain.
+ *
+ * An unknown id is not an error. A stored theme naming a colourway that has
+ * since been renamed should come back as the hue it was pointed at rather than
+ * as nothing at all.
+ */
+function withColourway(base: Palette, mode: ThemeMode, id: string): Palette {
+  const way = colourwayById(id);
+  if (!way || !paintsWash(mode)) return base;
+
+  const palette = { ...base };
+  for (const slot of Object.keys(POOL_TOKENS) as (keyof WashPools)[]) {
+    palette[POOL_TOKENS[slot]] = way.pools[slot];
+  }
+  return palette;
+}
+
+function generateBase(mode: ThemeMode, hue: number | null): Palette {
   if (hue === null) {
     return { ...REFERENCE_PALETTES[PLAIN[mode]] };
   }
