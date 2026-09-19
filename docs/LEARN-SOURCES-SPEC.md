@@ -112,7 +112,12 @@ belong to nobody.
 | `catalogue_items` | one work: title, provider, external id, canonical URL, duration or length, publication date, and the licence it came under |
 | `catalogue_segments` | the addressable unit above: item, ordinal, time offsets or section anchor, the text it covers, and its embedding |
 | `catalogue_links` | a segment speaks to a concept or a subject: target, basis, confidence, and the model and date that decided it |
-| `catalogue_courses` | an ordered sequence published by a provider: title, provider, and the items in order with the provider's own numbering |
+| `catalogue_course_items` | the published order of a course: which items belong to it, in what position, under the provider's own numbering |
+
+A course is not a table of its own. It is a `catalogue_items` row of kind
+`course`, which is a value `source_kind` has carried unused since 0001, and
+`catalogue_course_items` orders its members underneath it. One fewer table, and
+a course gets segments and links like anything else.
 
 `catalogue_providers` is a table rather than an enum because the brief says
 "ones I want to add later". An enum would make adding a channel a migration.
@@ -326,13 +331,13 @@ Wikipedia, OCW, Yale and TED need no credential.
 
 ## Decisions to make
 
-**Which embedding model.** The recommendation is a hosted API rather than a
-self-hosted model, because there is no GPU in this deployment and there is not
-going to be one. Voyage or OpenAI's small embedding model both work, cost cents
-per thousand segments at this volume, and differ mainly in dimension, which the
-`vector` column has to commit to. The choice is worth making before the
-migration and is not worth deliberating: pick one, store the model name on every
-segment row, and re-embedding later is a sweep rather than a schema change.
+**Which embedding model.** Settled at the schema level and still open at the
+provider level. The column is `vector(1024)`, which both candidates can emit:
+Voyage natively, and OpenAI's small model through its `dimensions` parameter. So
+the provider choice no longer blocks anything, and every segment stores the model
+that embedded it, which makes a half-re-embedded catalogue detectable rather than
+silently wrong. A hosted API either way, because there is no GPU in this
+deployment and there is not going to be one.
 
 **How much to ingest first.** Ingesting all of Wikipedia is pointless here. The
 useful scope is the reference set per subject already proposed for coverage,
@@ -348,9 +353,10 @@ can be changed without touching what a reading points at.
 
 ## Build order
 
-1. `pgvector`, the five catalogue tables, and the two changes to `readings` and
-   `sources`. The `timestamp` locator columns are worth having regardless of
-   everything below.
+1. ~~`pgvector`, the five catalogue tables, and the two changes to `readings`
+   and `sources`.~~ Applied as `learn_0022_catalogue`. The `timestamp` locator
+   columns were worth having regardless of everything below, and a reading can
+   now say `12:04–18:30` and be measured.
 2. Wikipedia ingest for one subject, at section granularity. No key, no
    transcripts, and it proves the retrieval and verdict passes end to end.
 3. The verdict pass and `catalogue_links`, with the approval screen.
