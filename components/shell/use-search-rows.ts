@@ -5,7 +5,13 @@ import { useRouter } from 'next/navigation';
 import { paletteHits } from '@/lib/search/rank';
 import { score } from '@/lib/search/score';
 import { MIN_QUERY, type SearchHit } from '@/lib/search/sources';
-import { SCOPE_PARAM, hitsInScope, type SearchScope } from '@/lib/search/scope';
+import {
+  SCOPE_PARAM,
+  commandsInScope,
+  hitsInScope,
+  moduleInScope,
+  type SearchScope,
+} from '@/lib/search/scope';
 import { useCapture } from '@/components/shell/capture';
 import { matchCaptureActions } from '@/lib/capture/actions';
 import { setTheme } from '@/app/theme-actions';
@@ -231,8 +237,10 @@ export function useSearchRows({
    * The workspace the search is asked for, or everything.
    *
    * Separate from `module` because the bar's chip switches this while the page
-   * stays where it is. It narrows the things you own; the commands are not
-   * narrowed, so a search in one workspace can still take you to another.
+   * stays where it is. It narrows both halves of the list: the things you own,
+   * and the places you can go and the things you can start. So a search asked
+   * for one workspace cannot take you to another, and a search asked for
+   * everything is what it has always been.
    */
   scope: SearchScope;
   sections: readonly NavSection[];
@@ -277,7 +285,7 @@ export function useSearchRows({
       (entry) => enabledModules === undefined || enabledModules.includes(entry.id),
     );
 
-    return [
+    const all = [
       ...sections.map((section) => ({
         id: `section:${section.href}`,
         label: section.label,
@@ -314,7 +322,14 @@ export function useSearchRows({
       // twelve rows of theme in a list you came to for something else.
       ...themeCommands(theme),
     ];
-  }, [sections, module, enabledModules, router, theme]);
+
+    // Narrowed by the same rule as the things you own, and from the same file.
+    // Every row carries the workspace it belongs to, so a scope naming one
+    // keeps this workspace's sections and drops every other workspace, Home,
+    // Account and the themes, which is the answer on #720. A scope of
+    // everything leaves the list as it was.
+    return commandsInScope(all, scope);
+  }, [sections, module, enabledModules, router, theme, scope]);
 
   /**
    * The things you can make, when what you typed names one.
@@ -328,20 +343,25 @@ export function useSearchRows({
    * Ranked against the action's own words rather than the whole query, for the
    * reason in lib/capture/actions.ts, and then sorted in with everything else
    * on the same points, so a workspace called Todo still wins on "todo".
+   *
+   * Scoped like the rest of the list: a search asked for one workspace offers
+   * only what you can start in that workspace.
    */
   const captures = useMemo(
     () =>
-      matchCaptureActions(query).map(({ action, points, seed }) => ({
-        points,
-        command: {
-          id: `capture:${action.id}`,
-          label: action.label,
-          hint: seed || 'Capture',
-          module: action.module,
-          run: () => openCapture(action.id, seed),
-        } satisfies SearchCommand,
-      })),
-    [query, openCapture],
+      matchCaptureActions(query)
+        .filter(({ action }) => moduleInScope(action.module, scope))
+        .map(({ action, points, seed }) => ({
+          points,
+          command: {
+            id: `capture:${action.id}`,
+            label: action.label,
+            hint: seed || 'Capture',
+            module: action.module,
+            run: () => openCapture(action.id, seed),
+          } satisfies SearchCommand,
+        })),
+    [query, openCapture, scope],
   );
 
   const matches = useMemo(() => {
