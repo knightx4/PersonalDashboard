@@ -58,6 +58,7 @@ describe('rollUp', () => {
       ...Array.from({ length: read }, () => 'read' as const),
       ...Array.from({ length: remaining }, () => 'queued' as const),
     ]),
+    matches: [],
   });
 
   it('counts the branches under a topic that has none of its own', () => {

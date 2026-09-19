@@ -24,7 +24,9 @@ export const dynamic = 'force-dynamic';
  * drawn under the one it came from and inset. Ten rows that are really three
  * subjects and seven parts of them read as ten unrelated topics otherwise.
  *
- * The search box narrows the list by title and question. The query lives in the
+ * The search box narrows the list by title and question, and by the readings
+ * inside each track: the title of a book you queued brings back the track
+ * holding it, with that reading listed under the row. The query lives in the
  * URL, so a narrowed list survives a refresh and can be sent as a link. A
  * branch whose parent the search did not match is still shown, at the top
  * level, because a hit you cannot see is worse than a lost indent.
@@ -127,6 +129,29 @@ export default async function LearnPage({
                   </span>
                   <ProgressBar progress={rolled} />
                 </Link>
+                {track.matches.length > 0 && (
+                  // Outside the link above, because a link inside a link is
+                  // invalid and each of these goes somewhere of its own. One
+                  // step further in than the title, so they read as being
+                  // inside the track rather than as more tracks.
+                  <ul className="pb-3" style={{ paddingLeft: inset }}>
+                    {track.matches.map((reading) => (
+                      <li key={reading.id}>
+                        <Link
+                          href={`/learn/r/${reading.id}`}
+                          className="flex items-center gap-1.5 py-1 pl-5 pr-4 text-ui text-ink-muted transition-colors duration-150 hover:text-ink"
+                        >
+                          <CornerDownRight
+                            className="size-3.5 shrink-0"
+                            strokeWidth={2}
+                            aria-hidden
+                          />
+                          <span className="truncate">{reading.subject}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             );
           })}
