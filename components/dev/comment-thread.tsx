@@ -9,7 +9,7 @@ import { Disclosure } from '@/components/ui/disclosure';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
 import { awaitingDash } from '@/lib/comments/awaiting';
 import { MENTION, mentionsDash } from '@/lib/comments/mention';
-import { commentWhen, exactTime } from '@/lib/comments/when';
+import { commentWhen, exactTime, shortWhen } from '@/lib/comments/when';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { useClockNow } from '@/lib/use-clock-now';
 import type { CommentAuthor, CommentTarget, DevComment } from '@/lib/comments/load';
@@ -73,8 +73,10 @@ function AuthorMark({ author }: { author: CommentAuthor }) {
  * A row rather than a bubble or a card. The mark sits in a column of its own
  * and the body hangs off it, so alignment does the grouping and no turn needs
  * a frame around it -- laws 11 and 13. A run of messages from one author draws
- * the header once and leaves the column empty under it, the way a chat window
- * does: repeating "Dash 3h ago" four times says the same thing four times.
+ * the header once, the way a chat window does: repeating "Dash 3h ago" four
+ * times says the same thing four times. Under that header the strip carries
+ * the short time on hover, so a message in the middle of a run can still be
+ * dated without a header of its own.
  *
  * Deleting lives on the message being pointed at. It used to be an X in every
  * header, which is a destructive control standing permanently on every turn of
@@ -101,8 +103,24 @@ function Message({
 
   return (
     <li className="group flex gap-2">
-      <div className="flex w-4 shrink-0 justify-center pt-1">
-        {!grouped && <AuthorMark author={comment.author} />}
+      {/* The strip the author mark stands in, and where a grouped message says
+          when it was written. A run draws one header, so every message under
+          the first had no time on it at all until #641; the short form fits
+          the roughly 40px there is here where `commentWhen`'s date does not
+          -- #640. Out of the flow and right-aligned, so the column keeps its
+          16px and nothing shifts when the string appears. */}
+      <div className="relative flex w-4 shrink-0 justify-center pt-1">
+        {grouped ? (
+          <time
+            dateTime={comment.createdAt}
+            title={exactTime(comment.createdAt)}
+            className="tabular absolute top-1 right-0 whitespace-nowrap text-micro text-ink-ghost transition-opacity duration-150 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
+          >
+            {shortWhen(comment.createdAt, now)}
+          </time>
+        ) : (
+          <AuthorMark author={comment.author} />
+        )}
       </div>
 
       <div className="min-w-0 flex-1 space-y-0.5">
