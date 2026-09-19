@@ -615,12 +615,13 @@ export function AppShell({
                   {title}
                 </h2>
 
-                {/* The middle of the bar was empty. It now carries the one thing
-                this workspace would say if it could say only one -- read on
-                arrival, not watched. Hidden on a phone, where there is no
-                middle. */}
+                {/* The one thing this workspace would say if it could say only
+                one, in the middle of the bar -- read on arrival, not watched.
+                Only between sm and lg now. From lg up it reads on the status
+                line at the foot of the page instead (#689, #707), and below sm
+                it gets its own line under the bar (#688), further down. */}
                 {brief && (
-                  <p className="hidden min-w-0 flex-1 justify-center truncate px-4 text-center text-ui sm:flex">
+                  <p className="hidden min-w-0 flex-1 justify-center truncate px-4 text-center text-ui sm:flex lg:hidden">
                     {brief.href ? (
                       <Link
                         href={brief.href}
@@ -643,13 +644,16 @@ export function AppShell({
                   </p>
                 )}
                 {/* The gap that puts the account controls in the right corner.
-                From sm up the brief is the flexible middle of the bar and does
-                that job itself, so the spacer stands down. Below sm the brief
-                is `display: none` and takes no part in the layout at all --
-                which is how, on a phone, the theme, notification, feedback and
-                account icons ended up bunched against the page title instead
-                of in the corner. */}
-                <span className={cn('min-w-0 flex-1', brief && 'sm:hidden')} />
+                Between sm and lg the brief is the flexible middle of the bar
+                and does that job itself, so the spacer stands down. Outside
+                that band the brief is `display: none` and takes no part in the
+                layout at all -- which is how, on a phone, the theme,
+                notification, feedback and account icons ended up bunched
+                against the page title instead of in the corner, and is what
+                would happen from lg up now that the brief has moved to the
+                status line. Whatever fills this slot from lg up next takes the
+                `lg:block` back off. */}
+                <span className={cn('min-w-0 flex-1', brief && 'sm:hidden lg:block')} />
 
                 {/* What is left here belongs to the person, not to the workspace:
                 their theme, their notifications, their feedback, their
@@ -708,7 +712,10 @@ export function AppShell({
             >
               {children}
             </main>
-            <StatusLine lines={activity} main={mainCheck} />
+            {/* The brief goes down here from lg up, which is exactly the width
+            this line is drawn at, so the two copies above and this one never
+            show at once. */}
+            <StatusLine lines={activity} brief={brief} main={mainCheck} />
 
             <nav
               // Named for what is actually in it: on home and the account page it
