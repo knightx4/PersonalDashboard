@@ -8,6 +8,7 @@ import type {
   SearchSource,
 } from '@/lib/search/sources';
 import { escapeLike } from '@/lib/search/sources/map';
+import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 
 /**
  * Vault notes, in the command palette.
@@ -27,20 +28,54 @@ import { escapeLike } from '@/lib/search/sources/map';
 /** A search, or -- with no query -- every note. */
 type Read = SearchListContext & { query?: string };
 
-async function read(ctx: Read): Promise<SearchHit[]> {
-  const supabase = await createVaultClient();
+type NoteRow = { id: string; title: string | null; path: string };
 
-  let notes = supabase.from('notes').select('id, title, path, updated_at');
-  if (ctx.query) {
-    const pattern = `%${escapeLike(ctx.query)}%`;
-    notes = notes.or(`title.ilike.${pattern},path.ilike.${pattern}`);
-  }
+/**
+ * The newest notes, optionally narrowed to one column matching a pattern.
+ *
+ * One column per read, because the two columns together used to be an `or`
+ * expression and a comma in what somebody typed reads as the separator
+ * between its conditions. `.ilike()` sends the pattern as its own parameter,
+ * where a comma is ordinary text. The limit applies to each read rather than
+ * to the pair.
+ */
+async function notes(
+  supabase: VaultSupabaseClient,
+  ctx: Read,
+  match?: { column: 'title' | 'path'; pattern: string },
+): Promise<NoteRow[]> {
+  let read = supabase.from('notes').select('id, title, path, updated_at');
+  if (match) read = read.ilike(match.column, match.pattern);
 
-  const { data, error } = await notes.order('updated_at', { ascending: false }).limit(ctx.limit);
+  const { data, error } = await read.order('updated_at', { ascending: false }).limit(ctx.limit);
 
   if (error) throw new Error(`notes: ${error.message}`);
 
-  return ((data ?? []) as { id: string; title: string | null; path: string }[]).map((row) => {
+  return (data ?? []) as NoteRow[];
+}
+
+async function read(ctx: Read): Promise<SearchHit[]> {
+  const supabase = await createVaultClient();
+
+  let rows: NoteRow[];
+  if (ctx.query) {
+    const pattern = `%${escapeLike(ctx.query)}%`;
+    const [byTitle, byPath] = await Promise.all([
+      notes(supabase, ctx, { column: 'title', pattern }),
+      notes(supabase, ctx, { column: 'path', pattern }),
+    ]);
+    // A note whose title and path both match is one note.
+    const seen = new Set<string>();
+    rows = [...byTitle, ...byPath].filter((row) => {
+      if (seen.has(row.id)) return false;
+      seen.add(row.id);
+      return true;
+    });
+  } else {
+    rows = await notes(supabase, ctx);
+  }
+
+  return rows.map((row) => {
     // A note with no frontmatter title is known by its filename, which is
     // what the vault itself shows.
     const name = row.title?.trim() || row.path.split('/').pop() || row.path;

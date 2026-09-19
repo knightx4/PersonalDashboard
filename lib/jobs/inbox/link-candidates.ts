@@ -137,11 +137,11 @@ export async function findUnlinkedMessages(
   // matched literally rather than as a pattern.
   const needle = term.replace(/[%_]/g, (char) => `\\${char}`);
 
-  const [{ data: dismissed }, { data: messages }] = await Promise.all([
-    supabase
-      .from('message_link_dismissals')
-      .select('message_id')
-      .eq('application_id', opts.applicationId),
+  // One read per column rather than one `or` expression over both: a comma in
+  // the term reads as the separator between an `or`'s conditions, and
+  // `.ilike()` sends the pattern as its own parameter where a comma is
+  // ordinary text. The limit applies to each read rather than to the pair.
+  const matching = (column: 'subject' | 'from_address') =>
     supabase
       .from('inbox_messages')
       .select(
@@ -150,14 +150,39 @@ export async function findUnlinkedMessages(
       .eq('user_id', userId)
       .is('resulting_application_id', null)
       .is('scrubbed_at', null)
-      .or(`subject.ilike.%${needle}%,from_address.ilike.%${needle}%`)
+      .ilike(column, `%${needle}%`)
       .order('received_at', { ascending: false })
-      .limit(limit + 25),
+      .limit(limit + 25);
+
+  const [{ data: dismissed }, { data: bySubject }, { data: byFrom }] = await Promise.all([
+    supabase
+      .from('message_link_dismissals')
+      .select('message_id')
+      .eq('application_id', opts.applicationId),
+    matching('subject'),
+    matching('from_address'),
   ]);
 
   const dismissedIds = new Set((dismissed ?? []).map((row) => row.message_id as string));
 
-  return (messages ?? [])
+  // A message matched by both columns is one message, and the two reads are
+  // each newest first, so the merge is sorted again to keep the list in the
+  // order the page shows.
+  const seen = new Set<string>();
+  const messages = [...(bySubject ?? []), ...(byFrom ?? [])]
+    .filter((row) => {
+      const id = row.id as string;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    })
+    .sort((a, b) => {
+      const left = (a.received_at as string) ?? '';
+      const right = (b.received_at as string) ?? '';
+      return left === right ? 0 : left < right ? 1 : -1;
+    });
+
+  return messages
     .filter((row) => !dismissedIds.has(row.id as string))
     .slice(0, limit)
     .map((row) => ({

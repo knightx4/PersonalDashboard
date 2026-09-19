@@ -81,7 +81,10 @@ async function findOrders(ctx: Read): Promise<SearchHit[]> {
     .from('orders')
     .select(ORDER_COLUMNS)
     .is('deleted_at', null)
-    .or(`external_order_number.ilike.${pattern}`)
+    // `.ilike()` rather than an `or` expression holding the one condition: the
+    // pattern goes out as its own parameter, so a comma in the order number
+    // somebody typed is ordinary text rather than a second condition.
+    .ilike('external_order_number', pattern)
     .order('order_date', { ascending: false })
     .limit(ctx.limit);
 
