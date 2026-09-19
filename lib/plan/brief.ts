@@ -315,7 +315,10 @@ export function planBrief(
     `Priority: ${PRIORITY_WORD[node.priority]}`,
   ];
   if (node.size) facts.push(`Size: ${node.size.toUpperCase()}`);
-  if (node.assignee) facts.push(`Assigned: ${node.assignee === 'claude' ? 'Claude' : 'me'}`);
+  // Only the mark you put on a step yourself. Nothing gives a step to Dash any
+  // more, so a `claude` left in the column by an old hand-over says nothing
+  // about who the step is for, and the brief prints nothing for it.
+  if (node.assignee === 'me') facts.push('Assigned: me');
   out.push(facts.join(' · '));
 
   if (ancestors.length > 0) {

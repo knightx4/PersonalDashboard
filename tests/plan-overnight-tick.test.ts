@@ -52,7 +52,7 @@ function item(over: Partial<PlanItem> & { id: string }): PlanItem {
     thread: [],
     priority: 2,
     size: null,
-    assignee: 'claude',
+    assignee: null,
     commitSha: null,
     position: counter * 10,
     startedAt: null,

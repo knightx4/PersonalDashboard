@@ -49,7 +49,6 @@ import {
   buildPlanTree,
   findNode,
   flatten,
-  isWaitingOnThePerson,
   topFeatureOf,
   type PlanNode,
   type PlanSection,
@@ -112,7 +111,7 @@ const assigneeField = z
   .string()
   .transform((value) => value.trim())
   .refine((value) => value === '' || (PLAN_ASSIGNEES as readonly string[]).includes(value), {
-    message: 'That is not somebody who builds this.',
+    message: 'A step is yours or nobody\'s.',
   })
   .transform((value) => (value === '' ? null : value));
 
@@ -384,35 +383,42 @@ export async function setPlanItemStatus(
     };
   }
 
-  // Blocking a step takes it back off Claude in the same write.
-  //
-  // A block says the step needs something outside the repo, so nothing a
-  // session does will move it -- and a row left assigned sits in the Claude's
-  // view carrying the reason it cannot be worked. Whoever blocks it should not
-  // have to remember to unhand it as a second step.
   // Blocking from here records the kind of block as well, because the
   // database will not take a blocked row without one. It is `outside` — the
   // default in lib/plan/load.ts — and that is what this control has always
-  // meant: the comment above says the step needs something outside the repo.
-  // A block that really is waiting on other steps is a row in
-  // plan_dependencies, or `plan.ts block --on-steps` from a session parking
+  // meant: the step needs something outside the repo, so nothing a session
+  // does will move it. A block that really is waiting on other steps is a row
+  // in plan_dependencies, or `plan.ts block --on-steps` from a session parking
   // its own step behind a question.
   //
   // Moving a step off blocked drops both: the sentence saying what it needed
   // and the word saying who could supply it. Both are claims about work that
   // has stopped, and this control is one of the ways it starts again; the
   // dated line in the comment is the record either way.
+  //
+  // The Mine mark is not one of those claims, and #719 settled that a block
+  // leaves it where it is. A step you kept for yourself is still yours while
+  // it waits, so it is still yours when the block lifts.
   const patch: Record<string, string | null> = { status: status.data, ...blockPatch(status.data) };
-  if (status.data === 'blocked') patch.assignee = null;
+
+  // Putting a step back to Not started takes the mark off, which is what
+  // hands it back to the overnight runner: an approved step nobody has marked
+  // is one the runner will fire.
+  //
+  // It clears the mark whether you set it on the row or the In progress press
+  // below wrote it, so there is no mark here worth keeping and no need to read
+  // the row first. The nightly claim sweep puts a dead claim back to not
+  // started through its own write, which touches the status and nothing else.
+  if (status.data === 'not_started') patch.assignee = null;
 
   // Marking a step underway yourself puts it in your queue, if it was in
   // nobody's.
   //
-  // `in_progress` means somebody has this step in hand right now, and the
-  // daily cron puts back a claim with no assignee on exactly that reading --
-  // nothing is working it. Moving the row here is you working it, so the row
-  // says so and the sweep leaves it alone. A step already handed to Claude
-  // keeps its assignee: pressing the status control is not taking it back.
+  // The claim sweep is what this write was for: a claim with no assignee was
+  // read as one nothing was working and put straight back. That rule went with
+  // #714, and #715 kept the write anyway -- moving the row here is you working
+  // the step, so the row says so. A step that already carries a mark keeps it:
+  // pressing the status control is not taking it off anybody.
   if (status.data === 'in_progress' && !current?.assignee) patch.assignee = 'me';
 
   const { error } = await supabase
@@ -423,7 +429,7 @@ export async function setPlanItemStatus(
   if (error) return { error: error.message };
 
   revalidatePlan();
-  return { message: status.data === 'blocked' ? 'Blocked, and taken back off Dash.' : 'Updated.' };
+  return { message: 'Updated.' };
 }
 
 /** "1" puts something aside; anything else brings it back. */
@@ -643,17 +649,18 @@ export async function approveProposals(
  *
  * The row's press is Mine and Not mine (#686): the runner takes anything
  * approved that is not yours, so marking a step Mine is how you hold it back
- * and clearing the column is how you give it back. `claude` is still written
- * here -- by the single Send, which claims the row for the session it starts.
+ * and clearing the column is how you give it back. Those two are the whole of
+ * what can be written: approving a step is what puts it in front of the runner
+ * (#669), so there is nothing left to hand over and the picker stopped offering
+ * it in #718.
  *
  * The step and every open step beneath it, for the same reason approving works
  * that way: work is assigned as a whole, and marking five sub-steps one at a
  * time is how four of them get missed. Closed steps are left alone -- who was
  * going to do a finished thing is history, not an instruction.
  *
- * A proposed step can be handed over. This column says who a step is for, not
- * that it has been agreed to, and nothing picks up a proposal: `next --claude`
- * lists approved steps only.
+ * A proposed step can be marked yours. The column says what you kept, not
+ * that the step has been agreed to, and nothing picks up a proposal.
  */
 // latency: pending
 export async function setPlanItemAssignee(
@@ -672,31 +679,16 @@ export async function setPlanItemAssignee(
   if (!node) return { error: 'That step no longer exists.' };
 
   // The step itself whatever state it is in -- you asked for this one -- and
-  // the open ones beneath it.
-  const candidates = [
-    node,
-    ...flatten([node]).filter((step) => step.id !== node.id && !isClosed(step.status)),
+  // the open ones beneath it. All of them are written: the branch that held
+  // back a blocked step or an unanswered question was there to keep a
+  // hand-over from filling Dash's list with rows nobody could work, and a
+  // step waiting on you is one you would be marking yours anyway.
+  const ids = [
+    node.id,
+    ...flatten([node])
+      .filter((step) => step.id !== node.id && !isClosed(step.status))
+      .map((step) => step.id),
   ];
-
-  // Nothing waiting on you goes to Claude. An unanswered question is yours to
-  // settle and a blocked step needs something outside the repo, so handing
-  // either over puts a session in front of the same wall -- and fills the
-  // Claude's view with rows nobody can work.
-  //
-  // Only when handing over. Taking work back is always allowed, whatever state
-  // it is in, because that is how a row that should never have been handed
-  // over gets unhanded.
-  const skipped =
-    assignee.data === 'claude' ? candidates.filter((step) => isWaitingOnThePerson(step)) : [];
-  const ids = candidates
-    .filter((step) => !skipped.some((other) => other.id === step.id))
-    .map((step) => step.id);
-
-  if (ids.length === 0) {
-    return {
-      error: `#${node.number} is ${node.status === 'blocked' ? 'blocked' : 'a question nobody has answered'}, so it is waiting on you rather than on Dash.`,
-    };
-  }
 
   const { error } = await supabase
     .from('plan_items')
@@ -709,15 +701,7 @@ export async function setPlanItemAssignee(
   if (assignee.data === 'me') {
     return { message: ids.length === 1 ? 'Marked yours.' : `Marked ${ids.length} steps yours.` };
   }
-  if (assignee.data === null) {
-    return { message: ids.length === 1 ? 'Given back.' : `Gave ${ids.length} steps back.` };
-  }
-
-  const left = skipped.length === 0 ? '' : ` ${skipped.length} left with you: ${skipped.map((step) => `#${step.number}`).join(', ')}.`;
-  return {
-    message:
-      (ids.length === 1 ? 'Handed to Dash.' : `Handed ${ids.length} steps to Dash.`) + left,
-  };
+  return { message: ids.length === 1 ? 'Given back.' : `Gave ${ids.length} steps back.` };
 }
 
 /**
@@ -1338,7 +1322,7 @@ export async function startOvernightRunner(
     return {
       message:
         'Running, with no limit. It keeps firing features while there is work ' +
-        'handed over and ready, and stops when you stop it. The next tick picks the first one.',
+        'you have approved that is ready, and stops when you stop it. The next tick picks the first one.',
     };
   }
 

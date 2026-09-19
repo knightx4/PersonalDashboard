@@ -93,7 +93,6 @@ function claim(over: Row = {}): Row {
     id: 'a',
     number: 42,
     status: 'in_progress',
-    assignee: 'claude',
     started_at: minutesAgo(10),
     comment: null,
     ...over,
@@ -167,19 +166,6 @@ describe('releaseStaleClaims', () => {
     expect(updates[0].patch.comment).toBe(
       'Blocked 2026-03-01: waiting on the key.\n\n' +
         'Claim expired 2026-03-02: nothing had touched it for 10h, so it went back to not started.',
-    );
-  });
-
-  it('puts back a claim nobody holds, however recent', async () => {
-    const { supabase, updates } = stubClient([claim({ assignee: null, started_at: minutesAgo(1) })]);
-
-    await expect(releaseStaleClaims(supabase, NOW)).resolves.toEqual({
-      released: 1,
-      steps: [42],
-      kept: [],
-    });
-    expect(updates[0].patch.comment).toBe(
-      'Claim expired 2026-03-02: it was underway with nobody holding it, so it went back to not started.',
     );
   });
 

@@ -164,7 +164,7 @@ const STATUS_LABEL: Record<PlanStatus, string> = {
 };
 
 const SIZE_LABEL: Record<PlanSize, string> = { s: 'Small', m: 'Medium', l: 'Large' };
-const ASSIGNEE_LABEL: Record<PlanAssignee, string> = { me: 'Me', claude: 'Dash' };
+const ASSIGNEE_LABEL: Record<PlanAssignee, string> = { me: 'Me' };
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -361,7 +361,8 @@ const EMPTY_VIEW: Partial<Record<View, { title: string; description: string }>> 
   },
   claude: {
     title: "Nothing of Dash's right now",
-    description: 'Hand a step to Dash from its menu, or send one straight to the routine.',
+    description:
+      'A step appears here once you approve it and leave it unmarked as yours, with nothing blocking it. You can also send one straight to the routine.',
   },
   you: {
     title: 'Nothing waiting on you',

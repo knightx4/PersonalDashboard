@@ -52,7 +52,7 @@ describe('planBrief', () => {
         detail: 'A page a person with no account can open.',
         acceptance: 'Opens without a session. Shows only owned items.',
         comment: 'Waiting on the RPC review.',
-        assignee: 'claude',
+        assignee: 'me',
         size: 'm',
       }),
       item({ id: 'form', title: 'The form', parentId: 'page' }),
@@ -77,7 +77,7 @@ describe('planBrief', () => {
 
   it('says where the step sits and who holds it', () => {
     expect(brief).toContain('Module: Shopping');
-    expect(brief).toContain('Assigned: Claude');
+    expect(brief).toContain('Assigned: me');
     expect(brief).toContain('Size: M');
     expect(brief).toContain('Part of: #2 Share links');
   });

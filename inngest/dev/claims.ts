@@ -2,7 +2,7 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
-import { claimExpiredNote, expiredClaim, type ExpiredClaim } from '@/lib/plan/claims';
+import { claimExpiredNote, expiredClaim } from '@/lib/plan/claims';
 import { listPushes } from '@/lib/plan/ci';
 import { claimIsLive, claimLiveness, lastPushSince } from '@/lib/plan/liveness';
 import { endsRun, readingFor } from '@/lib/plan/run-end';
@@ -85,13 +85,12 @@ type ClaimRow = {
   id: string;
   number: number | null;
   status: string;
-  assignee: string | null;
   started_at: string | null;
   comment: string | null;
 };
 
-/** A claim the clock has condemned, and which of the two reasons it was. */
-type StaleClaim = { row: ClaimRow; why: ExpiredClaim };
+/** A claim the clock has condemned, with the start time it was judged on. */
+type StaleClaim = { row: ClaimRow; startedAt: string };
 
 /** Enough of the run behind a claim to ask GitHub about it. */
 type RunRow = {
@@ -124,12 +123,6 @@ function noEvidence(): ClaimRunEvidence {
 /**
  * Which of these condemned claims have a run that is still live, by step id.
  *
- * Only the ones the clock condemned as `stale` are asked about. `unowned` is
- * not a judgement about time at all -- every path that claims a step names who
- * holds it, so a claim with no assignee is one nothing is holding whatever is
- * being pushed -- and sparing those would quietly change a second rule that
- * #571 did not ask about.
- *
  * Two reads and one request, whatever the number of claims: the runs sent at
  * those steps, and one listing of what has been pushed since the oldest of
  * them started. The runs are read without a user filter, the same as the
@@ -150,15 +143,14 @@ async function claimsWithLiveRuns(
   now: Date,
   fetchFn?: typeof globalThis.fetch,
 ): Promise<ClaimRunEvidence> {
-  const candidates = claims.filter((claim) => claim.why === 'stale');
-  if (candidates.length === 0) return noEvidence();
+  if (claims.length === 0) return noEvidence();
 
   const { data, error } = await supabase
     .from('plan_runs')
     .select('id, plan_item_id, status, created_at')
     .in(
       'plan_item_id',
-      candidates.map((claim) => claim.row.id),
+      claims.map((claim) => claim.row.id),
     )
     .order('created_at', { ascending: false });
   if (error) {
@@ -182,7 +174,7 @@ async function claimsWithLiveRuns(
 
   const live = new Set<string>();
   const unheard = new Map<string, string>();
-  for (const { row } of candidates) {
+  for (const { row } of claims) {
     const run = latest.get(row.id);
     if (!run) continue;
 
@@ -248,18 +240,20 @@ export async function releaseStaleClaims(
 ): Promise<ClaimSweepSummary> {
   const { data, error } = await supabase
     .from('plan_items')
-    .select('id, number, status, assignee, started_at, comment')
+    .select('id, number, status, started_at, comment')
     .eq('status', 'in_progress')
     .limit(500);
   if (error) throw new Error(error.message);
 
   const expired: StaleClaim[] = [];
   for (const row of (data ?? []) as ClaimRow[]) {
-    const why = expiredClaim(
-      { status: row.status, assignee: row.assignee, startedAt: row.started_at },
-      now.getTime(),
-    );
-    if (why) expired.push({ row, why });
+    // A row with no start time is never condemned -- the column is stamped by
+    // a trigger, so a row without one was claimed this instant -- which is why
+    // a condemned claim always has the start time the line is written from.
+    if (!row.started_at) continue;
+    if (expiredClaim({ status: row.status, startedAt: row.started_at }, now.getTime())) {
+      expired.push({ row, startedAt: row.started_at });
+    }
   }
 
   // Asked once, for the whole condemned set, before anything is written.
@@ -269,13 +263,13 @@ export async function releaseStaleClaims(
   const kept: number[] = [];
   let released = 0;
 
-  for (const { row, why } of expired) {
+  for (const { row, startedAt } of expired) {
     if (live.has(row.id)) {
       if (row.number !== null) kept.push(row.number);
       continue;
     }
 
-    const line = claimExpiredNote(why, row.started_at, now.getTime(), unheard.get(row.id) ?? null);
+    const line = claimExpiredNote(startedAt, now.getTime(), unheard.get(row.id) ?? null);
     const { error: writeError } = await supabase
       .from('plan_items')
       .update({

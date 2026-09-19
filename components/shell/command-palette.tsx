@@ -1,17 +1,17 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CornerDownLeft, Palette, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { HIT_KINDS } from '@/lib/search/sources';
-import { ModuleMark } from '@/components/ui/module-mark';
 import { popoverSurface, scrim } from '@/components/ui/popover';
 import { Kbd } from '@/components/shell/key-hints';
+import { SearchRowLine } from '@/components/shell/search-row';
 import {
   searchRowKey,
   useSearchRows,
   type SearchRow,
 } from '@/components/shell/use-search-rows';
+import { scopeForModule } from '@/lib/search/scope';
 import type { ModuleId } from '@/lib/modules';
 import type { Theme } from '@/lib/theme';
 import type { NavSection } from '@/components/shell/app-shell';
@@ -25,11 +25,14 @@ import type { NavSection } from '@/components/shell/app-shell';
  *
  * What goes in the list, where it comes from and in what order is
  * components/shell/use-search-rows.ts, because the bar across the top of the
- * workspace shows the same rows. This file is the modal: the scrim, the field,
- * the keys that walk the list, and how a row is drawn.
+ * workspace shows the same rows, and how one of them is drawn is
+ * components/shell/search-row.tsx for the same reason. This file is the modal:
+ * the scrim, the field and the keys that walk the list.
  *
- * It searches everything you own, which is what it has always done. The bar is
- * the one that narrows to a workspace.
+ * It searches the workspace the page is in, and everything you own on a page
+ * that is in no workspace. So it opens on that workspace's pages and what you
+ * can start there, and nothing from anywhere else; outside a workspace it
+ * opens on the list it has always opened on.
  */
 export function CommandPalette({
   account,
@@ -55,12 +58,20 @@ export function CommandPalette({
   const { rows, looking, run, reset } = useSearchRows({
     account,
     module,
-    scope: 'everything',
+    // The workspace the page is in, or everything where there is no workspace
+    // to narrow to. It follows the page rather than being held here, so the
+    // box opened after a navigation searches where you now are. The chip that
+    // widens it to everything is #703, and that is what turns this into
+    // state.
+    scope: scopeForModule(module),
     sections,
     enabledModules,
     theme,
     query,
     active: open,
+    // So an open box with nothing typed in it lists this workspace's pages
+    // and what you can start here.
+    surface: 'box',
   });
 
   useEffect(() => {
@@ -161,41 +172,15 @@ export function CommandPalette({
               {looking ? 'Looking…' : `Nothing matches “${query}”.`}
             </p>
           ) : (
-            rows.map((row, index) => {
-              const key = searchRowKey(row);
-              const label = row.kind === 'command' ? row.command.label : row.hit.title;
-              const hint =
-                row.kind === 'command'
-                  ? row.command.hint
-                  : (row.hit.subtitle ?? HIT_KINDS[row.hit.kind]);
-              const where = row.kind === 'command' ? (row.command.module ?? null) : row.hit.module;
-
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => choose(row)}
-                  onMouseMove={() => setActive(index)}
-                  className={cn(
-                    'flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left transition-colors',
-                    index === active ? 'bg-accent-tint' : 'hover:bg-sunken',
-                  )}
-                >
-                  {row.kind === 'command' && row.command.icon === 'theme' ? (
-                    <Palette className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
-                  ) : (
-                    // The mark of wherever it lives, so which workspace a row
-                    // belongs to is readable without a label.
-                    <ModuleMark module={where} size="sm" />
-                  )}
-                  <span className="min-w-0 flex-1 truncate text-ui font-medium text-ink">{label}</span>
-                  {hint && <span className="shrink-0 truncate text-small text-ink-muted">{hint}</span>}
-                  {index === active && (
-                    <CornerDownLeft className="size-3.5 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
-                  )}
-                </button>
-              );
-            })
+            rows.map((row, index) => (
+              <SearchRowLine
+                key={searchRowKey(row)}
+                row={row}
+                active={index === active}
+                onChoose={() => choose(row)}
+                onPoint={() => setActive(index)}
+              />
+            ))
           )}
 
           {/* Quiet, and below the rows rather than in place of them, so

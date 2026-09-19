@@ -5,9 +5,15 @@ import { useRouter } from 'next/navigation';
 import { paletteHits } from '@/lib/search/rank';
 import { score } from '@/lib/search/score';
 import { MIN_QUERY, type SearchHit } from '@/lib/search/sources';
-import { SCOPE_PARAM, hitsInScope, type SearchScope } from '@/lib/search/scope';
+import {
+  SCOPE_PARAM,
+  commandsInScope,
+  hitsInScope,
+  moduleInScope,
+  type SearchScope,
+} from '@/lib/search/scope';
 import { useCapture } from '@/components/shell/capture';
-import { matchCaptureActions } from '@/lib/capture/actions';
+import { CAPTURE_ACTIONS, matchCaptureActions } from '@/lib/capture/actions';
 import { setTheme } from '@/app/theme-actions';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import {
@@ -147,6 +153,24 @@ function matchingNow(account: string): Matching {
 /** A row in the one list: somewhere to go, or something you own. */
 export type SearchRow = { kind: 'command'; command: SearchCommand } | { kind: 'hit'; hit: SearchHit };
 
+/**
+ * Which of the two search boxes is asking.
+ *
+ * It only decides what an empty query answers with, and the two answers are
+ * opposites, so the hook cannot work it out for itself.
+ *
+ * `'bar'` is the field across the top of a wide window. It has the cursor
+ * because somebody clicked into it or tabbed past it, which is not yet a
+ * question, so it offers nothing until a character is typed.
+ *
+ * `'box'` is the panel the magnifier and the shortcut open. Opening it is the
+ * question, so it opens on somewhere to go and something to start.
+ *
+ * Everything else here is the same for both: once there is a query the two
+ * lists are built the same way, from the same rows, in the same order.
+ */
+export type SearchSurface = 'bar' | 'box';
+
 export type SearchCommand = {
   id: string;
   label: string;
@@ -222,6 +246,7 @@ export function useSearchRows({
   theme,
   query,
   active,
+  surface,
 }: {
   /** Whose pages these are. The held list is only searched when it is theirs. */
   account: string;
@@ -231,8 +256,10 @@ export function useSearchRows({
    * The workspace the search is asked for, or everything.
    *
    * Separate from `module` because the bar's chip switches this while the page
-   * stays where it is. It narrows the things you own; the commands are not
-   * narrowed, so a search in one workspace can still take you to another.
+   * stays where it is. It narrows both halves of the list: the things you own,
+   * and the places you can go and the things you can start. So a search asked
+   * for one workspace cannot take you to another, and a search asked for
+   * everything is what it has always been.
    */
   scope: SearchScope;
   sections: readonly NavSection[];
@@ -246,6 +273,8 @@ export function useSearchRows({
    * cursor. Nothing is fetched until it is true.
    */
   active: boolean;
+  /** Which box is asking, which is what an empty query is answered from. */
+  surface: SearchSurface;
 }): {
   rows: SearchRow[];
   /** An answer is still on its way, so "nothing matches" would be premature. */
@@ -277,7 +306,7 @@ export function useSearchRows({
       (entry) => enabledModules === undefined || enabledModules.includes(entry.id),
     );
 
-    return [
+    const all = [
       ...sections.map((section) => ({
         id: `section:${section.href}`,
         label: section.label,
@@ -314,7 +343,14 @@ export function useSearchRows({
       // twelve rows of theme in a list you came to for something else.
       ...themeCommands(theme),
     ];
-  }, [sections, module, enabledModules, router, theme]);
+
+    // Narrowed by the same rule as the things you own, and from the same file.
+    // Every row carries the workspace it belongs to, so a scope naming one
+    // keeps this workspace's sections and drops every other workspace, Home,
+    // Account and the themes, which is the answer on #720. A scope of
+    // everything leaves the list as it was.
+    return commandsInScope(all, scope);
+  }, [sections, module, enabledModules, router, theme, scope]);
 
   /**
    * The things you can make, when what you typed names one.
@@ -328,24 +364,64 @@ export function useSearchRows({
    * Ranked against the action's own words rather than the whole query, for the
    * reason in lib/capture/actions.ts, and then sorted in with everything else
    * on the same points, so a workspace called Todo still wins on "todo".
+   *
+   * Scoped like the rest of the list: a search asked for one workspace offers
+   * only what you can start in that workspace.
    */
   const captures = useMemo(
     () =>
-      matchCaptureActions(query).map(({ action, points, seed }) => ({
-        points,
-        command: {
-          id: `capture:${action.id}`,
-          label: action.label,
-          hint: seed || 'Capture',
-          module: action.module,
-          run: () => openCapture(action.id, seed),
-        } satisfies SearchCommand,
-      })),
-    [query, openCapture],
+      matchCaptureActions(query)
+        .filter(({ action }) => moduleInScope(action.module, scope))
+        .map(({ action, points, seed }) => ({
+          points,
+          command: {
+            id: `capture:${action.id}`,
+            label: action.label,
+            hint: seed || 'Capture',
+            module: action.module,
+            run: () => openCapture(action.id, seed),
+          } satisfies SearchCommand,
+        })),
+    [query, openCapture, scope],
   );
 
+  /**
+   * The things you can start here, for a list nobody has typed into.
+   *
+   * `matchCaptureActions` answers an empty query with nothing, which is right
+   * for ranking and leaves the opening list without them. So these rows are
+   * built rather than matched, and nothing is seeded into the panel they open,
+   * because nothing was typed to seed it with.
+   *
+   * Only where the search names a workspace. A box opened outside one searches
+   * everything, and everything is the list it has always opened with.
+   */
+  const startable = useMemo<SearchCommand[]>(() => {
+    if (scope === 'everything') return [];
+    return CAPTURE_ACTIONS.filter((action) => moduleInScope(action.module, scope)).map(
+      (action) => ({
+        id: `capture:${action.id}`,
+        label: action.label,
+        hint: 'Capture',
+        module: action.module,
+        run: () => openCapture(action.id),
+      }),
+    );
+  }, [scope, openCapture]);
+
   const matches = useMemo(() => {
-    if (!query.trim()) return commands.slice(0, 8);
+    if (!query.trim()) {
+      // The bar has the cursor because somebody clicked into it or tabbed
+      // past it. Neither is a question yet, so it answers with nothing until
+      // a character is typed, which is the answer on #717.
+      if (surface === 'bar') return [];
+      // Opening the box is the question, so it answers: where you can go from
+      // here and what you can start here. Both halves are already narrowed to
+      // the workspace by the scope, so a box opened in one offers no other
+      // workspace, no Home, no Account and no theme -- #737. The cap is the
+      // same eight the list is capped at once there is a query.
+      return [...commands, ...startable].slice(0, 8);
+    }
     return [
       ...captures,
       ...commands
@@ -360,7 +436,7 @@ export function useSearchRows({
       .sort((a, b) => b.points - a.points)
       .slice(0, 8)
       .map((entry) => entry.command);
-  }, [captures, commands, query]);
+  }, [captures, commands, query, startable, surface]);
 
   const needle = query.trim();
   const searching = active && needle.length >= MIN_QUERY;

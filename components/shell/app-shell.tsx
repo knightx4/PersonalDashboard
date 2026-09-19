@@ -10,6 +10,7 @@ import { NotificationsButton, type Notification } from '@/components/shell/notif
 import { ThemePicker } from '@/components/shell/theme-picker';
 import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
+import { SearchBar } from '@/components/shell/search-bar';
 import { CaptureButton, CaptureProvider } from '@/components/shell/capture';
 import { KeyHintsProvider, Kbd } from '@/components/shell/key-hints';
 import { ToastProvider } from '@/components/ui/toast';
@@ -615,12 +616,14 @@ export function AppShell({
                   {title}
                 </h2>
 
-                {/* The middle of the bar was empty. It now carries the one thing
-                this workspace would say if it could say only one -- read on
-                arrival, not watched. Hidden on a phone, where there is no
-                middle. */}
+                {/* The one thing this workspace would say if it could say only
+                one, in the middle of the bar -- read on arrival, not watched.
+                Only between sm and lg now. From lg up it reads on the status
+                line at the foot of the page instead (#689, #707) and the
+                search bar has this space, and below sm it gets its own line
+                under the bar (#688), further down. */}
                 {brief && (
-                  <p className="hidden min-w-0 flex-1 justify-center truncate px-4 text-center text-ui sm:flex">
+                  <p className="hidden min-w-0 flex-1 justify-center truncate px-4 text-center text-ui sm:flex lg:hidden">
                     {brief.href ? (
                       <Link
                         href={brief.href}
@@ -642,14 +645,37 @@ export function AppShell({
                     )}
                   </p>
                 )}
+                {/* Search, in the top bar of every page from lg up, narrowed to
+                the workspace the page is in. The chip is drawn from `module`,
+                so it names this workspace and goes back to naming it after a
+                move to another one; on Home and the account page `module` is
+                null, there is no chip, and the bar searches everything.
+
+                Below lg there is no field here at all and ⌘K is the way in.
+                1024 is where the column appears, and a field competing with
+                the page title for a phone's width would leave neither of them
+                readable. */}
+                <SearchBar
+                  account={account}
+                  module={module}
+                  sections={sections}
+                  enabledModules={workspaces}
+                  theme={theme}
+                  className="hidden min-w-0 flex-1 lg:block"
+                />
+
                 {/* The gap that puts the account controls in the right corner.
-                From sm up the brief is the flexible middle of the bar and does
-                that job itself, so the spacer stands down. Below sm the brief
-                is `display: none` and takes no part in the layout at all --
-                which is how, on a phone, the theme, notification, feedback and
-                account icons ended up bunched against the page title instead
-                of in the corner. */}
-                <span className={cn('min-w-0 flex-1', brief && 'sm:hidden')} />
+                Between sm and lg the brief is the flexible middle of the bar
+                and does that job itself, so the spacer stands down. Outside
+                that band the brief is `display: none` and takes no part in the
+                layout at all -- which is how, on a phone, the theme,
+                notification, feedback and account icons ended up bunched
+                against the page title instead of in the corner. From lg up the
+                search bar is the flexible middle, on every page and whether or
+                not there is a brief, so the spacer stands down there too. Two
+                items both growing from nothing would split the middle between
+                them, leaving the bar half the width it should have. */}
+                <span className={cn('min-w-0 flex-1', brief && 'sm:hidden', 'lg:hidden')} />
 
                 {/* What is left here belongs to the person, not to the workspace:
                 their theme, their notifications, their feedback, their
@@ -708,7 +734,10 @@ export function AppShell({
             >
               {children}
             </main>
-            <StatusLine lines={activity} main={mainCheck} />
+            {/* The brief goes down here from lg up, which is exactly the width
+            this line is drawn at, so the two copies above and this one never
+            show at once. */}
+            <StatusLine lines={activity} brief={brief} main={mainCheck} />
 
             <nav
               // Named for what is actually in it: on home and the account page it

@@ -26,7 +26,7 @@ describe('planItemFromRow', () => {
     comment: null,
     priority: 1,
     size: 'm',
-    assignee: 'claude',
+    assignee: 'me',
     commit_sha: null,
     position: 10,
     started_at: null,
@@ -40,7 +40,7 @@ describe('planItemFromRow', () => {
     expect(item.status).toBe('blocked');
     expect(item.priority).toBe(1);
     expect(item.size).toBe('m');
-    expect(item.assignee).toBe('claude');
+    expect(item.assignee).toBe('me');
     expect(item.acceptance).toBe('Done when it works.');
     expect(item.kind).toBe('build');
   });
@@ -82,6 +82,13 @@ describe('planItemFromRow', () => {
     // A word nothing names is read back as none rather than handed on to a
     // switch that has no arm for it.
     expect(planItemFromRow({ ...row, block_kind: 'somebody' }).blockKind).toBeNull();
+  });
+
+  it('reads a step still holding the old claude value as nobody\'s', () => {
+    // #718. The column says which approved steps you kept, and `me` is the
+    // whole of that answer, so the two dozen rows a hand-over wrote load as
+    // nobody's -- which is what `isClaudes` already counts as the runner's.
+    expect(planItemFromRow({ ...row, assignee: 'claude' }).assignee).toBeNull();
   });
 
   it('reads a value the code no longer names back as the default rather than crashing', () => {

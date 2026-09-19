@@ -4,7 +4,6 @@ import {
   hasLiveFog,
   isClosed,
   isDismissed,
-  type PlanAssignee,
   type PlanBlockKind,
   type PlanData,
   type PlanItem,
@@ -1362,21 +1361,26 @@ export function countMatches(sections: readonly PlanSection[]): number {
  * Both stay ready and stay in the unfiltered order, so they show on the page
  * and hold up everything waiting on them until somebody settles them.
  *
- * `{ assignee: 'claude' }` asks for what the runner may take, which is
+ * `{ only: 'runner' }` asks for what the runner may take, which is
  * `isClaudes` rather than the column: every approved step but the ones you
- * kept. `{ assignee: 'me' }` is the column read literally, because those are
+ * kept. `{ only: 'mine' }` is the column read literally, because those are
  * the ones you kept.
+ *
+ * Neither reads as an assignee, which is why this option is no longer named
+ * for one. `runner` was `{ assignee: 'claude' }` and never read the column at
+ * all; since #718 no step can be assigned to Dash, so the old name described
+ * a value nothing can hold.
  */
 export function workOrder(
   sections: readonly PlanSection[],
-  options: { assignee?: PlanAssignee } = {},
+  options: { only?: 'mine' | 'runner' } = {},
 ): PlanNode[] {
   return flattenSections(sections)
     .filter((node) => node.ready)
     .filter((node) => !isDismissed(node))
     .filter((node) => {
-      if (!options.assignee) return true;
-      if (options.assignee === 'me') return node.assignee === 'me';
+      if (!options.only) return true;
+      if (options.only === 'mine') return node.assignee === 'me';
       return isClaudes(node) && !isWaitingOnThePerson(node);
     })
     .sort((a, b) => a.priority - b.priority);

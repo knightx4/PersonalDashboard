@@ -9,25 +9,25 @@
  * live; this is the half that says a claim should be written back, so the row
  * itself stops being wrong.
  *
- * Two claims are not being worked. One is older than any session takes, which
- * is `isStalledClaim`'s rule and the same threshold. The other has nobody on
- * it at all: every path that claims a step names who holds it -- the send
- * button and `plan.ts start` name Claude, the page names you -- so a claim
- * with no assignee is one no session and no person is holding.
+ * One rule decides: the claim is older than any session takes, which is
+ * `isStalledClaim`'s and the same threshold. There was a second until #714 --
+ * a claim with no assignee was read as one nobody was holding, because every
+ * path that claimed a step wrote who held it. Those writes are gone, so an
+ * empty column no longer says anything about whether a session is on the step,
+ * and the sweep reads the run behind the claim for that.
  */
 import { elapsedSince, isStalledClaim } from './elapsed';
 
 export type Claim = {
   status: string;
-  assignee: string | null;
   startedAt: string | null;
 };
 
 /** Why a claim is being taken back. */
-export type ExpiredClaim = 'stale' | 'unowned';
+export type ExpiredClaim = 'stale';
 
 /**
- * Whether this row's claim should be put back, and which of the two it is.
+ * Whether this row's claim should be put back.
  *
  * Null for anything that is not a claim at all, and for a live one. A claim
  * with no `startedAt` is left alone the way `claimLiveness` leaves it: the
@@ -36,7 +36,6 @@ export type ExpiredClaim = 'stale' | 'unowned';
  */
 export function expiredClaim(claim: Claim, now: number): ExpiredClaim | null {
   if (claim.status !== 'in_progress') return null;
-  if (!claim.assignee) return 'unowned';
   if (!claim.startedAt) return null;
   return isStalledClaim(claim.startedAt, now) ? 'stale' : null;
 }
@@ -57,17 +56,14 @@ export function expiredClaim(claim: Claim, now: number): ExpiredClaim | null {
  * a reason to go and look at the token.
  */
 export function claimExpiredNote(
-  why: ExpiredClaim,
-  startedAt: string | null,
+  startedAt: string,
   now: number,
   refusal: string | null = null,
 ): string {
   const stamp = new Date(now).toISOString().slice(0, 10);
-  const reason =
-    why === 'unowned'
-      ? 'it was underway with nobody holding it'
-      : `nothing had touched it for ${elapsedSince(startedAt as string, now)}`;
-  const line = `Claim expired ${stamp}: ${reason}, so it went back to not started.`;
+  const line =
+    `Claim expired ${stamp}: nothing had touched it for ${elapsedSince(startedAt, now)}, ` +
+    'so it went back to not started.';
   if (!refusal) return line;
 
   const said = refusal.trim();
