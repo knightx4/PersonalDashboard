@@ -55,6 +55,11 @@ export const LEARN_OPERATIONS = [
   // name is declared here anyway, because this list is what the spend screen
   // groups by and an operation missing from it is one nobody can find.
   'embed-catalogue',
+  // One Haiku call per candidate segment, asking whether it teaches the claim.
+  // The only cost in the catalogue feature that scales with how much material
+  // has been pulled in rather than with how much you study, so it is worth
+  // being able to see on its own.
+  'judge-segment',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
