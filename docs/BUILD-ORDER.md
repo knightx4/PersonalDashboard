@@ -303,8 +303,9 @@ time it is used, never generated once and frozen.
 ## The knowledge foundation
 
 Specified in [KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md), which sits above the vault
-spec and both learn specs. The vault is the store, the map is derived from it,
-and what the app produces is written back so that staying derived costs nothing.
+spec and both learn specs. The vault is the record and the graph is a layer on
+top of it: read-only in, no write path out, and everything the graph holds is
+either derived from the notes or produced by using the app.
 
 The ordering argument is that every item is cheap at the few dozen concepts in
 the graph today and painful at the 1,500 to 2,500 the vault sweep is projected
@@ -321,27 +322,29 @@ to produce, so all of it comes before the sweep rather than after.
 56. **One extraction seam.** The node test, the kinds, the edge vocabulary and
     the quote rule in the shared prompt fragment the five chain-writing calls
     already draw on, so a change to what an atom is is made once.
-57. **The outbox.** Authored atoms and rewritten claims become files. Needs a
-    read-write PAT, which is one of the two things a session cannot do.
-58. **The sweep at scale.** A background job, a budget and a resume point,
+57. **The sweep at scale.** A background job, a budget and a resume point,
     which the one-note slice deliberately has none of.
-59. **The review queue.** Accept, merge or reject, highest centrality first.
-60. **Centrality and the frontier floor.** Graph arithmetic, no model call.
-61. **Disagreements.** The neighbourhood sweep, the six kinds, the crux, and
+58. **The review queue.** Accept, merge or reject, highest centrality first.
+59. **Centrality and the frontier floor.** Graph arithmetic, no model call.
+60. **Disagreements.** The neighbourhood sweep, the six kinds, the crux, and
     the resolution atom that `qualifies` both originals.
-62. **Overlays in the interface.** Interests and open questions, and the button
+61. **Overlays in the interface.** Interests and open questions, and the button
     that turns an unanswered question into a track in the reading queue.
+62. **The export.** One markdown file per atom, on demand. An atom you typed
+    into the app is the one thing here the vault cannot give back, since
+    nothing is ever written to it.
 
 ### Ordering notes worth respecting
 
 - Steps 54 and 55 block everything else here. 54 is not bookkeeping: the app
   is already doing the thing the policy does not describe.
-- 55 before 56 before 58, for the reason every block here repeats. A shape
+- 55 before 56 before 57, for the reason every block here repeats. A shape
   settled after 1,800 rows are written is a data migration rather than a
   migration.
-- 57 is independent of 58 and can wait on the token without blocking the sweep.
-- 62 last, and it is the one that closes the loop between the two modules: an
-  interest with no atoms under it is the best input the reading queue can get.
+- 61 is the one that closes the loop between the two modules: an interest with
+  no atoms under it is the best input the reading queue can get.
+- 62 depends on nothing and blocks nothing. It is last because there is
+  nothing worth exporting until the rest has run.
 
 ## Open questions, still open
 

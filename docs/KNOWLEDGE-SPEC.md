@@ -1,4 +1,4 @@
-# Knowledge: one store, and the map over it
+# Knowledge: the record, and the map over it
 
 The foundation the learn and vault modules both stand on. Four documents
 already describe parts of this and each was written from inside one part:
@@ -9,7 +9,8 @@ from notes that were never written to be mapped.
 
 They disagree with each other and with the database in eight places, listed at
 the end. This document settles those, and it owns the two decisions none of
-them could make alone: where the writing lives, and what sits above the notes.
+them could make alone: where the graph lives relative to the notes, and what
+sits above them.
 
 Written to [WRITING-GUIDE.md](WRITING-GUIDE.md).
 
@@ -42,76 +43,59 @@ you would rely on it.
 
 ---
 
-## Why one store, and how the map grows past it
+## The record, and the graph over it
 
-The vault is the store. The map is derived from it, plus what you learn inside
-the app, and the app writes that back.
+The vault is the record. The graph is a layer on top of it and never writes
+into it. Obsidian stays the only writer, the sync stays one-way, and the app
+holds a mirror of the notes plus everything it derives from them.
 
-The vault earns this on a property nothing else in the account has. It
+The vault earns the role on a property nothing else in the account has. It
 accumulates whether or not this app exists, it is plain text with two decades
 of history behind the format, and you would keep writing in it if the app were
-deleted tomorrow. Postgres has none of those properties and does not need
-them, because what Postgres holds is derived.
+deleted tomorrow. Nothing the graph does should put that at risk, and the
+cheapest way to guarantee it is to have no write path at all. The stored PAT is
+`Contents: Read-only` and `lib/vault/providers/github.ts` has no method that
+writes, so this is a property of the code rather than a rule somebody has to
+remember.
 
-**The test, stated so it can be checked rather than believed.** Drop the
-`learn` schema entirely and you lose compute, not writing. Every atom you
-authored, every claim you rewrote in your own words, every note you took after
-a reading is a file in the vault and is still there. What is gone is the
-extraction, the edges, the states and the probe history, and all of it can be
-rebuilt from the files for a few dollars.
+### What that costs, said plainly
 
-That test is what the outbox exists to keep true.
+An atom arrives in one of four ways, and they do not all survive the same
+accidents.
 
-### The outbox
-
-An atom arrives in one of four ways, and only some of them are yours.
-
-| how an atom arrives | is it yours | written back |
+| how an atom arrives | where it lives | recoverable from the vault |
 |---|---|---|
-| extracted from a note you wrote | yes, already a file | no, it is already in the vault |
-| you typed it, or rewrote a claim in your words | yes | **yes** |
-| you marked it held after a probe | yes, the position is | **yes** |
-| generated as scaffolding for a goal's chain | no | no |
+| extracted from a note you wrote | a row, pointing at the note and the sentence | yes, by re-running the sweep |
+| generated as scaffolding for a goal's chain | a row | yes, by regenerating |
+| you typed it into the app | a row, and only a row | **no** |
+| you rewrote a generated claim in your own words | a row, and only a row | **no** |
 
-Generated scaffolding is deliberately not written back. A goal expands to a
-dozen model-written claims so there is something to probe against, and filing
-those in your vault would flood the thing whose value is that it is all yours.
-They are regenerable and they stay rows.
+The first two are derived and cost a few dollars of model time to rebuild. The
+last two are writing you did, and they exist in exactly one place.
 
-Everything in the other three cases becomes a file under `outbox/` at the
-vault root, one atom per file, with the atom id, kind and stance in
-frontmatter.
+That is the real price of not writing back, and it is worth paying, because the
+alternative is a process holding commit access to the one body of writing in
+your life that currently has no automated writer. The mitigation is much smaller than a sync:
+an export that walks the atoms and writes a markdown file per atom into a
+folder you choose, on demand. It is not a second copy that has to stay
+consistent, because it is not read back.
 
-Three rules keep this from fighting the one-way sync:
+Two rules follow, and they are worth stating because they are what keep the
+mitigation honest.
 
-- **The app writes an outbox file once, at creation.** After that the file is
-  yours. Obsidian remains the only editor, sync pulls your edits back into the
-  atom row, and a later app-side change to that atom is a proposal you accept,
-  which writes a new commit rather than clobbering what you wrote.
-- **`outbox/` is excluded from extraction.** Its notes arrive back on the next
-  sync like any other file, and re-reading them for atoms would produce a
-  second copy of an atom that already exists. They are matched to their atom by
-  the frontmatter id instead.
-- **A deleted outbox file does not delete its atom.** Soft, like every other
-  vault delete, for the reason the vault spec already gives: the app must never
-  be the reason something is gone.
+- **A note body is never copied into the graph.** An atom carries a quote, a
+  note id and the blob hash that note had when it was read. It does not carry
+  the note. `learn.quiz_sources` already holds this line and says why: two
+  copies of a note disagree the moment the vault syncs.
+- **Prefer a row you can rebuild to a row you cannot.** Where a piece of state
+  could be stored or derived, derive it. What cannot be derived is what you
+  typed, which is precisely the set the export exists for.
 
-**This needs a token you have to generate.** The stored PAT is
-`Contents: Read-only`, the provider has no write path, and both the connect
-form and the settings page say read-only in as many words. Write-back needs
-`Contents: Read and write` on that one repository. Nothing else about the
-setup changes, and until the new token is pasted in, the outbox is disabled
-and authored atoms stay rows with a line on the page saying so.
+### What Postgres holds
 
-### What stays in Postgres, and why that is not a second store
-
-Probe questions, the answers you typed, verdicts, weights, states and the
-spend ledger. None of it is writing. A probe answer is only meaningful beside
-the question it answered, and a folder of four hundred one-line responses to
-questions you cannot see is not something anybody reads again.
-
-It exports to markdown on demand, which is the escape hatch rather than the
-plan: nothing here is trapped, and nothing here is worth reading as prose.
+The mirror of the notes, the atoms, the edges, the overlays, the states, the
+probe history and the spend ledger. All of it is either derived from the vault
+or produced by using the app, and none of it is the vault's to hold.
 
 ---
 
@@ -138,9 +122,9 @@ feature.
 
 ### 0. The record
 
-Files. Verbatim, one-way from Obsidian, plus what the outbox writes.
-`obsidian.notes` is a mirror of the record and not the record itself, which is
-why a rebuild of it is uninteresting and a loss of it is recoverable.
+Files. Verbatim, one-way from Obsidian, and written by nothing here.
+`obsidian.notes` is a mirror of the record rather than the record itself, which
+is why a rebuild of it is uninteresting and a loss of it is recoverable.
 
 The record is never the unit of meaning. It cannot be: the vault holds a
 105,874-character case-prep dump that yields two ideas and a
@@ -409,7 +393,7 @@ They are overlays, and this is the answer to the question the node test
 otherwise leaves stranded. "I am interested in how cities finance themselves"
 is not an atom, cannot be argued with, and would be correctly refused by
 extraction. It is an interest, it can hold zero atoms, and it is one of the
-most valuable rows in the store: an interest with no atoms under it is the
+most valuable rows in the graph: an interest with no atoms under it is the
 clearest possible instruction to the reading queue.
 
 Extraction proposes an overlay when a note is plainly about something without
@@ -474,7 +458,7 @@ ways.
 
 ## Knowing how you think
 
-The store above is what makes a recommendation specific to you rather than
+The layers above are what make a recommendation specific to you rather than
 specific to a topic you typed. Eight signals, all of them already implied by
 the layers:
 
@@ -540,7 +524,7 @@ Two further items are not schema and block the same work:
 
 ### On names
 
-The schema stays called `learn` and the outbox lands in the vault called
+The schema stays called `learn` and the notes stay in the one called
 `obsidian`. Renaming either buys nothing and costs a sweep of every file that
 references them, and this repo already has the precedent: the product is
 called vault and the schema is not, for a reason written at the head of its
@@ -569,28 +553,28 @@ rest of this repository already follows.
    two fragments. The node test, the four kinds, the six edge types and the
    verbatim quote rule belong in that shared fragment, written once, so a
    change to what an atom is does not have to be made five times.
-4. **The outbox.** Needs the read-write token. Authored atoms, rewritten
-   claims and held positions become files; `outbox/` is excluded from
-   extraction; the frontmatter id is the join.
-5. **The sweep at scale.** 1,244 notes needs what the one-note slice
+4. **The sweep at scale.** 1,244 notes needs what the one-note slice
    deliberately has none of: a background job, a budget, and a resume point.
    `lib/core/inbox/pump-budget.ts` already answers "is there time for another
    batch", and the vault's own backfill is the pattern for storing a position
    rather than chaining invocations.
-6. **The review queue.** Accept, merge or reject, one tap each, highest
+5. **The review queue.** Accept, merge or reject, one tap each, highest
    centrality first so the decisions that shape the map come before the ones
    that do not. The model proposes, the structure constrains, and you
    arbitrate. Letting the model decide produces a map you stop trusting, and
    maintaining a taxonomy by hand is work that stops after a fortnight.
-7. **Centrality, and the frontier floor.** Graph arithmetic, no model call.
-8. **Disagreements.** The sweep within neighbourhoods, the six kinds, the
+6. **Centrality, and the frontier floor.** Graph arithmetic, no model call.
+7. **Disagreements.** The sweep within neighbourhoods, the six kinds, the
    proposed crux, the resolution atom.
-9. **Overlays in the interface.** Interests and questions, the emptiness that
+8. **Overlays in the interface.** Interests and questions, the emptiness that
    makes them useful, and the button that turns an open question into a track
    in the reading queue.
+9. **The export.** One markdown file per atom, into a folder you pick, on
+   demand. Independent of everything above and worth having once there is
+   anything you typed to lose.
 
-Steps 1 and 2 block everything else here. Steps 3 to 6 are the sweep itself,
-and 7 to 9 are what makes its output usable.
+Steps 1 and 2 block everything else here. Steps 3 to 5 are the sweep itself,
+6 to 8 are what makes its output usable, and 9 stands on its own.
 
 ### What "it worked" looks like
 
@@ -636,18 +620,17 @@ does not serve embeddings. Only that stage changes.
 
 ---
 
-## Privacy, and the two things only you can do
+## Privacy, and the one thing only you can do
 
-Everything else here is settleable in a session. These two are not.
+Everything else here is settleable in a session. This is not.
 
-1. **A fine-grained PAT with `Contents: Read and write`** on the vault
-   repository, pasted into `/vault/settings`. Until it exists the outbox is off
-   and authored atoms stay rows. The current token is read-only and the
-   provider has no write path, so this is not something that can be worked
-   around.
-2. **The journal exclusion list.** Which paths are journals is a judgement only
-   you can make, and the map spec excludes them on privacy rather than on
-   yield.
+**The journal exclusion list.** Which paths are journals is a judgement only
+you can make, and the map spec excludes them on privacy rather than on yield.
+Until the list exists the sweep should not run, because the one exclusion that
+matters would not be in force.
+
+No new credential is needed. The read-only PAT already stored is the access
+this design wants, and it is why nothing here can damage the vault.
 
 The policy page can be drafted in a session and needs your reading before it
 ships, because it is a statement about your data made to you.
@@ -662,10 +645,11 @@ ships, because it is a statement about your data made to you.
   concepts today, on the grounds that a quiz over interview notes should not
   put one-off nodes into a subject that lives forever. Once subjects are labels
   that argument weakens, because there is no permanent container to pollute.
-- **Whether the outbox file becomes the source of truth for an atom's text.**
-  The rule above says your edits win on sync, which makes it true in practice.
-  Making it true in the schema means the atom row stores a path rather than the
-  text, and that is a bigger change than it looks.
+- **Whether the export should run on a schedule.** It is on demand above, on
+  the grounds that a scheduled export is a second copy nobody reads until they
+  need it and nobody notices has been failing. Against that, an atom you typed
+  exists in one place. Decide it the first time the export is actually
+  wanted.
 - **Whether overlays should ever be derived.** Ruled out above for v1 with a
   reason. The case that would reopen it is an interest you maintain by hand
   that is plainly a query, and it should be reopened from a real one.

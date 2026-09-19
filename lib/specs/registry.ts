@@ -38,9 +38,9 @@ export const SPECS: readonly SpecDoc[] = [
   },
   {
     slug: 'knowledge',
-    title: 'Knowledge: one store, and the map over it',
+    title: 'Knowledge: the record, and the map over it',
     blurb:
-      'The foundation under the vault and both learn specs: where the writing lives, what an atom is, and the overlays that hold interests and open questions.',
+      'The foundation under the vault and both learn specs: a graph built on top of the notes and never into them, what an atom is, and the overlays that hold interests and open questions.',
     file: 'KNOWLEDGE-SPEC.md',
     // Filed under learn rather than app-wide because it is read alongside the
     // map and the graph. It describes the vault as much as it does learn, and
