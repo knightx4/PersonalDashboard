@@ -275,6 +275,36 @@ describe('releaseStaleClaims against what the run pushed', () => {
     expect(updates[0].patch.status).toBe('not_started');
   });
 
+  // #682. The clock already released this claim; what it did not say was that
+  // nothing had been read about the run behind it. Released with no evidence
+  // and released against the evidence wrote the same sentence, and only the
+  // first is a reason to go and look at the token.
+  it('says on the row that GitHub could not be asked', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', '');
+    const { supabase, updates } = stubClient([condemned()], [run()]);
+
+    await releaseStaleClaims(supabase, NOW, { fetch: pushed() as never });
+    expect(updates[0].patch.comment).toBe(
+      'Claim expired 2026-03-02: nothing had touched it for 2h 40m, so it went back to not' +
+        ' started. GitHub could not be asked what its run pushed, so the clock decided alone.' +
+        ' No GITHUB_READ_TOKEN is set, so pushes cannot be read.',
+    );
+  });
+
+  // The other way a release happens with nothing read: GitHub answered fine
+  // and the run had pushed nothing since it was fired. That line stays as it
+  // was, since the evidence is what condemned the claim.
+  it('says nothing about GitHub when GitHub answered', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, updates } = stubClient([condemned()], [run()]);
+
+    await releaseStaleClaims(supabase, NOW, { fetch: pushed() as never });
+    expect(updates[0].patch.comment).toBe(
+      'Claim expired 2026-03-02: nothing had touched it for 2h 40m, so it went back to not' +
+        ' started.',
+    );
+  });
+
   it('falls back to the clock for a step with no run recorded', async () => {
     vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
     const { supabase } = stubClient([condemned()], []);
