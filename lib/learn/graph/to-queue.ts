@@ -29,12 +29,15 @@ function fail(action: string, error: { message: string }): Error {
  * Find the track this subject's gaps go in, or make it.
  *
  * One per subject, so a month of gap-reading lands in one place rather than
- * one track per concept. The question is written once, when the track is made,
+ * one track per concept. Exported because queuing a piece of catalogue
+ * material for a claim goes in the same place: it was found for a gap in this
+ * subject, and a second track holding the same month of reading would split
+ * the one queue in two. The question is written once, when the track is made,
  * and describes the track rather than any one gap in it: a track that holds
  * twenty claims cannot be about the twentieth. Each reading carries its own
  * claim, which is read off its concept when something needs it.
  */
-async function trackForSubject(
+export async function trackForSubject(
   supabase: LearnSupabaseClient,
   userId: string,
   subjectName: string,
