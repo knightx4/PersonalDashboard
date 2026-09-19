@@ -1,5 +1,32 @@
 import Markdown from 'react-markdown';
+import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+
+import { remarkObsidianMath } from '@/lib/vault/markdown/math';
+
+import 'katex/dist/katex.min.css';
+
+/**
+ * How KaTeX is allowed to behave on somebody else's markup.
+ *
+ * `trust` stays off, which is what keeps `\href` and `\includegraphics` from
+ * being a way back in for a clipped page -- the same reason raw HTML is off
+ * below. A formula KaTeX cannot parse is drawn as its own source in red
+ * rather than thrown, because one malformed expression must not cost the
+ * whole note. `strict: 'ignore'` is about the log rather than the page:
+ * Obsidian notes use Unicode in maths freely and each one is a warning nobody
+ * reads.
+ */
+const KATEX = {
+  trust: false,
+  throwOnError: false,
+  strict: 'ignore',
+  // KaTeX writes this into the style attribute of the source it falls back
+  // to, so it has to be the token rather than a class the stylesheet could
+  // set: an inline colour would win over the stylesheet in all four themes.
+  errorColor: 'var(--c-danger)',
+} as const;
 
 /**
  * A note, rendered.
@@ -14,12 +41,19 @@ import remarkGfm from 'remark-gfm';
  *
  * The source has already been through toStandardMarkdown(), so wikilinks are
  * ordinary links by the time they arrive.
+ *
+ * Maths is written the way Obsidian writes it, `$x$` inline and `$$x$$` on a
+ * line of its own, and rendered by KaTeX on the server -- nothing of it is
+ * shipped to the browser but the stylesheet. `remarkObsidianMath` is what
+ * keeps "$20 or $30" two prices rather than one expression; remark-math on
+ * its own reads any pair of dollar signs as a formula.
  */
 export function NoteBody({ markdown }: { markdown: string }) {
   return (
     <div className="vault-prose">
       <Markdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkMath, remarkObsidianMath]}
+        rehypePlugins={[[rehypeKatex, KATEX]]}
         components={{
           a({ href, children, ...props }) {
             const external = /^https?:\/\//i.test(href ?? '');

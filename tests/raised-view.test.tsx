@@ -108,6 +108,7 @@ function waitingRow(over: Partial<WaitingRow> = {}): WaitingRow {
     detail: 'Make a key at resend.com, then add RESEND_API_KEY to the Vercel project and redeploy.',
     resolution: null,
     proposedBeneath: 0,
+    thread: [],
     ...over,
   };
 }
@@ -470,5 +471,54 @@ describe('the three groups', () => {
 
     expect(html).toContain('Nothing waiting on you');
     expect(html).not.toContain('Your actions');
+  });
+});
+
+/**
+ * Note e91a8318: a raise could be talked to from Dash and a plan row could
+ * not, so anything you wanted to say about a stopped step had to be said on
+ * the plan page.
+ */
+describe('commenting on a plan row', () => {
+  it('offers the box on all four kinds of waiting', () => {
+    for (const health of ['blocked', 'setup', 'unanswered', 'proposed'] as const) {
+      const html = render([], [waitingRow({ health })]);
+      expect(html).toContain('Comment</button>');
+    }
+  });
+
+  it('draws what has already been said on the step, both halves of it', () => {
+    const html = render(
+      [],
+      [
+        waitingRow({
+          thread: [
+            {
+              id: 'c1',
+              author: 'me',
+              body: 'The key is ordered, it should be here Friday.',
+              createdAt: '2026-09-18T09:00:00.000Z',
+            },
+            {
+              id: 'c2',
+              author: 'claude',
+              body: 'Left stopped until then.',
+              createdAt: '2026-09-18T09:05:00.000Z',
+            },
+          ],
+        }),
+      ],
+    );
+
+    expect(html).toContain('The key is ordered, it should be here Friday.');
+    expect(html).toContain('Left stopped until then.');
+    expect(html).toContain('2 comments');
+  });
+
+  // Law 14: the box is a press until it is wanted, the same as on a raise.
+  it('does not stand the box open on a row with nothing said on it', () => {
+    const html = render([], [waitingRow()]);
+
+    expect(html).not.toContain('<textarea');
   });
 });
