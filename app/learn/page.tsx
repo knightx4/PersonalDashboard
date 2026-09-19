@@ -63,7 +63,7 @@ export default async function LearnPage({
   const search = q?.trim() ?? '';
 
   const supabase = await createLearnClient();
-  const tracks = await loadTracks(supabase, search);
+  const tracks = await loadTracks(supabase, { search });
   const rows = nestTracks(tracks);
 
   return (

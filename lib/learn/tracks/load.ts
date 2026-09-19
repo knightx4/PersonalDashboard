@@ -276,7 +276,24 @@ async function loadReadingMatches(
 }
 
 /**
- * Every track, with its progress. With a search, the ones it matches.
+ * What to narrow the list of tracks to.
+ *
+ * An object rather than a bare string because matching grows: the search here
+ * already reaches the readings inside a track as well as the track's own title
+ * and question, and anything narrower lands as another field rather than
+ * another positional argument.
+ */
+export type TrackListFilter = {
+  /**
+   * Keep only the tracks whose title or question contains this, ignoring case,
+   * along with the tracks holding a reading that contains it. Empty or blank is
+   * no search at all, and every track comes back.
+   */
+  search?: string;
+};
+
+/**
+ * Every track, with its progress. With a search, the ones that match it.
  *
  * A search matches the title or the question, which are the two strings a
  * track is remembered by, and it matches the readings inside a track, which is
@@ -286,27 +303,30 @@ async function loadReadingMatches(
  * Blank or whitespace is no search at all rather than a match on nothing, so
  * clearing the box gives the whole list back.
  *
- * Without a search that is two reads: the tracks, then their readings'
- * statuses, looked up by track id rather than counted per track. A search costs
- * two more for the readings it matches, and a fifth for the tracks that only a
- * reading reached -- none of which grows with the number of tracks.
+ * Without a search that is one query for the tracks and one for their
+ * readings' statuses, rather than a count per track: a personal queue is tens
+ * of tracks, and two round trips beat N. The statuses query is not narrowed
+ * alongside the tracks -- it is read by track id and the rows a search left out
+ * are simply never looked up. A search costs two more reads for the readings it
+ * matches, and a fifth for the tracks that only a reading reached, none of
+ * which grows with the number of tracks.
  */
 export async function loadTracks(
   supabase: LearnSupabaseClient,
-  search?: string,
+  filter: TrackListFilter = {},
 ): Promise<TrackSummary[]> {
-  let read = supabase.from('tracks').select(TRACK_COLUMNS);
+  let tracksRead = supabase.from('tracks').select(TRACK_COLUMNS);
 
-  const term = search?.trim();
-  // Escaped, so a % or an _ somebody typed is the character they typed
-  // rather than a wildcard matching everything from there.
-  const pattern = term ? `%${escapeLike(term)}%` : null;
+  const search = filter.search?.trim();
+  // Escaped, so a % or a _ somebody typed is the character they typed rather
+  // than "match anything from here".
+  const pattern = search ? `%${escapeLike(search)}%` : null;
   if (pattern) {
-    read = read.or(`title.ilike.${pattern},question.ilike.${pattern}`);
+    tracksRead = tracksRead.or(`title.ilike.${pattern},question.ilike.${pattern}`);
   }
 
   const [{ data, error }, matches] = await Promise.all([
-    read.order('created_at', { ascending: false }),
+    tracksRead.order('created_at', { ascending: false }),
     pattern ? loadReadingMatches(supabase, pattern) : Promise.resolve([]),
   ]);
 
