@@ -109,7 +109,7 @@ function ports(over: Partial<OvernightPorts> = {}) {
     /** What the tick asked for, in the order it asked, so sweep-then-tree can be checked. */
     order: [] as string[],
     fired: [] as Array<{ feature: string; step: string }>,
-    recorded: [] as number[],
+    recorded: [] as (number | null)[],
     stopped: [] as string[],
   };
   const sections = tree(oneReadyFeature());
@@ -227,6 +227,23 @@ describe('overnightTick', () => {
     expect(calls.fired).toEqual([{ feature: 'feature', step: 'step' }]);
     // The count the row said was left, not the one after it.
     expect(calls.recorded).toEqual([6]);
+    expect(calls.stopped).toEqual([]);
+  });
+
+  it('fires a run with no cap without counting anything down', async () => {
+    const { ports: p, calls } = ports({
+      loadRun: async () => night({ featuresBudget: null, featuresLeft: null, stopBy: null }),
+    });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({
+      act: 'fired',
+      featuresLeft: null,
+    });
+
+    expect(calls.fired).toEqual([{ feature: 'feature', step: 'step' }]);
+    // Null goes through to the write, which leaves the column alone. A zero
+    // here would be a spent budget and the next tick would end the run.
+    expect(calls.recorded).toEqual([null]);
     expect(calls.stopped).toEqual([]);
   });
 

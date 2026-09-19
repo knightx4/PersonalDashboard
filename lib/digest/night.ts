@@ -87,8 +87,10 @@ export type DigestNight = {
   endedAt: string | null;
   /** Why it stopped, in the row's own sentence. Null on a night still going. */
   endedReason: string | null;
-  featuresBudget: number;
-  featuresLeft: number;
+  /** Null when the run was started with no cap. */
+  featuresBudget: number | null;
+  /** Null exactly when `featuresBudget` is. */
+  featuresLeft: number | null;
   /** Every feature it fired, in the order it fired them. */
   features: (DigestNightRef & { at: string })[];
   /**
@@ -271,8 +273,16 @@ export function nightFrom(input: {
  * the reader work out whether it was the same quantity.
  */
 export function nightBudgetLine(
-  night: Pick<DigestNight, 'featuresBudget' | 'featuresLeft'>,
+  night: Pick<DigestNight, 'featuresBudget' | 'featuresLeft' | 'features'>,
 ): string {
+  // A run with no cap has no "of" to say, so it says what it fired. The fires
+  // themselves are the only source for that number -- which is why this is the
+  // one case that counts them rather than reading the columns: there is no
+  // budget to subtract a remainder from.
+  if (night.featuresBudget === null || night.featuresLeft === null) {
+    const fired = night.features.length;
+    return `${fired} ${fired === 1 ? 'feature' : 'features'} fired, no limit`;
+  }
   const spent = Math.max(0, night.featuresBudget - night.featuresLeft);
   return `${spent} of ${night.featuresBudget} ${
     night.featuresBudget === 1 ? 'feature' : 'features'

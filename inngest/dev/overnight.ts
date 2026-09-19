@@ -224,7 +224,7 @@ export type OvernightTick =
       act: 'fired';
       feature: number;
       step: number;
-      featuresLeft: number;
+      featuresLeft: number | null;
       /** Features the send refused on the way here, in the order they were tried. */
       refused: number[];
     }
@@ -265,7 +265,7 @@ export type OvernightPorts = {
     step: PlanNode,
   ) => Promise<{ ok: boolean; error?: string; refused?: boolean }>;
   /** Take one off the budget, given what the row said was left. */
-  recordFire: (featuresLeft: number) => Promise<void>;
+  recordFire: (featuresLeft: number | null) => Promise<void>;
   stop: (reason: string) => Promise<void>;
 };
 
@@ -382,7 +382,7 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
         act: 'fired',
         feature: choice.feature.number,
         step: choice.step.number,
-        featuresLeft: Math.max(0, run.featuresLeft - 1),
+        featuresLeft: run.featuresLeft === null ? null : Math.max(0, run.featuresLeft - 1),
         refused: refused.map((one) => one.number),
       };
     }

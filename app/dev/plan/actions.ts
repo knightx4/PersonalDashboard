@@ -33,6 +33,7 @@ import {
 import { handFeatureToClaude, handStepToClaude } from '@/lib/plan/handover';
 import {
   OVERNIGHT_FEATURE_CAP,
+  OVERNIGHT_NO_LIMIT,
   OVERNIGHT_HOUR_CAP,
   OVERNIGHT_STOPPED_BY_HAND,
   overnightStopBy,
@@ -1378,6 +1379,33 @@ export async function startOvernightRunner(
   const supabase = await createClient();
   const user = await requireOwner({ supabase });
 
+  // `OVERNIGHT_NO_LIMIT` in the duration field is the one choice that turns
+  // both brakes off: no bedtime and no budget. They go together because a cap
+  // with no clock still stops after its last feature, which is not what "keep
+  // going" means -- and the features field is not rendered in that mode, so
+  // there is nothing to read for it.
+  const keepGoing = field(formData, 'hours') === String(OVERNIGHT_NO_LIMIT);
+
+  if (keepGoing) {
+    const now = new Date();
+    const { run, error } = await startOvernightRun({
+      supabase,
+      userId: user.id,
+      features: null,
+      stopBy: null,
+      now,
+    });
+    if (error) return { error };
+    if (!run) return { error: 'The runner could not be started.' };
+
+    revalidatePlan();
+    return {
+      message:
+        'Running, with no limit. It keeps firing features while there is work ' +
+        'handed over and ready, and stops when you stop it. The next tick picks the first one.',
+    };
+  }
+
   const features = z.coerce
     .number()
     .int()
@@ -1516,8 +1544,13 @@ export async function stopOvernightRunner(
   if (!run) return { message: 'Nothing was running, so there was nothing to stop.' };
   return {
     message:
-      `Stopped with ${run.featuresLeft} of ${run.featuresBudget} ` +
-      `${run.featuresBudget === 1 ? 'feature' : 'features'} unspent. Anything already building ` +
+      `${
+        run.featuresLeft === null
+          ? 'Stopped. It was running with no limit'
+          : `Stopped with ${run.featuresLeft} of ${run.featuresBudget} ${
+              run.featuresBudget === 1 ? 'feature' : 'features'
+            } unspent`
+      }. Anything already building ` +
       'finishes on its own; nothing follows it.',
   };
 }
