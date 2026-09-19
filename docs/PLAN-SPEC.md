@@ -203,7 +203,7 @@ afternoon a session loses.
 surface reads through that: the health on the row, the Ready and Waiting views,
 the counts on the summary strip, a feature's roll-up, "On you", and the Send
 button's refusal. A `steps` block whose named steps have all closed reports the
-step it now is -- ready, or not started -- and is handed over like any other. An
+step it now is -- ready, or not started -- and the runner takes it like any other. An
 `outside` block reports `blocked` on all of them however much else closes, and
 Send refuses it until the person moves it.
 
@@ -686,7 +686,7 @@ typecheck at each surface rather than drawing itself as a proposal, and
 
 Each module is a section with its progress bar. Each step is a line: the
 status picker (one click changes it), the number, the title, and the facts
-that matter — *Next* or *Someday*, the size, *Claude*, *Ready*, *Waits on
+that matter — *Next* or *Someday*, the size, *Yours*, *Ready*, *Waits on
 #n*, and *done/live steps* on a feature. The chevron folds the sub-steps,
 closed by default on a finished step. The title opens the detail: what it
 involves, done when, your note, what it waits on and unblocks, dates, the

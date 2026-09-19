@@ -361,7 +361,8 @@ const EMPTY_VIEW: Partial<Record<View, { title: string; description: string }>> 
   },
   claude: {
     title: "Nothing of Dash's right now",
-    description: 'Hand a step to Dash from its menu, or send one straight to the routine.',
+    description:
+      'A step appears here once you approve it and leave it unmarked as yours, with nothing blocking it. You can also send one straight to the routine.',
   },
   you: {
     title: 'Nothing waiting on you',
