@@ -64,10 +64,11 @@ export type NextReady = Shared<'ready'> & {
   stepsToGoal: number | null;
 };
 
-/** A claim you answered about long enough ago to be worth asking again. */
+/** A claim settled long enough ago to be worth asking about again. */
 export type NextRecheck = Shared<'recheck'> & {
   concept: Concept;
-  testedAt: string;
+  /** When it was last answered about, or when you waved it through. */
+  settledAt: string;
 };
 
 /** A reading queued against a claim and never opened. */
@@ -293,11 +294,11 @@ function toRecheckRow(row: SettledConcept, now: Date, record: Digest): NextReche
     key: `recheck:${row.concept.id}`,
     title: row.concept.name,
     href: probeHref(row.subjectId, row.concept.id),
-    reason: recheckReason(row.testedAt, now),
+    reason: recheckReason(row.settledAt, now),
     subjectId: row.subjectId,
     subjectName: row.subjectName,
     concept: row.concept,
-    testedAt: row.testedAt,
+    settledAt: row.settledAt,
   };
 
   return { ...built, reason: reasonWith(built.reason, built, record) };
@@ -397,7 +398,7 @@ export function rankNext(input: NextInput, now: Date, limit: number = NEXT_LIMIT
     record,
   );
   const recheck = byRecord(
-    rankByLastChecked(input.settled.filter((row) => oldEnough(row.testedAt, now))).map((row) =>
+    rankByLastChecked(input.settled.filter((row) => oldEnough(row.settledAt, now))).map((row) =>
       toRecheckRow(row, now, record),
     ),
     record,

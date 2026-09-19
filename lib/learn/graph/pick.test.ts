@@ -53,7 +53,23 @@ function settled(
     concept: { ...concept(name, 'known'), testedAt },
     subjectId: subject.id,
     subjectName: subject.name,
-    testedAt,
+    established: 'tested',
+    settledAt: testedAt,
+  };
+}
+
+/** A claim you waved through rather than answered a question about. */
+function waved(
+  name: string,
+  subject: { id: string; name: string },
+  declaredAt: string,
+): SettledConcept {
+  return {
+    concept: { ...concept(name, 'known'), established: 'declared', declaredAt },
+    subjectId: subject.id,
+    subjectName: subject.name,
+    established: 'declared',
+    settledAt: declaredAt,
   };
 }
 
@@ -116,7 +132,32 @@ describe('the turn that goes back over old ground', () => {
     expect(picked.kind).toBe('recheck');
     if (picked.kind !== 'recheck') return;
     expect(picked.row.concept.name).toBe('refraction');
-    expect(picked.row.testedAt).toBe('2026-03-14T10:00:00.000Z');
+    expect(picked.row.settledAt).toBe('2026-03-14T10:00:00.000Z');
+    expect(picked.row.established).toBe('tested');
+  });
+
+  it('asks about a claim you waved through long enough ago, and says you did', () => {
+    const picked = ask({
+      ready: [row('splice', rigging, 1)],
+      settled: [waved('bowline', rigging, '2026-03-14T10:00:00.000Z')],
+      answered: 4,
+    });
+
+    expect(picked.kind).toBe('recheck');
+    if (picked.kind !== 'recheck') return;
+    expect(picked.row.concept.name).toBe('bowline');
+    expect(picked.row.established).toBe('declared');
+    expect(picked.row.settledAt).toBe('2026-03-14T10:00:00.000Z');
+  });
+
+  it('skips a claim you waved through this week', () => {
+    const picked = ask({
+      ready: [row('splice', rigging, 1)],
+      settled: [waved('bowline', rigging, '2026-09-08T10:00:00.000Z')],
+      answered: 4,
+    });
+
+    expect(picked.kind).toBe('ask');
   });
 
   it('asks an ordinary question on the four turns in between', () => {

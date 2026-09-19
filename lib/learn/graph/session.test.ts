@@ -150,6 +150,11 @@ describe('the turn a subject session gives back to old ground', () => {
     return { ...concept(id, 'known'), established: 'tested', testedAt };
   }
 
+  /** Settled because you said you already knew it, on the day you said it. */
+  function waved(id: string, declaredAt: string): Concept {
+    return { ...concept(id, 'known'), established: 'declared', declaredAt };
+  }
+
   const frontier = concept('untouched', 'unknown');
 
   it('asks about the claim checked longest ago on every fifth question', () => {
@@ -159,6 +164,29 @@ describe('the turn a subject session gives back to old ground', () => {
       { answered: 4, now },
     );
     expect(picked?.id).toBe('old');
+  });
+
+  it('asks about a claim you waved through a month ago, and not one from yesterday', () => {
+    const old = nextConcept([frontier, waved('waved', daysAgo(200))], noneAsked, {
+      answered: 4,
+      now,
+    });
+    expect(old?.id).toBe('waved');
+
+    const yesterday = nextConcept([frontier, waved('waved', daysAgo(1))], noneAsked, {
+      answered: 4,
+      now,
+    });
+    expect(yesterday?.id).toBe('untouched');
+  });
+
+  it('takes whichever was settled longest ago, answered or waved through', () => {
+    const picked = nextConcept(
+      [frontier, checked('answered', daysAgo(45)), waved('waved', daysAgo(200))],
+      noneAsked,
+      { answered: 4, now },
+    );
+    expect(picked?.id).toBe('waved');
   });
 
   it('goes back to the frontier on the turns in between', () => {

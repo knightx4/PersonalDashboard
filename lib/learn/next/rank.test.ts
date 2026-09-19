@@ -33,7 +33,12 @@ function daysAgo(days: number): string {
   return new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
 }
 
-function concept(id: string, state: KnowledgeState = 'unknown', testedAt: string | null = null): Concept {
+function concept(
+  id: string,
+  state: KnowledgeState = 'unknown',
+  testedAt: string | null = null,
+  declaredAt: string | null = null,
+): Concept {
   return {
     id,
     name: id,
@@ -44,10 +49,10 @@ function concept(id: string, state: KnowledgeState = 'unknown', testedAt: string
     kind: null,
     mastery: [],
     state,
-    established: testedAt === null ? 'inferred' : 'tested',
+    established: declaredAt !== null ? 'declared' : testedAt === null ? 'inferred' : 'tested',
     misconception: null,
     testedAt,
-    declaredAt: null,
+    declaredAt,
   };
 }
 
@@ -60,7 +65,19 @@ function settled(id: string, testedAt: string, where = subject): SettledConcept 
     concept: concept(id, 'known', testedAt),
     subjectId: where.id,
     subjectName: where.name,
-    testedAt,
+    established: 'tested',
+    settledAt: testedAt,
+  };
+}
+
+/** A claim you said you already knew, on the day you said it. */
+function waved(id: string, declaredAt: string, where = subject): SettledConcept {
+  return {
+    concept: concept(id, 'known', null, declaredAt),
+    subjectId: where.id,
+    subjectName: where.name,
+    established: 'declared',
+    settledAt: declaredAt,
   };
 }
 
@@ -139,6 +156,30 @@ describe('one kind at a time', () => {
 
   it('leaves out a claim settled too recently to ask about again', () => {
     const rows = rankNext({ ...empty, settled: [settled('tuesday', '2026-09-10T12:00:00Z')] }, NOW);
+    expect(rows).toEqual([]);
+  });
+
+  it('mixes a claim you waved through in with the ones you answered about', () => {
+    const rows = rankNext(
+      {
+        ...empty,
+        settled: [
+          settled('answered', '2026-06-01T12:00:00Z'),
+          waved('waved-long-ago', '2025-01-01T12:00:00Z'),
+          waved('waved-in-august', '2026-08-01T12:00:00Z'),
+        ],
+      },
+      NOW,
+    );
+    expect(keys(rows)).toEqual([
+      'recheck:waved-long-ago',
+      'recheck:answered',
+      'recheck:waved-in-august',
+    ]);
+  });
+
+  it('leaves out a claim you waved through this week', () => {
+    const rows = rankNext({ ...empty, settled: [waved('tuesday', '2026-09-10T12:00:00Z')] }, NOW);
     expect(rows).toEqual([]);
   });
 
