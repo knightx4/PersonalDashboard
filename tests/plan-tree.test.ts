@@ -161,8 +161,8 @@ describe('dependencies', () => {
 describe('when things happened', () => {
   async function stamps(id: string) {
     const [row] = await asUser(alice, (tx) =>
-      tx<{ started_at: Date | null; completed_at: Date | null }[]>`
-        select started_at, completed_at from plan_items where id = ${id}`,
+      tx<{ started_at: Date | null; blocked_at: Date | null; completed_at: Date | null }[]>`
+        select started_at, blocked_at, completed_at from plan_items where id = ${id}`,
     );
     return row;
   }
@@ -195,6 +195,32 @@ describe('when things happened', () => {
   it('stamps a step inserted already done', async () => {
     const step = await addStep(alice, 'Born done', { status: 'done' });
     expect((await stamps(step.id)).completed_at).not.toBeNull();
+  });
+
+  it('stamps a block and takes it back when the step moves on', async () => {
+    const step = await addStep(alice, 'Stuck');
+    expect((await stamps(step.id)).blocked_at).toBeNull();
+
+    await asUser(alice, (tx) => tx`update plan_items set status = 'blocked' where id = ${step.id}`);
+    const blocked = (await stamps(step.id)).blocked_at;
+    expect(blocked).not.toBeNull();
+
+    // A session blocking a step that is already blocked rewrites the ask. The
+    // instant it stopped is the first one, not the latest visit.
+    await asUser(
+      alice,
+      (tx) =>
+        tx`update plan_items set status = 'blocked', block_ask = 'still stuck' where id = ${step.id}`,
+    );
+    expect((await stamps(step.id)).blocked_at).toEqual(blocked);
+
+    await asUser(alice, (tx) => tx`update plan_items set status = 'in_progress' where id = ${step.id}`);
+    expect((await stamps(step.id)).blocked_at).toBeNull();
+  });
+
+  it('stamps a step inserted already blocked', async () => {
+    const step = await addStep(alice, 'Born blocked', { status: 'blocked' });
+    expect((await stamps(step.id)).blocked_at).not.toBeNull();
   });
 });
 
