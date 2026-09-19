@@ -9,6 +9,7 @@ import { loadConversations } from '@/lib/comments/recent';
 import { loadFeatureFires, loadLastRuns } from '@/lib/plan/runs';
 import { lastStoredPush } from '@/lib/plan/liveness';
 import { loadOvernightRun, overnightStanding } from '@/lib/plan/overnight';
+import { readyFeatureCount } from '@/lib/plan/overnight-choice';
 import { nightFrom } from '@/lib/digest/night';
 import { planRoutine } from '@/lib/feedback/routine';
 import { ConversationsView } from './conversations-view';
@@ -82,7 +83,10 @@ export default async function DevRaisedPage() {
   // than filed by a session, so a step blocked on a credential reaches this
   // page without anybody remembering to raise it as well) and the raises the
   // queue is holding open.
-  const groups = waitingGroups(buildPlanTree(plan), queue);
+  // The tree once, for the two things below that read it: what is waiting, and
+  // how many features the runner could pick up.
+  const sections = buildPlanTree(plan);
+  const groups = waitingGroups(sections, queue);
 
   // What every "#494" on this page is called. Built once here rather than
   // looked up where each one is drawn: a raise with nine references in it
@@ -100,6 +104,7 @@ export default async function DevRaisedPage() {
         canSend={Boolean(planRoutine().token)}
         night={night}
         push={nightPush}
+        ready={readyFeatureCount(sections)}
         openNotes={openNotes.count ?? 0}
       />
       <DigestPanel digest={digest} />

@@ -5,6 +5,7 @@ import { syncPlanFromSeed } from '@/lib/plan/sync';
 import { endQuietRuns, loadFeatureFires, loadLastRuns, loadRunRaises } from '@/lib/plan/runs';
 import { loadCommitChecks, refreshCommitChecks } from '@/lib/plan/ci';
 import { loadOvernightRun, overnightStanding } from '@/lib/plan/overnight';
+import { readyFeatureCount } from '@/lib/plan/overnight-choice';
 import { keyRefusal } from '@/lib/plan/work';
 import { lastStoredPush } from '@/lib/plan/liveness';
 import { nightFrom } from '@/lib/digest/night';
@@ -218,6 +219,7 @@ export default async function DevPlanPage({
         canSend={Boolean(planRoutine().token)}
         night={night}
         push={nightPush}
+        ready={readyFeatureCount(sections)}
       />
       <PlanViewComponent
         sections={sections}

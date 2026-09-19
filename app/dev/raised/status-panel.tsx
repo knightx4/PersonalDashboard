@@ -29,6 +29,7 @@ export function StatusPanel({
   canSend,
   night,
   push,
+  ready,
   openNotes,
 }: {
   run: OvernightRun | null;
@@ -36,13 +37,23 @@ export function StatusPanel({
   canSend: boolean;
   night: DigestNight | null;
   push: StoredPush | null;
+  /** Features the plan runner could pick up now. The card's own note says how. */
+  ready: number;
   /** Outstanding notes, so "run it" is an answerable question. */
   openNotes: number;
 }) {
   return (
     <Card padding="dense" className="space-y-3">
       <h2 className="text-ui font-semibold text-ink">Status</h2>
-      <OvernightControl run={run} canSend={canSend} night={night} push={push} label="Plan" bare />
+      <OvernightControl
+        run={run}
+        canSend={canSend}
+        night={night}
+        push={push}
+        ready={ready}
+        label="Plan"
+        bare
+      />
       <div className="border-t border-border pt-3">
         <RunRoutineButton openCount={openNotes} allHref="/dev/bugs" divider="none" />
       </div>
