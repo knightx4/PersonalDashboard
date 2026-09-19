@@ -98,6 +98,17 @@ async function seedMention(
     values (${userId}, ${subjectId}, ${source}, ${target}, 'Seeded by the test.')`;
 }
 
+/** A concept cross-listed into a second subject. */
+async function seedConceptSubject(
+  userId: string,
+  conceptId: string,
+  subjectId: string,
+): Promise<void> {
+  await admin`
+    insert into concept_subjects (user_id, concept_id, subject_id, basis)
+    values (${userId}, ${conceptId}, ${subjectId}, 'Seeded by the test.')`;
+}
+
 /**
  * A note in the vault, which a quiz source names by id and never copies.
  *
@@ -182,6 +193,12 @@ beforeAll(async () => {
   );
   conceptB1 = await seedConcept(userB, subjectB, 'Bob knows a thing', 'Bob has his own claim.');
 
+  // Cross-listed into a second subject, which is the case concept_subjects
+  // exists for: a concept that genuinely sits in two places rather than one
+  // filed arbitrarily or written twice.
+  const subjectA2 = await seedSubject(userA, 'Urban design');
+  await seedConceptSubject(userA, conceptA1, subjectA2);
+
   await seedEdge(userA, subjectA, conceptA1, conceptA2);
   await seedEdge(userA, subjectA, conceptA2, conceptA3);
 
@@ -252,6 +269,7 @@ describe('RLS coverage', () => {
       union all select 'concepts', count(*)::int from concepts
       union all select 'concept_edges', count(*)::int from concept_edges
       union all select 'concept_mentions', count(*)::int from concept_mentions
+      union all select 'concept_subjects', count(*)::int from concept_subjects
       union all select 'goals', count(*)::int from goals
       union all select 'concept_state', count(*)::int from concept_state
       union all select 'probes', count(*)::int from probes
@@ -279,7 +297,8 @@ describe('cross-user reads', () => {
       openingQuestions: (await tx`select id from opening_questions`).length,
     }));
     expect(seen).toEqual({
-      subjects: 1,
+      // Economics, plus the Urban design subject the cross-listing needed.
+      subjects: 2,
       concepts: 3,
       edges: 2,
       mentions: 2,
