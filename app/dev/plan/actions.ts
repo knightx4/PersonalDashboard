@@ -383,26 +383,33 @@ export async function setPlanItemStatus(
     };
   }
 
-  // Blocking a step takes it back off Claude in the same write.
-  //
-  // A block says the step needs something outside the repo, so nothing a
-  // session does will move it -- and a row left assigned sits in the Claude's
-  // view carrying the reason it cannot be worked. Whoever blocks it should not
-  // have to remember to unhand it as a second step.
   // Blocking from here records the kind of block as well, because the
   // database will not take a blocked row without one. It is `outside` — the
   // default in lib/plan/load.ts — and that is what this control has always
-  // meant: the comment above says the step needs something outside the repo.
-  // A block that really is waiting on other steps is a row in
-  // plan_dependencies, or `plan.ts block --on-steps` from a session parking
+  // meant: the step needs something outside the repo, so nothing a session
+  // does will move it. A block that really is waiting on other steps is a row
+  // in plan_dependencies, or `plan.ts block --on-steps` from a session parking
   // its own step behind a question.
   //
   // Moving a step off blocked drops both: the sentence saying what it needed
   // and the word saying who could supply it. Both are claims about work that
   // has stopped, and this control is one of the ways it starts again; the
   // dated line in the comment is the record either way.
+  //
+  // The Mine mark is not one of those claims, and #719 settled that a block
+  // leaves it where it is. A step you kept for yourself is still yours while
+  // it waits, so it is still yours when the block lifts.
   const patch: Record<string, string | null> = { status: status.data, ...blockPatch(status.data) };
-  if (status.data === 'blocked') patch.assignee = null;
+
+  // Putting a step back to Not started takes the mark off, which is what
+  // hands it back to the overnight runner: an approved step nobody has marked
+  // is one the runner will fire.
+  //
+  // It clears the mark whether you set it on the row or the In progress press
+  // below wrote it, so there is no mark here worth keeping and no need to read
+  // the row first. The nightly claim sweep puts a dead claim back to not
+  // started through its own write, which touches the status and nothing else.
+  if (status.data === 'not_started') patch.assignee = null;
 
   // Marking a step underway yourself puts it in your queue, if it was in
   // nobody's.
@@ -422,7 +429,7 @@ export async function setPlanItemStatus(
   if (error) return { error: error.message };
 
   revalidatePlan();
-  return { message: status.data === 'blocked' ? 'Blocked, and taken back off Dash.' : 'Updated.' };
+  return { message: 'Updated.' };
 }
 
 /** "1" puts something aside; anything else brings it back. */
