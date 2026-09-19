@@ -11,6 +11,7 @@ import {
   useSearchRows,
   type SearchRow,
 } from '@/components/shell/use-search-rows';
+import { scopeForModule } from '@/lib/search/scope';
 import type { ModuleId } from '@/lib/modules';
 import type { Theme } from '@/lib/theme';
 import type { NavSection } from '@/components/shell/app-shell';
@@ -28,8 +29,10 @@ import type { NavSection } from '@/components/shell/app-shell';
  * components/shell/search-row.tsx for the same reason. This file is the modal:
  * the scrim, the field and the keys that walk the list.
  *
- * It searches everything you own, which is what it has always done. The bar is
- * the one that narrows to a workspace.
+ * It searches the workspace the page is in, and everything you own on a page
+ * that is in no workspace. So it opens on that workspace's pages and what you
+ * can start there, and nothing from anywhere else; outside a workspace it
+ * opens on the list it has always opened on.
  */
 export function CommandPalette({
   account,
@@ -55,12 +58,20 @@ export function CommandPalette({
   const { rows, looking, run, reset } = useSearchRows({
     account,
     module,
-    scope: 'everything',
+    // The workspace the page is in, or everything where there is no workspace
+    // to narrow to. It follows the page rather than being held here, so the
+    // box opened after a navigation searches where you now are. The chip that
+    // widens it to everything is #703, and that is what turns this into
+    // state.
+    scope: scopeForModule(module),
     sections,
     enabledModules,
     theme,
     query,
     active: open,
+    // So an open box with nothing typed in it lists this workspace's pages
+    // and what you can start here.
+    surface: 'box',
   });
 
   useEffect(() => {

@@ -20,7 +20,10 @@ import type { NavSection } from '@/components/shell/app-shell';
  * The search bar, with the chip that says what it is searching.
  *
  * A field you can type in without opening anything first, and a chip at its
- * right end naming the workspace the search is narrowed to. Pressing the chip
+ * right end naming the workspace the search is narrowed to. The field is
+ * empty and so is the space under it: the list arrives with the first
+ * character and not before, because a bar that is always on screen would
+ * otherwise drop a panel over the page every time somebody tabbed past it. Pressing the chip
  * widens it to everything you own and pressing it again narrows it back, and
  * the list under the field changes with it: narrowed, it offers this
  * workspace's things, its pages and what you can start in it; widened, it is
@@ -75,6 +78,10 @@ export function SearchBar({
     theme,
     query,
     active: focused,
+    // Which decides what an empty field offers, and the bar offers nothing.
+    // The fetch still goes out on focus, so the first character has rows to
+    // match against.
+    surface: 'bar',
   });
 
   /**
@@ -93,7 +100,16 @@ export function SearchBar({
     setActive(0);
   }, [module]);
 
-  const showing = focused && !dismissed;
+  /**
+   * When there is a list under the field at all.
+   *
+   * An empty field has nothing to show, so the panel is not drawn rather than
+   * drawn around no rows: the empty state reads "Nothing matches" and naming
+   * the empty string is worse than showing nothing. Clicking in, tabbing in
+   * and arriving from the keyboard all land here, so all three leave the page
+   * as it was until a character is typed.
+   */
+  const showing = focused && !dismissed && query.trim() !== '';
   /** Only where there is a workspace to narrow to, which the home page is not. */
   const chip = module !== null;
 
