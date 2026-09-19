@@ -1,8 +1,10 @@
 /**
- * Put a Wikipedia article in the catalogue.
+ * Put a Wikipedia article in the catalogue, and embed what is in there.
  *
  *   npm run catalogue -- "Marginal utility"
  *   npm run catalogue -- "Marginal utility" "Indifference curve"
+ *   npm run catalogue -- --embed
+ *   npm run catalogue -- "Marginal utility" --embed --limit 200
  *
  * One article becomes one `learn.catalogue_items` row and one
  * `learn.catalogue_segments` row per section, each carrying the section's
@@ -10,8 +12,16 @@
  * updates those rows rather than adding more, and drops the sections the
  * article no longer has.
  *
- * Nothing is embedded here. The segments land with a null `embedding`, which
- * is what the next pass looks for.
+ * Fetching embeds nothing: segments land with a null `embedding`, and
+ * `--embed` is the second pass over everything that still has one. That pass
+ * is driven by the nulls rather than by what this run fetched, so it finishes
+ * whatever an earlier run left behind, and stopping it halfway costs only the
+ * chunk it was in.
+ *
+ * `--embed` spends money on somebody's behalf, and #741 settled whose: the
+ * account running the sweep. `--user` names it by id or email, `CATALOGUE_USER`
+ * does the same from the environment, and with one account in the database
+ * neither is needed. It needs `EMBEDDING_API_KEY` as well as `DATABASE_URL`.
  *
  * Two things about how it is run.
  *
@@ -26,12 +36,34 @@
  * too, and wants Drizzle's public-schema types. Same service-role credentials.
  * The catalogue tables carry no user id, so there is nothing here to filter by
  * -- they are reference data, shared by every account, and that is the whole
- * reason the sweeps run privileged.
+ * reason the sweeps run privileged. The one row with an owner is the spend row,
+ * which is why the account has to be resolved before the sweep starts rather
+ * than after it has spent.
  */
 import postgres from 'postgres';
+import { embedCatalogueSegments } from '../lib/learn/catalogue/embed-sweep';
 import { sweepWikipediaArticle } from '../lib/learn/catalogue/sweep';
 
-function db() {
+type Args = { titles: string[]; embed: boolean; user: string | null; limit: number | null };
+
+function parse(argv: string[]): Args {
+  const titles: string[] = [];
+  let embed = false;
+  let user = process.env.CATALOGUE_USER ?? null;
+  let limit: number | null = null;
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '--embed') embed = true;
+    else if (arg === '--user') user = argv[(i += 1)] ?? null;
+    else if (arg === '--limit') limit = Number(argv[(i += 1)]);
+    else if (arg.trim() !== '') titles.push(arg);
+  }
+
+  return { titles, embed, user, limit: Number.isFinite(limit) && limit ? limit : null };
+}
+
+function db(): postgres.Sql {
   const url = process.env.DATABASE_URL;
   if (!url) {
     console.error('DATABASE_URL is not set.');
@@ -40,10 +72,38 @@ function db() {
   return postgres(url, { max: 2, prepare: false, onnotice: () => {} });
 }
 
+/**
+ * Whose ledger the embedding goes on, the same way scripts/plan.ts resolves
+ * one: what you named, else the only account there is. Refused rather than
+ * guessed when there are two, because the wrong answer here is a bill on
+ * somebody else's screen.
+ */
+async function resolveUser(sql: postgres.Sql, wanted: string | null): Promise<string> {
+  if (wanted) {
+    const rows = await sql<{ id: string }[]>`
+      select id from auth.users
+       where id::text like ${`${wanted}%`} or email like ${`${wanted}%`}`;
+    if (rows.length === 1) return rows[0].id;
+    console.error(
+      rows.length === 0 ? `No account matches "${wanted}".` : `"${wanted}" matches ${rows.length} accounts.`,
+    );
+    process.exit(1);
+  }
+
+  const users = await sql<{ id: string }[]>`select id from auth.users`;
+  if (users.length === 1) return users[0].id;
+  console.error(
+    users.length === 0
+      ? 'No accounts in this database, so there is nobody to bill the embedding to.'
+      : 'More than one account here. Say which the embedding is billed to with --user <id or email>.',
+  );
+  process.exit(1);
+}
+
 async function main(): Promise<void> {
-  const titles = process.argv.slice(2).filter((arg) => arg.trim() !== '');
-  if (titles.length === 0) {
-    console.error('Usage: npm run catalogue -- "Marginal utility" ["Indifference curve" ...]');
+  const { titles, embed, user, limit } = parse(process.argv.slice(2));
+  if (titles.length === 0 && !embed) {
+    console.error('Usage: npm run catalogue -- "Marginal utility" ["Indifference curve" ...] [--embed]');
     process.exit(1);
   }
 
@@ -59,6 +119,23 @@ async function main(): Promise<void> {
     }
     const dropped = result.removed > 0 ? `, ${result.removed} dropped` : '';
     console.log(`${result.title}: ${result.written} segments${dropped}`);
+  }
+
+  if (embed) {
+    const userId = await resolveUser(sql, user);
+    const swept = await embedCatalogueSegments(sql, { userId, limit: limit ?? undefined });
+
+    const model = swept.model ? ` by ${swept.model}` : '';
+    console.log(
+      `Embedded ${swept.embedded} segments${model}, ${swept.tokens} tokens over ${swept.calls} calls.`,
+    );
+    if (swept.skipped > 0) {
+      console.log(`${swept.skipped} segments changed while they were being embedded and were left for the next run.`);
+    }
+    if (swept.stopped) {
+      failed += 1;
+      console.error(`Stopped: ${swept.stopped.reason} -- ${swept.stopped.detail}`);
+    }
   }
 
   await sql.end();

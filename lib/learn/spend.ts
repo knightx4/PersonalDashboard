@@ -49,6 +49,12 @@ export const LEARN_OPERATIONS = [
   'grade-quiz-answer',
   'write-applied-case',
   'grade-applied-answer',
+  // The catalogue embedding sweep, which records through its own postgres
+  // connection rather than through `recordLearnSpend`: it runs from a script,
+  // and reaching the ledger the usual way would pull `next/headers` in. The
+  // name is declared here anyway, because this list is what the spend screen
+  // groups by and an operation missing from it is one nobody can find.
+  'embed-catalogue',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

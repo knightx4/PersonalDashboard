@@ -63,6 +63,7 @@ describe('the operation names', () => {
       'grade-quiz-answer',
       'write-applied-case',
       'grade-applied-answer',
+      'embed-catalogue',
     ]);
   });
 });
