@@ -137,11 +137,12 @@ export async function findUnlinkedMessages(
   // matched literally rather than as a pattern.
   const needle = term.replace(/[%_]/g, (char) => `\\${char}`);
 
-  const [{ data: dismissed }, { data: messages }] = await Promise.all([
-    supabase
-      .from('message_link_dismissals')
-      .select('message_id')
-      .eq('application_id', opts.applicationId),
+  // One read per column rather than an `or` over both. PostgREST reads a comma
+  // inside an `or` expression as the separator between its two sides, so a
+  // company or role name with a comma in it sent a filter that does not parse
+  // and the box listed nothing. `.ilike()` sends the pattern as its own
+  // parameter, where a comma is ordinary text.
+  const unlinked = (column: 'subject' | 'from_address') =>
     supabase
       .from('inbox_messages')
       .select(
@@ -150,14 +151,43 @@ export async function findUnlinkedMessages(
       .eq('user_id', userId)
       .is('resulting_application_id', null)
       .is('scrubbed_at', null)
-      .or(`subject.ilike.%${needle}%,from_address.ilike.%${needle}%`)
+      .ilike(column, `%${needle}%`)
       .order('received_at', { ascending: false })
-      .limit(limit + 25),
+      .limit(limit + 25);
+
+  const [{ data: dismissed }, { data: bySubject }, { data: byFrom }] = await Promise.all([
+    supabase
+      .from('message_link_dismissals')
+      .select('message_id')
+      .eq('application_id', opts.applicationId),
+    unlinked('subject'),
+    unlinked('from_address'),
   ]);
 
   const dismissedIds = new Set((dismissed ?? []).map((row) => row.message_id as string));
 
-  return (messages ?? [])
+  // Each read took the newest `limit + 25` of its own matches, so the two are
+  // merged and put back in order before the dismissed ones are dropped and the
+  // list is cut to `limit`. A null received_at sorts first, which is where the
+  // descending order the database applied put it.
+  const seen = new Set<string>();
+  const messages = [...(bySubject ?? []), ...(byFrom ?? [])].filter((row) => {
+    const id = row.id as string;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+
+  messages.sort((a, b) => {
+    const left = (a.received_at as string | null) ?? '';
+    const right = (b.received_at as string | null) ?? '';
+    if (left === right) return 0;
+    if (!left) return -1;
+    if (!right) return 1;
+    return right.localeCompare(left);
+  });
+
+  return messages
     .filter((row) => !dismissedIds.has(row.id as string))
     .slice(0, limit)
     .map((row) => ({

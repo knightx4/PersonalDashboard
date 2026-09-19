@@ -51,33 +51,47 @@ export async function inventoryItemIdsForFilter(
   if (filter.merchantId) parts.push('order_items!inner ( orders!inner ( merchant_id ) )');
   if (filter.gamesOnly) parts.push('game_details!inner ( inventory_item_id )');
 
-  let query = supabase
-    .from('inventory_items')
-    .select(parts.join(', '))
-    .eq('user_id', userId);
+  // A fresh query each time rather than one variable: a `q` is matched by two
+  // reads below, and both of them start from these same conditions.
+  const matching = () => {
+    let query = supabase
+      .from('inventory_items')
+      .select(parts.join(', '))
+      .eq('user_id', userId);
 
-  if (!filter.includeDisposed) query = query.eq('status', 'owned');
-  if (filter.categorySlug) query = query.eq('categories.slug', filter.categorySlug);
-  if (filter.tagSlug) query = query.eq('inventory_item_tags.item_tags.slug', filter.tagSlug);
-  if (filter.listId) query = query.eq('inventory_item_lists.list_id', filter.listId);
-  if (filter.merchantId) {
-    query = query.eq('order_items.orders.merchant_id', filter.merchantId);
-  }
-  if (filter.q) {
-    const term = `%${filter.q.replace(/[%_]/g, (c) => `\\${c}`)}%`;
-    query = query.or(`name.ilike.${term},short_name.ilike.${term}`);
-  }
+    if (!filter.includeDisposed) query = query.eq('status', 'owned');
+    if (filter.categorySlug) query = query.eq('categories.slug', filter.categorySlug);
+    if (filter.tagSlug) query = query.eq('inventory_item_tags.item_tags.slug', filter.tagSlug);
+    if (filter.listId) query = query.eq('inventory_item_lists.list_id', filter.listId);
+    if (filter.merchantId) {
+      query = query.eq('order_items.orders.merchant_id', filter.merchantId);
+    }
 
-  const { data, error } = await query;
-  if (error) throw error;
+    return query;
+  };
+
+  // One read per column rather than an `or` over both. PostgREST reads a comma
+  // inside an `or` expression as the separator between its two sides, so a `q`
+  // with a comma in it sent a filter that does not parse and the picker came
+  // back empty. `.ilike()` sends the pattern as its own parameter, where a
+  // comma is ordinary text.
+  const term = filter.q ? `%${filter.q.replace(/[%_]/g, (c) => `\\${c}`)}%` : null;
+  const reads = term
+    ? [matching().ilike('name', term), matching().ilike('short_name', term)]
+    : [matching()];
 
   // The select list is assembled at runtime, so supabase-js cannot infer a row
   // type for it -- hence the cast, which is narrowed to the one column every
   // branch of that list starts with.
-  const rows = (data ?? []) as unknown as Array<{ id: string }>;
+  const rows: Array<{ id: string }> = [];
+  for (const { data, error } of await Promise.all(reads)) {
+    if (error) throw error;
+    rows.push(...((data ?? []) as unknown as Array<{ id: string }>));
+  }
 
-  // A join can repeat a row -- two matching tags, two order lines. The share
-  // wants one entry per unit, and adding is idempotent anyway, but deduping
-  // here keeps the "added N of M" count honest.
+  // A join can repeat a row -- two matching tags, two order lines -- and an
+  // item whose name and short name both match the `q` comes back from both
+  // reads above. The share wants one entry per unit, and adding is idempotent
+  // anyway, but deduping here keeps the "added N of M" count honest.
   return [...new Set(rows.map((row) => row.id))];
 }
