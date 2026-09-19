@@ -1,6 +1,7 @@
 import { generatePalette } from '@/lib/theme/palette';
 import { formatTheme, parseTheme, THEME_CHOICE_ATTRIBUTE, type Theme, type ThemeId } from '@/lib/theme';
 import { TOKEN_NAMES } from '@/lib/theme/reference';
+import { colourwayById, paintsWash, WASH_LIFT } from '@/lib/theme/colourway';
 
 /**
  * Putting a chosen theme onto the document.
@@ -43,7 +44,15 @@ export function themeAttribute(theme: Theme): ThemeId | undefined {
  */
 export function themeStyle(theme: Theme): Record<string, string> | undefined {
   if (theme.kind !== 'generated' || theme.hue === null) return undefined;
-  return generatePalette(theme.mode, theme.hue);
+  const palette = generatePalette(theme.mode, theme.hue, theme.way);
+
+  // `--wash-lift` is the one thing a colourway carries that is not a colour,
+  // so it is added here rather than inside the palette: the generator's tables
+  // hold hex and nothing else, and the contrast script walks them expecting
+  // that. Written only where the wash is painted.
+  const way = colourwayById(theme.way);
+  if (!way || !paintsWash(theme.mode)) return palette;
+  return { ...palette, [WASH_LIFT]: String(way.lift) };
 }
 
 /**
@@ -68,7 +77,7 @@ export function applyTheme(root: HTMLElement, theme: Theme): void {
   else root.removeAttribute(THEME_CHOICE_ATTRIBUTE);
 
   const style = themeStyle(theme);
-  for (const token of TOKEN_NAMES) {
+  for (const token of [...TOKEN_NAMES, WASH_LIFT]) {
     const value = style?.[token];
     if (value) root.style.setProperty(token, value);
     else root.style.removeProperty(token);

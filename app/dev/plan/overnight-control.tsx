@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { Moon, Pause, Play, Square } from 'lucide-react';
 
 import {
@@ -29,6 +29,7 @@ import {
   OVERNIGHT_DEFAULT_HOURS,
   OVERNIGHT_FEATURE_CAP,
   OVERNIGHT_HOUR_CHOICES,
+  OVERNIGHT_NO_LIMIT,
   overnightLine,
   overnightStanding,
   type OvernightRun,
@@ -236,6 +237,11 @@ export function OvernightControl({
   const standing = overnightStanding(run);
   const live = standing === 'running' || standing === 'paused';
 
+  // Held here rather than left to the form, because the features field is
+  // rendered out of existence when the answer is "until I stop it".
+  const [hours, setHours] = useState<number>(OVERNIGHT_DEFAULT_HOURS);
+  const keepGoing = hours === OVERNIGHT_NO_LIMIT;
+
   const [startState, startAction, starting] = useActionState(
     startOvernightRunner,
     {} as PlanActionState,
@@ -334,27 +340,38 @@ export function OvernightControl({
               exists for is the one made on the way to bed. */}
           {(standing === 'off' || standing === 'stopped') && (
             <form action={startAction} className="flex flex-wrap items-center gap-2">
-              <span className="text-small text-ink-muted">Up to</span>
-              <Input
-                type="number"
-                name="features"
-                min={1}
-                max={OVERNIGHT_FEATURE_CAP}
-                step={1}
-                defaultValue={OVERNIGHT_DEFAULT_FEATURES}
-                aria-label="Features it may fire"
-                className="w-16"
-              />
-              <span className="text-small text-ink-muted">features, over</span>
+              {/* The features field goes away on "until I stop it" rather than
+                  greying out: a cap that does not apply is a number to wonder
+                  about, and the sentence reads as one thing either way. */}
+              {!keepGoing && (
+                <>
+                  <span className="text-small text-ink-muted">Up to</span>
+                  <Input
+                    type="number"
+                    name="features"
+                    min={1}
+                    max={OVERNIGHT_FEATURE_CAP}
+                    step={1}
+                    defaultValue={OVERNIGHT_DEFAULT_FEATURES}
+                    aria-label="Features it may fire"
+                    className="w-16"
+                  />
+                  <span className="text-small text-ink-muted">features, over</span>
+                </>
+              )}
+              {keepGoing && <span className="text-small text-ink-muted">Run</span>}
               <Select
                 name="hours"
-                defaultValue={OVERNIGHT_DEFAULT_HOURS}
+                value={hours}
+                onChange={(event) => setHours(Number(event.target.value))}
                 aria-label="How long it may run for"
                 className="w-auto"
               >
-                {OVERNIGHT_HOUR_CHOICES.map((hours) => (
-                  <option key={hours} value={hours}>
-                    {hours === 1 ? '1 hour' : `${hours} hours`}
+                {/* First, because it is the default and the ordinary press. */}
+                <option value={OVERNIGHT_NO_LIMIT}>until I stop it</option>
+                {OVERNIGHT_HOUR_CHOICES.map((choice) => (
+                  <option key={choice} value={choice}>
+                    {choice === 1 ? '1 hour' : `${choice} hours`}
                   </option>
                 ))}
               </Select>

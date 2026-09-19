@@ -12,17 +12,20 @@ import {
   hueOf,
   modeOf,
   THEME_CHOICE_ATTRIBUTE,
-  THEME_COLOURS,
+  COLOURWAYS,
+  colourwayOf,
   THEME_POLARITIES,
   THEME_SURFACES,
   modeFor,
   partsOf,
   type Polarity,
   type Surface,
+  type ColourwayId,
   type GeneratedTheme,
   type Theme,
   type ThemeMode,
 } from '@/lib/theme';
+import { colourwayById, POOL_TOKENS, WASH_LIFT, type Colourway } from '@/lib/theme/colourway';
 import { applyTheme, shouldRepairTheme } from '@/lib/theme/apply';
 import { generatePalette } from '@/lib/theme/palette';
 import { DENSITIES, parseDensity, type Density } from '@/lib/density';
@@ -211,17 +214,31 @@ export function ThemePicker({ value }: { value: Theme }) {
    * the current room apart, replace one half, put it back together.
    */
   const here = partsOf(mode);
+  // The colour survives a change of room, which means carrying the colourway
+  // and not just its hue: dropping it here would turn Ember into "330 degrees"
+  // the first time somebody switched to dark, and the pools would go back to
+  // the turned sweep without anything having been said about colour.
+  const way = colourwayOf(showing) ?? undefined;
   const inPolarity = (next: Polarity): GeneratedTheme => ({
     kind: 'generated',
     mode: modeFor(next, here.surface),
     hue,
+    way,
   });
   const inSurface = (next: Surface): GeneratedTheme => ({
     kind: 'generated',
     mode: modeFor(here.polarity, next),
     hue,
+    way,
   });
+  /** The strip and "no colour": a hue with no name for its pools. */
   const inHue = (next: number | null): GeneratedTheme => ({ kind: 'generated', mode, hue: next });
+  const inWay = (next: Colourway): GeneratedTheme => ({
+    kind: 'generated',
+    mode,
+    hue: next.hue,
+    way: next.id as ColourwayId,
+  });
 
   return (
     <div className="relative shrink-0">
@@ -251,7 +268,7 @@ export function ThemePicker({ value }: { value: Theme }) {
           aria-label="Theme"
           tabIndex={-1}
           padding="menu"
-          className="sm:w-64"
+          className="sm:w-72"
         >
           <p className="px-2 pb-1.5 pt-1 text-micro font-semibold uppercase tracking-wider text-ink-muted">
             Theme
@@ -318,12 +335,12 @@ export function ThemePicker({ value }: { value: Theme }) {
               chosen={same(showing, inHue(null))}
               onChoose={save}
             />
-            {THEME_COLOURS.map((colour) => (
+            {COLOURWAYS.map((colour) => (
               <Swatch
                 key={colour.id}
-                theme={inHue(colour.hue)}
-                label={colour.label}
-                chosen={same(showing, inHue(colour.hue))}
+                theme={inWay(colour)}
+                label={`${colour.label} - ${colour.mood}`}
+                chosen={same(showing, inWay(colour))}
                 onChoose={save}
               />
             ))}
@@ -377,17 +394,30 @@ export function ThemePicker({ value }: { value: Theme }) {
 }
 
 /**
- * One colour, shown as the colour it actually produces.
+ * One colour, shown as what it actually paints.
  *
- * The accent rather than the ground: the grounds of the five are near-greys a
- * few thousandths of chroma apart, so a row of them would be a row of the same
- * square. The accent is what a person means when they say they want a green
- * app. "No colour" shows the page ground instead, because that is what it is.
+ * A colourway draws its own wash: the four pool tokens and the lift go onto
+ * the chip as inline custom properties, and `.wash-chip` draws
+ * `--page-wash-image` from them. So a swatch for Ember is the Ember bench,
+ * shrunk -- magenta into purple with the orange along the bottom -- and a
+ * swatch for Midnight is one blue, because that is what Midnight is. It used
+ * to be a single square of `--c-accent-base-lit`, which told you the link
+ * colour and nothing about the room, and made the four multi-coloured
+ * colourways indistinguishable from each other.
  *
- * The lit accent, specifically. In light and dark it is the same value as the
- * one on a card; on Lightbox it is the one that lands on the bench, and the
- * bench is what a colour moves there.
+ * A hue with no colourway keeps the old fill: the strip's presets are a
+ * position on a circle rather than a set of pools, and the accent is the
+ * clearest single colour to stand for one. "No colour" shows the page ground,
+ * because that is what it is.
  */
+/**
+ * How loud a chip is, against the percentages in `--page-wash`.
+ *
+ * The largest of those is 34%, so 2.6 lands just under the 100% at which a
+ * pool stops being a wash and becomes a flat fill.
+ */
+const CHIP_LIFT = 2.6;
+
 function Swatch({
   theme,
   label,
@@ -399,10 +429,40 @@ function Swatch({
   chosen: boolean;
   onChoose: (theme: Theme) => void;
 }) {
-  const fill = useMemo(() => {
-    const palette = generatePalette(theme.mode, theme.hue);
-    return palette[theme.hue === null ? '--c-page' : '--c-accent-base-lit'];
-  }, [theme.mode, theme.hue]);
+  const way = colourwayById(theme.way);
+  const style = useMemo(() => {
+    const palette = generatePalette(theme.mode, theme.hue, theme.way);
+    if (!way) {
+      return { background: palette[theme.hue === null ? '--c-page' : '--c-accent-base-lit'] };
+    }
+    // Always on a glass bench, whichever room is being edited. A colourway is
+    // a wash, and in Solid there is no wash to show: drawing it over Paper's
+    // near-white ground turned all seven chips into pale squares a few
+    // thousandths apart, which is the problem the chips were meant to fix.
+    // Lightbox and Darkroom share a bench, so either one stands for both.
+    return {
+      backgroundColor: generatePalette('darkroom', theme.hue, theme.way)['--c-page'],
+      // Turned up, and only here. A pool reaches the bench at about a third of
+      // itself, which is right across a whole viewport and invisible across
+      // 32 pixels: at the room's own strength every chip came out a flat dark
+      // square and the multi-coloured ones were indistinguishable. The field's
+      // shape and geometry are the real ones; only how much of each pool shows
+      // through is raised, which is the one thing a thumbnail cannot afford to
+      // be faithful about.
+      //
+      // Flat rather than a multiple of the room's own strength. Multiplying
+      // took Ember to 4.7, which puts the first pool's mix over 100%: it goes
+      // opaque, covers the other three, and the chip for a four-colour
+      // colourway comes back a single flat magenta.
+      [WASH_LIFT]: String(CHIP_LIFT),
+      ...Object.fromEntries(
+        Object.entries(POOL_TOKENS).map(([slot, token]) => [
+          token,
+          way.pools[slot as keyof typeof way.pools],
+        ]),
+      ),
+    } as React.CSSProperties;
+  }, [theme.mode, theme.hue, theme.way, way]);
 
   return (
     <button
@@ -410,12 +470,14 @@ function Swatch({
       onClick={() => onChoose(theme)}
       aria-pressed={chosen}
       title={label}
-      // ui-ok: hand-rolled-box -- a user's colour against a like ground needs
-      // an edge, which is the case law 11 keeps the border for.
-      className="press flex size-7 items-center justify-center rounded-md border border-border-strong transition-transform hover:scale-105"
+      className={cn(
+        // ui-ok: hand-rolled-box -- a user's colour against a like ground needs an edge, which is the case law 11 keeps the border for.
+        'press flex size-8 items-center justify-center rounded-md border border-border-strong transition-transform hover:scale-105',
+        way && 'wash-chip',
+      )}
       // ui-ok: raw-hex -- this is the generated colour itself, which is the
       // one thing on the screen that cannot be a token.
-      style={{ background: fill }}
+      style={style}
     >
       {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={3} aria-hidden />}
       <span className="sr-only">{label}</span>

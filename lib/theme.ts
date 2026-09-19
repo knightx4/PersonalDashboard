@@ -83,8 +83,10 @@ export function isThemeId(value: string | null | undefined): value is ThemeId {
  * pulling a hundred hex values into the browser.
  */
 import type { ThemeMode } from '@/lib/theme/reference';
+import { COLOURWAYS, colourwayById, type ColourwayId } from '@/lib/theme/colourway';
 
-export type { ThemeMode };
+export type { ThemeMode, ColourwayId };
+export { COLOURWAYS };
 
 /**
  * What somebody chose, read out of the one string that holds it.
@@ -112,7 +114,7 @@ export type { ThemeMode };
 export type Theme =
   | { kind: 'system' }
   | { kind: 'written'; id: ThemeId }
-  | { kind: 'generated'; mode: ThemeMode; hue: number | null };
+  | { kind: 'generated'; mode: ThemeMode; hue: number | null; way?: ColourwayId };
 
 /** The shape the picker works in: a polarity, and a colour or none. */
 export type GeneratedTheme = Extract<Theme, { kind: 'generated' }>;
@@ -130,12 +132,18 @@ export function parseTheme(value: string | null | undefined): Theme {
   const text = value.trim().toLowerCase();
   if (isThemeId(text)) return { kind: 'written', id: text };
 
-  const [mode, hue] = text.split(':');
+  const [mode, colour] = text.split(':');
   if (mode !== 'light' && mode !== 'dark' && mode !== 'lightbox' && mode !== 'darkroom')
     return SYSTEM_THEME;
-  if (hue === undefined) return { kind: 'generated', mode, hue: null };
+  if (colour === undefined) return { kind: 'generated', mode, hue: null };
 
-  const degrees = Number(hue);
+  // A name rather than a number is a colourway, and it carries its own hue.
+  // Numbers stay numbers, so every `lightbox:260` already stored keeps meaning
+  // what it meant.
+  const way = colourwayById(colour);
+  if (way) return { kind: 'generated', mode, hue: way.hue, way: way.id };
+
+  const degrees = Number(colour);
   if (!Number.isFinite(degrees)) return SYSTEM_THEME;
   return { kind: 'generated', mode, hue: wrapHue(degrees) };
 }
@@ -144,6 +152,9 @@ export function parseTheme(value: string | null | undefined): Theme {
 export function formatTheme(theme: Theme): string | null {
   if (theme.kind === 'system') return null;
   if (theme.kind === 'written') return theme.id;
+  // The colourway's name, not its hue: the hue is one of the things the name
+  // stands for, and storing the number would lose the pools.
+  if (theme.way) return `${theme.mode}:${theme.way}`;
   return theme.hue === null ? theme.mode : `${theme.mode}:${wrapHue(theme.hue)}`;
 }
 
@@ -230,22 +241,14 @@ export function partsOf(mode: ThemeMode): { polarity: Polarity; surface: Surface
 }
 
 /**
- * The five colours the picker offers.
+ * The colourway a theme is using, if it is using one.
  *
- * Presets rather than the only choices: the wheel in #427 writes the same
- * value these do, and these are here because most people want a colour rather
- * than a particular colour. Plum is Dusk's own hue, so dark with plum is the
- * theme that shipped, to within a rounding step.
+ * Null for a free hue, which has pools but no name for them, and for the two
+ * shapes that have no colour at all.
  */
-export const THEME_COLOURS = [
-  { id: 'plum', label: 'Plum', hue: 298 },
-  { id: 'blue', label: 'Blue', hue: 260 },
-  { id: 'green', label: 'Green', hue: 155 },
-  { id: 'orange', label: 'Orange', hue: 65 },
-  { id: 'red', label: 'Red', hue: 25 },
-] as const;
-
-export type ThemeColourId = (typeof THEME_COLOURS)[number]['id'];
+export function colourwayOf(theme: Theme): ColourwayId | null {
+  return theme.kind === 'generated' ? (theme.way ?? null) : null;
+}
 
 /** The attribute holding the whole choice, so a client can read it back. */
 export const THEME_CHOICE_ATTRIBUTE = 'data-theme-choice';

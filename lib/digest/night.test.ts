@@ -286,10 +286,38 @@ describe('nightRows', () => {
 describe('nightBudgetLine', () => {
   // Since #633 the plan page's control prints this same line rather than
   // counting the pair the other way round, so these are the words on both.
+  const fired = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      ref: `#${i + 1}`,
+      title: `Feature ${i + 1}`,
+      at: '2026-09-19T00:00:00.000Z',
+    }));
+
   it('says what the night spent, in the control’s words', () => {
-    expect(nightBudgetLine({ featuresBudget: 6, featuresLeft: 4 })).toBe('2 of 6 features spent');
-    expect(nightBudgetLine({ featuresBudget: 1, featuresLeft: 0 })).toBe('1 of 1 feature spent');
-    expect(nightBudgetLine({ featuresBudget: 6, featuresLeft: 6 })).toBe('0 of 6 features spent');
+    const none = { features: [] };
+    expect(nightBudgetLine({ ...none, featuresBudget: 6, featuresLeft: 4 })).toBe(
+      '2 of 6 features spent',
+    );
+    expect(nightBudgetLine({ ...none, featuresBudget: 1, featuresLeft: 0 })).toBe(
+      '1 of 1 feature spent',
+    );
+    expect(nightBudgetLine({ ...none, featuresBudget: 6, featuresLeft: 6 })).toBe(
+      '0 of 6 features spent',
+    );
+  });
+
+  it('counts the fires when the run was started with no cap', () => {
+    // No budget to subtract a remainder from, so the fires are the only source
+    // for the number and "of" has nothing to follow it.
+    expect(
+      nightBudgetLine({ featuresBudget: null, featuresLeft: null, features: fired(3) }),
+    ).toBe('3 features fired, no limit');
+    expect(
+      nightBudgetLine({ featuresBudget: null, featuresLeft: null, features: fired(1) }),
+    ).toBe('1 feature fired, no limit');
+    expect(nightBudgetLine({ featuresBudget: null, featuresLeft: null, features: [] })).toBe(
+      '0 features fired, no limit',
+    );
   });
 });
 

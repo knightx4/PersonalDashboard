@@ -38,11 +38,14 @@ export type OvernightRun = {
   running: boolean;
   /** Held by hand, mid-run. The budget and the stop time survive it. */
   paused: boolean;
-  /** How many features the night was given when it started. */
-  featuresBudget: number;
-  /** How many it may still fire. */
-  featuresLeft: number;
-  /** When it should stop by, whatever is left of the budget. */
+  /**
+   * How many features the night was given when it started, or null when it
+   * was started with no cap and fires until it is stopped.
+   */
+  featuresBudget: number | null;
+  /** How many it may still fire. Null exactly when `featuresBudget` is. */
+  featuresLeft: number | null;
+  /** When it should stop by, whatever is left. Null when it has no bedtime. */
   stopBy: string | null;
   /** When the button was pressed. The window the morning report covers. */
   startedAt: string | null;
@@ -70,15 +73,23 @@ export const OVERNIGHT_COLUMNS =
 export function overnightRunFromRow(row: Record<string, unknown>): OvernightRun {
   const stamp = (value: unknown): string | null =>
     value instanceof Date ? value.toISOString() : value == null ? null : String(value);
-  const budget = Number(row.features_budget ?? 0);
-  const left = Number(row.features_left ?? 0);
+  // Null is the absence of a cap and has to survive the read. `?? 0` here
+  // would turn "no limit" into "spent", which is the one reading that stops
+  // the night on its first tick.
+  const numberOrNull = (value: unknown): number | null => {
+    if (value == null) return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+  const budget = numberOrNull(row.features_budget);
+  const left = numberOrNull(row.features_left);
 
   return {
     id: row.id as string,
     running: row.running === true,
     paused: row.paused === true,
-    featuresBudget: Number.isFinite(budget) ? budget : 0,
-    featuresLeft: Number.isFinite(left) ? left : 0,
+    featuresBudget: budget,
+    featuresLeft: left,
     stopBy: stamp(row.stop_by),
     startedAt: stamp(row.started_at),
     lastFiredAt: stamp(row.last_fired_at),
@@ -126,7 +137,11 @@ export const OVERNIGHT_STOPPED_BY_HAND = 'You stopped it.';
  */
 export function overnightVerdict(run: OvernightRun | null, now: number): OvernightVerdict {
   if (!run || !run.running) return { act: 'idle' };
-  if (run.featuresLeft <= 0) return { act: 'end', reason: budgetSpentReason(run) };
+  // A null budget is no budget: the run was started to keep going, and only
+  // the person or the plan running out stops it.
+  if (run.featuresLeft !== null && run.featuresLeft <= 0) {
+    return { act: 'end', reason: budgetSpentReason(run) };
+  }
   if (run.stopBy !== null && new Date(run.stopBy).getTime() <= now) {
     return { act: 'end', reason: OVERNIGHT_TIME_UP };
   }
@@ -142,7 +157,9 @@ export function overnightVerdict(run: OvernightRun | null, now: number): Overnig
  * nothing left to count it from.
  */
 export function budgetSpentReason(run: Pick<OvernightRun, 'featuresBudget'>): string {
-  const n = run.featuresBudget;
+  // Only reached from a run that had one: `overnightVerdict` does not read a
+  // null budget as spent.
+  const n = run.featuresBudget ?? 0;
   return n === 1
     ? 'It fired the one feature you allowed.'
     : `It fired every one of the ${n} features you allowed.`;
@@ -209,9 +226,34 @@ export function overnightLine(run: OvernightRun | null, now: number): string {
     : `It last fired a feature ${elapsedSince(run.lastFiredAt, now)} ago. The next one goes once that session has ended.`;
 }
 
-/** What the start form offers before you touch it: a night, and a sleep. */
+/**
+ * The duration that means there is no duration.
+ *
+ * Zero rather than a word, because the field it travels in is a number and a
+ * union of "a count of hours or the string `none`" would have to be taken
+ * apart by everything that reads it. Zero is safe as the sentinel here in a
+ * way it is not for the budget: a night of no hours is not a night anybody
+ * could have meant, whereas a budget of zero is what a spent night holds.
+ *
+ * Choosing it turns both brakes off. A cap with no clock still stops after its
+ * last feature, which is not what leaving the runner on means.
+ */
+export const OVERNIGHT_NO_LIMIT = 0;
+
+/**
+ * What the start form offers before you touch it.
+ *
+ * No limit, because that is the ordinary press: leave it on and let it work
+ * through what has been approved. A night with a cap and a bedtime is the
+ * narrower case -- watching it do a couple of features, or keeping a lid on a
+ * run while something is being changed underneath it -- and it is one choice
+ * away in the same field.
+ *
+ * `OVERNIGHT_DEFAULT_FEATURES` is what the features box shows once a length in
+ * hours is chosen, so it appears with a sensible number already in it.
+ */
 export const OVERNIGHT_DEFAULT_FEATURES = 6;
-export const OVERNIGHT_DEFAULT_HOURS = 8;
+export const OVERNIGHT_DEFAULT_HOURS = OVERNIGHT_NO_LIMIT;
 
 /**
  * The lengths of night the control offers, in hours.
@@ -289,15 +331,26 @@ function wrote(result: { data: unknown; error: { message: string } | null }): Ov
 export async function startOvernightRun(input: {
   supabase: Db;
   userId: string;
-  /** How many features this night may fire. */
-  features: number;
-  /** When it should stop by, whatever is left of the budget. */
-  stopBy: string | Date;
+  /** How many features this run may fire, or null to keep going. */
+  features: number | null;
+  /** When it should stop by, or null for no bedtime. */
+  stopBy: string | Date | null;
   now?: Date;
 }): Promise<OvernightWrite> {
-  const features = Math.max(0, Math.min(OVERNIGHT_FEATURE_CAP, Math.trunc(input.features)));
+  // Null passes through as null: it is the absence of a cap, not a number to
+  // clamp. Anything that is a number is still held inside the cap, so a form
+  // that managed to send nonsense comes out of here with a brake on.
+  const features =
+    input.features === null
+      ? null
+      : Math.max(0, Math.min(OVERNIGHT_FEATURE_CAP, Math.trunc(input.features)));
   const startedAt = (input.now ?? new Date()).toISOString();
-  const stopBy = input.stopBy instanceof Date ? input.stopBy.toISOString() : input.stopBy;
+  const stopBy =
+    input.stopBy === null
+      ? null
+      : input.stopBy instanceof Date
+        ? input.stopBy.toISOString()
+        : input.stopBy;
 
   const result = await input.supabase
     .from('plan_overnight_runs')
@@ -412,14 +465,15 @@ export async function stopOvernightRun(input: {
 export async function recordOvernightFire(input: {
   supabase: Db;
   userId: string;
-  /** What the row said was left before this fire. */
-  featuresLeft: number;
+  /** What the row said was left before this fire, or null for no cap. */
+  featuresLeft: number | null;
   now?: Date;
 }): Promise<OvernightWrite> {
   const result = await input.supabase
     .from('plan_overnight_runs')
     .update({
-      features_left: Math.max(0, input.featuresLeft - 1),
+      // A run with no cap has nothing to count down; only the fire time moves.
+      features_left: input.featuresLeft === null ? null : Math.max(0, input.featuresLeft - 1),
       last_fired_at: (input.now ?? new Date()).toISOString(),
     })
     .eq('user_id', input.userId)
@@ -462,7 +516,9 @@ export function dashActivityLine(
 
   const night =
     standing === 'running' && input.run
-      ? `${input.run.featuresLeft} of ${input.run.featuresBudget} features left`
+      ? input.run.featuresLeft === null
+        ? 'no limit'
+        : `${input.run.featuresLeft} of ${input.run.featuresBudget} features left`
       : null;
 
   if (session) {

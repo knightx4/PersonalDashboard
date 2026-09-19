@@ -174,8 +174,8 @@ function nightFrom(value: unknown): DigestNight | null {
     startedAt,
     endedAt: text(row.endedAt),
     endedReason: text(row.endedReason),
-    featuresBudget: count(row.featuresBudget),
-    featuresLeft: count(row.featuresLeft),
+    featuresBudget: row.featuresBudget == null ? null : count(row.featuresBudget),
+    featuresLeft: row.featuresLeft == null ? null : count(row.featuresLeft),
     features: (Array.isArray(row.features) ? (row.features as unknown[]) : []).flatMap((entry) => {
       const named = nightRefFrom(entry);
       const at = text((entry as Record<string, unknown>)?.at);

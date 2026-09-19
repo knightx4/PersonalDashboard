@@ -121,6 +121,24 @@ describe('overnightVerdict', () => {
     });
   });
 
+  // Left on deliberately: no budget and no bedtime, stopping when the person
+  // stops it or the plan runs out of ready work.
+  it('keeps firing a run started with no cap, however long it has been going', () => {
+    const later = Date.parse('2026-09-25T07:30:00.000Z');
+    const noCap = night({ featuresBudget: null, featuresLeft: null, stopBy: null });
+    expect(overnightVerdict(noCap, MIDNIGHT)).toEqual({ act: 'fire' });
+    expect(overnightVerdict(noCap, later)).toEqual({ act: 'fire' });
+  });
+
+  it('still holds a run with no cap when it is paused', () => {
+    expect(
+      overnightVerdict(
+        night({ featuresBudget: null, featuresLeft: null, stopBy: null, paused: true }),
+        MIDNIGHT,
+      ),
+    ).toEqual({ act: 'paused' });
+  });
+
   it('fires on a night with no stop time rather than treating it as expired', () => {
     expect(overnightVerdict(night({ stopBy: null }), MIDNIGHT)).toEqual({ act: 'fire' });
   });

@@ -542,6 +542,7 @@ const FromNoteInput = z.object({
  * Approval is `approveBrief`. The chain is the same shape, so there is no
  * second save path and nothing new can go wrong on the way in.
  */
+// latency: pending
 export async function proposeFromNote(
   _prev: FromNoteState,
   formData: FormData,
