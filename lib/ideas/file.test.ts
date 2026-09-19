@@ -11,28 +11,53 @@ import { fileNightIdeas, nightIdeaBody } from '@/lib/ideas/file';
 
 type Row = Record<string, unknown>;
 
+/** An idea already on the page, as the stub holds it. */
+type Existing = {
+  id: string;
+  body: string;
+  /** Set on an idea put aside on the ideas page. */
+  dismissed_at?: string | null;
+  /** Set on an idea that has been shaped into a plan feature. */
+  plan_item_id?: string | null;
+};
+
 /**
- * Enough of the query builder for one read and the inserts after it. Filters
- * are ignored: the list is stubbed with exactly the rows the case is about.
+ * Enough of the query builder for one read and the inserts after it.
+ *
+ * The `is` filters are applied rather than ignored, because which rows the
+ * read asks for is the thing these cases are about: a dismissed idea reaches
+ * the comparison only while nothing filters it out. The account filter is
+ * ignored -- every stubbed row belongs to the account under test.
  */
 function stubClient(
-  existing: ReadonlyArray<{ id: string; body: string }>,
+  existing: ReadonlyArray<Existing>,
   fails: { read?: string; insert?: string } = {},
 ) {
   const written: Row[] = [];
   const tables: string[] = [];
   let ids = 0;
 
+  const filters: Array<[string, unknown]> = [];
+  const selected = () =>
+    existing
+      .filter((row) =>
+        filters.every(([column, value]) => ((row as Row)[column] ?? null) === value),
+      )
+      .map((row) => ({ id: row.id, body: row.body }));
+
   const read = {
     select: () => read,
     eq: () => read,
-    is: () => read,
+    is: (column: string, value: unknown) => {
+      filters.push([column, value]);
+      return read;
+    },
     order: () => read,
     then: (resolve: (value: { data: Row[] | null; error: { message: string } | null }) => unknown) =>
       resolve(
         fails.read
           ? { data: null, error: { message: fails.read } }
-          : { data: existing.map((row) => ({ ...row })), error: null },
+          : { data: selected(), error: null },
       ),
   };
 
@@ -93,6 +118,41 @@ describe('fileNightIdeas', () => {
 
     expect(filed).toBe(1);
     expect(written.map((row) => row.body)).toEqual([OTHER]);
+  });
+
+  /**
+   * #646: a suggestion you turned down is compared against like any other, so
+   * the night that thought of it once does not think of it again every night.
+   */
+  it('leaves out a suggestion that repeats an idea you put aside', async () => {
+    const { supabase, written } = stubClient([
+      { id: 'filed-1', body: SAME_QUESTION_AGAIN, dismissed_at: '2026-09-13T09:00:00Z' },
+    ]);
+
+    const filed = await fileNightIdeas(supabase, 'user-1', [
+      { title: OPEN_QUESTION, detail: null },
+      { title: OTHER, detail: null },
+    ]);
+
+    expect(filed).toBe(1);
+    expect(written.map((row) => row.body)).toEqual([OTHER]);
+  });
+
+  /**
+   * A shaped idea is out of the comparison: it is a plan feature now, and
+   * what a new thought about it would be added to is the feature.
+   */
+  it('files a suggestion that repeats an idea already shaped into the plan', async () => {
+    const { supabase, written } = stubClient([
+      { id: 'filed-1', body: SAME_QUESTION_AGAIN, plan_item_id: 'feature-1' },
+    ]);
+
+    const filed = await fileNightIdeas(supabase, 'user-1', [
+      { title: OPEN_QUESTION, detail: null },
+    ]);
+
+    expect(filed).toBe(1);
+    expect(written.map((row) => row.body)).toEqual([OPEN_QUESTION]);
   });
 
   it('files one of two suggestions that repeat each other', async () => {

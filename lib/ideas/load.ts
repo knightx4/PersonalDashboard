@@ -140,14 +140,16 @@ export async function loadDismissedSuggestions(
  * The ideas a new one is checked against before it is written.
  *
  * Body and id only, which is all lib/ideas/duplicate.ts compares and all a
- * refusal names. The set is what is open on the page: a shaped idea is in the
- * plan and a dismissed one was put aside, and neither is a row anything would
- * be adding to.
+ * refusal names. Every idea that has not been shaped into a plan feature is in
+ * the set, live or put aside. #646 settled that a dismissed idea counts: a
+ * suggestion you turned down comes back the next morning unless the run
+ * comparing against the list can still see it. A shaped idea is left out
+ * because it is a plan feature now, and what you would add to is the feature.
  *
- * The same set `scripts/plan.ts idea` selects by hand. #647 is the step that
- * brings that query here and takes the dismissed filter off both at once, so
- * that a suggestion you put aside is not filed again -- #646 answered A.
- * Until then this reads what the script reads.
+ * The ideas page and the nightly run read the set with a Supabase client.
+ * `scripts/plan.ts idea` holds a Postgres connection rather than a client, so
+ * it reads the same set with FILED_IDEAS_SQL below. load.test.ts checks both
+ * against the same rule.
  */
 export async function loadFiledIdeas(
   supabase: SupabaseClient,
@@ -158,7 +160,6 @@ export async function loadFiledIdeas(
     .select('id, body')
     .eq('user_id', userId)
     .is('plan_item_id', null)
-    .is('dismissed_at', null)
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(error.message);
@@ -168,6 +169,19 @@ export async function loadFiledIdeas(
     body: row.body as string,
   }));
 }
+
+/**
+ * The read above as one statement, for a caller on a direct connection.
+ *
+ * scripts/plan.ts talks to Postgres through postgres() -- lib/db/admin.ts is
+ * server-only and throws under plain node -- so it cannot hand a Supabase
+ * client to loadFiledIdeas. It runs this instead, with the account id as $1:
+ * that connection carries the service role, so filtering by user is the
+ * caller's job, and the filter is written here rather than at the call site.
+ */
+export const FILED_IDEAS_SQL = `select id, body from ideas
+   where user_id = $1 and plan_item_id is null
+   order by created_at desc`;
 
 /**
  * Newest first: the reason to open this page is usually the thought you had
