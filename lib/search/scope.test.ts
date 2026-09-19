@@ -6,6 +6,8 @@ import {
   moduleInScope,
   parseScope,
   scopeForModule,
+  scopeLabel,
+  toggleScope,
 } from './scope';
 import type { SearchHit } from './sources';
 
@@ -133,5 +135,46 @@ describe('reading a scope out of a query string', () => {
     // trip is the whole of the wire format.
     expect(parseScope(scopeForModule('jobs'))).toBe('jobs');
     expect(parseScope(scopeForModule(null))).toBe('everything');
+  });
+});
+
+/**
+ * The chip on the search bar: what it says, and what pressing it does.
+ *
+ * Two states and no more. The workspace the page is standing in, and
+ * everything the account holds -- so the chip can always be read as a name of
+ * what is being searched rather than as a filter that has to be remembered.
+ */
+describe('what the chip says', () => {
+  it('names the workspace being searched', () => {
+    expect(scopeLabel('jobs')).toBe('Job search');
+    expect(scopeLabel('vault')).toBe('Vault');
+  });
+
+  it('names the wider setting as everything', () => {
+    expect(scopeLabel('everything')).toBe('Everything');
+  });
+});
+
+describe('pressing the chip', () => {
+  it('widens a workspace to everything', () => {
+    expect(toggleScope('jobs', 'jobs')).toBe('everything');
+  });
+
+  it('narrows back to the workspace the page is in', () => {
+    expect(toggleScope('everything', 'jobs')).toBe('jobs');
+  });
+
+  it('narrows to where the page is now, not to where it was', () => {
+    // The bar survives a navigation, so a chip widened in one workspace and
+    // pressed again in another must come back to the second one.
+    expect(toggleScope('everything', 'shopping')).toBe('shopping');
+  });
+
+  it('stays on everything outside a workspace, which is what the home page is', () => {
+    // Nothing to narrow to, so both states are the same and the bar draws no
+    // chip at all.
+    expect(toggleScope('everything', null)).toBe('everything');
+    expect(toggleScope(scopeForModule(null), null)).toBe('everything');
   });
 });
