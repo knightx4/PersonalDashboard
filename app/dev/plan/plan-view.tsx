@@ -164,7 +164,7 @@ const STATUS_LABEL: Record<PlanStatus, string> = {
 };
 
 const SIZE_LABEL: Record<PlanSize, string> = { s: 'Small', m: 'Medium', l: 'Large' };
-const ASSIGNEE_LABEL: Record<PlanAssignee, string> = { me: 'Me', claude: 'Dash' };
+const ASSIGNEE_LABEL: Record<PlanAssignee, string> = { me: 'Me' };
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),

@@ -389,17 +389,3 @@ describe('planBrief, on a claimed step', () => {
     );
   });
 });
-
-describe('planBrief, on a step whose assignee column still says claude', () => {
-  const sections = buildPlanTree({
-    items: [item({ id: 'old-send', title: 'Sent before #672', assignee: 'claude' })],
-    dependencies: [],
-  });
-
-  it('says nothing about who it is for', () => {
-    // Nothing hands a step to Dash any more, so a `claude` here is a value
-    // left by a hand-over that no longer happens, and the brief skips it the
-    // way it skips an empty column.
-    expect(planBrief(sections, findNode(sections, 'old-send')!)).not.toContain('Assigned');
-  });
-});

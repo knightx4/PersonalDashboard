@@ -451,7 +451,7 @@ describe('applyView', () => {
         // step with nobody on it is Dash's.
         item({ id: 'feature', assignee: 'me' }),
         at('done', 'done-step', { parentId: 'feature' }),
-        at('not_started', 'open-step', { parentId: 'feature', assignee: 'claude' }),
+        at('not_started', 'open-step', { parentId: 'feature' }),
         at('blocked', 'stuck', { parentId: 'feature' }),
         at('done', 'finished-feature', { module: 'jobs' }),
         item({ id: 'waits', module: 'jobs', assignee: 'me' }),
@@ -515,7 +515,6 @@ describe('applyView', () => {
       item({ id: 'nobody' }),
       item({ id: 'kept', assignee: 'me' }),
       at('proposed', 'suggested'),
-      at('proposed', 'suggested-to-claude', { assignee: 'claude' }),
     ]);
     expect(flattenSections(applyView(sections, 'claude')).map((n) => n.id)).toEqual(['nobody']);
     expect(summarize(sections).claude).toBe(1);
@@ -710,14 +709,14 @@ describe('workOrder', () => {
     // pressed Send on it.
     const sections = tree([
       item({ id: 'mine', assignee: 'me' }),
-      item({ id: 'theirs', assignee: 'claude' }),
+      item({ id: 'theirs' }),
       item({ id: 'nobody' }),
     ]);
-    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual([
+    expect(workOrder(sections, { only: 'runner' }).map((n) => n.id)).toEqual([
       'theirs',
       'nobody',
     ]);
-    expect(workOrder(sections, { assignee: 'me' }).map((n) => n.id)).toEqual(['mine']);
+    expect(workOrder(sections, { only: 'mine' }).map((n) => n.id)).toEqual(['mine']);
   });
 
   it('still offers the steps of a feature blocked over one question beneath it', () => {
@@ -725,30 +724,27 @@ describe('workOrder', () => {
     // step; the two beside it are work, and the feature being marked blocked
     // over the question used to take them out of this list entirely.
     const sections = tree([
-      at('blocked', 'feature', { blockKind: 'steps', assignee: 'claude' }),
-      at('blocked', 'asked', { parentId: 'feature', blockKind: 'outside', assignee: 'claude' }),
-      item({ id: 'next', parentId: 'feature', assignee: 'claude', position: 20 }),
-      item({ id: 'after', parentId: 'feature', assignee: 'claude', position: 30 }),
+      at('blocked', 'feature', { blockKind: 'steps' }),
+      at('blocked', 'asked', { parentId: 'feature', blockKind: 'outside' }),
+      item({ id: 'next', parentId: 'feature', position: 20 }),
+      item({ id: 'after', parentId: 'feature', position: 30 }),
     ]);
-    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual([
+    expect(workOrder(sections, { only: 'runner' }).map((n) => n.id)).toEqual([
       'next',
       'after',
     ]);
   });
 
-  it('never hands Claude a decision, however it is assigned', () => {
+  it('never leaves a decision in the runner\'s list', () => {
     // The one thing a routine must not do is answer its own question.
-    const sections = tree([
-      item({ id: 'work', assignee: 'claude' }),
-      item({ id: 'question', assignee: 'claude', kind: 'decision' }),
-    ]);
-    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['work']);
+    const sections = tree([item({ id: 'work' }), item({ id: 'question', kind: 'decision' })]);
+    expect(workOrder(sections, { only: 'runner' }).map((n) => n.id)).toEqual(['work']);
   });
 
   it('still lists a decision unfiltered, so the person sees it', () => {
-    const sections = tree([item({ id: 'question', assignee: 'claude', kind: 'decision' })]);
+    const sections = tree([item({ id: 'question', kind: 'decision' })]);
     expect(workOrder(sections).map((n) => n.id)).toEqual(['question']);
-    expect(workOrder(sections, { assignee: 'me' }).map((n) => n.id)).toEqual([]);
+    expect(workOrder(sections, { only: 'mine' }).map((n) => n.id)).toEqual([]);
   });
 });
 
@@ -758,9 +754,9 @@ describe('summarize', () => {
       [
         item({ id: 'feature' }),
         at('done', 'a', { parentId: 'feature' }),
-        at('in_progress', 'b', { parentId: 'feature', assignee: 'claude' }),
+        at('in_progress', 'b', { parentId: 'feature' }),
         at('blocked', 'c', { parentId: 'feature' }),
-        item({ id: 'd', parentId: 'feature', assignee: 'claude' }),
+        item({ id: 'd', parentId: 'feature' }),
         at('dropped', 'e'),
         item({ id: 'f' }),
         at('proposed', 'g'),
@@ -1042,23 +1038,20 @@ describe('a setup step', () => {
     expect(ids).toEqual(['job']);
   });
 
-  it('is never handed to Claude, however it is assigned', () => {
+  it('is never in the runner\'s list, however it is assigned', () => {
     // A routine that claimed one would sit in front of an account nobody has
     // made and block itself to say so.
-    const sections = tree([
-      item({ id: 'work', assignee: 'claude' }),
-      setup('job', { assignee: 'claude' }),
-    ]);
+    const sections = tree([item({ id: 'work' }), setup('job', { assignee: 'me' })]);
 
-    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['work']);
+    expect(workOrder(sections, { only: 'runner' }).map((n) => n.id)).toEqual(['work']);
     // Still ready, and still listed unfiltered, so the page shows it.
     expect(only(sections, 'job').ready).toBe(true);
     expect(workOrder(sections).map((n) => n.id)).toEqual(['work', 'job']);
   });
 
-  it('is withheld from Claude even when nobody was assigned it', () => {
+  it('is withheld from the runner even when nobody was assigned it', () => {
     const sections = tree([setup('job', { assignee: null })]);
-    expect(workOrder(sections, { assignee: 'claude' })).toEqual([]);
+    expect(workOrder(sections, { only: 'runner' })).toEqual([]);
   });
 
   it('is a band and a tally entry like any other live step', () => {
@@ -1264,7 +1257,6 @@ describe('put aside as not right now', () => {
           id: 'handed',
           number: 1,
           status: 'not_started',
-          assignee: 'claude',
           dismissedAt: '2026-09-13T00:00:00Z',
         }),
       ],
@@ -1659,13 +1651,6 @@ describe('moveOf', () => {
     expect(moveOf(only([at('not_started', 'a')]))).toBe('none');
   });
 
-  // The column left over from the old hand-over. Nothing clears it, so the
-  // rows that still carry 'claude' have to read as the ordinary steps they
-  // are rather than as a queue nobody is working.
-  it('says nothing about a step left assigned to Dash by an old hand-over', () => {
-    expect(moveOf(only([at('not_started', 'a', { assignee: 'claude' })]))).toBe('none');
-  });
-
   it('is with Dash while a session is on it', () => {
     expect(moveOf(only([at('in_progress', 'a')]))).toBe('with_dash');
   });
@@ -1686,10 +1671,10 @@ describe('moveOf', () => {
     expect(moveOf(only([at('proposed', 'a')]))).toBe('on_you');
   });
 
-  // Assigned to Dash and blocked is still yours: a session sent there would
-  // sit in front of the same wall. Same rule `isWaitingOnThePerson` enforces.
-  it('needs you for a blocked step even when it is assigned to Dash', () => {
-    expect(moveOf(only([at('blocked', 'a', { assignee: 'claude' })]))).toBe('on_you');
+  // Blocked is yours whoever is on it: a session sent there would sit in front
+  // of the same wall. Same rule `isWaitingOnThePerson` enforces.
+  it('needs you for a blocked step nobody is marked on', () => {
+    expect(moveOf(only([at('blocked', 'a')]))).toBe('on_you');
   });
 
   it('is held up when another step is in the way', () => {

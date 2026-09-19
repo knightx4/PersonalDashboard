@@ -36,7 +36,7 @@ function item(over: Partial<PlanItem> & { id: string }): PlanItem {
     thread: [],
     priority: 2,
     size: null,
-    assignee: 'claude',
+    assignee: null,
     commitSha: null,
     position: counter * 10,
     startedAt: null,
@@ -149,11 +149,11 @@ describe('chooseOvernightFeature', () => {
 
     // And the same rule read the other way: every feature the order can reach
     // has a ready step under it, because the order is where features come from.
-    const ready = new Set(workOrder(sections, { assignee: 'claude' }).map((node) => node.id));
+    const ready = new Set(workOrder(sections, { only: 'runner' }).map((node) => node.id));
     expect([...ready]).toEqual(['real-step']);
   });
 
-  it('stops when nothing assigned to Claude is ready', () => {
+  it('stops when nothing the runner can take is ready', () => {
     const sections = tree([
       item({ id: 'yours' }),
       item({ id: 'yours-step', parentId: 'yours', assignee: 'me' }),
@@ -236,7 +236,7 @@ describe('readyFeatureCount', () => {
 
     // Three steps the runner could build, and one feature it would fire for
     // them -- which is the count the budget is spent in.
-    expect(workOrder(sections, { assignee: 'claude' })).toHaveLength(3);
+    expect(workOrder(sections, { only: 'runner' })).toHaveLength(3);
     expect(readyFeatureCount(sections)).toBe(1);
   });
 

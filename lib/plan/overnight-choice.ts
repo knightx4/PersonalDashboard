@@ -9,8 +9,8 @@
  * of them composed, so the tick route asks one question and gets one answer.
  *
  * The choice itself is the one a person would make standing at the plan: the
- * most urgent thing that is ready and has been handed to Claude, and the
- * feature it belongs to. `workOrder(sections, { assignee: 'claude' })` is
+ * most urgent thing that is ready and the runner may take, and the feature it
+ * belongs to. `workOrder(sections, { only: 'runner' })` is
  * already exactly that list -- ready steps only, decisions and dismissed rows
  * out, priority then reading order -- and `isReady` has already dropped
  * anything blocked, waiting on an open dependency, or sitting under a blocked,
@@ -81,7 +81,7 @@ export function chooseOvernightFeature(
   const verdict = overnightVerdict(run, now);
   if (verdict.act !== 'fire') return verdict;
 
-  const step = workOrder(sections, { assignee: 'claude' })[0];
+  const step = workOrder(sections, { only: 'runner' })[0];
   if (!step) return { act: 'end', reason: OVERNIGHT_NOTHING_READY };
 
   return { act: 'fire', feature: topFeatureOf(sections, step), step };
@@ -93,11 +93,11 @@ export function chooseOvernightFeature(
  * The card above the plan used to say only what a night had spent and what it
  * was on, which answers "is it working" but not "is there anything for it to
  * work". Those are different questions on this plan: the budget can have four
- * features left in it and the tree nothing handed over that is ready, and the
- * night then ends on its next tick with `OVERNIGHT_NOTHING_READY`.
+ * features left in it and the tree nothing ready for the runner to take, and
+ * the night then ends on its next tick with `OVERNIGHT_NOTHING_READY`.
  *
  * Counted the way the chooser chooses, not by a second reading of the tree:
- * every ready step handed to Claude, folded up to the feature that would be
+ * every ready step the runner may take, folded up to the feature that would be
  * fired for it. So a feature with six ready steps beneath it counts once --
  * which is the whole of the ask, because the runner fires features and the
  * budget is spent in features.
@@ -108,7 +108,7 @@ export function chooseOvernightFeature(
  */
 export function readyFeatureCount(sections: readonly PlanSection[]): number {
   const features = new Set<string>();
-  for (const step of workOrder(sections, { assignee: 'claude' })) {
+  for (const step of workOrder(sections, { only: 'runner' })) {
     features.add(topFeatureOf(sections, step).id);
   }
   return features.size;
