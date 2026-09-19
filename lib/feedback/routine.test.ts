@@ -4,6 +4,8 @@ import {
   fireFeatureRoutine,
   notesRoutine,
   planRoutine,
+  resolveRoutineId,
+  runIdFrom,
 } from '@/lib/feedback/routine';
 
 describe('fireFeatureRoutine', () => {
@@ -70,7 +72,93 @@ describe('fireFeatureRoutine', () => {
       throw new Error('getaddrinfo ENOTFOUND');
     });
     const result = await fireFeatureRoutine({ apiKey: 'sk-test', fetch: fetchFn as never });
-    expect(result).toMatchObject({ ok: false, error: 'getaddrinfo ENOTFOUND' });
+    expect(result).toMatchObject({ ok: false, error: 'getaddrinfo ENOTFOUND', status: null, body: null });
+  });
+
+  it('keeps the response body and the identifier in it', async () => {
+    const fetchFn = vi.fn(
+      async () => new Response(JSON.stringify({ run_id: 'run_123', status: 'queued' }), { status: 200 }),
+    );
+    const result = await fireFeatureRoutine({ apiKey: 'sk-test', fetch: fetchFn as never });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.status).toBe(200);
+      expect(result.body).toEqual({ run_id: 'run_123', status: 'queued' });
+      expect(result.runId).toBe('run_123');
+    }
+  });
+
+  it('keeps a body that is not JSON, rather than losing it', async () => {
+    const fetchFn = vi.fn(async () => new Response('accepted', { status: 202 }));
+    const result = await fireFeatureRoutine({ apiKey: 'sk-test', fetch: fetchFn as never });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.body).toBe('accepted');
+      expect(result.runId).toBeNull();
+    }
+  });
+
+  it('keeps the body of a refusal too, with the status it came with', async () => {
+    const fetchFn = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ error: { message: 'invalid x-api-key' } }), { status: 401 }),
+    );
+    const result = await fireFeatureRoutine({ apiKey: 'sk-bad', fetch: fetchFn as never });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(401);
+      expect(result.body).toEqual({ error: { message: 'invalid x-api-key' } });
+    }
+  });
+});
+
+/**
+ * Nobody has seen what the fire endpoint returns, so this reads the shapes such
+ * a body would plausibly take and answers null rather than guessing when none
+ * of them fits. The body is stored whole beside it, which is what makes a miss
+ * recoverable by looking.
+ */
+describe('runIdFrom', () => {
+  it('reads the session id the fire response actually carries', () => {
+    expect(
+      runIdFrom({
+        type: 'routine_fire',
+        claude_code_session_id: 'cse_01XcjPdgtBHS43gGoWWmxNKn',
+        claude_code_session_url: 'https://claude.ai/code/cse_01XcjPdgtBHS43gGoWWmxNKn',
+      }),
+    ).toBe('cse_01XcjPdgtBHS43gGoWWmxNKn');
+  });
+
+  it('reads the run\'s own id ahead of a bare id', () => {
+    expect(runIdFrom({ id: 'trig_1', run_id: 'run_1' })).toBe('run_1');
+  });
+
+  it('reads an identifier the body wrapped', () => {
+    expect(runIdFrom({ run: { id: 'run_2' } })).toBe('run_2');
+    expect(runIdFrom({ data: { session_id: 'sess_3' } })).toBe('sess_3');
+  });
+
+  it('answers null for a body that names nothing', () => {
+    expect(runIdFrom({ status: 'queued' })).toBeNull();
+    expect(runIdFrom('accepted')).toBeNull();
+    expect(runIdFrom(null)).toBeNull();
+    expect(runIdFrom([{ id: 'run_4' }])).toBeNull();
+  });
+
+  it('ignores a blank identifier', () => {
+    expect(runIdFrom({ run_id: '   ' })).toBeNull();
+  });
+});
+
+describe('resolveRoutineId', () => {
+  it('answers the routine the request actually goes to', () => {
+    expect(resolveRoutineId('trig_plan')).toBe('trig_plan');
+    expect(resolveRoutineId('  trig_plan  ')).toBe('trig_plan');
+    expect(resolveRoutineId(null)).toBe(DEFAULT_FEATURE_ROUTINE_ID);
+    expect(resolveRoutineId('   ')).toBe(DEFAULT_FEATURE_ROUTINE_ID);
   });
 });
 

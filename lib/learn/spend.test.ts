@@ -51,6 +51,7 @@ describe('the operation names', () => {
       'write-probe',
       'name-misconception',
       'propose-floor',
+      'classify-note',
       'concepts-from-note',
       'concepts-from-prior',
       'concepts-from-brief',
@@ -60,6 +61,8 @@ describe('the operation names', () => {
       'grade-opening-answer',
       'write-quiz-questions',
       'grade-quiz-answer',
+      'write-applied-case',
+      'grade-applied-answer',
     ]);
   });
 });

@@ -19,8 +19,10 @@ export const THEMES = [
     label: 'Paper',
     mood: 'Warm, printed, quiet',
     scheme: 'light',
-    /** For the picker's swatch, before the theme is applied. */
-    swatch: '#faf9f6',
+    /** For the picker's swatch, before the theme is applied. Paper's canvas
+     * rather than its sheet, because the sheet is a near-white that reads as
+     * no swatch at all against the picker's own ground. */
+    swatch: '#f7f4ed',
     ink: '#1a1a18',
   },
   {
@@ -35,11 +37,22 @@ export const THEMES = [
     id: 'lightbox',
     label: 'Lightbox',
     mood: 'Lit sheets, blue-black bench',
-    // The one theme whose page and cards disagree: the bench is dark, so the
-    // picker's swatch and the scheme it reports both describe the bench.
+    // The one theme whose page and cards disagree, which is why it is a mode
+    // of its own rather than a dark. `scheme` is what the browser is told to
+    // paint its own widgets in, and that is the bench.
     scheme: 'dark',
     swatch: '#0d1219',
     ink: '#e7ebf1',
+  },
+  {
+    id: 'darkroom',
+    label: 'Darkroom',
+    mood: 'Smoked glass, same bench',
+    // Lightbox with the lights off: one polarity rather than two, because the
+    // sheets stopped being the light source.
+    scheme: 'dark',
+    swatch: '#25374f',
+    ink: '#eaf0f8',
   },
   {
     id: 'dusk',
@@ -70,8 +83,10 @@ export function isThemeId(value: string | null | undefined): value is ThemeId {
  * pulling a hundred hex values into the browser.
  */
 import type { ThemeMode } from '@/lib/theme/reference';
+import { COLOURWAYS, colourwayById, type ColourwayId } from '@/lib/theme/colourway';
 
-export type { ThemeMode };
+export type { ThemeMode, ColourwayId };
+export { COLOURWAYS };
 
 /**
  * What somebody chose, read out of the one string that holds it.
@@ -82,21 +97,24 @@ export type { ThemeMode };
  *   `system`    -- nothing chosen. Follow the machine, which is not the same
  *                  as choosing light.
  *   `written`   -- one of the four palettes written out in app/globals.css.
- *                  Lightbox is the reason this shape survives: its page and
- *                  its cards are opposite polarities, so it cannot be said as
- *                  a mode and a colour at all. Paper, Ink and Dusk stay here
- *                  too, so an account holding one renders exactly as it did.
+ *                  An account holding one renders exactly as it did, which is
+ *                  what this shape is for.
  *   `generated` -- a mode and a colour, or a mode and none. What the picker
  *                  writes from now on.
  *
- * The string is `dark`, or `dark:284`, or a theme's name. One column, and a
- * cookie that keeps working, because widening the column would have meant a
- * migration for something that is already a short piece of text.
+ * The string is `dark`, or `dark:284`, or `lightbox:155`, or a theme's name.
+ * One column, and a cookie that keeps working, because widening the column
+ * would have meant a migration for something that is already a short piece of
+ * text.
+ *
+ * A mode with no colour and the written theme it equals are the same string --
+ * `lightbox` reads back as the written one -- because they are the same
+ * palette, and two spellings of one theme would be two things to keep in step.
  */
 export type Theme =
   | { kind: 'system' }
   | { kind: 'written'; id: ThemeId }
-  | { kind: 'generated'; mode: ThemeMode; hue: number | null };
+  | { kind: 'generated'; mode: ThemeMode; hue: number | null; way?: ColourwayId };
 
 /** The shape the picker works in: a polarity, and a colour or none. */
 export type GeneratedTheme = Extract<Theme, { kind: 'generated' }>;
@@ -114,11 +132,18 @@ export function parseTheme(value: string | null | undefined): Theme {
   const text = value.trim().toLowerCase();
   if (isThemeId(text)) return { kind: 'written', id: text };
 
-  const [mode, hue] = text.split(':');
-  if (mode !== 'light' && mode !== 'dark') return SYSTEM_THEME;
-  if (hue === undefined) return { kind: 'generated', mode, hue: null };
+  const [mode, colour] = text.split(':');
+  if (mode !== 'light' && mode !== 'dark' && mode !== 'lightbox' && mode !== 'darkroom')
+    return SYSTEM_THEME;
+  if (colour === undefined) return { kind: 'generated', mode, hue: null };
 
-  const degrees = Number(hue);
+  // A name rather than a number is a colourway, and it carries its own hue.
+  // Numbers stay numbers, so every `lightbox:260` already stored keeps meaning
+  // what it meant.
+  const way = colourwayById(colour);
+  if (way) return { kind: 'generated', mode, hue: way.hue, way: way.id };
+
+  const degrees = Number(colour);
   if (!Number.isFinite(degrees)) return SYSTEM_THEME;
   return { kind: 'generated', mode, hue: wrapHue(degrees) };
 }
@@ -127,6 +152,9 @@ export function parseTheme(value: string | null | undefined): Theme {
 export function formatTheme(theme: Theme): string | null {
   if (theme.kind === 'system') return null;
   if (theme.kind === 'written') return theme.id;
+  // The colourway's name, not its hue: the hue is one of the things the name
+  // stands for, and storing the number would lose the pools.
+  if (theme.way) return `${theme.mode}:${theme.way}`;
   return theme.hue === null ? theme.mode : `${theme.mode}:${wrapHue(theme.hue)}`;
 }
 
@@ -136,16 +164,19 @@ export function writtenId(theme: Theme): ThemeId | null {
 }
 
 /**
- * Which polarity a theme is, whatever shape it is stored in.
+ * Which mode a theme is, whatever shape it is stored in.
  *
- * A written theme reports the one it declares -- Lightbox says dark, because
- * its bench is what the room is -- and a theme nobody has chosen reports
- * light, which is what the switch should be sitting on before the machine's
- * own preference is readable.
+ * A written theme reports the one it belongs to: Paper is light, Ink and Dusk
+ * are dark, and Lightbox is its own, because a bench of one polarity under
+ * sheets of the other is neither. A theme nobody has chosen reports light,
+ * which is what the switch should be sitting on before the machine's own
+ * preference is readable.
  */
 export function modeOf(theme: Theme): ThemeMode {
   if (theme.kind === 'generated') return theme.mode;
   if (theme.kind === 'system') return 'light';
+  if (theme.id === 'lightbox') return 'lightbox';
+  if (theme.id === 'darkroom') return 'darkroom';
   return THEMES.find((written) => written.id === theme.id)?.scheme ?? 'light';
 }
 
@@ -155,22 +186,69 @@ export function hueOf(theme: Theme): number | null {
 }
 
 /**
- * The five colours the picker offers.
+ * A room, as the picker asks for it: two questions, not one.
  *
- * Presets rather than the only choices: the wheel in #427 writes the same
- * value these do, and these are here because most people want a colour rather
- * than a particular colour. Plum is Dusk's own hue, so dark with plum is the
- * theme that shipped, to within a rounding step.
+ * Light or dark is the polarity. Solid or lightbox is the surface -- whether
+ * the app is a flat page or a set of sheets floating on a lit bench. They are
+ * independent, so all four combinations exist and each one takes a colour.
+ *
+ * It used to be one list of three: light, dark, and lightbox as a third thing
+ * that was "both at once". That was true of the theme and false of the
+ * question -- it made lightbox a polarity you could not be light or dark
+ * inside of, and there was no way to ask for the dark one at all.
+ *
+ * In solid the polarity decides everything. In lightbox the bench is dark
+ * either way and the polarity decides only what a SHEET is made of: lit paper,
+ * or smoked glass.
  */
-export const THEME_COLOURS = [
-  { id: 'plum', label: 'Plum', hue: 298 },
-  { id: 'blue', label: 'Blue', hue: 260 },
-  { id: 'green', label: 'Green', hue: 155 },
-  { id: 'orange', label: 'Orange', hue: 65 },
-  { id: 'red', label: 'Red', hue: 25 },
-] as const;
+export const THEME_POLARITIES: readonly { id: Polarity; label: string; mood: string }[] = [
+  { id: 'light', label: 'Light', mood: 'Warm, printed, quiet' },
+  { id: 'dark', label: 'Dark', mood: 'Near-black, low chroma' },
+];
 
-export type ThemeColourId = (typeof THEME_COLOURS)[number]['id'];
+export const THEME_SURFACES: readonly { id: Surface; label: string; mood: string }[] = [
+  { id: 'solid', label: 'Solid', mood: 'One flat ground, edge to edge' },
+  { id: 'lightbox', label: 'Lightbox', mood: 'Sheets floating on a lit bench' },
+];
+
+export type Polarity = 'light' | 'dark';
+export type Surface = 'solid' | 'lightbox';
+
+/** The two answers, as the one mode everything downstream keys off. */
+export function modeFor(polarity: Polarity, surface: Surface): ThemeMode {
+  if (surface === 'solid') return polarity;
+  return polarity === 'light' ? 'lightbox' : 'darkroom';
+}
+
+/**
+ * The four rooms as one list, for the places that need to name or offer a room
+ * rather than ask the two questions -- the command palette, and the swatch
+ * table on /dev/ui. The picker itself uses the two axes above, because two
+ * questions are what it asks.
+ */
+export const THEME_ROOMS: readonly { id: ThemeMode; label: string; mood: string }[] = [
+  { id: 'light', label: 'Light', mood: 'Warm, printed, quiet' },
+  { id: 'dark', label: 'Dark', mood: 'Near-black, low chroma' },
+  { id: 'lightbox', label: 'Lightbox', mood: 'Lit sheets on a dark bench' },
+  { id: 'darkroom', label: 'Darkroom', mood: 'Smoked glass on the same bench' },
+];
+
+/** And back again, for putting the switch where the current theme is. */
+export function partsOf(mode: ThemeMode): { polarity: Polarity; surface: Surface } {
+  if (mode === 'lightbox') return { polarity: 'light', surface: 'lightbox' };
+  if (mode === 'darkroom') return { polarity: 'dark', surface: 'lightbox' };
+  return { polarity: mode, surface: 'solid' };
+}
+
+/**
+ * The colourway a theme is using, if it is using one.
+ *
+ * Null for a free hue, which has pools but no name for them, and for the two
+ * shapes that have no colour at all.
+ */
+export function colourwayOf(theme: Theme): ColourwayId | null {
+  return theme.kind === 'generated' ? (theme.way ?? null) : null;
+}
 
 /** The attribute holding the whole choice, so a client can read it back. */
 export const THEME_CHOICE_ATTRIBUTE = 'data-theme-choice';

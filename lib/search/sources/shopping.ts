@@ -1,7 +1,12 @@
 import 'server-only';
 
 import { createClient } from '@/lib/auth/server';
-import type { SearchContext, SearchHit, SearchSource } from '@/lib/search/sources';
+import type {
+  SearchContext,
+  SearchHit,
+  SearchListContext,
+  SearchSource,
+} from '@/lib/search/sources';
 import { embedded, escapeLike, inventoryHit, orderHit, savedHit } from '@/lib/search/sources/map';
 
 /**
@@ -19,40 +24,20 @@ import { embedded, escapeLike, inventoryHit, orderHit, savedHit } from '@/lib/se
 
 const contains = (query: string) => `%${escapeLike(query)}%`;
 
-async function findOrders(ctx: SearchContext): Promise<SearchHit[]> {
-  const supabase = await createClient();
-  const pattern = contains(ctx.query);
+/** A search, or -- with no query -- everything. */
+type Read = SearchListContext & { query?: string };
 
-  const { data, error } = await supabase
-    .from('orders')
-    .select('id, external_order_number, order_date, total_cents, merchants(name)')
-    .is('deleted_at', null)
-    .or(`external_order_number.ilike.${pattern}`)
-    .order('order_date', { ascending: false })
-    .limit(ctx.limit);
+const ORDER_COLUMNS = 'id, external_order_number, order_date, total_cents, merchants(name)';
 
-  if (error) throw new Error(`orders by number: ${error.message}`);
+type OrderRow = {
+  id: string;
+  external_order_number: string | null;
+  order_date: string | null;
+  merchants: { name: string } | { name: string }[] | null;
+};
 
-  // By merchant as well, which is how somebody actually looks for an order.
-  // A second read rather than an `or` across the join, because PostgREST
-  // cannot filter on an embedded table from inside an `or`.
-  const { data: byMerchant, error: merchantError } = await supabase
-    .from('orders')
-    .select('id, external_order_number, order_date, total_cents, merchants!inner(name)')
-    .is('deleted_at', null)
-    .ilike('merchants.name', pattern)
-    .order('order_date', { ascending: false })
-    .limit(ctx.limit);
-
-  if (merchantError) throw new Error(`orders by merchant: ${merchantError.message}`);
-
-  const rows = [...((data ?? []) as unknown[]), ...((byMerchant ?? []) as unknown[])] as {
-    id: string;
-    external_order_number: string | null;
-    order_date: string | null;
-    merchants: { name: string } | { name: string }[] | null;
-  }[];
-
+/** Each order once, in the order the reads returned it. */
+function orderHits(rows: OrderRow[]): SearchHit[] {
   const seen = new Set<string>();
   const hits: SearchHit[] = [];
 
@@ -73,14 +58,60 @@ async function findOrders(ctx: SearchContext): Promise<SearchHit[]> {
   return hits;
 }
 
-async function findInventory(ctx: SearchContext): Promise<SearchHit[]> {
+async function findOrders(ctx: Read): Promise<SearchHit[]> {
   const supabase = await createClient();
+
+  // Nothing to match against, so the two reads below are one read.
+  if (!ctx.query) {
+    const { data, error } = await supabase
+      .from('orders')
+      .select(ORDER_COLUMNS)
+      .is('deleted_at', null)
+      .order('order_date', { ascending: false })
+      .limit(ctx.limit);
+
+    if (error) throw new Error(`orders: ${error.message}`);
+
+    return orderHits((data ?? []) as unknown as OrderRow[]);
+  }
+
+  const pattern = contains(ctx.query);
+
   const { data, error } = await supabase
-    .from('inventory_items')
-    .select('id, name, variant, status')
-    .ilike('name', contains(ctx.query))
-    .order('updated_at', { ascending: false })
+    .from('orders')
+    .select(ORDER_COLUMNS)
+    .is('deleted_at', null)
+    .or(`external_order_number.ilike.${pattern}`)
+    .order('order_date', { ascending: false })
     .limit(ctx.limit);
+
+  if (error) throw new Error(`orders by number: ${error.message}`);
+
+  // By merchant as well, which is how somebody actually looks for an order.
+  // A second read rather than an `or` across the join, because PostgREST
+  // cannot filter on an embedded table from inside an `or`.
+  const { data: byMerchant, error: merchantError } = await supabase
+    .from('orders')
+    .select('id, external_order_number, order_date, total_cents, merchants!inner(name)')
+    .is('deleted_at', null)
+    .ilike('merchants.name', pattern)
+    .order('order_date', { ascending: false })
+    .limit(ctx.limit);
+
+  if (merchantError) throw new Error(`orders by merchant: ${merchantError.message}`);
+
+  return orderHits([
+    ...((data ?? []) as unknown as OrderRow[]),
+    ...((byMerchant ?? []) as unknown as OrderRow[]),
+  ]);
+}
+
+async function findInventory(ctx: Read): Promise<SearchHit[]> {
+  const supabase = await createClient();
+  let read = supabase.from('inventory_items').select('id, name, variant, status');
+  if (ctx.query) read = read.ilike('name', contains(ctx.query));
+
+  const { data, error } = await read.order('updated_at', { ascending: false }).limit(ctx.limit);
 
   if (error) throw new Error(`inventory: ${error.message}`);
 
@@ -92,14 +123,12 @@ async function findInventory(ctx: SearchContext): Promise<SearchHit[]> {
   }[]).map(inventoryHit);
 }
 
-async function findSaved(ctx: SearchContext): Promise<SearchHit[]> {
+async function findSaved(ctx: Read): Promise<SearchHit[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('saved_items')
-    .select('id, title, status, merchants(name)')
-    .ilike('title', contains(ctx.query))
-    .order('updated_at', { ascending: false })
-    .limit(ctx.limit);
+  let read = supabase.from('saved_items').select('id, title, status, merchants(name)');
+  if (ctx.query) read = read.ilike('title', contains(ctx.query));
+
+  const { data, error } = await read.order('updated_at', { ascending: false }).limit(ctx.limit);
 
   if (error) throw new Error(`saved: ${error.message}`);
 
@@ -113,17 +142,24 @@ async function findSaved(ctx: SearchContext): Promise<SearchHit[]> {
   );
 }
 
+async function read(ctx: Read): Promise<SearchHit[]> {
+  const [orders, inventory, saved] = await Promise.all([
+    findOrders(ctx),
+    findInventory(ctx),
+    findSaved(ctx),
+  ]);
+  return [...orders, ...inventory, ...saved];
+}
+
 export const shoppingSearchSource: SearchSource = {
   id: 'shopping',
   module: 'shopping',
   label: 'Shopping',
   kinds: ['order', 'inventory', 'saved'],
-  async find(ctx) {
-    const [orders, inventory, saved] = await Promise.all([
-      findOrders(ctx),
-      findInventory(ctx),
-      findSaved(ctx),
-    ]);
-    return [...orders, ...inventory, ...saved];
+  find(ctx: SearchContext) {
+    return read(ctx);
+  },
+  list(ctx: SearchListContext) {
+    return read(ctx);
   },
 };

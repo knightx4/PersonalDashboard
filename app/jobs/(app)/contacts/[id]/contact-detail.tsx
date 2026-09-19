@@ -30,7 +30,7 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
   return (
     <Card padding="dense">
       <header className="flex flex-wrap items-center gap-2">
-        <h1 className="text-lead font-semibold text-ink">{contact.fullName}</h1>
+        <h1 className="text-body font-semibold text-ink">{contact.fullName}</h1>
         {contact.title && <span className="text-ui text-ink-muted">{contact.title}</span>}
         <span className="rounded-full bg-canvas px-1.5 py-0.5 text-small text-ink-muted">
           {contact.relationship.replace(/_/g, ' ')}

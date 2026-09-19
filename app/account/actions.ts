@@ -5,7 +5,8 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { normalizeTimeZone } from '@/lib/core/timezone';
-import { MODULE_IDS, type ModuleId } from '@/lib/modules';
+import { moduleIdsFor, type ModuleId } from '@/lib/modules';
+import { isOwner } from '@/lib/dev/owner';
 import { isSupportedDisplayCurrency, normalizeCurrencyCode } from '@/lib/fx/money-fx';
 
 export interface AccountState {
@@ -85,7 +86,17 @@ export async function updateEnabledModules(
   _prev: AccountState,
   formData: FormData,
 ): Promise<AccountState> {
-  const chosen = MODULE_IDS.filter((id) => formData.get(`module:${id}`) === 'on');
+  const user = await requireUser();
+
+  /**
+   * Read off the allowed list rather than off the form, so a workspace this
+   * account may not have cannot be switched on by posting the field by hand.
+   * The checkbox is absent from the page for the same reason; this is the half
+   * that holds when the page is not what sent the form.
+   */
+  const chosen = moduleIdsFor(await isOwner({ user })).filter(
+    (id) => formData.get(`module:${id}`) === 'on',
+  );
 
   // The database refuses an empty array as well. Saying so here is friendlier
   // than a constraint violation, and the constraint is what makes it true.
@@ -93,7 +104,6 @@ export async function updateEnabledModules(
     return { error: 'Leave at least one workspace on, or there is nothing to open.' };
   }
 
-  const user = await requireUser();
   const supabase = await createCoreClient();
 
   const { error } = await supabase

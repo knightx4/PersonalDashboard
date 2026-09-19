@@ -13,6 +13,7 @@ import {
   type ReadingActionState,
   type RootingNote,
 } from './actions';
+import type { Aim } from '@/lib/learn/graph/aim';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 
@@ -35,6 +36,23 @@ const ACCESS_NOTE: Record<string, string | null> = {
   library: 'Library',
   unknown: 'Access unknown',
 };
+
+/**
+ * What the search went after, in one line.
+ *
+ * Shown only for a reading queued from a gap, which is the only kind that has
+ * a claim behind it. It is here so a bad result is traceable: a reading list
+ * about the wrong thing is a different problem from a reading list about the
+ * right thing badly, and without this line the two look identical.
+ */
+function Aimed({ aim }: { aim: Aim }) {
+  return (
+    <p className="mb-2 text-ui text-ink-muted">
+      Aimed at this claim: {aim.claim}
+      {aim.misconception && ` It was told you currently believe: ${aim.misconception}`}
+    </p>
+  );
+}
 
 /**
  * Whether the search knew where you stand, in one line.
@@ -156,6 +174,7 @@ export function FindSources({ readingId }: { readingId: string }) {
       <form action={attach}>
         <input type="hidden" name="readingId" value={readingId} />
 
+        {findState.aim && <Aimed aim={findState.aim} />}
         {findState.rooting && <Rooting note={findState.rooting} />}
 
         <p className="mb-2 text-body text-ink-muted">
@@ -187,8 +206,10 @@ export function FindSources({ readingId }: { readingId: string }) {
   return (
     <form action={find}>
       <input type="hidden" name="readingId" value={readingId} />
-      {/* After a search that found nothing, the rooting still explains what it
-          was looking with -- which is half of why it came back empty. */}
+      {/* After a search that found nothing, the claim and the rooting still
+          explain what it was looking with -- which is half of why it came back
+          empty. */}
+      {findState.aim && <Aimed aim={findState.aim} />}
       {findState.rooting && <Rooting note={findState.rooting} />}
       <div className="flex flex-wrap items-center gap-3">
         <SearchButton />

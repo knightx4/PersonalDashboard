@@ -21,7 +21,7 @@ export default async function OnboardingLayout({
       <header className="mx-auto flex h-14 max-w-lg items-center justify-between px-4 sm:px-0 sm:pt-6">
         <Link href="/onboarding" className="flex items-center gap-2">
           <ModuleMark module={null} size="md" />
-          <span className="text-lead font-semibold tracking-tight text-ink">
+          <span className="text-body font-semibold tracking-tight text-ink">
             Personal Dashboard
           </span>
         </Link>

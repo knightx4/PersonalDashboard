@@ -262,7 +262,7 @@ function Expanded({
         )}
       >
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lead font-semibold text-ink">{label}</h2>
+          <h2 className="text-body font-semibold text-ink">{label}</h2>
           <button
             type="button"
             onClick={onClose}

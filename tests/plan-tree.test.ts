@@ -161,8 +161,8 @@ describe('dependencies', () => {
 describe('when things happened', () => {
   async function stamps(id: string) {
     const [row] = await asUser(alice, (tx) =>
-      tx<{ started_at: Date | null; completed_at: Date | null }[]>`
-        select started_at, completed_at from plan_items where id = ${id}`,
+      tx<{ started_at: Date | null; blocked_at: Date | null; completed_at: Date | null }[]>`
+        select started_at, blocked_at, completed_at from plan_items where id = ${id}`,
     );
     return row;
   }
@@ -195,5 +195,153 @@ describe('when things happened', () => {
   it('stamps a step inserted already done', async () => {
     const step = await addStep(alice, 'Born done', { status: 'done' });
     expect((await stamps(step.id)).completed_at).not.toBeNull();
+  });
+
+  it('stamps a block and takes it back when the step moves on', async () => {
+    const step = await addStep(alice, 'Stuck');
+    expect((await stamps(step.id)).blocked_at).toBeNull();
+
+    await asUser(alice, (tx) => tx`update plan_items set status = 'blocked' where id = ${step.id}`);
+    const blocked = (await stamps(step.id)).blocked_at;
+    expect(blocked).not.toBeNull();
+
+    // A session blocking a step that is already blocked rewrites the ask. The
+    // instant it stopped is the first one, not the latest visit.
+    await asUser(
+      alice,
+      (tx) =>
+        tx`update plan_items set status = 'blocked', block_ask = 'still stuck' where id = ${step.id}`,
+    );
+    expect((await stamps(step.id)).blocked_at).toEqual(blocked);
+
+    await asUser(alice, (tx) => tx`update plan_items set status = 'in_progress' where id = ${step.id}`);
+    expect((await stamps(step.id)).blocked_at).toBeNull();
+  });
+
+  it('stamps a step inserted already blocked', async () => {
+    const step = await addStep(alice, 'Born blocked', { status: 'blocked' });
+    expect((await stamps(step.id)).blocked_at).not.toBeNull();
+  });
+});
+
+/**
+ * The reading the overnight runner takes to tell a session that is working
+ * from one that has stopped. It used to ask whether the feature it fired at
+ * had closed, and a feature does not close while any step under it is open --
+ * so a session that closed three steps of four looked identical to a session
+ * that had died, and the runner sat out a two-hour silence timeout before
+ * firing again. Two nights lost about four hours each to it.
+ */
+describe('the newest close under a step', () => {
+  async function closedAt(id: string): Promise<Date | null> {
+    const [row] = await asUser(alice, (tx) =>
+      tx<{ at: Date | null }[]>`select public.plan_subtree_closed_at(${id}) as at`,
+    );
+    return row.at;
+  }
+
+  it('is null while nothing under it has closed', async () => {
+    const feature = await addStep(alice, 'Nothing done yet');
+    await addStep(alice, 'Open step', { parentId: feature.id });
+    expect(await closedAt(feature.id)).toBeNull();
+  });
+
+  it('answers for a feature that can never close itself', async () => {
+    // The shape that cost the runner its nights: some steps done, one left
+    // `proposed` -- which is the person's to approve and no session may close,
+    // so the feature stays open for good.
+    const feature = await addStep(alice, 'Half built');
+    await addStep(alice, 'Built', { parentId: feature.id, status: 'done' });
+    await addStep(alice, 'Waiting on you', { parentId: feature.id, status: 'proposed' });
+
+    const [row] = await asUser(alice, (tx) =>
+      tx<{ completed_at: Date | null }[]>`
+        select completed_at from plan_items where id = ${feature.id}`,
+    );
+    // The old reading: the feature itself has not closed and never will.
+    expect(row.completed_at).toBeNull();
+    // The new one: a step under it closed, so the session was working.
+    expect(await closedAt(feature.id)).not.toBeNull();
+  });
+
+  it('reaches a step of a step, not just the children', async () => {
+    const feature = await addStep(alice, 'Deep');
+    const middle = await addStep(alice, 'Middle', { parentId: feature.id });
+    await addStep(alice, 'Leaf', { parentId: middle.id, status: 'done' });
+    expect(await closedAt(feature.id)).not.toBeNull();
+  });
+
+  it('takes the newest close when several have closed', async () => {
+    const feature = await addStep(alice, 'Several');
+    const first = await addStep(alice, 'First', { parentId: feature.id, status: 'done' });
+    const second = await addStep(alice, 'Second', { parentId: feature.id });
+    await asUser(alice, (tx) => tx`update plan_items set status = 'done' where id = ${second.id}`);
+
+    const [earlier] = await asUser(alice, (tx) =>
+      tx<{ at: Date }[]>`select completed_at as at from plan_items where id = ${first.id}`,
+    );
+    const newest = await closedAt(feature.id);
+    expect(newest).not.toBeNull();
+    expect((newest as Date).getTime()).toBeGreaterThanOrEqual(earlier.at.getTime());
+  });
+
+  it("shows one account nothing of another account's plan", async () => {
+    // `security invoker`, so the policy on plan_items still applies and a step
+    // belonging to someone else reads as an empty subtree rather than a date.
+    const hers = await addStep(bob, 'Bob feature');
+    await addStep(bob, 'Bob step', { parentId: hers.id, status: 'done' });
+    expect(await closedAt(hers.id)).toBeNull();
+  });
+});
+
+/**
+ * The other half of that reading. A session that stops to ask a question
+ * closes nothing, so the runner read it as silence and waited out the
+ * no-output mark before firing the next feature, with the session behind the
+ * block already gone. #679.
+ */
+describe('the newest block under a step', () => {
+  async function blockedAt(id: string): Promise<Date | null> {
+    const [row] = await asUser(alice, (tx) =>
+      tx<{ at: Date | null }[]>`select public.plan_subtree_blocked_at(${id}) as at`,
+    );
+    return row.at;
+  }
+
+  it('is null while nothing under it is blocked', async () => {
+    const feature = await addStep(alice, 'Nothing stuck');
+    await addStep(alice, 'Open step', { parentId: feature.id });
+    expect(await blockedAt(feature.id)).toBeNull();
+  });
+
+  it('answers for a feature whose step stopped to ask a question', async () => {
+    const feature = await addStep(alice, 'Stopped');
+    await addStep(alice, 'Built', { parentId: feature.id, status: 'done' });
+    await addStep(alice, 'Asking', { parentId: feature.id, status: 'blocked' });
+    expect(await blockedAt(feature.id)).not.toBeNull();
+  });
+
+  it('reaches a step of a step, not just the children', async () => {
+    const feature = await addStep(alice, 'Deep block');
+    const middle = await addStep(alice, 'Middle', { parentId: feature.id });
+    await addStep(alice, 'Leaf', { parentId: middle.id, status: 'blocked' });
+    expect(await blockedAt(feature.id)).not.toBeNull();
+  });
+
+  it('forgets a block once the step it was on moved on', async () => {
+    // The trigger clears `blocked_at` the moment the row is anything else, so
+    // an answered question leaves the subtree reading as it did before.
+    const feature = await addStep(alice, 'Answered');
+    const step = await addStep(alice, 'Was stuck', { parentId: feature.id, status: 'blocked' });
+    expect(await blockedAt(feature.id)).not.toBeNull();
+
+    await asUser(alice, (tx) => tx`update plan_items set status = 'not_started' where id = ${step.id}`);
+    expect(await blockedAt(feature.id)).toBeNull();
+  });
+
+  it("shows one account nothing of another account's plan", async () => {
+    const hers = await addStep(bob, 'Bob feature');
+    await addStep(bob, 'Bob step', { parentId: hers.id, status: 'blocked' });
+    expect(await blockedAt(hers.id)).toBeNull();
   });
 });

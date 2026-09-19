@@ -57,12 +57,19 @@ export interface SearchHit {
   href: string;
 }
 
-export interface SearchContext {
+export interface SearchListContext {
   userId: string;
+  /**
+   * The most rows to take from any one table. A read that comes back full
+   * means the source is holding back rows the caller will never see, which is
+   * what the truncation flag on the whole list is for.
+   */
+  limit: number;
+}
+
+export interface SearchContext extends SearchListContext {
   /** Trimmed, and never shorter than MIN_QUERY. */
   query: string;
-  /** The most this source may return. The merge caps the total again. */
-  limit: number;
 }
 
 export interface SearchSource {
@@ -78,6 +85,15 @@ export interface SearchSource {
    */
   kinds: readonly HitKind[];
   find(ctx: SearchContext): Promise<SearchHit[]>;
+  /**
+   * Everything this source can find, with no query to match against.
+   *
+   * The palette fetches the whole list once and matches it in the browser, so
+   * the same rows have to be reachable without a query. It is the same reads
+   * as `find` with the `ilike` left off, which is why both live in one file
+   * per source and go through the same mapping.
+   */
+  list(ctx: SearchListContext): Promise<SearchHit[]>;
 }
 
 /**
@@ -92,3 +108,14 @@ export const PER_SOURCE_LIMIT = 6;
 
 /** Overall, because the list is a list somebody reads rather than scrolls. */
 export const TOTAL_LIMIT = 12;
+
+/**
+ * The most rows the one-off list may hold, and the most any one read asks for.
+ *
+ * An account holds a couple of thousand findable rows today, so this is room
+ * to grow into rather than a limit anybody is near. It exists because the
+ * browser has to hold the answer: past a few thousand titles and paths the
+ * list stops being a few hundred KB, and the palette is better off going back
+ * to asking the server per keystroke than to holding a list that big.
+ */
+export const LIST_LIMIT = 5000;

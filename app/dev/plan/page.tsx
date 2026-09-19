@@ -2,19 +2,55 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadPlan } from '@/lib/plan/load';
 import { syncPlanFromSeed } from '@/lib/plan/sync';
+import { endQuietRuns, loadFeatureFires, loadLastRuns, loadRunRaises } from '@/lib/plan/runs';
+import { loadCommitChecks, refreshCommitChecks } from '@/lib/plan/ci';
+import { loadOvernightRun, overnightStanding } from '@/lib/plan/overnight';
+import { readyFeatureCount } from '@/lib/plan/overnight-choice';
+import { keyRefusal } from '@/lib/plan/work';
+import { lastStoredPush } from '@/lib/plan/liveness';
+import { nightFrom } from '@/lib/digest/night';
+import type { LastRun } from '@/lib/plan/run-end';
 import { planRoutine } from '@/lib/feedback/routine';
 import {
   applyView,
   buildPlanTree,
   flattenSections,
-  handedToClaude,
   isPlanView,
+  planLiveness,
+  splitFinished,
   summarize,
   type PlanView,
 } from '@/lib/plan/tree';
+import { OvernightControl } from './overnight-control';
 import { PlanView as PlanViewComponent, type PlanCatalogEntry } from './plan-view';
 
 export const metadata = { title: 'Plan' };
+
+/**
+ * The claims on these steps, read against the last run on each.
+ *
+ * Out here rather than in the page because it reads the clock, and reading the
+ * clock during a render is unstable. The answer is a snapshot either way: the
+ * browser recomputes each row as its own clock ticks.
+ */
+function claimsAsOfNow(
+  items: Parameters<typeof planLiveness>[0],
+  runs: Parameters<typeof planLiveness>[1],
+) {
+  return planLiveness(items, runs, Date.now());
+}
+
+/**
+ * Why GitHub is refusing the key, from the last run on each step.
+ *
+ * Out here beside `claimsAsOfNow` and for the same reason: it reads the clock,
+ * and how old a refusal is decides whether it is still the state of the key.
+ * The browser asks the route again once the page is up and prefers that
+ * answer, so this is only what the first paint is drawn with.
+ */
+function refusedKeyAsOfNow(runs: Record<string, LastRun>): string | null {
+  return keyRefusal(Object.values(runs), Date.now());
+}
 
 /**
  * What is built, what is being built, and what is still only written down.
@@ -68,10 +104,74 @@ export default async function DevPlanPage({
   // so rather than the page falling over.
   const sync = await syncPlanFromSeed(supabase, user.id);
 
-  const data = await loadPlan(supabase, user.id);
-  const whole = buildPlanTree(data);
-  const sections = applyView(whole, view);
+  // Before the runs are read, so a run that ended hours ago is drawn as ended
+  // on this render rather than still saying it is going. Nothing reports the
+  // end of a run, so this is where it gets noticed.
+  await endQuietRuns({ supabase, userId: user.id });
+
+  // And what CI said about the commits the closed steps shipped in. Nothing is
+  // asked of GitHub unless some commit has no answer yet, so this costs a
+  // request only after something new has been closed.
+  const checks = await refreshCommitChecks({ supabase, userId: user.id });
+
+  const [data, lastRuns, runRaises, commitChecks, overnight, fires] = await Promise.all([
+    loadPlan(supabase, user.id),
+    loadLastRuns(supabase, user.id),
+    // What sessions have raised against a step, so an opened step can say what
+    // its run asked for as well as what it pushed and closed.
+    loadRunRaises(supabase, user.id),
+    loadCommitChecks(supabase, user.id),
+    // The runner's standing intention, one row, which is about the plan as a
+    // whole rather than about any part of the tree.
+    loadOvernightRun(supabase, user.id),
+    // The presses the night made, for the control's totals. The same rows the
+    // morning digest reads, through the same loader, so the two cannot come to
+    // different answers about how many features a night got through. #633.
+    // Alongside the rest rather than behind a look at the runner's row: it is
+    // one indexed read of a table this page is already reading, and holding it
+    // back would cost every load a round trip to save this one.
+    loadFeatureFires(supabase, user.id),
+  ]);
+
+  const standing = overnightStanding(overnight);
+  const startedAt = overnight?.startedAt ?? null;
+  const live = (standing === 'running' || standing === 'paused') && startedAt !== null;
+
+  // The night as `nightFrom` reads it -- the same reading the morning report is
+  // written from. `since` is the night's own start rather than a day's window:
+  // the report is asked whether last night is still news, and this is asked
+  // what is happening right now, which a window could only get wrong.
+  const night = live
+    ? nightFrom({ run: overnight, fires, items: data.items, since: startedAt })
+    : null;
+
+  // And what the night has pushed, off the readings the run rows already carry.
+  // Nothing here asks GitHub: #563 settled that the render never waits on it,
+  // and #569's route refreshes these readings from the browser once the page is
+  // up -- so the card names the same push every other surface is reading rather
+  // than taking a second reading that could disagree with it.
+  const nightPush = live ? lastStoredPush(Object.values(lastRuns), startedAt) : null;
+
+  // What the runs say about the steps that are claimed, so the counts beside a
+  // module heading and the bands in its bar read the claims the same way the
+  // health column under them does. The rows are classified again in the browser
+  // as the clock ticks; both go through `healthOf`, so the two cannot disagree
+  // about a claim, only about how many minutes ago it was.
+  const liveness = claimsAsOfNow(data.items, lastRuns);
+  // And whether the reason those claims are being read off the clock is that
+  // GitHub is refusing the key. Off the run rows, so it is on screen in the
+  // first paint; the page asks the route again once it is up and takes that
+  // answer instead.
+  const refusedKey = refusedKeyAsOfNow(lastRuns);
+  const whole = buildPlanTree(data, liveness);
+  const narrowed = applyView(whole, view);
   const summary = summarize(whole);
+
+  // Only on Everything, which is the one view a finished feature reaches at
+  // all: it goes into the fold at the foot of the page rather than sitting in
+  // its module among the nine features that still have work in them.
+  const { sections, finished } =
+    view === 'all' ? splitFinished(narrowed) : { sections: narrowed, finished: [] };
 
   // Every step, for the pickers: a parent to move under, a step to wait on.
   // Light on purpose -- the tree is already on the page once.
@@ -82,11 +182,19 @@ export default async function DevPlanPage({
     module: node.module,
     parentId: node.parentId,
     depth: node.depth,
+    status: node.status,
+    completedAt: node.completedAt,
     closed: node.status === 'done' || node.status === 'dropped',
   }));
 
+  // Wider than the other dev pages, which are prose and lists at max-w-3xl.
+  // This one is a table with six columns and a tree indenting the first of
+  // them, and the Status column took the last of the room the titles had: at
+  // 3xl a third-level step's title truncated after about two words. The page
+  // earns the extra width by being the only one here that is a grid rather
+  // than a column of text.
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
         title="Plan"
         description="Features, the steps that get you there, and the steps beneath those. Seeded from the docs once; edited here after, and read from here by whoever builds next."
@@ -99,14 +207,33 @@ export default async function DevPlanPage({
       {sync.error && (
         <p className="text-small text-caution">Could not check for new steps: {sync.error}</p>
       )}
+      {/* A sentence now rather than a status code, so it is printed as one and
+        in the same tone as the sync failure above it -- a setting nobody can
+        act on until they are told which one is not a quieter problem than a
+        step that did not arrive. */}
+      {checks.error && (
+        <p className="text-small text-caution">Could not read CI. {checks.error}</p>
+      )}
+      <OvernightControl
+        run={overnight}
+        canSend={Boolean(planRoutine().token)}
+        night={night}
+        push={nightPush}
+        ready={readyFeatureCount(sections)}
+      />
       <PlanViewComponent
         sections={sections}
+        finished={finished}
         summary={summary}
         view={view}
         catalog={catalog}
+        lastRuns={lastRuns}
+        runRaises={runRaises}
+        keyRefusal={refusedKey}
+        liveness={liveness}
+        commitChecks={commitChecks}
         empty={data.items.length === 0}
         canSend={Boolean(planRoutine().token)}
-        queued={handedToClaude(whole).length}
       />
     </div>
   );

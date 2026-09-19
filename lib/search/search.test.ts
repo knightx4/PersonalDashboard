@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { rankHits, searchEverything } from './search';
+import { listEverything, searchEverything } from './search';
 import { MIN_QUERY, type HitKind, type SearchHit, type SearchSource } from './sources';
 
 /**
@@ -28,7 +28,14 @@ function source(
   module: SearchHit['module'] = 'jobs',
   kinds: readonly HitKind[] = ['company'],
 ): SearchSource {
-  return { id, module, label: id, kinds, find: vi.fn().mockResolvedValue(hits) };
+  return {
+    id,
+    module,
+    label: id,
+    kinds,
+    find: vi.fn().mockResolvedValue(hits),
+    list: vi.fn().mockResolvedValue(hits),
+  };
 }
 
 function failingSource(id: string, module: SearchHit['module'] = 'shopping'): SearchSource {
@@ -38,6 +45,7 @@ function failingSource(id: string, module: SearchHit['module'] = 'shopping'): Se
     label: id,
     kinds: ['company'],
     find: vi.fn().mockRejectedValue(new Error('token expired')),
+    list: vi.fn().mockRejectedValue(new Error('token expired')),
   };
 }
 
@@ -214,33 +222,145 @@ describe('asking for only some kinds', () => {
   });
 });
 
-describe('the ranking', () => {
-  it('puts a match at the start of a word above one in the middle', () => {
-    const ranked = rankHits([hit('Paracetamol'), hit('Acme')], 'ac');
-    expect(ranked[0].title).toBe('Acme');
+describe('asking for one workspace', () => {
+  // What the search bar at the top of a workspace asks for. Narrowed here as
+  // well as in the browser, so a source in another workspace is never read
+  // from and the caps are spent on rows the bar can show.
+  const pair = () => ({
+    jobs: source('jobs', [hit('Acme')]),
+    shopping: source('shopping', [hit('Acme order', { module: 'shopping' })], 'shopping'),
   });
 
-  it('drops what does not match at all', () => {
-    expect(rankHits([hit('Zebra')], 'qq')).toEqual([]);
+  it('never asks a source outside the workspace it was asked for', async () => {
+    const { jobs, shopping } = pair();
+    const result = await searchEverything({
+      userId: 'user-1',
+      query: 'ac',
+      sources: [jobs, shopping],
+      enabledModules: ALL,
+      scope: 'jobs',
+    });
+
+    expect(shopping.find).not.toHaveBeenCalled();
+    expect(result.hits.map((h) => h.title)).toEqual(['Acme']);
   });
 
-  it('finds a thing by the words its source said to look for it by', () => {
-    // A role is called "Staff Engineer" and is looked for by the company.
-    const ranked = rankHits(
-      [hit('Staff Engineer', { kind: 'role', subtitle: 'Role at Acme · Job search', match: 'Acme' })],
-      'acme',
-    );
-    expect(ranked).toHaveLength(1);
+  it('drops a hit stamped with another workspace, whoever returned it', async () => {
+    // A source says which workspace it belongs to; it is not trusted to only
+    // return hits from there.
+    const sloppy = source('jobs', [hit('Acme'), hit('Acme order', { module: 'shopping' })]);
+
+    const result = await searchEverything({
+      userId: 'user-1',
+      query: 'ac',
+      sources: [sloppy],
+      enabledModules: ALL,
+      scope: 'jobs',
+    });
+
+    expect(result.hits.map((h) => h.module)).toEqual(['jobs']);
   });
 
-  it('does not match against the subtitle, which is boilerplate', () => {
-    // "Company · Job search" contains an a and then a c, so matching it would
-    // make "ac" find every company there is.
-    expect(rankHits([hit('Zebra')], 'ac')).toEqual([]);
+  it('finds nothing in a workspace no source covers', async () => {
+    // News and dev have no search source yet, so their bar finds nothing
+    // rather than quietly finding somebody else's rows.
+    const { jobs, shopping } = pair();
+    const result = await searchEverything({
+      userId: 'user-1',
+      query: 'ac',
+      sources: [jobs, shopping],
+      enabledModules: [...ALL, 'news'],
+      scope: 'news',
+    });
+
+    expect(jobs.find).not.toHaveBeenCalled();
+    expect(shopping.find).not.toHaveBeenCalled();
+    expect(result.hits).toEqual([]);
   });
 
-  it('is stable for two things that score the same', () => {
-    const ranked = rankHits([hit('Acme Two'), hit('Acme One')], 'ac');
-    expect(ranked.map((h) => h.title)).toEqual(['Acme One', 'Acme Two']);
+  it('leaves a switched-off workspace out even when it is the one asked for', async () => {
+    // Narrowing to a workspace is not a way round the setting that turned it
+    // off: off wins, and the answer is empty.
+    const off = source('shopping', [hit('Acme', { module: 'shopping' })], 'shopping');
+    const result = await searchEverything({
+      userId: 'user-1',
+      query: 'ac',
+      sources: [off],
+      enabledModules: ['jobs'],
+      scope: 'shopping',
+    });
+
+    expect(off.find).not.toHaveBeenCalled();
+    expect(result.hits).toEqual([]);
+  });
+
+  it('asks everybody for everything, which is what the command box asks', async () => {
+    const { jobs, shopping } = pair();
+    const result = await searchEverything({
+      userId: 'user-1',
+      query: 'ac',
+      sources: [jobs, shopping],
+      enabledModules: ALL,
+      scope: 'everything',
+    });
+
+    expect(result.hits.map((h) => h.title).sort()).toEqual(['Acme', 'Acme order']);
+  });
+
+  it('asks everybody when no scope is named', async () => {
+    const { jobs, shopping } = pair();
+    const result = await run([jobs, shopping]);
+
+    expect(result.hits.map((h) => h.title).sort()).toEqual(['Acme', 'Acme order']);
+  });
+});
+
+describe('the whole list, with no query', () => {
+  // What the palette fetches when it opens. The same three rules as a search
+  // -- a broken workspace costs only itself, a switched-off one contributes
+  // nothing, there is a cap -- and no ranking, because the browser does that.
+  const list = (sources: SearchSource[], enabled: readonly SearchHit['module'][] = ALL, limit?: number) =>
+    listEverything({ userId: 'user-1', sources, enabledModules: enabled, limit });
+
+  it('returns what every source holds, unranked', async () => {
+    const result = await list([
+      source('a', [hit('Zebra'), hit('Acme')]),
+      source('b', [hit('Acorn', { module: 'vault', kind: 'note' })], 'vault', ['note']),
+    ]);
+
+    expect(result.hits.map((h) => h.title)).toEqual(['Zebra', 'Acme', 'Acorn']);
+    expect(result.failed).toEqual([]);
+    expect(result.truncated).toBe(false);
+  });
+
+  it('asks each source to list rather than to search', async () => {
+    const only = source('jobs', [hit('Acme')]);
+    await list([only], ALL, 40);
+
+    expect(only.find).not.toHaveBeenCalled();
+    expect(only.list).toHaveBeenCalledWith({ userId: 'user-1', limit: 40 });
+  });
+
+  it('lets the others answer when one of them throws', async () => {
+    const result = await list([source('good', [hit('Acme')]), failingSource('broken')]);
+
+    expect(result.hits.map((h) => h.title)).toEqual(['Acme']);
+    expect(result.failed).toEqual(['broken']);
+  });
+
+  it('never runs a source whose workspace is switched off', async () => {
+    const off = source('shopping', [hit('Acme', { module: 'shopping' })], 'shopping');
+    const result = await list([source('jobs', [hit('Acorn')]), off], ['jobs']);
+
+    expect(off.list).not.toHaveBeenCalled();
+    expect(result.hits.map((h) => h.title)).toEqual(['Acorn']);
+  });
+
+  it('cuts the list at the cap and says that it did', async () => {
+    const many = Array.from({ length: 9 }, (_, i) => hit(`Acme ${i}`));
+    const result = await list([source('noisy', many)], ALL, 4);
+
+    expect(result.hits).toHaveLength(4);
+    expect(result.truncated).toBe(true);
   });
 });

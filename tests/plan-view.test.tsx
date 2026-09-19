@@ -11,11 +11,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
+import type { PlanSection } from '@/lib/plan/tree';
+import type { LastRun } from '@/lib/plan/run-end';
+import type { RunRaise } from '@/lib/plan/work';
 import {
   applyView,
   buildPlanTree,
+  splitFinished,
   flattenSections,
-  handedToClaude,
+  planLiveness,
   summarize,
 } from '@/lib/plan/tree';
 
@@ -37,14 +41,15 @@ vi.mock('@/app/dev/plan/actions', () => {
     seedPlan: noop,
     sendPlanFeatureToClaude: noop,
     sendPlanItemToClaude: noop,
-    sendPlanQueueToClaude: noop,
     setPlanItemAssignee: noop,
+    setPlanItemPriority: noop,
     setPlanItemStatus: noop,
     updatePlanItem: noop,
   };
 });
 
 const { PlanView } = await import('@/app/dev/plan/plan-view');
+type PlanCatalogEntry = Parameters<typeof PlanView>[0]['catalog'][number];
 
 let counter = 0;
 
@@ -63,6 +68,8 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     dismissedAt: null,
     fogDismissedAt: null,
     comment: null,
+    blockAsk: null,
+    blockKind: null,
     thread: [],
     priority: 2,
     size: null,
@@ -72,6 +79,7 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     startedAt: null,
     completedAt: null,
     createdAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
+    updatedAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
     ...over,
   };
 }
@@ -102,52 +110,284 @@ const whole = buildPlanTree({
   dependencies: [dep('page', 'schema'), dep('form', 'page')],
 });
 
-const catalog = flattenSections(whole).map((node) => ({
-  id: node.id,
-  number: node.number,
-  title: node.title,
-  module: node.module,
-  parentId: node.parentId,
-  depth: node.depth,
-  closed: node.status === 'done' || node.status === 'dropped',
-}));
+/** The catalog the page builds: every step in the plan, however it is viewed. */
+function catalogOf(tree: PlanSection[]): PlanCatalogEntry[] {
+  return flattenSections(tree).map((node) => ({
+    id: node.id,
+    number: node.number,
+    title: node.title,
+    module: node.module,
+    parentId: node.parentId,
+    depth: node.depth,
+    status: node.status,
+    completedAt: node.completedAt,
+    closed: node.status === 'done' || node.status === 'dropped',
+  }));
+}
 
-function render(view: 'all' | 'open' | 'ready' | 'proposed' | 'claude' | 'blocked', empty = false) {
+const catalog = catalogOf(whole);
+
+function render(
+  view: 'all' | 'open' | 'ready' | 'proposed' | 'claude' | 'blocked',
+  empty = false,
+  // The page folds every feature, and a folded row renders no children at all.
+  // These tests are about how a nested row is laid out, so they ask for the
+  // rows to be open; the one test that is about the fold itself passes false.
+  unfolded = true,
+) {
+  const narrowed = applyView(whole, view);
+  // The page splits the finished features out of Everything before it renders;
+  // this has to do the same or the fold is never under test.
+  const { sections, finished } =
+    view === 'all' ? splitFinished(narrowed) : { sections: narrowed, finished: [] };
   return renderToStaticMarkup(
     <PlanView
-      sections={applyView(whole, view)}
+      sections={sections}
+      finished={finished}
       summary={summarize(whole)}
       view={view}
       catalog={catalog}
       empty={empty}
       canSend={false}
-      queued={handedToClaude(whole).length}
+      lastRuns={{}}
+      commitChecks={{}}
+      unfolded={unfolded}
     />,
   );
 }
 
 describe('PlanView', () => {
+  it('starts every feature folded, so the first screen is the map and not the detail', () => {
+    const html = render('open', false, false);
+    // The feature is there, and says how much is under it.
+    expect(html).toContain('Share links');
+    // Its steps are not rendered at all until the arrow is pressed.
+    expect(html).not.toContain('The anonymous page');
+    expect(html).not.toContain('The keep or sell form');
+    // A feature with no children has no fold to be on the wrong side of.
+    expect(html).toContain('Account deletion');
+  });
+
   it('shows the steps nested under their feature, with their numbers', () => {
     const html = render('open');
     expect(html).toContain('Share links');
     expect(html).toContain('#1');
     expect(html).toContain('The anonymous page');
-    expect(html).toContain('#3');
+    // Note 4ff04135: a step is numbered by its place under its feature. The
+    // done first step is filtered out of this view and the ones left keep the
+    // numbers they had -- a filter does not renumber the plan.
+    expect(html).toContain('#1.2');
+    expect(html).toContain('#1.3');
+    // Its own number is still the handle, on the button that opens it.
+    expect(html).toContain('Open #3');
     // The done schema step is not on the open view; the feature that holds
     // the open ones is.
     expect(html).not.toContain('Schema and RPCs');
     expect(render('all')).toContain('Schema and RPCs');
   });
 
+  it('makes priority a word on the row you click, not a form you open', () => {
+    // Note 3bfb2749: it was a label, and changing it meant opening the step
+    // and going through the edit form for one of three values.
+    const html = render('open');
+    // Every row, whatever it is set to, and named so the menu says which step
+    // it belongs to.
+    expect(html).toContain('Priority of #1 Share links');
+    expect(html).toContain('Priority of #5 Account deletion');
+    // The word itself is what carries the press.
+    expect(html).toContain('>Next</span>');
+    expect(html).toContain('>Someday</span>');
+  });
+
+  it('marks a step yours from the row, and gives it back on the next press', () => {
+    // #686: the runner takes anything approved that is not yours, so the press
+    // that holds a step back is Mine. It used to be Hand to Dash, and setting a
+    // step to Me meant opening Edit.
+    const held = buildPlanTree({
+      items: [
+        item({ id: 'runners', title: 'Outlook ingestion' }),
+        item({ id: 'held', title: 'Account deletion', assignee: 'me' }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(held, 'open')}
+        finished={[]}
+        summary={summarize(held)}
+        view="open"
+        catalog={catalogOf(held)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+    // Both presses are on the page: the runner's step offers Mine, and the one
+    // already held offers the press that gives it back.
+    expect(html).toContain('title="Mine"');
+    expect(html).toContain('title="Not mine"');
+    // And the values those forms send are the two the action takes.
+    expect(html).toContain('name="assignee" value="me"');
+    expect(html).toContain('name="assignee" value=""');
+    expect(html).not.toContain('Hand to Dash');
+  });
+
+  it('marks the steps you kept, and leaves the runner\'s own rows unmarked', () => {
+    // #693: the mark used to be a robot on every step handed to Dash. The
+    // runner now takes anything approved that is not yours, so the fact worth
+    // reading off a resting row is which steps it will skip.
+    const rows = buildPlanTree({
+      items: [
+        item({ id: 'runners', title: 'Outlook ingestion' }),
+        item({ id: 'held', title: 'Account deletion', assignee: 'me' }),
+        // A hand-over from before this feature. Nothing clears the column, so
+        // the row has to stop being read rather than stop holding the value.
+        item({ id: 'stale', title: 'Receipts by photo', assignee: 'claude' }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(rows, 'open')}
+        finished={[]}
+        summary={summarize(rows)}
+        view="open"
+        catalog={catalogOf(rows)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+    // One mark across the three rows, and it sits beside the title of the one
+    // you kept -- not on the runner's step, and not on the old hand-over.
+    expect((html.match(/Marked yours/g) ?? []).length).toBe(1);
+    expect(html).toContain(
+      '>Account deletion</span><span title="Yours. The runner will not take this one."',
+    );
+    // The robot that marked a handed-over step is gone with it.
+    expect(html).not.toContain('lucide-bot');
+  });
+
+  it('reads an underway step as a session\'s unless you kept it', () => {
+    // #693: the tooltip used to say "Dash has been on this" only for a step
+    // handed over. A session can start on anything approved, so the reading
+    // flips -- underway is Dash's unless the step is yours.
+    const running = buildPlanTree({
+      items: [
+        item({
+          id: 'dashs',
+          title: 'Outlook ingestion',
+          status: 'in_progress',
+          startedAt: '2026-02-01T09:30:00Z',
+        }),
+        item({
+          id: 'yours',
+          title: 'Account deletion',
+          status: 'in_progress',
+          assignee: 'me',
+          startedAt: '2026-02-01T09:30:00Z',
+        }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(running, 'open')}
+        finished={[]}
+        summary={summarize(running)}
+        view="open"
+        catalog={catalogOf(running)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+    expect(html).toContain('Dash has been on this since 2026-02-01 09:30');
+    expect(html).toContain('Underway since 2026-02-01 09:30');
+  });
+
+  it('gathers the finished features into the fold at the foot of Everything', () => {
+    const closed = buildPlanTree({
+      items: [
+        item({
+          id: 'shipped',
+          title: 'Share links',
+          status: 'done',
+          completedAt: '2026-02-01T00:00:00Z',
+        }),
+        item({ id: 'shipped-step', title: 'The RPCs', parentId: 'shipped', status: 'done' }),
+        item({
+          id: 'older',
+          title: 'Receipts by photo',
+          status: 'done',
+          completedAt: '2026-01-01T00:00:00Z',
+        }),
+        item({ id: 'live', title: 'Outlook ingestion' }),
+      ],
+      dependencies: [],
+    });
+    const narrowed = applyView(closed, 'all');
+    const { sections, finished } = splitFinished(narrowed);
+    expect(finished.map((node) => node.title)).toEqual(['Share links', 'Receipts by photo']);
+
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={sections}
+        finished={finished}
+        summary={summarize(closed)}
+        view="all"
+        catalog={[]}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+    // The fold says how many it is holding, so shutting it does not hide the
+    // count, and the rows are in it rather than in the module above.
+    expect(html).toContain('Finished');
+    expect(html).toContain('2</span> features');
+    expect(html).toContain('Share links');
+    expect(html).toContain('Outlook ingestion');
+  });
+
+  it('leaves a module with nothing open off the open view, and keeps it on all', () => {
+    // Four of the seven modules have nothing open, so on the working view they
+    // are headings between you and the work. The invitation to plan one is on
+    // Everything, along with the offer to start the app-wide list.
+    const open = render('open');
+    expect(open).not.toContain('Vault');
+    expect(open).not.toContain('The app as a whole');
+
+    const all = render('all');
+    expect(all).toContain('Vault');
+    expect(all).toContain('The app as a whole');
+  });
+
   it('puts the facts that decide what is next on the line', () => {
     const html = render('open');
     expect(html).toContain('>Next<');
     expect(html).toContain('>Someday<');
+    // Normal is the priority of nearly every step, so drawing it put the same
+    // word on almost every row. Next and Someday are what the column is for.
+    //
+    // Since note 3bfb2749 the word is the control that changes it, so on a
+    // Normal step it is in the markup as the thing you click -- and drawn
+    // only while the row is under the pointer, which is what keeps the
+    // resting column to Next and Someday. The rule is the class now.
+    expect(html).toContain('opacity-0 group-hover:opacity-100');
     // Not who has it: the Who column was dropped deliberately -- it was a
-    // column of dashes with the occasional "Claude" in it. Who has a step is
-    // on the open step, in the "Claude's" view, and in the menu that sets it,
-    // and the next two assertions are the ones that cover those.
-    expect(html).not.toContain('>Claude<');
+    // column of dashes with the occasional "Dash" in it. Who has a step is on
+    // the open step, in the "Dash's" view, and in the menu that sets it, and
+    // the next two assertions are the ones that cover those.
+    expect(html).not.toContain('>Dash<');
     expect(render('claude')).toContain('The anonymous page');
     expect(html).toContain('>Ready<');
     expect(html).toContain('Waits on #3');
@@ -177,7 +417,9 @@ describe('PlanView', () => {
     // Not one green length and a blank remainder: a module held up by
     // questions and a module nobody has reached drew the same bar.
     expect(html).toContain('aria-label="Shopping: 1 done, 2 ready, 1 waiting"');
-    expect(html).toContain('aria-label="Job search: 1 blocked"');
+    // A blocked step says who can unblock it, which is the word every dev
+    // queue now uses for a row stopped on the person.
+    expect(html).toContain('aria-label="Job search: 1 waiting on you"');
   });
 
   it('shows a proposal as one, and offers only proposals under that view', () => {
@@ -195,30 +437,22 @@ describe('PlanView', () => {
     }
     expect(html).toContain('href="/dev/plan"');
     expect(html).toMatch(/>2<\/span> ready/);
-    expect(html).toMatch(/>1<\/span> Claude/);
+    // Four of the five open steps: everything but the blocked one, since
+    // approving a step is what makes it Dash's and only `stuck` is on you.
+    expect(html).toMatch(/>4<\/span> Dash/);
   });
 
-  it('offers the whole queue in one press, and only when there is one', () => {
-    // One step is handed over in the fixture, so the button says so rather
-    // than making you count.
-    expect(render('open')).toContain('Send all 1 to Claude');
-
-    const nobodys = buildPlanTree({
-      items: [item({ id: 'mine', title: 'Mine to do' })],
-      dependencies: [],
-    });
-    const html = renderToStaticMarkup(
-      <PlanView
-        sections={applyView(nobodys, 'all')}
-        summary={summarize(nobodys)}
-        view="all"
-        catalog={[]}
-        empty={false}
-        canSend={false}
-        queued={handedToClaude(nobodys).length}
-      />,
-    );
-    expect(html).not.toContain('to Claude</button>');
+  it('draws five views as chips and leaves the rest to the menu', () => {
+    const row = /<nav aria-label="View"[^>]*>([\s\S]*?)<\/nav>/.exec(render('open'))?.[1] ?? '';
+    expect(row).not.toBe('');
+    expect([...row.matchAll(/<a /g)]).toHaveLength(5);
+    for (const label of ['Open', 'Ready', 'On you', 'Dash&#x27;s', 'Everything']) {
+      expect(row).toContain(label);
+    }
+    // The menu holds the other four. Its panel is a portal opened on a press,
+    // so the row itself carries only the trigger.
+    expect(row).toContain('More views');
+    expect(row).not.toContain('Not specified');
   });
 
   it('says on the row which answer produced a step a re-shape wrote', () => {
@@ -239,12 +473,15 @@ describe('PlanView', () => {
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(reshaped, 'all')}
+        finished={[]}
         summary={summarize(reshaped)}
         view="all"
         catalog={[]}
         empty={false}
         canSend={false}
-        queued={0}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
       />,
     );
 
@@ -265,12 +502,15 @@ describe('PlanView', () => {
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(nothing, 'ready')}
+        finished={[]}
         summary={summarize(nothing)}
         view="ready"
         catalog={[]}
         empty={false}
         canSend={false}
-        queued={0}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
       />,
     );
     expect(html).toContain('Nothing ready right now');
@@ -292,12 +532,15 @@ describe('PlanView', () => {
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(withDecision, 'all')}
+        finished={[]}
         summary={summarize(withDecision)}
         view="all"
         catalog={[]}
         empty={false}
         canSend={false}
-        queued={0}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
       />,
     );
 
@@ -331,12 +574,15 @@ describe('PlanView', () => {
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(withQuestions, 'all')}
+        finished={[]}
         summary={summarize(withQuestions)}
         view="all"
         catalog={[]}
         empty={false}
         canSend={false}
-        queued={0}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
       />,
     );
 
@@ -368,12 +614,15 @@ describe('PlanView', () => {
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(foggy, 'all')}
+        finished={[]}
         summary={summarize(foggy)}
         view="all"
         catalog={[]}
         empty={false}
         canSend={false}
-        queued={0}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
       />,
     );
 
@@ -385,6 +634,44 @@ describe('PlanView', () => {
     expect((html.match(/Not yet specified/g) ?? []).length).toBe(1);
     // And a plan with none of it anywhere says nothing at all.
     expect(render('all')).not.toContain('Not yet specified');
+  });
+
+  it('gives a feature that is only fog an arrow to fold it away', () => {
+    // #386's shape: real enough to name, not yet real enough to break into
+    // steps. The fold used to be drawn off the sub-steps alone, so a row like
+    // this one had its fog pinned open with no control anywhere on it.
+    const stepless = buildPlanTree({
+      items: [
+        item({
+          id: 'defence',
+          title: 'Test each concept at three rungs',
+          fog: 'The defence rung still cannot be written as steps.',
+        }),
+        item({ id: 'plain', title: 'A feature with neither steps nor fog' }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(stepless, 'all')}
+        finished={[]}
+        summary={summarize(stepless)}
+        view="all"
+        catalog={[]}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+      />,
+    );
+
+    // Unfolded to start, so scanning the plan still reads the fog without a
+    // press -- the arrow is what is new, not the hiding.
+    expect(html).toContain('The defence rung still cannot be written as steps.');
+    expect(html).toContain('Fold what is not yet specified');
+    // Exactly one control: the row with nothing under it gets no arrow, and
+    // the fog row gets one rather than two.
+    expect((html.match(/what is not yet specified/g) ?? []).length).toBe(2);
   });
 
   it('says nothing about a patch of fog that has been put aside', () => {
@@ -403,12 +690,15 @@ describe('PlanView', () => {
       renderToStaticMarkup(
         <PlanView
           sections={applyView(aside, view)}
+          finished={[]}
           summary={summarize(aside)}
           view={view}
           catalog={[]}
           empty={false}
           canSend={false}
-          queued={0}
+          lastRuns={{}}
+          commitChecks={{}}
+          unfolded
         />,
       );
 
@@ -436,12 +726,15 @@ describe('PlanView', () => {
       renderToStaticMarkup(
         <PlanView
           sections={applyView(aside, view)}
+          finished={[]}
           summary={summarize(aside)}
           view={view}
           catalog={[]}
           empty={false}
           canSend={false}
-          queued={0}
+          lastRuns={{}}
+          commitChecks={{}}
+          unfolded
         />,
       );
 
@@ -456,5 +749,445 @@ describe('PlanView', () => {
 
   it('opens on the import when there is no plan at all', () => {
     expect(render('open', true)).toContain('Import the build order');
+  });
+});
+
+/**
+ * The Status column, which is the whole point of there being two.
+ *
+ * Health and status had been one word, so the page could not say "a session is
+ * on this" and "three of its seven steps are done" at the same time. These
+ * assert the page draws both, and that the words come out of the fixture the
+ * way the rules say they should.
+ */
+describe('health and status, as two columns', () => {
+  it('heads both columns', () => {
+    const html = render('all');
+    expect(html).toContain('>Health<');
+    expect(html).toContain('>Status<');
+  });
+
+  // The complaint the note was filed about: a feature whose first step is done
+  // used to go on saying "Not started", with a progress bar beside it saying
+  // otherwise on the same line.
+  it('calls a feature with a finished step in progress, not not-started', () => {
+    const html = render('all');
+    // The row's own two cells: the health menu carries the row's name in its
+    // label, and the health word and the status word follow it in order.
+    const from = html.indexOf('Status of #1 Share links');
+    expect(from).toBeGreaterThan(-1);
+    const row = html.slice(from, from + 900);
+    expect(row).toContain('In progress');
+    expect(row).not.toContain('Not started');
+  });
+
+  it('says a blocked step and a proposal need you', () => {
+    const html = render('all');
+    expect(html).toContain('Needs you');
+  });
+
+  it('says a step held up by another is held up', () => {
+    expect(render('all')).toContain('Held up');
+  });
+
+  // #694. The runner takes anything approved that is not yours, so "handed
+  // over" is no longer a state a row can be in and the word for it is gone
+  // from the page in both places it was written.
+  it('says nothing about an approved step waiting its turn', () => {
+    const html = render('all');
+    expect(html).not.toContain('For Dash');
+    expect(html).not.toContain('Handed to Dash');
+  });
+
+  it('says Yours for a step you marked, underway or not', () => {
+    const marked = buildPlanTree({
+      items: [
+        item({ id: 'resting', title: 'Outlook ingestion', assignee: 'me' }),
+        item({
+          id: 'going',
+          title: 'Account deletion',
+          assignee: 'me',
+          status: 'in_progress',
+          startedAt: '2026-02-01T09:30:00Z',
+        }),
+        // The runner's own step, in the same render, saying nothing.
+        item({ id: 'queued', title: 'Receipts by photo' }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(marked, 'open')}
+        finished={[]}
+        summary={summarize(marked)}
+        view="open"
+        catalog={catalogOf(marked)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+    // Both marked rows say it, and the underway one is not read as a
+    // session's: marking a step is what holds the runner off it, whoever
+    // started it.
+    expect((html.match(/>Yours</g) ?? []).length).toBe(2);
+    expect(html).not.toContain('With Dash');
+    expect(html).toContain('You kept this one, so the runner will not take it.');
+  });
+
+  it('says With Dash for an underway step you did not mark', () => {
+    const running = buildPlanTree({
+      items: [
+        item({
+          id: 'session',
+          title: 'Outlook ingestion',
+          status: 'in_progress',
+          startedAt: '2026-02-01T09:30:00Z',
+        }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(running, 'open')}
+        finished={[]}
+        summary={summarize(running)}
+        view="open"
+        catalog={catalogOf(running)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+    expect(html).toContain('With Dash');
+    expect(html).not.toContain('>Yours<');
+  });
+});
+
+/**
+ * What CI said about a shipped step, on the row.
+ *
+ * The answer is kept against the commit the step closed at, so the page draws
+ * it from a map rather than from the row -- which is exactly the kind of wiring
+ * that typechecks and then shows nothing.
+ */
+describe('the CI mark on a closed step', () => {
+  const shipped = buildPlanTree({
+    items: [
+      item({ id: 'red', title: 'Landed on a red commit', status: 'done', commitSha: 'aaaaaaa' }),
+      item({ id: 'green', title: 'Landed on a green commit', status: 'done', commitSha: 'bbbbbbb' }),
+      item({ id: 'new', title: 'Nobody has looked yet', status: 'done', commitSha: 'ccccccc' }),
+    ],
+    dependencies: [],
+  });
+
+  const html = renderToStaticMarkup(
+    <PlanView
+      sections={applyView(shipped, 'all')}
+      finished={[]}
+      summary={summarize(shipped)}
+      view="all"
+      catalog={[]}
+      empty={false}
+      canSend={false}
+      lastRuns={{}}
+      commitChecks={{
+        aaaaaaa: { mergeSha: 'f12facc', conclusion: 'failed', checkedAt: '2026-09-17T03:00:00Z' },
+        bbbbbbb: { mergeSha: 'f12facc', conclusion: 'passed', checkedAt: '2026-09-17T03:00:00Z' },
+      }}
+      unfolded
+    />,
+  );
+
+  // From the row's own title up to its status menu, which is the end of the
+  // step cell and the start of the next column. Anything else would let the
+  // row above lend its mark to the row below.
+  const row = (title: string) => {
+    const from = html.indexOf(title);
+    expect(from).toBeGreaterThan(-1);
+    const to = html.indexOf('Status of #', from);
+    expect(to).toBeGreaterThan(from);
+    return html.slice(from, to);
+  };
+
+  it('marks the step that landed on a failing commit', () => {
+    expect(row('Landed on a red commit')).toContain('CI failed');
+  });
+
+  it('leaves a step whose checks passed unmarked', () => {
+    expect(row('Landed on a green commit')).not.toContain('CI failed');
+    expect(row('Landed on a green commit')).not.toContain('Not checked');
+  });
+
+  it('says so on a step with no answer yet, rather than letting it look green', () => {
+    expect(row('Nobody has looked yet')).toContain('Not checked');
+  });
+
+  it('names the merge the checks were read from', () => {
+    expect(html).toContain('the merge that put this on main');
+  });
+});
+
+describe('a claim, drawn from what its run did', () => {
+  const NOW = Date.parse('2026-09-17T12:00:00Z');
+  const minutesAgo = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
+
+  /** The page, for one step claimed `minutes` ago with no run recorded. */
+  function drawClaim(minutes: number) {
+    const items = [
+      item({ id: 'a', title: 'Being worked', status: 'in_progress', startedAt: minutesAgo(minutes) }),
+    ];
+    const liveness = planLiveness(items, {}, NOW);
+    const tree = buildPlanTree({ items, dependencies: [] }, liveness);
+    return renderToStaticMarkup(
+      <PlanView
+        sections={applyView(tree, 'open')}
+        finished={[]}
+        summary={summarize(tree)}
+        view="open"
+        catalog={[]}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        liveness={liveness}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+  }
+
+  it('draws a fresh claim as work in hand', () => {
+    const html = drawClaim(10);
+    expect(html).toContain('In progress');
+    expect(html).not.toContain('Stopped');
+  });
+
+  it('draws a claim whose run ended as stopped, and counts it that way too', () => {
+    // The whole of #500 on one row: the column, the pill and the count beside
+    // the module heading all read the claim through the same function, so the
+    // page cannot say underway while the count says the run is gone.
+    const html = drawClaim(200);
+    expect(html).toContain('Stopped');
+    expect(html).toContain('stopped without closing');
+  });
+});
+
+describe('what an opened step says its run has done', () => {
+  const NOW = Date.parse('2026-09-17T12:00:00Z');
+  const minutesAgo = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
+  const FIRED = minutesAgo(40);
+
+  /** One claimed feature with a closed step under it, and the run that did it. */
+  function drawRun(
+    reading: LastRun['reading'],
+    raises: (childNumber: number) => RunRaise[] = () => [],
+    childClosedAt: string | null = minutesAgo(8),
+  ) {
+    const parent = item({
+      id: 'p',
+      title: 'Being worked',
+      status: 'in_progress',
+      startedAt: FIRED,
+    });
+    const child = item({
+      id: 'c',
+      title: 'Already closed',
+      parentId: 'p',
+      status: childClosedAt ? 'done' : 'not_started',
+      completedAt: childClosedAt,
+    });
+    const items = [parent, child];
+    const lastRuns: Record<string, LastRun> = {
+      p: { status: 'started', createdAt: FIRED, error: null, job: 'feature', reading },
+    };
+    const liveness = planLiveness(items, lastRuns, NOW);
+    const tree = buildPlanTree({ items, dependencies: [] }, liveness);
+    return renderToStaticMarkup(
+      <PlanView
+        sections={applyView(tree, 'open')}
+        finished={[]}
+        summary={summarize(tree)}
+        view="open"
+        catalog={catalogOf(tree)}
+        empty={false}
+        canSend={false}
+        lastRuns={lastRuns}
+        runRaises={raises(child.number)}
+        liveness={liveness}
+        commitChecks={{}}
+        unfolded
+        opened
+      />,
+    );
+  }
+
+  it('names the run and when it started, not only that something is underway', () => {
+    const html = drawRun(null);
+    expect(html).toContain('Its run');
+    expect(html).toContain(`A feature batch started ${FIRED.replace('T', ' ').slice(0, 16)}`);
+  });
+
+  it('lists what it pushed, what it closed and what it raised', () => {
+    const html = drawRun(
+      {
+        checkedAt: minutesAgo(1),
+        lastPush: { at: minutesAgo(6), sha: 'f04d9da1111', subject: 'Read a claim (plan #500)' },
+        refusal: null,
+      },
+      (child) => [
+        {
+          id: 'r',
+          title: 'The GitHub key is refused',
+          source: `plan #${child}`,
+          createdAt: minutesAgo(10),
+        },
+      ],
+    );
+    expect(html).toContain('Read a claim (plan #500)');
+    expect(html).toContain('Closed #');
+    expect(html).toContain('The GitHub key is refused');
+  });
+
+  it('says a run with nothing to show has nothing to show, and which kind of nothing', () => {
+    // No stored reading at all: nobody has asked GitHub, which is not the same
+    // fact as a run that was asked about and had pushed nothing.
+    const html = drawRun(null, () => [], null);
+    expect(html).toContain('nothing has asked GitHub what it has pushed');
+  });
+
+  it('prints why GitHub refused, on a run that closed a step all the same', () => {
+    // #566. The run has a closure to report, so it is not empty and the
+    // sentence about nothing to show never renders -- the rejected key was
+    // invisible on exactly the runs doing work. It is printed as GitHub's
+    // refusal was worded, since that sentence names the variable and says
+    // what to do about it.
+    const html = drawRun({
+      checkedAt: minutesAgo(1),
+      lastPush: null,
+      refusal:
+        'GITHUB_READ_TOKEN is missing a permission (403). Give it access to ' +
+        "knightx4/PersonalDashboard in the token's settings, then redeploy.",
+    });
+    expect(html).toContain('Closed #');
+    expect(html).toContain('GITHUB_READ_TOKEN is missing a permission (403)');
+    expect(html).toContain('then redeploy.');
+  });
+});
+
+/**
+ * The refused key, above the whole plan.
+ *
+ * Its own state and not a run's: the key is one setting, so every claimed row
+ * below is being read off the clock for the same reason, and the page says
+ * that once rather than on each row.
+ */
+describe('what the page says when GitHub refuses the key', () => {
+  const NOW = Date.parse('2026-09-17T12:00:00Z');
+  const REJECTED =
+    'GITHUB_READ_TOKEN was rejected by GitHub (401) — it has expired or is mistyped.';
+
+  function draw(keyRefusal: string | null) {
+    const items = [item({ id: 'a', title: 'Being worked', status: 'in_progress' })];
+    const liveness = planLiveness(items, {}, NOW);
+    const tree = buildPlanTree({ items, dependencies: [] }, liveness);
+    return renderToStaticMarkup(
+      <PlanView
+        sections={applyView(tree, 'open')}
+        finished={[]}
+        summary={summarize(tree)}
+        view="open"
+        catalog={[]}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        keyRefusal={keyRefusal}
+        liveness={liveness}
+        commitChecks={{}}
+      />,
+    );
+  }
+
+  it('says so once, in the words the refusal was recorded in', () => {
+    const html = draw(REJECTED);
+    expect(html).toContain('Nothing can read what these runs have pushed.');
+    expect(html).toContain(REJECTED);
+    // And what the rows are doing in the meantime, since they go on showing a
+    // reading and it is no longer coming from GitHub.
+    expect(html).toContain('reads off the clock');
+  });
+
+  it('says nothing at all when the key is working', () => {
+    const html = draw(null);
+    expect(html).not.toContain('Nothing can read what these runs have pushed.');
+    expect(html).not.toContain('GITHUB_READ_TOKEN');
+  });
+});
+
+/**
+ * #598: a setup job is a row on the plan like any other, and the one thing you
+ * can do to it is say you have done it.
+ */
+describe('a setup step on the plan', () => {
+  function drawSetup(status: PlanItem['status'] = 'not_started') {
+    const feature = item({ id: 'f', title: 'Send the weekly digest', module: 'dev' });
+    const job = item({
+      id: 's',
+      title: 'Put the Resend API key in Vercel',
+      parentId: 'f',
+      module: 'dev',
+      kind: 'setup',
+      status,
+      detail: 'Make a key at resend.com, then add RESEND_API_KEY to the Vercel project.',
+    });
+    const tree = buildPlanTree({ items: [feature, job], dependencies: [] });
+    return renderToStaticMarkup(
+      <PlanView
+        sections={applyView(tree, 'all')}
+        finished={[]}
+        summary={summarize(tree)}
+        view="all"
+        catalog={catalogOf(tree)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+        opened
+      />,
+    );
+  }
+
+  it('shows what to set and the press that closes it, under its own feature', () => {
+    const html = drawSetup();
+
+    // Under the feature it belongs to, as an ordinary row in the tree.
+    expect(html).toContain('Send the weekly digest');
+    expect(html).toContain('Put the Resend API key in Vercel');
+    // What to actually go and do, labelled rather than left as a paragraph.
+    expect(html).toContain('What to set up');
+    expect(html).toContain('add RESEND_API_KEY to the Vercel project');
+    // One press, and it says no commit is recorded against it.
+    expect(html).toContain('I have set this up');
+    expect(html).toContain('This closes the step. Nothing is committed against it.');
+    // Its own health, not a blocked build's.
+    expect(html).toContain('Setup');
+  });
+
+  it('says the detail once, not once in the box and once above it', () => {
+    const html = drawSetup();
+    const detail = 'Make a key at resend.com';
+    expect(html.split(detail)).toHaveLength(2);
+  });
+
+  it('offers nothing to press once the errand has been run', () => {
+    const html = drawSetup('done');
+    expect(html).not.toContain('I have set this up');
+    expect(html).not.toContain('What to set up');
+    // The detail comes back as an ordinary step's does.
+    expect(html).toContain('Make a key at resend.com');
   });
 });

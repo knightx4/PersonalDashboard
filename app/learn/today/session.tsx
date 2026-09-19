@@ -64,10 +64,14 @@ export function TodaySession() {
       </p>
       {/* Said before the question rather than after the answer: being asked
           about something you settled months ago looks like the app having lost
-          track until you know it is deliberate. */}
+          track until you know it is deliberate. Which of the two settled it is
+          said as well, because a claim you only waved through has never been
+          asked about at all and the question will read differently for it. */}
       {live.recheck && (
         <p className="mt-0.5 text-small text-ink-muted">
-          A re-check — you settled this one a while ago.
+          {live.recheck === 'declared'
+            ? 'A re-check — you said you knew this one a while ago.'
+            : 'A re-check — you answered about this one a while ago.'}
         </p>
       )}
       <p className="mt-1 text-body text-ink">{live.question}</p>

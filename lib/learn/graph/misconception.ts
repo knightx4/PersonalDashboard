@@ -1,6 +1,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { ProbeRow } from '@/lib/learn/graph/session';
 
@@ -52,6 +53,10 @@ export type MisconceptionResult =
  * Pure, and by option text rather than by index: the options are regenerated
  * for every question, so index 2 in March and index 2 in April are not the
  * same answer, and comparing them would name a misconception nobody has.
+ *
+ * An applied case has no options and nothing picked, so it never reaches the
+ * count: a misconception is named from the same wrong option twice, and a
+ * typed answer has no option to be the same as.
  */
 export function repeatedWrongAnswer(probes: ProbeRow[]): { option: string; times: number } | null {
   const counts = new Map<string, number>();
@@ -59,7 +64,7 @@ export function repeatedWrongAnswer(probes: ProbeRow[]): { option: string; times
   for (const probe of probes) {
     if (probe.chosenIndex === null) continue;
     if (probe.chosenIndex === probe.correctIndex) continue;
-    const chosen = probe.options[probe.chosenIndex];
+    const chosen = probe.options?.[probe.chosenIndex];
     if (!chosen) continue;
     const key = chosen.trim().toLowerCase();
     counts.set(key, (counts.get(key) ?? 0) + 1);
@@ -68,7 +73,7 @@ export function repeatedWrongAnswer(probes: ProbeRow[]): { option: string; times
   let worst: { option: string; times: number } | null = null;
   for (const probe of probes) {
     if (probe.chosenIndex === null) continue;
-    const chosen = probe.options[probe.chosenIndex];
+    const chosen = probe.options?.[probe.chosenIndex];
     if (!chosen) continue;
     const times = counts.get(chosen.trim().toLowerCase()) ?? 0;
     if (times >= 2 && (!worst || times > worst.times)) worst = { option: chosen, times };
@@ -115,6 +120,7 @@ export async function nameMisconception(input: {
           },
         },
       ],
+      tool_choice: forceTool(TOOL_NAME),
       messages: [
         {
           role: 'user',
@@ -145,7 +151,7 @@ export async function nameMisconception(input: {
 
   const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
   if (!block || block.type !== 'tool_use') {
-    return { ok: false, reason: 'error', detail: 'The call ran but reported nothing.' };
+    return { ok: false, reason: 'error', detail: whyNoReport(response) };
   }
 
   const payload = block.input as { misconception?: unknown; unclear?: unknown };

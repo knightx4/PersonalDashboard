@@ -12,7 +12,7 @@
  * module is never invisible while waiting for someone to write the query.
  */
 
-export type ModuleId = 'shopping' | 'jobs' | 'vault' | 'todo' | 'learn' | 'dev';
+export type ModuleId = 'shopping' | 'jobs' | 'vault' | 'todo' | 'learn' | 'news' | 'dev';
 
 export type AppModule = {
   id: ModuleId;
@@ -34,51 +34,78 @@ export type AppModule = {
    */
   accent: `--color-w-${ModuleId}`;
   /**
-   * The one square in the mark that changes.
+   * What this module's mark draws, and in what hue.
    *
-   * Every mark is the same four-node square: three constant nodes in
-   * monochrome, and this in the top-right corner. It is the only colour in the
-   * mark and the only shape that is not a square, which is what makes it read
-   * as a key rather than as a fourth node.
-   *
-   * A picture *and* a hue, deliberately -- either alone would run out. Position
-   * ran out at four modules, which is what this replaces; hue alone stops
-   * being distinguishable somewhere around six. Together they go as far as
-   * anyone sensibly takes this, and the picture means a new module is
-   * recognisable before anyone has learned its colour.
+   * A picture *and* a hue, deliberately -- either alone would run out. Hue
+   * alone stops being distinguishable somewhere around six; a picture alone
+   * makes a new module recognisable before anyone has learned its colour.
    *
    * The hexes are fixed rather than themed. A mark is an object, and an app
-   * icon does not invert when the OS goes dark.
+   * icon does not invert when the OS goes dark -- the *ground* it sits on is
+   * what follows the theme, and that happens in module-mark.tsx.
    */
   key: MarkKey;
+  /**
+   * Only the owner of the app sees this workspace.
+   *
+   * Dev is the app looking at itself -- the build plan, the bug queue, the
+   * raises -- and three accounts sign in here. `modulesFor` below is what
+   * every list of workspaces goes through, so a module marked this way is
+   * absent from the switcher, from the home tiles and from the account page's
+   * checkboxes for everybody else, rather than present and refused when
+   * pressed.
+   *
+   * Absent means "everyone", which is the right default for a module: a new
+   * workspace is owner-only only if somebody says so.
+   */
+  ownerOnly?: true;
 };
 
 /**
- * The shapes the changing square can take.
+ * The objects a mark can draw.
  *
- * Each is a picture of what the module is, and each is a *solid silhouette* --
- * no strokes, no counters, no interior gap narrower than about a sixth of the
- * shape. That constraint is the whole reason these read: a stroked glyph at
- * this size is a smudge, and an outline of a briefcase is indistinguishable
- * from an outline of a bag.
+ * Each is a picture of the thing the module is about, drawn chunky: one closed
+ * form, generous radii, and exactly one detail held back for white. The detail
+ * is always the thing that *names* the object -- the gap between a cart's
+ * basket and its rail, the clasp on a case, the keyhole in a lock -- and never
+ * a highlight. One detail each, in every mark, is most of why eight drawings
+ * read as one set.
  *
- * They are also all drawn from one vocabulary -- flats, right angles and 45
- * degree cuts, radii around a sixth of the shape. There are no arcs and no
- * circles left in the set, which is what stops seven silhouettes chosen for
- * seven different reasons from looking like seven different people drew them.
+ * What they are not: outlines. A stroked glyph at 18px is a smudge, and an
+ * outline of a briefcase is indistinguishable from an outline of a bag -- the
+ * confusion that sent the previous set's two rounded-rectangles-with-a-bump
+ * back to the board. These are solids, told apart by silhouette first.
  *
- * 'dash' is the app itself and is the only abstract one, which is the point --
- * it is the whole rather than one of the parts. It is also the only key that
- * is a single element, and deliberately the flattest and widest thing any mark
- * contains, because on the home page and in a browser tab it is the mark.
+ * 'dash' is the app itself and is the only abstract one, which is the point:
+ * it is the whole rather than one of the parts. It is also the only object
+ * with no white detail at all, and deliberately the flattest and widest thing
+ * any mark contains, because on the home page and in a browser tab it is the
+ * mark.
  */
-export type MarkShape = 'dash' | 'bag' | 'briefcase' | 'check' | 'page' | 'stack' | 'bolt';
+export type MarkShape =
+  | 'dash'
+  | 'cart'
+  | 'briefcase'
+  | 'list'
+  | 'lock'
+  | 'book'
+  | 'envelope'
+  | 'terminal';
 
 export interface MarkKey {
   shape: MarkShape;
-  /** Rich to deep within one hue. See HOME_MARK for the one exception. */
+  /**
+   * Light to deep within one hue, and `to` is always the workspace's own
+   * accent from globals.css. That is the invariant worth keeping: a mark whose
+   * deep stop is some other rose than the rose the workspace paints its
+   * buttons is two products in one sidebar. Change one, change both.
+   *
+   * See HOME_MARK for the one place two hues are allowed to meet.
+   */
   from: string;
   to: string;
+  /** A third stop, mid-ramp. Only the home mark has one. */
+  mid?: string;
 }
 
 export const MODULES: readonly AppModule[] = [
@@ -89,7 +116,7 @@ export const MODULES: readonly AppModule[] = [
     label: 'Shopping',
     description: 'Orders, inventory, returns and resale',
     accent: '--color-w-shopping',
-    key: { shape: 'bag', from: '#fb7185', to: '#be123c' },
+    key: { shape: 'cart', from: '#fb7185', to: '#be123c' },
   },
   {
     id: 'jobs',
@@ -98,7 +125,7 @@ export const MODULES: readonly AppModule[] = [
     label: 'Job search',
     description: 'Pipeline, roles, companies and interviews',
     accent: '--color-w-jobs',
-    key: { shape: 'briefcase', from: '#c4b5fd', to: '#7c3aed' },
+    key: { shape: 'briefcase', from: '#a78bfa', to: '#7c3aed' },
   },
   {
     id: 'todo',
@@ -109,7 +136,7 @@ export const MODULES: readonly AppModule[] = [
     label: 'Todo',
     description: 'What has to happen, across everything',
     accent: '--color-w-todo',
-    key: { shape: 'check', from: '#7dd3fc', to: '#0369a1' },
+    key: { shape: 'list', from: '#38bdf8', to: '#0369a1' },
   },
   {
     id: 'vault',
@@ -120,7 +147,7 @@ export const MODULES: readonly AppModule[] = [
     label: 'Vault',
     description: 'Your Obsidian notes, mirrored and searchable',
     accent: '--color-w-vault',
-    key: { shape: 'page', from: '#f0abfc', to: '#a21caf' },
+    key: { shape: 'lock', from: '#f0abfc', to: '#a21caf' },
   },
   {
     id: 'learn',
@@ -131,17 +158,38 @@ export const MODULES: readonly AppModule[] = [
     label: 'Learn',
     description: 'Things worth reading, resolved and queued',
     accent: '--color-w-learn',
-    // Teal, at the cold end of the sweep the other four sit on -- sky, violet,
-    // fuchsia, rose -- rather than somewhere else on the wheel, which is what
-    // keeps five differently-coloured workspaces reading as one product.
-    key: { shape: 'stack', from: '#5eead4', to: '#0f766e' },
+    // Emerald into teal. The deep end is the workspace accent and sits at the
+    // cold end of the sweep the other four are on -- sky, violet, fuchsia,
+    // rose -- rather than somewhere else on the wheel, which is what keeps
+    // five differently-coloured workspaces reading as one product. The light
+    // end was pushed off teal and into green so that the open book has a green
+    // in it and is not a second cyan beside the terminal.
+    key: { shape: 'book', from: '#34d399', to: '#0f766e' },
+  },
+  {
+    id: 'news',
+    prefix: '/news',
+    // The list of what has arrived. "What have I been sent" is the question
+    // this module answers, and the address is a setting rather than a page you
+    // come back to.
+    home: '/news',
+    label: 'News',
+    description: 'Newsletters sent to an address of your own',
+    accent: '--color-w-news',
+    // Gold, and the only warm yellow in the app. It is off the sweep the other
+    // four sit on for the same reason dev is: the arc ran out at rose, and the
+    // next stop along it would have been the caution amber. Gold sits further
+    // from the warning colour in all four themes than rose sits from the
+    // delete red, which is the distance this set already accepts.
+    key: { shape: 'envelope', from: '#e8c760', to: '#846905' },
   },
   {
     id: 'dev',
     prefix: '/dev',
-    // Bugs and requests, not the ideas list: the queue is the thing with work
-    // in it, and the ideas are what you read when there is none.
-    home: '/dev/bugs',
+    // Dash, not the bug list: every bug report is closed, and Dash is the one
+    // page that carries what is still waiting -- the raises, the blocked steps
+    // and the questions nobody has answered.
+    home: '/dev/raised',
     label: 'Dev',
     description: 'Bugs, the build plan and long-term ideas for this app',
     accent: '--color-w-dev',
@@ -149,7 +197,8 @@ export const MODULES: readonly AppModule[] = [
     // on. This is the app looking at itself rather than a place work lives,
     // and a sixth hue on the same arc would have been the first pair anyone
     // confused -- teal and green side by side in the same switcher.
-    key: { shape: 'bolt', from: '#94a3b8', to: '#475569' },
+    key: { shape: 'terminal', from: '#94a3b8', to: '#475569' },
+    ownerOnly: true,
   },
 ] as const;
 
@@ -157,47 +206,85 @@ export const MODULES: readonly AppModule[] = [
  * The mark for the whole app: the topbar when no module is active, every
  * signed-out page, and the favicon.
  *
- * The app's own accent rather than a module's, and flat rather than a
- * gradient. A two-hue ramp was decoration pretending to be identity -- three
- * of the four module marks started on the same blue, so the hue was not
- * something a person could identify a workspace by. The glyph is the
- * mnemonic; the hue confirms it.
+ * A dash, and nothing else. It is the one mark that draws no object, because
+ * the app is not one of the six things -- it is the sheet they are written on.
+ * Six marks say what room you are in by showing you a cart or a lock; this one
+ * says "all of it" by showing you the stroke underneath them, and it is the
+ * only mark with no white detail, because there is nothing to name.
  *
- * -- Why a dash --
- * The key was an orb: a filled circle, the largest coloured area in any mark
- * in the set, and the only shape in the whole system with no drawn corner. It
- * had two problems at once. It was where nearly all of the mark's colour went,
- * so the app read as a gradient blob rather than as a black-and-white
- * constellation with something bright in the corner; and being a circle among
- * six angular silhouettes, it looked like a logo that had wandered in from
- * another product rather than the head of this family.
- *
- * A dash fixes both. It is punctuation -- flat, horizontal, cut square at both
- * ends, drawn with exactly the same instrument as the stack's bars and the
- * page's fold. It carries under half the orb's ink, which is what turns the
- * gradient from the subject of the mark into a flare across it. And it is the
- * only element in any mark that is emphatically wider than it is tall, so it
- * is what the eye reaches first even at sixteen pixels, where every other
- * shape in the set has already given up its detail.
+ * Being the widest and flattest thing in the whole set, it is also what the
+ * eye reaches first at sixteen pixels, where every drawn object has already
+ * given up its detail. That is the property a favicon needs and the reason
+ * this is a bar rather than a picture of something.
  */
 export const HOME_MARK = {
   label: 'Home',
   accent: '--color-accent',
   /**
-   * The app's own key, and the one place two hues are allowed to meet.
+   * The app's own key, and the one place more than one hue is allowed.
    *
-   * Everywhere else a gradient stays inside a single hue, because a two-hue
-   * ramp is decoration pretending to be identity. Here it *is* the identity:
-   * blue into pink is what this product has used for itself since before it
-   * had modules, and the home mark is the only thing entitled to wear it.
+   * Everywhere else a gradient stays inside a single hue and lands on the
+   * workspace's accent, because a many-hue ramp on a module mark is decoration
+   * pretending to be identity. Here it *is* the identity: blue into pink is
+   * what this product has used for itself since before it had modules, and the
+   * home mark is the only thing entitled to wear it.
    *
-   * Kept exactly as it was through the redraw, on purpose. The brief was to
-   * spend less of the mark on it, not to change it -- these two hexes are the
-   * one thing about this product's appearance that predates everything else in
-   * this file.
+   * The two end hexes are untouched -- they predate everything else in this
+   * file. `mid` is new, and only because the dash got much fatter: across
+   * nineteen units the straight blue-to-pink ramp spent its whole middle in a
+   * dead mauve, and putting the violet the brand already uses at the halfway
+   * mark turns that back into a ramp you can see three colours in.
    */
-  key: { shape: 'dash', from: '#6a82fb', to: '#ff6b9d' },
+  key: { shape: 'dash', from: '#6a82fb', mid: '#8b5cf6', to: '#ff6b9d' },
 } as const;
+
+/**
+ * The modules an account is allowed to see.
+ *
+ * Every list of workspaces in the app draws from this rather than from
+ * `MODULES` directly -- the switcher, the phone's sheet, the command palette,
+ * the home tiles and the account page's checkboxes -- so that "only the owner
+ * sees Dev" is one rule in one place instead of five lists that have to be
+ * remembered separately. The next owner-only module is a flag on the row
+ * above, and nothing else.
+ *
+ * The boolean is passed in rather than read here on purpose: the answer comes
+ * from `lib/dev/owner.ts`, which is server-only and costs a round trip, and
+ * half these callers are client components. The server reads it once per
+ * render and hands it down.
+ *
+ * Pure, so a caller that has no idea whether it is the owner should pass
+ * `false` -- that shows one workspace too few, which is a puzzle, rather than
+ * one too many, which is a leak.
+ */
+export function modulesFor(isOwner: boolean): readonly AppModule[] {
+  return isOwner ? MODULES : MODULES.filter((module) => !module.ownerOnly);
+}
+
+/** The same rule, as ids: for the places that store or compare them. */
+export function moduleIdsFor(isOwner: boolean): readonly ModuleId[] {
+  return modulesFor(isOwner).map((module) => module.id);
+}
+
+/**
+ * The workspaces the shell offers: the ones this account switched on, minus
+ * any it is not allowed to see at all.
+ *
+ * The switcher, the phone's sheet and the command palette are three lists of
+ * one thing, so the shell works this out once and hands all three the answer.
+ *
+ * `enabled` undefined means "all of them", because a shell rendered before the
+ * settings are known must not show an empty switcher -- a person whose
+ * workspaces vanished cannot tell a bug from a setting they do not remember
+ * changing. All of them still means all the ones this account may have.
+ */
+export function switchableModules(
+  enabled: readonly ModuleId[] | undefined,
+  isOwner: boolean,
+): readonly ModuleId[] {
+  const allowed = moduleIdsFor(isOwner);
+  return (enabled ?? allowed).filter((id) => allowed.includes(id));
+}
 
 export function moduleById(id: ModuleId | null): AppModule | null {
   if (id === null) return null;

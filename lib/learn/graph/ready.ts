@@ -87,7 +87,11 @@ const STATE_RANK: Record<Concept['state'], number> = {
   misconception: 0,
   shaky: 1,
   unknown: 2,
-  known: 3,
+  // A claim you have recognised and not yet applied still has a question
+  // waiting, so it outranks the two that do not.
+  recognised: 3,
+  known: 4,
+  sharp: 5,
 };
 
 /**

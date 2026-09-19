@@ -113,7 +113,7 @@ function ClaimRow({
   );
 }
 
-function Proposal({ chain, onDiscard }: { chain: ProposedChain; onDiscard: () => void }) {
+export function Proposal({ chain, onDiscard }: { chain: ProposedChain; onDiscard: () => void }) {
   const [state, approve] = useActionState<BriefState, FormData>(approveBrief, {});
   const [ticked, setTicked] = useState<ReadonlySet<string>>(
     () => new Set(chain.nodes.filter((node) => !node.existingId).map((node) => key(node.name))),

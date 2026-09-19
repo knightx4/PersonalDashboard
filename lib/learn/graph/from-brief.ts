@@ -1,11 +1,13 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
   approvedChainSchemaWith,
   chainPayloadSchema,
   normaliseChain,
+  whyMalformed,
   placeMentions,
   wouldCycle,
   MAX_CHAIN,
@@ -245,7 +247,7 @@ async function readSection(input: {
   try {
     response = await input.client.messages.create({
       model: MODEL,
-      max_tokens: 2048,
+      max_tokens: 4096,
       system: SYSTEM,
       tools: [
         {
@@ -302,6 +304,7 @@ async function readSection(input: {
           },
         },
       ],
+      tool_choice: forceTool(TOOL_NAME),
       messages: [{ role: 'user', content: lines.join('\n') }],
     });
   } catch (error) {
@@ -315,11 +318,11 @@ async function readSection(input: {
 
   const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
   if (!block || block.type !== 'tool_use') {
-    return { kind: 'error', detail: 'The call ran but reported nothing.' };
+    return { kind: 'error', detail: whyNoReport(response) };
   }
 
   const safe = chainPayloadSchema.safeParse(block.input);
-  if (!safe.success) return { kind: 'error', detail: 'That came back malformed.' };
+  if (!safe.success) return { kind: 'error', detail: whyMalformed(safe.error) };
 
   const chain = normaliseChain(safe.data, input.existing);
   return chain ? { kind: 'chain', chain } : { kind: 'nothing' };

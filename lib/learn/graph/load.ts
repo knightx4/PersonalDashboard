@@ -20,6 +20,15 @@ import {
   READY_LIMIT,
   type ReadyConcept,
 } from '@/lib/learn/graph/ready';
+import {
+  rankNext,
+  recordWindowStart,
+  NEXT_LIMIT,
+  type NextOutcome,
+  type NextRecord,
+  type NextRow,
+  type QueuedReading,
+} from '@/lib/learn/next/rank';
 
 /**
  * Reading a subject's graph.
@@ -123,6 +132,8 @@ type ConceptRow = {
   id: string;
   name: string;
   claim: string;
+  claim_original: string | null;
+  claim_rewritten_at: string | null;
   basis: string;
   kind: ConceptKind | null;
   mastery: unknown;
@@ -148,6 +159,7 @@ type StateRow = {
   established: StateBasis;
   misconception: string | null;
   tested_at: string | null;
+  declared_at: string | null;
 };
 
 /**
@@ -162,6 +174,8 @@ function toConcept(row: ConceptRow, state: StateRow | undefined): Concept {
     id: row.id,
     name: row.name,
     claim: row.claim,
+    claimOriginal: row.claim_original ?? null,
+    claimRewrittenAt: row.claim_rewritten_at ?? null,
     basis: row.basis,
     kind: row.kind,
     mastery: masteryOf(row.mastery),
@@ -169,7 +183,46 @@ function toConcept(row: ConceptRow, state: StateRow | undefined): Concept {
     established: state?.established ?? 'inferred',
     misconception: state?.misconception ?? null,
     testedAt: state?.tested_at ?? null,
+    declaredAt: state?.declared_at ?? null,
   };
+}
+
+/**
+ * One concept, with what is known about it.
+ *
+ * For the places that hold a concept id and want the claim rather than the
+ * whole graph around it -- opening a reading queued from a gap, which needs to
+ * know what that reading is for and nothing else. Null when the concept has
+ * been deleted since, which is a normal thing for a reading queued months ago
+ * to run into.
+ */
+export async function loadConcept(
+  supabase: LearnSupabaseClient,
+  conceptId: string,
+): Promise<Concept | null> {
+  const { data, error } = await supabase
+    .from('concepts')
+    .select('id, name, claim, basis, kind, mastery')
+    .eq('id', conceptId)
+    .maybeSingle();
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Reading that concept', error);
+  if (!data) return null;
+
+  const { data: stateData, error: stateError } = await supabase
+    .from('concept_state')
+    .select('concept_id, state, established, misconception, tested_at, declared_at')
+    .eq('concept_id', conceptId)
+    .maybeSingle();
+
+  assertSchemaExposed(stateError, LEARN_SCHEMA);
+  if (stateError) throw fail('Reading what you know', stateError);
+
+  return toConcept(
+    data as unknown as ConceptRow,
+    (stateData ?? undefined) as StateRow | undefined,
+  );
 }
 
 export async function loadGraph(
@@ -183,7 +236,7 @@ export async function loadGraph(
   ] = await Promise.all([
     supabase
       .from('concepts')
-      .select('id, name, claim, basis, kind, mastery')
+      .select('id, name, claim, claim_original, claim_rewritten_at, basis, kind, mastery')
       .eq('subject_id', subjectId)
       .order('name'),
     supabase
@@ -213,7 +266,7 @@ export async function loadGraph(
   if (ids.length > 0) {
     const { data, error } = await supabase
       .from('concept_state')
-      .select('concept_id, state, established, misconception, tested_at')
+      .select('concept_id, state, established, misconception, tested_at, declared_at')
       .in('concept_id', ids);
 
     assertSchemaExposed(error, LEARN_SCHEMA);
@@ -266,52 +319,212 @@ export async function loadGoals(
   }));
 }
 
+type QueuedReadingRow = {
+  id: string;
+  title: string | null;
+  concept_id: string;
+  created_at: string;
+  sources: { title: string } | null;
+};
+
 /**
- * Everything you could start on and everything you have settled, in every
- * subject.
+ * The readings you queued about a claim and have not opened.
+ *
+ * One query for every track at once, because a reading belongs to a track and
+ * a track belongs to no subject -- there is nothing per-subject to fold this
+ * into. `queued` and nothing else: a reading you have started, finished or
+ * put down is not a thing to offer you again. A reading with no `concept_id`
+ * is one you wrote down yourself, and it cannot say which claim it is about,
+ * so it is left out rather than shown with a blank reason.
+ */
+async function loadQueuedAboutAClaim(
+  supabase: LearnSupabaseClient,
+): Promise<QueuedReadingRow[]> {
+  const { data, error } = await supabase
+    .from('readings')
+    .select('id, title, concept_id, created_at, sources!readings_source_fk ( title )')
+    .eq('status', 'queued')
+    .not('concept_id', 'is', null)
+    .order('created_at');
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Reading what you queued', error);
+
+  return (data ?? []) as unknown as QueuedReadingRow[];
+}
+
+/**
+ * Everything you could start on, everything you have settled, and everything
+ * you queued and left, in every subject.
  *
  * One read per subject, the same four queries `/learn/know` already runs in a
- * loop, and no model call anywhere in it. A goal counts as one you named
- * unless you abandoned it, which is the rule the subject page uses to decide
- * what to draw a chain for. Both lists come out of the same walk because the
- * five-minute screen needs both to pick one question, and walking twice would
- * be the same graphs read twice.
+ * loop, plus one for the queue, and no model call anywhere in it. A goal
+ * counts as one you named unless you abandoned it, which is the rule the
+ * subject page uses to decide what to draw a chain for. The three lists come
+ * out of the same walk because the five-minute screen needs all of them to
+ * pick one row, and walking twice would be the same graphs read twice.
  */
-async function everywhere(
-  supabase: LearnSupabaseClient,
-): Promise<{ ready: ReadyConcept[]; settled: SettledConcept[] }> {
+async function everywhere(supabase: LearnSupabaseClient): Promise<{
+  ready: ReadyConcept[];
+  settled: SettledConcept[];
+  readings: QueuedReading[];
+}> {
   const subjects = await loadSubjects(supabase);
 
-  const perSubject = await Promise.all(
-    subjects.map(async (subject) => {
-      const [graph, goals] = await Promise.all([
-        loadGraph(supabase, subject.id),
-        loadGoals(supabase, subject.id),
-      ]);
+  const [perSubject, queued] = await Promise.all([
+    Promise.all(
+      subjects.map(async (subject) => {
+        const [graph, goals] = await Promise.all([
+          loadGraph(supabase, subject.id),
+          loadGoals(supabase, subject.id),
+        ]);
 
-      const goalConceptIds = goals
-        .filter((goal) => goal.status !== 'abandoned' && goal.conceptId !== null)
-        .map((goal) => goal.conceptId!);
+        const goalConceptIds = goals
+          .filter((goal) => goal.status !== 'abandoned' && goal.conceptId !== null)
+          .map((goal) => goal.conceptId!);
 
-      return {
-        ready: readyInSubject(graph, subject, goalConceptIds),
-        settled: settledInSubject(graph, subject),
-      };
-    }),
-  );
+        return {
+          subject,
+          concepts: graph.concepts,
+          ready: readyInSubject(graph, subject, goalConceptIds),
+          settled: settledInSubject(graph, subject),
+        };
+      }),
+    ),
+    loadQueuedAboutAClaim(supabase),
+  ]);
+
+  // Which subject each claim belongs to, off the graphs already in hand. A
+  // reading whose claim has since been deleted is dropped: it cannot say what
+  // it is about, and a row that links nowhere is worse than one row fewer.
+  const home = new Map<string, { name: string; subjectId: string; subjectName: string }>();
+  for (const { subject, concepts } of perSubject) {
+    for (const concept of concepts) {
+      home.set(concept.id, {
+        name: concept.name,
+        subjectId: subject.id,
+        subjectName: subject.name,
+      });
+    }
+  }
+
+  const readings: QueuedReading[] = [];
+  for (const row of queued) {
+    const claim = home.get(row.concept_id);
+    if (!claim) continue;
+    readings.push({
+      id: row.id,
+      // The same rule `tracks/load.ts` uses: the source's title when one has
+      // been found, your own words when it has not.
+      title: row.sources?.title ?? row.title ?? 'Untitled',
+      conceptId: row.concept_id,
+      conceptName: claim.name,
+      subjectId: claim.subjectId,
+      subjectName: claim.subjectName,
+      queuedAt: row.created_at,
+    });
+  }
 
   return {
     ready: perSubject.flatMap((subject) => subject.ready),
     settled: perSubject.flatMap((subject) => subject.settled),
+    readings,
   };
 }
 
-/** What to learn next: the ranked few, for the screen. */
-export async function loadReadyToLearn(
+type OutcomeRow = {
+  concept_id: string | null;
+  reading_id: string | null;
+  outcome: NextOutcome;
+  happened_at: string;
+};
+
+/**
+ * What you have done with what Learn next offered, recently.
+ *
+ * `learn.next_outcomes` holds a claim or a reading, and the order needs the
+ * subject as well -- a subject you are getting through is what lifts its other
+ * rows. So a reading is followed to the claim it was queued against and the
+ * claim to its subject, two reads by id that only run when there is something
+ * to look up. Nothing is written here and nothing is inferred from a page
+ * being opened; the rows this reads are written by the probe action, the
+ * reading status action and Not now.
+ */
+async function loadNextRecord(
   supabase: LearnSupabaseClient,
-  limit: number = READY_LIMIT,
-): Promise<ReadyConcept[]> {
-  return rankReady((await everywhere(supabase)).ready, limit);
+  now: Date,
+): Promise<NextRecord[]> {
+  const { data, error } = await supabase
+    .from('next_outcomes')
+    .select('concept_id, reading_id, outcome, happened_at')
+    .gte('happened_at', recordWindowStart(now).toISOString())
+    .order('happened_at', { ascending: false });
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Reading what you have done', error);
+
+  const rows = (data ?? []) as unknown as OutcomeRow[];
+  if (rows.length === 0) return [];
+
+  const readingIds = [...new Set(rows.map((row) => row.reading_id).filter((id) => id !== null))];
+  const claimOfReading = new Map<string, string>();
+  if (readingIds.length > 0) {
+    const { data: readings, error: readingError } = await supabase
+      .from('readings')
+      .select('id, concept_id')
+      .in('id', readingIds);
+
+    assertSchemaExposed(readingError, LEARN_SCHEMA);
+    if (readingError) throw fail('Reading what you have read', readingError);
+
+    for (const reading of (readings ?? []) as unknown as {
+      id: string;
+      concept_id: string | null;
+    }[]) {
+      if (reading.concept_id !== null) claimOfReading.set(reading.id, reading.concept_id);
+    }
+  }
+
+  const conceptIds = [
+    ...new Set(
+      rows
+        .map((row) => row.concept_id ?? (row.reading_id && claimOfReading.get(row.reading_id)))
+        .filter((id): id is string => typeof id === 'string'),
+    ),
+  ];
+
+  const subjectOfClaim = new Map<string, string>();
+  if (conceptIds.length > 0) {
+    const { data: concepts, error: conceptError } = await supabase
+      .from('concepts')
+      .select('id, subject_id')
+      .in('id', conceptIds);
+
+    assertSchemaExposed(conceptError, LEARN_SCHEMA);
+    if (conceptError) throw fail('Reading which subject those claims are in', conceptError);
+
+    for (const concept of (concepts ?? []) as unknown as {
+      id: string;
+      subject_id: string;
+    }[]) {
+      subjectOfClaim.set(concept.id, concept.subject_id);
+    }
+  }
+
+  return rows.map((row) => {
+    const conceptId =
+      row.concept_id ?? (row.reading_id ? claimOfReading.get(row.reading_id) ?? null : null);
+
+    return {
+      outcome: row.outcome,
+      conceptId,
+      readingId: row.reading_id,
+      // Null when the claim has been deleted since, which credits the outcome
+      // to no subject rather than to a guess.
+      subjectId: conceptId === null ? null : subjectOfClaim.get(conceptId) ?? null,
+      happenedAt: row.happened_at,
+    };
+  });
 }
 
 /**
@@ -329,7 +542,35 @@ export async function loadReadyAndSettled(
   return { ready: rankReady(ready, limit), settled: rankByLastChecked(settled) };
 }
 
-/** How many are ready in total -- for the tab's badge. */
-export async function countReadyToLearn(supabase: LearnSupabaseClient): Promise<number> {
-  return (await everywhere(supabase)).ready.length;
+/**
+ * What Learn next shows: the three kinds of row, ranked into one list.
+ *
+ * The same walk as everything else on this page, plus what you have done with
+ * what it offered before, and the ordering itself is in `lib/learn/next/rank.ts`
+ * where it can be tested against rows written by hand. `now` is a parameter for the same reason: what counts as long enough
+ * since a claim was answered is a comparison against the clock, and a function
+ * that reads the clock itself cannot be tested.
+ */
+export async function loadNext(
+  supabase: LearnSupabaseClient,
+  limit: number = NEXT_LIMIT,
+  now: Date = new Date(),
+): Promise<NextRow[]> {
+  const [graphs, record] = await Promise.all([everywhere(supabase), loadNextRecord(supabase, now)]);
+  return rankNext({ ...graphs, record }, now, limit);
+}
+
+/**
+ * How many rows Learn next would show -- for the tab's badge.
+ *
+ * The count is taken from the same ranking the page renders, cut at the same
+ * limit, so the number on the tab and the number of rows on the screen cannot
+ * disagree. A badge reading the ready concepts alone went stale the moment the
+ * page grew re-checks and queued readings.
+ */
+export async function countNext(
+  supabase: LearnSupabaseClient,
+  now: Date = new Date(),
+): Promise<number> {
+  return (await loadNext(supabase, NEXT_LIMIT, now)).length;
 }

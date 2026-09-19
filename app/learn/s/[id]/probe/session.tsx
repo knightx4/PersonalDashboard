@@ -8,12 +8,15 @@ import { cn } from '@/lib/cn';
 import { KindBadge } from '@/components/learn/kind-badge';
 import { MasteryChecks } from '@/components/learn/mastery-checks';
 import { ProbeOptions } from '@/components/learn/probe-options';
+import { WrittenAnswer } from '@/components/learn/written-answer';
 import {
   answerQuestion,
   approveFloor,
   askQuestion,
   findFloor,
+  markKnown,
   type AskState,
+  type DeclareState,
   type FloorState,
 } from './actions';
 
@@ -58,6 +61,23 @@ function AskButton({ label }: { label: string }) {
   return (
     <Button type="submit" variant="secondary" disabled={pending}>
       {pending ? 'Writing a question…' : label}
+    </Button>
+  );
+}
+
+/**
+ * The way out of a case about something you are already sure of.
+ *
+ * It submits the same form to a different action, which is why it carries
+ * `formAction` and turns the browser's validation off: the answer box is
+ * required for the answer and there is nothing to type here. The concept is
+ * marked known on your word, and the case is left unanswered.
+ */
+function KnownButton({ declare }: { declare: (formData: FormData) => void }) {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" variant="ghost" formAction={declare} formNoValidate disabled={pending}>
+      I already know this
     </Button>
   );
 }
@@ -153,28 +173,61 @@ export function ProbeSession({
 }) {
   const [state, ask] = useActionState<AskState, FormData>(askQuestion, { percent: startingPercent });
   const [answerState, answer] = useActionState<AskState, FormData>(answerQuestion, state);
+  const [declared, declare] = useActionState<DeclareState, FormData>(markKnown, {});
 
   // The answer action carries the question forward, so whichever ran last is
-  // the live one.
-  const live = answerState.answered ? answerState : state;
+  // the live one. An answer that could not be graded counts: the question is
+  // still on screen and the reason it was not graded belongs under it.
+  const live = answerState.answered || answerState.error ? answerState : state;
   const percent = live.percent ?? startingPercent;
+  // Keyed on the question rather than on a flag, so asking for another one
+  // brings the answer box back instead of leaving the last wave-through on
+  // screen. The bar is not read from here: nothing was answered, so nothing
+  // moved it.
+  const waved = declared.probeId !== undefined && declared.probeId === live.probeId;
 
   return (
     <>
       <Bar percent={percent} />
 
-      {live.question && live.options ? (
+      {live.question ? (
         <div className={cardVariants({ padding: 'standard' })}>
           <p className="text-small text-ink-muted">{live.conceptName}</p>
+          {/* The case, on the applied rung. Read first, then the thing to say
+              about it, which is why they are two paragraphs rather than one. */}
+          {live.situation && <p className="mt-1 text-body text-ink">{live.situation}</p>}
           <p className="mt-1 text-body text-ink">{live.question}</p>
 
-          <form action={answer} className="mt-4 space-y-2">
-            <input type="hidden" name="probeId" value={live.probeId} />
-            <input type="hidden" name="conceptId" value={live.conceptId} />
-            <input type="hidden" name="subjectId" value={subjectId} />
+          {!waved && (
+            <form action={answer} className="mt-4 space-y-2">
+              <input type="hidden" name="probeId" value={live.probeId} />
+              <input type="hidden" name="conceptId" value={live.conceptId} />
+              <input type="hidden" name="subjectId" value={subjectId} />
 
-            <ProbeOptions options={live.options} answered={live.answered ?? null} />
-          </form>
+              {live.options ? (
+                <ProbeOptions options={live.options} answered={live.answered ?? null} />
+              ) : (
+                <WrittenAnswer
+                  response={live.answered?.response ?? null}
+                  beside={live.answered ? undefined : <KnownButton declare={declare} />}
+                />
+              )}
+            </form>
+          )}
+
+          {waved && (
+            <div className="mt-4 border-t border-border pt-4">
+              <p className="text-body text-ink">
+                Marked as known. Nothing was answered here, so it shows as “you said so” wherever
+                the state appears, with no date on it.
+              </p>
+
+              <form action={ask} className="mt-4">
+                <input type="hidden" name="subjectId" value={subjectId} />
+                <AskButton label="Another one" />
+              </form>
+            </div>
+          )}
 
           {live.answered && (
             <div className="mt-4 border-t border-border pt-4">
@@ -182,8 +235,17 @@ export function ProbeSession({
                 {live.answered.correct ? 'Right.' : 'Not this time.'}
               </p>
               {/* Written when the question was, not in response to what was
-                  picked. That is what makes it worth reading. */}
+                  picked. That is what makes it worth reading. On the applied
+                  rung it is the grader's sentence about what was typed, and
+                  the answer the case was written with is below it. */}
               <p className="mt-1 text-body text-ink">{live.answered.reason}</p>
+
+              {live.answered.expected && (
+                <>
+                  <p className="mt-3 text-small text-ink-muted">The answer expected</p>
+                  <p className="mt-0.5 text-body text-ink">{live.answered.expected}</p>
+                </>
+              )}
 
               {!live.answered.correct && live.answered.weight === 0 && (
                 // A part of the idea you had already missed. Said out loud,
@@ -216,6 +278,7 @@ export function ProbeSession({
           )}
 
           {live.error && <p className="mt-3 text-ui text-danger">{live.error}</p>}
+          {declared.error && <p className="mt-3 text-ui text-danger">{declared.error}</p>}
         </div>
       ) : (
         <form action={ask} className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center')}>

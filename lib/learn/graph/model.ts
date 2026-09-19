@@ -8,7 +8,27 @@
  * so they are written where they can be tested against a graph built by hand.
  */
 
-export const KNOWLEDGE_STATES = ['unknown', 'shaky', 'known', 'misconception'] as const;
+/**
+ * Where a concept stands, in order of how much has been shown about it.
+ *
+ * Three rungs of question and three things they can establish. `recognised` is
+ * what a right multiple-choice answer earns: you picked the idea out of four,
+ * which is not the same as using it. `known` takes a right answer to an applied
+ * case, and `sharp` a defence that held -- the defence rung is not built, so
+ * nothing writes `sharp` yet and the value is here because the ladder is three
+ * rungs whether or not the top one exists.
+ *
+ * `shaky` and `misconception` are unchanged and sit outside the ladder: they are
+ * evidence against rather than a lower rung of evidence for.
+ */
+export const KNOWLEDGE_STATES = [
+  'unknown',
+  'shaky',
+  'recognised',
+  'known',
+  'sharp',
+  'misconception',
+] as const;
 export type KnowledgeState = (typeof KNOWLEDGE_STATES)[number];
 
 export const STATE_BASES = ['tested', 'inferred', 'declared'] as const;
@@ -29,6 +49,16 @@ export type Concept = {
   name: string;
   /** The claim itself. What a probe question would be written against. */
   claim: string;
+  /**
+   * What the claim said before the first time it was rewritten by hand. Null
+   * on a claim still in the app's wording, which is most of them.
+   */
+  claimOriginal: string | null;
+  /**
+   * When the claim was last written by hand. Null means the wording above is
+   * the app's, and it is what every screen reads to say whose words these are.
+   */
+  claimRewrittenAt: string | null;
   /** How this node came to be believed to belong here. */
   basis: string;
   /**
@@ -50,6 +80,13 @@ export type Concept = {
    */
   mastery: string[];
   testedAt: string | null;
+  /**
+   * When you said you already knew this, without being asked. Null on a claim
+   * you never declared, and never set at the same time as `testedAt`: a claim
+   * carries the date it was answered about or the date you waved it through,
+   * and the database refuses a row holding both.
+   */
+  declaredAt: string | null;
 };
 
 export type ConceptEdge = {
@@ -83,15 +120,21 @@ export type Graph = {
 };
 
 /**
- * Settled means `known`, and nothing else.
+ * Settled means `known` or `sharp`, and nothing else.
  *
  * `shaky` is not a weak yes, it is a no with evidence, and `misconception` is
  * the strongest possible no -- something is actively steering you wrong there.
  * Treating either as settled would prune away exactly the nodes worth working
  * on, which is the one mistake this file must not make.
+ *
+ * `recognised` is not settled either, and that is #392's answer working: a
+ * concept you have only picked out of four still has its applied case waiting,
+ * so it keeps showing up on the views and in what to learn next. `sharp` is
+ * settled, because a defence that held is more than the applied case it sits
+ * above rather than less.
  */
 export function isSettled(concept: Concept): boolean {
-  return concept.state === 'known';
+  return concept.state === 'known' || concept.state === 'sharp';
 }
 
 function byId(graph: Graph): Map<string, Concept> {
@@ -319,12 +362,25 @@ export function countStates(graph: Graph): SubjectCounts {
   const counts: SubjectCounts = {
     unknown: 0,
     shaky: 0,
+    recognised: 0,
     known: 0,
+    sharp: 0,
     misconception: 0,
     total: graph.concepts.length,
   };
   for (const concept of graph.concepts) counts[concept.state] += 1;
   return counts;
+}
+
+/**
+ * How many of those counts are settled, which is the number a page says.
+ *
+ * `isSettled` asks it of one concept and this asks it of the counts, and the
+ * two have to agree: a page that added up `known` alone would stop counting a
+ * concept the moment a defence moved it to `sharp`.
+ */
+export function settledCount(counts: SubjectCounts): number {
+  return counts.known + counts.sharp;
 }
 
 /**

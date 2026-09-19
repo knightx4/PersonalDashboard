@@ -125,6 +125,47 @@ export const WEIGHT_REINFORCED = 0.3;
 export const WEIGHT_INCONCLUSIVE = 0;
 
 /**
+ * The three rungs, hardest last, as `learn.probe_rung` holds them.
+ *
+ * Here rather than in session.ts because the rules below read it and this file
+ * has no client in it. `defend` is in the enum and nothing returns it yet: the
+ * defence rung is not built, and the picker cannot ask for a question no writer
+ * can produce.
+ */
+export type Rung = 'recognise' | 'apply' | 'defend';
+
+/**
+ * One question already asked about a concept, as the rules here read it.
+ *
+ * The columns rather than a verdict, because which of them carries the answer
+ * depends on the rung: a multiple-choice question is answered by picking an
+ * index, and a written one by a grader's judgement on what was typed. Both are
+ * null until the question is answered, which is what makes an abandoned
+ * question different from a wrong one.
+ */
+export type AskedRung = {
+  rung: Rung;
+  masteryCheck: string | null;
+  chosenIndex: number | null;
+  /** Null on a written row, which has no options and no index that is right. */
+  correctIndex: number | null;
+  responseCorrect: boolean | null;
+};
+
+/** Whether a question has been answered at all. */
+export function wasAnswered(probe: AskedRung): boolean {
+  return probe.rung === 'recognise' ? probe.chosenIndex !== null : probe.responseCorrect !== null;
+}
+
+/** Whether the answer given was right. False for one nobody has answered. */
+export function wasRight(probe: AskedRung): boolean {
+  if (probe.rung === 'recognise') {
+    return probe.chosenIndex !== null && probe.chosenIndex === probe.correctIndex;
+  }
+  return probe.responseCorrect === true;
+}
+
+/**
  * What the answers already given about one check did with it.
  *
  * `right` means one of them got it right, whatever happened before or after:
@@ -135,25 +176,28 @@ export const WEIGHT_INCONCLUSIVE = 0;
 export type CheckStanding = 'right' | 'missed' | 'untouched';
 
 /**
- * Where a check stands, from the questions already answered about it.
+ * Where a check stands at one rung, from the questions already answered about
+ * it there.
  *
  * Read off the rows rather than kept as a count, for the same reason the bar
  * is: a column saying how many checks are covered would have to be right after
  * every answer, and the answers themselves already say.
+ *
+ * The rung is half of the key, and #401 is why. Answering the applied case
+ * about a check you got right out of four is the first time anybody has seen
+ * you use that idea, so it is new information and the bar has to pay for it;
+ * keyed on the check alone it read as a repeat and earned a fraction.
  */
 export function standingOf(
   check: string,
-  earlier: readonly {
-    masteryCheck: string | null;
-    chosenIndex: number | null;
-    correctIndex: number;
-  }[],
+  rung: Rung,
+  earlier: readonly AskedRung[],
 ): CheckStanding {
   let missed = false;
 
   for (const probe of earlier) {
-    if (probe.masteryCheck !== check || probe.chosenIndex === null) continue;
-    if (probe.chosenIndex === probe.correctIndex) return 'right';
+    if (probe.masteryCheck !== check || probe.rung !== rung || !wasAnswered(probe)) continue;
+    if (wasRight(probe)) return 'right';
     missed = true;
   }
 

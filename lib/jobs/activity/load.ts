@@ -179,11 +179,21 @@ type EventRow = {
   applications: { roles: RoleJoin };
 };
 
+/**
+ * A nudge the sweep raised, read for its clock alone.
+ *
+ * Nudges used to be entries in this feed as well. They are not any more: the
+ * feed says what the syncs changed, and a nudge is the app asking you for
+ * something rather than telling you something happened. It already has a home
+ * on This week, and reading it in both places made the feed mostly a list of
+ * being asked to chase people who had not written back.
+ *
+ * The rows are still read, because the newest of them is half the answer to
+ * "when did the nightly sweep last do anything" -- see `lastSweepAt`.
+ */
 type ReminderRow = {
   id: string;
-  body: string;
   created_at: string;
-  applications: { roles: RoleJoin } | null;
 };
 
 /** A forward event, selected for the tile rather than for the feed. */
@@ -219,8 +229,6 @@ function sourceOfEvent(row: EventRow): ActivitySource {
 export function activityEntries(input: {
   newRoles: readonly NewRoleRow[];
   events: readonly EventRow[];
-  /** Rule-generated only: a to-do you typed yourself is not news. */
-  reminders?: readonly ReminderRow[];
   limit?: number;
 }): ActivityEntry[] {
   const fromRoles: ActivityEntry[] = input.newRoles.map((row) => ({
@@ -245,18 +253,7 @@ export function activityEntries(input: {
     roleId: row.applications.roles.id,
   }));
 
-  const fromReminders: ActivityEntry[] = (input.reminders ?? []).map((row) => ({
-    id: `reminder-${row.id}`,
-    at: row.created_at,
-    source: 'sweep',
-    label: 'Nudge',
-    subject: row.applications ? nameOf(row.applications.roles) : null,
-    tone: 'muted',
-    detail: row.body,
-    roleId: row.applications?.roles.id ?? null,
-  }));
-
-  return [...fromRoles, ...fromEvents, ...fromReminders]
+  return [...fromRoles, ...fromEvents]
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, input.limit ?? ENTRY_LIMIT);
 }
@@ -319,18 +316,17 @@ export async function loadActivity(
       .order('created_at', { ascending: false })
       .limit(ENTRY_LIMIT),
 
-    // Rule-generated only. rule_key is set by the sweep and by nothing else,
-    // so this is exactly the nudges it raised -- a to-do you typed on a role
-    // yourself has no rule_key and is not news.
+    // Rule-generated only, and only the newest. rule_key is set by the sweep
+    // and by nothing else, so this dates the sweep's last nudge -- a to-do you
+    // typed on a role yourself says nothing about when the sweep ran. The
+    // nudges themselves are not in the feed; see `ReminderRow`.
     supabase
       .from('reminders')
-      .select(
-        'id, body, created_at, applications ( roles!inner ( id, title, companies!inner ( name ) ) )',
-      )
+      .select('id, created_at')
       .eq('user_id', userId)
       .not('rule_key', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(ENTRY_LIMIT),
+      .limit(1),
 
     // No user filter: sync_jobs hangs off the mailbox, and its RLS policy
     // joins back to the account's owner. Filtering here would be duplicating
@@ -381,7 +377,6 @@ export async function loadActivity(
   const entries = activityEntries({
     newRoles: (roleRows.data ?? []) as unknown as NewRoleRow[],
     events: (eventRows.data ?? []) as unknown as EventRow[],
-    reminders,
   });
 
   const runs: ActivityRun[] = (

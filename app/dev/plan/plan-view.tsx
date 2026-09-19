@@ -3,9 +3,9 @@
 import { useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  Bot,
   Check,
   Circle,
+  CircleAlert,
   CircleUser,
   Flag,
   ChevronDown,
@@ -14,6 +14,7 @@ import {
   Pencil,
   Play,
   Scale,
+  Wrench,
   X,
 } from 'lucide-react';
 import {
@@ -30,21 +31,22 @@ import {
   dismissPlanDecision,
   dismissPlanFog,
   sendPlanItemToClaude,
-  sendPlanQueueToClaude,
   setPlanItemAssignee,
+  setPlanItemPriority,
   setPlanItemStatus,
   updatePlanItem,
   type PlanActionState,
 } from './actions';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
+import { planRowId } from '@/lib/comments/refs';
 import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { useClockNow } from '@/lib/use-clock-now';
 import { Button } from '@/components/ui/button';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { cardVariants } from '@/components/ui/card';
-import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Banner } from '@/components/ui/banner';
 import { Bands } from '@/components/ui/meter';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import {
@@ -58,10 +60,13 @@ import {
   Select,
   Textarea,
 } from '@/components/ui/field';
+import { StateLabel, TONE_TEXT, type DevTone } from '@/components/dev/state-label';
+import { DEV_STATE_WORD, PLAN_MOVE_WORD } from '@/lib/dev/words';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import {
   PLAN_ASSIGNEES,
   PLAN_PRIORITIES,
+  PLAN_PRIORITY_LABEL,
   PLAN_SIZES,
   PLAN_STATUSES,
   isClosed,
@@ -73,15 +78,22 @@ import {
 } from '@/lib/plan/load';
 import {
   PLAN_HEALTHS,
-  PLAN_VIEWS,
+  PLAN_VIEW_CHIPS,
   PLAN_VIEW_LABEL,
+  PLAN_VIEW_MENU,
   countMatches,
   flatten,
   healthOf as planHealthOf,
+  moveOf as planMoveOf,
+  planLiveness,
+  searchNodes,
   searchSections,
   searchTerms,
+  type MoveContext,
   type PlanBand,
   type PlanHealth,
+  type PlanLiveness,
+  type PlanMove,
   type PlanNode,
   type PlanProgress,
   type PlanSection,
@@ -91,11 +103,45 @@ import {
 } from '@/lib/plan/tree';
 import { PLAN_HEALTH_GLYPHS, type StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { reshapeOrigin } from '@/lib/plan/origin';
-import { elapsedSince, isStalledClaim } from '@/lib/plan/elapsed';
-import { optionAnswer, planOptions, type PlanOption } from '@/lib/plan/options';
+import type { PlanRefTitles } from '@/lib/comments/refs';
+import { elapsedSince } from '@/lib/plan/elapsed';
+import { quietSendAsk, type ClaimLiveness } from '@/lib/plan/liveness';
+import {
+  isResolvingAnswers,
+  lastRunLine,
+  withReadings,
+  type LastRun,
+  type StoredRunReading,
+} from '@/lib/plan/run-end';
+import {
+  closedLine,
+  nothingToShowLine,
+  pushLine,
+  raisedLine,
+  refusalLine,
+  runStartedLine,
+  runWork,
+  workIsEmpty,
+  type RunRaise,
+} from '@/lib/plan/work';
+import { checkLine, checkWord, type CommitCheck } from '@/lib/plan/checks';
+import {
+  AnswerBox,
+  QuestionPartLabel,
+  TheAnswered,
+  TheOptions,
+  TheQuestion,
+  useAnswerDraft,
+} from '@/components/dev/question';
 import { cn } from '@/lib/cn';
 
-/** A step as the pickers know it: enough to name it and to place it. */
+/**
+ * A step as the pickers know it: enough to name it and to place it.
+ *
+ * And enough to say when it closed, which the account of a run needs: the
+ * tree a row is drawn from is narrowed by the view, so the step a run closed
+ * is often not in it, while the catalog is every step in the plan.
+ */
 export type PlanCatalogEntry = {
   id: string;
   number: number;
@@ -103,6 +149,8 @@ export type PlanCatalogEntry = {
   module: ModuleId | null;
   parentId: string | null;
   depth: number;
+  status: PlanStatus;
+  completedAt: string | null;
   closed: boolean;
 };
 
@@ -115,7 +163,6 @@ const STATUS_LABEL: Record<PlanStatus, string> = {
   dropped: 'Dropped',
 };
 
-const PRIORITY_LABEL: Record<PlanPriority, string> = { 1: 'Next', 2: 'Normal', 3: 'Someday' };
 const SIZE_LABEL: Record<PlanSize, string> = { s: 'Small', m: 'Medium', l: 'Large' };
 const ASSIGNEE_LABEL: Record<PlanAssignee, string> = { me: 'Me', claude: 'Dash' };
 
@@ -159,7 +206,7 @@ function PrioritySelect({ defaultValue, id }: { defaultValue: PlanPriority; id?:
     >
       {PLAN_PRIORITIES.map((priority) => (
         <option key={priority} value={priority}>
-          {PRIORITY_LABEL[priority]}
+          {PLAN_PRIORITY_LABEL[priority]}
         </option>
       ))}
     </ChipSelect>
@@ -274,51 +321,14 @@ function Progress({
   );
 }
 
-/**
- * The numbers across the plan, and the views over it.
- *
- * The counts are links where a view answers them: "3 ready" is the question
- * "which three", and the view is the answer. The views are search parameters
- * rather than state so that "the ready steps" is something you can keep.
- */
-/**
- * The queue, sent.
- *
- * Beside the count of what is Claude's, because that number is the question
- * this button answers: you have spent a while going down the plan handing
- * things over, and what you want at the end of it is not to press Send on each
- * of them. Absent when nothing is handed over, since there would be nothing to
- * send and an always-present button that usually refuses teaches people not to
- * press it.
- */
-function SendTheQueue({ count }: { count: number }) {
-  const [state, action, pending] = useActionState(sendPlanQueueToClaude, {} as PlanActionState);
-
-  if (count === 0) return null;
-
-  return (
-    <>
-      <form action={action}>
-        <Button
-          type="submit"
-          size="sm"
-          variant="secondary"
-          pending={pending}
-          title="Hand the whole queue to one routine, worked in order"
-        >
-          <Play className="size-3.5" aria-hidden />
-          {pending ? 'Sending…' : `Send all ${count} to Dash`}
-        </Button>
-      </form>
-      {(state.error ?? state.message) && (
-        <p className="basis-full text-small">
-          <FieldError>{state.error}</FieldError>
-          {!state.error && <span className="text-ink-muted">{state.message}</span>}
-        </p>
-      )}
-    </>
-  );
+/** Where a view lives. "Open" is the page itself, so it keeps the bare link. */
+function viewHref(view: View): string {
+  return view === 'open' ? '/dev/plan' : `/dev/plan?view=${view}`;
 }
+
+const chipClass = 'press rounded-full px-2.5 py-1 text-small font-medium transition-colors';
+const chipOn = 'bg-accent text-surface';
+const chipOff = 'text-ink-muted hover:bg-accent-tint hover:text-accent';
 
 /**
  * What a narrowed view says when it finds nothing.
@@ -360,16 +370,19 @@ const EMPTY_VIEW: Partial<Record<View, { title: string; description: string }>> 
   },
 };
 
+/**
+ * The numbers across the plan, and the views over it.
+ *
+ * The counts are links where a view answers them: "3 ready" is the question
+ * "which three", and the view is the answer. The views are search parameters
+ * rather than state so that "the ready steps" is something you can keep.
+ */
 function SummaryStrip({
   summary,
   view,
-  queued,
 }: {
   summary: PlanSummary;
   view: View;
-  /** What the send-all button would actually send: not every step marked as
-      Claude's, since an unanswered question is nobody's to build. */
-  queued: number;
 }) {
   const facts: Array<{ view: View | null; value: number; noun: string }> = [
     { view: 'open', value: summary.open, noun: 'open' },
@@ -408,23 +421,42 @@ function SummaryStrip({
           ),
         )}
       </p>
-      <SendTheQueue count={queued} />
       <nav aria-label="View" className="ml-auto flex flex-wrap items-center gap-1">
-        {PLAN_VIEWS.map((candidate) => (
+        {PLAN_VIEW_CHIPS.map((candidate) => (
           <Link
             key={candidate}
-            href={candidate === 'open' ? '/dev/plan' : `/dev/plan?view=${candidate}`}
+            href={viewHref(candidate)}
             aria-current={candidate === view ? 'page' : undefined}
-            className={cn(
-              'press rounded-full px-2.5 py-1 text-small font-medium transition-colors',
-              candidate === view
-                ? 'bg-accent text-surface'
-                : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-            )}
+            className={cn(chipClass, candidate === view ? chipOn : chipOff)}
           >
             {PLAN_VIEW_LABEL[candidate]}
           </Link>
         ))}
+        {/* The other four. Nothing is lost by moving a view off the row -- it
+            is a link in here, and most of them are a link on the counts to the
+            left as well -- and the trigger says which one you are on when it is
+            one of these, so the row still answers "where am I". */}
+        <ActionMenu
+          label="More views"
+          align="end"
+          trigger={
+            <span className="inline-flex items-center gap-1">
+              {PLAN_VIEW_MENU.includes(view) ? PLAN_VIEW_LABEL[view] : 'More'}
+              <ChevronDown className="size-3.5" strokeWidth={2} aria-hidden />
+            </span>
+          }
+          triggerClassName={cn(
+            chipClass,
+            'gap-1',
+            PLAN_VIEW_MENU.includes(view) ? chipOn : chipOff,
+          )}
+          items={PLAN_VIEW_MENU.map((candidate) => ({
+            id: candidate,
+            label: PLAN_VIEW_LABEL[candidate],
+            href: viewHref(candidate),
+            current: candidate === view,
+          }))}
+        />
       </nav>
     </div>
   );
@@ -752,120 +784,6 @@ function EditStep({
  * box is still the whole form when a question has no options, which is most of
  * them.
  */
-/**
- * The heading over a part of a question: the question, the options, the answer.
- *
- * Three words in the same small caps in every place a question is shown, so
- * that "which of these am I reading" is answered by the shape of the thing and
- * not by working it out from the prose.
- */
-function QuestionPartLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">{children}</p>
-  );
-}
-
-/**
- * The question itself, said once and set apart.
- *
- * A question used to be a line of body text among the step's other lines, at
- * the same size and weight as the description of the work -- so the one thing
- * on the surface that is actually waiting on a person looked like reading
- * matter. It is now labelled and set a step up the scale, which is the whole
- * ask: when something needs an answer, the question I am answering should be
- * the clearest thing on the surface.
- */
-function TheQuestion({ node }: { node: PlanNode }) {
-  return (
-    <div className="space-y-0.5">
-      <QuestionPartLabel>The question</QuestionPartLabel>
-      <p className="text-ui font-medium text-ink">
-        <span className="tabular mr-1.5 font-normal text-small text-ink-ghost">#{node.number}</span>
-        {node.title}
-      </p>
-    </div>
-  );
-}
-
-/**
- * The options, as options.
- *
- * They are written as prose in `detail` -- a lettered paragraph each, with
- * what it costs and a recommendation -- and were shown as that same paragraph:
- * a muted block of text in which the choices had to be found by reading. Where
- * the letters are legible (see lib/plan/options.ts) each one now gets its own
- * line and its letter in a badge, so the shape of the choice is visible before
- * a word of it is read.
- *
- * `onChoose` makes each line the button that answers with it. Without it they
- * are just the options, which is what they are while nobody is answering.
- *
- * The prose does not disappear: the letters carry only each option's opening
- * sentence, and the cost and the recommendation are the rest of the paragraph.
- * That goes under the fold, where it can be read by anybody who wants more than
- * the choice -- law 10, and the collapsed line says what is behind it.
- */
-function TheOptions({
-  detail,
-  onChoose,
-}: {
-  detail: string | null;
-  onChoose?: (option: PlanOption) => void;
-}) {
-  if (!detail) return null;
-  const options = planOptions(detail);
-
-  if (options.length === 0) {
-    return (
-      <div className="space-y-0.5">
-        <QuestionPartLabel>The options</QuestionPartLabel>
-        <p className="whitespace-pre-wrap text-small text-ink-muted">{detail}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-1">
-      <QuestionPartLabel>The options</QuestionPartLabel>
-      <ul className="space-y-1">
-        {options.map((option) => {
-          const body = (
-            <>
-              <span
-                aria-hidden
-                className="flex size-5 shrink-0 items-center justify-center rounded-control bg-surface text-micro font-semibold uppercase text-ink"
-              >
-                {option.letter}
-              </span>
-              <span className="min-w-0 flex-1 text-left text-small text-ink">{option.label}</span>
-            </>
-          );
-
-          return (
-            <li key={option.letter}>
-              {onChoose ? (
-                <button
-                  type="button"
-                  onClick={() => onChoose(option)}
-                  title={`Answer ${option.letter}: ${option.label}`}
-                  className="press flex w-full items-start gap-2 rounded-control px-1.5 py-1 transition-colors duration-150 hover:bg-accent-tint"
-                >
-                  {body}
-                </button>
-              ) : (
-                <span className="flex items-start gap-2 px-1.5 py-1">{body}</span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-      <Disclosure title="What each one costs" className="px-1.5">
-        <p className="whitespace-pre-wrap text-small text-ink-muted">{detail}</p>
-      </Disclosure>
-    </div>
-  );
-}
-
 function AnswerDecision({
   node,
   action,
@@ -877,20 +795,7 @@ function AnswerDecision({
   pending: boolean;
   autoFocus: boolean;
 }) {
-  const field = `answer-${node.id}`;
-  const options = planOptions(node.detail);
-  const [answer, setAnswer] = useState('');
-
-  // Replaces rather than appends: the options are a choice between them, and
-  // pressing two means you changed your mind, not that you want both written
-  // down. What you type after it is yours and is left alone.
-  //
-  // Controlled rather than written through a ref. A ref put the text into the
-  // DOM node behind React's back, which worked here only because this box
-  // happens to always be mounted -- the same call in the questions list had
-  // nothing to write to, so the options there did nothing at all. One
-  // mechanism, in both places.
-  const choose = (option: PlanOption) => setAnswer(optionAnswer(option));
+  const { answer, setAnswer, choose } = useAnswerDraft();
 
   return (
     /* A well, not a frame: this sits inside the open step, which is already a
@@ -901,36 +806,71 @@ function AnswerDecision({
       {/* The question and its options, before the box that closes them. The
           box used to come first with the options as a row of chips above it,
           which put the form in front of the thing the form is about. */}
-      <TheQuestion node={node} />
+      <TheQuestion outline={node.outline} title={node.title} />
       <TheOptions detail={node.detail} onChoose={choose} />
 
-      {node.resolution && (
-        <div className="space-y-0.5">
-          <QuestionPartLabel>Answered</QuestionPartLabel>
-          <p className="whitespace-pre-wrap text-ui text-ink">{node.resolution}</p>
-        </div>
-      )}
+      {node.resolution && <TheAnswered resolution={node.resolution} />}
+      <AnswerBox
+        id={node.id}
+        detail={node.detail}
+        resolution={node.resolution}
+        action={action}
+        pending={pending}
+        answer={answer}
+        onAnswer={setAnswer}
+        autoFocus={autoFocus}
+        hint
+      />
+    </div>
+  );
+}
+
+/**
+ * A setup job, and the one press that closes it.
+ *
+ * Shaped like the answer box above and not like the status dropdown, because
+ * it is the same kind of row: something only the person can clear, closed by
+ * their word rather than by a commit. The dropdown is where you say where a
+ * piece of work has got to; this is not a piece of work that got anywhere, it
+ * is an errand, and pressing Done on it through a menu made it look like one
+ * more status to keep up to date.
+ *
+ * The title is the one-line summary and the detail is what to actually go and
+ * do -- #599 asked for both, so the detail is drawn here, labelled, rather
+ * than left as the unlabelled paragraph every other step's detail is. The
+ * paragraph is suppressed while this is showing so it is not said twice.
+ *
+ * Closing writes `done` through `setPlanItemStatus`, which records no commit,
+ * the same as answering a decision: `commit_sha` stays null, because nothing
+ * was built.
+ */
+function SetupJob({
+  node,
+  action,
+  pending,
+  error,
+}: {
+  node: PlanNode;
+  action: (formData: FormData) => void;
+  pending: boolean;
+  error?: string;
+}) {
+  return (
+    <div className="space-y-2.5 rounded-lg bg-caution-tint/40 px-3 py-2.5">
+      <div className="space-y-0.5">
+        <QuestionPartLabel>What to set up</QuestionPartLabel>
+        <p className="whitespace-pre-wrap text-ui text-ink">
+          {node.detail?.trim() || node.title}
+        </p>
+      </div>
       <form action={action} className="space-y-2">
         <input type="hidden" name="id" value={node.id} />
-        <Label htmlFor={field}>{node.resolution ? 'Change the answer' : 'Your answer'}</Label>
-        <Textarea
-          id={field}
-          name="answer"
-          rows={2}
-          className="min-h-12"
-          autoFocus={autoFocus}
-          value={answer}
-          onChange={(event) => setAnswer(event.target.value)}
-          placeholder={
-            options.length > 0
-              ? 'Pick one above, or say it in your own words — and enough of why that a session need not ask again.'
-              : 'What you decided, and enough of why that a session need not ask again.'
-          }
-        />
-        <FieldHint>This closes the question. Nothing is committed against it.</FieldHint>
+        <input type="hidden" name="status" value="done" />
+        <FieldHint>This closes the step. Nothing is committed against it.</FieldHint>
         <Button type="submit" size="sm" pending={pending}>
-          {node.resolution ? 'Record the new answer' : 'Answer'}
+          I have set this up
         </Button>
+        <FieldError>{error}</FieldError>
       </form>
     </div>
   );
@@ -988,7 +928,7 @@ function AskQuestion({ node, onDone }: { node: PlanNode; onDone: () => void }) {
  * something untrue, because a decision carrying an invented answer would be
  * repeated to every session that reads the feature from then on.
  */
-function QuestionRow({ node }: { node: PlanNode }) {
+function QuestionRow({ node, titles }: { node: PlanNode; titles?: PlanRefTitles }) {
   const [answerState, answerAction, answerPending] = useActionState(
     answerPlanDecision,
     {} as PlanActionState,
@@ -1002,35 +942,22 @@ function QuestionRow({ node }: { node: PlanNode }) {
     {} as PlanActionState,
   );
   const [answering, setAnswering] = useState(false);
-  const [answer, setAnswer] = useState('');
   useSettled(answerState, () => setAnswering(false));
 
   const settled = isClosed(node.status);
   // Only ever rendered under the Dismissed view: everywhere else the row is
   // pruned before it gets here.
   const aside = isDismissed(node);
-  const field = `question-${node.id}`;
-
   /**
    * Pressing an option opens the box with that option in it.
    *
-   * Both halves matter. It writes rather than records, as it always has:
-   * an answer is read by every session that works beneath this feature from
-   * now on, so the last word before it is written down stays yours, and "b,
-   * but only for the shared lists" is the answer you most often actually
-   * want. And it opens the box itself, which is the half that was missing --
-   * the options were only clickable once you had already pressed Answer, so
+   * The options were only clickable once you had already pressed Answer, so
    * from the outside they were three things that looked like buttons and did
-   * nothing. Replaces rather than appends: pressing two of them means you
-   * changed your mind, not that you want both written down.
-   *
-   * The box is controlled rather than written through a ref, because it does
-   * not exist yet at the moment the option is pressed.
+   * nothing. `useAnswerDraft` writes the option into the box rather than
+   * recording it; the callback is what opens the box, which does not exist yet
+   * at the moment the option is pressed.
    */
-  const choose = (option: PlanOption) => {
-    setAnswer(optionAnswer(option));
-    setAnswering(true);
-  };
+  const { answer, setAnswer, choose } = useAnswerDraft(() => setAnswering(true));
 
   return (
     <li
@@ -1062,58 +989,33 @@ function QuestionRow({ node }: { node: PlanNode }) {
               and none of the apparatus for answering it applies. */}
           {node.status === 'dropped' ? (
             <p className="text-ui text-ink-muted line-through">
-              <span className="tabular mr-1.5 text-small text-ink-ghost">#{node.number}</span>
+              <span className="tabular mr-1.5 text-small text-ink-ghost">#{node.outline}</span>
               {node.title}
             </p>
           ) : (
             <>
-              <TheQuestion node={node} />
+              <TheQuestion outline={node.outline} title={node.title} />
               <TheOptions detail={node.detail} onChoose={settled ? undefined : choose} />
             </>
           )}
 
-          {node.resolution && (
-            <div className="space-y-0.5">
-              <QuestionPartLabel>Answered</QuestionPartLabel>
-              <p className="whitespace-pre-wrap text-ui text-ink">{node.resolution}</p>
-            </div>
-          )}
+          {node.resolution && <TheAnswered resolution={node.resolution} />}
 
           {answering ? (
-            <form action={answerAction} className="space-y-2">
-              <input type="hidden" name="id" value={node.id} />
-              <Label htmlFor={field}>{node.resolution ? 'Change the answer' : 'Your answer'}</Label>
-              <Textarea
-                id={field}
-                name="answer"
-                rows={2}
-                className="min-h-12"
-                autoFocus
-                value={answer}
-                onChange={(event) => setAnswer(event.target.value)}
-                placeholder={
-                  planOptions(node.detail).length > 0
-                    ? 'Pick one above, or say it in your own words — and enough of why that a session need not ask again.'
-                    : 'What you decided, and enough of why that a session need not ask again.'
-                }
-              />
-              <div className="flex items-center gap-1">
-                <Button type="submit" size="sm" pending={answerPending}>
-                  {node.resolution ? 'Record the new answer' : 'Answer'}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setAnswer('');
-                    setAnswering(false);
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
+            <AnswerBox
+              id={node.id}
+              detail={node.detail}
+              resolution={node.resolution}
+              action={answerAction}
+              pending={answerPending}
+              answer={answer}
+              onAnswer={setAnswer}
+              autoFocus
+              onCancel={() => {
+                setAnswer('');
+                setAnswering(false);
+              }}
+            />
           ) : (
             <div className="flex flex-wrap items-center gap-1">
               <Button type="button" size="sm" variant="ghost" onClick={() => setAnswering(true)}>
@@ -1157,6 +1059,7 @@ function QuestionRow({ node }: { node: PlanNode }) {
               id={node.id}
               thread={node.thread}
               label="Comment"
+              titles={titles}
               placeholder="What is unclear about the question, or what you are weighing. Tag @dash to ask; either way it does not answer it."
             />
           )}
@@ -1185,7 +1088,7 @@ function QuestionRow({ node }: { node: PlanNode }) {
  * this" is the most useful thing a step can tell you; withdrawn ones stay too,
  * quietly, so a question does not simply vanish.
  */
-function Questions({ node }: { node: PlanNode }) {
+function Questions({ node, titles }: { node: PlanNode; titles?: PlanRefTitles }) {
   const [asking, setAsking] = useState(false);
   const questions = node.children.filter((child) => child.kind === 'decision');
   const unanswered = questions.filter(
@@ -1208,7 +1111,7 @@ function Questions({ node }: { node: PlanNode }) {
       {questions.length > 0 && (
         <ul className="space-y-1.5">
           {questions.map((question) => (
-            <QuestionRow key={question.id} node={question} />
+            <QuestionRow key={question.id} node={question} titles={titles} />
           ))}
         </ul>
       )}
@@ -1340,10 +1243,10 @@ function Dependencies({
 }
 
 /**
- * What pressing Send actually hands over, said before it is pressed.
+ * What pressing Send actually sends, said before it is pressed.
  *
  * The brief carries the step's whole subtree under "## Steps", so Send on a
- * feature hands over the feature and everything beneath it. The button read
+ * feature sends the feature and everything beneath it. The button read
  * "Send to Claude" whichever row it sat on, so pressing it on #197 looked like
  * sending one step and sent ten. The action already says so afterwards; this
  * is the same count, in the label, before you commit to it.
@@ -1360,7 +1263,7 @@ function sendLabel(node: PlanNode): string {
 }
 
 /**
- * Hand it over and start the routine now.
+ * Start the routine on it now.
  *
  * The button is offered whether or not the deployment can start a routine,
  * because the action says exactly what is missing when it cannot, and a
@@ -1376,6 +1279,9 @@ function SendToClaude({
   reshapeAction,
   reshapePending,
   quiet,
+  quietAsk,
+  onAskQuiet,
+  resolving,
 }: {
   node: PlanNode;
   canSend: boolean;
@@ -1390,6 +1296,23 @@ function SendToClaude({
   /** Nothing has been said about the last run yet, so the missing-key note is
       worth the room. */
   quiet: boolean;
+  /**
+   * The run behind this step has gone quiet, so Send asks before it hands the
+   * step over. Null when there is nothing to ask, which is most rows.
+   */
+  quietAsk: string | null;
+  /** Put that question on the row. The row owns it, not this button. */
+  onAskQuiet: () => void;
+  /**
+   * A re-shape is re-reading this feature right now.
+   *
+   * Everything that hands work over is shut while it is: the run is rewriting
+   * the steps a press would send, so a session sent now would build against a
+   * plan that is about to change under it, and a second re-shape would be the
+   * duplicate-question collision all over again. The button is disabled rather
+   * than removed -- a control that vanishes teaches nobody why.
+   */
+  resolving: boolean;
 }) {
   // Every open step beneath, the feature itself aside: what the batch would
   // take on, and the only reason to offer it.
@@ -1397,15 +1320,43 @@ function SendToClaude({
     (step) => step.id !== node.id && !isClosed(step.status) && step.status !== 'proposed',
   ).length;
 
+  const held = resolving
+    ? 'Dash is re-reading this feature against the answers you just gave. This comes back when it is done.'
+    : undefined;
+
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <form action={action}>
-        <input type="hidden" name="id" value={node.id} />
-        <Button type="submit" size="sm" variant="secondary" pending={pending}>
+      {quietAsk ? (
+        // Nothing is submitted from here while the run is quiet. The press
+        // raises the question on the row, and answering it is what sends --
+        // one question in one place, however Send was reached.
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={resolving}
+          title={held ?? quietAsk}
+          onClick={onAskQuiet}
+        >
           <Play className="size-3.5" aria-hidden />
-          {pending ? 'Sending…' : sendLabel(node)}
+          {sendLabel(node)}
         </Button>
-      </form>
+      ) : (
+        <form action={action}>
+          <input type="hidden" name="id" value={node.id} />
+          <Button
+            type="submit"
+            size="sm"
+            variant="secondary"
+            pending={pending}
+            disabled={resolving}
+            title={held}
+          >
+            <Play className="size-3.5" aria-hidden />
+            {pending ? 'Sending…' : sendLabel(node)}
+          </Button>
+        </form>
+      )}
       {beneath > 0 && (
         <form action={batchAction}>
           <input type="hidden" name="id" value={node.id} />
@@ -1414,14 +1365,15 @@ function SendToClaude({
             size="sm"
             variant="ghost"
             pending={batchPending}
-            title="Hand every open step beneath this one to Dash, worked in order"
+            disabled={resolving}
+            title={held ?? 'Start one session on every open step beneath this one, worked in order'}
           >
             {batchPending ? 'Sending…' : `Send all ${beneath} beneath`}
           </Button>
         </form>
       )}
-      {/* The return trip, and the only button here that does not hand work
-          over: it asks for the feature to be re-read against what has been
+      {/* The return trip, and the only button here that starts no build: it
+          asks for the feature to be re-read against what has been
           settled beneath it, and everything that comes back is a proposal
           waiting on the same approve as anything else. Offered wherever there
           is something beneath to re-read. */}
@@ -1433,13 +1385,25 @@ function SendToClaude({
             size="sm"
             variant="ghost"
             pending={reshapePending}
-            title="Re-read this feature against the questions answered beneath it. Whatever comes back is proposed, not started."
+            disabled={resolving}
+            title={
+              held ??
+              'Re-read this feature against the questions answered beneath it. Whatever comes back is proposed, not started.'
+            }
           >
             {reshapePending ? 'Re-shaping…' : 'Re-shape'}
           </Button>
         </form>
       )}
-      {!canSend && quiet && (
+      {/* Said in the row as well as on the tooltip: three buttons that have
+          gone quiet at once is the kind of thing a person reads as broken
+          unless something tells them otherwise. Law 2. */}
+      {resolving && (
+        <span className="text-small text-ink-muted">
+          Re-reading this against your answers. The buttons come back when it is done.
+        </span>
+      )}
+      {!canSend && quiet && !resolving && (
         <span className="text-small text-ink-muted">
           Needs the plan routine&apos;s token on the deployment.
         </span>
@@ -1496,26 +1460,156 @@ function Elapsed({ startedAt }: { startedAt: string }) {
 
 /**
  * The same fact in the opened row's meta line, where there is room for the
- * word. "Running 7h" and "stalled for 7h, nothing on it" are the two things a
- * step underway can mean, and the line said only the first.
+ * word. "Running 7h" and "stopped after 7h, nothing on it" are two of the
+ * things a step underway can mean, and the line said only the first.
+ *
+ * The reading comes from `claimLiveness` through the row rather than from the
+ * clock here, so this line and the health column beside it cannot differ about
+ * the same claim.
  */
-function RunningFor({ startedAt }: { startedAt: string }) {
-  const now = useClockNow();
-
-  if (!isStalledClaim(startedAt, now)) {
+function RunningFor({ startedAt, claim }: { startedAt: string; claim: ClaimLiveness | undefined }) {
+  if (claim === 'abandoned') {
     return (
-      <>
+      <span className="text-caution">
+        {' · stopped after '}
+        <Elapsed startedAt={startedAt} />, nothing on it
+      </span>
+    );
+  }
+
+  if (claim === 'quiet') {
+    return (
+      <span className="text-caution">
         {' · running '}
-        <Elapsed startedAt={startedAt} />
-      </>
+        <Elapsed startedAt={startedAt} />, nothing pushed lately
+      </span>
     );
   }
 
   return (
-    <span className="text-caution">
-      {' · stalled for '}
-      <Elapsed startedAt={startedAt} />, nothing on it
+    <>
+      {' · running '}
+      <Elapsed startedAt={startedAt} />
+    </>
+  );
+}
+
+/**
+ * What CI said about the commit this step shipped in.
+ *
+ * Read off the merge that carried the step onto main rather than off the sha
+ * the step records, which is nearly always a branch commit nothing ever
+ * checked -- #555. A commit whose checks passed carries no mark: it is the
+ * ordinary case, and the step's own Done is already saying it. Everything else
+ * gets one, a commit nobody has looked up yet included, because a step with no
+ * answer sitting unmarked among steps that passed reads as a step that passed.
+ */
+function CheckMark({ check }: { check: CommitCheck | undefined }) {
+  const word = checkWord(check);
+  if (!word) return null;
+
+  const failed = check?.conclusion === 'failed';
+  // A step closed against a commit main does not carry is at least as wrong as
+  // one closed against a red commit -- the work is nowhere, not merely broken
+  // -- so it is marked as loudly rather than sitting grey among the steps
+  // nobody has looked up yet. #637.
+  const alarming = failed || check?.conclusion === 'unmerged';
+  const merge = check?.mergeSha ? check.mergeSha.slice(0, 7) : null;
+  const title = failed
+    ? `The checks failed on ${merge}, the merge that put this on main.`
+    : merge
+      ? `${checkLine(check)} on ${merge}, the merge that put this on main.`
+      : `${checkLine(check)}.`;
+
+  return (
+    <span
+      title={title}
+      className={cn(
+        'inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 text-small font-semibold',
+        alarming ? 'bg-caution-tint text-caution' : 'font-normal text-ink-ghost',
+      )}
+    >
+      {alarming && <CircleAlert className="size-3" strokeWidth={2} aria-hidden />}
+      {word}
     </span>
+  );
+}
+
+/**
+ * What the last routine run against this step did.
+ *
+ * The claim beside it is what the step says about itself; this is what the run
+ * says. They disagree often enough to be worth both: a step still reading
+ * in_progress whose run stopped four hours ago is the case this line exists
+ * for, and before `plan_runs` was written back nothing on the page could tell
+ * you which of the two had happened.
+ */
+function LastRunLine({ run }: { run: LastRun }) {
+  const now = useClockNow();
+
+  return (
+    <span className={run.status === 'failed' ? 'text-caution' : undefined}>
+      {lastRunLine(run, now)}
+    </span>
+  );
+}
+
+/**
+ * What the run behind this step has actually done.
+ *
+ * The row above says "In progress" and a number of minutes, which is the same
+ * sentence whether the session has closed two steps or has been sitting on a
+ * failed build since it started. So the step you have opened on purpose gets
+ * the evidence: which press started the run and when, what it last pushed,
+ * which steps closed after it was fired, and what it raised.
+ *
+ * A run with none of that says which kind of none it is, because they are
+ * different things to do about it -- see `nothingToShowLine`. Nothing here asks
+ * GitHub: the push is the reading stored on the run row, so an opened step
+ * costs no request.
+ *
+ * The rules are in `lib/plan/work.ts` so the terminal tool and a session's
+ * brief can say the same thing from the same rows.
+ */
+function RunWork({
+  run,
+  node,
+  catalog,
+  raises,
+}: {
+  run: LastRun;
+  node: PlanNode;
+  catalog: readonly PlanCatalogEntry[];
+  raises: readonly RunRaise[];
+}) {
+  const now = useClockNow();
+  // The row and everything under it: a step run closes its own sub-steps and a
+  // feature batch closes the steps under the feature it was sent at. From the
+  // catalog rather than from `node.children`, because the view has already
+  // taken the closed steps out of the tree the row is drawn from.
+  const work = useMemo(() => {
+    const subtree = subtreeOf(catalog, node.id);
+    return runWork({ run, steps: catalog.filter((entry) => subtree.has(entry.id)), raises });
+  }, [run, node.id, catalog, raises]);
+  const empty = workIsEmpty(work);
+  const closed = closedLine(work);
+  const raised = raisedLine(work);
+  const refused = refusalLine(work);
+
+  return (
+    <div>
+      <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Its run</p>
+      <p className="text-ui text-ink">{runStartedLine(work, now)}</p>
+      {work.push && <p className="text-ui text-ink-muted">{pushLine(work.push, now)}</p>}
+      {closed && <p className="text-ui text-ink-muted">{closed}</p>}
+      {raised && <p className="text-ui text-ink-muted">{raised}</p>}
+      {empty && <p className="text-ui text-ink-muted">{nothingToShowLine(work, now)}</p>}
+      {/* After the rest, because what the run did is what was asked for and
+          this is why one of the four lines is missing. Caution rather than
+          muted: nothing on this row can be read properly until the key is
+          fixed, and the sentence says how. */}
+      {refused && <p className="text-ui text-caution">{refused}</p>}
+    </div>
   );
 }
 
@@ -1525,35 +1619,53 @@ function RunningFor({ startedAt }: { startedAt: string }) {
  *
  * Nothing releases a claim when the session holding it dies, so an abandoned
  * step sat here pulsing at the same accent as one being worked this minute --
- * the state was seven hours old and the badge said "live". Past
- * `STALLED_AFTER_MINUTES` the dot stops pulsing and the pill turns caution:
- * the row is still `in_progress`, because only you can say whether the work
- * happened, but the page stops claiming somebody is on it. Putting it back or
- * closing it is one press in the row's own menu.
+ * the state was seven hours old and the badge said "live". The pill now says
+ * what the run says: the dot pulses while the session is pushing, stops and
+ * turns caution once it has gone quiet, and the pill says the run stopped once
+ * it is past the ended mark. The row is still `in_progress`, because only you
+ * can say whether the work happened, but the page no longer claims somebody is
+ * on it. Putting it back or closing it is one press in the row's own menu.
+ *
+ * `claim` is the reading from `claimLiveness`, handed in by the row so that
+ * this pill, the health column and the meta line all draw one answer.
  */
-function Underway({ startedAt, assignee }: { startedAt: string; assignee: string | null }) {
-  const now = useClockNow();
-  const stalled = isStalledClaim(startedAt, now);
+function Underway({
+  startedAt,
+  assignee,
+  claim,
+}: {
+  startedAt: string;
+  assignee: string | null;
+  claim: ClaimLiveness | undefined;
+}) {
   const since = startedAt.replace('T', ' ').slice(0, 16);
+  const stopped = claim === 'abandoned';
+  const silent = stopped || claim === 'quiet';
 
   return (
     <span
       title={
-        stalled
-          ? `Claimed ${since} and untouched since. A session that stops without closing its step leaves it here — close it or put it back.`
-          : `${assignee === 'claude' ? 'Dash has been on this' : 'Underway'} since ${since}`
+        stopped
+          ? `Claimed ${since} and its run stopped without closing the step — close it or put it back.`
+          : claim === 'quiet'
+            ? `Claimed ${since}. Its run has pushed nothing for a while; it may still be reading or waiting on a build.`
+            : // A session can start on anything approved, so an underway step
+              // is a session's unless you kept it back. The column used to be
+              // read the other way, when only a step handed over was Dash's.
+              `${assignee === 'me' ? 'Underway' : 'Dash has been on this'} since ${since}`
       }
       className={cn(
         'tabular inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-small font-medium',
-        stalled ? 'bg-caution-tint text-caution' : 'bg-accent-tint text-accent',
+        silent ? 'bg-caution-tint text-caution' : 'bg-accent-tint text-accent',
       )}
     >
       <span
-        className={cn('size-1.5 rounded-full', stalled ? 'bg-caution' : 'animate-pulse bg-accent')}
+        className={cn('size-1.5 rounded-full', silent ? 'bg-caution' : 'animate-pulse bg-accent')}
         aria-hidden
       />
       <Elapsed startedAt={startedAt} />
-      {stalled && <span className="sr-only"> with no session on it</span>}
+      {stopped && <span className="sr-only"> with no session on it</span>}
+      {claim === 'quiet' && <span className="sr-only"> with nothing pushed lately</span>}
     </span>
   );
 }
@@ -1569,7 +1681,13 @@ function Underway({ startedAt, assignee }: { startedAt: string; assignee: string
  */
 type Health = {
   word: string;
-  tone: 'quiet' | 'ghost' | 'accent' | 'info' | 'positive' | 'caution';
+  /**
+   * The six the dev pages share. `info` is the app's blue and deliberately not
+   * `accent`: the accent is whichever hue the workspace you are standing in
+   * owns, so an accent-toned state is a different colour on every page and
+   * slate on this one.
+   */
+  tone: DevTone;
   title?: string;
 };
 
@@ -1581,6 +1699,15 @@ type Health = {
  * Which shape it draws is in lib/status-glyphs.ts, beside the pipeline's and
  * the todo list's, so a state here looks like the same state there. What is
  * left is the word, the tone and the fixed part of the tooltip.
+ *
+ * Seven of the fourteen are states the other dev queues have too, and those
+ * words come from lib/dev/words.ts so a dropped step and a declined note read
+ * alike. The other seven are the plan's own refinements -- a question, a
+ * question answered, a proposal, a step waiting on another step, a step nobody
+ * has reached, a claim whose run stopped, and a setup job that is yours to do
+ * -- and no other queue has anything for them to disagree with. Why there are
+ * fourteen rather than fewer is written where the set is, in
+ * lib/plan/tree.ts.
  */
 const HEALTH: Record<PlanHealth, Health> = {
   unanswered: {
@@ -1594,8 +1721,45 @@ const HEALTH: Record<PlanHealth, Health> = {
     tone: 'accent',
     title: 'Written by a session. Approve it, edit it, or drop it -- nothing happens until you do.',
   },
-  in_progress: { word: 'In progress', tone: 'accent' },
-  blocked: { word: 'Blocked', tone: 'caution' },
+  in_progress: { word: DEV_STATE_WORD.working, tone: 'accent' },
+  // The three readings of a claim. `in_progress` above is the fourth and says
+  // the least: the row is claimed and nothing has looked into what the session
+  // is doing.
+  working: {
+    word: DEV_STATE_WORD.working,
+    tone: 'accent',
+    title: 'A session has this and has pushed something recently.',
+  },
+  quiet: {
+    word: 'Quiet',
+    tone: 'caution',
+    title:
+      'A session has this and has pushed nothing for a while. It may still be reading or waiting on a build.',
+  },
+  abandoned: {
+    word: 'Stopped',
+    tone: 'caution',
+    title:
+      'A session claimed this and stopped without closing it. Put it back or send it again -- nothing is working it.',
+  },
+  // "Waiting on you" rather than "Blocked", which said a step was stuck and not
+  // who could unstick it. The notes queue says the same thing about a note
+  // blocked on an answer, and now says it in the same words.
+  blocked: {
+    word: DEV_STATE_WORD.waiting,
+    tone: 'caution',
+    title: 'Stopped on something only you can settle. The note says what.',
+  },
+  // A job that was yours from the day it was written -- an account, a key, a
+  // switch. "Waiting on you" is what a blocked step says, and it says it about
+  // a build that ran into a wall; this one never was a build.
+  setup: {
+    word: 'Setup',
+    tone: 'caution',
+    title: 'Something only you can set up. Open it for what to do, and say so when you have.',
+  },
+  // A step waiting on another step, which clears itself. Nothing else to say
+  // "on you" about, and the plan is the only queue that has it.
   waiting: { word: 'Waiting', tone: 'caution' },
   // Blue, not green. Ready and done were both `positive`, so the one state
   // that is an invitation to start read at a glance as the state that needs
@@ -1607,14 +1771,17 @@ const HEALTH: Record<PlanHealth, Health> = {
   // in this comment and rendered as grey on the only page that shows it.
   // `info` is the app's own blue, themed in all five palettes, and it does
   // not move when the workspace does.
-  ready: { word: 'Ready', tone: 'info' },
+  ready: { word: DEV_STATE_WORD.ready, tone: 'info' },
   not_started: { word: 'Not started', tone: 'quiet' },
-  done: { word: 'Done', tone: 'positive' },
-  dropped: { word: 'Dropped', tone: 'ghost' },
+  done: { word: DEV_STATE_WORD.done, tone: 'positive' },
+  dropped: { word: DEV_STATE_WORD.dropped, tone: 'ghost' },
 };
 
-function healthOf(node: PlanNode): Health & { glyph: GlyphName; name: PlanHealth } {
-  const health = planHealthOf(node);
+function healthOf(
+  node: PlanNode,
+  liveness?: PlanLiveness,
+): Health & { glyph: GlyphName; name: PlanHealth } {
+  const health = planHealthOf(node, liveness);
   const base = { ...HEALTH[health], glyph: PLAN_HEALTH_GLYPHS[health], name: health };
 
   // A row closed over open work reports what is open beneath it, so the word
@@ -1633,7 +1800,7 @@ function healthOf(node: PlanNode): Health & { glyph: GlyphName; name: PlanHealth
 
   // The three tooltips that can only be written with the step in hand.
   if (health === 'answered') return { ...base, title: node.resolution ?? undefined };
-  if (health === 'blocked') return { ...base, title: node.comment ?? undefined };
+  if (health === 'blocked') return { ...base, title: node.blockAsk ?? node.comment ?? undefined };
   if (health === 'waiting') {
     return {
       ...base,
@@ -1641,6 +1808,84 @@ function healthOf(node: PlanNode): Health & { glyph: GlyphName; name: PlanHealth
     };
   }
   return base;
+}
+
+/**
+ * The Status column, worded and toned.
+ *
+ * "Needs you" takes caution, which is the tone every dev queue already spends
+ * on a row stopped on the person. "With Dash" takes the accent because a
+ * session running right now is the one thing on this page that is changing
+ * while you look at it. The rest are ink: nothing is claimed about a step you
+ * kept or one another step is holding up, and a step waiting its turn has no
+ * word to tone.
+ *
+ * The tooltip is where the rollup is explained. A feature reporting "With Dash"
+ * because its third step is with a session would otherwise be a word with no
+ * visible cause, which is the complaint the whole column exists to answer.
+ */
+const MOVE_TONE: Record<PlanMove, Health['tone']> = {
+  // The accent, the same as "With Dash": both are a session working on this
+  // right now, and the difference between them is which job, not whose turn.
+  resolving: 'accent',
+  on_you: 'caution',
+  with_dash: 'accent',
+  waiting: 'quiet',
+  yours: 'quiet',
+  none: 'ghost',
+  settled: 'ghost',
+};
+
+const MOVE_TITLE: Record<PlanMove, string> = {
+  resolving:
+    'Re-reading this feature against the answers you just gave. What it proposes will be here when it is done; sending it anywhere until then would send a plan that is mid-edit.',
+  on_you: 'Stopped on you: a question to answer, a proposal to approve, or something only you can supply.',
+  with_dash: 'A session is working on this now.',
+  waiting: 'Held up by another step that has not closed.',
+  yours: 'You kept this one, so the runner will not take it.',
+  none: 'Approved and waiting its turn. Nothing is on it and nothing is needed from you.',
+  settled: 'Nothing left to do on this one.',
+};
+
+function moveFor(
+  node: PlanNode,
+  context?: MoveContext,
+): { word: string; tone: Health['tone']; title?: string } {
+  const move = planMoveOf(node, context);
+  const own = ownMoveWord(node, context);
+  return {
+    word: PLAN_MOVE_WORD[move],
+    tone: MOVE_TONE[move],
+    // Said only where it is not obvious from the row itself: a leaf reporting
+    // its own move needs no explanation of where the word came from.
+    title: own === move ? MOVE_TITLE[move] : `${MOVE_TITLE[move]} (from a step beneath this one.)`,
+  };
+}
+
+/** What this row alone would say, to tell a rollup from a row's own state. */
+function ownMoveWord(node: PlanNode, context?: MoveContext): PlanMove {
+  return planMoveOf({ ...node, children: [] }, context);
+}
+
+/**
+ * Which rows a re-shape is running against right now.
+ *
+ * Built from the runs the page already loaded rather than from a second read:
+ * `loadLastRuns` carries the job, and a re-shape still going is the whole of
+ * the question. Recomputed as the clock ticks, so the state clears on its own
+ * when the run ages out rather than on the next navigation.
+ */
+function useResolving(lastRuns: Readonly<Record<string, LastRun>>, now: number): MoveContext {
+  return useMemo(
+    () => ({
+      resolving: new Set(
+        Object.entries(lastRuns)
+          .filter(([, run]) => isResolvingAnswers(run, now))
+          .map(([id]) => id),
+      ),
+    }),
+    [lastRuns, now],
+  );
 }
 
 /**
@@ -1696,25 +1941,6 @@ function SectionTally({ tally, label }: { tally: PlanTally; label: string }) {
   );
 }
 
-/**
- * `info` is the app's blue, and it is deliberately not `accent`.
- *
- * The accent is whichever hue the workspace you are standing in owns, so an
- * accent-toned state is a different colour on every page and slate on this
- * one. A state that means the same thing everywhere needs a hue that does
- * too. `status-submitted` is that blue: defined in all five palettes, and
- * already read as a general "info" outside the pipeline it is named for --
- * see the jobs activity feed, which tones its info lines with it.
- */
-const TONE_TEXT: Record<Health['tone'], string> = {
-  quiet: 'text-ink-muted',
-  ghost: 'text-ink-ghost',
-  accent: 'text-accent',
-  info: 'text-status-submitted',
-  positive: 'text-positive',
-  caution: 'text-caution',
-};
-
 const TONE_DOT: Record<Health['tone'], string> = {
   quiet: 'bg-ink-ghost',
   ghost: 'bg-ink-ghost',
@@ -1736,9 +1962,12 @@ const TONE_DOT: Record<Health['tone'], string> = {
 // The last column holds the row's quick actions as well as its menu, so it is
 // wide enough for them from sm up -- reserved rather than grown on hover,
 // because a column that widens under the pointer moves every row beside it.
+// Status sits directly after Health, because the two are read together -- "how
+// far along, and who has it" is one question asked twice -- and a column
+// between them would make that a comparison across the row.
 const ROW_GRID =
   'grid grid-cols-[minmax(0,1fr)_7.25rem_2rem] items-center gap-x-2 ' +
-  'sm:grid-cols-[minmax(0,1fr)_7.25rem_5.5rem_6rem_8rem]';
+  'sm:grid-cols-[minmax(0,1fr)_7.25rem_6rem_5.5rem_6rem_8rem]';
 
 /** The width of one level of the tree, in the name cell. */
 const LEVEL = 'w-5';
@@ -1754,6 +1983,7 @@ function ColumnHeader() {
     >
       <span>Step</span>
       <span>Health</span>
+      <span className="hidden sm:block">Status</span>
       <span className="hidden sm:block">Priority</span>
       <span className="hidden sm:block">Steps</span>
       <span />
@@ -1844,34 +2074,114 @@ function PlanRow({
   trail,
   catalog,
   canSend,
+  lastRuns,
+  runRaises = [],
+  liveness: serverLiveness = {},
+  commitChecks,
   view,
   searching,
+  unfolded,
+  opened = false,
 }: {
   node: PlanNode;
   /** One entry per level above: whether that level's line carries on below this row. */
   trail: readonly boolean[];
   catalog: readonly PlanCatalogEntry[];
   canSend: boolean;
+  /** The newest run against each step, by step id. Most steps have none. */
+  lastRuns: Readonly<Record<string, LastRun>>;
+  /**
+   * What sessions have raised, for the opened step's account of its run.
+   *
+   * Every raise that names a step, not this step's: which run filed which is
+   * `runWork`, off the source and the time. Defaulted, because a render with
+   * none simply says nothing was raised.
+   */
+  runRaises?: readonly RunRaise[];
+  /**
+   * The same reading worked out on the server, at the clock it rendered with.
+   *
+   * Used until the browser's clock mounts. Without it the first paint would
+   * read every claim as fresh -- `runNow` is 0 before mount -- while the
+   * counts beside the module heading, worked out server-side from a real
+   * clock, already said one of them had stopped. One answer on the first
+   * paint, and the row takes over from the ticking clock after it.
+   */
+  liveness?: PlanLiveness;
+  /** What CI said about each commit a step shipped in, by the commit's sha. */
+  commitChecks: Readonly<Record<string, CommitCheck>>;
   /** Which view is on. Only Dismissed shows what has been put aside. */
   view: View;
   /** Whether a search is narrowing the page. Unfolds closed rows that hold a hit. */
   searching: boolean;
+  /**
+   * Start with the sub-steps showing.
+   *
+   * A seam for the render tests, and said plainly rather than dressed up as a
+   * feature: the page folds every feature by default, a folded row renders no
+   * children at all, and `renderToStaticMarkup` cannot press the arrow. The
+   * tests that pin how a nested row is laid out would otherwise have nothing
+   * to look at. Nothing in the app passes it.
+   */
+  unfolded: boolean;
+  /**
+   * Start with every row's own panel open.
+   *
+   * The second seam for the render tests, and separate from `unfolded` because
+   * they open different things: that one shows a row's sub-steps, this one
+   * shows what is behind the row's own fold. The tests about the panel -- what
+   * a step's run has done among them -- would otherwise be asserting against a
+   * closed drawer, and `renderToStaticMarkup` cannot press the title. Nothing
+   * in the app passes it.
+   */
+  opened?: boolean;
 }) {
+  // Ticks, so a re-shape that ages out stops holding this row's buttons shut
+  // without the page being navigated. 0 before mount, which is what keeps the
+  // server render and the first client one agreeing.
+  const runNow = useClockNow();
   // A question lives in its step's panel rather than as a row of its own, so
   // the Dismissed view would otherwise be a list of steps to open one at a
   // time. The rows that hold something put aside start open there.
   const [open, setOpen] = useState(
-    view === 'dismissed' &&
-      node.children.some((child) => child.kind === 'decision' && isDismissed(child)),
+    opened ||
+      (view === 'dismissed' &&
+        node.children.some((child) => child.kind === 'decision' && isDismissed(child))),
   );
   const [editing, setEditing] = useState(false);
   const [addingChild, setAddingChild] = useState(false);
   const [answering, setAnswering] = useState(false);
-  // A closed feature keeps its steps folded, because finished work is
-  // consulted rather than read -- except under a search, where the row is only
-  // on the page because something inside it was found, and folding that away
-  // would be answering the search with a closed drawer.
-  const [showChildren, setShowChildren] = useState(() => searching || !isClosed(node.status));
+  // Send has been pressed on a step whose run went quiet, and the question is
+  // on the page waiting to be answered. Held by the row rather than by a
+  // button because there are three ways to press Send here -- the quick icon,
+  // the button on the opened row and the row menu -- and one question in one
+  // place is better than the same question drawn three times.
+  const [confirmingSend, setConfirmingSend] = useState(false);
+  const substeps = node.children.filter((child) => child.kind !== 'decision');
+  const hasChildren = substeps.length > 0;
+  // Every feature starts folded.
+  //
+  // It used to be only the closed ones, on the grounds that finished work is
+  // consulted rather than read. But the page opens on a plan of 117 features
+  // and several hundred steps, and unfolding all the open ones by default made
+  // the first screen a wall with no shape in it -- the modules and the features
+  // are the map, and you cannot see a map through its own detail. The arrow on
+  // every row is one press, and it was already there.
+  //
+  // A search is the exception, and the same one as before: the row is only on
+  // the page because something inside it matched, and folding that away would
+  // be answering the search with a closed drawer.
+  //
+  // Fog folds too, and that is the whole of what the arrow is for on a row
+  // with no steps under it. #386 is fog and nothing else -- a feature real
+  // enough to name and not yet real enough to break up -- so gating the arrow
+  // on sub-steps alone left its one block of text pinned open with no control
+  // anywhere on the row. A leaf still starts unfolded, so scanning the plan
+  // shows the fog exactly as it did; what is new is being able to put it away.
+  const foldableFog = Boolean(node.fog) && (node.fogDismissedAt === null || view === 'dismissed');
+  const [showChildren, setShowChildren] = useState(
+    () => searching || unfolded || (!hasChildren && foldableFog),
+  );
 
   const [assignState, assignAction, assignPending] = useActionState(
     setPlanItemAssignee,
@@ -1892,6 +2202,13 @@ function PlanRow({
     answerPlanDecision,
     {} as PlanActionState,
   );
+  // The one press that closes a setup job. Held by the row for the same reason
+  // the hand-over is: the status dropdown drives the same action, and what
+  // came back should be said once rather than under each control.
+  const [setupState, setupAction, setupPending] = useActionState(
+    setPlanItemStatus,
+    {} as PlanActionState,
+  );
   // The same rope pulled the other way: re-read this feature against what has
   // been answered beneath it, and propose what has changed.
   const [reshapeState, reshapeAction, reshapePending] = useActionState(
@@ -1909,14 +2226,56 @@ function PlanRow({
   // it, is how you end up answering neither. A decision at the top of a module
   // is nobody's question but its own and stays a row.
   const questions = node.children.filter((child) => child.kind === 'decision');
-  const substeps = node.children.filter((child) => child.kind !== 'decision');
   const unanswered = questions.filter((question) => !isClosed(question.status)).length;
 
-  const hasChildren = substeps.length > 0;
   const descendants = flatten([node]).length - 1;
   const closed = isClosed(node.status);
   const isDecision = node.kind === 'decision';
-  const health = healthOf(node);
+  // A setup job still open. Closed, it is an ordinary finished row -- the
+  // errand is run, and a box inviting you to run it again would be a lie.
+  const setupOpen = node.kind === 'setup' && !closed;
+  // What the runs say about the claims on this row and everything under it.
+  //
+  // Recomputed as the clock ticks, so a session that goes quiet while you are
+  // looking at the page says so without a navigation -- the same reason
+  // `useResolving` is built this way. Only this row's subtree, because that is
+  // all this row can report on: the module's counts are worked out server-side
+  // in `buildPlanTree`, from the same function.
+  const liveness = useMemo(
+    () => (runNow === 0 ? serverLiveness : planLiveness(flatten([node]), lastRuns, runNow)),
+    [node, lastRuns, runNow, serverLiveness],
+  );
+  const health = healthOf(node, liveness);
+  const claim = liveness[node.id];
+  // The run behind this row, where there is one to account for. Typed as
+  // possibly missing because most rows have no run at all -- the index
+  // signature says otherwise and would let a row with none through.
+  const run: LastRun | undefined = lastRuns[node.id];
+  // A step being worked is what the account of a run is for. A run still
+  // reading `started` is included as well, because a feature batch is fired at
+  // a feature the batch itself never claims, and that row is where somebody
+  // looks for what the batch has done.
+  const accountForRun = run !== undefined && (node.status === 'in_progress' || run.status === 'started');
+  // The question Send has to put first, or null when it has nothing to ask.
+  //
+  // A quiet run may still be working -- the twenty-minute mark reads wrong on
+  // a session that is reading files or waiting on a build -- so #574 settled
+  // that the press is taken with the evidence in front of you. Null before
+  // mount, since `runNow` is 0 there and no claim reads quiet at that instant,
+  // which is what keeps the server render and the first client one agreeing.
+  const quietAsk = claim === 'quiet' && run ? quietSendAsk(node.number, run, runNow) : null;
+  const resolving = useResolving(lastRuns, runNow);
+  // What a "#494" written in a comment on this page is called. The catalog is
+  // already every step's number and title, so no page needs to hand it over.
+  const refTitles = useMemo(
+    () => Object.fromEntries(catalog.map((entry) => [entry.number, entry.title])),
+    [catalog],
+  );
+  const move = moveFor(node, resolving);
+  // Whether this row itself is the one being re-read. The rollup above would
+  // also be true of a feature whose child is being re-shaped, and it is the
+  // child's buttons that should be shut, not this one's.
+  const beingResolved = resolving.resolving?.has(node.id) ?? false;
 
   // The answer that produced this row, on the steps a re-shape wrote and on
   // nothing else.
@@ -1974,25 +2333,37 @@ function PlanRow({
     })),
   ];
 
-  // The open steps beneath this one, which a hand-over covers as well. Said in
+  const priorityMenu: ActionMenuItem[] = PLAN_PRIORITIES.map((priority) => ({
+    id: `priority-${priority}`,
+    label: PLAN_PRIORITY_LABEL[priority],
+    disabled: priority === node.priority,
+    formAction: (formData: FormData) => setPlanItemPriority({}, formData),
+    formFields: { id: node.id, priority: String(priority) },
+  }));
+
+  // The open steps beneath this one, which the press covers as well. Said in
   // the label rather than found out afterwards.
   const openBeneath = flatten([node]).filter(
     (step) => step.id !== node.id && !isClosed(step.status),
   ).length;
   const beneath = openBeneath > 0 ? `, with ${openBeneath} beneath` : '';
-  const handOver = node.assignee !== 'claude';
-  const assignLabel = handOver
-    ? `Hand to Dash${beneath}`
-    : `Take back from Dash${beneath}`;
+  // The row's assignee press is what you keep a step back with. The runner
+  // takes anything approved that is not yours, so marking a step Mine holds it
+  // until you press again; clearing the column gives it back. Until #670 that
+  // press was Hand to Dash, from when the runner could only see a step somebody
+  // had handed it, and setting a step to Me meant opening Edit.
+  const mine = node.assignee === 'me';
+  const assignLabel = mine ? `Not mine${beneath}` : `Mine${beneath}`;
+  const assignValue = mine ? '' : 'me';
 
   const menu: ActionMenuItem[] = [
     {
-      // First, because marking a step as Claude's is the move this page exists
-      // to make and it should not need the step opened first.
+      // First, because keeping a step back is the move this page exists to make
+      // and it should not need the step opened first.
       id: 'assign',
       label: assignLabel,
       formAction: (formData: FormData) => setPlanItemAssignee({}, formData),
-      formFields: { id: node.id, assignee: handOver ? 'claude' : '' },
+      formFields: { id: node.id, assignee: assignValue },
     },
     // The quick icons are only there from sm up and only under a pointer, so
     // the menu carries the same two actions for a phone and for a keyboard.
@@ -2002,8 +2373,18 @@ function PlanRow({
           {
             id: 'send',
             label: sendLabel(node),
+            // Shut for the same reason the button beside it is: the menu is
+            // the phone's copy of that button, not a way round it.
+            disabled: beingResolved,
+            // A quiet run is asked about here with the menu's own confirm,
+            // which arms on the first press and does it on the second -- the
+            // same shape the question on the row takes, so the two doors ask
+            // the same thing. The flag rides on the item, because the menu
+            // sends the fields it is given and the guard refuses the press
+            // without it anyway.
+            ...(quietAsk ? { confirm: quietAsk } : {}),
             formAction: (formData: FormData) => sendPlanItemToClaude({}, formData),
-            formFields: { id: node.id },
+            formFields: quietAsk ? { id: node.id, confirm: 'quiet' } : { id: node.id },
           },
         ]),
     // The return trip, beside the two hand-overs. Only on a feature: a leaf
@@ -2059,10 +2440,13 @@ function PlanRow({
 
   return (
     <>
+      {/* The anchor a `#494` written in a comment lands on. `scroll-mt` keeps
+          the row clear of the pinned header it would otherwise arrive under. */}
       <li
+        id={planRowId(node.number)}
         className={cn(
           ROW_GRID,
-          'group px-3',
+          'group scroll-mt-24 px-3',
           gloss && !open ? 'py-1.5' : 'py-2',
           !node.matches && 'opacity-60',
           closed && 'opacity-70',
@@ -2073,17 +2457,29 @@ function PlanRow({
 
           {/* The fold for the sub-steps. A spacer where there are none, so the
               titles at one depth line up. */}
-          {hasChildren ? (
+          {hasChildren || foldableFog ? (
             <button
               type="button"
               onClick={() => setShowChildren((value) => !value)}
               aria-expanded={showChildren}
               title={
-                showChildren
-                  ? `Fold the ${substeps.length} sub-steps`
-                  : `Unfold the ${substeps.length} sub-steps`
+                hasChildren
+                  ? showChildren
+                    ? `Fold the ${substeps.length} sub-steps`
+                    : `Unfold the ${substeps.length} sub-steps`
+                  : showChildren
+                    ? 'Fold what is not yet specified'
+                    : 'Unfold what is not yet specified'
               }
-              aria-label={showChildren ? 'Hide the sub-steps' : 'Show the sub-steps'}
+              aria-label={
+                hasChildren
+                  ? showChildren
+                    ? 'Hide the sub-steps'
+                    : 'Show the sub-steps'
+                  : showChildren
+                    ? 'Hide what is not yet specified'
+                    : 'Show what is not yet specified'
+              }
               className={cn(
                 LEVEL,
                 'press flex shrink-0 items-center justify-center self-center rounded text-ink-muted hover:bg-accent-tint hover:text-accent',
@@ -2109,6 +2505,21 @@ function PlanRow({
             >
               ?<span className="sr-only">Decision</span>
             </span>
+          ) : setupOpen ? (
+            // The same slot, for the other row that is not a piece of work.
+            // A setup job is an errand, closed by going and doing it, and the
+            // row should say so before the health column is read -- the same
+            // argument as the question mark above.
+            <span
+              title="A setup job: something only you can set up, closed when you have."
+              className={cn(
+                LEVEL,
+                'flex h-5 shrink-0 select-none items-center justify-center self-center text-caution',
+              )}
+            >
+              <Wrench className="size-3.5" strokeWidth={1.75} aria-hidden />
+              <span className="sr-only">Setup</span>
+            </span>
           ) : (
             <span className={cn(LEVEL, 'shrink-0')} aria-hidden />
           )}
@@ -2130,7 +2541,15 @@ function PlanRow({
                 trail.length === 0 ? 'font-medium text-ink' : 'text-ink',
               )}
             >
-              <span className="tabular shrink-0 text-small text-ink-ghost">#{node.number}</span>
+              {/* Where the row sits, not just what it is called: a feature
+                  reads #595 and its second step reads #595.2, so a step says
+                  which feature it belongs to and how far through it is
+                  without the tree guides having to be traced up by eye.
+                  `number` is still the handle -- it is what the commits, the
+                  comments and the CLI say, it is the anchor a `#597` link
+                  lands on, and the button around this says "Open #597" -- and
+                  the search box takes either. */}
+              <span className="tabular shrink-0 text-small text-ink-ghost">#{node.outline}</span>
               {/* Truncated closed, whole open. A row is a line and a long title
                 * has to give way to keep it one; but opening the step is the
                 * gesture that means "show me this one", and a name still cut
@@ -2162,28 +2581,36 @@ function PlanRow({
               )}
               {/* And whether anything has been said about it. */}
               <CommentCount count={node.thread.length} />
-              {/* Whose it is, on the row.
-                * The "Who" column was dropped for being a column of dashes,
-                * and it was right to go -- but with it went any way of seeing
-                * that a step is Claude's without opening it, hovering it, or
-                * switching to the Claude's view. Handing a step over is the
-                * move this page exists to make, and the page said nothing
-                * about the result. A mark, not a column: it appears only on
-                * the steps that have been handed over, which is what makes it
-                * worth reading. */}
-              {node.assignee === 'claude' && (
+              {/* The steps you kept, on the row.
+                * The runner takes anything approved that is not yours, so the
+                * fact worth reading off a resting row is which steps it will
+                * skip. It used to be the other way round: the mark was a robot
+                * on every step handed to Dash, from when a session could only
+                * work a step somebody had handed it.
+                *
+                * The row's Mine press carries the same fact in its accented
+                * icon, but that icon is drawn only under the pointer and not
+                * at all below sm, so this is the only place a plan at rest
+                * says it. Steps still holding the old 'claude' value are not
+                * read here and nothing clears them.
+                *
+                * A mark, not a column: it appears on the few steps you held
+                * back, which is what makes it worth reading. */}
+              {mine && (
                 <span
-                  title="Handed to Dash"
+                  title="Yours. The runner will not take this one."
                   className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1 py-0.5 text-accent"
                 >
-                  {/* A bot and not a person. This mark said "handed over" with
-                      the same head-and-shoulders the assignee picker uses for
-                      anybody at all, so the one thing it had to say -- that it
-                      went to Claude rather than onto your own list -- was the
-                      one thing it did not. */}
-                  <Bot className="size-3" strokeWidth={2} aria-hidden />
-                  <span className="sr-only">Handed to Dash</span>
+                  {/* The head-and-shoulders from the assignee picker, the same
+                      icon the Mine press uses, so the mark and the press that
+                      sets it are recognisably one thing. */}
+                  <CircleUser className="size-3" strokeWidth={2} aria-hidden />
+                  <span className="sr-only">Marked yours</span>
                 </span>
+              )}
+              {/* And whether the checks passed on what it shipped in. */}
+              {node.status === 'done' && node.commitSha && (
+                <CheckMark check={commitChecks[node.commitSha]} />
               )}
               {/* And how long it has been going.
                 * "In progress" in the health column is a state; this is the
@@ -2193,7 +2620,7 @@ function PlanRow({
                 * looks like from here. The dot pulses because the one fact it
                 * carries is that something is happening right now. */}
               {node.status === 'in_progress' && node.startedAt && (
-                <Underway startedAt={node.startedAt} assignee={node.assignee} />
+                <Underway startedAt={node.startedAt} assignee={node.assignee} claim={claim} />
               )}
             </span>
             {/* Where it came from, when it did not come from you. On the row
@@ -2227,39 +2654,94 @@ function PlanRow({
             TONE_TEXT[health.tone],
           )}
           trigger={
-            <span className="inline-flex items-center gap-1.5" title={health.title}>
-              {/* No glyph on a dropped row. The slash was a third way of
-                  saying what the ghost tone and the struck-through title
-                  already say, on the one state nobody is scanning for -- so it
-                  read as clutter beside the rows that are still live, which is
-                  where the eye is actually going (law 15). Every other state
-                  keeps its shape: those are the ones being scanned, and the
-                  glyph is how they are told apart at a glance. The count
-                  beside the module heading keeps its slash too, because there
-                  a bare number would say nothing at all. */}
-              {health.name !== 'dropped' && <StatusGlyph glyph={health.glyph} />}
-              <span className="truncate">{health.word}</span>
-            </span>
+            <StateLabel
+              // Inherits the trigger's own text size and tone, which is what
+              // makes the health a word you click rather than a badge inside a
+              // button.
+              className="text-inherit"
+              tone={health.tone}
+              title={health.title}
+              word={health.word}
+              // No glyph on a dropped row. The slash was a third way of
+              // saying what the ghost tone and the struck-through title
+              // already say, on the one state nobody is scanning for -- so it
+              // read as clutter beside the rows that are still live, which is
+              // where the eye is actually going (law 15). Every other state
+              // keeps its shape: those are the ones being scanned, and the
+              // glyph is how they are told apart at a glance. The count
+              // beside the module heading keeps its slash too, because there
+              // a bare number would say nothing at all.
+              glyph={health.name === 'dropped' ? null : health.glyph}
+            />
           }
         />
 
+        {/* Whose move it is, beside how far along it is.
+
+            A word and a tone, and deliberately no glyph: the hexagons belong to
+            health, they are a scale from empty to full, and a second column of
+            shapes beside them would read as a second position on the same scale
+            rather than as an answer to a different question. Law 4 -- if none
+            of the meanings is true, use ink and a shape, and here the shape is
+            the column itself.
+
+            Not a menu, where health is one. Health is set by hand; this is
+            derived from what is already true of the row -- who it is assigned
+            to, what it waits on, whether it is a question -- so there is
+            nothing here to pick. Changing it means handing the step over or
+            answering what it asks, which are the buttons already on the row. */}
+        <span
+          className={cn('hidden truncate text-small sm:block', TONE_TEXT[move.tone])}
+          title={move.title}
+        >
+          {move.word}
+        </span>
+
+        {/* Priority, and only when it says something. Nearly every step is at
+            Normal, so the word was on almost every row and told you nothing;
+            what you are scanning for is the handful marked Next or Someday.
+            The separator before the size goes with it, so a normal step at S
+            reads as "S" rather than as "· S".
+
+            A word you click, like the health beside it -- note 3bfb2749. At
+            Normal there is no word to click, so the trigger is the word
+            itself, drawn only while the row is under the pointer or the menu
+            is being reached by keyboard: the resting row still says nothing,
+            which is the whole reason Normal is silent. */}
         <span className="hidden truncate text-small sm:block">
-          {node.priority === 1 && <span className="text-accent">Next</span>}
-          {node.priority === 2 && <span className="text-ink-muted">Normal</span>}
-          {node.priority === 3 && <span className="text-ink-ghost">Someday</span>}
+          <ActionMenu
+            label={`Priority of #${node.number} ${node.title}`}
+            items={priorityMenu}
+            align="start"
+            triggerClassName={cn(
+              'h-auto w-auto rounded px-0.5 py-0 font-normal',
+              node.priority === 2 &&
+                'text-ink-ghost opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100',
+            )}
+            trigger={
+              <span
+                className={cn(
+                  node.priority === 1 && 'text-accent',
+                  node.priority === 3 && 'text-ink-ghost',
+                )}
+              >
+                {PLAN_PRIORITY_LABEL[node.priority]}
+              </span>
+            }
+          />
           {node.size && (
             <span className="text-ink-muted" title={SIZE_LABEL[node.size]}>
-              {' · '}
+              {node.priority !== 2 && ' · '}
               {node.size.toUpperCase()}
             </span>
           )}
         </span>
 
         {/* No "Who" column. It was a column of dashes with the occasional
-            "Claude" in it -- one fact, on a plan whose every step is yours
-            unless you hand it over, and handing it over is a button. The one
-            value it carried is now a mark beside the title, on the steps that
-            have it; the rest is on the open step, in the summary's "Claude's"
+            name in it -- one fact, on a plan whose every approved step the
+            runner takes unless you keep it, and keeping it is a button. The
+            one value it carried is now a mark beside the title, on the steps
+            you kept; the rest is on the open step, in the summary's "Claude's"
             view, and in the menu that changes it. */}
         <span className="hidden sm:block">
           <Breakdown node={node} />
@@ -2271,22 +2753,33 @@ function PlanRow({
             are in the menu, which is how a phone reaches them. */}
         <div className="flex items-center justify-self-end">
           <div className="hidden items-center opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 sm:flex">
-            {!closed && (
-              <form action={sendAction}>
-                <input type="hidden" name="id" value={node.id} />
-                <RowIconButton type="submit" label={sendLabel(node)} pending={sendPending}>
+            {!closed &&
+              (quietAsk ? (
+                // Nothing is sent from here while the run is quiet: the press
+                // puts the question on the row instead, and the answer to it
+                // is what sends. The icon has no room for a question of its
+                // own, and a confirmation that appeared under the pointer and
+                // vanished with it would be no confirmation at all.
+                <RowIconButton label={sendLabel(node)} onClick={() => setConfirmingSend(true)}>
                   <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
                 </RowIconButton>
-              </form>
-            )}
+              ) : (
+                <form action={sendAction}>
+                  <input type="hidden" name="id" value={node.id} />
+                  <RowIconButton type="submit" label={sendLabel(node)} pending={sendPending}>
+                    <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  </RowIconButton>
+                </form>
+              ))}
             <form action={assignAction}>
               <input type="hidden" name="id" value={node.id} />
-              <input type="hidden" name="assignee" value={handOver ? 'claude' : ''} />
+              <input type="hidden" name="assignee" value={assignValue} />
               <RowIconButton type="submit" label={assignLabel} pending={assignPending}>
-                {/* The same bot as the mark: this button is specifically the
-                    hand-to-Claude toggle, not a general "who is on it". */}
-                <Bot
-                  className={cn('size-3.5', !handOver && 'text-accent')}
+                {/* The head-and-shoulders the assignee picker uses for Me, and
+                    accented while the step is yours, so the icon says which way
+                    the next press goes. */}
+                <CircleUser
+                  className={cn('size-3.5', mine && 'text-accent')}
                   strokeWidth={1.75}
                   aria-hidden
                 />
@@ -2299,6 +2792,38 @@ function PlanRow({
           <ActionMenu label={`Actions for #${node.number}`} items={menu} />
         </div>
       </li>
+
+      {/* The question a quiet run puts in front of Send, wherever the press
+          came from. It sits where the result of that press will sit, so the
+          answer and what came back of it read as one exchange in one place.
+          Gone once something has come back, since the question has been
+          answered by then and the answer is what there is to read. */}
+      {confirmingSend && quietAsk && !sendState.error && !sendState.message && (
+        <li style={inset} className="pb-1.5 pr-3 text-small">
+          <p className="text-ink-muted">{quietAsk}</p>
+          <div className="mt-1 flex items-center gap-2">
+            {/* Cancel first and plain, because doing nothing is the safe half
+                of this and the press that sends should be the deliberate one. */}
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setConfirmingSend(false)}
+            >
+              Cancel
+            </Button>
+            <form action={sendAction}>
+              <input type="hidden" name="id" value={node.id} />
+              {/* The answer, and the only thing that carries it. The guard
+                  refuses the press without it. */}
+              <input type="hidden" name="confirm" value="quiet" />
+              <Button type="submit" size="sm" variant="secondary" pending={sendPending}>
+                {sendPending ? 'Sending…' : 'Send it anyway'}
+              </Button>
+            </form>
+          </div>
+        </li>
+      )}
 
       {/* What the last action did, wherever it was started from. */}
       {(assignState.error ??
@@ -2350,10 +2875,11 @@ function PlanRow({
           the row -- it is the part of it that is not a plan yet -- so a
           collapsed feature leaving its fog behind was one block outliving the
           thing it described. Only where there is an arrow to fold: on a leaf
-          `showChildren` is a state with no control, and gating on it alone
-          would hide fog on every closed step with no way back. */}
-      {node.fog && (node.fogDismissedAt === null || view === 'dismissed') &&
-        (!hasChildren || showChildren) && (
+          a leaf used to have no arrow at all, so gating on it alone hid fog on
+          every stepless feature with no way back -- which is what happened to
+          #386. The arrow above now appears for fog as well as for sub-steps,
+          so the fold is a control everywhere it is a state. */}
+      {foldableFog && showChildren && (
           <li style={inset} className="pb-1.5 pr-3">
             <div className="border-l-2 border-dashed border-border-strong pl-2.5">
               <p className="text-micro font-semibold uppercase tracking-wide text-ink-ghost">
@@ -2393,8 +2919,10 @@ function PlanRow({
             <div className="space-y-3 border-l-2 border-accent bg-canvas px-3 py-2.5">
             {/* Not on a decision: there the detail is the options, and it is
                 shown as options inside the question block below rather than
-                twice -- once as a paragraph here and once as itself. */}
-            {node.detail && !isDecision && (
+                twice -- once as a paragraph here and once as itself. Nor on an
+                open setup job, where the detail is the instructions and is
+                drawn inside the box that closes them, for the same reason. */}
+            {node.detail && !isDecision && !setupOpen && (
               <p className="whitespace-pre-wrap text-ui text-ink-muted">{node.detail}</p>
             )}
             {node.acceptance && (
@@ -2403,10 +2931,26 @@ function PlanRow({
                 <p className="whitespace-pre-wrap text-ui text-ink">{node.acceptance}</p>
               </div>
             )}
+            {/* What it needs, in its own line above the history. The comment
+                below is every block this step has had, dated; this is the one
+                sentence that still stands. */}
+            {node.blockAsk && (
+              <div>
+                <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Needs</p>
+                <p className="whitespace-pre-wrap text-ui text-ink">{node.blockAsk}</p>
+              </div>
+            )}
             {node.comment && (
               <p className="whitespace-pre-wrap rounded-lg bg-canvas px-3 py-2 text-ui text-ink">
                 {node.comment}
               </p>
+            )}
+
+            {/* What its run has done, above the questions and the thread: on a
+                step you opened because it says somebody is working it, this is
+                the thing you opened it to find out. */}
+            {accountForRun && run && (
+              <RunWork run={run} node={node} catalog={catalog} raises={runRaises} />
             )}
 
             {isDecision && (
@@ -2418,7 +2962,16 @@ function PlanRow({
               />
             )}
 
-            <Questions node={node} />
+            {setupOpen && (
+              <SetupJob
+                node={node}
+                action={setupAction}
+                pending={setupPending}
+                error={setupState.error}
+              />
+            )}
+
+            <Questions node={node} titles={refTitles} />
 
             <Dependencies node={node} catalog={catalog} />
 
@@ -2426,19 +2979,20 @@ function PlanRow({
               target="step"
               id={node.id}
               thread={node.thread}
+              titles={refTitles}
               placeholder="A note on this step. Tag @dash to ask something, or to tell it to reword the step, file an idea or build it."
             />
 
             <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">
               <span>{scopeLabel(node.module)}</span>
-              <span>{PRIORITY_LABEL[node.priority]}</span>
+              {node.priority !== 2 && <span>{PLAN_PRIORITY_LABEL[node.priority]}</span>}
               {node.size && <span>{SIZE_LABEL[node.size]}</span>}
               {node.assignee && <span>{ASSIGNEE_LABEL[node.assignee]}</span>}
               {when(node.startedAt) && (
                 <span>
                   Started {when(node.startedAt)}
                   {node.status === 'in_progress' && node.startedAt && (
-                    <RunningFor startedAt={node.startedAt} />
+                    <RunningFor startedAt={node.startedAt} claim={claim} />
                   )}
                 </span>
               )}
@@ -2448,6 +3002,22 @@ function PlanRow({
                 </span>
               )}
               {node.commitSha && <span className="font-mono">{node.commitSha}</span>}
+              {node.status === 'done' && node.commitSha && (
+                <span
+                  className={
+                    commitChecks[node.commitSha]?.conclusion === 'failed' ||
+                    commitChecks[node.commitSha]?.conclusion === 'unmerged'
+                      ? 'text-caution'
+                      : undefined
+                  }
+                >
+                  {checkLine(commitChecks[node.commitSha])}
+                </span>
+              )}
+              {/* Only where the block above is not already accounting for
+                  this run: two sentences about the same run on one opened row
+                  is one of them too many. */}
+              {run && !accountForRun && <LastRunLine run={run} />}
             </p>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -2467,11 +3037,7 @@ function PlanRow({
               </Button>
               <form action={assignAction}>
                 <input type="hidden" name="id" value={node.id} />
-                <input
-                  type="hidden"
-                  name="assignee"
-                  value={node.assignee === 'claude' ? '' : 'claude'}
-                />
+                <input type="hidden" name="assignee" value={assignValue} />
                 <Button type="submit" size="sm" variant="ghost" pending={assignPending}>
                   {assignLabel}
                 </Button>
@@ -2486,6 +3052,9 @@ function PlanRow({
                   batchPending={batchPending}
                   reshapeAction={reshapeAction}
                   reshapePending={reshapePending}
+                  resolving={beingResolved}
+                  quietAsk={quietAsk}
+                  onAskQuiet={() => setConfirmingSend(true)}
                   quiet={
                     !sendState.error &&
                     !sendState.message &&
@@ -2509,8 +3078,14 @@ function PlanRow({
             trail={[...trail, index < substeps.length - 1]}
             catalog={catalog}
             canSend={canSend}
+            lastRuns={lastRuns}
+            runRaises={runRaises}
+            liveness={serverLiveness}
+            commitChecks={commitChecks}
             view={view}
             searching={searching}
+            unfolded={unfolded}
+            opened={opened}
           />
         ))}
 
@@ -2621,25 +3196,143 @@ function SearchThePlan({
   );
 }
 
+/**
+ * The run readings, asked for once the page has drawn.
+ *
+ * #563: the page appears with whatever was last written down and updates a
+ * moment later, rather than holding the render open on a request to GitHub.
+ * `app/api/plan/runs` does the asking, writes what came back onto the run rows
+ * so the terminal tool and the next session's brief read the same answer, and
+ * hands the readings back for the rows already on screen.
+ *
+ * Nothing is asked when no step is claimed, which is most of the time: there
+ * is no run being worked to ask about, and every reading the page has is about
+ * a run that is over. Asked once rather than on a timer -- the clock ticks the
+ * rows on by itself, and a reading is only worth taking again when something
+ * has been sent since.
+ *
+ * A request that fails changes nothing, so the page goes on showing the
+ * reading it drew with. That is the third line of the done-when, and it is
+ * what falling back to the clock in `claimLiveness` is for.
+ */
+function useRefreshedRuns(
+  lastRuns: Record<string, LastRun>,
+  claims: number,
+  stored: string | null,
+): { runs: Record<string, LastRun>; refusal: string | null } {
+  const [answer, setAnswer] = useState<{
+    readings: Record<string, StoredRunReading>;
+    error: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (claims === 0) return;
+    const leaving = new AbortController();
+
+    void (async () => {
+      try {
+        const res = await fetch('/api/plan/runs', { method: 'POST', signal: leaving.signal });
+        if (!res.ok) return;
+        const body = (await res.json()) as {
+          readings?: Record<string, StoredRunReading>;
+          error?: string | null;
+        };
+        setAnswer({ readings: body.readings ?? {}, error: body.error ?? null });
+      } catch {
+        // Left as it was drawn.
+      }
+    })();
+
+    return () => leaving.abort();
+  }, [claims]);
+
+  const runs = useMemo(
+    () => (answer ? withReadings(lastRuns, answer.readings) : lastRuns),
+    [lastRuns, answer],
+  );
+
+  // The route's own word wins outright once it has one, `null` included. It
+  // asked GitHub a moment ago, and the refusals the page was handed are from
+  // whenever anything last asked -- a key replaced between the two would
+  // otherwise go on being reported as rejected for as long as one of those
+  // runs was on screen. A 200 with no `error` is GitHub answering, which is
+  // the fix landing.
+  return { runs, refusal: answer ? answer.error : stored };
+}
+
 export function PlanView({
   sections,
+  finished,
   summary,
   view,
   catalog,
+  lastRuns,
+  runRaises = [],
+  keyRefusal = null,
+  liveness,
+  commitChecks,
   empty,
   canSend,
-  queued,
+  unfolded = false,
+  opened = false,
 }: {
   sections: PlanSection[];
+  /** The finished features, for the fold at the foot of Everything. */
+  finished: PlanNode[];
   summary: PlanSummary;
   view: View;
   catalog: PlanCatalogEntry[];
+  /** The newest run against each step, by step id. */
+  lastRuns: Record<string, LastRun>;
+  /** Every raise that names a step, for the opened step's account of its run. */
+  runRaises?: readonly RunRaise[];
+  /**
+   * Why GitHub is refusing to say what anything has pushed, as the run rows
+   * had it when the page rendered.
+   *
+   * Drawn with rather than waited for, so a rejected key is on screen in the
+   * first paint instead of a second later: it is the reason every claimed row
+   * below reads off the clock. The route's answer replaces it once that
+   * arrives -- see `useRefreshedRuns`.
+   */
+  keyRefusal?: string | null;
+  /** The claims read against their runs, at the clock the page rendered with. */
+  liveness?: PlanLiveness;
+  /** What CI said about each commit a step shipped in, by the commit's sha. */
+  commitChecks: Record<string, CommitCheck>;
   empty: boolean;
   canSend: boolean;
-  queued: number;
+  /**
+   * Render every feature with its sub-steps already showing.
+   *
+   * A seam for the render tests and nothing else -- the page leaves it off, so
+   * every feature starts folded there. A folded row renders no children at
+   * all, and `renderToStaticMarkup` cannot press the arrow, so the tests that
+   * pin how a nested row is laid out would have nothing to look at.
+   */
+  unfolded?: boolean;
+  /**
+   * Render every row with its own panel already open.
+   *
+   * The same kind of seam, for what is behind a row's fold rather than beneath
+   * it: the account of a step's run lives there, and nothing can press a title
+   * in a static render. The page leaves it off.
+   */
+  opened?: boolean;
 }) {
   const [query, setQuery] = useState('');
   const searching = searchTerms(query).length > 0;
+
+  // What GitHub says about the runs behind the claimed steps, taken once the
+  // page is up and written over the readings it drew with. A claim is the only
+  // reason to ask, so the server's own reading of them is what decides whether
+  // anything is asked at all.
+  const refreshed = useRefreshedRuns(
+    lastRuns,
+    Object.keys(liveness ?? {}).length,
+    keyRefusal,
+  );
+  const runs = refreshed.runs;
 
   // The whole tree is already on the page, so the search runs here rather than
   // as a round trip: a plan is tens of steps, and a filter you feel keeping up
@@ -2650,15 +3343,43 @@ export function PlanView({
     () => (searching ? searchSections(sections, query) : sections),
     [sections, query, searching],
   );
-  const hits = useMemo(() => (searching ? countMatches(shown) : 0), [shown, searching]);
+  // The archive searches with everything else. "Did I already plan that" is
+  // the question a finished feature gets asked, and it is asked by typing.
+  const found = useMemo(
+    () => (searching ? searchNodes(finished, query) : finished),
+    [finished, query, searching],
+  );
+  const hits = useMemo(
+    () => (searching ? countMatches(shown) + flatten(found).filter((n) => n.matches).length : 0),
+    [shown, found, searching],
+  );
 
   if (empty) return <ImportTheBuildOrder />;
 
-  const nothingToShow = shown.every((section) => section.nodes.length === 0);
+  const nothingToShow =
+    shown.every((section) => section.nodes.length === 0) && found.length === 0;
 
   return (
     <div className="space-y-6">
-      <SummaryStrip summary={summary} view={view} queued={queued} />
+      {/* Above the summary, because it is the reason the summary's claims are
+          read off the clock. A banner rather than a status line: the key is a
+          setting only the person can change, the sentence GitHub's refusal was
+          turned into already says which one and what to do with it, and until
+          it is done no row on this page can say whether its session is still
+          working. */}
+      {refreshed.refusal && (
+        <Banner tone="warn">
+          <p className="font-semibold">
+            Nothing can read what these runs have pushed.
+          </p>
+          <p>{refreshed.refusal}</p>
+          <p className="text-small text-ink-muted">
+            Until then a claimed step reads off the clock: claimed for two hours, then stopped.
+          </p>
+        </Banner>
+      )}
+
+      <SummaryStrip summary={summary} view={view} />
 
       <SearchThePlan query={query} onQuery={setQuery} hits={hits} searching={searching} />
 
@@ -2721,7 +3442,7 @@ export function PlanView({
                   'group-open/section:border-b group-open/section:border-border',
                 )}
               >
-                <h2 className="flex items-center gap-2 text-lead font-semibold text-ink">
+                <h2 className="flex items-center gap-2 text-body font-semibold text-ink">
                   <ChevronRight
                     aria-hidden
                     strokeWidth={2}
@@ -2749,8 +3470,14 @@ export function PlanView({
                       trail={[]}
                       catalog={catalog}
                       canSend={canSend}
+                      lastRuns={runs}
+                      runRaises={runRaises}
+                      liveness={liveness}
+                      commitChecks={commitChecks}
                       view={view}
                       searching={searching}
+                      unfolded={unfolded}
+                      opened={opened}
                     />
                   ))}
                 </ul>
@@ -2784,10 +3511,68 @@ export function PlanView({
         })}
       </div>
 
+      {/* What is finished, out of the way but not gone. Folded shut, newest
+          first, and only on Everything -- every other view dropped these rows
+          before the page saw them. A search opens it, because "did I already
+          plan that" is the question it exists to answer. */}
+      {found.length > 0 && (
+        <details
+          key={searching ? 'finished:found' : 'finished'}
+          open={searching}
+          className={cn(cardVariants({ padding: 'none' }), 'group/section overflow-hidden')}
+        >
+          <summary
+            className={cn(
+              'press flex cursor-pointer list-none flex-wrap items-center justify-between gap-2',
+              'px-3 py-2.5 [&::-webkit-details-marker]:hidden',
+              'transition-colors duration-150 hover:bg-sunken',
+              'focus-visible:outline-2 focus-visible:-outline-offset-2',
+              'group-open/section:border-b group-open/section:border-border',
+            )}
+          >
+            <h2 className="flex items-center gap-2 text-body font-semibold text-ink">
+              <ChevronRight
+                aria-hidden
+                strokeWidth={2}
+                className="size-4 shrink-0 text-ink-muted transition-transform duration-150 group-open/section:rotate-90"
+              />
+              Finished
+            </h2>
+            <span className="text-ui text-ink-muted">
+              <span className="tabular font-semibold text-ink">{found.length}</span>{' '}
+              {found.length === 1 ? 'feature' : 'features'}
+            </span>
+          </summary>
+          <ul className="divide-y divide-border">
+            <ColumnHeader />
+            {found.map((node) => (
+              <PlanRow
+                key={node.id}
+                node={node}
+                trail={[]}
+                catalog={catalog}
+                canSend={canSend}
+                lastRuns={runs}
+                runRaises={runRaises}
+                liveness={liveness}
+                commitChecks={commitChecks}
+                view={view}
+                searching={searching}
+                unfolded={unfolded}
+                opened={opened}
+              />
+            ))}
+          </ul>
+        </details>
+      )}
+
       {/* The app-wide list is not offered as a section until something is in
-          it, so this is the only way to put the first thing there. */}
+          it, so this is the only way to put the first thing there. Only on
+          Everything, which is where the empty sections live now: drawing this
+          heading over the open view would put back the one thing dropping
+          them took away. */}
       {!searching &&
-        (view === 'open' || view === 'all') &&
+        view === 'all' &&
         !sections.some((section) => section.module === null) && (
           <section className="space-y-2">
             <h2 className="text-body font-semibold text-ink">The app as a whole</h2>

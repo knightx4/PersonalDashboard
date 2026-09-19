@@ -1,10 +1,12 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
   chainPayloadSchema,
   normaliseChain,
+  whyMalformed,
   type ExistingConcept,
   type ProposedChain,
 } from '@/lib/learn/graph/chain-payload';
@@ -105,7 +107,7 @@ export async function conceptsFromNote(input: {
   try {
     response = await client.messages.create({
       model: MODEL,
-      max_tokens: 2048,
+      max_tokens: 4096,
       system: SYSTEM,
       tools: [
         {
@@ -148,6 +150,7 @@ export async function conceptsFromNote(input: {
           },
         },
       ],
+      tool_choice: forceTool(TOOL_NAME),
       messages: [{ role: 'user', content: lines.join('\n') }],
     });
   } catch (error) {
@@ -162,12 +165,12 @@ export async function conceptsFromNote(input: {
 
   const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
   if (!block || block.type !== 'tool_use') {
-    return { ok: false, reason: 'error', detail: 'The call ran but reported nothing.' };
+    return { ok: false, reason: 'error', detail: whyNoReport(response) };
   }
 
   const safe = chainPayloadSchema.safeParse(block.input);
   if (!safe.success) {
-    return { ok: false, reason: 'error', detail: 'That came back malformed.' };
+    return { ok: false, reason: 'error', detail: whyMalformed(safe.error) };
   }
 
   const chain = normaliseChain(safe.data, input.existing);

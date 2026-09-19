@@ -1,8 +1,10 @@
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import { isOwner } from '@/lib/dev/owner';
 import { AppShell } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
 import { loadRaisedNotifications } from '@/lib/raised/notifications';
+import { loadMainCheck } from '@/lib/shell/main-check';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { AccountView } from './view';
 
@@ -26,23 +28,28 @@ export const metadata = { title: 'Account' };
  */
 export default async function AccountPage() {
   const user = await requireUser();
-  const [settings, counts, raised] = await Promise.all([
+  const [settings, counts, raised, mainCheck, owner] = await Promise.all([
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
     loadRaisedNotifications(user.id),
+    loadMainCheck(),
+    isOwner({ user }),
   ]);
 
   return (
     <div className="min-h-full">
       <AppShell
+        account={user.id}
         module={null}
         sections={[]}
         displayName={settings.displayName}
         email={user.email ?? ''}
         enabledModules={settings.enabledModules}
+        isOwner={owner}
         counts={switcherCounts(counts)}
         theme={settings.theme}
         notifications={raised}
+        mainCheck={mainCheck}
       >
         <div className="mx-auto max-w-3xl">
           <p className="text-body text-ink-muted">
@@ -58,6 +65,7 @@ export default async function AccountPage() {
               displayCurrency: settings.displayCurrency,
               enabledModules: settings.enabledModules,
             }}
+            isOwner={owner}
             />
           </div>
         </div>

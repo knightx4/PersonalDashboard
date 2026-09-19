@@ -61,8 +61,25 @@ describe('an instruction rather than a question', () => {
       }),
     ).toEqual({
       kind: 'action',
-      action: { name: 'file_idea', text: 'Photos on receipts.', module: 'shopping', field: null },
+      action: {
+        name: 'file_idea',
+        text: 'Photos on receipts.',
+        module: 'shopping',
+        field: null,
+        detail: null,
+        kind: null,
+      },
     });
+  });
+
+  it('reads the detail and the kind the two newer actions take', () => {
+    const reply = parseReplyPayload({
+      action: { name: 'add_step', text: 'Crop the photo', detail: 'Square, centred on the shelf.' },
+    });
+    expect(reply.kind === 'action' && reply.action.detail).toBe('Square, centred on the shelf.');
+
+    const note = parseReplyPayload({ action: { name: 'file_note', text: 'It opens wrong.', kind: 'bug' } });
+    expect(note.kind === 'action' && note.action.kind).toBe('bug');
   });
 
   it('keeps a name nobody listed, so it can be refused in words', () => {

@@ -247,6 +247,8 @@ export async function saveChain(
  * graph already has a state, arrived at some way -- possibly a probe that said
  * shaky -- and overwriting that from a paste would destroy the only evidence
  * in the module that was actually collected rather than asserted.
+ * `declareConceptKnown` below does overwrite, and says why that is a different
+ * case.
  */
 export async function declareKnown(
   supabase: LearnSupabaseClient,
@@ -255,21 +257,66 @@ export async function declareKnown(
 ): Promise<void> {
   if (conceptIds.length === 0) return;
 
+  const declaredAt = new Date().toISOString();
   const { error } = await supabase.from('concept_state').upsert(
     conceptIds.map((conceptId) => ({
       concept_id: conceptId,
       user_id: userId,
       state: 'known',
       established: 'declared',
-      // Not tested, so not dated. `tested_at` is what "not checked since
+      // Not tested, so no `tested_at`. That column is what "not checked since
       // March" is read off, and a declaration has never been checked at all.
+      // The day you declared it goes in its own column, which is what lets a
+      // claim settled on your word come back for a question later.
       tested_at: null,
+      declared_at: declaredAt,
     })),
     { onConflict: 'concept_id' },
   );
 
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw fail('Marking those as known', error);
+}
+
+/**
+ * Mark one concept known because you said so about the case in front of you.
+ *
+ * The same row `declareKnown` writes, with one difference: this one overwrites
+ * whatever state is already there. That is wanted here. The case was offered
+ * about this one concept, on screen, and the answer given to it was that you
+ * are already sure -- so a `recognised` left by an earlier picked answer is
+ * exactly what the wave-through is replacing. It stays unwanted on the paste
+ * path, where the ids arrive as a list nobody read one at a time and a `shaky`
+ * a probe collected would be overwritten without being shown to anybody.
+ *
+ * `misconception` is cleared by the same write, as `settleConcept` clears it:
+ * the column is tied to the state by a check constraint, so a concept carrying
+ * a named misconception cannot move to `known` while the sentence is still on
+ * the row.
+ */
+export async function declareConceptKnown(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  conceptId: string,
+): Promise<void> {
+  const { error } = await supabase.from('concept_state').upsert(
+    {
+      concept_id: conceptId,
+      user_id: userId,
+      state: 'known',
+      established: 'declared',
+      misconception: null,
+      // Nothing was answered, so there is no tested date to write. What the
+      // row does carry is the day it was waved through, which is what the
+      // re-check schedule reads when a claim has no `tested_at`.
+      tested_at: null,
+      declared_at: new Date().toISOString(),
+    },
+    { onConflict: 'concept_id' },
+  );
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Marking that as known', error);
 }
 
 /** The names a subject already holds, which is all the generator needs of it. */

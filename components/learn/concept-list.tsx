@@ -43,7 +43,7 @@ export function ConceptRow({
             href={`/learn/c/${concept.id}`}
             className={cn(
               'text-ink hover:text-accent',
-              door ? 'text-lead font-semibold' : 'text-body font-medium',
+              door ? 'text-body font-semibold' : 'text-body font-medium',
             )}
           >
             {concept.name}

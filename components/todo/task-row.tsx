@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { TASK_STATUS_GLYPHS } from '@/lib/status-glyphs';
@@ -34,6 +35,7 @@ import {
   renameTaskAction,
   reopenTask,
   rescheduleTaskAction,
+  unpointTask,
 } from '@/app/todo/actions';
 import { openCount, SNOOZE_DAYS, type Task, type TaskStatus } from '@/lib/todo/tasks/model';
 import { InlineInput } from '@/components/ui/field';
@@ -148,6 +150,8 @@ export function TaskRow({
   const [editing, setEditing] = useState(false);
   /** Whether the box for writing the next item is open under this task. */
   const [adding, setAdding] = useState(false);
+  /** The anchor finder on a narrow row, which has no button of its own. */
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [pending, start] = useTransition();
   const [grabbed, setGrabbed] = useState(false);
   /** Which edge of this row the dragged task would land on, while it is over. */
@@ -246,6 +250,47 @@ export function TaskRow({
   function move(direction: 'up' | 'down') {
     act(() => moveTask(task.id, direction, [...siblings]));
   }
+
+  /**
+   * Everything the narrow row does not have space to draw, in the order the
+   * icon row draws it. Same writes, same wording as the buttons' own labels --
+   * a control that changes name when it moves into a menu is a second control
+   * to learn. An arrow with nowhere to go is left out here exactly as it is
+   * left out there.
+   */
+  const moreActions: ActionMenuItem[] = [
+    ...(index > 0 ? [{ id: 'up', label: 'Move up', onSelect: () => move('up') }] : []),
+    ...(index !== -1 && index < siblings.length - 1
+      ? [{ id: 'down', label: 'Move down', onSelect: () => move('down') }]
+      : []),
+    {
+      id: 'pin',
+      label: task.pinned ? 'Unpin' : 'Pin',
+      onSelect: () => run({ patch: { pinned: !task.pinned }, write: () => pinTask(task.id, !task.pinned) }),
+    },
+    task.snoozedUntil
+      ? {
+          id: 'back',
+          label: 'Bring back',
+          onSelect: () => run({ patch: { snoozedUntil: null }, write: () => bringBackTask(task.id) }),
+        }
+      : { id: 'later', label: 'Later', onSelect: later },
+    { id: 'add', label: 'Add an item', onSelect: () => setAdding(true) },
+    {
+      id: 'about',
+      label: anchor ? 'Point it at something else' : 'What is this about?',
+      onSelect: () => setAboutOpen(true),
+    },
+    ...(anchor
+      ? [
+          {
+            id: 'unlink',
+            label: 'Not about anything',
+            onSelect: () => act(() => unpointTask(task.id)),
+          },
+        ]
+      : []),
+  ];
 
   /** A row can be reordered when it is in a pile and still on the list. */
   const sortable = index !== -1 && !done && !dropped;
@@ -431,10 +476,18 @@ export function TaskRow({
 
         {/* Visible on hover on a pointer, always on a touch screen -- where there
           is no hover and a row whose actions never appear is a row you cannot
-          act on. */}
+          act on.
+
+          Which is also why the two widths are not the same set. On a pointer
+          these eight are invisible until the row is pointed at, so they cost
+          the page nothing; on a phone they are all on screen, all the time,
+          against a title that has to share the line with them -- eight icons
+          and a task you can no longer read. Narrow gets the three that earn
+          the room, and everything else moves into one menu behind them.
+          Law 9. */}
         <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
           {!done && !dropped && (
-            <>
+            <span className="hidden sm:contents">
               {/* The arrows are how a task moves without a pointer: a touch
                 screen cannot drag the grip, and neither can a keyboard. So
                 they stand down where there is a pointer -- but come back the
@@ -501,7 +554,31 @@ export function TaskRow({
                 page resolved, so the unlink half only appears where there is
                 a link to remove. */}
               <TaskAbout taskId={task.id} linked={Boolean(anchor)} />
-            </>
+            </span>
+          )}
+
+          {/* The same row on a phone: drop, edit, and the rest behind the three
+            dots. Those two are out here rather than in the menu because they
+            are what a task gets once it is no longer just a checkbox --
+            everything else is a second thought, and reads fine one press
+            further away. */}
+          {!done && !dropped && (
+            <span className="flex items-center gap-0.5 sm:hidden">
+              <IconButton label="Drop" onClick={drop}>
+                <X className="size-3.5" strokeWidth={1.75} aria-hidden />
+              </IconButton>
+              <IconButton label="Edit everything" onClick={() => setEditing(true)}>
+                <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
+              </IconButton>
+              <ActionMenu label="More actions" items={moreActions} />
+              {/* Drawn with no trigger of its own -- the menu above opens it. */}
+              <TaskAbout
+                taskId={task.id}
+                linked={Boolean(anchor)}
+                open={aboutOpen}
+                onOpenChange={setAboutOpen}
+              />
+            </span>
           )}
 
           {(done || dropped) && (

@@ -4,6 +4,7 @@ import { runInboxIncrementalSync } from '@/inngest/cron/inbox';
 import { runJobSweep } from '@/inngest/jobs/cron/sweep';
 import { runJdBackfill } from '@/inngest/jobs/cron/jd-backfill';
 import { runVaultSyncForAll } from '@/inngest/vault/sync';
+import { runClaimSweep } from '@/inngest/dev/claims';
 import { runDevDigest } from '@/inngest/dev/digest';
 
 // Long enough for the pump it starts: PUMP_BUDGET_MS is what that work is
@@ -24,6 +25,10 @@ export const maxDuration = 300;
  * quietly stops telling the truth. The vault comes after both: it is the
  * newest stage, and nothing reads it yet, so its freshness buys nothing today
  * and it must never be what delays a stage that does matter.
+ *
+ * The claim sweep and the digest are both about the dev pages, and they are in
+ * that order because the sweep corrects rows the digest then reports: a step
+ * whose session died is put back before the summary lists what is underway.
  *
  * The digest is last because it summarises the day, and a note fixed
  * overnight should be on the morning summary of the day it was fixed rather
@@ -46,6 +51,7 @@ export async function GET(request: NextRequest) {
     { name: 'jobs-sweep', run: () => runJobSweep() },
     { name: 'jd-backfill', run: () => runJdBackfill() },
     { name: 'vault', run: () => runVaultSyncForAll() },
+    { name: 'plan-claims', run: () => runClaimSweep() },
     { name: 'dev-digest', run: () => runDevDigest() },
   ];
 

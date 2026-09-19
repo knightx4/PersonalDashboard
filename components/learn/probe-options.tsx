@@ -37,7 +37,7 @@ function AnswerButton({
         // as many lines as the answer needs, where Button is centred on one
         // line at the dial's height. Same call as components/todo/task-form.
         'w-full rounded-control border border-border px-4 py-3 text-left text-body text-ink',
-        'hover:border-accent hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-70',
+        'hover:bg-accent-tint disabled:cursor-not-allowed disabled:opacity-70',
       )}
     >
       {label}
@@ -50,8 +50,12 @@ export function ProbeOptions({
   answered,
 }: {
   options: string[];
-  /** Null until the question has been answered. */
-  answered?: { correctIndex: number; chosenIndex: number } | null;
+  /**
+   * Null until the question has been answered. The indexes are absent on an
+   * answer that was typed rather than picked, which this never marks: it is
+   * the multiple-choice rung's own control.
+   */
+  answered?: { correctIndex?: number; chosenIndex?: number } | null;
 }) {
   return (
     <>

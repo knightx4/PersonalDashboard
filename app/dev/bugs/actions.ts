@@ -3,9 +3,11 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { isOwner, requireOwner } from '@/lib/dev/owner';
 import { codeMatches } from '@/lib/feedback/code';
-import { fireFeatureRoutine, notesRoutine } from '@/lib/feedback/routine';
+import { notesRoutine } from '@/lib/feedback/routine';
 import { OUTSTANDING_STATUSES } from '@/lib/feedback/load';
+import { startRoutineRun } from '@/lib/plan/runs';
 
 /** One queue, one page. The old per-workspace pages redirect to it. */
 function revalidateFeedback(): void {
@@ -23,6 +25,31 @@ const submitSchema = z.object({
   pagePath: z.string().max(300).nullable(),
 });
 
+/**
+ * File a note -- a bug or a request -- from the header panel.
+ *
+ * The one action in this file that is open to every signed-in account, and the
+ * one exception #417 makes. The button that posts it is in the header on every
+ * page of the app, not inside /dev, so locking it to the owner would take the
+ * capture away from the two accounts most likely to hit something and least
+ * able to do anything else about it. Everything else here is triage -- reading,
+ * rewording, closing and deleting other people's notes, and starting the run
+ * that works them -- and that is the owner's, so it goes through `requireOwner`
+ * below.
+ *
+ * `requireUser`, not `requireOwner`, on purpose. Do not "fix" it.
+ *
+ * The submit code goes the same way. It is the owner's code, printed nowhere
+ * and known to nobody else, so asking a second account for it would be asking
+ * for a value they cannot have -- the panel does not even draw the box for
+ * them (#418). Still asked of the owner, because for them it is what stops a
+ * note being filed by a page left open on a shared screen, and dropping it
+ * would be weakening a check that is working.
+ *
+ * So: owner and wrong code is refused, exactly as before. Anyone else signed
+ * in files without one, and whatever they typed in a field that is not there
+ * is not read.
+ */
 // latency: pending
 export async function submitFeedback(
   _prev: FeedbackActionState,
@@ -31,7 +58,7 @@ export async function submitFeedback(
   const user = await requireUser();
   const supabase = await createClient();
 
-  if (!codeMatches(String(formData.get('code') ?? ''))) {
+  if ((await isOwner({ user, supabase })) && !codeMatches(String(formData.get('code') ?? ''))) {
     return { error: 'That code is not right.' };
   }
 
@@ -75,8 +102,8 @@ export async function updateFeedbackStatus(
   _prev: FeedbackActionState,
   formData: FormData,
 ): Promise<FeedbackActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   const status = statusSchema.safeParse(formData.get('status'));
@@ -123,8 +150,8 @@ export async function editFeedback(
   _prev: FeedbackActionState,
   formData: FormData,
 ): Promise<FeedbackActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const parsed = editSchema.safeParse({
     id: formData.get('id'),
@@ -185,8 +212,8 @@ export async function respondToFeedback(
   _prev: FeedbackActionState,
   formData: FormData,
 ): Promise<FeedbackActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const parsed = respondSchema.safeParse({
     id: formData.get('id'),
@@ -233,8 +260,8 @@ export async function deleteFeedback(
   _prev: FeedbackActionState,
   formData: FormData,
 ): Promise<FeedbackActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing item.' };
@@ -263,12 +290,14 @@ export async function runFeatureRoutine(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _prev: FeedbackActionState, _formData: FormData,
 ): Promise<FeedbackActionState> {
-  await requireUser();
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
-  const routine = notesRoutine();
-  const result = await fireFeatureRoutine({
-    apiKey: routine.token,
-    routineId: routine.id,
+  const result = await startRoutineRun({
+    supabase,
+    userId: user.id,
+    job: 'notes',
+    routine: notesRoutine(),
   });
   if (!result.ok) return { error: result.error };
   return { message: result.detail };
@@ -303,8 +332,8 @@ const STALE_AFTER_MS = 2 * 60 * 60 * 1000;
 
 // latency: instant -- a read for the button's badge, fetched without anything waiting
 export async function routineRun(): Promise<RoutineRun | null> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const { data } = await supabase
     .from('feedback_items')
@@ -335,8 +364,8 @@ export async function routineRun(): Promise<RoutineRun | null> {
  */
 // latency: instant -- a read for the header badge, fetched without anything waiting
 export async function openFeedbackCount(): Promise<number> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const { count } = await supabase
     .from('feedback_items')
@@ -352,8 +381,8 @@ export async function setFeedbackPriority(
   _prev: FeedbackActionState,
   formData: FormData,
 ): Promise<FeedbackActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   const priority = z.coerce.number().int().min(1).max(3).safeParse(formData.get('priority'));

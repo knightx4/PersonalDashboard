@@ -4,6 +4,7 @@ import { createClient } from '@/lib/auth/server';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
+import { createNewsClient } from '@/lib/news/auth/server';
 import { TERMINAL_STATUSES } from '@/lib/jobs/pipeline';
 import { countOpenTasks } from '@/lib/todo/tasks/load';
 import { OUTSTANDING_STATUSES } from '@/lib/feedback/load';
@@ -32,14 +33,15 @@ async function safe<T>(query: PromiseLike<T>, fallback: T): Promise<T> {
 }
 
 export async function loadModuleCounts(userId: string): Promise<ModuleCounts> {
-  const [supabase, jobs, vault, learn] = await Promise.all([
+  const [supabase, jobs, vault, learn, news] = await Promise.all([
     createClient(),
     createJobsClient(),
     createVaultClient(),
     createLearnClient(),
+    createNewsClient(),
   ]);
 
-  const [items, pursuits, notes, tasks, toRead, openNotes] = await Promise.all([
+  const [items, pursuits, notes, tasks, toRead, unread, openNotes] = await Promise.all([
     safe(
       supabase
         .from('inventory_items')
@@ -78,6 +80,16 @@ export async function loadModuleCounts(userId: string): Promise<ModuleCounts> {
         .then((r) => r.count),
       null,
     ),
+    // What has come in and not been opened. Read is a timestamp rather than a
+    // flag, so "not read" is the column being null.
+    safe(
+      news
+        .from('issues')
+        .select('id', { count: 'exact', head: true })
+        .is('read_at', null)
+        .then((r) => r.count),
+      null,
+    ),
     // The dev workspace's own number: what is still waiting to be worked in
     // the notes queue, which is the only thing there anyone is behind on.
     safe(
@@ -97,6 +109,7 @@ export async function loadModuleCounts(userId: string): Promise<ModuleCounts> {
     todo: { value: tasks, noun: 'thing to do' },
     vault: { value: notes, noun: 'note' },
     learn: { value: toRead, noun: 'thing to read' },
+    news: { value: unread, noun: 'unread newsletter' },
     dev: { value: openNotes, noun: 'open note' },
   };
 }

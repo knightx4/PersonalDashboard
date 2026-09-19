@@ -8,6 +8,7 @@ import {
   Briefcase,
   Bug,
   Building2,
+  FileText,
   CalendarClock,
   CalendarDays,
   CalendarRange,
@@ -19,6 +20,7 @@ import {
   Lightbulb,
   List,
   ListTodo,
+  Mail,
   Map,
   Network,
   PencilLine,
@@ -76,6 +78,9 @@ export const NAV_ICONS = {
   changelog: History,
   ui: Shapes,
   surfaces: Frame,
+  // A specification is a document you read and argue with, so it gets the
+  // document glyph rather than another list icon.
+  specs: FileText,
   // Todo and vault
   //
   // Agenda is the list with something still unticked -- what needs you next,
@@ -100,6 +105,10 @@ export const NAV_ICONS = {
   // A quiz is answered in writing, which is the whole of what separates it
   // from being asked to recognise something, so it gets the pencil.
   quiz: PencilLine,
+  // News. An envelope, the same object the workspace's own mark draws, because
+  // the tab and the mark name the same thing and picking a second object for
+  // it would say there are two.
+  newsletters: Mail,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
 } as const;

@@ -9,7 +9,7 @@ import { cn } from '@/lib/cn';
 export default function Loading() {
   return (
     <div className="min-h-full">
-      <div className="h-14 border-b border-border bg-surface" />
+      <div className="h-14 bg-page" />
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
         <div className="border-b border-border-strong pb-6 pt-2">
           <Skeleton className="h-3.5 w-28" />

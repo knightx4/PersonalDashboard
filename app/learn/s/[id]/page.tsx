@@ -16,6 +16,7 @@ import {
   learningOrder,
   pruneForGoal,
   readyNow,
+  settledCount,
   type Graph,
 } from '@/lib/learn/graph/model';
 
@@ -153,7 +154,7 @@ export default async function SubjectPage({
         description={
           counts.total === 0
             ? 'Nothing in this graph yet.'
-            : `${counts.known} of ${counts.total} settled${
+            : `${settledCount(counts)} of ${counts.total} settled${
                 counts.misconception > 0
                   ? ` · ${counts.misconception} ${counts.misconception === 1 ? 'misconception' : 'misconceptions'}`
                   : ''

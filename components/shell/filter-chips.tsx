@@ -40,9 +40,9 @@ export function FilterChips({
         <Link
           key={`${chip.label}:${chip.value}`}
           href={chip.clearHref}
-          className="press group inline-flex items-center gap-1.5 rounded-full bg-accent-tint py-1 pl-2.5 pr-1.5 text-small font-medium text-accent transition-colors hover:bg-accent hover:text-surface"
+          className="press group inline-flex items-center gap-1.5 rounded-full bg-accent-tint py-1 pl-2.5 pr-1.5 text-small font-medium text-accent transition-colors hover:bg-accent hover:text-fill-ink"
         >
-          <span className="text-accent/70 group-hover:text-surface/70">{chip.label}</span>
+          <span className="text-accent/70 group-hover:text-fill-ink/70">{chip.label}</span>
           <span className="max-w-40 truncate">{chip.value}</span>
           <X className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />
           <span className="sr-only">Remove the {chip.label} filter</span>

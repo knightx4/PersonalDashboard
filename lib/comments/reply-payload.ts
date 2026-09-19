@@ -23,8 +23,28 @@ export const MAX_REPLY = 4000;
  * proposal, answering a question, starting or assigning a step, dismissing or
  * deleting anything. A name outside this list is refused by lib/comments/act.ts
  * with a sentence saying so, so a model inventing one changes nothing.
+ *
+ * `file_note` and `add_step` are here because the list used to cover ideas and
+ * nothing else: "write this up as a bug" and "add a step under this" both fell
+ * through to a session that read the whole repository to make one row. Writing
+ * a row is not a thing that needs the code read, and a capability that takes
+ * ten minutes to reach is one the person stops asking for.
+ *
+ * `build_step` is the one that writes a row and does not stop there: it is
+ * "just do it", said on a raise that already describes the work. #605 settled
+ * that the step it writes is not a proposal -- the raise named the work and
+ * the comment said to do it, so the comment is the approval -- and that it is
+ * handed to a session in the same press. Taking it back is setting the row to
+ * not started, which is a move on the page like any other.
  */
-export const ACTIONS = ['file_idea', 'reword', 'send_step'] as const;
+export const ACTIONS = [
+  'file_idea',
+  'file_note',
+  'add_step',
+  'reword',
+  'send_step',
+  'build_step',
+] as const;
 export type ActionName = (typeof ACTIONS)[number];
 
 /**
@@ -48,6 +68,15 @@ export const actionSchema = z.object({
    * what keeps a status, an assignee and a decision's answer out of reach.
    */
   field: z.string().trim().nullable().optional().default(null),
+  /** The paragraph under a new step, when the instruction carried one. */
+  detail: z.string().trim().nullable().optional().default(null),
+  /**
+   * Which kind of row to file: a bug or a feature request. Read as a plain
+   * string, and anything that is not 'feature' is filed as a bug — see
+   * lib/comments/act.ts, where a note filed under the wrong heading is a
+   * dropdown away from right and a note never filed is lost.
+   */
+  kind: z.string().trim().nullable().optional().default(null),
 });
 
 export type DashAction = z.infer<typeof actionSchema>;

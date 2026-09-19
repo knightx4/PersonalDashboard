@@ -7,7 +7,8 @@ import { PipelineBoard, type PipelineView } from '@/components/jobs/pipeline/boa
 import { PipelineViewToggle } from '@/components/jobs/pipeline/view-toggle';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
-import { SearchField } from '@/components/jobs/shell/search-field';
+import { SearchField } from '@/components/shell/search-field';
+import { SearchEmpty } from '@/components/shell/search-empty';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { loadPipeline, type PipelineRow } from '@/lib/jobs/applications/load';
@@ -131,7 +132,6 @@ export default async function PipelinePage({
         }
         actions={
           <>
-            <SearchField />
             <PipelineViewToggle view={view} />
             <Link href="/jobs/roles/new" className={buttonVariants({ size: 'sm' })}>
               Add a role
@@ -231,8 +231,25 @@ export default async function PipelinePage({
           </p>
         </LeftRail>
 
-        <div className="min-w-0 flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pr-1">
-          <PipelineBoard rows={filtered} view={view} />
+        <div className="flex min-w-0 flex-1 flex-col lg:min-h-0">
+          {/* Directly above the board it narrows, like every other list in the
+              app. It sat in the header row beside Add a role until now, which
+              was the last placement out of line. Outside the scroller on
+              purpose: the whole point of pinning the chrome is that changing
+              the search does not mean scrolling back up to it. */}
+          <div className="mb-4">
+            <SearchField placeholder="Search company or role" />
+          </div>
+
+          <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pr-1">
+            {filtered.length === 0 && terms.length > 0 ? (
+              /* Clearing the search leaves the source, the excitement and the
+                 coverage rails where they were. */
+              <SearchEmpty query={params.q ?? ''} />
+            ) : (
+              <PipelineBoard rows={filtered} view={view} />
+            )}
+          </div>
         </div>
       </div>
     </div>

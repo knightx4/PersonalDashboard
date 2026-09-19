@@ -7,6 +7,7 @@ import { Group } from '@/components/ui/disclosure';
 import {
   ESTABLISHED_LABEL,
   LastChecked,
+  RUNG_LABEL,
   STATE_LABEL,
   StateMark,
 } from '@/components/learn/concept-state';
@@ -15,7 +16,10 @@ import { MasteryChecks } from '@/components/learn/mastery-checks';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createLearnClient } from '@/lib/learn/auth/server';
+import { splitCase } from '@/lib/learn/graph/applied-payload';
 import { loadConceptView } from '@/lib/learn/graph/concept';
+import { claimWordingLine } from '@/lib/learn/graph/last-answered';
+import { askedBeforeRewrite } from '@/lib/learn/graph/rewrite';
 import { probesFor, type ProbeRow } from '@/lib/learn/graph/session';
 import { openingQuestionFor } from '@/lib/learn/graph/opening';
 import type { Concept, Mentioned } from '@/lib/learn/graph/model';
@@ -34,10 +38,12 @@ export const dynamic = 'force-dynamic';
  * claim that mentions this one, from a highlight somebody wants to branch off
  * -- and it computes nothing the subject page does not already compute.
  *
- * Two things on it write, and both ask first: taking a gap to the reading
- * queue, which is the same action and the same two ids as the card it came
- * from, and branching a chain off a phrase selected in the claim, which is
- * proposed and approved like any other goal.
+ * Three things on it write. Two ask first: taking a gap to the reading queue,
+ * which is the same action and the same two ids as the card it came from, and
+ * branching a chain off a phrase selected in the claim, which is proposed and
+ * approved like any other goal. The third is rewriting the claim, which needs
+ * no proposal because the words are yours -- what the app wrote is kept, and
+ * the page says which of you wrote the sentence being read.
  */
 
 function ConceptLink({ concept }: { concept: Concept }) {
@@ -74,9 +80,7 @@ function MentionLink({ mention }: { mention: Mentioned }) {
         >
           {mention.concept.name}
         </Link>
-        <span className="ml-2 text-small text-ink-muted">
-          {STATE_LABEL[mention.concept.state]}
-        </span>
+        <span className="ml-2 text-small text-ink-muted">{STATE_LABEL[mention.concept.state]}</span>
         <p className="text-small text-ink-muted">{mention.basis}</p>
       </div>
     </li>
@@ -84,21 +88,74 @@ function MentionLink({ mention }: { mention: Mentioned }) {
 }
 
 /**
- * What was asked and what it settled.
+ * What was asked, at which rung, and what it settled.
  *
  * The reason is shown only for a question that was answered, which is the
  * rule the probe session works to: it was written at the same time as the
- * question, and reading it first is reading the answer.
+ * question, and reading it first is reading the answer. The answer a case was
+ * written with follows the same rule, for the same reason.
+ *
+ * A question written before the claim was last rewritten says so. #382
+ * settled that the answers keep their value -- rewriting a claim is usually
+ * tidying a sentence rather than deciding the app had the idea wrong -- but
+ * the page must not go on implying you were tested on wording that is no
+ * longer there. Two timestamps compared, and nothing written.
  */
-function Probe({ probe }: { probe: ProbeRow }) {
-  const chosen = probe.chosenIndex === null ? null : probe.options[probe.chosenIndex];
-  const correct = probe.options[probe.correctIndex];
+function Probe({ probe, claimRewrittenAt }: { probe: ProbeRow; claimRewrittenAt: string | null }) {
+  const earlier = askedBeforeRewrite(probe.askedAt, claimRewrittenAt);
+
+  // An applied case has no options and nothing picked: the situation, what was
+  // typed and how it was graded are what there is to show. The two halves of
+  // the case are stored in one column and split back out here, so the thing to
+  // say about the situation reads as its own paragraph the way it does in the
+  // session.
+  if (probe.rung !== 'recognise') {
+    const { situation, question } = splitCase(probe.question);
+    const answered = probe.response !== null;
+    const right = probe.responseCorrect === true;
+
+    return (
+      <li>
+        <p className="text-small text-ink-muted">{RUNG_LABEL[probe.rung]}</p>
+        {situation && <p className="mt-0.5 text-ui text-ink">{situation}</p>}
+        <p className="mt-0.5 text-ui text-ink">{question}</p>
+        {earlier && (
+          <p className="text-small text-ink-muted">
+            Written against the earlier wording of this claim.
+          </p>
+        )}
+        <p
+          className={
+            answered && !right ? 'mt-1 text-small text-danger' : 'mt-1 text-small text-ink-muted'
+          }
+        >
+          {answered ? `You wrote “${probe.response}”.` : 'Asked, not answered.'}
+        </p>
+        {answered && probe.gradeReason !== null && (
+          <p className="mt-0.5 text-small text-ink-muted">{probe.gradeReason}</p>
+        )}
+        {answered && probe.expected !== null && (
+          <p className="mt-0.5 text-small text-ink-muted">The answer expected: {probe.expected}</p>
+        )}
+      </li>
+    );
+  }
+
+  const options = probe.options ?? [];
+  const chosen = probe.chosenIndex === null ? null : options[probe.chosenIndex];
+  const correct = probe.correctIndex === null ? null : options[probe.correctIndex];
   const right = probe.chosenIndex === probe.correctIndex;
 
   return (
     <li>
-      <p className="text-ui text-ink">{probe.question}</p>
-      <p className={right ? 'text-small text-ink-muted' : 'text-small text-danger'}>
+      <p className="text-small text-ink-muted">{RUNG_LABEL[probe.rung]}</p>
+      <p className="mt-0.5 text-ui text-ink">{probe.question}</p>
+      {earlier && (
+        <p className="text-small text-ink-muted">
+          Written against the earlier wording of this claim.
+        </p>
+      )}
+      <p className={right ? 'mt-1 text-small text-ink-muted' : 'mt-1 text-small text-danger'}>
         {chosen === null
           ? 'Asked, not answered.'
           : right
@@ -150,8 +207,22 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
 
       <PageHeader title={concept.name} />
 
-      {/* The claim, and the offer to branch off a phrase in it. */}
-      <BranchFromClaim conceptId={concept.id} claim={concept.claim} />
+      {/* The claim, the offer to branch off a phrase in it, and the way to
+          write it yourself. */}
+      <BranchFromClaim
+        conceptId={concept.id}
+        claim={concept.claim}
+        wording={claimWordingLine(concept.claimRewrittenAt, new Date(), settings.timezone)}
+      />
+
+      {/* What the app first wrote, once there is a version of yours sitting
+          where it was. Nothing to show on a claim you have never rewritten,
+          and no heading either. */}
+      {concept.claimOriginal && (
+        <Group title="What the app first wrote" className="mb-5">
+          <p className="max-w-prose text-ui text-ink-muted">{concept.claimOriginal}</p>
+        </Group>
+      )}
 
       <CardSection title="Where it stands" className="mb-5">
         <p className="flex gap-2 text-ui text-ink">
@@ -166,7 +237,9 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
             the question was yesterday or in March. */}
         <LastChecked concept={concept} timezone={settings.timezone} className="mt-1 pl-6" />
 
-        {concept.misconception && <p className="mt-2 text-ui text-danger">{concept.misconception}</p>}
+        {concept.misconception && (
+          <p className="mt-2 text-ui text-danger">{concept.misconception}</p>
+        )}
 
         {/* Which kind of node it is, said only when somebody judged it: a
             concept from before the marks existed says nothing here. */}
@@ -259,7 +332,7 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
         hint={
           probes.length === 0
             ? undefined
-            : 'Newest first, with what you picked and why the answer is the answer.'
+            : 'Newest first, with the rung each was asked at and why the answer is the answer.'
         }
       >
         {probes.length === 0 ? (
@@ -276,7 +349,7 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
         ) : (
           <ul className="space-y-3">
             {probes.map((probe) => (
-              <Probe key={probe.id} probe={probe} />
+              <Probe key={probe.id} probe={probe} claimRewrittenAt={concept.claimRewrittenAt} />
             ))}
           </ul>
         )}

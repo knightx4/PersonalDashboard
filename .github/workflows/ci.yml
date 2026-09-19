@@ -59,6 +59,30 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Includes both cross-user isolation tests, each of which fails
+      # automatically if a table is added to its schema without an RLS policy,
+      # and the coexistence test that proves neither app's migrations reach
+      # into the other's schema.
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  # The design checks read source files and need neither a database nor a
+  # build, so they run beside the check job rather than inside it. A design
+  # finding still marks the run red; what it no longer does is stop the tests
+  # and the build from running at all.
+  design:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
       # Five themes is five times the surface area for a contrast bug to hide
       # in, and "it looked fine on my screen" is how all of them get shipped.
       - name: Contrast
@@ -69,16 +93,6 @@ jobs:
       # new file is held to zero from its first line. See scripts/check-ui.ts.
       - name: UI laws
         run: npm run check:ui
-
-      # Includes both cross-user isolation tests, each of which fails
-      # automatically if a table is added to its schema without an RLS policy,
-      # and the coexistence test that proves neither app's migrations reach
-      # into the other's schema.
-      - name: Test
-        run: npm test
-
-      - name: Build
-        run: npm run build
 
   audit:
     runs-on: ubuntu-latest

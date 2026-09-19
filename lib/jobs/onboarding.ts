@@ -1,6 +1,6 @@
 import 'server-only';
 
-import type { User } from '@supabase/supabase-js';
+import type { SessionUser } from '@/lib/auth/session-user';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { countConnectedInboxes } from '@/lib/core/inbox/accounts';
 import { saveAccountIdentity } from '@/lib/core/account/settings';
@@ -16,7 +16,7 @@ import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 export async function onboardingNeeded(
   supabase: AppSupabaseClient,
   core: CoreSupabaseClient,
-  user: User,
+  user: SessionUser,
 ): Promise<boolean> {
   const { data: profile, error } = await supabase
     .from('profiles')

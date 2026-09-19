@@ -23,6 +23,7 @@ const { AppShell } = await import('@/components/shell/app-shell');
 function render(sections: NavSection[], settingsHref?: string) {
   return renderToStaticMarkup(
     <AppShell
+      account="11111111-1111-4111-8111-111111111111"
       module={null}
       sections={sections}
       settingsHref={settingsHref}

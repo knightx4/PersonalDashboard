@@ -19,6 +19,7 @@ function track(id: string, branchedFrom: string | null = null): TrackSummary {
     createdAt: '2026-09-12T00:00:00Z',
     branchedFrom,
     progress: { read: 0, remaining: 0, abandoned: 0, fraction: 0 },
+    matches: [],
   };
 }
 

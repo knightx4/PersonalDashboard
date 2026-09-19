@@ -80,3 +80,25 @@ export function lastCheckedLine(
   if (!when) return null;
   return when.today ? 'Last checked today.' : `Last checked on ${when.date}.`;
 }
+
+/**
+ * Whose words the claim is in.
+ *
+ * Here rather than beside the rewrite itself because it is the same date in
+ * the same timezone as the two lines above, said the same way. Always a line:
+ * a claim nobody has touched is in the app's words, and that is a fact about
+ * it worth saying out loud, not an absence to leave blank. A timestamp that
+ * will not parse still means somebody wrote the sentence, so it says that
+ * much and drops the date.
+ */
+export function claimWordingLine(
+  rewrittenAt: string | null,
+  now: Date,
+  timezone: string,
+): string {
+  if (!rewrittenAt) return 'In the app’s words.';
+
+  const when = dayOrToday(rewrittenAt, now, timezone);
+  if (!when) return 'In your words.';
+  return when.today ? 'In your words, written today.' : `In your words, written on ${when.date}.`;
+}

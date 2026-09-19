@@ -32,6 +32,7 @@ import { ReadingCard } from '@/components/learn/reading-card';
 import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
 import type { Concept } from '@/lib/learn/graph/model';
+import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
 import {
@@ -464,6 +465,8 @@ const reviewRows: ReviewRow[] = [
     id: 'r1',
     subject: 'Your application to Monzo — Backend Engineer, Payments',
     fromAddress: 'no-reply@greenhouse.io',
+    threadId: 'thread-monzo-payments',
+    replyToAddress: 'careers@monzo.example',
     receivedAt: '2026-09-09T07:41:00.000Z',
     classification: 'confirmation',
     reason: 'Sent by an ATS, and no pursuit on file matches the job id.',
@@ -489,6 +492,9 @@ const reviewRows: ReviewRow[] = [
     id: 'r2',
     subject: 'Following up',
     fromAddress: 'kate@thehiringpartners.example',
+    // The unplaceable one has neither, which is why the matcher has nothing.
+    threadId: null,
+    replyToAddress: null,
     receivedAt: '2026-09-08T16:03:00.000Z',
     classification: 'other',
     reason: 'A person wrote it, and nothing in it names a role.',
@@ -1134,6 +1140,8 @@ const subjectConcepts: Concept[] = [
     name: 'Opportunity cost',
     claim:
       'A choice costs you the next best thing you could have done with the same time or money, whether or not any of it changed hands.',
+    claimOriginal: null,
+    claimRewrittenAt: null,
     basis: 'Standard in any first-year sequence, and the one the rest of the chain rests on.',
     kind: 'threshold',
     state: 'shaky',
@@ -1141,12 +1149,15 @@ const subjectConcepts: Concept[] = [
     misconception: null,
     mastery: [],
     testedAt: '2026-09-02T09:00:00.000Z',
+    declaredAt: null,
   },
   {
     id: 'k2',
     name: 'Marginal thinking',
     claim:
       'The question is always what one more unit costs and returns, not what the whole activity is worth on average.',
+    claimOriginal: null,
+    claimRewrittenAt: null,
     basis: 'Named in the goal, and every model after it assumes you have it.',
     kind: 'threshold',
     state: 'unknown',
@@ -1154,11 +1165,14 @@ const subjectConcepts: Concept[] = [
     misconception: null,
     mastery: [],
     testedAt: null,
+    declaredAt: null,
   },
   {
     id: 'k3',
     name: 'Sunk cost',
     claim: 'Money already spent is not a reason to continue, because it is gone under either choice.',
+    claimOriginal: null,
+    claimRewrittenAt: null,
     basis: 'Follows from opportunity cost once the counterfactual is the comparison.',
     kind: 'consequence',
     state: 'misconception',
@@ -1166,11 +1180,14 @@ const subjectConcepts: Concept[] = [
     misconception: 'You treat the amount already spent as part of what continuing is worth.',
     mastery: [],
     testedAt: '2026-09-05T18:30:00.000Z',
+    declaredAt: null,
   },
   {
     id: 'k4',
     name: 'Deadweight loss',
     claim: 'A tax that changes behaviour destroys trades that both sides wanted, and that loss goes to nobody.',
+    claimOriginal: null,
+    claimRewrittenAt: null,
     basis: 'Inferred from the goal, not checked against a syllabus.',
     kind: 'consequence',
     state: 'unknown',
@@ -1178,6 +1195,7 @@ const subjectConcepts: Concept[] = [
     misconception: null,
     mastery: [],
     testedAt: null,
+    declaredAt: null,
   },
 ];
 
@@ -1401,16 +1419,16 @@ const commentThread: DevComment[] = [
     author: 'claude',
     body: `The filter reads \`assignee\` off the row itself. The tree only rolls it up for the counts in the strip at the top of the page, so the view and the count can disagree and neither is wrong.
 
-#412 is there because its parent was handed over, and handing a feature over cascades the same way approving does:
+#412 is there because approving a step is what puts it in that view -- nothing has to be handed over separately:
 
-- \`handStepToClaude\` sets the assignee on the step and on every open step beneath it.
-- The queue the send-all button works is \`handedToClaude\`, which leaves out decisions and anything already closed.
-- The badge on the row is the column and nothing else, which is why it appears on children you did not press anything on.
+- \`handStepToClaude\` sets the assignee on the step it was pressed on.
+- The runner's list is \`workOrder\`, which leaves out decisions and anything already closed.
+- The badge on the row is the column and nothing else, which is why it appears on rows you did not press anything on.
 
 If you want the child back, take it back from its own menu -- that writes the column on that one row and leaves the parent alone:
 
 \`\`\`ts
-const queue = handedToClaude(sections);
+const ready = workOrder(sections, { assignee: 'claude' });
 \`\`\`
 
 The rule is written down in [the plan spec](https://example.com/docs/PLAN-SPEC.md), under how a feature is worked. Anything pasted in, <b>markup included</b>, is shown as the text it is.`,
@@ -1478,6 +1496,20 @@ function SharedDisplayOptions() {
     </div>
   );
 }
+
+/** The job search's ten sections, as its layout lists them. */
+const shellSections: NavSection[] = [
+  { href: '/jobs/today', label: 'This week', icon: 'week' },
+  { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
+  { href: '/jobs/roles', label: 'Roles', icon: 'roles' },
+  { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
+  { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
+  { href: '/jobs/interviews', label: 'Interviews', icon: 'interviews' },
+  { href: '/jobs/answers', label: 'Answers', icon: 'answers' },
+  { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
+  { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
+  { href: '/jobs/review', label: 'Review', icon: 'review', badge: 4 },
+];
 
 export const SURFACES: readonly Surface[] = [
   {
@@ -1551,18 +1583,70 @@ export const SURFACES: readonly Surface[] = [
   {
     /* The thread on a dev row, in the middle of an exchange. The waiting line
      * is up as well: it is only on screen while a tagged comment is being
-     * answered, which is a few seconds nobody can hold still for a shot. */
+     * answered, which is a few seconds nobody can hold still for a shot.
+     *
+     * In a card, because the thread's ground is a well inside one: every
+     * caller draws it there, and the whole point of the ground is the step
+     * down from the card behind it. Shot on the page ground alone it would be
+     * a panel floating on a bench, which is not a thing the app has. */
     id: 'dev-comment-thread',
     label: 'Comments · a thread on a plan step',
     module: 'dev',
     width: 'narrow',
     render: () => (
-      <CommentThread
-        target="step"
-        id="00000000-0000-4000-8000-000000000412"
-        thread={commentThread}
-        awaitingReply
-      />
+      <div className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}>
+        <p className="text-body text-ink">
+          The filter and the count disagree on who a step is handed to.
+        </p>
+        <CommentThread
+          target="step"
+          id="00000000-0000-4000-8000-000000000412"
+          thread={commentThread}
+          awaitingReply
+        />
+      </div>
+    ),
+  },
+  {
+    /* The same component on a row nobody has written on, which is the state
+     * that draws no panel at all: a ground round a single Add a comment button
+     * is a section announcing it has nothing in it -- law 1. Worth its own
+     * surface because it is what the thread looks like on most rows. */
+    id: 'dev-comment-thread-empty',
+    label: 'Comments · a row with nothing on it',
+    module: 'dev',
+    width: 'narrow',
+    render: () => (
+      <div className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}>
+        <p className="text-body text-ink">
+          The filter and the count disagree on who a step is handed to.
+        </p>
+        <CommentThread target="step" id="00000000-0000-4000-8000-000000000413" thread={[]} />
+      </div>
+    ),
+  },
+  {
+    /* The box, open, which is the only state the send control can be looked at
+     * in: it is a trigger until it is pressed, so nothing in the app renders
+     * it standing open and `composerOpen` is the only way a shot reaches it.
+     * Empty, so the send control is in its disabled state and the line under
+     * the words says a note reaches nobody until it is tagged. */
+    id: 'dev-comment-thread-composer',
+    label: 'Comments · the box you send from',
+    module: 'dev',
+    width: 'narrow',
+    render: () => (
+      <div className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}>
+        <p className="text-body text-ink">
+          The filter and the count disagree on who a step is handed to.
+        </p>
+        <CommentThread
+          target="step"
+          id="00000000-0000-4000-8000-000000000414"
+          thread={commentThread}
+          composerOpen
+        />
+      </div>
     ),
   },
   {
@@ -1784,6 +1868,41 @@ export const SURFACES: readonly Surface[] = [
     module: 'shopping',
     width: 'wide',
     render: () => <SharedDisplayOptions />,
+  },
+
+  {
+    /* The whole shell, which no other surface shows: the sidebar, the top bar,
+     * and a real page inside them. Every other entry here is a panel on the
+     * page's ground, so the chrome -- where most of the app's character
+     * actually lives -- had never been photographed at all.
+     *
+     * The props are the ones app/jobs/(app)/layout.tsx passes, copied rather
+     * than imported because that layout reads a session and a database and
+     * this route reads neither. */
+    id: 'shell-full',
+    label: 'The shell · Sidebar, top bar and a page',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AppShell
+        account="preview"
+        module="jobs"
+        sections={shellSections}
+        settingsHref="/jobs/settings"
+        settingsLabel="Job search settings"
+        feedbackHref="/dev/bugs"
+        displayName="Chris"
+        email="chris@example.com"
+        // The picture is of the owner's shell, which is the one with every
+        // workspace in the switcher.
+        isOwner
+        counts={{ jobs: '12', shopping: '3', todo: '8' }}
+        theme={{ kind: 'written', id: 'paper' }}
+        brief={null}
+      >
+        <TodayLists board={todayBoard} timezone="Europe/London" />
+      </AppShell>
+    ),
   },
 
   /* The page anatomies, framed at two widths by the anatomy section on

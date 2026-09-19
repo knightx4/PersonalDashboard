@@ -98,6 +98,17 @@ async function seedMention(
     values (${userId}, ${subjectId}, ${source}, ${target}, 'Seeded by the test.')`;
 }
 
+/** A concept cross-listed into a second subject. */
+async function seedConceptSubject(
+  userId: string,
+  conceptId: string,
+  subjectId: string,
+): Promise<void> {
+  await admin`
+    insert into concept_subjects (user_id, concept_id, subject_id, basis)
+    values (${userId}, ${conceptId}, ${subjectId}, 'Seeded by the test.')`;
+}
+
 /**
  * A note in the vault, which a quiz source names by id and never copies.
  *
@@ -182,6 +193,12 @@ beforeAll(async () => {
   );
   conceptB1 = await seedConcept(userB, subjectB, 'Bob knows a thing', 'Bob has his own claim.');
 
+  // Cross-listed into a second subject, which is the case concept_subjects
+  // exists for: a concept that genuinely sits in two places rather than one
+  // filed arbitrarily or written twice.
+  const subjectA2 = await seedSubject(userA, 'Urban design');
+  await seedConceptSubject(userA, conceptA1, subjectA2);
+
   await seedEdge(userA, subjectA, conceptA1, conceptA2);
   await seedEdge(userA, subjectA, conceptA2, conceptA3);
 
@@ -252,6 +269,7 @@ describe('RLS coverage', () => {
       union all select 'concepts', count(*)::int from concepts
       union all select 'concept_edges', count(*)::int from concept_edges
       union all select 'concept_mentions', count(*)::int from concept_mentions
+      union all select 'concept_subjects', count(*)::int from concept_subjects
       union all select 'goals', count(*)::int from goals
       union all select 'concept_state', count(*)::int from concept_state
       union all select 'probes', count(*)::int from probes
@@ -279,7 +297,8 @@ describe('cross-user reads', () => {
       openingQuestions: (await tx`select id from opening_questions`).length,
     }));
     expect(seen).toEqual({
-      subjects: 1,
+      // Economics, plus the Urban design subject the cross-listing needed.
+      subjects: 2,
       concepts: 3,
       edges: 2,
       mentions: 2,
@@ -552,6 +571,112 @@ describe('which check a question was written against', () => {
   });
 });
 
+describe('which rung a question was asked at', () => {
+  type Recognise = {
+    options?: string[] | null;
+    correctIndex?: number | null;
+    reason?: string | null;
+    response?: string | null;
+  };
+
+  async function seedRecognise(row: Recognise = {}): Promise<unknown> {
+    const options = row.options === undefined ? ['It steepens', 'It vanishes'] : row.options;
+    const correctIndex = row.correctIndex === undefined ? 1 : row.correctIndex;
+    const reason = row.reason === undefined ? 'Because of the mechanism.' : row.reason;
+    return admin`
+      insert into probes (user_id, concept_id, question, options, correct_index, reason, response)
+      values (${userA}, ${conceptA1}, 'What follows?',
+              ${options === null ? null : admin.json(options)}, ${correctIndex}, ${reason},
+              ${row.response ?? null})`;
+  }
+
+  type Applied = {
+    options?: string[] | null;
+    correctIndex?: number | null;
+    expected?: string | null;
+    response?: string | null;
+    responseCorrect?: boolean | null;
+    gradeReason?: string | null;
+    answered?: boolean;
+  };
+
+  const CASE_QUESTION = 'A firm freezes pay for a year. What happens to its real wage bill?';
+  const CASE_EXPECTED = 'It falls: prices keep rising while the nominal bill does not.';
+
+  async function seedApplied(row: Applied = {}): Promise<unknown> {
+    const expected = row.expected === undefined ? CASE_EXPECTED : row.expected;
+    return admin`
+      insert into probes (user_id, concept_id, rung, question, options, correct_index,
+                          expected, response, response_correct, grade_reason, answered_at)
+      values (${userA}, ${conceptA1}, 'apply', ${CASE_QUESTION},
+              ${row.options ? admin.json(row.options) : null}, ${row.correctIndex ?? null},
+              ${expected}, ${row.response ?? null}, ${row.responseCorrect ?? null},
+              ${row.gradeReason ?? null}, ${row.answered ? new Date() : null})`;
+  }
+
+  it('reads a question stored without a rung as recognise', async () => {
+    await seedRecognise();
+    const [row] = await admin<{ rung: string }[]>`
+      select rung from probes where concept_id = ${conceptA1}
+      order by created_at desc limit 1`;
+    expect(row.rung).toBe('recognise');
+  });
+
+  it('takes an applied case with no options and a graded typed answer', async () => {
+    await seedApplied({
+      response: 'The real bill falls, because inflation carries on.',
+      responseCorrect: true,
+      gradeReason: 'Names the mechanism, not just the direction.',
+      answered: true,
+    });
+    const [row] = await admin<
+      { options: unknown; response: string; response_correct: boolean; expected: string }[]
+    >`select options, response, response_correct, expected from probes
+      where concept_id = ${conceptA1} and rung = 'apply'
+      order by created_at desc limit 1`;
+    expect(row.options).toBeNull();
+    expect(row.expected).toBe(CASE_EXPECTED);
+    expect(row.response).toBe('The real bill falls, because inflation carries on.');
+    expect(row.response_correct).toBe(true);
+  });
+
+  it('refuses a multiple-choice question with no options', async () => {
+    await expect(seedRecognise({ options: null, correctIndex: null })).rejects.toThrow();
+  });
+
+  it('refuses an applied case carrying options', async () => {
+    // A row cannot be half of each kind. Four options would be rendered and a
+    // typed answer graded, on the same question.
+    await expect(seedApplied({ options: ['One', 'Two'], correctIndex: 0 })).rejects.toThrow();
+  });
+
+  it('refuses an applied case with no expected answer', async () => {
+    // Written with the question and shown afterwards. Without it there is
+    // nothing to grade against and nothing to show.
+    await expect(seedApplied({ expected: null })).rejects.toThrow();
+  });
+
+  it('refuses a typed answer on a multiple-choice question', async () => {
+    await expect(seedRecognise({ response: 'Typed at the wrong rung.' })).rejects.toThrow();
+  });
+
+  it('refuses a grade with nothing graded', async () => {
+    await expect(
+      seedApplied({ responseCorrect: false, gradeReason: 'Restates the question.' }),
+    ).rejects.toThrow();
+  });
+
+  it('refuses a typed answer nobody graded', async () => {
+    await expect(seedApplied({ response: 'Something.', answered: true })).rejects.toThrow();
+  });
+
+  it('refuses an answered applied case with nothing typed', async () => {
+    // Answered is a fact with two halves on every rung. Which column holds the
+    // answer is what the rung decides.
+    await expect(seedApplied({ answered: true })).rejects.toThrow();
+  });
+});
+
 describe('which concepts are doors into the subject', () => {
   // Two values and no third, and the absence of one is what an unjudged
   // concept looks like. A default here would say something nobody checked.
@@ -585,6 +710,54 @@ describe('which concepts are doors into the subject', () => {
       admin`insert into concepts (user_id, subject_id, name, claim, basis, kind)
             values (${userA}, ${subjectA}, 'Maybe', 'A claim with a hedged mark.',
                     'Seeded by the test.', 'unsure')`,
+    ).rejects.toThrow();
+  });
+});
+
+describe('a claim you rewrote in your own words', () => {
+  // Nothing is backfilled, so a concept written before the rewrite existed has
+  // to read as one nobody has rewritten rather than as one whose original is
+  // missing.
+  it('reads a concept nobody has rewritten as still the app’s wording', async () => {
+    const [row] = await admin<{ claim_original: string | null; claim_rewritten_at: Date | null }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis)
+      values (${userA}, ${subjectA}, 'Untouched', 'A claim as the app wrote it.',
+              'Seeded by the test.')
+      returning claim_original, claim_rewritten_at`;
+    expect(row.claim_original).toBeNull();
+    expect(row.claim_rewritten_at).toBeNull();
+  });
+
+  it('keeps the old wording beside the new one', async () => {
+    const id = await seedConcept(userA, subjectA, 'Rewritten', 'What the app wrote.');
+
+    await admin`
+      update concepts
+         set claim = 'What I would say instead.',
+             claim_original = 'What the app wrote.',
+             claim_rewritten_at = now()
+       where id = ${id}`;
+
+    const [row] = await admin<
+      { claim: string; claim_original: string; claim_rewritten_at: Date }[]
+    >`select claim, claim_original, claim_rewritten_at from concepts where id = ${id}`;
+    expect(row.claim).toBe('What I would say instead.');
+    expect(row.claim_original).toBe('What the app wrote.');
+    expect(row.claim_rewritten_at).not.toBeNull();
+  });
+
+  it('refuses half of the fact', async () => {
+    const id = await seedConcept(userA, subjectA, 'Half', 'What the app wrote.');
+
+    await expect(
+      admin`update concepts set claim_rewritten_at = now() where id = ${id}`,
+    ).rejects.toThrow();
+    await expect(
+      admin`update concepts set claim_original = 'What the app wrote.' where id = ${id}`,
+    ).rejects.toThrow();
+    await expect(
+      admin`update concepts set claim_original = '', claim_rewritten_at = now()
+            where id = ${id}`,
     ).rejects.toThrow();
   });
 });

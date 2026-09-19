@@ -31,16 +31,33 @@
   color-scheme: light;
   --c-sheet-scheme: light;
 
-  --c-canvas: #faf9f6;
-  --c-surface: #ffffff;
-  --c-raised: #ffffff;
+  /* The sheet is paper, not #ffffff.
+   *
+   * It used to be pure white, which cost two things. On Paper itself the card
+   * was the one surface in the theme carrying no warmth at all -- a cold slab
+   * on a warm page, with a warm well inside it. And in every generated light
+   * theme it stayed that way: the cast lifts a neutral to CAST_CHROMA while
+   * holding its luminance, and #ffffff is luminance 1.0, where sRGB has room
+   * for no chroma whatsoever. Ask for a blue light theme and the bench, the
+   * wells and the borders turned blue while the cards -- the largest lit area
+   * on the screen -- stayed white. The note calling them "pure white parts
+   * that dont respond to color" was measuring exactly this.
+   *
+   * So the sheet sits just under white, which is where printed paper is
+   * anyway, and the lift has somewhere to move it. Raised is a step above it
+   * rather than the same value twice, so a menu over a card reads as lifted
+   * off it without a border being asked to say so. Law 11. */
+  --c-canvas: #f7f4ed;
+  --c-surface: #fdfbf5;
+  --c-raised: #fffdf7;
   --c-sunken: #f2f0ea;
   --c-border: #e8e5df;
   --c-border-strong: #d5d1c8;
 
-  --c-shell: #f4f2ec;
+  --c-page-ground: #f0ece2;
+  --c-shell: #e4dfd2;
   --c-shell-ink: #1a1a18;
-  --c-shell-muted: #63635e;
+  --c-shell-muted: #5d5d58;
   --c-shell-border: #e2dfd7;
   --c-shell-hover: #eae7df;
 
@@ -65,6 +82,8 @@
   --c-w-vault-tint: #fcecfd;
   --c-w-learn: #0f6b62;
   --c-w-learn-tint: #e4f4f1;
+  --c-w-news: #806500;
+  --c-w-news-tint: #f6f1e2;
   --c-w-dev: #4b5768;
   --c-w-dev-tint: #eef1f5;
 
@@ -88,7 +107,12 @@
   --c-status-offer-tint: #ecfdf5;
   --c-status-rejected: #b91c1c;
   --c-status-rejected-tint: #fef2f2;
-  --c-status-ghosted: #78716c;
+  /* Two shades down from #78716c, which is what the well moving down cost.
+   * Ghosted is the one pipeline ink drawn on --c-canvas, and it was sitting at
+   * 4.56:1 there -- six hundredths over the floor, so the well could not be
+   * darkened by a single step without it failing. Darkening the ink instead
+   * buys the room and raises every other ground it sits on with it. */
+  --c-status-ghosted: #726b66;
   --c-status-ghosted-tint: #fafaf9;
 
   /* Turned up from 0.035: at that level the grain did not survive a 1x
@@ -112,10 +136,56 @@
    * rather than a hex in a className, so the checker can measure it. */
   --c-caution-fill-ink: #14100a;
 
+  /* The ink a SOLID fill writes its label in -- a primary button, a workspace
+   * button -- as opposed to --c-surface, which is a ground.
+   *
+   * Those were the same token until a theme wanted translucent sheets. The
+   * label was `text-surface`, and --c-surface is a ground that a glass theme
+   * has every reason to make see-through; used as ink on a coloured fill, a
+   * see-through label lets the fill show through the letters. Darkroom failed
+   * eight pairs at 1.6:1 on exactly that, and Lightbox has the same defect
+   * quietly -- at 0.80 its button labels carry a fifth of the accent.
+   *
+   * Always opaque, and always the far end of the theme from its accent: a
+   * near-white on the light themes, whose accents are deep, and a near-black
+   * on the dark ones, whose accents are light. Not hue-rotated, so a generated
+   * theme inherits it unchanged. */
+  --c-fill-ink: #ffffff;
+
   /* A wash laid over the page ground: soft, off-centre pools of colour that
    * give a flat ground somewhere to travel. Only a theme whose bench is large
    * and dark enough to look like a void needs one, so the default is none. */
-  --page-wash: none;
+  /* The four colours the bench's pools are made of.
+   *
+   * Tokens rather than literals inside the wash, and that is the whole
+   * point: the generator rotates `--c-*` tokens and cannot see anything
+   * written inline in a gradient. They were literals, so picking a colour
+   * turned the bench and left the pools where they were -- a red room with a
+   * blue-and-pink wash lying on it, which reads as a tint applied to the
+   * theme rather than as the theme being that colour.
+   *
+   * Four rather than one, because the room is a sweep and not a hue. They sit
+   * about 50 degrees apart, and the generator moves all four by the same
+   * amount, so asking for red gives red into orange into magenta rather than
+   * four flat reds.
+   *
+   * Defined in every theme because the palette has to be uniform -- the token
+   * set is read off Paper and cleared by name -- but only the glass rooms
+   * paint with them; the solid rooms paint no wash at all. */
+  --c-wash-near: #3a74d6;
+  --c-wash-mid: #8260fa;
+  --c-wash-far: #dd78e6;
+  --c-wash-floor: #175cb0;
+
+  /* How much of each pool reaches the bench, against the percentages written
+   * into the wash. One is those percentages. A named colourway sets its own
+   * (see lib/theme/colourway.ts): the pools are seen through a third of a mix
+   * over a near-black bench, and a third of a deep magenta is not magenta, so
+   * a colourway built from deep colours needs more of itself through to read
+   * as the colour it is. Each one's is measured against the light the free-hue
+   * wash already spends, so raising it is not free and is not guessed. */
+  --wash-lift: 1;
+
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
 
   /* ---- The page ground, as a scope of its own -------------------------
@@ -131,9 +201,24 @@
    *
    * The rule for a new theme: if your page and your cards share a polarity,
    * ignore all of this. */
-  --c-page: var(--c-canvas);
+  /* The page ground, and the one token in this block that is not simply the
+   * sheet half's opposite number.
+   *
+   * It used to be `var(--c-canvas)` outright. That reads as tidy and is
+   * wrong: --c-canvas is the recessed well INSIDE a card -- the Lightbox note
+   * below says so in as many words -- so aliasing them made the page ground
+   * three percent from a white card lying on it, which is why every card in
+   * this app needed a border drawn round it to be seen. It also meant the
+   * page could not be darkened without dragging every well down with it,
+   * which blows the contrast budget in seventy-two generated themes.
+   *
+   * So the page gets a token of its own. The alias survives as the default,
+   * because in the three dark themes canvas already sits below surface and
+   * the page wants exactly that value. Paper is the theme that needed a step
+   * put in, and it is the only one that overrides it. */
+  --c-page: var(--c-page-ground);
   --c-page-ink: var(--c-ink);
-  --c-page-ink-muted: var(--c-ink-muted);
+  --c-page-ink-muted: #65655f;
   --c-page-ink-ghost: var(--c-ink-ghost);
   --c-page-border: var(--c-border);
   --c-page-border-strong: var(--c-border-strong);
@@ -151,6 +236,7 @@
   --c-w-todo-lit: var(--c-w-todo);
   --c-w-vault-lit: var(--c-w-vault);
   --c-w-learn-lit: var(--c-w-learn);
+  --c-w-news-lit: var(--c-w-news);
   --c-w-dev-lit: var(--c-w-dev);
 
   /* The sheet palette, captured here on :root -- where --c-ink and friends
@@ -174,10 +260,27 @@
  * as one product.
  * ------------------------------------------------------------------------- */
 [data-theme='ink'] {
+  --c-wash-near: #3a74d6;
+  --c-wash-mid: #8260fa;
+  --c-wash-far: #dd78e6;
+  --c-wash-floor: #175cb0;
+
+  /* How much of each pool reaches the bench, against the percentages written
+   * into the wash. One is those percentages. A named colourway sets its own
+   * (see lib/theme/colourway.ts): the pools are seen through a third of a mix
+   * over a near-black bench, and a third of a deep magenta is not magenta, so
+   * a colourway built from deep colours needs more of itself through to read
+   * as the colour it is. Each one's is measured against the light the free-hue
+   * wash already spends, so raising it is not free and is not guessed. */
+  --wash-lift: 1;
+
+  --c-fill-ink: #0f1011;
   color-scheme: dark;
   --c-sheet-scheme: dark;
 
   --c-canvas: #08090a;
+  --c-page-ground: #08090a;
+  --c-page-ink-muted: var(--c-ink-muted);
   --c-surface: #0f1011;
   --c-raised: #191a1c;
   --c-sunken: #050506;
@@ -209,6 +312,8 @@
   --c-w-vault-tint: #2a1430;
   --c-w-learn: #4fd1c5;
   --c-w-learn-tint: #0a2420;
+  --c-w-news: #d8b23d;
+  --c-w-news-tint: #281e03;
   --c-w-dev: #a9b6c8;
   --c-w-dev-tint: #1a1f27;
 
@@ -273,6 +378,7 @@
  * meaning rather than a mood, and it is the same amber in all four themes.
  * ------------------------------------------------------------------------- */
 [data-theme='lightbox'] {
+  --c-fill-ink: #f7f9fc;
   /* The bench is black, so the scrollbar the browser draws down the side of
    * it has to be too. The sheets say `light` for themselves, which is where
    * the checkboxes and date pickers actually live. */
@@ -299,7 +405,8 @@
    * scripts/check-contrast.ts fails on. The sheets still clear the bench by
    * 11:1, so they are as lit as they ever were -- what shrank is the drop
    * from 16.9, and that step was never the point. */
-  --c-page: #2b3644;
+  --c-page-ground: #25374f;
+  --c-page: #25374f;
   --c-page-ink: #eef2f7;
   --c-page-ink-muted: #b6c1ce;
   --c-page-ink-ghost: #8a97a7;
@@ -307,13 +414,81 @@
   --c-page-border-strong: #6d8098;
   --c-page-border-control: #8a97a7;
 
-  /* Three pools, held under 0.3 alpha so the bench never lightens enough to
-   * put the inks above out of range. Fixed to the viewport at <body>, so it
-   * reads as depth the page slides over rather than a pattern that scrolls. */
-  --page-wash:
-    radial-gradient(110% 75% at 15% -5%, rgb(86 118 176 / 0.3), transparent 60%),
-    radial-gradient(90% 70% at 88% 6%, rgb(104 96 170 / 0.24), transparent 55%),
-    radial-gradient(130% 110% at 55% 115%, rgb(38 74 116 / 0.3), transparent 68%);
+  /* The room, and it is two colours rather than one.
+   *
+   * It used to be three blues and a violet, which on a slate bench came out as
+   * one blue haze -- and once the sheets went transparent, one blue haze read
+   * through them as grey. A ground with a single hue in it has nowhere to
+   * travel, so nothing on top of it has anything to reveal.
+   *
+   * So it runs the app's own ramp: near at the top left, mid through the
+   * middle, far at the top right, and floor holding the bottom. With no colour
+   * chosen those are blue, violet, orchid and a deep blue.
+   *
+   * Sixty-four degrees from near to far, and that ceiling is the point. They
+   * were a hundred and two apart, which at blue is the ramp this product has
+   * always worn -- blue into violet into rose -- and reads beautifully. But a
+   * rotation preserves the ANGLE and not the effect: the same hundred and two
+   * degrees asked for in red comes back red into orange into green, because
+   * the eye does not find every triple on the wheel equally happy. Pulled in
+   * to sixty-four it is an analogous sweep wherever it lands -- red into
+   * orange into yellow, green into teal into blue -- and the default gives up
+   * only the last step from orchid to rose to buy that.
+   *
+   * They are named for where they sit rather than for what colour they are,
+   * because the colour is not fixed: they are --c-* tokens in
+   * LIGHTBOX_HUE_TOKENS, so the generator turns all four by the same amount
+   * and the sweep survives. Ask for red and the room runs red into orange into
+   * magenta. They used to be literals written inside this gradient, where the
+   * generator could not see them at all, and picking a colour turned the bench
+   * and left the pools behind -- a red room with a blue-and-pink wash lying on
+   * it, which reads as a tint applied to a theme rather than as the theme
+   * being that colour.
+   *
+   * The pools turn by their own rule, which is the one thing in the palette
+   * that is not rotated at the light it was reflecting. See `turnWash` in
+   * lib/theme/palette.ts: holding a pool's luminance is right for anything
+   * carrying text and wrong for a decoration, because a yellow held down to a
+   * blue's luminance is olive. A pool's lightness follows where its new hue
+   * peaks instead, its chroma sits on the gamut edge, and it may spend at most
+   * a third again the light the written pool threw.
+   *
+   * Every layer only ADDS light, and that is load-bearing rather than tidy: a
+   * sheet is 20% bench, so a layer that darkens the bench darkens every sheet
+   * on it and takes the ink with it, somewhere scripts/check-contrast.ts
+   * cannot see -- it composites sheets over the flat --c-page. Checked by
+   * compositing all of them at full strength: the flat bench stays the darkest
+   * case, so the gate is a conservative bound for anything that reads DARKER
+   * than the flat bench.
+   *
+   * What it is not a bound for is the other direction, and that is worth
+   * writing down because it is a live gap rather than a solved one. Sampling
+   * the field as the browser actually paints it -- every hue, both glass
+   * rooms, the brightest pixel of the viewport -- the bench's own text lands
+   * at 3.0:1 against it at the worst hue, where the gate reads the flat bench
+   * and sees AA. That is not new and the lift did not cause it: the same
+   * sampling puts today's shipped wash at 3.4:1, and the count of pairs under
+   * 4.5:1 at the brightest pixel is 72 either way. It is why the pools have a
+   * light budget at all -- without one the lift trebles the peak and takes
+   * that 72 to 90. Sidebar text over the brightest corner of the wash is the
+   * thing to fix next, and it wants either a darker wash under the rail or a
+   * scrim behind the text, not a smaller budget.
+   *
+   * Fixed to the viewport at <body>, so it reads as depth the page slides over
+   * rather than a pattern that scrolls. */
+  --c-wash-near: #3a74d6;
+  --c-wash-mid: #8260fa;
+  --c-wash-far: #dd78e6;
+  --c-wash-floor: #175cb0;
+
+  /* How much of each pool reaches the bench, against the percentages written
+   * into the wash. One is those percentages. A named colourway sets its own
+   * (see lib/theme/colourway.ts): the pools are seen through a third of a mix
+   * over a near-black bench, and a third of a deep magenta is not magenta, so
+   * a colourway built from deep colours needs more of itself through to read
+   * as the colour it is. Each one's is measured against the light the free-hue
+   * wash already spends, so raising it is not free and is not guessed. */
+  --wash-lift: 1;
   --c-page-positive: #6fe0b0;
   --c-page-caution: #f5b459;
   --c-page-danger: #ff9d9d;
@@ -328,6 +503,7 @@
   --c-w-todo-lit: #6ccdf5;
   --c-w-vault-lit: #eda6f6;
   --c-w-learn-lit: #6fdcd2;
+  --c-w-news-lit: #debf69;
   --c-w-dev-lit: #bcc7d6;
 
   /* ---- The sheets ----
@@ -341,7 +517,7 @@
    * that, so an alpha that would darken a sheet out of range fails there.
    * --c-sunken is written a shade lighter than the flat value it replaces to
    * pay for the alpha: it is the darkest sheet and the one with least room. */
-  --c-canvas: rgb(231 236 242 / 0.92);
+  --c-canvas: rgb(231 236 242 / 0.88);
   /* Up from 0.9. At 0.9 over the bench the surface landed near #e3e5e7,
    * which is a grey card, not a lit one; at 0.96 it lands near #f1f3f5 and
    * is brighter than anything else on screen, which is what lit means.
@@ -352,9 +528,9 @@
    * and a warm one does not. The two sunken tokens keep their blue cast on
    * purpose: a well in a sheet is in shadow, and shadow takes the colour of
    * the room, which here is the bench. */
-  --c-surface: rgb(253 252 249 / 0.96);
-  --c-raised: rgb(255 254 250 / 0.97);
-  --c-sunken: rgb(228 234 241 / 0.92);
+  --c-surface: rgb(253 252 249 / 0.80);
+  --c-raised: rgb(255 254 250 / 0.9);
+  --c-sunken: rgb(228 234 241 / 0.86);
   --c-border: #d0d9e3;
   --c-border-strong: #a6b1bf;
 
@@ -407,7 +583,7 @@
 
   /* The sidebar is the same surface as the page ground, to the byte: one
    * bench, not two nearly-identical darks meeting at an edge. */
-  --c-shell: #2b3644;
+  --c-shell: #25374f;
   --c-shell-ink: #eef2f7;
   --c-shell-muted: #b6c1ce;
   --c-shell-border: #3d4b5c;
@@ -432,6 +608,8 @@
   --c-w-vault-tint: #f2def2;
   --c-w-learn: #0a5d54;
   --c-w-learn-tint: #d8ebe7;
+  --c-w-news: #6e5600;
+  --c-w-news-tint: #ece4cf;
   --c-w-dev: #434e5f;
   --c-w-dev-tint: #e6eaf0;
 
@@ -472,10 +650,27 @@
  * DUSK — plum-cast dark, softer edges, the same accent arc shifted warm.
  * ------------------------------------------------------------------------- */
 [data-theme='dusk'] {
+  --c-wash-near: #3a74d6;
+  --c-wash-mid: #8260fa;
+  --c-wash-far: #dd78e6;
+  --c-wash-floor: #175cb0;
+
+  /* How much of each pool reaches the bench, against the percentages written
+   * into the wash. One is those percentages. A named colourway sets its own
+   * (see lib/theme/colourway.ts): the pools are seen through a third of a mix
+   * over a near-black bench, and a third of a deep magenta is not magenta, so
+   * a colourway built from deep colours needs more of itself through to read
+   * as the colour it is. Each one's is measured against the light the free-hue
+   * wash already spends, so raising it is not free and is not guessed. */
+  --wash-lift: 1;
+
+  --c-fill-ink: #191426;
   color-scheme: dark;
   --c-sheet-scheme: dark;
 
   --c-canvas: #110d1a;
+  --c-page-ground: #110d1a;
+  --c-page-ink-muted: var(--c-ink-muted);
   --c-surface: #191426;
   --c-raised: #241d35;
   --c-sunken: #0b0812;
@@ -507,6 +702,8 @@
   --c-w-vault-tint: #301a3a;
   --c-w-learn: #74dccf;
   --c-w-learn-tint: #102c29;
+  --c-w-news: #dcb956;
+  --c-w-news-tint: #2c2205;
   --c-w-dev: #b3bfcf;
   --c-w-dev-tint: #212832;
 
@@ -537,6 +734,172 @@
   --grain-blend: overlay;
 }
 
+/* ---------------------------------------------------------------------------
+ * DARKROOM — Lightbox with the lights off.
+ *
+ * The same room: the same blue-black bench, the same blue-violet-rose pools,
+ * the same workspace pool, the same floating pane, the same grain under the
+ * content. The only thing that changes is what the sheets are made of.
+ *
+ * In Lightbox a sheet is lit paper -- 80% of a warm white, so the bench reads
+ * through it as a tint. Here a sheet is smoked glass: a dark blue panel at
+ * around 42% over the same bench, so it comes out a little LIGHTER than the
+ * room rather than a lot lighter, and the wash behind it reads through as
+ * colour rather than as a stain on white.
+ *
+ * That flips the sheet half to light ink on dark, which means this theme has
+ * one polarity where Lightbox has two. The --c-page-* half is unchanged and
+ * now agrees with the sheet half instead of opposing it; it is kept rather
+ * than collapsed because the SCOPES block at the foot of this file hands
+ * elements one half or the other, and a theme that quietly stopped answering
+ * for one of them would take the whole mechanism down with it.
+ *
+ * The inks and the meaning colours are Dusk's ramp moved off plum onto this
+ * bench's blue -- Dusk had already paid for a dark theme's contrast, and
+ * re-deriving it would have been inventing a second answer to a solved
+ * question. The accents are Lightbox's own lit set, which was tuned to clear
+ * this exact bench.
+ *
+ * The sheet edge loses most of its white. On lit paper a bright inset line is
+ * the light catching the paper's edge; on glass it is a glare, and at 0.85 it
+ * was the brightest thing on the screen with nothing to justify it.
+ * ------------------------------------------------------------------------- */
+[data-theme='darkroom'] {
+  --c-fill-ink: #111a2b;
+  color-scheme: dark;
+  /* One polarity. Lightbox says `light` here because its sheets are paper. */
+  --c-sheet-scheme: dark;
+
+  /* ---- The bench: Lightbox's, unchanged ---- */
+  --c-page-ground: #25374f;
+  --c-page: #25374f;
+  --c-page-ink: #eef2f7;
+  --c-page-ink-muted: #b6c1ce;
+  --c-page-ink-ghost: #8a97a7;
+  --c-page-border: #3d4b5c;
+  --c-page-border-strong: #6d8098;
+  --c-page-border-control: #8a97a7;
+  --c-page-positive: #6fe0b0;
+  --c-page-caution: #f5b459;
+  --c-page-danger: #ff9d9d;
+
+  --c-wash-near: #3a74d6;
+  --c-wash-mid: #8260fa;
+  --c-wash-far: #dd78e6;
+  --c-wash-floor: #175cb0;
+
+  /* How much of each pool reaches the bench, against the percentages written
+   * into the wash. One is those percentages. A named colourway sets its own
+   * (see lib/theme/colourway.ts): the pools are seen through a third of a mix
+   * over a near-black bench, and a third of a deep magenta is not magenta, so
+   * a colourway built from deep colours needs more of itself through to read
+   * as the colour it is. Each one's is measured against the light the free-hue
+   * wash already spends, so raising it is not free and is not guessed. */
+  --wash-lift: 1;
+
+  --c-accent-base-lit: #a6b4ff;
+  --c-accent-hover-lit: #bcc6ff;
+  --c-w-shopping-lit: #ffa3b8;
+  --c-w-jobs-lit: #c3b0ff;
+  --c-w-todo-lit: #6ccdf5;
+  --c-w-vault-lit: #eda6f6;
+  --c-w-learn-lit: #6fdcd2;
+  --c-w-news-lit: #debf69;
+  --c-w-dev-lit: #bcc7d6;
+
+  /* ---- The sheets: smoked glass ----
+   * Alpha for the same reason Lightbox's are alpha: one token that is a panel
+   * on the bench and a panel on another panel, which no flat hex can be.
+   *
+   * Darker than the bench, not lighter, and that is not only a look. A first
+   * pass made these a lifted blue panel -- a little brighter than the room --
+   * and check-contrast failed eight pairs at about 1.6:1, all of them "button
+   * label on its solid fill". --c-surface is not only a ground: it is also the
+   * ink a solid accent button writes its label in, and on a dark theme the
+   * accents are light, so the surface has to be dark enough to be read ON one.
+   * Dusk gets that for free from an opaque near-black. Here it means the glass
+   * is smoked rather than lifted, which is what a dark glass panel is anyway.
+   *
+   * The bloom, the drop and the lit top edge are what put it above the bench;
+   * being brighter than the room was never the thing doing that. */
+  --c-surface: rgb(13 20 34 / 0.52);
+  --c-raised: rgb(22 32 52 / 0.82);
+  --c-canvas: rgb(8 13 24 / 0.5);
+  --c-sunken: rgb(5 9 17 / 0.55);
+  --c-border: #33445e;
+  --c-border-strong: #53698c;
+
+  /* A light hairline, not a dark one. The sheet sits above the bench here, so
+   * the edge that separates them is the light side of the join. */
+  --c-sheet-outline: rgb(150 178 224 / 0.22);
+  --sheet-edge:
+    inset 0 1px 0 rgb(255 255 255 / 0.13),
+    0 1px 3px rgb(0 0 0 / 0.35),
+    0 14px 32px -14px rgb(0 0 0 / 0.6),
+    0 0 96px -8px rgb(140 158 255 / 0.3),
+    0 18px 68px -12px rgb(74 176 232 / 0.2);
+  --lift-shadow:
+    0 1px 3px rgb(0 0 0 / 0.4),
+    0 16px 36px -14px rgb(0 0 0 / 0.65),
+    0 0 108px -6px rgb(140 158 255 / 0.34);
+
+  --c-shell: #25374f;
+  --c-shell-ink: #eef2f7;
+  --c-shell-muted: #aab7c7;
+  --c-shell-border: #3d4b5c;
+  --c-shell-hover: #31445e;
+
+  --c-ink: #eaf0f8;
+  --c-ink-muted: #aebbcd;
+  --c-ink-ghost: #8494aa;
+  --c-border-control: #8494aa;
+
+  --c-accent-base: #a6b4ff;
+  --c-accent-hover: #bcc6ff;
+  --c-accent-tint-base: #1b2440;
+
+  --c-w-shopping: #ffa3b8;
+  --c-w-shopping-tint: #33202c;
+  --c-w-jobs: #c3b0ff;
+  --c-w-jobs-tint: #241f42;
+  --c-w-todo: #6ccdf5;
+  --c-w-todo-tint: #12283a;
+  --c-w-vault: #eda6f6;
+  --c-w-vault-tint: #2e1e3c;
+  --c-w-learn: #6fdcd2;
+  --c-w-learn-tint: #0f2b2e;
+  --c-w-news: #debf69;
+  --c-w-news-tint: #2a2410;
+  --c-w-dev: #bcc7d6;
+  --c-w-dev-tint: #1f2836;
+
+  --c-positive: #6fe0b0;
+  --c-positive-tint: #102b22;
+  --c-caution: #f5b459;
+  --c-caution-fill: #f5b459;
+  --c-caution-tint: #2d2410;
+  --c-danger: #ff9d9d;
+  --c-danger-tint: #32202a;
+
+  --c-status-lead: #a3b0c4;
+  --c-status-lead-tint: #212b3a;
+  --c-status-submitted: #8fb4ff;
+  --c-status-submitted-tint: #1a2340;
+  --c-status-process: #f5b459;
+  --c-status-process-tint: #2d2410;
+  --c-status-final: #c3b0ff;
+  --c-status-final-tint: #241f42;
+  --c-status-offer: #6fe0b0;
+  --c-status-offer-tint: #102b22;
+  --c-status-rejected: #ff9d9d;
+  --c-status-rejected-tint: #32202a;
+  --c-status-ghosted: #93a2b8;
+  --c-status-ghosted-tint: #1e2735;
+
+  --grain-opacity: 0.07;
+  --grain-blend: overlay;
+}
+
 /* An unset choice follows the system, and the system dark is Ink. Kept in sync
  * with the [data-theme='ink'] block above by scripts/check-contrast.ts. */
 @media (prefers-color-scheme: dark) {
@@ -544,7 +907,14 @@
     color-scheme: dark;
     --c-sheet-scheme: dark;
 
+    --c-fill-ink: #0f1011;
+    --c-wash-near: #3a74d6;
+    --c-wash-mid: #8260fa;
+    --c-wash-far: #dd78e6;
+    --c-wash-floor: #175cb0;
     --c-canvas: #08090a;
+    --c-page-ground: #08090a;
+    --c-page-ink-muted: var(--c-ink-muted);
     --c-surface: #0f1011;
     --c-raised: #191a1c;
     --c-sunken: #050506;
@@ -576,6 +946,8 @@
     --c-w-vault-tint: #2a1430;
     --c-w-learn: #4fd1c5;
     --c-w-learn-tint: #0a2420;
+    --c-w-news: #d8b23d;
+    --c-w-news-tint: #281e03;
     --c-w-dev: #a9b6c8;
     --c-w-dev-tint: #1a1f27;
 
@@ -644,6 +1016,11 @@
   --c-sheet-accent: var(--c-w-learn);
   --c-page-accent: var(--c-w-learn-lit);
   --c-accent-tint: var(--c-w-learn-tint);
+}
+[data-workspace='news'] {
+  --c-sheet-accent: var(--c-w-news);
+  --c-page-accent: var(--c-w-news-lit);
+  --c-accent-tint: var(--c-w-news-tint);
 }
 [data-workspace='dev'] {
   --c-sheet-accent: var(--c-w-dev);
@@ -746,8 +1123,6 @@ body,
  * background instead of letting <body> show through -- so wherever it appears
  * it goes back to the page scope, even if some sheet happens to be above it. */
 .bg-page {
-  /* It is standing in for <body>, so it carries the same wash. */
-  background-image: var(--page-wash);
   --c-ink: var(--c-page-ink);
   --c-ink-muted: var(--c-page-ink-muted);
   --c-ink-ghost: var(--c-page-ink-ghost);
@@ -780,6 +1155,7 @@ body,
   --color-page: var(--c-page);
   --color-canvas: var(--c-canvas);
   --color-surface: var(--c-surface);
+  --color-fill-ink: var(--c-fill-ink);
   --color-raised: var(--c-raised);
   --color-sunken: var(--c-sunken);
   --color-border: var(--c-border);
@@ -809,6 +1185,8 @@ body,
   --color-w-vault-tint: var(--c-w-vault-tint);
   --color-w-learn: var(--c-w-learn);
   --color-w-learn-tint: var(--c-w-learn-tint);
+  --color-w-news: var(--c-w-news);
+  --color-w-news-tint: var(--c-w-news-tint);
   --color-w-dev: var(--c-w-dev);
   --color-w-dev-tint: var(--c-w-dev-tint);
 
@@ -853,8 +1231,6 @@ body,
   --text-ui--line-height: 1.5;
   --text-body: 14px;
   --text-body--line-height: 1.55;
-  --text-lead: 15px;
-  --text-lead--line-height: 1.5;
   --text-title: 20px;
   --text-title--line-height: 1.25;
   --text-figure: 32px;
@@ -869,11 +1245,19 @@ body,
   --font-display: var(--font-display-face), var(--font-inter), ui-sans-serif, sans-serif;
   --font-mono: var(--font-mono-stack);
 
-  --radius-card: 0.5rem;
-  /* Tighter than the card that holds them. A control is a small object and a
-   * 12px radius on a 32px box is most of the way to a pill, which reads as a
-   * button even when it is a text field. */
-  --radius-control: 0.375rem;
+  /* Three steps, each one a third larger than the last.
+   *
+   * These were 8 and 6, which is the radius of an admin tool -- small enough
+   * that a corner reads as "not square" rather than as drawn. 12 and 8 is
+   * where a card starts looking like an object, and it is the cheapest
+   * perceived-quality change available anywhere in this file.
+   *
+   * A control stays tighter than the card holding it, for the reason it
+   * always did: 12px on a 32px box is most of the way to a pill, which reads
+   * as a button even when it is a text field. */
+  --radius-pane: 1rem;
+  --radius-card: 0.75rem;
+  --radius-control: 0.5rem;
 
   /* 150ms ease-out everywhere. Alive, never in the way. */
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
@@ -883,11 +1267,34 @@ body,
   --font-mono-stack: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 }
 
+/* No rubber band on the frame -- and only on the frame.
+ *
+ * From lg up the app is a fixed window: the ground is exactly the viewport and
+ * the pane inside it is what scrolls. A document with nothing to scroll still
+ * rubber-bands on macOS, which dragged the whole frame and its ground a few
+ * pixels and read as the layout coming loose. So the document is told not to.
+ *
+ * Only from lg up, because below it the document IS the thing that scrolls,
+ * and a thing that scrolls should overscroll: the bounce is the feedback that
+ * you have reached the end, and on a phone `none` here would also kill
+ * pull-to-refresh. The pane keeps `overscroll-behavior: contain` rather than
+ * `none` for exactly the same reason -- `contain` stops the gesture chaining
+ * up to the document but leaves the pane's own bounce intact, because the pane
+ * is meant to scroll.
+ *
+ * On <html>, not on <body>: overscroll-behavior propagates to the viewport
+ * from the root element and does not propagate from body, the opposite of how
+ * `overflow` behaves, which is why writing it on body looks right and does
+ * nothing.
+ */
+@media (min-width: 1024px) {
+  html {
+    overscroll-behavior: none;
+  }
+}
+
 body {
   background-color: var(--c-page);
-  /* Fixed, so the wash is a light source the page moves under rather than a
-   * pattern that scrolls away. `none` in every theme that does not set one. */
-  background-image: var(--page-wash);
   background-attachment: fixed;
   color: var(--c-ink);
   font-family: var(--font-sans);
@@ -974,6 +1381,79 @@ body::before {
   mix-blend-mode: var(--grain-blend);
   content: "";
   pointer-events: none;
+}
+
+/* In Lightbox the grain goes under the content instead of over it.
+ *
+ * Everywhere else the grain is a film across the whole viewport, sheets
+ * included, and that is right: those sheets are opaque, so the only way to get
+ * texture onto them is to lay it on top.
+ *
+ * Here the sheets are alpha. The bench reads through them, and so does the
+ * bench's texture -- which is what grain on glass actually looks like, and a
+ * better answer than a film over the paper.
+ *
+ * It is also the only answer that paints. A full-viewport fixed layer sitting
+ * ABOVE a stack of alpha-composited sheets is pathological: with --c-surface
+ * at 0.96 the page renders, and at 0.80 it does not render at all -- a capture
+ * never returns, at 25 seconds or at 90. Not the blend mode (normal hangs
+ * too), not the wash, not the pane; only the sheet alpha, and only while the
+ * grain is on top. Moving it below fixes it outright. If the sheets ever go
+ * opaque again, this override should go with them.
+ */
+[data-theme='lightbox'] body::before,
+[data-theme='darkroom'] body::before {
+  z-index: -1;
+}
+
+/* The sheen on a sheet, and the reason the glass reads as glass.
+ *
+ * A translucent rectangle is not a pane of glass; a translucent rectangle with
+ * light running across it is. This is the one gradient that is ON the sheet
+ * rather than behind it: white catching the top-left corner and gone by the
+ * middle, at the angle the bench's own ramp runs, so the whole room is lit
+ * from the same place.
+ *
+ * It only adds light to a sheet that already carries dark ink, so it cannot
+ * take any pair below where scripts/check-contrast.ts measured it -- which is
+ * just as well, because the checker reads --c-surface and not this.
+ *
+ * On `.sheet` rather than on Card, so every surface that calls itself a sheet
+ * gets it: cards, sections, the empty state, the popovers.
+ */
+/* A floating panel in a glass room is frosted, and that is not decoration.
+ *
+ * `--c-raised` was already 0.86 in Lightbox -- nearly opaque -- and the menus
+ * were still hard to read. Alpha was not the problem on its own: with no blur
+ * you get a SHARP ghost of whatever is behind, and the sidebar behind these is
+ * light text on a dark bench, which is the highest-contrast thing in the room.
+ * A crisp 7% ghost of legible words is far worse to read across than a 20%
+ * smear of colour.
+ *
+ * So the blur is what makes it readable and the alpha is what lets the room
+ * through. Both moved: 0.86 -> 0.90 here, 0.62 -> 0.82 in Darkroom, which was
+ * the worse of the two.
+ *
+ * backdrop-filter is cheap here in a way it is not on the page pane, which is
+ * why the pane says outright that it does not use one: a popover is small and
+ * transient, and nothing scrolls underneath it while it is open.
+ *
+ * The saturate is doing real work -- a blur alone greys the colour it is
+ * blurring, and the point is to keep some of the bench's gradient.
+ */
+[data-theme='lightbox'] .popover-panel,
+[data-theme='darkroom'] .popover-panel {
+  backdrop-filter: blur(22px) saturate(1.5);
+}
+
+[data-theme='lightbox'] .sheet,
+[data-theme='darkroom'] .sheet {
+  background-image: linear-gradient(
+    155deg,
+    rgb(255 255 255 / 0.16) 0%,
+    rgb(255 255 255 / 0.05) 38%,
+    rgb(255 255 255 / 0) 72%
+  );
 }
 
 /* ---------------------------------------------------------------------------
@@ -1343,6 +1823,17 @@ form[data-auto-submit] [data-fallback-submit] {
   margin: 2em 0;
 }
 
+/* A formula set on a line of its own is often wider than the measure, and on
+   a phone it is wider than the screen. It scrolls inside the note, the same
+   as a wide table. The inline kind is left alone: it belongs to the sentence
+   around it and wraps with it. KaTeX draws in the current ink colour, so the
+   four themes need nothing else. */
+.vault-prose .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.25em;
+}
+
 /* ---------------------------------------------------------------------------
  * Jobs prose.
  *
@@ -1462,3 +1953,275 @@ form[data-auto-submit] [data-fallback-submit] {
   font-weight: 500;
   padding: 0.05em 0.25em;
 }
+
+/* A step number, drawn as the link it now is. Tabular, because these arrive in
+ * runs -- "#500, #501 and #505" -- and proportional digits make a run of them
+ * ragged. It takes the ordinary link colour rather than a mark of its own: it
+ * goes somewhere, which is exactly what a link already means here. */
+.comment-ref {
+  font-variant-numeric: tabular-nums;
+  text-decoration-thickness: from-font;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+ * The workspace's colour, on the ground -- in Lightbox and nowhere else.
+ *
+ * A workspace used to announce itself as a hue on buttons and chips, which is
+ * both a weak signal (you have to be looking at a control to get it) and the
+ * one place the guide keeps trying to get colour out of. This puts it on the
+ * bench instead. Switching workspace changes the room, not the buttons.
+ *
+ * -- Why only here --
+ * Lightbox is the theme to play with colour in; its own note says so, and it
+ * is already built for this. It has a mid-toned bench rather than a page, it
+ * already lays three fixed radial pools over that bench, its sheets are alpha
+ * rather than flat white so the bench reads through them, and it already has
+ * a coloured bloom around every sheet. A workspace pool is a fourth pool in a
+ * theme that has three; in Paper it would be a wash on a sheet of paper.
+ *
+ * -- How it composes --
+ * As one more fixed gradient over the bench, on the element that carries
+ * `data-workspace` -- which is a div inside <body>, not <html>, so it cannot
+ * feed the body's own `--page-wash` however tidy that would have been. The
+ * shell draws no ground of its own in this theme, so the body's three pools
+ * show straight through and this lands on top of them.
+ *
+ * One gradient and no more. The first attempt gave the shell a whole ground of
+ * its own with a turbulence layer besides, and the result could not be painted
+ * at all here -- a full-viewport capture never returned, because two
+ * feTurbulence-backed background layers compositing over alpha sheets is not a
+ * thing to do. `body::before` already lays the one grain over everything,
+ * including this.
+ *
+ * The pool is held at 0.22 -- below the 0.3 the three blue pools are held at,
+ * because it is a fourth pool laid over them rather than one of them, and
+ * because scripts/check-contrast.ts composites sheets over the flat --c-page
+ * and cannot see it. Anything strong enough to move a sheet's contrast would
+ * be moving it somewhere the checker is not looking.
+ * ------------------------------------------------------------------------- */
+:root {
+  --workspace-pool: none;
+}
+
+[data-workspace='shopping'] { --wash-a: 251 113 133; }
+[data-workspace='jobs']     { --wash-a: 167 139 250; }
+[data-workspace='todo']     { --wash-a: 56 189 248; }
+[data-workspace='vault']    { --wash-a: 240 171 252; }
+[data-workspace='learn']    { --wash-a: 52 211 153; }
+[data-workspace='dev']      { --wash-a: 148 163 184; }
+[data-workspace='news']     { --wash-a: 222 191 105; }
+
+[data-workspace] {
+  /* Bottom left, where the sidebar is, reaching up across the bench. The three
+   * blue pools sit top-left, top-right and bottom-centre, so this lands in the
+   * one quarter they leave alone. */
+  --workspace-pool: radial-gradient(
+    95% 75% at 0% 100%,
+    rgb(var(--wash-a) / 0.30),
+    transparent 62%
+  );
+}
+
+/* The wash: the pools, laid out across whatever is painting them.
+ *
+ * Written as a background-image on each painter rather than stored in a custom
+ * property they all read, and that is forced rather than chosen. A var() inside
+ * a custom property is substituted where the property is DECLARED, not where it
+ * is used, so a `--page-wash` built at :root bakes in :root's pools and every
+ * element that inherits it paints those -- which is fine for the two rooms,
+ * whose pools are written onto <html> by the theme and so are :root's, and
+ * wrong for anything else. A colourway chip sets its own pools on itself; it
+ * has to declare the gradient on itself too, or it inherits a finished picture
+ * of somebody else's colours. Listing the painters together is what keeps one
+ * copy of the stack.
+ *
+ * Only the glass rooms are here. The solid two paint no wash, which is now
+ * said by their not matching rather than by a token set to none.
+ *
+ * On <body> it is fixed to the viewport, so it reads as depth the page slides
+ * over rather than a pattern that scrolls away; `.bg-page` is a layout drawing
+ * the page ground itself, standing in for <body>, so it carries the same wash.
+ */
+[data-theme='lightbox'] body,
+[data-theme='darkroom'] body,
+[data-theme='lightbox'] .bg-page,
+[data-theme='darkroom'] .bg-page,
+.wash-chip {
+  background-image:
+    radial-gradient(
+      105% 72% at 10% -8%,
+      color-mix(in oklab, var(--c-wash-near) calc(var(--wash-lift) * 34%), transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      82% 78% at 88% -2%,
+      color-mix(in oklab, var(--c-wash-far) calc(var(--wash-lift) * 30%), transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      75% 62% at 78% 48%,
+      color-mix(in oklab, var(--c-wash-mid) calc(var(--wash-lift) * 26%), transparent),
+      transparent 64%
+    ),
+    linear-gradient(
+      155deg,
+      color-mix(in oklab, var(--c-wash-near) calc(var(--wash-lift) * 22%), transparent) 0%,
+      color-mix(in oklab, var(--c-wash-mid) calc(var(--wash-lift) * 15%), transparent) 36%,
+      color-mix(in oklab, var(--c-wash-far) calc(var(--wash-lift) * 12%), transparent) 62%,
+      transparent 86%
+    ),
+    radial-gradient(
+      130% 110% at 42% 118%,
+      color-mix(in oklab, var(--c-wash-floor) calc(var(--wash-lift) * 34%), transparent),
+      transparent 68%
+    );
+}
+
+/**
+ * A colourway, small enough to click.
+ *
+ * Draws the same gradient the bench does, from pool tokens set on the chip
+ * itself, so the swatch in the picker is the room rather than a drawing of it.
+ * It carries its own background colour too, because the bench a colourway
+ * turns to is part of what it looks like.
+ *
+ * Painted in every room, including the solid two that paint no wash of their
+ * own: a person choosing a colourway in Solid should still see what they are
+ * picking, even though nothing will paint it until they switch surface.
+ */
+.wash-chip {
+  background-size: cover;
+}
+
+.shell-ground {
+  background-color: var(--c-shell);
+}
+
+/* One bench, and the body already owns it. The shell paints no ground here so
+ * those three pools read through; the workspace pool goes on top of them. */
+[data-theme='lightbox'] .shell-ground,
+[data-theme='darkroom'] .shell-ground {
+  background-color: transparent;
+  background-image: var(--workspace-pool);
+  background-attachment: fixed;
+}
+
+/* The page pane: the one thing in the shell that genuinely floats. */
+.page-pane {
+  background-color: var(--c-page);
+}
+
+@media (min-width: 1024px) {
+  .page-pane {
+    border-radius: var(--radius-pane);
+    /* The pane is the scrollport from here up, and the frame stops moving.
+     *
+     * Two complaints, one cause. Dragging past the end bounced the whole app,
+     * frame and ground and all, because the document was what scrolled. And
+     * the page scrolled straight through the pane's rounded corner and painted
+     * on the ground outside the radius -- worse, once you had scrolled at all
+     * the corner had left the viewport entirely, because the frame went up
+     * with the content.
+     *
+     * A border-radius rounds an element's own background and clips nothing, so
+     * the corner was never a cut-off. Making the pane scroll gives it one for
+     * free: a scroll container clips to its padding box, radius included, and
+     * the frame stays where it is because there is nothing left for the
+     * document to scroll.
+     *
+     * `overflow-y: auto` rather than `overflow: hidden` + a taller inner div:
+     * hidden was tried and it makes the element a scroll container that never
+     * scrolls, which then becomes the sticky containing block for everything
+     * inside it, and the top bar quietly stopped sticking. Here the pane really
+     * does scroll, so the bar sticks to it -- which is what a top bar in an
+     * application window should stick to anyway.
+     *
+     * `overscroll-behavior: contain` so reaching the end of the page does not
+     * hand the gesture up to the document. Inner regions -- the filter rail, a
+     * long menu -- keep their own default and still behave as they always did.
+     *
+     * Below lg none of this applies: there is no radius to cut against, the
+     * document scrolling is what lets a phone browser hide its URL bar, and the
+     * dock is fixed to the viewport regardless.
+     */
+    height: calc(100dvh - 0.75rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.04),
+      0 8px 24px -8px rgb(0 0 0 / 0.10);
+  }
+}
+
+/* Lightbox floats its page too, but not by being a different colour.
+ *
+ * The first attempt here gave up: its --c-shell and its --c-page are the same
+ * #2b3644, so a pane drawn in --c-page was an invisible rectangle with a
+ * shadow hanging off it, and the note said the bench should simply run edge to
+ * edge. That was the right call for an opaque pane and the wrong one for this
+ * theme, which separates everything by light rather than by tone -- it is the
+ * only theme in the app where a sheet is already alpha and already carries a
+ * bloom.
+ *
+ * So the pane is the faintest sheet in the stack: four percent of white over
+ * the bench, no tone change at all, and a hairline of caught light along its
+ * top edge. That is enough for the corner to cut against and for the drop to
+ * have something to fall from, and it adds a third depth between the bench and
+ * the cards rather than a second colour.
+ *
+ * No backdrop-filter. It would be the obvious way to do this and it is the
+ * expensive way: a full-height blurred layer under every scrolling list in the
+ * app, on the one theme whose sheets are already alpha-composited.
+ */
+[data-theme='lightbox'] .page-pane,
+[data-theme='darkroom'] .page-pane {
+  background-color: rgb(255 255 255 / 0.03);
+  /* The same light, on the biggest piece of glass in the room. Weaker than a
+   * sheet's, because it is behind them and a lit ground competing with lit
+   * cards is how this turns to soup. */
+  background-image: linear-gradient(
+    155deg,
+    rgb(255 255 255 / 0.05) 0%,
+    rgb(255 255 255 / 0.015) 40%,
+    rgb(255 255 255 / 0) 70%
+  );
+}
+
+@media (min-width: 1024px) {
+  [data-theme='lightbox'] .page-pane,
+  [data-theme='darkroom'] .page-pane {
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.10),
+      0 18px 48px -20px rgb(0 0 0 / 0.55);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Things arrive by moving.
+ *
+ * Every overlay in this app appeared: one frame absent, the next frame there.
+ * A fade is the cheap default and reads as a repaint; four pixels of travel on
+ * the easing this file already uses reads as the thing coming from somewhere.
+ * ------------------------------------------------------------------------- */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise-in {
+  animation: rise-in 140ms var(--ease-out-soft) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise-in {
+    animation: none;
+  }
+}
+
