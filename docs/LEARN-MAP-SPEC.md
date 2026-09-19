@@ -424,6 +424,33 @@ the first 1,500 characters, returning one of four classes:
 | `evidence` | produces no concepts, but raises confidence in concepts found elsewhere: coursework, transcripts, a CV, an application describing what you can do |
 | `operational` | skipped: logistics, meeting arrangements, task lists, contact details |
 
+> **Revised by the [75-note trial](trials/2026-09-19-map-75-notes.md), in two
+> places, and both for the same reason the folder rules were revised: a
+> routing rule was discarding material the node test would have handled.**
+>
+> **`evidence` becomes a flag, not a fourth class.** Eleven of 75 notes
+> classified `evidence` and produced nothing, and three readers independently
+> reported that it cost real positions: a case write-up judging Hamilton a
+> great applied economist, a course summary carrying the
+> social-licence-to-operate idea, an application arguing that leaning on a
+> model to write code is now the right way to work. All three are the author's
+> own positions inside a note whose *purpose* is to evidence what they were
+> taught. Purpose and content are independent, and the class was reading only
+> purpose. The classes become `knowledge`, `mixed` and `operational`, with an
+> `is_evidence` boolean alongside, so a note can be evidence and still be read
+> for claims.
+>
+> **The free-skip threshold drops from 200 characters to 80.** The rule exists
+> so 249 stubs cost nothing, and most of them are stubs. But four readers
+> reported it destroying the densest notes in the vault: a 128-character note
+> stating that striving is itself a moral act, a 149-character pair of Blake
+> aphorisms, a 146-character position on what city technology owes people who
+> want a simpler life. A short note that states one thing plainly is the best
+> shape a node can come from, and the rule was biased against exactly that. Of
+> the 228 notes under 200 characters, 61 contain an argumentative verb; 130 sit
+> between 80 and 199 and become classify calls, which at the measured cost is a
+> rounding error.
+
 **There is no folder routing.** The original design excluded whole paths such as
 `Me/` and application files, on the reasoning that a folder is a free and
 predictable filter. Two findings from the trial changed that:
@@ -450,6 +477,13 @@ Split each note on its headings. Sections under about 200 characters merge into
 their neighbour, and sections over about 4,000 split on paragraph boundaries.
 Extraction runs per chunk, so a 20,000-character essay is not processed in one
 pass.
+
+**Chunk the whole note; never truncate it.** The 75-note trial truncated at
+6,000 characters for its own convenience and paid for it: its richest note
+yielded 17 candidates from the first 6,000 of 54,070 characters, with a
+class-logistics wrapper hiding a sustained argument about car-dependent
+development. Stage 1 exists precisely so a long note is processed in pieces,
+and the sweep has no reason to read only the first piece.
 
 > **Revised.** LEARN-GRAPH-SPEC.md implied a budget of about three concepts per
 > note, which is wrong for a dense note. The thing to guard against is
@@ -631,3 +665,11 @@ Any of these failing changes the design before $5 is spent on the wrong shape.
 
 The run against the live vault is written up in
 [trials/2026-09-16-map-30-notes.md](trials/2026-09-16-map-30-notes.md).
+
+A second, larger run followed on 2026-09-19: 75 notes drawn at random rather
+than stratified, through Stages 0 to 2, written up in
+[trials/2026-09-19-map-75-notes.md](trials/2026-09-19-map-75-notes.md). It
+confirmed the node definition and the verbatim-quote rule, put `requires` at
+6% of edges where the design wants it rarest, and produced the two routing
+revisions above. Neither trial has been run through Haiku, so the model tier
+remains unverified.

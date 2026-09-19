@@ -127,10 +127,11 @@ Files. Verbatim, one-way from Obsidian, and written by nothing here.
 is why a rebuild of it is uninteresting and a loss of it is recoverable.
 
 The record is never the unit of meaning. It cannot be: the vault holds a
-105,874-character case-prep dump that yields two ideas and a
-1,995-character course note that yields eleven. Length predicts nothing about
-a note and note type predicts almost everything, which the 30-note trial
-measured across a 290-fold spread of density.
+147,133-character interview-prep file that yields two ideas and an
+867-character book note that yields seven. Length predicts nothing about a
+note and note type predicts almost everything, measured across a 290-fold
+spread of density in the 30-note trial and confirmed on a random sample in
+the [75-note trial](trials/2026-09-19-map-75-notes.md).
 
 ### 1. Atoms
 
@@ -139,8 +140,10 @@ not a note. Your notes are not atomic and making them atomic would mean
 rewriting five years of them. An atom is one idea, extracted or authored, with
 a verbatim sentence pointing back at the file it came from.
 
-Expected size after the full sweep is 1,500 to 2,500, from the trial's
-projection of roughly 2,400 candidates reconciling to 1,600 to 1,800.
+Expected size after the full sweep is 1,500 to 2,500. Two differently drawn
+samples agree: the stratified 30-note trial projected about 2,400 candidates,
+and the random 75-note trial projected about 2,800 across the vault's 1,288
+notes. Both land inside the bar once cross-note merging is applied.
 
 ### 2. Relations
 
@@ -202,11 +205,15 @@ real property and the probe picker already reads it.
   shows which one this is.
 - `kind`, one of the four.
 - `provenance`: `extracted`, `authored`, or `generated`.
-- `stance`: whether you appear to **hold** this or to have **encountered** it.
-  A note in your own words is evidence you hold a position; a clipping is
-  evidence you were interested, which is a different and still useful fact. The
-  trial separated these cleanly on first-person markers against attribution,
-  with two or three ambiguous cases in eighty-two.
+- `stance`: `held`, `encountered`, or `generated`. A note in your own words is
+  evidence you hold a position; a clipping is evidence you were interested,
+  which is a different and still useful fact; a note a model wrote is neither.
+  The 75-note trial found the third case is already in the vault and that the
+  first two values cannot see it: one note carries an Obsidian callout saying
+  Claude generated and expanded it from a seed idea, and it produced 9% of the
+  sample's nodes, every one marked `held`. `generated` is read from that
+  callout rather than inferred, and a generated node is not evidence of what
+  you think until you say so.
 - `centrality`, computed from edges, stored, recomputed when edges change.
 - two to four **checks**: what having the idea looks like, what it rules out,
   what the standard objection is. Questions are written against a check rather
@@ -240,8 +247,8 @@ purpose that connects to nothing is a frontier or a confusion, and both are
 worth attention. Orphans get a holding area rather than a rejection, and the
 connection check re-runs whenever the map grows.
 
-The 2,791 wikilinks you drew by hand across 741 notes are ready-made edge
-candidates, and the ones that resolve to nothing are ready-made seeds: an
+The 2,833 wikilinks you drew by hand across 745 notes are ready-made edge
+candidates, and the 417 that resolve to nothing are ready-made seeds: an
 unresolved `[[link]]` is an idea you named and never wrote up.
 
 ---
@@ -597,26 +604,53 @@ Agreed before it runs, so the result can be judged against something.
 
 ## What it costs
 
-From the map spec, and still unverified, which is what the spend ledger is
-for. Haiku throughout.
+Modelled from the 75-note trial's measured classification split and current
+Haiku 4.5 pricing, $1.00 and $5.00 per million tokens, at 3.6 characters per
+token. The vault is 1,288 notes and 5,724,185 characters, of which 1,039 notes
+clear the classify threshold.
 
-| stage | rough cost |
+| stage | cost |
 |---|---|
-| classify 1,244 notes on their first 1,500 characters | ~$0.60 |
-| extract from what classifies as knowledge or mixed | ~$2.00 |
-| reconcile, twenty pairs per call | ~$0.30 |
-| edges and disagreements | ~$0.50 |
+| classify every note over the threshold | $0.78 |
+| extract from the 48% that classify `knowledge` or `mixed` | $2.64 |
+| reconcile, twenty pairs per call | $1.31 |
+| cross-note edges and disagreements | $1.60 |
 | centrality | free |
-| **first full build** | **under $6** |
+| **first full build** | **$6.34** |
+
+At the roughly 60% extraction share the evidence-flag change below produces,
+the total is $7.71.
 
 Incremental syncs cost a fraction, because only changed notes are read and
 `blob_sha` decides which those are.
+
+The useful conclusion is that no design choice here should be made on cost.
+The numbers are modelled rather than measured, and the spend ledger exists so
+the first real run replaces this table with facts.
 
 The one number that is a real risk is reconciliation. Trigram blocking plus
 batched adjudication removes around 99% of the comparison space and needs no
 new vendor. If the merge rate proves bad, the upgrade is pgvector, which
 Supabase ships, with an embedding model from another vendor, since Anthropic
 does not serve embeddings. Only that stage changes.
+
+---
+
+## What the sweep must not read
+
+Two rules, both found by running the trial rather than by design.
+
+**Journals are excluded by a list you control**, never inferred. Until the
+list exists the sweep does not run, which is the one thing here a session
+cannot settle.
+
+**A note containing a credential-shaped string is skipped and reported,
+never sent to a model.** Nine notes in the vault currently match
+`sk-ant-`, `sk-proj-`, `ghp_` or `AKIA` patterns. The check is a regex over
+the body before any call, the note is recorded as skipped on the sweep run
+the way an oversized note already is, and the reason is shown rather than
+swallowed. Extraction would otherwise post those keys to an API and store
+them in the graph's evidence quotes.
 
 ---
 
