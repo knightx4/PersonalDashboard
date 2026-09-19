@@ -207,28 +207,27 @@ export async function handStepToClaude(input: {
     });
   }
 
-  // Handed over and underway, in the one write. A step sent to Claude is being
-  // built from the moment the routine wakes, and a plan still reading "not
-  // started" while a session works it is the plan lying about itself -- the one
-  // thing it is not allowed to do. `started_at` comes from the trigger, so the
-  // page can also say how long it has been going.
+  // Underway, and nothing else. A step sent to Claude is being built from the
+  // moment the routine wakes, and a plan still reading "not started" while a
+  // session works it is the plan lying about itself -- the one thing it is not
+  // allowed to do. `started_at` comes from the trigger, so the page can also
+  // say how long it has been going.
   //
-  // The assignee is still written here, where the feature send has stopped
-  // writing it (#672). It is not a hand-over any more -- the runner reads what
-  // you approved -- but `expiredClaim` takes a claim with no assignee as one
-  // nobody is holding and puts it straight back, so a single send that left the
-  // column empty would have the next sweep undo the claim it just made. #712
-  // is the question of which of the two moves.
-  const patch: Record<string, string> = {};
-  if (node.assignee !== 'claude') patch.assignee = 'claude';
+  // The assignee is left as it was. Writing 'claude' here stopped being a
+  // hand-over when the runner started working from what you approved (#672),
+  // and what was left of it was keeping the claim sweep off the claim this
+  // press had just made: a claim with no assignee read as one nobody held.
+  // #712 settled that the sweep reads the run behind the claim instead, so
+  // both halves come out and a step you marked as yours is still yours after
+  // you press Send.
+  //
   // Only a step nobody has started moves. A blocked one keeps its status and
   // its reason, and one already underway keeps the clock it started on.
-  if (node.status === 'not_started') patch.status = 'in_progress';
-  const changed = Object.keys(patch).length > 0;
+  const changed = node.status === 'not_started';
   if (changed) {
     const { error } = await supabase
       .from('plan_items')
-      .update(patch)
+      .update({ status: 'in_progress' })
       .eq('id', node.id)
       .eq('user_id', userId);
     if (error) return { ok: false, error: error.message };
