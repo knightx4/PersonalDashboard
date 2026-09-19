@@ -8,6 +8,11 @@ level rather than at the level of the whole book.
 Everything else the module is eventually for is in "Where this goes" at the
 end, and none of it is v1.
 
+> **Slice 5 and "the notes question, still open" are now owned by
+> [KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md).** That document answers what an atom
+> is, where interests live, and how the queue and the map read the same store.
+> Everything about resolution and located reading below stands unchanged.
+
 ## The problem, precisely
 
 The recommendation is not the bottleneck. Ask any decent model what to read

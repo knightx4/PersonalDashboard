@@ -300,6 +300,49 @@ time it is used, never generated once and frozen.
   (20–23) shipped for the note half of it; nothing else in the block depends on
   another block.
 
+## The knowledge foundation
+
+Specified in [KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md), which sits above the vault
+spec and both learn specs. The vault is the store, the map is derived from it,
+and what the app produces is written back so that staying derived costs nothing.
+
+The ordering argument is that every item is cheap at the few dozen concepts in
+the graph today and painful at the 1,500 to 2,500 the vault sweep is projected
+to produce, so all of it comes before the sweep rather than after.
+
+54. **The privacy page, and the journal exclusion list.** Before another note
+    reaches a model. Two paths already send vault content to one and the policy
+    describes mail only, which the vault spec said had to change first.
+55. **The realignment migrations.** Subjects demoted from containers to labels,
+    the four node kinds, typed edges absorbing `concept_mentions`, the
+    `claimed` state, stance, a provenance table keyed on `blob_sha` with a
+    verified quote, disagreements, centrality, and the overlays pair.
+    `concept_subjects` is superseded and comes back out.
+56. **One extraction seam.** The node test, the kinds, the edge vocabulary and
+    the quote rule in the shared prompt fragment the five chain-writing calls
+    already draw on, so a change to what an atom is is made once.
+57. **The outbox.** Authored atoms and rewritten claims become files. Needs a
+    read-write PAT, which is one of the two things a session cannot do.
+58. **The sweep at scale.** A background job, a budget and a resume point,
+    which the one-note slice deliberately has none of.
+59. **The review queue.** Accept, merge or reject, highest centrality first.
+60. **Centrality and the frontier floor.** Graph arithmetic, no model call.
+61. **Disagreements.** The neighbourhood sweep, the six kinds, the crux, and
+    the resolution atom that `qualifies` both originals.
+62. **Overlays in the interface.** Interests and open questions, and the button
+    that turns an unanswered question into a track in the reading queue.
+
+### Ordering notes worth respecting
+
+- Steps 54 and 55 block everything else here. 54 is not bookkeeping: the app
+  is already doing the thing the policy does not describe.
+- 55 before 56 before 58, for the reason every block here repeats. A shape
+  settled after 1,800 rows are written is a data migration rather than a
+  migration.
+- 57 is independent of 58 and can wait on the token without blocking the sweep.
+- 62 last, and it is the one that closes the loop between the two modules: an
+  interest with no atoms under it is the best input the reading queue can get.
+
 ## Open questions, still open
 
 Carried forward from the spec. None of them block the next few steps, but the

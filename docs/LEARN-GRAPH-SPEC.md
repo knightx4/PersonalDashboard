@@ -11,6 +11,11 @@ authored orphan is allowed where an extracted one is not, and the per-note
 extraction budget is dropped. Each is marked there with its reason. Everything
 else below stands.
 
+**[KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md) now sits above both this document and
+the map spec.** It settles the store, the layers and the overlays; the probe
+ladder, the states, the bar and the cost model below are unchanged and are
+still owned here.
+
 It exists because the queue has a hole in it. A reading list is a list of things
 somebody thought were good. It has no opinion about you. It cannot tell you that
 you are about to read chapter 9 of a book whose chapter 3 you needed, or that

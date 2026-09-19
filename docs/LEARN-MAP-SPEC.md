@@ -16,6 +16,14 @@ Written to [WRITING-GUIDE.md](WRITING-GUIDE.md).
 
 ---
 
+**What moved.** [KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md) now owns the questions
+this document raised and could not settle from inside extraction: where the
+writing lives, what happens to an atom the app produces, and where an interest
+that holds no position goes. It also turns provenance from a sentence into a
+table keyed on the note's blob hash, with the supporting quote verified present
+in the note. Node kinds, edge types, the disagreement lifecycle and the
+procedure below are unchanged.
+
 ## Why the vault is the starting point
 
 Most learning tools know nothing about the person using them, so they ask for a
