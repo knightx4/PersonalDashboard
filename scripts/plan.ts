@@ -953,21 +953,20 @@ async function main(): Promise<void> {
       // lib/plan/needs.ts.
       if (item.kind === SETUP_KIND) fail(setupStartRefusal(item.number));
 
-      // Claimed, and in Claude's queue if it was in nobody's.
+      // Claimed, and nothing written about who holds it.
       //
-      // `in_progress` means a session has this step in hand, and the daily
-      // cron puts back a claim with no assignee because nothing is working it.
-      // A session claiming a sub-step nobody handed over made exactly that
-      // row. `coalesce` rather than a plain set, so a step you had marked as
-      // yours stays yours.
+      // This used to fill an empty assignee with 'claude', because the daily
+      // cron put back a claim with no assignee on the reading that nothing was
+      // working it. #712 settled that the sweep reads the run behind the claim
+      // instead, so claiming a step no longer says anything about the column
+      // and the mark you put on a row survives a session working it.
       // A step being worked is not a step waiting on anything, so the
       // sentence saying what it needed and the word saying who could supply
       // it both go. The dated line that recorded the block stays in the
       // comment.
       await sql`
         update plan_items
-        set status = 'in_progress', assignee = coalesce(assignee, 'claude'),
-            block_ask = null, block_kind = null
+        set status = 'in_progress', block_ask = null, block_kind = null
         where id = ${item.id} and user_id = ${userId}`;
       console.log(`#${item.number} in progress.`);
       return;

@@ -408,11 +408,11 @@ export async function setPlanItemStatus(
   // Marking a step underway yourself puts it in your queue, if it was in
   // nobody's.
   //
-  // `in_progress` means somebody has this step in hand right now, and the
-  // daily cron puts back a claim with no assignee on exactly that reading --
-  // nothing is working it. Moving the row here is you working it, so the row
-  // says so and the sweep leaves it alone. A step already handed to Claude
-  // keeps its assignee: pressing the status control is not taking it back.
+  // The claim sweep is what this write was for: a claim with no assignee was
+  // read as one nothing was working and put straight back. That rule went with
+  // #714, and #715 kept the write anyway -- moving the row here is you working
+  // the step, so the row says so. A step that already carries a mark keeps it:
+  // pressing the status control is not taking it off anybody.
   if (status.data === 'in_progress' && !current?.assignee) patch.assignee = 'me';
 
   const { error } = await supabase

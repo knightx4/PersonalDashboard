@@ -52,7 +52,7 @@ beside them.
 | `comment` | Your own note on it: why it stalled, what changed. The CLI appends a dated line when it closes or blocks a step. |
 | `priority` | 1 next, 2 normal, 3 someday — the same three the notes queue uses. |
 | `size` | `s`, `m` or `l`. Coarse on purpose: "one sitting or not", not hours. |
-| `assignee` | `me`, `claude`, or nothing at all. `me` is a step you kept for yourself; every other approved step is one a routine may pick up on its own, which is what approving it did. `claude` reads the same as an empty column. Every hand-over used to write it; the feature Send stopped in #672, and the Send on one step still writes it so that the claim sweep does not take the step back (#712). |
+| `assignee` | `me`, `claude`, or nothing at all. `me` is a step you kept for yourself; every other approved step is one a routine may pick up on its own, which is what approving it did. `claude` reads the same as an empty column. Every hand-over used to write it; the feature Send stopped in #672 and the Send on one step in #714, so nothing writes this column when a step is claimed. |
 | `commit_sha` | The commit that shipped it. |
 | `position` | Order among siblings. Sparse; re-dealt in tens when a step is moved. |
 | `started_at`, `completed_at` | Kept by a trigger from the status. Done and dropped both count as finished; a reopened step loses its completion time. |
@@ -502,10 +502,11 @@ the other half: a stage of the daily cron that writes those rows back to
 it the reading is only on the page, and the CLI, the brief and the next session
 all still take the status at its word.
 
-A claim is taken back for one of two reasons, both in `lib/plan/claims.ts`:
-nothing has touched it for two hours, or it has no assignee at all. The second
-is why both the page's status control and `plan.ts start` now name who holds a
-step they mark underway — a claim nobody is on is one nothing is working.
+A claim is taken back for one reason, in `lib/plan/claims.ts`: nothing has
+touched it for two hours. There was a second until #714 — a claim with no
+assignee read as one nothing was working — and it is what made the Send button
+and `plan.ts start` write who held a step they marked underway. Both writes are
+gone, and the run behind the claim is what the sweep reads instead.
 
 Two hours is a threshold and not evidence, and a long batch is called stale
 while it is still going. So the claim is read off the run behind it instead.
@@ -801,7 +802,7 @@ specified*, what it waits on (its own and inherited), its sub-steps as a
 checklist, what it unblocks, the note. A decision leads with its question
 instead. It is what `show` prints and what *Send to Claude* sends.
 
-**Send to Claude.** The button on a step marks it Claude's and fires the
+**Send to Claude.** The button on a step fires the
 same routine the notes queue uses (`fireFeatureRoutine`, with
 `CLAUDE_API_KEY` and optionally `CLAUDE_FEATURE_ROUTINE_ID` on the
 deployment), with the brief as the extra turn. The session that wakes up is
