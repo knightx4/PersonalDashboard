@@ -24,6 +24,7 @@ import {
 } from '@/lib/digest/night';
 import { elapsedSince, remainingUntil } from '@/lib/plan/elapsed';
 import { commitSubject, type StoredPush } from '@/lib/plan/liveness';
+import { readyFeaturesLine } from '@/lib/plan/overnight-choice';
 import {
   OVERNIGHT_DEFAULT_FEATURES,
   OVERNIGHT_DEFAULT_HOURS,
@@ -194,11 +195,23 @@ export function OvernightControl({
   canSend,
   night,
   push,
+  ready,
   label = 'Overnight',
   bare = false,
 }: {
   run: OvernightRun | null;
   canSend: boolean;
+  /**
+   * How many features the runner could pick up now, as `readyFeatureCount`
+   * counts them: features rather than steps, and only the ones handed to
+   * Claude that nothing is holding.
+   *
+   * Required rather than optional because it is the other half of the glance
+   * -- a night with budget left and nothing ready stops on its next tick --
+   * and every caller of this card has already built the tree it is counted
+   * from.
+   */
+  ready: number;
   /**
    * What to call the runner here.
    *
@@ -287,6 +300,14 @@ export function OvernightControl({
         ) : (
           <p className="text-small text-ink-muted">{overnightLine(run, now)}</p>
         )}
+        {/* What there is left for it to pick up, which nothing else on the card
+            can say: the budget counts what a night has spent, and a night with
+            three features left in it and nothing ready stops on its next tick.
+            In features because that is what a tick fires and what the budget is
+            spent in -- the ask on note 2721ff74 was "features (not steps)".
+            Said in both states, because before bed it is what decides whether
+            to start a night at all. */}
+        <p className="text-small text-ink-muted">{readyFeaturesLine(ready)}</p>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {standing === 'running' && (
