@@ -262,3 +262,57 @@ describe('the search bar in the top bar', () => {
     expect(bar).not.toContain('>Todo<');
   });
 });
+
+/**
+ * The magnifier in the top row.
+ *
+ * Below lg there is no field in the bar, so search is a button beside the
+ * account icons and it opens the box the shortcut opens (#701, #702, #704).
+ * That the press opens the box needs a browser; what is asserted here is that
+ * the button is drawn, where it is drawn and the width it stops at.
+ */
+describe('the search button on a phone', () => {
+  function shell(module: ModuleId | null) {
+    return renderToStaticMarkup(
+      <AppShell
+        account="11111111-1111-4111-8111-111111111111"
+        module={module}
+        sections={[]}
+        displayName="Sam"
+        email="sam@example.com"
+        theme={SYSTEM_THEME}
+      >
+        <p>The page</p>
+      </AppShell>,
+    );
+  }
+
+  /** The top bar, from its own tag to its close. */
+  function header(html: string): string {
+    const at = html.indexOf('<header');
+    expect(at).toBeGreaterThan(-1);
+    return html.slice(at, html.indexOf('</header>', at));
+  }
+
+  it('draws a search button in the top row', () => {
+    expect(header(shell('todo'))).toContain('title="Search"');
+  });
+
+  it('draws it below lg only, where the bar has no field', () => {
+    const bar = header(shell('todo'));
+    const at = bar.indexOf('title="Search"');
+    // The button's own classes, read from the tag the title sits in.
+    const tag = bar.slice(bar.lastIndexOf('<button', at), bar.indexOf('>', at));
+    expect(tag).toContain('lg:hidden');
+  });
+
+  it('puts it with the account icons rather than in the middle of the bar', () => {
+    const bar = header(shell('todo'));
+    expect(bar.indexOf('title="Search"')).toBeGreaterThan(bar.indexOf('aria-label="Search"'));
+    expect(bar.indexOf('title="Search"')).toBeLessThan(bar.indexOf('Capture something'));
+  });
+
+  it('draws it outside a workspace too', () => {
+    expect(header(shell(null))).toContain('title="Search"');
+  });
+});
