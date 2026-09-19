@@ -6,12 +6,13 @@ import { cn } from '@/lib/cn';
 import { popoverSurface, scrim } from '@/components/ui/popover';
 import { Kbd } from '@/components/shell/key-hints';
 import { SearchRowLine } from '@/components/shell/search-row';
+import { SearchScopeChip } from '@/components/shell/search-scope-chip';
 import {
   searchRowKey,
   useSearchRows,
   type SearchRow,
 } from '@/components/shell/use-search-rows';
-import { scopeForModule } from '@/lib/search/scope';
+import { scopeForModule, toggleScope, type SearchScope } from '@/lib/search/scope';
 import type { ModuleId } from '@/lib/modules';
 import type { Theme } from '@/lib/theme';
 import type { NavSection } from '@/components/shell/app-shell';
@@ -32,7 +33,14 @@ import type { NavSection } from '@/components/shell/app-shell';
  * It searches the workspace the page is in, and everything you own on a page
  * that is in no workspace. So it opens on that workspace's pages and what you
  * can start there, and nothing from anywhere else; outside a workspace it
- * opens on the list it has always opened on.
+ * opens on the list it has always opened on. The chip beside the field widens
+ * it to everything you own and narrows it back, the same chip the bar carries
+ * and the same two states.
+ *
+ * Whether it is open is the shell's, not this file's, because on a phone the
+ * magnifier in the top row opens it as well as the shortcut. The shortcut is
+ * still listened for here and still toggles; #663 is the step that moves it
+ * into the bar and retires this box.
  */
 export function CommandPalette({
   account,
@@ -40,6 +48,8 @@ export function CommandPalette({
   sections,
   enabledModules,
   theme,
+  open,
+  onOpenChange,
 }: {
   /** Whose pages these are. The held list is only searched when it is theirs. */
   account: string;
@@ -48,9 +58,22 @@ export function CommandPalette({
   enabledModules?: readonly ModuleId[];
   /** What is on screen now, so a colour can be applied to the mode you are in. */
   theme: Theme;
+  /** Whether the box is up. Held by the shell, so the magnifier can open it. */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  /**
+   * What is being searched, which starts as the workspace the page is in.
+   *
+   * State rather than derived, because the chip changes it. It survives the
+   * box closing and reopening on the same page -- widening it is something
+   * you do about a search, and having to press the chip again on every open
+   * would make it a setting you cannot keep -- and goes back to the workspace
+   * you have landed in when the page changes, which is the rule the bar
+   * follows too.
+   */
+  const [scope, setScope] = useState<SearchScope>(() => scopeForModule(module));
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -58,12 +81,7 @@ export function CommandPalette({
   const { rows, looking, run, reset } = useSearchRows({
     account,
     module,
-    // The workspace the page is in, or everything where there is no workspace
-    // to narrow to. It follows the page rather than being held here, so the
-    // box opened after a navigation searches where you now are. The chip that
-    // widens it to everything is #703, and that is what turns this into
-    // state.
-    scope: scopeForModule(module),
+    scope,
     sections,
     enabledModules,
     theme,
@@ -74,16 +92,31 @@ export function CommandPalette({
     surface: 'box',
   });
 
+  /**
+   * The box follows the page.
+   *
+   * The shell holds it across a navigation, so a scope left pointing at the
+   * workspace you have just left would search somewhere you are not. Arriving
+   * anywhere new puts it back to the workspace you have landed in.
+   */
+  const standingIn = useRef(module);
+  useEffect(() => {
+    if (standingIn.current === module) return;
+    standingIn.current = module;
+    setScope(scopeForModule(module));
+    setActive(0);
+  }, [module]);
+
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
-        setOpen((value) => !value);
+        onOpenChange(!open);
       }
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, []);
+  }, [open, onOpenChange]);
 
   useEffect(() => {
     if (!open) return;
@@ -91,7 +124,7 @@ export function CommandPalette({
   }, [open]);
 
   function close() {
-    setOpen(false);
+    onOpenChange(false);
     setQuery('');
     setActive(0);
     reset();
@@ -101,6 +134,15 @@ export function CommandPalette({
     if (!row) return;
     close();
     run(row);
+  }
+
+  function pressChip() {
+    setScope((current) => toggleScope(current, module));
+    setActive(0);
+    reset();
+    // The cursor goes back where it was: switching what is being searched is
+    // something you do in the middle of typing, not instead of typing.
+    inputRef.current?.focus();
   }
 
   if (!open) return null;
@@ -155,6 +197,10 @@ export function CommandPalette({
             data-focus-ring="none"
             className="h-12 w-full bg-transparent text-body text-ink outline-none placeholder:text-ink-ghost"
           />
+          {/* The same chip the bar carries, and the same two states. It sits
+              between the field and the keycap because it belongs to the field
+              -- what is being searched -- rather than to the box. */}
+          <SearchScopeChip scope={scope} module={module} onPress={pressChip} />
           {/* The shell's keycap, not a second drawing of one: this was a
               hairline bigger and a step up the type scale from every other
               cap in the app, which is visible the moment the palette opens
