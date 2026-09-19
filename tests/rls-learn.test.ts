@@ -104,6 +104,7 @@ describe('RLS coverage', () => {
       'concept_edges',
       'concept_mentions',
       'concept_state',
+      'concept_subjects',
       'concepts',
       'goals',
       'imports',
