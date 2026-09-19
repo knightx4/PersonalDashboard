@@ -478,12 +478,55 @@ their neighbour, and sections over about 4,000 split on paragraph boundaries.
 Extraction runs per chunk, so a 20,000-character essay is not processed in one
 pass.
 
-**Chunk the whole note; never truncate it.** The 75-note trial truncated at
-6,000 characters for its own convenience and paid for it: its richest note
-yielded 17 candidates from the first 6,000 of 54,070 characters, with a
-class-logistics wrapper hiding a sustained argument about car-dependent
-development. Stage 1 exists precisely so a long note is processed in pieces,
-and the sweep has no reason to read only the first piece.
+**Chunk the whole note; never truncate it — and raise the section cap, which
+is the real limit.** The 75-note trial truncated at 6,000 characters for its
+own convenience and paid for it: its richest note yielded 17 candidates from
+the first 6,000 of 54,070 characters, with a class-logistics wrapper hiding a
+sustained argument about car-dependent development.
+
+Reading `splitBriefing` afterwards showed the trial's truncation was the
+smaller problem. The chunker cuts on headings when a note has more than one,
+and otherwise groups blank-line blocks up to 6,000 characters. Then
+`MAX_BRIEF_SECTIONS` stops the import after **ten** sections. The effect is
+the opposite of what anybody would guess:
+
+| note | chars | sections | read |
+|---|---|---|---|
+| `Pending/Property and Regulation Study Guide.md` | 302,851 | 219 | 3.6% |
+| `Bulk/Strong Towns Housing Course.md` | 40,683 | 78 | 6% |
+| `Bulk/.../World building simulator.md` | 50,842 | 43 | 8% |
+| `Pending/Casanova … Lottery Passage.md` | 37,480 | 7 | **100%** |
+
+**A well-structured note is punished hardest.** More headings means smaller
+sections, so ten of them is a smaller share of the note. The copied book
+passage, which has no headings at all and falls to the 6,000-character
+grouping, is read in full in seven sections. The study guide, which is
+carefully organised, is read at 3.6%.
+
+Across the vault this is not an edge case. 365 notes carry more than one
+heading; 63 of them exceed ten sections, and **1,927,088 characters, 40.7% of
+the text in those notes, would never be read.**
+
+Three smaller faults in the same function:
+
+- **A single oversized block is never split.** The grouping loop only flushes
+  when adding the *next* block would exceed the limit, so a block larger than
+  the limit goes into a section alone.
+  `Pending/New Orleans Data Center Full Transcript.md` is 54,709 characters
+  with one blank line in it, which becomes one section of 54,658 characters in
+  a single call.
+- **Anything before the first heading is discarded.** The loop only collects
+  lines once it has seen a heading, so a note that opens with two paragraphs
+  and then starts its headings loses those paragraphs silently.
+- **The vault path has no length check at all.** `proposeBrief` validates the
+  paste box against `MAX_BRIEFING_CHARS` and says so; `proposeFromNote` passes
+  `note.body` straight through at any size.
+
+What the sweep needs: cap on **characters read**, not sections; split a block
+that exceeds the section size rather than passing it whole; keep the preamble;
+and report what was skipped per note on the sweep run, the way an oversized
+note already is. The ten-section cap was written for a pasted briefing, where
+somebody chose what to paste. It is the wrong shape for a vault.
 
 > **Revised.** LEARN-GRAPH-SPEC.md implied a budget of about three concepts per
 > note, which is wrong for a dense note. The thing to guard against is
