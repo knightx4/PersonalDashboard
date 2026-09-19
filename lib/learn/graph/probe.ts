@@ -1,6 +1,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { probePayloadSchema, toProbe, type Probe } from '@/lib/learn/graph/probe-payload';
 
@@ -154,6 +155,7 @@ export async function writeProbe(input: {
           },
         },
       ],
+      tool_choice: forceTool(TOOL_NAME),
       messages: [
         {
           role: 'user',
@@ -183,7 +185,7 @@ export async function writeProbe(input: {
 
   const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
   if (!block || block.type !== 'tool_use') {
-    return { ok: false, reason: 'error', detail: 'The call ran but reported nothing.' };
+    return { ok: false, reason: 'error', detail: whyNoReport(response) };
   }
 
   const safe = probePayloadSchema.safeParse(block.input);
