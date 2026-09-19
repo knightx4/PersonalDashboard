@@ -10,6 +10,12 @@ import { outstandingCount, unfinishedSweep } from '@/lib/learn/graph/opening';
 import { countStates, settledCount } from '@/lib/learn/graph/model';
 import { MAX_BRIEFING_CHARS } from '@/lib/learn/graph/from-brief';
 import { BriefForm } from './brief-form';
+import { FromVaultForm } from './from-vault-form';
+import { createVaultClient } from '@/lib/vault/auth/server';
+import { loadNotes } from '@/lib/vault/notes/load';
+
+/** How many notes the picker offers. Scaffolding; the sweep needs no picker. */
+const VAULT_PICKER_LIMIT = 500;
 import { GoalForm } from './goal-form';
 import { PriorForm } from './prior-form';
 
@@ -47,6 +53,13 @@ export default async function KnowPage() {
   const supabase = await createLearnClient();
   const subjects = await loadSubjects(supabase);
   const unfinished = await unfinishedSweep(supabase);
+
+  // Scaffolding for the first slice of the vault pass: a list to pick one note
+  // out of. The sweep that follows picks its own and needs no list, so this is
+  // capped rather than paged.
+  const vaultNotes = (await loadNotes(await createVaultClient(), { limit: VAULT_PICKER_LIMIT })).map(
+    (note) => ({ path: note.path, title: note.title }),
+  );
 
   const rows = await Promise.all(
     subjects.map(async (subject) => ({
@@ -130,6 +143,17 @@ export default async function KnowPage() {
       <BriefForm
         subjects={subjects.map((subject) => ({ id: subject.id, name: subject.name }))}
         maxChars={MAX_BRIEFING_CHARS}
+      />
+
+      {/* The fourth way in, and the one that needs nothing typed. The vault
+          already holds years of notes arguing things; this reads one of them.
+          Last because it is the first slice of a sweep that will eventually
+          read all of them without being asked, at which point this form is
+          for checking what the sweep would do rather than for doing it. */}
+      <h2 className="mt-8 text-body font-medium text-ink">Or read a note from your vault</h2>
+      <FromVaultForm
+        subjects={subjects.map((subject) => ({ id: subject.id, name: subject.name }))}
+        notes={vaultNotes}
       />
     </>
   );
