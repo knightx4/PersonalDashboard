@@ -186,7 +186,7 @@ describe('endQuietRuns', () => {
   /** The runs, the steps they were sent at, and what got written back. */
   function db(
     runs: Array<{ id: string; plan_item_id: string | null; created_at: string }>,
-    steps: Array<{ id: string; completed_at: string | null }> = [],
+    steps: Array<{ id: string; completed_at: string | null; blocked_at?: string | null }> = [],
   ) {
     const updates: Array<{ values: Record<string, unknown>; ids: string[] }> = [];
     const supabase = {
@@ -256,6 +256,26 @@ describe('endQuietRuns', () => {
     const { supabase, updates } = db(
       [{ id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(300) }],
       [{ id: 'step-1', completed_at: minutesAgo(200) }],
+    );
+
+    const result = await endQuietRuns({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      pushes: [],
+    });
+
+    expect(result.finished).toBe(1);
+    expect(updates).toEqual([{ values: { status: 'finished' }, ids: ['run-1'] }]);
+  });
+
+  it('finishes a run whose step was blocked after it was fired', async () => {
+    // The session stopped to ask a question, which closes nothing. Without the
+    // block the run sat reading `started` until the two hours were up and the
+    // overnight tick waited them out before firing the next feature. #679.
+    const { supabase, updates } = db(
+      [{ id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(300) }],
+      [{ id: 'step-1', completed_at: null, blocked_at: minutesAgo(200) }],
     );
 
     const result = await endQuietRuns({
