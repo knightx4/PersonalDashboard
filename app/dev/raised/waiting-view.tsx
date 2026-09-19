@@ -10,6 +10,7 @@ import {
   type PlanActionState,
 } from '@/app/dev/plan/actions';
 import { Button } from '@/components/ui/button';
+import { CommentThread } from '@/components/dev/comment-thread';
 import { AnswerBox, TheAnswered, TheOptions, useAnswerDraft } from '@/components/dev/question';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { FieldError } from '@/components/ui/field';
@@ -36,6 +37,21 @@ const TONE: Record<WaitingRow['health'], DevTone> = {
   setup: 'caution',
   unanswered: 'accent',
   proposed: 'quiet',
+};
+
+/**
+ * What the box asks for, which is not the same thing on all four kinds.
+ *
+ * A question wants what you are weighing; a step that has stopped wants what
+ * you know about the thing it is stopped on; a proposal wants the doubt that
+ * is keeping you from saying yes. One placeholder for all of them would have
+ * to be vague enough to fit a proposal and a missing token at once.
+ */
+const PLACEHOLDER: Record<WaitingRow['health'], string> = {
+  blocked: 'What you know about what it is waiting on. Tag @dash to ask.',
+  setup: 'Where you have got to with this, or what is in the way. Tag @dash to ask.',
+  unanswered: 'What is unclear about the question, or what you are weighing. Tag @dash to ask.',
+  proposed: 'What you want changed before this is approved. Tag @dash to ask.',
 };
 
 /**
@@ -95,6 +111,21 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
       )}
 
       {question && <AnswerQuestion row={row} />}
+
+      {/* The same thread the plan page keeps on the step, on the page the row
+          is read from. Dash could be answered but not talked to: a raise took
+          a comment and a plan row did not, so saying "this one is waiting on
+          the other half of #612" meant going to the plan and finding the
+          number. The write is against the step either way, so what is said
+          here is on the row when you next open it there. */}
+      <CommentThread
+        target="step"
+        id={row.id}
+        thread={row.thread}
+        label="Comment"
+        placeholder={PLACEHOLDER[row.health]}
+        titles={titles}
+      />
 
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-micro text-ink-ghost">
