@@ -11,15 +11,17 @@ vault, and [LEARN-SOURCES-SPEC.md](LEARN-SOURCES-SPEC.md) is the catalogue. Each
 says what its own piece does. None of them says what happens between the pieces,
 which is where the module is actually incomplete.
 
-Every stage below says what it hands the next one. That contract is the useful
-part: a stage can be rebuilt freely and a broken handoff is what makes the
-module do nothing.
+Each stage below says what it hands on. That contract is the useful part: a stage
+can be rebuilt freely, and a broken handoff is what makes the module do nothing.
+Questioning is the exception and has no position, which is the point of it.
 
 Written to [WRITING-GUIDE.md](WRITING-GUIDE.md).
 
 ---
 
 ## The seven stages
+
+Six of them form a loop. The seventh, questioning, is not a position in it.
 
 | # | stage | the question it answers | specified in | state |
 | --- | --- | --- | --- | --- |
@@ -28,11 +30,18 @@ Written to [WRITING-GUIDE.md](WRITING-GUIDE.md).
 | 3 | The curriculum | in what order | GRAPH, SPEC | baseline built, adaptation built, no external skeleton |
 | 4 | The suggestion engine | what is the one next thing | GRAPH | built |
 | 5 | The sources | where do I go and learn it | SPEC, SOURCES | store built, no ingest, two rival mechanisms |
-| 6 | Questioning | show me you hold it | GRAPH | built at three rungs, unverified |
-| 7 | Back into what you know | what did that change | GRAPH | built for probes, missing for readings |
+| 6 | Back into what you know | what did that change | GRAPH | built for probes, missing for readings |
+| — | **Questioning** | show me you hold it | GRAPH | six entry points, no rule about which answers count |
 
-It is not a line. Stages 1 and 7 write the same two tables, which is what makes
-this a loop with a bootstrap rather than a pipeline that finishes.
+**Questioning happens at any time, from anywhere, and is not a stage.** It is an
+operation available against any claim, and the module already works this way at
+six surfaces: one of them runs before a subject row exists, and another never
+touches the graph at all. Putting it between the sources and the feedback would
+say you have to go and fetch something before you can be asked, which is both
+false and not wanted.
+
+It is also not a line. Stages 1 and 6 write the same two tables, which is what
+makes this a loop with a bootstrap rather than a pipeline that finishes.
 
 ---
 
@@ -67,7 +76,8 @@ overstating two of them.
   an account, or paste an essay or a syllabus, and Sonnet turns it into a
   proposed chain. Written because every other route waits for you to do
   something and none of them can reach the years before the app existed.
-- **A probe result**, which is stage 7 and the only route that writes `tested`.
+- **A probe result**, which is the only route that writes `tested`, and which can
+  arrive at any time from any of the six surfaces below.
 - **The vault**, which is `lib/learn/vault/classify.ts` and nothing else.
 
 **Hands on.** `concept_state` rows, and through `lib/learn/graph/rooting.ts` two
@@ -228,9 +238,10 @@ subject-level links that coverage would read.
 
 ---
 
-## 6. Questioning
+## Questioning, which is not a stage
 
-**For.** The only thing that writes `tested`.
+**For.** The only thing that writes `tested`, and the only operation in the
+module with no fixed place in the flow.
 
 **What exists.** `learn.probes`, one row per question at any rung, kept in full
 rather than collapsed into a score, which is what makes "you have been wrong
@@ -244,30 +255,73 @@ about this three times in four months" answerable.
 
 One table for all three, because a row is already "one question about one claim
 and what came back" and the rung only changes which columns carry it. Check
-constraints refuse a row that is half of two rungs.
-
-`concepts.mastery` holds the two to four checks of understanding for a claim, and
-a probe aims at one named check rather than at the claim in general, so the next
-question has somewhere new to go.
+constraints refuse a row that is half of two rungs. `concepts.mastery` holds the
+two to four checks for a claim, and a probe aims at one named check rather than
+at the claim in general, so the next question has somewhere new to go.
 
 Generation is Haiku, one claim in and one item out, carrying no conversation
 history, which is the difference between a session costing twenty cents and ten
 dollars.
 
-**Hands on.** A result, and a rung.
+### Six places a question can start
 
-**Missing.** Nothing checks the marked answer. The generator has two real
-guards, the `unusable` flag and the rule that the reason must stand without
-pointing back at the options, and both catch incoherent items rather than
-confidently wrong ones. The misconception guard looks like it covers this and
-does not: it fires on the same wrong option twice, and the same model on the same
-claim will mis-mark the same way twice. A systematic error walks through a guard
-built for slips, and what it writes is a sentence about your mind that you will
-believe.
+| surface | what it asks about | what exists first |
+| --- | --- | --- |
+| `/learn/opening/[id]` | ten claims across a subject, carried as text | nothing. No subject row exists yet |
+| `/learn/now` | the one claim a five-minute session picks | a graph |
+| `/learn/s/[id]/probe` | claims in one subject | a subject |
+| `/learn/c/[id]` | one claim, on its own page | one concept |
+| `/learn/quiz/new` | material you chose, notes or pasted text | no graph involvement at all |
+| `/learn/today` | whatever the day's surface offers | varies |
+
+The opening sweep and the standalone quiz are the two that settle the shape. The
+sweep asks before anything exists, so its claims live as text and a subject id is
+stamped in later by whoever approves a chain. The quiz is deliberately outside
+the graph: its own header says a quiz over your interview notes stands on its own
+and does not put one-off nodes into a subject that lives forever.
+
+So questioning is already free-standing. What it is not yet is *ambient*: there
+is no way to be asked from inside a reading, or straight after a clip, which is
+the moment when being asked is worth the most and the only moment that gives the
+reading verdict its "after" without scheduling anything.
+
+### The real question is which answers count
+
+Once a question can be asked anywhere, when to ask stops being interesting and
+what an answer is allowed to write becomes the whole design. Today three kinds of
+questioning write three different things, and the rule is nowhere:
+
+| asked from | writes to the graph | writes `tested` |
+| --- | --- | --- |
+| a probe on a claim | yes, at the rung's state | yes |
+| an opening question | a starting state, once a chain is approved | no |
+| a quiz | nothing, on purpose | no |
+
+Each of those is defensible on its own. Together they are three policies nobody
+chose at the same time, and the gaps show: a quiz question that is plainly about
+a claim in your graph, answered correctly, moves nothing. That is right if the
+quiz was about interview prep and wrong if it was about the subject you are
+studying, and no column records which it was.
+
+The rule worth writing down is about the claim rather than the surface. An answer
+counts toward `concept_state` when it was asked against a stored claim and aimed
+at one of that claim's checks. An answer to a question written from loose material
+does not, however much it looks like the same question, because nothing
+established that it tested the same thing. That keeps the quiz honest, keeps the
+sweep's answers as a baseline rather than as evidence, and gives a quiz a way to
+promote a question later: attach it to a claim, and it counts from then on.
+
+**Missing, beyond the above.** Nothing checks the marked answer. The generator has
+two real guards, the `unusable` flag and the rule that the reason must stand
+without pointing back at the options, and both catch incoherent items rather than
+confidently wrong ones. The misconception guard looks like it covers this and does
+not: it fires on the same wrong option twice, and the same model on the same claim
+will mis-mark the same way twice. A systematic error walks through a guard built
+for slips, and what it writes is a sentence about your mind that you will believe.
 
 ---
 
-## 7. Back into what you know
+## 6. Back into what you know
 
 **For.** Closing the loop, which is the reason the module is a loop.
 
@@ -283,10 +337,14 @@ a missing floor or a known ceiling is triggers 2 and 3, and goes back to stage 3
 
 **Missing.** The reading half of the loop does not exist. A reading can be marked
 read, and that records that you read it. Nothing asks afterwards whether it
-worked, so a source that reads well and teaches nothing is indistinguishable
-from one that lands. The mechanism is a before-and-after around the claim, and
-the harder half is a reason to re-probe: a new row kind on `/learn/next` saying
-you read this, here is the question that checks whether it landed.
+worked, so a source that reads well and teaches nothing is indistinguishable from
+one that lands.
+
+Because questioning is ambient, the fix is smaller than it looked. It does not
+need a scheduled re-probe row. It needs the entry point that is missing anyway:
+being able to be asked from inside a reading, or as the clip ends. The snapshot
+before and the answer after fall out of that, and the same entry point is worth
+having on its own.
 
 ---
 
@@ -300,14 +358,19 @@ Ranked by how much each one stops the module working at all.
    handoff below is theoretical until a subject exists.
 2. **The vault is one stage of eight.** Stage 1's only route that does not
    require you to type is a classifier with nothing downstream of it.
-3. **No probe verification.** Stage 6 can write a false `misconception`, which is
-   the worst output the module has.
-4. **Two rival source mechanisms.** Stage 5 has rooting and retrieval and no rule
+3. **No probe verification.** Questioning can write a false `misconception`, which
+   is the worst output the module has.
+4. **No rule about which answers count.** Three kinds of questioning write three
+   different things to `concept_state` and nothing states the policy, so a quiz
+   question that plainly tests a claim in your graph moves nothing.
+5. **Two rival source mechanisms.** Stage 5 has rooting and retrieval and no rule
    saying which surface uses which.
-5. **No reading verdict.** Stage 7 closes for probes and not for readings.
-6. **No external reference.** Every growth trigger is reflexive, so blind spots
+6. **No reading verdict, and no way to be asked from inside a reading.** These are
+   one problem: the missing entry point is what would give the verdict its
+   "after".
+7. **No external reference.** Every growth trigger is reflexive, so blind spots
    are structurally invisible.
-7. **The sweep is a gate.** Stage 2 asks for ten written answers before a subject
+8. **The sweep is a gate.** Stage 2 asks for ten written answers before a subject
    exists.
 
 ---
@@ -339,13 +402,17 @@ Worth knowing before reading either as authoritative.
    on `/learn/next` instead of a gate?
 2. Which surfaces use `rooting.ts` and which use catalogue retrieval?
 3. Does probe verification run on every generated probe or on a sample?
-4. Do MAP-SPEC's four node kinds and the schema's `threshold`/`consequence` both
+4. Which answers count toward `concept_state`? The proposal above is that it
+   turns on whether the question was asked against a stored claim and aimed at
+   one of its checks, never on which page it was asked from. That would let a
+   quiz question be promoted later by attaching it to a claim.
+5. Do MAP-SPEC's four node kinds and the schema's `threshold`/`consequence` both
    land, as two columns?
-5. Is the next build the vault (stages 1 to 7 of MAP-SPEC) or the Wikipedia
+6. Is the next build the vault (stages 1 to 7 of MAP-SPEC) or the Wikipedia
    ingest (stage 5)? The vault fills the graph, which every other stage is
    waiting on. The ingest is smaller and its value depends on there being claims
    to link to.
 
-On 5, the vault comes first. Four of the seven breaks above are downstream of an
+On 6, the vault comes first. Four of the seven breaks above are downstream of an
 empty graph, and the catalogue cannot be judged useful until there is something
 for it to point at.
