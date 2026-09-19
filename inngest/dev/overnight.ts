@@ -33,9 +33,9 @@ import { buildPlanTree, flatten, type PlanNode, type PlanSection } from '@/lib/p
  * -- is `overnightVerdict` and needs no reads at all. The last session -- is
  * it still going -- is `runLiveness` and costs one listing of what has been
  * pushed. The plan -- what should go next -- is `chooseOvernightFeature` and
- * costs the whole tree. Only the last one can fire. The stale-claim sweep sits
- * between the second and the third, because it is the one write that has to
- * land before the tree is read rather than after.
+ * costs the whole tree. Only the last one can fire. The stale-claim sweep runs
+ * ahead of both of those reads, so a claim whose session has ended comes back
+ * on a tick that ends up waiting as well as on the tick that fires.
  *
  * The one place this departs from "check liveness first" is a night that is
  * already over on its own terms. A budget that is spent or a stop time that
@@ -253,7 +253,7 @@ export type OvernightPorts = {
   lastFiredAt: () => Promise<Record<string, string>>;
   /** What the run this night last fired is doing, or null if it fired none. */
   lastRunLiveness: (run: OvernightRun) => Promise<RunLiveness | null>;
-  /** Put back the claims of sessions that died, before the plan is read. */
+  /** Put back the claims of sessions that died. Run on every tick of a running night. */
   sweepClaims: () => Promise<void>;
   /**
    * Send the feature. `refused` says the feature itself cannot be taken --
@@ -296,37 +296,45 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
   // `fire` is only ever reached with a running row, so there is one here.
   if (!run) return { act: 'idle' };
 
-  const liveness = await ports.lastRunLiveness(run);
-  if (!isOver(liveness)) return { act: 'waiting', liveness: liveness as RunLiveness };
-
-  // Before the tree is read, and only on the tick that will choose from it.
+  // Before the liveness check, so a claim comes back on any tick of a running
+  // night and not only on the pass that will choose from the tree.
   //
   // A session that died mid-feature left its step saying `in_progress`, and
   // nothing puts that back overnight: the sweep is a stage of the daily cron.
   // So the step is not ready, the send guard refuses the feature above it, and
-  // one dead run holds up the rest of the night. Sweeping here means the claim
-  // goes back within one tick of ageing out and the tree loaded a line later
-  // shows the step as the not-started work it is.
+  // one dead run holds up the rest of the night. Sweeping means the claim goes
+  // back within one tick of ageing out, and the tree read further down sees the
+  // step as the not-started work it is.
   //
-  // Nothing is swept on a tick that is idle, paused, ended or still waiting on
-  // a live session: those ticks write nothing at all, which is the whole shape
-  // of this function, and a claim nobody is working keeps just as well until
-  // the tick that could actually use it.
+  // This used to sit under the liveness check, on the reasoning that a tick
+  // which will not fire has no use for a freed claim. The claims that go stale
+  // are mostly not the one the night is waiting on; they belong to other
+  // sessions under other features, and they age out during the hours the night
+  // spends waiting. Held until the next firing tick, they come back that much
+  // later. The sweep is one indexed read of the in-progress rows and finds
+  // nothing on the ordinary tick, so running it every tick of a running night
+  // costs about what skipping it saved.
+  //
+  // Nothing is swept when the runner is off, paused or ending: those ticks
+  // write nothing at all.
   //
   // A sweep that fails is logged and stepped over rather than thrown. It is a
   // tidying pass, not a precondition: without it the tick chooses from the tree
-  // as it stands, which is exactly what every night did before this, and a
-  // night that gave up on one unreadable table would cost itself every feature
-  // it could still have fired.
+  // as it stands, which is what every night did before this, and a night that
+  // gave up on one unreadable table would cost itself every feature it could
+  // still have fired.
   try {
     await ports.sweepClaims();
   } catch (err) {
     console.error(
-      `stale claims could not be swept before the overnight tick chose: ${
+      `stale claims could not be swept on the overnight tick: ${
         err instanceof Error ? err.message : 'failed'
       }`,
     );
   }
+
+  const liveness = await ports.lastRunLiveness(run);
+  if (!isOver(liveness)) return { act: 'waiting', liveness: liveness as RunLiveness };
 
   const [sections, lastFiredAt] = await Promise.all([ports.loadSections(), ports.lastFiredAt()]);
 
