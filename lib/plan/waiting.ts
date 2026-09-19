@@ -24,6 +24,7 @@ import {
   type PlanNode,
   type PlanSection,
 } from './tree';
+import type { DevComment } from '@/lib/comments/load';
 import type { RaisedQueue, RaisedRow } from '@/lib/raised/load';
 
 /** One row of the section, flattened out of the tree it came from. */
@@ -69,6 +70,13 @@ export type WaitingRow = {
    * it, so this is what the button has to say it is about to approve.
    */
   proposedBeneath: number;
+  /**
+   * What has been said about the row, oldest first, carried through from the
+   * step so Dash can draw the thread it is already drawing on raises. The
+   * comment is written against the step, so it is the same thread the plan
+   * page shows and either page can be the one you write it on.
+   */
+  thread: DevComment[];
 };
 
 /**
@@ -153,6 +161,7 @@ export function waitingOnYou(sections: readonly PlanSection[]): WaitingRow[] {
       proposedBeneath: flatten([node]).filter(
         (step) => step.id !== node.id && step.status === 'proposed',
       ).length,
+      thread: node.thread,
       ask:
         health === 'blocked'
           ? (node.blockAsk?.trim() || latestBlockNote(node.comment))

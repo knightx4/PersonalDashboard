@@ -1823,6 +1823,17 @@ form[data-auto-submit] [data-fallback-submit] {
   margin: 2em 0;
 }
 
+/* A formula set on a line of its own is often wider than the measure, and on
+   a phone it is wider than the screen. It scrolls inside the note, the same
+   as a wide table. The inline kind is left alone: it belongs to the sentence
+   around it and wraps with it. KaTeX draws in the current ink colour, so the
+   four themes need nothing else. */
+.vault-prose .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.25em;
+}
+
 /* ---------------------------------------------------------------------------
  * Jobs prose.
  *

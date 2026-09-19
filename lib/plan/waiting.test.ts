@@ -104,6 +104,29 @@ describe('waitingOnYou', () => {
     expect(row.ask).toBe('what still stands.');
   });
 
+  // Dash draws the thread on the row, so the row has to arrive carrying it.
+  it('carries the step thread through to the row', () => {
+    const [row] = rows([
+      item({
+        id: 'b2',
+        status: 'blocked',
+        blockAsk: 'A Resend API key.',
+        thread: [
+          {
+            id: 'c1',
+            author: 'me',
+            body: 'Ordered, it should be here Friday.',
+            createdAt: '2026-09-18T09:00:00.000Z',
+          },
+        ],
+      }),
+    ]);
+
+    expect(row.thread.map((comment) => comment.body)).toEqual([
+      'Ordered, it should be here Friday.',
+    ]);
+  });
+
   it('reads a decision as its question and a proposal as its title alone', () => {
     const found = rows([
       item({ id: 'c', kind: 'decision', detail: 'A — one way. B — the other.' }),
