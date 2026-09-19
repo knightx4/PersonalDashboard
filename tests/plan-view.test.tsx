@@ -98,7 +98,6 @@ const whole = buildPlanTree({
       id: 'page',
       title: 'The anonymous page',
       parentId: 'feature',
-      assignee: 'claude',
       size: 'm',
       comment: 'Waiting on the RPC review.',
     }),
@@ -242,9 +241,10 @@ describe('PlanView', () => {
       items: [
         item({ id: 'runners', title: 'Outlook ingestion' }),
         item({ id: 'held', title: 'Account deletion', assignee: 'me' }),
-        // A hand-over from before this feature. Nothing clears the column, so
-        // the row has to stop being read rather than stop holding the value.
-        item({ id: 'stale', title: 'Receipts by photo', assignee: 'claude' }),
+        // A row a hand-over wrote before this feature. The column still says
+        // `claude` in the database and the loader reads it back as nobody's,
+        // so it arrives here as one more of the runner's rows (#718).
+        item({ id: 'stale', title: 'Receipts by photo' }),
       ],
       dependencies: [],
     });
@@ -263,7 +263,7 @@ describe('PlanView', () => {
       />,
     );
     // One mark across the three rows, and it sits beside the title of the one
-    // you kept -- not on the runner's step, and not on the old hand-over.
+    // you kept -- not on the runner's steps.
     expect((html.match(/Marked yours/g) ?? []).length).toBe(1);
     expect(html).toContain(
       '>Account deletion</span><span title="Yours. The runner will not take this one."',

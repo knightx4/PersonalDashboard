@@ -10,7 +10,7 @@
  *   npx tsx scripts/plan.ts next [--claude] [--limit <n>]
  *   npx tsx scripts/plan.ts show <n>
  *   npx tsx scripts/plan.ts add "<title>" [--parent <n>] [--module <id>]
- *                                [--priority 1|2|3] [--size s|m|l] [--claude]
+ *                                [--priority 1|2|3] [--size s|m|l]
  *                                [--detail "…"] [--done-when "…"] [--fog "…"]
  *                                [--proposed] [--idea <id prefix>]
  *                                [--kind decision|setup] [--from <n>]
@@ -42,7 +42,7 @@
  *   npx tsx scripts/plan.ts reopen <n>
  *   npx tsx scripts/plan.ts fog <n> --note "what cannot be seen yet" | --clear
  *                                # one patch per feature, about finishing it
- *   npx tsx scripts/plan.ts assign <n> me|claude|none
+ *   npx tsx scripts/plan.ts assign <n> me|none
  *   npx tsx scripts/plan.ts priority <n> 1|2|3
  *   npx tsx scripts/plan.ts depends <n> --on <m>
  *   npx tsx scripts/plan.ts undepend <n> --on <m>
@@ -694,13 +694,13 @@ async function main(): Promise<void> {
       const { sections, liveness } = await loadState(sql, userId);
       const claude = has('--claude');
       const limit = Number(arg('--limit') ?? 10);
-      const order = workOrder(sections, claude ? { assignee: 'claude' } : {});
+      const order = workOrder(sections, claude ? { only: 'runner' } : {});
 
       if (order.length === 0) {
         const summary = summarize(sections);
         console.log(
           claude
-            ? 'Nothing handed to Claude is ready. Hand a step over on /dev/plan, or run without --claude.'
+            ? 'Nothing the runner can take is ready. Approve a step on /dev/plan, or run without --claude.'
             : `Nothing is ready. ${summary.inProgress} underway, ${summary.waiting} waiting.`,
         );
         return;
@@ -751,20 +751,12 @@ async function main(): Promise<void> {
       // said: a decided step inside an undecided feature is a contradiction.
       const proposed = has('--proposed') || parent?.status === 'proposed';
 
-      // A decision is never assigned to Claude, whatever --claude said. The
-      // whole guarantee is that a session cannot pick up its own question, and
-      // it is worth more enforced here than remembered at the call site. A
-      // setup job is the same guarantee from the other side: it is the
-      // person's by definition, so it is written as theirs rather than left
-      // unassigned for somebody to wonder about.
-      const assignee =
-        kind === 'decision'
-          ? null
-          : kind === SETUP_KIND
-            ? SETUP_ASSIGNEE
-            : has('--claude')
-              ? 'claude'
-              : null;
+      // A setup job is the person's by definition, so it is written as
+      // theirs rather than left unassigned for somebody to wonder about.
+      // Nothing else is written with an assignee: approving a step is what
+      // makes it one the runner may take, and keeping one for yourself is a
+      // press on the row rather than a flag here.
+      const assignee = kind === SETUP_KIND ? SETUP_ASSIGNEE : null;
 
       // Where the row came from, when it did not come from a person. The gist
       // is read off the decision's own answer rather than retyped by whoever
@@ -1163,7 +1155,7 @@ async function main(): Promise<void> {
 
     if (command === 'assign') {
       const who = extra;
-      if (!who || !['me', 'claude', 'none'].includes(who)) fail('assign <n> me|claude|none');
+      if (!who || !['me', 'none'].includes(who)) fail('assign <n> me|none');
       await sql`
         update plan_items set assignee = ${who === 'none' ? null : who}
         where id = ${item.id} and user_id = ${userId}`;

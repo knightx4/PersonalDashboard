@@ -135,11 +135,18 @@ export function isPlanSize(value: string): value is PlanSize {
 }
 
 /**
- * Who is on it. Two answers, because there are two people who build this app.
- * A step handed to Claude is one the routine may pick up on its own — which is
- * the reason the column exists.
+ * Who is on it: you, or nobody.
+ *
+ * One answer, because the column now says only which approved steps you kept
+ * for yourself. Every other approved step is one the runner may take, which
+ * is what approving it did (#669, #670), so there is nothing to hand over and
+ * nothing to write here but `me`.
+ *
+ * Rows written before that still hold `claude`. The mapper below turns a
+ * value outside this list into null, so they load as nobody's and `isClaudes`
+ * goes on counting them as the runner's (#691).
  */
-export const PLAN_ASSIGNEES = ['me', 'claude'] as const;
+export const PLAN_ASSIGNEES = ['me'] as const;
 export type PlanAssignee = (typeof PLAN_ASSIGNEES)[number];
 
 export function isPlanAssignee(value: string): value is PlanAssignee {

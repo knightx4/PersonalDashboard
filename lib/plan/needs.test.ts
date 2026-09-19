@@ -158,7 +158,7 @@ describe('the plan after a needs', () => {
     thread: [],
     priority: 2,
     size: null,
-    assignee: 'claude',
+    assignee: null,
     commitSha: null,
     position: 10,
     startedAt: null,
@@ -194,7 +194,7 @@ describe('the plan after a needs', () => {
   it('reads the job as one of yours, and never as work to hand out', () => {
     expect(healthOf(node('job'))).toBe('setup');
     expect(isWaitingOnThePerson(node('job'))).toBe(true);
-    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.number)).not.toContain(605);
+    expect(workOrder(sections, { only: 'runner' }).map((n) => n.number)).not.toContain(605);
   });
 
   it('frees the work when you close the job, with nothing else to clear', () => {
