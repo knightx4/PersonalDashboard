@@ -3,6 +3,7 @@ import {
   nextConcept,
   nextMasteryCheck,
   nextRung,
+  setMisconception,
   settledStateFor,
   type AskedRung,
 } from './session';
@@ -31,6 +32,7 @@ function concept(id: string, state: KnowledgeState, kind: Concept['kind'] = null
     established: 'inferred',
     misconception: state === 'misconception' ? 'A wrong idea.' : null,
     testedAt: null,
+    declaredAt: null,
   };
 }
 
@@ -148,6 +150,11 @@ describe('the turn a subject session gives back to old ground', () => {
     return { ...concept(id, 'known'), established: 'tested', testedAt };
   }
 
+  /** Settled because you said you already knew it, on the day you said it. */
+  function waved(id: string, declaredAt: string): Concept {
+    return { ...concept(id, 'known'), established: 'declared', declaredAt };
+  }
+
   const frontier = concept('untouched', 'unknown');
 
   it('asks about the claim checked longest ago on every fifth question', () => {
@@ -157,6 +164,29 @@ describe('the turn a subject session gives back to old ground', () => {
       { answered: 4, now },
     );
     expect(picked?.id).toBe('old');
+  });
+
+  it('asks about a claim you waved through a month ago, and not one from yesterday', () => {
+    const old = nextConcept([frontier, waved('waved', daysAgo(200))], noneAsked, {
+      answered: 4,
+      now,
+    });
+    expect(old?.id).toBe('waved');
+
+    const yesterday = nextConcept([frontier, waved('waved', daysAgo(1))], noneAsked, {
+      answered: 4,
+      now,
+    });
+    expect(yesterday?.id).toBe('untouched');
+  });
+
+  it('takes whichever was settled longest ago, answered or waved through', () => {
+    const picked = nextConcept(
+      [frontier, checked('answered', daysAgo(45)), waved('waved', daysAgo(200))],
+      noneAsked,
+      { answered: 4, now },
+    );
+    expect(picked?.id).toBe('waved');
   });
 
   it('goes back to the frontier on the turns in between', () => {
@@ -327,5 +357,44 @@ describe('where an answer leaves the concept', () => {
     expect(settledStateFor('recognise', false)).toBe('shaky');
     expect(settledStateFor('apply', false)).toBe('shaky');
     expect(settledStateFor('defend', false)).toBe('shaky');
+  });
+});
+
+
+/**
+ * A stand-in for the session client, recording what the upsert was handed.
+ *
+ * Enough of the builder for the one write under test, the same way
+ * save.test.ts stubs the chain writes.
+ */
+function clientRecordingUpserts() {
+  const rows: Record<string, unknown>[] = [];
+  const client = {
+    from() {
+      return {
+        upsert: (written: unknown) => {
+          for (const row of Array.isArray(written) ? written : [written]) {
+            rows.push(row as Record<string, unknown>);
+          }
+          return { then: (resolve: (v: { error: null }) => void) => resolve({ error: null }) };
+        },
+      };
+    },
+  };
+
+  return { client: client as never, rows };
+}
+
+describe('what a graded answer writes on the row', () => {
+  it('dates the claim as tested and drops the date you declared it', async () => {
+    const { client, rows } = clientRecordingUpserts();
+    await setMisconception(client, 'user-1', 'concept-1', 'Thinks marginal means average.');
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].established).toBe('tested');
+    expect(rows[0].tested_at).not.toBeNull();
+    // Answered about, so it no longer rests on your word. The database refuses
+    // a row carrying both dates, so this null is not optional.
+    expect(rows[0].declared_at).toBeNull();
   });
 });

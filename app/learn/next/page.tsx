@@ -29,11 +29,11 @@ const SUBJECT_LINK =
  *
  * Both are a claim with a link into a probe session, so they are drawn once.
  * A ready row is marked with the state of the claim, since what you know about
- * it is why it is worth starting, and a re-check row is marked as a re-check --
- * every one of those is a claim you answered about, so the state mark would be
- * the same tick eight times. A ready row also says how the claim was settled
- * and when it was last asked about; on a re-check row the reason line already
- * says both.
+ * it is why it is worth starting. A re-check row is marked as a re-check
+ * instead: every one of those is settled, so the state mark would be the same
+ * tick eight times. A ready row also says how the claim was settled and when
+ * it was last asked about; on a re-check row the reason line says both, and it
+ * says which of the two settled it -- a question you answered, or your word.
  */
 function ConceptRow({ row, timezone }: { row: NextReady | NextRecheck; timezone: string }) {
   const { concept, subjectId, subjectName } = row;

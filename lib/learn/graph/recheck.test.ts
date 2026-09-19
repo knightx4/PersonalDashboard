@@ -12,9 +12,9 @@ import type { Concept, Graph, KnowledgeState, StateBasis } from './model';
 /**
  * Which settled claim has gone longest without being asked about.
  *
- * Two rules, and both are about not inventing a date: a claim nobody has
- * answered a question about is not in the list at all, and among the ones that
- * are, the oldest date wins.
+ * Two rules, and both are about not inventing a date: a claim carrying no date
+ * of either kind is not in the list at all, and among the ones that are, the
+ * oldest date wins whether it came from an answer or from your word.
  */
 
 function concept(
@@ -22,6 +22,7 @@ function concept(
   state: KnowledgeState,
   established: StateBasis,
   testedAt: string | null,
+  declaredAt: string | null = null,
 ): Concept {
   return {
     id,
@@ -36,6 +37,7 @@ function concept(
     established,
     misconception: null,
     testedAt,
+    declaredAt,
   };
 }
 
@@ -58,7 +60,8 @@ describe('which settled claims are up for a re-check', () => {
         concept: expect.objectContaining({ name: 'refraction' }),
         subjectId: 'subject-1',
         subjectName: 'Optics',
-        testedAt: '2026-03-14T10:00:00.000Z',
+        established: 'tested',
+        settledAt: '2026-03-14T10:00:00.000Z',
       },
     ]);
   });
@@ -76,11 +79,28 @@ describe('which settled claims are up for a re-check', () => {
     expect(rows).toEqual([]);
   });
 
-  it('leaves out a claim known by inference or because you said so', () => {
+  it('takes a claim you said you knew, with the day you said it', () => {
+    const rows = settledInSubject(
+      graphOf([concept('waved-through', 'known', 'declared', null, '2026-03-14T10:00:00.000Z')]),
+      subject,
+    );
+
+    expect(rows).toEqual([
+      {
+        concept: expect.objectContaining({ name: 'waved-through' }),
+        subjectId: 'subject-1',
+        subjectName: 'Optics',
+        established: 'declared',
+        settledAt: '2026-03-14T10:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('leaves out one known by inference, and one you waved through with no date', () => {
     const rows = settledInSubject(
       graphOf([
         concept('inferred-one', 'known', 'inferred', null),
-        concept('declared-one', 'known', 'declared', null),
+        concept('undated-declared', 'known', 'declared', null),
         concept('tested-one', 'known', 'tested', '2026-03-14T10:00:00.000Z'),
       ]),
       subject,
@@ -89,11 +109,12 @@ describe('which settled claims are up for a re-check', () => {
     expect(names(rows)).toEqual(['tested-one']);
   });
 
-  it('leaves out a tested claim with no date on it', () => {
+  it('leaves out a claim with no date on it, or one that will not parse', () => {
     const rows = settledInSubject(
       graphOf([
         concept('no-date', 'known', 'tested', null),
         concept('bad-date', 'known', 'tested', 'the fourteenth'),
+        concept('bad-declared-date', 'known', 'declared', null, 'the fourteenth'),
       ]),
       subject,
     );
@@ -108,7 +129,18 @@ describe('the order they come back in', () => {
       concept: concept(name, 'known', 'tested', testedAt),
       subjectId: subjectName.toLowerCase(),
       subjectName,
-      testedAt,
+      established: 'tested',
+      settledAt: testedAt,
+    };
+  }
+
+  function waved(name: string, declaredAt: string, subjectName = 'Optics'): SettledConcept {
+    return {
+      concept: concept(name, 'known', 'declared', null, declaredAt),
+      subjectId: subjectName.toLowerCase(),
+      subjectName,
+      established: 'declared',
+      settledAt: declaredAt,
     };
   }
 
@@ -120,6 +152,20 @@ describe('the order they come back in', () => {
     ]);
 
     expect(names(ranked)).toEqual(['march', 'june', 'yesterday']);
+  });
+
+  it('mixes the ones you waved through in with the ones you answered', () => {
+    const ranked = rankByLastChecked([
+      row('answered in june', '2026-06-01T10:00:00.000Z'),
+      waved('waved through in march', '2026-03-14T10:00:00.000Z'),
+      waved('waved through in august', '2026-08-02T10:00:00.000Z'),
+    ]);
+
+    expect(names(ranked)).toEqual([
+      'waved through in march',
+      'answered in june',
+      'waved through in august',
+    ]);
   });
 
   it('mixes subjects together rather than grouping them', () => {
@@ -183,7 +229,18 @@ describe('how often an old claim comes back', () => {
       concept: concept(name, 'known', 'tested', testedAt),
       subjectId: 'subject-1',
       subjectName: 'Optics',
-      testedAt,
+      established: 'tested',
+      settledAt: testedAt,
+    };
+  }
+
+  function wavedThrough(name: string, declaredAt: string): SettledConcept {
+    return {
+      concept: concept(name, 'known', 'declared', null, declaredAt),
+      subjectId: 'subject-1',
+      subjectName: 'Optics',
+      established: 'declared',
+      settledAt: declaredAt,
     };
   }
 
@@ -204,6 +261,23 @@ describe('how often an old claim comes back', () => {
   it('takes one that has been unchecked exactly a month', () => {
     const claim = claimToRecheck([settled('a-month', daysAgo(RECHECK_AFTER_DAYS))], now);
     expect(claim?.concept.name).toBe('a-month');
+  });
+
+  it('takes one you waved through a month ago and leaves a newer one alone', () => {
+    const old = claimToRecheck([wavedThrough('a-month', daysAgo(RECHECK_AFTER_DAYS))], now);
+    expect(old?.concept.name).toBe('a-month');
+
+    const nearly = [wavedThrough('nearly', daysAgo(RECHECK_AFTER_DAYS - 1))];
+    expect(claimToRecheck(nearly, now)).toBeNull();
+    expect(claimToRecheck([wavedThrough('yesterday', daysAgo(1))], now)).toBeNull();
+  });
+
+  it('offers a waved-through claim ahead of one answered about more recently', () => {
+    const claim = claimToRecheck(
+      [settled('answered', daysAgo(40)), wavedThrough('waved', daysAgo(90))],
+      now,
+    );
+    expect(claim?.concept.name).toBe('waved');
   });
 
   it('has nothing to offer when nothing is settled', () => {

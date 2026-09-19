@@ -193,10 +193,12 @@ async function main(): Promise<void> {
     // reads as unknown, which is the truthful default.
     if (concept.state !== 'unknown') {
       await sql`
-        insert into learn.concept_state (concept_id, user_id, state, established, misconception, tested_at)
+        insert into learn.concept_state (concept_id, user_id, state, established, misconception,
+                                         tested_at, declared_at)
         values (${row!.id}, ${user.id}, ${concept.state}, ${concept.established},
                 ${'misconception' in concept ? concept.misconception : null},
-                ${concept.established === 'tested' ? sql`now()` : null})`;
+                ${concept.established === 'tested' ? sql`now()` : null},
+                ${concept.established === 'declared' ? sql`now()` : null})`;
     }
   }
 

@@ -417,6 +417,9 @@ export async function setMisconception(
       established: 'tested',
       misconception,
       tested_at: new Date().toISOString(),
+      // A question was answered about this, so whatever was claimed on your
+      // word about it is superseded. The row holds one date or the other.
+      declared_at: null,
     },
     { onConflict: 'concept_id' },
   );
@@ -687,6 +690,9 @@ async function settleConcept(
       // correct answer would be the screen saying something untrue.
       misconception: null,
       tested_at: new Date().toISOString(),
+      // Cleared for the same reason: the claim now rests on an answer rather
+      // than on your word, and the row is allowed only one of the two dates.
+      declared_at: null,
     },
     { onConflict: 'concept_id' },
   );

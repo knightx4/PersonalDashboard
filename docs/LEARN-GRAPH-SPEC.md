@@ -239,15 +239,19 @@ rests on at the state that answer reached, established `inferred`, and never
 over a concept somebody has answered about.
 
 Every state also carries the date it was last actually answered on, in
-`tested_at`, written by the answer and by nothing else. Every screen that shows
-a state shows that date beside it, so "known" does not read the same whether the
-question was yesterday or in March. A concept marked known by inference, or
-because you said so, has no date and shows no line rather than one saying never.
+`tested_at`, written by the answer and by nothing else, and a state you claimed
+yourself carries the day you claimed it in `declared_at`. A row holds one of
+those two dates or neither, and the database refuses one holding both. Every
+screen that shows a state shows the date beside it, so "known" does not read the
+same whether the question was yesterday or in March. A concept marked known by
+inference has no date and shows no line rather than one saying never.
 
 One question in five goes back over old ground. Instead of the next claim on the
-frontier it is about the settled claim you were asked about longest ago, and
-only from claims last answered more than a month ago; when nothing is that old
-the turn is skipped and an ordinary question is asked instead. The five-minute
+frontier it is about the settled claim that has gone longest without being asked
+about, and only from claims settled more than a month ago; when nothing is that
+old the turn is skipped and an ordinary question is asked instead. A claim you
+waved through waits the same month as one you answered a question about, and the
+two are ordered together on whichever of the two dates each carries. The five-minute
 screen counts those four questions across every subject and a session inside one
 subject counts its own, both read back from the stored answers rather than held
 between questions — there is no session object anywhere in this module.
@@ -321,9 +325,9 @@ Three kinds of row can appear on it:
 - **A claim you are ready for.** Nothing is missing underneath it, which is the
   same set the subject screen offers and the same ordering: nearest to a goal
   you named first.
-- **A claim worth asking about again.** Settled, and last answered more than a
-  month ago — the same cutoff the one-question-in-five re-check uses inside a
-  probe session. Longest unasked first.
+- **A claim worth asking about again.** Settled more than a month ago, by an
+  answer or by your word, which is the same cutoff the one-question-in-five
+  re-check uses inside a probe session. Longest unasked first.
 - **A reading you queued about a claim and never opened.** Only the ones that
   name the concept they were queued to close, because only those can say what
   they are about. Longest in the queue first.
