@@ -78,14 +78,18 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
    done.
 
    **Do not run the full suite and do not run `next build`.** The session that
-   sent you runs both once, after the last step, before it pushes; CI runs them
-   again on main. Running them here costs three minutes a step and catches
-   nothing the batch gate will not. The exception is a step whose done-when is
-   about the build or about a test that the narrow run cannot reach — then run
-   what the done-when needs and say so in your report.
+   sent you runs both when it merges your step to main, which is as soon as you
+   report the commit; CI runs them again on main. Running them here first would only run
+   them twice. The exception is a step whose done-when is about the build or
+   about a test that the narrow run cannot reach: run what the done-when needs
+   and say so in your report.
 7. **Commit the step on its own.** One step per commit. End the subject with
-   the step: `Add the anonymous share page (plan #14)`. **Do not push.** The
-   session that sent you pushes once for the whole batch.
+   the step: `Add the anonymous share page (plan #14)`. **Do not push and do
+   not merge.** The session that sent you puts your commit on main and closes
+   your step from there, so stop at the commit and say in your report that you
+   made it. If nobody sent you and this step is the whole job, the merge is
+   yours: the procedure is step 4 of the Building section in `SKILL.md`, and
+   the merge comes before the close.
 8. **Before closing, look up once.** If the feature above your step carries
    fog, and what you just learned makes it specifiable, write those steps now
    — `add "…" --parent <the feature> --proposed --done-when "…" --size s|m|l` —
@@ -102,9 +106,12 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
    own step: your own decisions, and fog you can now specify. Nothing else — no
    reordering, no dropping somebody else's step, no rewriting a done-when you
    disagree with, and never an approve.
-9. **Close it.** `done <n> --note "what changed, in one sentence"`. The commit
-   is recorded from HEAD, so close after committing. The output names any steps
-   that became ready as a result.
+9. **Hand the close over.** `done` refuses a commit that is not on main, and
+   yours is on a branch nobody has merged yet, so the session that sent you
+   closes the step once it has merged. Write the note it should close with —
+   what changed, in one sentence — and put it in your report. If nobody sent
+   you, merge first and then close it yourself: `done <n> --note "…"`, which
+   records the commit from HEAD and names any steps that became ready.
 
 ## What to report back
 
@@ -112,8 +119,9 @@ You are one step in a batch, and the session that sent you keeps none of what
 you read. Your report is the only thing that survives you, so write it for the
 session building the next step:
 
-- **The step, by number and title, and what you did to it** — closed, blocked
-  and on what, or put back and why.
+- **The step, by number and title, and what you did to it** — committed, with
+  the sha and the note it should close with; blocked, and on what; or put back,
+  and why.
 - **What changed**, as files and what each now does. Not a diff; the next
   session can read the diff. Name what it would otherwise have to go looking
   for.
@@ -156,6 +164,13 @@ an account is not one of those: that is `needs`, in the next section, and it
 writes the row and the edge for you.
 
 Then report the block. Do not move on to another step; that is not your call.
+
+The same two moves close out a merge that will not go through, when the merge
+was yours because nobody sent you: push the working branch before you block the
+step, and name that branch in the `--ask`. The work then outlives the session
+that wrote it, and whoever picks the step up reads it instead of building it
+twice. Leave the step open — its commit is on a branch, which is the thing
+`done` refuses.
 
 The recommendation is part of the job: a question with no proposed answer makes
 the person do the reading you already did. What you must not do is act on your

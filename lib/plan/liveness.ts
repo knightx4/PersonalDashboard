@@ -21,7 +21,7 @@
  * them, at twenty minutes.
  */
 import { elapsedSince, isStalledClaim } from './elapsed';
-import { RUN_QUIET_AFTER_MINUTES, type StoredRunReading } from './run-end';
+import { endsRun, RUN_QUIET_AFTER_MINUTES, type StoredRunReading } from './run-end';
 
 /**
  * Nothing pushed for this long and the run is shown as quiet. #524.
@@ -147,6 +147,18 @@ export type RunEvidence = {
   lastPush: Push | null;
   /** When the step the run was sent at closed, if it has. */
   stepClosedAt: string | null;
+  /**
+   * When that step became blocked, if it did. #679.
+   *
+   * The other way a session ends: it did the work it could and wrote down the
+   * question it cannot answer. Nothing closes, so the close above stays null
+   * and the run used to fall through to the silence rules for the rest of the
+   * no-output mark with nobody behind it.
+   *
+   * Null is "no block since this run was fired", which is also what the three
+   * steps blocked before #678 stamped the column say.
+   */
+  stepBlockedAt: string | null;
   /** False when GitHub could not be asked, so silence proves nothing. */
   read: boolean;
 };
@@ -243,10 +255,16 @@ export function silenceReads(minutes: number): 'working' | 'quiet' | 'ended' {
 /**
  * What a run is doing, from the pushes since it started.
  *
- * The step closing is checked before anything else: a run that did what it was
- * sent for is finished whether or not it pushed afterwards, and a step closed
- * before the run was fired belongs to an earlier run and says nothing about
- * this one.
+ * What the step did is checked before anything else: a run that did what it
+ * was sent for is finished whether or not it pushed afterwards, and a stamp
+ * from before the run was fired belongs to an earlier run and says nothing
+ * about this one.
+ *
+ * A block counts as the end of the run the same way a close does. #679. A
+ * session that stops to ask a question has finished with the step -- it wrote
+ * the ask on the row, and no more work comes from it until somebody answers --
+ * so treating that as silence left the runner waiting out the no-output mark
+ * on a session that had already gone.
  *
  * `now` of 0 is the clock's pre-mount value, so nothing ages at that instant
  * and the server and the first client render agree -- the same rule
@@ -254,8 +272,8 @@ export function silenceReads(minutes: number): 'working' | 'quiet' | 'ended' {
  */
 export function runLiveness(evidence: RunEvidence, now: number): RunLiveness {
   const fired = new Date(evidence.startedAt).getTime();
-  const closed = evidence.stepClosedAt ? new Date(evidence.stepClosedAt).getTime() : null;
-  if (closed !== null && closed >= fired) return 'finished';
+  if (endsRun(evidence.stepClosedAt, evidence.startedAt)) return 'finished';
+  if (endsRun(evidence.stepBlockedAt, evidence.startedAt)) return 'finished';
 
   if (!evidence.read) return 'unknown';
   if (now === 0) return 'working';

@@ -13,6 +13,10 @@
  * long it has been going. Both directions of that are covered below, including
  * every way the ask can come back with nothing, since each of those has to
  * leave the sweep behaving exactly as it did before.
+ *
+ * The fourth is #679's, and it is the one thing that can undo the third: a
+ * block under the step is the session saying it has stopped, so the claim goes
+ * back however recently that session pushed.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -34,8 +38,9 @@ const minutesAgo = (minutes: number) =>
  * The runs are a second table and read-only: the sweep asks which run holds
  * each condemned step and writes nothing back to `plan_runs`.
  */
-function stubClient(rows: Row[], runs: Row[] = []) {
+function stubClient(rows: Row[], runs: Row[] = [], blocks: Record<string, string> = {}) {
   const updates: Array<{ id: unknown; patch: Row }> = [];
+  const asked: string[] = [];
 
   const builder = () => {
     let patch: Row | null = null;
@@ -73,7 +78,14 @@ function stubClient(rows: Row[], runs: Row[] = []) {
 
   const from = (table: string) => (table === 'plan_runs' ? runReads() : builder());
 
-  return { supabase: { from } as unknown as SupabaseClient, updates, rows };
+  // `plan_subtree_blocked_at`: the newest block under the step, which the
+  // sweep asks about only once a run has saved the claim.
+  const rpc = async (_fn: string, args: { root: string }) => {
+    asked.push(args.root);
+    return { data: blocks[args.root] ?? null, error: null };
+  };
+
+  return { supabase: { from, rpc } as unknown as SupabaseClient, updates, rows, asked };
 }
 
 function claim(over: Row = {}): Row {
@@ -263,6 +275,36 @@ describe('releaseStaleClaims against what the run pushed', () => {
     expect(updates[0].patch.status).toBe('not_started');
   });
 
+  // #682. The clock already released this claim; what it did not say was that
+  // nothing had been read about the run behind it. Released with no evidence
+  // and released against the evidence wrote the same sentence, and only the
+  // first is a reason to go and look at the token.
+  it('says on the row that GitHub could not be asked', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', '');
+    const { supabase, updates } = stubClient([condemned()], [run()]);
+
+    await releaseStaleClaims(supabase, NOW, { fetch: pushed() as never });
+    expect(updates[0].patch.comment).toBe(
+      'Claim expired 2026-03-02: nothing had touched it for 2h 40m, so it went back to not' +
+        ' started. GitHub could not be asked what its run pushed, so the clock decided alone.' +
+        ' No GITHUB_READ_TOKEN is set, so pushes cannot be read.',
+    );
+  });
+
+  // The other way a release happens with nothing read: GitHub answered fine
+  // and the run had pushed nothing since it was fired. That line stays as it
+  // was, since the evidence is what condemned the claim.
+  it('says nothing about GitHub when GitHub answered', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, updates } = stubClient([condemned()], [run()]);
+
+    await releaseStaleClaims(supabase, NOW, { fetch: pushed() as never });
+    expect(updates[0].patch.comment).toBe(
+      'Claim expired 2026-03-02: nothing had touched it for 2h 40m, so it went back to not' +
+        ' started.',
+    );
+  });
+
   it('falls back to the clock for a step with no run recorded', async () => {
     vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
     const { supabase } = stubClient([condemned()], []);
@@ -283,6 +325,43 @@ describe('releaseStaleClaims against what the run pushed', () => {
     await expect(
       releaseStaleClaims(supabase, NOW, { fetch: pushed({ ref: 'claude/one', minutes: 6 }) as never }),
     ).resolves.toEqual({ released: 1, steps: [42], kept: [] });
+  });
+
+  it('takes the step back when a block under it is newer than its run', async () => {
+    // The run pushed a few minutes ago, so what it did says it was working.
+    // The block says the session behind it has stopped: it wrote down what it
+    // needs, and nothing more is coming from it. #679.
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, updates } = stubClient([condemned()], [run()], { a: minutesAgo(20) });
+
+    await expect(
+      releaseStaleClaims(supabase, NOW, { fetch: pushed({ ref: 'claude/one', minutes: 6 }) as never }),
+    ).resolves.toEqual({ released: 1, steps: [42], kept: [] });
+    expect(updates[0].patch.status).toBe('not_started');
+  });
+
+  it('keeps the step when the only block under it is older than its run', async () => {
+    // A step that was already blocked when this session was sent at it. The
+    // question it asks is the one the session is there to answer.
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, updates } = stubClient([condemned()], [run()], {
+      a: minutesAgo(STALLED_AFTER_MINUTES + 90),
+    });
+
+    await expect(
+      releaseStaleClaims(supabase, NOW, { fetch: pushed({ ref: 'claude/one', minutes: 6 }) as never }),
+    ).resolves.toEqual({ released: 0, steps: [], kept: [42] });
+    expect(updates).toHaveLength(0);
+  });
+
+  it('asks for a block only about the claims its run saved', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, asked } = stubClient([condemned()], [run()]);
+
+    await releaseStaleClaims(supabase, NOW, {
+      fetch: pushed({ ref: 'claude/one', minutes: 180 }) as never,
+    });
+    expect(asked).toEqual([]);
   });
 
   it('asks nothing when no claim is up for being taken back', async () => {

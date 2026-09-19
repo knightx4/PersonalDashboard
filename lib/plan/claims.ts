@@ -48,16 +48,30 @@ export function expiredClaim(claim: Claim, now: number): ExpiredClaim | null {
  * history of a step reads in one column however each line got there. It says
  * how long the claim sat because that is the question somebody reading it a
  * week later asks: whether the session had time to do anything first.
+ *
+ * `refusal` is what GitHub said when it could not be asked what the run behind
+ * the claim had pushed. The clock takes the claim back either way, and #682 is
+ * that the line has to say which of the two happened: a claim released against
+ * the evidence -- GitHub answered, and the run had pushed nothing -- reads
+ * identically to one released with no evidence at all, and only the second is
+ * a reason to go and look at the token.
  */
 export function claimExpiredNote(
   why: ExpiredClaim,
   startedAt: string | null,
   now: number,
+  refusal: string | null = null,
 ): string {
   const stamp = new Date(now).toISOString().slice(0, 10);
   const reason =
     why === 'unowned'
       ? 'it was underway with nobody holding it'
       : `nothing had touched it for ${elapsedSince(startedAt as string, now)}`;
-  return `Claim expired ${stamp}: ${reason}, so it went back to not started.`;
+  const line = `Claim expired ${stamp}: ${reason}, so it went back to not started.`;
+  if (!refusal) return line;
+
+  const said = refusal.trim();
+  return `${line} GitHub could not be asked what its run pushed, so the clock decided alone. ${
+    said.endsWith('.') ? said : `${said}.`
+  }`;
 }

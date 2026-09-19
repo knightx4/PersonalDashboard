@@ -271,9 +271,11 @@ describe('overnightTick', () => {
       });
 
       await expect(overnightTick(p)).resolves.toEqual({ act: 'waiting', liveness });
-      // Not even the tree, and not the claims either: a tick that cannot fire
-      // has nothing to choose from and nothing to clear the way for.
-      expect(calls).toMatchObject({ sections: 0, swept: 0, fired: [], recorded: [], stopped: [] });
+      // The tree is not read: there is nothing to choose from while the last
+      // session is still going. The claims are still swept, because the ones
+      // that go stale belong to other sessions under other features and the
+      // night spends most of its ticks here.
+      expect(calls).toMatchObject({ sections: 0, swept: 1, fired: [], recorded: [], stopped: [] });
     }
   });
 
@@ -285,6 +287,7 @@ describe('overnightTick', () => {
 
     await expect(overnightTick(p)).resolves.toEqual({ act: 'waiting', liveness: 'unknown' });
     expect(calls.fired).toEqual([]);
+    expect(calls.swept).toBe(1);
   });
 
   it('fires the next one once the last run is over', async () => {

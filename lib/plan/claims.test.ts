@@ -53,6 +53,22 @@ describe('claimExpiredNote', () => {
     );
   });
 
+  it('says when GitHub could not be asked what the run pushed', () => {
+    expect(claimExpiredNote('stale', start, at(160), 'No GITHUB_READ_TOKEN is set.')).toBe(
+      'Claim expired 2026-09-09: nothing had touched it for 2h 40m, so it went back to not' +
+        ' started. GitHub could not be asked what its run pushed, so the clock decided alone.' +
+        ' No GITHUB_READ_TOKEN is set.',
+    );
+  });
+
+  // The refusals come from `listPushes` as whole sentences, but a bare reason
+  // off a thrown error does not always end in a full stop.
+  it('ends the refusal it repeats', () => {
+    expect(claimExpiredNote('stale', start, at(160), '  fetch failed  ')).toMatch(
+      /the clock decided alone\. fetch failed\.$/,
+    );
+  });
+
   it('says so when nobody held it', () => {
     expect(claimExpiredNote('unowned', null, at(5))).toBe(
       'Claim expired 2026-09-09: it was underway with nobody holding it, so it went back to not started.',

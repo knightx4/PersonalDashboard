@@ -43,6 +43,7 @@ function evidence(over: Partial<RunEvidence> = {}): RunEvidence {
     startedAt: minutesAgo(30),
     lastPush: null,
     stepClosedAt: null,
+    stepBlockedAt: null,
     read: true,
     ...over,
   };
@@ -198,6 +199,24 @@ describe('runLiveness', () => {
   it('ignores a step that closed before this run started', () => {
     expect(
       runLiveness(evidence({ startedAt: minutesAgo(150), stepClosedAt: minutesAgo(400) }), NOW),
+    ).toBe('ended');
+  });
+
+  it('is finished when the step it was sent at was blocked after it was fired', () => {
+    // A session that stops to ask a question closes nothing, so on the close
+    // alone this run read as silence for the rest of the no-output mark while
+    // nobody was behind it. #679.
+    expect(
+      runLiveness(evidence({ startedAt: minutesAgo(40), stepBlockedAt: minutesAgo(5) }), NOW),
+    ).toBe('finished');
+  });
+
+  it('ignores a block from before this run started', () => {
+    // The step was already blocked when the run was fired, which is the
+    // session that was sent to answer the question rather than the one that
+    // asked it.
+    expect(
+      runLiveness(evidence({ startedAt: minutesAgo(150), stepBlockedAt: minutesAgo(400) }), NOW),
     ).toBe('ended');
   });
 
