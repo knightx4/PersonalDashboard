@@ -97,17 +97,20 @@ describe('writeDigestFor', () => {
   });
 
   /**
-   * The count the morning summary prints. Nothing files ideas from the night
-   * yet -- #645 is the step that makes this run write what it noticed to the
-   * ideas page -- so the honest number today is none, and the panel draws no
-   * line for it. When that step lands this is the assertion it changes.
+   * The count the morning summary prints. A run that noticed nothing files
+   * nothing and touches the ideas table not at all, which is most nights, and
+   * the panel then draws no line for it. What it does file is
+   * lib/ideas/file.ts, tested beside it.
    */
-  it('records how many ideas the night filed, which is none until something files them', async () => {
+  it('files no ideas and records none on a night with no suggestions', async () => {
+    vi.stubEnv('ANTHROPIC_API_KEY', '');
     const { supabase, inserted } = stubClient({ plan_items: [closedStep()] });
 
     await writeDigestFor(supabase, 'user-1', NOW);
 
     expect(inserted[0].row.ideas_filed).toBe(0);
+    expect(inserted.map((row) => row.table)).toEqual(['dev_digests']);
+    vi.unstubAllEnvs();
   });
 
   it('writes nothing the second time it runs on the same day', async () => {

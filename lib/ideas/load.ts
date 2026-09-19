@@ -137,6 +137,39 @@ export async function loadDismissedSuggestions(
 }
 
 /**
+ * The ideas a new one is checked against before it is written.
+ *
+ * Body and id only, which is all lib/ideas/duplicate.ts compares and all a
+ * refusal names. The set is what is open on the page: a shaped idea is in the
+ * plan and a dismissed one was put aside, and neither is a row anything would
+ * be adding to.
+ *
+ * The same set `scripts/plan.ts idea` selects by hand. #647 is the step that
+ * brings that query here and takes the dismissed filter off both at once, so
+ * that a suggestion you put aside is not filed again -- #646 answered A.
+ * Until then this reads what the script reads.
+ */
+export async function loadFiledIdeas(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<Array<{ id: string; body: string }>> {
+  const { data, error } = await supabase
+    .from('ideas')
+    .select('id, body')
+    .eq('user_id', userId)
+    .is('plan_item_id', null)
+    .is('dismissed_at', null)
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(error.message);
+
+  return ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
+    id: row.id as string,
+    body: row.body as string,
+  }));
+}
+
+/**
  * Newest first: the reason to open this page is usually the thought you had
  * last week, not the one you had in March.
  */
