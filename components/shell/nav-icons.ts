@@ -103,10 +103,9 @@ export const NAV_ICONS = {
   readNow: BookOpenCheck,
   know: Network,
   learnNext: Target,
-  // The five-minute session. A clock rather than a question mark: what
-  // separates it from Read now is how long it takes, and the question mark is
-  // already the dev workspace's raised tab.
-  fiveMinutes: Timer,
+  // Practice Flow. Still the clock it had as the five-minute session: the
+  // question mark is already the dev workspace's raised tab.
+  practiceFlow: Timer,
   // A quiz is answered in writing, which is the whole of what separates it
   // from being asked to recognise something, so it gets the pencil.
   quiz: PencilLine,
