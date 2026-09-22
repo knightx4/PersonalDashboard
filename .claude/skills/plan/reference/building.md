@@ -67,6 +67,32 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
 5. **Make the change.** The smallest change that meets the done-when. Follow
    the repo's rules (`README.md` "Rules", the module's spec in `docs/`). Do not
    fold unrelated cleanup into a step's commit.
+
+   **Read the part you need, not the whole file.** Eleven files here are over
+   forty thousand characters and two are over a hundred and forty thousand:
+   `app/dev/plan/plan-view.tsx` is about thirty-six thousand tokens, and
+   `lib/plan/tree.ts`, `app/dev/plan/actions.ts` and `lib/plan/tree.test.ts`
+   are fourteen to nineteen thousand each. Opening one whole to change three
+   hundred lines costs that once to read and again on every turn afterwards,
+   because the session carries it to the end.
+
+   So find the line first and read around it: `grep -n` for the symbol, then
+   read with an offset and a limit. Read a whole file only when you are
+   changing most of it. The same goes for a file you have just edited -- the
+   edit told you what it now says, so do not read it back to check.
+
+   **Send a search you cannot narrow to a subagent.** "Which files construct
+   this type", "where is this rule enforced", anything that means opening
+   several files to find one answer: dispatch it and let it report back the
+   paths, the line numbers and a sentence. Those files then cost you the
+   sentence rather than their contents.
+
+   Give that subagent `model: haiku`. Locating a symbol and reporting where it
+   is does not need the model that writes the code, and the answer comes back
+   the same. Keep the editing yourself, on the session's own model: a subagent
+   that reads is cheap to be wrong about -- you can check the paths it names --
+   and one that writes code you have not seen is not. Haiku holds 200K rather
+   than 1M, so give it a search, not the whole feature.
 6. **Verify before closing.** Three, every time:
    - `npx tsc --noEmit -p tsconfig.json` — whole project, about 25 seconds. An
      edit in one file breaks types in another, so this is not narrowed.
