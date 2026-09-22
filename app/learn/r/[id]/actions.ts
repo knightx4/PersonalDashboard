@@ -401,7 +401,7 @@ export async function readNoteIntoGraph(
   const readingId = z.string().uuid().safeParse(formData.get('readingId'));
   const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
   if (!readingId.success) return { error: 'Could not work out which reading that was.' };
-  if (!subjectId.success) return { error: 'Pick which subject this belongs to.' };
+  if (!subjectId.success) return { error: 'Pick which track this belongs to.' };
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { error: 'This needs ANTHROPIC_API_KEY to be set.' };
@@ -414,7 +414,7 @@ export async function readNoteIntoGraph(
   }
 
   const subject = await loadSubject(supabase, subjectId.data);
-  if (!subject) return { error: 'That subject is not there any more.' };
+  if (!subject) return { error: 'That track is not there any more.' };
 
   const spend = collectSpend();
   const result = await conceptsFromNote({
@@ -445,7 +445,7 @@ export async function approveNoteConcepts(
   const user = await requireUser();
 
   const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
-  if (!subjectId.success) return { error: 'Could not work out which subject that was.' };
+  if (!subjectId.success) return { error: 'Could not work out which track that was.' };
 
   const raw = formData.get('chain');
   if (typeof raw !== 'string') return { error: 'There is nothing here to approve.' };

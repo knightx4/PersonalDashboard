@@ -56,8 +56,8 @@ export default async function ProbePage({
       </p>
 
       <PageHeader
-        title={`Probing ${subject.name}`}
-        description="One question at a time, each written against one claim."
+        title={`Questions on ${subject.name}`}
+        description="One question at a time, each written against one idea."
       />
 
       {graph.concepts.length === 0 ? (
@@ -67,8 +67,8 @@ export default async function ProbePage({
             'border-dashed px-4 py-6 text-center text-body text-ink-muted',
           )}
         >
-          Nothing in this subject to ask about yet. Name a goal first, and the chain leading to it
-          is what gets probed.
+          Nothing in this track to ask about yet. Name a goal first, and the chain leading to it is
+          what gets asked about.
         </p>
       ) : (
         <ProbeSession

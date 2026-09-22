@@ -46,7 +46,7 @@ function ProgressBar({ progress }: { progress: TrackProgress }) {
         aria-valuenow={percent}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label="Progress through this track"
+        aria-label="Progress through this reading list"
       >
         <div className="h-full rounded-pill bg-accent" style={{ width: `${percent}%` }} />
       </div>

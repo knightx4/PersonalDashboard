@@ -30,13 +30,16 @@ export function trackPercent(settled: number, total: number): number {
   return Math.round((Math.min(settled, total) / total) * 100);
 }
 
-/** The line under the bar saying what the answer did to it. */
+/**
+ * The line under the bar saying what the answer did to it. Said as "known",
+ * the word the state labels use, though it counts settled ideas.
+ */
 export function trackChange(move: TrackMove): string {
   const delta = move.settled - move.before;
-  if (delta === 0) return `Still ${move.settled} of ${move.total} settled.`;
+  if (delta === 0) return `Still ${move.settled} of ${move.total} known.`;
   const size = Math.abs(delta);
   const noun = size === 1 ? 'idea' : 'ideas';
   return delta > 0
-    ? `${size} more ${noun} settled, up from ${move.before}.`
-    : `${size} ${noun} no longer settled, down from ${move.before}.`;
+    ? `${size} more ${noun} known, up from ${move.before}.`
+    : `${size} ${noun} no longer known, down from ${move.before}.`;
 }

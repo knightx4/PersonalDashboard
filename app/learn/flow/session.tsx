@@ -27,8 +27,8 @@ import type { FlowReading } from './state';
 export type FlowTrack = { id: string; name: string } | null;
 
 const NOTHING_TO_ASK: Record<NonNullable<FlowState['nothing']>, string> = {
-  'no-subjects': 'No subjects yet, so there is nothing to ask about. Name one first.',
-  'all-settled': 'Every claim in every subject is settled. Nothing left to ask.',
+  'no-subjects': 'No tracks yet, so there is nothing to ask about. Name one first.',
+  'all-settled': 'Every idea in every track is known. Nothing left to ask.',
 };
 
 function AskButton({ label }: { label: string }) {
@@ -62,7 +62,7 @@ function TrackBar({ name, move }: { name?: string; move: TrackMove }) {
     <div className="mt-4">
       <p className="text-ui text-ink">
         {name ? `${name}, ` : ''}
-        {move.settled} of {move.total} settled
+        {move.settled} of {move.total} known
       </p>
       <div
         className="mt-1.5 h-1.5 w-full overflow-hidden rounded-pill bg-sunken"
@@ -70,7 +70,7 @@ function TrackBar({ name, move }: { name?: string; move: TrackMove }) {
         aria-valuenow={move.settled}
         aria-valuemin={0}
         aria-valuemax={move.total}
-        aria-label={name ? `Ideas settled in ${name}` : 'Ideas settled in this track'}
+        aria-label={name ? `Ideas known in ${name}` : 'Ideas known in this track'}
       >
         <div
           className={cn(
@@ -180,8 +180,8 @@ export function FlowSession({ first, track }: { first: FlowState; track: FlowTra
       {live.recheck && (
         <p className="mt-0.5 text-small text-ink-muted">
           {live.recheck === 'declared'
-            ? 'A re-check — you said you knew this one a while ago.'
-            : 'A re-check — you answered about this one a while ago.'}
+            ? 'A quick review. You said you knew this one a while ago.'
+            : 'A quick review. You answered this one a while ago.'}
         </p>
       )}
       <p className="mt-1 text-body text-ink">{live.question}</p>

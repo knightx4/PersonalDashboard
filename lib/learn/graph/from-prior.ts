@@ -199,7 +199,7 @@ export async function conceptsFromPrior(input: {
       ok: false,
       reason: 'nothing-in-it',
       detail:
-        'Nothing in that states a claim your graph does not already have. Course titles and reading lists say you were there, not what you understood — say what you actually think about one of them.',
+        'Nothing in that states an idea your graph does not already have. Course titles and reading lists say you were there, not what you understood. Say what you actually think about one of them.',
     };
   }
 

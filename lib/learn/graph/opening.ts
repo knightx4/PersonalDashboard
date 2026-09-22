@@ -438,5 +438,5 @@ export async function attachSweepToSubject(
     .eq('id', sweepId);
 
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw fail('Linking the opening questions to the subject', error);
+  if (error) throw fail('Linking the opening questions to the track', error);
 }

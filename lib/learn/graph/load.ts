@@ -69,7 +69,7 @@ export async function loadSubjects(supabase: LearnSupabaseClient): Promise<Subje
     .order('name');
 
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw fail('Reading your subjects', error);
+  if (error) throw fail('Reading your tracks', error);
 
   return (data ?? []).map((row) => {
     const subject = row as { id: string; name: string; note: string | null; created_at: string };
@@ -93,7 +93,7 @@ export async function loadSubject(
     .maybeSingle();
 
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw fail('Reading that subject', error);
+  if (error) throw fail('Reading that track', error);
   if (!data) return null;
 
   const subject = data as { id: string; name: string; note: string | null; created_at: string };
@@ -471,7 +471,7 @@ async function loadNextRecord(
       .in('id', conceptIds);
 
     assertSchemaExposed(conceptError, LEARN_SCHEMA);
-    if (conceptError) throw fail('Reading which subject those claims are in', conceptError);
+    if (conceptError) throw fail('Reading which track those ideas are in', conceptError);
 
     for (const concept of (concepts ?? []) as unknown as {
       id: string;
@@ -543,7 +543,7 @@ export async function loadReadingToOffer(
   ]);
 
   assertSchemaExposed(claims.error, LEARN_SCHEMA);
-  if (claims.error) throw fail('Reading which claims those readings are about', claims.error);
+  if (claims.error) throw fail('Reading which ideas those readings are about', claims.error);
 
   const subjectName = new Map(subjects.map((subject) => [subject.id, subject.name]));
   const claimById = new Map(

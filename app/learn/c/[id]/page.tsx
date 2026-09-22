@@ -126,7 +126,7 @@ function Probe({ probe, claimRewrittenAt }: { probe: ProbeRow; claimRewrittenAt:
         <p className="mt-0.5 text-ui text-ink">{question}</p>
         {earlier && (
           <p className="text-small text-ink-muted">
-            Written against the earlier wording of this claim.
+            Written against the earlier wording of this idea.
           </p>
         )}
         <p
@@ -157,7 +157,7 @@ function Probe({ probe, claimRewrittenAt }: { probe: ProbeRow; claimRewrittenAt:
       <p className="mt-0.5 text-ui text-ink">{probe.question}</p>
       {earlier && (
         <p className="text-small text-ink-muted">
-          Written against the earlier wording of this claim.
+          Written against the earlier wording of this idea.
         </p>
       )}
       <p className={right ? 'mt-1 text-small text-ink-muted' : 'mt-1 text-small text-danger'}>
@@ -342,7 +342,7 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
       {opening && (
         <CardSection
           title="Asked before you started"
-          hint="Answered from memory, before anything about this subject was laid out."
+          hint="Answered from memory, before anything about this track was laid out."
           className="mb-5"
         >
           <p className="text-ui text-ink">{opening.question}</p>
@@ -360,7 +360,7 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
         hint={
           probes.length === 0
             ? undefined
-            : 'Newest first, with the rung each was asked at and why the answer is the answer.'
+            : 'Newest first, with the kind of question each was and why the answer is the answer.'
         }
       >
         {probes.length === 0 ? (
@@ -370,7 +370,7 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
               href={`/learn/s/${subject.id}/probe`}
               className="underline underline-offset-2 hover:text-ink"
             >
-              Probe this subject
+              Ask about this track
             </Link>{' '}
             and it will come up.
           </p>

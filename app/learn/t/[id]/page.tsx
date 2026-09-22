@@ -59,15 +59,15 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
             fields={{ trackId: track.id }}
             prompt={
               track.readings.length === 0
-                ? 'Deletes this track. Nothing else goes with it.'
-                : `Deletes this track and its ${track.readings.length} ${
+                ? 'Deletes this reading list. Nothing else goes with it.'
+                : `Deletes this reading list and its ${track.readings.length} ${
                     track.readings.length === 1 ? 'item' : 'items'
-                  }. The sources stay, since other tracks may use them.`
+                  }. The sources stay, since other reading lists may use them.`
             }
             confirmLabel="Yes, delete it"
             pendingLabel="Deleting…"
           >
-            Delete track
+            Delete reading list
           </ConfirmStep>
         }
         title={track.title}

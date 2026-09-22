@@ -194,7 +194,7 @@ export async function nameAreas(input: {
     return {
       ok: false,
       reason: 'not-a-subject',
-      detail: 'That does not name a subject, so there is nothing inside it to look at.',
+      detail: 'That does not name a topic, so there is nothing inside it to look at.',
     };
   }
 

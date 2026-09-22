@@ -65,7 +65,7 @@ export async function classifyNote(input: {
   // notes are a line that meant something at the time, and paying to be told
   // so once per note is the easiest saving in the pass.
   if (tooShortToRead(input.body)) {
-    return { noteClass: 'operational', reason: 'Too short to be stating a claim.' };
+    return { noteClass: 'operational', reason: 'Too short to be arguing anything.' };
   }
 
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });

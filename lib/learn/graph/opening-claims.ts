@@ -138,7 +138,7 @@ export async function nameOpeningClaims(input: {
     return {
       ok: false,
       reason: 'error',
-      detail: error instanceof Error ? error.message : 'Naming the claims failed.',
+      detail: error instanceof Error ? error.message : 'Naming the ideas failed.',
     };
   }
 
@@ -152,7 +152,7 @@ export async function nameOpeningClaims(input: {
 
   const safe = openingPayloadSchema.safeParse(block.input);
   if (!safe.success) {
-    return { ok: false, reason: 'error', detail: 'The claims came back malformed.' };
+    return { ok: false, reason: 'error', detail: 'The ideas came back malformed.' };
   }
 
   // A model that says both "no structure here" and here are ten claims has
@@ -162,7 +162,7 @@ export async function nameOpeningClaims(input: {
       ok: false,
       reason: 'no-structure',
       detail:
-        'That is broader than one subject, so there is no shared ground to ask about. Name the field you want to start in.',
+        'That is broader than one track, so there is no shared ground to ask about. Name the field you want to start in.',
     };
   }
 
@@ -171,7 +171,7 @@ export async function nameOpeningClaims(input: {
     return {
       ok: false,
       reason: 'too-few',
-      detail: 'Not enough usable claims came back to span the subject. Try again.',
+      detail: 'Not enough usable ideas came back to span the track. Try again.',
     };
   }
 

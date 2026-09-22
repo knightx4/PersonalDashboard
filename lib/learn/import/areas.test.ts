@@ -119,7 +119,7 @@ describe('when there is nothing inside it', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.reason).toBe('not-a-subject');
-      expect(result.detail).toMatch(/subject/i);
+      expect(result.detail).toMatch(/topic/i);
     }
   });
 

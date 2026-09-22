@@ -24,8 +24,8 @@ export const KIND_LABEL: Record<ConceptKind, string> = {
  * line says what being a door costs you rather than restating the word.
  */
 export const KIND_LINE: Record<ConceptKind, string> = {
-  threshold: 'A door into this subject. What sits after it does not land until you are through it.',
-  consequence: 'Follows on from the doors in this subject, and is learnable once you hold them.',
+  threshold: 'A door into this track. What sits after it does not land until you are through it.',
+  consequence: 'Follows on from the doors in this track, and is learnable once you hold them.',
 };
 
 export function KindBadge({ kind, className }: { kind: ConceptKind | null; className?: string }) {

@@ -60,7 +60,7 @@ function SaveButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={pending}>
-      {pending ? 'Saving…' : 'Add these to the track'}
+      {pending ? 'Saving…' : 'Add these to the reading list'}
     </Button>
   );
 }
@@ -142,7 +142,7 @@ function StepRow({ step, index }: { step: PlanStep; index: number }) {
           </>
         ) : (
           <span className="mt-1 block text-ui text-ink-muted">
-            {step.noSourceReason} It goes in as a subject, and you can search for it from its own
+            {step.noSourceReason} It goes in as a topic, and you can search for it from its own
             page.
           </span>
         )}
@@ -239,7 +239,7 @@ export function PlanForm({ trackId }: { trackId: string }) {
       <input type="hidden" name="trackId" value={trackId} />
 
       <p className="text-body text-ink-muted">
-        Nothing in this track yet. Write down what you want to learn, or have the route worked out
+        Nothing in this reading list yet. Write down what you want to learn, or have the route worked out
         for you.
       </p>
 

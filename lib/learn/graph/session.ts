@@ -429,7 +429,7 @@ export async function setMisconception(
   );
 
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw fail('Naming that misconception', error);
+  if (error) throw fail('Naming what you mixed up', error);
 }
 
 /** Write a question as asked, before it is answered. */
@@ -721,7 +721,7 @@ async function settleConcept(
   );
 
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw fail('Recording what that settled', error);
+  if (error) throw fail('Recording what that answer showed', error);
 
   // Growth trigger 3: answering correctly about a node says the things it
   // rests on are probably in place. Weakly, and never over an answer somebody

@@ -187,13 +187,13 @@ export type SegmentLink = { basis: string; confidence: string };
 function basisFor(link: SegmentLink | null): string {
   if (link && link.confidence === 'verified') {
     return (
-      'A model read this part of the work and argued that it teaches this claim. ' +
+      'A model read this part of the work and argued that it teaches this idea. ' +
       'The position came from the catalogue entry, so it points at the part that was read.'
     );
   }
 
   return (
-    'One of the nearest things in the catalogue to this claim, with nothing having read it to check. ' +
+    'One of the nearest things in the catalogue to this idea, with nothing having read it to check. ' +
     'The position came from the catalogue entry.'
   );
 }
@@ -540,7 +540,7 @@ export function tableQueueStore(supabase: LearnSupabaseClient, userId: string): 
         .maybeSingle();
 
       assertSchemaExposed(error, LEARN_SCHEMA);
-      if (error) throw fail('Finding the end of the track', error);
+      if (error) throw fail('Finding the end of the reading list', error);
       return (data as { position: number } | null)?.position ?? 0;
     },
 

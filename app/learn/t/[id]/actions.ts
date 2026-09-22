@@ -118,7 +118,7 @@ export async function removeTrack(formData: FormData): Promise<void> {
   await requireUser();
 
   const trackId = z.string().uuid().safeParse(formData.get('trackId'));
-  if (!trackId.success) throw new Error('Could not work out which track to delete.');
+  if (!trackId.success) throw new Error('Could not work out which reading list to delete.');
 
   const supabase = await createLearnClient();
   await deleteTrack(supabase, trackId.data);
@@ -155,7 +155,7 @@ export async function planTrack(_prev: PlanState, formData: FormData): Promise<P
 
   const supabase = await createLearnClient();
   const track = await loadTrack(supabase, trackId.data);
-  if (!track) return { error: 'That topic is not there any more.' };
+  if (!track) return { error: 'That reading list is not there any more.' };
 
   const spend = collectSpend();
   const result = await planTopic({

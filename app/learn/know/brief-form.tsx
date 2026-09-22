@@ -48,7 +48,7 @@ function ImportButton({ count }: { count: number }) {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={pending || count === 0}>
-      {pending ? 'Saving…' : `Add ${count} ${count === 1 ? 'claim' : 'claims'} to learn`}
+      {pending ? 'Saving…' : `Add ${count} ${count === 1 ? 'idea' : 'ideas'} to learn`}
     </Button>
   );
 }
@@ -73,7 +73,7 @@ function ClaimRow({
               nothing for it, and it is here because the edges around it are
               what join the new claims to what you have. */}
           <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
-            Already in this subject
+            Already in this track
           </span>
         </p>
         {node.claim && <p className="mt-0.5 text-ui text-ink">{node.claim}</p>}
@@ -130,9 +130,9 @@ export function Proposal({ chain, onDiscard }: { chain: ProposedChain; onDiscard
       <input type="hidden" name="chain" value={JSON.stringify(chain)} />
 
       <p className="mb-2 text-body text-ink-muted">
-        {`${adding} ${adding === 1 ? 'claim' : 'claims'} for ${chain.subject}${
+        {`${adding} ${adding === 1 ? 'idea' : 'ideas'} for ${chain.subject}${
           chain.joined > 0 ? `, joined onto ${chain.joined} you already had` : ''
-        }. They land as things to learn, not things you know — untick anything the briefing was wrong about or you do not care to learn. Nothing is saved until you add them.`}
+        }. They land as things to learn, not things you know. Untick anything the briefing was wrong about or you do not care to learn. Nothing is saved until you add them.`}
       </p>
 
       <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
@@ -204,12 +204,12 @@ export function BriefForm({
     <form action={propose} className={cn(cardVariants({ padding: 'standard' }), 'mt-6')}>
       {subjects.length > 0 && (
         <Field
-          label="Which subject?"
+          label="Which track?"
           id="brief-subject"
-          hint="Leave it open and the import names one. Choosing a subject you already have is what stops it proposing claims that are in there already."
+          hint="Leave it open and the import names one. Choosing a track you already have is what stops it proposing ideas that are in there already."
         >
           <Select id="brief-subject" name="subjectId" defaultValue="">
-            <option value="">A new subject</option>
+            <option value="">A new track</option>
             {subjects.map((subject) => (
               <option key={subject.id} value={subject.id}>
                 {subject.name}
@@ -222,7 +222,7 @@ export function BriefForm({
       <Field
         label="Paste the briefing"
         id="briefing"
-        hint="Prose somebody prepared for you — a pass per topic, the background, the argument. It reads claims, so a table of numbers or a list of names has nothing in it to take."
+        hint="Prose somebody prepared for you — a pass per topic, the background, the argument. It reads ideas, so a table of numbers or a list of names has nothing in it to take."
         className={subjects.length > 0 ? 'mt-4' : undefined}
       >
         {/* ui-ok: composer-always-open -- the create. Pasting the briefing is

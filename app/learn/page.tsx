@@ -130,13 +130,13 @@ export default async function PracticeFlowPage({
           <EmptyState
             icon={Target}
             title="Nothing to ask about yet"
-            description="You have no subjects. Name one, or paste something you have read, and the claims underneath it are what these questions get written against."
-            action={{ label: 'What you know', href: '/learn/know' }}
+            description="You have no tracks. Name one, or paste something you have read, and the ideas underneath it are what these questions get written against."
+            action={{ label: 'Tracks', href: '/learn/know' }}
           />
         ) : (
           <EmptyState
             title="Nothing left to ask"
-            description="Every claim in every subject is settled. Name a goal or add a reading, and whatever is missing underneath it will be what gets asked about."
+            description="Every idea in every track is known. Name a goal or add a reading, and whatever is missing underneath it will be what gets asked about."
             tone="finished"
             seed={`${user.id}:${new Date().toISOString().slice(0, 10)}:learn-five`}
           />

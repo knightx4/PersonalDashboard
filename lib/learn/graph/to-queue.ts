@@ -51,13 +51,13 @@ export async function trackForSubject(
     .maybeSingle();
 
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw fail('Looking for the track', error);
+  if (error) throw fail('Looking for the reading list', error);
 
   if (data) return (data as { id: string }).id;
 
   return createTrack(supabase, userId, {
     title,
-    question: `What would settle the claims in ${subjectName} you are shaky on?`,
+    question: `What would help with the ideas in ${subjectName} you are still getting there on?`,
   });
 }
 
@@ -114,7 +114,7 @@ export async function queueConcept(
     title: input.concept.name,
     why: input.concept.misconception
       ? `A gap worth closing: ${input.concept.misconception}`
-      : `Shaky: ${input.concept.claim}`,
+      : `Getting there: ${input.concept.claim}`,
     // Which gap this was. The reading is still an ordinary row -- everything
     // the queue does works on it unchanged -- but it can now find its way back
     // to the graph, which is what lets the source search know where you stand

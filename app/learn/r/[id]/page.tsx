@@ -185,8 +185,8 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
           </Button>
         </form>
         <p className="mt-1.5 text-small text-ink-muted">
-          Opens this one subject up as a topic of its own, planned when you get there. This step
-          stays where it is.
+          Opens this up as a reading list of its own, planned when you get there. This step stays
+          where it is.
         </p>
       </section>
 
@@ -209,12 +209,12 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
         <ConfirmStep
           action={removeFromTrack}
           fields={{ readingId: reading.id, trackId: reading.trackId }}
-          prompt="Removes this from the track for good. To keep it but stop working on it, mark it as gave up instead."
+          prompt="Removes this from the reading list for good. To keep it but stop working on it, mark it as gave up instead."
           confirmLabel="Yes, remove it"
           pendingLabel="Removing…"
           align="start"
         >
-          Remove from this track
+          Remove from this reading list
         </ConfirmStep>
       </section>
 

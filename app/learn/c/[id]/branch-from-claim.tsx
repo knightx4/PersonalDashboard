@@ -64,7 +64,7 @@ function NodeRow({ node, isGoal }: { node: ChainNode; isGoal: boolean }) {
       <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="text-ui font-medium text-ink">{node.name}</span>
         <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
-          {node.existingId ? 'Already in this subject' : 'New'}
+          {node.existingId ? 'Already in this track' : 'New'}
         </span>
         {isGoal && (
           <span className="rounded-pill bg-accent-soft px-1.5 py-0.5 text-small text-accent">
@@ -104,7 +104,7 @@ function Proposal({
 
       <p className="mb-2 text-ui text-ink-muted">
         {added === 0
-          ? `Nothing new — every rung of this is already in ${chain.subject}.`
+          ? `Nothing new. Every step of this is already in ${chain.subject}.`
           : `${added} new ${added === 1 ? 'concept' : 'concepts'} under “${selection}”${
               chain.joined > 0 ? `, joined onto ${chain.joined} you already had` : ''
             }. Nothing is saved until you approve it.`}
@@ -177,7 +177,7 @@ function ClaimEditor({
         * component, which the rule cannot see across. Law 14 is obeyed. */}
       <Textarea
         autoFocus
-        aria-label="The claim, in your own words"
+        aria-label="The idea, in your own words"
         value={draft}
         rows={4}
         onChange={(event) => setDraft(event.target.value)}
@@ -286,7 +286,7 @@ export function BranchFromClaim({
               className="press inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-small text-ink-ghost transition-colors duration-150 hover:bg-sunken hover:text-ink-muted"
             >
               <Pencil className="size-3" strokeWidth={1.75} aria-hidden />
-              Write this claim yourself
+              Put this in your own words
             </button>
           )}
 
@@ -307,7 +307,7 @@ export function BranchFromClaim({
                 <>
                   <AskButton pending={asking} />
                   <span className="text-small text-ink-muted">
-                    Lays out what “{selection}” rests on, in this subject. Nothing is saved
+                    Lays out what “{selection}” rests on, in this track. Nothing is saved
                     until you have read it.
                   </span>
                 </>

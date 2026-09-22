@@ -289,8 +289,8 @@ export function ProbeSession({
           {startConceptId && <input type="hidden" name="conceptId" value={startConceptId} />}
           <p className="text-body text-ink-muted">
             {startConceptName
-              ? `The first question is about ${startConceptName}. After that, one at a time against whatever this subject has least evidence on.`
-              : 'One question at a time, written against one claim in this subject. Ten is a good start, and then as many as you want.'}
+              ? `The first question is about ${startConceptName}. After that, one at a time against whatever this track has least evidence on.`
+              : 'One question at a time, written against one idea in this track. Ten is a good start, and then as many as you want.'}
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
             <AskButton label="Start" />

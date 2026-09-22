@@ -7,26 +7,26 @@ import type { Rung } from '@/lib/learn/graph/probe-payload';
 /**
  * How a concept's state is said, wherever it is said.
  *
- * Six states and three ways of establishing them, kept apart on purpose:
- * "you told me you knew this" and "you answered three questions on it" are
- * different claims, and a screen that rendered them identically would be
- * overstating one of them every time. The subject page and the concept page
- * both say it, so the words live here rather than in whichever one was
- * written first.
+ * The database keeps six states, and the screen says four of them. Known and
+ * sharp both read "Known", since both mean the idea is settled. Recognised
+ * and shaky both read "Getting there": picking the idea out of four still
+ * leaves the applied case to answer, and a shaky idea has been half shown.
+ * What the question was is still said by RUNG_LABEL below, so the ladder is
+ * not lost, only no longer named as a state.
  *
- * Three of the labels are the ladder, and they say what was shown rather than
- * grading it: picking the idea out of four is recognising it, answering a case
- * you have not seen is knowing it, and holding it against the strongest
- * objection makes it sharp.
+ * How a state was reached is kept apart on purpose: "you told me you knew
+ * this" and "you answered three questions on it" are different claims, and a
+ * screen that rendered them identically would be overstating one of them
+ * every time.
  */
 
 export const STATE_LABEL: Record<Concept['state'], string> = {
-  recognised: 'Recognised',
+  recognised: 'Getting there',
   known: 'Known',
-  sharp: 'Sharp',
-  shaky: 'Shaky',
-  misconception: 'Misconception',
-  unknown: 'Not looked at',
+  sharp: 'Known',
+  shaky: 'Getting there',
+  misconception: 'Mixed up',
+  unknown: 'Not seen yet',
 };
 
 export const ESTABLISHED_LABEL: Record<Concept['established'], string> = {

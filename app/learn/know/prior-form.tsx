@@ -58,7 +58,7 @@ function ClaimRow({ node }: { node: ChainNode }) {
           // button does: a concept already in the graph keeps whatever state
           // it arrived at, and approving does not reach it.
           <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
-            Already in this subject — left as it is
+            Already in this track, left as it is
           </span>
         ) : (
           <span className="rounded-pill bg-accent-soft px-1.5 py-0.5 text-small text-accent">
@@ -89,7 +89,7 @@ function Proposal({ chain }: { chain: ProposedChain }) {
       <p className="mb-2 text-body text-ink-muted">
         {added === 0
           ? `Nothing new — ${chain.subject} already holds all of this.`
-          : `${added} ${added === 1 ? 'claim' : 'claims'} in ${chain.subject}, settled on your word alone. They will show as known, and say “you said so” wherever the graph shows how a state was reached. Nothing is saved until you approve it.`}
+          : `${added} ${added === 1 ? 'idea' : 'ideas'} in ${chain.subject}, marked known on your word alone. They will show as known, and say “you said so” wherever the graph shows how a state was reached. Nothing is saved until you approve it.`}
       </p>
 
       <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
