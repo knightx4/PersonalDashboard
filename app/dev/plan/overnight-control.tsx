@@ -16,12 +16,7 @@ import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError, Input, Select } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
-import {
-  nightBudgetLine,
-  nightClosedLine,
-  nightRows,
-  type DigestNight,
-} from '@/lib/digest/night';
+import { nightBudgetLine, nightClosedLine, nightRows, type DigestNight } from '@/lib/digest/night';
 import { elapsedSince, remainingUntil } from '@/lib/plan/elapsed';
 import { commitSubject, type StoredPush } from '@/lib/plan/liveness';
 import { readyFeaturesLine } from '@/lib/plan/overnight-choice';
@@ -146,6 +141,62 @@ function LastPush({ push, now }: { push: StoredPush; now: number }) {
   );
 }
 
+/**
+ * When the last night ended, and why, for a runner that is not running.
+ *
+ * The reason is the sentence on the row, verbatim, for the reason given at the
+ * top of this file. How long ago goes first because it is what decides whether
+ * the rest is still news.
+ */
+function Ended({ night, now, said }: { night: DigestNight; now: number; said: string }) {
+  if (!night.endedAt) return null;
+  const ago = now > 0 ? elapsedSince(night.endedAt, now) : null;
+
+  return (
+    <p className="text-small text-ink-muted">
+      {ago && (
+        <span className="tabular text-ink">
+          {ago === 'just now' ? 'Ended just now.' : `Ended ${ago} ago.`}
+        </span>
+      )}{' '}
+      {said}
+    </p>
+  );
+}
+
+/**
+ * The steps the night left blocked on you, each with what it asked for.
+ *
+ * Open rather than folded, unlike the closed steps: a blocked step is waiting
+ * on the reader, and hiding it behind a count is how it stays blocked.
+ */
+function BlockedSteps({ night }: { night: DigestNight }) {
+  const blocked = nightRows(night.blocked);
+  const n = night.blocked.length;
+
+  return (
+    <div className="space-y-1">
+      <p className="text-small text-caution">
+        {n} {n === 1 ? 'step' : 'steps'} blocked on you
+      </p>
+      <ul className="space-y-1">
+        {blocked.shown.map((step) => (
+          <li key={step.ref} className="flex flex-wrap items-baseline gap-2">
+            <span className="tabular shrink-0 text-small text-ink-ghost">{step.ref}</span>
+            <span className="min-w-0 flex-1 text-small text-ink">
+              {step.title}
+              {step.ask && <span className="text-ink-muted"> · {step.ask}</span>}
+            </span>
+          </li>
+        ))}
+        {blocked.more > 0 && (
+          <li className="text-small text-ink-muted">{blocked.more} more on the plan.</li>
+        )}
+      </ul>
+    </div>
+  );
+}
+
 /** How much clock is left, or that there is none. */
 function StopsIn({ run, now }: { run: OvernightRun; now: number }) {
   if (run.stopBy === null || now === 0) return null;
@@ -231,9 +282,12 @@ export function OvernightControl({
    */
   bare?: boolean;
   /**
-   * The night so far, as `nightFrom` reads it. Null when there is no night
-   * running -- a stopped night's account is the morning digest's job, and this
-   * card goes back to its resting shape.
+   * The night so far, as `nightFrom` reads it, or the last night once it has
+   * stopped, as `lastNightFrom` reads it. Null when there is nothing to say.
+   *
+   * The plan page passes only a live night and goes back to its resting shape
+   * when the night stops. The Status panel on Dash passes the stopped one too,
+   * so the row still says what the last run did when nothing is running.
    */
   night: DigestNight | null;
   /**
@@ -295,7 +349,7 @@ export function OvernightControl({
         <OvernightState standing={standing} />
         {/* The totals are the headline while a night is on; a night that is
             over or has never run has none, and says what it is doing instead. */}
-        {night ? (
+        {night && (live || night.features.length > 0) ? (
           <Totals night={night} />
         ) : (
           <p className="text-small text-ink-muted">{overnightLine(run, now)}</p>
@@ -427,6 +481,23 @@ export function OvernightControl({
 
           <StopsIn run={run} now={now} />
 
+          {night.closed.length > 0 && <WhichSteps night={night} />}
+        </div>
+      )}
+
+      {/* The last night, once it is over: when it ended and why, what it left
+          on you, and what it closed. The reason moves down here from the
+          header, where the totals now stand. */}
+      {standing === 'stopped' && night && (
+        <div className="space-y-1">
+          {/* A night that fired nothing has no totals, so its reason is
+              already in the header where the totals would be. */}
+          <Ended
+            night={night}
+            now={now}
+            said={night.features.length > 0 ? (night.endedReason ?? '') : 'It fired nothing.'}
+          />
+          {night.blocked.length > 0 && <BlockedSteps night={night} />}
           {night.closed.length > 0 && <WhichSteps night={night} />}
         </div>
       )}

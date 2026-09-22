@@ -10,8 +10,9 @@ import { loadFeatureFires, loadLastRuns } from '@/lib/plan/runs';
 import { lastStoredPush } from '@/lib/plan/liveness';
 import { loadOvernightRun, overnightStanding } from '@/lib/plan/overnight';
 import { readyFeatureCount } from '@/lib/plan/overnight-choice';
-import { nightFrom } from '@/lib/digest/night';
+import { lastNightFrom } from '@/lib/digest/night';
 import { planRoutine } from '@/lib/feedback/routine';
+import { loadNotesLastRun } from '@/lib/feedback/last-worked';
 import { ConversationsView } from './conversations-view';
 import { DigestPanel } from './digest-panel';
 import { RaisedView } from './raised-view';
@@ -44,7 +45,7 @@ export const metadata = { title: 'Dash' };
 export default async function DevRaisedPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  const [queue, digest, conversations, plan, overnight, fires, lastRuns, openNotes] =
+  const [queue, digest, conversations, plan, overnight, fires, lastRuns, openNotes, notesLastRun] =
     await Promise.all([
       loadRaised(supabase, user.id),
       loadDigest(supabase, user.id),
@@ -63,18 +64,25 @@ export default async function DevRaisedPage() {
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .in('status', ['open', 'in_progress', 'blocked', 'planned']),
+      loadNotesLastRun(supabase, user.id),
     ]);
 
   // The night as `nightFrom` reads it, exactly as the plan page reads it: the
   // control's totals come from the same rows the morning report is written
   // from, so nothing here can disagree with the digest below it.
+  //
+  // Unlike the plan page, a night that has stopped is read too. With nothing
+  // running, the row would otherwise have nothing to say but the ready count,
+  // and "what did the last run do" is the question it is opened to answer.
   const standing = overnightStanding(overnight);
   const startedAt = overnight?.startedAt ?? null;
-  const live = (standing === 'running' || standing === 'paused') && startedAt !== null;
-  const night = live
-    ? nightFrom({ run: overnight, fires, items: plan.items, since: startedAt })
-    : null;
-  const nightPush = live ? lastStoredPush(Object.values(lastRuns), startedAt) : null;
+  const shown = standing !== 'off' && startedAt !== null;
+  const night = shown ? lastNightFrom({ run: overnight, fires, items: plan.items }) : null;
+  // The last push only while the night is live. After it stops, the newest
+  // push on the run rows can belong to a later session, and the row would
+  // credit the night with it.
+  const live = standing === 'running' || standing === 'paused';
+  const nightPush = shown && live ? lastStoredPush(Object.values(lastRuns), startedAt) : null;
 
   // Everything waiting on you, in the three groups the section is drawn in:
   // what you have to go and do, what you have to answer, what you only have to
@@ -106,6 +114,7 @@ export default async function DevRaisedPage() {
         push={nightPush}
         ready={readyFeatureCount(sections)}
         openNotes={openNotes.count ?? 0}
+        notesLastRun={notesLastRun}
       />
       <DigestPanel digest={digest} />
       <RaisedView queue={queue} groups={groups} titles={titles} />

@@ -216,13 +216,14 @@ export function nightFrom(input: {
   // The newest press inside the window, whatever it was for. Read off the
   // fires rather than off `features` above, which is deduplicated and ordered
   // by first sight; see the field's own note.
-  const lastFire = [...input.fires]
-    .filter((fire) => fire.planItemId !== null && inside(fire.at, startedAt))
-    .sort((a, b) => b.at.localeCompare(a.at))
-    .flatMap((fire) => {
-      const item = itemById.get(fire.planItemId as string);
-      return item ? [{ ...refOf(item), at: fire.at }] : [];
-    })[0] ?? null;
+  const lastFire =
+    [...input.fires]
+      .filter((fire) => fire.planItemId !== null && inside(fire.at, startedAt))
+      .sort((a, b) => b.at.localeCompare(a.at))
+      .flatMap((fire) => {
+        const item = itemById.get(fire.planItemId as string);
+        return item ? [{ ...refOf(item), at: fire.at }] : [];
+      })[0] ?? null;
 
   // Everything that closed while it was running. Nothing on a plan row says
   // which press closed it, and at three in the morning there is only one thing
@@ -323,4 +324,58 @@ export function nightLine(night: DigestNight): string {
     default:
       return 'It was still running when this was written, so this is the night so far.';
   }
+}
+
+/**
+ * The last night, read after it has ended, for the Status panel on Dash.
+ *
+ * `nightFrom` counts every step that closed after the night started, which is
+ * right on the morning it is reported. Days later it is not: a step you closed
+ * by hand on Thursday would be counted as work Tuesday's night did. So a night
+ * that has stopped keeps only the steps under a feature it actually fired.
+ *
+ * The end time cannot bound it instead. A night ends when it has spent its
+ * budget or reached its stop time, and the session building its last feature
+ * is still running then and closes its steps afterwards.
+ *
+ * A night still going is returned exactly as `nightFrom` reads it, so the
+ * Status panel and the plan page agree about the night in progress.
+ */
+export function lastNightFrom(input: {
+  run: OvernightRun | null;
+  fires: readonly NightFire[];
+  items: readonly PlanItem[];
+}): DigestNight | null {
+  const { run } = input;
+  if (!run?.startedAt) return null;
+  const night = nightFrom({ ...input, since: run.startedAt });
+  if (!night || night.standing !== 'stopped') return night;
+
+  const startedAt = new Date(run.startedAt).getTime();
+  const fired = new Set(
+    input.fires
+      .filter((fire) => fire.planItemId !== null && inside(fire.at, startedAt))
+      .map((fire) => fire.planItemId as string),
+  );
+  const parentOf = new Map(input.items.map((item) => [item.id, item.parentId]));
+  const refToId = new Map(input.items.map((item) => [`#${item.number}`, item.id]));
+
+  // Walk up from the step itself, so a fired feature that is not at the root
+  // of the tree still claims the steps beneath it.
+  const underFired = (ref: string): boolean => {
+    const seen = new Set<string>();
+    let current = refToId.get(ref) ?? null;
+    while (current && !seen.has(current)) {
+      if (fired.has(current)) return true;
+      seen.add(current);
+      current = parentOf.get(current) ?? null;
+    }
+    return false;
+  };
+
+  return {
+    ...night,
+    closed: night.closed.filter((step) => underFired(step.ref)),
+    blocked: night.blocked.filter((step) => underFired(step.ref)),
+  };
 }

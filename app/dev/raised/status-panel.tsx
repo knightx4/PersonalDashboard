@@ -2,6 +2,7 @@ import { OvernightControl } from '@/app/dev/plan/overnight-control';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { Card } from '@/components/ui/card';
 import type { DigestNight } from '@/lib/digest/night';
+import type { NotesLastRun } from '@/lib/feedback/last-worked';
 import type { StoredPush } from '@/lib/plan/liveness';
 import type { OvernightRun } from '@/lib/plan/overnight';
 
@@ -31,6 +32,7 @@ export function StatusPanel({
   push,
   ready,
   openNotes,
+  notesLastRun,
 }: {
   run: OvernightRun | null;
   /** Whether the deployment has the token the plan runner fires through. */
@@ -41,6 +43,8 @@ export function StatusPanel({
   ready: number;
   /** Outstanding notes, so "run it" is an answerable question. */
   openNotes: number;
+  /** What the notes routine did last, so the row says something between runs. */
+  notesLastRun: NotesLastRun | null;
 }) {
   return (
     <Card padding="dense" className="space-y-3">
@@ -55,7 +59,12 @@ export function StatusPanel({
         bare
       />
       <div className="border-t border-border pt-3">
-        <RunRoutineButton openCount={openNotes} allHref="/dev/bugs" divider="none" />
+        <RunRoutineButton
+          openCount={openNotes}
+          allHref="/dev/bugs"
+          divider="none"
+          lastRun={notesLastRun}
+        />
       </div>
     </Card>
   );
