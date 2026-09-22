@@ -73,14 +73,14 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       exact: true,
       badge: readNow,
     },
-    // Five minutes is the other end of Read now: the same module asked for
-    // when there is no time to read anything. No badge, because there is
+    // Practice Flow is the other end of Read now: the same module asked for
+    // when you would rather answer than read. No badge, because there is
     // always a question waiting and a number that never goes down is not
     // information.
     {
-      href: '/learn/today',
-      label: 'Five minutes',
-      icon: 'fiveMinutes',
+      href: '/learn/flow',
+      label: 'Practice Flow',
+      icon: 'practiceFlow',
       exact: true,
     },
     // Learn next earns a tab on the same argument Read now does: it is not a

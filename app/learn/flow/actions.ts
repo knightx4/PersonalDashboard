@@ -11,7 +11,8 @@ import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { answerQuestion, type AskState } from '../s/[id]/probe/actions';
 
 /**
- * One question, asked without being asked which subject.
+ * Practice Flow: a question, its answer, and then the next question, for as
+ * long as you keep pressing Next.
  *
  * Asking is its own action because the claim is picked across every subject
  * rather than inside one. Answering is the subject session's action called
@@ -20,7 +21,7 @@ import { answerQuestion, type AskState } from '../s/[id]/probe/actions';
  * are the same code in both places rather than two versions that drift.
  */
 
-export type TodayState = AskState & {
+export type FlowState = AskState & {
   /** The subject the picked claim belongs to. What the link onwards points at. */
   subjectId?: string;
   subjectName?: string;
@@ -34,16 +35,26 @@ export type TodayState = AskState & {
   recheck?: SettledConcept['established'];
 };
 
+/**
+ * Asks, or answers, depending on which form was submitted.
+ *
+ * One action rather than two, because the flow alternates between them
+ * indefinitely: with a separate state for each, whichever ran last would
+ * have to be worked out on every render, and the question after an answer
+ * would be read from the wrong one.
+ */
 // latency: pending
-export async function askTodayQuestion(
-  // Neither is read: nothing is carried over from a previous question, and
-  // there is no subject or concept to name in the form. The two arguments are
-  // what useActionState passes.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _prev: TodayState,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _formData: FormData,
-): Promise<TodayState> {
+export async function flowStep(prev: FlowState, formData: FormData): Promise<FlowState> {
+  return formData.get('intent') === 'answer'
+    ? answerFlowQuestion(prev, formData)
+    : askFlowQuestion();
+}
+
+/**
+ * The next question. Nothing is carried over from the previous one: the pick
+ * runs again, so an answer that just settled a claim moves it on.
+ */
+async function askFlowQuestion(): Promise<FlowState> {
   const user = await requireUser();
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -117,10 +128,6 @@ export async function askTodayQuestion(
  * on it, so the fields this screen needs for the link onwards are carried
  * across from the previous state.
  */
-// latency: pending
-export async function answerTodayQuestion(
-  prev: TodayState,
-  formData: FormData,
-): Promise<TodayState> {
+async function answerFlowQuestion(prev: FlowState, formData: FormData): Promise<FlowState> {
   return { ...prev, ...(await answerQuestion(prev, formData)) };
 }

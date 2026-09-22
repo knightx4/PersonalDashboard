@@ -1,54 +1,50 @@
 'use client';
 
-import Link from 'next/link';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { ProbeOptions } from '@/components/learn/probe-options';
-import { answerTodayQuestion, askTodayQuestion, type TodayState } from './actions';
+import { flowStep, type FlowState } from './actions';
 
 /**
- * Start, one question, the reason, and then nothing.
+ * Start, a question, the reason, and Next, for as long as you keep going.
  *
- * There is no button for another question, and that is the whole shape of the
- * thing: a session that offers one more is a session you have to decide to
- * stop. Carrying on means opening the subject the claim came from, which is a
- * link rather than a button because it is leaving rather than continuing.
+ * Asking and answering share one action state, so the question on screen is
+ * always the one the last submit returned. Next runs the pick again rather
+ * than working through a list, which is what lets an answer that just settled
+ * a claim change what is asked after it. It stops only when the pick has
+ * nothing left.
  */
 
-const NOTHING_TO_ASK: Record<NonNullable<TodayState['nothing']>, string> = {
+const NOTHING_TO_ASK: Record<NonNullable<FlowState['nothing']>, string> = {
   'no-subjects': 'No subjects yet, so there is nothing to ask about. Name one first.',
-  'all-settled': 'Every claim in every subject is settled. Nothing to ask about today.',
+  'all-settled': 'Every claim in every subject is settled. Nothing left to ask.',
 };
 
-function StartButton() {
+function AskButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={pending}>
-      {pending ? 'Writing a question…' : 'Start'}
+      {pending ? 'Writing a question…' : label}
     </Button>
   );
 }
 
-export function TodaySession() {
-  const [state, ask] = useActionState<TodayState, FormData>(askTodayQuestion, {});
-  const [answerState, answer] = useActionState<TodayState, FormData>(answerTodayQuestion, state);
-
-  // The answer action carries the question forward, so whichever ran last is
-  // the live one.
-  const live = answerState.answered ? answerState : state;
+export function FlowSession() {
+  const [live, step] = useActionState<FlowState, FormData>(flowStep, {});
 
   if (!live.question || !live.options) {
     return (
-      <form action={ask} className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center')}>
+      <form action={step} className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center')}>
+        <input type="hidden" name="intent" value="ask" />
         <p className="text-body text-ink-muted">
-          One question about the one thing you are ready for next, across everything you are
-          learning. You do not pick the subject, and there is only the one question.
+          Questions about what you are ready for next, across everything you are learning. Answer
+          as many as you like and stop whenever you want.
         </p>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-          <StartButton />
+          {!live.nothing && <AskButton label="Start" />}
           {live.nothing && <span className="text-ui text-ink-muted">{NOTHING_TO_ASK[live.nothing]}</span>}
           {live.error && <span className="text-ui text-danger">{live.error}</span>}
         </div>
@@ -76,7 +72,8 @@ export function TodaySession() {
       )}
       <p className="mt-1 text-body text-ink">{live.question}</p>
 
-      <form action={answer} className="mt-4 space-y-2">
+      <form action={step} className="mt-4 space-y-2">
+        <input type="hidden" name="intent" value="answer" />
         <input type="hidden" name="probeId" value={live.probeId} />
         <input type="hidden" name="conceptId" value={live.conceptId} />
         <input type="hidden" name="subjectId" value={live.subjectId} />
@@ -99,17 +96,10 @@ export function TodaySession() {
             </p>
           )}
 
-          <p className="mt-4 text-ui text-ink-muted">
-            That is it for now.{' '}
-            {live.subjectId && (
-              <Link
-                href={`/learn/s/${live.subjectId}/probe`}
-                className="underline underline-offset-2 hover:text-ink"
-              >
-                Keep going in {live.subjectName ?? 'this subject'}
-              </Link>
-            )}
-          </p>
+          <form action={step} className="mt-4">
+            <input type="hidden" name="intent" value="ask" />
+            <AskButton label="Next" />
+          </form>
         </div>
       )}
 
