@@ -1,3 +1,6 @@
+'use client';
+
+import { useFormStatus } from 'react-dom';
 import type { Concept } from '@/lib/learn/graph/model';
 import { readAboutConcept } from './actions';
 
@@ -10,6 +13,11 @@ import { readAboutConcept } from './actions';
  *
  * The subject page shows it on a card and the concept page shows it on its
  * own, and both send the same two ids to the same action.
+ *
+ * The press searches the catalogue before it queues anything, which takes a
+ * few seconds rather than being instant, so the button says so while it runs.
+ * Without that it reads as a button that did nothing, and a second press is a
+ * second search.
  *
  * `anyState` drops the gate, for the screen of what to learn next: there the
  * row is already something you could start on, and a claim nothing is known
@@ -31,12 +39,22 @@ export function ReadAbout({
     <form action={readAboutConcept}>
       <input type="hidden" name="conceptId" value={concept.id} />
       <input type="hidden" name="subjectId" value={subjectId} />
-      <button
-        type="submit"
-        className="text-ui text-ink-muted underline-offset-2 hover:text-accent hover:underline"
-      >
-        Find something to read for this
-      </button>
+      <Submit />
     </form>
+  );
+}
+
+function Submit() {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      aria-busy={pending}
+      className="text-ui text-ink-muted underline-offset-2 hover:text-accent hover:underline disabled:hover:text-ink-muted disabled:hover:no-underline"
+    >
+      {pending ? 'Looking for something…' : 'Find something to read for this'}
+    </button>
   );
 }

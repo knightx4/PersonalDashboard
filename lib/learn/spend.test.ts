@@ -64,6 +64,7 @@ describe('the operation names', () => {
       'write-applied-case',
       'grade-applied-answer',
       'embed-catalogue',
+      'embed-claim',
       'judge-segment',
     ]);
   });

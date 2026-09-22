@@ -5,17 +5,32 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
+import { searchCatalogueForClaim } from '@/lib/learn/catalogue/search';
 import { loadGraph, loadSubject } from '@/lib/learn/graph/load';
 import { queueConcept } from '@/lib/learn/graph/to-queue';
+import { recordLearnSpend } from '@/lib/learn/spend';
 
 /**
- * Taking a gap to the reading queue.
+ * Taking a gap to the reading queue, or to what has already been written about
+ * it.
  *
- * The one action on this page that writes, and it writes an ordinary reading
- * in an ordinary track -- the queue is the same queue, and everything it
- * already does works on the row because the row is not special. Pressed on a
- * gap that is already in the queue it writes nothing and sends you to the row
- * that is there.
+ * The press #742 settled on. It looks through the catalogue first: the claim
+ * is embedded, the segments nearest it are judged, and the ones argued for are
+ * written as links. With at least one, this leaves you on the claim, where the
+ * page lists what was found and queues nothing until you pick one -- the page
+ * reads `catalogue_links` on every render, so there is nothing to hand it.
+ * With none, it does what it always did and writes an ordinary reading in an
+ * ordinary track, where Find sources already knows what to do with a subject
+ * you wrote down and no source yet.
+ *
+ * Every way of the catalogue coming up empty lands in the same place. A
+ * missing key, a provider that would not answer, forty candidates the judge
+ * refused: the press was asking for something to read, and the web search is
+ * what answers when the catalogue cannot. That is why the search reports a
+ * miss rather than throwing.
+ *
+ * Pressed on a gap that is already in the queue it writes nothing and sends
+ * you to the row that is there.
  */
 // latency: pending
 export async function readAboutConcept(formData: FormData): Promise<void> {
@@ -33,6 +48,34 @@ export async function readAboutConcept(formData: FormData): Promise<void> {
 
   const concept = graph.concepts.find((c) => c.id === conceptId.data);
   if (!subject || !concept) redirect(`/learn/s/${subjectId.data}`);
+
+  const found = await searchCatalogueForClaim(supabase, user.id, {
+    claim: concept.claim,
+    concept: concept.name,
+    target: { concept: concept.id },
+  });
+
+  // Two operations rather than one, because the embedding is cents and the
+  // judging is the cost that grows with the catalogue, and a screen that
+  // groups by operation should be able to see them apart. Written after the
+  // work rather than between the calls, so nothing the person is waiting on
+  // waits on the ledger.
+  await recordLearnSpend(user.id, 'embed-claim', found.embedSpend);
+  await recordLearnSpend(user.id, 'judge-segment', found.judgeSpend);
+
+  // A catalogue with nothing close and a judge that refused everything are the
+  // ordinary misses and say nothing. The rest -- no key, a provider that would
+  // not answer, a write that failed -- look identical from the page, which is
+  // the point, and would otherwise leave nobody able to tell a catalogue that
+  // covers nothing from a search that never ran.
+  if (found.missed && found.missed !== 'nothing-near' && found.missed !== 'nothing-taught') {
+    console.warn(`[learn catalogue] search missed (${found.missed})`, found.detail);
+  }
+
+  if (found.covered) {
+    revalidatePath(`/learn/c/${concept.id}`);
+    redirect(`/learn/c/${concept.id}`);
+  }
 
   const readingId = await queueConcept(supabase, user.id, {
     subjectName: subject.name,
