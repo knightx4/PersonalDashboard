@@ -227,14 +227,25 @@ Findings become a migration that edits the grid. It is cheaper to run now than
 after subjects and themes point at the fields, because moving a field then
 means placing everything in it again.
 
-The script needs to reach `en.wikipedia.org`. The cloud environment this spec
-was written in blocks it, so the check runs locally or from the app.
+It runs in the app, because the app can reach `en.wikipedia.org`.
+`/api/cron/area-check` loads the Level 3 list into `learn.area_check_articles`
+on its first call and places unplaced articles until its time is up on every
+call, so it is called until it reports nothing remaining. It has no schedule:
+it is fired by hand through `pg_net` with the vault's `app_origin` and
+`cron_secret`, the pair the map sweep's tick already uses. Placement is one
+Opus call per forty articles, about twenty-five calls for the whole page,
+recorded as `check-areas` in the spend ledger.
+
+Each finding is a query over that table: `confidence = 'none'` for a missing
+field, `confidence = 'close'` for a missing boundary rule, and a count by
+`field_id` for fields that receive almost nothing.
 
 ## Build order
 
 1. ✅ **The grid.** `0027_areas.sql`: two tables, seeded, read-only to accounts.
-2. **The check against Level 3.** A script that places the thousand articles and
-   reports the three kinds of finding above. Any changes to the grid land as a
+2. **The check against Level 3.** `0028_area_check.sql` and
+   `/api/cron/area-check`, which place the thousand articles and leave the three
+   kinds of finding above in a table. Any changes to the grid land as a
    migration.
 3. **Placement.** `subjects.field_id`, `theme_fields`, the placement call, and
    moving a placement by hand.

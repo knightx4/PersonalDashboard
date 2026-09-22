@@ -76,6 +76,10 @@ export const LEARN_OPERATIONS = [
   // `recordLearnSpend`, which needs a session. Kept apart from 'map-note' so
   // the cost of the sweep can be read against the 75-note trial's estimate.
   'map-sweep',
+  // Placing Wikipedia's Level 3 vital articles into the areas, the check in
+  // docs/LEARN-AREAS-SPEC.md. Recorded through the service role from its cron
+  // call, like 'map-sweep', and a one-off rather than something that recurs.
+  'check-areas',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

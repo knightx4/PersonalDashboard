@@ -101,6 +101,7 @@ describe('RLS coverage', () => {
       where n.nspname = 'learn' and c.relkind = 'r'
       order by 1`;
     expect(rows.map((r) => r.tablename)).toEqual([
+      'area_check_articles',
       'area_domains',
       'area_fields',
       'catalogue_course_items',
@@ -162,6 +163,15 @@ describe('the areas, which change only by migration', () => {
     const [physics] = await admin<{ name: string }[]>`
       select name from area_fields where slug = 'physics'`;
     expect(physics?.name).toBe('Physics');
+  });
+
+  it('does not let a signed-in user write a placement into the check', async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into area_check_articles (title, section) values ('Planted', 'Nowhere')`,
+      ),
+    ).rejects.toThrow();
   });
 
   it('gives every domain between three and six fields', async () => {
