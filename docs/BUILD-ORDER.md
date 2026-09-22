@@ -300,6 +300,112 @@ time it is used, never generated once and frozen.
   (20–23) shipped for the note half of it; nothing else in the block depends on
   another block.
 
+## Learn: where to go learn it
+
+Specified in [LEARN-SOURCES-SPEC.md](LEARN-SOURCES-SPEC.md). A shared catalogue
+of places to learn from, addressable down to one clip of one lecture, matched
+against claims by embedding and then confirmed by a model reading the segment.
+It supplies the thing neither the reading queue nor the vault can: material
+about parts of a subject nobody wrote a note about.
+
+Built by the plan rather than from this file, which is why it arrives here after
+the fact. Its own build order is the one to follow; this block records that the
+module exists and where it sits.
+
+63. ✅ **pgvector, the catalogue, and time offsets on a reading.** Five shared
+    tables carrying no `user_id`, the segment as the addressable unit with its
+    own embedding, and the `timestamp` locator columns the enum had advertised
+    since `0001`. Applied as `learn_0022_catalogue` and `learn_0023`.
+64. ✅ **Retrieval, the verdict pass, and what a claim's read button does.**
+    Nearest segments by embedding as candidate generation only, then one call
+    per candidate that matters, because a link written on similarity alone is
+    the failure `locator_basis` exists to prevent.
+
+The remaining steps are in that document: Wikipedia ingest first because it
+needs no key, then ordering within a claim, then YouTube metadata with
+institution-published transcripts, then courses as track skeletons.
+
+One decision spans this block and the one below, and is open: a catalogue link
+points at a learn concept today, and the vault map's positions are the larger
+and more personal store on the model the foundation now describes. See the open
+questions in [KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md).
+
+## The vault map
+
+Specified in [KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md), which sits over the vault
+spec and both learn specs. The vault stops being only a viewer and gains a map
+of itself: themes, the positions under them, and what points at what, derived
+from the notes and stored beside them in `obsidian`.
+
+The ordering argument is different from the earlier draft of this block. That
+one put a learn-schema realignment first, on the grounds that eight
+disagreements were cheap at forty rows and painful at 1,800. Most of that list
+existed because vault-extracted concepts were going to land in
+`learn.concepts`. They are not — the map is the vault's and makes no claim
+about what anybody knows — so the realignment stops gating the sweep and the
+map's tables are greenfield.
+
+54. **The privacy page, and the journal exclusion list.** Before another note
+    reaches a model. Two paths already send vault content to one and the policy
+    describes mail only, which the vault spec said had to change first.
+55. ✅ **The map's tables.** Seven in `obsidian`: `themes`, `theme_notes`,
+    `positions`, `theme_positions`, `position_sources`, `position_edges` and
+    `tensions`, with `strength` and `centrality` as columns rather than tables.
+    RLS on all seven in the migration that creates them, and `rls-vault.test.ts`
+    extended from 20 assertions to 35 **before any feature code** — build
+    step 2's rule for the sixth time and the same reason.
+
+    Three things the schema settles that a prompt otherwise would.
+    Every foreign key is composite and carries `user_id`, because keys are not
+    subject to RLS and a policy alone would let a row join one account's
+    position to another's theme; the test proves that as admin, where a policy
+    cannot help. The join tables have no update policy *and* no update grant,
+    so editing a membership is refused at the privilege level rather than
+    quietly matching nothing. And a tension's pair is ordered by a trigger
+    before it is written, so a dismissed one cannot come back by being found
+    from the other side.
+
+    Deliberately **not** acyclic. `learn.concept_edges` rejects a cycle because
+    the frontier walks it; nothing walks these, so the constraint would refuse
+    honest relations between two notes that answer each other.
+56. **One extraction seam.** The node test, the four kinds, the edge
+    vocabulary and the verbatim-quote rule in the shared prompt fragment the
+    chain-writing calls already draw on, so a change to what a position is is
+    made once.
+57. **The sweep at scale.** A background job, a budget and a resume point,
+    which the one-note slice deliberately has none of. The chunker is the
+    thing to fix first: it stops after ten sections, which leaves 40.7% of the
+    text in headed notes unread and punishes well-structured notes hardest.
+58. **The map on screen.** `/vault` gains themes by strength, a theme's
+    positions, and a position's notes and quotes. The deliverable, and worth
+    having whether or not Learn ever reads it.
+59. **The merge pass and the review queue.** Themes and positions reconciled
+    across notes, then accept, merge or reject, highest centrality first.
+60. **Tensions and open questions.** The neighbourhood sweep, the six kinds,
+    the proposed crux, the resolution that `qualifies` both originals.
+61. **The seam into Learn.** A theme's strength ranks what Learn offers, a
+    theme's positions go into the generation prompt as context, and an open
+    question becomes a track in the reading queue. Nothing crosses back, and
+    nothing read out of the vault writes a knowledge state.
+62. **The export.** One markdown file per theme, on demand, since the map
+    lives in Postgres and nothing writes it back.
+
+### Ordering notes worth respecting
+
+- Step 54 blocks everything else here. It is not bookkeeping: the app is
+  already doing the thing the policy does not describe.
+- 55 before 56 before 57, for the reason every block here repeats. A missing
+  policy has to fail immediately, and a shape settled after 1,800 rows are
+  written is a data migration rather than a migration.
+- 57 needs the chunking fix or it reads a third of the vault and says nothing
+  about the rest.
+- 58 is the point at which this is worth having. Everything after it is
+  improvement on something real.
+- 61 is the one that makes both modules worth more than either, and it comes
+  late deliberately: Learn has four working ways into a graph already, and the
+  map has to be good before it is allowed to steer them.
+- 62 depends on nothing and blocks nothing.
+
 ## Open questions, still open
 
 Carried forward from the spec. None of them block the next few steps, but the

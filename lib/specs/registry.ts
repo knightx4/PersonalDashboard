@@ -37,6 +37,25 @@ export const SPECS: readonly SpecDoc[] = [
     module: null,
   },
   {
+    slug: 'knowledge',
+    title: 'The vault map',
+    blurb:
+      'The foundation under the vault and both learn specs: a map of what you write about, derived from the notes and never written back, and the rule that it says what you are interested in rather than what you know.',
+    file: 'KNOWLEDGE-SPEC.md',
+    // Filed under vault: the map it specifies is derived from the notes and
+    // belongs to that module. It also governs what Learn may assume from the
+    // map, and all three learn specs point here for the decisions that moved.
+    module: 'vault',
+  },
+  {
+    slug: 'learn-sources',
+    title: 'Learn: where to go learn it',
+    blurb:
+      'A shared catalogue of Wikipedia sections and lecture segments, embedded and matched to a claim, so a subject you never wrote a note about still has material.',
+    file: 'LEARN-SOURCES-SPEC.md',
+    module: 'learn',
+  },
+  {
     slug: 'learn-map',
     title: 'The map',
     blurb:
