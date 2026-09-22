@@ -23,6 +23,20 @@ describe('CommentBody', () => {
     expect(html).toContain('>#494</a>');
   });
 
+  // Note cfd2543f: the plan page labels a step by its place in the tree, so
+  // the link reads that way too where the page knows it.
+  it('reads a step as the outline the plan page shows, and still links its number', () => {
+    const html = renderToStaticMarkup(
+      <CommentBody
+        body="The trial (#760) cannot run."
+        titles={{ 760: { title: 'Try Wikipedia sections', outline: '723.20' } }}
+      />,
+    );
+    expect(html).toContain('href="/dev/plan?view=all#plan-760"');
+    expect(html).toContain('>#723.20</a>');
+    expect(html).toContain('title="#723.20 — Try Wikipedia sections"');
+  });
+
   it('links every number in a run of them', () => {
     const html = render('#500, #501 and #505 all wait on #499.');
     for (const number of [499, 500, 501, 505]) {

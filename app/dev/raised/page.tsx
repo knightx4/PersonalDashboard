@@ -2,7 +2,7 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadRaised } from '@/lib/raised/load';
 import { loadPlan, planRefTitles } from '@/lib/plan/load';
-import { buildPlanTree } from '@/lib/plan/tree';
+import { buildPlanTree, flattenSections } from '@/lib/plan/tree';
 import { waitingGroups } from '@/lib/plan/waiting';
 import { loadDigest } from '@/lib/digest/load';
 import { loadConversations } from '@/lib/comments/recent';
@@ -91,7 +91,7 @@ export default async function DevRaisedPage() {
   // What every "#494" on this page is called. Built once here rather than
   // looked up where each one is drawn: a raise with nine references in it
   // would otherwise be nine lookups inside a render.
-  const titles = planRefTitles(plan);
+  const titles = planRefTitles(plan, flattenSections(sections));
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">

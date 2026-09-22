@@ -172,6 +172,26 @@ describe('the Overnight card while a night is running', () => {
     expect(draw()).toContain('stops in 5h 10m');
   });
 
+  // Note 84482e92: the claimed step hangs under the feature it belongs to.
+  it('names the step being worked under the feature it is on', () => {
+    const html = draw({
+      run: run(),
+      night: night({
+        lastFire: {
+          ref: '#494',
+          title: 'The dev pages say what is actually happening',
+          at: '2026-09-17T04:04:00Z',
+          step: { ref: '#494.3', title: 'Say what the runner is on' },
+        },
+      }),
+      push: null,
+    });
+
+    expect(html).toContain('Working on</span>');
+    expect(html).toContain('#494.3');
+    expect(html).toContain('Say what the runner is on');
+  });
+
   it('does not read like a working night when it has fired nothing', () => {
     const html = draw({
       run: run({ featuresLeft: 4, lastFiredAt: null }),

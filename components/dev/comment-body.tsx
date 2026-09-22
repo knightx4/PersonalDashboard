@@ -1,7 +1,13 @@
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { splitOnMention } from '@/lib/comments/mention';
-import { planRefHref, planRefLabel, splitOnRefs, type PlanRefTitles } from '@/lib/comments/refs';
+import {
+  planRefHref,
+  planRefLabel,
+  planRefText,
+  splitOnRefs,
+  type PlanRefTitles,
+} from '@/lib/comments/refs';
 
 /**
  * What one comment says, laid out.
@@ -135,7 +141,7 @@ function walkRefs(node: Node, titles?: PlanRefTitles): void {
         part.ref !== null
           ? {
               type: 'planRef',
-              children: [{ type: 'text', value: part.text }],
+              children: [{ type: 'text', value: planRefText(part.ref, titles) }],
               data: {
                 hName: 'a',
                 hProperties: {

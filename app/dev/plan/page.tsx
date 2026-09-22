@@ -178,6 +178,7 @@ export default async function DevPlanPage({
   const catalog: PlanCatalogEntry[] = flattenSections(whole).map((node) => ({
     id: node.id,
     number: node.number,
+    outline: node.outline,
     title: node.title,
     module: node.module,
     parentId: node.parentId,

@@ -1981,7 +1981,10 @@ function PlanRow({
   // What a "#494" written in a comment on this page is called. The catalog is
   // already every step's number and title, so no page needs to hand it over.
   const refTitles = useMemo(
-    () => Object.fromEntries(catalog.map((entry) => [entry.number, entry.title])),
+    () =>
+      Object.fromEntries(
+        catalog.map((entry) => [entry.number, { title: entry.title, outline: entry.outline }]),
+      ),
     [catalog],
   );
   const move = moveFor(node, resolving);
