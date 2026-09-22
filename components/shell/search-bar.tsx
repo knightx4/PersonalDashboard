@@ -11,7 +11,7 @@ import {
   useSearchRows,
   type SearchRow,
 } from '@/components/shell/use-search-rows';
-import { scopeForModule, toggleScope, type SearchScope } from '@/lib/search/scope';
+import { scopeForModule, type SearchScope } from '@/lib/search/scope';
 import type { ModuleId } from '@/lib/modules';
 import type { Theme } from '@/lib/theme';
 import type { NavSection } from '@/components/shell/app-shell';
@@ -37,11 +37,11 @@ export type SearchBarHandle = {
  * right end naming the workspace the search is narrowed to. The field is
  * empty and so is the space under it: the list arrives with the first
  * character and not before, because a bar that is always on screen would
- * otherwise drop a panel over the page every time somebody tabbed past it. Pressing the chip
- * widens it to everything you own and pressing it again narrows it back, and
- * the list under the field changes with it: narrowed, it offers this
- * workspace's things, its pages and what you can start in it; widened, it is
- * the whole list the command box has always shown.
+ * otherwise drop a panel over the page every time somebody tabbed past it. The
+ * chip opens on the two scopes -- this workspace and everything you own -- and
+ * the list under the field changes with the one picked: narrowed, it offers
+ * this workspace's things, its pages and what you can start in it; widened, it
+ * is the whole list the command box has always shown.
  *
  * What goes in the list, in what order and with what caps is
  * components/shell/use-search-rows.ts, the same hook the modal draws from, and
@@ -87,6 +87,8 @@ export function SearchBar({
   const [focused, setFocused] = useState(false);
   /** Escape was pressed: the list is shut while the text stays where it is. */
   const [dismissed, setDismissed] = useState(false);
+  /** The chip's menu is up, and the list under the field stands down for it. */
+  const [picking, setPicking] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useImperativeHandle(
@@ -145,7 +147,7 @@ export function SearchBar({
    * and arriving from the keyboard all land here, so all three leave the page
    * as it was until a character is typed.
    */
-  const showing = focused && !dismissed && query.trim() !== '';
+  const showing = focused && !dismissed && !picking && query.trim() !== '';
 
   function choose(row: SearchRow | undefined) {
     if (!row) return;
@@ -164,8 +166,8 @@ export function SearchBar({
     run(row);
   }
 
-  function pressChip() {
-    setScope((current) => toggleScope(current, module));
+  function chooseScope(next: SearchScope) {
+    setScope(next);
     setActive(0);
     setDismissed(false);
     reset();
@@ -197,8 +199,14 @@ export function SearchBar({
         * Drawn here rather than taken from Input because a control sits inside
         * the field, so the border has to belong to the pair. The tokens are
         * the shared control's, and the ring is focus-within so the box lights
-        * up while the chip has the cursor. */}
-      <div className="flex h-(--control-h) items-center gap-2 rounded-control border border-control bg-surface px-(--control-px) focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/40">
+        * up while the chip has the cursor.
+        *
+        * No ground of its own and a full radius. It had the surface fill every
+        * other field has, which on the top bar's own ground read as a slab
+        * laid across it rather than as one control among the icons beside it
+        * -- note ca910aa3. The edge is what says you can type here, and with
+        * the bar showing through it says it without the rest. */}
+      <div className="flex h-(--control-h) items-center gap-2 rounded-full border border-control bg-transparent px-(--control-px) focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/40">
         <Search className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
         <input
           ref={inputRef}
@@ -245,7 +253,12 @@ export function SearchBar({
           className="h-full w-full min-w-0 bg-transparent text-base text-ink outline-none placeholder:text-ink-ghost sm:text-ui"
         />
 
-        <SearchScopeChip scope={scope} module={module} onPress={pressChip} />
+        <SearchScopeChip
+          scope={scope}
+          module={module}
+          onScope={chooseScope}
+          onOpenChange={setPicking}
+        />
       </div>
 
       {showing && (

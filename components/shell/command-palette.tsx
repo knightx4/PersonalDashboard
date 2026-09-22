@@ -12,7 +12,7 @@ import {
   useSearchRows,
   type SearchRow,
 } from '@/components/shell/use-search-rows';
-import { scopeForModule, toggleScope, type SearchScope } from '@/lib/search/scope';
+import { scopeForModule, type SearchScope } from '@/lib/search/scope';
 import type { ModuleId } from '@/lib/modules';
 import type { Theme } from '@/lib/theme';
 import type { NavSection } from '@/components/shell/app-shell';
@@ -33,9 +33,9 @@ import type { NavSection } from '@/components/shell/app-shell';
  * It searches the workspace the page is in, and everything you own on a page
  * that is in no workspace. So it opens on that workspace's pages and what you
  * can start there, and nothing from anywhere else; outside a workspace it
- * opens on the list it has always opened on. The chip beside the field widens
- * it to everything you own and narrows it back, the same chip the bar carries
- * and the same two states.
+ * opens on the list it has always opened on. The chip beside the field opens on
+ * the two scopes -- this workspace and everything you own -- the same chip the
+ * bar carries and the same two states.
  *
  * Below lg this is the whole of search: the magnifier in the top row opens it
  * and so does ⌘K (#713). From lg up the field in the top bar is the way in
@@ -129,8 +129,8 @@ export function CommandPalette({
     run(row);
   }
 
-  function pressChip() {
-    setScope((current) => toggleScope(current, module));
+  function chooseScope(next: SearchScope) {
+    setScope(next);
     setActive(0);
     reset();
     // The cursor goes back where it was: switching what is being searched is
@@ -193,7 +193,7 @@ export function CommandPalette({
           {/* The same chip the bar carries, and the same two states. It sits
               between the field and the keycap because it belongs to the field
               -- what is being searched -- rather than to the box. */}
-          <SearchScopeChip scope={scope} module={module} onPress={pressChip} />
+          <SearchScopeChip scope={scope} module={module} onScope={chooseScope} />
           {/* The shell's keycap, not a second drawing of one: this was a
               hairline bigger and a step up the type scale from every other
               cap in the app, which is visible the moment the palette opens

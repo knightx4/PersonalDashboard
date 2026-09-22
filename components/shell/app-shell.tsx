@@ -712,7 +712,14 @@ export function AppShell({
 
                 `lg:block` is the only place that width is written down. The
                 shortcut asks this bar whether the cursor landed in it rather
-                than reading the breakpoint again; see the effect above. */}
+                than reading the breakpoint again; see the effect above.
+
+                It grows into the middle of the bar but stops at `max-w-md` and
+                centres in what is left, rather than taking every pixel between
+                the brief and the account icons. A field the width of a desk
+                reads as the page's own furniture rather than as one control,
+                and there is nothing to put in it that is a paragraph long --
+                note ca910aa3. */}
                 <SearchBar
                   ref={searchBar}
                   account={account}
@@ -720,7 +727,7 @@ export function AppShell({
                   sections={sections}
                   enabledModules={workspaces}
                   theme={theme}
-                  className="hidden min-w-0 flex-1 lg:block"
+                  className="hidden min-w-0 flex-1 lg:mx-auto lg:block lg:max-w-md"
                 />
 
                 {/* The gap that puts the account controls in the right corner.

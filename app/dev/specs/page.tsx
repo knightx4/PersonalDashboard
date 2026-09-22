@@ -6,6 +6,8 @@ import { cardVariants } from '@/components/ui/card';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { SPECS, groupSpecs, type SpecDoc } from '@/lib/specs/registry';
 import { specCommentCounts } from '@/lib/specs/load';
+import { loadModuleVisions } from '@/lib/specs/vision';
+import { ModuleVisionPanel } from './vision-view';
 import { cn } from '@/lib/cn';
 
 export const metadata = { title: 'Specs' };
@@ -23,6 +25,12 @@ export const metadata = { title: 'Specs' };
  * So the text stays in the repository and is read from it, and only the
  * comments are stored. Nothing here can write a word of a spec, which is what
  * keeps the document and the code honest about each other.
+ *
+ * The one thing on this page that is written here is the vision at the head of
+ * each workspace: what the workspace is for, above every document under it,
+ * and the person's rather than the repository's. That is the layer a session
+ * reads first, and it is edited in place because a paragraph that needs a
+ * commit to change is one that goes stale.
  */
 
 function SpecRow({ spec, comments }: { spec: SpecDoc; comments: number }) {
@@ -54,14 +62,17 @@ function SpecRow({ spec, comments }: { spec: SpecDoc; comments: number }) {
 export default async function SpecsPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  const counts = await specCommentCounts(supabase, user.id);
+  const [counts, visions] = await Promise.all([
+    specCommentCounts(supabase, user.id),
+    loadModuleVisions(supabase, user.id),
+  ]);
   const groups = groupSpecs(SPECS, counts);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader
         title="Specs"
-        description="The documents behind each workspace, read from the repository. Comment on any section; tag @dash in one to ask about it."
+        description="The vision for each workspace, and the documents behind it read from the repository. Comment on any section; tag @dash in one to ask about it."
       />
 
       <div className="space-y-2">
@@ -84,7 +95,11 @@ export default async function SpecsPage() {
             meta={
               <span className="flex items-center gap-3">
                 <span>
-                  {group.specs.length} {group.specs.length === 1 ? 'document' : 'documents'}
+                  {/* A workspace can now be here with nothing written for it,
+                      and "0 documents" is a count standing in for a state. */}
+                  {group.specs.length === 0
+                    ? 'No documents yet'
+                    : `${group.specs.length} ${group.specs.length === 1 ? 'document' : 'documents'}`}
                 </span>
                 {group.comments > 0 && (
                   <span className="flex items-center gap-1">
@@ -95,11 +110,27 @@ export default async function SpecsPage() {
               </span>
             }
           >
-            <ul className="space-y-2 pt-2">
-              {group.specs.map((spec) => (
-                <SpecRow key={spec.slug} spec={spec} comments={counts[spec.slug] ?? 0} />
-              ))}
-            </ul>
+            <div className="pt-2">
+              {/* Above the documents rather than among them, because it is the
+                  layer above them. The app-wide group has none: a vision is
+                  what one workspace is for, and "the app as a whole" already
+                  has a writing guide standing for it. */}
+              {group.module && (
+                <ModuleVisionPanel
+                  module={group.module}
+                  label={group.label}
+                  vision={visions[group.module] ?? null}
+                />
+              )}
+
+              {group.specs.length > 0 && (
+                <ul className="space-y-2">
+                  {group.specs.map((spec) => (
+                    <SpecRow key={spec.slug} spec={spec} comments={counts[spec.slug] ?? 0} />
+                  ))}
+                </ul>
+              )}
+            </div>
           </Disclosure>
         ))}
       </div>

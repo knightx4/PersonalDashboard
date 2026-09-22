@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   countLabel,
   formatArrival,
+  issueReturn,
   senderLabel,
   sortSenders,
   visibleIssues,
@@ -83,5 +84,28 @@ describe('countLabel', () => {
   it('counts one and many', () => {
     expect(countLabel(1)).toBe('1 newsletter');
     expect(countLabel(4)).toBe('4 newsletters');
+  });
+});
+
+describe('issueReturn', () => {
+  it('goes back to the whole list when that is where you were', () => {
+    expect(issueReturn(undefined, paper)).toEqual({
+      href: '/news',
+      label: 'Newsletters',
+      from: null,
+    });
+  });
+
+  it('goes back to the sender list when that is where you were', () => {
+    expect(issueReturn('s1', paper)).toEqual({
+      href: '/news?from=s1',
+      label: 'The Paper',
+      from: 's1',
+    });
+  });
+
+  it('ignores a filter that names another sender, or none at all', () => {
+    expect(issueReturn('s2', paper).href).toBe('/news');
+    expect(issueReturn('s1', null).href).toBe('/news');
   });
 });
