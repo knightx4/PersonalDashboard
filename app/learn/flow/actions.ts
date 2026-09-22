@@ -6,9 +6,17 @@ import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { fillQueue, nextQuestion } from '@/lib/learn/flow/ahead';
+import {
+  loadTrackOffer,
+  recordTrackOffer,
+  startTrackFromTheme,
+  themeName,
+  themeStrength,
+} from '@/lib/learn/flow/offer';
 import { trackMove } from '@/lib/learn/flow/track';
 import { loadGraph, loadReadingToOffer } from '@/lib/learn/graph/load';
 import { recordOutcome } from '@/lib/learn/next/record';
+import { createVaultClient } from '@/lib/vault/auth/server';
 import { answerQuestion } from '../s/[id]/probe/actions';
 import { toFlowState, type FlowState } from './state';
 
@@ -60,14 +68,52 @@ export async function flowStep(prev: FlowState, formData: FormData): Promise<Flo
   const supabase = await createLearnClient();
 
   const track = trackFrom(formData);
+  const intent = formData.get('intent');
 
   const state =
-    formData.get('intent') === 'answer'
-      ? await answerFlowQuestion(prev, formData)
-      : toFlowState(await nextQuestion(supabase, user.id, { resume: false, track }));
+    intent === 'answer'
+      ? await answerFlowQuestion(prev, formData, track)
+      : intent === 'start-track'
+        ? await startOfferedTrack(prev, formData, user.id)
+        : toFlowState(await nextQuestion(supabase, user.id, { resume: false, track }));
 
   after(() => fillQueue(supabase, user.id, track));
   return state;
+}
+
+const ThemeId = z.string().uuid();
+
+/**
+ * Start, on a new track the flow offered (plan #778, #776's answer A).
+ *
+ * The track is written without an approval screen, and the next question is
+ * taken from it straight away, so starting a track puts one of its questions
+ * on the screen in the same press. The flow carries on mixing afterwards: the
+ * new track's ideas are ready ones like any other, and the picks reach them.
+ *
+ * A failure keeps everything on the screen as it was and says why on the card.
+ */
+async function startOfferedTrack(
+  prev: FlowState,
+  formData: FormData,
+  userId: string,
+): Promise<FlowState> {
+  const themeId = ThemeId.safeParse(formData.get('themeId'));
+  if (!themeId.success) return { ...prev, offerError: 'Could not tell which theme that was.' };
+
+  const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
+  const started = await startTrackFromTheme(supabase, vault, userId, themeId.data).catch(
+    (error: unknown) => ({
+      ok: false as const,
+      detail: error instanceof Error ? error.message : 'Could not start that track.',
+    }),
+  );
+  if (!started.ok) return { ...prev, offerError: started.detail };
+
+  const next = toFlowState(
+    await nextQuestion(supabase, userId, { resume: false, track: started.subjectId }),
+  );
+  return { ...next, started: started.name };
 }
 
 /**
@@ -96,7 +142,11 @@ export async function fillFlowQueue(track: string | null): Promise<void> {
  * record of it. Failing to read either loses the track line, not the answer.
  * The reading offered under the answer is looked up alongside the second read.
  */
-async function answerFlowQuestion(prev: FlowState, formData: FormData): Promise<FlowState> {
+async function answerFlowQuestion(
+  prev: FlowState,
+  formData: FormData,
+  focus: string | null,
+): Promise<FlowState> {
   const supabase = await createLearnClient();
   const subjectId = prev.subjectId;
   const before = subjectId ? await loadGraph(supabase, subjectId).catch(() => null) : null;
@@ -105,18 +155,25 @@ async function answerFlowQuestion(prev: FlowState, formData: FormData): Promise<
     ...prev,
     track: undefined,
     reading: undefined,
+    offer: undefined,
+    offerError: undefined,
+    started: undefined,
     ...(await answerQuestion(prev, formData)),
   };
   if (!answered.answered || answered.error) return answered;
 
-  const [after, reading] = await Promise.all([
+  // A new track is offered only when the flow mixes: focused on one track,
+  // running low means that track is nearly done, not that you need another.
+  const [after, reading, offer] = await Promise.all([
     before && subjectId ? loadGraph(supabase, subjectId).catch(() => null) : null,
     readingFor(supabase, prev.conceptId ?? null),
+    focus === null ? createVaultClient().then((vault) => loadTrackOffer(supabase, vault)) : null,
   ]);
   return {
     ...answered,
     ...(before && after ? { track: trackMove(before, after) } : {}),
     ...(reading ? { reading } : {}),
+    ...(offer ? { offer } : {}),
   };
 }
 
@@ -156,5 +213,45 @@ export async function pushReadingAside(formData: FormData): Promise<void> {
     kind: 'reading',
     readingId: readingId.data,
     outcome: 'not_now',
+  });
+}
+
+const OfferAnswer = z.object({
+  themeId: z.string().uuid(),
+  outcome: z.enum(['not_now', 'never']),
+});
+
+/**
+ * Not now or Never, on a new track the flow offered (plan #778).
+ *
+ * Not now holds the theme back for a few weeks; Never stops it being offered
+ * again. Both are kept in `learn.track_offers`, which is also what plan #780
+ * reads to learn which offers you take up. Nothing is revalidated, for the
+ * reason `pushReadingAside` gives: the card hides itself.
+ *
+ * The theme is read back through the session's own client for its name, so an
+ * id from the form that is not one of your themes records nothing.
+ */
+// latency: optimistic
+export async function answerTrackOffer(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const parsed = OfferAnswer.safeParse({
+    themeId: formData.get('themeId'),
+    outcome: formData.get('outcome'),
+  });
+  if (!parsed.success) return;
+
+  const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
+  const [name, strength] = await Promise.all([
+    themeName(vault, parsed.data.themeId),
+    themeStrength(vault, parsed.data.themeId),
+  ]);
+  if (!name) return;
+
+  await recordTrackOffer(supabase, user.id, {
+    themeId: parsed.data.themeId,
+    themeName: name,
+    themeStrength: strength,
+    outcome: parsed.data.outcome,
   });
 }

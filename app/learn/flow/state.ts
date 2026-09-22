@@ -2,6 +2,7 @@ import type { NextQuestion } from '@/lib/learn/flow/ahead';
 import type { NothingToAsk } from '@/lib/learn/graph/pick';
 import type { SettledConcept } from '@/lib/learn/graph/recheck';
 import type { TrackMove } from '@/lib/learn/flow/track';
+import type { TrackOffer } from '@/lib/learn/flow/offer';
 import type { AskState } from '../s/[id]/probe/actions';
 
 /**
@@ -33,7 +34,22 @@ export type FlowState = AskState & {
    * to list as its third kind of row, before the flow took that page over.
    */
   reading?: FlowReading;
+  /**
+   * A new track from a theme in your notes, offered when the flow is running
+   * low (plan #778). Set by the answer in a mixed flow, and by the page when
+   * there is nothing left to ask; never on a question by itself.
+   */
+  offer?: TrackOffer;
+  /** Why pressing Start on the offer did not make a track. */
+  offerError?: string;
+  /**
+   * The track Start just made. Set on the first question from it, so the
+   * screen can say where the question came from.
+   */
+  started?: string;
 };
+
+export type { TrackOffer };
 
 /** A queued reading as the answer panel offers it. */
 export type FlowReading = {

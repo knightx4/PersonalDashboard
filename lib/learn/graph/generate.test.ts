@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { generateChain, type SweptClaim } from './generate';
+import { generateChain, type FromNotes, type SweptClaim } from './generate';
 
 /**
  * What comes back when you name a goal.
@@ -264,5 +264,44 @@ describe('what the opening questions put in front of it', () => {
 
   it('builds the same prompt it always did when nothing was asked', async () => {
     expect(await promptFor(null)).toBe(await promptFor([]));
+  });
+});
+
+describe('a theme from the notes as the goal (plan #778)', () => {
+  async function promptFor(notes: FromNotes | null) {
+    const client = clientReturning(CHAIN);
+    await generateChain({
+      goal: 'Urban design',
+      subject: 'Urban design',
+      existing: [],
+      notes,
+      anthropicApiKey: 'test',
+      client: client as never,
+    });
+    const create = (client as unknown as { messages: { create: ReturnType<typeof vi.fn> } })
+      .messages.create;
+    return create.mock.calls[0][0].messages[0].content as string;
+  }
+
+  const NOTES: FromNotes = {
+    theme: { name: 'Urban design', about: 'How city layout shapes travel.' },
+    positions: [{ name: 'Density shortens trips', statement: 'Denser blocks mean shorter trips.' }],
+  };
+
+  it('passes the theme and what the notes say under it', async () => {
+    const prompt = await promptFor(NOTES);
+
+    expect(prompt).toContain('a theme they write about in their own notes');
+    expect(prompt).toContain('How city layout shapes travel.');
+    expect(prompt).toContain('Density shortens trips: Denser blocks mean shorter trips.');
+    expect(prompt).not.toContain('Goal, in their words');
+  });
+
+  it('says the notes earn no credit', async () => {
+    expect(await promptFor(NOTES)).toContain('propose every claim as something still to learn');
+  });
+
+  it('leaves a typed goal as it was', async () => {
+    expect(await promptFor(null)).toContain('Goal, in their words: Urban design');
   });
 });

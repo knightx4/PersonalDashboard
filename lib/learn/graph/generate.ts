@@ -117,16 +117,55 @@ export type SweptClaim = {
   outcome: 'right' | 'wrong' | 'skipped';
 };
 
+/**
+ * A theme from the vault map, and what the notes under it say, when the goal
+ * is that theme rather than something typed (plan #778).
+ *
+ * The positions go in so the claims are written in the person's own words and
+ * around their own examples, which is the second of the three things
+ * KNOWLEDGE-SPEC.md lets cross from the map into Learn. They earn no credit:
+ * having written a note about something says nothing about knowing it, so
+ * every claim proposed is still something to learn, and the prompt says so.
+ */
+export type FromNotes = {
+  theme: { name: string; about: string };
+  positions: { name: string; statement: string }[];
+};
+
+/**
+ * The opening of the prompt for a theme from the notes. A theme is looser than
+ * a goal anybody would type -- "Emergent systems" -- so the call is told to aim
+ * at what the notes actually argue rather than to refuse it as too broad.
+ */
+function notesLines(notes: FromNotes): string[] {
+  const lines = [
+    `This comes from a theme they write about in their own notes, not from a goal they typed: ${notes.theme.name}. ${notes.theme.about}`,
+    '',
+    'Aim the chain at the most central idea their notes argue under this theme, and name the goal node after it. Do not refuse it as too vague: narrow it to what the notes are about instead.',
+  ];
+  if (notes.positions.length > 0) {
+    lines.push(
+      '',
+      'What their notes say under this theme. Use their vocabulary and their examples when you write the claims. These are things they wrote about, not things they are known to understand: propose every claim as something still to learn.',
+      ...notes.positions.map((position) => `- ${position.name}: ${position.statement}`),
+    );
+  }
+  return lines;
+}
+
 function buildPrompt(input: {
   goal: string;
   subject: string | null;
   existing: ExistingConcept[];
   from?: BranchFrom | null;
   swept?: SweptClaim[] | null;
+  notes?: FromNotes | null;
 }): string {
-  const lines = input.from
-    ? [`They selected this phrase and asked to understand it: ${input.goal}`]
-    : [`Goal, in their words: ${input.goal}`];
+  const lines = input.notes
+    ? notesLines(input.notes)
+    : input.from
+      ? [`They selected this phrase and asked to understand it: ${input.goal}`]
+      : [`Goal, in their words: ${input.goal}`];
 
   if (input.subject) {
     lines.push('', `They are working inside the subject: ${input.subject}`);
@@ -200,6 +239,8 @@ export async function generateChain(input: {
   from?: BranchFrom | null;
   /** The opening questions and how they came out, when they were asked. */
   swept?: SweptClaim[] | null;
+  /** Set when the goal is a theme from the vault map (plan #778). */
+  notes?: FromNotes | null;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
