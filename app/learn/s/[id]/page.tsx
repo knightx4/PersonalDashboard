@@ -184,6 +184,11 @@ export default async function SubjectPage({
               >
                 Probe this
               </Link>
+              {/* The flow limited to this track (plan #779), left again with
+                  All tracks on the flow itself. */}
+              <Link href={`/learn?track=${id}`} className={buttonVariants({ variant: 'primary' })}>
+                Practice this
+              </Link>
             </>
           ) : undefined
         }
