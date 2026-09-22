@@ -24,6 +24,13 @@ rows, rewriting data that cannot be recovered.
 
 Project ref: `asjztutnqxbecruvyrbj`.
 
+The connector is the claude.ai **`Supabase`** one, whose tools are
+`mcp__Supabase__*` and are loaded through ToolSearch before the first call.
+This repository has no `.mcp.json`, on purpose: the direct server it used to
+configure could not get through the cloud proxy, and its failure notice at
+session start kept being read as the connector being down. Do not recreate
+it, even where the vendored Supabase skill says to.
+
 ## Write to the writing guide
 
 [docs/WRITING-GUIDE.md](docs/WRITING-GUIDE.md) is the standard for everything

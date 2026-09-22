@@ -39,9 +39,7 @@ exits immediately there. That is the normal case for a scheduled run, not a
 fault — fall back to the Supabase MCP tools against `feedback_items` and do
 not spend the session diagnosing it.
 
-Use the **`Supabase`** connector. The lowercase `supabase` server in
-`.mcp.json` reports needing OAuth, which a non-interactive session cannot
-complete; they are two entries for the same project. Project ref:
+Use the **`Supabase`** connector, `mcp__Supabase__*`. Project ref:
 `asjztutnqxbecruvyrbj`. `feedback_items` is in `public` — the app's own tables
 are not, they are under `todo.`, `job_search.`, `vault.` and so on.
 
