@@ -4,6 +4,7 @@ import type { JudgePassResult } from '@/lib/learn/catalogue/judge';
 import type { NearbySegment, NearestOutcome } from '@/lib/learn/catalogue/nearest';
 import {
   runCatalogueSearch,
+  runCatalogueSearchIfNew,
   searchCompleted,
   type CatalogueMiss,
   type CatalogueSearchPorts,
@@ -238,5 +239,117 @@ describe('whether a press got an answer out of the catalogue', () => {
     // Retrieval answered, so segments were found; nothing read them. Saying
     // the claim was searched would be saying they were refused.
     expect(searchCompleted('judge-failed')).toBe(false);
+  });
+});
+
+/**
+ * The second press on the same claim.
+ *
+ * #743's answer: search again only when new material has arrived. What is
+ * worth holding still is that a press with nothing to judge reaches neither
+ * outside call and still shows what the last press found, because a skip that
+ * quietly showed nothing would look identical to a catalogue that covers
+ * nothing.
+ *
+ * The search is a port here for that reason. A test that stubbed the result
+ * could only prove what came back; this one proves that the judging call was
+ * never made, which is the thing the step exists for.
+ */
+function repeatPorts(state: { embeddedSince: boolean; linked: boolean }) {
+  const inner = ports(found([segment('segment-1')]), pass({ written: [LINK], judged: 1 }));
+  const counts = { searched: 0, asked: [] as string[] };
+
+  return {
+    get judged() {
+      return inner.judged;
+    },
+    get searched() {
+      return counts.searched;
+    },
+    get asked() {
+      return counts.asked;
+    },
+    async embeddedSince(at: string) {
+      counts.asked.push(at);
+      return state.embeddedSince;
+    },
+    async linked() {
+      return state.linked;
+    },
+    async search() {
+      counts.searched += 1;
+      return runCatalogueSearch(inner, CLAIM);
+    },
+  };
+}
+
+const SEARCHED_AT = '2026-09-01T10:00:00.000Z';
+
+describe('runCatalogueSearchIfNew', () => {
+  it('searches a claim nobody has pressed the button on', async () => {
+    const port = repeatPorts({ embeddedSince: false, linked: false });
+
+    const result = await runCatalogueSearchIfNew(port, null);
+
+    expect(result.skipped).toBe(false);
+    expect(result.covered).toBe(true);
+    expect(port.searched).toBe(1);
+    // Nothing to compare against, so nothing is asked about the catalogue.
+    expect(port.asked).toEqual([]);
+  });
+
+  it('searches again once something has been embedded since the last press', async () => {
+    const port = repeatPorts({ embeddedSince: true, linked: false });
+
+    const result = await runCatalogueSearchIfNew(port, SEARCHED_AT);
+
+    expect(result.skipped).toBe(false);
+    expect(port.searched).toBe(1);
+    expect(port.judged).toBe(1);
+    // The new material is what it can appear from, so the press writes links.
+    expect(result.written).toBe(1);
+    expect(port.asked).toEqual([SEARCHED_AT]);
+  });
+
+  it('makes no judging call when nothing has arrived, and shows what is stored', async () => {
+    const port = repeatPorts({ embeddedSince: false, linked: true });
+
+    const result = await runCatalogueSearchIfNew(port, SEARCHED_AT);
+
+    expect(result.skipped).toBe(true);
+    expect(result.covered).toBe(true);
+    expect(result.missed).toBeNull();
+    expect(port.searched).toBe(0);
+    expect(port.judged).toBe(0);
+  });
+
+  it('spends nothing on a press that skipped, in either ledger', async () => {
+    // What the spend page reads. The press records both of these as they come
+    // back, so empty here is no row there.
+    const port = repeatPorts({ embeddedSince: false, linked: true });
+
+    const result = await runCatalogueSearchIfNew(port, SEARCHED_AT);
+
+    expect(result.embedSpend).toEqual([]);
+    expect(result.judgeSpend).toEqual([]);
+    expect(result.considered).toBe(0);
+  });
+
+  it('misses on a skip over a claim the last search found nothing for', async () => {
+    // The press has somewhere else to go, exactly as it did last time: the
+    // reading is queued and the web search runs.
+    const port = repeatPorts({ embeddedSince: false, linked: false });
+
+    const result = await runCatalogueSearchIfNew(port, SEARCHED_AT);
+
+    expect(result.covered).toBe(false);
+    expect(result.missed).toBe('nothing-new');
+    expect(port.judged).toBe(0);
+  });
+
+  it('does not count a skip as a search, so the claim keeps its search time', async () => {
+    // A skip that moved the time forward would be a claim saying it was
+    // searched at a moment nothing looked at it.
+    expect(searchCompleted('nothing-new')).toBe(false);
   });
 });

@@ -7,7 +7,7 @@ import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import {
   recordClaimSearched,
-  searchCatalogueForClaim,
+  searchCatalogueIfNew,
   searchCompleted,
 } from '@/lib/learn/catalogue/search';
 import { loadGraph, loadSubject } from '@/lib/learn/graph/load';
@@ -40,6 +40,13 @@ import { recordLearnSpend } from '@/lib/learn/spend';
  * a claim nobody has looked for from one that was looked for and had nothing.
  * A press that never reached the catalogue records nothing, which leaves the
  * next press free to try again.
+ *
+ * **Pressed again with nothing new in the catalogue, it makes no call at all.**
+ * #743's answer: the claim's search time is compared against the last time any
+ * segment was embedded, and a press with nothing to judge shows what the last
+ * one found. That press writes no search time and no spend, so the ledger
+ * shows the judging calls of the press that did the work and nothing for the
+ * press that repeated it.
  */
 // latency: pending
 export async function readAboutConcept(formData: FormData): Promise<void> {
@@ -58,11 +65,23 @@ export async function readAboutConcept(formData: FormData): Promise<void> {
   const concept = graph.concepts.find((c) => c.id === conceptId.data);
   if (!subject || !concept) redirect(`/learn/s/${subjectId.data}`);
 
-  const found = await searchCatalogueForClaim(supabase, user.id, {
-    claim: concept.claim,
-    concept: concept.name,
-    target: { concept: concept.id },
-  });
+  // Taken before the search rather than after it. The time written below is
+  // what the next press compares against, so a segment embedded while this
+  // search was running has to read as newer than this press: stamping the
+  // finish would put that segment behind a search that never saw it, and no
+  // later press would look at it again.
+  const pressedAt = new Date();
+
+  const found = await searchCatalogueIfNew(
+    supabase,
+    user.id,
+    {
+      claim: concept.claim,
+      concept: concept.name,
+      target: { concept: concept.id },
+    },
+    { searchedAt: concept.catalogueSearchedAt },
+  );
 
   // Two operations rather than one, because the embedding is cents and the
   // judging is the cost that grows with the catalogue, and a screen that
@@ -77,7 +96,7 @@ export async function readAboutConcept(formData: FormData): Promise<void> {
   // not answer, a write that failed -- look identical from the page, which is
   // the point, and would otherwise leave nobody able to tell a catalogue that
   // covers nothing from a search that never ran.
-  if (!searchCompleted(found.missed)) {
+  if (!found.skipped && !searchCompleted(found.missed)) {
     console.warn(`[learn catalogue] search missed (${found.missed})`, found.detail);
   }
 
@@ -89,8 +108,12 @@ export async function readAboutConcept(formData: FormData): Promise<void> {
   // Only a press that got an answer out of the catalogue writes it. A press
   // that embedded nothing read nothing, and a claim saying it was searched
   // when nothing looked is a page inventing a search.
-  if (searchCompleted(found.missed)) {
-    await recordClaimSearched(supabase, user.id, concept.id);
+  //
+  // A press that skipped wrote nothing and read nothing new, so it leaves both
+  // alone: the links are the ones the last search wrote and the time is the
+  // time that search ran, which is what the next press has to compare against.
+  if (!found.skipped && searchCompleted(found.missed)) {
+    await recordClaimSearched(supabase, user.id, concept.id, pressedAt);
     // Both of the things a completed press changes on the claim page are here:
     // the links it wrote and the time it looked. A press that found nothing
     // still changed what that page says about why, so this is not the covered

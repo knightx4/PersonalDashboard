@@ -102,7 +102,13 @@ async function upsertSegments(
            embedding = case when catalogue_segments.text is distinct from excluded.text
                             then null else catalogue_segments.embedding end,
            embedding_model = case when catalogue_segments.text is distinct from excluded.text
-                                  then null else catalogue_segments.embedding_model end`;
+                                  then null else catalogue_segments.embedding_model end,
+           -- Goes null with the vector, which the check constraint requires and
+           -- the repeat press relies on: the next embedding pass stamps a new
+           -- time, and a rewritten section is offered again to claims searched
+           -- before it changed.
+           embedded_at = case when catalogue_segments.text is distinct from excluded.text
+                              then null else catalogue_segments.embedded_at end`;
 }
 
 async function deleteTrailingSegments(sql: Sql, itemId: string, kept: number): Promise<number> {

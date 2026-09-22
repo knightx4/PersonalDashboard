@@ -153,7 +153,11 @@ export function segmentStore(sql: postgres.Sql): SegmentStore {
       const written = await sql<{ id: string }[]>`
         update learn.catalogue_segments as s
            set embedding = v.embedding::extensions.vector,
-               embedding_model = v.model
+               embedding_model = v.model,
+               -- When this segment became findable, which is what the read
+               -- button compares against the claim's last search to decide
+               -- whether there is anything new to judge.
+               embedded_at = now()
           from unnest(${ids}::uuid[], ${texts}::text[], ${vectors}::text[], ${models}::text[])
                as v(id, text, embedding, model)
          where s.id = v.id and s.text = v.text
