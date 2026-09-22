@@ -22,13 +22,20 @@ import { z } from 'zod';
 export const JOURNAL_FOLDERS = ['Me'] as const;
 
 /**
+ * Folders the person asked the map to leave out, matched as a path prefix so
+ * a nested folder can be named without the rest of its parent. Job
+ * applications are cover letters and forms, not what the person thinks about.
+ */
+export const EXCLUDED_FOLDERS = ['Career/Job Applications'] as const;
+
+/**
  * Strings shaped like an API key. A note carrying one is never sent to a
  * model, since extraction would post the key to an API and could store it in
  * a quote.
  */
 export const CREDENTIAL_PATTERN = /sk-ant-|sk-proj-|ghp_|AKIA[0-9A-Z]{16}/;
 
-export type NotReadReason = 'journal' | 'credential';
+export type NotReadReason = 'journal' | 'excluded' | 'credential';
 
 export type NotRead = { reason: NotReadReason; detail: string };
 
@@ -42,6 +49,10 @@ export function whyNotRead(note: { path: string; body: string }): NotRead | null
   const folder = note.path.split('/')[0];
   if (note.path.includes('/') && (JOURNAL_FOLDERS as readonly string[]).includes(folder)) {
     return { reason: 'journal', detail: `Not read: notes in ${folder}/ are journals.` };
+  }
+  const excluded = EXCLUDED_FOLDERS.find((prefix) => note.path.startsWith(`${prefix}/`));
+  if (excluded) {
+    return { reason: 'excluded', detail: `Not read: ${excluded}/ is left out of the map.` };
   }
   if (CREDENTIAL_PATTERN.test(note.body)) {
     return {

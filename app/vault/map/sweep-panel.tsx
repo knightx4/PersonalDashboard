@@ -20,6 +20,7 @@ const OUTCOME_LINES: { outcome: SweepOutcome; label: string }[] = [
   { outcome: 'record', label: 'judged a record rather than an argument, so only the opening was read' },
   { outcome: 'unchanged', label: 'unchanged since an earlier sweep, so not read again' },
   { outcome: 'journal', label: 'in Me, so never sent' },
+  { outcome: 'excluded', label: 'in Career/Job Applications, so never sent' },
   { outcome: 'credential', label: 'contain what looks like an API key, so never sent' },
   { outcome: 'too_short', label: 'under 80 characters, so never sent' },
   { outcome: 'reading', label: 'being read now' },
@@ -38,11 +39,11 @@ export function SweepPanel({ sweep }: { sweep: SweepView | null }) {
         <p className="mt-1 text-ui text-ink-muted">
           Reads every note in your vault the way a note&rsquo;s Map section does and writes what
           it finds to the map. Notes in Me, notes with API keys and notes under 80 characters are
-          skipped. It runs in the background a few minutes at a time, carries on after you close
+          skipped, and so is Career/Job Applications. It runs in the background a few minutes at a time, carries on after you close
           this page, and can be stopped.
         </p>
         <form action={startSweep} className="mt-3">
-          <Button type="submit">Sweep every note</Button>
+          <Button type="submit">Sweep</Button>
         </form>
       </section>
     );
@@ -132,11 +133,11 @@ export function SweepPanel({ sweep }: { sweep: SweepView | null }) {
             Stop
           </Button>
         ) : sweep.status === 'stopped' ? (
-          <Button type="submit">Resume</Button>
+          <Button type="submit">Sweep</Button>
         ) : (
           <>
             <Button type="submit" variant="secondary">
-              Sweep again
+              Sweep
             </Button>
             <p className="mt-2 text-small text-ink-muted">
               A new sweep sends only the notes that are new, changed or failed since this one.
