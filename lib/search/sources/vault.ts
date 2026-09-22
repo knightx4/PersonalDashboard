@@ -24,23 +24,73 @@ import { escapeLike } from '@/lib/search/sources/map';
  * nothing anybody wrote does.
  */
 
+const COLUMNS = 'id, title, path, updated_at';
+
+type NoteRow = { id: string; title: string | null; path: string; updated_at: string | null };
+
 /** A search, or -- with no query -- every note. */
 type Read = SearchListContext & { query?: string };
+
+/**
+ * Each note once, newest first, no more than the caller asked for.
+ *
+ * The two searching reads each take `limit` rows of their own, so the cap and
+ * the ordering are both applied again here over what they returned together.
+ */
+function newest(rows: NoteRow[], limit: number): NoteRow[] {
+  const seen = new Set<string>();
+  const unique: NoteRow[] = [];
+
+  for (const row of rows) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    unique.push(row);
+  }
+
+  unique.sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
+  return unique.slice(0, limit);
+}
 
 async function read(ctx: Read): Promise<SearchHit[]> {
   const supabase = await createVaultClient();
 
-  let notes = supabase.from('notes').select('id, title, path, updated_at');
+  const search = (column: 'title' | 'path', pattern: string) =>
+    supabase
+      .from('notes')
+      .select(COLUMNS)
+      .ilike(column, pattern)
+      .order('updated_at', { ascending: false })
+      .limit(ctx.limit);
+
+  const rows: NoteRow[] = [];
+
   if (ctx.query) {
+    // One read per column rather than an `or` over both. PostgREST reads a
+    // comma inside an `or` expression as the separator between its two sides,
+    // so a search for a phrase with a comma in it sent a filter that does not
+    // parse and the palette dropped the whole source. `.ilike()` sends the
+    // pattern as its own parameter, where a comma is ordinary text.
     const pattern = `%${escapeLike(ctx.query)}%`;
-    notes = notes.or(`title.ilike.${pattern},path.ilike.${pattern}`);
+    const [byTitle, byPath] = await Promise.all([search('title', pattern), search('path', pattern)]);
+
+    if (byTitle.error) throw new Error(`notes by title: ${byTitle.error.message}`);
+    if (byPath.error) throw new Error(`notes by path: ${byPath.error.message}`);
+
+    rows.push(...((byTitle.data ?? []) as unknown as NoteRow[]));
+    rows.push(...((byPath.data ?? []) as unknown as NoteRow[]));
+  } else {
+    const { data, error } = await supabase
+      .from('notes')
+      .select(COLUMNS)
+      .order('updated_at', { ascending: false })
+      .limit(ctx.limit);
+
+    if (error) throw new Error(`notes: ${error.message}`);
+
+    rows.push(...((data ?? []) as unknown as NoteRow[]));
   }
 
-  const { data, error } = await notes.order('updated_at', { ascending: false }).limit(ctx.limit);
-
-  if (error) throw new Error(`notes: ${error.message}`);
-
-  return ((data ?? []) as { id: string; title: string | null; path: string }[]).map((row) => {
+  return newest(rows, ctx.limit).map((row) => {
     // A note with no frontmatter title is known by its filename, which is
     // what the vault itself shows.
     const name = row.title?.trim() || row.path.split('/').pop() || row.path;

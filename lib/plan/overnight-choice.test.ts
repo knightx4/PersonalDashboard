@@ -3,6 +3,8 @@ import type { PlanDependency, PlanItem } from '@/lib/plan/load';
 import {
   chooseOvernightFeature,
   OVERNIGHT_NOTHING_READY,
+  readyFeatureCount,
+  readyFeaturesLine,
   type OvernightChoice,
 } from '@/lib/plan/overnight-choice';
 import { budgetSpentReason, OVERNIGHT_TIME_UP, type OvernightRun } from '@/lib/plan/overnight';
@@ -34,7 +36,7 @@ function item(over: Partial<PlanItem> & { id: string }): PlanItem {
     thread: [],
     priority: 2,
     size: null,
-    assignee: 'claude',
+    assignee: null,
     commitSha: null,
     position: counter * 10,
     startedAt: null,
@@ -147,11 +149,11 @@ describe('chooseOvernightFeature', () => {
 
     // And the same rule read the other way: every feature the order can reach
     // has a ready step under it, because the order is where features come from.
-    const ready = new Set(workOrder(sections, { assignee: 'claude' }).map((node) => node.id));
+    const ready = new Set(workOrder(sections, { only: 'runner' }).map((node) => node.id));
     expect([...ready]).toEqual(['real-step']);
   });
 
-  it('stops when nothing assigned to Claude is ready', () => {
+  it('stops when nothing the runner can take is ready', () => {
     const sections = tree([
       item({ id: 'yours' }),
       item({ id: 'yours-step', parentId: 'yours', assignee: 'me' }),
@@ -220,5 +222,73 @@ describe('chooseOvernightFeature', () => {
   it('ends its reasons with a full stop, since the report prints them whole', () => {
     expect(OVERNIGHT_NOTHING_READY.endsWith('.')).toBe(true);
     expect(OVERNIGHT_NOTHING_READY.length).toBeLessThanOrEqual(500);
+  });
+});
+
+describe('readyFeatureCount', () => {
+  it('counts the feature once however many ready steps are under it', () => {
+    const sections = tree([
+      item({ id: 'feature' }),
+      item({ id: 'one', parentId: 'feature' }),
+      item({ id: 'two', parentId: 'feature' }),
+      item({ id: 'three', parentId: 'feature' }),
+    ]);
+
+    // Three steps the runner could build, and one feature it would fire for
+    // them -- which is the count the budget is spent in.
+    expect(workOrder(sections, { only: 'runner' })).toHaveLength(3);
+    expect(readyFeatureCount(sections)).toBe(1);
+  });
+
+  it('counts each feature that has something ready under it', () => {
+    const sections = tree([
+      item({ id: 'first' }),
+      item({ id: 'first-step', parentId: 'first' }),
+      item({ id: 'second' }),
+      item({ id: 'second-step', parentId: 'second' }),
+    ]);
+
+    expect(readyFeatureCount(sections)).toBe(2);
+  });
+
+  it('leaves out a feature whose only step waits on an open one', () => {
+    const sections = tree(
+      [
+        item({ id: 'feature' }),
+        item({ id: 'step', parentId: 'feature' }),
+        item({ id: 'other' }),
+        item({ id: 'blocker', parentId: 'other' }),
+      ],
+      [dep('step', 'blocker')],
+    );
+
+    // `other` is still ready through `blocker`; `feature` is not, and the
+    // count is the same one `chooseOvernightFeature` would fire from.
+    expect(readyFeatureCount(sections)).toBe(1);
+    expect(named(chooseOvernightFeature(sections, night(), MIDNIGHT))).toBe('other');
+  });
+
+  it('is zero when nothing is handed to Claude, which is the night that stops early', () => {
+    const sections = tree([
+      item({ id: 'feature', assignee: 'me' }),
+      item({ id: 'step', parentId: 'feature', assignee: 'me' }),
+    ]);
+
+    expect(readyFeatureCount(sections)).toBe(0);
+    expect(chooseOvernightFeature(sections, night(), MIDNIGHT)).toEqual({
+      act: 'end',
+      reason: OVERNIGHT_NOTHING_READY,
+    });
+  });
+});
+
+describe('readyFeaturesLine', () => {
+  it('says the zero as a state rather than as a number with a noun after it', () => {
+    expect(readyFeaturesLine(0)).toBe('no features ready');
+  });
+
+  it('agrees with itself about one and about many', () => {
+    expect(readyFeaturesLine(1)).toBe('1 feature ready');
+    expect(readyFeaturesLine(4)).toBe('4 features ready');
   });
 });

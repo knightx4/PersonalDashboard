@@ -1,17 +1,18 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CornerDownLeft, Palette, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { HIT_KINDS } from '@/lib/search/sources';
-import { ModuleMark } from '@/components/ui/module-mark';
 import { popoverSurface, scrim } from '@/components/ui/popover';
 import { Kbd } from '@/components/shell/key-hints';
+import { SearchRowLine } from '@/components/shell/search-row';
+import { SearchScopeChip } from '@/components/shell/search-scope-chip';
 import {
   searchRowKey,
   useSearchRows,
   type SearchRow,
 } from '@/components/shell/use-search-rows';
+import { scopeForModule, toggleScope, type SearchScope } from '@/lib/search/scope';
 import type { ModuleId } from '@/lib/modules';
 import type { Theme } from '@/lib/theme';
 import type { NavSection } from '@/components/shell/app-shell';
@@ -25,11 +26,25 @@ import type { NavSection } from '@/components/shell/app-shell';
  *
  * What goes in the list, where it comes from and in what order is
  * components/shell/use-search-rows.ts, because the bar across the top of the
- * workspace shows the same rows. This file is the modal: the scrim, the field,
- * the keys that walk the list, and how a row is drawn.
+ * workspace shows the same rows, and how one of them is drawn is
+ * components/shell/search-row.tsx for the same reason. This file is the modal:
+ * the scrim, the field and the keys that walk the list.
  *
- * It searches everything you own, which is what it has always done. The bar is
- * the one that narrows to a workspace.
+ * It searches the workspace the page is in, and everything you own on a page
+ * that is in no workspace. So it opens on that workspace's pages and what you
+ * can start there, and nothing from anywhere else; outside a workspace it
+ * opens on the list it has always opened on. The chip beside the field widens
+ * it to everything you own and narrows it back, the same chip the bar carries
+ * and the same two states.
+ *
+ * Below lg this is the whole of search: the magnifier in the top row opens it
+ * and so does ⌘K (#713). From lg up the field in the top bar is the way in
+ * and the shortcut goes there instead (#662), which leaves this box open to
+ * nothing on a wide window except a press that was made on a narrow one.
+ *
+ * Whether it is open is the shell's, not this file's: the magnifier opens it,
+ * and since #663 the shortcut is listened for there too, because the shell is
+ * the only place that can see both surfaces and pick between them.
  */
 export function CommandPalette({
   account,
@@ -37,6 +52,8 @@ export function CommandPalette({
   sections,
   enabledModules,
   theme,
+  open,
+  onOpenChange,
 }: {
   /** Whose pages these are. The held list is only searched when it is theirs. */
   account: string;
@@ -45,9 +62,22 @@ export function CommandPalette({
   enabledModules?: readonly ModuleId[];
   /** What is on screen now, so a colour can be applied to the mode you are in. */
   theme: Theme;
+  /** Whether the box is up. Held by the shell, so the magnifier can open it. */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  /**
+   * What is being searched, which starts as the workspace the page is in.
+   *
+   * State rather than derived, because the chip changes it. It survives the
+   * box closing and reopening on the same page -- widening it is something
+   * you do about a search, and having to press the chip again on every open
+   * would make it a setting you cannot keep -- and goes back to the workspace
+   * you have landed in when the page changes, which is the rule the bar
+   * follows too.
+   */
+  const [scope, setScope] = useState<SearchScope>(() => scopeForModule(module));
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -55,24 +85,31 @@ export function CommandPalette({
   const { rows, looking, run, reset } = useSearchRows({
     account,
     module,
-    scope: 'everything',
+    scope,
     sections,
     enabledModules,
     theme,
     query,
     active: open,
+    // So an open box with nothing typed in it lists this workspace's pages
+    // and what you can start here.
+    surface: 'box',
   });
 
+  /**
+   * The box follows the page.
+   *
+   * The shell holds it across a navigation, so a scope left pointing at the
+   * workspace you have just left would search somewhere you are not. Arriving
+   * anywhere new puts it back to the workspace you have landed in.
+   */
+  const standingIn = useRef(module);
   useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        setOpen((value) => !value);
-      }
-    }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, []);
+    if (standingIn.current === module) return;
+    standingIn.current = module;
+    setScope(scopeForModule(module));
+    setActive(0);
+  }, [module]);
 
   useEffect(() => {
     if (!open) return;
@@ -80,7 +117,7 @@ export function CommandPalette({
   }, [open]);
 
   function close() {
-    setOpen(false);
+    onOpenChange(false);
     setQuery('');
     setActive(0);
     reset();
@@ -90,6 +127,15 @@ export function CommandPalette({
     if (!row) return;
     close();
     run(row);
+  }
+
+  function pressChip() {
+    setScope((current) => toggleScope(current, module));
+    setActive(0);
+    reset();
+    // The cursor goes back where it was: switching what is being searched is
+    // something you do in the middle of typing, not instead of typing.
+    inputRef.current?.focus();
   }
 
   if (!open) return null;
@@ -144,6 +190,10 @@ export function CommandPalette({
             data-focus-ring="none"
             className="h-12 w-full bg-transparent text-body text-ink outline-none placeholder:text-ink-ghost"
           />
+          {/* The same chip the bar carries, and the same two states. It sits
+              between the field and the keycap because it belongs to the field
+              -- what is being searched -- rather than to the box. */}
+          <SearchScopeChip scope={scope} module={module} onPress={pressChip} />
           {/* The shell's keycap, not a second drawing of one: this was a
               hairline bigger and a step up the type scale from every other
               cap in the app, which is visible the moment the palette opens
@@ -161,41 +211,15 @@ export function CommandPalette({
               {looking ? 'Looking…' : `Nothing matches “${query}”.`}
             </p>
           ) : (
-            rows.map((row, index) => {
-              const key = searchRowKey(row);
-              const label = row.kind === 'command' ? row.command.label : row.hit.title;
-              const hint =
-                row.kind === 'command'
-                  ? row.command.hint
-                  : (row.hit.subtitle ?? HIT_KINDS[row.hit.kind]);
-              const where = row.kind === 'command' ? (row.command.module ?? null) : row.hit.module;
-
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => choose(row)}
-                  onMouseMove={() => setActive(index)}
-                  className={cn(
-                    'flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left transition-colors',
-                    index === active ? 'bg-accent-tint' : 'hover:bg-sunken',
-                  )}
-                >
-                  {row.kind === 'command' && row.command.icon === 'theme' ? (
-                    <Palette className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
-                  ) : (
-                    // The mark of wherever it lives, so which workspace a row
-                    // belongs to is readable without a label.
-                    <ModuleMark module={where} size="sm" />
-                  )}
-                  <span className="min-w-0 flex-1 truncate text-ui font-medium text-ink">{label}</span>
-                  {hint && <span className="shrink-0 truncate text-small text-ink-muted">{hint}</span>}
-                  {index === active && (
-                    <CornerDownLeft className="size-3.5 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
-                  )}
-                </button>
-              );
-            })
+            rows.map((row, index) => (
+              <SearchRowLine
+                key={searchRowKey(row)}
+                row={row}
+                active={index === active}
+                onChoose={() => choose(row)}
+                onPoint={() => setActive(index)}
+              />
+            ))
           )}
 
           {/* Quiet, and below the rows rather than in place of them, so

@@ -77,6 +77,11 @@ export function serverEnv() {
       /** 32 bytes, base64. Deliberately NOT the anon or service key. */
       TOKEN_ENCRYPTION_KEY: z.string().min(1),
       ANTHROPIC_API_KEY: z.string().min(1).optional(),
+      /**
+       * Optional. Voyage, per #724. Without it the Learn catalogue can be
+       * filled but not embedded, so nothing in it can be searched.
+       */
+      EMBEDDING_API_KEY: z.string().min(1).optional(),
       GOOGLE_GMAIL_CLIENT_ID: z.string().min(1).optional(),
       GOOGLE_GMAIL_CLIENT_SECRET: z.string().min(1).optional(),
       /** Optional. Raises Google Books quota above the shared courtesy limit. */

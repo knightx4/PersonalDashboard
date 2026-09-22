@@ -81,24 +81,26 @@ export const DISMISSED_WORD = 'Dismissed';
  *
  * "Needs you" and "Yours" are both you and they are not the same thing. Needs
  * you is a stop: a question to answer, a proposal to approve, a step blocked on
- * a credential -- until you do something, nothing can. Yours is ordinary work
- * in your court that nobody has handed anywhere.
+ * a credential -- until you do something, nothing can. Yours is a step you
+ * marked as yours, which is what holds the runner off it, and it reads the
+ * same whether or not you have started.
  *
  * "Held up" rather than a second "waiting": the shared vocabulary already
  * spends "Waiting on you" on the person, and this one means the opposite --
  * another step is in the way and you are not what it needs.
  *
- * A settled row says nothing at all. It has no next move, and an em dash in
- * the column would be a fact nobody needed on the rows nobody is scanning
+ * Two of these say nothing at all. A settled row has no next move, and an
+ * approved step waiting its turn has nothing happening to it yet. An em dash
+ * in either cell would be a fact nobody needed on the rows nobody is scanning
  * (law 1).
  */
 export const PLAN_MOVE_WORD: Record<PlanMove, string> = {
   resolving: 'Resolving answers',
   on_you: 'Needs you',
   with_dash: 'With Dash',
-  for_dash: 'For Dash',
   waiting: 'Held up',
   yours: 'Yours',
+  none: '',
   settled: '',
 };
 

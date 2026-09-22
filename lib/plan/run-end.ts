@@ -272,33 +272,73 @@ export function isResolvingAnswers(
   now: number,
 ): boolean {
   if (!run || run.job !== 'reshape') return false;
-  return runEnd(run, null, now) === null && run.status === 'started';
+  if (run.status !== 'started') return false;
+  if (now === 0) return true;
+  return (now - new Date(run.createdAt).getTime()) / 60_000 < RESHAPE_UNDERWAY_MINUTES;
+}
+
+/**
+ * How long a re-shape holds its feature before the guard lets go.
+ *
+ * Its own mark rather than `RUN_QUIET_AFTER_MINUTES`, which is two hours. That
+ * number is for a build: a session working a feature can go quiet for a long
+ * stretch and firing a second one at it would be worse than waiting. A
+ * re-shape reads a feature against the answers under it and proposes what they
+ * changed, which takes minutes -- and while the guard holds, the feature
+ * refuses every send, so a re-shape that died takes its feature out of the
+ * night for two hours.
+ *
+ * It did. On 19 September the re-shapes fired at #669 and #656 were still
+ * `started` after nearly two hours, both features refused, and the run stopped
+ * with five others waiting behind them. Thirty minutes is well past what a
+ * re-shape takes and short enough that a dead one costs one feature a few
+ * ticks rather than an evening.
+ */
+export const RESHAPE_UNDERWAY_MINUTES = 30;
+
+/**
+ * Whether a stamp on a step is one that ended the run fired at it.
+ *
+ * A close and a block both say the session finished with that step: it either
+ * did the work or wrote down the question it could not answer, and no more
+ * comes from it either way. A stamp from before the run was fired belongs to
+ * an earlier run and says nothing about this one.
+ *
+ * One function because four readers ask it -- `runEnd` below, `runLiveness`,
+ * the overnight tick and the claim sweep -- and the fourth copy of a date
+ * comparison is the one that drifts.
+ */
+export function endsRun(stamp: string | null | undefined, firedAt: string): boolean {
+  if (!stamp) return false;
+  const at = new Date(stamp).getTime();
+  return Number.isFinite(at) && at >= new Date(firedAt).getTime();
 }
 
 /**
  * What a run that still reads `started` should be written back as, or null
  * while it may still be working.
  *
- * A step closing after the run was fired is the one piece of evidence a
- * session leaves: it was sent at that step, and that step is now closed, so
- * the run did what it was for. Everything else is the clock — past the cutoff
- * with no step closed, nothing has been heard from it and it is not coming
- * back.
+ * A step closing after the run was fired is the evidence a session leaves: it
+ * was sent at that step, and that step is now closed, so the run did what it
+ * was for. A block counts the same from #679: the session stopped at that step
+ * and wrote down what it needs, so nothing more is coming from it either.
+ * Everything else is the clock — past the cutoff with the step neither closed
+ * nor blocked, nothing has been heard from it and it is not coming back.
  *
  * `now` of 0 is the clock's pre-mount value, so nothing ends at that instant.
  */
 export function runEnd(
   run: { status: string; createdAt: string },
-  step: { completedAt: string | null } | null,
+  step: { completedAt: string | null; blockedAt?: string | null } | null,
   now: number,
 ): RunEnd | null {
   if (run.status !== 'started') return null;
   if (now === 0) return null;
 
-  const fired = new Date(run.createdAt).getTime();
-  const closed = step?.completedAt ? new Date(step.completedAt).getTime() : null;
-  if (closed !== null && closed >= fired) return 'finished';
+  if (endsRun(step?.completedAt, run.createdAt)) return 'finished';
+  if (endsRun(step?.blockedAt, run.createdAt)) return 'finished';
 
+  const fired = new Date(run.createdAt).getTime();
   return (now - fired) / 60_000 >= RUN_QUIET_AFTER_MINUTES ? 'failed' : null;
 }
 

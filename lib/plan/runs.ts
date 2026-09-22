@@ -208,16 +208,22 @@ export async function endQuietRuns(input: {
   }>;
   if (started.length === 0) return { ...nothing, error: null };
 
-  // Only the steps these runs name, and only the column that says one closed.
+  // Only the steps these runs name, and only the two columns that say one is
+  // over: it closed, or it stopped to ask a question. #679.
   const stepIds = [...new Set(started.map((row) => row.plan_item_id).filter(Boolean))] as string[];
-  const closedAt = new Map<string, string | null>();
+  type StepStamps = { completedAt: string | null; blockedAt: string | null };
+  const stamps = new Map<string, StepStamps>();
   if (stepIds.length > 0) {
     const { data: steps } = await input.supabase
       .from('plan_items')
-      .select('id, completed_at')
+      .select('id, completed_at, blocked_at')
       .in('id', stepIds);
-    for (const step of (steps ?? []) as Array<{ id: string; completed_at: string | null }>) {
-      closedAt.set(step.id, step.completed_at);
+    for (const step of (steps ?? []) as Array<{
+      id: string;
+      completed_at: string | null;
+      blocked_at: string | null;
+    }>) {
+      stamps.set(step.id, { completedAt: step.completed_at, blockedAt: step.blocked_at });
     }
   }
 
@@ -225,13 +231,12 @@ export async function endQuietRuns(input: {
   const finished: string[] = [];
   const ended: Array<{ id: string; note: string }> = [];
   for (const row of started) {
-    const closed = row.plan_item_id ? (closedAt.get(row.plan_item_id) ?? null) : null;
+    const step = (row.plan_item_id ? stamps.get(row.plan_item_id) : null) ?? {
+      completedAt: null,
+      blockedAt: null,
+    };
     if (!pushes) {
-      const end = runEnd(
-        { status: 'started', createdAt: row.created_at },
-        { completedAt: closed },
-        now,
-      );
+      const end = runEnd({ status: 'started', createdAt: row.created_at }, step, now);
       if (end === 'finished') finished.push(row.id);
       if (end === 'failed') ended.push({ id: row.id, note: runQuietNote(row.created_at, now) });
       continue;
@@ -240,7 +245,8 @@ export async function endQuietRuns(input: {
     const evidence: RunEvidence = {
       startedAt: row.created_at,
       lastPush: lastPushSince(pushes, row.created_at),
-      stepClosedAt: closed,
+      stepClosedAt: step.completedAt,
+      stepBlockedAt: step.blockedAt,
       read: true,
     };
     const liveness = runLiveness(evidence, now);
@@ -393,6 +399,10 @@ export async function readRunLiveness(input: {
       startedAt: run.created_at,
       lastPush: pushError ? null : lastPushSince(pushes, run.created_at),
       stepClosedAt: step.completed_at,
+      // Every step here is `in_progress`, and the trigger clears `blocked_at`
+      // the moment a row stops being blocked, so a claimed step never carries
+      // one. A block under it is the sweep's question, not this one's.
+      stepBlockedAt: null,
       read: !pushError,
     };
     const liveness = runLiveness(evidence, now);

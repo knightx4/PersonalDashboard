@@ -1,4 +1,4 @@
-import { isModuleId, type ModuleId } from '@/lib/modules';
+import { isModuleId, moduleById, type ModuleId } from '@/lib/modules';
 import type { SearchHit } from '@/lib/search/sources';
 
 /**
@@ -34,6 +34,35 @@ export function scopeForModule(module: ModuleId | null): SearchScope {
 }
 
 /**
+ * What the bar's chip says it is searching.
+ *
+ * The workspace's own name, or "Everything" for the whole account. The word
+ * is the chip's whole content, so it has to name the wider setting rather
+ * than describe it: "Everything" is what the person gets when they press it,
+ * and a scope naming a workspace that no longer exists falls back to the same
+ * thing `parseScope` does.
+ */
+export function scopeLabel(scope: SearchScope): string {
+  return scope === 'everything' ? 'Everything' : (moduleById(scope)?.label ?? 'Everything');
+}
+
+/**
+ * What pressing the chip switches to.
+ *
+ * Two states and no more: the workspace the page is in, and everything you
+ * own. `module` is where the page stands, so a bar switched to everything
+ * goes back to the workspace it is sitting in rather than to whichever
+ * workspace it was last narrowed to -- which matters because the chip is in
+ * the top bar of every workspace and the page underneath changes.
+ *
+ * Outside a workspace there is nothing to narrow to, so both states are
+ * `'everything'` and the bar draws no chip at all.
+ */
+export function toggleScope(scope: SearchScope, module: ModuleId | null): SearchScope {
+  return scope === 'everything' ? scopeForModule(module) : 'everything';
+}
+
+/**
  * A scope out of what arrived in a query string.
  *
  * Anything that is not a workspace this app has reads as everything, which is
@@ -44,9 +73,22 @@ export function parseScope(value: string | null | undefined): SearchScope {
   return value && isModuleId(value) ? value : 'everything';
 }
 
+/**
+ * Whether a row belonging to this workspace may appear in a search asked for
+ * this scope.
+ *
+ * The one rule both halves of a search box are narrowed by. A row with no
+ * workspace -- Home, Account, a theme -- is out of every scope but
+ * `'everything'`, which is what #720 settled: with the chip on a workspace the
+ * list is that workspace's rows and nothing else.
+ */
+export function moduleInScope(module: ModuleId | null | undefined, scope: SearchScope): boolean {
+  return scope === 'everything' || module === scope;
+}
+
 /** Whether one hit belongs in a search asked for this scope. */
 export function inScope(hit: SearchHit, scope: SearchScope): boolean {
-  return scope === 'everything' || hit.module === scope;
+  return moduleInScope(hit.module, scope);
 }
 
 /**
@@ -58,5 +100,26 @@ export function inScope(hit: SearchHit, scope: SearchScope): boolean {
  * first would spend the caps in rank.ts on rows about to be dropped.
  */
 export function hitsInScope(hits: readonly SearchHit[], scope: SearchScope): SearchHit[] {
-  return scope === 'everything' ? [...hits] : hits.filter((hit) => hit.module === scope);
+  return scope === 'everything' ? [...hits] : hits.filter((hit) => inScope(hit, scope));
+}
+
+/**
+ * The places to go and the things to start that a scoped search may show.
+ *
+ * The other half of the same list: the sections of the workspace you are in,
+ * Home, the other workspaces, Account, the themes and the capture actions. A
+ * scoped search keeps only the rows of the workspace it names, so a bar
+ * narrowed to one workspace offers no other workspace by name, no page of one
+ * and nothing you could start in one.
+ *
+ * Structural rather than typed to the command, so the shape that carries these
+ * rows can stay in the component that builds them.
+ */
+export function commandsInScope<T extends { module?: ModuleId | null }>(
+  commands: readonly T[],
+  scope: SearchScope,
+): T[] {
+  return scope === 'everything'
+    ? [...commands]
+    : commands.filter((command) => moduleInScope(command.module, scope));
 }

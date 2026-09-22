@@ -16,6 +16,24 @@ describe('issueDocument', () => {
     expect(doc).toContain("kind: 'open'");
   });
 
+  it('caps a fixed-width newsletter against the viewport, not its containing cell', () => {
+    // A percentage cap is measured against the containing block, which for a
+    // newsletter's 600-pixel table is a cell sized by its own contents. The
+    // browser drops a percentage it cannot resolve that way and the table keeps
+    // its 600 pixels, so the cap is written as a length instead.
+    const doc = issueDocument('');
+    expect(doc).toContain('img, table { max-width: calc(100vw - var(--frame-pad) * 2) !important; }');
+    expect(doc).toContain('--frame-pad: 16px');
+    expect(doc).toContain('padding: var(--frame-pad)');
+  });
+
+  it('lets a nested table asking for pixels take the width it fits in', () => {
+    // The two-column layout: a 600-pixel shell holding a pair of 300-pixel
+    // tables. No cap shrinks the shell, because the pair is its contents.
+    const doc = issueDocument('');
+    expect(doc).toContain('table table[width]:not([width$="%"]) { width: auto !important; }');
+  });
+
   it('measures again when a late picture lands', () => {
     const doc = issueDocument('');
     expect(doc).toContain("document.addEventListener('load', measure, true)");

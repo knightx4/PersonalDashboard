@@ -3,13 +3,22 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Settings, X } from 'lucide-react';
+import {
+  Menu,
+  MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Search,
+  Settings,
+  X,
+} from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { FeedbackButton } from '@/components/shell/feedback-button';
 import { NotificationsButton, type Notification } from '@/components/shell/notifications-button';
 import { ThemePicker } from '@/components/shell/theme-picker';
 import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
+import { SearchBar, type SearchBarHandle } from '@/components/shell/search-bar';
 import { CaptureButton, CaptureProvider } from '@/components/shell/capture';
 import { KeyHintsProvider, Kbd } from '@/components/shell/key-hints';
 import { ToastProvider } from '@/components/ui/toast';
@@ -135,6 +144,17 @@ export function AppShell({
   const paneRef = useRef<HTMLDivElement>(null);
   const [drawer, setDrawer] = useState(false);
   const [switcher, setSwitcher] = useState(false);
+  /**
+   * Whether the search box is up.
+   *
+   * Held here rather than inside the box, because below lg there is no field
+   * in the top bar and the magnifier beside the account icons is how search
+   * opens (#701, #703). The shortcut is listened for here too, and below lg it
+   * reaches this same box (#713); see the effect further down.
+   */
+  const [searching, setSearching] = useState(false);
+  /** The field in the top bar, so the shortcut can put the cursor in it. */
+  const searchBar = useRef<SearchBarHandle>(null);
   const [collapsed, setCollapsed] = useState(false);
   const initial = (displayName || email).charAt(0).toUpperCase();
 
@@ -222,6 +242,40 @@ export function AppShell({
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [sections, router]);
+
+  /**
+   * ⌘K goes to the search, whichever search is on screen.
+   *
+   * From lg up that is the field in the top bar: the key puts the cursor in
+   * it and nothing else happens until a character is typed, which is what a
+   * click into the field does too (#662, #717). Below lg there is no field,
+   * so the key opens the box, the same box the magnifier opens (#713). An
+   * open box closes on the key, which is what the shortcut has always done to
+   * it.
+   *
+   * Which surface is decided by asking the bar rather than by restating 1024:
+   * `focus()` reports whether the cursor landed, and below lg the bar's root
+   * is `display: none`, so it cannot. The only statement of the breakpoint
+   * stays the `lg:block` on the bar in the top row.
+   *
+   * It is here rather than in either surface because the shell is the only
+   * place that can see both -- the bar is a child of this file and the box's
+   * open state is held above.
+   */
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'k') return;
+      event.preventDefault();
+      if (searching) {
+        setSearching(false);
+        return;
+      }
+      if (searchBar.current?.focus()) return;
+      setSearching(true);
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [searching]);
 
   const active = sections.find(isActive);
   // The top bar names the page. Falling back to the workspace rather than to
@@ -615,12 +669,14 @@ export function AppShell({
                   {title}
                 </h2>
 
-                {/* The middle of the bar was empty. It now carries the one thing
-                this workspace would say if it could say only one -- read on
-                arrival, not watched. Hidden on a phone, where there is no
-                middle. */}
+                {/* The one thing this workspace would say if it could say only
+                one, in the middle of the bar -- read on arrival, not watched.
+                Only between sm and lg now. From lg up it reads on the status
+                line at the foot of the page instead (#689, #707) and the
+                search bar has this space, and below sm it gets its own line
+                under the bar (#688), further down. */}
                 {brief && (
-                  <p className="hidden min-w-0 flex-1 justify-center truncate px-4 text-center text-ui sm:flex">
+                  <p className="hidden min-w-0 flex-1 justify-center truncate px-4 text-center text-ui sm:flex lg:hidden">
                     {brief.href ? (
                       <Link
                         href={brief.href}
@@ -642,20 +698,65 @@ export function AppShell({
                     )}
                   </p>
                 )}
+                {/* Search, in the top bar of every page from lg up, narrowed to
+                the workspace the page is in. The chip is drawn from `module`,
+                so it names this workspace and goes back to naming it after a
+                move to another one; on Home and the account page `module` is
+                null, there is no chip, and the bar searches everything.
+
+                From lg up ⌘K lands in this field. Below lg there is no field
+                here at all: the magnifier further along this row opens the box
+                instead, and ⌘K opens it too. 1024 is where the column appears,
+                and a field competing with the page title for a phone's width
+                would leave neither of them readable.
+
+                `lg:block` is the only place that width is written down. The
+                shortcut asks this bar whether the cursor landed in it rather
+                than reading the breakpoint again; see the effect above. */}
+                <SearchBar
+                  ref={searchBar}
+                  account={account}
+                  module={module}
+                  sections={sections}
+                  enabledModules={workspaces}
+                  theme={theme}
+                  className="hidden min-w-0 flex-1 lg:block"
+                />
+
                 {/* The gap that puts the account controls in the right corner.
-                From sm up the brief is the flexible middle of the bar and does
-                that job itself, so the spacer stands down. Below sm the brief
-                is `display: none` and takes no part in the layout at all --
-                which is how, on a phone, the theme, notification, feedback and
-                account icons ended up bunched against the page title instead
-                of in the corner. */}
-                <span className={cn('min-w-0 flex-1', brief && 'sm:hidden')} />
+                Between sm and lg the brief is the flexible middle of the bar
+                and does that job itself, so the spacer stands down. Outside
+                that band the brief is `display: none` and takes no part in the
+                layout at all -- which is how, on a phone, the theme,
+                notification, feedback and account icons ended up bunched
+                against the page title instead of in the corner. From lg up the
+                search bar is the flexible middle, on every page and whether or
+                not there is a brief, so the spacer stands down there too. Two
+                items both growing from nothing would split the middle between
+                them, leaving the bar half the width it should have. */}
+                <span className={cn('min-w-0 flex-1', brief && 'sm:hidden', 'lg:hidden')} />
 
                 {/* What is left here belongs to the person, not to the workspace:
                 their theme, their notifications, their feedback, their
                 account. The workspace's own settings moved into its column --
                 see sidebarInner. */}
                 <div className="flex shrink-0 items-center gap-0.5">
+                  {/* Search, below lg, where there is no field in the bar. It
+                  opens the same box the shortcut opens, on the same rows and
+                  the same ranking, with the chip that widens it to everything
+                  you own. From lg up the field is in the bar a few inches to
+                  the left and a second way in beside it would be two controls
+                  for one thing. */}
+                  <button
+                    type="button"
+                    onClick={() => setSearching(true)}
+                    title="Search"
+                    className="press flex size-8 shrink-0 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink lg:hidden"
+                  >
+                    <Search className="size-4" strokeWidth={1.75} aria-hidden />
+                    <span className="sr-only">Search</span>
+                  </button>
+
                   <CaptureButton />
                   <ThemePicker value={theme} />
                   <NotificationsButton notifications={notifications} />
@@ -708,7 +809,10 @@ export function AppShell({
             >
               {children}
             </main>
-            <StatusLine lines={activity} main={mainCheck} />
+            {/* The brief goes down here from lg up, which is exactly the width
+            this line is drawn at, so the two copies above and this one never
+            show at once. */}
+            <StatusLine lines={activity} brief={brief} main={mainCheck} />
 
             <nav
               // Named for what is actually in it: on home and the account page it
@@ -739,6 +843,8 @@ export function AppShell({
             sections={sections}
             enabledModules={workspaces}
             theme={theme}
+            open={searching}
+            onOpenChange={setSearching}
           />
         </div>
       </CaptureProvider>

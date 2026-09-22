@@ -13,3 +13,12 @@
  */
 export { fetchDocument } from './fetch';
 export type { FetchedDocument, FetchFailure, FetchResult } from './fetch';
+
+export {
+  WIKIPEDIA_PROVIDER_SLUG,
+  articleRequestUrl,
+  fetchWikipediaArticle,
+  parseArticleResponse,
+  sectionsFromExtract,
+} from './wikipedia';
+export type { WikipediaArticle, WikipediaFailure, WikipediaResult, WikipediaSection } from './wikipedia';

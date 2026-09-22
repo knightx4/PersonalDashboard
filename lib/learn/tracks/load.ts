@@ -303,59 +303,59 @@ export type TrackListFilter = {
  * Blank or whitespace is no search at all rather than a match on nothing, so
  * clearing the box gives the whole list back.
  *
+ * The tracks come back whole and the search is applied to them here, in
+ * memory. Narrowing them in the query took an `or` expression, and PostgREST
+ * reads a comma inside one as the separator between its two sides, so
+ * searching for "value, price" sent a filter that does not parse and the page
+ * failed. Nothing more comes over the wire for matching here: the read has no
+ * limit and the page draws every track anyway.
+ *
  * Without a search that is one query for the tracks and one for their
  * readings' statuses, rather than a count per track: a personal queue is tens
  * of tracks, and two round trips beat N. The statuses query is not narrowed
  * alongside the tracks -- it is read by track id and the rows a search left out
  * are simply never looked up. A search costs two more reads for the readings it
- * matches, and a fifth for the tracks that only a reading reached, none of
- * which grows with the number of tracks.
+ * matches, neither of which grows with the number of tracks.
  */
 export async function loadTracks(
   supabase: LearnSupabaseClient,
   filter: TrackListFilter = {},
 ): Promise<TrackSummary[]> {
-  let tracksRead = supabase.from('tracks').select(TRACK_COLUMNS);
-
   const search = filter.search?.trim();
-  // Escaped, so a % or a _ somebody typed is the character they typed rather
-  // than "match anything from here".
+  // The readings are still read with `ilike`, so their pattern is escaped: a %
+  // or a _ somebody typed is the character they typed rather than "match
+  // anything from here". The tracks need no escaping, since the substring test
+  // below has no wildcards to confuse.
   const pattern = search ? `%${escapeLike(search)}%` : null;
-  if (pattern) {
-    tracksRead = tracksRead.or(`title.ilike.${pattern},question.ilike.${pattern}`);
-  }
 
   const [{ data, error }, matches] = await Promise.all([
-    tracksRead.order('created_at', { ascending: false }),
+    supabase.from('tracks').select(TRACK_COLUMNS).order('created_at', { ascending: false }),
     pattern ? loadReadingMatches(supabase, pattern) : Promise.resolve([]),
   ]);
 
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw new Error(`Reading your tracks failed: ${error.message}`);
 
-  const found = (data ?? []) as TrackRecord[];
+  const all = (data ?? []) as TrackRecord[];
+
+  // Lower-cased on both sides, which is the `ilike` this replaces for the
+  // strings people actually type. Plain substring: what was typed is what is
+  // looked for, spaces, commas and all.
+  const needle = search?.toLowerCase();
+  const found = needle
+    ? all.filter(
+        (track) =>
+          track.title.toLowerCase().includes(needle) ||
+          (track.question?.toLowerCase().includes(needle) ?? false),
+      )
+    : all;
 
   // The tracks a matching reading is in that the search did not find on its
-  // own. Read by id rather than through the readings: RLS still decides what
-  // comes back, and a track that is gone simply is not in the answer.
+  // own. They are among the rows already read, under the same policies, so
+  // this picks them out rather than asking for them a second time.
   const foundIds = new Set(found.map((track) => track.id));
-  const missing = [...new Set(matches.map((match) => match.trackId))].filter(
-    (id) => !foundIds.has(id),
-  );
-
-  let holders: TrackRecord[] = [];
-  if (missing.length > 0) {
-    const { data: holderRows, error: holderError } = await supabase
-      .from('tracks')
-      .select(TRACK_COLUMNS)
-      .in('id', missing);
-
-    assertSchemaExposed(holderError, LEARN_SCHEMA);
-    if (holderError) {
-      throw new Error(`Reading the tracks those readings are in failed: ${holderError.message}`);
-    }
-    holders = (holderRows ?? []) as TrackRecord[];
-  }
+  const holding = new Set(matches.map((match) => match.trackId));
+  const holders = all.filter((track) => holding.has(track.id) && !foundIds.has(track.id));
 
   const merged = mergeTrackMatches(
     [...found, ...holders].map((track) => ({

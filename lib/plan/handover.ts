@@ -207,21 +207,27 @@ export async function handStepToClaude(input: {
     });
   }
 
-  // Handed over and underway, in the one write. A step sent to Claude is being
-  // built from the moment the routine wakes, and a plan still reading "not
-  // started" while a session works it is the plan lying about itself -- the one
-  // thing it is not allowed to do. `started_at` comes from the trigger, so the
-  // page can also say how long it has been going.
-  const patch: Record<string, string> = {};
-  if (node.assignee !== 'claude') patch.assignee = 'claude';
+  // Underway, and nothing else. A step sent to Claude is being built from the
+  // moment the routine wakes, and a plan still reading "not started" while a
+  // session works it is the plan lying about itself -- the one thing it is not
+  // allowed to do. `started_at` comes from the trigger, so the page can also
+  // say how long it has been going.
+  //
+  // The assignee is left as it was. Writing 'claude' here stopped being a
+  // hand-over when the runner started working from what you approved (#672),
+  // and what was left of it was keeping the claim sweep off the claim this
+  // press had just made: a claim with no assignee read as one nobody held.
+  // #712 settled that the sweep reads the run behind the claim instead, so
+  // both halves come out and a step you marked as yours is still yours after
+  // you press Send.
+  //
   // Only a step nobody has started moves. A blocked one keeps its status and
   // its reason, and one already underway keeps the clock it started on.
-  if (node.status === 'not_started') patch.status = 'in_progress';
-  const changed = Object.keys(patch).length > 0;
+  const changed = node.status === 'not_started';
   if (changed) {
     const { error } = await supabase
       .from('plan_items')
-      .update(patch)
+      .update({ status: 'in_progress' })
       .eq('id', node.id)
       .eq('user_id', userId);
     if (error) return { ok: false, error: error.message };
@@ -238,7 +244,7 @@ export async function handStepToClaude(input: {
       '.claude/skills/plan/reference/building.md. The brief is below; it is the plan as the ' +
       'app holds it right now, and the plan is the source of truth -- claim the step, build ' +
       'it, verify, commit with the step number in the subject, and close it with a note. ' +
-      'Push when it is closed.\n\n' +
+      'Merge it to main when it is closed.\n\n' +
       planBrief(sections, node, { thread: true, liveness })
     : `Build plan step #${node.number}, "${node.title}", and the steps beneath it, following ` +
       '.claude/skills/plan/SKILL.md -- the Building section, which has more than one step to ' +
@@ -262,7 +268,7 @@ export async function handStepToClaude(input: {
     number: node.number,
     title: node.title,
     // The brief carries the step's whole subtree under "## Steps", so sending
-    // a higher-level row hands over rather more than the row that was clicked.
+    // a higher-level row sends rather more than the row that was clicked.
     beneath: flatten([node]).length - 1,
     detail: result.detail,
     changed,
@@ -279,8 +285,6 @@ export type FeatureHandOver =
       steps: number;
       /** What the routine said when it started. */
       detail: string;
-      /** Whether any row changed, so the page needs redrawing. */
-      changed: boolean;
     }
   | {
       ok: false;
@@ -303,13 +307,13 @@ export type FeatureHandOver =
     };
 
 /**
- * Hand a whole feature over and start the routine on it now.
+ * Start the routine on a whole feature, now.
  *
  * The press on the plan page and the overnight tick both do this, and they
- * have to do it identically: the same refusals, the same cascade, and above
- * all the same instruction, because a second copy of that paragraph is a
- * second thing to keep in step and the first one to drift is the one nobody
- * is watching at three in the morning. So the whole thing is here and both
+ * have to do it identically: the same refusals and, above all, the same
+ * instruction, because a second copy of that paragraph is a second thing to
+ * keep in step and the first one to drift is the one nobody is watching at
+ * three in the morning. So the whole thing is here and both
  * callers ask for it; the page turns the answer into a sentence for the
  * toast, and the tick turns it into a log line and a number off the budget.
  *
@@ -347,8 +351,8 @@ export async function handFeatureToClaude(input: {
   const now = input.now ?? Date.now();
 
   // The same refusal as the single send, and more clearly right here: the
-  // batch hands over every open step under a feature a re-shape is in the
-  // middle of rewriting.
+  // batch sends a session at every open step under a feature a re-shape is in
+  // the middle of rewriting.
   if (await reshapeUnderway(supabase, userId, node.id, now)) {
     return {
       ok: false,
@@ -397,21 +401,17 @@ export async function handFeatureToClaude(input: {
     };
   }
 
-  const toHandOver = open.filter((step) => step.assignee !== 'claude').map((step) => step.id);
-  let changed = false;
-  if (toHandOver.length > 0) {
-    const { error } = await supabase
-      .from('plan_items')
-      .update({ assignee: 'claude' })
-      .in('id', toHandOver)
-      .eq('user_id', userId);
-    if (error) return { ok: false, error: error.message };
-    changed = true;
-  }
-
-  // Handed over, and that is all. Nothing here is marked underway.
+  // A session is started on the feature and not one row is written. Nothing is
+  // handed over and nothing is marked underway.
   //
-  // This used to set every open step in the feature to `in_progress` on the
+  // The press used to set `assignee` to 'claude' on every open step beneath
+  // the feature, because that column was what the runner and the queue read to
+  // find work. #670 settled that they read what you have approved instead, and
+  // that the column records only the steps you kept for yourself, so the
+  // cascade had nothing left to say and would have written over the one mark
+  // that still means something.
+  //
+  // It also used to set every open step in the feature to `in_progress` on the
   // press, so that the plan showed the batch as work in hand. What it actually
   // showed was six lies and one truth: the session works the steps one at a
   // time, and everything it had not reached yet -- everything it never reached,
@@ -422,17 +422,16 @@ export async function handFeatureToClaude(input: {
   // `in_progress` now means one thing: a session has claimed this step and is
   // on it. The session sets it when it claims, one at a time, and clears it
   // when it closes the step -- which is what the plan skill already tells it to
-  // do. "Handed to Claude" is a separate fact and has its own state:
-  // `assignee`, set above, which is exactly what this press changes and what
-  // the queue is built from.
+  // do.
   const text =
     `Work plan feature #${node.number}, "${node.title}", to completion, following ` +
     '.claude/skills/plan/SKILL.md. This is a batch, so it is orchestrated: send each step ' +
     'to its own subagent, in the order the plan gives, and do not read the steps\' source ' +
     'files or make the edits yourself. Keep the carry-forward between them. Stop at the ' +
     'first step that needs a decision from me: block it with the exact question rather ' +
-    'than guessing, and do not skip past it to a later step that depends on it. Run the ' +
-    'gate once at the end, push once, and report every step you closed, by number and ' +
+    'than guessing, and do not skip past it to a later step that depends on it. Merge ' +
+    'each step to main as it closes, before you send the next one. The Building section ' +
+    'says how. Report every step you closed, by number and ' +
     'title.\n\nThe brief is below; it is the plan as the app holds it right now, and ' +
     'the plan is the source of truth.\n\n' +
     planBrief(sections, node, { thread: true, liveness });
@@ -453,6 +452,5 @@ export async function handFeatureToClaude(input: {
     title: node.title,
     steps: open.length - 1,
     detail: result.detail,
-    changed,
   };
 }

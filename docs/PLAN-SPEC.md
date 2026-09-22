@@ -52,7 +52,7 @@ beside them.
 | `comment` | Your own note on it: why it stalled, what changed. The CLI appends a dated line when it closes or blocks a step. |
 | `priority` | 1 next, 2 normal, 3 someday — the same three the notes queue uses. |
 | `size` | `s`, `m` or `l`. Coarse on purpose: "one sitting or not", not hours. |
-| `assignee` | `me` or `claude`. A step handed to Claude is one a routine may pick up on its own. |
+| `assignee` | `me`, or nothing at all. `me` is a step you kept for yourself; every other approved step is one a routine may pick up on its own, which is what approving it did. Nothing can set it to anything else since #718: the page offers Me and Nobody, `plan.ts assign` takes `me` and `none`, and the rows a hand-over wrote still hold `claude`, which `planItemFromRow` reads back as nobody's. |
 | `commit_sha` | The commit that shipped it. |
 | `position` | Order among siblings. Sparse; re-dealt in tens when a step is moved. |
 | `started_at`, `completed_at` | Kept by a trigger from the status. Done and dropped both count as finished; a reopened step loses its completion time. |
@@ -169,7 +169,7 @@ what to end the night with when it may not.
 The chooser is `chooseOvernightFeature` in `lib/plan/overnight-choice.ts`: the
 row's verdict and the plan tree composed into one answer, either the feature to
 fire or the sentence to stop on. It picks what a person would — the first row
-of `workOrder(sections, { assignee: 'claude' })`, and the top-level feature
+of `workOrder(sections, { only: 'runner' })`, and the top-level feature
 above it — so a feature it names always has a ready step beneath it, and
 nothing about blocked, waiting or unapproved work is restated here. Still being
 built around it: the tick route, the schedule, the page control and the report.
@@ -203,7 +203,7 @@ afternoon a session loses.
 surface reads through that: the health on the row, the Ready and Waiting views,
 the counts on the summary strip, a feature's roll-up, "On you", and the Send
 button's refusal. A `steps` block whose named steps have all closed reports the
-step it now is -- ready, or not started -- and is handed over like any other. An
+step it now is -- ready, or not started -- and the runner takes it like any other. An
 `outside` block reports `blocked` on all of them however much else closes, and
 Send refuses it until the person moves it.
 
@@ -224,8 +224,8 @@ the code. So the shaping is Claude's job and the approving is the person's.
    waiting. Three cheap moves are the whole review: drop a step, reorder or
    reprioritise, and **Approve** — the first choice in a proposal's health
    menu, which moves the step and every proposed step beneath it to not
-   started in one click. Handing a step to Claude is the fourth move, and
-   the one that makes the routine pick it up.
+   started in one click. Approving is also what puts the step in front of the
+   runner: there is no separate hand-over.
 4. From there the building loop applies. The idea's button has become the
    link "in the plan as #n".
 
@@ -311,8 +311,8 @@ as being further along than it is.
 
 **Never answered by a session.** `workOrder` withholds a decision from
 `--claude` however it is assigned, `scripts/plan.ts start` refuses one and
-says where it is answered instead, `add` withholds `--claude` from one, and
-the skill says it twice. The guarantee is worth the four locks: a routine
+says where it is answered instead, and the skill says it twice. The guarantee
+is worth the three locks: a routine
 that can answer its own questions has no questions, only guesses with a paper
 trail. The cost is real and accepted — a decision nobody answers stalls
 everything that depends on it until the person looks at the page.
@@ -474,11 +474,12 @@ The plan routine's standing prompt is the frame; the turn a button appends
 says what this firing is for, and wins:
 
 - ***Send to Claude*** on a step — build that one step, then stop.
-- ***Send all n beneath*** on a feature — every open step under it becomes
-  Claude's, the way approving cascades, and one session works them in plan
-  order, each verified, committed and closed before the next is claimed. It
-  stops at the first step that needs a decision, blocking it with the question
-  rather than skipping to a later one. Push and merge happen once, at the end.
+- ***Send all n beneath*** on a feature — one session works every open step
+  under it in plan order, each verified, committed and closed before the next
+  is claimed. It stops at the first step that needs a decision, blocking it
+  with the question rather than skipping to a later one. Push and merge happen
+  once, at the end. The press writes no row: it starts the session and nothing
+  else, because approving is what the runner reads now (#672).
 - ***Shape into a plan*** on an idea — write the proposal and nothing else.
 
 The batch button is the one to think twice about. There is no review point
@@ -501,10 +502,11 @@ the other half: a stage of the daily cron that writes those rows back to
 it the reading is only on the page, and the CLI, the brief and the next session
 all still take the status at its word.
 
-A claim is taken back for one of two reasons, both in `lib/plan/claims.ts`:
-nothing has touched it for two hours, or it has no assignee at all. The second
-is why both the page's status control and `plan.ts start` now name who holds a
-step they mark underway — a claim nobody is on is one nothing is working.
+A claim is taken back for one reason, in `lib/plan/claims.ts`: nothing has
+touched it for two hours. There was a second until #714 — a claim with no
+assignee read as one nothing was working — and it is what made the Send button
+and `plan.ts start` write who held a step they marked underway. Both writes are
+gone, and the run behind the claim is what the sweep reads instead.
 
 Two hours is a threshold and not evidence, and a long batch is called stale
 while it is still going. So the claim is read off the run behind it instead.
@@ -618,7 +620,7 @@ decision is ready for the person, not for a session.
 
 **Views.** `?view=` narrows the page to `open` (the default), `you`, `ready`,
 `proposed`, `blocked` (blocked by hand or waiting on another), `claude`
-(open steps handed to Claude), `fog`, `dismissed` or `all`. A step that does
+(approved steps you did not keep for yourself), `fog`, `dismissed` or `all`. A step that does
 not match stays, dimmed, when something beneath it does, so a ready sub-step is
 seen in its place. A dismissed step is the one thing `all` does not show:
 `dismissed` is where it is, and hiding it everywhere else is what dismissing it
@@ -684,12 +686,12 @@ typecheck at each surface rather than drawing itself as a proposal, and
 
 Each module is a section with its progress bar. Each step is a line: the
 status picker (one click changes it), the number, the title, and the facts
-that matter — *Next* or *Someday*, the size, *Claude*, *Ready*, *Waits on
+that matter — *Next* or *Someday*, the size, *Yours*, *Ready*, *Waits on
 #n*, and *done/live steps* on a feature. The chevron folds the sub-steps,
 closed by default on a finished step. The title opens the detail: what it
 involves, done when, your note, what it waits on and unblocks, dates, the
-commit, and the actions — edit, add a sub-step, hand to Claude, send to
-Claude. The menu on the line adds a sub-step, edits, moves the step up or
+commit, and the actions — edit, add a sub-step, mark it yours or give it
+back, send to Claude. The menu on the line adds a sub-step, edits, moves the step up or
 down among its siblings, or deletes it with its count of sub-steps in the
 confirm.
 
@@ -780,7 +782,7 @@ list [--all]        the tree, per module
 show <n>            the brief
 ideas               ideas not yet shaped into the plan, dismissals left out
 idea "…" [--module <id>] [--from <n>]   a follow-on, filed as a suggestion
-add "…" --parent <n> [--done-when "…"] [--size s|m|l] [--claude] [--proposed] [--idea <id>]
+add "…" --parent <n> [--done-when "…"] [--size s|m|l] [--proposed] [--idea <id>]
                     [--fog "…"] [--kind decision|setup]
 needs "…" --for <n> [--detail "…"]   a setup job of the person's, and the edge to it
 approve <n>         a person's move: the step and the proposed steps beneath it
@@ -800,7 +802,7 @@ specified*, what it waits on (its own and inherited), its sub-steps as a
 checklist, what it unblocks, the note. A decision leads with its question
 instead. It is what `show` prints and what *Send to Claude* sends.
 
-**Send to Claude.** The button on a step marks it Claude's and fires the
+**Send to Claude.** The button on a step fires the
 same routine the notes queue uses (`fireFeatureRoutine`, with
 `CLAUDE_API_KEY` and optionally `CLAUDE_FEATURE_ROUTINE_ID` on the
 deployment), with the brief as the extra turn. The session that wakes up is
@@ -846,8 +848,8 @@ the first through every turn of the last, and runs out of room around the
 third. The subagents also skip the full test suite and `next build` — the
 orchestrator runs both once before it pushes, and CI runs them again on main.
 
-A step assigned to Claude is Claude's to pick up; a step named by the user is
-Claude's whoever holds it; anything else, ask. The plan must always tell the
+An approved step you did not keep is Claude's to pick up; a step named by the
+user is Claude's whoever holds it; anything else, ask. The plan must always tell the
 truth: a step that cannot be finished is blocked with the question, never left
 in progress and never closed to look tidy.
 

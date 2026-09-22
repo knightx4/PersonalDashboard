@@ -52,7 +52,7 @@ function item(over: Partial<PlanItem> & { id: string }): PlanItem {
     thread: [],
     priority: 2,
     size: null,
-    assignee: 'claude',
+    assignee: null,
     commitSha: null,
     position: counter * 10,
     startedAt: null,
@@ -230,6 +230,33 @@ describe('overnightTick', () => {
     expect(calls.stopped).toEqual([]);
   });
 
+  it('offers a feature again on a new run, however the last one went', async () => {
+    // The zero-progress guard belongs inside one run. Read over all time it
+    // takes a feature out of every night that follows: #532 was excluded from
+    // 18 September onwards by a session that died before claiming its step,
+    // while still handed to Claude and still ready.
+    const { ports: p, calls } = ports({
+      loadRun: async () => night({ startedAt: '2026-09-17T23:00:00.000Z' }),
+      lastFiredAt: async () => ({ feature: YESTERDAY }),
+    });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired' });
+    expect(calls.fired).toEqual([{ feature: 'feature', step: 'step' }]);
+  });
+
+  it('still passes over a feature this run already tried without a close', async () => {
+    const { ports: p, calls } = ports({
+      loadRun: async () => night({ startedAt: '2026-09-17T23:00:00.000Z' }),
+      lastFiredAt: async () => ({ feature: '2026-09-17T23:30:00.000Z' }),
+    });
+
+    const tick = await overnightTick(p);
+
+    expect(tick.act).toBe('nothing-ready');
+    expect(calls.fired).toEqual([]);
+    expect(calls.stopped).toEqual([]);
+  });
+
   it('fires a run with no cap without counting anything down', async () => {
     const { ports: p, calls } = ports({
       loadRun: async () => night({ featuresBudget: null, featuresLeft: null, stopBy: null }),
@@ -271,9 +298,11 @@ describe('overnightTick', () => {
       });
 
       await expect(overnightTick(p)).resolves.toEqual({ act: 'waiting', liveness });
-      // Not even the tree, and not the claims either: a tick that cannot fire
-      // has nothing to choose from and nothing to clear the way for.
-      expect(calls).toMatchObject({ sections: 0, swept: 0, fired: [], recorded: [], stopped: [] });
+      // The tree is not read: there is nothing to choose from while the last
+      // session is still going. The claims are still swept, because the ones
+      // that go stale belong to other sessions under other features and the
+      // night spends most of its ticks here.
+      expect(calls).toMatchObject({ sections: 0, swept: 1, fired: [], recorded: [], stopped: [] });
     }
   });
 
@@ -285,6 +314,7 @@ describe('overnightTick', () => {
 
     await expect(overnightTick(p)).resolves.toEqual({ act: 'waiting', liveness: 'unknown' });
     expect(calls.fired).toEqual([]);
+    expect(calls.swept).toBe(1);
   });
 
   it('fires the next one once the last run is over', async () => {
@@ -422,7 +452,7 @@ describe('overnightTick', () => {
     expect(calls.stopped).toEqual([]);
   });
 
-  it('ends the night naming every feature that refused', async () => {
+  it('keeps the night running, naming every feature that refused', async () => {
     const sections = tree(twoFeatures());
     const first = findNode(sections, 'first')!;
     const second = findNode(sections, 'second')!;
@@ -438,14 +468,19 @@ describe('overnightTick', () => {
       }),
     });
 
-    const ended = await overnightTick(p);
+    const tick = await overnightTick(p);
 
-    expect(ended.act).toBe('ended');
-    const reason = ended.act === 'ended' ? ended.reason : '';
+    // A refusal is a reading of one instant like any other. Two of the three
+    // reasons a send refuses -- a re-shape rewriting the feature, a claim still
+    // live beneath it -- clear themselves with nobody watching, and on
+    // 19 September a run with no limit stopped twenty-one minutes in because
+    // two features refused for a re-shape that had died.
+    expect(tick.act).toBe('nothing-ready');
+    const reason = tick.act === 'nothing-ready' ? tick.reason : '';
     expect(reason).toContain(`#${first.number} is only a proposal.`);
     // The refusal that names no feature gets the number put in front of it.
     expect(reason).toContain(`#${second.number}: Nothing open under that step`);
-    expect(calls.stopped).toEqual([reason]);
+    expect(calls.stopped).toEqual([]);
     expect(calls.recorded).toEqual([]);
   });
 
@@ -454,7 +489,9 @@ describe('overnightTick', () => {
     const first = findNode(sections, 'first')!;
     const { ports: p } = ports({
       loadSections: async () => sections,
-      lastFiredAt: async () => ({ second: YESTERDAY }),
+      // Inside this run's window, so the guard passes it over. A fire from
+      // before the run started is another run's business.
+      lastFiredAt: async () => ({ second: '2026-09-17T23:30:00.000Z' }),
       fire: async () => ({
         ok: false,
         refused: true,
@@ -462,8 +499,8 @@ describe('overnightTick', () => {
       }),
     });
 
-    const ended = await overnightTick(p);
-    const reason = ended.act === 'ended' ? ended.reason : '';
+    const tick = await overnightTick(p);
+    const reason = tick.act === 'nothing-ready' ? tick.reason : '';
 
     // "Every feature left refused" would not be true: one was never offered.
     expect(reason).toContain('what had not already been tried');

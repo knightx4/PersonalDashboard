@@ -3,10 +3,8 @@
 import { useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  Bot,
   Check,
   Circle,
-  CircleAlert,
   CircleUser,
   Flag,
   ChevronDown,
@@ -32,7 +30,6 @@ import {
   dismissPlanDecision,
   dismissPlanFog,
   sendPlanItemToClaude,
-  sendPlanQueueToClaude,
   setPlanItemAssignee,
   setPlanItemPriority,
   setPlanItemStatus,
@@ -106,27 +103,15 @@ import {
 import { PLAN_HEALTH_GLYPHS, type StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { reshapeOrigin } from '@/lib/plan/origin';
 import type { PlanRefTitles } from '@/lib/comments/refs';
-import { elapsedSince } from '@/lib/plan/elapsed';
-import { quietSendAsk, type ClaimLiveness } from '@/lib/plan/liveness';
+import { quietSendAsk } from '@/lib/plan/liveness';
 import {
   isResolvingAnswers,
-  lastRunLine,
   withReadings,
   type LastRun,
   type StoredRunReading,
 } from '@/lib/plan/run-end';
-import {
-  closedLine,
-  nothingToShowLine,
-  pushLine,
-  raisedLine,
-  refusalLine,
-  runStartedLine,
-  runWork,
-  workIsEmpty,
-  type RunRaise,
-} from '@/lib/plan/work';
-import { checkLine, checkWord, type CommitCheck } from '@/lib/plan/checks';
+import { type RunRaise } from '@/lib/plan/work';
+import { checkLine, type CommitCheck } from '@/lib/plan/checks';
 import {
   AnswerBox,
   QuestionPartLabel,
@@ -135,6 +120,16 @@ import {
   TheQuestion,
   useAnswerDraft,
 } from '@/components/dev/question';
+import {
+  CheckMark,
+  LastRunLine,
+  RowIconButton,
+  RunWork,
+  RunningFor,
+  Underway,
+  when,
+} from './plan-run-status';
+import { catalogLabel, subtreeOf, type PlanCatalogEntry } from './plan-catalog';
 import { cn } from '@/lib/cn';
 
 /**
@@ -144,17 +139,6 @@ import { cn } from '@/lib/cn';
  * tree a row is drawn from is narrowed by the view, so the step a run closed
  * is often not in it, while the catalog is every step in the plan.
  */
-export type PlanCatalogEntry = {
-  id: string;
-  number: number;
-  title: string;
-  module: ModuleId | null;
-  parentId: string | null;
-  depth: number;
-  status: PlanStatus;
-  completedAt: string | null;
-  closed: boolean;
-};
 
 const STATUS_LABEL: Record<PlanStatus, string> = {
   proposed: 'Proposed',
@@ -166,7 +150,7 @@ const STATUS_LABEL: Record<PlanStatus, string> = {
 };
 
 const SIZE_LABEL: Record<PlanSize, string> = { s: 'Small', m: 'Medium', l: 'Large' };
-const ASSIGNEE_LABEL: Record<PlanAssignee, string> = { me: 'Me', claude: 'Dash' };
+const ASSIGNEE_LABEL: Record<PlanAssignee, string> = { me: 'Me' };
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -333,52 +317,6 @@ const chipOn = 'bg-accent text-surface';
 const chipOff = 'text-ink-muted hover:bg-accent-tint hover:text-accent';
 
 /**
- * The numbers across the plan, and the views over it.
- *
- * The counts are links where a view answers them: "3 ready" is the question
- * "which three", and the view is the answer. The views are search parameters
- * rather than state so that "the ready steps" is something you can keep.
- */
-/**
- * The queue, sent.
- *
- * Beside the count of what is Claude's, because that number is the question
- * this button answers: you have spent a while going down the plan handing
- * things over, and what you want at the end of it is not to press Send on each
- * of them. Absent when nothing is handed over, since there would be nothing to
- * send and an always-present button that usually refuses teaches people not to
- * press it.
- */
-function SendTheQueue({ count }: { count: number }) {
-  const [state, action, pending] = useActionState(sendPlanQueueToClaude, {} as PlanActionState);
-
-  if (count === 0) return null;
-
-  return (
-    <>
-      <form action={action}>
-        <Button
-          type="submit"
-          size="sm"
-          variant="secondary"
-          pending={pending}
-          title="Hand the whole queue to one routine, worked in order"
-        >
-          <Play className="size-3.5" aria-hidden />
-          {pending ? 'Sending…' : `Send all ${count} to Dash`}
-        </Button>
-      </form>
-      {(state.error ?? state.message) && (
-        <p className="basis-full text-small">
-          <FieldError>{state.error}</FieldError>
-          {!state.error && <span className="text-ink-muted">{state.message}</span>}
-        </p>
-      )}
-    </>
-  );
-}
-
-/**
  * What a narrowed view says when it finds nothing.
  *
  * Empty is the good state for most of these, so each one says what it means
@@ -409,7 +347,8 @@ const EMPTY_VIEW: Partial<Record<View, { title: string; description: string }>> 
   },
   claude: {
     title: "Nothing of Dash's right now",
-    description: 'Hand a step to Dash from its menu, or send one straight to the routine.',
+    description:
+      'A step appears here once you approve it and leave it unmarked as yours, with nothing blocking it. You can also send one straight to the routine.',
   },
   you: {
     title: 'Nothing waiting on you',
@@ -418,16 +357,19 @@ const EMPTY_VIEW: Partial<Record<View, { title: string; description: string }>> 
   },
 };
 
+/**
+ * The numbers across the plan, and the views over it.
+ *
+ * The counts are links where a view answers them: "3 ready" is the question
+ * "which three", and the view is the answer. The views are search parameters
+ * rather than state so that "the ready steps" is something you can keep.
+ */
 function SummaryStrip({
   summary,
   view,
-  queued,
 }: {
   summary: PlanSummary;
   view: View;
-  /** What the send-all button would actually send: not every step marked as
-      Claude's, since an unanswered question is nobody's to build. */
-  queued: number;
 }) {
   const facts: Array<{ view: View | null; value: number; noun: string }> = [
     { view: 'open', value: summary.open, noun: 'open' },
@@ -466,7 +408,6 @@ function SummaryStrip({
           ),
         )}
       </p>
-      <SendTheQueue count={queued} />
       <nav aria-label="View" className="ml-auto flex flex-wrap items-center gap-1">
         {PLAN_VIEW_CHIPS.map((candidate) => (
           <Link
@@ -527,24 +468,7 @@ function useSettled(state: PlanActionState, onSettle: () => void) {
 }
 
 /** The steps in the catalog beneath one, itself included: what it cannot move under or wait on. */
-function subtreeOf(catalog: readonly PlanCatalogEntry[], id: string): Set<string> {
-  const ids = new Set([id]);
-  let grew = true;
-  while (grew) {
-    grew = false;
-    for (const entry of catalog) {
-      if (entry.parentId && ids.has(entry.parentId) && !ids.has(entry.id)) {
-        ids.add(entry.id);
-        grew = true;
-      }
-    }
-  }
-  return ids;
-}
 
-function catalogLabel(entry: PlanCatalogEntry): string {
-  return `${'· '.repeat(entry.depth)}#${entry.number} ${entry.title}`;
-}
 
 /**
  * The fields every step has, for the add and the edit form alike.
@@ -1289,10 +1213,10 @@ function Dependencies({
 }
 
 /**
- * What pressing Send actually hands over, said before it is pressed.
+ * What pressing Send actually sends, said before it is pressed.
  *
  * The brief carries the step's whole subtree under "## Steps", so Send on a
- * feature hands over the feature and everything beneath it. The button read
+ * feature sends the feature and everything beneath it. The button read
  * "Send to Claude" whichever row it sat on, so pressing it on #197 looked like
  * sending one step and sent ten. The action already says so afterwards; this
  * is the same count, in the label, before you commit to it.
@@ -1309,7 +1233,7 @@ function sendLabel(node: PlanNode): string {
 }
 
 /**
- * Hand it over and start the routine now.
+ * Start the routine on it now.
  *
  * The button is offered whether or not the deployment can start a routine,
  * because the action says exactly what is missing when it cannot, and a
@@ -1412,14 +1336,14 @@ function SendToClaude({
             variant="ghost"
             pending={batchPending}
             disabled={resolving}
-            title={held ?? 'Hand every open step beneath this one to Dash, worked in order'}
+            title={held ?? 'Start one session on every open step beneath this one, worked in order'}
           >
             {batchPending ? 'Sending…' : `Send all ${beneath} beneath`}
           </Button>
         </form>
       )}
-      {/* The return trip, and the only button here that does not hand work
-          over: it asks for the feature to be re-read against what has been
+      {/* The return trip, and the only button here that starts no build: it
+          asks for the feature to be re-read against what has been
           settled beneath it, and everything that comes back is a proposal
           waiting on the same approve as anything else. Offered wherever there
           is something beneath to re-read. */}
@@ -1458,260 +1382,6 @@ function SendToClaude({
   );
 }
 
-/**
- * One of the row's quick actions.
- *
- * An icon on the row rather than a button behind the fold: sending a step to
- * Claude, handing it over and editing it are the three things done to a step
- * without needing to read it first, and reaching them through the step's own
- * detail made every one of them two clicks and a scroll.
- */
-function RowIconButton({
-  label,
-  type = 'button',
-  pending = false,
-  onClick,
-  children,
-}: {
-  label: string;
-  type?: 'button' | 'submit';
-  pending?: boolean;
-  onClick?: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type={type}
-      title={label}
-      onClick={onClick}
-      disabled={pending}
-      className="press flex size-7 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink disabled:opacity-50"
-    >
-      {children}
-      <span className="sr-only">{label}</span>
-    </button>
-  );
-}
-
-function when(iso: string | null): string | null {
-  return iso ? iso.slice(0, 10) : null;
-}
-
-/** The clock on a step that is underway. */
-function Elapsed({ startedAt }: { startedAt: string }) {
-  const now = useClockNow();
-
-  return <>{now === 0 ? '…' : elapsedSince(startedAt, now)}</>;
-}
-
-/**
- * The same fact in the opened row's meta line, where there is room for the
- * word. "Running 7h" and "stopped after 7h, nothing on it" are two of the
- * things a step underway can mean, and the line said only the first.
- *
- * The reading comes from `claimLiveness` through the row rather than from the
- * clock here, so this line and the health column beside it cannot differ about
- * the same claim.
- */
-function RunningFor({ startedAt, claim }: { startedAt: string; claim: ClaimLiveness | undefined }) {
-  if (claim === 'abandoned') {
-    return (
-      <span className="text-caution">
-        {' · stopped after '}
-        <Elapsed startedAt={startedAt} />, nothing on it
-      </span>
-    );
-  }
-
-  if (claim === 'quiet') {
-    return (
-      <span className="text-caution">
-        {' · running '}
-        <Elapsed startedAt={startedAt} />, nothing pushed lately
-      </span>
-    );
-  }
-
-  return (
-    <>
-      {' · running '}
-      <Elapsed startedAt={startedAt} />
-    </>
-  );
-}
-
-/**
- * What CI said about the commit this step shipped in.
- *
- * Read off the merge that carried the step onto main rather than off the sha
- * the step records, which is nearly always a branch commit nothing ever
- * checked -- #555. A commit whose checks passed carries no mark: it is the
- * ordinary case, and the step's own Done is already saying it. Everything else
- * gets one, a commit nobody has looked up yet included, because a step with no
- * answer sitting unmarked among steps that passed reads as a step that passed.
- */
-function CheckMark({ check }: { check: CommitCheck | undefined }) {
-  const word = checkWord(check);
-  if (!word) return null;
-
-  const failed = check?.conclusion === 'failed';
-  // A step closed against a commit main does not carry is at least as wrong as
-  // one closed against a red commit -- the work is nowhere, not merely broken
-  // -- so it is marked as loudly rather than sitting grey among the steps
-  // nobody has looked up yet. #637.
-  const alarming = failed || check?.conclusion === 'unmerged';
-  const merge = check?.mergeSha ? check.mergeSha.slice(0, 7) : null;
-  const title = failed
-    ? `The checks failed on ${merge}, the merge that put this on main.`
-    : merge
-      ? `${checkLine(check)} on ${merge}, the merge that put this on main.`
-      : `${checkLine(check)}.`;
-
-  return (
-    <span
-      title={title}
-      className={cn(
-        'inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 text-small font-semibold',
-        alarming ? 'bg-caution-tint text-caution' : 'font-normal text-ink-ghost',
-      )}
-    >
-      {alarming && <CircleAlert className="size-3" strokeWidth={2} aria-hidden />}
-      {word}
-    </span>
-  );
-}
-
-/**
- * What the last routine run against this step did.
- *
- * The claim beside it is what the step says about itself; this is what the run
- * says. They disagree often enough to be worth both: a step still reading
- * in_progress whose run stopped four hours ago is the case this line exists
- * for, and before `plan_runs` was written back nothing on the page could tell
- * you which of the two had happened.
- */
-function LastRunLine({ run }: { run: LastRun }) {
-  const now = useClockNow();
-
-  return (
-    <span className={run.status === 'failed' ? 'text-caution' : undefined}>
-      {lastRunLine(run, now)}
-    </span>
-  );
-}
-
-/**
- * What the run behind this step has actually done.
- *
- * The row above says "In progress" and a number of minutes, which is the same
- * sentence whether the session has closed two steps or has been sitting on a
- * failed build since it started. So the step you have opened on purpose gets
- * the evidence: which press started the run and when, what it last pushed,
- * which steps closed after it was fired, and what it raised.
- *
- * A run with none of that says which kind of none it is, because they are
- * different things to do about it -- see `nothingToShowLine`. Nothing here asks
- * GitHub: the push is the reading stored on the run row, so an opened step
- * costs no request.
- *
- * The rules are in `lib/plan/work.ts` so the terminal tool and a session's
- * brief can say the same thing from the same rows.
- */
-function RunWork({
-  run,
-  node,
-  catalog,
-  raises,
-}: {
-  run: LastRun;
-  node: PlanNode;
-  catalog: readonly PlanCatalogEntry[];
-  raises: readonly RunRaise[];
-}) {
-  const now = useClockNow();
-  // The row and everything under it: a step run closes its own sub-steps and a
-  // feature batch closes the steps under the feature it was sent at. From the
-  // catalog rather than from `node.children`, because the view has already
-  // taken the closed steps out of the tree the row is drawn from.
-  const work = useMemo(() => {
-    const subtree = subtreeOf(catalog, node.id);
-    return runWork({ run, steps: catalog.filter((entry) => subtree.has(entry.id)), raises });
-  }, [run, node.id, catalog, raises]);
-  const empty = workIsEmpty(work);
-  const closed = closedLine(work);
-  const raised = raisedLine(work);
-  const refused = refusalLine(work);
-
-  return (
-    <div>
-      <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Its run</p>
-      <p className="text-ui text-ink">{runStartedLine(work, now)}</p>
-      {work.push && <p className="text-ui text-ink-muted">{pushLine(work.push, now)}</p>}
-      {closed && <p className="text-ui text-ink-muted">{closed}</p>}
-      {raised && <p className="text-ui text-ink-muted">{raised}</p>}
-      {empty && <p className="text-ui text-ink-muted">{nothingToShowLine(work, now)}</p>}
-      {/* After the rest, because what the run did is what was asked for and
-          this is why one of the four lines is missing. Caution rather than
-          muted: nothing on this row can be read properly until the key is
-          fixed, and the sentence says how. */}
-      {refused && <p className="text-ui text-caution">{refused}</p>}
-    </div>
-  );
-}
-
-/**
- * The badge on a step that is underway, and the one place the page admits a
- * claim can go stale.
- *
- * Nothing releases a claim when the session holding it dies, so an abandoned
- * step sat here pulsing at the same accent as one being worked this minute --
- * the state was seven hours old and the badge said "live". The pill now says
- * what the run says: the dot pulses while the session is pushing, stops and
- * turns caution once it has gone quiet, and the pill says the run stopped once
- * it is past the ended mark. The row is still `in_progress`, because only you
- * can say whether the work happened, but the page no longer claims somebody is
- * on it. Putting it back or closing it is one press in the row's own menu.
- *
- * `claim` is the reading from `claimLiveness`, handed in by the row so that
- * this pill, the health column and the meta line all draw one answer.
- */
-function Underway({
-  startedAt,
-  assignee,
-  claim,
-}: {
-  startedAt: string;
-  assignee: string | null;
-  claim: ClaimLiveness | undefined;
-}) {
-  const since = startedAt.replace('T', ' ').slice(0, 16);
-  const stopped = claim === 'abandoned';
-  const silent = stopped || claim === 'quiet';
-
-  return (
-    <span
-      title={
-        stopped
-          ? `Claimed ${since} and its run stopped without closing the step — close it or put it back.`
-          : claim === 'quiet'
-            ? `Claimed ${since}. Its run has pushed nothing for a while; it may still be reading or waiting on a build.`
-            : `${assignee === 'claude' ? 'Dash has been on this' : 'Underway'} since ${since}`
-      }
-      className={cn(
-        'tabular inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-small font-medium',
-        silent ? 'bg-caution-tint text-caution' : 'bg-accent-tint text-accent',
-      )}
-    >
-      <span
-        className={cn('size-1.5 rounded-full', silent ? 'bg-caution' : 'animate-pulse bg-accent')}
-        aria-hidden
-      />
-      <Elapsed startedAt={startedAt} />
-      {stopped && <span className="sr-only"> with no session on it</span>}
-      {claim === 'quiet' && <span className="sr-only"> with nothing pushed lately</span>}
-    </span>
-  );
-}
 
 /**
  * What the health column says about a step.
@@ -1859,11 +1529,9 @@ function healthOf(
  * "Needs you" takes caution, which is the tone every dev queue already spends
  * on a row stopped on the person. "With Dash" takes the accent because a
  * session running right now is the one thing on this page that is changing
- * while you look at it. "For Dash" takes the same blue "Ready" does in the
- * health column beside it -- the two are saying the same thing from two sides,
- * and a step that is ready and handed over should not read as two unrelated
- * facts. The rest are ink: nothing is claimed about work that is simply yours
- * or simply waiting its turn.
+ * while you look at it. The rest are ink: nothing is claimed about a step you
+ * kept or one another step is holding up, and a step waiting its turn has no
+ * word to tone.
  *
  * The tooltip is where the rollup is explained. A feature reporting "With Dash"
  * because its third step is with a session would otherwise be a word with no
@@ -1875,9 +1543,9 @@ const MOVE_TONE: Record<PlanMove, Health['tone']> = {
   resolving: 'accent',
   on_you: 'caution',
   with_dash: 'accent',
-  for_dash: 'info',
   waiting: 'quiet',
   yours: 'quiet',
+  none: 'ghost',
   settled: 'ghost',
 };
 
@@ -1886,9 +1554,9 @@ const MOVE_TITLE: Record<PlanMove, string> = {
     'Re-reading this feature against the answers you just gave. What it proposes will be here when it is done; sending it anywhere until then would send a plan that is mid-edit.',
   on_you: 'Stopped on you: a question to answer, a proposal to approve, or something only you can supply.',
   with_dash: 'A session is working on this now.',
-  for_dash: 'Handed to Dash, waiting for a session to pick it up.',
   waiting: 'Held up by another step that has not closed.',
-  yours: 'Nobody has handed this anywhere. It is yours to pick up or hand over.',
+  yours: 'You kept this one, so the runner will not take it.',
+  none: 'Approved and waiting its turn. Nothing is on it and nothing is needed from you.',
   settled: 'Nothing left to do on this one.',
 };
 
@@ -2386,25 +2054,29 @@ function PlanRow({
     formFields: { id: node.id, priority: String(priority) },
   }));
 
-  // The open steps beneath this one, which a hand-over covers as well. Said in
+  // The open steps beneath this one, which the press covers as well. Said in
   // the label rather than found out afterwards.
   const openBeneath = flatten([node]).filter(
     (step) => step.id !== node.id && !isClosed(step.status),
   ).length;
   const beneath = openBeneath > 0 ? `, with ${openBeneath} beneath` : '';
-  const handOver = node.assignee !== 'claude';
-  const assignLabel = handOver
-    ? `Hand to Dash${beneath}`
-    : `Take back from Dash${beneath}`;
+  // The row's assignee press is what you keep a step back with. The runner
+  // takes anything approved that is not yours, so marking a step Mine holds it
+  // until you press again; clearing the column gives it back. Until #670 that
+  // press was Hand to Dash, from when the runner could only see a step somebody
+  // had handed it, and setting a step to Me meant opening Edit.
+  const mine = node.assignee === 'me';
+  const assignLabel = mine ? `Not mine${beneath}` : `Mine${beneath}`;
+  const assignValue = mine ? '' : 'me';
 
   const menu: ActionMenuItem[] = [
     {
-      // First, because marking a step as Claude's is the move this page exists
-      // to make and it should not need the step opened first.
+      // First, because keeping a step back is the move this page exists to make
+      // and it should not need the step opened first.
       id: 'assign',
       label: assignLabel,
       formAction: (formData: FormData) => setPlanItemAssignee({}, formData),
-      formFields: { id: node.id, assignee: handOver ? 'claude' : '' },
+      formFields: { id: node.id, assignee: assignValue },
     },
     // The quick icons are only there from sm up and only under a pointer, so
     // the menu carries the same two actions for a phone and for a keyboard.
@@ -2622,27 +2294,31 @@ function PlanRow({
               )}
               {/* And whether anything has been said about it. */}
               <CommentCount count={node.thread.length} />
-              {/* Whose it is, on the row.
-                * The "Who" column was dropped for being a column of dashes,
-                * and it was right to go -- but with it went any way of seeing
-                * that a step is Claude's without opening it, hovering it, or
-                * switching to the Claude's view. Handing a step over is the
-                * move this page exists to make, and the page said nothing
-                * about the result. A mark, not a column: it appears only on
-                * the steps that have been handed over, which is what makes it
-                * worth reading. */}
-              {node.assignee === 'claude' && (
+              {/* The steps you kept, on the row.
+                * The runner takes anything approved that is not yours, so the
+                * fact worth reading off a resting row is which steps it will
+                * skip. It used to be the other way round: the mark was a robot
+                * on every step handed to Dash, from when a session could only
+                * work a step somebody had handed it.
+                *
+                * The row's Mine press carries the same fact in its accented
+                * icon, but that icon is drawn only under the pointer and not
+                * at all below sm, so this is the only place a plan at rest
+                * says it. Steps still holding the old 'claude' value are not
+                * read here and nothing clears them.
+                *
+                * A mark, not a column: it appears on the few steps you held
+                * back, which is what makes it worth reading. */}
+              {mine && (
                 <span
-                  title="Handed to Dash"
+                  title="Yours. The runner will not take this one."
                   className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1 py-0.5 text-accent"
                 >
-                  {/* A bot and not a person. This mark said "handed over" with
-                      the same head-and-shoulders the assignee picker uses for
-                      anybody at all, so the one thing it had to say -- that it
-                      went to Claude rather than onto your own list -- was the
-                      one thing it did not. */}
-                  <Bot className="size-3" strokeWidth={2} aria-hidden />
-                  <span className="sr-only">Handed to Dash</span>
+                  {/* The head-and-shoulders from the assignee picker, the same
+                      icon the Mine press uses, so the mark and the press that
+                      sets it are recognisably one thing. */}
+                  <CircleUser className="size-3" strokeWidth={2} aria-hidden />
+                  <span className="sr-only">Marked yours</span>
                 </span>
               )}
               {/* And whether the checks passed on what it shipped in. */}
@@ -2775,10 +2451,10 @@ function PlanRow({
         </span>
 
         {/* No "Who" column. It was a column of dashes with the occasional
-            "Claude" in it -- one fact, on a plan whose every step is yours
-            unless you hand it over, and handing it over is a button. The one
-            value it carried is now a mark beside the title, on the steps that
-            have it; the rest is on the open step, in the summary's "Claude's"
+            name in it -- one fact, on a plan whose every approved step the
+            runner takes unless you keep it, and keeping it is a button. The
+            one value it carried is now a mark beside the title, on the steps
+            you kept; the rest is on the open step, in the summary's "Claude's"
             view, and in the menu that changes it. */}
         <span className="hidden sm:block">
           <Breakdown node={node} />
@@ -2810,12 +2486,13 @@ function PlanRow({
               ))}
             <form action={assignAction}>
               <input type="hidden" name="id" value={node.id} />
-              <input type="hidden" name="assignee" value={handOver ? 'claude' : ''} />
+              <input type="hidden" name="assignee" value={assignValue} />
               <RowIconButton type="submit" label={assignLabel} pending={assignPending}>
-                {/* The same bot as the mark: this button is specifically the
-                    hand-to-Claude toggle, not a general "who is on it". */}
-                <Bot
-                  className={cn('size-3.5', !handOver && 'text-accent')}
+                {/* The head-and-shoulders the assignee picker uses for Me, and
+                    accented while the step is yours, so the icon says which way
+                    the next press goes. */}
+                <CircleUser
+                  className={cn('size-3.5', mine && 'text-accent')}
                   strokeWidth={1.75}
                   aria-hidden
                 />
@@ -3073,11 +2750,7 @@ function PlanRow({
               </Button>
               <form action={assignAction}>
                 <input type="hidden" name="id" value={node.id} />
-                <input
-                  type="hidden"
-                  name="assignee"
-                  value={node.assignee === 'claude' ? '' : 'claude'}
-                />
+                <input type="hidden" name="assignee" value={assignValue} />
                 <Button type="submit" size="sm" variant="ghost" pending={assignPending}>
                   {assignLabel}
                 </Button>
@@ -3313,7 +2986,6 @@ export function PlanView({
   commitChecks,
   empty,
   canSend,
-  queued,
   unfolded = false,
   opened = false,
 }: {
@@ -3343,7 +3015,6 @@ export function PlanView({
   commitChecks: Record<string, CommitCheck>;
   empty: boolean;
   canSend: boolean;
-  queued: number;
   /**
    * Render every feature with its sub-steps already showing.
    *
@@ -3421,7 +3092,7 @@ export function PlanView({
         </Banner>
       )}
 
-      <SummaryStrip summary={summary} view={view} queued={queued} />
+      <SummaryStrip summary={summary} view={view} />
 
       <SearchThePlan query={query} onQuery={setQuery} hits={hits} searching={searching} />
 
@@ -3624,3 +3295,5 @@ export function PlanView({
     </div>
   );
 }
+
+export type { PlanCatalogEntry };

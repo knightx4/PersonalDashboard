@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   RUN_QUIET_AFTER_MINUTES,
   isResolvingAnswers,
+  RESHAPE_UNDERWAY_MINUTES,
   lastRunLine,
   readingColumns,
   readingFor,
@@ -38,6 +39,19 @@ describe('runEnd', () => {
   it('prefers the step over the clock, so a long run that shipped is not a failure', () => {
     const step = { completedAt: '2026-09-17T05:00:00.000Z' };
     expect(runEnd({ status: 'started', createdAt: fired }, step, at(60 * 40))).toBe('finished');
+  });
+
+  it('counts a run whose step was blocked after it as finished', () => {
+    // The session did what it could and wrote down the question it could not
+    // answer, which is as much an end as a close. #679.
+    const step = { completedAt: null, blockedAt: '2026-09-17T02:40:00.000Z' };
+    expect(runEnd({ status: 'started', createdAt: fired }, step, at(50))).toBe('finished');
+  });
+
+  it('ignores a block from before the run was fired', () => {
+    const step = { completedAt: null, blockedAt: '2026-09-16T22:00:00.000Z' };
+    expect(runEnd({ status: 'started', createdAt: fired }, step, at(10))).toBeNull();
+    expect(runEnd({ status: 'started', createdAt: fired }, step, at(60 * 5))).toBe('failed');
   });
 
   it('ignores a step that closed before the run was fired', () => {
@@ -110,11 +124,19 @@ describe('isResolvingAnswers', () => {
 
   it('is true while the re-shape the answer fired is still going', () => {
     expect(isResolvingAnswers(reshape(), at(1))).toBe(true);
-    expect(isResolvingAnswers(reshape(), at(RUN_QUIET_AFTER_MINUTES - 1))).toBe(true);
+    expect(isResolvingAnswers(reshape(), at(RESHAPE_UNDERWAY_MINUTES - 1))).toBe(true);
   });
 
   it('clears once the run is past the cutoff', () => {
-    expect(isResolvingAnswers(reshape(), at(RUN_QUIET_AFTER_MINUTES))).toBe(false);
+    expect(isResolvingAnswers(reshape(), at(RESHAPE_UNDERWAY_MINUTES))).toBe(false);
+  });
+
+  it('lets go long before a build session would, because a re-shape takes minutes', () => {
+    // While the guard holds, the feature refuses every send. A re-shape that
+    // died on 19 September held #669 and #656 for nearly two hours and stopped
+    // a run that had five other features waiting.
+    expect(RESHAPE_UNDERWAY_MINUTES).toBeLessThan(RUN_QUIET_AFTER_MINUTES);
+    expect(isResolvingAnswers(reshape(), at(RUN_QUIET_AFTER_MINUTES - 1))).toBe(false);
   });
 
   it('clears the moment the run is written back as over', () => {

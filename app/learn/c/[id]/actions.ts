@@ -1,9 +1,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
+import { queueCatalogueSegment } from '@/lib/learn/catalogue/queue';
+import { trackForSubject } from '@/lib/learn/graph/to-queue';
 import { fromClaim, MAX_SELECTION, normaliseSelection } from '@/lib/learn/graph/branch';
 import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { loadConceptView } from '@/lib/learn/graph/concept';
@@ -221,4 +224,50 @@ export async function rewriteClaim({
 
   revalidatePath(`/learn/c/${parsed.data.conceptId}`);
   return {};
+}
+
+/**
+ * One piece of catalogue material, into the reading queue.
+ *
+ * The press #725 settled on: material found for a claim is proposed on the
+ * claim's page and one press turns one of those proposals into a reading. What
+ * that produces is an ordinary row in the track this subject's gaps already go
+ * in -- `trackForSubject` is the same one `queueConcept` uses, so a month of
+ * reading about one subject stays in one place rather than growing a track per
+ * claim.
+ *
+ * Nothing about the material is passed in from the page. The segment is an id,
+ * and the sentence that becomes the reading's `why` is read out of
+ * `catalogue_links` inside the call, so a form somebody edited cannot put words
+ * into a reading.
+ *
+ * Pressing twice hands back the reading already queued rather than a second
+ * copy, which is `queueCatalogueSegment`'s promise, and either way this lands
+ * on that reading. A segment deleted by a re-sweep between the page rendering
+ * and the press throws, as the rest of the module's writes do: the alternative
+ * is a press that silently does nothing.
+ */
+export async function queueMaterial(formData: FormData): Promise<void> {
+  const user = await requireUser();
+
+  const conceptId = z.string().uuid().safeParse(formData.get('conceptId'));
+  const segmentId = z.string().uuid().safeParse(formData.get('segmentId'));
+  if (!conceptId.success || !segmentId.success) redirect('/learn/know');
+
+  const supabase = await createLearnClient();
+  // Read back rather than trusted from the page: this is what says the claim
+  // is yours, and it is where the subject's name comes from.
+  const view = await loadConceptView(supabase, conceptId.data);
+  if (!view) redirect('/learn/know');
+
+  const trackId = await trackForSubject(supabase, user.id, view.subject.name);
+  const { readingId } = await queueCatalogueSegment(supabase, user.id, {
+    segmentId: segmentId.data,
+    trackId,
+    target: { concept: view.concept.id },
+  });
+
+  revalidatePath('/learn');
+  revalidatePath(`/learn/c/${conceptId.data}`);
+  redirect(`/learn/r/${readingId}`);
 }

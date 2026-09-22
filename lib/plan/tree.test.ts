@@ -24,7 +24,6 @@ import {
   tallyHealth,
   planProgress,
   subtreeIds,
-  handedToClaude,
   summarize,
   workOrder,
   searchSections,
@@ -446,12 +445,16 @@ describe('applyView', () => {
   const fixture = () =>
     tree(
       [
-        item({ id: 'feature' }),
+        // Kept for yourself, both of them, because the Dash view needs a row
+        // that does not match and a module with nothing to show for the two
+        // tests below to have a subject. Approving is the hand-over now, so a
+        // step with nobody on it is Dash's.
+        item({ id: 'feature', assignee: 'me' }),
         at('done', 'done-step', { parentId: 'feature' }),
-        at('not_started', 'open-step', { parentId: 'feature', assignee: 'claude' }),
+        at('not_started', 'open-step', { parentId: 'feature' }),
         at('blocked', 'stuck', { parentId: 'feature' }),
         at('done', 'finished-feature', { module: 'jobs' }),
-        item({ id: 'waits', module: 'jobs' }),
+        item({ id: 'waits', module: 'jobs', assignee: 'me' }),
       ],
       [dep('waits', 'feature')],
     );
@@ -505,6 +508,16 @@ describe('applyView', () => {
 
   it('leaves out modules that have nothing to show, so a narrowed page is short', () => {
     expect(applyView(fixture(), 'claude').map((s) => s.module)).toEqual(['shopping']);
+  });
+
+  it('shows a step nobody was assigned under "claude", and no proposal', () => {
+    const sections = tree([
+      item({ id: 'nobody' }),
+      item({ id: 'kept', assignee: 'me' }),
+      at('proposed', 'suggested'),
+    ]);
+    expect(flattenSections(applyView(sections, 'claude')).map((n) => n.id)).toEqual(['nobody']);
+    expect(summarize(sections).claude).toBe(1);
   });
 
   it('drops a module with nothing open from "open" as well', () => {
@@ -690,13 +703,20 @@ describe('workOrder', () => {
     ]);
   });
 
-  it('can be narrowed to what Claude holds', () => {
+  it('can be narrowed to every approved step but the ones you kept', () => {
+    // The two halves of one question: `me` is what you held back, and
+    // everything else approved is the runner's, whether or not anybody ever
+    // pressed Send on it.
     const sections = tree([
       item({ id: 'mine', assignee: 'me' }),
-      item({ id: 'theirs', assignee: 'claude' }),
+      item({ id: 'theirs' }),
       item({ id: 'nobody' }),
     ]);
-    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['theirs']);
+    expect(workOrder(sections, { only: 'runner' }).map((n) => n.id)).toEqual([
+      'theirs',
+      'nobody',
+    ]);
+    expect(workOrder(sections, { only: 'mine' }).map((n) => n.id)).toEqual(['mine']);
   });
 
   it('still offers the steps of a feature blocked over one question beneath it', () => {
@@ -704,81 +724,27 @@ describe('workOrder', () => {
     // step; the two beside it are work, and the feature being marked blocked
     // over the question used to take them out of this list entirely.
     const sections = tree([
-      at('blocked', 'feature', { blockKind: 'steps', assignee: 'claude' }),
-      at('blocked', 'asked', { parentId: 'feature', blockKind: 'outside', assignee: 'claude' }),
-      item({ id: 'next', parentId: 'feature', assignee: 'claude', position: 20 }),
-      item({ id: 'after', parentId: 'feature', assignee: 'claude', position: 30 }),
+      at('blocked', 'feature', { blockKind: 'steps' }),
+      at('blocked', 'asked', { parentId: 'feature', blockKind: 'outside' }),
+      item({ id: 'next', parentId: 'feature', position: 20 }),
+      item({ id: 'after', parentId: 'feature', position: 30 }),
     ]);
-    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual([
+    expect(workOrder(sections, { only: 'runner' }).map((n) => n.id)).toEqual([
       'next',
       'after',
     ]);
   });
-});
 
-describe('handedToClaude', () => {
-  const mine = (id: string, over: Partial<PlanItem> = {}) =>
-    item({ id, assignee: 'claude', ...over });
-
-  it('takes every open step handed over, most urgent first', () => {
-    const sections = tree([
-      mine('normal', { position: 10 }),
-      mine('someday', { priority: 3, position: 20 }),
-      mine('urgent', { priority: 1, position: 30 }),
-      item({ id: 'not-handed-over', position: 40 }),
-      item({ id: 'mine-to-do', assignee: 'me', position: 50 }),
-    ]);
-    expect(handedToClaude(sections).map((n) => n.id)).toEqual(['urgent', 'normal', 'someday']);
-  });
-
-  it('keeps a step that is only waiting on another, unlike workOrder', () => {
-    const sections = tree(
-      [mine('first'), mine('second')],
-      [dep('second', 'first')],
-    );
-    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['first']);
-    expect(handedToClaude(sections).map((n) => n.id)).toEqual(['first', 'second']);
-  });
-
-  it('leaves out what is finished, only proposed, or waiting on the person', () => {
-    const sections = tree([
-      mine('open'),
-      mine('done', { status: 'done' }),
-      mine('dropped', { status: 'dropped' }),
-      mine('proposal', { status: 'proposed' }),
-      mine('question', { kind: 'decision' }),
-      // A block names something outside the repo, so a session sent at it
-      // meets the same wall -- and it sat in the Claude's view saying so.
-      mine('stuck', { status: 'blocked' }),
-    ]);
-    expect(handedToClaude(sections).map((n) => n.id)).toEqual(['open']);
-  });
-
-  it('takes an answered decision back, since nothing is waiting on the person now', () => {
-    const sections = tree([mine('settled', { kind: 'decision', status: 'done' })]);
-    // Closed, so still not work -- but for being closed, not for being a
-    // question.
-    expect(handedToClaude(sections)).toEqual([]);
-    expect(isWaitingOnThePerson({ kind: 'decision', status: 'done' })).toBe(false);
-  });
-
-  it('is empty when nothing has been handed over', () => {
-    expect(handedToClaude(tree([item({ id: 'a' }), item({ id: 'b', assignee: 'me' })]))).toEqual([]);
-  });
-
-  it('never hands Claude a decision, however it is assigned', () => {
+  it('never leaves a decision in the runner\'s list', () => {
     // The one thing a routine must not do is answer its own question.
-    const sections = tree([
-      item({ id: 'work', assignee: 'claude' }),
-      item({ id: 'question', assignee: 'claude', kind: 'decision' }),
-    ]);
-    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['work']);
+    const sections = tree([item({ id: 'work' }), item({ id: 'question', kind: 'decision' })]);
+    expect(workOrder(sections, { only: 'runner' }).map((n) => n.id)).toEqual(['work']);
   });
 
   it('still lists a decision unfiltered, so the person sees it', () => {
-    const sections = tree([item({ id: 'question', assignee: 'claude', kind: 'decision' })]);
+    const sections = tree([item({ id: 'question', kind: 'decision' })]);
     expect(workOrder(sections).map((n) => n.id)).toEqual(['question']);
-    expect(workOrder(sections, { assignee: 'me' }).map((n) => n.id)).toEqual([]);
+    expect(workOrder(sections, { only: 'mine' }).map((n) => n.id)).toEqual([]);
   });
 });
 
@@ -788,9 +754,9 @@ describe('summarize', () => {
       [
         item({ id: 'feature' }),
         at('done', 'a', { parentId: 'feature' }),
-        at('in_progress', 'b', { parentId: 'feature', assignee: 'claude' }),
+        at('in_progress', 'b', { parentId: 'feature' }),
         at('blocked', 'c', { parentId: 'feature' }),
-        item({ id: 'd', parentId: 'feature', assignee: 'claude' }),
+        item({ id: 'd', parentId: 'feature' }),
         at('dropped', 'e'),
         item({ id: 'f' }),
         at('proposed', 'g'),
@@ -811,7 +777,9 @@ describe('summarize', () => {
       // d alone: the feature has open steps and f is waiting.
       ready: 1,
       done: 1,
-      claude: 2,
+      // Everything open that you did not keep: the feature itself, b, d and
+      // f. c is blocked, so it is on you; g is a proposal.
+      claude: 4,
       fog: 0,
       dismissed: 0,
     });
@@ -1070,24 +1038,20 @@ describe('a setup step', () => {
     expect(ids).toEqual(['job']);
   });
 
-  it('is never handed to Claude, however it is assigned', () => {
+  it('is never in the runner\'s list, however it is assigned', () => {
     // A routine that claimed one would sit in front of an account nobody has
     // made and block itself to say so.
-    const sections = tree([
-      item({ id: 'work', assignee: 'claude' }),
-      setup('job', { assignee: 'claude' }),
-    ]);
+    const sections = tree([item({ id: 'work' }), setup('job', { assignee: 'me' })]);
 
-    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['work']);
-    expect(handedToClaude(sections).map((n) => n.id)).toEqual(['work']);
+    expect(workOrder(sections, { only: 'runner' }).map((n) => n.id)).toEqual(['work']);
     // Still ready, and still listed unfiltered, so the page shows it.
     expect(only(sections, 'job').ready).toBe(true);
     expect(workOrder(sections).map((n) => n.id)).toEqual(['work', 'job']);
   });
 
-  it('is withheld from Claude even when nobody was assigned it', () => {
+  it('is withheld from the runner even when nobody was assigned it', () => {
     const sections = tree([setup('job', { assignee: null })]);
-    expect(workOrder(sections, { assignee: 'claude' })).toEqual([]);
+    expect(workOrder(sections, { only: 'runner' })).toEqual([]);
   });
 
   it('is a band and a tally entry like any other live step', () => {
@@ -1293,14 +1257,12 @@ describe('put aside as not right now', () => {
           id: 'handed',
           number: 1,
           status: 'not_started',
-          assignee: 'claude',
           dismissedAt: '2026-09-13T00:00:00Z',
         }),
       ],
       dependencies: [],
     });
     expect(workOrder(sections)).toEqual([]);
-    expect(handedToClaude(sections)).toEqual([]);
   });
 });
 
@@ -1683,20 +1645,22 @@ describe('healthOf, over a subtree that has started', () => {
 describe('moveOf', () => {
   const only = (items: PlanItem[]) => shopping(tree(items)).nodes[0];
 
-  it('is yours when nobody has handed it anywhere', () => {
-    expect(moveOf(only([at('not_started', 'a')]))).toBe('yours');
-  });
-
-  it('is for Dash once it is assigned', () => {
-    expect(moveOf(only([at('not_started', 'a', { assignee: 'claude' })]))).toBe('for_dash');
+  // #694: the column says a word only when something is happening to the row,
+  // and an approved step in the queue is the ordinary case on this page.
+  it('says nothing about an approved step waiting its turn', () => {
+    expect(moveOf(only([at('not_started', 'a')]))).toBe('none');
   });
 
   it('is with Dash while a session is on it', () => {
-    expect(moveOf(only([at('in_progress', 'a', { assignee: 'claude' })]))).toBe('with_dash');
+    expect(moveOf(only([at('in_progress', 'a')]))).toBe('with_dash');
   });
 
-  it('is still yours when you are the one working on it', () => {
-    expect(moveOf(only([at('in_progress', 'a')]))).toBe('yours');
+  it('is yours once you mark it, before anything has started', () => {
+    expect(moveOf(only([at('not_started', 'a', { assignee: 'me' })]))).toBe('yours');
+  });
+
+  it('is still yours once a step you marked is underway', () => {
+    expect(moveOf(only([at('in_progress', 'a', { assignee: 'me' })]))).toBe('yours');
   });
 
   it('needs you for a question nobody has answered', () => {
@@ -1707,10 +1671,10 @@ describe('moveOf', () => {
     expect(moveOf(only([at('proposed', 'a')]))).toBe('on_you');
   });
 
-  // Assigned to Dash and blocked is still yours: a session sent there would
-  // sit in front of the same wall. Same rule `isWaitingOnThePerson` enforces.
-  it('needs you for a blocked step even when it is assigned to Dash', () => {
-    expect(moveOf(only([at('blocked', 'a', { assignee: 'claude' })]))).toBe('on_you');
+  // Blocked is yours whoever is on it: a session sent there would sit in front
+  // of the same wall. Same rule `isWaitingOnThePerson` enforces.
+  it('needs you for a blocked step nobody is marked on', () => {
+    expect(moveOf(only([at('blocked', 'a')]))).toBe('on_you');
   });
 
   it('is held up when another step is in the way', () => {
@@ -1730,16 +1694,33 @@ describe('moveOf', () => {
       shopping(tree([at('not_started', 'f'), ...children])).nodes[0];
 
     it('reports a session working beneath it', () => {
+      expect(moveOf(feature([at('in_progress', 's1', { parentId: 'f' })]))).toBe('with_dash');
+    });
+
+    it('reports a step you marked yours beneath it', () => {
+      expect(moveOf(feature([at('not_started', 's1', { parentId: 'f', assignee: 'me' })]))).toBe(
+        'yours',
+      );
+    });
+
+    // The other half of #694: a feature is the rollup of its steps, so one
+    // whose steps are all waiting their turn has nothing to say either.
+    it('says nothing when every step beneath it is waiting its turn', () => {
       expect(
-        moveOf(feature([at('in_progress', 's1', { parentId: 'f', assignee: 'claude' })])),
-      ).toBe('with_dash');
+        moveOf(
+          feature([
+            at('not_started', 's1', { parentId: 'f' }),
+            at('not_started', 's2', { parentId: 'f' }),
+          ]),
+        ),
+      ).toBe('none');
     });
 
     it('reports the most pressing of several', () => {
       expect(
         moveOf(
           feature([
-            at('in_progress', 's1', { parentId: 'f', assignee: 'claude' }),
+            at('in_progress', 's1', { parentId: 'f' }),
             at('not_started', 'q', { parentId: 'f', kind: 'decision' }),
           ]),
         ),
@@ -1775,7 +1756,7 @@ describe('moveOf', () => {
             }),
           ]),
         ),
-      ).toBe('yours');
+      ).toBe('none');
     });
   });
 
@@ -1813,8 +1794,8 @@ describe('moveOf', () => {
     });
 
     it('is not claimed of a feature no re-shape is running against', () => {
-      expect(moveOf(feature(), { resolving: new Set(['somebody-else']) })).toBe('yours');
-      expect(moveOf(feature())).toBe('yours');
+      expect(moveOf(feature(), { resolving: new Set(['somebody-else']) })).toBe('none');
+      expect(moveOf(feature())).toBe('none');
     });
 
     // The set holds the feature the run was fired at. A step beneath it is not
@@ -1822,7 +1803,7 @@ describe('moveOf', () => {
     it('does not spread down to the steps beneath it', () => {
       const sections = shopping(tree([at('not_started', 'f'), at('not_started', 's1', { parentId: 'f' })]));
       const step = findNode([sections], 's1')!;
-      expect(moveOf(step, whileResolving)).toBe('yours');
+      expect(moveOf(step, whileResolving)).toBe('none');
     });
   });
 });

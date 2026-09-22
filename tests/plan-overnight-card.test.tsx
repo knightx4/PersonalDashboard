@@ -94,6 +94,7 @@ function draw(props: Partial<Parameters<typeof OvernightControl>[0]> = {}): stri
       canSend
       night={night()}
       push={PUSH}
+      ready={3}
       {...props}
     />,
   );
@@ -144,6 +145,29 @@ describe('the Overnight card while a night is running', () => {
     expect(html).not.toContain('<details open');
   });
 
+  it('says how many features are left for it to pick up, not how many steps', () => {
+    expect(draw()).toContain('3 features ready');
+  });
+
+  it('says a night with budget left has nothing to fire, where that is true', () => {
+    // The pair #633 could not tell apart from the other side: the budget says
+    // there is room for three more and the plan has nothing to put in it.
+    const html = draw({ ready: 0 });
+    expect(html).toContain('1 of 4 features spent');
+    expect(html).toContain('no features ready');
+  });
+
+  it('still says what is ready on a card with no night running', () => {
+    const html = draw({
+      run: run({ running: false, endedAt: '2026-09-17T04:00:00Z', endedReason: 'You stopped it.' }),
+      night: null,
+      push: null,
+      ready: 1,
+    });
+
+    expect(html).toContain('1 feature ready');
+  });
+
   it('still says how much clock is left', () => {
     expect(draw()).toContain('stops in 5h 10m');
   });
@@ -192,7 +216,7 @@ describe('the Overnight card before the browser clock arrives', () => {
     const { OvernightControl: AtZero } = await import('@/app/dev/plan/overnight-control');
 
     const html = renderToStaticMarkup(
-      <AtZero run={run()} canSend night={night()} push={PUSH} />,
+      <AtZero run={run()} canSend night={night()} push={PUSH} ready={3} />,
     );
 
     // The facts that do not come off a clock are all still there.

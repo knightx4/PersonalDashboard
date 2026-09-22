@@ -4,7 +4,6 @@ import {
   hasLiveFog,
   isClosed,
   isDismissed,
-  type PlanAssignee,
   type PlanBlockKind,
   type PlanData,
   type PlanItem,
@@ -814,17 +813,23 @@ function startedBeneath(node: { children?: readonly PlanNode[] }): boolean {
  *
  * Every rule here is already written down somewhere else and is reused rather
  * than restated: `needsThePerson` for what is yours to answer, `waitingOn` for
- * what another step is holding up, and the `assignee` a hand-over sets. Two
- * implementations of "is this Dash's" would disagree by next month, and the
- * disagreement would be between a column and the button beside it.
+ * what another step is holding up, and the `assignee` you set by marking a
+ * step yours. Two implementations of "is this Dash's" would disagree by next
+ * month, and the disagreement would be between a column and the button beside
+ * it.
+ *
+ * A row gets a word only when something is happening to it (#694). An approved
+ * step waiting its turn is the ordinary case on this page, and the health
+ * column beside it already says it is ready, so its move is `none` and the
+ * cell stays empty.
  */
 export const PLAN_MOVES = [
   'resolving',
   'on_you',
   'with_dash',
-  'for_dash',
-  'waiting',
   'yours',
+  'waiting',
+  'none',
   'settled',
 ] as const;
 export type PlanMove = (typeof PLAN_MOVES)[number];
@@ -845,16 +850,18 @@ export type MoveContext = {
  * Most pressing first, and so the order a parent reports from.
  *
  * "On you" outranks everything because it is the only one that stops on your
- * desk. A session working now outranks one that could start, which outranks a
- * step held up by another, which outranks work nobody has handed anywhere.
+ * desk. A session working now outranks a step you marked yours, which outranks
+ * one another step is holding up. `none` comes last of the open moves because
+ * it is the absence of a move: anything else beneath a feature is the thing
+ * the feature has to report.
  */
 const MOVE_RANK: readonly PlanMove[] = [
   'resolving',
   'on_you',
   'with_dash',
-  'for_dash',
-  'waiting',
   'yours',
+  'waiting',
+  'none',
   'settled',
 ];
 
@@ -875,10 +882,15 @@ function ownMove(node: MoveInput, context?: MoveContext): PlanMove {
   // something only you can supply. One rule, shared with the "On you" view.
   if (needsThePerson(node)) return 'on_you';
   if (node.waitingOn.length > 0) return 'waiting';
-  if (node.assignee === 'claude') {
-    return node.status === 'in_progress' ? 'with_dash' : 'for_dash';
-  }
-  return 'yours';
+  // `assignee` says one thing now: you marked this and the runner will not
+  // take it. That is true whether or not the step has been started, so it is
+  // read before the status -- a step you kept and then began is still yours,
+  // not with a session.
+  if (node.assignee === 'me') return 'yours';
+  if (node.status === 'in_progress') return 'with_dash';
+  // Approved, ready, nothing on it. The runner will fire it when it reaches
+  // it, and until then there is no move to report.
+  return 'none';
 }
 
 type MoveInput = Pick<
@@ -1073,6 +1085,30 @@ export function needsThePerson(
   );
 }
 
+/**
+ * A step the runner may take: one you approved and did not keep.
+ *
+ * The test here used to be `assignee === 'claude'`, so a step had to be handed
+ * over by hand before any routine could see it. On the night of 18 September
+ * sixteen of the twenty-four approved, ready build steps had no assignee at
+ * all, and the run ended at 23:44 saying nothing was ready with two thirds of
+ * the available work in front of it.
+ *
+ * Approving is the hand-over now (#669, #670), which leaves the assignee
+ * column answering the narrower question it is good at: which approved steps
+ * did you keep for yourself. `me` is the whole of that answer, so an empty
+ * assignee and the `claude` every hand-over used to write read the same way.
+ *
+ * `proposed` is the other half of it, and it is what approving means: a
+ * suggestion nobody has said yes to stays out of reach however it is
+ * assigned. Everything past those two -- ready, open, not waiting on the
+ * person -- is the caller's, because the three readers of this rule each want
+ * a different amount of it.
+ */
+export function isClaudes(node: Pick<PlanNode, 'status' | 'assignee'>): boolean {
+  return node.status !== 'proposed' && node.assignee !== 'me';
+}
+
 function matchesView(node: PlanNode, view: PlanView): boolean {
   switch (view) {
     case 'all':
@@ -1086,9 +1122,7 @@ function matchesView(node: PlanNode, view: PlanView): boolean {
     case 'proposed':
       return node.status === 'proposed';
     case 'claude':
-      return (
-        node.assignee === 'claude' && !isClosed(node.status) && !isWaitingOnThePerson(node)
-      );
+      return isClaudes(node) && !isClosed(node.status) && !isWaitingOnThePerson(node);
     case 'blocked':
       return !isClosed(node.status) && (isBlocked(node) || node.waitingOn.length > 0);
     // Closed steps included. A finished feature still carrying fog is the
@@ -1326,39 +1360,29 @@ export function countMatches(sections: readonly PlanSection[]): number {
  *
  * Both stay ready and stay in the unfiltered order, so they show on the page
  * and hold up everything waiting on them until somebody settles them.
+ *
+ * `{ only: 'runner' }` asks for what the runner may take, which is
+ * `isClaudes` rather than the column: every approved step but the ones you
+ * kept. `{ only: 'mine' }` is the column read literally, because those are
+ * the ones you kept.
+ *
+ * Neither reads as an assignee, which is why this option is no longer named
+ * for one. `runner` was `{ assignee: 'claude' }` and never read the column at
+ * all; since #718 no step can be assigned to Dash, so the old name described
+ * a value nothing can hold.
  */
 export function workOrder(
   sections: readonly PlanSection[],
-  options: { assignee?: PlanAssignee } = {},
+  options: { only?: 'mine' | 'runner' } = {},
 ): PlanNode[] {
   return flattenSections(sections)
     .filter((node) => node.ready)
     .filter((node) => !isDismissed(node))
-    .filter((node) => (options.assignee ? node.assignee === options.assignee : true))
-    .filter((node) => (options.assignee === 'claude' ? !isWaitingOnThePerson(node) : true))
-    .sort((a, b) => a.priority - b.priority);
-}
-
-/**
- * Everything handed to Claude, in the order it should be worked.
- *
- * `workOrder` answers "what could be picked up right now", so it keeps only
- * ready steps. This answers a different question — "what has been handed over"
- * — and a step held up by another is still handed over: it is the second half
- * of a batch, not something to leave behind. The session works them in order
- * and the ones that wait say what they wait on.
- *
- * The two exclusions are the ones `workOrder` makes and for the same reasons. A
- * decision is a question put to the person, and a session that picked one up
- * would answer its own question. A proposal is not work yet — nobody has said
- * yes to it — so it is left for the person to approve, however it is assigned.
- */
-export function handedToClaude(sections: readonly PlanSection[]): PlanNode[] {
-  return flattenSections(sections)
-    .filter((node) => node.assignee === 'claude')
-    .filter((node) => !isDismissed(node))
-    .filter((node) => !isClosed(node.status) && node.status !== 'proposed')
-    .filter((node) => !isWaitingOnThePerson(node))
+    .filter((node) => {
+      if (!options.only) return true;
+      if (options.only === 'mine') return node.assignee === 'me';
+      return isClaudes(node) && !isWaitingOnThePerson(node);
+    })
     .sort((a, b) => a.priority - b.priority);
 }
 
@@ -1486,8 +1510,7 @@ export function summarize(sections: readonly PlanSection[]): PlanSummary {
     waiting: open.filter((node) => isBlocked(node) || node.waitingOn.length > 0).length,
     ready: open.filter((node) => node.ready).length,
     done: nodes.filter((node) => node.status === 'done').length,
-    claude: open.filter((node) => node.assignee === 'claude' && !isWaitingOnThePerson(node))
-      .length,
+    claude: open.filter((node) => isClaudes(node) && !isWaitingOnThePerson(node)).length,
     fog: nodes.filter((node) => hasLiveFog(node)).length,
     dismissed: all.filter((node) => isDismissed(node) || node.fogDismissedAt !== null).length,
   };

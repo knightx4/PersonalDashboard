@@ -585,8 +585,9 @@ async function buildStep(input: ActInput): Promise<ActOutcome> {
   // `not_started` rather than `proposed`, because `handStepToClaude` refuses a
   // proposal -- rightly, since approving one is the person's move -- and a row
   // written proposed here would be refused by the very next line of its own
-  // action. `assignee` is left alone: the hand-over sets it, so who is on the
-  // step is written in one place and only when a session really is.
+  // action. `assignee` is left empty, which is the only thing a step written
+  // here could say: the column marks what you kept for yourself, and nobody
+  // has kept a step that has just been written.
   const { data, error } = await input.supabase
     .from('plan_items')
     .insert({

@@ -49,6 +49,23 @@ export const LEARN_OPERATIONS = [
   'grade-quiz-answer',
   'write-applied-case',
   'grade-applied-answer',
+  // The catalogue embedding sweep, which records through its own postgres
+  // connection rather than through `recordLearnSpend`: it runs from a script,
+  // and reaching the ledger the usual way would pull `next/headers` in. The
+  // name is declared here anyway, because this list is what the spend screen
+  // groups by and an operation missing from it is one nobody can find.
+  'embed-catalogue',
+  // Embedding one claim as a query, to find the catalogue segments nearest it.
+  // Separate from the sweep above because it is the cheap half of a press
+  // somebody is waiting on rather than a batch job, and because the two answer
+  // different questions on the spend screen: what the catalogue cost to take
+  // in, and what searching it costs.
+  'embed-claim',
+  // One Haiku call per candidate segment, asking whether it teaches the claim.
+  // The only cost in the catalogue feature that scales with how much material
+  // has been pulled in rather than with how much you study, so it is worth
+  // being able to see on its own.
+  'judge-segment',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
