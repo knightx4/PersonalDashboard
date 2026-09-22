@@ -27,6 +27,7 @@ let themeB = '';
 let positionA = '';
 let positionA2 = '';
 let positionB = '';
+let sweepA = '';
 
 async function seedConnection(userId: string, tag: string): Promise<string> {
   const [row] = await admin<{ id: string }[]>`
@@ -105,6 +106,15 @@ beforeAll(async () => {
   await admin`
     insert into tensions (user_id, left_id, right_id, kind, crux)
     values (${userA}, ${positionA}, ${positionA2}, 'scope', 'metro-wide or local')`;
+
+  // The sweep (plan #757): one run and the row for the note it reached.
+  const [sweep] = await admin<{ id: string }[]>`
+    insert into map_sweeps (user_id) values (${userA}) returning id`;
+  sweepA = sweep.id;
+  await admin`
+    insert into map_sweep_notes (user_id, sweep_id, note_id, blob_sha, outcome, detail)
+    values (${userA}, ${sweepA}, ${noteA}, 'sha-Journal/2019-04-02.md', 'journal',
+            'Not read: notes in Me/ are journals.')`;
 });
 
 afterAll(async () => {
@@ -131,6 +141,8 @@ describe('RLS coverage', () => {
       where n.nspname = 'obsidian' and c.relkind = 'r'
       order by 1`;
     expect(rows.map((r) => r.tablename)).toEqual([
+      'map_sweep_notes',
+      'map_sweeps',
       'notes',
       'position_edges',
       'position_sources',
@@ -527,6 +539,69 @@ describe('what the map enforces itself', () => {
     await expect(
       admin`insert into position_edges (user_id, from_id, to_id, type)
             values (${userA}, ${positionA}, ${positionA}, 'supports')`,
+    ).rejects.toThrow();
+  });
+});
+
+describe('the sweep, across users', () => {
+  it('shows the owner their sweep and what it did to each note', async () => {
+    const seen = await asUser(userA, async (tx) => ({
+      sweeps: (await tx`select id from map_sweeps`).length,
+      notes: (await tx`select id from map_sweep_notes`).length,
+      counts: (await tx<{ c: { outcomes: Record<string, number> } }[]>`
+        select map_sweep_counts(${sweepA}) as c`)[0].c.outcomes,
+    }));
+    expect(seen).toEqual({ sweeps: 1, notes: 1, counts: { journal: 1 } });
+  });
+
+  it('shows another user none of it, counts included', async () => {
+    const seen = await asUser(userB, async (tx) => ({
+      sweeps: (await tx`select id from map_sweeps where id = ${sweepA}`).length,
+      notes: (await tx`select id from map_sweep_notes where sweep_id = ${sweepA}`).length,
+      counts: (await tx<{ c: { outcomes: Record<string, number> } }[]>`
+        select map_sweep_counts(${sweepA}) as c`)[0].c.outcomes,
+    }));
+    expect(seen).toEqual({ sweeps: 0, notes: 0, counts: {} });
+  });
+
+  it('does not let another user stop, resume or start your sweep', async () => {
+    const stopped = await asUser(
+      userB,
+      (tx) => tx`update map_sweeps set status = 'stopped' where id = ${sweepA} returning id`,
+    );
+    expect(stopped).toHaveLength(0);
+
+    await expect(
+      asUser(userB, (tx) => tx`insert into map_sweeps (user_id) values (${userA})`),
+    ).rejects.toThrow();
+  });
+
+  it('lets the owner stop their sweep but not write its note rows', async () => {
+    const stopped = await asUser(
+      userA,
+      (tx) => tx`update map_sweeps set status = 'stopped' where id = ${sweepA} returning id`,
+    );
+    expect(stopped).toHaveLength(1);
+    await admin`update map_sweeps set status = 'running' where id = ${sweepA}`;
+
+    // The per-note rows are the cron call's record. A signed-in person reads them.
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`update map_sweep_notes set outcome = 'read' where sweep_id = ${sweepA}`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('refuses a second unfinished sweep for one person', async () => {
+    await expect(admin`insert into map_sweeps (user_id) values (${userA})`).rejects.toThrow();
+  });
+
+  it('refuses a sweep row for a note in another vault', async () => {
+    const [noteB] = await admin<{ id: string }[]>`select id from notes where user_id = ${userB}`;
+    await expect(
+      admin`insert into map_sweep_notes (user_id, sweep_id, note_id, blob_sha, outcome)
+            values (${userA}, ${sweepA}, ${noteB.id}, 'sha', 'read')`,
     ).rejects.toThrow();
   });
 });

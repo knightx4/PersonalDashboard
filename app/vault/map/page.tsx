@@ -5,7 +5,9 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { cardVariants } from '@/components/ui/card';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { loadThemeList, THEME_LIST_LIMIT } from '@/lib/vault/map/read';
+import { loadLatestSweep } from '@/lib/vault/map/sweep-read';
 import { cn } from '@/lib/cn';
+import { SweepPanel } from './sweep-panel';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,18 +24,22 @@ export const dynamic = 'force-dynamic';
  */
 export default async function VaultMapPage() {
   const supabase = await createVaultClient();
-  const { themes, capped } = await loadThemeList(supabase);
+  const [{ themes, capped }, sweep] = await Promise.all([
+    loadThemeList(supabase),
+    loadLatestSweep(supabase),
+  ]);
 
   if (themes.length === 0) {
     return (
       <>
         <PageHeader title="Map" />
-        {/* Until the sweep (#757) exists, a theme arrives only from one note's
-            own page, so the empty state sends the person there. */}
+        <SweepPanel sweep={sweep} />
+        {/* Themes arrive two ways: the sweep above, and one note's own Map
+            section. The empty state names both. */}
         <EmptyState
           icon={Waypoints}
           title="Nothing on the map yet"
-          description="The map lists the subjects your notes return to, most written about first, with the positions under each and the sentence each came from. Open a note and use its Map section to read it for themes and positions. What you accept there appears here."
+          description="The map lists the subjects your notes return to, most written about first, with the positions under each and the sentence each came from. Sweep every note to fill it, or open one note and use its Map section. What the sweep reads and what you accept on a note appear here."
           action={{ label: 'Open your notes', href: '/vault' }}
         />
       </>
@@ -43,6 +49,7 @@ export default async function VaultMapPage() {
   return (
     <>
       <PageHeader title="Map" />
+      <SweepPanel sweep={sweep} />
 
       <p className="mb-3 text-body text-ink-muted">
         {themes.length} {themes.length === 1 ? 'theme' : 'themes'}, most written about first

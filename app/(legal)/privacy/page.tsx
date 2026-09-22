@@ -133,15 +133,21 @@ export default function PrivacyPage() {
         lib/learn/vault/classify.ts with app/learn/know/actions.ts
         (proposeFromNote) and lib/learn/graph/from-brief.ts, and lib/vault/map
         (classify.ts, extract.ts, rules.ts) with app/vault/n/[...path]/actions.ts
-        (proposeMap). Any new path that sends note text to a model, such as a
-        sweep over the whole vault, has to be added here before it ships, along
-        with what it skips.
+        (proposeMap), and the sweep over the whole vault in lib/vault/map/sweep.ts
+        with inngest/vault/map-sweep.ts (plan #757). The sweep skips what
+        rules.ts skips (the Me folder and notes with API keys), notes under 80
+        characters, and text past MAX_NOTE_READ_CHARS in
+        lib/learn/graph/note-chunks.ts. Any new path that sends note text to a
+        model has to be added here before it ships, along with what it skips.
       */}
       <p>
         Three features send the text of your notes to Anthropic&rsquo;s Claude models: writing a
-        quiz, reading a note for Learn, and reading a note for the map of what you write about.
-        Each runs when you press its button, on the notes you picked. Nothing is sent in the
-        background.
+        quiz, reading a note for Learn, and reading notes for the map of what you write about.
+        Writing a quiz and reading for Learn run when you press their button, on the notes you
+        picked. The map can also be filled by a sweep, which you start from the map page. The
+        sweep sends every note in your vault, apart from those listed below, without you picking
+        them. It runs in the background a few minutes at a time until it has reached every note or
+        you stop it.
       </p>
       <p>What is sent:</p>
       <ul>
@@ -160,15 +166,16 @@ export default function PrivacyPage() {
           twice.
         </li>
         <li>
-          <strong>Reading a note for the map.</strong> First the note&rsquo;s title and its first
-          1,500 characters, to decide whether it argues anything. If it does, the whole note is
-          sent, one section at a time, each with the note&rsquo;s title, the section&rsquo;s
-          heading and the names of the themes already on your map.
+          <strong>Reading notes for the map.</strong> First the note&rsquo;s title and its first
+          1,500 characters, to decide whether it argues anything. If it does, the note is sent one
+          section at a time, each with the note&rsquo;s title, the section&rsquo;s heading and the
+          names of the themes already on your map. This happens to one note when you use its Map
+          section, and to every note in turn while a sweep runs.
         </li>
       </ul>
       <p>What is never sent:</p>
       <ul>
-        <li>A note you did not pick.</li>
+        <li>For a quiz or for Learn, a note you did not pick.</li>
         <li>
           Your name, email address or account. A request carries the note and the instructions,
           and nothing that says whose note it is.
@@ -180,10 +187,11 @@ export default function PrivacyPage() {
           sent.
         </li>
         <li>
-          For the map, any part of a note in your Me folder, which holds your journals, or of a
-          note that contains what looks like an API key. These are turned away before anything is
-          sent.
+          For the map, from a sweep or from one note: any part of a note in your Me folder, which
+          holds your journals, of a note that contains what looks like an API key, or of a note
+          under 80 characters. These are turned away before anything is sent.
         </li>
+        <li>For the map, the part of a note past its first 400,000 characters.</li>
       </ul>
       <p>
         Nothing sent from your notes is used to train a model. Anthropic&rsquo;s{' '}
