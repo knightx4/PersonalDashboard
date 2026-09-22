@@ -22,3 +22,19 @@ export {
   sectionsFromExtract,
 } from './wikipedia';
 export type { WikipediaArticle, WikipediaFailure, WikipediaResult, WikipediaSection } from './wikipedia';
+
+export {
+  chaptersFromDescription,
+  fetchYouTubePlaylist,
+  lectureLabel,
+  parseIsoDuration,
+  playlistUrl,
+  watchUrl,
+} from './youtube';
+export type {
+  YouTubeChapter,
+  YouTubeFailure,
+  YouTubePlaylist,
+  YouTubePlaylistResult,
+  YouTubeVideo,
+} from './youtube';
