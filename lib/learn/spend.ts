@@ -66,6 +66,11 @@ export const LEARN_OPERATIONS = [
   // has been pulled in rather than with how much you study, so it is worth
   // being able to see on its own.
   'judge-segment',
+  // Reading one vault note for the map: the classifier call and one Haiku call
+  // per chunk, recorded together because they are one press on the note's
+  // page. Kept apart from 'classify-note' and 'concepts-from-note', which are
+  // the older path into learn.concepts, so the two can be compared.
+  'map-note',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
