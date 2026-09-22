@@ -126,6 +126,23 @@ describe('cutting the briefing into passes', () => {
     expect(sections.length).toBeGreaterThan(1);
     expect(sections.length).toBeLessThan(12);
   });
+
+  it('keeps what comes before the first heading', () => {
+    const sections = splitBriefing(`Why this matters first.\n\n${TWO_SECTIONS}`);
+    expect(sections.map((s) => s.title)).toEqual([
+      'Why this matters first.',
+      'Bitcoin',
+      'Ethereum Classic',
+    ]);
+  });
+
+  it('cuts a block larger than a pass rather than sending it whole', () => {
+    const block = Array.from({ length: 800 }, (_, i) => `Sentence ${i} goes here.`).join(' ');
+    const sections = splitBriefing(block);
+    expect(sections.length).toBeGreaterThan(1);
+    for (const s of sections) expect(s.text.length).toBeLessThanOrEqual(6000);
+    expect(sections.map((s) => s.text).join(' ')).toBe(block);
+  });
 });
 
 describe('when the briefing states claims', () => {
