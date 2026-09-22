@@ -11,6 +11,8 @@ import { cn } from '@/lib/cn';
  * tick, and the map pages, which show the accepted rows the same way. The
  * quote is always shown: it is the one part of a position that was checked
  * against the note, and the only way to tell a fair reading from a stretch.
+ * The review passes its one quote; a theme's page passes none and puts every
+ * sentence behind the position, each with its note, in `children`.
  */
 export function MapPosition({
   name,
@@ -22,18 +24,21 @@ export function MapPosition({
   basis,
   tag,
   className,
+  children,
 }: {
   name: string;
   statement: string;
   kind: PositionKind;
   stance: ProposedStance;
-  quote: string;
+  quote?: string;
   /** Theme names it sits under, when the context does not already say. */
   under?: string[];
   basis?: string | null;
   /** One short warning beside the name, e.g. that nothing is left to hold it. */
   tag?: string | null;
   className?: string;
+  /** The sentences behind it, when there is more than the one `quote`. */
+  children?: React.ReactNode;
 }) {
   return (
     <span className={cn('block min-w-0', className)}>
@@ -49,7 +54,8 @@ export function MapPosition({
         )}
       </span>
       <span className="mt-0.5 block text-ui text-ink">{statement}</span>
-      <MapQuote quote={quote} className="mt-1.5" />
+      {quote !== undefined && <MapQuote quote={quote} className="mt-1.5" />}
+      {children}
       {(under?.length || basis) && (
         <span className="mt-1 block text-small text-ink-muted">
           {under && under.length > 0 && <>Under {under.join(', ')}. </>}
