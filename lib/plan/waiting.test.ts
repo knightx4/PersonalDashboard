@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanItem } from '@/lib/plan/load';
 import { buildPlanTree } from '@/lib/plan/tree';
-import { latestBlockNote, waitingGroups, waitingOnYou } from '@/lib/plan/waiting';
+import { isJobForYou, latestBlockNote, waitingGroups, waitingOnYou } from '@/lib/plan/waiting';
 import { raisedQueueFrom, type RaisedRow } from '@/lib/raised/load';
 
 let counter = 0;
@@ -277,6 +277,38 @@ describe('waitingGroups', () => {
       'Questions for you': ['#2'],
       'To approve': ['#1'],
     });
+  });
+
+  it('puts a step blocked on your read or your say-so under Questions', () => {
+    // Note d0ae7105: Your actions is only for what you clearly have to do.
+    expect(
+      laidOut([
+        item({
+          id: 'a',
+          number: 1,
+          status: 'blocked',
+          blockAsk:
+            'Read the new section of the privacy page and say whether it can go to main as written.',
+        }),
+        item({ id: 'b', number: 2, status: 'blocked', blockAsk: 'Should the export keep the nesting?' }),
+        item({ id: 'c', number: 3, status: 'blocked', blockAsk: 'Set GITHUB_TOKEN in Vercel.' }),
+        item({ id: 'd', number: 4, status: 'blocked', blockAsk: null }),
+      ]),
+    ).toEqual({
+      'Your actions': ['#3'],
+      'Questions for you': ['#1', '#2', '#4'],
+      'To approve': [],
+    });
+  });
+
+  it('reads a job from its wording and a question from anything short of one', () => {
+    expect(isJobForYou('Add the Mailgun API key to the Vercel project.')).toBe(true);
+    expect(isJobForYou('A token, scoped to this repo.')).toBe(true);
+    expect(isJobForYou('Allow ocw.mit.edu in the session network policy.')).toBe(true);
+    expect(isJobForYou('Which of the two layouts do you want?')).toBe(false);
+    expect(isJobForYou('Answer twenty applied cases and say whether a second turn is worth it.')).toBe(false);
+    expect(isJobForYou('The wording of the empty state.')).toBe(false);
+    expect(isJobForYou(null)).toBe(false);
   });
 
   it('keeps the three in order and returns the empty ones too', () => {

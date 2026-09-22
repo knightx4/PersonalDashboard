@@ -91,7 +91,10 @@ export function SearchScopeChip({
         // something you press. No primitive draws this shape: Button is
         // rounded-control and its smallest size is the height of the box this
         // sits inside, and ChipSelect and ChipInput wrap a select and an input.
-        className="press flex shrink-0 items-center gap-1.5 rounded-full border border-border py-0.5 pl-1 pr-1.5 text-small text-ink-muted transition-colors hover:bg-sunken hover:text-ink"
+        // The edge is drawn only on hover, focus and while the menu is open:
+        // at rest the mark, the word and the chevron already say what it is,
+        // and a ring inside the field's own ring read as a second box.
+        className="press flex shrink-0 items-center gap-1.5 rounded-full border border-transparent py-0 pl-0.5 pr-1.5 text-small text-ink-muted transition-colors hover:border-border hover:bg-sunken hover:text-ink focus-visible:border-border aria-expanded:border-border aria-expanded:bg-sunken"
       >
         {/* The mark of what is being searched: a workspace's own, or the app's
             for everything you own. */}

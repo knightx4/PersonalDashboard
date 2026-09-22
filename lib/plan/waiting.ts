@@ -177,9 +177,10 @@ export function waitingOnYou(sections: readonly PlanSection[]): WaitingRow[] {
 /**
  * The three groups the Dash section is drawn in.
  *
- * `actions` is what you have to go and do: a step stopped on something only
- * you can supply, and a setup job that was yours from the day it was written.
- * `questions` is what you have to answer in words. `approve` is what you only
+ * `actions` is what you have to go and do: a setup job that was yours from
+ * the day it was written, and a step stopped on something only you can
+ * supply. `questions` is what you have to answer in words, which includes a
+ * step stopped on your read or your say-so. `approve` is what you only
  * have to say yes to.
  *
  * The split is by what finishes the row, not by where it came from, which is
@@ -211,11 +212,43 @@ const GROUP_TITLE: Record<WaitingGroupKey, string> = {
 
 /** Which group a plan row finishes in. */
 const PLAN_GROUP: Record<WaitingRow['health'], WaitingGroupKey> = {
-  blocked: 'actions',
+  blocked: 'questions',
   setup: 'actions',
   unanswered: 'questions',
   proposed: 'approve',
 };
+
+/** Wording that asks for a judgement back: an answer, a read, a yes or no. */
+const WANTS_AN_ANSWER =
+  /\?|\b(say|tell|decide|choose|pick|confirm|answer|whether|which|should|shall|approve|read|review|look at|opinion|prefer)\b/i;
+
+/**
+ * Wording that names a job only the person can do: a thing to supply or a
+ * switch to throw, finished by doing it rather than by saying anything.
+ */
+const NAMES_A_JOB =
+  /^(set|add|create|make|install|enable|allow|grant|connect|configure|apply|run|rotate|buy|register|sign|upload|deploy|verify|invite|link|generate|issue|provide|supply|put)\b|\b(token|api key|secret|credential|password|env(ironment)? var(iable)?|allowlist|network access|billing)\b/i;
+
+/**
+ * Whether a blocked step is a job for you rather than a question.
+ *
+ * Note d0ae7105: Your actions is for what you clearly have to go and do, and
+ * anything that needs your input belongs under Questions. A block can be
+ * either -- #499 waited on a GitHub token, #751 on a read and a yes -- and
+ * `block_kind` only says whether it waits on steps or on something outside,
+ * so the ask is what decides. A job is named outright and asks nothing back;
+ * anything short of that is a question, because a question drawn as a chore
+ * is the mistake the note was about.
+ */
+export function isJobForYou(ask: string | null): boolean {
+  if (!ask) return false;
+  return NAMES_A_JOB.test(ask.trim()) && !WANTS_AN_ANSWER.test(ask);
+}
+
+function planGroupOf(row: WaitingRow): WaitingGroupKey {
+  if (row.health === 'blocked' && isJobForYou(row.ask)) return 'actions';
+  return PLAN_GROUP[row.health];
+}
 
 /**
  * Which group a raise finishes in: #622 settled that one naming an action Dash
@@ -254,7 +287,7 @@ export function waitingGroups(
   };
 
   for (const row of waitingOnYou(sections)) {
-    entries[PLAN_GROUP[row.health]].push({ kind: 'plan', id: row.id, row });
+    entries[planGroupOf(row)].push({ kind: 'plan', id: row.id, row });
   }
   // In the order the queue reads them, newest first, which is the order they
   // were in when every raise sat in one fold.
