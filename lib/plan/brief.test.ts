@@ -234,7 +234,6 @@ describe('planBrief on a step a re-shape wrote', () => {
   });
 });
 
-
 describe('what has been put aside', () => {
   const sections = buildPlanTree({
     items: [
@@ -363,7 +362,12 @@ describe('planBrief, on a claimed step', () => {
     items: [
       item({ id: 'feature', title: 'Liveness' }),
       item({ id: 'mine', title: 'The step being read', parentId: 'feature' }),
-      item({ id: 'other', title: 'Somebody else is on this', parentId: 'feature', status: 'in_progress' }),
+      item({
+        id: 'other',
+        title: 'Somebody else is on this',
+        parentId: 'feature',
+        status: 'in_progress',
+      }),
     ],
     dependencies: [],
   });

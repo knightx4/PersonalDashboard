@@ -74,13 +74,17 @@ describe('where new steps go', () => {
   });
 
   it('keeps the app-wide list separate from every module', () => {
-    const existing = [{ module: null, position: 50 }, { module: 'learn', position: 200 }];
+    const existing = [
+      { module: null, position: 50 },
+      { module: 'learn', position: 200 },
+    ];
     const steps = [step(null, 'a'), step('learn', 'b')];
     expect(positionsForNewSteps(existing, steps)).toEqual([60, 210]);
   });
 
   it('survives a row with no position at all', () => {
-    expect(positionsForNewSteps([{ module: 'learn', position: null }], [step('learn', 'a')]))
-      .toEqual([10]);
+    expect(
+      positionsForNewSteps([{ module: 'learn', position: null }], [step('learn', 'a')]),
+    ).toEqual([10]);
   });
 });

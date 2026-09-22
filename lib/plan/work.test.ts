@@ -74,10 +74,7 @@ describe('the steps a run closed', () => {
   });
 
   it('leaves out a step that closed before the run started', () => {
-    const closed = stepsClosedSince(
-      [step({ number: 9, completedAt: minutesAgo(400) })],
-      FIRED,
-    );
+    const closed = stepsClosedSince([step({ number: 9, completedAt: minutesAgo(400) })], FIRED);
     expect(closed).toEqual([]);
   });
 
@@ -124,10 +121,7 @@ describe('what a run has to show', () => {
           refusal: null,
         },
       }),
-      steps: [
-        step({ number: 494 }),
-        step({ number: 500, completedAt: minutesAgo(8) }),
-      ],
+      steps: [step({ number: 494 }), step({ number: 500, completedAt: minutesAgo(8) })],
       raises: [raise({ id: 'r', source: 'plan #500' })],
     });
 
@@ -159,7 +153,9 @@ describe('what a run has to show', () => {
       steps: [],
       raises: [],
     });
-    expect(nothingToShowLine(work, NOW)).toBe('Nothing pushed, closed or raised in the 40m since it started.');
+    expect(nothingToShowLine(work, NOW)).toBe(
+      'Nothing pushed, closed or raised in the 40m since it started.',
+    );
   });
 
   it('says GitHub refused rather than counting the silence as evidence', () => {
@@ -182,12 +178,12 @@ describe('the line that names the run', () => {
   });
 
   it('names a feature batch and a re-shape as themselves', () => {
-    expect(runStartedLine(runWork({ run: run({ job: 'feature' }), steps: [], raises: [] }), NOW)).toContain(
-      'A feature batch',
-    );
-    expect(runStartedLine(runWork({ run: run({ job: 'reshape' }), steps: [], raises: [] }), NOW)).toContain(
-      'A re-shape',
-    );
+    expect(
+      runStartedLine(runWork({ run: run({ job: 'feature' }), steps: [], raises: [] }), NOW),
+    ).toContain('A feature batch');
+    expect(
+      runStartedLine(runWork({ run: run({ job: 'reshape' }), steps: [], raises: [] }), NOW),
+    ).toContain('A re-shape');
   });
 
   it('says a run that is over is over rather than still counting', () => {

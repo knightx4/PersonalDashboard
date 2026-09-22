@@ -13,6 +13,8 @@
  * means "nothing on main carries this commit" and this commit *is* main.
  */
 import type { CheckConclusion } from './checks';
+import { DEPLOY_SAYS, type DeployState } from './deploy';
+import { unappliedSentence } from './migrations';
 
 /** One stored reading of main's newest commit. */
 export type MainCheck = {
@@ -32,6 +34,19 @@ export type MainCheck = {
   reason: string | null;
   /** The failing run on GitHub, for the panel to link to. Null unless failed. */
   runUrl: string | null;
+  /** Whether main's head deployed (`lib/plan/deploy.ts`). Null when not read. */
+  deployState: DeployState | null;
+  /** The deployment's page on Vercel. */
+  deployUrl: string | null;
+  /** Why the deploy could not be read. Null when it was. */
+  deployError: string | null;
+  /**
+   * Migration files on main that the live database has not applied
+   * (`lib/plan/migrations.ts`). Empty when all are; null when not read.
+   */
+  unapplied: string[] | null;
+  /** Why the migrations could not be compared. Null when they were. */
+  migrationsError: string | null;
 };
 
 /** One job of a failing workflow run, as `/actions/runs/{id}/jobs` gives it. */
@@ -152,16 +167,64 @@ export function mainCheckStale(check: MainCheck, now: number): boolean {
 export function mainDot(check: MainCheck | null, now: number | null): MainDot {
   if (!check || !check.conclusion) return 'unknown';
   if (now !== null && mainCheckStale(check, now)) return 'unknown';
+
+  let dot: MainDot;
   switch (check.conclusion) {
     case 'passed':
-      return 'passed';
+      dot = 'passed';
+      break;
     case 'failed':
-      return 'failed';
+      dot = 'failed';
+      break;
     case 'running':
-      return 'running';
+      dot = 'running';
+      break;
     default:
       return 'unknown';
   }
+
+  // The deploy and the migrations can only make it worse. Green CI on a commit
+  // that did not deploy, or that needs a migration the live database does not
+  // have, is not a green main: the site is broken or behind either way. A
+  // reading that could not be taken leaves the dot as CI has it, and the panel
+  // says which reading is missing.
+  const deployDot: MainDot | null =
+    check.deployState === 'failed' || check.deployState === 'missing'
+      ? 'failed'
+      : check.deployState === 'deploying'
+        ? 'running'
+        : null;
+  const migrationsDot: MainDot | null =
+    check.unapplied && check.unapplied.length > 0 ? 'failed' : null;
+
+  for (const other of [deployDot, migrationsDot]) {
+    if (other && RANK[other] > RANK[dot]) dot = other;
+  }
+  return dot;
+}
+
+/** Which of two colours is worse news, for combining the three readings. */
+const RANK: Record<MainDot, number> = { unknown: 0, passed: 1, running: 2, failed: 3 };
+
+/**
+ * One line per reading, for the panel: CI, the deploy and the migrations.
+ *
+ * `null` for a line that has nothing to say yet, which is a reading from
+ * before these columns existed. A line that could not be read says why, in the
+ * refusal's own sentence, because "not read" alone sends nobody anywhere.
+ */
+export function deployLine(check: MainCheck): string | null {
+  if (check.deployError) return `Deploy not read. ${check.deployError}`;
+  if (!check.deployState) return null;
+  return DEPLOY_SAYS[check.deployState];
+}
+
+export function migrationsLine(check: MainCheck): string | null {
+  if (check.migrationsError) return `Migrations not compared. ${check.migrationsError}`;
+  if (!check.unapplied) return null;
+  return (
+    unappliedSentence(check.unapplied) ?? 'Every migration on main is applied to the live database.'
+  );
 }
 
 /** Seven characters, which is what a commit is called everywhere else here. */
@@ -216,7 +279,21 @@ export function mainCheckTitle(
     return `${commit} ${said}, but that was ${minutes} minutes ago and nothing has read it since.`;
   }
 
-  return `${commit} ${said}.${when}`;
+  return `${commit} ${said}.${also(check)}${when}`;
+}
+
+/**
+ * What the deploy and migrations add to the sentence, when they are what
+ * turned the dot. A dot that is red because of a migration and a sentence
+ * that says "passed its checks" would be two channels disagreeing.
+ */
+function also(check: MainCheck): string {
+  const extra: string[] = [];
+  if (check.deployState === 'failed') extra.push(' Its deploy failed.');
+  if (check.deployState === 'missing') extra.push(' It has not deployed.');
+  const n = check.unapplied?.length ?? 0;
+  if (n > 0) extra.push(` ${n} ${n === 1 ? 'migration is' : 'migrations are'} not applied.`);
+  return extra.join('');
 }
 
 /**
@@ -232,9 +309,10 @@ export function mainCheckTitle(
  * stale, and a commit no workflow touched all land on grey.
  */
 export const MAIN_DOT_MEANING: Record<MainDot, string> = {
-  passed: 'Green: main built and its checks passed.',
-  failed: 'Red: a check on main failed. This is the one worth acting on.',
-  running: 'Amber: main is still being checked.',
+  passed: 'Green: main passed its checks, deployed, and every migration on it is applied.',
+  failed:
+    'Red: a check on main failed, its deploy failed, or a migration on it is not applied. This is the one worth acting on.',
+  running: 'Amber: main is still being checked or deployed.',
   unknown:
     'Grey: nothing is known. Not read yet, GitHub would not say, the reading is over six minutes old, or main ran no checks.',
 };

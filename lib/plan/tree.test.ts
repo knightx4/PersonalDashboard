@@ -82,7 +82,12 @@ const shopping = (sections: ReturnType<typeof tree>) =>
 describe('planProgress', () => {
   it('counts what is done against what is still live', () => {
     expect(
-      planProgress([at('done', 'a'), at('done', 'b'), at('not_started', 'c'), at('in_progress', 'd')]),
+      planProgress([
+        at('done', 'a'),
+        at('done', 'b'),
+        at('not_started', 'c'),
+        at('in_progress', 'd'),
+      ]),
     ).toMatchObject({ done: 2, inProgress: 1, live: 4, fraction: 0.5 });
   });
 
@@ -538,8 +543,9 @@ describe('the chip row', () => {
   it('draws five views and keeps every other one in the menu', () => {
     expect([...PLAN_VIEW_CHIPS]).toEqual(['open', 'ready', 'you', 'claude', 'all']);
     expect([...PLAN_VIEW_CHIPS, ...PLAN_VIEW_MENU].sort()).toEqual([...PLAN_VIEWS].sort());
-    expect(PLAN_VIEW_MENU.some((view) => (PLAN_VIEW_CHIPS as readonly string[]).includes(view)))
-      .toBe(false);
+    expect(
+      PLAN_VIEW_MENU.some((view) => (PLAN_VIEW_CHIPS as readonly string[]).includes(view)),
+    ).toBe(false);
   });
 });
 
@@ -547,7 +553,12 @@ describe('ordering the features inside a section', () => {
   const fixture = () =>
     tree([
       item({ id: 'first', position: 10, updatedAt: '2026-01-01T00:00:00Z' }),
-      item({ id: 'first-step', parentId: 'first', position: 10, updatedAt: '2026-01-01T00:00:00Z' }),
+      item({
+        id: 'first-step',
+        parentId: 'first',
+        position: 10,
+        updatedAt: '2026-01-01T00:00:00Z',
+      }),
       item({ id: 'second', position: 20, updatedAt: '2026-02-01T00:00:00Z' }),
       item({ id: 'third', position: 30, updatedAt: '2026-01-15T00:00:00Z' }),
       // Closed this morning. It used to lift its feature to the top of the
@@ -557,7 +568,12 @@ describe('ordering the features inside a section', () => {
         position: 10,
         updatedAt: '2026-03-01T00:00:00Z',
       }),
-      item({ id: 'third-next', parentId: 'third', position: 20, updatedAt: '2026-01-15T00:00:00Z' }),
+      item({
+        id: 'third-next',
+        parentId: 'third',
+        position: 20,
+        updatedAt: '2026-01-15T00:00:00Z',
+      }),
     ]);
 
   it('keeps the plan’s own order in a working view, whatever was touched last', () => {
@@ -712,10 +728,7 @@ describe('workOrder', () => {
       item({ id: 'theirs' }),
       item({ id: 'nobody' }),
     ]);
-    expect(workOrder(sections, { only: 'runner' }).map((n) => n.id)).toEqual([
-      'theirs',
-      'nobody',
-    ]);
+    expect(workOrder(sections, { only: 'runner' }).map((n) => n.id)).toEqual(['theirs', 'nobody']);
     expect(workOrder(sections, { only: 'mine' }).map((n) => n.id)).toEqual(['mine']);
   });
 
@@ -729,13 +742,10 @@ describe('workOrder', () => {
       item({ id: 'next', parentId: 'feature', position: 20 }),
       item({ id: 'after', parentId: 'feature', position: 30 }),
     ]);
-    expect(workOrder(sections, { only: 'runner' }).map((n) => n.id)).toEqual([
-      'next',
-      'after',
-    ]);
+    expect(workOrder(sections, { only: 'runner' }).map((n) => n.id)).toEqual(['next', 'after']);
   });
 
-  it('never leaves a decision in the runner\'s list', () => {
+  it("never leaves a decision in the runner's list", () => {
     // The one thing a routine must not do is answer its own question.
     const sections = tree([item({ id: 'work' }), item({ id: 'question', kind: 'decision' })]);
     expect(workOrder(sections, { only: 'runner' }).map((n) => n.id)).toEqual(['work']);
@@ -853,8 +863,11 @@ describe('a block on steps whose dependencies have all closed', () => {
     expect(summarize(sections).onYou).toBe(2);
     // The feature is in the Waiting view as the container it is shown in; the
     // step itself is what the view matched.
-    expect(flattenSections(applyView(sections, 'blocked')).filter((n) => n.matches).map((n) => n.id))
-      .toEqual(['stuck']);
+    expect(
+      flattenSections(applyView(sections, 'blocked'))
+        .filter((n) => n.matches)
+        .map((n) => n.id),
+    ).toEqual(['stuck']);
     expect(flattenSections(applyView(sections, 'ready')).map((n) => n.id)).toEqual([]);
     expect(findNode(sections, 'stuck')!.ready).toBe(false);
     expect(healthOf(findNode(sections, 'stuck')!)).toBe('blocked');
@@ -980,11 +993,9 @@ describe('a setup step', () => {
   // The whole point of the kind: a job that is yours reads as a job on your
   // list, not as a build somebody got stuck on. Everything below is one line
   // of #597's done-when.
-  const setup = (id: string, over: Partial<PlanItem> = {}) =>
-    item({ id, kind: 'setup', ...over });
+  const setup = (id: string, over: Partial<PlanItem> = {}) => item({ id, kind: 'setup', ...over });
 
-  const only = (sections: ReturnType<typeof tree>, id: string) =>
-    findNode(sections, id)!;
+  const only = (sections: ReturnType<typeof tree>, id: string) => findNode(sections, id)!;
 
   it('reports setup while it is open, whatever the status column says', () => {
     const sections = tree([
@@ -1001,10 +1012,7 @@ describe('a setup step', () => {
   });
 
   it('stops reporting setup once it is closed', () => {
-    const sections = tree([
-      setup('done', { status: 'done' }),
-      setup('cut', { status: 'dropped' }),
-    ]);
+    const sections = tree([setup('done', { status: 'done' }), setup('cut', { status: 'dropped' })]);
 
     expect(healthOf(only(sections, 'done'))).toBe('done');
     expect(healthOf(only(sections, 'cut'))).toBe('dropped');
@@ -1038,7 +1046,7 @@ describe('a setup step', () => {
     expect(ids).toEqual(['job']);
   });
 
-  it('is never in the runner\'s list, however it is assigned', () => {
+  it("is never in the runner's list, however it is assigned", () => {
     // A routine that claimed one would sit in front of an account nobody has
     // made and block itself to say so.
     const sections = tree([item({ id: 'work' }), setup('job', { assignee: 'me' })]);
@@ -1089,7 +1097,11 @@ describe('tallyHealth', () => {
     // The same reason planProgress measures leaves: counting a feature and the
     // steps under it says "three things" about a module that has two.
     const section = shopping(
-      tree([at('not_started', 'f'), at('done', 's1', { parentId: 'f' }), at('done', 's2', { parentId: 'f' })]),
+      tree([
+        at('not_started', 'f'),
+        at('done', 's1', { parentId: 'f' }),
+        at('done', 's2', { parentId: 'f' }),
+      ]),
     );
     const total = Object.values(section.tally).reduce((sum, n) => sum + n, 0);
     expect(total).toBe(2);
@@ -1507,9 +1519,11 @@ describe('searchSections', () => {
 
   it('finds a step by a word in its detail', () => {
     const found = searchSections(plan(), 'camera roll');
-    expect(flattenSections(found).filter((node) => node.matches).map((n) => n.title)).toEqual([
-      'Pick a photo',
-    ]);
+    expect(
+      flattenSections(found)
+        .filter((node) => node.matches)
+        .map((n) => n.title),
+    ).toEqual(['Pick a photo']);
   });
 
   it('finds a step by its number, with or without the hash', () => {
@@ -1562,8 +1576,7 @@ describe('searchSections', () => {
  * until #fa32dfaa, and these are the cases that separate them.
  */
 describe('healthOf, over a subtree that has started', () => {
-  const feature = (children: PlanItem[]) =>
-    shopping(tree([at('not_started', 'f'), ...children]));
+  const feature = (children: PlanItem[]) => shopping(tree([at('not_started', 'f'), ...children]));
 
   it('calls a feature in progress once a step beneath it is done', () => {
     const sections = feature([
@@ -1801,7 +1814,9 @@ describe('moveOf', () => {
     // The set holds the feature the run was fired at. A step beneath it is not
     // itself being re-read, and it is the feature's buttons that shut.
     it('does not spread down to the steps beneath it', () => {
-      const sections = shopping(tree([at('not_started', 'f'), at('not_started', 's1', { parentId: 'f' })]));
+      const sections = shopping(
+        tree([at('not_started', 'f'), at('not_started', 's1', { parentId: 'f' })]),
+      );
       const step = findNode([sections], 's1')!;
       expect(moveOf(step, whileResolving)).toBe('none');
     });
@@ -1835,8 +1850,11 @@ describe('healthOf, on a claim read against its run', () => {
     const section = shopping(tree([claimed('a')]));
     const node = section.nodes[0];
     const liveness = (pushed: number | null, fired = 30) =>
-      planLiveness([{ id: node.id, status: 'in_progress', startedAt: node.startedAt }],
-        { [node.id]: run(fired, pushed) }, NOW);
+      planLiveness(
+        [{ id: node.id, status: 'in_progress', startedAt: node.startedAt }],
+        { [node.id]: run(fired, pushed) },
+        NOW,
+      );
 
     expect(healthOf(node, liveness(2))).toBe('working');
     expect(healthOf(node, liveness(25))).toBe('quiet');

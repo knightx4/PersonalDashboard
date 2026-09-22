@@ -84,7 +84,7 @@ describe('planItemFromRow', () => {
     expect(planItemFromRow({ ...row, block_kind: 'somebody' }).blockKind).toBeNull();
   });
 
-  it('reads a step still holding the old claude value as nobody\'s', () => {
+  it("reads a step still holding the old claude value as nobody's", () => {
     // #718. The column says which approved steps you kept, and `me` is the
     // whole of that answer, so the two dozen rows a hand-over wrote load as
     // nobody's -- which is what `isClaudes` already counts as the runner's.
