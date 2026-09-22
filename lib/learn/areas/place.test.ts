@@ -50,6 +50,28 @@ describe('readPlacements', () => {
     expect(result.dropped).toEqual(['Isaac Newton', 'Tea']);
   });
 
+  it('places an umbrella article at a real domain, and refuses an invented one', () => {
+    const result = readPlacements(
+      {
+        placements: [
+          { title: 'Isaac Newton', kind: 'person', field: 'physics', confidence: 'clear', basis: 'Physics.' },
+          { title: 'Inflation', kind: 'topic', field: 'domain:social-sciences', confidence: 'clear', basis: 'Spans the domain.' },
+          { title: 'Tea', kind: 'topic', field: 'domain:everyday-life', confidence: 'clear', basis: 'Invented.' },
+        ],
+      },
+      BATCH,
+      SLUGS,
+      new Set(['social-sciences', 'arts-culture']),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.placements.map((p) => [p.title, p.field, p.domain])).toEqual([
+      ['Isaac Newton', 'physics', null],
+      ['Inflation', null, 'social-sciences'],
+    ]);
+    expect(result.dropped).toEqual(['Tea']);
+  });
+
   it('refuses a payload in the wrong shape rather than reading part of it', () => {
     expect(readPlacements({ placements: [{ title: 'Tea' }] }, BATCH, SLUGS).ok).toBe(false);
   });

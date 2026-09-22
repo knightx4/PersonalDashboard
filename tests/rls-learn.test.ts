@@ -141,7 +141,8 @@ describe('the areas, which change only by migration', () => {
     const domains = await asUser(userB, (tx) => tx`select slug from area_domains`);
     const fields = await asUser(userB, (tx) => tx`select slug from area_fields`);
     expect(domains.length).toBe(10);
-    expect(fields.length).toBe(46);
+    // 46 from 0027, and World and regional history from 0030.
+    expect(fields.length).toBe(47);
   });
 
   it('does not let a signed-in user add, rename or remove an area', async () => {
@@ -163,6 +164,19 @@ describe('the areas, which change only by migration', () => {
     const [physics] = await admin<{ name: string }[]>`
       select name from area_fields where slug = 'physics'`;
     expect(physics?.name).toBe('Physics');
+  });
+
+  it('refuses a placed row that names both a field and a domain, or neither', async () => {
+    const [field] = await admin<{ id: string }[]>`select id from area_fields where slug = 'physics'`;
+    const [domain] = await admin<{ id: string }[]>`select id from area_domains where slug = 'technology'`;
+    await expect(
+      admin`insert into area_check_articles (title, section, kind, confidence, basis, placed_at, field_id, domain_id)
+            values ('Both', 'x', 'topic', 'clear', 'Both.', now(), ${field.id}, ${domain.id})`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into area_check_articles (title, section, kind, confidence, basis, placed_at)
+            values ('Neither', 'x', 'topic', 'clear', 'Neither.', now())`,
+    ).rejects.toThrow();
   });
 
   it('does not let a signed-in user write a placement into the check', async () => {
