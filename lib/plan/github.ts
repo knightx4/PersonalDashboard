@@ -34,13 +34,15 @@ export function readToken(): string | null {
  * repository fine can still be refused the workflow runs -- which is exactly
  * the shape this failed in.
  *
- * Only the two this file is sure of are named. The activity listing falls
+ * Only the ones this file is sure of are named. The activity listing falls
  * through to the unnamed form on purpose: sending someone to tick the wrong
  * box is worse than telling them a box is missing.
  */
 const PERMISSION_FOR: ReadonlyArray<readonly [string, string]> = [
   ['/actions/runs', 'Actions: Read'],
   ['/commits', 'Contents: Read'],
+  ['/contents/', 'Contents: Read'],
+  ['/deployments', 'Deployments: Read'],
 ];
 
 /**

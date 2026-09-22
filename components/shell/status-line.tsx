@@ -9,8 +9,10 @@ import { usePopover } from '@/lib/use-popover';
 import type { ActivityLine } from '@/lib/shell/activity';
 import type { Brief } from '@/lib/shell/brief';
 import {
+  deployLine,
   MAIN_DOT_MEANING,
   MAIN_DOT_ORDER,
+  migrationsLine,
   mainCheckTitle,
   mainDot,
   type MainCheck,
@@ -250,6 +252,25 @@ function MainDotMark({ check }: { check: MainCheck | null }) {
           className="w-72 font-sans"
         >
           <p className="text-ui text-ink">{said}</p>
+          {/*
+            Why, and where to read more. Only a red reading carries either,
+            and only when the tick could read the failing jobs; the sentence
+            above still stands on its own when it could not.
+          */}
+          {state === 'failed' && check?.reason && (
+            <p className="mt-2 text-caption text-ink">{check.reason}</p>
+          )}
+          {state === 'failed' && check?.runUrl && (
+            <a
+              href={check.runUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-block text-caption text-ink-muted underline underline-offset-2 hover:text-ink"
+            >
+              Open the run on GitHub
+            </a>
+          )}
+          {check && <Readings check={check} />}
           <ul className="mt-3 space-y-2 border-t border-border pt-3">
             {MAIN_DOT_ORDER.map((dot) => (
               <li key={dot} className="flex items-start gap-2">
@@ -276,6 +297,55 @@ function MainDotMark({ check }: { check: MainCheck | null }) {
         </Popover>
       )}
     </span>
+  );
+}
+
+/**
+ * The deploy and migration readings, one line each, under the CI sentence.
+ *
+ * A line with nothing to say is left out rather than drawn as "unknown": the
+ * row predates the reading, and the next tick fills it in. The deploy links to
+ * Vercel's page for it when it failed, because that page has the build log.
+ */
+function Readings({ check }: { check: MainCheck }) {
+  const deploy = deployLine(check);
+  const migrations = migrationsLine(check);
+  if (!deploy && !migrations) return null;
+  const deployBad = check.deployState === 'failed' || check.deployState === 'missing';
+  const migrationsBad = (check.unapplied?.length ?? 0) > 0;
+
+  return (
+    <dl className="mt-3 space-y-1.5 border-t border-border pt-3 text-caption">
+      {deploy && (
+        <div>
+          <dt className="sr-only">Deploy</dt>
+          <dd className={deployBad ? 'text-danger' : 'text-ink-muted'}>
+            {deploy}
+            {deployBad && check.deployUrl && (
+              <>
+                {' '}
+                <a
+                  href={check.deployUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline underline-offset-2 hover:text-ink"
+                >
+                  Open the deploy
+                </a>
+              </>
+            )}
+          </dd>
+        </div>
+      )}
+      {migrations && (
+        <div>
+          <dt className="sr-only">Migrations</dt>
+          <dd className={cn('break-words', migrationsBad ? 'text-danger' : 'text-ink-muted')}>
+            {migrations}
+          </dd>
+        </div>
+      )}
+    </dl>
   );
 }
 

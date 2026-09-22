@@ -18,7 +18,7 @@ export const metadata = {
   description: 'What Personal Dashboard reads, what it stores, and what it never keeps.',
 };
 
-const LAST_UPDATED = '26 July 2026';
+const LAST_UPDATED = '22 September 2026';
 
 export default function PrivacyPage() {
   return (
@@ -30,6 +30,10 @@ export default function PrivacyPage() {
         Personal Dashboard helps you see what you already own and what you spend. To do that it
         can, with your permission, read purchase-related messages in your email. This page
         explains exactly what it reads, what it keeps, and what it never keeps.
+      </p>
+      <p>
+        It can also send notes from your notes vault to a language model when you ask it to. The
+        section on your notes says what is sent.
       </p>
 
       <h2>Who we are</h2>
@@ -121,6 +125,84 @@ export default function PrivacyPage() {
         read that one message, we do not send your identity along with it, and we disable
         provider-side retention where the provider supports it. The provider does not use this
         content to train models.
+      </p>
+
+      <h2>Your notes and the language model</h2>
+      {/*
+        Written against lib/learn/quiz (generate.ts, grade.ts, plan.ts),
+        lib/learn/vault/classify.ts with app/learn/know/actions.ts
+        (proposeFromNote) and lib/learn/graph/from-brief.ts, and lib/vault/map
+        (classify.ts, extract.ts, rules.ts) with app/vault/n/[...path]/actions.ts
+        (proposeMap), and the sweep over the whole vault in lib/vault/map/sweep.ts
+        with inngest/vault/map-sweep.ts (plan #757). The sweep skips what
+        rules.ts skips (the Me folder and notes with API keys), notes under 80
+        characters, and text past MAX_NOTE_READ_CHARS in
+        lib/learn/graph/note-chunks.ts. Any new path that sends note text to a
+        model has to be added here before it ships, along with what it skips.
+      */}
+      <p>
+        Three features send the text of your notes to Anthropic&rsquo;s Claude models: writing a
+        quiz, reading a note for Learn, and reading notes for the map of what you write about.
+        Writing a quiz and reading for Learn run when you press their button, on the notes you
+        picked. The map can also be filled by a sweep, which you start from the map page. The
+        sweep sends every note in your vault, apart from those listed below, without you picking
+        them. It runs in the background a few minutes at a time until it has reached every note or
+        you stop it.
+      </p>
+      <p>What is sent:</p>
+      <ul>
+        <li>
+          <strong>Writing a quiz.</strong> The title of each note you picked and the text the
+          questions are written from. A short note is sent whole. A long one is split at its
+          headings, and the sections the questions come from are sent. When you answer, the
+          question, the answer the model expected, your answer and the note&rsquo;s title are
+          sent so your answer can be marked.
+        </li>
+        <li>
+          <strong>Reading a note for Learn.</strong> First the note&rsquo;s title and its first
+          1,500 characters, to decide whether it argues anything. If it does, the note is sent
+          again, section by section up to its first ten sections, with the name of the subject
+          you chose and the names of the ideas already in that subject, so none is proposed
+          twice.
+        </li>
+        <li>
+          <strong>Reading notes for the map.</strong> First the note&rsquo;s title and its first
+          1,500 characters, to decide whether it argues anything. If it does, the note is sent one
+          section at a time, each with the note&rsquo;s title, the section&rsquo;s heading and the
+          names of the themes already on your map. This happens to one note when you use its Map
+          section, and to every note in turn while a sweep runs.
+        </li>
+      </ul>
+      <p>What is never sent:</p>
+      <ul>
+        <li>For a quiz or for Learn, a note you did not pick.</li>
+        <li>
+          Your name, email address or account. A request carries the note and the instructions,
+          and nothing that says whose note it is.
+        </li>
+        <li>The folder or file path of a note. Only its title is sent.</li>
+        <li>
+          The rest of a note that the first read judges to be a record rather than an argument,
+          such as a travel plan or a log of measurements. Only its first 1,500 characters were
+          sent.
+        </li>
+        <li>
+          For the map, from a sweep or from one note: any part of a note in your Me folder, which
+          holds your journals, of a note in Career/Job Applications, of a note that contains what looks like an API key, or of a note
+          under 80 characters. These are turned away before anything is sent.
+        </li>
+        <li>For the map, the part of a note past its first 400,000 characters.</li>
+      </ul>
+      <p>
+        Nothing sent from your notes is used to train a model. Anthropic&rsquo;s{' '}
+        <a
+          href="https://www.anthropic.com/legal/commercial-terms"
+          className="text-accent hover:underline"
+        >
+          commercial terms
+        </a>{' '}
+        do not allow it to train models on what is sent through its API, and this app does not
+        train models of its own.
       </p>
 
       <h2>How your data is protected</h2>

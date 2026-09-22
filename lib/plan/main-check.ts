@@ -13,6 +13,8 @@
  * means "nothing on main carries this commit" and this commit *is* main.
  */
 import type { CheckConclusion } from './checks';
+import { DEPLOY_SAYS, type DeployState } from './deploy';
+import { unappliedSentence } from './migrations';
 
 /** One stored reading of main's newest commit. */
 export type MainCheck = {
@@ -24,7 +26,103 @@ export type MainCheck = {
   checkedAt: string;
   /** Why GitHub refused, in the sentence `refusalFor` writes. Null when it answered. */
   error: string | null;
+  /**
+   * Why main failed, in the sentence `failureReason` writes: which job and
+   * step broke, or that GitHub never started the jobs. Null unless failed, and
+   * null on a failure whose jobs could not be read.
+   */
+  reason: string | null;
+  /** The failing run on GitHub, for the panel to link to. Null unless failed. */
+  runUrl: string | null;
+  /** Whether main's head deployed (`lib/plan/deploy.ts`). Null when not read. */
+  deployState: DeployState | null;
+  /** The deployment's page on Vercel. */
+  deployUrl: string | null;
+  /** Why the deploy could not be read. Null when it was. */
+  deployError: string | null;
+  /**
+   * Migration files on main that the live database has not applied
+   * (`lib/plan/migrations.ts`). Empty when all are; null when not read.
+   */
+  unapplied: string[] | null;
+  /** Why the migrations could not be compared. Null when they were. */
+  migrationsError: string | null;
 };
+
+/** One job of a failing workflow run, as `/actions/runs/{id}/jobs` gives it. */
+export type FailedJob = {
+  name: string;
+  conclusion: string | null;
+  /** Zero or null when GitHub never gave the job a machine to run on. */
+  runner_id?: number | null;
+  steps?: Array<{ name: string; conclusion: string | null }>;
+};
+
+/** One failing workflow run and the jobs under it. */
+export type FailedRun = { name: string; conclusion: string | null; jobs: FailedJob[] };
+
+/** The job conclusions that count as broken, the same set `checks.ts` fails on. */
+const BROKEN = new Set(['failure', 'timed_out', 'cancelled', 'startup_failure', 'action_required']);
+
+/**
+ * Why main is red, in one or two sentences for the panel behind the dot.
+ *
+ * Two different failures look identical from the conclusion alone, and they
+ * want different people. A job that ran and broke at a step is the code: the
+ * sentence names the job and the step, which is where the log starts to
+ * matter. A job GitHub never started has no steps and was never given a
+ * runner, and no push can fix it: on a private repository that is almost
+ * always the month's Actions minutes used up or a payment that failed, so the
+ * sentence says that and where to look, rather than sending somebody into
+ * logs that do not exist.
+ *
+ * Null when there is nothing to say beyond "failed", which the panel already
+ * says.
+ */
+export function failureReason(runs: readonly FailedRun[]): string | null {
+  const broke: string[] = [];
+  const unstarted: string[] = [];
+  let unstartedRun = false;
+
+  for (const run of runs) {
+    const failing = run.jobs.filter((job) => job.conclusion && BROKEN.has(job.conclusion));
+    // A run that failed before it had any jobs is a workflow GitHub could not
+    // start at all: a broken workflow file, or the same billing refusal.
+    if (run.jobs.length === 0 && run.conclusion && BROKEN.has(run.conclusion)) {
+      unstartedRun = true;
+      continue;
+    }
+    for (const job of failing) {
+      const steps = job.steps ?? [];
+      if (steps.length === 0 && !job.runner_id) {
+        unstarted.push(job.name);
+        continue;
+      }
+      const step = steps.find((s) => s.conclusion && BROKEN.has(s.conclusion));
+      broke.push(step ? `${job.name} › ${step.name}` : job.name);
+    }
+  }
+
+  const said: string[] = [];
+  if (broke.length > 0) said.push(`Failed at ${broke.join(', ')}.`);
+  if (unstarted.length > 0) {
+    said.push(
+      `GitHub never started ${unstarted.join(', ')}: no runner was given ${
+        unstarted.length === 1 ? 'to it' : 'to them'
+      }, which on a private repository usually means the month's Actions minutes are used up or a payment failed. Check github.com/settings/billing.`,
+    );
+  } else if (unstartedRun) {
+    said.push(
+      "GitHub could not start the workflow at all: either the workflow file is invalid or the account's Actions minutes or billing stopped it. The run on GitHub says which.",
+    );
+  }
+
+  if (said.length === 0) return null;
+  // The column holds 500 characters; a run with a dozen broken jobs is still
+  // one reason, and the link beside it has the rest.
+  const text = said.join(' ');
+  return text.length > 500 ? `${text.slice(0, 497)}...` : text;
+}
 
 /**
  * The four states the dot can be in, which is fewer than the conclusions.
@@ -69,16 +167,64 @@ export function mainCheckStale(check: MainCheck, now: number): boolean {
 export function mainDot(check: MainCheck | null, now: number | null): MainDot {
   if (!check || !check.conclusion) return 'unknown';
   if (now !== null && mainCheckStale(check, now)) return 'unknown';
+
+  let dot: MainDot;
   switch (check.conclusion) {
     case 'passed':
-      return 'passed';
+      dot = 'passed';
+      break;
     case 'failed':
-      return 'failed';
+      dot = 'failed';
+      break;
     case 'running':
-      return 'running';
+      dot = 'running';
+      break;
     default:
       return 'unknown';
   }
+
+  // The deploy and the migrations can only make it worse. Green CI on a commit
+  // that did not deploy, or that needs a migration the live database does not
+  // have, is not a green main: the site is broken or behind either way. A
+  // reading that could not be taken leaves the dot as CI has it, and the panel
+  // says which reading is missing.
+  const deployDot: MainDot | null =
+    check.deployState === 'failed' || check.deployState === 'missing'
+      ? 'failed'
+      : check.deployState === 'deploying'
+        ? 'running'
+        : null;
+  const migrationsDot: MainDot | null =
+    check.unapplied && check.unapplied.length > 0 ? 'failed' : null;
+
+  for (const other of [deployDot, migrationsDot]) {
+    if (other && RANK[other] > RANK[dot]) dot = other;
+  }
+  return dot;
+}
+
+/** Which of two colours is worse news, for combining the three readings. */
+const RANK: Record<MainDot, number> = { unknown: 0, passed: 1, running: 2, failed: 3 };
+
+/**
+ * One line per reading, for the panel: CI, the deploy and the migrations.
+ *
+ * `null` for a line that has nothing to say yet, which is a reading from
+ * before these columns existed. A line that could not be read says why, in the
+ * refusal's own sentence, because "not read" alone sends nobody anywhere.
+ */
+export function deployLine(check: MainCheck): string | null {
+  if (check.deployError) return `Deploy not read. ${check.deployError}`;
+  if (!check.deployState) return null;
+  return DEPLOY_SAYS[check.deployState];
+}
+
+export function migrationsLine(check: MainCheck): string | null {
+  if (check.migrationsError) return `Migrations not compared. ${check.migrationsError}`;
+  if (!check.unapplied) return null;
+  return (
+    unappliedSentence(check.unapplied) ?? 'Every migration on main is applied to the live database.'
+  );
 }
 
 /** Seven characters, which is what a commit is called everywhere else here. */
@@ -133,7 +279,21 @@ export function mainCheckTitle(
     return `${commit} ${said}, but that was ${minutes} minutes ago and nothing has read it since.`;
   }
 
-  return `${commit} ${said}.${when}`;
+  return `${commit} ${said}.${also(check)}${when}`;
+}
+
+/**
+ * What the deploy and migrations add to the sentence, when they are what
+ * turned the dot. A dot that is red because of a migration and a sentence
+ * that says "passed its checks" would be two channels disagreeing.
+ */
+function also(check: MainCheck): string {
+  const extra: string[] = [];
+  if (check.deployState === 'failed') extra.push(' Its deploy failed.');
+  if (check.deployState === 'missing') extra.push(' It has not deployed.');
+  const n = check.unapplied?.length ?? 0;
+  if (n > 0) extra.push(` ${n} ${n === 1 ? 'migration is' : 'migrations are'} not applied.`);
+  return extra.join('');
 }
 
 /**
@@ -149,9 +309,10 @@ export function mainCheckTitle(
  * stale, and a commit no workflow touched all land on grey.
  */
 export const MAIN_DOT_MEANING: Record<MainDot, string> = {
-  passed: 'Green: main built and its checks passed.',
-  failed: 'Red: a check on main failed. This is the one worth acting on.',
-  running: 'Amber: main is still being checked.',
+  passed: 'Green: main passed its checks, deployed, and every migration on it is applied.',
+  failed:
+    'Red: a check on main failed, its deploy failed, or a migration on it is not applied. This is the one worth acting on.',
+  running: 'Amber: main is still being checked or deployed.',
   unknown:
     'Grey: nothing is known. Not read yet, GitHub would not say, the reading is over six minutes old, or main ran no checks.',
 };

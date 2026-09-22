@@ -9,6 +9,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  featureProgress,
+  lastNightFrom,
   MAX_NIGHT_ROWS,
   nightBudgetLine,
   nightClosedLine,
@@ -336,12 +338,12 @@ describe('nightBudgetLine', () => {
   it('counts the fires when the run was started with no cap', () => {
     // No budget to subtract a remainder from, so the fires are the only source
     // for the number and "of" has nothing to follow it.
-    expect(
-      nightBudgetLine({ featuresBudget: null, featuresLeft: null, features: fired(3) }),
-    ).toBe('3 features fired, no limit');
-    expect(
-      nightBudgetLine({ featuresBudget: null, featuresLeft: null, features: fired(1) }),
-    ).toBe('1 feature fired, no limit');
+    expect(nightBudgetLine({ featuresBudget: null, featuresLeft: null, features: fired(3) })).toBe(
+      '3 features fired, no limit',
+    );
+    expect(nightBudgetLine({ featuresBudget: null, featuresLeft: null, features: fired(1) })).toBe(
+      '1 feature fired, no limit',
+    );
     expect(nightBudgetLine({ featuresBudget: null, featuresLeft: null, features: [] })).toBe(
       '0 features fired, no limit',
     );
@@ -354,9 +356,9 @@ describe('nightClosedLine', () => {
   // read past -- and it is the outcome worth getting out of bed for.
   it('counts the steps, and says when there are none', () => {
     expect(nightClosedLine({ closed: [] })).toBe('no steps closed');
-    expect(nightClosedLine({ closed: [{ ref: '#1', title: 'One', feature: null, ask: null }] })).toBe(
-      '1 step closed',
-    );
+    expect(
+      nightClosedLine({ closed: [{ ref: '#1', title: 'One', feature: null, ask: null }] }),
+    ).toBe('1 step closed');
     expect(
       nightClosedLine({
         closed: Array.from({ length: 9 }, (_, index) => ({
@@ -367,5 +369,72 @@ describe('nightClosedLine', () => {
         })),
       }),
     ).toBe('9 steps closed');
+  });
+});
+
+describe('lastNightFrom', () => {
+  it('keeps only the steps under a feature the stopped night fired', () => {
+    const feature = step({ id: 'f1', status: 'in_progress' });
+    const sub = step({ id: 'f1a', parentId: 'f1', status: 'in_progress' });
+    const ours = step({ id: 's1', parentId: 'f1a', completedAt: '2026-03-02T01:00:00Z' });
+    // Closed after the night, by hand, under a feature it never touched.
+    const other = step({
+      id: 'o1',
+      title: 'Closed on Thursday',
+      completedAt: '2026-03-05T12:00:00Z',
+    });
+    const stuck = step({
+      id: 's2',
+      parentId: 'f1',
+      status: 'blocked',
+      blockAsk: 'Needs the API key',
+      updatedAt: '2026-03-02T02:00:00Z',
+    });
+
+    const night = lastNightFrom({
+      run: run(),
+      fires: [{ planItemId: 'f1', at: '2026-03-02T00:10:00Z' }],
+      items: [feature, sub, ours, other, stuck],
+    });
+
+    expect(night?.closed.map((s) => s.title)).toEqual([ours.title]);
+    expect(night?.blocked.map((s) => s.ask)).toEqual(['Needs the API key']);
+    expect(night?.endedReason).toBe(budgetSpentReason({ featuresBudget: 6 }));
+  });
+
+  it('leaves a night still running as nightFrom reads it', () => {
+    const live = run({ running: true, endedAt: null, endedReason: null });
+    const other = step({ id: 'o2', completedAt: '2026-03-02T01:00:00Z' });
+
+    const night = lastNightFrom({ run: live, fires: [], items: [other] });
+    expect(night?.closed).toHaveLength(1);
+  });
+
+  it('says nothing about an account that has never run one', () => {
+    expect(lastNightFrom({ run: null, fires: [], items: [] })).toBeNull();
+  });
+});
+
+describe('featureProgress', () => {
+  it('counts the steps beneath a feature, however deep', () => {
+    const feature = step({ id: 'p1', status: 'in_progress' });
+    const items = [
+      feature,
+      step({ id: 'p2', parentId: 'p1', status: 'done' }),
+      step({ id: 'p3', parentId: 'p1', status: 'in_progress', title: 'Add the filter' }),
+      step({ id: 'p4', parentId: 'p3', status: 'not_started' }),
+      step({ id: 'p5', parentId: 'p1', kind: 'decision', status: 'not_started' }),
+    ];
+
+    expect(featureProgress(items, `#${feature.number}`)).toEqual({
+      done: 1,
+      total: 3,
+    });
+  });
+
+  it('says nothing about a feature with no steps or one it cannot find', () => {
+    const lone = step({ id: 'p6' });
+    expect(featureProgress([lone], `#${lone.number}`)).toBeNull();
+    expect(featureProgress([lone], '#99999')).toBeNull();
   });
 });

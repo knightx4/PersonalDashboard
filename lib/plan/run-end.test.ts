@@ -25,9 +25,9 @@ describe('runEnd', () => {
   });
 
   it('counts a run nothing has been heard from as failed', () => {
-    expect(
-      runEnd({ status: 'started', createdAt: fired }, null, at(RUN_QUIET_AFTER_MINUTES)),
-    ).toBe('failed');
+    expect(runEnd({ status: 'started', createdAt: fired }, null, at(RUN_QUIET_AFTER_MINUTES))).toBe(
+      'failed',
+    );
     expect(runEnd({ status: 'started', createdAt: fired }, null, at(60 * 96))).toBe('failed');
   });
 
@@ -100,9 +100,9 @@ describe('lastRunLine', () => {
   });
 
   it('gives the reason a run stopped', () => {
-    expect(
-      lastRunLine(run({ status: 'failed', error: 'Anthropic answered 401.' }), at(60)),
-    ).toBe('Last run stopped: Anthropic answered 401.');
+    expect(lastRunLine(run({ status: 'failed', error: 'Anthropic answered 401.' }), at(60))).toBe(
+      'Last run stopped: Anthropic answered 401.',
+    );
   });
 
   it('says so when a stopped run kept no reason', () => {

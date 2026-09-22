@@ -104,7 +104,9 @@ describe('closeRefusal', () => {
   it('refuses a close that could not reach GitHub, and repeats what it said', () => {
     const said = closeRefusal({
       sha: 'a405587',
-      landing: landing({ error: 'No GITHUB_READ_TOKEN is set, so whether a commit is on main cannot be read.' }),
+      landing: landing({
+        error: 'No GITHUB_READ_TOKEN is set, so whether a commit is on main cannot be read.',
+      }),
     });
     expect(said).toContain('could not be read');
     expect(said).toContain('GITHUB_READ_TOKEN');

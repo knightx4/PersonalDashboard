@@ -620,6 +620,16 @@ A `200` there is a tick that ran. A `401` means `cron_secret` does not match
 `CRON_SECRET` — which is also the protection this route has instead of a login,
 since anything on the internet can reach it.
 
+### The map sweep tick
+
+`supabase/migrations/0094_map_sweep_tick_cron.sql` schedules a second job,
+`map-sweep-tick`, every five minutes. It POSTs to `/api/cron/map-sweep`, which
+works any sweep started from the vault's Map page for up to four minutes and
+saves where it stopped. It reads the same two Vault secrets as the overnight
+tick, so nothing new has to be set. It also needs `ANTHROPIC_API_KEY` in
+Vercel; without it the sweep stays running and the Map page shows why it
+cannot continue.
+
 ---
 
 ## Running cost

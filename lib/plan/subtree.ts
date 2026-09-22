@@ -60,3 +60,55 @@ export async function subtreeClosedAt(supabase: Db, root: string): Promise<strin
 export async function subtreeBlockedAt(supabase: Db, root: string): Promise<string | null> {
   return subtreeStamp(supabase, root, 'plan_subtree_blocked_at', 'blocked_at');
 }
+
+/**
+ * Whether anything beneath a feature is claimed, and when any row in its
+ * subtree last changed. Read for `featureRunIdle`.
+ *
+ * The account's rows are read and walked here rather than through a database
+ * function: it is three narrow columns, and one account's plan is a few
+ * hundred rows. Null when the rows cannot be read, so the caller falls back
+ * to the push readings rather than ending a run on a failed lookup.
+ */
+export async function subtreeTrail(
+  supabase: Db,
+  userId: string,
+  root: string,
+): Promise<{ claimed: boolean; touchedAt: string | null } | null> {
+  const { data, error } = await supabase
+    .from('plan_items')
+    .select('id, parent_id, status, updated_at')
+    .eq('user_id', userId);
+  if (error) {
+    console.error(`plan_items could not be read for the feature trail: ${error.message}`);
+    return null;
+  }
+  const rows = (data ?? []) as Array<{
+    id: string;
+    parent_id: string | null;
+    status: string;
+    updated_at: string;
+  }>;
+  const children = new Map<string, typeof rows>();
+  for (const row of rows) {
+    if (!row.parent_id) continue;
+    children.set(row.parent_id, [...(children.get(row.parent_id) ?? []), row]);
+  }
+
+  let claimed = false;
+  let touchedAt: string | null = rows.find((row) => row.id === root)?.updated_at ?? null;
+  const seen = new Set<string>([root]);
+  const queue = [root];
+  while (queue.length > 0) {
+    for (const child of children.get(queue.pop() as string) ?? []) {
+      if (seen.has(child.id)) continue;
+      seen.add(child.id);
+      queue.push(child.id);
+      if (child.status === 'in_progress') claimed = true;
+      if (!touchedAt || new Date(child.updated_at) > new Date(touchedAt)) {
+        touchedAt = child.updated_at;
+      }
+    }
+  }
+  return { claimed, touchedAt };
+}

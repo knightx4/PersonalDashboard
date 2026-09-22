@@ -11,6 +11,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  deployLine,
+  failureReason,
+  migrationsLine,
   MAIN_CHECK_STALE_MINUTES,
   MAIN_DOT_MEANING,
   MAIN_DOT_ORDER,
@@ -30,6 +33,13 @@ function check(over: Partial<MainCheck> = {}): MainCheck {
     conclusion: 'passed',
     checkedAt: minutesAgo(1),
     error: null,
+    reason: null,
+    runUrl: null,
+    deployState: null,
+    deployUrl: null,
+    deployError: null,
+    unapplied: null,
+    migrationsError: null,
     ...over,
   };
 }
@@ -130,5 +140,147 @@ describe('the dot legend', () => {
     expect(MAIN_DOT_MEANING.failed).toContain('Red');
     expect(MAIN_DOT_MEANING.running).toContain('Amber');
     expect(MAIN_DOT_MEANING.unknown).toContain('Grey');
+  });
+});
+
+describe('failureReason', () => {
+  it('names the job and the step that broke', () => {
+    expect(
+      failureReason([
+        {
+          name: 'CI',
+          conclusion: 'failure',
+          jobs: [
+            {
+              name: 'check',
+              conclusion: 'failure',
+              runner_id: 1,
+              steps: [
+                { name: 'Typecheck', conclusion: 'success' },
+                { name: 'Test', conclusion: 'failure' },
+                { name: 'Build', conclusion: 'skipped' },
+              ],
+            },
+            {
+              name: 'design',
+              conclusion: 'failure',
+              runner_id: 2,
+              steps: [{ name: 'UI laws', conclusion: 'failure' }],
+            },
+            { name: 'audit', conclusion: 'success', runner_id: 3, steps: [] },
+          ],
+        },
+      ]),
+    ).toBe('Failed at check › Test, design › UI laws.');
+  });
+
+  // What main did on 22 September: three jobs, none given a runner, no steps,
+  // no logs. Pointing at the code would send somebody into logs that do not
+  // exist.
+  it('says GitHub never started jobs that got no runner, and where to look', () => {
+    const said = failureReason([
+      {
+        name: 'CI',
+        conclusion: 'failure',
+        jobs: ['check', 'audit', 'design'].map((name) => ({
+          name,
+          conclusion: 'failure',
+          runner_id: null,
+          steps: [],
+        })),
+      },
+    ]);
+    expect(said).toContain('GitHub never started check, audit, design');
+    expect(said).toContain('Actions minutes');
+    expect(said).toContain('github.com/settings/billing');
+  });
+
+  it('says a run with no jobs could not be started at all', () => {
+    expect(failureReason([{ name: 'CI', conclusion: 'startup_failure', jobs: [] }])).toContain(
+      'could not start the workflow',
+    );
+  });
+
+  it('has nothing to add when no job failed', () => {
+    expect(failureReason([])).toBeNull();
+    expect(
+      failureReason([
+        { name: 'CI', conclusion: 'failure', jobs: [{ name: 'check', conclusion: 'success' }] },
+      ]),
+    ).toBeNull();
+  });
+
+  it('stays inside the column', () => {
+    const jobs = Array.from({ length: 60 }, (_, i) => ({
+      name: `job-with-a-long-name-${i}`,
+      conclusion: 'failure',
+      runner_id: 1,
+      steps: [{ name: 'a step with a long name', conclusion: 'failure' }],
+    }));
+    expect(
+      failureReason([{ name: 'CI', conclusion: 'failure', jobs }])!.length,
+    ).toBeLessThanOrEqual(500);
+  });
+});
+
+describe('mainDot with the deploy and migrations', () => {
+  it('turns red on a failed or missing deploy even when CI passed', () => {
+    expect(mainDot(check({ deployState: 'failed' }), NOW)).toBe('failed');
+    expect(mainDot(check({ deployState: 'missing' }), NOW)).toBe('failed');
+  });
+
+  it('turns amber while a passed commit is deploying', () => {
+    expect(mainDot(check({ deployState: 'deploying' }), NOW)).toBe('running');
+    expect(mainDot(check({ deployState: 'deployed' }), NOW)).toBe('passed');
+  });
+
+  it('turns red when a migration on main is not applied', () => {
+    expect(mainDot(check({ unapplied: ['migrations/0097_x.sql'] }), NOW)).toBe('failed');
+    expect(mainDot(check({ unapplied: [] }), NOW)).toBe('passed');
+  });
+
+  it('never makes a failed CI reading look better', () => {
+    expect(
+      mainDot(check({ conclusion: 'failed', deployState: 'deployed', unapplied: [] }), NOW),
+    ).toBe('failed');
+  });
+
+  // A reading that could not be taken says so in the panel. It is not evidence
+  // that anything is wrong, so the dot stays as CI has it.
+  it('leaves the dot alone when the other readings were refused', () => {
+    expect(mainDot(check({ deployError: 'refused', migrationsError: 'refused' }), NOW)).toBe(
+      'passed',
+    );
+  });
+
+  it('says in the sentence what turned the dot', () => {
+    const said = mainCheckTitle(
+      check({ deployState: 'failed', unapplied: ['a.sql', 'b.sql'] }),
+      NOW,
+      '21:39',
+    );
+    expect(said).toContain('passed its checks');
+    expect(said).toContain('Its deploy failed.');
+    expect(said).toContain('2 migrations are not applied.');
+  });
+});
+
+describe('deployLine and migrationsLine', () => {
+  it('have nothing to say about a reading from before they existed', () => {
+    expect(deployLine(check())).toBeNull();
+    expect(migrationsLine(check())).toBeNull();
+  });
+
+  it('say what was read, or why it could not be', () => {
+    expect(deployLine(check({ deployState: 'deployed' }))).toBe('Deployed to production.');
+    expect(deployLine(check({ deployError: 'Give it "Deployments: Read"' }))).toContain(
+      'Deployments: Read',
+    );
+    expect(migrationsLine(check({ unapplied: [] }))).toBe(
+      'Every migration on main is applied to the live database.',
+    );
+    expect(migrationsLine(check({ unapplied: ['migrations/0097_x.sql'] }))).toContain(
+      'migrations/0097_x.sql',
+    );
   });
 });

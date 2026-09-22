@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  featureRunIdle,
   abandonedClaim,
   claimIsLive,
   claimLiveness,
@@ -686,5 +687,28 @@ describe('underwayRefusal', () => {
       now: NOW,
     });
     expect(said).not.toContain('?');
+  });
+});
+
+describe('featureRunIdle', () => {
+  const started = '2026-09-22T22:04:00Z';
+  const at = (iso: string) => new Date(iso).getTime();
+
+  it('ends a run that left its rows alone with nothing claimed', () => {
+    const trail = { claimed: false, touchedAt: '2026-09-22T22:07:00Z' };
+    expect(featureRunIdle(started, trail, at('2026-09-22T22:26:00Z'))).toBe(false);
+    expect(featureRunIdle(started, trail, at('2026-09-22T22:27:00Z'))).toBe(true);
+  });
+
+  it('counts from the start when the rows were last touched before it', () => {
+    const trail = { claimed: false, touchedAt: '2026-09-22T12:00:00Z' };
+    expect(featureRunIdle(started, trail, at('2026-09-22T22:20:00Z'))).toBe(false);
+    expect(featureRunIdle(started, trail, at('2026-09-22T22:24:00Z'))).toBe(true);
+  });
+
+  it('never ends a run with a step claimed, or before the clock arrives', () => {
+    const quiet = { claimed: true, touchedAt: null };
+    expect(featureRunIdle(started, quiet, at('2026-09-23T03:00:00Z'))).toBe(false);
+    expect(featureRunIdle(started, { claimed: false, touchedAt: null }, 0)).toBe(false);
   });
 });

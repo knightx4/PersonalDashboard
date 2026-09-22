@@ -227,7 +227,10 @@ describe('refreshCommitChecks on a commit the listing never reaches', () => {
   const filler = (page: number) =>
     Array.from({ length: PAGE_SIZE }, (_, i) => {
       const n = page * PAGE_SIZE + i;
-      return { sha: String(n).padStart(40, '0'), parents: [{ sha: String(n + 1).padStart(40, '0') }] };
+      return {
+        sha: String(n).padStart(40, '0'),
+        parents: [{ sha: String(n + 1).padStart(40, '0') }],
+      };
     });
 
   async function refresh(compare: () => Response) {
@@ -330,13 +333,16 @@ describe('refreshMainCheck', () => {
 
     const result = await refreshMainCheck({ supabase, now: NOW, fetch: fetchFn as never });
 
-    expect(result).toEqual({ sha: MERGE, conclusion: 'failed', error: null });
-    expect(written(upsert)).toEqual({
+    expect(result).toEqual({ sha: MERGE, conclusion: 'failed', error: null, reason: null });
+    // The deploy and migration readings beside it have tests of their own.
+    expect(written(upsert)).toMatchObject({
       repo: 'knightx4/PersonalDashboard',
       head_sha: MERGE,
       conclusion: 'failed',
       checked_at: new Date(NOW).toISOString(),
       error: null,
+      reason: null,
+      run_url: null,
     });
 
     // One commit, not eight pages of them: the whole question is what is at the
@@ -344,6 +350,224 @@ describe('refreshMainCheck', () => {
     const asked = fetchFn.mock.calls.map(([url]) => String(url));
     expect(asked[0]).toContain('/commits?sha=main&per_page=1');
     expect(asked[1]).toContain(`/actions/runs?head_sha=${MERGE}`);
+    vi.unstubAllEnvs();
+  });
+
+  it('stores why main failed and the run to open, read from the failing jobs', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, upsert } = store();
+    const fetchFn = vi.fn(async (url: string) => {
+      const asked = String(url);
+      if (asked.includes('/actions/runs/42/jobs')) {
+        return new Response(
+          JSON.stringify({
+            jobs: [
+              {
+                name: 'check',
+                conclusion: 'failure',
+                runner_id: 7,
+                steps: [
+                  { name: 'Apply migrations', conclusion: 'success' },
+                  { name: 'Test', conclusion: 'failure' },
+                ],
+              },
+              { name: 'audit', conclusion: 'success', runner_id: 8, steps: [] },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      if (asked.includes('/actions/runs')) {
+        return new Response(
+          JSON.stringify({
+            workflow_runs: [
+              {
+                id: 42,
+                name: 'CI',
+                status: 'completed',
+                conclusion: 'failure',
+                html_url: 'https://github.com/knightx4/PersonalDashboard/actions/runs/42',
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify([{ sha: MERGE, parents: [] }]), { status: 200 });
+    });
+
+    const result = await refreshMainCheck({ supabase, now: NOW, fetch: fetchFn as never });
+
+    expect(result.reason).toBe('Failed at check › Test.');
+    const row = written(upsert);
+    expect(row.reason).toBe('Failed at check › Test.');
+    expect(row.run_url).toBe('https://github.com/knightx4/PersonalDashboard/actions/runs/42');
+    vi.unstubAllEnvs();
+  });
+
+  it('keeps the red reading when the jobs cannot be read, without a reason', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, upsert } = store();
+    const fetchFn = vi.fn(async (url: string) => {
+      const asked = String(url);
+      if (asked.includes('/jobs')) return new Response('{}', { status: 403 });
+      if (asked.includes('/actions/runs')) {
+        return new Response(
+          JSON.stringify({
+            workflow_runs: [{ id: 42, status: 'completed', conclusion: 'failure' }],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify([{ sha: MERGE, parents: [] }]), { status: 200 });
+    });
+
+    const result = await refreshMainCheck({ supabase, now: NOW, fetch: fetchFn as never });
+
+    expect(result).toMatchObject({ conclusion: 'failed', error: null, reason: null });
+    expect(written(upsert).conclusion).toBe('failed');
+    vi.unstubAllEnvs();
+  });
+
+  /**
+   * A GitHub that answers by path, and a database whose migration history is
+   * `applied`. Everything the three readings ask for has an answer here, so a
+   * test only overrides the one it is about.
+   */
+  function github(over: Record<string, () => Response> = {}) {
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+    const routes: Array<[RegExp, () => Response]> = [
+      ...Object.entries(over).map(
+        ([path, answer]) => [new RegExp(path), answer] as [RegExp, () => Response],
+      ),
+      [
+        /\/commits\?sha=main/,
+        () => json([{ sha: MERGE, parents: [], commit: { committer: { date: minutes(30) } } }]),
+      ],
+      [
+        /\/actions\/runs\?/,
+        () => json({ workflow_runs: [{ status: 'completed', conclusion: 'success' }] }),
+      ],
+      [
+        /\/deployments\/\d+\/statuses/,
+        () => json([{ state: 'success', target_url: 'https://vercel.com/deploy/1' }]),
+      ],
+      [/\/deployments\?/, () => json([{ id: 9 }])],
+      [
+        /\/contents\/supabase\?/,
+        () =>
+          json([
+            { name: 'migrations', type: 'dir' },
+            { name: 'local', type: 'dir' },
+          ]),
+      ],
+      [
+        /\/contents\/supabase\/migrations\?/,
+        () =>
+          json([
+            { name: '0095_plan_main_check_reason.sql', type: 'file' },
+            { name: '0096_plan_main_deploy_and_migrations.sql', type: 'file' },
+            { name: '0097_something_new.sql', type: 'file' },
+          ]),
+      ],
+    ];
+    return vi.fn(async (url: string) => {
+      const found = routes.find(([pattern]) => pattern.test(String(url)));
+      return found ? found[1]() : json({ message: 'unrouted' }, 500);
+    });
+  }
+
+  const minutes = (n: number) => new Date(NOW - n * 60_000).toISOString();
+
+  function storeWith(applied: string[] | { error: string }) {
+    const upsert = vi.fn(async () => ({ error: null as null }));
+    const rpc = vi.fn(async () =>
+      Array.isArray(applied)
+        ? { data: applied, error: null }
+        : { data: null, error: { message: applied.error } },
+    );
+    return { upsert, rpc, supabase: { from: () => ({ upsert }), rpc } as never };
+  }
+
+  it('stores that main deployed and which migrations the live database lacks', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, upsert, rpc } = storeWith([
+      'plan_main_check_reason',
+      'plan_main_deploy_and_migrations',
+    ]);
+
+    await refreshMainCheck({ supabase, now: NOW, fetch: github() as never });
+
+    expect(rpc).toHaveBeenCalledWith('applied_migration_names');
+    expect(written(upsert)).toMatchObject({
+      conclusion: 'passed',
+      deploy_state: 'deployed',
+      deploy_url: 'https://vercel.com/deploy/1',
+      deploy_error: null,
+      unapplied_migrations: ['migrations/0097_something_new.sql'],
+      migrations_error: null,
+    });
+    vi.unstubAllEnvs();
+  });
+
+  it("asks about the files at main's head, not whatever this deploy has on disk", async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase } = storeWith([]);
+    const fetchFn = github();
+
+    await refreshMainCheck({ supabase, now: NOW, fetch: fetchFn as never });
+
+    const asked = fetchFn.mock.calls.map(([url]) => String(url));
+    expect(asked.some((url) => url.includes(`/contents/supabase?ref=${MERGE}`))).toBe(true);
+    expect(
+      asked.some((url) => url.includes(`/deployments?sha=${MERGE}&environment=Production`)),
+    ).toBe(true);
+    // `local` is not a migrations folder and is never listed.
+    expect(asked.some((url) => url.includes('/contents/supabase/local'))).toBe(false);
+    vi.unstubAllEnvs();
+  });
+
+  it('says a deploy nobody started is missing once the grace period is over', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, upsert } = storeWith([
+      'plan_main_check_reason',
+      'plan_main_deploy_and_migrations',
+      'something_new',
+    ]);
+    const fetchFn = github({ '/deployments\\?': () => new Response('[]', { status: 200 }) });
+
+    await refreshMainCheck({ supabase, now: NOW, fetch: fetchFn as never });
+
+    expect(written(upsert)).toMatchObject({ deploy_state: 'missing', unapplied_migrations: [] });
+    vi.unstubAllEnvs();
+  });
+
+  it('carries a refused deploy read as its own sentence and keeps the CI reading', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, upsert } = storeWith([]);
+    const fetchFn = github({ '/deployments\\?': () => new Response('{}', { status: 403 }) });
+
+    const result = await refreshMainCheck({ supabase, now: NOW, fetch: fetchFn as never });
+
+    expect(result).toMatchObject({ conclusion: 'passed', error: null });
+    const row = written(upsert);
+    expect(row.deploy_state).toBeNull();
+    expect(row.deploy_error).toContain('Deployments: Read');
+    vi.unstubAllEnvs();
+  });
+
+  it('carries an unreadable migration history as its own sentence', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, upsert } = storeWith({
+      error: 'function applied_migration_names() does not exist',
+    });
+
+    await refreshMainCheck({ supabase, now: NOW, fetch: github() as never });
+
+    const row = written(upsert);
+    expect(row.unapplied_migrations).toBeNull();
+    expect(row.migrations_error).toContain('does not exist');
+    expect(row.conclusion).toBe('passed');
     vi.unstubAllEnvs();
   });
 
