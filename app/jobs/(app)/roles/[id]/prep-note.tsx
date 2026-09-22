@@ -16,7 +16,8 @@
 import Link from 'next/link';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
+import { ChevronRight } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
@@ -121,6 +122,7 @@ export function RoundPrep({
   const [stale, setStale] = useState(state.stale);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const foldRef = useRef<HTMLDetailsElement>(null);
 
   const prepare = (regenerate: boolean) =>
     startTransition(async () => {
@@ -131,51 +133,81 @@ export function RoundPrep({
         return;
       }
       setNote(result.note);
+      // A fresh note is opened, even if the old one had been folded away.
+      if (foldRef.current) foldRef.current.open = true;
       setGeneratedAt(new Date().toISOString());
       setStale(false);
     });
 
-  return (
-    <div className="mt-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
-          Prep note
-        </h4>
-        {note ? (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => prepare(true)}
-            className="text-small text-ink-muted underline underline-offset-2 hover:text-accent"
-          >
-            {pending ? 'Preparing…' : 'Regenerate'}
-          </button>
-        ) : (
+  const heading = (
+    <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">Prep note</h4>
+  );
+
+  const staleLine = stale && (
+    <p className="mt-1 text-small text-caution">
+      The description, your bank or who you are meeting has changed since this was written.
+    </p>
+  );
+
+  if (!note) {
+    return (
+      <div className="mt-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          {heading}
           <Button type="button" size="sm" disabled={pending} onClick={() => prepare(false)}>
             {pending ? 'Preparing…' : 'Prepare me'}
           </Button>
+        </div>
+
+        {!error && (
+          <p className="mt-1 text-small text-ink-muted">
+            What this job asks for against your record, who you are meeting, what earlier rounds
+            here asked, and the stories to have ready — from what the app already holds. Your own
+            prep note is untouched.
+          </p>
         )}
+
+        {error && <p className="mt-1 text-small text-danger">{error}</p>}
       </div>
+    );
+  }
 
-      {!note && !error && (
-        <p className="mt-1 text-small text-ink-muted">
-          What this job asks for against your record, who you are meeting, what earlier rounds
-          here asked, and the stories to have ready — from what the app already holds. Your own
-          prep note is untouched.
-        </p>
-      )}
+  return (
+    // Note ad736ea2: a written note is long, so it folds by its own heading.
+    // A native <details> so it folds before JavaScript loads (law 6), open to
+    // begin with because it was asked for. Regenerate sits beside the summary
+    // rather than in it, so pressing it never folds the note as well.
+    <div className="relative mt-3">
+      <details ref={foldRef} open className="group/prep">
+        <summary
+          className={cn(
+            'press flex cursor-pointer list-none items-center gap-1.5 rounded-control pr-24',
+            'hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2',
+            '[&::-webkit-details-marker]:hidden',
+          )}
+        >
+          <ChevronRight
+            aria-hidden
+            strokeWidth={2}
+            className="size-3.5 shrink-0 text-ink-muted transition-transform duration-150 group-open/prep:rotate-90"
+          />
+          {heading}
+          {/* Law 10: the closed line says whether the note is still current. */}
+          <span className="text-small text-ink-muted group-open/prep:hidden">
+            {stale
+              ? 'Out of date'
+              : generatedAt
+                ? `Written ${formatDateTime(generatedAt, timezone)}`
+                : null}
+          </span>
+        </summary>
 
-      {stale && note && (
-        <p className="mt-1 text-small text-caution">
-          The description, your bank or who you are meeting has changed since this was written.
-        </p>
-      )}
+        {staleLine}
 
-      {error && <p className="mt-1 text-small text-danger">{error}</p>}
+        {error && <p className="mt-1 text-small text-danger">{error}</p>}
 
-      {note && (
-        // A well rather than a frame, the same as the answer draft: this is the
-        // one block on the card that the app wrote rather than you.
+        {/* A well rather than a frame, the same as the answer draft: this is
+            the one block on the card that the app wrote rather than you. */}
         <div className="mt-2 space-y-3 rounded-card bg-canvas p-3">
           <Prose>{note.roundSummary}</Prose>
 
@@ -268,7 +300,16 @@ export function RoundPrep({
             </p>
           )}
         </div>
-      )}
+      </details>
+
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => prepare(true)}
+        className="absolute right-0 top-0 text-small text-ink-muted underline underline-offset-2 hover:text-accent"
+      >
+        {pending ? 'Preparing…' : 'Regenerate'}
+      </button>
     </div>
   );
 }
