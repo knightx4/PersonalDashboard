@@ -40,12 +40,13 @@ export default async function VaultLayout({ children }: { children: React.ReactN
   const brief = await loadVaultBrief();
 
   /**
-   * One section, because there is one page of content. Settings moved to the
+   * The notes, and the map drawn from them (#758). Settings moved to the
    * gear, where every other workspace keeps it -- it was a nav tab here only
    * because this shell was written on its own.
    */
   const sections: NavSection[] = [
     { href: '/vault', label: 'Notes', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
+    { href: '/vault/map', label: 'Map', icon: 'vaultMap' },
   ];
 
   return (
