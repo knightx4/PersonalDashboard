@@ -101,6 +101,9 @@ describe('RLS coverage', () => {
       where n.nspname = 'learn' and c.relkind = 'r'
       order by 1`;
     expect(rows.map((r) => r.tablename)).toEqual([
+      'area_check_articles',
+      'area_domains',
+      'area_fields',
       'catalogue_course_items',
       'catalogue_items',
       'catalogue_judgements',
@@ -126,6 +129,61 @@ describe('RLS coverage', () => {
       'subjects',
       'tracks',
     ]);
+  });
+});
+
+describe('the areas, which change only by migration', () => {
+  // The fixed grid the Know dashboard counts against. Like the catalogue it
+  // carries no user_id, so the questions are that everybody can read it, that
+  // nobody can write it through the API, and that the seed is the one the spec
+  // lists. It survives truncateAll because nothing in it hangs off auth.users.
+  it('lets any signed-in user read the grid', async () => {
+    const domains = await asUser(userB, (tx) => tx`select slug from area_domains`);
+    const fields = await asUser(userB, (tx) => tx`select slug from area_fields`);
+    expect(domains.length).toBe(10);
+    expect(fields.length).toBe(46);
+  });
+
+  it('does not let a signed-in user add, rename or remove an area', async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into area_domains (slug, name, scope, position)
+                   values ('planted', 'Planted', 'planted', 99)`,
+      ),
+    ).rejects.toThrow();
+
+    // The grant is select alone, so these are refused outright.
+    await expect(
+      asUser(userB, (tx) => tx`update area_fields set name = 'Renamed' where slug = 'physics'`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userB, (tx) => tx`delete from area_fields where slug = 'physics'`),
+    ).rejects.toThrow();
+    const [physics] = await admin<{ name: string }[]>`
+      select name from area_fields where slug = 'physics'`;
+    expect(physics?.name).toBe('Physics');
+  });
+
+  it('does not let a signed-in user write a placement into the check', async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into area_check_articles (title, section) values ('Planted', 'Nowhere')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('gives every domain between three and six fields', async () => {
+    const rows = await admin<{ slug: string; n: number }[]>`
+      select d.slug, count(f.id)::int as n
+      from area_domains d
+      left join area_fields f on f.domain_id = d.id
+      group by d.slug`;
+    for (const row of rows) {
+      expect(row.n, row.slug).toBeGreaterThanOrEqual(3);
+      expect(row.n, row.slug).toBeLessThanOrEqual(6);
+    }
   });
 });
 
