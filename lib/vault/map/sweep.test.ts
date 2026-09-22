@@ -66,6 +66,9 @@ function vault(notes: MapNote[], opts: { settled?: Map<string, string> } = {}) {
     record: async (row) => {
       rows.set(row.noteId, row);
     },
+    forget: async (noteId) => {
+      rows.delete(noteId);
+    },
     saveProgress: async (path) => {
       afterPath = path;
     },
@@ -162,6 +165,47 @@ describe('runSweepSlice', () => {
 
     expect(result).toMatchObject({ stopped: true, finished: false, reached: 0 });
     expect(v.afterPath).toBeNull();
+  });
+
+  it('does not send a note in Career/Job Applications', async () => {
+    const v = vault([note('Career/Job Applications/Acme.md'), note('Career/Career Options.md')]);
+
+    await runSweepSlice({ afterPath: null, ports: v.ports, budgetMs: 200_000 });
+
+    expect(v.sent).toEqual(['Career/Career Options.md']);
+    expect(v.rows.get('id-Career/Job Applications/Acme.md')?.outcome).toBe('excluded');
+  });
+
+  it('stops when out of credit, and reads the unfinished notes when resumed', async () => {
+    const notes = Array.from({ length: SWEEP_BATCH * 2 }, (_, i) => note(`N${String(i).padStart(2, '0')}.md`));
+    const v = vault(notes);
+    const broke = '400 {"error":{"message":"Your credit balance is too low to access the Anthropic API."}}';
+    let credit = true;
+    const propose = v.ports.propose;
+    v.ports.propose = async (n) => {
+      if (!credit || n.path === 'N08.md') {
+        credit = false;
+        return { ok: false, reason: 'error', detail: broke };
+      }
+      return propose(n, []);
+    };
+
+    const first = await runSweepSlice({ afterPath: null, ports: v.ports, budgetMs: 1_000_000 });
+
+    expect(first).toMatchObject({ stopped: true, finished: false, outOfCredits: true });
+    // The first batch finished and was saved; the second was not saved past.
+    expect(v.afterPath).toBe(notes[SWEEP_BATCH - 1].path);
+    expect([...v.rows.values()].some((row) => row.outcome === 'failed')).toBe(false);
+
+    credit = true;
+    v.ports.propose = propose;
+    const second = await runSweepSlice({ afterPath: v.afterPath, ports: v.ports, budgetMs: 1_000_000 });
+
+    expect(second.finished).toBe(true);
+    expect(v.rows.size).toBe(notes.length);
+    expect([...v.rows.values()].every((row) => row.outcome === 'read')).toBe(true);
+    // Nothing that finished before the stop was sent a second time.
+    expect(v.sent.filter((path) => path === 'N06.md')).toHaveLength(1);
   });
 
   it('records a note whose reading throws as failed and carries on', async () => {

@@ -41,6 +41,7 @@ export const SWEEP_OUTCOMES = [
   'read',
   'unchanged',
   'journal',
+  'excluded',
   'credential',
   'too_short',
   'record',
@@ -51,7 +52,24 @@ export const SWEEP_OUTCOMES = [
 export type SweepOutcome = (typeof SWEEP_OUTCOMES)[number];
 
 /** Outcomes that mean nothing was sent to a model for this note. */
-export const NEVER_SENT: readonly SweepOutcome[] = ['unchanged', 'journal', 'credential', 'too_short'];
+export const NEVER_SENT: readonly SweepOutcome[] = [
+  'unchanged',
+  'journal',
+  'excluded',
+  'credential',
+  'too_short',
+];
+
+/**
+ * Anthropic's refusal when the account has no credit left. Every later call
+ * would get the same answer, so the sweep stops rather than marking the rest
+ * of the vault failed.
+ */
+const OUT_OF_CREDITS = /credit balance is too low/i;
+
+export function isOutOfCredits(detail: string | null): boolean {
+  return detail !== null && OUT_OF_CREDITS.test(detail);
+}
 
 export type SweepNoteRow = {
   noteId: string;
@@ -78,6 +96,8 @@ export type SweepPorts = {
   accept(proposal: NoteMapProposal): Promise<AcceptResult>;
   /** Write or replace this note's row in the sweep. */
   record(row: SweepNoteRow): Promise<void>;
+  /** Remove this note's row, so the sweep reaches it again when resumed. */
+  forget(noteId: string): Promise<void>;
   saveProgress(afterPath: string): Promise<void>;
   /** False once the person has stopped the sweep. */
   stillRunning(): Promise<boolean>;
@@ -94,6 +114,11 @@ export type SliceResult = {
   finished: boolean;
   /** The person stopped the sweep while this call was working it. */
   stopped: boolean;
+  /**
+   * The API refused a call for lack of credit. The batch it happened in is not
+   * saved as reached, so resuming reads its unfinished notes again.
+   */
+  outOfCredits?: boolean;
 };
 
 function row(note: MapNote, outcome: SweepOutcome, detail: string | null): SweepNoteRow {
@@ -240,10 +265,27 @@ export async function runSweepSlice(opts: {
     let names: Promise<string[]> | null = null;
     const themes = () => (names ??= ports.themeNames());
 
+    let outOfCredits = false;
     await inBatches(todo, NOTES_AT_ONCE, async (note) => {
-      await ports.record(await sweepOne(ports, note, settled.get(note.id), themes));
+      // Once one call has been refused for credit, the rest of the batch is
+      // left for the resumed sweep rather than sent to be refused too.
+      if (outOfCredits) return;
+      const done = await sweepOne(ports, note, settled.get(note.id), themes);
+      if (done.outcome === 'failed' && isOutOfCredits(done.detail)) {
+        outOfCredits = true;
+        await ports.forget(note.id);
+        return;
+      }
+      await ports.record(done);
       reached += 1;
     });
+
+    if (outOfCredits) {
+      // The position is not moved past this batch. Resuming plans it again,
+      // skips the notes that finished and reads the ones that did not.
+      await ports.afterBatch?.();
+      return { reached, afterPath, finished: false, stopped: true, outOfCredits: true };
+    }
 
     afterPath = notes[notes.length - 1].path;
     await ports.saveProgress(afterPath);

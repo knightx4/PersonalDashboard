@@ -188,7 +188,7 @@ export default function PrivacyPage() {
         </li>
         <li>
           For the map, from a sweep or from one note: any part of a note in your Me folder, which
-          holds your journals, of a note that contains what looks like an API key, or of a note
+          holds your journals, of a note in Career/Job Applications, of a note that contains what looks like an API key, or of a note
           under 80 characters. These are turned away before anything is sent.
         </li>
         <li>For the map, the part of a note past its first 400,000 characters.</li>

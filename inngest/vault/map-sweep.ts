@@ -213,6 +213,13 @@ async function workSweep(supabase: VaultSupabaseClient, sweep: SweepRow) {
       );
     },
 
+    async forget(noteId) {
+      await check(
+        supabase.from('map_sweep_notes').delete().eq('sweep_id', sweep.id).eq('note_id', noteId),
+        'Clearing a note to read again',
+      );
+    },
+
     async saveProgress(afterPath) {
       await check(
         supabase
@@ -257,6 +264,13 @@ async function workSweep(supabase: VaultSupabaseClient, sweep: SweepRow) {
         lease_until: null,
         updated_at: finishedAt,
         ...(result.finished ? { status: 'done', finished_at: finishedAt, last_error: null } : {}),
+        ...(result.outOfCredits
+          ? {
+              status: 'stopped',
+              last_error:
+                'Anthropic refused the request because the account is out of credit. Add credit, then press Sweep to carry on from where it stopped.',
+            }
+          : {}),
       })
       .eq('id', sweep.id),
     'Releasing the sweep',
