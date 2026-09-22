@@ -5,6 +5,7 @@ import { conceptsFromBrief } from './from-brief';
 import { conceptsFromNote } from './from-note';
 import { conceptsFromPrior } from './from-prior';
 import { generateChain } from './generate';
+import { proposeNoteMap } from '@/lib/vault/map/extract';
 import {
   MAP_EDGE_RULE,
   MAP_EDGE_TYPES,
@@ -121,5 +122,37 @@ describe('the position fragment', () => {
 
   it('uses the edge types the database accepts, less the legacy one', () => {
     expect(enumValues('edge_type')).toEqual([...MAP_EDGE_TYPES, 'mentions']);
+  });
+});
+
+describe('the vault map extraction', () => {
+  it('sends the whole position fragment', async () => {
+    const create = vi
+      .fn()
+      .mockResolvedValueOnce({
+        content: [
+          {
+            type: 'tool_use',
+            name: 'classify_note',
+            input: { class: 'knowledge', is_evidence: false, reason: 'Argues about cities.' },
+          },
+        ],
+      })
+      .mockResolvedValue({
+        content: [{ type: 'tool_use', name: 'report_note_map', input: { themes: [], positions: [], edges: [] } }],
+      });
+    await proposeNoteMap({
+      note: {
+        id: 'n1',
+        path: 'Cities/Parking.md',
+        title: 'Parking',
+        body: 'Surface parking is among the worst things to happen to cities, and here is why at length.',
+        blobSha: 'sha',
+      },
+      anthropicApiKey: 'test',
+      client: { messages: { create } } as never,
+    });
+    expect(create).toHaveBeenCalledTimes(2);
+    expect((create.mock.calls[1][0] as { system: string }).system).toContain(POSITION_RULE);
   });
 });
