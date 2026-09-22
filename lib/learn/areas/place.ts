@@ -30,10 +30,18 @@ const TOOL_NAME = 'report_placements';
 
 export type AreaField = { slug: string; name: string; scope: string; domain: string };
 
+/** A domain, which an umbrella article is placed at instead of a field. */
+export type AreaDomain = { slug: string; name: string; scope: string };
+
+/** How a domain is named to the model, so it cannot be mistaken for a field slug. */
+const DOMAIN_PREFIX = 'domain:';
+
 export type Placement = {
   title: string;
   kind: 'topic' | 'person' | 'place' | 'work';
-  field: string;
+  /** Exactly one of these two is set: a field, or for an umbrella article, its domain. */
+  field: string | null;
+  domain: string | null;
   runnerUp: string | null;
   confidence: 'clear' | 'close' | 'none';
   basis: string;
@@ -54,6 +62,10 @@ For every article, decide which ONE field it belongs in.
 - A topic goes in the field that studies it. Follow the scope sentences: they
   settle the common overlaps, and where one says something belongs elsewhere,
   it does.
+- An umbrella article that covers a whole domain rather than one of its
+  fields ("Technology", "The arts") goes at the domain itself: give
+  "domain:<slug>" as field. Use this only when the article spans every field
+  in the domain. An article that is mostly about one field goes in that field.
 - A person goes in the field of the work they are known for. A place goes where
   most writing about it would go: its history, its politics, or, for a place
   in general, Human geography. A work (a book, a painting, a piece of music)
@@ -72,7 +84,7 @@ Then say how sure you are:
 say what the scopes fail to settle.
 
 Report every article in the batch through ${TOOL_NAME}, using the field slugs
-exactly as given, and the article titles exactly as given.`;
+(or "domain:" slugs) exactly as given, and the article titles exactly as given.`;
 
 const payloadSchema = z.object({
   placements: z.array(
@@ -87,13 +99,14 @@ const payloadSchema = z.object({
   ),
 });
 
-function fieldList(fields: AreaField[]): string {
+function fieldList(fields: AreaField[], domains: AreaDomain[]): string {
+  const domainLine = new Map(domains.map((d) => [d.name, `${DOMAIN_PREFIX}${d.slug}: ${d.scope}`]));
   let domain = '';
   const lines: string[] = [];
   for (const field of fields) {
     if (field.domain !== domain) {
       domain = field.domain;
-      lines.push('', `## ${domain}`);
+      lines.push('', `## ${domain}`, domainLine.get(domain) ?? '');
     }
     lines.push(`- ${field.slug}: ${field.name}. ${field.scope}`);
   }
@@ -104,15 +117,16 @@ function fieldList(fields: AreaField[]): string {
  * Read the tool payload against the batch it answers.
  *
  * Pure, and exported for the test. A placement is kept only when its title is
- * one that was asked about and its field is a real slug; a runner-up that is
- * not a real slug, or is the same as the field, is dropped rather than kept
- * wrong. Titles asked about and not answered come back in `dropped`, and stay
+ * one that was asked about and its field is a real field slug, or
+ * `domain:` and a real domain slug; a runner-up that is not a real field slug,
+ * or is the same as the field, is dropped rather than kept wrong. Titles asked about and not answered come back in `dropped`, and stay
  * unplaced for the next call.
  */
 export function readPlacements(
   input: unknown,
   batch: Level3Article[],
   slugs: ReadonlySet<string>,
+  domainSlugs: ReadonlySet<string> = new Set(),
 ): PlaceResult {
   const parsed = payloadSchema.safeParse(input);
   if (!parsed.success) return { ok: false, detail: 'The report did not match its schema.' };
@@ -124,16 +138,21 @@ export function readPlacements(
   for (const item of parsed.data.placements) {
     const title = asked.get(item.title.trim().toLowerCase());
     const basis = item.basis.trim();
-    if (!title || answered.has(title) || !slugs.has(item.field) || !basis) continue;
+    const target = item.field.trim();
+    const domain = target.startsWith(DOMAIN_PREFIX) ? target.slice(DOMAIN_PREFIX.length) : null;
+    const field = domain === null ? target : null;
+    const known = domain !== null ? domainSlugs.has(domain) : slugs.has(target);
+    if (!title || answered.has(title) || !known || !basis) continue;
 
     const runnerUp =
-      item.runner_up && slugs.has(item.runner_up) && item.runner_up !== item.field ? item.runner_up : null;
+      item.runner_up && slugs.has(item.runner_up) && item.runner_up !== field ? item.runner_up : null;
 
     answered.add(title);
     placements.push({
       title,
       kind: item.kind,
-      field: item.field,
+      field,
+      domain,
       runnerUp,
       confidence: item.confidence,
       basis,
@@ -147,12 +166,14 @@ export function readPlacements(
 export async function placeArticles(input: {
   batch: Level3Article[];
   fields: AreaField[];
+  domains: AreaDomain[];
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
 }): Promise<PlaceResult> {
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
   const slugs = new Set(input.fields.map((field) => field.slug));
+  const domainSlugs = new Set(input.domains.map((domain) => domain.slug));
 
   let response;
   try {
@@ -194,7 +215,7 @@ export async function placeArticles(input: {
           content: [
             'The fields:',
             '',
-            fieldList(input.fields),
+            fieldList(input.fields, input.domains),
             '',
             'The articles, as "title (where Wikipedia filed it)":',
             '',
@@ -218,5 +239,5 @@ export async function placeArticles(input: {
   const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
   if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
 
-  return readPlacements(block.input, input.batch, slugs);
+  return readPlacements(block.input, input.batch, slugs, domainSlugs);
 }
