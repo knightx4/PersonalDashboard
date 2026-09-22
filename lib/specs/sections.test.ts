@@ -89,29 +89,40 @@ describe('groupSpecs', () => {
     module,
   });
 
+  const moduleOf = (module: string | null) => (group: { module: string | null }) =>
+    group.module === module;
+
   it('follows MODULES order and puts the app-wide group last', () => {
     const groups = groupSpecs([
       spec('a', null),
       spec('b', 'learn'),
       spec('c', 'shopping'),
     ]);
-    expect(groups.map((group) => group.module)).toEqual(['shopping', 'learn', null]);
-    expect(groups[2].label).toBe('The app as a whole');
+    const modules = groups.map((group) => group.module);
+    expect(modules[modules.length - 1]).toBeNull();
+    expect(modules.indexOf('shopping')).toBeLessThan(modules.indexOf('learn'));
+    expect(groups[groups.length - 1].label).toBe('The app as a whole');
   });
 
-  it('leaves out a workspace with no spec', () => {
+  it('keeps a workspace with no spec, because its vision is written there', () => {
     const groups = groupSpecs([spec('a', 'learn')]);
-    expect(groups.map((group) => group.module)).toEqual(['learn']);
+    const todo = groups.find(moduleOf('todo'));
+    expect(todo).toBeDefined();
+    expect(todo?.specs).toEqual([]);
+  });
+
+  it('leaves out the app-wide group when nothing is filed under it', () => {
+    expect(groupSpecs([spec('a', 'learn')]).some(moduleOf(null))).toBe(false);
   });
 
   it('sums the comments on a group, which is what the folded row shows', () => {
     const groups = groupSpecs([spec('a', 'learn'), spec('b', 'learn')], { a: 3, b: 4 });
-    expect(groups[0].comments).toBe(7);
+    expect(groups.find(moduleOf('learn'))?.comments).toBe(7);
   });
 
   it('counts zero for specs nobody has commented on', () => {
     const groups = groupSpecs([spec('a', 'learn')], { somethingElse: 9 });
-    expect(groups[0].comments).toBe(0);
+    expect(groups.find(moduleOf('learn'))?.comments).toBe(0);
   });
 
   it('groups every real spec, so none can go missing from the page', () => {
