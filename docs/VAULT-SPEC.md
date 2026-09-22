@@ -5,6 +5,24 @@ it. v1 is a viewer and nothing more. It is specified in full here because what
 it is *for* only makes sense at the end, and the shape of v1 is chosen to make
 that end cheap rather than to make v1 impressive.
 
+> **[KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md) now sits over this document.** The
+> vault is no longer only a viewer: it owns a **map of itself** — themes, the
+> positions under them, and what points at what — derived from these notes and
+> stored beside them in `obsidian`. That is new scope for this module and the
+> foundation spec holds it.
+>
+> - **"Not an editor" stands, without qualification.** The map is derived from
+>   the notes and never written back. The `outbox/` idea floated below is not
+>   being built, the stored PAT stays `Contents: Read-only`, and the provider
+>   keeps no write path.
+> - **The map makes no claim about what its owner knows.** It says what is
+>   written and how much of it there is. What somebody knows is Learn's, and
+>   Learn starts everything at unknown.
+> - **"No LLM pass over vault content in v1" has been crossed twice,** by quiz
+>   generation and by the note classifier, and the privacy policy has not
+>   caught up. This document said that had to happen first, and it is now the
+>   first item in the foundation's build order.
+
 ## Why a vault at all
 
 Every other source this app has needs a habit. Gmail was the exception — mail

@@ -11,6 +11,17 @@ authored orphan is allowed where an extracted one is not, and the per-note
 extraction budget is dropped. Each is marked there with its reason. Everything
 else below stands.
 
+**[KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md) now sits above both this document and
+the map spec,** and settles one thing that changes how this graph is seeded.
+The probe ladder, the six states, the bar and the cost model below are
+unchanged and still owned here.
+What changed: **nothing read out of the vault writes a knowledge state.** The
+vault's map records what its owner writes about, not what they know, so a
+concept enters this graph at `unknown` and moves only when a question is
+answered. The vault supplies what to offer and the wording to offer it in; it
+never supplies a starting state. The `claimed` state an earlier draft proposed
+is not being built.
+
 It exists because the queue has a hole in it. A reading list is a list of things
 somebody thought were good. It has no opinion about you. It cannot tell you that
 you are about to read chapter 9 of a book whose chapter 3 you needed, or that

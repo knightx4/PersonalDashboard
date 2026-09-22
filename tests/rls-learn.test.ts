@@ -101,6 +101,11 @@ describe('RLS coverage', () => {
       where n.nspname = 'learn' and c.relkind = 'r'
       order by 1`;
     expect(rows.map((r) => r.tablename)).toEqual([
+      'catalogue_course_items',
+      'catalogue_items',
+      'catalogue_links',
+      'catalogue_providers',
+      'catalogue_segments',
       'concept_edges',
       'concept_mentions',
       'concept_state',
@@ -120,6 +125,55 @@ describe('RLS coverage', () => {
       'subjects',
       'tracks',
     ]);
+  });
+});
+
+describe('the catalogue, which belongs to nobody', () => {
+  // Four of the five catalogue tables carry no user_id on purpose: a catalogue
+  // of forty thousand Wikipedia sections is not forty thousand rows per
+  // account. So "can B read A's rows" is the wrong question for them, and the
+  // right ones are that everybody can read them and nobody can write them
+  // through the API. catalogue_links is the exception -- a link points into
+  // one person's graph -- and it gets the usual treatment.
+  const SHARED = ['catalogue_providers', 'catalogue_items', 'catalogue_segments'];
+
+  it('lets any signed-in user read the shared catalogue', async () => {
+    await admin`
+      insert into catalogue_providers (slug, name, home_url, licence, ingest_note)
+      values ('wikipedia', 'Wikipedia', 'https://en.wikipedia.org', 'CC BY-SA',
+              'REST API, no key, section text')
+      on conflict do nothing`;
+
+    for (const table of SHARED) {
+      const seen = await asUser(userB, (tx) => tx`select 1 from ${tx(table)} limit 1`);
+      expect(Array.isArray(seen)).toBe(true);
+    }
+  });
+
+  it('does not let a signed-in user write to the shared catalogue', async () => {
+    // Select is the only policy any of them carries. An insert has nothing to
+    // pass, so it is refused rather than silently landing a row everybody sees.
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into catalogue_providers (slug, name, home_url, licence, ingest_note)
+                   values ('planted', 'Planted', 'https://example.com', 'none', 'planted')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('keeps a catalogue link private to the graph it points into', async () => {
+    // The one catalogue table that is somebody's. A link says this segment
+    // teaches that claim, which is a fact about one person's graph.
+    const rows = await admin<{ n: number }[]>`
+      select count(*)::int as n from catalogue_links where user_id = ${userA}`;
+    expect(rows[0].n).toBe(0);
+
+    const theirs = await asUser(
+      userB,
+      (tx) => tx`select id from catalogue_links where user_id = ${userA}`,
+    );
+    expect(theirs).toHaveLength(0);
   });
 });
 
