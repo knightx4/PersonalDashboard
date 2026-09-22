@@ -18,7 +18,7 @@ export const metadata = {
   description: 'What Personal Dashboard reads, what it stores, and what it never keeps.',
 };
 
-const LAST_UPDATED = '26 July 2026';
+const LAST_UPDATED = '22 September 2026';
 
 export default function PrivacyPage() {
   return (
@@ -30,6 +30,10 @@ export default function PrivacyPage() {
         Personal Dashboard helps you see what you already own and what you spend. To do that it
         can, with your permission, read purchase-related messages in your email. This page
         explains exactly what it reads, what it keeps, and what it never keeps.
+      </p>
+      <p>
+        It can also send notes from your notes vault to a language model when you ask it to. The
+        section on your notes says what is sent.
       </p>
 
       <h2>Who we are</h2>
@@ -121,6 +125,76 @@ export default function PrivacyPage() {
         read that one message, we do not send your identity along with it, and we disable
         provider-side retention where the provider supports it. The provider does not use this
         content to train models.
+      </p>
+
+      <h2>Your notes and the language model</h2>
+      {/*
+        Written against lib/learn/quiz (generate.ts, grade.ts, plan.ts),
+        lib/learn/vault/classify.ts with app/learn/know/actions.ts
+        (proposeFromNote) and lib/learn/graph/from-brief.ts, and lib/vault/map
+        (classify.ts, extract.ts, rules.ts) with app/vault/n/[...path]/actions.ts
+        (proposeMap). Any new path that sends note text to a model, such as a
+        sweep over the whole vault, has to be added here before it ships, along
+        with what it skips.
+      */}
+      <p>
+        Three features send the text of your notes to Anthropic&rsquo;s Claude models: writing a
+        quiz, reading a note for Learn, and reading a note for the map of what you write about.
+        Each runs when you press its button, on the notes you picked. Nothing is sent in the
+        background.
+      </p>
+      <p>What is sent:</p>
+      <ul>
+        <li>
+          <strong>Writing a quiz.</strong> The title of each note you picked and the text the
+          questions are written from. A short note is sent whole. A long one is split at its
+          headings, and the sections the questions come from are sent. When you answer, the
+          question, the answer the model expected, your answer and the note&rsquo;s title are
+          sent so your answer can be marked.
+        </li>
+        <li>
+          <strong>Reading a note for Learn.</strong> First the note&rsquo;s title and its first
+          1,500 characters, to decide whether it argues anything. If it does, the note is sent
+          again, section by section up to its first ten sections, with the name of the subject
+          you chose and the names of the ideas already in that subject, so none is proposed
+          twice.
+        </li>
+        <li>
+          <strong>Reading a note for the map.</strong> First the note&rsquo;s title and its first
+          1,500 characters, to decide whether it argues anything. If it does, the whole note is
+          sent, one section at a time, each with the note&rsquo;s title, the section&rsquo;s
+          heading and the names of the themes already on your map.
+        </li>
+      </ul>
+      <p>What is never sent:</p>
+      <ul>
+        <li>A note you did not pick.</li>
+        <li>
+          Your name, email address or account. A request carries the note and the instructions,
+          and nothing that says whose note it is.
+        </li>
+        <li>The folder or file path of a note. Only its title is sent.</li>
+        <li>
+          The rest of a note that the first read judges to be a record rather than an argument,
+          such as a travel plan or a log of measurements. Only its first 1,500 characters were
+          sent.
+        </li>
+        <li>
+          For the map, any part of a note in your Me folder, which holds your journals, or of a
+          note that contains what looks like an API key. These are turned away before anything is
+          sent.
+        </li>
+      </ul>
+      <p>
+        Nothing sent from your notes is used to train a model. Anthropic&rsquo;s{' '}
+        <a
+          href="https://www.anthropic.com/legal/commercial-terms"
+          className="text-accent hover:underline"
+        >
+          commercial terms
+        </a>{' '}
+        do not allow it to train models on what is sent through its API, and this app does not
+        train models of its own.
       </p>
 
       <h2>How your data is protected</h2>
