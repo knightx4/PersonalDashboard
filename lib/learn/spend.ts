@@ -35,6 +35,11 @@ export const LEARN_OPERATIONS = [
   'locate-passage',
   'generate-chain',
   'write-probe',
+  // Practice Flow writing its next few questions before they are needed
+  // (plan #771). Apart from 'write-probe', which is a question somebody is
+  // waiting on, so the cost of questions written and never shown can be read
+  // against the rows the flow threw away.
+  'write-probe-ahead',
   'name-misconception',
   'propose-floor',
   'classify-note',
