@@ -11,6 +11,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
 import { GoalForm } from '@/app/learn/know/goal-form';
 import { ConceptList } from '@/components/learn/concept-list';
+import { PullArticles } from './pull-articles';
 import {
   countStates,
   learningOrder,
@@ -23,6 +24,13 @@ import {
 export const dynamic = 'force-dynamic';
 
 /**
+ * Pulling twenty Wikipedia articles into the catalogue fetches each one and
+ * then embeds a few hundred sections, which runs past a default function
+ * limit. Server actions invoked from this page inherit this ceiling.
+ */
+export const maxDuration = 300;
+
+/**
  * One subject: its goals, and the chain still standing between you and each.
  *
  * The pruned view is the default and the whole graph is behind ?all=1, because
@@ -30,8 +38,9 @@ export const dynamic = 'force-dynamic';
  * suspect something is missing. It is a link rather than a control because the
  * page holds no state of its own -- the graph is the state.
  *
- * The only thing here that writes is naming another goal, and that writes
- * nothing until the chain it proposes has been read and approved.
+ * Two things here write. Naming another goal writes nothing until the chain it
+ * proposes has been read and approved. Naming Wikipedia articles at the foot
+ * of the page stores them in the shared catalogue and embeds them.
  *
  * Four states and three ways of establishing them, and the screen shows both.
  * "You told me you knew this" and "you answered three questions on it" are
@@ -237,6 +246,8 @@ export default async function SubjectPage({
       {/* A second goal in a subject you already have is the cheap case: the
           generator is told what is here and proposes only what is missing. */}
       <GoalForm subjectId={subject.id} />
+
+      <PullArticles />
     </>
   );
 }

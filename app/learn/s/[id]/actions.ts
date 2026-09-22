@@ -13,6 +13,10 @@ import {
 import { loadGraph, loadSubject } from '@/lib/learn/graph/load';
 import { queueConcept } from '@/lib/learn/graph/to-queue';
 import { recordLearnSpend } from '@/lib/learn/spend';
+import { catalogueSql } from '@/lib/learn/catalogue/connection';
+import { embedCatalogueSegments } from '@/lib/learn/catalogue/embed-sweep';
+import { parseTitles, pullArticles, type PullReport } from '@/lib/learn/catalogue/pull';
+import { sweepWikipediaArticle } from '@/lib/learn/catalogue/sweep';
 
 /**
  * Taking a gap to the reading queue, or to what has already been written about
@@ -136,4 +140,62 @@ export async function readAboutConcept(formData: FormData): Promise<void> {
   // already there -- where Find sources already knows what to do with a
   // subject you wrote down and no source yet.
   redirect(`/learn/r/${readingId}`);
+}
+
+export type PullState = { report?: PullReport; error?: string };
+
+/**
+ * Fetching named Wikipedia articles into the catalogue, and embedding them.
+ *
+ * What `npm run catalogue -- "…" --embed` does, from a subject page, so the
+ * deployed app can fill the catalogue with the keys it already holds. The
+ * articles are stored first and embedded after, in the same press, and the
+ * embedding spend goes on the ledger of the account that pressed, as #741
+ * settled.
+ *
+ * Both passes run inside the action rather than in after(), because a Voyage
+ * refusal or a missing key has to be shown on the page, and after() runs once
+ * the response has gone. The page sets maxDuration so twenty articles fit.
+ *
+ * The embedding pass is not limited to the articles this press fetched: it
+ * gives a vector to every segment in the catalogue that has none, the same as
+ * the script. Anything an earlier run left unembedded is finished here too,
+ * and billed to this account.
+ *
+ * Pulling an article that is already in the catalogue updates its sections in
+ * place. A section whose text is unchanged keeps its vector and the judgements
+ * made against it. A section whose text changed loses its vector and is
+ * embedded again, and a section the article no longer has is deleted along
+ * with its judgements.
+ */
+// latency: pending
+export async function pullWikipediaArticles(
+  _previous: PullState,
+  formData: FormData,
+): Promise<PullState> {
+  const user = await requireUser();
+
+  const parsed = parseTitles(String(formData.get('titles') ?? ''));
+  if (!parsed.ok) return { error: parsed.error };
+
+  let sql;
+  try {
+    sql = catalogueSql();
+  } catch (error) {
+    return {
+      error: `The catalogue cannot be written from this deployment: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    };
+  }
+
+  const report = await pullArticles(
+    {
+      sweep: (title) => sweepWikipediaArticle(sql, title),
+      embed: (limit) => embedCatalogueSegments(sql, { userId: user.id, limit }),
+    },
+    parsed.titles,
+  );
+
+  return { report };
 }
