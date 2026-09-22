@@ -105,7 +105,11 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
           box reads its options out of, so drawing both would be the same
           paragraph twice. */}
       {row.ask && !question && (
-        <p className={setup ? 'whitespace-pre-wrap text-small text-ink' : 'text-small text-ink-muted'}>
+        <p
+          className={
+            setup ? 'whitespace-pre-wrap text-small text-ink' : 'text-small text-ink-muted'
+          }
+        >
           <RefText text={row.ask} titles={titles} />
         </p>
       )}
@@ -159,10 +163,7 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
  * decision.
  */
 function SetupDone({ row }: { row: WaitingRow }) {
-  const [state, action, pending] = useActionState(
-    setPlanItemStatus,
-    {} as PlanActionState,
-  );
+  const [state, action, pending] = useActionState(setPlanItemStatus, {} as PlanActionState);
 
   return (
     <form action={action} className="flex flex-wrap items-center gap-2">
@@ -198,10 +199,7 @@ function SetupDone({ row }: { row: WaitingRow }) {
  * it was waiting for has happened.
  */
 function BlockedDone({ row }: { row: WaitingRow }) {
-  const [state, action, pending] = useActionState(
-    setPlanItemStatus,
-    {} as PlanActionState,
-  );
+  const [state, action, pending] = useActionState(setPlanItemStatus, {} as PlanActionState);
 
   return (
     <form action={action} className="flex flex-wrap items-center gap-2">
@@ -234,10 +232,7 @@ function BlockedDone({ row }: { row: WaitingRow }) {
  * not read yet is still a row-at-a-time job.
  */
 function ApprovePlanRow({ row }: { row: WaitingRow }) {
-  const [state, action, pending] = useActionState(
-    approvePlanItem,
-    {} as PlanActionState,
-  );
+  const [state, action, pending] = useActionState(approvePlanItem, {} as PlanActionState);
 
   return (
     <form action={action} className="flex flex-wrap items-center gap-2">
@@ -270,10 +265,7 @@ function ApprovePlanRow({ row }: { row: WaitingRow }) {
  * a time, so those keep their own buttons and are not counted here.
  */
 export function ApproveAll({ entries }: { entries: readonly WaitingEntry[] }) {
-  const [state, action, pending] = useActionState(
-    approveProposals,
-    {} as PlanActionState,
-  );
+  const [state, action, pending] = useActionState(approveProposals, {} as PlanActionState);
 
   const proposals = entries.filter((entry) => entry.kind === 'plan');
   if (proposals.length === 0) return null;
@@ -309,10 +301,7 @@ export function ApproveAll({ entries }: { entries: readonly WaitingEntry[] }) {
  * the list rather than leaving it sitting there answered.
  */
 function AnswerQuestion({ row }: { row: WaitingRow }) {
-  const [state, action, pending] = useActionState(
-    answerPlanDecision,
-    {} as PlanActionState,
-  );
+  const [state, action, pending] = useActionState(answerPlanDecision, {} as PlanActionState);
   const [answering, setAnswering] = useState(false);
   const { answer, setAnswer, choose } = useAnswerDraft(() => setAnswering(true));
 

@@ -1,7 +1,7 @@
 import { OvernightControl } from '@/app/dev/plan/overnight-control';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { Card } from '@/components/ui/card';
-import type { DigestNight } from '@/lib/digest/night';
+import type { DigestNight, FeatureProgress } from '@/lib/digest/night';
 import type { NotesLastRun } from '@/lib/feedback/last-worked';
 import type { StoredPush } from '@/lib/plan/liveness';
 import type { OvernightRun } from '@/lib/plan/overnight';
@@ -29,6 +29,7 @@ export function StatusPanel({
   run,
   canSend,
   night,
+  progress,
   push,
   ready,
   openNotes,
@@ -38,6 +39,8 @@ export function StatusPanel({
   /** Whether the deployment has the token the plan runner fires through. */
   canSend: boolean;
   night: DigestNight | null;
+  /** How far the night is through the feature it is on. */
+  progress: FeatureProgress | null;
   push: StoredPush | null;
   /** Features the plan runner could pick up now. The card's own note says how. */
   ready: number;
@@ -53,6 +56,8 @@ export function StatusPanel({
         run={run}
         canSend={canSend}
         night={night}
+        progress={progress}
+        refreshReadings
         push={push}
         ready={ready}
         label="Plan"

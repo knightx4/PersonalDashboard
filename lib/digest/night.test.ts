@@ -9,6 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  featureProgress,
   lastNightFrom,
   MAX_NIGHT_ROWS,
   nightBudgetLine,
@@ -384,5 +385,30 @@ describe('lastNightFrom', () => {
 
   it('says nothing about an account that has never run one', () => {
     expect(lastNightFrom({ run: null, fires: [], items: [] })).toBeNull();
+  });
+});
+
+describe('featureProgress', () => {
+  it('counts the steps beneath a feature and names the one claimed', () => {
+    const feature = step({ id: 'p1', status: 'in_progress' });
+    const items = [
+      feature,
+      step({ id: 'p2', parentId: 'p1', status: 'done' }),
+      step({ id: 'p3', parentId: 'p1', status: 'in_progress', title: 'Add the filter' }),
+      step({ id: 'p4', parentId: 'p3', status: 'not_started' }),
+      step({ id: 'p5', parentId: 'p1', kind: 'decision', status: 'not_started' }),
+    ];
+
+    expect(featureProgress(items, `#${feature.number}`)).toEqual({
+      done: 1,
+      total: 3,
+      current: { ref: `#${items[2].number}`, title: 'Add the filter' },
+    });
+  });
+
+  it('says nothing about a feature with no steps or one it cannot find', () => {
+    const lone = step({ id: 'p6' });
+    expect(featureProgress([lone], `#${lone.number}`)).toBeNull();
+    expect(featureProgress([lone], '#99999')).toBeNull();
   });
 });

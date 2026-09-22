@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Moon, Pause, Play, Square } from 'lucide-react';
 
 import {
@@ -16,9 +17,15 @@ import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError, Input, Select } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
-import { nightBudgetLine, nightClosedLine, nightRows, type DigestNight } from '@/lib/digest/night';
+import {
+  nightBudgetLine,
+  nightClosedLine,
+  nightRows,
+  type DigestNight,
+  type FeatureProgress,
+} from '@/lib/digest/night';
 import { elapsedSince, remainingUntil } from '@/lib/plan/elapsed';
-import { commitSubject, type StoredPush } from '@/lib/plan/liveness';
+import { commitSubject, silenceReads, type StoredPush } from '@/lib/plan/liveness';
 import { readyFeaturesLine } from '@/lib/plan/overnight-choice';
 import {
   OVERNIGHT_DEFAULT_FEATURES,
@@ -91,7 +98,15 @@ function Totals({ night }: { night: DigestNight }) {
  * earlier feature is working that feature, and the deduplicated list is in the
  * order the night first reached each one. See the field's note in `night.ts`.
  */
-function OnFeature({ fire, now }: { fire: NonNullable<DigestNight['lastFire']>; now: number }) {
+function OnFeature({
+  fire,
+  now,
+  progress,
+}: {
+  fire: NonNullable<DigestNight['lastFire']>;
+  now: number;
+  progress: FeatureProgress | null;
+}) {
   return (
     <p className="text-small text-ink-muted">
       On <span className="tabular text-ink">{fire.ref}</span>{' '}
@@ -102,6 +117,50 @@ function OnFeature({ fire, now }: { fire: NonNullable<DigestNight['lastFire']>; 
           <span className="tabular">{elapsedSince(fire.at, now)}</span>
         </>
       )}
+      {progress && (
+        <>
+          {' · '}
+          <span className="tabular">
+            {progress.done} of {progress.total} steps done
+          </span>
+          {progress.current && (
+            <>
+              {', now '}
+              <span className="tabular text-ink">{progress.current.ref}</span>{' '}
+              <span className="text-ink">{progress.current.title}</span>
+            </>
+          )}
+        </>
+      )}
+    </p>
+  );
+}
+
+/**
+ * A warning when the session has gone silent, read with the same marks the
+ * plan page uses for a claim. Counted from the last push, or from the fire if
+ * nothing has been pushed since. Says nothing while it is still pushing.
+ */
+function Silence({
+  fire,
+  push,
+  now,
+}: {
+  fire: NonNullable<DigestNight['lastFire']>;
+  push: StoredPush | null;
+  now: number;
+}) {
+  if (now === 0) return null;
+  const since = Math.max(new Date(fire.at).getTime(), push ? new Date(push.at).getTime() : 0);
+  const reads = silenceReads((now - since) / 60_000);
+  if (reads === 'working') return null;
+  const quiet = elapsedSince(new Date(since).toISOString(), now);
+
+  return (
+    <p className="text-small text-caution">
+      {reads === 'quiet'
+        ? `Nothing pushed for ${quiet}. The session may have stalled.`
+        : `Nothing pushed for ${quiet}. The session has most likely ended without finishing.`}
     </p>
   );
 }
@@ -249,6 +308,8 @@ export function OvernightControl({
   ready,
   label = 'Overnight',
   bare = false,
+  progress = null,
+  refreshReadings = false,
 }: {
   run: OvernightRun | null;
   canSend: boolean;
@@ -282,6 +343,19 @@ export function OvernightControl({
    */
   bare?: boolean;
   /**
+   * Progress through the feature the night is on, as `featureProgress` reads
+   * it. Passed by the Status panel on Dash; the plan page shows the steps
+   * themselves and leaves it out.
+   */
+  progress?: FeatureProgress | null;
+  /**
+   * Ask GitHub for fresh push readings once the page has drawn, while a night
+   * is live, and redraw with them. The plan page does its own asking for every
+   * claimed step; Dash has nothing else that does, and without it the silence
+   * warning would be read off whatever the plan page last wrote down.
+   */
+  refreshReadings?: boolean;
+  /**
    * The night so far, as `nightFrom` reads it, or the last night once it has
    * stopped, as `lastNightFrom` reads it. Null when there is nothing to say.
    *
@@ -303,6 +377,19 @@ export function OvernightControl({
   const now = useClockNow();
   const standing = overnightStanding(run);
   const live = standing === 'running' || standing === 'paused';
+
+  const router = useRouter();
+  useEffect(() => {
+    if (!refreshReadings || standing !== 'running') return;
+    const leaving = new AbortController();
+    fetch('/api/plan/runs', { method: 'POST', signal: leaving.signal })
+      .then((res) => {
+        if (res.ok) router.refresh();
+      })
+      // A failed ask leaves the readings the page drew with.
+      .catch(() => {});
+    return () => leaving.abort();
+  }, [refreshReadings, standing, router]);
 
   // Held here rather than left to the form, because the features field is
   // rendered out of existence when the answer is "until I stop it".
@@ -465,7 +552,7 @@ export function OvernightControl({
       {live && run && night && (
         <div className="space-y-0.5">
           {night.lastFire ? (
-            <OnFeature fire={night.lastFire} now={now} />
+            <OnFeature fire={night.lastFire} now={now} progress={progress} />
           ) : (
             <p className="text-small text-ink-muted">{overnightLine(run, now)}</p>
           )}
@@ -478,6 +565,12 @@ export function OvernightControl({
           )}
 
           {push && <LastPush push={push} now={now} />}
+
+          {standing === 'running' && night.lastFire && (
+            <Silence fire={night.lastFire} push={push} now={now} />
+          )}
+
+          {night.blocked.length > 0 && <BlockedSteps night={night} />}
 
           <StopsIn run={run} now={now} />
 

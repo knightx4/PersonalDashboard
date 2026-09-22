@@ -10,7 +10,7 @@ import { loadFeatureFires, loadLastRuns } from '@/lib/plan/runs';
 import { lastStoredPush } from '@/lib/plan/liveness';
 import { loadOvernightRun, overnightStanding } from '@/lib/plan/overnight';
 import { readyFeatureCount } from '@/lib/plan/overnight-choice';
-import { lastNightFrom } from '@/lib/digest/night';
+import { featureProgress, lastNightFrom } from '@/lib/digest/night';
 import { planRoutine } from '@/lib/feedback/routine';
 import { loadNotesLastRun } from '@/lib/feedback/last-worked';
 import { ConversationsView } from './conversations-view';
@@ -83,6 +83,7 @@ export default async function DevRaisedPage() {
   // credit the night with it.
   const live = standing === 'running' || standing === 'paused';
   const nightPush = shown && live ? lastStoredPush(Object.values(lastRuns), startedAt) : null;
+  const progress = live && night?.lastFire ? featureProgress(plan.items, night.lastFire.ref) : null;
 
   // Everything waiting on you, in the three groups the section is drawn in:
   // what you have to go and do, what you have to answer, what you only have to
@@ -111,6 +112,7 @@ export default async function DevRaisedPage() {
         run={overnight}
         canSend={Boolean(planRoutine().token)}
         night={night}
+        progress={progress}
         push={nightPush}
         ready={readyFeatureCount(sections)}
         openNotes={openNotes.count ?? 0}

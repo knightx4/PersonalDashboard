@@ -146,8 +146,8 @@ export function ConversationsView({
     >
       {shown.length === 0 ? (
         <p className="text-small text-ink-muted">
-          Nothing said yet. Anything written on an idea, a plan step, a raise or a bug note shows
-          up here.
+          Nothing said yet. Anything written on an idea, a plan step, a raise or a bug note shows up
+          here.
         </p>
       ) : (
         <>

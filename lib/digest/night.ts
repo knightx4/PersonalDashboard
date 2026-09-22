@@ -379,3 +379,53 @@ export function lastNightFrom(input: {
     blocked: night.blocked.filter((step) => underFired(step.ref)),
   };
 }
+
+/** How far the night has got through the feature it is on. */
+export type FeatureProgress = {
+  /** Steps under the feature that are done. */
+  done: number;
+  /** Every step under it, decisions left out. */
+  total: number;
+  /** The step a session has claimed, or null while none is. */
+  current: DigestNightRef | null;
+};
+
+/**
+ * Progress through one feature, for the line naming the feature the night is
+ * on. Every step beneath it counts, however deep, because a sub-step is work
+ * the session has to finish before the feature is.
+ */
+export function featureProgress(
+  items: readonly PlanItem[],
+  featureRef: string,
+): FeatureProgress | null {
+  const feature = items.find((item) => `#${item.number}` === featureRef);
+  if (!feature) return null;
+
+  const children = new Map<string, PlanItem[]>();
+  for (const item of items) {
+    if (!item.parentId) continue;
+    children.set(item.parentId, [...(children.get(item.parentId) ?? []), item]);
+  }
+  const steps: PlanItem[] = [];
+  const seen = new Set<string>([feature.id]);
+  const walk = (id: string) => {
+    for (const child of children.get(id) ?? []) {
+      if (seen.has(child.id)) continue;
+      seen.add(child.id);
+      if (child.kind !== 'decision') steps.push(child);
+      walk(child.id);
+    }
+  };
+  walk(feature.id);
+  if (steps.length === 0) return null;
+
+  const claimed = steps
+    .filter((step) => step.status === 'in_progress')
+    .sort((a, b) => (b.startedAt ?? '').localeCompare(a.startedAt ?? ''))[0];
+  return {
+    done: steps.filter((step) => step.status === 'done').length,
+    total: steps.length,
+    current: claimed ? refOf(claimed) : null,
+  };
+}
