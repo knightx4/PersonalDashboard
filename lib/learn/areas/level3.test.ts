@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseLevel3, wikitextFrom } from '@/lib/learn/areas/level3';
+import { level3RequestUrl, parseLevel3, wikitextFrom } from '@/lib/learn/areas/level3';
 
 /**
  * The page is hand-edited, so these hold the parse to the shapes it actually
@@ -16,6 +16,8 @@ Intro text with a [[Wikipedia:Vital articles|link]] that is not an article.
 === Scientists ===
 # [[Isaac Newton]]
 # [[File:Newton.jpg]] [[Charles Darwin]]
+| {{Icon|FA}} [[:Category:FA-Class vital articles|FA]] || 84
+* [[:Category:Scientists]]
 
 == History (80 articles) ==
 # [[History]]
@@ -49,6 +51,14 @@ describe('parseLevel3', () => {
 
   it('ignores everything above the first section heading', () => {
     expect(articles.some((a) => a.title.startsWith('Wikipedia'))).toBe(false);
+  });
+});
+
+describe('level3RequestUrl', () => {
+  it('asks for the current title and follows a redirect if it moves again', () => {
+    const url = new URL(level3RequestUrl());
+    expect(url.searchParams.get('page')).toBe('Wikipedia:Vital_articles/Level_3');
+    expect(url.searchParams.get('redirects')).toBe('1');
   });
 });
 
