@@ -3,6 +3,7 @@ import 'server-only';
 import { createClient } from '@/lib/auth/server';
 import { REPO_KEY } from '@/lib/plan/ci';
 import type { CheckConclusion } from '@/lib/plan/checks';
+import type { DeployState } from '@/lib/plan/deploy';
 import type { MainCheck } from '@/lib/plan/main-check';
 
 /**
@@ -26,7 +27,9 @@ export async function loadMainCheck(): Promise<MainCheck | null> {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from('plan_main_checks')
-      .select('head_sha, conclusion, checked_at, error, reason, run_url')
+      .select(
+        'head_sha, conclusion, checked_at, error, reason, run_url, deploy_state, deploy_url, deploy_error, unapplied_migrations, migrations_error',
+      )
       .eq('repo', REPO_KEY)
       .maybeSingle();
     if (error || !data) return null;
@@ -38,6 +41,11 @@ export async function loadMainCheck(): Promise<MainCheck | null> {
       error: string | null;
       reason: string | null;
       run_url: string | null;
+      deploy_state: string | null;
+      deploy_url: string | null;
+      deploy_error: string | null;
+      unapplied_migrations: string[] | null;
+      migrations_error: string | null;
     };
     return {
       sha: row.head_sha,
@@ -48,6 +56,12 @@ export async function loadMainCheck(): Promise<MainCheck | null> {
       error: row.error,
       reason: row.reason,
       runUrl: row.run_url,
+      // Constrained in 0096 to the four DeployState words, as `conclusion` is.
+      deployState: (row.deploy_state as DeployState | null) ?? null,
+      deployUrl: row.deploy_url,
+      deployError: row.deploy_error,
+      unapplied: row.unapplied_migrations,
+      migrationsError: row.migrations_error,
     };
   } catch {
     return null;

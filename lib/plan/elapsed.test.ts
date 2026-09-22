@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  elapsedSince,
-  isStalledClaim,
-  remainingUntil,
-  STALLED_AFTER_MINUTES,
-} from './elapsed';
+import { elapsedSince, isStalledClaim, remainingUntil, STALLED_AFTER_MINUTES } from './elapsed';
 
 const start = '2026-09-09T10:00:00.000Z';
 const at = (minutes: number) => new Date(start).getTime() + minutes * 60_000;

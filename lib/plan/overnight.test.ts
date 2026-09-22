@@ -477,7 +477,10 @@ describe('dashActivityLine', () => {
   it('says nothing when nothing is running', () => {
     expect(dashActivityLine({ run: null, session: null }, NOW)).toBeNull();
     expect(
-      dashActivityLine({ run: night({ running: false, endedReason: 'It stopped.' }), session: null }, NOW),
+      dashActivityLine(
+        { run: night({ running: false, endedReason: 'It stopped.' }), session: null },
+        NOW,
+      ),
     ).toBeNull();
   });
 
@@ -510,6 +513,8 @@ describe('dashActivityLine', () => {
   it('stops counting a run that has been quiet for hours as work', () => {
     const stale = { job: 'step' as const, startedAt: minutesAgo(300) };
     expect(dashActivityLine({ run: null, session: stale }, NOW)).toBeNull();
-    expect(dashActivityLine({ run: null, session: { job: 'step', startedAt: 'nonsense' } }, NOW)).toBeNull();
+    expect(
+      dashActivityLine({ run: null, session: { job: 'step', startedAt: 'nonsense' } }, NOW),
+    ).toBeNull();
   });
 });

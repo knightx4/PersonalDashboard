@@ -27,7 +27,9 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ask, commitOnMain, readToken, REPO, REPO_KEY, refusalFor } from './github';
 import { pushesFrom, type ActivityRow, type Push } from './liveness';
+import { deployStateFrom, type DeployState } from './deploy';
 import { failureReason, type FailedJob, type FailedRun } from './main-check';
+import { unappliedMigrations, type MigrationFile } from './migrations';
 import {
   carriedBy,
   carrierFor,
@@ -73,7 +75,11 @@ const LANDING_BUDGET = 10;
 /** How many of those are in flight at once. */
 const LANES = 5;
 
-type CommitRow = { sha: string; parents?: Array<{ sha?: string }> };
+type CommitRow = {
+  sha: string;
+  parents?: Array<{ sha?: string }>;
+  commit?: { committer?: { date?: string } };
+};
 
 /**
  * Main's commits, newest first, until every commit asked about has been seen.
@@ -190,6 +196,114 @@ async function explainFailure(
   }
 }
 
+/** The environment Vercel records production deploys under on GitHub. */
+const DEPLOY_ENVIRONMENT = 'Production';
+
+/**
+ * Whether main's head deployed, from the deployment Vercel records on GitHub.
+ *
+ * Two requests: the newest production deployment for the commit, and that
+ * deployment's newest status. Under Deployments: Read, which the token did
+ * not need before this reading; a refusal is carried as the reading's own
+ * error so the CI reading beside it still stands.
+ */
+async function readDeploy(
+  sha: string,
+  committedAt: string | null,
+  now: number,
+  token: string,
+  doFetch: typeof globalThis.fetch,
+): Promise<{ state: DeployState | null; url: string | null; error: string | null }> {
+  try {
+    const deployments = await ask<Array<{ id: number }>>(
+      `/repos/${REPO.owner}/${REPO.repo}/deployments?sha=${sha}&environment=${DEPLOY_ENVIRONMENT}&per_page=1`,
+      token,
+      doFetch,
+    );
+    let status: string | null = null;
+    let url: string | null = null;
+    const newest = deployments[0];
+    if (newest) {
+      const statuses = await ask<
+        Array<{ state: string; target_url?: string | null; environment_url?: string | null }>
+      >(
+        `/repos/${REPO.owner}/${REPO.repo}/deployments/${newest.id}/statuses?per_page=1`,
+        token,
+        doFetch,
+      );
+      // A deployment with no status yet has only just been created.
+      status = statuses[0]?.state ?? 'pending';
+      url = statuses[0]?.target_url || statuses[0]?.environment_url || null;
+    }
+    return {
+      state: deployStateFrom({ status, committedAt, now }),
+      url: url && url.length <= 300 ? url : null,
+      error: null,
+    };
+  } catch (err) {
+    return { state: null, url: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * The migration files on main that the live database has not applied.
+ *
+ * The files come from GitHub at main's head rather than from this deploy's
+ * own disk: the question is about main, and a deploy that failed would
+ * otherwise be answering for an older commit. One listing of `supabase/` and
+ * one per migrations folder, all under Contents: Read, which the token
+ * already has. The applied names come from `applied_migration_names()`
+ * (migration 0096), which only the service role the tick runs as can call.
+ */
+async function readMigrations(
+  sha: string,
+  supabase: Db,
+  token: string,
+  doFetch: typeof globalThis.fetch,
+): Promise<{ unapplied: string[] | null; error: string | null }> {
+  type Entry = { name: string; type: string };
+  try {
+    const top = await ask<Entry[]>(
+      `/repos/${REPO.owner}/${REPO.repo}/contents/supabase?ref=${sha}`,
+      token,
+      doFetch,
+    );
+    const dirs = top.filter((entry) => entry.type === 'dir' && entry.name.startsWith('migrations'));
+    const files: MigrationFile[] = (
+      await inLanes(dirs, async (dir) =>
+        (
+          await ask<Entry[]>(
+            `/repos/${REPO.owner}/${REPO.repo}/contents/supabase/${dir.name}?ref=${sha}`,
+            token,
+            doFetch,
+          )
+        )
+          .filter((entry) => entry.type === 'file')
+          .map((entry) => ({ dir: dir.name, name: entry.name })),
+      )
+    ).flat();
+
+    const { data, error } = await supabase.rpc('applied_migration_names');
+    if (error) {
+      return {
+        unapplied: null,
+        error: `The live migration history could not be read: ${error.message}`,
+      };
+    }
+    // A set-returning function comes back as bare values or as one-key rows
+    // depending on how it is called; either is a list of names.
+    const applied = new Set(
+      ((data ?? []) as unknown[]).map((row) =>
+        typeof row === 'string' ? row : String(Object.values(row as object)[0] ?? ''),
+      ),
+    );
+    // The column holds fifty, and fifty unapplied migrations is one message.
+    return { unapplied: unappliedMigrations(files, applied).slice(0, 50), error: null };
+  } catch (err) {
+    return { unapplied: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 /**
  * What CI says about main's newest commit right now, written down for the
  * shell to read.
@@ -234,6 +348,8 @@ export async function refreshMainCheck(input: {
   let error: string | null = null;
   let reason: string | null = null;
   let runUrl: string | null = null;
+  let deploy: Awaited<ReturnType<typeof readDeploy>> = { state: null, url: null, error: null };
+  let migrations: Awaited<ReturnType<typeof readMigrations>> = { unapplied: null, error: null };
 
   if (!token) {
     error = `No GITHUB_READ_TOKEN is set, so ${REPO.branch}'s checks cannot be read.`;
@@ -257,9 +373,19 @@ export async function refreshMainCheck(input: {
         );
         const runs = body.workflow_runs ?? [];
         conclusion = conclusionFrom(runs);
-        if (conclusion === 'failed') {
-          ({ reason, runUrl } = await explainFailure(runs, token, doFetch));
-        }
+        const head = sha;
+        // Three readings of the same commit, asked side by side. Each carries
+        // its own refusal, so one GitHub will not answer leaves the others.
+        const [explained, deployed, compared] = await Promise.all([
+          conclusion === 'failed'
+            ? explainFailure(runs, token, doFetch)
+            : Promise.resolve({ reason: null, runUrl: null }),
+          readDeploy(head, rows[0]?.commit?.committer?.date ?? null, now, token, doFetch),
+          readMigrations(head, input.supabase, token, doFetch),
+        ]);
+        ({ reason, runUrl } = explained);
+        deploy = deployed;
+        migrations = compared;
       }
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
@@ -275,6 +401,11 @@ export async function refreshMainCheck(input: {
       error,
       reason,
       run_url: runUrl,
+      deploy_state: deploy.state,
+      deploy_url: deploy.url,
+      deploy_error: deploy.error,
+      unapplied_migrations: migrations.unapplied,
+      migrations_error: migrations.error,
     },
     { onConflict: 'repo' },
   );

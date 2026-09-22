@@ -290,7 +290,12 @@ describe('waitingGroups', () => {
           blockAsk:
             'Read the new section of the privacy page and say whether it can go to main as written.',
         }),
-        item({ id: 'b', number: 2, status: 'blocked', blockAsk: 'Should the export keep the nesting?' }),
+        item({
+          id: 'b',
+          number: 2,
+          status: 'blocked',
+          blockAsk: 'Should the export keep the nesting?',
+        }),
         item({ id: 'c', number: 3, status: 'blocked', blockAsk: 'Set GITHUB_TOKEN in Vercel.' }),
         item({ id: 'd', number: 4, status: 'blocked', blockAsk: null }),
       ]),
@@ -306,7 +311,9 @@ describe('waitingGroups', () => {
     expect(isJobForYou('A token, scoped to this repo.')).toBe(true);
     expect(isJobForYou('Allow ocw.mit.edu in the session network policy.')).toBe(true);
     expect(isJobForYou('Which of the two layouts do you want?')).toBe(false);
-    expect(isJobForYou('Answer twenty applied cases and say whether a second turn is worth it.')).toBe(false);
+    expect(
+      isJobForYou('Answer twenty applied cases and say whether a second turn is worth it.'),
+    ).toBe(false);
     expect(isJobForYou('The wording of the empty state.')).toBe(false);
     expect(isJobForYou(null)).toBe(false);
   });
@@ -348,9 +355,9 @@ describe('waitingGroups', () => {
   });
 
   it('leaves out a raise that is not open', () => {
-    expect(
-      laidOut([], [raise({ id: 'r3', status: 'closed', outcome: 'Filed as #700.' })]),
-    ).toEqual({ 'Your actions': [], 'Questions for you': [], 'To approve': [] });
+    expect(laidOut([], [raise({ id: 'r3', status: 'closed', outcome: 'Filed as #700.' })])).toEqual(
+      { 'Your actions': [], 'Questions for you': [], 'To approve': [] },
+    );
   });
 
   it('puts the plan rows above the raises in the group they share', () => {

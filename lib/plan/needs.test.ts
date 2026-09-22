@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanItem } from '@/lib/plan/load';
-import { buildPlanTree, findNode, healthOf, isWaitingOnThePerson, workOrder } from '@/lib/plan/tree';
+import {
+  buildPlanTree,
+  findNode,
+  healthOf,
+  isWaitingOnThePerson,
+  workOrder,
+} from '@/lib/plan/tree';
 import {
   needsLines,
   needsRefusal,
@@ -166,7 +172,13 @@ describe('the plan after a needs', () => {
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
   };
-  const feature: PlanItem = { ...stopped, id: 'feature', number: 494, parentId: null, position: 10 };
+  const feature: PlanItem = {
+    ...stopped,
+    id: 'feature',
+    number: 494,
+    parentId: null,
+    position: 10,
+  };
   // Exactly the row the insert writes: setup, the person's, under the feature.
   const job: PlanItem = {
     ...stopped,
