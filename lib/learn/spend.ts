@@ -71,6 +71,11 @@ export const LEARN_OPERATIONS = [
   // page. Kept apart from 'classify-note' and 'concepts-from-note', which are
   // the older path into learn.concepts, so the two can be compared.
   'map-note',
+  // The same reading done by the sweep over the whole vault (plan #757),
+  // recorded through the service role from the cron call rather than through
+  // `recordLearnSpend`, which needs a session. Kept apart from 'map-note' so
+  // the cost of the sweep can be read against the 75-note trial's estimate.
+  'map-sweep',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

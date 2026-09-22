@@ -7,14 +7,19 @@ import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
  *
  * A failed read returns no names. The proposal still works without them; it
  * only loses the nudge towards names already in use.
+ *
+ * `userId` is required with a service-role client, which RLS does not narrow:
+ * the sweep passes it so one person's theme names are never sent with
+ * another's notes.
  */
 export async function loadThemeNames(
   supabase: VaultSupabaseClient,
   limit = 200,
+  userId?: string,
 ): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('themes')
-    .select('name')
+  let query = supabase.from('themes').select('name');
+  if (userId) query = query.eq('user_id', userId);
+  const { data, error } = await query
     .order('strength', { ascending: false })
     .order('name')
     .limit(limit);
