@@ -28,7 +28,7 @@ export default function NewTrackPage() {
       </p>
 
       <PageHeader
-        title="New track"
+        title="New reading list"
         description="Start with a topic you want to learn about, or paste a reading list somebody gave you."
       />
 

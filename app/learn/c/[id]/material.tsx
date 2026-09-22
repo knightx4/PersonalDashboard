@@ -103,11 +103,11 @@ function Material({ row, conceptId }: { row: ClaimMaterial; conceptId: string })
  */
 const ABSENCE: Record<MaterialAbsence, string> = {
   'never-searched':
-    'The catalogue has not been searched for this claim yet. It is searched when you ask for something to read for it.',
+    'The catalogue has not been searched for this idea yet. It is searched when you ask for something to read for it.',
   'nothing-matched':
-    'The catalogue was searched for this claim and nothing in it matched. More material has to be pulled in before that changes.',
+    'The catalogue was searched for this idea and nothing in it matched. More material has to be pulled in before that changes.',
   'catalogue-empty':
-    'Nothing has been pulled into the catalogue yet, so there is nothing to match this claim against.',
+    'Nothing has been pulled into the catalogue yet, so there is nothing to match this idea against.',
 };
 
 /**
@@ -135,7 +135,7 @@ export function MaterialForClaim({
   if (view.material.length === 0) return null;
 
   return (
-    <CardSection title="Material for this claim" className={className}>
+    <CardSection title="Material for this idea" className={className}>
       {/* One surface with hairlines rather than a card each, law 13. Every row
           runs to several lines, and a frame round each of them inside a card
           that already has one is the mistake law 11 names. */}

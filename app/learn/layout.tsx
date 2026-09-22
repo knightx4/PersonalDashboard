@@ -65,7 +65,7 @@ export default async function LearnLayout({ children }: { children: React.ReactN
     // The subjects, which are what "track" means on screen now (#774).
     {
       href: '/learn/know',
-      label: 'What you know',
+      label: 'Tracks',
       icon: 'know',
       exact: true,
       alsoMatches: ['/learn/s/', '/learn/c/'],

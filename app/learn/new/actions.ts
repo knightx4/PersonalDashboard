@@ -272,7 +272,7 @@ export async function confirmImport(
     });
     trackId = result.trackId;
   } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Could not save that track.' };
+    return { error: error instanceof Error ? error.message : 'Could not save that reading list.' };
   }
 
   revalidatePath('/learn/lists');

@@ -50,12 +50,12 @@ describe('trackMove', () => {
 
 describe('trackChange', () => {
   it('says what moved and from where', () => {
-    expect(trackChange({ before: 6, settled: 7, total: 19 })).toBe('1 more idea settled, up from 6.');
-    expect(trackChange({ before: 6, settled: 9, total: 19 })).toBe('3 more ideas settled, up from 6.');
+    expect(trackChange({ before: 6, settled: 7, total: 19 })).toBe('1 more idea known, up from 6.');
+    expect(trackChange({ before: 6, settled: 9, total: 19 })).toBe('3 more ideas known, up from 6.');
     expect(trackChange({ before: 8, settled: 7, total: 19 })).toBe(
-      '1 idea no longer settled, down from 8.',
+      '1 idea no longer known, down from 8.',
     );
-    expect(trackChange({ before: 7, settled: 7, total: 19 })).toBe('Still 7 of 19 settled.');
+    expect(trackChange({ before: 7, settled: 7, total: 19 })).toBe('Still 7 of 19 known.');
   });
 });
 

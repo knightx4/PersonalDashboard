@@ -111,11 +111,11 @@ function seededLine(known?: string, shaky?: string, unmatched?: string): string 
   if (!Number.isFinite(settled) || known === undefined) return null;
 
   const parts: string[] = [];
-  if (settled > 0) parts.push(`${settled} you answered right ${settled === 1 ? 'starts' : 'start'} settled`);
-  if (wobbly > 0) parts.push(`${wobbly} you missed ${wobbly === 1 ? 'starts' : 'start'} shaky`);
+  if (settled > 0) parts.push(`${settled} you answered right ${settled === 1 ? 'starts' : 'start'} as known`);
+  if (wobbly > 0) parts.push(`${wobbly} you missed ${wobbly === 1 ? 'starts' : 'start'} as getting there`);
   if (parts.length === 0) parts.push('Nothing you answered matched a concept in this chain');
   if (missed > 0) {
-    parts.push(`${missed} ${missed === 1 ? 'claim' : 'claims'} you were asked about did not turn up in it`);
+    parts.push(`${missed} ${missed === 1 ? 'idea' : 'ideas'} you were asked about did not turn up in it`);
   }
 
   return `From the opening questions: ${parts.join(', ')}.`;
@@ -154,7 +154,7 @@ export default async function SubjectPage({
           className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
           <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          What you know
+          Tracks
         </Link>
       </p>
 
@@ -163,10 +163,8 @@ export default async function SubjectPage({
         description={
           counts.total === 0
             ? 'Nothing in this graph yet.'
-            : `${settledCount(counts)} of ${counts.total} settled${
-                counts.misconception > 0
-                  ? ` · ${counts.misconception} ${counts.misconception === 1 ? 'misconception' : 'misconceptions'}`
-                  : ''
+            : `${settledCount(counts)} of ${counts.total} known${
+                counts.misconception > 0 ? ` · ${counts.misconception} mixed up` : ''
               }`
         }
         actions={
@@ -182,7 +180,7 @@ export default async function SubjectPage({
                 href={`/learn/s/${id}/probe`}
                 className={buttonVariants({ variant: 'secondary' })}
               >
-                Probe this
+                Ask me about this
               </Link>
               {/* The flow limited to this track (plan #779), left again with
                   All tracks on the flow itself. */}
@@ -210,13 +208,13 @@ export default async function SubjectPage({
             'border-dashed px-4 py-6 text-center text-body text-ink-muted',
           )}
         >
-          No concepts in this subject yet. A concept is one claim you can be right or wrong about —
-          not a heading.
+          No ideas in this track yet. An idea is one thing you can be right or wrong about, not a
+          heading.
         </p>
       ) : showEverything ? (
         <>
           <p className="mb-2 text-ui text-ink-muted">
-            Everything in this subject, prerequisites first — including what you already know.
+            Everything in this track, prerequisites first, including what you already know.
           </p>
           <ConceptList
             concepts={learningOrder(graph, graph.concepts.map((concept) => concept.id))}
@@ -232,7 +230,7 @@ export default async function SubjectPage({
             'border-dashed px-4 py-6 text-center text-body text-ink-muted',
           )}
         >
-          No goals in this subject yet. A goal is what you actually want to understand, and the
+          No goals in this track yet. A goal is what you actually want to understand, and the
           chain leading to it is what gets shown here.
         </p>
       ) : (

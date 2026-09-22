@@ -37,7 +37,7 @@ export function PullArticles() {
       <Field
         label="Pull Wikipedia articles into the catalogue"
         id="catalogue-titles"
-        hint={`One article per line, by title or by link, up to ${MAX_TITLES}. Each is split into its sections and embedded, and the embedding is charged to your account. Pressing Find something to read on a claim then looks through them.`}
+        hint={`One article per line, by title or by link, up to ${MAX_TITLES}. Each is split into its sections and embedded, and the embedding is charged to your account. Pressing Find something to read on an idea then looks through them.`}
       >
         <Textarea
           id="catalogue-titles"
@@ -148,5 +148,5 @@ function embeddingLine(embedding: PullReport['embedding']): string {
   if (embedding.capped) {
     return `${done}, which is as many as one press does. Press again to embed the rest.`;
   }
-  return `${done}. They can be found from a claim now.`;
+  return `${done}. They can be found from an idea now.`;
 }

@@ -56,9 +56,9 @@ export function FromVaultForm({
     <form action={propose} className={cn(cardVariants({ padding: 'standard' }), 'mt-6')}>
       {subjects.length > 0 && (
         <Field
-          label="Into which subject?"
+          label="Into which track?"
           id="vault-subject"
-          hint="Leave it unset and the note names its own subject."
+          hint="Leave it unset and the note names its own track."
         >
           <Select id="vault-subject" name="subjectId" defaultValue="">
             <option value="">Let it decide</option>
@@ -74,7 +74,7 @@ export function FromVaultForm({
       <Field
         label="Which note?"
         id="vault-note"
-        hint="Notes long enough to be arguing something. What it claims becomes concepts; what it merely records does not."
+        hint="Notes long enough to be arguing something. What it argues becomes ideas to learn, and what it only records does not."
       >
         {/*
           The note that was read stays chosen. A proposal that failed is

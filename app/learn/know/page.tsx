@@ -38,14 +38,12 @@ export const dynamic = 'force-dynamic';
 function settledLine(counts: ReturnType<typeof countStates>): string {
   if (counts.total === 0) return 'No concepts yet.';
 
-  const parts = [`${settledCount(counts)} of ${counts.total} settled`];
-  if (counts.recognised > 0) parts.push(`${counts.recognised} recognised`);
-  if (counts.shaky > 0) parts.push(`${counts.shaky} shaky`);
+  const parts = [`${settledCount(counts)} of ${counts.total} known`];
+  const gettingThere = counts.recognised + counts.shaky;
+  if (gettingThere > 0) parts.push(`${gettingThere} getting there`);
   // Named first-class, because a thing steering you wrong is not a gap and
   // should not be counted as one.
-  if (counts.misconception > 0) {
-    parts.push(`${counts.misconception} ${counts.misconception === 1 ? 'misconception' : 'misconceptions'}`);
-  }
+  if (counts.misconception > 0) parts.push(`${counts.misconception} mixed up`);
   return parts.join(' · ');
 }
 
@@ -71,15 +69,15 @@ export default async function KnowPage() {
   return (
     <>
       <PageHeader
-        title="What you know"
-        description="One graph per subject, and it grows every time you use it."
+        title="Tracks"
+        description="One graph per track, and it grows every time you use it."
       />
 
       {rows.length === 0 ? (
         <EmptyState
           icon={Network}
-          title="No subjects yet"
-          description="A subject is the container — Economics, not the Phillips curve. Name a goal below and the chain of things leading to it gets laid out, in whichever subject it belongs to."
+          title="No tracks yet"
+          description="A track is the container: Economics, not the Phillips curve. Name a goal below and the chain of things leading to it gets laid out, in whichever track it belongs to."
         />
       ) : (
         <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>

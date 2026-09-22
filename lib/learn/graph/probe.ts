@@ -199,7 +199,7 @@ export async function writeProbe(input: {
       ? {
           ok: false,
           reason: 'unusable',
-          detail: 'This claim is too vague to ask about. It wants rewriting rather than testing.',
+          detail: 'This idea is too vague to ask about. It wants rewriting rather than testing.',
         }
       : {
           ok: false,

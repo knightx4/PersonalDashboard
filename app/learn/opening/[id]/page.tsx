@@ -45,7 +45,7 @@ export default async function OpeningPage({ params }: { params: Promise<{ id: st
       <>
         <PageHeader
           title={`Before we start on ${sweep.subjectName}`}
-          description="Ten questions across the subject, answered from memory. Most people get most of them wrong — that is what makes this worth doing."
+          description="Ten questions across the track, answered from memory. Most people get most of them wrong, which is what makes this worth doing."
         />
 
         <QuestionForm

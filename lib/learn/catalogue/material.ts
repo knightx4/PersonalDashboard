@@ -341,7 +341,7 @@ export function tableMaterialStore(
         .order('created_at');
 
       assertSchemaExposed(error, LEARN_SCHEMA);
-      if (error) throw fail('Reading what was found for this claim', error);
+      if (error) throw fail('Reading what was found for this idea', error);
 
       return ((data ?? []) as unknown as LinkRecord[])
         .map(materialFrom)

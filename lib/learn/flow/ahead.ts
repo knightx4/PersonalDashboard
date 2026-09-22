@@ -124,7 +124,7 @@ async function claimsNow(
   ]);
 
   assertSchemaExposed(homes.error, LEARN_SCHEMA);
-  if (homes.error) throw fail('Reading which subject those claims are in', homes.error);
+  if (homes.error) throw fail('Reading which track those ideas are in', homes.error);
 
   const subjectOf = new Map(
     ((homes.data ?? []) as { id: string; subject_id: string }[]).map((row) => [

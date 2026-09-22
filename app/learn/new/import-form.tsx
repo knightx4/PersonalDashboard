@@ -245,7 +245,7 @@ export function ImportForm() {
         <input type="hidden" name="question" value={parsed.question ?? ''} />
         <input type="hidden" name="sourceHint" value={parsed.sourceHint ?? ''} />
 
-        <Field label="Call this track" id="title">
+        <Field label="Call this reading list" id="title">
           <Input id="title" name="title" defaultValue={parsed.title} required />
         </Field>
 
@@ -255,7 +255,7 @@ export function ImportForm() {
           {/* Deliberately not disabled while rows are still landing. If the
               three you wanted are already in, there is no reason to make you
               wait on a fourth you were going to untick anyway. */}
-          <SubmitButton idle="Save this track" busy="Saving…" />
+          <SubmitButton idle="Save this reading list" busy="Saving…" />
           {confirmState.error && <span className="text-ui text-danger">{confirmState.error}</span>}
         </div>
       </form>

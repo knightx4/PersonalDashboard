@@ -112,7 +112,7 @@ export async function saveImport(
 
   assertSchemaExposed(trackError, LEARN_SCHEMA);
   if (trackError || !trackData) {
-    throw messageFor('Creating the track', trackError ?? { message: 'no row' });
+    throw messageFor('Creating the reading list', trackError ?? { message: 'no row' });
   }
   const trackId = (trackData as { id: string }).id;
 
@@ -189,7 +189,7 @@ export async function createTrack(
     .single();
 
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error || !data) throw messageFor('Creating the track', error ?? { message: 'no row' });
+  if (error || !data) throw messageFor('Creating the reading list', error ?? { message: 'no row' });
   return (data as { id: string }).id;
 }
 
@@ -339,7 +339,7 @@ export async function deleteTrack(
 ): Promise<void> {
   const { error } = await supabase.from('tracks').delete().eq('id', trackId);
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw messageFor('Deleting the track', error);
+  if (error) throw messageFor('Deleting the reading list', error);
 }
 
 /** Take a reading off a track. Only ever the one you asked for; RLS does the rest. */

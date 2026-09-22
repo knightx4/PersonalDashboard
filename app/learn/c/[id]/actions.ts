@@ -57,7 +57,7 @@ export async function proposeBranch(
     conceptId: formData.get('conceptId') ?? '',
     selection: normaliseSelection(String(formData.get('selection') ?? '')),
   });
-  if (!parsed.success) return { error: 'Select a phrase in the claim first.' };
+  if (!parsed.success) return { error: 'Select a phrase in the idea first.' };
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { error: 'Going deeper needs ANTHROPIC_API_KEY to be set.' };
@@ -69,7 +69,7 @@ export async function proposeBranch(
   // The offer is only ever drawn over the claim, so a phrase that is not in it
   // did not come from the page.
   if (!fromClaim(parsed.data.selection, view.concept.claim)) {
-    return { error: 'Select a phrase from the claim itself.' };
+    return { error: 'Select a phrase from the idea itself.' };
   }
 
   const spend = collectSpend();
@@ -192,8 +192,8 @@ export async function rewriteClaim({
     return {
       error:
         claim.trim().length === 0
-          ? 'A claim is a sentence somebody can be wrong about. Write one.'
-          : `Keep it under ${MAX_CLAIM} characters — a claim is a sentence or two.`,
+          ? 'An idea is a sentence somebody can be wrong about. Write one.'
+          : `Keep it under ${MAX_CLAIM} characters. An idea is a sentence or two.`,
     };
   }
 

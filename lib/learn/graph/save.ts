@@ -64,7 +64,7 @@ export async function findOrCreateSubject(
     .maybeSingle();
 
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw fail('Looking up the subject', error);
+  if (error) throw fail('Looking up the track', error);
   if (data) return { id: (data as { id: string }).id, created: false };
 
   const { data: created, error: createError } = await supabase
@@ -75,7 +75,7 @@ export async function findOrCreateSubject(
 
   assertSchemaExposed(createError, LEARN_SCHEMA);
   if (createError || !created) {
-    throw fail('Creating the subject', createError ?? { message: 'no row' });
+    throw fail('Creating the track', createError ?? { message: 'no row' });
   }
   return { id: (created as { id: string }).id, created: true };
 }
@@ -331,6 +331,6 @@ export async function existingConcepts(
     .order('name');
 
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw fail('Reading the subject', error);
+  if (error) throw fail('Reading the track', error);
   return (data ?? []) as { id: string; name: string }[];
 }

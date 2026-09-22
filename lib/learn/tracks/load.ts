@@ -334,7 +334,7 @@ export async function loadTracks(
   ]);
 
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw new Error(`Reading your tracks failed: ${error.message}`);
+  if (error) throw new Error(`Reading your reading lists failed: ${error.message}`);
 
   const all = (data ?? []) as TrackRecord[];
 
@@ -420,7 +420,7 @@ export async function loadTrack(
     .order('created_at');
 
   assertSchemaExposed(readingError, LEARN_SCHEMA);
-  if (readingError) throw new Error(`Reading this track failed: ${readingError.message}`);
+  if (readingError) throw new Error(`Reading this reading list failed: ${readingError.message}`);
 
   const readings = ((readingRows ?? []) as unknown as ReadingRecord[]).map(toReading);
 

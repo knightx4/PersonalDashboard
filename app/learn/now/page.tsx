@@ -45,7 +45,7 @@ export default async function ReadNowPage() {
         <EmptyState
           icon={BookOpenCheck}
           title="Nothing on the shelf"
-          description="Open anything in a track and press Read now, and it will be waiting here."
+          description="Open anything in a reading list and press Read now, and it will be waiting here."
           action={{ label: 'Your reading lists', href: '/learn/lists' }}
           className="mt-6"
         />

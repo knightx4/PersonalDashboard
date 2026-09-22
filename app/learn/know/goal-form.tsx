@@ -52,7 +52,7 @@ function NodeRow({ node, isGoal }: { node: ChainNode; isGoal: boolean }) {
         <span className="text-body font-medium text-ink">{node.name}</span>
         {node.existingId ? (
           <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
-            Already in this subject
+            Already in this track
           </span>
         ) : (
           <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">New</span>
@@ -99,7 +99,7 @@ function Proposal({
 
       <p className="mb-2 text-body text-ink-muted">
         {added === 0
-          ? `Nothing new — every rung of this is already in ${chain.subject}.`
+          ? `Nothing new. Every step of this is already in ${chain.subject}.`
           : `${added} new ${added === 1 ? 'concept' : 'concepts'} in ${chain.subject}${
               chain.joined > 0 ? `, joined onto ${chain.joined} you already had` : ''
             }. Nothing is saved until you approve it.`}
@@ -170,9 +170,9 @@ export function GoalForm({
 
       {picker && (
         <Field
-          label="Which subject?"
+          label="Which track?"
           id="goal-subject"
-          hint="What it lays out is joined onto what that subject already holds, so it does not propose claims that are in there already."
+          hint="What it lays out is joined onto what that track already holds, so it does not propose ideas that are in there already."
           className="mb-4"
         >
           <Select id="goal-subject" name="subjectId" defaultValue={subjects[0].id}>
@@ -181,7 +181,7 @@ export function GoalForm({
                 {subject.name}
               </option>
             ))}
-            <option value="">A new subject</option>
+            <option value="">A new track</option>
           </Select>
         </Field>
       )}

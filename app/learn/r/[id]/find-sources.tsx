@@ -48,7 +48,7 @@ const ACCESS_NOTE: Record<string, string | null> = {
 function Aimed({ aim }: { aim: Aim }) {
   return (
     <p className="mb-2 text-ui text-ink-muted">
-      Aimed at this claim: {aim.claim}
+      Aimed at this idea: {aim.claim}
       {aim.misconception && ` It was told you currently believe: ${aim.misconception}`}
     </p>
   );
@@ -66,8 +66,8 @@ function Rooting({ note }: { note: RootingNote }) {
   if (!note.rooted) {
     return (
       <p className="mb-2 text-ui text-ink-muted">
-        Nothing in {note.subject} is settled yet, so this is not rooted in what you know — it is a
-        search on the claim alone. Probe the subject and it gets better.
+        Nothing in {note.subject} is known yet, so this is not rooted in what you know. It is a
+        search on the idea alone. Answer some questions on the track and it gets better.
       </p>
     );
   }
@@ -75,7 +75,7 @@ function Rooting({ note }: { note: RootingNote }) {
   return (
     <p className="mb-2 text-ui text-ink-muted">
       Searched against {note.subject}: the {note.settled}{' '}
-      {note.settled === 1 ? 'claim' : 'claims'} you have settled there, and what you are ready for
+      {note.settled === 1 ? 'idea' : 'ideas'} you know there, and what you are ready for
       next. Nothing here only re-teaches them or assumes what you have not got to.
     </p>
   );

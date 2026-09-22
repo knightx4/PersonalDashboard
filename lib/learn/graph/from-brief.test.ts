@@ -253,7 +253,7 @@ describe('when the briefing states claims', () => {
     if (result.ok) {
       expect(result.chain.dropped).toContainEqual({
         name: 'Ethereum Classic',
-        reason: 'no claim in it that this subject does not already have',
+        reason: 'no idea in it that this track does not already have',
       });
     }
   });
