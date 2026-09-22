@@ -326,7 +326,13 @@ about the same part of one.
 
 ## What to do next
 
-`/learn/next` answers "what is the one next thing worth learning" once, across
+Since plan #773 there is no `/learn/next` page. Practice Flow at `/learn` asks
+the claims to start and the ones worth checking again, and offers a queued
+reading under an answer (`readingToOffer` in `lib/learn/next/rank.ts`). What
+follows describes the list as it was, and the ordering it used still lives in
+that file.
+
+`/learn/next` answered "what is the one next thing worth learning" once, across
 every subject, instead of a subject and a goal at a time. It is read straight
 off the graphs and the reading queue — one pass over the subjects, no model
 call — so it is a page you can open out of idleness.
@@ -476,7 +482,8 @@ and a per-module cost table would be three tables with the same columns.
 | `/learn/s/[id]` | one subject: the graph, its goals, what you know and what is shaky |
 | `/learn/s/[id]/probe` | a probe session: one question at whichever rung is next, the bar, and afterwards the reason or the answer that was expected |
 | `/learn/c/[id]` | one concept: the claim, where it stands, what it sits between, what was asked |
-| `/learn/next` | what to do next across every subject: a claim to start, one worth checking again, a reading you left |
+| `/learn` | Practice Flow: one question after another across every subject, with a reading you left offered under an answer |
+| `/learn/next` | redirects to `/learn`. Its list went in plan #773 and the flow serves what it held |
 
 Same shell and design system as the other four workspaces. The graph view shows
 the pruned graph by default with a toggle for everything, because the pruned one

@@ -2,12 +2,15 @@
 
 import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
+import Link from 'next/link';
+import { BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { ProbeOptions } from '@/components/learn/probe-options';
 import { trackChange, trackPercent, type TrackMove } from '@/lib/learn/flow/track';
-import { fillFlowQueue, flowStep, type FlowState } from './actions';
+import { fillFlowQueue, flowStep, pushReadingAside, type FlowState } from './actions';
+import type { FlowReading } from './state';
 
 /**
  * A question, the reason, and Next, for as long as you keep going.
@@ -75,6 +78,45 @@ function TrackBar({ name, move }: { name?: string; move: TrackMove }) {
         />
       </div>
       <p className="mt-1 text-small text-ink-muted">{trackChange(move)}</p>
+    </div>
+  );
+}
+
+/**
+ * A reading you queued and never opened, offered under the answer. What Learn
+ * next listed before the flow took that page over (plan #773). Not now hides
+ * it here at once and keeps it out of the offer for a few weeks.
+ */
+function ReadingOffer({ reading }: { reading: FlowReading }) {
+  const [hidden, setHidden] = useState(false);
+  if (hidden) return null;
+
+  return (
+    <div className="mt-4 flex gap-3">
+      <BookOpen className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={2} aria-hidden />
+      <div className="min-w-0 flex-1">
+        <Link
+          href={`/learn/r/${reading.id}`}
+          className="text-ui font-medium text-ink hover:text-accent"
+        >
+          {reading.title}
+        </Link>
+        <p className="mt-0.5 text-small text-ink-muted">{reading.reason}</p>
+      </div>
+      <form
+        action={async (formData) => {
+          setHidden(true);
+          await pushReadingAside(formData);
+        }}
+      >
+        <input type="hidden" name="readingId" value={reading.id} />
+        <button
+          type="submit"
+          className="text-ui text-ink-muted underline-offset-2 hover:text-accent hover:underline"
+        >
+          Not now
+        </button>
+      </form>
     </div>
   );
 }
@@ -150,6 +192,8 @@ export function FlowSession({ first }: { first: FlowState }) {
           {live.track && (
             <TrackBar key={live.probeId} name={live.subjectName} move={live.track} />
           )}
+
+          {live.reading && <ReadingOffer key={live.probeId} reading={live.reading} />}
 
           <form action={step} className="mt-4">
             <input type="hidden" name="intent" value="ask" />

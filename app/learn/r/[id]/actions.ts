@@ -195,7 +195,7 @@ export async function attachSource(
   }
 
   revalidatePath(`/learn/r/${readingId.data}`);
-  revalidatePath('/learn');
+  revalidatePath('/learn/lists');
   return {};
 }
 
@@ -238,7 +238,7 @@ export async function updateStatus(
   }
 
   revalidatePath(`/learn/r/${parsed.data.readingId}`);
-  revalidatePath('/learn');
+  revalidatePath('/learn/lists');
   // Finishing or giving up takes it off the shelf, so the shelf has changed.
   revalidatePath('/learn/now');
   return {};
@@ -272,7 +272,7 @@ export async function toggleReadNow(
 
   revalidatePath(`/learn/r/${parsed.data.readingId}`);
   revalidatePath('/learn/now');
-  revalidatePath('/learn');
+  revalidatePath('/learn/lists');
   return {};
 }
 
@@ -328,11 +328,11 @@ export async function openReading(formData: FormData): Promise<void> {
   const user = await requireUser();
 
   const readingId = z.string().uuid().safeParse(formData.get('readingId'));
-  if (!readingId.success) redirect('/learn');
+  if (!readingId.success) redirect('/learn/lists');
 
   const supabase = await createLearnClient();
   const reading = await loadReading(supabase, readingId.data);
-  if (!reading) redirect('/learn');
+  if (!reading) redirect('/learn/lists');
 
   // A reading you wrote down yourself has nowhere to go yet. Back to its own
   // page, which says so.
@@ -492,11 +492,11 @@ export async function goDeeper(formData: FormData): Promise<void> {
   const user = await requireUser();
 
   const readingId = z.string().uuid().safeParse(formData.get('readingId'));
-  if (!readingId.success) redirect('/learn');
+  if (!readingId.success) redirect('/learn/lists');
 
   const supabase = await createLearnClient();
   const reading = await loadReading(supabase, readingId.data);
-  if (!reading) redirect('/learn');
+  if (!reading) redirect('/learn/lists');
 
   // Your own words for the step when there are any: `subject` falls back to
   // the source's title, and "Spheres of Justice" is a book, not the thing you
@@ -507,7 +507,7 @@ export async function goDeeper(formData: FormData): Promise<void> {
     branchedFrom: reading.trackId,
   });
 
-  revalidatePath('/learn');
+  revalidatePath('/learn/lists');
   revalidatePath(`/learn/t/${reading.trackId}`);
   redirect(`/learn/t/${trackId}`);
 }

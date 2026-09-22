@@ -31,7 +31,6 @@ import {
   Shapes,
   StickyNote,
   Tag,
-  Target,
   Timer,
   Undo2,
   Users,
@@ -102,9 +101,9 @@ export const NAV_ICONS = {
   tracks: BookOpen,
   readNow: BookOpenCheck,
   know: Network,
-  learnNext: Target,
-  // Practice Flow. Still the clock it had as the five-minute session: the
-  // question mark is already the dev workspace's raised tab.
+  // Practice Flow, and so Learn's front page. Still the clock it had as the
+  // five-minute session: the question mark is already the dev workspace's
+  // raised tab.
   practiceFlow: Timer,
   // A quiz is answered in writing, which is the whole of what separates it
   // from being asked to recognise something, so it gets the pencil.

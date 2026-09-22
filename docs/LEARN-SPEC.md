@@ -380,7 +380,8 @@ existing vault-provider boundary.
 
 | Route | |
 |---|---|
-| `/learn` | tracks, with progress. `EmptyState` pointing at `/learn/new` when there are none |
+| `/learn` | Practice Flow, a question on the screen when the page opens ([LEARN-GRAPH-SPEC](LEARN-GRAPH-SPEC.md)). It was the tracks until plan #773 |
+| `/learn/lists` | tracks, shown as reading lists, with progress. `EmptyState` pointing at `/learn/new` when there are none |
 | `/learn/new` | question + paste, then the confirm list |
 | `/learn/t/[id]` | one track: the question at the top, then ordered readings |
 | `/learn/r/[id]` | one reading: locator, basis, open, note, status |
@@ -388,7 +389,7 @@ existing vault-provider boundary.
 Same shell, same design system, same `PageHeader` and `EmptyState` as the
 other four.
 
-Progress on `/learn` counts `read` over `read + queued + reading`, with
+Progress on `/learn/lists` counts `read` over `read + queued + reading`, with
 `abandoned` excluded from both. A bar that fills when you give up is a lie,
 and a bar that is permanently short because of one abandoned paper in March
 is a nag.

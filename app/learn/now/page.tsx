@@ -46,7 +46,7 @@ export default async function ReadNowPage() {
           icon={BookOpenCheck}
           title="Nothing on the shelf"
           description="Open anything in a track and press Read now, and it will be waiting here."
-          action={{ label: 'Your tracks', href: '/learn' }}
+          action={{ label: 'Your reading lists', href: '/learn/lists' }}
           className="mt-6"
         />
       ) : (

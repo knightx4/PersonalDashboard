@@ -19,11 +19,11 @@ export default function NewTrackPage() {
     <>
       <p className="mb-3">
         <Link
-          href="/learn"
+          href="/learn/lists"
           className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
           <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          Tracks
+          Reading lists
         </Link>
       </p>
 

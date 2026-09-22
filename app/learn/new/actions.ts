@@ -213,7 +213,7 @@ export async function startTrack(
     return { error: error instanceof Error ? error.message : 'Could not start that topic.' };
   }
 
-  revalidatePath('/learn');
+  revalidatePath('/learn/lists');
   redirect(`/learn/t/${trackId}`);
 }
 
@@ -275,6 +275,6 @@ export async function confirmImport(
     return { error: error instanceof Error ? error.message : 'Could not save that track.' };
   }
 
-  revalidatePath('/learn');
+  revalidatePath('/learn/lists');
   redirect(`/learn/t/${trackId}`);
 }

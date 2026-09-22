@@ -27,6 +27,20 @@ export type FlowState = AskState & {
    * and nowhere else, so a question on screen never carries the last one's.
    */
   track?: TrackMove;
+  /**
+   * A reading you queued and never opened, offered under the answer. Set by
+   * the answer and nowhere else, like the track: it is what Learn next used
+   * to list as its third kind of row, before the flow took that page over.
+   */
+  reading?: FlowReading;
+};
+
+/** A queued reading as the answer panel offers it. */
+export type FlowReading = {
+  id: string;
+  title: string;
+  /** Why it is offered, in one line: which claim it was queued about. */
+  reason: string;
 };
 
 /** What the screen shows for the next question, or why there is none. */

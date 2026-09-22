@@ -44,11 +44,11 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
           going next. */}
       <p className="mb-3">
         <Link
-          href={track.branchedFrom ? `/learn/t/${track.branchedFrom}` : '/learn'}
+          href={track.branchedFrom ? `/learn/t/${track.branchedFrom}` : '/learn/lists'}
           className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
           <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          {track.branchedFrom ? (track.branchedFromTitle ?? 'The topic this came from') : 'Tracks'}
+          {track.branchedFrom ? (track.branchedFromTitle ?? 'The topic this came from') : 'Reading lists'}
         </Link>
       </p>
 

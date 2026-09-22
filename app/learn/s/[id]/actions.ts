@@ -135,7 +135,7 @@ export async function readAboutConcept(formData: FormData): Promise<void> {
     concept,
   });
 
-  revalidatePath('/learn');
+  revalidatePath('/learn/lists');
   // Straight to the reading -- the one just queued, or the one that was
   // already there -- where Find sources already knows what to do with a
   // subject you wrote down and no source yet.

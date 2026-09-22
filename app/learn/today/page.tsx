@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
 
 /**
- * Five minutes became Practice Flow and moved to /learn/flow. Kept as a
- * redirect so bookmarks and links written before the move still land on it.
+ * Five minutes became Practice Flow, which is now /learn itself. Kept as a
+ * redirect so bookmarks and links written before either move still land on it.
  */
 export default function FiveMinutesMovedPage() {
-  redirect('/learn/flow');
+  redirect('/learn');
 }
