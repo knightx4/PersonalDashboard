@@ -570,7 +570,12 @@ describe('runOvernightTick', () => {
 
     expect(summary.accounts).toBe(0);
     expect(summary.fired).toBe(0);
-    expect(summary.main).toEqual({ sha: HEAD, conclusion: 'passed', error: null });
+    expect(summary.main).toEqual({
+      sha: HEAD,
+      conclusion: 'passed',
+      error: null,
+      reason: null,
+    });
     expect(upsert).toHaveBeenCalledTimes(1);
     expect((upsert.mock.calls as unknown as unknown[][])[0]?.[0]).toMatchObject({
       repo: 'knightx4/PersonalDashboard',

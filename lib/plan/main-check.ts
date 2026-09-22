@@ -24,7 +24,90 @@ export type MainCheck = {
   checkedAt: string;
   /** Why GitHub refused, in the sentence `refusalFor` writes. Null when it answered. */
   error: string | null;
+  /**
+   * Why main failed, in the sentence `failureReason` writes: which job and
+   * step broke, or that GitHub never started the jobs. Null unless failed, and
+   * null on a failure whose jobs could not be read.
+   */
+  reason: string | null;
+  /** The failing run on GitHub, for the panel to link to. Null unless failed. */
+  runUrl: string | null;
 };
+
+/** One job of a failing workflow run, as `/actions/runs/{id}/jobs` gives it. */
+export type FailedJob = {
+  name: string;
+  conclusion: string | null;
+  /** Zero or null when GitHub never gave the job a machine to run on. */
+  runner_id?: number | null;
+  steps?: Array<{ name: string; conclusion: string | null }>;
+};
+
+/** One failing workflow run and the jobs under it. */
+export type FailedRun = { name: string; conclusion: string | null; jobs: FailedJob[] };
+
+/** The job conclusions that count as broken, the same set `checks.ts` fails on. */
+const BROKEN = new Set(['failure', 'timed_out', 'cancelled', 'startup_failure', 'action_required']);
+
+/**
+ * Why main is red, in one or two sentences for the panel behind the dot.
+ *
+ * Two different failures look identical from the conclusion alone, and they
+ * want different people. A job that ran and broke at a step is the code: the
+ * sentence names the job and the step, which is where the log starts to
+ * matter. A job GitHub never started has no steps and was never given a
+ * runner, and no push can fix it: on a private repository that is almost
+ * always the month's Actions minutes used up or a payment that failed, so the
+ * sentence says that and where to look, rather than sending somebody into
+ * logs that do not exist.
+ *
+ * Null when there is nothing to say beyond "failed", which the panel already
+ * says.
+ */
+export function failureReason(runs: readonly FailedRun[]): string | null {
+  const broke: string[] = [];
+  const unstarted: string[] = [];
+  let unstartedRun = false;
+
+  for (const run of runs) {
+    const failing = run.jobs.filter((job) => job.conclusion && BROKEN.has(job.conclusion));
+    // A run that failed before it had any jobs is a workflow GitHub could not
+    // start at all: a broken workflow file, or the same billing refusal.
+    if (run.jobs.length === 0 && run.conclusion && BROKEN.has(run.conclusion)) {
+      unstartedRun = true;
+      continue;
+    }
+    for (const job of failing) {
+      const steps = job.steps ?? [];
+      if (steps.length === 0 && !job.runner_id) {
+        unstarted.push(job.name);
+        continue;
+      }
+      const step = steps.find((s) => s.conclusion && BROKEN.has(s.conclusion));
+      broke.push(step ? `${job.name} › ${step.name}` : job.name);
+    }
+  }
+
+  const said: string[] = [];
+  if (broke.length > 0) said.push(`Failed at ${broke.join(', ')}.`);
+  if (unstarted.length > 0) {
+    said.push(
+      `GitHub never started ${unstarted.join(', ')}: no runner was given ${
+        unstarted.length === 1 ? 'to it' : 'to them'
+      }, which on a private repository usually means the month's Actions minutes are used up or a payment failed. Check github.com/settings/billing.`,
+    );
+  } else if (unstartedRun) {
+    said.push(
+      "GitHub could not start the workflow at all: either the workflow file is invalid or the account's Actions minutes or billing stopped it. The run on GitHub says which.",
+    );
+  }
+
+  if (said.length === 0) return null;
+  // The column holds 500 characters; a run with a dozen broken jobs is still
+  // one reason, and the link beside it has the rest.
+  const text = said.join(' ');
+  return text.length > 500 ? `${text.slice(0, 497)}...` : text;
+}
 
 /**
  * The four states the dot can be in, which is fewer than the conclusions.

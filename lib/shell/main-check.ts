@@ -26,7 +26,7 @@ export async function loadMainCheck(): Promise<MainCheck | null> {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from('plan_main_checks')
-      .select('head_sha, conclusion, checked_at, error')
+      .select('head_sha, conclusion, checked_at, error, reason, run_url')
       .eq('repo', REPO_KEY)
       .maybeSingle();
     if (error || !data) return null;
@@ -36,6 +36,8 @@ export async function loadMainCheck(): Promise<MainCheck | null> {
       conclusion: string | null;
       checked_at: string;
       error: string | null;
+      reason: string | null;
+      run_url: string | null;
     };
     return {
       sha: row.head_sha,
@@ -44,6 +46,8 @@ export async function loadMainCheck(): Promise<MainCheck | null> {
       conclusion: (row.conclusion as CheckConclusion | null) ?? null,
       checkedAt: row.checked_at,
       error: row.error,
+      reason: row.reason,
+      runUrl: row.run_url,
     };
   } catch {
     return null;

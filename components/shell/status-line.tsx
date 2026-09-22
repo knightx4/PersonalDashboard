@@ -250,6 +250,24 @@ function MainDotMark({ check }: { check: MainCheck | null }) {
           className="w-72 font-sans"
         >
           <p className="text-ui text-ink">{said}</p>
+          {/*
+            Why, and where to read more. Only a red reading carries either,
+            and only when the tick could read the failing jobs; the sentence
+            above still stands on its own when it could not.
+          */}
+          {state === 'failed' && check?.reason && (
+            <p className="mt-2 text-caption text-ink">{check.reason}</p>
+          )}
+          {state === 'failed' && check?.runUrl && (
+            <a
+              href={check.runUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-block text-caption text-ink-muted underline underline-offset-2 hover:text-ink"
+            >
+              Open the run on GitHub
+            </a>
+          )}
           <ul className="mt-3 space-y-2 border-t border-border pt-3">
             {MAIN_DOT_ORDER.map((dot) => (
               <li key={dot} className="flex items-start gap-2">

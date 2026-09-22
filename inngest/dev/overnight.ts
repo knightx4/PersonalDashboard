@@ -646,7 +646,12 @@ export type OvernightTickSummary = {
    * anything was running. In the response so that a tick can be poked by hand
    * and the reading it took read back from what it answers.
    */
-  main: { sha: string | null; conclusion: CheckConclusion | null; error: string | null };
+  main: {
+    sha: string | null;
+    conclusion: CheckConclusion | null;
+    error: string | null;
+    reason: string | null;
+  };
 };
 
 /**
@@ -688,13 +693,18 @@ export async function runOvernightTick(
   // `refreshMainCheck` already carries its own refusals back as a stored row
   // rather than throwing, so only the write itself can land here -- and a tick
   // that could not store a dot still has nights to run.
-  let main: OvernightTickSummary['main'] = { sha: null, conclusion: null, error: null };
+  let main: OvernightTickSummary['main'] = {
+    sha: null,
+    conclusion: null,
+    error: null,
+    reason: null,
+  };
   try {
     main = await refreshMainCheck({ supabase, now, fetch: input.fetch });
   } catch (err) {
     const said = err instanceof Error ? err.message : 'failed';
     console.error(`main's CI could not be read on this tick: ${said}`);
-    main = { sha: null, conclusion: null, error: said };
+    main = { sha: null, conclusion: null, error: said, reason: null };
   }
 
   const { data, error } = await supabase

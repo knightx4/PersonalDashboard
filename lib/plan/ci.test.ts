@@ -330,13 +330,15 @@ describe('refreshMainCheck', () => {
 
     const result = await refreshMainCheck({ supabase, now: NOW, fetch: fetchFn as never });
 
-    expect(result).toEqual({ sha: MERGE, conclusion: 'failed', error: null });
+    expect(result).toEqual({ sha: MERGE, conclusion: 'failed', error: null, reason: null });
     expect(written(upsert)).toEqual({
       repo: 'knightx4/PersonalDashboard',
       head_sha: MERGE,
       conclusion: 'failed',
       checked_at: new Date(NOW).toISOString(),
       error: null,
+      reason: null,
+      run_url: null,
     });
 
     // One commit, not eight pages of them: the whole question is what is at the
@@ -344,6 +346,82 @@ describe('refreshMainCheck', () => {
     const asked = fetchFn.mock.calls.map(([url]) => String(url));
     expect(asked[0]).toContain('/commits?sha=main&per_page=1');
     expect(asked[1]).toContain(`/actions/runs?head_sha=${MERGE}`);
+    vi.unstubAllEnvs();
+  });
+
+  it('stores why main failed and the run to open, read from the failing jobs', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, upsert } = store();
+    const fetchFn = vi.fn(async (url: string) => {
+      const asked = String(url);
+      if (asked.includes('/actions/runs/42/jobs')) {
+        return new Response(
+          JSON.stringify({
+            jobs: [
+              {
+                name: 'check',
+                conclusion: 'failure',
+                runner_id: 7,
+                steps: [
+                  { name: 'Apply migrations', conclusion: 'success' },
+                  { name: 'Test', conclusion: 'failure' },
+                ],
+              },
+              { name: 'audit', conclusion: 'success', runner_id: 8, steps: [] },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      if (asked.includes('/actions/runs')) {
+        return new Response(
+          JSON.stringify({
+            workflow_runs: [
+              {
+                id: 42,
+                name: 'CI',
+                status: 'completed',
+                conclusion: 'failure',
+                html_url: 'https://github.com/knightx4/PersonalDashboard/actions/runs/42',
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify([{ sha: MERGE, parents: [] }]), { status: 200 });
+    });
+
+    const result = await refreshMainCheck({ supabase, now: NOW, fetch: fetchFn as never });
+
+    expect(result.reason).toBe('Failed at check › Test.');
+    const row = written(upsert);
+    expect(row.reason).toBe('Failed at check › Test.');
+    expect(row.run_url).toBe('https://github.com/knightx4/PersonalDashboard/actions/runs/42');
+    vi.unstubAllEnvs();
+  });
+
+  it('keeps the red reading when the jobs cannot be read, without a reason', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, upsert } = store();
+    const fetchFn = vi.fn(async (url: string) => {
+      const asked = String(url);
+      if (asked.includes('/jobs')) return new Response('{}', { status: 403 });
+      if (asked.includes('/actions/runs')) {
+        return new Response(
+          JSON.stringify({
+            workflow_runs: [{ id: 42, status: 'completed', conclusion: 'failure' }],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify([{ sha: MERGE, parents: [] }]), { status: 200 });
+    });
+
+    const result = await refreshMainCheck({ supabase, now: NOW, fetch: fetchFn as never });
+
+    expect(result).toMatchObject({ conclusion: 'failed', error: null, reason: null });
+    expect(written(upsert).conclusion).toBe('failed');
     vi.unstubAllEnvs();
   });
 
