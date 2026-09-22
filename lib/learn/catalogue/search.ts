@@ -4,7 +4,9 @@ import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import type { SpendReport, SpendSink } from '@/lib/core/spend/pricing';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import {
+  JUDGE_MODEL,
   judgeSegmentsForClaim,
+  type Judgement,
   type JudgePassOptions,
   type JudgePassResult,
   type LinkTarget,
@@ -70,6 +72,11 @@ export type CatalogueSearchInput = {
   concept?: string | null;
   /** What a surviving link is written against. */
   target: LinkTarget;
+  /**
+   * When the button was pressed. Every judgement the press records carries
+   * it, so one press reads back as one group. Defaults to the start of the pass.
+   */
+  pressedAt?: Date;
 };
 
 export type CatalogueSearchResult = {
@@ -105,6 +112,12 @@ export type CatalogueSearchPorts = {
   judge(
     input: CatalogueSearchInput & { segments: NearbySegment[]; onSpend: SpendSink },
   ): Promise<JudgePassResult>;
+  /** Keep what the judge said about each candidate it read. */
+  record(input: {
+    target: LinkTarget;
+    judgements: Judgement[];
+    pressedAt: Date;
+  }): Promise<void>;
 };
 
 /**
@@ -120,6 +133,7 @@ export async function runCatalogueSearch(
 ): Promise<CatalogueSearchResult> {
   const embed = collectSpend();
   const judge = collectSpend();
+  const pressedAt = input.pressedAt ?? new Date();
 
   const miss = (
     missed: CatalogueMiss,
@@ -152,6 +166,21 @@ export async function runCatalogueSearch(
     return miss('judge-failed', error instanceof Error ? error.message : String(error), {
       considered: nearest.segments.length,
     });
+  }
+
+  // Every call the pass made, refusals and failures with the acceptances, so
+  // the trial can read what the judge did with each candidate. A write that
+  // fails is logged and the press goes on: the person is owed their answer
+  // more than the trial is owed its row.
+  if (pass.judgements.length > 0) {
+    try {
+      await ports.record({ target: input.target, judgements: pass.judgements, pressedAt });
+    } catch (error) {
+      console.warn(
+        '[learn catalogue] recording the judgements failed',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   }
 
   // `raced` is a link that was written between the skip check and the insert,
@@ -223,9 +252,46 @@ export async function searchCatalogueForClaim(
           { claim, concept, segments, target },
           { ...options, apiKey: anthropicApiKey, onSpend },
         ),
+      record: (recorded) => recordJudgements(supabase, userId, recorded),
     },
     input,
   );
+}
+
+/**
+ * Write one row per judged candidate to `catalogue_judgements`.
+ *
+ * One insert for the whole press. Throws on failure; the pass above catches it,
+ * because a lost row costs the trial a data point and a thrown press costs the
+ * person their answer.
+ */
+export async function recordJudgements(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  input: { target: LinkTarget; judgements: Judgement[]; pressedAt: Date },
+): Promise<void> {
+  if (input.judgements.length === 0) return;
+
+  const pressedAt = input.pressedAt.toISOString();
+  const target = input.target.concept
+    ? { concept_id: input.target.concept }
+    : { subject_id: input.target.subject };
+
+  const { error } = await supabase.from('catalogue_judgements').insert(
+    input.judgements.map((judgement) => ({
+      user_id: userId,
+      segment_id: judgement.segmentId,
+      ...target,
+      similarity: judgement.similarity,
+      chars: judgement.chars,
+      verdict: judgement.verdict,
+      model: JUDGE_MODEL,
+      pressed_at: pressedAt,
+    })),
+  );
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw new Error(error.message);
 }
 
 /**

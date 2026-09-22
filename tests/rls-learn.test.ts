@@ -103,6 +103,7 @@ describe('RLS coverage', () => {
     expect(rows.map((r) => r.tablename)).toEqual([
       'catalogue_course_items',
       'catalogue_items',
+      'catalogue_judgements',
       'catalogue_links',
       'catalogue_providers',
       'catalogue_segments',
@@ -174,6 +175,26 @@ describe('the catalogue, which belongs to nobody', () => {
       (tx) => tx`select id from catalogue_links where user_id = ${userA}`,
     );
     expect(theirs).toHaveLength(0);
+  });
+
+  it('keeps what the judge said about a claim private to its graph', async () => {
+    // Same reason as a link: a judgement is about one person's claim, and a
+    // refusal says what they are trying to learn as plainly as a match does.
+    const theirs = await asUser(
+      userB,
+      (tx) => tx`select id from catalogue_judgements where user_id = ${userA}`,
+    );
+    expect(theirs).toHaveLength(0);
+
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into catalogue_judgements
+                     (user_id, segment_id, subject_id, similarity, chars, verdict, model, pressed_at)
+                   values (${userA}, gen_random_uuid(), gen_random_uuid(), 0.9, 10, 'refused',
+                           'x', now())`,
+      ),
+    ).rejects.toThrow();
   });
 });
 

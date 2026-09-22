@@ -164,9 +164,29 @@ export type JudgePassOptions = {
   maxCandidates?: number;
 };
 
+/**
+ * What the judge said about one candidate it read, whatever happened after.
+ *
+ * `accepted` stays accepted when the link insert then failed or found the link
+ * already there: this records the judge, and the link table records the links.
+ */
+export type CandidateVerdict = 'accepted' | 'refused' | 'failed';
+
+/** One judging call, as `catalogue_judgements` stores it. */
+export type Judgement = {
+  segmentId: string;
+  /** Retrieval's cosine for this segment against the claim. */
+  similarity: number;
+  /** The section's length in characters. The judge reads MAX_SEGMENT_CHARS of it at most. */
+  chars: number;
+  verdict: CandidateVerdict;
+};
+
 export type JudgePassResult = {
   /** The links written by this pass, closest candidate first. */
   written: JudgedLink[];
+  /** Every candidate that cost a call, closest first. Not those skipped. */
+  judgements: Judgement[];
   /** Calls made. What this pass cost, one call each. */
   judged: number;
   /** Candidates the model read and would not argue for. */
@@ -216,6 +236,7 @@ export async function judgeCandidates(
 ): Promise<JudgePassResult> {
   const result: JudgePassResult = {
     written: [],
+    judgements: [],
     judged: 0,
     refused: 0,
     skipped: 0,
@@ -251,6 +272,12 @@ export async function judgeCandidates(
   for (const [index, verdict] of verdicts.entries()) {
     const segment = toJudge[index];
     result.judged += 1;
+    result.judgements.push({
+      segmentId: segment.segmentId,
+      similarity: segment.similarity,
+      chars: segment.text.length,
+      verdict: verdict.outcome === 'teaches' ? 'accepted' : verdict.outcome,
+    });
 
     if (verdict.outcome === 'failed') {
       result.failed.push({ segmentId: segment.segmentId, detail: verdict.detail });

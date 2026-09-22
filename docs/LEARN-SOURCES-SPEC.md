@@ -130,6 +130,7 @@ belong to nobody.
 | `catalogue_items` | one work: title, provider, external id, canonical URL, duration or length, publication date, and the licence it came under |
 | `catalogue_segments` | the addressable unit above: item, ordinal, time offsets or section anchor, the text it covers, and its embedding |
 | `catalogue_links` | a segment speaks to a concept or a subject: target, basis, confidence, and the model and date that decided it |
+| `catalogue_judgements` | every segment the judge read for a claim, accepted or refused: target, similarity, length in characters, verdict, and the press it came from |
 | `catalogue_course_items` | the published order of a course: which items belong to it, in what position, under the provider's own numbering |
 
 A course is not a table of its own. It is a `catalogue_items` row of kind
