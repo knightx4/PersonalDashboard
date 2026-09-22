@@ -12,6 +12,8 @@ import type { PlanStatus } from '@/lib/plan/load';
 export type PlanCatalogEntry = {
   id: string;
   number: number;
+  /** Where the row sits in the tree, as the page labels it: "723.20". */
+  outline: string;
   title: string;
   module: ModuleId | null;
   parentId: string | null;

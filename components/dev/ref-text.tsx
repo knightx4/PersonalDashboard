@@ -1,4 +1,10 @@
-import { planRefHref, planRefLabel, splitOnRefs, type PlanRefTitles } from '@/lib/comments/refs';
+import {
+  planRefHref,
+  planRefLabel,
+  planRefText,
+  splitOnRefs,
+  type PlanRefTitles,
+} from '@/lib/comments/refs';
 
 /**
  * Plain text, with its step numbers turned into links.
@@ -32,7 +38,7 @@ export function RefText({ text, titles }: { text: string; titles?: PlanRefTitles
             className="comment-ref underline underline-offset-2 hover:text-accent"
             title={planRefLabel(part.ref, titles)}
           >
-            {part.text}
+            {planRefText(part.ref, titles)}
           </a>
         ),
       )}
