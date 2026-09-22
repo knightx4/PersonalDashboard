@@ -35,6 +35,12 @@ const NOW = Date.parse('2026-09-17T04:30:00Z');
 // hydration rule is checked on its own below.
 vi.mock('@/lib/use-clock-now', () => ({ useClockNow: () => NOW }));
 
+// The card refreshes the page once a running night's readings come back, so it
+// asks for the router. A static render has no app router mounted to give it.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
+}));
+
 const { OvernightControl } = await import('@/app/dev/plan/overnight-control');
 
 function run(over: Partial<OvernightRun> = {}): OvernightRun {
