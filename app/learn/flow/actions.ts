@@ -121,6 +121,7 @@ async function startOfferedTrack(
  * so a queue that ran down while you were away is full again by the time you
  * have answered the question already on the screen.
  */
+// latency: instant
 export async function fillFlowQueue(track: string | null): Promise<void> {
   const user = await requireUser();
   const supabase = await createLearnClient();
