@@ -19,6 +19,7 @@ import {
 } from '@/lib/learn/graph/chain-payload';
 import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
+import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
 
 /**
  * A briefing somebody wrote for you, read into things you have yet to learn.
@@ -87,12 +88,7 @@ knows. You are recording what this section says, so that each piece of it can
 be learned, probed and checked later. Nothing you report is known, established
 or verified by anybody.
 
-CLAIMS, NOT HEADINGS. Every node is one thing a person can be right or wrong
-about, stated in a sentence or two.
-
-  Heading, useless: "Ethereum Classic."
-  Claim, usable: "Ethereum Classic kept the original chain after the DAO fork,
-  so its security budget is a fraction of the chain that carried the name."
+${NODE_RULE}
 
 A LOOSE FACT IS NOT A CLAIM YOU CAN PLACE. A revenue figure, a founding date,
 a headcount -- nothing rests on it and it rests on nothing, so it has no place
