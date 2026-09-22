@@ -158,7 +158,11 @@ export default async function NewsPage({
                 return (
                   <li key={issue.id}>
                     <Link
-                      href={`/news/i/${issue.id}`}
+                      // Which list this was opened from, carried so that back
+                      // comes back to it. An issue knows its sender and
+                      // cannot know whether you were filtered to them, so the
+                      // list is the only thing that can say -- note 71889d79.
+                      href={selected ? `/news/i/${issue.id}?from=${selected}` : `/news/i/${issue.id}`}
                       className="flex items-baseline gap-3 px-4 py-3 transition-colors duration-150 hover:bg-canvas"
                     >
                       <span
