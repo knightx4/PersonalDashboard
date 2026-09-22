@@ -5,7 +5,11 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { searchCatalogueForClaim } from '@/lib/learn/catalogue/search';
+import {
+  recordClaimSearched,
+  searchCatalogueForClaim,
+  searchCompleted,
+} from '@/lib/learn/catalogue/search';
 import { loadGraph, loadSubject } from '@/lib/learn/graph/load';
 import { queueConcept } from '@/lib/learn/graph/to-queue';
 import { recordLearnSpend } from '@/lib/learn/spend';
@@ -31,6 +35,11 @@ import { recordLearnSpend } from '@/lib/learn/spend';
  *
  * Pressed on a gap that is already in the queue it writes nothing and sends
  * you to the row that is there.
+ *
+ * Either way the claim records when it was last searched, so the page can tell
+ * a claim nobody has looked for from one that was looked for and had nothing.
+ * A press that never reached the catalogue records nothing, which leaves the
+ * next press free to try again.
  */
 // latency: pending
 export async function readAboutConcept(formData: FormData): Promise<void> {
@@ -68,12 +77,28 @@ export async function readAboutConcept(formData: FormData): Promise<void> {
   // not answer, a write that failed -- look identical from the page, which is
   // the point, and would otherwise leave nobody able to tell a catalogue that
   // covers nothing from a search that never ran.
-  if (found.missed && found.missed !== 'nothing-near' && found.missed !== 'nothing-taught') {
+  if (!searchCompleted(found.missed)) {
     console.warn(`[learn catalogue] search missed (${found.missed})`, found.detail);
   }
 
-  if (found.covered) {
+  // The claim carries when it was last looked for, which is what lets the page
+  // tell a claim nobody has searched from one that was searched and had
+  // nothing. Written here rather than anywhere below, because the branch under
+  // this one redirects and nothing after it runs.
+  //
+  // Only a press that got an answer out of the catalogue writes it. A press
+  // that embedded nothing read nothing, and a claim saying it was searched
+  // when nothing looked is a page inventing a search.
+  if (searchCompleted(found.missed)) {
+    await recordClaimSearched(supabase, user.id, concept.id);
+    // Both of the things a completed press changes on the claim page are here:
+    // the links it wrote and the time it looked. A press that found nothing
+    // still changed what that page says about why, so this is not the covered
+    // branch's job any more.
     revalidatePath(`/learn/c/${concept.id}`);
+  }
+
+  if (found.covered) {
     redirect(`/learn/c/${concept.id}`);
   }
 

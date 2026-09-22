@@ -208,26 +208,51 @@ describe('what a row costs you', () => {
 });
 
 describe('a claim with nothing found for it', () => {
+  const SEARCHED = '2026-09-20T09:00:00Z';
+
   it('says the catalogue is empty when there is nothing to search', async () => {
     const { store } = memoryStore({ links: [], searchable: false });
 
     await expect(
-      materialForClaim(store, { conceptId: 'concept-1', rung: 'recognise' }),
+      materialForClaim(store, { conceptId: 'concept-1', rung: 'recognise', searchedAt: null }),
     ).resolves.toEqual({ material: [], absence: 'catalogue-empty' });
   });
 
-  it('says nothing matched when the catalogue holds material and none is linked', async () => {
+  it('says the catalogue is empty ahead of saying nobody looked', async () => {
+    const { store } = memoryStore({ links: [], searchable: false });
+
+    // Both are true of a claim nobody has pressed while the catalogue is
+    // empty, and only one of them is worth acting on: pressing the button
+    // searches a catalogue with nothing in it.
+    await expect(
+      materialForClaim(store, { conceptId: 'concept-1', rung: 'recognise', searchedAt: SEARCHED }),
+    ).resolves.toEqual({ material: [], absence: 'catalogue-empty' });
+  });
+
+  it('says nobody has looked when the claim has never been searched', async () => {
     const { store } = memoryStore({ links: [], searchable: true });
 
     await expect(
-      materialForClaim(store, { conceptId: 'concept-1', rung: 'recognise' }),
+      materialForClaim(store, { conceptId: 'concept-1', rung: 'recognise', searchedAt: null }),
+    ).resolves.toEqual({ material: [], absence: 'never-searched' });
+  });
+
+  it('says nothing matched only once something has searched', async () => {
+    const { store } = memoryStore({ links: [], searchable: true });
+
+    await expect(
+      materialForClaim(store, { conceptId: 'concept-1', rung: 'recognise', searchedAt: SEARCHED }),
     ).resolves.toEqual({ material: [], absence: 'nothing-matched' });
   });
 
   it('does not ask what the catalogue holds when the claim has material', async () => {
     const { store, asked } = memoryStore({ links: [section()], searchable: true });
 
-    const view = await materialForClaim(store, { conceptId: 'concept-1', rung: 'recognise' });
+    const view = await materialForClaim(store, {
+      conceptId: 'concept-1',
+      rung: 'recognise',
+      searchedAt: null,
+    });
 
     expect(view.absence).toBeNull();
     expect(ids(view.material)).toEqual(['segment-section']);
@@ -382,7 +407,11 @@ describe('the live store', () => {
     });
 
     await expect(
-      loadClaimMaterial(client, 'user-1', { conceptId: 'concept-1', rung: 'recognise' }),
+      loadClaimMaterial(client, 'user-1', {
+        conceptId: 'concept-1',
+        rung: 'recognise',
+        searchedAt: null,
+      }),
     ).rejects.toThrow('row-level security');
   });
 });

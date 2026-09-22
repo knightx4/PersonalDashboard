@@ -201,6 +201,9 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
     loadClaimMaterial(supabase, user.id, {
       conceptId: concept.id,
       rung: nextRung(concept.mastery, probes).rung,
+      // When the button on this claim last got an answer out of the catalogue,
+      // which is what separates "nothing matched" from "nobody has looked".
+      searchedAt: concept.catalogueSearchedAt,
     }),
   ]);
 
@@ -269,7 +272,7 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
         <div className="mt-3">
           <ReadAbout concept={concept} subjectId={subject.id} />
           {/* Where a claim with nothing found for it says why, under the
-              button that will go looking once #744 lands. */}
+              button that goes looking. */}
           <NoMaterialNote view={material} />
         </div>
       </CardSection>
