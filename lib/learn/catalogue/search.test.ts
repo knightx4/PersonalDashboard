@@ -4,6 +4,8 @@ import type { JudgePassResult } from '@/lib/learn/catalogue/judge';
 import type { NearbySegment, NearestOutcome } from '@/lib/learn/catalogue/nearest';
 import {
   runCatalogueSearch,
+  searchCompleted,
+  type CatalogueMiss,
   type CatalogueSearchPorts,
   type CatalogueSearchResult,
 } from '@/lib/learn/catalogue/search';
@@ -202,5 +204,39 @@ describe('runCatalogueSearch', () => {
     await runCatalogueSearch(port, CLAIM);
 
     expect(seen).toEqual({ claim: CLAIM.claim, concept: CLAIM.concept });
+  });
+});
+
+/**
+ * Which misses count as having looked.
+ *
+ * #745 records a search time on the claim, and the page reads it to say "we
+ * looked and nothing matched". So the line between a press that looked and a
+ * press that did not is worth holding still: getting it wrong once makes the
+ * page claim a search that never happened, and makes the repeat press treat a
+ * timeout as a search already done.
+ */
+describe('whether a press got an answer out of the catalogue', () => {
+  it('counts a covered claim and the two ordinary empty answers', () => {
+    expect(searchCompleted(null)).toBe(true);
+    expect(searchCompleted('nothing-near')).toBe(true);
+    expect(searchCompleted('nothing-taught')).toBe(true);
+  });
+
+  it('does not count a press that embedded nothing', () => {
+    expect(searchCompleted('no-key')).toBe(false);
+    expect(searchCompleted('no-judge-key')).toBe(false);
+  });
+
+  it('does not count retrieval that would not answer', () => {
+    const refusals: CatalogueMiss[] = ['index', 'rate-limited', 'timeout', 'error', 'malformed'];
+
+    for (const refusal of refusals) expect(searchCompleted(refusal)).toBe(false);
+  });
+
+  it('does not count candidates nothing formed a verdict about', () => {
+    // Retrieval answered, so segments were found; nothing read them. Saying
+    // the claim was searched would be saying they were refused.
+    expect(searchCompleted('judge-failed')).toBe(false);
   });
 });

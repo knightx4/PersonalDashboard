@@ -1,7 +1,8 @@
 import 'server-only';
 
+import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import type { SpendReport, SpendSink } from '@/lib/core/spend/pricing';
-import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import {
   judgeSegmentsForClaim,
   type JudgePassOptions,
@@ -218,4 +219,61 @@ export async function searchCatalogueForClaim(
     },
     input,
   );
+}
+
+/**
+ * Whether the press got an answer out of the catalogue.
+ *
+ * What separates a claim nobody has looked for material for from a claim that
+ * was looked for and had none. Both end with no links, so the difference is
+ * not readable off `catalogue_links` and has to be recorded by the press that
+ * knows.
+ *
+ * `nothing-near` and `nothing-taught` are searches. The claim was embedded,
+ * the index answered, and either nothing was close enough to be worth a call
+ * or every candidate was read and refused. An empty answer is still an answer
+ * and the claim page may say so.
+ *
+ * Everything else is a press that never reached that point. Without a key
+ * nothing was embedded; a provider that would not answer retrieved nothing;
+ * `judge-failed` retrieved candidates and formed no verdict about any of them.
+ * Recording one of those would have the page say nothing matched when nothing
+ * was read, and would have the repeat press treat a timeout as a search
+ * already done, which is a claim that never gets searched again.
+ */
+export function searchCompleted(missed: CatalogueMiss | null): boolean {
+  return missed === null || missed === 'nothing-near' || missed === 'nothing-taught';
+}
+
+/**
+ * Write the time a claim was last searched.
+ *
+ * A call of its own rather than part of the pass, so the press decides whether
+ * the search counted and a caller that wants to search again can wrap the pass
+ * without touching it.
+ *
+ * False rather than a throw when the write fails. The person pressed a button
+ * asking for something to read and has their answer by now; a claim left
+ * reading as never searched costs them one more press, and an error page costs
+ * them the answer. The caller logs it.
+ */
+export async function recordClaimSearched(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  conceptId: string,
+  at: Date = new Date(),
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('concepts')
+    .update({ catalogue_searched_at: at.toISOString() })
+    .eq('user_id', userId)
+    .eq('id', conceptId);
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) {
+    console.warn('[learn catalogue] recording the search time failed', error.message);
+    return false;
+  }
+
+  return true;
 }

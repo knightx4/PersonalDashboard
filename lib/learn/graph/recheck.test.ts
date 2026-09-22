@@ -30,6 +30,7 @@ function concept(
     claim: `${id} is the case, for a reason.`,
     claimOriginal: null,
     claimRewrittenAt: null,
+    catalogueSearchedAt: null,
     basis: 'Written by hand for this test.',
     kind: null,
     mastery: [],

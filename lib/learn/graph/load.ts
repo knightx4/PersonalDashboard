@@ -137,6 +137,7 @@ type ConceptRow = {
   basis: string;
   kind: ConceptKind | null;
   mastery: unknown;
+  catalogue_searched_at: string | null;
 };
 
 /**
@@ -184,6 +185,7 @@ function toConcept(row: ConceptRow, state: StateRow | undefined): Concept {
     misconception: state?.misconception ?? null,
     testedAt: state?.tested_at ?? null,
     declaredAt: state?.declared_at ?? null,
+    catalogueSearchedAt: row.catalogue_searched_at ?? null,
   };
 }
 
@@ -202,7 +204,7 @@ export async function loadConcept(
 ): Promise<Concept | null> {
   const { data, error } = await supabase
     .from('concepts')
-    .select('id, name, claim, basis, kind, mastery')
+    .select('id, name, claim, basis, kind, mastery, catalogue_searched_at')
     .eq('id', conceptId)
     .maybeSingle();
 
@@ -236,7 +238,10 @@ export async function loadGraph(
   ] = await Promise.all([
     supabase
       .from('concepts')
-      .select('id, name, claim, claim_original, claim_rewritten_at, basis, kind, mastery')
+      .select(
+        'id, name, claim, claim_original, claim_rewritten_at, basis, kind, mastery, ' +
+          'catalogue_searched_at',
+      )
       .eq('subject_id', subjectId)
       .order('name'),
     supabase

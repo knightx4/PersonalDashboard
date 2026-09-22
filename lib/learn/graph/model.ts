@@ -87,6 +87,17 @@ export type Concept = {
    * and the database refuses a row holding both.
    */
   declaredAt: string | null;
+  /**
+   * When the catalogue was last searched for material for this claim. Null
+   * means nobody has pressed the button on it, which is a different thing from
+   * having pressed it and found nothing: the search runs on the press (#742)
+   * and a candidate the judging call refused leaves no row behind.
+   *
+   * Set only by a press that got an answer out of the catalogue. A press that
+   * could not embed the claim or could not judge what it retrieved leaves this
+   * null, so it never says a search happened that did not.
+   */
+  catalogueSearchedAt: string | null;
 };
 
 export type ConceptEdge = {
