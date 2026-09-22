@@ -188,7 +188,8 @@ function nightFrom(value: unknown): DigestNight | null {
     lastFire: (() => {
       const named = nightRefFrom(row.lastFire);
       const at = text((row.lastFire as Record<string, unknown> | null)?.at);
-      return named ? { ...named, at: at ?? '' } : null;
+      const step = nightRefFrom((row.lastFire as Record<string, unknown> | null)?.step);
+      return named ? { ...named, at: at ?? '', step } : null;
     })(),
     closed: nightStepsFrom(row.closed),
     blocked: nightStepsFrom(row.blocked),
