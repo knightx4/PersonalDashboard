@@ -63,6 +63,47 @@ export const ENDED_AFTER_MINUTES = RUN_QUIET_AFTER_MINUTES;
 export const NO_OUTPUT_AFTER_MINUTES = 30;
 
 /**
+ * How long a feature run may leave its own part of the plan untouched, with
+ * no step under it claimed, before it is counted as over.
+ *
+ * The push readings cannot answer this on their own. `listPushes` reads the
+ * whole repository's activity, so any other session pushing anywhere reads as
+ * this run still working. On 22 September the session on #723 wrote a setup
+ * step at 22:07 and stopped, and the runner kept waiting because other
+ * sessions went on pushing to main.
+ *
+ * A session working a feature always has a trail on the feature's own rows:
+ * it claims a step before building it (`plan.ts start`) and closes or blocks
+ * it after. So no claim under the feature and no change to any row beneath it
+ * for this long means nobody is working it, whatever else the repository is
+ * doing. Twenty minutes covers the gap between closing one step and claiming
+ * the next, which is a merge and a subagent starting up.
+ */
+export const FEATURE_IDLE_AFTER_MINUTES = 20;
+
+/** What a feature's rows say about the session sent to build it. */
+export type FeatureTrail = {
+  /** Whether any step beneath the feature is claimed right now. */
+  claimed: boolean;
+  /** The newest change to the feature or any row beneath it. */
+  touchedAt: string | null;
+};
+
+/**
+ * Whether a feature run has gone idle on its own rows: nothing claimed, and
+ * nothing changed since the run started or since its last change, for
+ * `FEATURE_IDLE_AFTER_MINUTES`. False at `now === 0`, like every clock rule
+ * here.
+ */
+export function featureRunIdle(startedAt: string, trail: FeatureTrail, now: number): boolean {
+  if (now === 0 || trail.claimed) return false;
+  const fired = new Date(startedAt).getTime();
+  const touched = trail.touchedAt ? new Date(trail.touchedAt).getTime() : 0;
+  const last = Math.max(fired, Number.isFinite(touched) ? touched : 0);
+  return (now - last) / 60_000 >= FEATURE_IDLE_AFTER_MINUTES;
+}
+
+/**
  * What a run is doing.
  *
  * `finished` is the one state that is not read off pushes: the step the run
