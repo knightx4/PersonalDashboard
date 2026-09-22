@@ -13,6 +13,7 @@ import {
 } from '@/lib/learn/graph/chain-payload';
 import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
+import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
 
 /**
  * What you already know, told directly.
@@ -43,12 +44,7 @@ const SYSTEM = `Somebody is telling you what they already know, so it can be add
 graph of their knowledge. The text is theirs: an account they wrote, an essay,
 a syllabus, a transcript, a write-up of work they cannot show you.
 
-CLAIMS, NOT HEADINGS. Every node is one thing a person can be right or wrong
-about, stated in a sentence or two.
-
-  Heading, useless: "Econometrics II."
-  Claim, usable: "An instrument has to be correlated with the regressor and
-  uncorrelated with the error, and the second half cannot be tested."
+${NODE_RULE}
 
 ONLY WHAT THE TEXT ACTUALLY SHOWS. This is the rule that matters here and the
 one you will be tempted to break. A course title, a module code, a grade, a job

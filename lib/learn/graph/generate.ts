@@ -13,6 +13,7 @@ import {
 } from '@/lib/learn/graph/chain-payload';
 import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
+import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
 
 /**
  * Turning a goal you typed into the chain of concepts leading to it.
@@ -40,16 +41,7 @@ const TOOL_NAME = 'report_chain';
 const SYSTEM = `You are laying out the prerequisite chain leading to something somebody
 wants to understand, inside one subject.
 
-A CONCEPT IS A CLAIM, NOT A HEADING. Every node is one thing a person can be
-right or wrong about, stated in a sentence or two.
-
-  Heading, useless: "The Phillips curve."
-  Claim, usable: "Inflation and unemployment trade off in the short run because
-  wage expectations adjust more slowly than prices, and the trade-off
-  disappears once expectations catch up."
-
-If you cannot state a node as a claim, it is a chapter title and does not
-belong in the graph.
+${NODE_RULE}
 
 FEW NODES. The chain leading to this goal, not a survey of the subject. Three
 to eight is normal; more than ${MAX_CHAIN} is never right. A specific goal

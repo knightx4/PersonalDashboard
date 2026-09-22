@@ -12,6 +12,7 @@ import {
 } from '@/lib/learn/graph/chain-payload';
 import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
+import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
 
 /**
  * What a node rests on, when getting it wrong says the graph is missing a
@@ -45,9 +46,7 @@ ONE OR TWO PREREQUISITES. Never more than three. You are naming the level
 immediately below, not rebuilding the subject from the ground up. The test: if
 they understood this one thing, would the claim above stop being confusing?
 
-CLAIMS, NOT HEADINGS. Each prerequisite is one thing somebody can be right or
-wrong about, in a sentence or two. "Prices clear a market rather than measure
-worth" is a node; "Supply and demand" is a chapter title.
+${NODE_RULE}
 
 EDGES. Every prerequisite you name must be joined to the claim above by an
 edge, and to each other where one rests on the other. Nothing goes in the graph
