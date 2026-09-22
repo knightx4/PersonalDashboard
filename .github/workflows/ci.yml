@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+# Each step that can fail runs through scripts/ci-step.sh, which on failure
+# puts the tail of that step's output in an error annotation and the job
+# summary, so the check panel says what broke instead of only "exit code 1".
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -12,10 +15,12 @@ jobs:
     # The RLS, status and coexistence tests need a real Postgres: they assert
     # on policy behaviour, on trigger-maintained columns, and on two apps'
     # schemas sitting side by side -- none of which can be faked. pg_trgm and
-    # pgcrypto come with the stock image.
+    # pgcrypto come with the stock image; pgvector, which learn/0022 needs for
+    # catalogue embeddings, does not, so this is the pgvector build of the same
+    # Postgres 16.
     services:
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: postgres
           POSTGRES_HOST_AUTH_METHOD: trust
@@ -51,23 +56,23 @@ jobs:
       # test asserts against the result, so it exercises the real neighbour
       # rather than a stand-in.
       - name: Apply migrations
-        run: ./scripts/db-reset.sh
+        run: scripts/ci-step.sh "Apply migrations" ./scripts/db-reset.sh
 
       - name: Typecheck
-        run: npm run typecheck
+        run: scripts/ci-step.sh Typecheck npm run typecheck
 
       - name: Lint
-        run: npm run lint
+        run: scripts/ci-step.sh Lint npm run lint
 
       # Includes both cross-user isolation tests, each of which fails
       # automatically if a table is added to its schema without an RLS policy,
       # and the coexistence test that proves neither app's migrations reach
       # into the other's schema.
       - name: Test
-        run: npm test
+        run: scripts/ci-step.sh Test npm test
 
       - name: Build
-        run: npm run build
+        run: scripts/ci-step.sh Build npm run build
 
   # The design checks read source files and need neither a database nor a
   # build, so they run beside the check job rather than inside it. A design
@@ -86,13 +91,13 @@ jobs:
       # Five themes is five times the surface area for a contrast bug to hide
       # in, and "it looked fine on my screen" is how all of them get shipped.
       - name: Contrast
-        run: npm run check:contrast
+        run: scripts/ci-step.sh Contrast npm run check:contrast
 
       # The mechanical half of the design laws, against a ratcheting baseline:
       # existing violations are tolerated and counted, new ones are not, and a
       # new file is held to zero from its first line. See scripts/check-ui.ts.
       - name: UI laws
-        run: npm run check:ui
+        run: scripts/ci-step.sh "UI laws" npm run check:ui
 
   audit:
     runs-on: ubuntu-latest
@@ -106,4 +111,5 @@ jobs:
       # Dependency scanning is a CASA Tier 2 requirement, so it runs from the
       # start rather than being retrofitted before an assessment. Omit dev
       # tooling (eslint, drizzle-kit) — production runtime deps are what ship.
-      - run: npm audit --omit=dev --audit-level=high
+      - name: Audit
+        run: scripts/ci-step.sh Audit npm audit --omit=dev --audit-level=high
