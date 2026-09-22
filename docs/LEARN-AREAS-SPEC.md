@@ -44,7 +44,7 @@ making the calls the learn graph exists to make.
 ## Where the list came from
 
 The starting point was the section structure of Wikipedia's
-[Level 3 vital articles](https://en.wikipedia.org/wiki/Wikipedia:Vital_articles/Level/3),
+[Level 3 vital articles](https://en.wikipedia.org/wiki/Wikipedia:Vital_articles/Level_3),
 the thousand articles its editors consider most important. It covers every
 field and has been argued over for years.
 
@@ -53,7 +53,7 @@ why they cannot be used as they are:
 
 | Division | Level 3 sections |
 |---|---|
-| Field of study | Mathematics, Physical sciences, Biology and health sciences, Technology, Society and social sciences, Arts, Philosophy and religion |
+| Field of study | Mathematics, Science, Health, medicine and disease, Technology, Society and social sciences, Arts, Philosophy and religion |
 | Kind of thing | People, Geography |
 | Time | History |
 | Area of daily life | Everyday life |
@@ -72,8 +72,10 @@ study, roughly what a university department teaches. The changes from Level 3:
   particular field belongs to that field.
 - **Everyday life** is removed. Sport goes to Sport and games, food to Food and
   cuisine or to Public health, family to Sociology and anthropology.
-- **Biology and health sciences** is split into Life sciences and Health and
-  medicine, because the healthy body and disease are studied separately.
+- **Science** is split into Physical sciences and Life sciences, which are
+  different departments with little shared teaching. **Health, medicine and
+  disease** becomes Health and medicine, and the healthy body moves to Life
+  sciences, because it is studied separately from disease.
 - **Language and literature** is its own domain. Level 3 spreads it across Arts
   and Society.
 
