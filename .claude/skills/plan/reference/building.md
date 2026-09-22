@@ -85,9 +85,14 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
    this type", "where is this rule enforced", anything that means opening
    several files to find one answer: dispatch it and let it report back the
    paths, the line numbers and a sentence. Those files then cost you the
-   sentence rather than their contents. Do the same for a step that is mostly
-   reading. Keep the editing yourself: a subagent that reads is cheap, and one
-   that writes code you have not seen is not.
+   sentence rather than their contents.
+
+   Give that subagent `model: haiku`. Locating a symbol and reporting where it
+   is does not need the model that writes the code, and the answer comes back
+   the same. Keep the editing yourself, on the session's own model: a subagent
+   that reads is cheap to be wrong about -- you can check the paths it names --
+   and one that writes code you have not seen is not. Haiku holds 200K rather
+   than 1M, so give it a search, not the whole feature.
 6. **Verify before closing.** Three, every time:
    - `npx tsc --noEmit -p tsconfig.json` — whole project, about 25 seconds. An
      edit in one file breaks types in another, so this is not narrowed.
