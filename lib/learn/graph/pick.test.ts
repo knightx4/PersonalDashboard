@@ -233,3 +233,46 @@ describe('picking the claims to write questions for ahead of time', () => {
     expect(names(picks)).toEqual(['splice']);
   });
 });
+
+describe('sharing the mixed flow between tracks (plan #780)', () => {
+  // Plenty ready in both, rigging closer to its goal so it wins without shares.
+  const ready = [
+    ...['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((name) => row(`knot-${name}`, rigging, 1)),
+    ...['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((name) => row(`lens-${name}`, optics, 3)),
+  ];
+  const count = (picks: ReturnType<typeof pickAhead>, subjectId: string) =>
+    picks.filter((picked) => picked.row.subjectId === subjectId).length;
+
+  it('asks about a track you answer a lot more often than one you keep skipping', () => {
+    const picks = pickAhead(
+      {
+        ready,
+        settled: [],
+        subjectCount: 2,
+        answered: 0,
+        now,
+        shares: [
+          { subjectId: optics.id, weight: 4, asked: 0 },
+          { subjectId: rigging.id, weight: 0.25, asked: 0 },
+        ],
+      },
+      10,
+      [],
+    );
+    expect(count(picks, optics.id)).toBeGreaterThan(count(picks, rigging.id));
+    // One in five still goes to the track asked about least.
+    expect(count(picks, rigging.id)).toBeGreaterThan(0);
+  });
+
+  it('ranks by goal inside the chosen track', () => {
+    const picked = pickOneToAsk({
+      ready,
+      settled: [],
+      subjectCount: 2,
+      answered: 0,
+      now,
+      shares: [{ subjectId: optics.id, weight: 4, asked: 0 }],
+    });
+    expect(picked.kind === 'ask' && picked.row.concept.name).toBe('lens-a');
+  });
+});

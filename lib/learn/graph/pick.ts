@@ -1,3 +1,4 @@
+import { isExploreTurn, trackToAsk, type TrackShare } from '@/lib/learn/flow/interest';
 import { claimToRecheck, isRecheckTurn, type SettledConcept } from './recheck';
 import { rankReady, type ReadyConcept } from './ready';
 
@@ -28,6 +29,13 @@ export type PickInput = {
   /** How many questions have been answered, across every subject. */
   answered: number;
   now: Date;
+  /**
+   * How the mixed flow shares questions between tracks (plan #780). When set,
+   * the track is chosen first by weight and the claim ranked inside it; when
+   * unset, the ready rows are ranked across every track at once, which is
+   * what a flow focused on one track and the older callers want.
+   */
+  shares?: readonly TrackShare[];
 };
 
 /**
@@ -36,7 +44,9 @@ export type PickInput = {
  * Every fifth question goes back to the settled claim you were asked about
  * longest ago, and every other one is about the frontier. A re-check turn with
  * nothing old enough on it falls through to an ordinary question rather than
- * asking about something settled last week.
+ * asking about something settled last week. With `shares`, an ordinary
+ * question comes from the track `trackToAsk` chooses (plan #780); re-checks
+ * are not shared out, since they go to whatever was settled longest ago.
  *
  * Ranked here rather than trusted from the caller, so a list read in any order
  * gives the same question. `subjectCount` is what separates the two empty
@@ -51,9 +61,20 @@ export function pickOneToAsk(input: PickInput): OneToAsk {
     if (old) return { kind: 'recheck', row: old };
   }
 
-  const [row] = rankReady(input.ready, 1);
+  const [row] = rankReady(readyInChosenTrack(input), 1);
   if (row) return { kind: 'ask', row };
   return { kind: 'nothing', because: input.subjectCount === 0 ? 'no-subjects' : 'all-settled' };
+}
+
+/** The ready rows of the track this turn goes to, or all of them without shares. */
+function readyInChosenTrack(input: PickInput): ReadyConcept[] {
+  if (!input.shares) return input.ready;
+  const track = trackToAsk(
+    input.ready.map((row) => row.subjectId),
+    input.shares,
+    isExploreTurn(input.answered),
+  );
+  return input.ready.filter((row) => row.subjectId === track);
 }
 
 /** A pick that found something to ask about. */
@@ -76,10 +97,13 @@ export type PickedToAsk = Exclude<OneToAsk, { kind: 'nothing' }>;
 export function pickAhead(input: PickInput, count: number, queued: readonly string[]): PickedToAsk[] {
   const taken = new Set(queued);
   const picks: PickedToAsk[] = [];
+  // Each pick counts as asked, so the next one is shared out after it.
+  const shares = input.shares?.map((share) => ({ ...share }));
 
   while (picks.length < count) {
     const picked = pickOneToAsk({
       ...input,
+      shares,
       ready: input.ready.filter((row) => !taken.has(row.concept.id)),
       settled: input.settled.filter((row) => !taken.has(row.concept.id)),
       answered: input.answered + queued.length + picks.length,
@@ -87,6 +111,9 @@ export function pickAhead(input: PickInput, count: number, queued: readonly stri
     if (picked.kind === 'nothing') break;
     taken.add(picked.row.concept.id);
     picks.push(picked);
+    const share = shares?.find((row) => row.subjectId === picked.row.subjectId);
+    if (share) share.asked += 1;
+    else shares?.push({ subjectId: picked.row.subjectId, weight: 1, asked: 1 });
   }
 
   return picks;

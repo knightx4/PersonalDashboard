@@ -33,12 +33,18 @@ const THEMES = [
   theme('t-systems', 'Emergent systems', 36),
 ];
 
-const offer = (input: { trackNames?: string[]; record?: OfferRecord[]; themes?: ThemeCandidate[] }) =>
+const offer = (input: {
+  trackNames?: string[];
+  record?: OfferRecord[];
+  themes?: ThemeCandidate[];
+  lean?: Map<string, number>;
+}) =>
   trackToOffer({
     themes: input.themes ?? THEMES,
     trackNames: input.trackNames ?? [],
     record: input.record ?? [],
     now: NOW,
+    lean: input.lean,
   });
 
 describe('the theme offered', () => {
@@ -98,6 +104,16 @@ describe('the theme offered', () => {
         ],
       }),
     ).toBeNull();
+  });
+});
+
+describe('the lean towards tracks you engage with (plan #780)', () => {
+  it('lifts a weaker theme near a track you answer past a stronger one', () => {
+    expect(offer({ lean: new Map([['t-systems', 2]]) })?.themeId).toBe('t-systems');
+  });
+
+  it('pushes a theme near a track you skip below a weaker one', () => {
+    expect(offer({ lean: new Map([['t-urban', 0.5]]) })?.themeId).toBe('t-agency');
   });
 });
 
