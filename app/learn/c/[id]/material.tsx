@@ -90,17 +90,22 @@ function Material({ row, conceptId }: { row: ClaimMaterial; conceptId: string })
 }
 
 /**
- * Why there is nothing, which is two problems with two different fixes.
+ * Why there is nothing, which is three problems with three different fixes.
  *
- * Neither line says anybody went looking, and neither may: under #742 the
- * search runs when you press the button on the claim, so a claim nobody has
- * pressed reads as `nothing-matched` here. #745 adds the third case, the claim
- * nobody has looked for material for, by recording when a claim was last
- * searched. That is the step that gets to say it, and these two words change
- * when it does.
+ * The search runs when you press the button on the claim, so a claim with no
+ * material is in one of three states and only the concept's search time tells
+ * them apart. Each line says which one you are in and what would change it,
+ * and no line says anybody went looking unless somebody did.
+ *
+ * `never-searched` names what does the searching rather than the button above
+ * it, because that button is only offered on a claim you are shaky on or wrong
+ * about, and this line is shown on any claim with nothing.
  */
 const ABSENCE: Record<MaterialAbsence, string> = {
-  'nothing-matched': 'The catalogue holds material, and none of it is matched to this claim.',
+  'never-searched':
+    'The catalogue has not been searched for this claim yet. It is searched when you ask for something to read for it.',
+  'nothing-matched':
+    'The catalogue was searched for this claim and nothing in it matched. More material has to be pulled in before that changes.',
   'catalogue-empty':
     'Nothing has been pulled into the catalogue yet, so there is nothing to match this claim against.',
 };

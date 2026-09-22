@@ -19,6 +19,7 @@ const concept = (over: Partial<Concept> = {}): Concept => ({
   claim: 'Marginal cost is the cost of one more unit, not the average per unit.',
   claimOriginal: null,
   claimRewrittenAt: null,
+  catalogueSearchedAt: null,
   basis: 'Named in the brief.',
   kind: 'threshold',
   state: 'shaky',

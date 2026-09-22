@@ -21,8 +21,9 @@ import type { LocatorConfidence } from '@/lib/learn/tracks/load';
  * makes it work on the first day the catalogue exists.
  *
  * A claim with nothing gets a reason rather than an empty list, because
- * "nothing has been pulled in" and "nothing here covers this claim" are
- * different problems and only one of them is about the claim.
+ * "nobody has looked", "nothing here covers this claim" and "nothing has been
+ * pulled in" are three different problems, only one of them is about the
+ * claim, and what would change each of them is different.
  */
 
 /** Where a segment sits in its work, which is what decides how it reads. */
@@ -64,17 +65,17 @@ export type ClaimMaterial = {
 };
 
 /**
- * Why a claim has nothing.
+ * Why a claim has nothing, which is three problems with three different fixes.
  *
- * Two reasons now and three later. #745 adds the claim nobody has pressed the
- * button on, which needs a search timestamp nothing writes yet. Until it does,
- * neither of these says anybody went looking and neither may imply it: the
- * search runs on the press (#742), so a claim can sit at `nothing-matched`
- * having never been searched at all.
+ * The search runs when you press the button on the claim (#742), so a claim
+ * with no links may never have been looked for at all. The search time on the
+ * concept is what tells those apart, and it is why `nothing-matched` may now
+ * say somebody went looking: it is only reached when somebody did.
  */
 export type MaterialAbsence =
-  /** The catalogue holds material that can be searched, and none of it is
-   *  linked to this claim. */
+  /** Nobody has pressed the button on this claim, so nothing has looked. */
+  | 'never-searched'
+  /** The catalogue was searched for this claim and nothing in it matched. */
   | 'nothing-matched'
   /** There is nothing to search: nothing pulled in, or nothing embedded yet. */
   | 'catalogue-empty';
@@ -185,7 +186,7 @@ export function orderForClaim(rung: Rung, rows: readonly ClaimMaterial[]): Claim
  * The two reads this needs, named so a test never reaches a database.
  *
  * The two-port pattern the rest of this directory uses. What is worth holding
- * still is which of the two absences a claim gets and in what order the rows
+ * still is which of the three absences a claim gets and in what order the rows
  * come back, and neither of those is about PostgREST.
  */
 export type MaterialStore = {
@@ -200,18 +201,27 @@ export type MaterialStore = {
  *
  * Whether the catalogue holds anything is only asked when the claim has no
  * links, which is the one case where the answer changes what a page says.
+ *
+ * An empty catalogue is reported ahead of a claim nobody has searched, because
+ * both are true of most claims today and only one of them is worth acting on.
+ * Telling somebody to go and search a catalogue with nothing in it sends them
+ * to press a button that cannot succeed.
  */
 export async function materialForClaim(
   store: MaterialStore,
-  input: { conceptId: string; rung: Rung },
+  input: {
+    conceptId: string;
+    rung: Rung;
+    /** When the catalogue was last searched for this claim. Null: never. */
+    searchedAt: string | null;
+  },
 ): Promise<ClaimMaterialView> {
   const rows = await store.forClaim(input.conceptId);
   if (rows.length > 0) return { material: orderForClaim(input.rung, rows), absence: null };
 
-  return {
-    material: [],
-    absence: (await store.anySearchable()) ? 'nothing-matched' : 'catalogue-empty',
-  };
+  if (!(await store.anySearchable())) return { material: [], absence: 'catalogue-empty' };
+
+  return { material: [], absence: input.searchedAt ? 'nothing-matched' : 'never-searched' };
 }
 
 function fail(action: string, error: { message: string }): Error {
@@ -366,7 +376,7 @@ export function tableMaterialStore(
 export async function loadClaimMaterial(
   supabase: LearnSupabaseClient,
   userId: string,
-  input: { conceptId: string; rung: Rung },
+  input: { conceptId: string; rung: Rung; searchedAt: string | null },
 ): Promise<ClaimMaterialView> {
   return materialForClaim(tableMaterialStore(supabase, userId), input);
 }
