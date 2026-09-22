@@ -247,18 +247,24 @@ describe('the search bar in the top bar', () => {
   it('draws it only from lg up', () => {
     // `hidden` up to lg is also what keeps the field out of the tab order on a
     // phone: a field nobody can see is a field nobody should be able to reach.
-    expect(header(shell('todo'))).toContain('hidden min-w-0 flex-1 lg:block');
+    expect(header(shell('todo'))).toContain('hidden min-w-0 flex-1 lg:mx-auto lg:block');
   });
 
   it('names the workspace on its chip', () => {
     expect(header(shell('todo'))).toContain('>Todo<');
-    expect(header(shell('todo'))).toContain('Search Everything instead');
+    expect(header(shell('todo'))).toContain('Searching Todo. Choose what to search');
+  });
+
+  it('stops short of the width of the bar', () => {
+    // Note ca910aa3: it grew into every pixel between the brief and the
+    // account icons, which is a field the width of a desk for a few words.
+    expect(header(shell('todo'))).toContain('lg:max-w-md');
   });
 
   it('searches everything, with no chip, outside a workspace', () => {
     const bar = header(shell(null));
     expect(bar).toContain('aria-label="Search"');
-    expect(bar).not.toContain('Search Everything instead');
+    expect(bar).not.toContain('Choose what to search');
     expect(bar).not.toContain('>Todo<');
   });
 });
