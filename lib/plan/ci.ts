@@ -27,6 +27,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ask, commitOnMain, readToken, REPO, REPO_KEY, refusalFor } from './github';
 import { pushesFrom, type ActivityRow, type Push } from './liveness';
+import { failureReason, type FailedJob, type FailedRun } from './main-check';
 import {
   carriedBy,
   carrierFor,
@@ -134,6 +135,61 @@ async function checkCommit(
   return conclusionFrom(body.workflow_runs ?? []);
 }
 
+/** A workflow run as the runs listing gives it, with what the panel links to. */
+type WorkflowRun = CheckRun & { id?: number; name?: string; html_url?: string };
+
+/** The same failing set as `checks.ts`, for picking which runs to explain. */
+const RUN_FAILED = new Set([
+  'failure',
+  'timed_out',
+  'action_required',
+  'cancelled',
+  'startup_failure',
+]);
+
+/** How many failing runs one tick reads the jobs of. There is one workflow today. */
+const EXPLAIN_BUDGET = 3;
+
+/**
+ * Why main's head failed, read from the jobs of its failing runs.
+ *
+ * One more request per failing run, and only on a tick that found main red,
+ * so a green main costs nothing extra. The jobs listing is under the same
+ * Actions: Read the runs listing already needs. A refusal here is dropped
+ * rather than carried: "failed" is still true and worth storing without the
+ * why, and turning it into an `error` would grey out a dot that knows it is red.
+ */
+async function explainFailure(
+  runs: readonly WorkflowRun[],
+  token: string,
+  doFetch: typeof globalThis.fetch,
+): Promise<{ reason: string | null; runUrl: string | null }> {
+  // Without an id there are no jobs to ask for, and a run with no jobs reads
+  // as one GitHub never started, which would be a guess.
+  const failing = runs
+    .filter((run) => run.id !== undefined && run.conclusion && RUN_FAILED.has(run.conclusion))
+    .slice(0, EXPLAIN_BUDGET);
+  const runUrl = failing.find((run) => run.html_url)?.html_url ?? null;
+
+  try {
+    const explained: FailedRun[] = await inLanes(failing, async (run) => ({
+      name: run.name ?? 'workflow',
+      conclusion: run.conclusion,
+      jobs:
+        (
+          await ask<{ jobs?: FailedJob[] }>(
+            `/repos/${REPO.owner}/${REPO.repo}/actions/runs/${run.id}/jobs?per_page=${PAGE_SIZE}`,
+            token,
+            doFetch,
+          )
+        ).jobs ?? [],
+    }));
+    return { reason: failureReason(explained), runUrl };
+  } catch {
+    return { reason: null, runUrl };
+  }
+}
+
 /**
  * What CI says about main's newest commit right now, written down for the
  * shell to read.
@@ -163,7 +219,12 @@ export async function refreshMainCheck(input: {
   supabase: Db;
   now?: number;
   fetch?: typeof globalThis.fetch;
-}): Promise<{ sha: string | null; conclusion: CheckConclusion | null; error: string | null }> {
+}): Promise<{
+  sha: string | null;
+  conclusion: CheckConclusion | null;
+  error: string | null;
+  reason: string | null;
+}> {
   const now = input.now ?? Date.now();
   const doFetch = input.fetch ?? globalThis.fetch;
   const token = readToken();
@@ -171,6 +232,8 @@ export async function refreshMainCheck(input: {
   let sha: string | null = null;
   let conclusion: CheckConclusion | null = null;
   let error: string | null = null;
+  let reason: string | null = null;
+  let runUrl: string | null = null;
 
   if (!token) {
     error = `No GITHUB_READ_TOKEN is set, so ${REPO.branch}'s checks cannot be read.`;
@@ -187,7 +250,16 @@ export async function refreshMainCheck(input: {
       if (!sha) {
         error = `GitHub named no commits on ${REPO.branch}.`;
       } else {
-        conclusion = await checkCommit(sha, token, doFetch);
+        const body = await ask<{ workflow_runs?: WorkflowRun[] }>(
+          `/repos/${REPO.owner}/${REPO.repo}/actions/runs?head_sha=${sha}&per_page=${PAGE_SIZE}`,
+          token,
+          doFetch,
+        );
+        const runs = body.workflow_runs ?? [];
+        conclusion = conclusionFrom(runs);
+        if (conclusion === 'failed') {
+          ({ reason, runUrl } = await explainFailure(runs, token, doFetch));
+        }
       }
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
@@ -201,6 +273,8 @@ export async function refreshMainCheck(input: {
       conclusion,
       checked_at: new Date(now).toISOString(),
       error,
+      reason,
+      run_url: runUrl,
     },
     { onConflict: 'repo' },
   );
@@ -210,7 +284,7 @@ export async function refreshMainCheck(input: {
     console.error(`main's CI reading could not be stored: ${writeError.message}`);
   }
 
-  return { sha, conclusion, error };
+  return { sha, conclusion, error, reason };
 }
 
 /** A few at a time, so a backlog does not become twenty-five round trips. */

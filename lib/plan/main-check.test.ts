@@ -11,6 +11,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  failureReason,
   MAIN_CHECK_STALE_MINUTES,
   MAIN_DOT_MEANING,
   MAIN_DOT_ORDER,
@@ -30,6 +31,8 @@ function check(over: Partial<MainCheck> = {}): MainCheck {
     conclusion: 'passed',
     checkedAt: minutesAgo(1),
     error: null,
+    reason: null,
+    runUrl: null,
     ...over,
   };
 }
@@ -130,5 +133,85 @@ describe('the dot legend', () => {
     expect(MAIN_DOT_MEANING.failed).toContain('Red');
     expect(MAIN_DOT_MEANING.running).toContain('Amber');
     expect(MAIN_DOT_MEANING.unknown).toContain('Grey');
+  });
+});
+
+describe('failureReason', () => {
+  it('names the job and the step that broke', () => {
+    expect(
+      failureReason([
+        {
+          name: 'CI',
+          conclusion: 'failure',
+          jobs: [
+            {
+              name: 'check',
+              conclusion: 'failure',
+              runner_id: 1,
+              steps: [
+                { name: 'Typecheck', conclusion: 'success' },
+                { name: 'Test', conclusion: 'failure' },
+                { name: 'Build', conclusion: 'skipped' },
+              ],
+            },
+            {
+              name: 'design',
+              conclusion: 'failure',
+              runner_id: 2,
+              steps: [{ name: 'UI laws', conclusion: 'failure' }],
+            },
+            { name: 'audit', conclusion: 'success', runner_id: 3, steps: [] },
+          ],
+        },
+      ]),
+    ).toBe('Failed at check › Test, design › UI laws.');
+  });
+
+  // What main did on 22 September: three jobs, none given a runner, no steps,
+  // no logs. Pointing at the code would send somebody into logs that do not
+  // exist.
+  it('says GitHub never started jobs that got no runner, and where to look', () => {
+    const said = failureReason([
+      {
+        name: 'CI',
+        conclusion: 'failure',
+        jobs: ['check', 'audit', 'design'].map((name) => ({
+          name,
+          conclusion: 'failure',
+          runner_id: null,
+          steps: [],
+        })),
+      },
+    ]);
+    expect(said).toContain('GitHub never started check, audit, design');
+    expect(said).toContain('Actions minutes');
+    expect(said).toContain('github.com/settings/billing');
+  });
+
+  it('says a run with no jobs could not be started at all', () => {
+    expect(failureReason([{ name: 'CI', conclusion: 'startup_failure', jobs: [] }])).toContain(
+      'could not start the workflow',
+    );
+  });
+
+  it('has nothing to add when no job failed', () => {
+    expect(failureReason([])).toBeNull();
+    expect(
+      failureReason([
+        { name: 'CI', conclusion: 'failure', jobs: [{ name: 'check', conclusion: 'success' }] },
+      ]),
+    ).toBeNull();
+  });
+
+  it('stays inside the column', () => {
+    const jobs = Array.from({ length: 60 }, (_, i) => ({
+      name: `job-with-a-long-name-${i}`,
+      conclusion: 'failure',
+      runner_id: 1,
+      steps: [{ name: 'a step with a long name', conclusion: 'failure' }],
+    }));
+    expect(
+      failureReason([{ name: 'CI', conclusion: 'failure', jobs }])!.length,
+    ).toBeLessThanOrEqual(500);
   });
 });
