@@ -48,6 +48,7 @@ describe('the operation names', () => {
       'name-areas',
       'locate-passage',
       'generate-chain',
+      'generate-track-from-theme',
       'write-probe',
       'write-probe-ahead',
       'name-misconception',

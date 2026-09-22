@@ -3,14 +3,20 @@
 import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Sprout } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { ProbeOptions } from '@/components/learn/probe-options';
 import { trackChange, trackPercent, type TrackMove } from '@/lib/learn/flow/track';
-import { fillFlowQueue, flowStep, pushReadingAside, type FlowState } from './actions';
-import type { FlowReading } from './state';
+import {
+  answerTrackOffer,
+  fillFlowQueue,
+  flowStep,
+  pushReadingAside,
+  type FlowState,
+} from './actions';
+import type { FlowReading, TrackOffer } from './state';
 
 /**
  * A question, the reason, and Next, for as long as you keep going.
@@ -124,6 +130,76 @@ function ReadingOffer({ reading }: { reading: FlowReading }) {
   );
 }
 
+function StartButton() {
+  const { pending } = useFormStatus();
+  // One call to write the track's ideas and one to write its first question,
+  // so this is the slowest press in the flow and says so.
+  return (
+    <Button type="submit" variant="secondary" size="sm" disabled={pending}>
+      {pending ? 'Writing the track…' : 'Start'}
+    </Button>
+  );
+}
+
+/**
+ * A new track from a theme in your notes, offered when the flow is running
+ * low (plan #778). Start writes the track and puts its first question on the
+ * screen; Not now and Never hide the card here at once, and keep the theme
+ * back for a few weeks or for good.
+ */
+function TrackOfferCard({
+  offer,
+  error,
+  step,
+  track,
+}: {
+  offer: TrackOffer;
+  error?: string;
+  step: (formData: FormData) => void;
+  track: FlowTrack;
+}) {
+  const [hidden, setHidden] = useState(false);
+  if (hidden) return null;
+
+  const setAside = async (formData: FormData) => {
+    setHidden(true);
+    await answerTrackOffer(formData);
+  };
+
+  return (
+    <div className="mt-4 flex gap-3 text-left">
+      <Sprout className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={2} aria-hidden />
+      <div className="min-w-0 flex-1">
+        <p className="text-ui font-medium text-ink">New track: {offer.name}</p>
+        <p className="mt-0.5 text-small text-ink-muted">
+          From {offer.notes} of your {offer.notes === 1 ? 'note' : 'notes'}. {offer.about}
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <form action={step}>
+            <input type="hidden" name="intent" value="start-track" />
+            <input type="hidden" name="themeId" value={offer.themeId} />
+            <TrackField track={track} />
+            <StartButton />
+          </form>
+          {(['not_now', 'never'] as const).map((outcome) => (
+            <form key={outcome} action={setAside}>
+              <input type="hidden" name="themeId" value={offer.themeId} />
+              <input type="hidden" name="outcome" value={outcome} />
+              <button
+                type="submit"
+                className="text-ui text-ink-muted underline-offset-2 hover:text-accent hover:underline"
+              >
+                {outcome === 'never' ? 'Never' : 'Not now'}
+              </button>
+            </form>
+          ))}
+        </div>
+        {error && <p className="mt-2 text-ui text-danger">{error}</p>}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Every form in the flow carries the focus, because the action reads the
  * form and nothing else: the next question and the queue topped up after it
@@ -144,6 +220,22 @@ export function FlowSession({ first, track }: { first: FlowState; track: FlowTra
   }, [trackId]);
 
   if (!live.question || !live.options) {
+    // Nothing left to ask, and a theme from your notes to start on: the offer
+    // is the way on, so it is the whole card rather than a line under it.
+    if (live.nothing && live.offer) {
+      return (
+        <div className={cn(cardVariants(), 'border-dashed px-4 py-6')}>
+          <p className="text-ui text-ink-muted">{NOTHING_TO_ASK[live.nothing]}</p>
+          <TrackOfferCard
+            key={live.offer.themeId}
+            offer={live.offer}
+            error={live.offerError}
+            step={step}
+            track={track}
+          />
+        </div>
+      );
+    }
     return (
       <form action={step} className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center')}>
         <input type="hidden" name="intent" value="ask" />
@@ -168,6 +260,11 @@ export function FlowSession({ first, track }: { first: FlowState; track: FlowTra
 
   return (
     <div className={cardVariants({ padding: 'standard' })}>
+      {live.started && (
+        <p className="mb-2 text-ui text-ink">
+          Started {live.started}. Its questions are mixed in with the rest from here on.
+        </p>
+      )}
       <p className="text-small text-ink-muted">
         {live.conceptName}
         {live.subjectName && ` · ${live.subjectName}`}
@@ -218,6 +315,16 @@ export function FlowSession({ first, track }: { first: FlowState; track: FlowTra
           )}
 
           {live.reading && <ReadingOffer key={live.probeId} reading={live.reading} />}
+
+          {live.offer && (
+            <TrackOfferCard
+              key={`${live.probeId}:${live.offer.themeId}`}
+              offer={live.offer}
+              error={live.offerError}
+              step={step}
+              track={track}
+            />
+          )}
 
           <form action={step} className="mt-4">
             <input type="hidden" name="intent" value="ask" />

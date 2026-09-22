@@ -11,6 +11,8 @@ import { loadReadyAndSettled, loadSubjects } from '@/lib/learn/graph/load';
 import { pickOneToAsk } from '@/lib/learn/graph/pick';
 import { answeredCount, lastAnsweredAt } from '@/lib/learn/graph/session';
 import { nextQuestion } from '@/lib/learn/flow/ahead';
+import { loadTrackOffer } from '@/lib/learn/flow/offer';
+import { createVaultClient } from '@/lib/vault/auth/server';
 import { FlowSession } from './flow/session';
 import { toFlowState } from './flow/state';
 
@@ -86,6 +88,14 @@ export default async function PracticeFlowPage({
       ? null
       : toFlowState(await nextQuestion(supabase, user.id, { resume: true, track: trackId }));
 
+  // Nothing to ask across every track, including having no tracks at all: a
+  // theme from your notes is offered as the way on (plan #778). Not when
+  // focused, where the empty state points back at the other tracks instead.
+  const offer =
+    picked.kind === 'nothing' && !track
+      ? await loadTrackOffer(supabase, await createVaultClient())
+      : null;
+
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
@@ -118,6 +128,8 @@ export default async function PracticeFlowPage({
           // soft navigation, and without a new key the action state would
           // carry the last question across it.
           <FlowSession key={track?.id ?? 'all'} first={first ?? {}} track={track} />
+        ) : offer ? (
+          <FlowSession key="offer" first={{ nothing: picked.because, offer }} track={null} />
         ) : track ? (
           <EmptyState
             title={`Nothing left to ask about ${track.name}`}

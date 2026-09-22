@@ -34,6 +34,11 @@ export const LEARN_OPERATIONS = [
   'name-areas',
   'locate-passage',
   'generate-chain',
+  // Starting a track from a theme in the vault map, from the offer card in
+  // Practice Flow (plan #778). The same call as 'generate-chain' with the
+  // theme's positions in the prompt, kept apart so what offered tracks cost
+  // can be read against how often they are started.
+  'generate-track-from-theme',
   'write-probe',
   // Practice Flow writing its next few questions before they are needed
   // (plan #771). Apart from 'write-probe', which is a question somebody is
