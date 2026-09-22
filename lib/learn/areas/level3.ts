@@ -14,13 +14,18 @@
  * Pure. The fetch is the caller's, so this can be tested against a fixture.
  */
 
-/** The request that returns the page as wikitext. */
-export const LEVEL3_PAGE = 'Wikipedia:Vital_articles/Level/3';
+/**
+ * The page's title. It moved from `Level/3` to `Level 3` in 2026 and the old
+ * title is now a redirect, which `redirects=1` below follows, so a later move
+ * does not quietly return a one-line redirect page.
+ */
+export const LEVEL3_PAGE = 'Wikipedia:Vital_articles/Level_3';
 
 export function level3RequestUrl(): string {
   const url = new URL('https://en.wikipedia.org/w/api.php');
   url.searchParams.set('action', 'parse');
   url.searchParams.set('page', LEVEL3_PAGE);
+  url.searchParams.set('redirects', '1');
   url.searchParams.set('prop', 'wikitext');
   url.searchParams.set('format', 'json');
   url.searchParams.set('formatversion', '2');
@@ -55,7 +60,7 @@ function cleanHeading(raw: string): string {
 
 function firstArticleLink(line: string): string | null {
   for (const match of line.matchAll(LINK)) {
-    const title = match[1].replace(/_/g, ' ').trim();
+    const title = match[1].replace(/_/g, ' ').replace(/^:/, '').trim();
     if (!title || OTHER_NAMESPACE.test(title)) continue;
     return title.charAt(0).toUpperCase() + title.slice(1);
   }
