@@ -16,21 +16,23 @@ import { MasteryChecks } from '@/components/learn/mastery-checks';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createLearnClient } from '@/lib/learn/auth/server';
+import { loadClaimMaterial } from '@/lib/learn/catalogue/material';
 import { splitCase } from '@/lib/learn/graph/applied-payload';
 import { loadConceptView } from '@/lib/learn/graph/concept';
 import { claimWordingLine } from '@/lib/learn/graph/last-answered';
 import { askedBeforeRewrite } from '@/lib/learn/graph/rewrite';
-import { probesFor, type ProbeRow } from '@/lib/learn/graph/session';
+import { nextRung, probesFor, type ProbeRow } from '@/lib/learn/graph/session';
 import { openingQuestionFor } from '@/lib/learn/graph/opening';
 import type { Concept, Mentioned } from '@/lib/learn/graph/model';
 import { ReadAbout } from '@/app/learn/s/[id]/read-about';
 import { BranchFromClaim } from './branch-from-claim';
+import { MaterialForClaim, NoMaterialNote } from './material';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * One concept: the claim, where it stands, what it sits between, and what has
- * been asked about it.
+ * One concept: the claim, where it stands, what it sits between, what has been
+ * asked about it, and what there is to read about it.
  *
  * The subject page shows a claim inside a chain, which is the right frame for
  * deciding what to learn next and the wrong one for reading about a single
@@ -38,12 +40,15 @@ export const dynamic = 'force-dynamic';
  * claim that mentions this one, from a highlight somebody wants to branch off
  * -- and it computes nothing the subject page does not already compute.
  *
- * Three things on it write. Two ask first: taking a gap to the reading queue,
+ * Four things on it write. Two ask first: taking a gap to the reading queue,
  * which is the same action and the same two ids as the card it came from, and
  * branching a chain off a phrase selected in the claim, which is proposed and
  * approved like any other goal. The third is rewriting the claim, which needs
  * no proposal because the words are yours -- what the app wrote is kept, and
- * the page says which of you wrote the sentence being read.
+ * the page says which of you wrote the sentence being read. The fourth is
+ * queueing a piece of the catalogue's material for this claim, which needs no
+ * approval screen either: the list it is pressed from is the proposal, which
+ * is what #725 settled.
  */
 
 function ConceptLink({ concept }: { concept: Concept }) {
@@ -182,10 +187,22 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
 
   const { concept, subject, prerequisites, dependents, refersTo, referredToBy } = view;
   const probes = await probesFor(supabase, concept.id);
-  // The question asked before any of this subject existed, when there was one.
-  // It is where a state of known or shaky on a first chain came from, so a
-  // page showing the state has to be able to show what established it.
-  const opening = await openingQuestionFor(supabase, subject.id, concept.name);
+
+  const [opening, material] = await Promise.all([
+    // The question asked before any of this subject existed, when there was
+    // one. It is where a state of known or shaky on a first chain came from,
+    // so a page showing the state has to be able to show what established it.
+    openingQuestionFor(supabase, subject.id, concept.name),
+    // Which rung you are at is which rung the next question about this claim
+    // would be asked at, and it is the largest term in the order material is
+    // offered in: an article section lays an idea out, a lecture works an
+    // example. `nextRung` is the module's own rule for that and reads the
+    // answers already given, so this is a lookup rather than a second opinion.
+    loadClaimMaterial(supabase, user.id, {
+      conceptId: concept.id,
+      rung: nextRung(concept.mastery, probes).rung,
+    }),
+  ]);
 
   const connected =
     prerequisites.length > 0 ||
@@ -251,8 +268,16 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
 
         <div className="mt-3">
           <ReadAbout concept={concept} subjectId={subject.id} />
+          {/* Where a claim with nothing found for it says why, under the
+              button that will go looking once #744 lands. */}
+          <NoMaterialNote view={material} />
         </div>
       </CardSection>
+
+      {/* What was found, if anything was. Directly under where it stands,
+          because what is worth reading depends on which rung you are at and
+          that is the card above. */}
+      <MaterialForClaim view={material} conceptId={concept.id} className="mb-5" />
 
       {/* What having this claim looks like, and what the questions about it are
           written against. Its own section rather than a line under the claim:
