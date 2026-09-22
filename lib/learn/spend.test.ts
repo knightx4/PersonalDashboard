@@ -49,6 +49,7 @@ describe('the operation names', () => {
       'locate-passage',
       'generate-chain',
       'write-probe',
+      'write-probe-ahead',
       'name-misconception',
       'propose-floor',
       'classify-note',

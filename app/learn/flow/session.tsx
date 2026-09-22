@@ -1,18 +1,19 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { ProbeOptions } from '@/components/learn/probe-options';
-import { flowStep, type FlowState } from './actions';
+import { fillFlowQueue, flowStep, type FlowState } from './actions';
 
 /**
- * Start, a question, the reason, and Next, for as long as you keep going.
+ * A question, the reason, and Next, for as long as you keep going.
  *
- * Asking and answering share one action state, so the question on screen is
- * always the one the last submit returned. Next runs the pick again rather
+ * The page hands over the first question, so there is nothing to press before
+ * it. Asking and answering share one action state, so the question on screen
+ * is always the one the last submit returned. Next runs the pick again rather
  * than working through a list, which is what lets an answer that just settled
  * a claim change what is asked after it. It stops only when the pick has
  * nothing left.
@@ -25,26 +26,30 @@ const NOTHING_TO_ASK: Record<NonNullable<FlowState['nothing']>, string> = {
 
 function AskButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
+  // Usually the next question was written ahead and comes straight back. The
+  // wait is only long when the queue ran dry and it is being written now.
   return (
     <Button type="submit" disabled={pending}>
-      {pending ? 'Writing a question…' : label}
+      {pending ? 'Getting the next question…' : label}
     </Button>
   );
 }
 
-export function FlowSession() {
-  const [live, step] = useActionState<FlowState, FormData>(flowStep, {});
+export function FlowSession({ first }: { first: FlowState }) {
+  const [live, step] = useActionState<FlowState, FormData>(flowStep, first);
+
+  // Once per visit: the queue may have run down while you were away, and
+  // filling it now means the question after this one is ready in time.
+  useEffect(() => {
+    void fillFlowQueue();
+  }, []);
 
   if (!live.question || !live.options) {
     return (
       <form action={step} className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center')}>
         <input type="hidden" name="intent" value="ask" />
-        <p className="text-body text-ink-muted">
-          Questions about what you are ready for next, across everything you are learning. Answer
-          as many as you like and stop whenever you want.
-        </p>
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-          {!live.nothing && <AskButton label="Start" />}
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {live.error && <AskButton label="Try again" />}
           {live.nothing && <span className="text-ui text-ink-muted">{NOTHING_TO_ASK[live.nothing]}</span>}
           {live.error && <span className="text-ui text-danger">{live.error}</span>}
         </div>

@@ -13,7 +13,7 @@ import {
   type AskedRung,
   type Rung,
 } from '@/lib/learn/graph/probe-payload';
-import { inferredFrom, type Concept, type Graph } from '@/lib/learn/graph/model';
+import { inferredFrom, type Concept, type Graph, type KnowledgeState } from '@/lib/learn/graph/model';
 import { conceptToRecheck, isRecheckTurn } from '@/lib/learn/graph/recheck';
 
 /**
@@ -162,6 +162,10 @@ export async function probesFor(
         'response, response_correct, grade_reason, rung, weight, mastery_check, created_at',
     )
     .eq('concept_id', conceptId)
+    // Not a question Practice Flow has written ahead and not yet shown. It
+    // has not been asked, and listing it would put a question and its answer
+    // on the claim's page before the flow gets to it.
+    .or('picked_state.is.null,shown_at.not.is.null')
     .order('created_at', { ascending: false });
 
   assertSchemaExposed(error, LEARN_SCHEMA);
@@ -432,11 +436,30 @@ export async function setMisconception(
 export async function recordProbe(
   supabase: LearnSupabaseClient,
   userId: string,
-  input: { conceptId: string; probe: Probe; model: string },
+  input: {
+    conceptId: string;
+    probe: Probe;
+    model: string;
+    /**
+     * Set by Practice Flow, which records what the pick was so it can tell
+     * later whether the pick still holds. `shownAt` is left out for a question
+     * written ahead, which waits in the queue until it is shown.
+     */
+    flow?: {
+      pickedState: KnowledgeState;
+      pickedRecheck: 'tested' | 'declared' | null;
+      shownAt: string | null;
+    };
+  },
 ): Promise<string> {
   const { data, error } = await supabase
     .from('probes')
     .insert({
+      ...(input.flow && {
+        picked_state: input.flow.pickedState,
+        picked_recheck: input.flow.pickedRecheck,
+        shown_at: input.flow.shownAt,
+      }),
       user_id: userId,
       concept_id: input.conceptId,
       question: input.probe.question,
