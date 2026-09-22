@@ -11,7 +11,6 @@ import { loadLearnBrief } from '@/lib/shell/brief';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { countReadNow } from '@/lib/learn/tracks/load';
-import { countNext } from '@/lib/learn/graph/load';
 
 /**
  * Shell for the learn workspace.
@@ -42,58 +41,52 @@ export default async function LearnLayout({ children }: { children: React.ReactN
   const brief = await loadLearnBrief();
 
   /**
-   * Two sections. A track and a reading are both reached through Tracks, so
-   * they are `alsoMatches` rather than tabs of their own -- a nav that grows
-   * an entry per depth level stops being navigation.
+   * Practice Flow first, because it is what Learn opens on (plan #773), then
+   * the subjects the flow asks about, then the rest. A subject and a single
+   * idea are reached through What you know, and a reading list and a reading
+   * through Reading lists, so they are `alsoMatches` rather than tabs of their
+   * own -- a nav that grows an entry per depth level stops being navigation.
    *
-   * Read now is the exception that earns a tab, because it is not a deeper
-   * view of a track: it is every track's next thing on one shelf, and it is
-   * the page you open when you have twenty minutes rather than a decision to
-   * make. The badge is the count, so the tab answers "is there anything" from
-   * the column.
+   * There is no Learn next tab. Its re-checks are asked in the flow and its
+   * readings are offered there after an answer, and /learn/next redirects.
    */
   const learnClient = await createLearnClient();
-  const [readNow, learnNext] = await Promise.all([
-    countReadNow(learnClient),
-    countNext(learnClient),
-  ]);
+  const readNow = await countReadNow(learnClient);
 
   const sections: NavSection[] = [
+    // No badge, because there is always a question waiting and a number that
+    // never goes down is not information.
     {
       href: '/learn',
-      label: 'Tracks',
+      label: 'Practice Flow',
+      icon: 'practiceFlow',
+      exact: true,
+    },
+    // The subjects, which are what "track" means on screen now (#774).
+    {
+      href: '/learn/know',
+      label: 'What you know',
+      icon: 'know',
+      exact: true,
+      alsoMatches: ['/learn/s/', '/learn/c/'],
+    },
+    {
+      href: '/learn/lists',
+      label: 'Reading lists',
       icon: 'tracks',
       exact: true,
       alsoMatches: ['/learn/t/', '/learn/r/', '/learn/new'],
     },
+    // Read now earns a tab because it is not a deeper view of a reading list:
+    // it is every list's next thing on one shelf, and it is the page you open
+    // when you have twenty minutes rather than a decision to make. The badge
+    // is the count, so the tab answers "is there anything" from the column.
     {
       href: '/learn/now',
       label: 'Read now',
       icon: 'readNow',
       exact: true,
       badge: readNow,
-    },
-    // Practice Flow is the other end of Read now: the same module asked for
-    // when you would rather answer than read. No badge, because there is
-    // always a question waiting and a number that never goes down is not
-    // information.
-    {
-      href: '/learn/flow',
-      label: 'Practice Flow',
-      icon: 'practiceFlow',
-      exact: true,
-    },
-    // Learn next earns a tab on the same argument Read now does: it is not a
-    // deeper view of a subject, it is every subject's next thing on one
-    // screen, and the badge answers "is there anything" from the column. The
-    // count is the rows the page would draw, so tapping the tab never finds a
-    // different number of them.
-    {
-      href: '/learn/next',
-      label: 'Learn next',
-      icon: 'learnNext',
-      exact: true,
-      badge: learnNext,
     },
     // Quizzes are not a deeper view of anything else here: they are over
     // material you chose out of the vault rather than over a subject the graph
@@ -105,16 +98,6 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       icon: 'quiz',
       exact: true,
       alsoMatches: ['/learn/quiz/'],
-    },
-    // The other half of the module. A subject is reached through here, and a
-    // single concept through a subject, so both are alsoMatches rather than
-    // tabs of their own.
-    {
-      href: '/learn/know',
-      label: 'What you know',
-      icon: 'know',
-      exact: true,
-      alsoMatches: ['/learn/s/', '/learn/c/'],
     },
   ];
 

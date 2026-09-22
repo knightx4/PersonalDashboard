@@ -232,7 +232,7 @@ export async function loadLearnBrief(): Promise<Brief | null> {
   );
 
   if (!count) return null;
-  return { text: `${plural(count, 'thing')} to read`, href: '/learn' };
+  return { text: `${plural(count, 'thing')} to read`, href: '/learn/lists' };
 }
 
 export type BriefFor = ModuleId | null;

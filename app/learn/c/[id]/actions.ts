@@ -268,7 +268,7 @@ export async function queueMaterial(formData: FormData): Promise<void> {
     target: { concept: view.concept.id },
   });
 
-  revalidatePath('/learn');
+  revalidatePath('/learn/lists');
   revalidatePath(`/learn/c/${conceptId.data}`);
   redirect(`/learn/r/${readingId}`);
 }

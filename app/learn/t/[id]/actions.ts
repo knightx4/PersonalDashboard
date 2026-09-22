@@ -73,7 +73,7 @@ export async function addToTrack(
   }
 
   revalidatePath(`/learn/t/${parsed.data.trackId}`);
-  revalidatePath('/learn');
+  revalidatePath('/learn/lists');
   return {};
 }
 
@@ -103,7 +103,7 @@ export async function removeFromTrack(formData: FormData): Promise<void> {
   await deleteReading(supabase, parsed.data.readingId);
 
   revalidatePath(`/learn/t/${parsed.data.trackId}`);
-  revalidatePath('/learn');
+  revalidatePath('/learn/lists');
 }
 
 /**
@@ -123,8 +123,8 @@ export async function removeTrack(formData: FormData): Promise<void> {
   const supabase = await createLearnClient();
   await deleteTrack(supabase, trackId.data);
 
-  revalidatePath('/learn');
-  redirect('/learn');
+  revalidatePath('/learn/lists');
+  redirect('/learn/lists');
 }
 
 export type PlanState = {
@@ -234,7 +234,7 @@ export async function confirmPlan(
   }
 
   revalidatePath(`/learn/t/${trackId.data}`);
-  revalidatePath('/learn');
+  revalidatePath('/learn/lists');
   return {};
 }
 
@@ -283,6 +283,6 @@ export async function keepAreas(
   }
 
   revalidatePath(`/learn/t/${trackId.data}`);
-  revalidatePath('/learn');
-  redirect('/learn');
+  revalidatePath('/learn/lists');
+  redirect('/learn/lists');
 }

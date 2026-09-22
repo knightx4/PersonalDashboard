@@ -16,7 +16,10 @@ import { oldEnough, rankByLastChecked, type SettledConcept } from '@/lib/learn/g
  * `lib/learn/graph/load.ts`.
  */
 
-/** How many rows the screen shows, the same cut `/learn/next` has always made. */
+/**
+ * How many rows the Learn next list showed. The page went in plan #773, when
+ * Practice Flow took over what it offered; the ranking is kept for the order.
+ */
 export const NEXT_LIMIT = 8;
 
 export type NextKind = 'ready' | 'recheck' | 'reading';
@@ -74,6 +77,7 @@ export type NextRecheck = Shared<'recheck'> & {
 /** A reading queued against a claim and never opened. */
 export type NextReading = Shared<'reading'> & {
   readingId: string;
+  conceptId: string;
   conceptName: string;
   queuedAt: string;
 };
@@ -330,6 +334,7 @@ function toReadingRow(reading: QueuedReading, record: Digest): NextReading {
     subjectId: reading.subjectId,
     subjectName: reading.subjectName,
     readingId: reading.id,
+    conceptId: reading.conceptId,
     conceptName: reading.conceptName,
     queuedAt: reading.queuedAt,
   };
@@ -425,4 +430,30 @@ export function rankNext(input: NextInput, now: Date, limit: number = NEXT_LIMIT
   );
 
   return takeTurns([ready, recheck, readings], limit);
+}
+
+/**
+ * The one queued reading Practice Flow offers after an answer, or null.
+ *
+ * The reading row Learn next used to list, moved into the flow when that page
+ * went (plan #773). A reading queued about the claim just answered comes
+ * first, because that is when it is about what is on your mind. Otherwise the
+ * one that has waited longest, with subjects you are getting through ahead.
+ * A reading you pushed aside is left out until its few weeks are up rather
+ * than sent to the back: the flow offers one thing, and a held one at the
+ * front would be the same thing you just said no to.
+ */
+export function readingToOffer(
+  readings: QueuedReading[],
+  record: NextRecord[],
+  now: Date,
+  answeredConceptId: string | null,
+): NextReading | null {
+  const digest = readRecord(record, now);
+  const rows = byRecord(
+    rankQueuedReadings(readings).map((row) => toReadingRow(row, digest)),
+    digest,
+  ).filter((row) => !held(row, digest));
+
+  return rows.find((row) => row.conceptId === answeredConceptId) ?? rows[0] ?? null;
 }

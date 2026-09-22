@@ -46,11 +46,11 @@ function rememberPath(module: ModuleId, path: string) {
 
 /**
  * Where switching to a module should land: where you last were in it, or its
- * home. Exported because the phone's dock offers the same list from a sheet of
+ * home. A module marked `alwaysHome` always lands on its home. Exported because the phone's dock offers the same list from a sheet of
  * its own, and two rules for "where does Jobs go" is one rule too many.
  */
 export function rememberedPath(module: ModuleId | null, fallback: string): string {
-  if (!module) return fallback;
+  if (!module || moduleById(module)?.alwaysHome) return fallback;
   return readLastPaths()[module] ?? fallback;
 }
 

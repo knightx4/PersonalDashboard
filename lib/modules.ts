@@ -59,6 +59,15 @@ export type AppModule = {
    * workspace is owner-only only if somebody says so.
    */
   ownerOnly?: true;
+  /**
+   * Switching to it always lands on `home`, never on the page you were last
+   * on inside it.
+   *
+   * Learn is the one: opening it is meant to put a question in front of you
+   * (plan #773), and landing back on a reading list you left yesterday would
+   * make that depend on where you happened to stop.
+   */
+  alwaysHome?: true;
 };
 
 /**
@@ -152,11 +161,12 @@ export const MODULES: readonly AppModule[] = [
   {
     id: 'learn',
     prefix: '/learn',
-    // The tracks, not a reading. "What am I part way through" is the question
-    // this module answers, and it is the only page that answers one.
+    // Practice Flow, which is /learn itself: a question on the screen with
+    // nothing to press first. The reading lists moved to /learn/lists.
     home: '/learn',
+    alwaysHome: true,
     label: 'Learn',
-    description: 'Things worth reading, resolved and queued',
+    description: 'Questions until you stop, and what to read',
     accent: '--color-w-learn',
     // Emerald into teal. The deep end is the workspace accent and sits at the
     // cold end of the sweep the other four are on -- sky, violet, fuchsia,

@@ -21,12 +21,11 @@ import {
   type ReadyConcept,
 } from '@/lib/learn/graph/ready';
 import {
-  rankNext,
+  readingToOffer,
   recordWindowStart,
-  NEXT_LIMIT,
   type NextOutcome,
+  type NextReading,
   type NextRecord,
-  type NextRow,
   type QueuedReading,
 } from '@/lib/learn/next/rank';
 
@@ -359,81 +358,43 @@ async function loadQueuedAboutAClaim(
 }
 
 /**
- * Everything you could start on, everything you have settled, and everything
- * you queued and left, in every subject.
+ * Everything you could start on and everything you have settled, in every
+ * subject.
  *
  * One read per subject, the same four queries `/learn/know` already runs in a
- * loop, plus one for the queue, and no model call anywhere in it. A goal
- * counts as one you named unless you abandoned it, which is the rule the
- * subject page uses to decide what to draw a chain for. The three lists come
- * out of the same walk because the five-minute screen needs all of them to
- * pick one row, and walking twice would be the same graphs read twice.
+ * loop, and no model call anywhere in it. A goal counts as one you named
+ * unless you abandoned it, which is the rule the subject page uses to decide
+ * what to draw a chain for. Both lists come out of the same walk because
+ * Practice Flow needs both to pick one claim, and walking twice would be the
+ * same graphs read twice.
  */
 async function everywhere(supabase: LearnSupabaseClient): Promise<{
   ready: ReadyConcept[];
   settled: SettledConcept[];
-  readings: QueuedReading[];
 }> {
   const subjects = await loadSubjects(supabase);
 
-  const [perSubject, queued] = await Promise.all([
-    Promise.all(
-      subjects.map(async (subject) => {
-        const [graph, goals] = await Promise.all([
-          loadGraph(supabase, subject.id),
-          loadGoals(supabase, subject.id),
-        ]);
+  const perSubject = await Promise.all(
+    subjects.map(async (subject) => {
+      const [graph, goals] = await Promise.all([
+        loadGraph(supabase, subject.id),
+        loadGoals(supabase, subject.id),
+      ]);
 
-        const goalConceptIds = goals
-          .filter((goal) => goal.status !== 'abandoned' && goal.conceptId !== null)
-          .map((goal) => goal.conceptId!);
+      const goalConceptIds = goals
+        .filter((goal) => goal.status !== 'abandoned' && goal.conceptId !== null)
+        .map((goal) => goal.conceptId!);
 
-        return {
-          subject,
-          concepts: graph.concepts,
-          ready: readyInSubject(graph, subject, goalConceptIds),
-          settled: settledInSubject(graph, subject),
-        };
-      }),
-    ),
-    loadQueuedAboutAClaim(supabase),
-  ]);
-
-  // Which subject each claim belongs to, off the graphs already in hand. A
-  // reading whose claim has since been deleted is dropped: it cannot say what
-  // it is about, and a row that links nowhere is worse than one row fewer.
-  const home = new Map<string, { name: string; subjectId: string; subjectName: string }>();
-  for (const { subject, concepts } of perSubject) {
-    for (const concept of concepts) {
-      home.set(concept.id, {
-        name: concept.name,
-        subjectId: subject.id,
-        subjectName: subject.name,
-      });
-    }
-  }
-
-  const readings: QueuedReading[] = [];
-  for (const row of queued) {
-    const claim = home.get(row.concept_id);
-    if (!claim) continue;
-    readings.push({
-      id: row.id,
-      // The same rule `tracks/load.ts` uses: the source's title when one has
-      // been found, your own words when it has not.
-      title: row.sources?.title ?? row.title ?? 'Untitled',
-      conceptId: row.concept_id,
-      conceptName: claim.name,
-      subjectId: claim.subjectId,
-      subjectName: claim.subjectName,
-      queuedAt: row.created_at,
-    });
-  }
+      return {
+        ready: readyInSubject(graph, subject, goalConceptIds),
+        settled: settledInSubject(graph, subject),
+      };
+    }),
+  );
 
   return {
     ready: perSubject.flatMap((subject) => subject.ready),
     settled: perSubject.flatMap((subject) => subject.settled),
-    readings,
   };
 }
 
@@ -445,7 +406,7 @@ type OutcomeRow = {
 };
 
 /**
- * What you have done with what Learn next offered, recently.
+ * What you have done with what Learn offered, recently.
  *
  * `learn.next_outcomes` holds a claim or a reading, and the order needs the
  * subject as well -- a subject you are getting through is what lifts its other
@@ -533,7 +494,7 @@ async function loadNextRecord(
 }
 
 /**
- * What the five-minute question is picked from.
+ * What Practice Flow's questions are picked from.
  *
  * The ranked few that could be started next, and the settled claims you have
  * gone longest without being asked about, oldest first. One walk of the
@@ -548,34 +509,56 @@ export async function loadReadyAndSettled(
 }
 
 /**
- * What Learn next shows: the three kinds of row, ranked into one list.
+ * The queued reading Practice Flow offers after an answer, or null.
  *
- * The same walk as everything else on this page, plus what you have done with
- * what it offered before, and the ordering itself is in `lib/learn/next/rank.ts`
- * where it can be tested against rows written by hand. `now` is a parameter for the same reason: what counts as long enough
- * since a claim was answered is a comparison against the clock, and a function
- * that reads the clock itself cannot be tested.
+ * What Learn next listed as its third kind of row, read on its own now that
+ * the list has gone (plan #773). The queue first, and only when something is
+ * in it the claims those readings are about and what you have pushed aside:
+ * a reading whose claim has since been deleted is dropped, because it cannot
+ * say what it is about. The choice itself is `readingToOffer`, where it is
+ * tested against rows written by hand.
  */
-export async function loadNext(
+export async function loadReadingToOffer(
   supabase: LearnSupabaseClient,
-  limit: number = NEXT_LIMIT,
+  answeredConceptId: string | null,
   now: Date = new Date(),
-): Promise<NextRow[]> {
-  const [graphs, record] = await Promise.all([everywhere(supabase), loadNextRecord(supabase, now)]);
-  return rankNext({ ...graphs, record }, now, limit);
-}
+): Promise<NextReading | null> {
+  const queued = await loadQueuedAboutAClaim(supabase);
+  if (queued.length === 0) return null;
 
-/**
- * How many rows Learn next would show -- for the tab's badge.
- *
- * The count is taken from the same ranking the page renders, cut at the same
- * limit, so the number on the tab and the number of rows on the screen cannot
- * disagree. A badge reading the ready concepts alone went stale the moment the
- * page grew re-checks and queued readings.
- */
-export async function countNext(
-  supabase: LearnSupabaseClient,
-  now: Date = new Date(),
-): Promise<number> {
-  return (await loadNext(supabase, NEXT_LIMIT, now)).length;
+  const conceptIds = [...new Set(queued.map((row) => row.concept_id))];
+  const [claims, subjects, record] = await Promise.all([
+    supabase.from('concepts').select('id, name, subject_id').in('id', conceptIds),
+    loadSubjects(supabase),
+    loadNextRecord(supabase, now),
+  ]);
+
+  assertSchemaExposed(claims.error, LEARN_SCHEMA);
+  if (claims.error) throw fail('Reading which claims those readings are about', claims.error);
+
+  const subjectName = new Map(subjects.map((subject) => [subject.id, subject.name]));
+  const claimById = new Map(
+    ((claims.data ?? []) as unknown as { id: string; name: string; subject_id: string }[]).map(
+      (claim) => [claim.id, claim],
+    ),
+  );
+
+  const readings: QueuedReading[] = [];
+  for (const row of queued) {
+    const claim = claimById.get(row.concept_id);
+    if (!claim) continue;
+    readings.push({
+      id: row.id,
+      // The same rule `tracks/load.ts` uses: the source's title when one has
+      // been found, your own words when it has not.
+      title: row.sources?.title ?? row.title ?? 'Untitled',
+      conceptId: claim.id,
+      conceptName: claim.name,
+      subjectId: claim.subject_id,
+      subjectName: subjectName.get(claim.subject_id) ?? '',
+      queuedAt: row.created_at,
+    });
+  }
+
+  return readingToOffer(readings, record, now, answeredConceptId);
 }
