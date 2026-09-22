@@ -19,7 +19,10 @@
  * `learn.catalogue_course_items` for the order the institution published them
  * in. It needs `YOUTUBE_API_KEY` and costs three quota units of ten thousand
  * for a forty-lecture course. `--provider` says which seeded provider the
- * playlist belongs to, and defaults to MIT OpenCourseWare.
+ * playlist belongs to, and defaults to MIT OpenCourseWare. For an MIT course
+ * each lecture's transcript is read from ocw.mit.edu and cut into timed
+ * segments; a lecture with none found there is cut on its chapter markers or
+ * kept as one segment, and the run prints how many went each way.
  *
  * Fetching embeds nothing: segments land with a null `embedding`, and
  * `--embed` is the second pass over everything that still has one. That pass

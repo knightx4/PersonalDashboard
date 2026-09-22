@@ -38,3 +38,13 @@ export type {
   YouTubePlaylistResult,
   YouTubeVideo,
 } from './youtube';
+
+export {
+  captionUrlFromLecturePage,
+  cuesFromVtt,
+  galleryUrlsFromCoursePage,
+  lecturePagesFromGallery,
+  ocwCourseUrlFromDescription,
+  ocwTranscriptLookup,
+} from './ocw';
+export type { OcwVideo } from './ocw';

@@ -290,6 +290,15 @@ Yale and TED all do, on their own sites, under licences that permit this. So
 take metadata and playlist order from the YouTube API and take text from the
 institution.
 
+For MIT the two sites share the YouTube video id, so nothing is matched on
+titles. Each mitocw video description links its course ("View the complete
+course: http://ocw.mit.edu/18-06S05"). The course page links its video
+galleries, each gallery card shows the video's YouTube thumbnail next to the
+lecture's own page, and that page carries a WebVTT caption track whose file name
+ends in the video id. `lib/learn/providers/ocw.ts` follows that chain. A course
+whose lectures are not in a video gallery, as in the OCW Scholar courses, gets
+no transcript and falls back to chapters or one segment.
+
 **Enumerate playlists, do not search.** `search.list` costs 100 quota units per
 call against a 10,000-unit daily default, which is a hundred calls a day and
 makes search-driven ingest impossible. `playlistItems.list` costs 1. Every
