@@ -48,6 +48,14 @@ export const SPECS: readonly SpecDoc[] = [
     module: 'vault',
   },
   {
+    slug: 'learn-sources',
+    title: 'Learn: where to go learn it',
+    blurb:
+      'A shared catalogue of Wikipedia sections and lecture segments, embedded and matched to a claim, so a subject you never wrote a note about still has material.',
+    file: 'LEARN-SOURCES-SPEC.md',
+    module: 'learn',
+  },
+  {
     slug: 'learn-map',
     title: 'The map',
     blurb:

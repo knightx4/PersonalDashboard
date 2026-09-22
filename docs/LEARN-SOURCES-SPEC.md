@@ -19,6 +19,24 @@ Written to [WRITING-GUIDE.md](WRITING-GUIDE.md).
 
 ---
 
+> **One premise under this document has changed since it was written.**
+> [KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md) now holds the foundation, and it moves
+> the map of the vault out of the learn graph entirely: the map belongs to the
+> vault, records what its owner writes about rather than what they know, and the
+> learn graph starts empty and fills a goal at a time.
+>
+> Nothing built here is wrong because of it. The catalogue, the segment as the
+> unit, the retrieval-then-verdict pass and the ranking rules all stand
+> unchanged, and the sentence above about supplying "material about parts of a
+> subject you never wrote a note about" is more true rather than less.
+>
+> What is genuinely open is what `catalogue_links` should point at. A link
+> targets a concept or a subject today. On the new model the graph is the
+> sparser of the two stores for a long while, and the vault map holds roughly
+> two thousand positions from its first sweep. That decision is recorded in the
+> foundation's open questions and wants settling before the verdict pass writes
+> links at volume, since re-targeting them means running it again.
+
 ## What the schema already anticipated
 
 Most of the shape needed here was designed in `0001_learn_schema.sql` and never

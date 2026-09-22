@@ -6,7 +6,9 @@ parts of it, each written from inside one part:
 [LEARN-SPEC.md](LEARN-SPEC.md) queues the reading,
 [LEARN-GRAPH-SPEC.md](LEARN-GRAPH-SPEC.md) probes what you know, and
 [LEARN-MAP-SPEC.md](LEARN-MAP-SPEC.md) gives the procedure that reads a vault
-of notes that were never written to be read this way.
+of notes that were never written to be read this way. A fifth,
+[LEARN-SOURCES-SPEC.md](LEARN-SOURCES-SPEC.md), landed on main while this one
+was being written and supplies material from outside the vault entirely.
 
 This one owns the seam: what the vault produces, what Learn is allowed to do
 with it, and the rule that keeps them apart.
@@ -25,13 +27,26 @@ you do not yet know. Knowledge is only ever written by you answering a
 question.
 
 ```
-    learn graph     concepts, prerequisites, states, probes
-        ^           everything starts unknown
-        |           reads the map for topics, your notes for context
-    vault map       themes, and the positions under them
-        |           descriptive. Makes no claim about what you know
-    the record      1,288 notes, 5.7M characters, in git, read-only
+  the record    1,288 notes, 5.7M characters, in git. One way in, never
+      |         written to by anything here
+      v
+  vault map     themes, and the positions under them. Descriptive, and it
+      |         makes no claim at all about what you know
+      v
+  learn graph   concepts, prerequisites, states, probes. Everything starts
+      ^         unknown. Reads the map for topics, your notes for wording
+      |
+  catalogue     shared, and the only one of the four that is nobody's.
+                Wikipedia sections and lecture segments, embedded, supplying
+                material about parts of a subject you never wrote a note on
 ```
+
+The catalogue is the newest of the four and arrived from a different
+direction: it was built by the plan while this document was being written.
+[LEARN-SOURCES-SPEC.md](LEARN-SOURCES-SPEC.md) owns it. What matters here is
+that it is a fourth thing rather than part of either store above it, and that
+it carries no `user_id`, because a catalogue of forty thousand Wikipedia
+sections is not forty thousand rows per account.
 
 ---
 
@@ -281,6 +296,26 @@ Three things cross the seam, and nothing else:
 the two for display, showing that you have been probed on a theme, without
 either owning the other.
 
+### Where the catalogue fits, and the one decision it needs
+
+The catalogue supplies what the map cannot: material about parts of a subject
+you never wrote a note about. It is retrieval, it is shared, and it belongs to
+nobody, so it sits outside this seam entirely.
+
+It does need a decision this document cannot make on its own.
+`learn.catalogue_links` points a segment at a concept or a subject in the learn
+graph, which was the right target when that spec was written, because the graph
+was going to be filled from the vault. It is not any more. On the model here the
+graph starts nearly empty and fills a goal at a time, while the vault map holds
+on the order of two thousand positions and their themes from the first sweep.
+
+So the candidate targets are the richer store and the sparser one, and the
+question is whether a link should point at a vault-map position as well as a
+learn concept. Pointing at both is the obvious answer and is not free: it is a
+second target column with its own constraint, and it makes "material about this"
+a question with two different answers depending on which store you asked from.
+Recorded here rather than settled, and named in the open questions below.
+
 ### Why this is better than what it replaces
 
 The old design had one graph doing both jobs, which forced the hard call on
@@ -401,10 +436,17 @@ than measured, and the spend ledger exists so the first real run replaces this
 table with facts.
 
 The one real risk is the merge pass. Trigram blocking plus batched
-adjudication removes around 99% of the comparison space and needs no new
-vendor. If the merge rate proves bad, the upgrade is pgvector, which Supabase
-ships, with an embedding model from another vendor, since Anthropic does not
-serve embeddings. Only that stage changes.
+adjudication removes around 99% of the comparison space and costs nothing but
+a few model calls.
+
+**The fallback is now much cheaper than it was when this was written.** The
+upgrade, if the merge rate proves bad, is embeddings over the statements, and
+the catalogue work has already installed everything that needs: `pgvector` in
+`extensions`, `lib/learn/embed/voyage.ts` against the Voyage 4 family at 1,024
+dimensions, and an HNSW index as the worked example. So it is a column and a
+sweep on an existing path rather than a new vendor and a new decision. Start
+with trigram anyway, because it needs no key and no per-row cost, but the
+second option is no longer expensive enough to avoid.
 
 ---
 
@@ -424,6 +466,17 @@ them in the map's evidence quotes.
 
 ## Open questions
 
+- **What a catalogue link should point at.** Stated in full above. A segment
+  currently links to a learn concept or a subject. The vault map's positions are
+  the larger and more personal store, and on this model they exist long before
+  the graph does. Decide before the verdict pass writes links at volume, because
+  re-targeting them later means re-running it.
+- **Whether the course prerequisite prior helps the vault map too.**
+  LEARN-SOURCES-SPEC proposes reading a syllabus order as weak evidence for
+  `requires`, aimed at the learn graph. The map has the same problem and names
+  it as its open risk: most real edges are between positions that never appeared
+  in the same note. The same prior would narrow those candidates, and nothing in
+  either document says whether it should.
 - **What counts as a journal.** Worth deciding by looking at folders rather
   than in the abstract.
 - **Whether a theme should ever be authored.** The map is derived, so a theme

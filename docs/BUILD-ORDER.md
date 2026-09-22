@@ -300,6 +300,36 @@ time it is used, never generated once and frozen.
   (20–23) shipped for the note half of it; nothing else in the block depends on
   another block.
 
+## Learn: where to go learn it
+
+Specified in [LEARN-SOURCES-SPEC.md](LEARN-SOURCES-SPEC.md). A shared catalogue
+of places to learn from, addressable down to one clip of one lecture, matched
+against claims by embedding and then confirmed by a model reading the segment.
+It supplies the thing neither the reading queue nor the vault can: material
+about parts of a subject nobody wrote a note about.
+
+Built by the plan rather than from this file, which is why it arrives here after
+the fact. Its own build order is the one to follow; this block records that the
+module exists and where it sits.
+
+63. ✅ **pgvector, the catalogue, and time offsets on a reading.** Five shared
+    tables carrying no `user_id`, the segment as the addressable unit with its
+    own embedding, and the `timestamp` locator columns the enum had advertised
+    since `0001`. Applied as `learn_0022_catalogue` and `learn_0023`.
+64. ✅ **Retrieval, the verdict pass, and what a claim's read button does.**
+    Nearest segments by embedding as candidate generation only, then one call
+    per candidate that matters, because a link written on similarity alone is
+    the failure `locator_basis` exists to prevent.
+
+The remaining steps are in that document: Wikipedia ingest first because it
+needs no key, then ordering within a claim, then YouTube metadata with
+institution-published transcripts, then courses as track skeletons.
+
+One decision spans this block and the one below, and is open: a catalogue link
+points at a learn concept today, and the vault map's positions are the larger
+and more personal store on the model the foundation now describes. See the open
+questions in [KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md).
+
 ## The vault map
 
 Specified in [KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md), which sits over the vault
