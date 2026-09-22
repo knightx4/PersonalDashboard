@@ -151,8 +151,8 @@ function Decide({ row }: { row: RaisedRow }) {
         <input type="hidden" name="id" value={row.id} />
         <input type="hidden" name="answer" value="no" />
         {/* ui-ok: composer-always-open -- this whole branch renders only after
-          * "No, and here is why" is pressed. The guard is an early return on
-          * `saying`, which the gate reads only in its `if (!open)` shape. */}
+         * "No, and here is why" is pressed. The guard is an early return on
+         * `saying`, which the gate reads only in its `if (!open)` shape. */}
         <Textarea
           name="body"
           rows={2}
@@ -384,7 +384,9 @@ export function RaisedView({
                    list would read as belonging to whichever row it landed
                    next to. Only this group has one -- the other two are
                    finished a row at a time, in words. */
-                action={group.key === 'approve' ? <ApproveAll entries={group.entries} /> : undefined}
+                action={
+                  group.key === 'approve' ? <ApproveAll entries={group.entries} /> : undefined
+                }
               >
                 <ul className={cn(cardVariants(), 'divide-y divide-border')}>
                   {/* A plan row and a raise sit in the same group when the same
@@ -406,8 +408,8 @@ export function RaisedView({
       {queue.unfinished.length > 0 && (
         <SectionFold title="Answered, nothing done" count={queue.unfinished.length}>
           <p className="text-small text-ink-muted">
-            These closed without anything coming of them. Run what they asked for, or close one
-            with the reason nothing was needed.
+            These closed without anything coming of them. Run what they asked for, or close one with
+            the reason nothing was needed.
           </p>
           <ul className={cn(cardVariants(), 'divide-y divide-border')}>
             {queue.unfinished.map((row) => (

@@ -276,9 +276,7 @@ export function DigestPanel({ digest }: { digest: Digest | null }) {
               digest.night ? nightBudgetLine(digest.night) : null,
               // `more` is the remainder past the cut, so `happened` is
               // already the whole count and adding it would say it twice.
-              digest.happened.length > 0
-                ? `${digest.happened.length} closed`
-                : 'nothing closed',
+              digest.happened.length > 0 ? `${digest.happened.length} closed` : 'nothing closed',
             ]
               .filter(Boolean)
               .join(' · ')}

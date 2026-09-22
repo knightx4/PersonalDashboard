@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
+import { notesLastRunLine, type NotesLastRun } from '@/lib/feedback/last-worked';
 
 /**
  * Start the routine that works this queue.
@@ -46,7 +47,8 @@ function elapsed(since: string, now: number): string {
   if (minutes < 1) return 'less than a minute';
   if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
   const hours = Math.floor(minutes / 60);
-  return `${hours} hour${hours === 1 ? '' : 's'}`;
+  if (hours < 48) return `${hours} hour${hours === 1 ? '' : 's'}`;
+  return `${Math.floor(hours / 24)} days`;
 }
 
 /** Enough of the note to recognise it, on one line. */
@@ -60,6 +62,7 @@ export function RunRoutineButton({
   allHref,
   onNavigate,
   divider = 'top',
+  lastRun,
 }: {
   /** Outstanding notes, shown beside the button. Omitted while unknown. */
   openCount?: number | null;
@@ -77,11 +80,14 @@ export function RunRoutineButton({
    * would be a line under a line.
    */
   divider?: 'top' | 'bottom' | 'none';
+  /**
+   * What the last run did, as `notesLastRun` infers it. Passed by the Status
+   * panel on Dash, where the row otherwise has nothing to say between runs.
+   * Omitted elsewhere.
+   */
+  lastRun?: NotesLastRun | null;
 }) {
-  const [state, action, pending] = useActionState(
-    runFeatureRoutine,
-    {} as FeedbackActionState,
-  );
+  const [state, action, pending] = useActionState(runFeatureRoutine, {} as FeedbackActionState);
 
   /**
    * Whether a run is already working the queue.
@@ -159,7 +165,13 @@ export function RunRoutineButton({
           </Link>
         )}
       </div>
-      {run === null && (
+      {run === null && lastRun && (
+        <p className="text-ui text-ink-muted">
+          <span className="text-ink">Last ran {elapsed(lastRun.at, now)} ago</span>:{' '}
+          {notesLastRunLine(lastRun)}.
+        </p>
+      )}
+      {run === null && !lastRun && (
         <p className="text-ui text-ink-muted">
           Works the outstanding notes now instead of waiting for the schedule.
         </p>
