@@ -247,6 +247,7 @@ export async function rewriteClaim({
  * and the press throws, as the rest of the module's writes do: the alternative
  * is a press that silently does nothing.
  */
+// latency: pending
 export async function queueMaterial(formData: FormData): Promise<void> {
   const user = await requireUser();
 
