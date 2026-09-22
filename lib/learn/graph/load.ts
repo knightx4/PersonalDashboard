@@ -359,7 +359,7 @@ async function loadQueuedAboutAClaim(
 
 /**
  * Everything you could start on and everything you have settled, in every
- * subject.
+ * subject, or in the one named by `onlySubjectId`.
  *
  * One read per subject, the same four queries `/learn/know` already runs in a
  * loop, and no model call anywhere in it. A goal counts as one you named
@@ -368,11 +368,15 @@ async function loadQueuedAboutAClaim(
  * Practice Flow needs both to pick one claim, and walking twice would be the
  * same graphs read twice.
  */
-async function everywhere(supabase: LearnSupabaseClient): Promise<{
+async function everywhere(
+  supabase: LearnSupabaseClient,
+  onlySubjectId: string | null,
+): Promise<{
   ready: ReadyConcept[];
   settled: SettledConcept[];
 }> {
-  const subjects = await loadSubjects(supabase);
+  const all = await loadSubjects(supabase);
+  const subjects = onlySubjectId ? all.filter((subject) => subject.id === onlySubjectId) : all;
 
   const perSubject = await Promise.all(
     subjects.map(async (subject) => {
@@ -499,12 +503,17 @@ async function loadNextRecord(
  * The ranked few that could be started next, and the settled claims you have
  * gone longest without being asked about, oldest first. One walk of the
  * subjects for both, so the page and the action each read the graphs once.
+ *
+ * `onlySubjectId` is a flow focused on one track (plan #779). It narrows the
+ * walk before the ranking, so `limit` counts rows in that track alone rather
+ * than the top few everywhere with the others filtered out afterwards.
  */
 export async function loadReadyAndSettled(
   supabase: LearnSupabaseClient,
   limit: number = READY_LIMIT,
+  onlySubjectId: string | null = null,
 ): Promise<{ ready: ReadyConcept[]; settled: SettledConcept[] }> {
-  const { ready, settled } = await everywhere(supabase);
+  const { ready, settled } = await everywhere(supabase, onlySubjectId);
   return { ready: rankReady(ready, limit), settled: rankByLastChecked(settled) };
 }
 

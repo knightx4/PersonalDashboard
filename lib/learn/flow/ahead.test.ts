@@ -1,0 +1,130 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+
+/**
+ * A flow focused on one track takes only that track's questions off the
+ * queue (plan #779). The queue is one table for every track, so this is the
+ * rule that keeps a focused flow from asking about something else.
+ */
+
+vi.mock('@/lib/learn/graph/load', () => ({
+  loadConcept: vi.fn(async (_supabase: unknown, id: string) => ({
+    id,
+    name: `claim ${id}`,
+    state: 'unknown',
+  })),
+  loadSubjects: vi.fn(async () => [
+    { id: TRACK_A, name: 'Economics' },
+    { id: TRACK_B, name: 'Music' },
+  ]),
+  loadReadyAndSettled: vi.fn(),
+}));
+
+const TRACK_A = '00000000-0000-4000-8000-00000000000a';
+const TRACK_B = '00000000-0000-4000-8000-00000000000b';
+
+const { takeWaiting } = await import('./ahead');
+
+type Row = {
+  id: string;
+  concept_id: string;
+  question: string;
+  options: string[];
+  picked_state: string;
+  picked_recheck: null;
+  shown_at: string | null;
+};
+
+function row(id: string, conceptId: string, shownAt: string | null = null): Row {
+  return {
+    id,
+    concept_id: conceptId,
+    question: `question ${id}`,
+    options: ['a', 'b', 'c', 'd'],
+    picked_state: 'unknown',
+    picked_recheck: null,
+    shown_at: shownAt,
+  };
+}
+
+/**
+ * Just enough of the client for the queue: every chained call returns the
+ * same builder, and awaiting it answers by table and by whether it was an
+ * update. Updates to `shown_at` are recorded so the test can see what was taken.
+ */
+function fakeClient(queue: Row[], homes: Record<string, string>) {
+  const taken: string[] = [];
+  const client = {
+    from(table: string) {
+      let update: Record<string, unknown> | null = null;
+      let eqId: string | null = null;
+      const builder = {
+        select: () => builder,
+        not: () => builder,
+        is: () => builder,
+        order: () => builder,
+        in: () => builder,
+        eq: (_column: string, value: string) => {
+          eqId = value;
+          return builder;
+        },
+        update: (values: Record<string, unknown>) => {
+          update = values;
+          return builder;
+        },
+        then(resolve: (value: unknown) => void) {
+          if (table === 'concepts') {
+            resolve({
+              data: Object.entries(homes).map(([id, subject_id]) => ({ id, subject_id })),
+              error: null,
+            });
+          } else if (update && 'shown_at' in update) {
+            if (eqId) taken.push(eqId);
+            resolve({ data: [{ id: eqId }], error: null });
+          } else if (update) {
+            resolve({ error: null });
+          } else {
+            resolve({ data: queue, error: null });
+          }
+        },
+      };
+      return builder;
+    },
+  };
+  return { client: client as unknown as LearnSupabaseClient, taken };
+}
+
+describe('takeWaiting with a track', () => {
+  const homes = { c1: TRACK_B, c2: TRACK_A, c3: TRACK_B };
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('takes the oldest waiting question in any track when mixed', async () => {
+    const { client, taken } = fakeClient([row('p1', 'c1'), row('p2', 'c2')], homes);
+    const question = await takeWaiting(client, { resume: false, track: null });
+    expect(question?.probeId).toBe('p1');
+    expect(taken).toEqual(['p1']);
+  });
+
+  it('skips questions from other tracks when focused', async () => {
+    const { client, taken } = fakeClient([row('p1', 'c1'), row('p2', 'c2')], homes);
+    const question = await takeWaiting(client, { resume: false, track: TRACK_A });
+    expect(question?.probeId).toBe('p2');
+    expect(question?.subjectName).toBe('Economics');
+    expect(taken).toEqual(['p2']);
+  });
+
+  it('finds nothing when only other tracks have questions waiting', async () => {
+    const { client, taken } = fakeClient([row('p1', 'c1'), row('p3', 'c3')], homes);
+    expect(await takeWaiting(client, { resume: false, track: TRACK_A })).toBeNull();
+    expect(taken).toEqual([]);
+  });
+
+  it('does not resume a question on screen from another track', async () => {
+    const onScreen = row('p1', 'c1', new Date().toISOString());
+    const { client } = fakeClient([onScreen, row('p2', 'c2')], homes);
+
+    expect((await takeWaiting(client, { resume: true, track: null }))?.probeId).toBe('p1');
+    expect((await takeWaiting(client, { resume: true, track: TRACK_A }))?.probeId).toBe('p2');
+  });
+});

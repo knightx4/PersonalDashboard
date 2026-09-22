@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Target } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
@@ -14,6 +15,8 @@ import { FlowSession } from './flow/session';
 import { toFlowState } from './flow/state';
 
 export const dynamic = 'force-dynamic';
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const metadata = { title: 'Practice Flow' };
 
 /**
@@ -33,29 +36,40 @@ export const metadata = { title: 'Practice Flow' };
  * here, on a question. It used to be the reading lists, which are now at
  * /learn/lists, and a search on that page kept its query in the URL, so an old
  * link carrying `?q=` is sent on to the list it was searching.
+ *
+ * `?track=<subject id>` focuses the flow on one track (plan #779): every
+ * question comes from that subject until you press All tracks, which is a
+ * plain link back to /learn. Mixed is the default. A track that is not one of
+ * yours, or no longer exists, is dropped rather than shown as empty.
  */
 export default async function PracticeFlowPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; track?: string | string[] }>;
 }) {
-  const { q } = await searchParams;
+  const { q, track: trackParam } = await searchParams;
   if (q !== undefined) redirect(`/learn/lists?q=${encodeURIComponent(q)}`);
+  const trackId = typeof trackParam === 'string' && UUID.test(trackParam) ? trackParam : null;
+  if (trackParam !== undefined && trackId === null) redirect('/learn');
 
   const user = await requireUser();
   const supabase = await createLearnClient();
   const [settings, subjects, rows, answeredAt, answeredSoFar] = await Promise.all([
     loadAccountSettings(user.id),
     loadSubjects(supabase),
-    loadReadyAndSettled(supabase, 1),
+    loadReadyAndSettled(supabase, 1, trackId),
     lastAnsweredAt(supabase),
     answeredCount(supabase),
   ]);
 
+  const focused = trackId ? subjects.find((subject) => subject.id === trackId) : undefined;
+  if (trackId && !focused) redirect('/learn');
+  const track = focused ? { id: focused.id, name: focused.name } : null;
+
   const picked = pickOneToAsk({
     ready: rows.ready,
     settled: rows.settled,
-    subjectCount: subjects.length,
+    subjectCount: track ? 1 : subjects.length,
     answered: answeredSoFar,
     now: new Date(),
   });
@@ -70,7 +84,7 @@ export default async function PracticeFlowPage({
   const first =
     picked.kind === 'nothing'
       ? null
-      : toFlowState(await nextQuestion(supabase, user.id, { resume: true }));
+      : toFlowState(await nextQuestion(supabase, user.id, { resume: true, track: trackId }));
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -87,9 +101,31 @@ export default async function PracticeFlowPage({
         }
       />
 
+      {track && (
+        <p className="mt-4 flex flex-wrap items-baseline gap-x-3 text-ui text-ink-muted">
+          <span>
+            Only asking about <span className="font-medium text-ink">{track.name}</span>
+          </span>
+          <Link href="/learn" className="text-accent hover:underline">
+            All tracks
+          </Link>
+        </p>
+      )}
+
       <div className="mt-6">
         {picked.kind !== 'nothing' ? (
-          <FlowSession first={first ?? {}} />
+          // Keyed by the focus: moving between a track and all of them is a
+          // soft navigation, and without a new key the action state would
+          // carry the last question across it.
+          <FlowSession key={track?.id ?? 'all'} first={first ?? {}} track={track} />
+        ) : track ? (
+          <EmptyState
+            title={`Nothing left to ask about ${track.name}`}
+            description="You have answered everything in this track for now. The other tracks may still have questions."
+            tone="finished"
+            seed={`${user.id}:${new Date().toISOString().slice(0, 10)}:learn-track`}
+            action={{ label: 'All tracks', href: '/learn' }}
+          />
         ) : picked.because === 'no-subjects' ? (
           <EmptyState
             icon={Target}

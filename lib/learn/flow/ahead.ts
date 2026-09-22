@@ -23,6 +23,12 @@ import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
  * while the claim is in the state it was in then. Before a question is shown
  * the claim's state is read again, and a question whose claim has moved is
  * thrown away unshown (`discarded_at`) rather than asked.
+ *
+ * A flow can be focused on one track (plan #779): `track` is that subject's
+ * id, and null asks across all of them. Focused, only that subject's waiting
+ * questions are taken and only that subject is picked from when writing. The
+ * queue itself stays one queue, so questions written for other tracks wait
+ * there untouched until the flow mixes again.
  */
 
 /** How many questions the flow keeps written ahead. */
@@ -205,23 +211,31 @@ async function sortQueue(supabase: LearnSupabaseClient): Promise<{
   };
 }
 
+/** Whether a claim belongs to the track the flow is focused on. Always, when mixed. */
+function inTrack(claim: ClaimNow, track: string | null): boolean {
+  return track === null || claim.subjectId === track;
+}
+
 /**
  * Take the next waiting question and mark it shown. Null when nothing is
  * waiting that still fits.
  *
  * `resume` is for opening the page: a question already on the screen and not
  * yet answered comes back rather than a new one being taken, so a reload does
- * not spend a question.
+ * not spend a question. A focused flow resumes only a question from its own
+ * track; one from elsewhere is left as walked away from.
  */
 export async function takeWaiting(
   supabase: LearnSupabaseClient,
-  options: { resume: boolean },
+  options: { resume: boolean; track: string | null },
 ): Promise<FlowQuestion | null> {
   const { valid, onScreen } = await sortQueue(supabase);
 
-  if (options.resume && onScreen) return asQuestion(onScreen.row, onScreen.claim);
+  if (options.resume && onScreen && inTrack(onScreen.claim, options.track)) {
+    return asQuestion(onScreen.row, onScreen.claim);
+  }
 
-  for (const { row, claim } of valid) {
+  for (const { row, claim } of valid.filter(({ claim }) => inTrack(claim, options.track))) {
     // Conditional on it still being unshown, so two presses at once cannot
     // both take the same question.
     const { data, error } = await supabase
@@ -309,7 +323,7 @@ async function writeFor(
 export async function nextQuestion(
   supabase: LearnSupabaseClient,
   userId: string,
-  options: { resume: boolean },
+  options: { resume: boolean; track: string | null },
 ): Promise<NextQuestion> {
   const waiting = await takeWaiting(supabase, options);
   if (waiting) return { kind: 'question', question: waiting };
@@ -319,13 +333,14 @@ export async function nextQuestion(
 
   const [subjects, rows, answered] = await Promise.all([
     loadSubjects(supabase),
-    loadReadyAndSettled(supabase, 1),
+    loadReadyAndSettled(supabase, 1, options.track),
     answeredCount(supabase),
   ]);
   const picked = pickOneToAsk({
     ready: rows.ready,
     settled: rows.settled,
-    subjectCount: subjects.length,
+    subjectCount: subjects.filter((subject) => options.track === null || subject.id === options.track)
+      .length,
     answered,
     now: new Date(),
   });
@@ -344,19 +359,28 @@ export async function nextQuestion(
  * and count them towards the re-check cadence, so the queue reads the way the
  * live picks would have. Never throws: a queue that failed to fill only means
  * the next Next writes its question live.
+ *
+ * Focused on a track, it counts and fills only that track's share, so the
+ * queue can hold up to `WRITE_AHEAD` for the track on top of what is waiting
+ * for the others.
  */
-export async function fillQueue(supabase: LearnSupabaseClient, userId: string): Promise<void> {
+export async function fillQueue(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  track: string | null,
+): Promise<void> {
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return;
 
     const { valid, onScreen } = await sortQueue(supabase);
-    const wanted = WRITE_AHEAD - valid.length;
+    const waiting = valid.filter(({ claim }) => inTrack(claim, track));
+    const wanted = WRITE_AHEAD - waiting.length;
     if (wanted <= 0) return;
 
     const [subjects, rows, answered] = await Promise.all([
       loadSubjects(supabase),
-      loadReadyAndSettled(supabase, READY_LIMIT),
+      loadReadyAndSettled(supabase, READY_LIMIT, track),
       answeredCount(supabase),
     ]);
 
@@ -364,14 +388,14 @@ export async function fillQueue(supabase: LearnSupabaseClient, userId: string): 
       {
         ready: rows.ready,
         settled: rows.settled,
-        subjectCount: subjects.length,
+        subjectCount: subjects.filter((subject) => track === null || subject.id === track).length,
         answered,
         now: new Date(),
       },
       wanted,
       [
         ...(onScreen ? [onScreen.row.concept_id] : []),
-        ...valid.map(({ row }) => row.concept_id),
+        ...waiting.map(({ row }) => row.concept_id),
       ],
     );
     if (picks.length === 0) return;

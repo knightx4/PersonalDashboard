@@ -23,6 +23,9 @@ import type { FlowReading } from './state';
  * nothing left.
  */
 
+/** The track a focused flow asks about (plan #779). Null when it mixes. */
+export type FlowTrack = { id: string; name: string } | null;
+
 const NOTHING_TO_ASK: Record<NonNullable<FlowState['nothing']>, string> = {
   'no-subjects': 'No subjects yet, so there is nothing to ask about. Name one first.',
   'all-settled': 'Every claim in every subject is settled. Nothing left to ask.',
@@ -121,22 +124,42 @@ function ReadingOffer({ reading }: { reading: FlowReading }) {
   );
 }
 
-export function FlowSession({ first }: { first: FlowState }) {
+/**
+ * Every form in the flow carries the focus, because the action reads the
+ * form and nothing else: the next question and the queue topped up after it
+ * both come from the track named here, or from all of them when it is empty.
+ */
+function TrackField({ track }: { track: FlowTrack }) {
+  return <input type="hidden" name="track" value={track?.id ?? ''} />;
+}
+
+export function FlowSession({ first, track }: { first: FlowState; track: FlowTrack }) {
   const [live, step] = useActionState<FlowState, FormData>(flowStep, first);
+  const trackId = track?.id ?? null;
 
   // Once per visit: the queue may have run down while you were away, and
   // filling it now means the question after this one is ready in time.
   useEffect(() => {
-    void fillFlowQueue();
-  }, []);
+    void fillFlowQueue(trackId);
+  }, [trackId]);
 
   if (!live.question || !live.options) {
     return (
       <form action={step} className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center')}>
         <input type="hidden" name="intent" value="ask" />
+        <TrackField track={track} />
         <div className="flex flex-wrap items-center justify-center gap-3">
           {live.error && <AskButton label="Try again" />}
-          {live.nothing && <span className="text-ui text-ink-muted">{NOTHING_TO_ASK[live.nothing]}</span>}
+          {live.nothing && (
+            <span className="text-ui text-ink-muted">
+              {track ? `Nothing left to ask about ${track.name}.` : NOTHING_TO_ASK[live.nothing]}
+            </span>
+          )}
+          {live.nothing && track && (
+            <Link href="/learn" className="text-ui text-accent hover:underline">
+              Ask across all tracks
+            </Link>
+          )}
           {live.error && <span className="text-ui text-danger">{live.error}</span>}
         </div>
       </form>
@@ -165,6 +188,7 @@ export function FlowSession({ first }: { first: FlowState }) {
 
       <form action={step} className="mt-4 space-y-2">
         <input type="hidden" name="intent" value="answer" />
+        <TrackField track={track} />
         <input type="hidden" name="probeId" value={live.probeId} />
         <input type="hidden" name="conceptId" value={live.conceptId} />
         <input type="hidden" name="subjectId" value={live.subjectId} />
@@ -197,6 +221,7 @@ export function FlowSession({ first }: { first: FlowState }) {
 
           <form action={step} className="mt-4">
             <input type="hidden" name="intent" value="ask" />
+            <TrackField track={track} />
             <AskButton label="Next" />
           </form>
         </div>

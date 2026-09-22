@@ -29,6 +29,19 @@ import { toFlowState, type FlowState } from './state';
 
 export type { FlowState };
 
+const TrackId = z.string().uuid();
+
+/**
+ * The track a focused flow asks about, from the form's hidden `track` field,
+ * or null for asking across all of them (plan #779). Not trusted for
+ * ownership: it only narrows which of your own subjects are read, and a
+ * subject that is not yours reads as none.
+ */
+function trackFrom(formData: FormData): string | null {
+  const track = TrackId.safeParse(formData.get('track'));
+  return track.success ? track.data : null;
+}
+
 /**
  * Asks, or answers, depending on which form was submitted.
  *
@@ -46,12 +59,14 @@ export async function flowStep(prev: FlowState, formData: FormData): Promise<Flo
   const user = await requireUser();
   const supabase = await createLearnClient();
 
+  const track = trackFrom(formData);
+
   const state =
     formData.get('intent') === 'answer'
       ? await answerFlowQuestion(prev, formData)
-      : toFlowState(await nextQuestion(supabase, user.id, { resume: false }));
+      : toFlowState(await nextQuestion(supabase, user.id, { resume: false, track }));
 
-  after(() => fillQueue(supabase, user.id));
+  after(() => fillQueue(supabase, user.id, track));
   return state;
 }
 
@@ -60,10 +75,11 @@ export async function flowStep(prev: FlowState, formData: FormData): Promise<Flo
  * so a queue that ran down while you were away is full again by the time you
  * have answered the question already on the screen.
  */
-export async function fillFlowQueue(): Promise<void> {
+export async function fillFlowQueue(track: string | null): Promise<void> {
   const user = await requireUser();
   const supabase = await createLearnClient();
-  after(() => fillQueue(supabase, user.id));
+  const focus = TrackId.safeParse(track);
+  after(() => fillQueue(supabase, user.id, focus.success ? focus.data : null));
 }
 
 /**
