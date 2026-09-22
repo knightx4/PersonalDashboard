@@ -39,12 +39,17 @@ const MAX_REDIRECTS = 5;
  * this module to fetch it with. It widens what a body may be and nothing else
  * -- the address check, the redirect check, the size cap and the timeout all
  * run first and are untouched.
+ *
+ * `text/vtt` is there for the same reason: MIT OpenCourseWare publishes its
+ * lecture transcripts as WebVTT caption files (lib/learn/providers/ocw.ts),
+ * and it is read as plain text.
  */
 const ALLOWED_TYPES = [
   'text/html',
   'application/xhtml+xml',
   'application/pdf',
   'text/plain',
+  'text/vtt',
   'application/json',
 ];
 
@@ -83,7 +88,7 @@ function classify(contentType: string): FetchedDocument['contentType'] | null {
   const type = contentType.split(';')[0].trim().toLowerCase();
   if (type === 'application/pdf') return 'pdf';
   if (type === 'text/html' || type === 'application/xhtml+xml') return 'html';
-  if (type === 'text/plain') return 'text';
+  if (type === 'text/plain' || type === 'text/vtt') return 'text';
   if (type === 'application/json') return 'json';
   return null;
 }

@@ -6,6 +6,7 @@ import {
   type YouTubeVideo,
 } from '@/lib/learn/providers/youtube';
 import { fetchWikipediaArticle } from '@/lib/learn/providers/wikipedia';
+import { ocwTranscriptLookup } from '@/lib/learn/providers/ocw';
 import { segmentsForVideo, type TranscriptCue } from './segment';
 import {
   storeArticle,
@@ -61,10 +62,22 @@ export type TranscriptLookup = (video: {
   videoId: string;
   title: string;
   canonicalUrl: string;
+  /** Where an institution's uploads say which course a lecture belongs to. */
+  description: string;
 }) => Promise<TranscriptCue[] | null>;
 
-/** The default: no institution adapter is wired up yet. */
+/** The default for a provider with no institution adapter. */
 export const noTranscripts: TranscriptLookup = async () => null;
+
+/**
+ * The adapter for a provider's transcripts, by its slug in
+ * `learn.catalogue_providers`. A fresh one per call, because the OCW adapter
+ * remembers the courses it has read and that memory belongs to one sweep.
+ */
+export function transcriptsForProvider(providerSlug: string): TranscriptLookup {
+  if (providerSlug === 'mit-ocw') return ocwTranscriptLookup();
+  return noTranscripts;
+}
 
 export type CourseSweepResult =
   | ({
@@ -125,7 +138,7 @@ export async function sweepYouTubeCourse(
   const playlist = await fetchYouTubePlaylist(options.playlistId);
   if (!playlist.ok) return { ok: false, reason: playlist.reason, detail: playlist.detail };
 
-  const transcripts = options.transcripts ?? noTranscripts;
+  const transcripts = options.transcripts ?? transcriptsForProvider(options.providerSlug);
   const cutBy = { transcript: 0, chapters: 0, whole: 0 };
   const videos: CourseVideoInput[] = [];
 
@@ -134,6 +147,7 @@ export async function sweepYouTubeCourse(
       videoId: video.videoId,
       title: video.title,
       canonicalUrl: video.canonicalUrl,
+      description: video.description,
     });
     const stored = videoToStore(video, cues);
     cutBy[stored.cutBy] += 1;
