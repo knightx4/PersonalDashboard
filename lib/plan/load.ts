@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
+import type { PlanRefTitles } from '@/lib/comments/refs';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 
 /**
@@ -358,10 +359,17 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
  * Off the raw items rather than the tree: a reference can name a step that is
  * closed, dropped or dismissed, and the reader wants to know what it was
  * either way. `lib/comments/refs.ts` says what the label is made of; this is
- * just the lookup it reads.
+ * just the lookup it reads. The outline comes from the tree's flattened nodes,
+ * where the caller has built one; this file does not import the tree.
  */
-export function planRefTitles(data: PlanData): Record<number, string> {
-  const titles: Record<number, string> = {};
-  for (const item of data.items) titles[item.number] = item.title;
+export function planRefTitles(
+  data: PlanData,
+  nodes: readonly { number: number; outline: string }[] = [],
+): PlanRefTitles {
+  const outlines = new Map(nodes.map((node) => [node.number, node.outline]));
+  const titles: Record<number, { title: string; outline?: string }> = {};
+  for (const item of data.items) {
+    titles[item.number] = { title: item.title, outline: outlines.get(item.number) };
+  }
   return titles;
 }

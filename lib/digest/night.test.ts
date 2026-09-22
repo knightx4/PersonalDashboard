@@ -145,6 +145,33 @@ describe('nightFrom', () => {
       ref: `#${first.number}`,
       title: 'One tab for your day',
       at: '2026-03-02T02:30:00Z',
+      step: null,
+    });
+  });
+
+  // Note 84482e92: "on #723" also says which step under it is being worked.
+  it('names the step under the feature that a session has claimed, by its outline', () => {
+    const feature = step({ id: 'f1', title: 'One tab for your day' });
+    const done = step({ id: 's1', parentId: 'f1', position: 1, status: 'done' });
+    const claimed = step({
+      id: 's2',
+      parentId: 'f1',
+      position: 2,
+      status: 'in_progress',
+      title: 'Store what the runner is doing',
+    });
+    const elsewhere = step({ id: 'g1', status: 'in_progress', title: 'Another feature' });
+
+    const night = nightFrom({
+      run: run({ running: true, endedAt: null, endedReason: null }),
+      fires: [{ planItemId: 'f1', at: '2026-03-02T02:30:00Z' }],
+      items: [feature, done, claimed, elsewhere],
+      since: SINCE,
+    });
+
+    expect(night?.lastFire?.step).toEqual({
+      ref: `#${feature.number}.2`,
+      title: 'Store what the runner is doing',
     });
   });
 

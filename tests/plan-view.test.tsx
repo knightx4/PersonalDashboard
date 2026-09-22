@@ -114,6 +114,7 @@ function catalogOf(tree: PlanSection[]): PlanCatalogEntry[] {
   return flattenSections(tree).map((node) => ({
     id: node.id,
     number: node.number,
+    outline: node.outline,
     title: node.title,
     module: node.module,
     parentId: node.parentId,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planRefHref, planRefLabel, planRowId, splitOnRefs } from './refs';
+import { planRefHref, planRefLabel, planRefText, planRowId, splitOnRefs } from './refs';
 
 /** The refs found in a body, in order. */
 function refs(text: string): number[] {
@@ -82,7 +82,10 @@ describe('planRefHref', () => {
 });
 
 describe('planRefLabel', () => {
-  const titles = { 494: 'A step says when a session is working on it', 63: 'Which permission' };
+  const titles = {
+    494: { title: 'A step says when a session is working on it' },
+    63: { title: 'Which permission' },
+  };
 
   it('names the step, so the number can be read without following it', () => {
     expect(planRefLabel(494, titles)).toBe(
@@ -97,5 +100,28 @@ describe('planRefLabel', () => {
 
   it('says nothing made up about a number the plan no longer holds', () => {
     expect(planRefLabel(9999, titles)).toBe('Step #9999 on the plan');
+  });
+});
+
+/**
+ * Note cfd2543f: the plan page labels a step by its place in the tree, so a
+ * reference reads the same way where the page building it knows the tree.
+ */
+describe('planRefText', () => {
+  const titles = {
+    760: { title: 'Try Wikipedia sections against one subject', outline: '723.20' },
+    723: { title: 'Pull learning material', outline: '723' },
+    63: { title: 'Which permission' },
+  };
+
+  it('reads as the outline the plan page shows', () => {
+    expect(planRefText(760, titles)).toBe('#723.20');
+    expect(planRefLabel(760, titles)).toBe('#723.20 — Try Wikipedia sections against one subject');
+  });
+
+  it('keeps the number where the outline is the number or is not known', () => {
+    expect(planRefText(723, titles)).toBe('#723');
+    expect(planRefText(63, titles)).toBe('#63');
+    expect(planRefText(760)).toBe('#760');
   });
 });

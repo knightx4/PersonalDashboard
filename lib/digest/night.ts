@@ -1,5 +1,6 @@
 import { featureAbove, type PlanParentRow } from '@/lib/changelog/entries';
 import type { PlanItem } from '@/lib/plan/load';
+import { buildPlanTree, flatten, flattenSections } from '@/lib/plan/tree';
 import { overnightStanding, type OvernightRun, type OvernightStanding } from '@/lib/plan/overnight';
 import { oneLine } from './build';
 
@@ -109,7 +110,7 @@ export type DigestNight = {
    * it -- by breakfast the night is over -- but a second reading of the same
    * fires kept somewhere else is exactly the drift `nightFrom` exists to stop.
    */
-  lastFire: (DigestNightRef & { at: string }) | null;
+  lastFire: (DigestNightRef & { at: string; step?: DigestNightRef | null }) | null;
   /** Every step that closed while it ran. */
   closed: DigestNightStep[];
   /** Every step that is stopped on you now and was written to while it ran. */
@@ -154,6 +155,27 @@ function featureOf(
 ): DigestNightRef | null {
   const above = featureAbove(item.parentId, byId);
   return above ? { ref: `#${above.number}`, title: oneLine(above.title) } : null;
+}
+
+/**
+ * The step under a feature that a session has claimed, labelled by its place
+ * in the tree the way the plan page labels it: "#723.20".
+ *
+ * Note 84482e92 asked for "on #723" to say which step under it is being
+ * worked. A claim is the step's `in_progress` status, so that is what is read;
+ * two claims at once is a state the plan skill forbids, and the one written to
+ * last wins if it happens. Null when nothing under the feature is claimed,
+ * which is the gap between a fire and the session's first claim.
+ */
+function claimedStep(featureId: string, items: readonly PlanItem[]): DigestNightRef | null {
+  const feature = flattenSections(buildPlanTree({ items: [...items], dependencies: [] })).find(
+    (node) => node.id === featureId,
+  );
+  if (!feature) return null;
+  const claimed = flatten(feature.children)
+    .filter((node) => node.status === 'in_progress')
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+  return claimed ? { ref: `#${claimed.outline}`, title: oneLine(claimed.title) } : null;
 }
 
 /** Whether an instant falls inside the night: at or after it started. */
@@ -221,7 +243,7 @@ export function nightFrom(input: {
     .sort((a, b) => b.at.localeCompare(a.at))
     .flatMap((fire) => {
       const item = itemById.get(fire.planItemId as string);
-      return item ? [{ ...refOf(item), at: fire.at }] : [];
+      return item ? [{ ...refOf(item), at: fire.at, step: claimedStep(item.id, items) }] : [];
     })[0] ?? null;
 
   // Everything that closed while it was running. Nothing on a plan row says

@@ -70,14 +70,31 @@ export function splitOnRefs(text: string): RefPart[] {
 }
 
 /**
- * What each step number is called, by number.
+ * What each step number is called, and where it sits, by number.
  *
  * Built by whichever page has the plan loaded and handed down to the readers,
  * rather than looked up where it is drawn: a raise with nine references in it
  * would otherwise be nine lookups inside a render, and three of the pages that
  * draw comments never load the plan at all.
+ *
+ * `outline` is the place in the tree the plan page labels the row with --
+ * "723.20" for the twentieth step under #723. Absent where the page building
+ * this does not have the tree.
  */
-export type PlanRefTitles = Readonly<Record<number, string>>;
+export type PlanRefTitles = Readonly<Record<number, { title: string; outline?: string }>>;
+
+/**
+ * What a reference reads as: the step's place in the tree where it is known.
+ *
+ * The plan page labels a step by its outline and says its number nowhere a
+ * reader looks, so "#760" in a raise named a step that could not be found by
+ * eye: the row reads "#723.20". Note cfd2543f took the number for a mistake.
+ * The link still lands on the number, which is the handle; only the words
+ * change, to the ones the page uses.
+ */
+export function planRefText(number: number, titles?: PlanRefTitles): string {
+  return `#${titles?.[number]?.outline ?? number}`;
+}
 
 /**
  * The hover text on a reference.
@@ -92,6 +109,6 @@ export type PlanRefTitles = Readonly<Record<number, string>>;
  * saying nothing about it is better than saying something made up.
  */
 export function planRefLabel(number: number, titles?: PlanRefTitles): string {
-  const title = titles?.[number];
-  return title ? `#${number} — ${title}` : `Step #${number} on the plan`;
+  const title = titles?.[number]?.title;
+  return title ? `${planRefText(number, titles)} — ${title}` : `Step #${number} on the plan`;
 }

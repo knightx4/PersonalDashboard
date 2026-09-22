@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { Moon, Pause, Play, Square } from 'lucide-react';
+import { CornerDownRight, Moon, Pause, Play, Square } from 'lucide-react';
 
 import {
   pauseOvernightRunner,
@@ -98,16 +98,33 @@ function Totals({ night }: { night: DigestNight }) {
  */
 function OnFeature({ fire, now }: { fire: NonNullable<DigestNight['lastFire']>; now: number }) {
   return (
-    <p className="text-small text-ink-muted">
-      On <span className="tabular text-ink">{fire.ref}</span>{' '}
-      <span className="text-ink">{fire.title}</span>
-      {now > 0 && (
-        <>
-          {' · '}
-          <span className="tabular">{elapsedSince(fire.at, now)}</span>
-        </>
+    <>
+      <p className="text-small text-ink-muted">
+        On <span className="tabular text-ink">{fire.ref}</span>{' '}
+        <span className="text-ink">{fire.title}</span>
+        {now > 0 && (
+          <>
+            {' · '}
+            <span className="tabular">{elapsedSince(fire.at, now)}</span>
+          </>
+        )}
+      </p>
+      {/* The step under it that a session has claimed, hung off the feature
+          as a branch the way the plan page draws a child -- note 84482e92.
+          Nothing is drawn between a fire and the session's first claim. */}
+      {fire.step && (
+        <p className="flex min-w-0 items-baseline gap-1.5 pl-2 text-small text-ink-muted">
+          <CornerDownRight
+            className="size-3 shrink-0 translate-y-0.5 text-ink-ghost"
+            strokeWidth={1.75}
+            aria-hidden
+          />
+          <span className="sr-only">Working on</span>
+          <span className="tabular text-ink">{fire.step.ref}</span>
+          <span className="min-w-0 truncate text-ink">{fire.step.title}</span>
+        </p>
       )}
-    </p>
+    </>
   );
 }
 
