@@ -129,16 +129,19 @@ export default function PrivacyPage() {
 
       <h2>Your notes and the language model</h2>
       {/*
-        Written against lib/learn/quiz (generate.ts, grade.ts, plan.ts) and
+        Written against lib/learn/quiz (generate.ts, grade.ts, plan.ts),
         lib/learn/vault/classify.ts with app/learn/know/actions.ts
-        (proposeFromNote). Any new path that sends note text to a model, such
-        as a sweep over the whole vault, has to be added here before it ships,
-        along with what it skips.
+        (proposeFromNote) and lib/learn/graph/from-brief.ts, and lib/vault/map
+        (classify.ts, extract.ts, rules.ts) with app/vault/n/[...path]/actions.ts
+        (proposeMap). Any new path that sends note text to a model, such as a
+        sweep over the whole vault, has to be added here before it ships, along
+        with what it skips.
       */}
       <p>
-        Two features send the text of your notes to Anthropic&rsquo;s Claude models: writing a
-        quiz, and reading a note for the ideas in it. Each runs when you press its button, on
-        the notes you picked. Nothing is sent in the background.
+        Three features send the text of your notes to Anthropic&rsquo;s Claude models: writing a
+        quiz, reading a note for Learn, and reading a note for the map of what you write about.
+        Each runs when you press its button, on the notes you picked. Nothing is sent in the
+        background.
       </p>
       <p>What is sent:</p>
       <ul>
@@ -150,10 +153,17 @@ export default function PrivacyPage() {
           sent so your answer can be marked.
         </li>
         <li>
-          <strong>Reading a note for its ideas.</strong> First the note&rsquo;s title and its
-          first 1,500 characters, to decide whether it argues anything. If it does, the whole
-          note is sent to find the ideas in it, with the name of the subject you chose and the
-          names of the ideas already in that subject, so none is proposed twice.
+          <strong>Reading a note for Learn.</strong> First the note&rsquo;s title and its first
+          1,500 characters, to decide whether it argues anything. If it does, the note is sent
+          again, section by section up to its first ten sections, with the name of the subject
+          you chose and the names of the ideas already in that subject, so none is proposed
+          twice.
+        </li>
+        <li>
+          <strong>Reading a note for the map.</strong> First the note&rsquo;s title and its first
+          1,500 characters, to decide whether it argues anything. If it does, the whole note is
+          sent, one section at a time, each with the note&rsquo;s title, the section&rsquo;s
+          heading and the names of the themes already on your map.
         </li>
       </ul>
       <p>What is never sent:</p>
@@ -167,6 +177,11 @@ export default function PrivacyPage() {
         <li>
           The rest of a note that the first read judges to be a record rather than an argument,
           such as a travel plan or a log of measurements. Only its first 1,500 characters were
+          sent.
+        </li>
+        <li>
+          For the map, any part of a note in your Me folder, which holds your journals, or of a
+          note that contains what looks like an API key. These are turned away before anything is
           sent.
         </li>
       </ul>
