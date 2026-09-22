@@ -1,7 +1,8 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
+import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Field, Textarea } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
@@ -20,11 +21,18 @@ import { pullWikipediaArticles, type PullState } from './actions';
  * A title Wikipedia does not have, a missing key and a refusal from Voyage are
  * each shown here, because the next thing you would do about each is
  * different.
+ *
+ * Closed until asked for (law 14). It sits at the foot of every subject page,
+ * under the claims and goals that page is for, and it is used now and then;
+ * a five-line box standing open there on every visit is the page leading with
+ * a chore. Once a pull has answered, the form stays open so the report stays
+ * readable beside the titles that produced it.
  */
 export function PullArticles() {
   const [state, pull] = useActionState<PullState, FormData>(pullWikipediaArticles, {});
+  const [open, setOpen] = useState(false);
 
-  return (
+  return open || state.report ? (
     <form action={pull} className={cn(cardVariants({ padding: 'standard' }), 'mt-6')}>
       <Field
         label="Pull Wikipedia articles into the catalogue"
@@ -36,12 +44,14 @@ export function PullArticles() {
           name="titles"
           rows={5}
           required
+          autoFocus
           placeholder={'Marginal utility\nIndifference curve'}
         />
       </Field>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <PullButton />
+        <CloseButton onClose={() => setOpen(false)} hasReport={Boolean(state.report)} />
         {state.error && (
           <span role="alert" className="text-ui text-danger">
             {state.error}
@@ -51,6 +61,27 @@ export function PullArticles() {
 
       {state.report && <Report report={state.report} />}
     </form>
+  ) : (
+    <div className="mt-6">
+      <AddTrigger
+        label="Pull Wikipedia articles into the catalogue"
+        onClick={() => setOpen(true)}
+      />
+    </div>
+  );
+}
+
+/**
+ * Folds the form back to its trigger. Hidden once a pull has answered, because
+ * the report is kept open on purpose and a Cancel beside it would only lose it.
+ */
+function CloseButton({ onClose, hasReport }: { onClose: () => void; hasReport: boolean }) {
+  const { pending } = useFormStatus();
+  if (hasReport) return null;
+  return (
+    <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>
+      Cancel
+    </Button>
   );
 }
 
