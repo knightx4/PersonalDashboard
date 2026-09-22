@@ -4,6 +4,8 @@ import { after } from 'next/server';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { fillQueue, nextQuestion } from '@/lib/learn/flow/ahead';
+import { trackMove } from '@/lib/learn/flow/track';
+import { loadGraph } from '@/lib/learn/graph/load';
 import { answerQuestion } from '../s/[id]/probe/actions';
 import { toFlowState, type FlowState } from './state';
 
@@ -62,12 +64,26 @@ export async function fillFlowQueue(): Promise<void> {
 }
 
 /**
- * The subject session's answer, with the subject kept on the state.
+ * The subject session's answer, with the subject kept on the state and the
+ * track's move worked out around it.
  *
  * `answerQuestion` returns the shape it was given, which has no subject name
  * on it, so the fields this screen needs for the link onwards are carried
  * across from the previous state.
+ *
+ * The graph is read before the answer and again after it, because what an
+ * answer settles is decided inside `answerQuestion` (the claim itself, and by
+ * inference what it rests on) and the counts on either side are the only
+ * record of it. Failing to read either loses the track line, not the answer.
  */
 async function answerFlowQuestion(prev: FlowState, formData: FormData): Promise<FlowState> {
-  return { ...prev, ...(await answerQuestion(prev, formData)) };
+  const supabase = await createLearnClient();
+  const subjectId = prev.subjectId;
+  const before = subjectId ? await loadGraph(supabase, subjectId).catch(() => null) : null;
+
+  const answered: FlowState = { ...prev, track: undefined, ...(await answerQuestion(prev, formData)) };
+  if (!before || !subjectId || !answered.answered || answered.error) return answered;
+
+  const after = await loadGraph(supabase, subjectId).catch(() => null);
+  return after ? { ...answered, track: trackMove(before, after) } : answered;
 }

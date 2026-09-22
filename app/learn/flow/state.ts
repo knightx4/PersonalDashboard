@@ -1,6 +1,7 @@
 import type { NextQuestion } from '@/lib/learn/flow/ahead';
 import type { NothingToAsk } from '@/lib/learn/graph/pick';
 import type { SettledConcept } from '@/lib/learn/graph/recheck';
+import type { TrackMove } from '@/lib/learn/flow/track';
 import type { AskState } from '../s/[id]/probe/actions';
 
 /**
@@ -21,11 +22,18 @@ export type FlowState = AskState & {
    * question, so it reads as a flag as well as naming which of the two.
    */
   recheck?: SettledConcept['established'];
+  /**
+   * The track's settled count before and after the answer. Set by the answer
+   * and nowhere else, so a question on screen never carries the last one's.
+   */
+  track?: TrackMove;
 };
 
 /** What the screen shows for the next question, or why there is none. */
 export function toFlowState(next: NextQuestion): FlowState {
   if (next.kind === 'nothing') return { nothing: next.because };
   if (next.kind === 'error') return { error: next.detail };
+  // Built fresh rather than spread over the answered state, so nothing of the
+  // last answer (its panel, its track line) survives onto the next question.
   return { ...next.question };
 }

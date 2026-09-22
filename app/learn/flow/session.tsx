@@ -1,11 +1,12 @@
 'use client';
 
-import { useActionState, useEffect } from 'react';
+import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { ProbeOptions } from '@/components/learn/probe-options';
+import { trackChange, trackPercent, type TrackMove } from '@/lib/learn/flow/track';
 import { fillFlowQueue, flowStep, type FlowState } from './actions';
 
 /**
@@ -32,6 +33,49 @@ function AskButton({ label }: { label: string }) {
     <Button type="submit" disabled={pending}>
       {pending ? 'Getting the next question…' : label}
     </Button>
+  );
+}
+
+/**
+ * The track the answer belonged to, and its bar moving from where it stood to
+ * where the answer left it. Drawn at the old width first and moved on the next
+ * frame, so the change is seen rather than only stated. Red when it fell,
+ * because a bar that only ever goes up says nothing.
+ */
+function TrackBar({ name, move }: { name?: string; move: TrackMove }) {
+  const [shown, setShown] = useState(trackPercent(move.before, move.total));
+  const target = trackPercent(move.settled, move.total);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setShown(target));
+    return () => cancelAnimationFrame(frame);
+  }, [target]);
+
+  const fell = move.settled < move.before;
+  return (
+    <div className="mt-4">
+      <p className="text-ui text-ink">
+        {name ? `${name}, ` : ''}
+        {move.settled} of {move.total} settled
+      </p>
+      <div
+        className="mt-1.5 h-1.5 w-full overflow-hidden rounded-pill bg-sunken"
+        role="progressbar"
+        aria-valuenow={move.settled}
+        aria-valuemin={0}
+        aria-valuemax={move.total}
+        aria-label={name ? `Ideas settled in ${name}` : 'Ideas settled in this track'}
+      >
+        <div
+          className={cn(
+            'h-full rounded-pill transition-[width] duration-700 ease-out motion-reduce:transition-none',
+            fell ? 'bg-danger' : 'bg-accent',
+          )}
+          style={{ width: `${shown}%` }}
+        />
+      </div>
+      <p className="mt-1 text-small text-ink-muted">{trackChange(move)}</p>
+    </div>
   );
 }
 
@@ -99,6 +143,12 @@ export function FlowSession({ first }: { first: FlowState }) {
             <p className="mt-3 border-l-2 border-danger pl-3 text-body text-ink">
               You have picked this one twice now. {live.answered.misconception}
             </p>
+          )}
+
+          {/* Keyed by the question, so each answer mounts a new bar that starts
+              at the old width instead of reusing the last one's. */}
+          {live.track && (
+            <TrackBar key={live.probeId} name={live.subjectName} move={live.track} />
           )}
 
           <form action={step} className="mt-4">
