@@ -6,7 +6,7 @@ import { createServiceSupabase } from '@/inngest/supabase-admin';
 import { listPushes, refreshMainCheck } from '@/lib/plan/ci';
 import { handFeatureToClaude } from '@/lib/plan/handover';
 import type { CheckConclusion } from '@/lib/plan/checks';
-import { lastPushSince, runLiveness, type RunLiveness } from '@/lib/plan/liveness';
+import { featureRunIdle, lastPushSince, runLiveness, type RunLiveness } from '@/lib/plan/liveness';
 import { loadPlan } from '@/lib/plan/load';
 import {
   loadOvernightRun,
@@ -16,7 +16,8 @@ import {
   type OvernightRun,
 } from '@/lib/plan/overnight';
 import { chooseOvernightFeature, OVERNIGHT_NOTHING_READY } from '@/lib/plan/overnight-choice';
-import { subtreeBlockedAt, subtreeClosedAt } from '@/lib/plan/subtree';
+import { endsRun } from '@/lib/plan/run-end';
+import { subtreeBlockedAt, subtreeClosedAt, subtreeTrail } from '@/lib/plan/subtree';
 import { buildPlanTree, flatten, type PlanNode, type PlanSection } from '@/lib/plan/tree';
 
 /**
@@ -543,6 +544,17 @@ async function lastFireLiveness(input: {
       subtreeClosedAt(supabase, last.plan_item_id),
       subtreeBlockedAt(supabase, last.plan_item_id),
     ]);
+  }
+
+  // The feature's own rows, before the pushes. The push listing is the whole
+  // repository, so another session pushing anywhere keeps this run reading as
+  // alive; a run that has left its own rows alone, with nothing claimed, is
+  // over whatever else is being pushed. See `FEATURE_IDLE_AFTER_MINUTES`.
+  // A close or block since the start is still `finished`, which says more.
+  const endedOnRows = endsRun(closedAt, last.created_at) || endsRun(blockedAt, last.created_at);
+  if (last.plan_item_id && !endedOnRows) {
+    const trail = await subtreeTrail(supabase, userId, last.plan_item_id);
+    if (trail && featureRunIdle(last.created_at, trail, input.now)) return 'ended';
   }
 
   const since = new Date(last.created_at).getTime();
