@@ -115,12 +115,35 @@ one is closed.
    twice. If it cannot be reproduced, that is a `block`, with what you tried.
 4. **Make the change.** Smallest change that genuinely fixes it. Do not fold
    unrelated cleanup into a note's commit.
-5. **Verify before closing.** All four, every time:
-   - `npx tsc --noEmit -p tsconfig.json`
-   - `npx eslint app lib components scripts --max-warnings 0`
-   - `npx vitest run lib` (two FX tests fail without network — that is
-     pre-existing, everything else must pass)
-   - `npx next build` when routes, pages, or server actions changed
+
+   **Read the part you need, not the whole file.** Eleven files here are over
+   forty thousand characters and two are over a hundred and forty thousand:
+   `app/dev/plan/plan-view.tsx` is roughly thirty-six thousand tokens, and
+   `lib/plan/tree.ts`, `app/dev/plan/actions.ts` and `lib/plan/tree.test.ts`
+   are fourteen to nineteen thousand each. Opening one whole to change twenty
+   lines costs that once to read and again on every turn for the rest of the
+   batch, because the session carries it to the end. `grep -n` for the symbol,
+   then read around the line. Read a whole file only when you are changing most
+   of it, and do not read back a file you just edited.
+
+   **Send a search you cannot narrow to a subagent, with `model: haiku`.**
+   "Which page renders this", "where is this validated", anything that means
+   opening several files to find one answer. It reports the paths, the line
+   numbers and a sentence, and those files cost you the sentence instead of
+   their contents. Finding a symbol does not need the model that writes the
+   fix. Keep the editing yourself, on the session's own model.
+5. **Verify before closing.** Three, every time:
+   - `npx tsc --noEmit -p tsconfig.json` — the whole project, about twenty-five
+     seconds. Not narrowed: an edit in one file breaks types in another.
+   - `npx eslint <the files you changed> --max-warnings 0`
+   - `npx vitest run <the test files covering what you changed>`
+
+   **Not the whole suite, and not `next build`.** Both run once over the
+   finished batch, in *Pushing the batch* below, and again on main in CI.
+   Running them per note runs them once per note for a batch that is merged
+   as one commit. The exception is a note whose own fix is about the build or
+   about a test the narrow run cannot reach: run what that note needs and say
+   so when you close it.
 6. **Commit the note on its own.** One note per commit, so a change can be
    traced back to the ask and reverted alone. End the subject with the short
    id: `Fix the shelf photo picker (note 3f9c1a2b)`.
@@ -168,6 +191,18 @@ changed (`npm run shoot -- <surface-id>`) and look at the pictures before
 closing.
 
 ## Pushing the batch
+
+**Run the full gate once, before the merge.** These are the checks each note
+skipped, and this is where they are paid for:
+
+    npx eslint app lib components scripts --max-warnings 0
+    npx vitest run lib      # two FX tests fail without network; that is pre-existing
+    npx next build
+
+Anything that fails here belongs to whichever note broke it: fix it, and amend
+or add a commit against that note. Do not merge a batch that has not been
+through this — the per-note checks were narrowed on the understanding that it
+happens here.
 
 Fetch with a plain `git fetch origin`. Naming refs — `git fetch origin main
 <branch>` — aborts the **whole** fetch when one of them is missing, which is
