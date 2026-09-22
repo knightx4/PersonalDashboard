@@ -187,6 +187,41 @@ describe('judging the candidates', () => {
     expect(result.written.map((link) => link.segmentId)).toEqual(['segment-b']);
   });
 
+  it('keeps a verdict for every call, refusals and failures included', async () => {
+    // What #766 records. A candidate already linked cost no call and has no
+    // verdict, so it is not among them; everything the judge read is.
+    const store = memoryStore();
+    await store.write({
+      target: CONCEPT,
+      link: { segmentId: 'segment-d', basis: 'Linked last time.', model: JUDGE_MODEL },
+    });
+    const judge = scriptedJudge({
+      'segment-a': { outcome: 'teaches', basis: 'Works the example through.' },
+      'segment-b': { outcome: 'refused', detail: 'Mentions it in passing.' },
+      'segment-c': { outcome: 'failed', detail: 'The reply was cut off.' },
+    });
+
+    const result = await judgeCandidates(
+      { judge, store },
+      {
+        claim: 'A claim.',
+        segments: [
+          segment('segment-a', { similarity: 0.82, text: 'x'.repeat(1200) }),
+          segment('segment-b', { similarity: 0.71, text: 'y'.repeat(300) }),
+          segment('segment-c', { similarity: 0.64, text: 'z'.repeat(40) }),
+          segment('segment-d', { similarity: 0.6 }),
+        ],
+        target: CONCEPT,
+      },
+    );
+
+    expect(result.judgements).toEqual([
+      { segmentId: 'segment-a', similarity: 0.82, chars: 1200, verdict: 'accepted' },
+      { segmentId: 'segment-b', similarity: 0.71, chars: 300, verdict: 'refused' },
+      { segmentId: 'segment-c', similarity: 0.64, chars: 40, verdict: 'failed' },
+    ]);
+  });
+
   it('judges no more candidates than it was told it could', async () => {
     const store = memoryStore();
     const judge = scriptedJudge({});
@@ -215,7 +250,15 @@ describe('judging the candidates', () => {
     );
 
     expect(judge.asked).toEqual([]);
-    expect(result).toEqual({ written: [], judged: 0, refused: 0, skipped: 0, raced: 0, failed: [] });
+    expect(result).toEqual({
+      written: [],
+      judgements: [],
+      judged: 0,
+      refused: 0,
+      skipped: 0,
+      raced: 0,
+      failed: [],
+    });
   });
 });
 

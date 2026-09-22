@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { EMPTY_USAGE } from '@/lib/core/spend/pricing';
-import type { JudgePassResult } from '@/lib/learn/catalogue/judge';
+import { JUDGE_MODEL, type JudgePassResult } from '@/lib/learn/catalogue/judge';
+import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { NearbySegment, NearestOutcome } from '@/lib/learn/catalogue/nearest';
 import {
+  recordJudgements,
   runCatalogueSearch,
   runCatalogueSearchIfNew,
   searchCompleted,
@@ -53,21 +55,37 @@ function found(segments: NearbySegment[]): NearestOutcome {
 }
 
 function pass(overrides: Partial<JudgePassResult> = {}): JudgePassResult {
-  return { written: [], judged: 0, refused: 0, skipped: 0, raced: 0, failed: [], ...overrides };
+  return {
+    written: [],
+    judgements: [],
+    judged: 0,
+    refused: 0,
+    skipped: 0,
+    raced: 0,
+    failed: [],
+    ...overrides,
+  };
 }
 
 const LINK = { segmentId: 'segment-1', basis: 'It works the example through.', model: 'x' };
+
+type Recorded = Parameters<CatalogueSearchPorts['record']>[0];
 
 /** Ports that spend on both calls, so the split of the ledger is visible. */
 function ports(
   retrieve: NearestOutcome | (() => Promise<NearestOutcome>),
   judge: JudgePassResult | (() => Promise<JudgePassResult>),
-): CatalogueSearchPorts & { judged: number } {
+): CatalogueSearchPorts & { judged: number; recorded: Recorded[] } {
   const state = { judged: 0 };
+  const recorded: Recorded[] = [];
 
   return {
+    recorded,
     get judged() {
       return state.judged;
+    },
+    async record(input) {
+      recorded.push(input);
     },
     async retrieve({ onSpend }) {
       onSpend({ model: 'voyage-4-lite', usage: { ...EMPTY_USAGE, inputTokens: 12 } });
@@ -200,11 +218,148 @@ describe('runCatalogueSearch', () => {
         seen = { claim: input.claim, concept: input.concept };
         return pass({ written: [LINK], judged: 1 });
       },
+      async record() {},
     };
 
     await runCatalogueSearch(port, CLAIM);
 
     expect(seen).toEqual({ claim: CLAIM.claim, concept: CLAIM.concept });
+  });
+});
+
+/**
+ * What the press keeps of the judging, for the section trial (#766).
+ *
+ * The acceptance is that a press with candidates above the floor leaves one
+ * row per judged segment, refusals included, and that a skipped press leaves
+ * none. The skip half is in the repeat-press block below.
+ */
+describe('recording what the judge said', () => {
+  const JUDGEMENTS = [
+    { segmentId: 'segment-1', similarity: 0.8, chars: 900, verdict: 'accepted' as const },
+    { segmentId: 'segment-2', similarity: 0.7, chars: 200, verdict: 'refused' as const },
+  ];
+
+  it('records every judged candidate against the claim, stamped with the press', async () => {
+    const pressedAt = new Date('2026-09-22T12:00:00.000Z');
+    const port = ports(
+      found([segment('segment-1'), segment('segment-2')]),
+      pass({ written: [LINK], judged: 2, refused: 1, judgements: JUDGEMENTS }),
+    );
+
+    await runCatalogueSearch(port, { ...CLAIM, pressedAt });
+
+    expect(port.recorded).toEqual([
+      { target: CLAIM.target, judgements: JUDGEMENTS, pressedAt },
+    ]);
+  });
+
+  it('records a press whose every candidate was refused', async () => {
+    const refusals = JUDGEMENTS.map((j) => ({ ...j, verdict: 'refused' as const }));
+    const port = ports(
+      found([segment('segment-1'), segment('segment-2')]),
+      pass({ judged: 2, refused: 2, judgements: refusals }),
+    );
+
+    const result = await runCatalogueSearch(port, CLAIM);
+
+    expect(result.missed).toBe('nothing-taught');
+    expect(port.recorded[0].judgements).toEqual(refusals);
+  });
+
+  it('records nothing when nothing was close enough to judge', async () => {
+    const port = ports(found([]), pass());
+
+    await runCatalogueSearch(port, CLAIM);
+
+    expect(port.recorded).toEqual([]);
+  });
+
+  it('still answers the press when the record cannot be written', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const port: CatalogueSearchPorts = {
+      ...ports(found([segment('segment-1')]), pass({ written: [LINK], judged: 1, judgements: JUDGEMENTS })),
+      async record() {
+        throw new Error('permission denied');
+      },
+    };
+
+    const result = await runCatalogueSearch(port, CLAIM);
+
+    expect(result.covered).toBe(true);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
+
+describe('the live judgements writer', () => {
+  function recordingClient(error: { message: string } | null = null) {
+    const inserted: { table: string; rows: Record<string, unknown>[] }[] = [];
+    const client = {
+      from(table: string) {
+        return {
+          async insert(rows: Record<string, unknown>[]) {
+            inserted.push({ table, rows });
+            return { error };
+          },
+        };
+      },
+    };
+    return { client: client as unknown as LearnSupabaseClient, inserted };
+  }
+
+  const pressedAt = new Date('2026-09-22T12:00:00.000Z');
+  const judgements = [
+    { segmentId: 'segment-1', similarity: 0.8, chars: 900, verdict: 'accepted' as const },
+    { segmentId: 'segment-2', similarity: 0.7, chars: 200, verdict: 'refused' as const },
+  ];
+
+  it('writes one row per judgement in one insert, against the concept', async () => {
+    const { client, inserted } = recordingClient();
+
+    await recordJudgements(client, 'user-1', { target: { concept: 'concept-1' }, judgements, pressedAt });
+
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0].table).toBe('catalogue_judgements');
+    expect(inserted[0].rows).toEqual([
+      {
+        user_id: 'user-1',
+        segment_id: 'segment-1',
+        concept_id: 'concept-1',
+        similarity: 0.8,
+        chars: 900,
+        verdict: 'accepted',
+        model: JUDGE_MODEL,
+        pressed_at: '2026-09-22T12:00:00.000Z',
+      },
+      {
+        user_id: 'user-1',
+        segment_id: 'segment-2',
+        concept_id: 'concept-1',
+        similarity: 0.7,
+        chars: 200,
+        verdict: 'refused',
+        model: JUDGE_MODEL,
+        pressed_at: '2026-09-22T12:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('writes against the subject column for a subject target', async () => {
+    const { client, inserted } = recordingClient();
+
+    await recordJudgements(client, 'user-1', { target: { subject: 'subject-1' }, judgements, pressedAt });
+
+    expect(inserted[0].rows[0]).toMatchObject({ subject_id: 'subject-1' });
+    expect(inserted[0].rows[0]).not.toHaveProperty('concept_id');
+  });
+
+  it('throws when the insert is refused, for the pass to catch', async () => {
+    const { client } = recordingClient({ message: 'permission denied' });
+
+    await expect(
+      recordJudgements(client, 'user-1', { target: { concept: 'concept-1' }, judgements, pressedAt }),
+    ).rejects.toThrow('permission denied');
   });
 });
 
@@ -256,7 +411,14 @@ describe('whether a press got an answer out of the catalogue', () => {
  * never made, which is the thing the step exists for.
  */
 function repeatPorts(state: { embeddedSince: boolean; linked: boolean }) {
-  const inner = ports(found([segment('segment-1')]), pass({ written: [LINK], judged: 1 }));
+  const inner = ports(
+    found([segment('segment-1')]),
+    pass({
+      written: [LINK],
+      judged: 1,
+      judgements: [{ segmentId: 'segment-1', similarity: 0.8, chars: 24, verdict: 'accepted' }],
+    }),
+  );
   const counts = { searched: 0, asked: [] as string[] };
 
   return {
@@ -265,6 +427,9 @@ function repeatPorts(state: { embeddedSince: boolean; linked: boolean }) {
     },
     get searched() {
       return counts.searched;
+    },
+    get recorded() {
+      return inner.recorded;
     },
     get asked() {
       return counts.asked;
@@ -309,6 +474,7 @@ describe('runCatalogueSearchIfNew', () => {
     // The new material is what it can appear from, so the press writes links.
     expect(result.written).toBe(1);
     expect(port.asked).toEqual([SEARCHED_AT]);
+    expect(port.recorded).toHaveLength(1);
   });
 
   it('makes no judging call when nothing has arrived, and shows what is stored', async () => {
@@ -321,6 +487,8 @@ describe('runCatalogueSearchIfNew', () => {
     expect(result.missed).toBeNull();
     expect(port.searched).toBe(0);
     expect(port.judged).toBe(0);
+    // Nothing was judged, so nothing is recorded for the trial.
+    expect(port.recorded).toEqual([]);
   });
 
   it('spends nothing on a press that skipped, in either ledger', async () => {

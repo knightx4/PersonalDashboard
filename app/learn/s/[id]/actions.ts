@@ -79,6 +79,7 @@ export async function readAboutConcept(formData: FormData): Promise<void> {
       claim: concept.claim,
       concept: concept.name,
       target: { concept: concept.id },
+      pressedAt,
     },
     { searchedAt: concept.catalogueSearchedAt },
   );
