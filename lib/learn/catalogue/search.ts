@@ -55,7 +55,14 @@ export type CatalogueMiss =
   /** Candidates were read and none was argued for. The ordinary miss. */
   | 'nothing-taught'
   /** The judging pass itself failed, rather than refusing. */
-  | 'judge-failed';
+  | 'judge-failed'
+  /**
+   * Nothing has been embedded since this claim was last searched, so no call
+   * was made and the answer from last time stands. Not a search, which is why
+   * `searchCompleted` refuses it: a press that looked at nothing must not move
+   * the claim's search time.
+   */
+  | 'nothing-new';
 
 export type CatalogueSearchInput = {
   claim: string;
@@ -237,6 +244,8 @@ export async function searchCatalogueForClaim(
  * Everything else is a press that never reached that point. Without a key
  * nothing was embedded; a provider that would not answer retrieved nothing;
  * `judge-failed` retrieved candidates and formed no verdict about any of them.
+ * `nothing-new` did not look at all, because nothing had arrived since the
+ * last press; the time that press wrote is the one that still holds.
  * Recording one of those would have the page say nothing matched when nothing
  * was read, and would have the repeat press treat a timeout as a search
  * already done, which is a claim that never gets searched again.
@@ -276,4 +285,162 @@ export async function recordClaimSearched(
   }
 
   return true;
+}
+
+/**
+ * A press, including the presses that decided not to search.
+ *
+ * `skipped` is what the caller cannot work out from the rest: a skip that
+ * finds the claim already covered is indistinguishable from a search that
+ * judged nothing new and found the same links, and only one of those looked.
+ */
+export type CatalogueSearchOutcome = CatalogueSearchResult & {
+  /** True when no call was made because nothing has arrived since last time. */
+  skipped: boolean;
+};
+
+/**
+ * The three things the repeat press asks, named so a test never reaches a
+ * database.
+ *
+ * `search` is the whole of the pass below this, handed over as a port rather
+ * than called directly, which is what lets a test prove that a skipped press
+ * judged nothing: the port is simply never reached.
+ */
+export type RepeatPressPorts = {
+  /** Whether any segment has been embedded since the given moment. */
+  embeddedSince(at: string): Promise<boolean>;
+  /** Whether the claim already holds links, which is what a skip shows. */
+  linked(): Promise<boolean>;
+  /** The pass, run only when there is something new to run it against. */
+  search(): Promise<CatalogueSearchResult>;
+};
+
+/**
+ * Search the catalogue for one claim, unless nothing has arrived since the
+ * last time it was searched.
+ *
+ * #743's answer. The retrieval call is cents and the judging calls are the
+ * cost that grows with the catalogue, so the press that can skip both is worth
+ * the two selects it takes to find out. A claim nobody has pressed the button
+ * on has no search time and searches, which is every claim in this database
+ * today.
+ *
+ * **What counts as arrived is a segment that has been embedded**, not one that
+ * has been fetched. A segment with no vector cannot be retrieved, so searching
+ * for its sake would cost the calls and find it no sooner; the embedding sweep
+ * stamps `embedded_at` and the next press picks it up. That also covers a
+ * section rewritten in place, because the re-sweep drops the stale vector and
+ * the new one is stamped when it lands.
+ *
+ * **A skip shows what is stored rather than nothing.** The links are still
+ * there, so a claim the catalogue covered last time comes back covered and the
+ * press stays on the claim. A claim that was searched and had nothing comes
+ * back a miss, and the press queues the reading and goes to the web, which is
+ * what the press before it did.
+ */
+export async function runCatalogueSearchIfNew(
+  ports: RepeatPressPorts,
+  searchedAt: string | null,
+): Promise<CatalogueSearchOutcome> {
+  if (searchedAt === null || (await ports.embeddedSince(searchedAt))) {
+    return { ...(await ports.search()), skipped: false };
+  }
+
+  const covered = await ports.linked();
+
+  return {
+    covered,
+    considered: 0,
+    written: 0,
+    already: 0,
+    failed: 0,
+    missed: covered ? null : 'nothing-new',
+    detail: null,
+    embedSpend: [],
+    judgeSpend: [],
+    skipped: true,
+  };
+}
+
+export type RepeatPressOptions = CatalogueSearchOptions & {
+  /** When this claim was last searched, off the concept. Null: never. */
+  searchedAt: string | null;
+};
+
+/**
+ * Whether anything has been embedded since a moment.
+ *
+ * True when the read fails, which sends the press to search. The alternative
+ * is a failed select deciding that nothing has arrived, and a person who
+ * pressed a button for something to read being shown last week's answer
+ * because PostgREST was unhappy.
+ */
+async function anyEmbeddedSince(supabase: LearnSupabaseClient, at: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('catalogue_segments')
+    .select('id')
+    .gt('embedded_at', at)
+    .limit(1)
+    .maybeSingle();
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) {
+    console.warn('[learn catalogue] reading what is new failed', error.message);
+    return true;
+  }
+
+  return data !== null;
+}
+
+/**
+ * Whether this claim holds any link at all.
+ *
+ * Asked only of a press that is skipping, to tell a claim the catalogue
+ * covered from one it was searched for and had nothing. A count would read the
+ * same rows; one id is all the answer needs.
+ */
+async function anyLinkFor(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  target: LinkTarget,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('catalogue_links')
+    .select('id')
+    .eq('user_id', userId)
+    .eq(target.concept ? 'concept_id' : 'subject_id', target.concept ?? target.subject)
+    .limit(1)
+    .maybeSingle();
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) {
+    console.warn('[learn catalogue] reading what is already linked failed', error.message);
+    return false;
+  }
+
+  return data !== null;
+}
+
+/**
+ * Search the live catalogue for one claim, unless nothing is new.
+ *
+ * What the server action calls. It wraps `searchCatalogueForClaim` rather than
+ * changing it: the pass has one job and this has the other, and a caller that
+ * wants the search whatever the state of the catalogue still has it.
+ */
+export async function searchCatalogueIfNew(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  input: CatalogueSearchInput,
+  options: RepeatPressOptions,
+): Promise<CatalogueSearchOutcome> {
+  return runCatalogueSearchIfNew(
+    {
+      embeddedSince: (at) => anyEmbeddedSince(supabase, at),
+      linked: () => anyLinkFor(supabase, userId, input.target),
+      search: () => searchCatalogueForClaim(supabase, userId, input, options),
+    },
+    options.searchedAt,
+  );
 }
