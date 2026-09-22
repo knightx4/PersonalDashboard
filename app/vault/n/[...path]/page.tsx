@@ -13,6 +13,8 @@ import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { loadTasksFor } from '@/lib/todo/links/load';
+import { whyNotRead } from '@/lib/vault/map/rules';
+import { MapReview } from './map-review';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +80,7 @@ export default async function NotePage({
   // An empty vault keeps the column and the button away entirely; a search that
   // matched nothing must not, or the box that got you there would go with it.
   const hasVault = groups.length > 0 || Boolean(search);
+  const notRead = whyNotRead(note);
 
   const user = await requireUser();
   const [{ timezone }, linkedTasks] = await Promise.all([
@@ -144,6 +147,16 @@ export default async function NotePage({
             timezone={timezone}
           />
         </div>
+
+        {/* Reading the note for the map (#763). A note the map never reads --
+            a journal, or one carrying what looks like a key -- says so in the
+            button's place rather than offering a press that can only refuse,
+            and nothing about it is sent to find that out. */}
+        {notRead ? (
+          <p className="mt-10 text-ui text-ink-muted">{notRead.detail}</p>
+        ) : (
+          <MapReview notePath={note.path} />
+        )}
       </article>
     </div>
   );

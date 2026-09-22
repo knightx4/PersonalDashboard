@@ -66,6 +66,7 @@ describe('the operation names', () => {
       'embed-catalogue',
       'embed-claim',
       'judge-segment',
+      'map-note',
     ]);
   });
 });

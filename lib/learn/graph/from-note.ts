@@ -12,6 +12,7 @@ import {
 } from '@/lib/learn/graph/chain-payload';
 import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
+import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
 
 /**
  * What a reading actually taught, read out of the note you already wrote.
@@ -39,11 +40,11 @@ const SYSTEM = `Somebody finished a reading and wrote a note about it. Pull out 
 concepts the reading actually introduced, so they can be added to a graph of
 what they know.
 
-CLAIMS, NOT HEADINGS, and not topics the note merely mentions. Each one is a
-single thing that can be right or wrong, stated in a sentence or two, in the
-terms the note uses. "A policy rate only reaches prices through what people
-expect it to do next" is a concept. "Monetary policy" is a subject heading and
-does not belong in this graph.
+${NODE_RULE}
+
+IN THE NOTE'S TERMS. State each one in the words the note uses. "A policy rate
+only reaches prices through what people expect it to do next" is a concept;
+"Monetary policy" is a subject heading and does not belong in this graph.
 
 FEW. One to four. A reading introduces a couple of ideas and reminds you of a
 dozen; only the introduced ones count. If the note is thin, return one. If the

@@ -27,6 +27,8 @@ export type NoteSummary = {
 
 export type NoteDetail = NoteSummary & {
   body: string;
+  /** git's blob SHA for the body, which is what a map proposal is checked against. */
+  blobSha: string;
   frontmatter: Record<string, unknown>;
   sizeBytes: number;
 };
@@ -205,6 +207,12 @@ export async function loadNotes(
   return ((data ?? []) as NoteRow[]).map(toSummary);
 }
 
+type DetailRow = NoteRow & {
+  frontmatter: Record<string, unknown>;
+  size_bytes: number;
+  blob_sha: string;
+};
+
 /**
  * Notes named by id, with their bodies, in the order they were asked for.
  *
@@ -225,7 +233,7 @@ export async function loadNotesByIds(
 
   const { data, error } = await supabase
     .from('notes')
-    .select('id, path, title, body, frontmatter, size_bytes, git_updated_at')
+    .select('id, path, title, body, frontmatter, size_bytes, git_updated_at, blob_sha')
     .in('id', [...ids])
     .is('deleted_at', null);
 
@@ -233,12 +241,16 @@ export async function loadNotesByIds(
   if (error) throw new Error(`Reading the vault failed: ${error.message}`);
 
   const found = new Map(
-    ((data ?? []) as (NoteRow & { frontmatter: Record<string, unknown>; size_bytes: number })[]).map(
-      (row) => [
-        row.id,
-        { ...toSummary(row), body: row.body, frontmatter: row.frontmatter ?? {}, sizeBytes: row.size_bytes },
-      ],
-    ),
+    ((data ?? []) as DetailRow[]).map((row) => [
+      row.id,
+      {
+        ...toSummary(row),
+        body: row.body,
+        blobSha: row.blob_sha,
+        frontmatter: row.frontmatter ?? {},
+        sizeBytes: row.size_bytes,
+      },
+    ]),
   );
 
   return ids.map((id) => found.get(id)).filter((note): note is NoteDetail => note !== undefined);
@@ -250,7 +262,7 @@ export async function loadNote(
 ): Promise<NoteDetail | null> {
   const { data, error } = await supabase
     .from('notes')
-    .select('id, path, title, body, frontmatter, size_bytes, git_updated_at')
+    .select('id, path, title, body, frontmatter, size_bytes, git_updated_at, blob_sha')
     .eq('path', path)
     .is('deleted_at', null)
     .maybeSingle();
@@ -258,11 +270,12 @@ export async function loadNote(
   assertSchemaExposed(error, VAULT_SCHEMA);
   if (error || !data) return null;
 
-  const row = data as NoteRow & { frontmatter: Record<string, unknown>; size_bytes: number };
+  const row = data as DetailRow;
 
   return {
     ...toSummary(row),
     body: row.body,
+    blobSha: row.blob_sha,
     frontmatter: row.frontmatter ?? {},
     sizeBytes: row.size_bytes,
   };

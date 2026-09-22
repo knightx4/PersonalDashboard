@@ -18,7 +18,9 @@ import {
   type ProposedChain,
 } from '@/lib/learn/graph/chain-payload';
 import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
+import { cutLong } from '@/lib/learn/graph/note-chunks';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
+import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
 
 /**
  * A briefing somebody wrote for you, read into things you have yet to learn.
@@ -87,12 +89,7 @@ knows. You are recording what this section says, so that each piece of it can
 be learned, probed and checked later. Nothing you report is known, established
 or verified by anybody.
 
-CLAIMS, NOT HEADINGS. Every node is one thing a person can be right or wrong
-about, stated in a sentence or two.
-
-  Heading, useless: "Ethereum Classic."
-  Claim, usable: "Ethereum Classic kept the original chain after the DAO fork,
-  so its security budget is a fraction of the chain that carried the name."
+${NODE_RULE}
 
 A LOOSE FACT IS NOT A CLAIM YOU CAN PLACE. A revenue figure, a founding date,
 a headcount -- nothing rests on it and it rests on nothing, so it has no place
@@ -159,34 +156,57 @@ function label(text: string): string {
   return bare.length > 80 ? `${bare.slice(0, 77)}…` : bare;
 }
 
+/** A section larger than a pass, cut into passes at its paragraph breaks. */
+function cutSection(section: BriefSection): BriefSection[] {
+  if (section.text.length <= SECTION_CHARS) return [section];
+  return cutLong(section.text, 0, section.text.length, SECTION_CHARS)
+    .map(([start, end]) => section.text.slice(start, end).trim())
+    .filter((text) => text.length > 0)
+    .map((text, part) => ({
+      title:
+        part === 0 ? section.title || label(text) : `${section.title || label(text)} (continued)`,
+      text,
+    }));
+}
+
 /**
  * Cut the briefing into the pieces each pass reads.
  *
  * Its own headings first, because a briefing written a pass per token already
  * says where one ends. Failing that, blank-line blocks grouped up to a size --
  * a paragraph is too small to be worth a call of its own, and a pass per
- * paragraph is how a cheap import becomes an expensive one.
+ * paragraph is how a cheap import becomes an expensive one. Text before the
+ * first heading is kept as a section, and a block larger than a pass is cut
+ * at its paragraph breaks rather than sent whole.
+ *
+ * A vault note is read with `chunkNote` in note-chunks.ts instead: this one
+ * still stops at `MAX_BRIEF_SECTIONS`, which suits a paste and not a vault.
  */
 export function splitBriefing(briefing: string): BriefSection[] {
   const headed: BriefSection[] = [];
-  let current: string[] | null = null;
+  // What comes before the first heading is a section of its own, not a loss.
+  let current: string[] = [];
 
   for (const line of briefing.split(/\r?\n/)) {
     if (ATX_HEADING.test(line)) {
-      if (current) headed.push({ title: label(current.join('\n')), text: current.join('\n') });
+      if (current.join('').trim().length > 0) {
+        headed.push({ title: label(current.join('\n')), text: current.join('\n') });
+      }
       current = [line];
-    } else if (current) {
+    } else {
       current.push(line);
     }
   }
-  if (current) headed.push({ title: label(current.join('\n')), text: current.join('\n') });
+  if (current.join('').trim().length > 0) {
+    headed.push({ title: label(current.join('\n')), text: current.join('\n') });
+  }
 
   // A heading with nothing under it is a contents line, not a section, and a
   // single heading over the whole paste says nothing about where to cut.
   const withBody = headed.filter(
     (section) => section.text.replace(ATX_HEADING, '').trim().length > 0,
   );
-  if (withBody.length > 1) return withBody;
+  if (withBody.length > 1) return withBody.flatMap(cutSection);
 
   const blocks = briefing
     .split(/\n\s*\n/)
@@ -205,10 +225,11 @@ export function splitBriefing(briefing: string): BriefSection[] {
     size = 0;
   };
 
-  for (const block of blocks) {
-    if (size > 0 && size + block.length > SECTION_CHARS) flush();
-    buffer.push(block);
-    size += block.length;
+  // A block bigger than a pass is cut first, so it never goes in whole.
+  for (const block of blocks.flatMap((b) => cutSection({ title: '', text: b }))) {
+    if (size > 0 && size + block.text.length > SECTION_CHARS) flush();
+    buffer.push(block.text);
+    size += block.text.length;
   }
   flush();
 
