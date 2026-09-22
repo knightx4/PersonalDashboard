@@ -9,6 +9,8 @@ import { PUSHED_ASIDE_DAYS } from '@/lib/learn/next/rank';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { loadThemeMap } from '@/lib/vault/map/read';
+import { NEVER_PULL, offerLean, type ThemeAnchor, type TrackWeight } from './interest';
+import { loadTrackInterest } from './interest-load';
 
 /**
  * New tracks offered in Practice Flow from the vault map (plan #778).
@@ -24,6 +26,10 @@ import { loadThemeMap } from '@/lib/vault/map/read';
  * positions under it as context for writing the ideas. Nothing is written back
  * to the map, and nothing from the notes counts as knowing anything
  * (KNOWLEDGE-SPEC.md, "Everything starts unknown").
+ *
+ * Which theme is offered leans towards the tracks you engage with (plan #780):
+ * a theme's strength is multiplied by `offerLean` from `interest.ts`, which
+ * counts how many notes it shares with the theme behind each weighted track.
  */
 
 /**
@@ -32,8 +38,12 @@ import { loadThemeMap } from '@/lib/vault/map/read';
  */
 export const LOW_WATER = 10;
 
-/** How many of the strongest themes are read to choose from. */
-const THEMES_READ = 60;
+/**
+ * How many of the strongest themes are read to choose from. Enough that a
+ * theme four times lighter than the strongest can still be lifted past it by
+ * the lean towards tracks you engage with.
+ */
+const THEMES_READ = 150;
 
 /** How many of a theme's positions go into the prompt. */
 const POSITIONS_IN_PROMPT = 20;
@@ -49,6 +59,8 @@ export type ThemeCandidate = {
   about: string;
   strength: number;
   notes: number;
+  /** The notes it covers, for how near it is to other themes. */
+  noteIds?: string[];
 };
 
 /** One press on an earlier offer. */
@@ -57,6 +69,8 @@ export type OfferRecord = {
   themeName: string;
   outcome: OfferOutcome;
   happenedAt: string;
+  /** The track a Start made. Unset for Not now and Never. */
+  subjectId?: string | null;
 };
 
 /** What the card shows. */
@@ -85,12 +99,17 @@ const key = (name: string) => name.trim().toLowerCase();
  *
  * A record matches a theme by id or by name, because a later sweep can merge
  * or rename a theme and give it a new id.
+ *
+ * Strongest after `lean`, the multiplier from `offerLean`: a theme near a
+ * track you answer a lot is offered before a slightly stronger one that is
+ * not. A theme missing from `lean` keeps its own strength.
  */
 export function trackToOffer(input: {
   themes: ThemeCandidate[];
   trackNames: string[];
   record: OfferRecord[];
   now: Date;
+  lean?: ReadonlyMap<string, number>;
 }): TrackOffer | null {
   const taken = new Set(input.trackNames.map(key));
   const heldUntil = input.now.getTime() - PUSHED_ASIDE_DAYS * DAY_MS;
@@ -105,8 +124,9 @@ export function trackToOffer(input: {
     closedNames.add(key(row.themeName));
   }
 
+  const weighed = (theme: ThemeCandidate) => theme.strength * (input.lean?.get(theme.id) ?? 1);
   const theme = [...input.themes]
-    .sort((a, b) => b.strength - a.strength || a.name.localeCompare(b.name))
+    .sort((a, b) => weighed(b) - weighed(a) || a.name.localeCompare(b.name))
     .find(
       (candidate) =>
         candidate.notes > 0 &&
@@ -122,12 +142,12 @@ export function runningLow(ready: number): boolean {
   return ready < LOW_WATER;
 }
 
-type Count = { count: number }[] | null;
+type NoteLinks = { note_id: string }[] | null;
 
 async function loadThemes(vault: VaultSupabaseClient): Promise<ThemeCandidate[]> {
   const { data, error } = await vault
     .from('themes')
-    .select('id, name, about, strength, theme_notes(count)')
+    .select('id, name, about, strength, theme_notes(note_id)')
     .order('strength', { ascending: false })
     .limit(THEMES_READ);
   if (error) throw fail('Reading the themes in your notes', error);
@@ -138,22 +158,26 @@ async function loadThemes(vault: VaultSupabaseClient): Promise<ThemeCandidate[]>
       name: string;
       about: string;
       strength: number | string;
-      theme_notes: Count;
+      theme_notes: NoteLinks;
     }[]
-  ).map((row) => ({
-    id: row.id,
-    name: row.name,
-    about: row.about,
-    strength: Number(row.strength) || 0,
-    notes: row.theme_notes?.[0]?.count ?? 0,
-  }));
+  ).map((row) => {
+    const noteIds = (row.theme_notes ?? []).map((link) => link.note_id);
+    return {
+      id: row.id,
+      name: row.name,
+      about: row.about,
+      strength: Number(row.strength) || 0,
+      notes: noteIds.length,
+      noteIds,
+    };
+  });
 }
 
 /** Every press on a track offer, newest first. */
 export async function loadOfferRecord(supabase: LearnSupabaseClient): Promise<OfferRecord[]> {
   const { data, error } = await supabase
     .from('track_offers')
-    .select('theme_id, theme_name, outcome, happened_at')
+    .select('theme_id, theme_name, outcome, happened_at, subject_id')
     .order('happened_at', { ascending: false });
 
   assertSchemaExposed(error, LEARN_SCHEMA);
@@ -165,12 +189,14 @@ export async function loadOfferRecord(supabase: LearnSupabaseClient): Promise<Of
       theme_name: string;
       outcome: OfferOutcome;
       happened_at: string;
+      subject_id: string | null;
     }[]
   ).map((row) => ({
     themeId: row.theme_id,
     themeName: row.theme_name,
     outcome: row.outcome,
     happenedAt: row.happened_at,
+    subjectId: row.subject_id,
   }));
 }
 
@@ -191,21 +217,98 @@ export async function loadTrackOffer(
     const rows = await loadReadyAndSettled(supabase, LOW_WATER, null);
     if (!runningLow(rows.ready.length)) return null;
 
-    const [themes, subjects, record] = await Promise.all([
+    const [themes, subjects, record, interest] = await Promise.all([
       loadThemes(vault),
       loadSubjects(supabase),
       loadOfferRecord(supabase),
+      loadTrackInterest(supabase, now).catch((error: unknown) => {
+        console.error('[learn flow] track weights', error instanceof Error ? error.message : error);
+        return null;
+      }),
     ]);
+    const anchors = interest
+      ? await loadAnchors(vault, subjects, record, interest.weights).catch(() => [])
+      : [];
     return trackToOffer({
       themes,
       trackNames: subjects.map((subject) => subject.name),
       record,
       now,
+      lean: offerLean(
+        themes.map((theme) => ({ id: theme.id, notes: new Set(theme.noteIds ?? []) })),
+        anchors,
+      ),
     });
   } catch (error) {
     console.error('[learn flow] track offer', error instanceof Error ? error.message : error);
     return null;
   }
+}
+
+/**
+ * The themes that lean the offer, with the notes each covers.
+ *
+ * A weighted track pulls through the theme it was started from, when an offer
+ * started it, and through any theme with its exact name. A track typed by hand
+ * whose name matches no theme pulls nothing, since there is nothing in the map
+ * to measure nearness from. An offer you pressed Never on pulls away.
+ */
+async function loadAnchors(
+  vault: VaultSupabaseClient,
+  subjects: { id: string; name: string }[],
+  record: OfferRecord[],
+  weights: Map<string, TrackWeight>,
+): Promise<ThemeAnchor[]> {
+  const pullOf = new Map<string, number>();
+  const weighted = subjects.filter((subject) => (weights.get(subject.id)?.weight ?? 1) !== 1);
+
+  for (const row of record) {
+    if (row.outcome === 'never') pullOf.set(row.themeId, NEVER_PULL);
+  }
+  for (const row of record) {
+    const weight = row.subjectId ? weights.get(row.subjectId)?.weight : undefined;
+    if (row.outcome === 'started' && weight !== undefined && weight !== 1) {
+      pullOf.set(row.themeId, weight);
+    }
+  }
+
+  if (weighted.length > 0) {
+    const { data, error } = await vault
+      .from('themes')
+      .select('id, name')
+      .in(
+        'name',
+        weighted.map((subject) => subject.name),
+      );
+    if (error) throw fail('Reading the themes behind your tracks', error);
+    const weightByName = new Map(
+      weighted.map((subject) => [subject.name, weights.get(subject.id)!.weight]),
+    );
+    for (const theme of (data ?? []) as { id: string; name: string }[]) {
+      const weight = weightByName.get(theme.name);
+      if (weight !== undefined) pullOf.set(theme.id, weight);
+    }
+  }
+
+  const ids = [...pullOf.keys()];
+  if (ids.length === 0) return [];
+  const { data, error } = await vault
+    .from('theme_notes')
+    .select('theme_id, note_id')
+    .in('theme_id', ids);
+  if (error) throw fail('Reading the notes behind your tracks', error);
+
+  const notesOf = new Map<string, Set<string>>();
+  for (const link of (data ?? []) as { theme_id: string; note_id: string }[]) {
+    const notes = notesOf.get(link.theme_id) ?? new Set<string>();
+    notes.add(link.note_id);
+    notesOf.set(link.theme_id, notes);
+  }
+  return ids.map((themeId) => ({
+    themeId,
+    pull: pullOf.get(themeId)!,
+    notes: notesOf.get(themeId) ?? new Set<string>(),
+  }));
 }
 
 /** Keep one press on an offer. */

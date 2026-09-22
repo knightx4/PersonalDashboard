@@ -9,6 +9,8 @@ import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
+import { weightReason } from '@/lib/learn/flow/interest';
+import { loadTrackInterest } from '@/lib/learn/flow/interest-load';
 import { GoalForm } from '@/app/learn/know/goal-form';
 import { ConceptList } from '@/components/learn/concept-list';
 import { PullArticles } from './pull-articles';
@@ -138,10 +140,12 @@ export default async function SubjectPage({
   const subject = await loadSubject(supabase, id);
   if (!subject) notFound();
 
-  const [graph, goals, settings] = await Promise.all([
+  const [graph, goals, settings, interest] = await Promise.all([
     loadGraph(supabase, id),
     loadGoals(supabase, id),
     loadAccountSettings(user.id),
+    // Losing the line about how often it is asked is better than losing the page.
+    loadTrackInterest(supabase).catch(() => null),
   ]);
   const counts = countStates(graph);
   const live = goals.filter((goal) => goal.status !== 'abandoned' && goal.conceptId !== null);
@@ -196,6 +200,14 @@ export default async function SubjectPage({
           concept marked known is one this page deliberately stops showing, so
           a claim that seeded nothing has to be visible rather than silent. */}
       {seeded && <p className="mb-5 text-body text-ink-muted">{seeded}</p>}
+
+      {/* Why the mixed flow asks about this track as often as it does (plan
+          #780), with the counts it came from. */}
+      {interest && counts.total > 0 && (
+        <p className="mb-5 text-ui text-ink-muted">
+          {weightReason(interest.activity.get(id), interest.weights.get(id))}
+        </p>
+      )}
 
       {subject.note && (
         <p className="mb-5 border-l-2 border-accent pl-3 text-body text-ink-muted">{subject.note}</p>

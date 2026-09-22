@@ -10,6 +10,8 @@ import { PROBE_MODEL, writeProbe } from '@/lib/learn/graph/probe';
 import { answeredCount, nextMasteryCheck, probesFor, recordProbe } from '@/lib/learn/graph/session';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
+import type { TrackShare } from './interest';
+import { loadTrackInterest, sharesFrom } from './interest-load';
 
 /**
  * Practice Flow's questions, written before they are needed (plan #771).
@@ -29,6 +31,10 @@ import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
  * questions are taken and only that subject is picked from when writing. The
  * queue itself stays one queue, so questions written for other tracks wait
  * there untouched until the flow mixes again.
+ *
+ * Mixed, the picks share questions between tracks by how much you engage with
+ * each (plan #780, `interest.ts`), so every track's ready ideas are read
+ * rather than only the top few across all of them.
  */
 
 /** How many questions the flow keeps written ahead. */
@@ -211,6 +217,34 @@ async function sortQueue(supabase: LearnSupabaseClient): Promise<{
   };
 }
 
+/**
+ * What the picks read: the ready and settled ideas, and for a mixed flow the
+ * share each track has had. Focused, the one track's top `limit` is enough.
+ * A failure to read the shares mixes the old way rather than asking nothing.
+ */
+async function pickRows(
+  supabase: LearnSupabaseClient,
+  limit: number,
+  track: string | null,
+  waiting: ReadonlyMap<string, number> = new Map(),
+): Promise<{
+  rows: Awaited<ReturnType<typeof loadReadyAndSettled>>;
+  shares: TrackShare[] | undefined;
+}> {
+  if (track !== null) return { rows: await loadReadyAndSettled(supabase, limit, track), shares: undefined };
+
+  const [rows, shares] = await Promise.all([
+    loadReadyAndSettled(supabase, Number.POSITIVE_INFINITY, null),
+    loadTrackInterest(supabase)
+      .then((interest) => sharesFrom(interest, waiting))
+      .catch((error: unknown) => {
+        console.error('[learn flow] track weights', error instanceof Error ? error.message : error);
+        return undefined;
+      }),
+  ]);
+  return { rows, shares };
+}
+
 /** Whether a claim belongs to the track the flow is focused on. Always, when mixed. */
 function inTrack(claim: ClaimNow, track: string | null): boolean {
   return track === null || claim.subjectId === track;
@@ -331,14 +365,15 @@ export async function nextQuestion(
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { kind: 'error', detail: 'Asking a question needs ANTHROPIC_API_KEY to be set.' };
 
-  const [subjects, rows, answered] = await Promise.all([
+  const [subjects, { rows, shares }, answered] = await Promise.all([
     loadSubjects(supabase),
-    loadReadyAndSettled(supabase, 1, options.track),
+    pickRows(supabase, 1, options.track),
     answeredCount(supabase),
   ]);
   const picked = pickOneToAsk({
     ready: rows.ready,
     settled: rows.settled,
+    shares,
     subjectCount: subjects.filter((subject) => options.track === null || subject.id === options.track)
       .length,
     answered,
@@ -378,9 +413,14 @@ export async function fillQueue(
     const wanted = WRITE_AHEAD - waiting.length;
     if (wanted <= 0) return;
 
-    const [subjects, rows, answered] = await Promise.all([
+    const waitingByTrack = new Map<string, number>();
+    for (const { claim } of valid) {
+      waitingByTrack.set(claim.subjectId, (waitingByTrack.get(claim.subjectId) ?? 0) + 1);
+    }
+
+    const [subjects, { rows, shares }, answered] = await Promise.all([
       loadSubjects(supabase),
-      loadReadyAndSettled(supabase, READY_LIMIT, track),
+      pickRows(supabase, READY_LIMIT, track, waitingByTrack),
       answeredCount(supabase),
     ]);
 
@@ -388,6 +428,7 @@ export async function fillQueue(
       {
         ready: rows.ready,
         settled: rows.settled,
+        shares,
         subjectCount: subjects.filter((subject) => track === null || subject.id === track).length,
         answered,
         now: new Date(),

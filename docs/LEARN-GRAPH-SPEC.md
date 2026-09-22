@@ -332,6 +332,17 @@ reading under an answer (`readingToOffer` in `lib/learn/next/rank.ts`). What
 follows describes the list as it was, and the ordering it used still lives in
 that file.
 
+Since plan #780 the mixed flow shares its questions between tracks by weight
+(`lib/learn/flow/interest.ts`). A track's weight comes from the last four
+weeks: (answered + 1) / (skipped + Not now + 1), between a quarter and four. A
+track you answered before, and not since while answering others, weighs a
+half. Each ordinary question comes from the track furthest behind its share,
+and one in five goes to the track asked about least. Inside the track, the
+order is still nearest to a goal first. The track's page states its weight and
+the counts behind it. The same weights lean the new-track offer: a theme's
+strength is multiplied by how many notes it shares with the theme behind each
+weighted track, and with any offer you pressed Never on.
+
 `/learn/next` answered "what is the one next thing worth learning" once, across
 every subject, instead of a subject and a goal at a time. It is read straight
 off the graphs and the reading queue — one pass over the subjects, no model
