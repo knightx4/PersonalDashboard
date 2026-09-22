@@ -318,11 +318,26 @@ map's tables are greenfield.
 54. **The privacy page, and the journal exclusion list.** Before another note
     reaches a model. Two paths already send vault content to one and the policy
     describes mail only, which the vault spec said had to change first.
-55. **The map's tables.** Themes, positions, position edges, provenance rows
-    carrying the note, its `blob_sha` and a verified quote, tensions, and a
-    centrality score. New tables in `obsidian`, RLS on all of them, and the
-    cross-user isolation test extended **before any feature code** — build
+55. ✅ **The map's tables.** Seven in `obsidian`: `themes`, `theme_notes`,
+    `positions`, `theme_positions`, `position_sources`, `position_edges` and
+    `tensions`, with `strength` and `centrality` as columns rather than tables.
+    RLS on all seven in the migration that creates them, and `rls-vault.test.ts`
+    extended from 20 assertions to 35 **before any feature code** — build
     step 2's rule for the sixth time and the same reason.
+
+    Three things the schema settles that a prompt otherwise would.
+    Every foreign key is composite and carries `user_id`, because keys are not
+    subject to RLS and a policy alone would let a row join one account's
+    position to another's theme; the test proves that as admin, where a policy
+    cannot help. The join tables have no update policy *and* no update grant,
+    so editing a membership is refused at the privilege level rather than
+    quietly matching nothing. And a tension's pair is ordered by a trigger
+    before it is written, so a dismissed one cannot come back by being found
+    from the other side.
+
+    Deliberately **not** acyclic. `learn.concept_edges` rejects a cycle because
+    the frontier walks it; nothing walks these, so the constraint would refuse
+    honest relations between two notes that answer each other.
 56. **One extraction seam.** The node test, the four kinds, the edge
     vocabulary and the verbatim-quote rule in the shared prompt fragment the
     chain-writing calls already draw on, so a change to what a position is is

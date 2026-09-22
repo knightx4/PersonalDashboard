@@ -22,6 +22,12 @@ let userB = '';
 let connectionA = '';
 let connectionB = '';
 let noteA = '';
+let noteB = '';
+let themeA = '';
+let themeB = '';
+let positionA = '';
+let positionA2 = '';
+let positionB = '';
 
 async function seedConnection(userId: string, tag: string): Promise<string> {
   const [row] = await admin<{ id: string }[]>`
@@ -45,6 +51,23 @@ async function seedNote(
   return row.id;
 }
 
+async function seedTheme(userId: string, name: string): Promise<string> {
+  const [row] = await admin<{ id: string }[]>`
+    insert into themes (user_id, name, about)
+    values (${userId}, ${name}, ${`what ${name} covers`})
+    returning id`;
+  return row.id;
+}
+
+async function seedPosition(userId: string, name: string): Promise<string> {
+  const [row] = await admin<{ id: string }[]>`
+    insert into positions (user_id, name, statement, basis, kind, stance)
+    values (${userId}, ${name}, ${`${name}, stated.`}, 'extracted from a note',
+            'claim', 'held')
+    returning id`;
+  return row.id;
+}
+
 beforeAll(async () => {
   await truncateAll();
   userA = await createUser('vault-a@example.com');
@@ -54,11 +77,35 @@ beforeAll(async () => {
   connectionB = await seedConnection(userB, 'bob');
 
   noteA = await seedNote(userA, connectionA, 'Journal/2019-04-02.md', 'I am quitting.');
-  await seedNote(userB, connectionB, 'Journal/2019-04-02.md', 'Bob wrote this one.');
+  noteB = await seedNote(userB, connectionB, 'Journal/2019-04-02.md', 'Bob wrote this one.');
 
   await admin`
     insert into sync_runs (connection_id, type, status, to_sha, notes_written)
     values (${connectionA}, 'backfill', 'completed', 'abc123', 1)`;
+
+  // The map. Every table gets a row, so the coverage guard above stays honest
+  // and every assertion below has something real to fail against.
+  themeA = await seedTheme(userA, 'Urbanism');
+  themeB = await seedTheme(userB, 'Bookkeeping');
+  positionA = await seedPosition(userA, 'Parking lots wreck cities');
+  positionA2 = await seedPosition(userA, 'Transport cost is land cost');
+  positionB = await seedPosition(userB, 'Accruals beat cash for a quarter');
+
+  await admin`
+    insert into theme_notes (user_id, theme_id, note_id, basis)
+    values (${userA}, ${themeA}, ${noteA}, 'the note is about this')`;
+  await admin`
+    insert into theme_positions (user_id, theme_id, position_id, basis)
+    values (${userA}, ${themeA}, ${positionA}, 'stated under this theme')`;
+  await admin`
+    insert into position_sources (user_id, position_id, note_id, quote, blob_sha)
+    values (${userA}, ${positionA}, ${noteA}, 'I am quitting.', 'sha-Journal/2019-04-02.md')`;
+  await admin`
+    insert into position_edges (user_id, from_id, to_id, type, description)
+    values (${userA}, ${positionA2}, ${positionA}, 'supports', 'land cost is why')`;
+  await admin`
+    insert into tensions (user_id, left_id, right_id, kind, crux)
+    values (${userA}, ${positionA}, ${positionA2}, 'scope', 'metro-wide or local')`;
 });
 
 afterAll(async () => {
@@ -84,7 +131,18 @@ describe('RLS coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'obsidian' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['notes', 'sync_runs', 'vault_connections']);
+    expect(rows.map((r) => r.tablename)).toEqual([
+      'notes',
+      'position_edges',
+      'position_sources',
+      'positions',
+      'sync_runs',
+      'tensions',
+      'theme_notes',
+      'theme_positions',
+      'themes',
+      'vault_connections',
+    ]);
   });
 });
 
@@ -272,5 +330,204 @@ describe('integrity the database enforces itself', () => {
       select (select count(*) from notes where connection_id = ${connection})::int as notes,
              (select count(*) from sync_runs where connection_id = ${connection})::int as runs`;
     expect({ notes, runs }).toEqual({ notes: 0, runs: 0 });
+  });
+});
+
+describe('the map, across users', () => {
+  it('shows the owner their whole map', async () => {
+    const seen = await asUser(userA, async (tx) => ({
+      themes: (await tx`select id from themes`).length,
+      positions: (await tx`select id from positions`).length,
+      themeNotes: (await tx`select id from theme_notes`).length,
+      themePositions: (await tx`select id from theme_positions`).length,
+      sources: (await tx`select id from position_sources`).length,
+      edges: (await tx`select id from position_edges`).length,
+      tensions: (await tx`select id from tensions`).length,
+    }));
+    expect(seen).toEqual({
+      themes: 1,
+      positions: 2,
+      themeNotes: 1,
+      themePositions: 1,
+      sources: 1,
+      edges: 1,
+      tensions: 1,
+    });
+  });
+
+  it('shows another user none of it', async () => {
+    const seen = await asUser(userB, async (tx) => ({
+      themes: (await tx`select id from themes where id = ${themeA}`).length,
+      positions: (await tx`select id from positions where id = ${positionA}`).length,
+      themeNotes: (await tx`select id from theme_notes where theme_id = ${themeA}`).length,
+      themePositions: (await tx`select id from theme_positions where theme_id = ${themeA}`).length,
+      sources: (await tx`select id from position_sources where position_id = ${positionA}`).length,
+      edges: (await tx`select id from position_edges where from_id = ${positionA2}`).length,
+      tensions: (await tx`select id from tensions where left_id = ${positionA}`).length,
+    }));
+    expect(seen).toEqual({
+      themes: 0,
+      positions: 0,
+      themeNotes: 0,
+      themePositions: 0,
+      sources: 0,
+      edges: 0,
+      tensions: 0,
+    });
+  });
+
+  it('does not leak a note body through the quote stored beside it', async () => {
+    // A position's evidence is a verbatim sentence out of a private note. The
+    // provenance row is a second copy of that sentence, so it needs the same
+    // policy the note does or the map becomes the way around it.
+    const rows = await asUser(
+      userB,
+      (tx) => tx`select quote from position_sources where quote ilike '%quitting%'`,
+    );
+    expect(rows).toHaveLength(0);
+  });
+
+  it('still hides an ungrounded position from another user', async () => {
+    // Ungrounded means every quote behind it has left the record. The row
+    // stays, because its owner may well still hold the position, and a row
+    // that is dimmed for its owner is still theirs.
+    await admin`update positions set ungrounded_at = now() where id = ${positionA2}`;
+
+    const theirs = await asUser(userB, (tx) => tx`select id from positions where id = ${positionA2}`);
+    expect(theirs).toHaveLength(0);
+
+    const own = await asUser(userA, (tx) => tx`select id from positions where id = ${positionA2}`);
+    expect(own).toHaveLength(1);
+
+    await admin`update positions set ungrounded_at = null where id = ${positionA2}`;
+  });
+
+  it('does not let another user edit or delete a position', async () => {
+    const edited = await asUser(
+      userB,
+      (tx) => tx`update positions set statement = 'tampered' where id = ${positionA} returning id`,
+    );
+    expect(edited).toHaveLength(0);
+
+    const deleted = await asUser(
+      userB,
+      (tx) => tx`delete from positions where id = ${positionA} returning id`,
+    );
+    expect(deleted).toHaveLength(0);
+  });
+
+  it('does not let another user settle your tension', async () => {
+    const affected = await asUser(
+      userB,
+      (tx) => tx`update tensions set status = 'dismissed', resolved_at = now()
+                 where left_id = ${positionA} returning id`,
+    );
+    expect(affected).toHaveLength(0);
+  });
+
+  it('does not let another user file a position into your theme', async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into theme_positions (user_id, theme_id, position_id, basis)
+                   values (${userB}, ${themeA}, ${positionB}, 'planted')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('refuses a join across two accounts even with RLS out of the way', async () => {
+    // The one that matters. Foreign keys are not subject to RLS, so a policy
+    // alone would not stop a row joining one account's position to another's
+    // theme. Every key here carries user_id for exactly this, and the check
+    // runs as admin because that is the case a policy cannot see.
+    await expect(
+      admin`insert into theme_positions (user_id, theme_id, position_id, basis)
+            values (${userB}, ${themeA}, ${positionB}, 'cross-account')`,
+    ).rejects.toThrow();
+
+    await expect(
+      admin`insert into position_edges (user_id, from_id, to_id, type)
+            values (${userB}, ${positionA}, ${positionB}, 'supports')`,
+    ).rejects.toThrow();
+
+    await expect(
+      admin`insert into position_sources (user_id, position_id, note_id, quote, blob_sha)
+            values (${userB}, ${positionB}, ${noteA}, 'I am quitting.', 'sha-x')`,
+    ).rejects.toThrow();
+
+    await expect(
+      admin`insert into theme_notes (user_id, theme_id, note_id, basis)
+            values (${userB}, ${themeB}, ${noteA}, 'cross-account')`,
+    ).rejects.toThrow();
+  });
+
+  it('does not let a membership be edited into a different one', async () => {
+    // A row in a join table is the pair it names. Changing either end is a
+    // different claim, which is a delete and an insert, so these tables carry
+    // no update policy -- and no update grant either, which is the stronger
+    // half: the privilege is refused before a policy is ever consulted, so
+    // this cannot be loosened by adding a policy without also noticing.
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`update theme_positions set basis = 'rewritten'
+                   where theme_id = ${themeA} returning id`,
+      ),
+    ).rejects.toThrow(/permission denied/);
+  });
+});
+
+describe('what the map enforces itself', () => {
+  it('orders a tension pair, so one dismissed cannot return from the other side', async () => {
+    const a = await seedPosition(userA, 'Upzoning lowers rents metro-wide');
+    const b = await seedPosition(userA, 'New buildings track rising rents');
+    const [lo, hi] = a < b ? [a, b] : [b, a];
+
+    // Written the "wrong" way round on purpose.
+    const [row] = await admin<{ left_id: string; right_id: string }[]>`
+      insert into tensions (user_id, left_id, right_id, kind, crux)
+      values (${userA}, ${hi}, ${lo}, 'scope', 'metro-wide over years, or local')
+      returning left_id, right_id`;
+    expect([row.left_id, row.right_id]).toEqual([lo, hi]);
+
+    await expect(
+      admin`insert into tensions (user_id, left_id, right_id, kind, crux)
+            values (${userA}, ${lo}, ${hi}, 'level', 'found again from the other side')`,
+    ).rejects.toThrow();
+  });
+
+  it('refuses a tension that is settled without a date, or open with one', async () => {
+    await expect(
+      admin`insert into tensions (user_id, left_id, right_id, kind, status, crux)
+            values (${userA}, ${positionA}, ${positionA2}, 'scope', 'resolved', 'no date')`,
+    ).rejects.toThrow();
+  });
+
+  it('refuses a position with no statement, and a source with no quote', async () => {
+    await expect(
+      admin`insert into positions (user_id, name, statement, basis, kind, stance)
+            values (${userA}, 'Nameless', '', 'from a note', 'claim', 'held')`,
+    ).rejects.toThrow();
+
+    await expect(
+      admin`insert into position_sources (user_id, position_id, note_id, quote, blob_sha)
+            values (${userA}, ${positionA}, ${noteA}, '', 'sha-x')`,
+    ).rejects.toThrow();
+  });
+
+  it('refuses two themes with the same name in one vault, whatever the case', async () => {
+    await expect(seedTheme(userA, 'urbanism')).rejects.toThrow();
+  });
+
+  it('lets two people hold the same theme name', async () => {
+    const id = await seedTheme(userB, 'Urbanism');
+    expect(id).toBeTruthy();
+  });
+
+  it('refuses an edge from a position to itself', async () => {
+    await expect(
+      admin`insert into position_edges (user_id, from_id, to_id, type)
+            values (${userA}, ${positionA}, ${positionA}, 'supports')`,
+    ).rejects.toThrow();
   });
 });
