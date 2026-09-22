@@ -50,7 +50,10 @@ describe('the chip', () => {
   it('names the workspace the bar is standing in', () => {
     const html = render('jobs');
     expect(html).toContain('Job search');
-    expect(html).toContain('Search Everything instead');
+    // The word on the chip is the state it is in, and the press offers the
+    // choice rather than making it -- the menu is what carries both scopes.
+    expect(html).toContain('Searching Job search. Choose what to search');
+    expect(html).toContain('aria-haspopup="menu"');
   });
 
   it('is absent outside a workspace, where there is nothing to narrow to', () => {

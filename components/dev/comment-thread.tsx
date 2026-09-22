@@ -231,6 +231,21 @@ export function CommentThread({
   const form = useRef<HTMLFormElement>(null);
   /** Kept only so a failed write can hand the words back rather than lose them. */
   const [sent, setSent] = useState('');
+  /**
+   * The box has been sent from and is not to be drawn, whatever `writing` and
+   * `draft` still say.
+   *
+   * `setDraft('')` and `setWriting(false)` are ordinary state, and the form
+   * action they are called from runs inside a transition that stays pending
+   * until the write comes back -- which for a tagged comment is however long a
+   * reply takes. React holds an ordinary update for that whole time and shows
+   * only optimistic ones, so the words sat in the box, whole, while the
+   * comment they had already been posted as stood in the thread above them
+   * (note ba9b608a). The two setters below are still what empties the box; this
+   * is what makes the emptying visible on the press. Both land in the same
+   * commit when the transition ends, so nothing flickers back.
+   */
+  const [posted, markPosted] = useOptimistic<boolean, void>(false, () => true);
 
   const [shown, showOptimistically] = useOptimistic(
     thread,
@@ -311,11 +326,18 @@ export function CommentThread({
         </ul>
       )}
 
-      {!writing ? (
+      {!writing || posted ? (
         <button
           type="button"
           onClick={() => setWriting(true)}
-          className="press -ml-1.5 inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-ui text-ink-ghost hover:bg-sunken hover:text-ink-muted"
+          // Off for the moment the last comment is still going out. Opening
+          // the box again in that window would hand back the box we have just
+          // optimistically emptied, still holding the words, and anything
+          // typed into it would be wiped when the real clear lands with the
+          // write. A control that is visibly off for a second says that
+          // better than one that swallows the press.
+          disabled={posted}
+          className="press -ml-1.5 inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-ui text-ink-ghost hover:bg-sunken hover:text-ink-muted disabled:opacity-50"
         >
           <span aria-hidden>+</span>
           {trigger}
@@ -331,6 +353,10 @@ export function CommentThread({
             setSent(body);
             setDraft('');
             setWriting(false);
+            // On the optimistic channel with the comment itself, so the box
+            // goes at the same moment the comment appears rather than when the
+            // write returns.
+            markPosted();
             showOptimistically(body);
             action(formData);
           }}

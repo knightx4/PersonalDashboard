@@ -133,6 +133,14 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.spec_sections = specSection.id;
 
+  // Keyed by (user_id, module) rather than an id of its own, so what goes in
+  // `ids` is the owner and ROW_KEY below reads that column. Asking "how many of
+  // A's visions can B see" is the isolation question anyway.
+  await admin`
+    insert into module_visions (user_id, module, body)
+    values (${userId}, 'learn', ${`${tag} wants Learn to know what it does not know`})`;
+  ids.module_visions = userId;
+
   // Keyed by (user_id, target, row_id) rather than an id of its own, so what
   // goes in `ids` is the row the thread hangs off -- see ROW_KEY below.
   await admin`
@@ -490,7 +498,10 @@ describe('cross-user reads', () => {
    * row_id) -- one row per conversation per person -- so the question "can B
    * see A's row" is asked of the row the thread hangs off.
    */
-  const ROW_KEY: Record<string, string> = { dev_comment_reads: 'row_id' };
+  const ROW_KEY: Record<string, string> = {
+    dev_comment_reads: 'row_id',
+    module_visions: 'user_id',
+  };
 
   it('shows user B zero rows belonging to user A, in every table', async () => {
     const leaks: string[] = [];

@@ -145,8 +145,13 @@ export type SpecGroup = {
  * The specs, grouped by the workspace they describe.
  *
  * Module order follows `MODULES`, with the app-wide group last, which is the
- * order `/dev/plan` and `/dev/ideas` already use. A workspace with no spec is
- * left out rather than shown empty.
+ * order `/dev/plan` and `/dev/ideas` already use.
+ *
+ * Every workspace gets a group, whether or not a document has been written for
+ * it, because the group is also where its vision is written and a workspace
+ * nobody has specified yet is exactly the one that wants one. The app-wide
+ * group is the exception and is dropped when it is empty: it has no vision of
+ * its own, so with no documents there is nothing in it at all.
  *
  * Pure, and it takes the comment counts rather than reading them, so the
  * grouping and the numbers on the folded rows can be tested without a database.
@@ -169,5 +174,5 @@ export function groupSpecs(
         comments: mine.reduce((total, spec) => total + (counts[spec.slug] ?? 0), 0),
       };
     })
-    .filter((group) => group.specs.length > 0);
+    .filter((group) => group.module !== null || group.specs.length > 0);
 }

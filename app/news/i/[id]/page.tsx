@@ -9,7 +9,7 @@ import { cn } from '@/lib/cn';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { loadIssue } from '@/lib/news/issues/load';
-import { formatArrival, senderLabel } from '@/lib/news/issues/list';
+import { formatArrival, issueReturn, senderLabel } from '@/lib/news/issues/list';
 import { markRead } from '@/lib/news/issues/read';
 import { cleanIssueHtml } from '@/lib/news/issues/sanitize';
 import { markIssueUnread } from './actions';
@@ -41,10 +41,10 @@ export default async function IssuePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ pictures?: string }>;
+  searchParams: Promise<{ pictures?: string; from?: string }>;
 }) {
   const { id } = await params;
-  const { pictures } = await searchParams;
+  const { pictures, from: cameFrom } = await searchParams;
   const user = await requireUser();
   const client = await createNewsClient();
 
@@ -60,16 +60,19 @@ export default async function IssuePage({
   const from = sender ? senderLabel(sender) : 'Unknown sender';
   const wanted = pictures === '1';
   const { html, blockedImages } = cleanIssueHtml(issue.htmlBody, wanted);
+  const back = issueReturn(cameFrom, sender);
+  /** Asking for the pictures reloads this page, and keeps where you were with it. */
+  const picturesHref = `/news/i/${issue.id}?pictures=1${back.from ? `&from=${back.from}` : ''}`;
 
   return (
     <div className="mx-auto max-w-3xl">
       <p className="mb-3">
         <Link
-          href={sender ? `/news?from=${sender.id}` : '/news'}
+          href={back.href}
           className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
           <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          {sender ? from : 'Newsletters'}
+          {back.label}
         </Link>
       </p>
 
@@ -80,7 +83,7 @@ export default async function IssuePage({
           <>
             {blockedImages > 0 && (
               <Link
-                href={`/news/i/${issue.id}?pictures=1`}
+                href={picturesHref}
                 className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}
               >
                 <ImageIcon className="size-3.5" strokeWidth={1.75} aria-hidden />
