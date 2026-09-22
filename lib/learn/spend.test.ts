@@ -69,6 +69,7 @@ describe('the operation names', () => {
       'judge-segment',
       'map-note',
       'map-sweep',
+      'check-areas',
     ]);
   });
 });
