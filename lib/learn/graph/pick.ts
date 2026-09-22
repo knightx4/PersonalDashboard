@@ -55,3 +55,39 @@ export function pickOneToAsk(input: PickInput): OneToAsk {
   if (row) return { kind: 'ask', row };
   return { kind: 'nothing', because: input.subjectCount === 0 ? 'no-subjects' : 'all-settled' };
 }
+
+/** A pick that found something to ask about. */
+export type PickedToAsk = Exclude<OneToAsk, { kind: 'nothing' }>;
+
+/**
+ * The next few claims Practice Flow writes questions for ahead of time.
+ *
+ * The same pick run `count` times, each time as though the questions before it
+ * had been answered: a claim picked once is taken out of the rows, and the
+ * count of answers moves on by one, so the fifth-question re-check lands where
+ * it would have if each had been picked live. `queued` is the claims already
+ * written ahead and not yet shown. They are left out too, and they count
+ * towards how far along the re-check cadence the new picks sit.
+ *
+ * What an answer will do to a claim cannot be known here, so these are the
+ * picks as things stand. The flow checks each claim's state again before
+ * showing its question and throws the question away if it has moved.
+ */
+export function pickAhead(input: PickInput, count: number, queued: readonly string[]): PickedToAsk[] {
+  const taken = new Set(queued);
+  const picks: PickedToAsk[] = [];
+
+  while (picks.length < count) {
+    const picked = pickOneToAsk({
+      ...input,
+      ready: input.ready.filter((row) => !taken.has(row.concept.id)),
+      settled: input.settled.filter((row) => !taken.has(row.concept.id)),
+      answered: input.answered + queued.length + picks.length,
+    });
+    if (picked.kind === 'nothing') break;
+    taken.add(picked.row.concept.id);
+    picks.push(picked);
+  }
+
+  return picks;
+}

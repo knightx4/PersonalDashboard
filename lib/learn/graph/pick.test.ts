@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pickOneToAsk, type PickInput } from './pick';
+import { pickAhead, pickOneToAsk, type PickInput } from './pick';
 import type { ReadyConcept } from './ready';
 import type { SettledConcept } from './recheck';
 import type { Concept, KnowledgeState } from './model';
@@ -192,5 +192,44 @@ describe('the turn that goes back over old ground', () => {
   it('re-checks even when there is nothing on the frontier left', () => {
     const picked = ask({ settled: [march], answered: 4 });
     expect(picked.kind).toBe('recheck');
+  });
+});
+
+describe('picking the claims to write questions for ahead of time', () => {
+  const march = settled('refraction', optics, '2026-03-14T10:00:00.000Z');
+  const ready = [row('splice', rigging, 1), row('bowline', rigging, 2), row('lens', optics, 3)];
+
+  function names(picks: ReturnType<typeof pickAhead>): string[] {
+    return picks.map((picked) => picked.row.concept.name);
+  }
+
+  it('picks different claims, in the order they would be asked', () => {
+    const picks = pickAhead({ ready, settled: [], subjectCount: 2, answered: 0, now }, 3, []);
+    expect(names(picks)).toEqual(['splice', 'bowline', 'lens']);
+  });
+
+  it('leaves out claims that already have a question waiting', () => {
+    const picks = pickAhead({ ready, settled: [], subjectCount: 2, answered: 0, now }, 2, [
+      ready[0].concept.id,
+    ]);
+    expect(names(picks)).toEqual(['bowline', 'lens']);
+  });
+
+  it('puts the re-check where the fifth answer falls', () => {
+    // Two answered and one already waiting: the second new pick is the fifth.
+    const picks = pickAhead({ ready, settled: [march], subjectCount: 2, answered: 2, now }, 3, [
+      'already-waiting',
+    ]);
+    expect(picks.map((picked) => picked.kind)).toEqual(['ask', 'recheck', 'ask']);
+    expect(names(picks)).toEqual(['splice', 'refraction', 'bowline']);
+  });
+
+  it('stops short when there is nothing more to ask', () => {
+    const picks = pickAhead(
+      { ready: [ready[0]], settled: [], subjectCount: 2, answered: 0, now },
+      3,
+      [],
+    );
+    expect(names(picks)).toEqual(['splice']);
   });
 });

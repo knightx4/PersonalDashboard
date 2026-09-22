@@ -8,7 +8,9 @@ import { lastAnsweredLine } from '@/lib/learn/graph/last-answered';
 import { loadReadyAndSettled, loadSubjects } from '@/lib/learn/graph/load';
 import { pickOneToAsk } from '@/lib/learn/graph/pick';
 import { answeredCount, lastAnsweredAt } from '@/lib/learn/graph/session';
+import { nextQuestion } from '@/lib/learn/flow/ahead';
 import { FlowSession } from './session';
+import { toFlowState } from './state';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Practice Flow' };
@@ -18,7 +20,10 @@ export const metadata = { title: 'Practice Flow' };
  * nothing left to ask.
  *
  * Each claim is picked across every subject, so there is nothing to choose
- * before starting. Whether there is anything to ask about is worked out here
+ * before starting, and the first question is on the screen when the page
+ * opens. Usually it was written ahead and this only takes it off the queue;
+ * when the queue is empty it is written here, and the page waits for it.
+ * Whether there is anything to ask about is worked out here
  * rather than after pressing start, because the two ways of having nothing --
  * no subjects at all, and every claim settled -- are different situations and
  * only one of them is an achievement.
@@ -47,6 +52,13 @@ export default async function PracticeFlowPage() {
   // reason somebody is still reading with it.
   const answered = lastAnsweredLine(answeredAt, new Date(), settings.timezone);
 
+  // Resumed rather than taken fresh, so a reload shows the question already
+  // on the screen instead of spending another one.
+  const first =
+    picked.kind === 'nothing'
+      ? null
+      : toFlowState(await nextQuestion(supabase, user.id, { resume: true }));
+
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
@@ -64,7 +76,7 @@ export default async function PracticeFlowPage() {
 
       <div className="mt-6">
         {picked.kind !== 'nothing' ? (
-          <FlowSession />
+          <FlowSession first={first ?? {}} />
         ) : picked.because === 'no-subjects' ? (
           <EmptyState
             icon={Target}
