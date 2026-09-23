@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, Package } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
-import { Card, CardSection } from '@/components/ui/card';
+import { Card, CardSection, foldCount } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatMoneyOrBlank } from '@/lib/money';
 import { requestOrigin } from '@/lib/auth/origin';
@@ -178,7 +178,7 @@ export default async function ShareDetailPage({ params }: { params: Promise<{ id
         </div>
 
         <div className="space-y-4">
-          <CardSection title="Links">
+          <CardSection title="Links" fold={foldCount((tokens ?? []).length, 'link')}>
             {/* Divided rows rather than a box each: the Links card is the
                 frame. Law 11. */}
             <div className="divide-y divide-border">
@@ -199,7 +199,7 @@ export default async function ShareDetailPage({ params }: { params: Promise<{ id
             </p>
           </CardSection>
 
-          <CardSection title="Recent activity">
+          <CardSection title="Recent activity" fold={foldCount((events ?? []).length, 'event')}>
             {(events ?? []).length === 0 ? (
               <p className="text-ui text-ink-muted">Nothing yet.</p>
             ) : (

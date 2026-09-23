@@ -6,7 +6,7 @@ import type { AttributeActionState } from './attribute-actions';
 import { updateInventoryItem, type ActionState } from '@/app/shopping/inventory/actions';
 import { Button } from '@/components/ui/button';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
-import { CardSection, cardVariants } from '@/components/ui/card';
+import { CardSection, cardVariants, foldCount } from '@/components/ui/card';
 import { Field, FieldError, Input, Select, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import {
@@ -94,6 +94,7 @@ export function ItemDetailsPanel({
 
   return (
     <CardSection
+      fold={foldCount(fields.length, 'field')}
       title="Details"
       action={
         <form action={lookupAction}>

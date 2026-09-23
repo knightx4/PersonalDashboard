@@ -128,3 +128,36 @@ export function CardSection({
     </Card>
   );
 }
+
+/**
+ * A list short enough to read in passing starts open; past this it starts
+ * folded, with its count on the closed line.
+ */
+export const FOLD_OPEN_AT = 5;
+
+/**
+ * The fold for a section that lists things: its count on the closed line, and
+ * open only while the list is short enough not to push the page down.
+ */
+export function foldCount(
+  count: number,
+  one: string,
+  many = `${one}s`,
+): { meta: string; defaultOpen: boolean } {
+  return {
+    meta: count === 0 ? `No ${many}` : `${count} ${count === 1 ? one : many}`,
+    defaultOpen: count <= FOLD_OPEN_AT,
+  };
+}
+
+/** Prose that fits in a glance starts open; longer text starts folded. */
+const FOLD_OPEN_WORDS = 80;
+
+/** The fold for a section that is one block of prose: its length on the closed line. */
+export function foldWords(text: string | null | undefined): { meta: string; defaultOpen: boolean } {
+  const words = text?.trim() ? text.trim().split(/\s+/).length : 0;
+  return {
+    meta: words === 0 ? 'Empty' : `${words} ${words === 1 ? 'word' : 'words'}`,
+    defaultOpen: words <= FOLD_OPEN_WORDS,
+  };
+}

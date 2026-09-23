@@ -6,7 +6,7 @@ import { RotateCcw, Tag } from 'lucide-react';
 import { separateCopy, ungroupItems } from '@/app/shopping/inventory/group-actions';
 import type { ActionState } from '@/app/shopping/inventory/actions';
 import { Button } from '@/components/ui/button';
-import { CardSection } from '@/components/ui/card';
+import { CardSection, foldCount } from '@/components/ui/card';
 import { FieldError } from '@/components/ui/field';
 import { formatMoney } from '@/lib/money';
 import { cn } from '@/lib/cn';
@@ -64,6 +64,7 @@ export function CopiesPanel({
 
   return (
     <CardSection
+      fold={foldCount(copies.length, 'copy', 'copies')}
       title={
         <>
           Copies <span className="font-normal text-ink-muted">({copies.length})</span>

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
-import { CardSection } from '@/components/ui/card';
+import { CardSection, foldCount } from '@/components/ui/card';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { formatDate } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
@@ -168,6 +168,7 @@ export default async function CompanyDetailPage({
       />
 
       <CardSection
+        fold={foldCount(roleRows.length, 'role')}
         title="Roles here, across cycles"
         className="mb-6"
         action={

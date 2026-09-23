@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { CardSection } from '@/components/ui/card';
+import { CardSection, foldCount } from '@/components/ui/card';
 import { Group } from '@/components/ui/disclosure';
 import {
   ESTABLISHED_LABEL,
@@ -294,7 +294,7 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
       </CardSection>
 
       {connected && (
-        <CardSection title="How it connects" className="mb-5">
+        <CardSection title="How it connects" className="mb-5" fold={foldCount(prerequisites.length + dependents.length + refersTo.length + referredToBy.length, 'connection')}>
           <div className="space-y-4">
             {prerequisites.length > 0 && (
               <Group title="It rests on">
@@ -360,6 +360,7 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
       )}
 
       <CardSection
+        fold={foldCount(probes.length, 'question')}
         title="Questions asked"
         hint={
           probes.length === 0

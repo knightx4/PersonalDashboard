@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
-import { Card, CardSection, cardVariants } from '@/components/ui/card';
+import { Card, CardSection, cardVariants, foldCount, foldWords } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { EditableProse } from '@/components/ui/editable-prose';
@@ -401,6 +401,7 @@ function Timeline({ events, timezone, otherAttempts, todos, applicationId, messa
 
       {otherAttempts.length > 0 && (
         <CardSection
+          fold={foldCount(otherAttempts.length, 'earlier attempt')}
           title="Earlier attempts"
           hint="Kept as history rather than overwritten — which is the whole reason a pursuit is a separate row from the posting."
         >
@@ -501,7 +502,7 @@ function Todos({
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <CardSection title="To-dos">
+    <CardSection title="To-dos" fold={foldCount(todos.length, 'to-do')}>
       {todos.length > 0 && (
         <ul className="mb-3 space-y-2">
           {todos.map((todo) => (
@@ -897,6 +898,7 @@ function Posting({
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <CardSection
+        fold={foldCount(lines.length, 'requirement')}
         title="Requirement map"
         hint={
           matches
@@ -1274,6 +1276,7 @@ function RoleDetailsCard({
   if (!editing) {
     return (
       <CardSection
+        fold={foldWords(jdText)}
         title="Details"
         action={
           <div className="flex items-center gap-1">

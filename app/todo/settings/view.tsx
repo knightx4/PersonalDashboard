@@ -3,7 +3,7 @@
 import { useActionState } from 'react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
-import { CardSection } from '@/components/ui/card';
+import { CardSection, foldCount } from '@/components/ui/card';
 import { Field, FieldError, Input } from '@/components/ui/field';
 import type { ModuleId } from '@/lib/modules';
 import type { SourceId } from '@/lib/todo/agenda/sources';
@@ -41,6 +41,7 @@ export function AgendaSettingsForm({
   return (
     <form action={action} className="space-y-6">
       <CardSection
+        fold={foldCount(groups.length, 'group')}
         title="Sources"
         padding="standard"
         hint="Things the other workspaces already know about, shown on your agenda. They are read where they live and never copied here — finishing one writes to the workspace that owns it."

@@ -1,7 +1,7 @@
 import { BarChart3 } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
-import { CardSection } from '@/components/ui/card';
+import { CardSection, foldCount } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Figure } from '@/components/ui/figure';
 import { Meter } from '@/components/ui/meter';
@@ -142,6 +142,7 @@ export default async function AnalyticsPage() {
         </CardSection>
 
         <CardSection
+          fold={foldCount(bySource.length, 'channel')}
           title="By channel"
           hint="The comparison a single blended number hides. This is usually the most actionable table in the app."
         >
@@ -180,6 +181,7 @@ export default async function AnalyticsPage() {
         </CardSection>
 
         <CardSection
+          fold={foldCount(cohorts.length, 'month')}
           title="By month applied"
           hint="Cohorted by submission date, always. Applications sent in June stay the June cohort forever and their response rate fills in as replies arrive."
         >
@@ -221,6 +223,7 @@ export default async function AnalyticsPage() {
         </CardSection>
 
         <CardSection
+          fold={foldCount(rejections.length, 'stage')}
           title="Where rejections happen"
           hint="Rejection at resume review and rejection after a final round are opposite diagnoses leading to opposite responses. Without this split, every rejection looks the same."
         >

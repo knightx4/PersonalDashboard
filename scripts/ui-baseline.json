@@ -172,18 +172,5 @@
   "small-input components/todo/task-form.tsx": 1,
   "spinner app/learn/new/import-form.tsx": 3,
   "spinner app/vault/settings/sync-now-button.tsx": 1,
-  "spinner components/feedback/run-routine-button.tsx": 3,
-  "unfolded-section app/dev/ui/page.tsx": 1,
-  "unfolded-section app/jobs/(app)/analytics/page.tsx": 3,
-  "unfolded-section app/jobs/(app)/companies/[slug]/page.tsx": 1,
-  "unfolded-section app/jobs/(app)/companies/[slug]/panels.tsx": 3,
-  "unfolded-section app/jobs/(app)/roles/[id]/panels.tsx": 4,
-  "unfolded-section app/learn/c/[id]/material.tsx": 1,
-  "unfolded-section app/learn/c/[id]/page.tsx": 2,
-  "unfolded-section app/shopping/inventory/[id]/copies-panel.tsx": 1,
-  "unfolded-section app/shopping/inventory/[id]/item-details-panel.tsx": 1,
-  "unfolded-section app/shopping/inventory/[id]/item-forms.tsx": 1,
-  "unfolded-section app/shopping/share/[id]/page.tsx": 2,
-  "unfolded-section app/todo/settings/feeds.tsx": 1,
-  "unfolded-section app/todo/settings/view.tsx": 1
+  "spinner components/feedback/run-routine-button.tsx": 3
 }

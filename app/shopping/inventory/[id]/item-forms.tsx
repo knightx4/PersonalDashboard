@@ -10,7 +10,7 @@ import {
 } from '@/app/shopping/inventory/actions';
 import { Button } from '@/components/ui/button';
 import { AddTrigger } from '@/components/ui/add-trigger';
-import { CardSection, cardVariants } from '@/components/ui/card';
+import { CardSection, cardVariants, foldCount } from '@/components/ui/card';
 import { Field, FieldError, Input, Select } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { DISPOSAL_METHODS } from '@/lib/inventory/status-actions';
@@ -124,7 +124,7 @@ export function ItemListsForm({
   const selected = new Set(selectedListIds);
 
   return (
-    <CardSection title="Lists">
+    <CardSection title="Lists" fold={foldCount(lists.length, 'list')}>
       <div className="space-y-3">
       <p className="text-ui text-ink-muted">
         Personal trackers — not categories. Filter inventory by any list you add here.

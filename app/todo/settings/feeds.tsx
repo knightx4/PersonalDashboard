@@ -3,7 +3,7 @@
 import { useActionState, useState, useTransition } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { CardSection } from '@/components/ui/card';
+import { CardSection, foldCount } from '@/components/ui/card';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { Field, FieldError, Input } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
@@ -23,6 +23,7 @@ export function CalendarFeeds({ feeds, timezone }: { feeds: Feed[]; timezone: st
 
   return (
     <CardSection
+      fold={foldCount(feeds.length, 'calendar')}
       title="Subscribed calendars"
       padding="standard"
       hint="Paste the private address of a calendar you already keep and its appointments appear here beside your own. Nothing you type here is ever sent back to it."

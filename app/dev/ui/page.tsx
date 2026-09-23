@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { Circle, CircleUser, Flag, Scale } from 'lucide-react';
-import { Card, CardSection } from '@/components/ui/card';
+import { Card, CardSection, foldCount } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
   ChipSelect,
@@ -1085,6 +1085,7 @@ export default function DevUiPage() {
             </div>
           </CardSection>
           <CardSection
+            fold={foldCount(DEV_QUEUE_STATES.length, 'queue')}
             title="The other dev queues"
             hint="Bugs, raises, findings and ideas drew their own pills until #503, and printed their status column until #504. Each reads what its row means now \u2014 a note you have replied to is not still waiting on you \u2014 and the shapes and the words are shared."
           >

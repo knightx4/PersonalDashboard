@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
-import { CardSection } from '@/components/ui/card';
+import { CardSection, foldCount, foldWords } from '@/components/ui/card';
 import { Field, FieldError, Input, Select, Textarea } from '@/components/ui/field';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { EditableProse } from '@/components/ui/editable-prose';
@@ -112,6 +112,7 @@ function Research({ companyId, research }: { companyId: string; research: string
   // card is the wrong shape for something this long (laws 14 and 12).
   return (
     <CardSection
+      fold={foldWords(text)}
       title="What you know about this place"
       hint="The one long-form field. It outlives every posting."
     >
@@ -585,7 +586,7 @@ function AiEnrichment({ companyId }: { companyId: string }) {
 
 function Contacts({ contacts }: { contacts: CompanyContact[] }) {
   return (
-    <CardSection title="People">
+    <CardSection title="People" fold={foldCount(contacts.length, 'person', 'people')}>
       {contacts.length === 0 ? (
         <p className="mt-2 text-ui text-ink-muted">
           Nobody recorded here yet. Add people from the contacts page.
@@ -718,7 +719,7 @@ function Notes({
   // arrival above them, so a panel whose job is to show what you have written
   // led with an empty box (law 14). It opens when there is something to add.
   return (
-    <CardSection title="Notes">
+    <CardSection title="Notes" fold={foldCount(notes.length, 'note')}>
       {adding ? (
         <div className="mt-2 space-y-2">
           <Textarea
