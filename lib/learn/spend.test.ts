@@ -73,6 +73,7 @@ describe('the operation names', () => {
       'check-areas',
       'place-themes',
       'place-track',
+      'name-feed-material',
     ]);
   });
 });

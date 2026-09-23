@@ -115,6 +115,7 @@ describe('RLS coverage', () => {
       'concept_state',
       'concept_subjects',
       'concepts',
+      'feed_cards',
       'goals',
       'imports',
       'next_outcomes',
@@ -380,6 +381,80 @@ describe('the catalogue, which belongs to nobody', () => {
                            'x', now())`,
       ),
     ).rejects.toThrow();
+  });
+});
+
+describe('the cards behind Learn now', () => {
+  // Picked and written by the service role (plan #806 and #807), read and
+  // updated by their owner when they save, dismiss or open one.
+  let cardA = '';
+  let themeA = '';
+
+  beforeAll(async () => {
+    const [provider] = await admin<{ id: string }[]>`
+      insert into catalogue_providers (slug, name, home_url, licence, ingest_note)
+      values ('wikipedia', 'Wikipedia', 'https://en.wikipedia.org', 'CC BY-SA',
+              'REST API, no key, section text')
+      on conflict (slug) do update set name = excluded.name
+      returning id`;
+    const [item] = await admin<{ id: string }[]>`
+      insert into catalogue_items (provider_id, external_id, title, kind, canonical_url)
+      values (${provider.id}, 'Inflation', 'Inflation', 'article', 'https://en.wikipedia.org/wiki/Inflation')
+      returning id`;
+    const [segment] = await admin<{ id: string }[]>`
+      insert into catalogue_segments (item_id, ordinal, section_anchor, heading, text)
+      values (${item.id}, 1, 'Causes', 'Causes', 'Prices rise when...')
+      returning id`;
+    const [theme] = await admin<{ id: string }[]>`
+      insert into obsidian.themes (user_id, name, about)
+      values (${userA}, 'Central banks', 'How rates are set.')
+      returning id`;
+    themeA = theme.id;
+    const [card] = await admin<{ id: string }[]>`
+      insert into feed_cards (user_id, reason, theme_id, theme_name, item_id, segment_id)
+      values (${userA}, 'interest', ${themeA}, 'Central banks', ${item.id}, ${segment.id})
+      returning id`;
+    cardA = card.id;
+  });
+
+  it('shows the owner their cards and another user none of them', async () => {
+    const own = await asUser(userA, (tx) => tx`select id from feed_cards`);
+    const other = await asUser(userB, (tx) => tx`select id from feed_cards`);
+    expect(own).toHaveLength(1);
+    expect(other).toHaveLength(0);
+  });
+
+  it('lets the owner record what they did with a card and nobody else', async () => {
+    await asUser(userB, (tx) => tx`update feed_cards set acted_at = now()`);
+    const [before] = await admin<{ acted_at: string | null }[]>`
+      select acted_at from feed_cards where id = ${cardA}`;
+    expect(before.acted_at).toBeNull();
+
+    await asUser(userA, (tx) => tx`update feed_cards set acted_at = now()`);
+    const [after] = await admin<{ acted_at: string | null }[]>`
+      select acted_at from feed_cards where id = ${cardA}`;
+    expect(after.acted_at).not.toBeNull();
+  });
+
+  it('does not let a signed-in user write a card directly', async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into feed_cards (user_id, reason, reading_id)
+                   values (${userB}, 'queued', ${readingA})`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('refuses a card shown before it has a summary', async () => {
+    await expect(admin`update feed_cards set status = 'ready' where id = ${cardA}`).rejects.toThrow();
+  });
+
+  it('keeps the card and its theme name when the theme goes', async () => {
+    await admin`delete from obsidian.themes where id = ${themeA}`;
+    const [row] = await admin<{ theme_id: string | null; theme_name: string }[]>`
+      select theme_id, theme_name from feed_cards where id = ${cardA}`;
+    expect(row).toEqual({ theme_id: null, theme_name: 'Central banks' });
   });
 });
 

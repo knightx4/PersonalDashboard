@@ -98,6 +98,10 @@ export const LEARN_OPERATIONS = [
   // show which fields you have been tested in. One call per track; a track
   // started from a theme copies the theme's placement and spends nothing.
   'place-track',
+  // Naming the Wikipedia sections a Learn now card is made from (plan #806).
+  // One Sonnet call per target, recorded through the service role from the
+  // picking pass against the account the target belongs to.
+  'name-feed-material',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
