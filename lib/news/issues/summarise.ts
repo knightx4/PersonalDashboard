@@ -16,7 +16,22 @@ import { digestIssue, type DigestOutcome } from './digest';
  * deployment, or the function stopped mid-call). A failed digest sets
  * `digested_at` too, so the catch-up does not pay for the same failure twice;
  * clearing `digested_at` on a row queues it again.
+ *
+ * The catch-up also redoes the issues summarised before the one-line summary
+ * existed (plan #824), rewriting each in place so its summary is never cleared
+ * in between. It picks those by `digested_at` before LINE_SINCE: a redo moves
+ * `digested_at` past it whether or not it wrote a line, so no issue is redone
+ * twice, and a failed redo keeps the summary it had.
  */
+
+/**
+ * When the code that writes `summary_line` was committed (61af3ee, 06:48 UTC).
+ * Every summary before it was written without a line; the last was at 06:13.
+ */
+export const LINE_SINCE = '2026-09-23T06:48:00Z';
+
+/** Never attempted, or summarised without a line before LINE_SINCE. */
+export const PENDING_FILTER = `digested_at.is.null,and(summary.not.is.null,summary_line.is.null,digested_at.lt."${LINE_SINCE}")`;
 
 type Clients = {
   /** May be the service role: digestIssue names the account on every query. */
@@ -65,7 +80,9 @@ const PENDING_LIMIT = 500;
 export type PendingTally = { digested: number; failed: number; missing: number; left: number };
 
 /**
- * Summarise every issue not yet attempted, oldest first, one at a time.
+ * Summarise every issue not yet attempted, oldest first, one at a time, then
+ * redo the ones summarised without a line. The never-attempted come first so
+ * the redo never holds up a new issue.
  *
  * Reads across all accounts, which is why it takes the service-role client;
  * each issue's own `user_id` is passed on, so the spend lands on the account
@@ -86,7 +103,8 @@ export async function digestPending(
   const { data, error } = await input.news
     .from('issues')
     .select('id, user_id')
-    .is('digested_at', null)
+    .or(PENDING_FILTER)
+    .order('digested_at', { ascending: true, nullsFirst: true })
     .order('received_at', { ascending: true })
     .limit(input.limit ?? PENDING_LIMIT);
   if (error) throw new Error(`news: listing issues to summarise failed (${error.message})`);
