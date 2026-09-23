@@ -54,6 +54,10 @@ export type OvernightRun = {
   endedAt: string | null;
   /** Why it ended, in a sentence. Null on a night that is still going. */
   endedReason: string | null;
+  /** When the tick last ran for this account. Migration 0098. */
+  lastTickAt: string | null;
+  /** What that tick decided, in a sentence: why it waited, or what it started. */
+  lastTickNote: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -61,7 +65,7 @@ export type OvernightRun = {
 /** Every column of the row, so one string is read in one place. */
 export const OVERNIGHT_COLUMNS =
   'id, running, paused, features_budget, features_left, stop_by, started_at, ' +
-  'last_fired_at, ended_at, ended_reason, created_at, updated_at';
+  'last_fired_at, ended_at, ended_reason, last_tick_at, last_tick_note, created_at, updated_at';
 
 /**
  * A row as the app reads it.
@@ -95,6 +99,8 @@ export function overnightRunFromRow(row: Record<string, unknown>): OvernightRun 
     lastFiredAt: stamp(row.last_fired_at),
     endedAt: stamp(row.ended_at),
     endedReason: (row.ended_reason as string | null) ?? null,
+    lastTickAt: stamp(row.last_tick_at),
+    lastTickNote: (row.last_tick_note as string | null) ?? null,
     createdAt: stamp(row.created_at) ?? '',
     updatedAt: stamp(row.updated_at) ?? stamp(row.created_at) ?? '',
   };

@@ -25,7 +25,7 @@ import {
   type FeatureProgress,
 } from '@/lib/digest/night';
 import { elapsedSince, remainingUntil } from '@/lib/plan/elapsed';
-import { commitSubject, silenceReads, type StoredPush } from '@/lib/plan/liveness';
+import { commitSubject, type StoredPush } from '@/lib/plan/liveness';
 import { readyFeaturesLine } from '@/lib/plan/overnight-choice';
 import {
   OVERNIGHT_DEFAULT_FEATURES,
@@ -146,31 +146,41 @@ function OnFeature({
   );
 }
 
+/** How long the runner may go without a tick before the page says so. */
+const TICK_SILENT_AFTER_MINUTES = 15;
+
 /**
- * A warning when the session has gone silent, read with the same marks the
- * plan page uses for a claim. Counted from the last push, or from the fire if
- * nothing has been pushed since. Says nothing while it is still pushing.
+ * What the runner last decided, in its own words, and when.
+ *
+ * The tick writes this on every pass of a running night (migration 0098):
+ * waiting for the session on the current feature, or waiting until something
+ * is ready and why. That is the answer to "is it stuck", read off the runner
+ * rather than guessed. The one thing said as a warning is a runner that has
+ * stopped checking in at all, because that is the only state in which nothing
+ * will move without somebody looking.
  */
-function Silence({
-  fire,
-  push,
-  now,
-}: {
-  fire: NonNullable<DigestNight['lastFire']>;
-  push: StoredPush | null;
-  now: number;
-}) {
-  if (now === 0) return null;
-  const since = Math.max(new Date(fire.at).getTime(), push ? new Date(push.at).getTime() : 0);
-  const reads = silenceReads((now - since) / 60_000);
-  if (reads === 'working') return null;
-  const quiet = elapsedSince(new Date(since).toISOString(), now);
+function TickNote({ run, now }: { run: OvernightRun; now: number }) {
+  if (!run.lastTickAt || !run.lastTickNote || now === 0) return null;
+  const ago = elapsedSince(run.lastTickAt, now);
+  const silent = (now - new Date(run.lastTickAt).getTime()) / 60_000 >= TICK_SILENT_AFTER_MINUTES;
+
+  if (silent) {
+    return (
+      <p className="text-small text-caution">
+        The runner has not checked in for {ago}. Its clock may have stopped, and nothing new will
+        start until it runs again.
+      </p>
+    );
+  }
+  // A fire is already on the line above, as the feature it is on.
+  if (run.lastTickNote.startsWith('Started #')) return null;
 
   return (
-    <p className="text-small text-caution">
-      {reads === 'quiet'
-        ? `Nothing pushed for ${quiet}. The session may have stalled.`
-        : `Nothing pushed for ${quiet}. The session has most likely ended without finishing.`}
+    <p className="text-small text-ink-muted">
+      {run.lastTickNote}{' '}
+      <span className="tabular">
+        {ago === 'just now' ? 'Checked just now.' : `Checked ${ago} ago.`}
+      </span>
     </p>
   );
 }
@@ -576,9 +586,7 @@ export function OvernightControl({
 
           {push && <LastPush push={push} now={now} />}
 
-          {standing === 'running' && night.lastFire && (
-            <Silence fire={night.lastFire} push={push} now={now} />
-          )}
+          {standing === 'running' && <TickNote run={run} now={now} />}
 
           {night.blocked.length > 0 && <BlockedSteps night={night} />}
 

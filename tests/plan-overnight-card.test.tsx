@@ -55,6 +55,8 @@ function run(over: Partial<OvernightRun> = {}): OvernightRun {
     lastFiredAt: '2026-09-17T04:04:00Z',
     endedAt: null,
     endedReason: null,
+    lastTickAt: null,
+    lastTickNote: null,
     createdAt: '2026-09-16T23:00:00Z',
     updatedAt: '2026-09-17T04:04:00Z',
     ...over,
@@ -69,7 +71,13 @@ function night(over: Partial<DigestNight> = {}): DigestNight {
     endedReason: null,
     featuresBudget: 4,
     featuresLeft: 3,
-    features: [{ ref: '#494', title: 'The dev pages say what is actually happening', at: '2026-09-17T04:04:00Z' }],
+    features: [
+      {
+        ref: '#494',
+        title: 'The dev pages say what is actually happening',
+        at: '2026-09-17T04:04:00Z',
+      },
+    ],
     lastFire: {
       ref: '#494',
       title: 'The dev pages say what is actually happening',
@@ -95,14 +103,7 @@ const PUSH: StoredPush = {
 
 function draw(props: Partial<Parameters<typeof OvernightControl>[0]> = {}): string {
   return renderToStaticMarkup(
-    <OvernightControl
-      run={run()}
-      canSend
-      night={night()}
-      push={PUSH}
-      ready={3}
-      {...props}
-    />,
+    <OvernightControl run={run()} canSend night={night()} push={PUSH} ready={3} {...props} />,
   );
 }
 

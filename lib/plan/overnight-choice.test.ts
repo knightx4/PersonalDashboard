@@ -68,6 +68,8 @@ function night(over: Partial<OvernightRun> = {}): OvernightRun {
     lastFiredAt: null,
     endedAt: null,
     endedReason: null,
+    lastTickAt: null,
+    lastTickNote: null,
     createdAt: '2026-09-17T23:00:00.000Z',
     updatedAt: '2026-09-17T23:00:00.000Z',
     ...over,

@@ -74,6 +74,8 @@ function run(over: Partial<OvernightRun> = {}): OvernightRun {
     lastFiredAt: '2026-03-02T02:00:00Z',
     endedAt: '2026-03-02T03:00:00Z',
     endedReason: budgetSpentReason({ featuresBudget: 6 }),
+    lastTickAt: null,
+    lastTickNote: null,
     createdAt: STARTED,
     updatedAt: '2026-03-02T03:00:00Z',
     ...over,

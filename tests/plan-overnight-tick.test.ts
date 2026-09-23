@@ -21,6 +21,7 @@ import {
   overnightTick,
   OVERNIGHT_NO_PROGRESS,
   runOvernightTick,
+  tickNote,
   type OvernightPorts,
 } from '@/inngest/dev/overnight';
 import { buildPlanTree, findNode, type PlanSection } from '@/lib/plan/tree';
@@ -79,6 +80,8 @@ function night(over: Partial<OvernightRun> = {}): OvernightRun {
     lastFiredAt: null,
     endedAt: null,
     endedReason: null,
+    lastTickAt: null,
+    lastTickNote: null,
     createdAt: '2026-09-17T23:00:00.000Z',
     updatedAt: '2026-09-17T23:00:00.000Z',
     ...over,
@@ -598,5 +601,27 @@ describe('runOvernightTick', () => {
     expect(summary.main.error).toContain('GITHUB_READ_TOKEN');
     expect(summary.accounts).toBe(0);
     vi.unstubAllEnvs();
+  });
+});
+
+describe('tickNote', () => {
+  it('says why the runner is waiting, in the reason it worked out', () => {
+    expect(tickNote({ act: 'nothing-ready', reason: '#723 is being re-read.' })).toBe(
+      'Waiting until something is ready. #723 is being re-read.',
+    );
+    expect(tickNote({ act: 'waiting', liveness: 'working' })).toBe(
+      'Waiting for the session on the current feature to finish.',
+    );
+    expect(tickNote({ act: 'waiting', liveness: 'unknown' })).toContain(
+      'GitHub could not be asked',
+    );
+  });
+
+  it('names what it started, and says nothing for an idle or held runner', () => {
+    expect(
+      tickNote({ act: 'fired', feature: 791, step: 792, featuresLeft: null, refused: [] }),
+    ).toBe('Started #791.');
+    expect(tickNote({ act: 'idle' })).toBeNull();
+    expect(tickNote({ act: 'paused' })).toBeNull();
   });
 });
