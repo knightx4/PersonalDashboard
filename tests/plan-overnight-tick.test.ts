@@ -20,6 +20,7 @@ import {
   closedNothingSince,
   overnightRefusedReason,
   overnightTick,
+  featureRunLiveness,
   featureRunsInFlight,
   OVERNIGHT_NO_PROGRESS,
   outsideRunning,
@@ -793,5 +794,49 @@ describe('featureRunsInFlight', () => {
       now: MIDNIGHT,
     });
     expect(runs).toEqual([]);
+  });
+});
+
+describe('featureRunLiveness', () => {
+  const started = new Date(MIDNIGHT - 30 * 60_000).toISOString();
+  const closed = new Date(MIDNIGHT - 15 * 60_000).toISOString();
+
+  /** A feature with one closed step and one more, claimed or not. */
+  function plan(nextStatus: string) {
+    const rows = [
+      { id: 'feature', parent_id: null, status: 'not_started', updated_at: started },
+      { id: 'first', parent_id: 'feature', status: 'done', updated_at: closed },
+      { id: 'next', parent_id: 'feature', status: nextStatus, updated_at: closed },
+    ];
+    const chain = { select: () => chain, eq: async () => ({ data: rows, error: null }) };
+    return {
+      rpc: async (fn: string) => ({
+        data: fn === 'plan_subtree_closed_at' ? closed : null,
+        error: null,
+      }),
+      from: () => chain,
+    } as never;
+  }
+
+  it('reads a session that closed a step and claimed the next as still working', async () => {
+    const liveness = await featureRunLiveness({
+      supabase: plan('in_progress'),
+      userId: 'u',
+      row: { plan_item_id: 'feature', status: 'started', created_at: started },
+      now: MIDNIGHT,
+      pushes: [],
+    });
+    expect(liveness).toBe('working');
+  });
+
+  it('reads it as finished once nothing under the feature is claimed', async () => {
+    const liveness = await featureRunLiveness({
+      supabase: plan('not_started'),
+      userId: 'u',
+      row: { plan_item_id: 'feature', status: 'started', created_at: started },
+      now: MIDNIGHT,
+      pushes: [],
+    });
+    expect(liveness).toBe('finished');
   });
 });

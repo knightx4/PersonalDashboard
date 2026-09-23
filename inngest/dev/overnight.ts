@@ -695,7 +695,7 @@ export async function featureRunsInFlight(input: {
  * own rows alone, with nothing claimed, is over whatever else is being pushed.
  * See `FEATURE_IDLE_AFTER_MINUTES`.
  */
-async function featureRunLiveness(input: {
+export async function featureRunLiveness(input: {
   supabase: Db;
   userId: string;
   row: FeatureRunRow;
@@ -706,17 +706,27 @@ async function featureRunLiveness(input: {
   const { supabase, userId, row } = input;
   let closedAt: string | null = null;
   let blockedAt: string | null = null;
+  let trail: Awaited<ReturnType<typeof subtreeTrail>> = null;
   if (row.plan_item_id) {
-    [closedAt, blockedAt] = await Promise.all([
+    [closedAt, blockedAt, trail] = await Promise.all([
       subtreeClosedAt(supabase, row.plan_item_id),
       subtreeBlockedAt(supabase, row.plan_item_id),
+      subtreeTrail(supabase, userId, row.plan_item_id),
     ]);
   }
+
+  // A step claimed under the feature is a session at work in its module,
+  // whatever closed before it. A run sent at a feature closes one step and
+  // claims the next, and reading the first close as the end of the run freed
+  // its slot and its module while it went on working: #749 on 23 September
+  // closed #878 at 19:27, claimed #879 at 19:28, and the next tick offered
+  // #749 again. A claim whose session died is put back by the stale-claim
+  // sweep, which runs ahead of this on every tick.
+  if (trail?.claimed) return 'working';
 
   // A close or block since the start is still `finished`, which says more.
   const endedOnRows = endsRun(closedAt, row.created_at) || endsRun(blockedAt, row.created_at);
   if (row.plan_item_id && !endedOnRows) {
-    const trail = await subtreeTrail(supabase, userId, row.plan_item_id);
     if (trail && featureRunIdle(row.created_at, trail, input.now)) return 'ended';
   }
 
