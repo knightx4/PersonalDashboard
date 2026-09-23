@@ -11,6 +11,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardBody, CardSection } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { SaveStoryButton } from '@/components/news/save-story-button';
 import { StoryText } from '@/components/news/story-text';
 import type { NewsStory } from '@/lib/news/issues/stories';
 import { markIssueUnread } from './actions';
@@ -41,6 +42,8 @@ export type IssueViewProps = {
   picturesHref: string;
   originalHref: string;
   summaryHref: string;
+  /** Headlines of this issue's stories on the Saved list, so each reads Save or Saved. */
+  savedHeadlines?: readonly string[];
 };
 
 /**
@@ -65,7 +68,9 @@ export function IssueView({
   picturesHref,
   originalHref,
   summaryHref,
+  savedHeadlines = [],
 }: IssueViewProps) {
+  const isSaved = (story: NewsStory) => savedHeadlines.includes(story.headline);
   return (
     <div className="mx-auto max-w-3xl">
       <p className="mb-3">
@@ -168,7 +173,12 @@ export function IssueView({
             <p className="break-words text-body leading-relaxed text-ink">{digest.summary}</p>
           </Card>
           {digest.stories.length > 0 && (
-            <LeadStory story={digest.stories[0]} pictures={pictures} />
+            <LeadStory
+              story={digest.stories[0]}
+              pictures={pictures}
+              issueId={issueId}
+              saved={isSaved(digest.stories[0])}
+            />
           )}
           {digest.stories.length > 1 && (
             <CardSection title="More stories">
@@ -199,7 +209,7 @@ export function IssueView({
                       )}
                     </div>
                     <StoryText text={story.text} />
-                    <StoryLink link={story.link} />
+                    <StoryActions story={story} issueId={issueId} saved={isSaved(story)} />
                   </li>
                 ))}
               </ul>
@@ -231,9 +241,19 @@ export function IssueView({
  * The issue's first story, given the most room so the page says where to
  * start (plan #856): its picture across the card's full width, its headline a
  * size up. With pictures off, or no picture in the email, it is the larger
- * headline alone. The fold and the link are the same as every other story's.
+ * headline alone. The fold, the link and Save are the same as every other story's.
  */
-function LeadStory({ story, pictures }: { story: NewsStory; pictures: boolean }) {
+function LeadStory({
+  story,
+  pictures,
+  issueId,
+  saved,
+}: {
+  story: NewsStory;
+  pictures: boolean;
+  issueId: string;
+  saved: boolean;
+}) {
   return (
     <Card padding="none" className="overflow-hidden">
       {pictures && story.image && (
@@ -252,23 +272,42 @@ function LeadStory({ story, pictures }: { story: NewsStory; pictures: boolean })
         </h2>
         <p className="mt-2 text-body leading-relaxed text-ink-muted">{story.summary}</p>
         <StoryText text={story.text} />
-        <StoryLink link={story.link} />
+        <StoryActions story={story} issueId={issueId} saved={saved} />
       </div>
     </Card>
   );
 }
 
-function StoryLink({ link }: { link: string | undefined }) {
-  if (!link) return null;
+/**
+ * Under each story: the article, when the email linked one, and Save (plan
+ * #869). Save sits at the far end so it lands in the same place on every
+ * story, linked or not.
+ */
+function StoryActions({
+  story,
+  issueId,
+  saved,
+}: {
+  story: NewsStory;
+  issueId: string;
+  saved: boolean;
+}) {
   return (
-    <a
-      href={link}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="mt-1.5 inline-flex items-center gap-1 text-ui text-accent hover:underline"
-    >
-      Read the article
-      <ExternalLink className="size-3" strokeWidth={1.75} aria-hidden />
-    </a>
+    <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+      {story.link ? (
+        <a
+          href={story.link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-ui text-accent hover:underline"
+        >
+          Read the article
+          <ExternalLink className="size-3" strokeWidth={1.75} aria-hidden />
+        </a>
+      ) : (
+        <span aria-hidden />
+      )}
+      <SaveStoryButton issueId={issueId} headline={story.headline} saved={saved} className="-mr-2.5" />
+    </div>
   );
 }

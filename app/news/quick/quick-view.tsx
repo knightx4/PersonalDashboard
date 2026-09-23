@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Image as ImageIcon, ImageOff, Mail } from 'lucide-react';
+import { SaveStoryButton } from '@/components/news/save-story-button';
 import { StoryText } from '@/components/news/story-text';
 import { TopicChips, type TopicChipsProps } from '@/components/news/topic-chips';
 import { PageHeader } from '@/components/shell/page-header';
@@ -19,6 +20,8 @@ export type QuickReadViewProps = {
   nothingYet: boolean;
   /** How many topics are hidden with Fewer like this, so caught up can say they are set aside. */
   hiddenCount?: number;
+  /** Whether the card's story is on the Saved list (plan #869). */
+  saved?: boolean;
   /** Whether pictures load: on unless the reader turned them off with ?pictures=0. */
   pictures: boolean;
   picturesHref: string;
@@ -41,6 +44,7 @@ export function QuickReadView({
   arrived,
   nothingYet,
   hiddenCount = 0,
+  saved = false,
   pictures,
   picturesHref,
   issueHref,
@@ -167,6 +171,9 @@ export function QuickReadView({
                   : `${left} more ${topic ? `on ${topic} ` : ''}from this newsletter`}
               </p>
               <div className="flex flex-wrap items-center gap-2">
+                {story && (
+                  <SaveStoryButton issueId={card.issueId} headline={story.headline} saved={saved} />
+                )}
                 {story?.topic && <HideTopicForm topic={story.topic} />}
                 <QuickNextForm issueId={card.issueId} storyIndex={card.storyIndex} />
               </div>

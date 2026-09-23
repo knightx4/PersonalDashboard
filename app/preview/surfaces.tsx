@@ -1563,6 +1563,8 @@ const issueBase: IssueViewProps = {
   picturesHref: '/news/i/issue-1?pictures=0',
   originalHref: '/news/i/issue-1?view=original',
   summaryHref: '/news/i/issue-1',
+  // One story saved, so the gallery shows Save and Saved side by side (plan #869).
+  savedHeadlines: ['Tracing library 4.0 drops the global registry'],
 };
 
 /** A single-essay newsletter: the summary is the whole digest. */

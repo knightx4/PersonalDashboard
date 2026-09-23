@@ -6,6 +6,7 @@ import { formatArrival, issueHref } from '@/lib/news/issues/list';
 import { loadQuickRead } from '@/lib/news/issues/quick';
 import { readTopic } from '@/lib/news/issues/topics';
 import { loadHiddenTopics } from '@/lib/news/quick/hidden-topics';
+import { loadSavedHeadlines } from '@/lib/news/saved/stories';
 import { nextCard, quickHref, quickTopics } from '@/lib/news/quick/next';
 import { topicHrefs } from '@/components/news/topic-chips';
 import { QuickReadView } from './quick/quick-view';
@@ -48,6 +49,9 @@ export default async function QuickReadPage({
   const card = nextCard(issues, senders, passes, { topic, hidden });
   const wanted = params.pictures !== '0';
   const topics = quickTopics(issues, senders, passes, hidden);
+  const saved =
+    card?.kind === 'story' &&
+    (await loadSavedHeadlines(client, card.issueId)).has(card.story.headline);
 
   return (
     <QuickReadView
@@ -55,6 +59,7 @@ export default async function QuickReadPage({
       arrived={card ? formatArrival(card.receivedAt, settings.timezone) : null}
       nothingYet={issues.length === 0}
       hiddenCount={hidden.length}
+      saved={saved}
       pictures={wanted}
       picturesHref={quickHref({ pictures: !wanted, topic })}
       issueHref={
