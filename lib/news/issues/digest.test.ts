@@ -229,6 +229,28 @@ describe('digesting a newsletter', () => {
     expect(spend.insert).not.toHaveBeenCalled();
   });
 
+  it('rewrites a summarised issue in place, with its line', async () => {
+    const { outcome, news } = await run(
+      reported({ summary: 'New.', line: 'A new line', stories: [] }),
+      { ...ISSUE, summary: 'Old.' },
+    );
+
+    expect(outcome).toMatchObject({ status: 'digested', line: 'A new line' });
+    expect(news.updates[0]).toMatchObject({
+      summary: 'New.',
+      summary_line: 'A new line',
+      stories: [],
+      digest_error: null,
+    });
+  });
+
+  it('keeps the old summary when a redo fails, and moves only digested_at', async () => {
+    const { outcome, news } = await run(new Error('529 overloaded'), { ...ISSUE, summary: 'Old.' });
+
+    expect(outcome).toEqual({ status: 'failed', error: '529 overloaded' });
+    expect(Object.keys(news.updates[0])).toEqual(['digested_at']);
+  });
+
   it('saves an error, and still records the spend, when the reply is unusable', async () => {
     const { outcome, news, spend } = await run({
       content: [{ type: 'tool_use', name: 'report_digest', input: { stories: [] } }],

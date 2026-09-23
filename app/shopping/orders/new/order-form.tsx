@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, FieldError, Input, Select } from '@/components/ui/field';
 import type { Person } from '@/lib/people/load';
+import type { OrderFormPrefill } from '@/lib/review/read-order';
 import {
   computeOrderTotalCents,
   formatMoney,
@@ -57,18 +58,28 @@ export function OrderForm({
   defaultDate,
   people = [],
   defaultPersonId = null,
+  prefill = null,
+  sourceMessageId = null,
 }: {
   merchants: MerchantOption[];
   categories: CategoryOption[];
   defaultDate: string;
   people?: Person[];
   defaultPersonId?: string | null;
+  /** Starting values read out of an email. */
+  prefill?: OrderFormPrefill | null;
+  /** The review email the order is made from; saving links it to the order. */
+  sourceMessageId?: string | null;
 }) {
   const [state, action, pending] = useActionState(createManualOrder, initialState);
-  const [lines, setLines] = useState<LineDraft[]>([newLine()]);
-  const [tax, setTax] = useState('');
-  const [shipping, setShipping] = useState('');
-  const [discount, setDiscount] = useState('');
+  const [lines, setLines] = useState<LineDraft[]>(() =>
+    prefill && prefill.lines.length > 0
+      ? prefill.lines.map((line) => ({ ...line, key: crypto.randomUUID() }))
+      : [newLine()],
+  );
+  const [tax, setTax] = useState(prefill?.tax ?? '');
+  const [shipping, setShipping] = useState(prefill?.shipping ?? '');
+  const [discount, setDiscount] = useState(prefill?.discount ?? '');
 
   const preview = useMemo(() => {
     const pricedLines = lines.flatMap((line) => {
@@ -91,9 +102,22 @@ export function OrderForm({
 
   return (
     <form action={action} className="space-y-8">
+      {sourceMessageId && (
+        <input type="hidden" name="source_message_id" value={sourceMessageId} />
+      )}
+      {prefill && <input type="hidden" name="currency" value={prefill.currency} />}
       <section className="grid gap-4 sm:grid-cols-2">
         <Field id="merchant" label="Merchant" className="sm:col-span-2">
-          <MerchantField id="merchant" merchants={merchants} />
+          <MerchantField
+            id="merchant"
+            merchants={merchants}
+            defaultValue={
+              prefill
+                ? (merchants.find((merchant) => merchant.id === prefill.merchantId)?.name ??
+                  prefill.merchantName)
+                : undefined
+            }
+          />
         </Field>
 
         <Field id="external_order_number" label="Order number">
@@ -101,6 +125,7 @@ export function OrderForm({
             id="external_order_number"
             name="external_order_number"
             placeholder="Optional"
+            defaultValue={prefill?.externalOrderNumber}
           />
         </Field>
 
@@ -110,7 +135,7 @@ export function OrderForm({
             name="order_date"
             type="date"
             required
-            defaultValue={defaultDate}
+            defaultValue={prefill?.orderDate ?? defaultDate}
           />
         </Field>
 
