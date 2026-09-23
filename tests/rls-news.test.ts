@@ -238,6 +238,31 @@ describe('news.story_passes', () => {
   });
 });
 
+describe('news.hidden_topics', () => {
+  it('shows a user only the topics they have hidden, once each', async () => {
+    await asUser(userA, (tx) => tx`
+      insert into hidden_topics (user_id, topic) values (${userA}, 'Sport')`);
+
+    const mine = await asUser(userA, (tx) => tx<{ topic: string }[]>`
+      select topic from hidden_topics`);
+    expect(mine.map((r) => r.topic)).toEqual(['Sport']);
+
+    const theirs = await asUser(userB, (tx) => tx`select 1 from hidden_topics`);
+    expect(theirs).toHaveLength(0);
+
+    await expect(
+      admin`insert into hidden_topics (user_id, topic) values (${userA}, 'Sport')`,
+    ).rejects.toThrow(/hidden_topics_pkey/);
+  });
+
+  it('refuses a topic hidden under another account\'s id', async () => {
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into hidden_topics (user_id, topic) values (${userA}, 'Politics')`),
+    ).rejects.toThrow(/row-level security/);
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`
@@ -256,7 +281,13 @@ describe('RLS coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'news' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['addresses', 'issues', 'senders', 'story_passes']);
+    expect(rows.map((r) => r.tablename)).toEqual([
+      'addresses',
+      'hidden_topics',
+      'issues',
+      'senders',
+      'story_passes',
+    ]);
   });
 
   it('reaches nothing in the schema as an anonymous visitor', async () => {

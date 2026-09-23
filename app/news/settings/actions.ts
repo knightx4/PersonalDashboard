@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth/server';
 import { createNewsClient } from '@/lib/news/auth/server';
+import { readTopic } from '@/lib/news/issues/topics';
+import { showTopic } from '@/lib/news/quick/hidden-topics';
 import { loadOrCreateLocalPart, replaceLocalPart } from '@/lib/news/settings/address';
 
 /**
@@ -32,4 +34,20 @@ export async function replaceAddress(): Promise<{ ok: boolean; error?: string }>
 
   revalidatePath('/news/settings');
   return { ok: true };
+}
+
+/**
+ * Bring a topic hidden with Fewer like this back into Quick read (plan #861).
+ */
+// latency: pending
+export async function showHiddenTopic(formData: FormData): Promise<void> {
+  const topic = readTopic(formData.get('topic'));
+  if (!topic) return;
+
+  const user = await requireUser();
+  const client = await createNewsClient();
+  await showTopic(client, { userId: user.id, topic });
+
+  revalidatePath('/news/settings');
+  revalidatePath('/news');
 }

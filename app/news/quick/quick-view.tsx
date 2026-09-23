@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
 import type { QuickCard } from '@/lib/news/quick/next';
-import { ArticleLink, QuickNextForm, QuickSwipe } from './quick-controls';
+import { ArticleLink, HideTopicForm, QuickNextForm, QuickSwipe } from './quick-controls';
 
 export type QuickReadViewProps = {
   /** The story to show, or null when there is none left. */
@@ -17,6 +17,8 @@ export type QuickReadViewProps = {
   arrived: string | null;
   /** Whether no newsletter has been summarised yet, which is not the same as caught up. */
   nothingYet: boolean;
+  /** How many topics are hidden with Fewer like this, so caught up can say they are set aside. */
+  hiddenCount?: number;
   /** Whether pictures load: on unless the reader turned them off with ?pictures=0. */
   pictures: boolean;
   picturesHref: string;
@@ -38,6 +40,7 @@ export function QuickReadView({
   card,
   arrived,
   nothingYet,
+  hiddenCount = 0,
   pictures,
   picturesHref,
   issueHref,
@@ -72,7 +75,11 @@ export function QuickReadView({
             tone="finished"
             seed={seed}
             title="You are caught up"
-            description="You have been through every story from the newsletters you have not muted. New ones show here as they arrive."
+            description={
+              hiddenCount
+                ? `You have been through every story from the newsletters you have not muted, apart from the ${hiddenCount === 1 ? 'topic' : `${hiddenCount} topics`} you hid. New ones show here as they arrive.`
+                : 'You have been through every story from the newsletters you have not muted. New ones show here as they arrive.'
+            }
             action={{ label: 'All newsletters', href: '/news/all' }}
           />
         )}
@@ -159,7 +166,10 @@ export function QuickReadView({
                   ? `The last ${topic ? `${topic} story` : 'story'} from this newsletter`
                   : `${left} more ${topic ? `on ${topic} ` : ''}from this newsletter`}
               </p>
-              <QuickNextForm issueId={card.issueId} storyIndex={card.storyIndex} />
+              <div className="flex flex-wrap items-center gap-2">
+                {story?.topic && <HideTopicForm topic={story.topic} />}
+                <QuickNextForm issueId={card.issueId} storyIndex={card.storyIndex} />
+              </div>
             </div>
           </article>
         </Card>

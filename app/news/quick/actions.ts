@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { passStory } from '@/lib/news/issues/quick';
+import { readTopic } from '@/lib/news/issues/topics';
+import { hideTopic } from '@/lib/news/quick/hidden-topics';
 
 const PassInput = z.object({
   issueId: z.string().uuid(),
@@ -53,4 +55,25 @@ export async function recordArticleOpened(issueId: string, storyIndex: number): 
   const user = await requireUser();
   const client = await createNewsClient();
   await passStory(client, { userId: user.id, ...parsed.data });
+}
+
+/**
+ * Fewer like this (plan #861): hide the card's topic from Quick read and bring
+ * up the next card.
+ *
+ * Nothing is passed. The card leaves because its topic is now hidden, and it
+ * comes back if the topic is brought back from News settings. The newsletter
+ * list is untouched, so only Quick read and the settings page are refreshed.
+ */
+// latency: pending
+export async function hideQuickTopic(formData: FormData): Promise<void> {
+  const topic = readTopic(formData.get('topic'));
+  if (!topic) return;
+
+  const user = await requireUser();
+  const client = await createNewsClient();
+  await hideTopic(client, { userId: user.id, topic });
+
+  revalidatePath('/news');
+  revalidatePath('/news/settings');
 }
