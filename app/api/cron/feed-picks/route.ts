@@ -12,8 +12,9 @@ export const maxDuration = 300;
  *
  * Draws a few targets for every account with placed themes, names Wikipedia
  * sections for each, stores the articles in the catalogue and leaves `picked`
- * rows in learn.feed_cards. Plan #807 calls this from its hourly tick before
- * writing the picked rows into cards.
+ * rows in learn.feed_cards. The hourly top-up (`/api/cron/feed-top-up`, plan
+ * #807) runs the same pass per person when it needs more picks, so this route
+ * is for a manual run across every account.
  *
  * `?targets=n` draws n targets per person instead of the default four, up to
  * ten. Authorised like the other cron routes, with `Authorization: Bearer

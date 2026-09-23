@@ -24,8 +24,9 @@ import { fetchWikipediaArticle } from '@/lib/learn/providers/wikipedia';
  *
  * For every account with placed themes, draws a few targets and leaves
  * `picked` rows in `learn.feed_cards`, each pointing at a Wikipedia section
- * stored in the catalogue. Plan #807 writes those rows into cards and adds the
- * hourly schedule; until then this runs when its route is called.
+ * stored in the catalogue. The Learn now top-up (plan #807,
+ * `inngest/learn/feed-top-up.ts`) calls the same pass per person when it runs
+ * out of picked rows to write; this whole-account run stays for a manual call.
  *
  * The service client bypasses RLS, so every read and write names the person.
  */
@@ -53,7 +54,7 @@ async function readAll<T>(
 }
 
 /** Every account with at least one theme placed in a field. */
-async function peopleWithThemes(learn: LearnSupabaseClient): Promise<string[]> {
+export async function peopleWithThemes(learn: LearnSupabaseClient): Promise<string[]> {
   const rows = await readAll<{ user_id: string }>(
     (from, to) =>
       learn.from('theme_fields').select('user_id').not('field_id', 'is', null).order('user_id').range(from, to),
@@ -146,29 +147,33 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
 
 export type FeedPicksResult = { people: FeedPickSummary[] };
 
-export async function runFeedPicks(options: { targets?: number } = {}): Promise<FeedPicksResult> {
-  const started = Date.now();
-  const deadline = started + FEED_PICKS_BUDGET_MS;
-  const learn = createLearnServiceSupabase();
-  const core = createCoreServiceSupabase();
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('The Learn now pass needs ANTHROPIC_API_KEY to be set.');
-
+/** The fields in the areas, as the draw needs them. */
+export async function loadFeedFields(learn: LearnSupabaseClient): Promise<FeedField[]> {
   const areas = await loadAreas(learn);
   const domainOf = new Map(areas.fields.map((field) => [field.slug, field.domain]));
-  const fields: FeedField[] = areas.fields.map((field) => ({
+  return areas.fields.map((field) => ({
     id: areas.fieldIds.get(field.slug)!,
     slug: field.slug,
     name: field.name,
     scope: field.scope,
     domain: domainOf.get(field.slug) ?? '',
   }));
+}
 
-  const people: FeedPickSummary[] = [];
-  for (const userId of await peopleWithThemes(learn)) {
-    if (Date.now() >= deadline) break;
-
+/**
+ * The picking pass for one person, with the real ports.
+ *
+ * Exported for the Learn now top-up (plan #807), which picks for one person
+ * when their picked rows run out, inside its own deadline.
+ */
+export function createFeedPicker(context: {
+  learn: LearnSupabaseClient;
+  core: ReturnType<typeof createCoreServiceSupabase>;
+  apiKey: string;
+  fields: FeedField[];
+}): (userId: string, options: { targets?: number; deadline: number }) => Promise<FeedPickSummary> {
+  const { learn, core, apiKey, fields } = context;
+  return (userId, options) => {
     const ports: FeedPickPorts = {
       loadPerson: (id) => loadPerson(learn, fields, id),
       name: async (target, avoid) => {
@@ -202,15 +207,30 @@ export async function runFeedPicks(options: { targets?: number } = {}): Promise<
       },
       now: Date.now,
     };
+    return runFeedPicksFor(ports, {
+      userId,
+      targets: options.targets,
+      deadline: options.deadline,
+      model: NAME_MATERIAL_MODEL,
+    });
+  };
+}
 
-    people.push(
-      await runFeedPicksFor(ports, {
-        userId,
-        targets: options.targets,
-        deadline,
-        model: NAME_MATERIAL_MODEL,
-      }),
-    );
+export async function runFeedPicks(options: { targets?: number } = {}): Promise<FeedPicksResult> {
+  const started = Date.now();
+  const deadline = started + FEED_PICKS_BUDGET_MS;
+  const learn = createLearnServiceSupabase();
+  const core = createCoreServiceSupabase();
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('The Learn now pass needs ANTHROPIC_API_KEY to be set.');
+
+  const pickFor = createFeedPicker({ learn, core, apiKey, fields: await loadFeedFields(learn) });
+
+  const people: FeedPickSummary[] = [];
+  for (const userId of await peopleWithThemes(learn)) {
+    if (Date.now() >= deadline) break;
+    people.push(await pickFor(userId, { targets: options.targets, deadline }));
   }
 
   return { people };

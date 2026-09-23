@@ -74,6 +74,7 @@ describe('the operation names', () => {
       'place-themes',
       'place-track',
       'name-feed-material',
+      'write-feed-card',
     ]);
   });
 });
