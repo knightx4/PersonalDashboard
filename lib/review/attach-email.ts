@@ -6,8 +6,8 @@ import type { MessageClassification } from '@/lib/email/extract/schema';
 import { SUGGESTABLE_CLASSIFICATIONS } from '@/lib/orders/suggest-for-email';
 
 /**
- * Attaching a waiting shipping, delivery or return email to an order the
- * person picked in the review queue.
+ * Attaching a waiting shipping, delivery, return or confirmation email to an
+ * order the person picked in the review queue.
  *
  * The sync attaches these itself when it can find the order, and runs
  * applyLifecycleToOrder with what extractLifecycleFromEmail read from the
@@ -16,11 +16,48 @@ import { SUGGESTABLE_CLASSIFICATIONS } from '@/lib/orders/suggest-for-email';
  * The parts that do not need a database are here so they can be tested.
  */
 
-/** The kinds of review email that can be attached to an existing order. */
+/** A lifecycle email: what the sync applies to an order it finds. */
+export type LifecycleAttachKind = 'shipping' | 'delivery' | 'return';
+
+/** Every kind of review email that can be attached to an existing order. */
+export type AttachableClassification = LifecycleAttachKind | 'order_confirmation';
+
+/**
+ * The kinds of review email that can be attached to an existing order.
+ * Confirmations are included because most of the ones waiting in review are
+ * shipping notices the classifier misread; see lifecycleKindForAttach.
+ */
 export function isAttachableClassification(
   classification: string | null | undefined,
-): classification is 'shipping' | 'delivery' | 'return' {
+): classification is AttachableClassification {
   return classification != null && SUGGESTABLE_CLASSIFICATIONS.has(classification);
+}
+
+const RETURN_SUBJECT = /\b(?:returns?|returned|refund|refunded|credited back)\b/i;
+const DELIVERY_SUBJECT = /\b(?:delivered|has arrived|have arrived|delivery confirmation)\b/i;
+const SHIPPING_SUBJECT =
+  /\b(?:shipped|shipment|on the way|on its way|out for delivery|in transit|tracking|has your order|about to ship|delivery estimate)\b/i;
+
+/**
+ * What an attached email should be applied to the order as.
+ *
+ * A shipping, delivery or return email is applied as what it is. A
+ * confirmation is read again from its subject, because the classifier checks
+ * for "order #" before it checks for "on the way", so "A shipment from order
+ * #11888 is on the way" arrives as a confirmation. When the subject reads as
+ * none of the three (a pickup notice, a support thread, a ticket), the result
+ * is null and the email is only linked to the order, with nothing applied.
+ */
+export function lifecycleKindForAttach(
+  classification: AttachableClassification,
+  subject: string | null,
+): LifecycleAttachKind | null {
+  if (classification !== 'order_confirmation') return classification;
+  const text = subject ?? '';
+  if (RETURN_SUBJECT.test(text)) return 'return';
+  if (DELIVERY_SUBJECT.test(text)) return 'delivery';
+  if (SHIPPING_SUBJECT.test(text)) return 'shipping';
+  return null;
 }
 
 /**
@@ -32,7 +69,7 @@ export function isAttachableClassification(
  * status; only the tracking number and refund amount are lost.
  */
 export function extractionForAttach(input: {
-  classification: 'shipping' | 'delivery' | 'return';
+  classification: LifecycleAttachKind;
   subject: string | null;
   body: { text: string; html: string | null } | null;
   receivedAt: Date | null;
@@ -51,13 +88,18 @@ export function extractionForAttach(input: {
   return extraction;
 }
 
-/** The toast after an attach: what happened and to which order. */
+/**
+ * The toast after an attach: what happened and to which order. A null kind is
+ * an email that was only linked, with nothing applied.
+ */
 export function attachedMessage(
-  classification: 'shipping' | 'delivery' | 'return',
+  classification: LifecycleAttachKind | null,
   order: { merchantName: string; orderDate: string },
 ): string {
   const what =
-    classification === 'shipping'
+    classification === null
+      ? 'Email'
+      : classification === 'shipping'
       ? 'Shipping email'
       : classification === 'delivery'
         ? 'Delivery email'

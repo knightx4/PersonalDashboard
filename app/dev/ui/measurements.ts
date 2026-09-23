@@ -188,6 +188,7 @@ export const MOTION: readonly Row4[] = [
   ['press', 'scale(0.98)', 'Every button, chip and summary, while held.', '150ms'],
   ['lift', 'translateY(-2px) + shadow', 'An interactive card under the cursor.', '150ms'],
   ['dragging', 'scale(0.98) rotate(-0.5°), 55% opacity', 'The pipeline card mid-drag.', '—'],
+  ['swipe', 'follows the finger, springs back', 'A Quick read card dragged left. Still under reduced motion.', '150ms'],
   ['toast-in', '6px rise, fade in', 'A toast arriving. Nothing on the way out.', '180ms'],
   ['keyhint', 'fade', 'Shortcut hints while a modifier is held.', '120ms'],
   ['status line', 'fade back', 'The line settling after it has been read.', '1000ms'],

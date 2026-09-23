@@ -12,6 +12,7 @@ import {
   attachedMessage,
   extractionForAttach,
   isAttachableClassification,
+  lifecycleKindForAttach,
 } from '@/lib/review/attach-email';
 import { fetchMessageBody } from '@/lib/inbox/fetch-message-body';
 import { applyLifecycleToOrder } from '@/lib/orders/apply-lifecycle';
@@ -273,6 +274,11 @@ export async function excludeSenderReview(
  * becomes `parsed`. The order page lists linked emails by resulting_order_id,
  * so that is what puts the email there.
  *
+ * An order confirmation goes the same way under the kind its subject reads as
+ * (lifecycleKindForAttach), and its classification is corrected to that kind
+ * so the order page shows it beside the shipment. One whose subject reads as
+ * no lifecycle kind is only linked and marked `parsed`, with nothing applied.
+ *
  * Nothing records that the link was made by hand: nothing would read it.
  */
 // latency: pending
@@ -315,8 +321,16 @@ export async function attachEmailToOrder(
 
   const classification = message.classification as string | null;
   if (!isAttachableClassification(classification)) {
-    return { error: 'Only shipping, delivery and return emails attach to an order.' };
+    return {
+      error: 'Only confirmation, shipping, delivery and return emails attach to an order.',
+    };
   }
+  const kind = lifecycleKindForAttach(classification, message.subject as string | null);
+  const merchant = Array.isArray(order.merchants) ? order.merchants[0] : order.merchants;
+  const toast = attachedMessage(kind, {
+    merchantName: (merchant?.name as string | undefined) ?? 'Unknown merchant',
+    orderDate: order.order_date as string,
+  });
   if (message.parse_status !== 'needs_review') {
     return { error: 'That email has already left the queue.' };
   }
@@ -334,6 +348,17 @@ export async function attachEmailToOrder(
     return { error: 'That email has already left the queue.' };
   }
 
+  if (kind === null) {
+    const { error: linkError } = await supabase
+      .from('ingested_messages')
+      .update({ parse_status: 'parsed', error: null })
+      .eq('id', messageId);
+    if (linkError) return { error: linkError.message };
+    revalidateReviewSurfaces();
+    revalidatePath(`/shopping/orders/${orderId}`);
+    return { message: toast };
+  }
+
   const core = await createCoreClient();
   const fetched = await fetchMessageBody(core, {
     userId: user.id,
@@ -342,7 +367,7 @@ export async function attachEmailToOrder(
   });
   const receivedAt = message.received_at ? new Date(message.received_at as string) : null;
   const extraction = extractionForAttach({
-    classification,
+    classification: kind,
     subject: fetched.ok ? fetched.message.subject : (message.subject as string | null),
     body: fetched.ok ? { text: fetched.message.text, html: fetched.message.html } : null,
     receivedAt: fetched.ok ? (fetched.message.internalDate ?? receivedAt) : receivedAt,
@@ -362,7 +387,7 @@ export async function attachEmailToOrder(
       externalOrderNumber: (order.external_order_number as string | null) ?? null,
       cancelledAt: (order.cancelled_at as string | null) ?? null,
     },
-    classification,
+    classification: kind,
     extraction,
     sourceMessageId: messageId,
     receivedAt,
@@ -384,21 +409,17 @@ export async function attachEmailToOrder(
     .update({
       parse_status: 'parsed',
       parse_confidence: extraction.confidence,
+      // A confirmation that was really a shipping notice is recorded as one.
+      classification: kind,
       error: null,
     })
     .eq('id', messageId);
   if (doneError) return { error: doneError.message };
 
-  const merchant = Array.isArray(order.merchants) ? order.merchants[0] : order.merchants;
   revalidateReviewSurfaces();
   revalidatePath(`/shopping/orders/${orderId}`);
   revalidatePath('/shopping/returns');
-  return {
-    message: attachedMessage(classification, {
-      merchantName: (merchant?.name as string | undefined) ?? 'Unknown merchant',
-      orderDate: order.order_date as string,
-    }),
-  };
+  return { message: toast };
 }
 
 /**

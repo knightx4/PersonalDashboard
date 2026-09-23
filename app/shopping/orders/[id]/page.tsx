@@ -378,6 +378,56 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           </section>
         )}
 
+        {/* Every email linked to the order, including one attached from the
+            review queue that wrote nothing onto it (a pickup notice, a support
+            thread), which no other section would show. */}
+        {(sourceMessages?.length ?? 0) > 0 && (
+          <section className="space-y-3">
+            <h2 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
+              Emails
+            </h2>
+            <ul
+              className={cn(
+                cardVariants({ padding: 'none' }),
+                'divide-y divide-border overflow-hidden',
+              )}
+            >
+              {(sourceMessages ?? []).map((message) => {
+                const href = messageGmailHref(message);
+                return (
+                  <li key={message.id} className="row-pad flex justify-between gap-4 px-4">
+                    <div className="min-w-0">
+                      <p className="truncate text-body text-ink">
+                        {message.subject?.trim() || 'Email without subject'}
+                      </p>
+                      <p className="text-ui text-ink-muted">
+                        {[
+                          message.classification?.replaceAll('_', ' '),
+                          message.received_at
+                            ? new Date(message.received_at).toLocaleDateString()
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </p>
+                    </div>
+                    {href && (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="shrink-0 text-ui text-ink-muted transition-colors duration-150 hover:text-accent hover:underline"
+                      >
+                        Open in Gmail
+                      </a>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+
         <Card padding="none" className="overflow-hidden">
           <Table>
             <THead>
