@@ -260,6 +260,60 @@ describe('where a theme sits in the areas', () => {
   });
 });
 
+describe('where a track sits in the areas', () => {
+  // The placement is columns on learn.subjects (0032_subject_fields.sql),
+  // written through the owner's session like the rest of the subject.
+  let subjectA = '';
+  let physics = '';
+  let domain = '';
+
+  beforeAll(async () => {
+    const [subject] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Placed track') returning id`;
+    subjectA = subject.id;
+    const [field] = await admin<{ id: string; domain_id: string }[]>`
+      select id, domain_id from area_fields where slug = 'physics'`;
+    physics = field.id;
+    domain = field.domain_id;
+  });
+
+  it('lets the owner place their track and nobody else', async () => {
+    await asUser(
+      userB,
+      (tx) => tx`update subjects set field_id = ${physics}, placement_confidence = 'clear',
+                 placement_basis = 'Planted.', placed_at = now() where id = ${subjectA}`,
+    );
+    const [before] = await admin<{ field_id: string | null }[]>`
+      select field_id from subjects where id = ${subjectA}`;
+    expect(before.field_id).toBeNull();
+
+    await asUser(
+      userA,
+      (tx) => tx`update subjects set field_id = ${physics}, placement_confidence = 'clear',
+                 placement_basis = 'Placed for the test.', placed_at = now() where id = ${subjectA}`,
+    );
+    const [after] = await admin<{ field_id: string | null }[]>`
+      select field_id from subjects where id = ${subjectA}`;
+    expect(after.field_id).toBe(physics);
+  });
+
+  it('refuses a track placed in a field and a domain at once', async () => {
+    await expect(
+      admin`update subjects set domain_id = ${domain} where id = ${subjectA}`,
+    ).rejects.toThrow();
+  });
+
+  it('refuses a field with no basis or no placed_at', async () => {
+    await expect(
+      admin`insert into subjects (user_id, name, field_id) values (${userA}, 'Half placed', ${physics})`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into subjects (user_id, name, field_id, placement_confidence, placed_at)
+            values (${userA}, 'No basis', ${physics}, 'clear', now())`,
+    ).rejects.toThrow();
+  });
+});
+
 describe('the catalogue, which belongs to nobody', () => {
   // Four of the five catalogue tables carry no user_id on purpose: a catalogue
   // of forty thousand Wikipedia sections is not forty thousand rows per

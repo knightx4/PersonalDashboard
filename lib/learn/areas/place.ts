@@ -9,8 +9,9 @@ import type { Level3Article } from '@/lib/learn/areas/level3';
 /**
  * Placing things into the areas (docs/LEARN-AREAS-SPEC.md).
  *
- * Two callers, one call. The check places Wikipedia's Level 3 articles to test
- * the grid, and theme placement puts each vault theme where it belongs. Both
+ * Three callers, one call. The check places Wikipedia's Level 3 articles to
+ * test the grid, theme placement puts each vault theme where it belongs, and
+ * track placement puts each learn subject in the field it studies. All
  * hand the model every field with its scope, which is where the boundary rules
  * live, and a batch of named items with a line of context each. For each item
  * it names a field (or, for an umbrella, a domain), a runner-up when one is
@@ -18,8 +19,8 @@ import type { Level3Article } from '@/lib/learn/areas/level3';
  *
  * They differ in one respect. An encyclopedia article is always about
  * something a field studies, so the check never leaves one out. A theme can be
- * a trip being planned or the plot of a story being written, so theme
- * placement may answer "unplaced".
+ * a trip being planned or the plot of a story being written, and a track can
+ * span two domains, so theme and track placement may answer "unplaced".
  *
  * Opus, because the value is in the close calls. Forty items is one call.
  */
@@ -85,6 +86,20 @@ A theme that is not about any field of study goes nowhere: answer "${UNPLACED}"
 as field. That covers personal logistics and errands, and the plot, setting or
 characters of a story the person is writing, unless the theme is really about
 an idea the story explores, in which case place the idea.`;
+
+/** What track placement says about its items, ahead of the shared rules. */
+const TRACK_INTRO = `You are placing one person's study tracks into a fixed list of
+fields of study, so they can see which fields they have been tested in. You are
+given the fields, each with a scope that says what belongs there and where the
+nearest things that do not belong there go instead. Then you are given the
+tracks, each with a line saying what it covers.
+
+For every track, decide which ONE field it belongs in. A track narrower than a
+field goes in the field that contains it. A track that straddles two fields goes
+in the one where most of its ideas would be taught.
+
+A track that spans more than one domain has nothing above a domain to go in:
+answer "${UNPLACED}" as field, and say so in the basis.`;
 
 const SHARED_RULES = `- A topic goes in the field that studies it. Follow the scope sentences: they
   settle the common overlaps, and where one says something belongs elsewhere,
@@ -293,6 +308,17 @@ export function placeThemes(input: PlaceInput & { themes: PlaceItem[] }): Promis
     items: input.themes,
     intro: THEME_INTRO,
     listHeading: 'The themes, as "name (what the writing under it is about)":',
+    allowUnplaced: true,
+  });
+}
+
+/** Track placement: learn subjects, one at a time as each is created. */
+export function placeTracks(input: PlaceInput & { tracks: PlaceItem[] }): Promise<PlaceResult> {
+  return placeItems({
+    ...input,
+    items: input.tracks,
+    intro: TRACK_INTRO,
+    listHeading: 'The tracks, as "name (what it covers)":',
     allowUnplaced: true,
   });
 }

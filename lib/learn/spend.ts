@@ -94,6 +94,10 @@ export const LEARN_OPERATIONS = [
   // fields your writing falls in. Recorded through the service role from its
   // hourly cron call, and against the account whose themes were placed.
   'place-themes',
+  // Placing one track into the areas when it is created, so the Know page can
+  // show which fields you have been tested in. One call per track; a track
+  // started from a theme copies the theme's placement and spends nothing.
+  'place-track',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

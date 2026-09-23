@@ -13,13 +13,8 @@ import {
   wikitextFrom,
   type Level3Article,
 } from '@/lib/learn/areas/level3';
-import {
-  PLACE_BATCH,
-  PLACE_MODEL,
-  placeArticles,
-  type AreaDomain,
-  type AreaField,
-} from '@/lib/learn/areas/place';
+import { loadAreas } from '@/lib/learn/areas/load';
+import { PLACE_BATCH, PLACE_MODEL, placeArticles } from '@/lib/learn/areas/place';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { fetchDocument } from '@/lib/learn/providers/fetch';
 import type { LearnOperation } from '@/lib/learn/spend';
@@ -77,47 +72,6 @@ async function loadList(learn: LearnSupabaseClient): Promise<number> {
   return articles.length;
 }
 
-type Areas = {
-  fields: AreaField[];
-  domains: AreaDomain[];
-  ids: Map<string, string>;
-  domainIds: Map<string, string>;
-};
-
-async function loadAreas(learn: LearnSupabaseClient): Promise<Areas> {
-  const { data, error } = await learn
-    .from('area_fields')
-    .select('id, slug, name, scope, position, domain:area_domains(name, position)');
-  if (error) throw new Error(`Reading the areas failed: ${error.message}`);
-
-  const { data: domainData, error: domainError } = await learn
-    .from('area_domains')
-    .select('id, slug, name, scope, position')
-    .order('position');
-  if (domainError) throw new Error(`Reading the domains failed: ${domainError.message}`);
-  const domainRows = (domainData ?? []) as { id: string; slug: string; name: string; scope: string }[];
-
-  type Row = {
-    id: string;
-    slug: string;
-    name: string;
-    scope: string;
-    position: number;
-    domain: { name: string; position: number } | null;
-  };
-  const rows = ((data ?? []) as unknown as Row[]).sort(
-    (a, b) => (a.domain?.position ?? 0) - (b.domain?.position ?? 0) || a.position - b.position,
-  );
-  if (rows.length === 0) throw new Error('There are no areas to place into. Is 0027_areas applied?');
-
-  return {
-    fields: rows.map((row) => ({ slug: row.slug, name: row.name, scope: row.scope, domain: row.domain?.name ?? '' })),
-    ids: new Map(rows.map((row) => [row.slug, row.id])),
-    domains: domainRows.map((row) => ({ slug: row.slug, name: row.name, scope: row.scope })),
-    domainIds: new Map(domainRows.map((row) => [row.slug, row.id])),
-  };
-}
-
 async function countUnplaced(learn: LearnSupabaseClient): Promise<number> {
   const { count, error } = await learn
     .from('area_check_articles')
@@ -150,7 +104,7 @@ export async function runAreaCheckTick(): Promise<AreaCheckSummary> {
   if (ownerError || !owner.success) throw new Error('Could not resolve the owner to record spend against.');
   const core = createCoreServiceSupabase();
 
-  const { fields, domains, ids, domainIds } = await loadAreas(learn);
+  const { fields, domains, fieldIds: ids, domainIds } = await loadAreas(learn);
 
   while (Date.now() - started < CHECK_BUDGET_MS) {
     const { data, error } = await learn

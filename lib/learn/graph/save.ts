@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
+import { placeTrackAfterResponse, type TrackTheme } from '@/lib/learn/areas/place-track';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { ProposedChain } from '@/lib/learn/graph/chain-payload';
 
@@ -41,6 +42,14 @@ export type SavedChain = {
   conceptIds: string[];
 };
 
+/** A line saying what a track covers: what was asked for, and its first few ideas. */
+export function trackContext(asked: string, chain: ProposedChain): string {
+  const ideas = chain.nodes.slice(0, 8).map((node) => node.name);
+  return [`aimed at: ${asked}`, ideas.length > 0 ? `ideas: ${ideas.join('; ')}` : '']
+    .filter(Boolean)
+    .join('. ');
+}
+
 function fail(action: string, error: { message: string }): Error {
   return new Error(`${action} failed: ${error.message}`);
 }
@@ -51,21 +60,27 @@ function fail(action: string, error: { message: string }): Error {
  * Case-insensitive, matching the unique index: `economics` and `Economics` are
  * one subject, and ending up with two half-graphs of the same field is the
  * failure the spec warns about specifically.
+ *
+ * `placed` says whether the subject has a placement in the areas yet. A new
+ * one never has, and an old one lacks it only when placing it failed.
  */
 export async function findOrCreateSubject(
   supabase: LearnSupabaseClient,
   userId: string,
   name: string,
-): Promise<{ id: string; created: boolean }> {
+): Promise<{ id: string; created: boolean; placed: boolean }> {
   const { data, error } = await supabase
     .from('subjects')
-    .select('id, name')
+    .select('id, name, placed_at')
     .ilike('name', name)
     .maybeSingle();
 
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw fail('Looking up the track', error);
-  if (data) return { id: (data as { id: string }).id, created: false };
+  if (data) {
+    const found = data as { id: string; placed_at?: string | null };
+    return { id: found.id, created: false, placed: Boolean(found.placed_at) };
+  }
 
   const { data: created, error: createError } = await supabase
     .from('subjects')
@@ -77,7 +92,7 @@ export async function findOrCreateSubject(
   if (createError || !created) {
     throw fail('Creating the track', createError ?? { message: 'no row' });
   }
-  return { id: (created as { id: string }).id, created: true };
+  return { id: (created as { id: string }).id, created: true, placed: false };
 }
 
 /**
@@ -103,10 +118,22 @@ export async function saveChain(
    * worth setting: on the day a claim turns out to be wrong, `generated` points
    * at a model that laid out a chain and `briefing` points at a document
    * somebody handed you.
+   *
+   * `theme` is the vault theme a track was started from, when it was. The
+   * track then takes that theme's placement in the areas rather than asking
+   * the model for one.
    */
-  options: { goal?: boolean; origin?: ConceptOrigin } = {},
+  options: { goal?: boolean; origin?: ConceptOrigin; theme?: TrackTheme } = {},
 ): Promise<SavedChain> {
-  const { id: subjectId } = await findOrCreateSubject(supabase, userId, chain.subject);
+  const { id: subjectId, placed } = await findOrCreateSubject(supabase, userId, chain.subject);
+
+  // Placed once the response has gone, and never allowed to fail the write: a
+  // track with no field is still a track, and the next chain written into it
+  // tries again (docs/LEARN-AREAS-SPEC.md, "Placement").
+  if (!placed) {
+    const track = { id: subjectId, name: chain.subject, context: trackContext(asked, chain) };
+    placeTrackAfterResponse(supabase, userId, track, options.theme);
+  }
 
   const idByName = new Map<string, string>();
   for (const node of chain.nodes) {

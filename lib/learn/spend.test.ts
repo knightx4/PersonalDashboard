@@ -72,6 +72,7 @@ describe('the operation names', () => {
       'map-sweep',
       'check-areas',
       'place-themes',
+      'place-track',
     ]);
   });
 });
