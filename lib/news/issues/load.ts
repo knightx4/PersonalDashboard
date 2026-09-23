@@ -2,8 +2,9 @@ import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { NEWS_SCHEMA, type NewsSupabaseClient } from '@/lib/news/db/schema-name';
-import type { NewsIssue, NewsSender } from './list';
+import type { NewsIssue, NewsSender, UnreadStories } from './list';
 import { readStories, type NewsStory } from './stories';
+import type { NewsTopic } from './topics';
 
 /**
  * How many issues one page holds.
@@ -28,13 +29,21 @@ export async function loadSenders(client: NewsSupabaseClient): Promise<NewsSende
   return (data ?? []) as NewsSender[];
 }
 
-/** What has arrived, newest first. Muting is applied in visibleIssues, not here. */
-export async function loadIssues(client: NewsSupabaseClient): Promise<NewsIssue[]> {
-  const { data, error } = await client
-    .from('issues')
-    .select('id, sender_id, subject, received_at, read_at')
-    .order('received_at', { ascending: false })
-    .limit(PAGE);
+/**
+ * What has arrived, newest first. Muting is applied in visibleIssues, not here.
+ *
+ * With a topic, only newsletters with at least one story tagged with it
+ * (plan #860). The match is jsonb containment on the stories column, so the
+ * stories themselves are not read for the list; topics are stored as the
+ * exact names in NEWS_TOPICS, which the summariser writes through readTopic.
+ */
+export async function loadIssues(
+  client: NewsSupabaseClient,
+  { topic = null }: { topic?: NewsTopic | null } = {},
+): Promise<NewsIssue[]> {
+  let query = client.from('issues').select('id, sender_id, subject, received_at, read_at');
+  if (topic) query = query.contains('stories', JSON.stringify([{ topic }]));
+  const { data, error } = await query.order('received_at', { ascending: false }).limit(PAGE);
   assertSchemaExposed(error, NEWS_SCHEMA);
   if (error) throw new Error(`news: reading your newsletters failed (${error.message})`);
   return (data ?? []).map((row) => ({
@@ -47,6 +56,26 @@ export async function loadIssues(client: NewsSupabaseClient): Promise<NewsIssue[
 }
 
 /** One newsletter with its bodies, which is what the reading page needs. */
+/**
+ * The stories of every unread newsletter, for the list's topic chips
+ * (unreadTopics in list.ts). Only unread ones are read, so this stays small
+ * however long the list grows.
+ */
+export async function loadUnreadStories(client: NewsSupabaseClient): Promise<UnreadStories[]> {
+  const { data, error } = await client
+    .from('issues')
+    .select('sender_id, stories')
+    .is('read_at', null)
+    .not('summary', 'is', null)
+    .limit(PAGE);
+  assertSchemaExposed(error, NEWS_SCHEMA);
+  if (error) throw new Error(`news: reading your unread newsletters failed (${error.message})`);
+  return (data ?? []).map((row) => ({
+    senderId: row.sender_id as string,
+    stories: row.stories as unknown,
+  }));
+}
+
 export type NewsIssueDetail = {
   id: string;
   subject: string | null;

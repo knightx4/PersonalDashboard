@@ -1,5 +1,6 @@
 import { senderLabel, type NewsSender } from '@/lib/news/issues/list';
 import { readStories, type NewsStory } from '@/lib/news/issues/stories';
+import { NEWS_TOPICS, type NewsTopic } from '@/lib/news/issues/topics';
 
 /**
  * One newsletter as Quick read needs it.
@@ -29,6 +30,16 @@ export type StoryPass = { issueId: string; storyIndex: number };
 export type QuickCardBody =
   | { kind: 'story'; story: NewsStory }
   | { kind: 'essay'; summary: string };
+
+/**
+ * What narrows Quick read beyond muting and passing (plan #860).
+ *
+ * `topic` keeps only stories tagged with it, from every newsletter. An essay
+ * card carries no topic, so it is left out while a topic is picked. A story
+ * that fits is decided in one place, `fits`, so a later rule such as a list
+ * of hidden topics goes there too.
+ */
+export type QuickFilter = { topic?: NewsTopic | null };
 
 /** The next card, with what the page needs to draw it and to record the pass. */
 export type QuickCard = QuickCardBody & {
@@ -66,6 +77,26 @@ function slots(issue: QuickIssue): Slot[] {
   return [{ storyIndex: 0, body: { kind: 'essay', summary: issue.summary.trim() } }];
 }
 
+function fits(slot: Slot, filter: QuickFilter): boolean {
+  if (!filter.topic) return true;
+  return slot.body.kind === 'story' && slot.body.story.topic === filter.topic;
+}
+
+/**
+ * The newsletters Quick read draws from, newest first: muted senders left
+ * out, and newsletters that arrived at the same moment in the order given.
+ */
+function readable(
+  issues: readonly QuickIssue[],
+  byId: ReadonlyMap<string, NewsSender>,
+): QuickIssue[] {
+  return issues
+    .filter((issue) => !byId.get(issue.senderId)?.muted)
+    .map((issue, order) => ({ issue, order }))
+    .sort((a, b) => arrival(b.issue) - arrival(a.issue) || a.order - b.order)
+    .map(({ issue }) => issue);
+}
+
 function passedIn(issueId: string, passes: readonly StoryPass[]): Set<number> {
   return new Set(passes.filter((p) => p.issueId === issueId).map((p) => p.storyIndex));
 }
@@ -82,22 +113,20 @@ function arrival(issue: QuickIssue): number {
  * it the stories in the order the email gave them. A newsletter from a muted
  * sender is left out, as are stories already passed and newsletters that have
  * not been summarised. Newsletters that arrived at the same moment keep the
- * order they were given in.
+ * order they were given in. `filter` narrows it further; `remainingInIssue`
+ * then counts only the cards that fit it.
  */
 export function nextCard(
   issues: readonly QuickIssue[],
   senders: readonly NewsSender[],
   passes: readonly StoryPass[],
+  filter: QuickFilter = {},
 ): QuickCard | null {
   const byId = new Map(senders.map((sender) => [sender.id, sender]));
-  const newestFirst = issues
-    .filter((issue) => !byId.get(issue.senderId)?.muted)
-    .map((issue, order) => ({ issue, order }))
-    .sort((a, b) => arrival(b.issue) - arrival(a.issue) || a.order - b.order);
 
-  for (const { issue } of newestFirst) {
+  for (const issue of readable(issues, byId)) {
     const passed = passedIn(issue.id, passes);
-    const left = slots(issue).filter((slot) => !passed.has(slot.storyIndex));
+    const left = slots(issue).filter((slot) => !passed.has(slot.storyIndex) && fits(slot, filter));
     if (!left.length) continue;
     const sender = byId.get(issue.senderId) ?? null;
     return {
@@ -112,6 +141,47 @@ export function nextCard(
     };
   }
   return null;
+}
+
+/**
+ * The topics Quick read has a story left on, in NEWS_TOPICS order: the chips
+ * drawn above the card. Muted senders and passed stories do not count, the
+ * same as for nextCard, so every chip leads to at least one card.
+ */
+export function quickTopics(
+  issues: readonly QuickIssue[],
+  senders: readonly NewsSender[],
+  passes: readonly StoryPass[],
+): NewsTopic[] {
+  const byId = new Map(senders.map((sender) => [sender.id, sender]));
+  const found = new Set<NewsTopic>();
+  for (const issue of readable(issues, byId)) {
+    const passed = passedIn(issue.id, passes);
+    for (const slot of slots(issue)) {
+      if (passed.has(slot.storyIndex) || slot.body.kind !== 'story') continue;
+      if (slot.body.story.topic) found.add(slot.body.story.topic);
+    }
+  }
+  return NEWS_TOPICS.filter((topic) => found.has(topic));
+}
+
+/**
+ * Where Quick read lives with the reader's choices on it. Pictures are on
+ * unless turned off, so only `pictures=0` is written, and no topic means
+ * every topic.
+ */
+export function quickHref({
+  pictures,
+  topic,
+}: {
+  pictures: boolean;
+  topic: NewsTopic | null;
+}): string {
+  const query = new URLSearchParams();
+  if (!pictures) query.set('pictures', '0');
+  if (topic) query.set('topic', topic);
+  const search = query.toString();
+  return search ? `/news?${search}` : '/news';
 }
 
 /**

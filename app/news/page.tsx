@@ -4,7 +4,9 @@ import { createNewsClient } from '@/lib/news/auth/server';
 import { loadSenders } from '@/lib/news/issues/load';
 import { formatArrival, issueHref } from '@/lib/news/issues/list';
 import { loadQuickRead } from '@/lib/news/issues/quick';
-import { nextCard } from '@/lib/news/quick/next';
+import { readTopic } from '@/lib/news/issues/topics';
+import { nextCard, quickHref, quickTopics } from '@/lib/news/quick/next';
+import { topicHrefs } from '@/components/news/topic-chips';
 import { QuickReadView } from './quick/quick-view';
 
 export const metadata = { title: 'Quick read' };
@@ -20,14 +22,16 @@ export const dynamic = 'force-dynamic';
  *
  * Pictures follow the issue page's `?pictures=0`, and the setting rides on
  * the address, so Next keeps it: the action re-renders the page at the address
- * it was pressed on.
+ * it was pressed on. The topic chip (#860) rides on the address the same way,
+ * as `?topic=`, and a value that is not a topic reads as every topic.
  */
 export default async function QuickReadPage({
   searchParams,
 }: {
-  searchParams: Promise<{ pictures?: string }>;
+  searchParams: Promise<{ pictures?: string; topic?: string }>;
 }) {
-  const { pictures } = await searchParams;
+  const params = await searchParams;
+  const topic = readTopic(params.topic) ?? null;
   const user = await requireUser();
   const client = await createNewsClient();
 
@@ -37,8 +41,9 @@ export default async function QuickReadPage({
     loadQuickRead(client),
   ]);
 
-  const card = nextCard(issues, senders, passes);
-  const wanted = pictures !== '0';
+  const card = nextCard(issues, senders, passes, { topic });
+  const wanted = params.pictures !== '0';
+  const topics = quickTopics(issues, senders, passes);
 
   return (
     <QuickReadView
@@ -46,11 +51,17 @@ export default async function QuickReadPage({
       arrived={card ? formatArrival(card.receivedAt, settings.timezone) : null}
       nothingYet={issues.length === 0}
       pictures={wanted}
-      picturesHref={wanted ? '/news?pictures=0' : '/news'}
+      picturesHref={quickHref({ pictures: !wanted, topic })}
       issueHref={
         card ? issueHref(card.issueId, { original: false, pictures: wanted, from: null }) : null
       }
       seed={`${user.id}:${new Date().toISOString().slice(0, 10)}:news`}
+      topics={{
+        topics,
+        selected: topic,
+        hrefs: topicHrefs(topics, (t) => quickHref({ pictures: wanted, topic: t })),
+        allHref: quickHref({ pictures: wanted, topic: null }),
+      }}
     />
   );
 }

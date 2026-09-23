@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { NewsSender } from '@/lib/news/issues/list';
-import { issueFinished, nextCard, type QuickIssue, type StoryPass } from '@/lib/news/quick/next';
+import {
+  issueFinished,
+  nextCard,
+  quickHref,
+  quickTopics,
+  type QuickIssue,
+  type StoryPass,
+} from '@/lib/news/quick/next';
 
 const paper: NewsSender = {
   id: 's1',
@@ -152,5 +159,60 @@ describe('issueFinished', () => {
       stories: null,
     });
     expect(issueFinished(pending, [{ issueId: 'pending', storyIndex: 0 }])).toBe(false);
+  });
+});
+
+describe('the topic filter', () => {
+  const tagged = (headline: string, topic: string) => ({ ...story(headline), topic });
+  const mixed = issue('mix', 's1', '2026-09-22T09:00:00Z', {
+    stories: [tagged('mix-0', 'Politics'), tagged('mix-1', 'Sport'), tagged('mix-2', 'Politics')],
+  });
+  const sport = issue('sport', 's2', '2026-09-21T09:00:00Z', {
+    stories: [tagged('sport-0', 'Sport')],
+  });
+  const hidden = issue('hush', 's3', '2026-09-23T09:00:00Z', {
+    stories: [tagged('hush-0', 'Health')],
+  });
+  const essay = issue('essay', 's1', '2026-09-23T10:00:00Z', { stories: [] });
+  const all = [mixed, sport, hidden, essay];
+
+  it('shows only stories on the topic, across newsletters, and counts only those', () => {
+    const first = nextCard(all, senders, [], { topic: 'Sport' });
+    expect(first).toMatchObject({ issueId: 'mix', storyIndex: 1, remainingInIssue: 1 });
+    const second = nextCard(all, senders, [{ issueId: 'mix', storyIndex: 1 }], { topic: 'Sport' });
+    expect(second).toMatchObject({ issueId: 'sport', storyIndex: 0 });
+    expect(
+      nextCard(all, senders, [{ issueId: 'mix', storyIndex: 0 }], { topic: 'Politics' }),
+    ).toMatchObject({ storyIndex: 2, remainingInIssue: 1 });
+  });
+
+  it('shows everything, essays included, with no topic', () => {
+    expect(nextCard(all, senders, [], { topic: null })).toMatchObject({ kind: 'essay' });
+    expect(nextCard(all, senders, [])).toMatchObject({ kind: 'essay' });
+  });
+
+  it('is caught up once nothing on the topic is left', () => {
+    expect(
+      nextCard(all, senders, [{ issueId: 'sport', storyIndex: 0 }], { topic: 'Health' }),
+    ).toBeNull();
+    const passes = [
+      { issueId: 'mix', storyIndex: 1 },
+      { issueId: 'sport', storyIndex: 0 },
+    ];
+    expect(nextCard(all, senders, passes, { topic: 'Sport' })).toBeNull();
+  });
+
+  it('offers a chip only for topics with a story left, muted senders aside', () => {
+    expect(quickTopics(all, senders, [])).toEqual(['Politics', 'Sport']);
+    const passes = [
+      { issueId: 'mix', storyIndex: 1 },
+      { issueId: 'sport', storyIndex: 0 },
+    ];
+    expect(quickTopics(all, senders, passes)).toEqual(['Politics']);
+  });
+
+  it('keeps the pictures setting and the topic on the address', () => {
+    expect(quickHref({ pictures: true, topic: null })).toBe('/news');
+    expect(quickHref({ pictures: false, topic: 'Sport' })).toBe('/news?pictures=0&topic=Sport');
   });
 });
