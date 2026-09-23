@@ -1262,7 +1262,14 @@ function matchesQuery(node: PlanNode, terms: readonly string[]): boolean {
   const haystack = [`#${node.number}`, node.outline, node.title, node.detail ?? '']
     .join(' ')
     .toLowerCase();
-  return terms.every((term) => haystack.includes(term));
+  return terms.every((term) => {
+    // `#812` is that step and no other (note 843f7506): read as text it also
+    // found #8120, and any detail that mentioned 812 in passing, so a link to
+    // one step arrived at several.
+    const number = /^#(\d+)$/.exec(term);
+    if (number) return node.number === Number(number[1]);
+    return haystack.includes(term.replace(/^#/, ''));
+  });
 }
 
 /** A query split into the terms every step has to carry. Empty when blank. */
@@ -1270,8 +1277,7 @@ export function searchTerms(query: string): string[] {
   return query
     .toLowerCase()
     .split(/\s+/)
-    .map((term) => term.replace(/^#/, ''))
-    .filter(Boolean);
+    .filter((term) => term.replace(/^#/, '') !== '');
 }
 
 /** A whole subtree kept for context, so nothing under a hit reads as a hit. */

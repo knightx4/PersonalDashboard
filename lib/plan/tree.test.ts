@@ -1531,6 +1531,17 @@ describe('searchSections', () => {
     expect(countMatches(searchSections(plan(), '#400'))).toBe(1);
   });
 
+  // Note 843f7506: a link to one step arrives filtered to that step alone.
+  it('takes a hashed number as that step exactly, not as text', () => {
+    const sections = tree([
+      item({ id: 'a', number: 81, title: 'The one' }),
+      item({ id: 'b', number: 812, title: 'Not this', detail: 'Mentions #81 in passing' }),
+    ]);
+
+    expect(titles(searchSections(sections, '#81'))).toEqual(['The one']);
+    expect(countMatches(searchSections(sections, '81'))).toBe(2);
+  });
+
   it('requires every term, across any of the fields', () => {
     expect(countMatches(searchSections(plan(), '343 photo'))).toBe(1);
     expect(countMatches(searchSections(plan(), '343 digest'))).toBe(0);
