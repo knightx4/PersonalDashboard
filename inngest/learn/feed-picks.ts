@@ -1,0 +1,217 @@
+import 'server-only';
+
+import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
+import { createLearnServiceSupabase } from '@/inngest/learn/supabase-admin';
+import { createVaultServiceSupabase } from '@/inngest/vault/supabase-admin';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSpend } from '@/lib/core/spend/record';
+import { loadAreas } from '@/lib/learn/areas/load';
+import { storeArticleOverRest } from '@/lib/learn/catalogue/store-rest';
+import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { NAME_MATERIAL_MODEL, nameMaterial } from '@/lib/learn/feed/name-material';
+import {
+  runFeedPicksFor,
+  type FeedPickPorts,
+  type FeedPickSummary,
+  type PersonInputs,
+} from '@/lib/learn/feed/pass';
+import { RECENT_TARGET_DAYS, type FeedField, type FeedTheme, type FieldTests } from '@/lib/learn/feed/targets';
+import type { LearnOperation } from '@/lib/learn/spend';
+import { fetchWikipediaArticle } from '@/lib/learn/providers/wikipedia';
+
+/**
+ * One call of the Learn now picking pass (plan #806).
+ *
+ * For every account with placed themes, draws a few targets and leaves
+ * `picked` rows in `learn.feed_cards`, each pointing at a Wikipedia section
+ * stored in the catalogue. Plan #807 writes those rows into cards and adds the
+ * hourly schedule; until then this runs when its route is called.
+ *
+ * The service client bypasses RLS, so every read and write names the person.
+ */
+
+/** Time one call spends. The route's limit is 300 seconds. */
+export const FEED_PICKS_BUDGET_MS = 230_000;
+
+const OPERATION: LearnOperation = 'name-feed-material';
+
+/** PostgREST returns at most this many rows per request, so longer reads page. */
+const PAGE = 1000;
+
+async function readAll<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+  what: string,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await page(from, from + PAGE - 1);
+    if (error) throw new Error(`Reading ${what} failed: ${error.message}`);
+    const batch = (data ?? []) as T[];
+    rows.push(...batch);
+    if (batch.length < PAGE) return rows;
+  }
+}
+
+/** Every account with at least one theme placed in a field. */
+async function peopleWithThemes(learn: LearnSupabaseClient): Promise<string[]> {
+  const rows = await readAll<{ user_id: string }>(
+    (from, to) =>
+      learn.from('theme_fields').select('user_id').not('field_id', 'is', null).order('user_id').range(from, to),
+    'placed themes',
+  );
+  return [...new Set(rows.map((row) => row.user_id))];
+}
+
+async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userId: string): Promise<PersonInputs> {
+  const vault = createVaultServiceSupabase();
+
+  type Placement = { theme_id: string; field_id: string };
+  type Theme = { id: string; name: string; about: string; strength: number | string | null };
+  type Card = {
+    reason: 'interest' | 'gap' | 'queued';
+    theme_id: string | null;
+    field_id: string | null;
+    named_article: string | null;
+    created_at: string;
+  };
+
+  const [placements, themes, cards, tests] = await Promise.all([
+    readAll<Placement>(
+      (from, to) =>
+        learn
+          .from('theme_fields')
+          .select('theme_id, field_id')
+          .eq('user_id', userId)
+          .not('field_id', 'is', null)
+          .order('theme_id')
+          .range(from, to),
+      'where your themes sit',
+    ),
+    readAll<Theme>(
+      (from, to) =>
+        vault.from('themes').select('id, name, about, strength').eq('user_id', userId).order('id').range(from, to),
+      'your themes',
+    ),
+    readAll<Card>(
+      (from, to) =>
+        learn
+          .from('feed_cards')
+          .select('reason, theme_id, field_id, named_article, created_at')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .range(from, to),
+      'your cards',
+    ),
+    learn.rpc('feed_field_tests', { p_user_id: userId }),
+  ]);
+  if (tests.error) throw new Error(`Reading what you have been tested on failed: ${tests.error.message}`);
+
+  const fieldOf = new Map(placements.map((row) => [row.theme_id, row.field_id]));
+  const feedThemes: FeedTheme[] = themes.flatMap((theme) => {
+    const fieldId = fieldOf.get(theme.id);
+    if (!fieldId) return [];
+    // numeric comes back from PostgREST as a string.
+    return [{ id: theme.id, name: theme.name, about: theme.about, strength: Number(theme.strength ?? 0), fieldId }];
+  });
+
+  const fieldTests = new Map<string, FieldTests>(
+    ((tests.data ?? []) as { field_id: string; tracks: number; answered: number }[]).map((row) => [
+      row.field_id,
+      { tracks: row.tracks, answered: row.answered },
+    ]),
+  );
+
+  const since = Date.now() - RECENT_TARGET_DAYS * 24 * 60 * 60 * 1000;
+  const recentThemeIds = new Set<string>();
+  const recentFieldIds = new Set<string>();
+  const picked = { interest: 0, gap: 0 };
+  for (const card of cards) {
+    if (card.reason === 'queued') continue;
+    picked[card.reason] += 1;
+    if (Date.parse(card.created_at) < since) continue;
+    if (card.reason === 'interest' && card.theme_id) recentThemeIds.add(card.theme_id);
+    if (card.reason === 'gap' && card.field_id) recentFieldIds.add(card.field_id);
+  }
+
+  return {
+    themes: feedThemes,
+    fields,
+    tests: fieldTests,
+    recentThemeIds,
+    recentFieldIds,
+    picked,
+    articlesHeld: [...new Set(cards.flatMap((card) => (card.named_article ? [card.named_article] : [])))],
+  };
+}
+
+export type FeedPicksResult = { people: FeedPickSummary[] };
+
+export async function runFeedPicks(options: { targets?: number } = {}): Promise<FeedPicksResult> {
+  const started = Date.now();
+  const deadline = started + FEED_PICKS_BUDGET_MS;
+  const learn = createLearnServiceSupabase();
+  const core = createCoreServiceSupabase();
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('The Learn now pass needs ANTHROPIC_API_KEY to be set.');
+
+  const areas = await loadAreas(learn);
+  const domainOf = new Map(areas.fields.map((field) => [field.slug, field.domain]));
+  const fields: FeedField[] = areas.fields.map((field) => ({
+    id: areas.fieldIds.get(field.slug)!,
+    slug: field.slug,
+    name: field.name,
+    scope: field.scope,
+    domain: domainOf.get(field.slug) ?? '',
+  }));
+
+  const people: FeedPickSummary[] = [];
+  for (const userId of await peopleWithThemes(learn)) {
+    if (Date.now() >= deadline) break;
+
+    const ports: FeedPickPorts = {
+      loadPerson: (id) => loadPerson(learn, fields, id),
+      name: async (target, avoid) => {
+        const spend: SpendReport[] = [];
+        const result = await nameMaterial({
+          target,
+          avoid,
+          anthropicApiKey: apiKey,
+          onSpend: (report) => spend.push(report),
+        });
+        // Awaited, so the row lands before the function is frozen.
+        for (const report of spend) {
+          await recordSpend(core, userId, {
+            module: 'learn',
+            operation: OPERATION,
+            model: report.model,
+            usage: report.usage,
+          });
+        }
+        return result;
+      },
+      fetchArticle: fetchWikipediaArticle,
+      storeArticle: (article) => storeArticleOverRest(learn, article),
+      insertCard: async (row) => {
+        const { data, error } = await learn
+          .from('feed_cards')
+          .upsert(row, { onConflict: 'user_id,segment_id', ignoreDuplicates: true })
+          .select('id');
+        if (error) throw new Error(`Writing the pick failed: ${error.message}`);
+        return (data ?? []).length > 0 ? 'inserted' : 'duplicate';
+      },
+      now: Date.now,
+    };
+
+    people.push(
+      await runFeedPicksFor(ports, {
+        userId,
+        targets: options.targets,
+        deadline,
+        model: NAME_MATERIAL_MODEL,
+      }),
+    );
+  }
+
+  return { people };
+}
