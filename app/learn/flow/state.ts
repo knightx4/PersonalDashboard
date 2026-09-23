@@ -1,4 +1,4 @@
-import type { NextQuestion } from '@/lib/learn/flow/ahead';
+import type { NextQuestion, SurveyAbout } from '@/lib/learn/flow/ahead';
 import type { NothingToAsk } from '@/lib/learn/graph/pick';
 import type { SettledConcept } from '@/lib/learn/graph/recheck';
 import type { TrackMove } from '@/lib/learn/flow/track';
@@ -23,6 +23,11 @@ export type FlowState = AskState & {
    * question, so it reads as a flag as well as naming which of the two.
    */
   recheck?: SettledConcept['established'];
+  /**
+   * Set on a survey question (plan #842): the vault subject it is about, which
+   * is not one of your tracks, and its field.
+   */
+  survey?: SurveyAbout;
   /**
    * The track's settled count before and after the answer. Set by the answer
    * and nowhere else, so a question on screen never carries the last one's.

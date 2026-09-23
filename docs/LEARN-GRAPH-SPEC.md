@@ -538,7 +538,7 @@ and a per-module cost table would be three tables with the same columns.
 | `/learn/s/[id]/probe` | a probe session: one question at whichever rung is next, the bar, and afterwards the reason or the answer that was expected |
 | `/learn/c/[id]` | one concept: the claim, where it stands, what it sits between, what was asked |
 | `/learn` | redirects to Learn now at `/learn/now` (plan #805), or to the flow when the link carries `?track=` |
-| `/learn/flow` | Practice Flow: one question after another across every subject, and a new track offered when it runs low. It was `/learn` from plan #773 to #805 |
+| `/learn/flow` | Practice Flow: one question after another across every track, and a new track offered when it runs low. It was `/learn` from plan #773 to #805. Since #842 it also asks about subjects in your notes that are not tracks, unless Tracks only is set ([LEARN-NOW-SPEC](LEARN-NOW-SPEC.md), "Practice Flow") |
 | `/learn/next` | redirects to `/learn/now`. Its list went in plan #773: the flow asks its re-checks and Learn now holds its readings |
 
 Same shell and design system as the other four workspaces. The graph view shows

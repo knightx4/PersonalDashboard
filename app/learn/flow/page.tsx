@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { Target } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import { segmentedFrame } from '@/components/ui/segmented';
+import { cn } from '@/lib/cn';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createLearnClient } from '@/lib/learn/auth/server';
@@ -44,18 +46,26 @@ export const metadata = { title: 'Practice Flow' };
  * question comes from that subject until you press All tracks, which is a
  * plain link back to /learn/flow. Mixed is the default. A track that is not one of
  * yours, or no longer exists, is dropped rather than shown as empty.
+ *
+ * Mixed with no filter also asks about subjects you write about in the vault
+ * and have no track for (plan #842), at the rate in `lib/learn/survey/rate.ts`.
+ * `?only=tracks` is the Tracks only filter, which leaves those out. With
+ * nothing left to ask in the tracks, the default still asks a survey question
+ * when there is one to write, before falling back to the empty states.
  */
 export default async function PracticeFlowPage({
   searchParams,
 }: {
-  searchParams: Promise<{ track?: string | string[] }>;
+  searchParams: Promise<{ track?: string | string[]; only?: string | string[] }>;
 }) {
-  const { track: trackParam } = await searchParams;
+  const { track: trackParam, only } = await searchParams;
   const trackId = typeof trackParam === 'string' && UUID.test(trackParam) ? trackParam : null;
   if (trackParam !== undefined && trackId === null) redirect('/learn/flow');
+  // A focused flow asks about one track already, so the filter has nothing to add.
+  const tracksOnly = only === 'tracks' && trackId === null;
 
   const user = await requireUser();
-  const supabase = await createLearnClient();
+  const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
   const [settings, subjects, rows, answeredAt, answeredSoFar] = await Promise.all([
     loadAccountSettings(user.id),
     loadSubjects(supabase),
@@ -81,20 +91,29 @@ export default async function PracticeFlowPage({
   // reason somebody is still reading with it.
   const answered = lastAnsweredLine(answeredAt, new Date(), settings.timezone);
 
+  // With no filter, the survey can still ask when the tracks have nothing.
+  const surveys = !track && !tracksOnly;
+
   // Resumed rather than taken fresh, so a reload shows the question already
   // on the screen instead of spending another one.
   const first =
-    picked.kind === 'nothing'
+    picked.kind === 'nothing' && !surveys
       ? null
-      : toFlowState(await nextQuestion(supabase, user.id, { resume: true, track: trackId }));
+      : toFlowState(
+          await nextQuestion(supabase, user.id, {
+            resume: true,
+            track: trackId,
+            tracksOnly,
+            vault,
+          }),
+        );
+  const asking = picked.kind !== 'nothing' || first?.question !== undefined;
 
   // Nothing to ask across every track, including having no tracks at all: a
   // theme from your notes is offered as the way on (plan #778). Not when
   // focused, where the empty state points back at the other tracks instead.
   const offer =
-    picked.kind === 'nothing' && !track
-      ? await loadTrackOffer(supabase, await createVaultClient())
-      : null;
+    picked.kind === 'nothing' && !asking && !track ? await loadTrackOffer(supabase, vault) : null;
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -111,6 +130,8 @@ export default async function PracticeFlowPage({
         }
       />
 
+      {!track && <ScopeFilter tracksOnly={tracksOnly} />}
+
       {track && (
         <p className="mt-4 flex flex-wrap items-baseline gap-x-3 text-ui text-ink-muted">
           <span>
@@ -123,13 +144,23 @@ export default async function PracticeFlowPage({
       )}
 
       <div className="mt-6">
-        {picked.kind !== 'nothing' ? (
-          // Keyed by the focus: moving between a track and all of them is a
-          // soft navigation, and without a new key the action state would
-          // carry the last question across it.
-          <FlowSession key={track?.id ?? 'all'} first={first ?? {}} track={track} />
-        ) : offer ? (
-          <FlowSession key="offer" first={{ nothing: picked.because, offer }} track={null} />
+        {asking ? (
+          // Keyed by the focus: moving between a track and all of them, or
+          // into Tracks only, is a soft navigation, and without a new key the
+          // action state would carry the last question across it.
+          <FlowSession
+            key={track?.id ?? (tracksOnly ? 'tracks' : 'all')}
+            first={first ?? {}}
+            track={track}
+            tracksOnly={tracksOnly}
+          />
+        ) : picked.kind !== 'nothing' ? null : offer ? (
+          <FlowSession
+            key="offer"
+            first={{ nothing: picked.because, offer }}
+            track={null}
+            tracksOnly={tracksOnly}
+          />
         ) : track ? (
           <EmptyState
             title={`Nothing left to ask about ${track.name}`}
@@ -154,6 +185,42 @@ export default async function PracticeFlowPage({
           />
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * What the mixed flow asks about (plan #842): everything, which mixes in
+ * questions about subjects in your notes that are not tracks, or your tracks
+ * alone. Links onto the page's own search parameter, as the ideas page's
+ * arrangement rows are, so the choice survives a reload and the back button.
+ */
+function ScopeFilter({ tracksOnly }: { tracksOnly: boolean }) {
+  const options = [
+    { key: 'all', label: 'Everything', href: '/learn/flow', on: !tracksOnly },
+    { key: 'tracks', label: 'Tracks only', href: '/learn/flow?only=tracks', on: tracksOnly },
+  ];
+  return (
+    <div className="mt-4">
+      <span role="group" aria-label="What to ask about" className={segmentedFrame}>
+        {options.map((option) => (
+          <Link
+            key={option.key}
+            href={option.href}
+            scroll={false}
+            aria-current={option.on ? 'true' : undefined}
+            className={cn(
+              'press inline-flex h-(--control-h) items-center px-2.5 text-ui font-medium',
+              'transition-colors duration-150 focus-visible:outline-2 focus-visible:-outline-offset-2',
+              option.on
+                ? 'bg-accent-tint text-accent'
+                : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
+            )}
+          >
+            {option.label}
+          </Link>
+        ))}
+      </span>
     </div>
   );
 }

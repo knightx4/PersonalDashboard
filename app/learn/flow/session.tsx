@@ -153,11 +153,13 @@ function TrackOfferCard({
   error,
   step,
   track,
+  tracksOnly,
 }: {
   offer: TrackOffer;
   error?: string;
   step: (formData: FormData) => void;
   track: FlowTrack;
+  tracksOnly: boolean;
 }) {
   const [hidden, setHidden] = useState(false);
   if (hidden) return null;
@@ -184,7 +186,7 @@ function TrackOfferCard({
           <form action={step}>
             <input type="hidden" name="intent" value="start-track" />
             <input type="hidden" name="themeId" value={offer.themeId} />
-            <TrackField track={track} />
+            <TrackField track={track} tracksOnly={tracksOnly} />
             <StartButton />
           </form>
           {(['not_now', 'never'] as const).map((outcome) => (
@@ -210,20 +212,35 @@ function TrackOfferCard({
  * Every form in the flow carries the focus, because the action reads the
  * form and nothing else: the next question and the queue topped up after it
  * both come from the track named here, or from all of them when it is empty.
+ * `only` carries the Tracks only filter (plan #842) the same way.
  */
-function TrackField({ track }: { track: FlowTrack }) {
-  return <input type="hidden" name="track" value={track?.id ?? ''} />;
+function TrackField({ track, tracksOnly }: { track: FlowTrack; tracksOnly: boolean }) {
+  return (
+    <>
+      <input type="hidden" name="track" value={track?.id ?? ''} />
+      {tracksOnly && <input type="hidden" name="only" value="tracks" />}
+    </>
+  );
 }
 
-export function FlowSession({ first, track }: { first: FlowState; track: FlowTrack }) {
+export function FlowSession({
+  first,
+  track,
+  tracksOnly = false,
+}: {
+  first: FlowState;
+  track: FlowTrack;
+  /** The Tracks only filter: no questions about subjects that are not tracks. */
+  tracksOnly?: boolean;
+}) {
   const [live, step] = useActionState<FlowState, FormData>(flowStep, first);
   const trackId = track?.id ?? null;
 
   // Once per visit: the queue may have run down while you were away, and
   // filling it now means the question after this one is ready in time.
   useEffect(() => {
-    void fillFlowQueue(trackId);
-  }, [trackId]);
+    void fillFlowQueue(trackId, tracksOnly);
+  }, [trackId, tracksOnly]);
 
   if (!live.question || !live.options) {
     // Nothing left to ask, and a theme from your notes to start on: the offer
@@ -238,6 +255,7 @@ export function FlowSession({ first, track }: { first: FlowState; track: FlowTra
             error={live.offerError}
             step={step}
             track={track}
+            tracksOnly={tracksOnly}
           />
         </div>
       );
@@ -245,7 +263,7 @@ export function FlowSession({ first, track }: { first: FlowState; track: FlowTra
     return (
       <form action={step} className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center')}>
         <input type="hidden" name="intent" value="ask" />
-        <TrackField track={track} />
+        <TrackField track={track} tracksOnly={tracksOnly} />
         <div className="flex flex-wrap items-center justify-center gap-3">
           {live.error && <AskButton label="Try again" />}
           {live.nothing && (
@@ -274,7 +292,16 @@ export function FlowSession({ first, track }: { first: FlowState; track: FlowTra
       <p className="text-small text-ink-muted">
         {live.conceptName}
         {live.subjectName && ` · ${live.subjectName}`}
+        {live.survey?.fieldName && ` · ${live.survey.fieldName}`}
       </p>
+      {/* A survey question is about something you write about and have no
+          track for (plan #842). Said so, because the subject named above is
+          not in your list of tracks and would otherwise look like a mistake. */}
+      {live.survey && (
+        <p className="mt-0.5 text-small text-ink-muted">
+          From a subject in your notes that is not one of your tracks.
+        </p>
+      )}
       {/* Said before the question rather than after the answer: being asked
           about something you settled months ago looks like the app having lost
           track until you know it is deliberate. Which of the two settled it is
@@ -291,7 +318,7 @@ export function FlowSession({ first, track }: { first: FlowState; track: FlowTra
 
       <form action={step} className="mt-4 space-y-2">
         <input type="hidden" name="intent" value="answer" />
-        <TrackField track={track} />
+        <TrackField track={track} tracksOnly={tracksOnly} />
         <input type="hidden" name="probeId" value={live.probeId} />
         <input type="hidden" name="conceptId" value={live.conceptId} />
         <input type="hidden" name="subjectId" value={live.subjectId} />
@@ -337,12 +364,13 @@ export function FlowSession({ first, track }: { first: FlowState; track: FlowTra
               error={live.offerError}
               step={step}
               track={track}
+              tracksOnly={tracksOnly}
             />
           )}
 
           <form action={step} className="mt-4">
             <input type="hidden" name="intent" value="ask" />
-            <TrackField track={track} />
+            <TrackField track={track} tracksOnly={tracksOnly} />
             <AskButton label="Next" />
           </form>
         </div>
