@@ -90,6 +90,10 @@ export const LEARN_OPERATIONS = [
   // docs/LEARN-AREAS-SPEC.md. Recorded through the service role from its cron
   // call, like 'map-sweep', and a one-off rather than something that recurs.
   'check-areas',
+  // Placing vault themes into the areas, so the Know page can show which
+  // fields your writing falls in. Recorded through the service role from its
+  // hourly cron call, and against the account whose themes were placed.
+  'place-themes',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

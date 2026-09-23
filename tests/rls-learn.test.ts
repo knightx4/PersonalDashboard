@@ -127,6 +127,8 @@ describe('RLS coverage', () => {
       'readings',
       'sources',
       'subjects',
+      'theme_fields',
+      'track_offers',
       'tracks',
     ]);
   });
@@ -198,6 +200,63 @@ describe('the areas, which change only by migration', () => {
       expect(row.n, row.slug).toBeGreaterThanOrEqual(3);
       expect(row.n, row.slug).toBeLessThanOrEqual(6);
     }
+  });
+});
+
+describe('where a theme sits in the areas', () => {
+  // Placements are written by the service role and read by their owner. The
+  // composite key to obsidian.themes carries user_id, so a placement cannot
+  // point at another account's theme even from the service role.
+  let themeA = '';
+  let physics = '';
+
+  beforeAll(async () => {
+    const [theme] = await admin<{ id: string }[]>`
+      insert into obsidian.themes (user_id, name, about)
+      values (${userA}, 'Urban design', 'How streets shape travel.')
+      returning id`;
+    themeA = theme.id;
+    const [field] = await admin<{ id: string }[]>`select id from area_fields where slug = 'physics'`;
+    physics = field.id;
+    await admin`
+      insert into theme_fields (user_id, theme_id, field_id, confidence, basis)
+      values (${userA}, ${themeA}, ${physics}, 'clear', 'Placed for the test.')`;
+  });
+
+  it('shows the owner their placement and another user none of it', async () => {
+    const own = await asUser(userA, (tx) => tx`select id from theme_fields`);
+    const other = await asUser(userB, (tx) => tx`select id from theme_fields`);
+    expect(own).toHaveLength(1);
+    expect(other).toHaveLength(0);
+  });
+
+  it('lets the owner move a placement and nobody else', async () => {
+    await asUser(userB, (tx) => tx`update theme_fields set moved_by_hand = true`);
+    const [before] = await admin<{ moved_by_hand: boolean }[]>`
+      select moved_by_hand from theme_fields where theme_id = ${themeA}`;
+    expect(before.moved_by_hand).toBe(false);
+
+    await asUser(userA, (tx) => tx`update theme_fields set moved_by_hand = true`);
+    const [after] = await admin<{ moved_by_hand: boolean }[]>`
+      select moved_by_hand from theme_fields where theme_id = ${themeA}`;
+    expect(after.moved_by_hand).toBe(true);
+  });
+
+  it('refuses a placement filed under one account for another account\'s theme', async () => {
+    await expect(
+      admin`insert into theme_fields (user_id, theme_id, field_id, confidence, basis)
+            values (${userB}, ${themeA}, ${physics}, 'clear', 'Planted.')`,
+    ).rejects.toThrow();
+  });
+
+  it('does not let a signed-in user write a placement directly', async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into theme_fields (user_id, theme_id, confidence, basis)
+                   values (${userB}, ${themeA}, 'none', 'Planted.')`,
+      ),
+    ).rejects.toThrow();
   });
 });
 
