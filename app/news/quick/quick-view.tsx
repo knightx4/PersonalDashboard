@@ -57,7 +57,7 @@ export function QuickReadView({
             seed={seed}
             title="You are caught up"
             description="You have been through every story from the newsletters you have not muted. New ones show here as they arrive."
-            action={{ label: 'All newsletters', href: '/news' }}
+            action={{ label: 'All newsletters', href: '/news/all' }}
           />
         )}
       </div>
