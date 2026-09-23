@@ -139,6 +139,17 @@ beforeAll(async () => {
     insert into position_pair_scans (user_id, position_id, name, embedded_at)
     values (${userA}, ${positionA}, 'the name searched with', null)`;
 
+  // A link pair judged to carry an edge, and the search that found it (plan
+  // #816).
+  await admin`
+    insert into position_link_pairs (user_id, a_id, b_id, similarity, judged_at, relation,
+                                     from_id, reason, confidence, model)
+    values (${userA}, ${first}, ${second}, 0.7, now(), 'supports', ${first},
+            'one is why the other holds', 0.8, 'claude-haiku-4-5')`;
+  await admin`
+    insert into position_link_scans (user_id, position_id, embedded_at)
+    values (${userA}, ${positionA}, null)`;
+
   // A merge log row (plan #813). Written directly: the functions that write it
   // are tests/vault-map-merge.test.ts's subject.
   const [merge] = await admin<{ id: string }[]>`
@@ -179,6 +190,8 @@ describe('RLS coverage', () => {
       'map_sweeps',
       'notes',
       'position_edges',
+      'position_link_pairs',
+      'position_link_scans',
       'position_pair_scans',
       'position_pairs',
       'position_sources',
@@ -729,6 +742,42 @@ describe('kept position pairs, across users', () => {
                    values (${userA}, ${positionA2}, 'x')`,
       ),
     ).rejects.toThrow();
+  });
+});
+
+describe('link pairs, across users', () => {
+  it('shows the owner their link pairs and searches and another user none', async () => {
+    const own = await asUser(userA, async (tx) => ({
+      pairs: (await tx`select a_id from position_link_pairs`).length,
+      scans: (await tx`select position_id from position_link_scans`).length,
+    }));
+    const other = await asUser(userB, async (tx) => ({
+      pairs: (await tx`select a_id from position_link_pairs`).length,
+      scans: (await tx`select position_id from position_link_scans`).length,
+    }));
+    expect([own, other]).toEqual([
+      { pairs: 1, scans: 1 },
+      { pairs: 0, scans: 0 },
+    ]);
+  });
+
+  it('does not let another user judge a pair or record links against it', async () => {
+    const judged = await asUser(
+      userB,
+      (tx) => tx`update position_link_pairs set relation = 'none', from_id = null
+                 where user_id = ${userA} returning a_id`,
+    );
+    expect(judged.length).toBe(0);
+
+    const [first, second] = [positionA, positionA2].sort();
+    const [row] = await asUser(
+      userB,
+      (tx) => tx`select * from record_position_links(${JSON.stringify([
+        { a_id: first, b_id: second, relation: 'contradicts', from_id: first,
+          reason: 'x', confidence: 0.5, model: 'm' },
+      ])}::jsonb)`,
+    );
+    expect([row.recorded, row.edges]).toEqual([0, 0]);
   });
 });
 
