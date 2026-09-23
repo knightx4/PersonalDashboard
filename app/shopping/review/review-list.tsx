@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { ClipboardCheck } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import { formatMoney } from '@/lib/money';
 import { countNoun, useBatchWrite } from '@/lib/use-batch-write';
 import { reviewSelectionTargets } from '@/lib/review/bulk';
 import type { ReviewEmailRow, ReviewOrderRow, ReviewRow, ReviewView } from '@/lib/review/load';
+import { isAttachableClassification, type SearchableOrder } from '@/lib/review/attach-email';
 import {
   confirmOrdersReview,
   discardOrdersReview,
@@ -35,6 +36,7 @@ import {
   DismissEmailButton,
   ExcludeSenderButton,
 } from './review-buttons';
+import { AttachChoices, useAttachEmail } from './attach-email';
 
 function classificationLabel(value: string): string {
   return value.replaceAll('_', ' ');
@@ -65,21 +67,42 @@ const emptyCopy: Record<ReviewView, { title: string; description: string }> = {
  * bar takes the header's place and has to be able to see what is ticked. That
  * is the only reason this is one component instead of the page rendering a
  * header and a list.
+ *
+ * With the keyboard on a shipping, delivery or return email (j and k move it),
+ * 1, 2 and 3 attach it to the first, second or third suggested order, as they
+ * link a message on the jobs review queue.
  */
 export function ReviewQueue({
   rows,
   view,
   seed,
+  searchOrders,
 }: {
   rows: ReviewRow[];
   view: ReviewView;
   /** Steadies which empty-state illustration a finished queue draws. */
   seed: string;
+  /** Every live order, for attaching an email the suggestions missed. */
+  searchOrders: SearchableOrder[];
 }) {
   const selectionRows = useMemo(() => rows.map((row) => ({ key: row.id })), [rows]);
+  const { attach } = useAttachEmail();
+
+  const onKey = useCallback(
+    (event: KeyboardEvent, focused: string | null) => {
+      if (!['1', '2', '3'].includes(event.key)) return;
+      const row = rows.find((entry) => entry.id === focused);
+      if (!row || row.kind !== 'email') return;
+      const candidate = row.candidates[Number(event.key) - 1];
+      if (!candidate) return;
+      event.preventDefault();
+      attach(row.messageId, candidate.orderId);
+    },
+    [rows, attach],
+  );
 
   return (
-    <SelectionProvider rows={selectionRows}>
+    <SelectionProvider rows={selectionRows} onKey={onKey}>
       <PageHeader
         title="Review"
         description="Orders we could not read with confidence, and emails that never became an order. Confirm, discard, or dismiss — nothing is dropped silently."
@@ -107,7 +130,7 @@ export function ReviewQueue({
             row.kind === 'order' ? (
               <OrderRow key={row.id} row={row} />
             ) : (
-              <EmailRow key={row.id} row={row} />
+              <EmailRow key={row.id} row={row} searchOrders={searchOrders} />
             ),
           )}
         </ul>
@@ -271,7 +294,13 @@ function OrderRow({ row }: { row: ReviewOrderRow }) {
   );
 }
 
-function EmailRow({ row }: { row: ReviewEmailRow }) {
+function EmailRow({
+  row,
+  searchOrders,
+}: {
+  row: ReviewEmailRow;
+  searchOrders: SearchableOrder[];
+}) {
   const className = useSelectionRowClass(row.id, 'row-pad flex items-start gap-3 px-4');
   const subject = row.subject?.trim() || 'Email without subject';
 
@@ -297,6 +326,9 @@ function EmailRow({ row }: { row: ReviewEmailRow }) {
             {row.inboxEmail ? ` · via ${row.inboxEmail}` : ''}
           </p>
           <p className="text-ui text-ink-muted">{row.reason}</p>
+          {!row.linkedOrderId && isAttachableClassification(row.classification) && (
+            <AttachChoices row={row} searchOrders={searchOrders} />
+          )}
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
           {row.linkedOrderId && (
