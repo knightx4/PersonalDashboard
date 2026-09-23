@@ -132,6 +132,34 @@ describe('digesting a newsletter', () => {
     );
   });
 
+  it('stores the email\'s own address for a story Haiku gave a link number', async () => {
+    const tracked = 'https://link.example.com/click/6aac/aHR0cHM6Ly9leGFtcGxlLmNvbS9h/9f?x=1&y=2';
+    const { outcome, news, haiku } = await run(
+      reported({
+        summary: 'Two stories.',
+        stories: [
+          { headline: 'Paramount', summary: 'It may leave LA. Critics call it a bluff.', link: 1 },
+          { headline: 'Oil', summary: 'Oil fell. Nobody linked it.' },
+        ],
+      }),
+      {
+        subject: 'Roundup',
+        text_body: 'Paramount may leave LA.\n\nOil fell.',
+        html_body: `<p><a href="${tracked.replace('&', '&amp;')}">Paramount may leave LA</a></p><p>Oil fell.</p>`,
+      },
+    );
+
+    expect(haiku.create.mock.calls[0][0].messages[0].content).toBe(
+      'Subject: Roundup\n\nParamount may leave LA [link 1]\nOil fell.',
+    );
+    const stories = [
+      { headline: 'Paramount', summary: 'It may leave LA. Critics call it a bluff.', link: tracked },
+      { headline: 'Oil', summary: 'Oil fell. Nobody linked it.' },
+    ];
+    expect(outcome).toEqual({ status: 'digested', summary: 'Two stories.', stories });
+    expect(news.updates[0]).toMatchObject({ stories });
+  });
+
   it('gives a single essay its summary and an empty story list', async () => {
     const { outcome, news } = await run(
       reported({ summary: 'One long argument about parking.', stories: [] }),
@@ -208,13 +236,81 @@ describe('the text Haiku reads', () => {
         htmlBody:
           '<html><head><style>p{}</style></head><body><p>Rates &amp; bonds</p><p>Oil&nbsp;up</p></body></html>',
       }),
-    ).toBe('Rates & bonds\nOil up');
+    ).toEqual({ text: 'Rates & bonds\nOil up', links: [] });
+  });
+
+  it('reads the HTML when it has links, numbering each address once', () => {
+    expect(
+      bodyText({
+        subject: null,
+        textBody: 'Rates rose. Oil fell.',
+        htmlBody:
+          '<p><a href="https://t.example/c/1?a=1&amp;b=2"><b>Rates rose</b></a></p>' +
+          "<p><a class='x' href='https://t.example/c/2'>Oil fell</a>" +
+          ' <a href="https://t.example/c/1?a=1&amp;b=2">more</a>' +
+          ' <a href="mailto:ed@example.com">write to us</a></p>',
+      }),
+    ).toEqual({
+      text: 'Rates rose [link 1]\nOil fell [link 2] more [link 1] write to us',
+      links: ['https://t.example/c/1?a=1&b=2', 'https://t.example/c/2'],
+    });
+  });
+
+  it('numbers the addresses a text body writes out when the HTML has no links', () => {
+    expect(
+      bodyText({
+        subject: null,
+        textBody:
+          'Rates rose [ https://substack.com/redirect/abc ] and oil fell (https://t.example/2).\nhttps://t.example/3',
+        htmlBody: '<p>no links</p>',
+      }),
+    ).toEqual({
+      text: 'Rates rose [link 1] and oil fell [link 2] .\n[link 3]',
+      links: ['https://substack.com/redirect/abc', 'https://t.example/2', 'https://t.example/3'],
+    });
   });
 });
 
 describe('reading the report', () => {
   it('refuses a report with a blank summary', () => {
     expect(readDigest({ summary: '  ', stories: [] })).toBe('The model returned no summary.');
+  });
+
+  it('puts the address behind each link number on its story', () => {
+    const links = ['https://t.example/c/1', 'https://t.example/c/2'];
+    expect(
+      readDigest(
+        {
+          summary: 'Two stories.',
+          stories: [
+            { headline: 'Linked', summary: 'Has a link.', link: 2 },
+            { headline: 'Unlinked', summary: 'Has none.' },
+            { headline: 'Made up', summary: 'Its number is not in the email.', link: 3 },
+            { headline: 'Zero', summary: 'Numbers start at one.', link: 0 },
+            { headline: 'Quoted', summary: 'A number sent as text.', link: '1' },
+          ],
+        },
+        links,
+      ),
+    ).toEqual({
+      summary: 'Two stories.',
+      stories: [
+        { headline: 'Linked', summary: 'Has a link.', link: 'https://t.example/c/2' },
+        { headline: 'Unlinked', summary: 'Has none.' },
+        { headline: 'Made up', summary: 'Its number is not in the email.' },
+        { headline: 'Zero', summary: 'Numbers start at one.' },
+        { headline: 'Quoted', summary: 'A number sent as text.', link: 'https://t.example/c/1' },
+      ],
+    });
+  });
+
+  it('never stores an address the model wrote itself', () => {
+    expect(
+      readDigest({
+        summary: 'One story.',
+        stories: [{ headline: 'Typed', summary: 'Wrote a URL.', link: 'https://evil.example' }],
+      }),
+    ).toEqual({ summary: 'One story.', stories: [{ headline: 'Typed', summary: 'Wrote a URL.' }] });
   });
 
   it('reads a missing story list as none', () => {
