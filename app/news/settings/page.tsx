@@ -5,24 +5,30 @@ import { requireUser } from '@/lib/auth/server';
 import { newsAddress, newsDomainOrNull } from '@/lib/news/address';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { deliveryGap } from '@/lib/news/inbound/readiness';
+import { loadHiddenTopics } from '@/lib/news/quick/hidden-topics';
 import { loadOrCreateLocalPart } from '@/lib/news/settings/address';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { AddressCard } from './address-card';
+import { HiddenTopicList } from './hidden-topics';
 import { replaceAddress } from './actions';
 
 export const metadata = { title: 'News settings' };
 export const dynamic = 'force-dynamic';
 
 /**
- * The address, which is the whole of what there is to configure.
+ * The address, and the topics hidden from Quick read (plan #861).
  *
- * Opening this page for the first time is what creates it -- there is no
- * button to press before the workspace works, and nothing to seed by hand.
+ * Opening this page for the first time is what creates the address -- there
+ * is no button to press before the workspace works, and nothing to seed by
+ * hand.
  */
 export default async function NewsSettingsPage() {
   const user = await requireUser();
   const client = await createNewsClient();
-  const localPart = await loadOrCreateLocalPart(client, user.id);
+  const [localPart, hidden] = await Promise.all([
+    loadOrCreateLocalPart(client, user.id),
+    loadHiddenTopics(client),
+  ]);
   const domain = newsDomainOrNull();
   const address = domain ? newsAddress(localPart, domain) : null;
   const gap = deliveryGap();
@@ -31,7 +37,7 @@ export default async function NewsSettingsPage() {
     <div className="mx-auto max-w-2xl">
       <PageHeader
         title="News settings"
-        description="The address newsletters are sent to, and how to replace it."
+        description="The address newsletters are sent to, how to replace it, and the topics kept out of Quick read."
       />
 
       <div className="space-y-5">
@@ -87,6 +93,20 @@ export default async function NewsSettingsPage() {
             >
               Replace my address
             </ConfirmStep>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Hidden from Quick read</CardTitle>
+          </CardHeader>
+          <CardBody className="space-y-4">
+            <p className="text-body leading-relaxed text-ink-muted">
+              {hidden.length
+                ? 'Stories on these topics are left out of Quick read. They still show in the newsletter list and in each newsletter.'
+                : 'Nothing is hidden. Press Fewer like this on a Quick read card to stop seeing stories on its topic there.'}
+            </p>
+            {hidden.length > 0 && <HiddenTopicList topics={hidden} />}
           </CardBody>
         </Card>
       </div>

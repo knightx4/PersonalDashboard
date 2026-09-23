@@ -2,10 +2,11 @@
 
 import { startTransition, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useFormStatus } from 'react-dom';
-import { ArrowRight, ExternalLink } from 'lucide-react';
+import { ArrowRight, EyeOff, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { swipeAxis, swipeFarEnough } from '@/lib/news/quick/swipe';
-import { passQuickStory, recordArticleOpened } from './actions';
+import type { NewsTopic } from '@/lib/news/issues/topics';
+import { hideQuickTopic, passQuickStory, recordArticleOpened } from './actions';
 
 /**
  * The id of the form Next submits. A swipe on the card (#855) submits the
@@ -34,6 +35,36 @@ function NextButton() {
     <Button type="submit" size="lg" pending={pending}>
       {pending ? 'Loading…' : 'Next story'}
       {!pending && <ArrowRight className="size-4" strokeWidth={2} aria-hidden />}
+    </Button>
+  );
+}
+
+/**
+ * Fewer like this (plan #861): hides the card's topic from Quick read, and the
+ * page comes back with the next card that is not on it. Drawn only on a story
+ * that has a topic.
+ */
+export function HideTopicForm({ topic }: { topic: NewsTopic }) {
+  return (
+    <form action={hideQuickTopic}>
+      <input type="hidden" name="topic" value={topic} />
+      <HideTopicButton topic={topic} />
+    </form>
+  );
+}
+
+function HideTopicButton({ topic }: { topic: NewsTopic }) {
+  const { pending } = useFormStatus();
+  return (
+    <Button
+      type="submit"
+      variant="ghost"
+      size="sm"
+      pending={pending}
+      title={`Stop showing ${topic} stories in Quick read`}
+    >
+      {!pending && <EyeOff className="size-3.5" strokeWidth={1.75} aria-hidden />}
+      {pending ? 'Hiding…' : 'Fewer like this'}
     </Button>
   );
 }

@@ -32,14 +32,16 @@ export type QuickCardBody =
   | { kind: 'essay'; summary: string };
 
 /**
- * What narrows Quick read beyond muting and passing (plan #860).
+ * What narrows Quick read beyond muting and passing.
  *
- * `topic` keeps only stories tagged with it, from every newsletter. An essay
- * card carries no topic, so it is left out while a topic is picked. A story
- * that fits is decided in one place, `fits`, so a later rule such as a list
- * of hidden topics goes there too.
+ * `topic` (plan #860) keeps only stories tagged with it, from every
+ * newsletter. An essay card carries no topic, so it is left out while a topic
+ * is picked. `hidden` (plan #861) is the topics put aside with Fewer like
+ * this: a story tagged with one of them is left out. An essay and an untagged
+ * story have no topic to hide, so they stay. A story that fits is decided in
+ * one place, `fits`.
  */
-export type QuickFilter = { topic?: NewsTopic | null };
+export type QuickFilter = { topic?: NewsTopic | null; hidden?: readonly NewsTopic[] };
 
 /** The next card, with what the page needs to draw it and to record the pass. */
 export type QuickCard = QuickCardBody & {
@@ -78,8 +80,10 @@ function slots(issue: QuickIssue): Slot[] {
 }
 
 function fits(slot: Slot, filter: QuickFilter): boolean {
+  const topic = slot.body.kind === 'story' ? slot.body.story.topic : undefined;
+  if (topic && filter.hidden?.includes(topic)) return false;
   if (!filter.topic) return true;
-  return slot.body.kind === 'story' && slot.body.story.topic === filter.topic;
+  return topic === filter.topic;
 }
 
 /**
@@ -146,12 +150,14 @@ export function nextCard(
 /**
  * The topics Quick read has a story left on, in NEWS_TOPICS order: the chips
  * drawn above the card. Muted senders and passed stories do not count, the
- * same as for nextCard, so every chip leads to at least one card.
+ * same as for nextCard, so every chip leads to at least one card. A hidden
+ * topic gets no chip, since nextCard would show nothing under it.
  */
 export function quickTopics(
   issues: readonly QuickIssue[],
   senders: readonly NewsSender[],
   passes: readonly StoryPass[],
+  hidden: readonly NewsTopic[] = [],
 ): NewsTopic[] {
   const byId = new Map(senders.map((sender) => [sender.id, sender]));
   const found = new Set<NewsTopic>();
@@ -162,7 +168,7 @@ export function quickTopics(
       if (slot.body.story.topic) found.add(slot.body.story.topic);
     }
   }
-  return NEWS_TOPICS.filter((topic) => found.has(topic));
+  return NEWS_TOPICS.filter((topic) => found.has(topic) && !hidden.includes(topic));
 }
 
 /**

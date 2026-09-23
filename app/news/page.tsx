@@ -5,6 +5,7 @@ import { loadSenders } from '@/lib/news/issues/load';
 import { formatArrival, issueHref } from '@/lib/news/issues/list';
 import { loadQuickRead } from '@/lib/news/issues/quick';
 import { readTopic } from '@/lib/news/issues/topics';
+import { loadHiddenTopics } from '@/lib/news/quick/hidden-topics';
 import { nextCard, quickHref, quickTopics } from '@/lib/news/quick/next';
 import { topicHrefs } from '@/components/news/topic-chips';
 import { QuickReadView } from './quick/quick-view';
@@ -24,6 +25,8 @@ export const dynamic = 'force-dynamic';
  * the address, so Next keeps it: the action re-renders the page at the address
  * it was pressed on. The topic chip (#860) rides on the address the same way,
  * as `?topic=`, and a value that is not a topic reads as every topic.
+ * Topics hidden with Fewer like this (#861) are left out of both the card and
+ * the chips.
  */
 export default async function QuickReadPage({
   searchParams,
@@ -35,21 +38,23 @@ export default async function QuickReadPage({
   const user = await requireUser();
   const client = await createNewsClient();
 
-  const [settings, senders, { issues, passes }] = await Promise.all([
+  const [settings, senders, { issues, passes }, hidden] = await Promise.all([
     loadAccountSettings(user.id),
     loadSenders(client),
     loadQuickRead(client),
+    loadHiddenTopics(client),
   ]);
 
-  const card = nextCard(issues, senders, passes, { topic });
+  const card = nextCard(issues, senders, passes, { topic, hidden });
   const wanted = params.pictures !== '0';
-  const topics = quickTopics(issues, senders, passes);
+  const topics = quickTopics(issues, senders, passes, hidden);
 
   return (
     <QuickReadView
       card={card}
       arrived={card ? formatArrival(card.receivedAt, settings.timezone) : null}
       nothingYet={issues.length === 0}
+      hiddenCount={hidden.length}
       pictures={wanted}
       picturesHref={quickHref({ pictures: !wanted, topic })}
       issueHref={

@@ -211,6 +211,28 @@ describe('the topic filter', () => {
     expect(quickTopics(all, senders, passes)).toEqual(['Politics']);
   });
 
+  it('leaves out a hidden topic but keeps essays and the other topics', () => {
+    const hide = { hidden: ['Politics'] as const };
+    expect(nextCard(all, senders, [], hide)).toMatchObject({ kind: 'essay' });
+    const afterEssay = [{ issueId: 'essay', storyIndex: 0 }];
+    expect(nextCard(all, senders, afterEssay, hide)).toMatchObject({
+      issueId: 'mix',
+      storyIndex: 1,
+      remainingInIssue: 1,
+    });
+    const allSport = [
+      ...afterEssay,
+      { issueId: 'mix', storyIndex: 1 },
+      { issueId: 'sport', storyIndex: 0 },
+    ];
+    expect(nextCard(all, senders, allSport, hide)).toBeNull();
+    expect(nextCard(all, senders, [], { topic: 'Politics', hidden: ['Politics'] })).toBeNull();
+  });
+
+  it('offers no chip for a hidden topic', () => {
+    expect(quickTopics(all, senders, [], ['Politics'])).toEqual(['Sport']);
+  });
+
   it('keeps the pictures setting and the topic on the address', () => {
     expect(quickHref({ pictures: true, topic: null })).toBe('/news');
     expect(quickHref({ pictures: false, topic: 'Sport' })).toBe('/news?pictures=0&topic=Sport');
