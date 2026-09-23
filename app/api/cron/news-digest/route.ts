@@ -10,7 +10,8 @@ export const maxDuration = 300;
  * The newsletter catch-up (plan #787).
  *
  * Summarises up to ten issues that have no summary yet, oldest first, across
- * every account. Fired hourly by pg_cron
+ * every account, and with any room left redoes issues summarised without a
+ * one-line summary. Fired hourly by pg_cron
  * (supabase/migrations/0100_news_digest_tick_cron.sql); when nothing is
  * pending a call is one query and no model call. Authorised like the other
  * cron routes, with `Authorization: Bearer $CRON_SECRET`, because every call

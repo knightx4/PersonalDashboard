@@ -9,7 +9,9 @@ import { digestPending, type PendingTally } from '@/lib/news/issues/summarise';
  *
  * Summarises issues with no `digested_at`, across every account: the ones
  * stored before summaries existed, and any arrival whose summary did not run,
- * for example because ANTHROPIC_API_KEY was missing then. Called by pg_cron
+ * for example because ANTHROPIC_API_KEY was missing then. After those it
+ * redoes the issues summarised before the one-line summary existed, so they
+ * get their line (plan #824). Called by pg_cron
  * through `/api/cron/news-digest`
  * (supabase/migrations/0100_news_digest_tick_cron.sql).
  */
