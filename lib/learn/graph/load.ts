@@ -60,6 +60,9 @@ export async function loadSubjects(supabase: LearnSupabaseClient): Promise<Subje
   const { data, error } = await supabase
     .from('subjects')
     .select('id, name, note, created_at')
+    // A survey subject holds questions about a theme you have no track for
+    // (plan #838). It is not one of your tracks, so no list of them shows it.
+    .eq('survey', false)
     .order('name');
 
   assertSchemaExposed(error, LEARN_SCHEMA);
