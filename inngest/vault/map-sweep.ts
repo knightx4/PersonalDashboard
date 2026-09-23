@@ -8,6 +8,7 @@ import type { LearnOperation } from '@/lib/learn/spend';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { acceptNoteMap } from '@/lib/vault/map/accept';
 import { embedMapRows, type MapEmbedResult } from '@/lib/vault/map/embed';
+import { linkPositions, type LinkPassResult } from '@/lib/vault/map/link-positions';
 import { applyMergeProposals, type ApplyResult } from '@/lib/vault/map/merge-apply';
 import { proposePositionMerges, type PositionMergeResult } from '@/lib/vault/map/merge-positions';
 import { proposeThemeMerges, type ThemeMergeResult } from '@/lib/vault/map/merge-themes';
@@ -66,6 +67,14 @@ export const POSITION_MERGE_UNTIL_MS = 255_000;
 /** When applying the position proposals stops, inside the route's 300 seconds. */
 export const POSITION_APPLY_UNTIL_MS = 285_000;
 
+/**
+ * When linking positions across notes stops starting new calls (plan #816).
+ * The pass runs only once the position merge pass has no pairs left, so it
+ * takes the rest of the position share rather than a share of its own; one
+ * call over twenty pairs takes ten to twenty seconds.
+ */
+export const LINK_UNTIL_MS = 255_000;
+
 const OPERATION: LearnOperation = 'map-sweep';
 
 type SweepRow = { id: string; user_id: string; after_path: string | null; notes_total: number | null };
@@ -96,6 +105,12 @@ export type MapSweepTickSummary = {
    * positions. Null when that kind's apply threw.
    */
   applied: { theme: ApplyResult | null; position: ApplyResult | null };
+  /**
+   * Edges found between positions from different notes (plan #816). Null when
+   * the pass did not run: no ANTHROPIC_API_KEY, the position merge pass still
+   * had pairs to judge or did not run, or it threw.
+   */
+  links: Pick<LinkPassResult, 'judged' | 'edges' | 'stopped'> | null;
 };
 
 export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
@@ -110,6 +125,7 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
     themeMerges: null,
     positionMerges: null,
     applied: { theme: null, position: null },
+    links: null,
   };
 
   const nowIso = new Date().toISOString();
@@ -204,6 +220,23 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
   }
 
   summary.applied.position = await applyKind(supabase, 'position', startedAt + POSITION_APPLY_UNTIL_MS);
+
+  // Edges between positions from different notes, once the position merge
+  // pass has judged every pair it has, so the pass links positions as merged
+  // rather than two rows about to become one. A pair is judged once, so a
+  // tick with nothing new asks nothing.
+  if (apiKey && summary.positionMerges && summary.positionMerges.stopped === null) {
+    try {
+      const links = await linkPositions(supabase, createCoreServiceSupabase(), {
+        userId: null,
+        anthropicApiKey: apiKey,
+        deadline: startedAt + LINK_UNTIL_MS,
+      });
+      summary.links = { judged: links.judged, edges: links.edges, stopped: links.stopped };
+    } catch (err) {
+      console.error('[map sweep] position links', err instanceof Error ? err.message : err);
+    }
+  }
 
   return summary;
 }

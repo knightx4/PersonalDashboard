@@ -125,6 +125,10 @@ export const LEARN_OPERATIONS = [
   // (plan #812), twenty pairs a call. Recorded the same way as the theme pass,
   // against the account whose positions were judged.
   'propose-position-merges',
+  // Asking Haiku which edge, if any, joins two vault positions from different
+  // notes (plan #816), twenty pairs a call. Recorded the same way as the merge
+  // passes, against the account whose positions were judged.
+  'link-positions',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
