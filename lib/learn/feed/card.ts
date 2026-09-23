@@ -170,24 +170,30 @@ export function toFeedCard(row: FeedCardRow): FeedCard | null {
   };
 }
 
-/** The deliberate actions a card records (LEARN-NOW-SPEC "What is recorded"). */
-export type FeedAction = 'opened' | 'saved' | 'dismissed' | 'tested';
+/** The actions a card records (LEARN-NOW-SPEC "What is recorded"). */
+export type FeedAction = 'opened' | 'saved' | 'dismissed' | 'tested' | 'passed';
 
 /**
  * The statuses each action may move a card from.
  *
- * Opening the source only marks a card nobody has acted on: opening a card you
- * already saved leaves it saved. The other three may follow an open, since
- * reading the source is often how you decide to save it or to be tested on it.
- * Test me may also follow a Save, and the card keeps `saved_reading_id`, so
- * both are still readable. Otherwise nothing moves a card that was saved,
- * dismissed or tested: the first decision stands.
+ * Opening the source only marks a card nobody has decided on: opening a card
+ * you already saved leaves it saved. Save, Not interested and Test me may
+ * follow an open, since reading the source is often how you decide to save it
+ * or to be tested on it. Test me may also follow a Save, and the card keeps
+ * `saved_reading_id`, so both are still readable. Otherwise nothing moves a
+ * card that was saved, dismissed or tested: the first decision stands.
+ *
+ * Next marks a card `passed`, only from `ready`. A pass takes the card out of
+ * the feed and says nothing about what you thought of it, so every other
+ * action may still follow it: the card stays on the screen for the rest of the
+ * visit, and scrolling back up to save it should work.
  */
 export const ACTION_FROM: Record<FeedAction, readonly string[]> = {
-  opened: ['ready'],
-  saved: ['ready', 'opened'],
-  dismissed: ['ready', 'opened'],
-  tested: ['ready', 'opened', 'saved'],
+  opened: ['ready', 'passed'],
+  saved: ['ready', 'opened', 'passed'],
+  dismissed: ['ready', 'opened', 'passed'],
+  tested: ['ready', 'opened', 'saved', 'passed'],
+  passed: ['ready'],
 };
 
 /** Append a page of cards, skipping any already on the screen. */
@@ -205,7 +211,8 @@ export const FEED_PAGE = 5;
  * `writing`: fewer than `low` cards are ready, so the top-up is running (the
  * action that loaded the page started it) and more will arrive.
  * `passed`: plenty are ready but you have been through all of them this
- * visit. Passing a card records nothing, so they come back next time.
+ * visit. They are the cards you scrolled past without pressing anything, and
+ * they come back next time.
  */
 export function feedEnd(ready: number, low: number): 'writing' | 'passed' {
   return ready < low ? 'writing' : 'passed';

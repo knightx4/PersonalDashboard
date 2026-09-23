@@ -118,8 +118,15 @@ describe('turning a row into a card', () => {
 });
 
 describe('what each action may move', () => {
-  it('opens only a card nobody has acted on', () => {
-    expect(ACTION_FROM.opened).toEqual(['ready']);
+  it('opens only a card nobody has decided on', () => {
+    expect(ACTION_FROM.opened).toEqual(['ready', 'passed']);
+  });
+
+  it('passes only a ready card, and lets every other action follow a pass', () => {
+    expect(ACTION_FROM.passed).toEqual(['ready']);
+    for (const action of ['opened', 'saved', 'dismissed', 'tested'] as const) {
+      expect(ACTION_FROM[action]).toContain('passed');
+    }
   });
 
   it('lets save, dismiss and test follow an open, and nothing undo a dismissal', () => {
