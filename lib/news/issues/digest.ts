@@ -8,6 +8,7 @@ import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { forceTool } from '@/lib/learn/graph/tool-call';
 import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
 import { readStories, type NewsStory } from '@/lib/news/issues/stories';
+import { FALLBACK_TOPIC, NEWS_TOPICS, readTopic } from '@/lib/news/issues/topics';
 
 /**
  * A newsletter's summary and stories, written by Haiku from the body already
@@ -47,6 +48,11 @@ import { readStories, type NewsStory } from '@/lib/news/issues/stories';
  * email's own. The model also copies each story's text out of the email, so
  * the page can show the whole story under its summary. Both live on the story
  * inside the `stories` jsonb, so neither needed a column.
+ *
+ * Topics (plan #859). The model also picks one of NEWS_TOPICS for each story,
+ * kept on the story in the same jsonb. A story it gives no topic, or one not
+ * on the list, is stored as Other, so every story digested from here on has
+ * one.
  */
 
 export const DIGEST_MODEL = 'claude-haiku-4-5';
@@ -117,6 +123,10 @@ with it, usually just above or below its headline. Leave the number out when
 the story has none. Never give a logo, an icon, an advertisement, or a picture
 that belongs to a different story.
 
+TOPIC. For each story, pick the one topic from this list that fits it best:
+${NEWS_TOPICS.join(', ')}. Judge by what the story is about, not by what the
+newsletter usually covers. Use Other only when none of the rest fits.
+
 ONE ESSAY. When the issue is a single article or essay rather than a set of
 items, the summary covers it and the story list is empty. Do not cut one essay
 into stories by its sections.`;
@@ -154,8 +164,13 @@ const TOOL = {
               description:
                 "The story's own text from the email, word for word, paragraphs separated by a blank line.",
             },
+            topic: {
+              type: 'string',
+              enum: [...NEWS_TOPICS],
+              description: 'The one topic from the list that fits this story best.',
+            },
           },
-          required: ['headline', 'summary'],
+          required: ['headline', 'summary', 'topic'],
         },
       },
     },
@@ -375,9 +390,9 @@ function withoutMarkers(text: unknown): unknown {
  * Each story's link number is looked up in `links` and its picture number in
  * `images`, the addresses behind the markers; a number that is not a whole
  * number from 1 to the count of addresses is dropped, and the story kept
- * without it. Stories then go through `readStories`, the same reading the page
- * applies, so a story without a headline or summary is dropped here rather
- * than stored.
+ * without it. A topic not on NEWS_TOPICS, or none at all, becomes Other.
+ * Stories then go through `readStories`, the same reading the page applies, so
+ * a story without a headline or summary is dropped here rather than stored.
  */
 export function readDigest(
   input: unknown,
@@ -390,8 +405,12 @@ export function readDigest(
   const linked = Array.isArray(stories)
     ? stories.map((story: unknown) => {
         if (!story || typeof story !== 'object') return story;
-        const { link, image, text, ...rest } = story as Record<string, unknown>;
-        const out: Record<string, unknown> = { ...rest, text: withoutMarkers(text) };
+        const { link, image, text, topic, ...rest } = story as Record<string, unknown>;
+        const out: Record<string, unknown> = {
+          ...rest,
+          text: withoutMarkers(text),
+          topic: readTopic(topic) ?? FALLBACK_TOPIC,
+        };
         const linkAddress = lookUp(link, links);
         if (linkAddress) out.link = linkAddress;
         const imageAddress = lookUp(image, images);
