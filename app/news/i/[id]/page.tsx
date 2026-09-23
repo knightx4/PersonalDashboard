@@ -1,19 +1,12 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, ExternalLink, FileText, Image as ImageIcon, Mail } from 'lucide-react';
-import { PageHeader } from '@/components/shell/page-header';
-import { Button, buttonVariants } from '@/components/ui/button';
-import { Card, CardBody, CardSection } from '@/components/ui/card';
 import { requireUser } from '@/lib/auth/server';
-import { cn } from '@/lib/cn';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { loadIssue } from '@/lib/news/issues/load';
 import { formatArrival, issueHref, issueReturn, senderLabel } from '@/lib/news/issues/list';
 import { markRead } from '@/lib/news/issues/read';
 import { cleanIssueHtml } from '@/lib/news/issues/sanitize';
-import { markIssueUnread } from './actions';
-import { IssueFrame } from './issue-frame';
+import { IssueView } from './issue-view';
 
 export const metadata = { title: 'Newsletter' };
 export const dynamic = 'force-dynamic';
@@ -68,7 +61,6 @@ export default async function IssuePage({
   const { html, blockedImages } = cleanIssueHtml(issue.htmlBody, wanted);
   const back = issueReturn(cameFrom, sender);
   const digest = issue.digest;
-  /** The summary is the page when there is one, unless the original was asked for. */
   const showDigest = digest !== null && view !== 'original';
   /** Asking for the pictures reloads this page, and keeps where you were with it. */
   const picturesHref = issueHref(issue.id, {
@@ -80,136 +72,21 @@ export default async function IssuePage({
   const summaryHref = issueHref(issue.id, { original: false, pictures: wanted, from: back.from });
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <p className="mb-3">
-        <Link
-          href={back.href}
-          className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          {back.label}
-        </Link>
-      </p>
-
-      <PageHeader
-        title={issue.subject ?? 'No subject'}
-        description={`${from} · ${formatArrival(issue.receivedAt, settings.timezone)}`}
-        actions={
-          <>
-            {digest &&
-              (showDigest ? (
-                <Link
-                  href={originalHref}
-                  className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}
-                >
-                  <Mail className="size-3.5" strokeWidth={1.75} aria-hidden />
-                  Original email
-                </Link>
-              ) : (
-                <Link
-                  href={summaryHref}
-                  className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}
-                >
-                  <FileText className="size-3.5" strokeWidth={1.75} aria-hidden />
-                  Summary
-                </Link>
-              ))}
-            {!showDigest && blockedImages > 0 && (
-              <Link
-                href={picturesHref}
-                className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}
-              >
-                <ImageIcon className="size-3.5" strokeWidth={1.75} aria-hidden />
-                {blockedImages === 1 ? 'Show 1 picture' : `Show ${blockedImages} pictures`}
-              </Link>
-            )}
-            <form action={markIssueUnread}>
-              <input type="hidden" name="issueId" value={issue.id} />
-              <Button type="submit" size="sm" variant="secondary">
-                Mark unread
-              </Button>
-            </form>
-            {/*
-              A plain link rather than a form, because nothing is sent on your
-              behalf: the publisher's own page does the unsubscribing, and all
-              this does is open it. No confirm either -- #683 asks before a
-              mail goes, and there is no mail here to send.
-
-              Only for an issue that carried a link. An issue that carried only
-              an address is #667's, which sends the mail through Mailgun; an
-              issue that carried neither gets no button, and that is most of
-              the list, since only issues delivered after #614 shipped kept the
-              header at all.
-            */}
-            {issue.unsubscribeUrl && (
-              <a
-                href={issue.unsubscribeUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}
-              >
-                <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
-                Unsubscribe
-              </a>
-            )}
-          </>
-        }
-      />
-
-      {!digest && issue.digestError && (
-        <p className="mb-3 text-ui text-ink-muted">
-          This issue could not be summarised, so it is shown as it arrived.
-        </p>
-      )}
-
-      {showDigest ? (
-        <div className="space-y-5">
-          <Card padding="standard">
-            <p className="break-words text-body leading-relaxed text-ink">{digest.summary}</p>
-          </Card>
-          {digest.stories.length > 0 && (
-            <CardSection title="Stories">
-              <ul className="divide-y divide-border">
-                {digest.stories.map((story, index) => (
-                  <li key={index} className="py-3 first:pt-0 last:pb-0">
-                    <h3 className="break-words text-body font-semibold text-ink">{story.headline}</h3>
-                    <p className="mt-1 text-body leading-relaxed text-ink-muted">
-                      {story.summary}
-                    </p>
-                    {story.link && (
-                      <a
-                        href={story.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-1.5 inline-flex items-center gap-1 text-ui text-accent hover:underline"
-                      >
-                        Read the article
-                        <ExternalLink className="size-3" strokeWidth={1.75} aria-hidden />
-                      </a>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </CardSection>
-          )}
-        </div>
-      ) : html ? (
-        <IssueFrame html={html} />
-      ) : (
-        <Card>
-          <CardBody>
-            {issue.textBody ? (
-              <div className="whitespace-pre-wrap break-words text-body leading-relaxed text-ink">
-                {issue.textBody}
-              </div>
-            ) : (
-              <p className="text-body text-ink-muted">
-                This one arrived with nothing in it to show.
-              </p>
-            )}
-          </CardBody>
-        </Card>
-      )}
-    </div>
+    <IssueView
+      issueId={issue.id}
+      subject={issue.subject}
+      byline={`${from} · ${formatArrival(issue.receivedAt, settings.timezone)}`}
+      back={back}
+      digest={digest}
+      digestError={issue.digestError}
+      showDigest={showDigest}
+      html={html}
+      textBody={issue.textBody}
+      blockedImages={blockedImages}
+      unsubscribeUrl={issue.unsubscribeUrl}
+      picturesHref={picturesHref}
+      originalHref={originalHref}
+      summaryHref={summaryHref}
+    />
   );
 }

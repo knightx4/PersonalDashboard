@@ -7,7 +7,7 @@ import { cn } from '@/lib/cn';
  * under prefers-reduced-motion -- see globals.css.
  */
 const button = cva(
-  'press inline-flex items-center justify-center gap-1.5 rounded-control font-medium ' +
+  'press inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-control font-medium ' +
     'transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50 ' +
     'focus-visible:outline-2 focus-visible:outline-offset-2',
   {

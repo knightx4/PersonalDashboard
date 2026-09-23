@@ -50,6 +50,7 @@ import { CommentThread } from '@/components/dev/comment-thread';
 import type { DevComment } from '@/lib/comments/load';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { IssueView, type IssueViewProps } from '@/app/news/i/[id]/issue-view';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -1503,6 +1504,82 @@ function SharedDisplayOptions() {
   );
 }
 
+/**
+ * A newsletter issue as /news/i/[id] draws it (plan #788). A weekly roundup
+ * with four stories: one headline is a single long unbroken word, the way a
+ * link-roundup names a repository, and two stories carry no link.
+ */
+const issueBase: IssueViewProps = {
+  issueId: 'issue-1',
+  subject: 'The Week in Infrastructure #212: queues, caches and one bad deploy',
+  byline: 'Infra Weekly · Tue 22 Sep, 07:14',
+  back: { href: '/news', label: 'Newsletters' },
+  digest: {
+    summary:
+      'A quieter week for launches and a busy one for post-mortems. The lead piece walks through how a payments company lost six hours to a cache that kept serving stale balances after a failover, and what they changed. Elsewhere: a benchmark of three Postgres-backed job queues, a new release of a popular tracing library, and a short essay on why most teams do not need Kubernetes yet.',
+    stories: [
+      {
+        headline: 'Six hours of stale balances: a failover post-mortem',
+        summary:
+          'A replica promoted during a network partition kept its warm cache, so reads served balances from before the split. The fix was to tie cache generations to the primary\'s timeline ID rather than to wall-clock expiry.',
+        link: 'https://example.com/blog/2026/09/stale-balances-post-mortem',
+      },
+      {
+        headline: 'github.com/example-org/postgres-backed-job-queue-benchmarks-2026',
+        summary:
+          'Three queues built on SKIP LOCKED were run at the same load for a week. The simplest one held its latency best, and the one with the most features fell over first when vacuum could not keep up.',
+        link: 'https://github.com/example-org/postgres-backed-job-queue-benchmarks-2026',
+      },
+      {
+        headline: 'Tracing library 4.0 drops the global registry',
+        summary:
+          'Every tracer is now passed explicitly, which breaks most existing setups. The maintainers say the upgrade is a morning\'s work for a typical service.',
+      },
+      {
+        headline: 'You probably do not need Kubernetes yet',
+        summary:
+          'An essay arguing that a team under twenty engineers spends more on the platform than it saves. Its test is whether anyone on the team would notice a week without it.',
+      },
+    ],
+  },
+  digestError: null,
+  showDigest: true,
+  html: null,
+  textBody: null,
+  blockedImages: 0,
+  unsubscribeUrl: 'https://example.com/unsubscribe?u=abc123',
+  picturesHref: '/news/i/issue-1?view=original&pictures=1',
+  originalHref: '/news/i/issue-1?view=original',
+  summaryHref: '/news/i/issue-1',
+};
+
+/** A single-essay newsletter: the summary is the whole digest. */
+const issueEssay: IssueViewProps = {
+  ...issueBase,
+  issueId: 'issue-2',
+  subject: 'On leaving things unfinished',
+  byline: 'Slow Letters · Sun 20 Sep, 09:02',
+  digest: {
+    summary:
+      'An essay about the half-built projects that pile up in any maker\'s life, and the argument that abandoning one on purpose is a skill. The writer keeps a list of what they stopped and why, and rereads it before starting anything new. Their point is that the list is less about guilt than about noticing which kinds of project they never finish.',
+    stories: [],
+  },
+  unsubscribeUrl: null,
+};
+
+/** A newsletter whose digest failed: the email as it arrived, with one line above it. */
+const issueFailed: IssueViewProps = {
+  ...issueBase,
+  issueId: 'issue-3',
+  subject: 'Market notes for Monday',
+  byline: 'Morning Tape · Mon 21 Sep, 06:30',
+  digest: null,
+  digestError: 'model returned no summary',
+  showDigest: false,
+  html: '<h2>Good morning</h2><p>Futures are flat ahead of the open. Three things to watch today: the jobs revision, two earnings reports after the close, and whether the long end keeps selling off.</p><p><img src="https://example.com/chart.png" alt="Chart of the ten-year yield"></p><p>That is it for today.</p>',
+  blockedImages: 1,
+};
+
 /** The job search's ten sections, as its layout lists them. */
 const shellSections: NavSection[] = [
   { href: '/jobs/today', label: 'This week', icon: 'week' },
@@ -1936,6 +2013,35 @@ export const SURFACES: readonly Surface[] = [
         <TodayLists board={todayBoard} timezone="Europe/London" />
       </AppShell>
     ),
+  },
+
+  {
+    id: 'news-issue-digest',
+    label: 'News · Issue summary and stories',
+    module: 'news',
+    width: 'page',
+    render: () => <IssueView {...issueBase} />,
+  },
+  {
+    id: 'news-issue-essay',
+    label: 'News · Single-essay issue summary',
+    module: 'news',
+    width: 'page',
+    render: () => <IssueView {...issueEssay} />,
+  },
+  {
+    id: 'news-issue-original',
+    label: 'News · Issue original email',
+    module: 'news',
+    width: 'page',
+    render: () => <IssueView {...issueBase} showDigest={false} html={issueFailed.html} blockedImages={1} />,
+  },
+  {
+    id: 'news-issue-failed',
+    label: 'News · Issue whose summary failed',
+    module: 'news',
+    width: 'page',
+    render: () => <IssueView {...issueFailed} />,
   },
 
   /* The page anatomies, framed at two widths by the anatomy section on
