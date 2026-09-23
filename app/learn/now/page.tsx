@@ -1,41 +1,52 @@
 import Link from 'next/link';
-import { BookOpenCheck, ExternalLink } from 'lucide-react';
+import { after } from 'next/server';
+import { ExternalLink } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
+import { topUpFeedAfterResponse } from '@/inngest/learn/feed-top-up';
+import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
+import { countReadyCards, loadFeedPage } from '@/lib/learn/feed/load';
+import { READY_LOW } from '@/lib/learn/feed/top-up';
 import { loadReadNow } from '@/lib/learn/tracks/load';
 import { openReading } from '../r/[id]/actions';
+import { LearnNowFeed } from './feed';
 import { FinishButton } from './finish-button';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Learn now' };
 
 /**
- * Learn now, the first tab and what opening Learn lands on (plan #805).
+ * Long enough for the page's actions and what they start afterwards. Test me
+ * on this writes a track while you wait, and every action may top the feed up
+ * inside `after()`, which runs within this same limit (plan #808).
+ */
+export const maxDuration = 300;
+
+/**
+ * Learn now, the first tab and what opening Learn lands on (plan #805), as the
+ * endless feed of docs/LEARN-NOW-SPEC.md (plan #808).
  *
- * Until the feed in docs/LEARN-NOW-SPEC.md is built (plan #808), this is the
- * Read now shelf it replaced, under the new name: the readings you queued,
- * which the feed will show first, ahead of anything it picked. What follows is
- * why the shelf was built the way it is.
+ * The readings you queued come first, in the order you queued them, as the
+ * thin shelf they always were: what it is, why you put it there, Open, and
+ * Read it. Nothing on it asks you a question before you can read, and all the
+ * rest is on the reading's own page, one click away.
  *
- * The shelf you actually read from.
- *
- * A track is a curriculum: ordered, reasoned, read over weeks. That is the
- * right shape for deciding what to read and the wrong one for the twenty
- * minutes in which you read it, where the question is not "what is the fourth
- * step of my Marx track" but "what did I say I would read next".
- *
- * So this page is deliberately thin. One line saying what it is, one line
- * saying why you put it there, Open, and Read. No status row, no locator
- * basis, no access notes, no note field -- all of that is on the reading's own
- * page, one click away, and none of it is the reason you opened this tab. The
- * whole point is that nothing here asks you a question before you can read.
+ * Then the cards the app wrote, one after another (`./feed.tsx`), loaded a
+ * few at a time as you scroll.
  */
 export default async function LearnNowPage() {
+  const user = await requireUser();
   const supabase = await createLearnClient();
-  const readings = await loadReadNow(supabase);
+  const [readings, cards, ready] = await Promise.all([
+    loadReadNow(supabase),
+    loadFeedPage(supabase, []),
+    countReadyCards(supabase),
+  ]);
+  // Opening the page counts as a response: when fewer than ten are ready,
+  // more are written while you read the first.
+  after(() => topUpFeedAfterResponse(user.id));
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -43,24 +54,19 @@ export default async function LearnNowPage() {
         title="Learn now"
         description={
           readings.length === 0
-            ? 'What you said you would read next.'
-            : 'What you said you would read next, in the order you said it.'
+            ? 'Something worth reading next, one after another.'
+            : 'What you said you would read next, then something new.'
         }
       />
 
-      {readings.length === 0 ? (
-        <EmptyState
-          icon={BookOpenCheck}
-          title="Nothing on the shelf"
-          description="Open anything in a reading list and press Read now, and it will be waiting here."
-          action={{ label: 'Your reading lists', href: '/learn/lists' }}
-          className="mt-6"
-        />
-      ) : (
+      {readings.length > 0 && (
         /* One surface with hairlines, not a card per reading. Law 13: the
-         * shelf is scrolled, so it is a list, and a card each cost every row
+         * shelf is scanned, so it is a list, and a card each cost every row
          * its own border and eight pixels of margin for nothing. */
-        <Card padding="none" className="mt-6">
+        <Card padding="none" className="mb-4">
+          <h2 className="card-pad-x pt-(--card-p) text-ui font-semibold text-ink">
+            You said you would read these
+          </h2>
           <ul className="divide-y divide-border">
             {readings.map((reading) => {
               const url = reading.openUrl ?? reading.source?.canonicalUrl ?? null;
@@ -68,7 +74,7 @@ export default async function LearnNowPage() {
               return (
                 <li key={reading.id} className="card-pad-x row-pad">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                    <h2 className="text-body font-medium text-ink">{reading.subject}</h2>
+                    <h3 className="text-body font-medium text-ink">{reading.subject}</h3>
                     <Link
                       href={`/learn/t/${reading.trackId}`}
                       className="text-small text-ink-muted underline underline-offset-2 hover:text-ink"
@@ -99,8 +105,8 @@ export default async function LearnNowPage() {
                       </Link>
                     )}
 
-                    {/* Finishing is the one write this page needs, and it is
-                        also what takes the row off the shelf. */}
+                    {/* Finishing is the one write this shelf needs, and it is
+                        also what takes the row off it. */}
                     <FinishButton readingId={reading.id} />
 
                     <Link
@@ -116,6 +122,8 @@ export default async function LearnNowPage() {
           </ul>
         </Card>
       )}
+
+      <LearnNowFeed first={cards} ready={ready} low={READY_LOW} />
     </div>
   );
 }
