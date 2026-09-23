@@ -374,3 +374,101 @@ describe('merging across users', () => {
     ).rejects.toThrow(/not about this pair/);
   });
 });
+
+describe('apply_merge_proposals (plan #820)', () => {
+  async function propose(x: string, y: string, survivor: string, name: string, confidence = 0.9) {
+    const [lo, hi] = [x, y].sort();
+    const [labels] = await admin<{ lo: string; hi: string }[]>`
+      select (select name from themes where id = ${lo}) as lo,
+             (select name from themes where id = ${hi}) as hi`;
+    const [row] = await admin<{ id: string }[]>`
+      insert into map_merge_proposals (user_id, kind, a_id, b_id, a_name, b_name, source,
+                                       verdict, survivor_id, survivor_name, reason, confidence, model)
+      values (${userA}, 'theme', ${lo}, ${hi}, ${labels.lo}, ${labels.hi}, 'embedding', 'same',
+              ${survivor}, ${name}, 'One subject.', ${confidence}, 'claude-haiku-4-5')
+      returning id`;
+    return row.id;
+  }
+
+  async function apply() {
+    const [row] = await admin<{ r: Record<string, number> }[]>`
+      select apply_merge_proposals('theme', ${userA}) as r`;
+    return row.r;
+  }
+
+  async function outcome(proposalId: string) {
+    const [row] = await admin<{ apply_outcome: string | null }[]>`
+      select apply_outcome from map_merge_proposals where id = ${proposalId}`;
+    return row.apply_outcome;
+  }
+
+  it('merges every same proposal, following a side already merged, and records each', async () => {
+    const hub = await theme('Transit');
+    const bus = await theme('Buses');
+    const tram = await theme('Trams');
+    const n1 = await note('Transit/Bus.md');
+    const n2 = await note('Transit/Tram.md');
+    await filed(bus, [n1], []);
+    await filed(tram, [n2], []);
+    // Bus into the hub, surer, so it goes first; then bus and tram, whose bus
+    // side now lives on the hub; then hub and tram, already one by then.
+    const p1 = await propose(hub, bus, hub, 'Public transit', 0.95);
+    const p2 = await propose(bus, tram, bus, 'Buses', 0.9);
+    const p3 = await propose(hub, tram, hub, 'Transit', 0.85);
+
+    const result = await apply();
+    expect(result).toMatchObject({ merged: 2, joined: 1, remaining: 0 });
+    expect([await outcome(p1), await outcome(p2), await outcome(p3)]).toEqual([
+      'merged',
+      'merged',
+      'joined',
+    ]);
+
+    const merges = await admin<{ proposal_id: string; survivor_id: string; absorbed_id: string }[]>`
+      select proposal_id, survivor_id, absorbed_id from map_merges
+      where user_id = ${userA} and proposal_id in (${p1}, ${p2}) order by merged_at`;
+    expect(merges).toEqual([
+      { proposal_id: p1, survivor_id: hub, absorbed_id: bus },
+      { proposal_id: p2, survivor_id: hub, absorbed_id: tram },
+    ]);
+    const [hubRow] = await admin<{ name: string; notes: number }[]>`
+      select name, (select count(*)::int from theme_notes where theme_id = ${hub}) as notes
+      from themes where id = ${hub}`;
+    // The first merge took the suggested name; the chained one kept it.
+    expect(hubRow).toEqual({ name: 'Public transit', notes: 2 });
+
+    // A second run finds nothing to do.
+    expect(await apply()).toMatchObject({ merged: 0, joined: 0, remaining: 0 });
+  });
+
+  it('does not merge an undone pair again, and the search leaves it out', async () => {
+    const a = await theme('Housing supply');
+    const b = await theme('Housing shortage');
+    const c = await theme('Zoning reform');
+    const p1 = await propose(a, b, a, 'Housing supply');
+    await apply();
+    const [merge] = await admin<{ id: string }[]>`select id from map_merges where proposal_id = ${p1}`;
+    await admin`select undo_map_merge(${merge.id})`;
+
+    // A later proposal that leads to the same pair through a chain: c into a,
+    // then c and b, which is a and b again.
+    const p2 = await propose(a, c, a, 'Housing supply', 0.95);
+    const p3 = await propose(b, c, c, 'Zoning reform', 0.9);
+    const result = await apply();
+    expect(result).toMatchObject({ merged: 1, undone: 1, remaining: 0 });
+    expect(await outcome(p2)).toBe('merged');
+    expect(await outcome(p3)).toBe('undone');
+    const [rows] = await admin<{ n: number }[]>`
+      select count(*)::int as n from themes where id in (${a}, ${b})`;
+    expect(rows.n).toBe(2);
+
+    // The undone pair is left out of the candidate search even with its
+    // proposal gone.
+    await admin`delete from map_merge_proposals where id = ${p1}`;
+    const [lo, hi] = [a, b].sort();
+    const found = await admin<{ a_id: string }[]>`
+      select a_id from theme_merge_candidates(1000, ${userA}, 5, 0.7, 0.3)
+      where a_id = ${lo} and b_id = ${hi}`;
+    expect(found).toHaveLength(0);
+  });
+});

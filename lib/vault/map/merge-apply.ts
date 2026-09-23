@@ -124,3 +124,65 @@ export function mergeInputFromProposal(proposal: ApplicableProposal): MergeInput
     proposalId: proposal.id,
   };
 }
+
+/** What the apply run did with a proposal (obsidian.map_merge_proposals.apply_outcome). */
+export type ApplyOutcome = 'merged' | 'joined' | 'undone' | 'gone' | 'failed';
+
+export type ApplyResult = {
+  kind: MergeKind;
+  /** Proposals looked at this run, per outcome. */
+  counts: Record<ApplyOutcome, number>;
+  /** `same` proposals of this kind still not looked at when the run stopped. */
+  remaining: number;
+  /** Why the run stopped with proposals left: out of time, or a call failed. */
+  stopped: { reason: 'time' } | { reason: 'error'; detail: string } | null;
+};
+
+/** How long one database call may work, well inside PostgREST's eight seconds. */
+export const APPLY_CALL_BUDGET_MS = 4_000;
+
+/**
+ * Merge every `same` proposal of one kind that has not been applied yet
+ * (plan #820), by calling obsidian.apply_merge_proposals until nothing is
+ * left or the deadline passes. The function follows each side through earlier
+ * merges, skips a pair whose merge was undone, and marks every proposal it
+ * looks at with the outcome, so a call that is cut off loses nothing.
+ *
+ * Needs the service-role client: the function is not granted to a signed-in
+ * caller. `userId` null applies every owner's proposals.
+ */
+export async function applyMergeProposals(
+  supabase: VaultSupabaseClient,
+  kind: MergeKind,
+  options: { userId: string | null; deadline: number; now?: () => number },
+): Promise<ApplyResult> {
+  const now = options.now ?? Date.now;
+  const counts: Record<ApplyOutcome, number> = { merged: 0, joined: 0, undone: 0, gone: 0, failed: 0 };
+  let remaining = 0;
+
+  for (;;) {
+    const left = options.deadline - now();
+    if (left <= 500) return { kind, counts, remaining, stopped: remaining > 0 ? { reason: 'time' } : null };
+
+    const { data, error } = await supabase.rpc('apply_merge_proposals', {
+      p_kind: kind,
+      p_user_id: options.userId,
+      p_limit: 500,
+      p_budget_ms: Math.min(APPLY_CALL_BUDGET_MS, left - 500),
+    });
+    if (error) return { kind, counts, remaining, stopped: { reason: 'error', detail: error.message } };
+
+    const reply = data as Record<ApplyOutcome, number> & { remaining: number };
+    let looked = 0;
+    for (const outcome of Object.keys(counts) as ApplyOutcome[]) {
+      const n = Number(reply[outcome] ?? 0);
+      counts[outcome] += n;
+      looked += n;
+    }
+    remaining = Number(reply.remaining ?? 0);
+    if (remaining === 0) return { kind, counts, remaining, stopped: null };
+    // Nothing looked at with proposals left means the call had no time for
+    // even one; carry on next tick rather than spin.
+    if (looked === 0) return { kind, counts, remaining, stopped: { reason: 'time' } };
+  }
+}
