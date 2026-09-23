@@ -408,7 +408,7 @@ describe('apply_merge_proposals (plan #820)', () => {
     return row.apply_outcome;
   }
 
-  it('merges every same proposal, following a side already merged, and records each', async () => {
+  it('merges every same proposal whose two themes are both still there, and records each', async () => {
     const hub = await theme('Transit');
     const bus = await theme('Buses');
     const tram = await theme('Trams');
@@ -417,38 +417,72 @@ describe('apply_merge_proposals (plan #820)', () => {
     await filed(bus, [n1], []);
     await filed(tram, [n2], []);
     // Bus into the hub, surer, so it goes first; then bus and tram, whose bus
-    // side now lives on the hub; then hub and tram, already one by then.
+    // side is gone by then (plan #878); then hub and tram, both still there.
     const p1 = await propose(hub, bus, hub, 'Public transit', 0.95);
     const p2 = await propose(bus, tram, bus, 'Buses', 0.9);
     const p3 = await propose(hub, tram, hub, 'Transit', 0.85);
 
     const result = await apply();
-    expect(result).toMatchObject({ merged: 2, joined: 1, remaining: 0 });
+    expect(result).toMatchObject({ merged: 2, absorbed: 1, joined: 0, remaining: 0 });
     expect([await outcome(p1), await outcome(p2), await outcome(p3)]).toEqual([
       'merged',
+      'absorbed',
       'merged',
-      'joined',
     ]);
 
     const merges = await admin<{ proposal_id: string; survivor_id: string; absorbed_id: string }[]>`
       select m.proposal_id, m.survivor_id, m.absorbed_id from map_merges m
       join map_merge_proposals p on p.id = m.proposal_id
-      where m.user_id = ${userA} and m.proposal_id in (${p1}, ${p2})
+      where m.user_id = ${userA} and m.proposal_id in (${p1}, ${p2}, ${p3})
       -- One apply is one transaction, so both merges share a merged_at; the
       -- proposals' confidence is the order the pass took them in.
       order by p.confidence desc`;
     expect(merges).toEqual([
       { proposal_id: p1, survivor_id: hub, absorbed_id: bus },
-      { proposal_id: p2, survivor_id: hub, absorbed_id: tram },
+      { proposal_id: p3, survivor_id: hub, absorbed_id: tram },
     ]);
     const [hubRow] = await admin<{ name: string; notes: number }[]>`
       select name, (select count(*)::int from theme_notes where theme_id = ${hub}) as notes
       from themes where id = ${hub}`;
-    // The first merge took the suggested name; the chained one kept it.
+    // The first merge took the suggested name. The second was proposed for
+    // the old name, so it kept the one the hub has now.
     expect(hubRow).toEqual({ name: 'Public transit', notes: 2 });
 
     // A second run finds nothing to do.
-    expect(await apply()).toMatchObject({ merged: 0, joined: 0, remaining: 0 });
+    expect(await apply()).toMatchObject({ merged: 0, absorbed: 0, remaining: 0 });
+  });
+
+  it('offers the surviving theme and the other side of an absorbed proposal as a new pair (plan #878)', async () => {
+    // Names far apart and no embeddings, so neither search half would find
+    // the pair on its own.
+    const kept = await theme('Gardening');
+    const gone = await theme('Allotments');
+    const other = await theme('Compost heaps');
+    const p1 = await propose(kept, gone, kept, 'Gardening', 0.95);
+    const p2 = await propose(gone, other, gone, 'Allotments', 0.9);
+    expect(await apply()).toMatchObject({ merged: 1, absorbed: 1, remaining: 0 });
+    expect(await outcome(p1)).toBe('merged');
+    expect(await outcome(p2)).toBe('absorbed');
+    // Compost heaps is still its own theme.
+    const [left] = await admin<{ n: number }[]>`
+      select count(*)::int as n from themes where id = ${other}`;
+    expect(left.n).toBe(1);
+
+    const [lo, hi] = [kept, other].sort();
+    const candidates = async () =>
+      admin<{ a_id: string; b_id: string; a_name: string; b_name: string }[]>`
+        select a_id, b_id, a_name, b_name from theme_merge_candidates(1000, ${userA}, 5, 0.7, 0.5)`;
+    const first = await candidates();
+    // The carried pair comes first, named as the two themes read now.
+    expect(first[0]).toMatchObject({ a_id: lo, b_id: hi });
+    expect([first[0].a_name, first[0].b_name].sort()).toEqual(['Compost heaps', 'Gardening']);
+
+    // Judged as one subject, it merges directly, and is not offered again.
+    const p3 = await propose(kept, other, kept, 'Gardening', 0.9);
+    expect(await apply()).toMatchObject({ merged: 1, absorbed: 0, remaining: 0 });
+    expect(await outcome(p3)).toBe('merged');
+    const after = await candidates();
+    expect(after.some((c) => [c.a_id, c.b_id].includes(other))).toBe(false);
   });
 
   it('does not merge an undone pair again, and the search leaves it out', async () => {
@@ -461,19 +495,20 @@ describe('apply_merge_proposals (plan #820)', () => {
     await admin`select undo_map_merge(${merge.id})`;
 
     // A later proposal that leads to the same pair through a chain: c into a,
-    // then c and b, which is a and b again.
+    // then c and b, which is a and b again. Since plan #878 that chain is
+    // not followed: c is gone by then, so the proposal is marked absorbed.
     const p2 = await propose(a, c, a, 'Housing supply', 0.95);
     const p3 = await propose(b, c, c, 'Zoning reform', 0.9);
     const result = await apply();
-    expect(result).toMatchObject({ merged: 1, undone: 1, remaining: 0 });
+    expect(result).toMatchObject({ merged: 1, absorbed: 1, remaining: 0 });
     expect(await outcome(p2)).toBe('merged');
-    expect(await outcome(p3)).toBe('undone');
+    expect(await outcome(p3)).toBe('absorbed');
     const [rows] = await admin<{ n: number }[]>`
       select count(*)::int as n from themes where id in (${a}, ${b})`;
     expect(rows.n).toBe(2);
 
     // The undone pair is left out of the candidate search even with its
-    // proposal gone.
+    // proposal gone, including as the pair p3 now leads to.
     await admin`delete from map_merge_proposals where id = ${p1}`;
     const [lo, hi] = [a, b].sort();
     const found = await admin<{ a_id: string }[]>`
