@@ -453,8 +453,10 @@ function errorText(error: unknown): string {
  * `news` may be the service-role client, so every query names the account.
  * `spend` is a client bound to the core schema; the call's cost is written to
  * core.model_spend under module 'news', operation 'digest-issue', whether the
- * reply was usable or not. Throws only when the row itself cannot be read or
- * written; a failed model call is saved as `digest_error` and returned, unless
+ * reply was usable or not. New stories clear the issue's rows in
+ * news.story_passes, since those name stories by position. Throws only when
+ * the row itself cannot be read or written, or those passes cannot be cleared;
+ * a failed model call is saved as `digest_error` and returned, unless
  * the issue already had a summary, which is then kept.
  */
 export async function digestIssue(input: {
@@ -520,5 +522,19 @@ export async function digestIssue(input: {
   }
 
   if (saved.error) throw new Error(`news: saving the summary failed (${saved.error.message})`);
+
+  // Quick read records a pass by the story's position in the array, and the
+  // array just written may put different stories at those positions, so the
+  // old passes go. A failed redo kept the old stories, so it keeps them too.
+  if (outcome.status === 'digested') {
+    const cleared = await input.news
+      .from('story_passes')
+      .delete()
+      .eq('issue_id', input.issueId)
+      .eq('user_id', input.userId);
+    if (cleared.error) {
+      throw new Error(`news: clearing the stories passed in Quick read failed (${cleared.error.message})`);
+    }
+  }
   return outcome;
 }

@@ -202,6 +202,48 @@ describe('news.senders', () => {
   });
 });
 
+describe('news.story_passes', () => {
+  it('records a story once, and shows each account only its own passes', async () => {
+    await asUser(userA, (tx) => tx`
+      insert into story_passes (user_id, issue_id, story_index) values (${userA}, ${issueA}, 0)`);
+    await asUser(userA, (tx) => tx`
+      insert into story_passes (user_id, issue_id, story_index) values (${userA}, ${issueA}, 0)
+      on conflict (issue_id, story_index) do nothing`);
+
+    const mine = await asUser(userA, (tx) => tx<{ story_index: number }[]>`
+      select story_index from story_passes`);
+    expect(mine.map((r) => r.story_index)).toEqual([0]);
+
+    const theirs = await asUser(userB, (tx) => tx<{ story_index: number }[]>`
+      select story_index from story_passes`);
+    expect(theirs).toEqual([]);
+  });
+
+  it('refuses a second pass of the same story', async () => {
+    await expect(
+      admin`insert into story_passes (user_id, issue_id, story_index) values (${userA}, ${issueA}, 0)`,
+    ).rejects.toThrow(/story_passes_pkey/);
+  });
+
+  it("refuses a pass on another account's issue, even through its own user_id", async () => {
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into story_passes (user_id, issue_id, story_index) values (${userA}, ${issueA}, 1)`),
+    ).rejects.toThrow(/row-level security/);
+    // Foreign keys are checked without row level security, so the key carrying
+    // user_id is what refuses this one.
+    await expect(
+      admin`insert into story_passes (user_id, issue_id, story_index) values (${userB}, ${issueA}, 1)`,
+    ).rejects.toThrow(/story_passes_issue_fk/);
+  });
+
+  it('refuses a negative position', async () => {
+    await expect(
+      admin`insert into story_passes (user_id, issue_id, story_index) values (${userA}, ${issueA}, -1)`,
+    ).rejects.toThrow(/story_passes_index_ck/);
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`
@@ -220,7 +262,7 @@ describe('RLS coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'news' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['addresses', 'issues', 'senders']);
+    expect(rows.map((r) => r.tablename)).toEqual(['addresses', 'issues', 'senders', 'story_passes']);
   });
 
   it('reaches nothing in the schema as an anonymous visitor', async () => {

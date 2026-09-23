@@ -24,11 +24,29 @@ const ISSUE = {
   html_body: '<p>ignored</p>',
 };
 
-function newsClient(row: unknown = ISSUE, saveError: { message: string } | null = null) {
+function newsClient(
+  row: unknown = ISSUE,
+  saveError: { message: string } | null = null,
+  clearError: { message: string } | null = null,
+) {
   const updates: Record<string, unknown>[] = [];
   const filters: [string, unknown][] = [];
+  // Each delete, as the table it ran on and the filters it was given.
+  const deletes: { table: string; filters: [string, unknown][] }[] = [];
   const client = {
-    from: vi.fn(() => ({
+    from: vi.fn((table: string) => ({
+      delete: () => {
+        const entry = { table, filters: [] as [string, unknown][] };
+        deletes.push(entry);
+        const query = {
+          eq: (column: string, value: unknown) => {
+            entry.filters.push([column, value]);
+            return query;
+          },
+          then: (resolve: (value: unknown) => void) => resolve({ error: clearError }),
+        };
+        return query;
+      },
       select: () => {
         const query = {
           eq: (column: string, value: unknown) => {
@@ -52,7 +70,7 @@ function newsClient(row: unknown = ISSUE, saveError: { message: string } | null 
       },
     })),
   };
-  return { client: client as never, updates, filters };
+  return { client: client as never, updates, filters, deletes };
 }
 
 function spendClient() {
@@ -284,6 +302,62 @@ describe('digesting a newsletter', () => {
         client: model(reported({ summary: 'Fine.', stories: [] })).client,
       }),
     ).rejects.toThrow('permission denied');
+  });
+});
+
+describe('the stories passed in Quick read', () => {
+  const PASSES = [
+    { table: 'story_passes', filters: [['issue_id', 'issue-1'], ['user_id', 'user-1']] },
+  ];
+
+  it('clears the issue\'s passes when it saves new stories', async () => {
+    const { news } = await run(
+      reported({ summary: 'New.', stories: [{ headline: 'A', summary: 'B.' }] }),
+      { ...ISSUE, summary: 'Old.' },
+    );
+
+    expect(news.deletes).toEqual(PASSES);
+  });
+
+  it('clears them for an essay too, whose one card is passed as position 0', async () => {
+    const { news } = await run(reported({ summary: 'An essay.', stories: [] }));
+
+    expect(news.deletes).toEqual(PASSES);
+  });
+
+  it('keeps them when a redo fails and the old stories stay', async () => {
+    const { news } = await run(new Error('529 overloaded'), { ...ISSUE, summary: 'Old.' });
+
+    expect(news.deletes).toEqual([]);
+  });
+
+  it('keeps them when the new stories could not be saved', async () => {
+    const news = newsClient(ISSUE, { message: 'permission denied' });
+    await expect(
+      digestIssue({
+        news: news.client,
+        spend: spendClient().client,
+        userId: 'user-1',
+        issueId: 'issue-1',
+        anthropicApiKey: 'test',
+        client: model(reported({ summary: 'Fine.', stories: [] })).client,
+      }),
+    ).rejects.toThrow('permission denied');
+    expect(news.deletes).toEqual([]);
+  });
+
+  it('throws when the passes cannot be cleared', async () => {
+    const news = newsClient(ISSUE, null, { message: 'relation does not exist' });
+    await expect(
+      digestIssue({
+        news: news.client,
+        spend: spendClient().client,
+        userId: 'user-1',
+        issueId: 'issue-1',
+        anthropicApiKey: 'test',
+        client: model(reported({ summary: 'Fine.', stories: [] })).client,
+      }),
+    ).rejects.toThrow('relation does not exist');
   });
 });
 
