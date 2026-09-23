@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { mergeInputFromProposal, mergeMapRows, undoMapMerge } from './merge-apply';
+import {
+  applyMergeProposals,
+  mergeInputFromProposal,
+  mergeMapRows,
+  undoMapMerge,
+} from './merge-apply';
 
 /**
  * The TypeScript side of merging. What the database does with a merge is
@@ -124,5 +129,75 @@ describe('mergeInputFromProposal', () => {
         survivor_name: null,
       }),
     ).toBeNull();
+  });
+});
+
+describe('applyMergeProposals', () => {
+  const reply = (counts: Partial<Record<string, number>>, remaining: number) => ({
+    data: { merged: 0, joined: 0, undone: 0, gone: 0, failed: 0, ...counts, kind: 'theme', remaining },
+    error: null,
+  });
+
+  it('calls the database until nothing is left, adding up the outcomes', async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValueOnce(reply({ merged: 150, joined: 20 }, 30))
+      .mockResolvedValueOnce(reply({ merged: 25, undone: 5 }, 0));
+    const result = await applyMergeProposals({ rpc } as never, 'theme', {
+      userId: null,
+      deadline: 100_000,
+      now: () => 0,
+    });
+    expect(result).toEqual({
+      kind: 'theme',
+      counts: { merged: 175, joined: 20, undone: 5, gone: 0, failed: 0 },
+      remaining: 0,
+      stopped: null,
+    });
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc).toHaveBeenCalledWith('apply_merge_proposals', {
+      p_kind: 'theme',
+      p_user_id: null,
+      p_limit: 500,
+      p_budget_ms: 4000,
+    });
+  });
+
+  it('stops for time with proposals left, and gives a short call only the time there is', async () => {
+    let clock = 0;
+    const rpc = vi.fn().mockImplementation(async () => {
+      clock += 2_000;
+      return reply({ merged: 80 }, 100);
+    });
+    const result = await applyMergeProposals({ rpc } as never, 'position', {
+      userId: 'u1',
+      deadline: 2_400,
+      now: () => clock,
+    });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls[0][1]).toMatchObject({ p_kind: 'position', p_user_id: 'u1', p_budget_ms: 1_900 });
+    expect(result.stopped).toEqual({ reason: 'time' });
+    expect(result.remaining).toBe(100);
+  });
+
+  it('reports a failed call instead of throwing', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { message: 'canceling statement' } });
+    const result = await applyMergeProposals({ rpc } as never, 'theme', {
+      userId: null,
+      deadline: 100_000,
+      now: () => 0,
+    });
+    expect(result.stopped).toEqual({ reason: 'error', detail: 'canceling statement' });
+  });
+
+  it('does not spin when a call looks at nothing', async () => {
+    const rpc = vi.fn().mockResolvedValue(reply({}, 40));
+    const result = await applyMergeProposals({ rpc } as never, 'theme', {
+      userId: null,
+      deadline: 100_000,
+      now: () => 0,
+    });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(result.stopped).toEqual({ reason: 'time' });
   });
 });
