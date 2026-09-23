@@ -48,7 +48,8 @@ export function useAttachEmail(): {
 }
 
 /**
- * The orders a shipping, delivery or return email probably belongs to, each a
+ * The orders a waiting email probably belongs to (a shipping, delivery or
+ * return email, or a confirmation that is often a shipping notice), each a
  * press away, numbered for the keys 1 to 3 the queue listens for, and a search
  * over every order for when none of them is right. Follows MessageRow and
  * OtherRolePicker on the jobs review queue.
