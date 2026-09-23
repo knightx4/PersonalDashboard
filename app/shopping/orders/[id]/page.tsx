@@ -54,7 +54,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const { data: sourceMessages } = await supabase
     .from('inbox_messages')
     .select(
-      'provider_message_id, thread_id, subject, from_address, classification, received_at, email_address',
+      'id, provider_message_id, thread_id, subject, from_address, classification, received_at, email_address',
     )
     .eq('resulting_order_id', id)
     .order('received_at', { ascending: true });
@@ -77,7 +77,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
   const { data: returnRows } = await supabase
     .from('returns')
-    .select('id, status, refund_amount_cents, initiated_at, refunded_at')
+    .select('id, status, refund_amount_cents, initiated_at, refunded_at, source_message_id')
     .eq('order_id', id)
     .order('initiated_at', { ascending: false });
 
@@ -152,6 +152,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const displayReturns = (returnRows ?? []).map((row) => ({
     ...row,
     display_refund_cents: next(),
+    // The return email that recorded it, when it came from one.
+    emailHref: messageGmailHref(
+      (sourceMessages ?? []).find((message) => message.id === row.source_message_id),
+    ),
   }));
 
   function moneyLabel(displayCents: number, nativeCents: number): string {
@@ -354,6 +358,16 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                   <span className="text-ink">
                     {row.status.replaceAll('_', ' ')}
                     {row.refunded_at ? ` · ${row.refunded_at}` : ` · ${row.initiated_at}`}
+                    {row.emailHref && (
+                      <a
+                        href={row.emailHref}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="ml-3 text-ui text-ink-muted transition-colors duration-150 hover:text-accent hover:underline"
+                      >
+                        Open return email
+                      </a>
+                    )}
                   </span>
                   <span className="tabular text-ink-muted">
                     {moneyLabel(row.display_refund_cents, row.refund_amount_cents)}
@@ -496,6 +510,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 }
 
 type LinkedEmail = {
+  id?: string;
   provider_message_id: string;
   thread_id: string | null;
   subject: string | null;

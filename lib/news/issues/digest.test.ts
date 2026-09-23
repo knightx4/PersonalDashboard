@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { bodyText, digestIssue, readDigest, DIGEST_MODEL, DIGEST_OPERATION } from './digest';
+import {
+  bodyText,
+  digestIssue,
+  readDigest,
+  readLine,
+  DIGEST_MODEL,
+  DIGEST_OPERATION,
+  LINE_CHARS,
+} from './digest';
 
 /**
  * One stored newsletter into a summary and stories, without a network.
@@ -84,9 +92,10 @@ async function run(reply: unknown, row: unknown = ISSUE) {
 }
 
 describe('digesting a newsletter', () => {
-  it('saves the summary and each story, and records the spend', async () => {
+  it('saves the line, the summary and each story, and records the spend', async () => {
     const { outcome, news, spend, haiku } = await run(
       reported({
+        line: ' Two stories:\nthe first and the second. ',
         summary: ' Two stories today. ',
         stories: [
           { headline: 'First', summary: 'The first story. It happened.' },
@@ -100,11 +109,18 @@ describe('digesting a newsletter', () => {
       { headline: 'First', summary: 'The first story. It happened.' },
       { headline: 'Second', summary: 'The second story. It also happened.' },
     ];
-    expect(outcome).toEqual({ status: 'digested', summary: 'Two stories today.', stories });
+    expect(outcome).toEqual({
+      status: 'digested',
+      line: 'Two stories: the first and the second.',
+      summary: 'Two stories today.',
+      stories,
+    });
 
     const sent = haiku.create.mock.calls[0][0];
     expect(sent.model).toBe(DIGEST_MODEL);
     expect(sent.tool_choice).toEqual({ type: 'tool', name: 'report_digest' });
+    expect(sent.tools[0].input_schema.required).toContain('line');
+    expect(sent.system).toContain(`at most ${LINE_CHARS} characters`);
     expect(sent.messages[0].content).toBe(
       'Subject: Morning roundup\n\nView in browser\n\nFirst story.\n\nSecond story.',
     );
@@ -112,6 +128,7 @@ describe('digesting a newsletter', () => {
     expect(news.updates).toHaveLength(1);
     expect(news.updates[0]).toMatchObject({
       summary: 'Two stories today.',
+      summary_line: 'Two stories: the first and the second.',
       stories,
       digest_error: null,
     });
@@ -156,23 +173,40 @@ describe('digesting a newsletter', () => {
       { headline: 'Paramount', summary: 'It may leave LA. Critics call it a bluff.', link: tracked },
       { headline: 'Oil', summary: 'Oil fell. Nobody linked it.' },
     ];
-    expect(outcome).toEqual({ status: 'digested', summary: 'Two stories.', stories });
+    expect(outcome).toEqual({ status: 'digested', line: null, summary: 'Two stories.', stories });
     expect(news.updates[0]).toMatchObject({ stories });
   });
 
   it('gives a single essay its summary and an empty story list', async () => {
     const { outcome, news } = await run(
-      reported({ summary: 'One long argument about parking.', stories: [] }),
+      reported({
+        line: 'An argument about parking',
+        summary: 'One long argument about parking.',
+        stories: [],
+      }),
     );
 
     expect(outcome).toEqual({
       status: 'digested',
+      line: 'An argument about parking',
       summary: 'One long argument about parking.',
       stories: [],
     });
     expect(news.updates[0]).toMatchObject({
       summary: 'One long argument about parking.',
+      summary_line: 'An argument about parking',
       stories: [],
+      digest_error: null,
+    });
+  });
+
+  it('still saves the summary when the reply leaves the line out', async () => {
+    const { outcome, news } = await run(reported({ summary: 'Two stories.', stories: [] }));
+
+    expect(outcome).toEqual({ status: 'digested', line: null, summary: 'Two stories.', stories: [] });
+    expect(news.updates[0]).toMatchObject({
+      summary: 'Two stories.',
+      summary_line: null,
       digest_error: null,
     });
   });
@@ -183,6 +217,7 @@ describe('digesting a newsletter', () => {
     expect(outcome).toEqual({ status: 'failed', error: '529 overloaded' });
     expect(news.updates[0]).toMatchObject({
       summary: null,
+      summary_line: null,
       stories: null,
       digest_error: '529 overloaded',
     });
@@ -293,6 +328,7 @@ describe('reading the report', () => {
         links,
       ),
     ).toEqual({
+      line: null,
       summary: 'Two stories.',
       stories: [
         { headline: 'Linked', summary: 'Has a link.', link: 'https://t.example/c/2' },
@@ -310,10 +346,34 @@ describe('reading the report', () => {
         summary: 'One story.',
         stories: [{ headline: 'Typed', summary: 'Wrote a URL.', link: 'https://evil.example' }],
       }),
-    ).toEqual({ summary: 'One story.', stories: [{ headline: 'Typed', summary: 'Wrote a URL.' }] });
+    ).toEqual({
+      line: null,
+      summary: 'One story.',
+      stories: [{ headline: 'Typed', summary: 'Wrote a URL.' }],
+    });
   });
 
   it('reads a missing story list as none', () => {
-    expect(readDigest({ summary: 'Fine.' })).toEqual({ summary: 'Fine.', stories: [] });
+    expect(readDigest({ summary: 'Fine.' })).toEqual({ line: null, summary: 'Fine.', stories: [] });
+  });
+});
+
+describe('reading the line', () => {
+  it('reads a blank or missing line as none', () => {
+    expect(readLine(undefined)).toBeNull();
+    expect(readLine('   ')).toBeNull();
+    expect(readLine(42)).toBeNull();
+  });
+
+  it('keeps a line within the limit as written, on one line', () => {
+    expect(readLine('  Rates hold;\n oil slides ')).toBe('Rates hold; oil slides');
+  });
+
+  it('cuts a long line at a word and marks the cut', () => {
+    const long = 'The Fed holds rates, oil slides on supply news, and three startups raise money this week in Europe';
+    const line = readLine(long);
+    expect(long.length).toBeGreaterThan(LINE_CHARS);
+    expect(line).toBe('The Fed holds rates, oil slides on supply news, and three startups raise money this week…');
+    expect(line!.length).toBeLessThanOrEqual(LINE_CHARS);
   });
 });

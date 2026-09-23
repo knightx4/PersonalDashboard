@@ -8,6 +8,13 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { connectedAccountIds } from '@/lib/core/inbox/accounts';
 import { EXCLUDED_SENDER_ERROR, isExcludedSender } from '@/lib/inbox/merchant-exclusion-match';
 import { chooseExclusionDomain } from '@/lib/review/exclude-sender';
+import {
+  attachedMessage,
+  extractionForAttach,
+  isAttachableClassification,
+} from '@/lib/review/attach-email';
+import { fetchMessageBody } from '@/lib/inbox/fetch-message-body';
+import { applyLifecycleToOrder } from '@/lib/orders/apply-lifecycle';
 
 export interface ActionState {
   error?: string;
@@ -250,6 +257,145 @@ export async function excludeSenderReview(
   revalidatePath('/shopping/settings');
   return {
     message: `Excluded ${domain}. ${ids.length} waiting ${ids.length === 1 ? 'email' : 'emails'} removed.`,
+  };
+}
+
+/**
+ * Attach a waiting shipping, delivery or return email to an order the person
+ * picked, from the suggestions or from a search.
+ *
+ * This is the sync's lifecycle path with the order chosen by hand: the verdict
+ * row is claimed as `pending` against the order, the body is fetched from
+ * Gmail and read by extractLifecycleFromEmail, applyLifecycleToOrder writes the
+ * shipment or return (triggers then move the order's status), and the verdict
+ * becomes `parsed`. The order page lists linked emails by resulting_order_id,
+ * so that is what puts the email there.
+ *
+ * Nothing records that the link was made by hand: nothing would read it.
+ */
+// latency: pending
+export async function attachEmailToOrder(
+  messageId: string,
+  orderId: string,
+): Promise<ActionState> {
+  const ids = z.object({ messageId: z.string().uuid(), orderId: z.string().uuid() });
+  if (!ids.safeParse({ messageId, orderId }).success) {
+    return { error: 'That email or order is not one we can attach.' };
+  }
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const [messageResult, orderResult] = await Promise.all([
+    supabase
+      .from('inbox_messages')
+      .select(
+        'id, email_account_id, provider_message_id, subject, received_at, classification, parse_status',
+      )
+      .eq('id', messageId)
+      .eq('user_id', user.id)
+      .maybeSingle(),
+    supabase
+      .from('orders')
+      .select('id, merchant_id, external_order_number, cancelled_at, order_date, merchants ( name )')
+      .eq('id', orderId)
+      .eq('user_id', user.id)
+      .is('deleted_at', null)
+      .maybeSingle(),
+  ]);
+
+  if (messageResult.error) return { error: messageResult.error.message };
+  if (orderResult.error) return { error: orderResult.error.message };
+  const message = messageResult.data;
+  const order = orderResult.data;
+  if (!message) return { error: 'Email not found.' };
+  if (!order) return { error: 'Order not found.' };
+
+  const classification = message.classification as string | null;
+  if (!isAttachableClassification(classification)) {
+    return { error: 'Only shipping, delivery and return emails attach to an order.' };
+  }
+  if (message.parse_status !== 'needs_review') {
+    return { error: 'That email has already left the queue.' };
+  }
+
+  // Claim the row first, so a second press or a sync running at the same time
+  // finds it no longer waiting and does not write the shipment twice.
+  const { data: claimed, error: claimError } = await supabase
+    .from('ingested_messages')
+    .update({ parse_status: 'pending', resulting_order_id: orderId, error: null })
+    .eq('id', messageId)
+    .eq('parse_status', 'needs_review')
+    .select('id');
+  if (claimError) return { error: claimError.message };
+  if (!claimed || claimed.length === 0) {
+    return { error: 'That email has already left the queue.' };
+  }
+
+  const core = await createCoreClient();
+  const fetched = await fetchMessageBody(core, {
+    userId: user.id,
+    accountId: message.email_account_id as string,
+    providerMessageId: message.provider_message_id as string,
+  });
+  const receivedAt = message.received_at ? new Date(message.received_at as string) : null;
+  const extraction = extractionForAttach({
+    classification,
+    subject: fetched.ok ? fetched.message.subject : (message.subject as string | null),
+    body: fetched.ok ? { text: fetched.message.text, html: fetched.message.html } : null,
+    receivedAt: fetched.ok ? (fetched.message.internalDate ?? receivedAt) : receivedAt,
+  });
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('timezone')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const applied = await applyLifecycleToOrder(supabase, {
+    userId: user.id,
+    order: {
+      id: order.id as string,
+      merchantId: (order.merchant_id as string | null) ?? null,
+      externalOrderNumber: (order.external_order_number as string | null) ?? null,
+      cancelledAt: (order.cancelled_at as string | null) ?? null,
+    },
+    classification,
+    extraction,
+    sourceMessageId: messageId,
+    receivedAt,
+    timezone: (profile?.timezone as string | null) ?? 'UTC',
+  });
+
+  if (!applied.ok) {
+    // Back in the queue, unlinked, with the reason it could not be applied.
+    await supabase
+      .from('ingested_messages')
+      .update({ parse_status: 'needs_review', resulting_order_id: null, error: applied.error })
+      .eq('id', messageId);
+    revalidateReviewSurfaces();
+    return { error: applied.error };
+  }
+
+  const { error: doneError } = await supabase
+    .from('ingested_messages')
+    .update({
+      parse_status: 'parsed',
+      parse_confidence: extraction.confidence,
+      error: null,
+    })
+    .eq('id', messageId);
+  if (doneError) return { error: doneError.message };
+
+  const merchant = Array.isArray(order.merchants) ? order.merchants[0] : order.merchants;
+  revalidateReviewSurfaces();
+  revalidatePath(`/shopping/orders/${orderId}`);
+  revalidatePath('/shopping/returns');
+  return {
+    message: attachedMessage(classification, {
+      merchantName: (merchant?.name as string | undefined) ?? 'Unknown merchant',
+      orderDate: order.order_date as string,
+    }),
   };
 }
 
