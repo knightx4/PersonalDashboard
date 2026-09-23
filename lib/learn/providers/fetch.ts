@@ -158,8 +158,10 @@ export async function fetchDocument(rawUrl: string): Promise<FetchResult> {
         redirect: 'manual',
         signal: AbortSignal.timeout(TIMEOUT_MS),
         headers: {
-          // Identify honestly. A source that blocks this is entitled to.
-          'user-agent': 'PersonalTracker-Learn/1.0 (+reading queue; one user)',
+          // Identify honestly, with a way to reach the operator. A source that
+          // blocks this is entitled to. Wikimedia's User-Agent policy asks for
+          // contact details and throttles requests that carry none.
+          'user-agent': 'PersonalTracker-Learn/1.0 (https://dash.selveyknight.com; one user)',
           accept: ALLOWED_TYPES.join(', '),
         },
         // No cookies, no credentials, ever. This is a public read.
