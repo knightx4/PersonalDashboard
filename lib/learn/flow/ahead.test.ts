@@ -22,6 +22,8 @@ vi.mock('@/lib/learn/graph/load', () => ({
 
 const TRACK_A = '00000000-0000-4000-8000-00000000000a';
 const TRACK_B = '00000000-0000-4000-8000-00000000000b';
+/** A hidden survey subject (plan #840), which `loadSubjects` leaves out. */
+const SURVEY = '00000000-0000-4000-8000-00000000000c';
 
 const { putBack, takeWaiting } = await import('./ahead');
 
@@ -53,6 +55,11 @@ function row(id: string, conceptId: string, shownAt: string | null = null): Row 
  * update. Updates to `shown_at` are recorded so the test can see what was taken.
  */
 function fakeClient(queue: Row[], homes: Record<string, string>) {
+  const tables: Record<string, unknown[]> = {
+    subjects: [{ id: SURVEY, name: 'Stoicism', theme_id: 'theme-stoicism' }],
+    theme_fields: [{ theme_id: 'theme-stoicism', field_id: 'field-phil' }],
+    area_fields: [{ id: 'field-phil', name: 'Philosophy' }],
+  };
   const taken: string[] = [];
   const client = {
     from(table: string) {
@@ -73,7 +80,9 @@ function fakeClient(queue: Row[], homes: Record<string, string>) {
           return builder;
         },
         then(resolve: (value: unknown) => void) {
-          if (table === 'concepts') {
+          if (table in tables) {
+            resolve({ data: tables[table], error: null });
+          } else if (table === 'concepts') {
             resolve({
               data: Object.entries(homes).map(([id, subject_id]) => ({ id, subject_id })),
               error: null,
@@ -126,6 +135,45 @@ describe('takeWaiting with a track', () => {
 
     expect((await takeWaiting(client, { resume: true, track: null }))?.probeId).toBe('p1');
     expect((await takeWaiting(client, { resume: true, track: TRACK_A }))?.probeId).toBe('p2');
+  });
+});
+
+/**
+ * Plan #842: with no filter the queue's survey questions are asked, named by
+ * the vault subject and its field. Tracks only and a focused track leave them
+ * waiting.
+ */
+describe('takeWaiting with survey questions', () => {
+  const homes = { c1: SURVEY, c2: TRACK_A };
+
+  it('takes a survey question with no filter, naming its subject and field', async () => {
+    const { client, taken } = fakeClient([row('p1', 'c1'), row('p2', 'c2')], homes);
+    const question = await takeWaiting(client, { resume: false, track: null });
+    expect(taken).toEqual(['p1']);
+    expect(question?.subjectName).toBe('Stoicism');
+    expect(question?.survey).toEqual({ themeName: 'Stoicism', fieldName: 'Philosophy' });
+  });
+
+  it('leaves survey questions waiting for Tracks only', async () => {
+    const { client, taken } = fakeClient([row('p1', 'c1'), row('p2', 'c2')], homes);
+    const question = await takeWaiting(client, { resume: false, track: null, tracksOnly: true });
+    expect(taken).toEqual(['p2']);
+    expect(question?.survey).toBeUndefined();
+  });
+
+  it('leaves survey questions waiting when focused on a track', async () => {
+    const { client, taken } = fakeClient([row('p1', 'c1')], homes);
+    expect(await takeWaiting(client, { resume: false, track: TRACK_A })).toBeNull();
+    expect(await takeWaiting(client, { resume: false, track: SURVEY })).toBeNull();
+    expect(taken).toEqual([]);
+  });
+
+  it('does not resume a survey question on screen for Tracks only', async () => {
+    const onScreen = row('p1', 'c1', new Date().toISOString());
+    const { client } = fakeClient([onScreen, row('p2', 'c2')], homes);
+    expect(
+      (await takeWaiting(client, { resume: true, track: null, tracksOnly: true }))?.probeId,
+    ).toBe('p2');
   });
 });
 
