@@ -2991,6 +2991,7 @@ export function PlanView({
   canSend,
   unfolded = false,
   opened = false,
+  initialQuery = '',
 }: {
   sections: PlanSection[];
   /** The finished features, for the fold at the foot of Everything. */
@@ -3035,8 +3036,10 @@ export function PlanView({
    * in a static render. The page leaves it off.
    */
   opened?: boolean;
+  /** What the search box holds on arrival: `?q=` on the page's address. */
+  initialQuery?: string;
 }) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery);
   const searching = searchTerms(query).length > 0;
 
   // What GitHub says about the runs behind the claimed steps, taken once the

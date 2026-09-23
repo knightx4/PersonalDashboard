@@ -26,6 +26,10 @@ export const HIT_KINDS = {
   reading: 'Reading',
   track: 'Track',
   subject: 'Subject',
+  plan: 'Plan',
+  spec: 'Spec',
+  idea: 'Idea',
+  feedback: 'Bug or request',
 } as const;
 
 export type HitKind = keyof typeof HIT_KINDS;
