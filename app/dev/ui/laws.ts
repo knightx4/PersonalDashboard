@@ -76,7 +76,7 @@ export const RESTRAINT_LAWS: readonly Law[] = [
   {
     n: 10,
     title: 'Anything long can be folded away.',
-    body: 'A section the reader is done with should be collapsible, and its collapsed line has to carry enough — a count, a total, the one fact it is about — that opening it is a choice rather than a check. A fold that hides whether it is worth opening has moved the work rather than saved it. Collapse with <details>, so it folds before JavaScript loads and a keyboard and a screen reader get it for free.',
+    body: 'Anything that can take up a lot of room folds away: a list that grows with the data, a description, a note, a history. A section the reader is done with should be collapsible, and its collapsed line has to carry enough — a count, a total, the one fact it is about — that opening it is a choice rather than a check. A fold that hides whether it is worth opening has moved the work rather than saved it. Collapse with <details>, so it folds before JavaScript loads and a keyboard and a screen reader get it for free.',
   },
   {
     n: 11,

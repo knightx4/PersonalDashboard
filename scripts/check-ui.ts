@@ -146,6 +146,8 @@ type RuleContext = {
   before: string[];
   /** The whole file, for asking what kind of surface this is. */
   source: string;
+  /** The file's lines, for a rule that has to read to the end of a block. */
+  lines: string[];
 };
 
 /** A condition that can keep the markup beneath it off the screen. */
@@ -285,6 +287,38 @@ function openingTag(line: string, after: string[]): string {
 
 /** Text a person reads: JSX text between tags, and quoted strings. */
 const READ_TEXT = />([^<>{}]*[A-Za-z][^<>{}]*)</g;
+
+
+/**
+ * The lines of the JSX element that opens on `index`, up to the line that
+ * closes it at the same indentation. Empty for a self-closing tag.
+ */
+function elementBody(lines: string[], index: number, tag: string): string[] {
+  const indent = indentOf(lines[index]!);
+  const close = new RegExp(`^\\s*</${tag}>`);
+  for (let i = index + 1; i < lines.length; i += 1) {
+    if (close.test(lines[i]!) && indentOf(lines[i]!) === indent) return lines.slice(index, i + 1);
+  }
+  return [];
+}
+
+/**
+ * Content that grows with the data: a list mapped out of it, or prose of any
+ * length. A map over a constant (`INTERVIEW_KINDS.map`, `[5, 4, 3].map`) is a
+ * fixed set of controls, and a map into `<option>`s is a select's menu; neither
+ * gets longer as the account fills up.
+ */
+function grows(body: string[]): boolean {
+  return body.some((line, i) => {
+    if (/whitespace-pre-(?:wrap|line)|<(?:Markdown|Prose|EditableProse)\b/.test(line)) return true;
+    if (!/\.map\(/.test(line)) return false;
+    if (/\b[A-Z][A-Z0-9_]+\.map\(|\]\.map\(/.test(line)) return false;
+    return !body.slice(i, i + 4).some((next) => /<option\b/.test(next));
+  });
+}
+
+/** Something already keeping the section short: a fold, a cap, a scroll. */
+const KEPT_SHORT = /<Disclosure\b|<details\b|\bfold=|\.slice\(|line-clamp|max-h-|overflow-y-auto/;
 
 const RULES: Rule[] = [
   {
@@ -621,6 +655,29 @@ const RULES: Rule[] = [
     find: (line) => [...line.matchAll(/\bstreaks?\b/gi)].map((m) => m[0]),
   },
   {
+    id: 'unfolded-section',
+    law: '10',
+    says: 'a titled section whose content grows with the data, with nothing to fold it away',
+    instead: 'CardSection fold={{ meta: <the count or total> }}, or Disclosure; or cap it with a "show all" link',
+    /**
+     * A `<CardSection>` that maps a list out of the data, or renders prose,
+     * and has no fold, cap or scroll anywhere inside it.
+     *
+     * Law 10 was a read-only rule until this, and the sections that broke it
+     * were the most common complaint about the app: a role page where the
+     * description, the notes and five lists each take a screen, and nothing
+     * can be put away. It is a grep, so it cannot see a list drawn by a child
+     * component or know that a list is short in practice. A section that is
+     * genuinely always short says so with `ui-ok:` on the line.
+     */
+    find: (line, { lines, index }) => {
+      if (!/<CardSection\b/.test(line)) return [];
+      const body = elementBody(lines, index, 'CardSection');
+      if (body.length === 0 || body.some((l) => KEPT_SHORT.test(l))) return [];
+      return grows(body) ? ['section grows with no fold'] : [];
+    },
+  },
+  {
     id: 'route-without-loading',
     law: '-',
     says: 'a page with no loading.tsx between it and app/',
@@ -702,6 +759,7 @@ function scan(target: ModuleId | null): Hit[] {
             after: lines.slice(index + 1, index + 7),
             before: lines.slice(0, index),
             source,
+            lines,
           };
           for (const text of rule.find(line, context)) {
             hits.push({ file, line: index + 1, rule, text });

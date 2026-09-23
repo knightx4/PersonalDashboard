@@ -1,3 +1,4 @@
+import { ChevronRight } from 'lucide-react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/cn';
 
@@ -72,6 +73,7 @@ export function CardSection({
   className,
   padding = 'dense',
   id,
+  fold,
 }: {
   title: React.ReactNode;
   hint?: React.ReactNode;
@@ -80,7 +82,41 @@ export function CardSection({
   className?: string;
   padding?: 'standard' | 'dense';
   id?: string;
+  /**
+   * Makes the section fold away (law 10). `meta` is what the closed heading
+   * says -- a count, a total, the one fact that makes opening it a choice --
+   * and is required, because a fold that hides whether it is worth opening
+   * has moved the work rather than saved it.
+   */
+  fold?: { meta: React.ReactNode; defaultOpen?: boolean };
 }) {
+  if (fold) {
+    // Native <details>, like Disclosure: it folds before JavaScript loads and
+    // the keyboard comes free. The action sits at the top of the open body
+    // rather than in the heading, because a button inside <summary> toggles
+    // the fold as well as doing its own job.
+    return (
+      <Card id={id} padding={padding} className={className} data-slot="section">
+        <details open={fold.defaultOpen} className="group/fold">
+          <summary className="press flex cursor-pointer list-none items-baseline gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 [&::-webkit-details-marker]:hidden">
+            <ChevronRight
+              aria-hidden
+              strokeWidth={1.75}
+              className="size-3.5 shrink-0 self-center text-ink-muted transition-transform duration-150 group-open/fold:rotate-90"
+            />
+            <h2 className="text-ui font-semibold text-ink">{title}</h2>
+            <span className="text-small text-ink-muted">{fold.meta}</span>
+          </summary>
+          <div className="mt-2">
+            {action && <div className="mb-2 flex justify-end">{action}</div>}
+            {hint && <p className="mb-2 text-small text-ink-muted">{hint}</p>}
+            {children}
+          </div>
+        </details>
+      </Card>
+    );
+  }
+
   return (
     <Card id={id} padding={padding} className={className} data-slot="section">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">

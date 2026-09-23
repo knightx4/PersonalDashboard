@@ -103,6 +103,7 @@ export const HELD_BY_GATE: readonly { rule: string; heldBy: string }[] = [
   { rule: '16px inputs', heldBy: 'check:ui small-input' },
   { rule: 'No "successfully", exclamation marks, Submit/OK or emoji', heldBy: 'check:ui product-copy' },
   { rule: 'No streaks', heldBy: 'check:ui streak' },
+  { rule: 'A section that grows with the data can fold (law 10)', heldBy: 'check:ui unfolded-section' },
   { rule: 'Every route has a loading file', heldBy: 'check:ui route-without-loading' },
   { rule: 'Every route has an error file', heldBy: 'check:ui route-without-error' },
 ];
