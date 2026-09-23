@@ -1,0 +1,265 @@
+import 'server-only';
+
+import Anthropic from '@anthropic-ai/sdk';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { usageFrom } from '@/lib/core/spend/pricing';
+import { recordSpend } from '@/lib/core/spend/record';
+import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
+import { forceTool } from '@/lib/learn/graph/tool-call';
+import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
+import { readStories, type NewsStory } from '@/lib/news/issues/stories';
+
+/**
+ * A newsletter's summary and stories, written by Haiku from the body already
+ * stored (plan #786).
+ *
+ * One call per issue. Nothing is fetched from the sender: the model reads the
+ * text body, or the HTML with its tags stripped when there is no text body,
+ * and links in it are left unfollowed. A newsletter that is one essay gets its
+ * summary and an empty story list.
+ *
+ * `digestIssue` saves the outcome on the row, as the columns added by
+ * supabase/migrations-news/0005_issues_digest.sql expect: a summary and its
+ * stories on success, or `digest_error` on failure, with `digested_at` set
+ * either way. A failed digest leaves the issue readable as it was.
+ */
+
+export const DIGEST_MODEL = 'claude-haiku-4-5';
+
+/** The name this call has in core.model_spend. Stable: renaming it splits the history. */
+export const DIGEST_OPERATION = 'digest-issue';
+
+const TOOL_NAME = 'report_digest';
+
+/**
+ * Longest body sent, in characters. The stored text bodies run to about
+ * eighteen thousand, so this only bites on an HTML-only issue that strips to
+ * something unusually long.
+ */
+const MAX_BODY_CHARS = 60_000;
+
+/** Enough for a summary and a roundup of about thirty stories. */
+const MAX_TOKENS = 4_000;
+
+/** Longest error kept on the row, so a provider's error page is not stored whole. */
+const MAX_ERROR_CHARS = 500;
+
+const SYSTEM = `You summarise one email newsletter so its reader can see what
+is in it without reading the email.
+
+SUMMARY. Two or three plain sentences on what this issue covers as a whole.
+Say what it says, not that it is a newsletter.
+
+STORIES. List each separate story, article or item the issue covers, in the
+order it appears. For each, give a short headline in your own words and two
+sentences on what it says. Use the newsletter's own facts and do not add any.
+
+LEAVE OUT sponsor messages and advertisements, housekeeping such as "view in
+browser", subscription and unsubscribe text, social links, and the sign-off.
+
+ONE ESSAY. When the issue is a single article or essay rather than a set of
+items, the summary covers it and the story list is empty. Do not cut one essay
+into stories by its sections.`;
+
+const TOOL = {
+  name: TOOL_NAME,
+  description: 'Report the summary of this newsletter issue and the stories it covers.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      summary: { type: 'string' },
+      stories: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            headline: { type: 'string' },
+            summary: { type: 'string' },
+          },
+          required: ['headline', 'summary'],
+        },
+      },
+    },
+    required: ['summary', 'stories'],
+  },
+};
+
+/** What is read from a stored issue. */
+export type DigestSource = {
+  subject: string | null;
+  textBody: string | null;
+  htmlBody: string | null;
+};
+
+export type Digest = { summary: string; stories: NewsStory[] };
+
+/** What became of one issue. */
+export type DigestOutcome =
+  | ({ status: 'digested' } & Digest)
+  | { status: 'failed'; error: string }
+  | { status: 'missing' };
+
+/** Characters a newsletter pads its preview text with, which carry nothing. */
+const INVISIBLE = /[\u00AD\u034F\u200B-\u200D\u2060\uFEFF]/g;
+
+/** HTML to readable text, for an issue with no text body. */
+export function htmlToText(html: string): string {
+  return html
+    .replace(/<head[\s\S]*?<\/head>/gi, ' ')
+    .replace(/<(script|style|noscript|svg)[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<\/(p|div|section|li|h[1-6]|tr|table)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
+    .replace(/&amp;/gi, '&');
+}
+
+/**
+ * The text Haiku reads: the text body when there is one, since every stored
+ * issue has one and it is the sender's own plain version, else the HTML
+ * stripped. Padding characters and runs of blank space are collapsed.
+ */
+export function bodyText(source: DigestSource): string {
+  const raw = source.textBody?.trim() ? source.textBody : htmlToText(source.htmlBody ?? '');
+  return raw
+    .replace(/\r\n?/g, '\n')
+    .replace(INVISIBLE, '')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ ?\n ?/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, MAX_BODY_CHARS);
+}
+
+/**
+ * The model's report as something that can be stored, or why it cannot.
+ *
+ * Stories go through `readStories`, the same reading the page applies, so a
+ * story without a headline or summary is dropped here rather than stored.
+ */
+export function readDigest(input: unknown): Digest | string {
+  if (!input || typeof input !== 'object') return 'The model returned no digest.';
+  const { summary, stories } = input as Record<string, unknown>;
+  if (typeof summary !== 'string' || !summary.trim()) return 'The model returned no summary.';
+  return { summary: summary.trim(), stories: readStories(stories) };
+}
+
+/**
+ * One call to Haiku for one issue. Throws with a sentence a person can read
+ * when the call fails or reports nothing usable. Spend is reported to
+ * `onSpend` whenever a reply came back, usable or not.
+ */
+export async function writeDigest(
+  source: DigestSource,
+  options: { client: Pick<Anthropic, 'messages'>; onSpend?: (report: SpendReport) => void },
+): Promise<Digest> {
+  const text = bodyText(source);
+  if (!text) throw new Error('The issue has no text to summarise.');
+
+  const response = await options.client.messages.create({
+    model: DIGEST_MODEL,
+    max_tokens: MAX_TOKENS,
+    system: SYSTEM,
+    tools: [TOOL],
+    tool_choice: forceTool(TOOL_NAME),
+    messages: [
+      {
+        role: 'user',
+        content: [`Subject: ${source.subject ?? '(none)'}`, '', text].join('\n'),
+      },
+    ],
+  });
+
+  options.onSpend?.({ model: DIGEST_MODEL, usage: usageFrom(response.usage) });
+
+  if (response.stop_reason === 'max_tokens') {
+    throw new Error('The reply was cut off before it finished.');
+  }
+  const block = response.content.find(
+    (part) => part.type === 'tool_use' && part.name === TOOL_NAME,
+  );
+  if (!block || block.type !== 'tool_use') {
+    throw new Error(`The model did not report a digest (stopped: ${response.stop_reason ?? 'unknown'}).`);
+  }
+  const digest = readDigest(block.input);
+  if (typeof digest === 'string') throw new Error(digest);
+  return digest;
+}
+
+function errorText(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.trim().slice(0, MAX_ERROR_CHARS) || 'The digest failed for an unknown reason.';
+}
+
+/**
+ * Digest one stored issue and save the outcome on it.
+ *
+ * `news` may be the service-role client, so every query names the account.
+ * `spend` is a client bound to the core schema; the call's cost is written to
+ * core.model_spend under module 'news', operation 'digest-issue', whether the
+ * reply was usable or not. Throws only when the row itself cannot be read or
+ * written; a failed model call is saved as `digest_error` and returned.
+ */
+export async function digestIssue(input: {
+  news: NewsSupabaseClient;
+  spend: Pick<CoreSupabaseClient, 'from'>;
+  userId: string;
+  issueId: string;
+  anthropicApiKey: string;
+  client?: Pick<Anthropic, 'messages'>;
+}): Promise<DigestOutcome> {
+  const { data, error } = await input.news
+    .from('issues')
+    .select('subject, text_body, html_body')
+    .eq('id', input.issueId)
+    .eq('user_id', input.userId)
+    .maybeSingle();
+  if (error) throw new Error(`news: reading the issue to summarise failed (${error.message})`);
+  if (!data) return { status: 'missing' };
+
+  const reports: SpendReport[] = [];
+
+  let outcome: Exclude<DigestOutcome, { status: 'missing' }>;
+  try {
+    const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
+    const digest = await writeDigest(
+      {
+        subject: data.subject as string | null,
+        textBody: data.text_body as string | null,
+        htmlBody: data.html_body as string | null,
+      },
+      { client, onSpend: (report) => reports.push(report) },
+    );
+    outcome = { status: 'digested', ...digest };
+  } catch (failure) {
+    outcome = { status: 'failed', error: errorText(failure) };
+  }
+
+  const row =
+    outcome.status === 'digested'
+      ? { summary: outcome.summary, stories: outcome.stories, digest_error: null }
+      : { summary: null, stories: null, digest_error: outcome.error };
+
+  const saved = await input.news
+    .from('issues')
+    .update({ ...row, digested_at: new Date().toISOString() })
+    .eq('id', input.issueId)
+    .eq('user_id', input.userId);
+
+  for (const report of reports) {
+    await recordSpend(input.spend, input.userId, {
+      module: 'news',
+      operation: DIGEST_OPERATION,
+      model: report.model,
+      usage: report.usage,
+    });
+  }
+
+  if (saved.error) throw new Error(`news: saving the summary failed (${saved.error.message})`);
+  return outcome;
+}
