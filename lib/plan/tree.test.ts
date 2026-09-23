@@ -1138,8 +1138,8 @@ describe('tallyHealth', () => {
 
     expect(section.tally.done).toBe(1);
     expect(section.bands).toEqual([
-      { health: 'done', count: 1 },
       { health: 'ready', count: 1 },
+      { health: 'done', count: 1 },
     ]);
     expect(section.progress).toMatchObject({ done: 1, live: 2 });
     // The rows themselves are untouched -- the finished plan is still listed
@@ -1410,9 +1410,9 @@ describe('planBands', () => {
     );
 
     expect(section.bands).toEqual([
-      { health: 'done', count: 2 },
-      { health: 'in_progress', count: 1 },
       { health: 'blocked', count: 1 },
+      { health: 'in_progress', count: 1 },
+      { health: 'done', count: 2 },
     ]);
   });
 
@@ -1468,7 +1468,8 @@ describe('planBands', () => {
 
     // 'a' waits on nothing, so it reads as ready rather than not started --
     // the health column's rule, which the bar follows rather than re-deciding.
-    expect(section.bands.map((band) => band.health)).toEqual(['done', 'in_progress', 'ready']);
+    // Amber, blue, green (note 42aa1fa4): ready before underway, done last.
+    expect(section.bands.map((band) => band.health)).toEqual(['ready', 'in_progress', 'done']);
   });
 
   it('gives an unanswered question its own band, not the not-started one', () => {
@@ -1479,8 +1480,8 @@ describe('planBands', () => {
     );
 
     expect(section.bands).toEqual([
-      { health: 'ready', count: 1 },
       { health: 'unanswered', count: 1 },
+      { health: 'ready', count: 1 },
     ]);
   });
 

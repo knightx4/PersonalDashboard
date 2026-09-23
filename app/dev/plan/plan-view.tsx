@@ -263,9 +263,8 @@ function StatusChip({ defaultValue }: { defaultValue: PlanStatus }) {
  * thing -- the done fraction -- and left everything not done as blank track,
  * so a module held up by four unanswered questions and a module nobody has
  * got to yet drew the same picture. Each state now owns its share of the
- * length in the tone the health column beneath it already gives it: underway
- * in the app's blue, questions and blocks in the caution amber, not reached
- * in ghost ink. The tally beside it was already saying this in numbers; the
+ * length in the tone the health column beneath it already gives it: amber for
+ * everything not yet takeable, blue for ready and underway, green for done. The tally beside it was already saying this in numbers; the
  * bar was the one thing on the row still claiming the module was simply
  * eight twelfths of the way there.
  */
@@ -1421,6 +1420,10 @@ type Health = {
  * -- and no other queue has anything for them to disagree with. Why there are
  * fourteen rather than fewer is written where the set is, in
  * lib/plan/tree.ts.
+ *
+ * Fourteen words, three colours (note 42aa1fa4): anything that cannot be
+ * taken yet, for whatever reason, is amber; ready or underway is blue; done is
+ * green. Dropped is the one outside the three, because it is none of them.
  */
 const HEALTH: Record<PlanHealth, Health> = {
   unanswered: {
@@ -1431,21 +1434,21 @@ const HEALTH: Record<PlanHealth, Health> = {
   answered: { word: 'Answered', tone: 'positive' },
   proposed: {
     word: 'Proposed',
-    tone: 'accent',
+    tone: 'caution',
     title: 'Written by a session. Approve it, edit it, or drop it -- nothing happens until you do.',
   },
-  in_progress: { word: DEV_STATE_WORD.working, tone: 'accent' },
+  in_progress: { word: DEV_STATE_WORD.working, tone: 'info' },
   // The three readings of a claim. `in_progress` above is the fourth and says
   // the least: the row is claimed and nothing has looked into what the session
   // is doing.
   working: {
     word: DEV_STATE_WORD.working,
-    tone: 'accent',
+    tone: 'info',
     title: 'A session has this and has pushed something recently.',
   },
   quiet: {
     word: 'Quiet',
-    tone: 'caution',
+    tone: 'info',
     title:
       'A session has this and has pushed nothing for a while. It may still be reading or waiting on a build.',
   },
@@ -1485,7 +1488,7 @@ const HEALTH: Record<PlanHealth, Health> = {
   // `info` is the app's own blue, themed in all five palettes, and it does
   // not move when the workspace does.
   ready: { word: DEV_STATE_WORD.ready, tone: 'info' },
-  not_started: { word: 'Not started', tone: 'quiet' },
+  not_started: { word: 'Not started', tone: 'caution' },
   done: { word: DEV_STATE_WORD.done, tone: 'positive' },
   dropped: { word: DEV_STATE_WORD.dropped, tone: 'ghost' },
 };
@@ -1526,25 +1529,22 @@ function healthOf(
 /**
  * The Status column, worded and toned.
  *
- * "Needs you" takes caution, which is the tone every dev queue already spends
- * on a row stopped on the person. "With Dash" takes the accent because a
- * session running right now is the one thing on this page that is changing
- * while you look at it. The rest are ink: nothing is claimed about a step you
- * kept or one another step is holding up, and a step waiting its turn has no
- * word to tone.
+ * The same three colours as the health column (note 42aa1fa4). What is being
+ * worked right now -- "With Dash", or a re-shape resolving answers -- is blue.
+ * Everything still to do that nobody is working is amber: a step on you, one
+ * you kept, one another step is holding up. A step waiting its turn has no
+ * word to tone, and nor does one that is settled.
  *
  * The tooltip is where the rollup is explained. A feature reporting "With Dash"
  * because its third step is with a session would otherwise be a word with no
  * visible cause, which is the complaint the whole column exists to answer.
  */
 const MOVE_TONE: Record<PlanMove, Health['tone']> = {
-  // The accent, the same as "With Dash": both are a session working on this
-  // right now, and the difference between them is which job, not whose turn.
-  resolving: 'accent',
+  resolving: 'info',
   on_you: 'caution',
-  with_dash: 'accent',
-  waiting: 'quiet',
-  yours: 'quiet',
+  with_dash: 'info',
+  waiting: 'caution',
+  yours: 'caution',
   none: 'ghost',
   settled: 'ghost',
 };
@@ -1741,19 +1741,17 @@ function TreeGuides({ trail }: { trail: readonly boolean[] }) {
  * Read from the roll-up rather than from the children on the page, so a
  * narrowed view that has folded the done steps away still counts them.
  *
- * Ready leads in blue and everything else still to do follows in amber,
- * blocked and waiting alike (note c12fe73a): what can be taken next and what
- * cannot are the two numbers worth reading here. Underway and done come after
- * them and quieter.
+ * Amber, blue, green, in that order (note 42aa1fa4): everything that cannot
+ * be taken yet, blocked and waiting alike, then what is ready or underway, then
+ * what is done. The same three colours the health column gives each state.
  */
 function Breakdown({ node }: { node: PlanNode }) {
   const { done, inProgress, ready, live } = node.rollup;
   if (live === 0) return <span className="text-small text-ink-ghost">—</span>;
 
   const counts: Array<{ key: string; word: string; tone: Health['tone']; n: number }> = [
-    { key: 'ready', word: 'ready', tone: 'accent', n: ready },
     { key: 'not-ready', word: 'not ready', tone: 'caution', n: live - done - inProgress - ready },
-    { key: 'underway', word: 'underway', tone: 'quiet', n: inProgress },
+    { key: 'ready', word: 'ready or underway', tone: 'info', n: ready + inProgress },
     { key: 'done', word: 'done', tone: 'positive', n: done },
   ];
   const shown = counts.filter((c) => c.n > 0);
