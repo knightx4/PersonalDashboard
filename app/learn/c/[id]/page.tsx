@@ -161,13 +161,17 @@ function Probe({ probe, claimRewrittenAt }: { probe: ProbeRow; claimRewrittenAt:
         </p>
       )}
       <p className={right ? 'mt-1 text-small text-ink-muted' : 'mt-1 text-small text-danger'}>
-        {chosen === null
-          ? 'Asked, not answered.'
-          : right
-            ? `You picked “${chosen}”, which is right.`
-            : `You picked “${chosen}”. The answer was “${correct}”.`}
+        {probe.dontKnow
+          ? `You said you did not know. The answer was “${correct}”.`
+          : chosen === null
+            ? 'Asked, not answered.'
+            : right
+              ? `You picked “${chosen}”, which is right.`
+              : `You picked “${chosen}”. The answer was “${correct}”.`}
       </p>
-      {chosen !== null && <p className="mt-0.5 text-small text-ink-muted">{probe.reason}</p>}
+      {(chosen !== null || probe.dontKnow) && (
+        <p className="mt-0.5 text-small text-ink-muted">{probe.reason}</p>
+      )}
     </li>
   );
 }

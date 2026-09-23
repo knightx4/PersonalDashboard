@@ -148,6 +148,12 @@ describe('where a check stands', () => {
   it('does not read a rung one answer as the applied case having been missed', () => {
     expect(standingOf(CHECK, 'apply', [answered(CHECK, 0)])).toBe('untouched');
   });
+
+  it('reads "I don\'t know" as a miss, with nothing picked', () => {
+    const dontKnow: AskedRung = { ...answered(CHECK, null), dontKnow: true };
+    expect(standingOf(CHECK, 'recognise', [dontKnow])).toBe('missed');
+    expect(standingOf(CHECK, 'recognise', [dontKnow, answered(CHECK, 1)])).toBe('right');
+  });
 });
 
 describe('what an answer was worth', () => {

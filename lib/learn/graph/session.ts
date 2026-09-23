@@ -40,6 +40,8 @@ export type ProbeRow = {
   correctIndex: number | null;
   reason: string | null;
   chosenIndex: number | null;
+  /** Answered by saying you did not know, with nothing picked. Recognise only. */
+  dontKnow?: boolean;
   /** The answer the writer expected. Written rungs only. */
   expected: string | null;
   /** What was typed. Null until a written question is answered. */
@@ -158,8 +160,9 @@ export async function probesFor(
   const { data, error } = await supabase
     .from('probes')
     .select(
-      'id, concept_id, question, options, correct_index, reason, chosen_index, expected, ' +
-        'response, response_correct, grade_reason, rung, weight, mastery_check, created_at',
+      'id, concept_id, question, options, correct_index, reason, chosen_index, dont_know, ' +
+        'expected, response, response_correct, grade_reason, rung, weight, mastery_check, ' +
+        'created_at',
     )
     .eq('concept_id', conceptId)
     // Not a question Practice Flow has written ahead and not yet shown. It
@@ -179,6 +182,7 @@ export async function probesFor(
     correct_index: number | null;
     reason: string | null;
     chosen_index: number | null;
+    dont_know: boolean;
     expected: string | null;
     response: string | null;
     response_correct: boolean | null;
@@ -195,6 +199,7 @@ export async function probesFor(
     correctIndex: row.correct_index,
     reason: row.reason,
     chosenIndex: row.chosen_index,
+    dontKnow: row.dont_know,
     expected: row.expected,
     response: row.response,
     responseCorrect: row.response_correct,
@@ -602,7 +607,7 @@ export async function recordAnswer(
 ): Promise<AnswerOutcome> {
   const { data, error } = await supabase
     .from('probes')
-    .select('correct_index, reason, chosen_index, mastery_check')
+    .select('correct_index, reason, chosen_index, dont_know, mastery_check')
     .eq('id', input.probeId)
     .maybeSingle();
 
@@ -614,8 +619,12 @@ export async function recordAnswer(
     correct_index: number;
     reason: string;
     chosen_index: number | null;
+    dont_know: boolean;
     mastery_check: string | null;
   };
+  // Said you did not know it already: the answer is on the screen, and a pick
+  // made after reading it is not an answer.
+  if (probe.dont_know) throw new Error('You already said you did not know this one.');
   const correct = probe.correct_index === input.chosenIndex;
 
   // Where the check this question aimed at stood before the answer, from the
@@ -658,6 +667,69 @@ export async function recordAnswer(
   });
 
   return { correct, reason: probe.reason ?? '', weight, state, inferred, first };
+}
+
+/**
+ * Record "I don't know" on a multiple-choice question (note a62b132f, A).
+ *
+ * A miss with nothing picked: weighed and settled exactly as a wrong pick is,
+ * so the concept goes shaky, but no option is stored, so a repeated "don't
+ * know" can never be read as the same wrong answer twice and named as a
+ * misconception. Pressing it again earns nothing, the same as picking twice.
+ */
+export async function recordDontKnow(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  input: { probeId: string; conceptId: string; wasSettled: boolean },
+): Promise<AnswerOutcome> {
+  const { data, error } = await supabase
+    .from('probes')
+    .select('reason, chosen_index, dont_know, mastery_check')
+    .eq('id', input.probeId)
+    .maybeSingle();
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Reading the question', error);
+  if (!data) throw new Error('That question is not there any more.');
+
+  const probe = data as {
+    reason: string | null;
+    chosen_index: number | null;
+    dont_know: boolean;
+    mastery_check: string | null;
+  };
+  if (probe.chosen_index !== null) throw new Error('This one is already answered.');
+
+  const first = !probe.dont_know;
+  const standing =
+    probe.mastery_check === null
+      ? null
+      : standingOf(
+          probe.mastery_check,
+          'recognise',
+          (await probesFor(supabase, input.conceptId)).filter((row) => row.id !== input.probeId),
+        );
+  const weight = first
+    ? weightFor({ conclusive: true, correct: false, standing, wasSettled: input.wasSettled })
+    : 0;
+
+  if (first) {
+    const { error: answerError } = await supabase
+      .from('probes')
+      .update({ dont_know: true, answered_at: new Date().toISOString(), weight })
+      .eq('id', input.probeId);
+
+    assertSchemaExposed(answerError, LEARN_SCHEMA);
+    if (answerError) throw fail('Saving the answer', answerError);
+  }
+
+  const { state, inferred } = await settleConcept(supabase, userId, {
+    conceptId: input.conceptId,
+    rung: 'recognise',
+    correct: false,
+  });
+
+  return { correct: false, reason: probe.reason ?? '', weight, state, inferred, first };
 }
 
 /** What an answer can leave a concept in. Never `unknown` or `misconception`. */

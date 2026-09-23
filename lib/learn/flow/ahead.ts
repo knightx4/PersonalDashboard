@@ -317,7 +317,9 @@ async function writeFor(
     otherChecks: concept.mastery.filter((other) => other !== check),
     asked: previous.map((probe) => probe.question),
     missedBefore: previous.some(
-      (probe) => probe.chosenIndex !== null && probe.chosenIndex !== probe.correctIndex,
+      (probe) =>
+        probe.dontKnow === true ||
+        (probe.chosenIndex !== null && probe.chosenIndex !== probe.correctIndex),
     ),
     anthropicApiKey: apiKey,
     onSpend,
