@@ -1,10 +1,18 @@
 import Link from 'next/link';
-import { ArrowLeft, ExternalLink, FileText, Image as ImageIcon, Mail } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronRight,
+  ExternalLink,
+  FileText,
+  Image as ImageIcon,
+  ImageOff,
+  Mail,
+} from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardBody, CardSection } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import type { NewsStory } from '@/lib/news/issues/stories';
+import { storyParagraphs, type NewsStory } from '@/lib/news/issues/stories';
 import { markIssueUnread } from './actions';
 import { IssueFrame } from './issue-frame';
 
@@ -20,6 +28,14 @@ export type IssueViewProps = {
   showDigest: boolean;
   html: string | null;
   textBody: string | null;
+  /** Whether pictures load: on unless the reader turned them off. */
+  pictures: boolean;
+  /**
+   * The pictures on what is showing: the stories' thumbnails on the summary,
+   * the email's pictures on the original. No picture button when it is zero.
+   */
+  pictureCount: number;
+  /** Pictures held back from the original email while pictures are off. */
   blockedImages: number;
   unsubscribeUrl: string | null;
   picturesHref: string;
@@ -42,6 +58,8 @@ export function IssueView({
   showDigest,
   html,
   textBody,
+  pictures,
+  pictureCount,
   blockedImages,
   unsubscribeUrl,
   picturesHref,
@@ -83,13 +101,26 @@ export function IssueView({
                   Summary
                 </Link>
               ))}
-            {!showDigest && blockedImages > 0 && (
+            {pictureCount > 0 && (
               <Link
                 href={picturesHref}
                 className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}
               >
-                <ImageIcon className="size-3.5" strokeWidth={1.75} aria-hidden />
-                {blockedImages === 1 ? 'Show 1 picture' : `Show ${blockedImages} pictures`}
+                {pictures ? (
+                  <>
+                    <ImageOff className="size-3.5" strokeWidth={1.75} aria-hidden />
+                    Hide pictures
+                  </>
+                ) : (
+                  <>
+                    <ImageIcon className="size-3.5" strokeWidth={1.75} aria-hidden />
+                    {showDigest || blockedImages === 0
+                      ? 'Show pictures'
+                      : blockedImages === 1
+                        ? 'Show 1 picture'
+                        : `Show ${blockedImages} pictures`}
+                  </>
+                )}
               </Link>
             )}
             <form action={markIssueUnread}>
@@ -141,10 +172,30 @@ export function IssueView({
               <ul className="divide-y divide-border">
                 {digest.stories.map((story, index) => (
                   <li key={index} className="py-3 first:pt-0 last:pb-0">
-                    <h3 className="break-words text-body font-semibold text-ink">{story.headline}</h3>
-                    <p className="mt-1 text-body leading-relaxed text-ink-muted">
-                      {story.summary}
-                    </p>
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="break-words text-body font-semibold text-ink">
+                          {story.headline}
+                        </h3>
+                        <p className="mt-1 text-body leading-relaxed text-ink-muted">
+                          {story.summary}
+                        </p>
+                      </div>
+                      {pictures && story.image && (
+                        // A plain img: the address is the sender's, fetched by
+                        // the browser as the email's own pictures are, and
+                        // next/image would need every sender's host listed.
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={story.image}
+                          alt=""
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          className="size-20 shrink-0 rounded-card border border-border bg-sunken object-cover sm:size-24"
+                        />
+                      )}
+                    </div>
+                    <StoryText text={story.text} />
                     {story.link && (
                       <a
                         href={story.link}
@@ -180,5 +231,34 @@ export function IssueView({
         </Card>
       )}
     </div>
+  );
+}
+
+/**
+ * The story as the email told it, folded under its summary. A details element,
+ * so opening it needs no script and no second request.
+ */
+function StoryText({ text }: { text: string | undefined }) {
+  const paragraphs = storyParagraphs(text);
+  if (paragraphs.length === 0) return null;
+  return (
+    <details className="group mt-1.5">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-ui text-accent hover:underline [&::-webkit-details-marker]:hidden">
+        <ChevronRight
+          className="size-3 transition-transform group-open:rotate-90"
+          strokeWidth={2}
+          aria-hidden
+        />
+        <span className="group-open:hidden">Read the full story</span>
+        <span className="hidden group-open:inline">Hide the full story</span>
+      </summary>
+      <div className="mt-2 space-y-2 border-l-2 border-border pl-3">
+        {paragraphs.map((paragraph, index) => (
+          <p key={index} className="break-words text-body leading-relaxed text-ink">
+            {paragraph}
+          </p>
+        ))}
+      </div>
+    </details>
   );
 }

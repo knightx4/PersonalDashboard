@@ -1525,6 +1525,11 @@ const issueBase: IssueViewProps = {
         summary:
           'A replica promoted during a network partition kept its warm cache, so reads served balances from before the split. The fix was to tie cache generations to the primary\'s timeline ID rather than to wall-clock expiry.',
         link: 'https://example.com/blog/2026/09/stale-balances-post-mortem',
+        // Drawn inline so the gallery needs no network for it.
+        image:
+          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' fill='%23334155'/%3E%3Cpath d='M0 70 L30 44 L52 62 L70 48 L96 70 V96 H0Z' fill='%2394a3b8'/%3E%3Ccircle cx='70' cy='26' r='10' fill='%23fbbf24'/%3E%3C/svg%3E",
+        text:
+          'At 02:14 a network partition split the primary from two of its replicas. The failover promoted one of them within forty seconds, which is what it is meant to do.\n\nWhat nobody had planned for was the cache in front of it. Its keys expired on a timer, not on a change of primary, so for six hours it went on serving balances written before the split.\n\nThe fix ties each cache generation to the primary\'s timeline ID. A promotion now empties the cache on the spot.',
       },
       {
         headline: 'github.com/example-org/postgres-backed-job-queue-benchmarks-2026',
@@ -1548,9 +1553,11 @@ const issueBase: IssueViewProps = {
   showDigest: true,
   html: null,
   textBody: null,
+  pictures: true,
+  pictureCount: 1,
   blockedImages: 0,
   unsubscribeUrl: 'https://example.com/unsubscribe?u=abc123',
-  picturesHref: '/news/i/issue-1?view=original&pictures=1',
+  picturesHref: '/news/i/issue-1?pictures=0',
   originalHref: '/news/i/issue-1?view=original',
   summaryHref: '/news/i/issue-1',
 };
@@ -1579,7 +1586,10 @@ const issueFailed: IssueViewProps = {
   digestError: 'model returned no summary',
   showDigest: false,
   html: '<h2>Good morning</h2><p>Futures are flat ahead of the open. Three things to watch today: the jobs revision, two earnings reports after the close, and whether the long end keeps selling off.</p><p><img src="https://example.com/chart.png" alt="Chart of the ten-year yield"></p><p>That is it for today.</p>',
+  pictures: false,
+  pictureCount: 1,
   blockedImages: 1,
+  picturesHref: '/news/i/issue-3',
 };
 
 /** The job search's ten sections, as its layout lists them. */
@@ -2097,7 +2107,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'News · Issue original email',
     module: 'news',
     width: 'page',
-    render: () => <IssueView {...issueBase} showDigest={false} html={issueFailed.html} blockedImages={1} />,
+    render: () => <IssueView {...issueBase} showDigest={false} html={issueFailed.html} pictures={false} blockedImages={1} />,
   },
   {
     id: 'news-issue-failed',

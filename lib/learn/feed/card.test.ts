@@ -119,7 +119,7 @@ describe('turning a row into a card', () => {
 });
 
 describe('what each action may move', () => {
-  it('opens only a card nobody has acted on', () => {
+  it('opens only a card nobody has decided on', () => {
     expect(ACTION_FROM.opened).toEqual(['ready']);
   });
 

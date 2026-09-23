@@ -10,7 +10,8 @@
  * this" (a card left `review`), which counts as a save. Opening the source,
  * testing without saving, passing a card, skipping it and swiping it down as
  * known count for nothing here: known changes how deep the next pick goes
- * (`depth.ts`), not how often the theme comes up.
+ * (`depth.ts`), not how often the theme comes up. Cards left `passed` by the
+ * Next button of the scrolling feed the deck replaced count for nothing too.
  *
  * Each save multiplies the weight by SAVE_STEP and each dismissal by
  * DISMISS_STEP, and the product is held between FLOOR and CAP. The floor means

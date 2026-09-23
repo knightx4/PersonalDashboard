@@ -66,6 +66,16 @@ describe('counting what you did with cards', () => {
     expect(preferences.themes.size).toBe(1);
   });
 
+  it('leaves the weights alone however many cards you pressed Next on', () => {
+    const passed = preferencesFrom(
+      Array.from({ length: 30 }, () => card({ status: 'passed', theme_id: 't1', field_id: 'a' })),
+    );
+    expect(passed.themes.size).toBe(0);
+    expect(passed.fields.size).toBe(0);
+    expect(themeWeight(passed, 't1', 'a')).toBe(1);
+    expect(fieldWeight(passed, 'a')).toBe(1);
+  });
+
   it('lowers a field for each dismissal and raises it for each save, within the floor and the cap', () => {
     const dismissed = (n: number) =>
       preferencesFrom(Array.from({ length: n }, () => card({ status: 'dismissed', field_id: 'a' })));

@@ -35,7 +35,10 @@ import {
  * Candidates come from obsidian.position_merge_candidates
  * (supabase/migrations-vault/0008): name pairs close by trigram, plus each
  * position's nearest neighbours by the embedding of its statement, minus pairs
- * that share a note and pairs already judged.
+ * that share a note and pairs already judged. Since 0011 (plan #836) the pairs
+ * are kept in obsidian.position_pairs and each call searches only up to 100
+ * positions not yet searched as they stand, so a call stays near a second
+ * rather than the eleven that PostgREST's eight-second timeout cancelled.
  *
  * The model judges against the node test from position-prompt.ts, so a claim
  * and its qualification, which pass that test separately, stay two positions.

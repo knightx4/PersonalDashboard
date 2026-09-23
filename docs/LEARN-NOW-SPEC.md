@@ -96,16 +96,28 @@ clips join once the catalogue has courses in it (plan #789).
 
 ## What is recorded
 
-Only what you do on purpose: Save, Not interested, Test me on this, and
-opening the source. Scrolling past a card records nothing, the same rule
-LEARN-GRAPH-SPEC holds What next to. Not interested lowers the weight of that
-card's theme or field for later draws; Save raises it.
+Next, Save, Not interested, Test me on this, and opening the source, plus one
+thing you do without pressing anything: scrolling on until a card has gone out
+of view above you, which counts the same as Next. Not interested lowers the
+weight of that card's theme or field for later draws; Save raises it. Next and
+scrolling past only take the card out of the feed and are never read as
+dislike.
 
 ### How the page records it (plan #808)
 
 Each deliberate action sets the card's status in `learn.feed_cards`, with
 `acted_at`:
 
+- **Next** marks it `passed` (plan #833), only if it was still `ready`. The
+  feed shows `ready` cards only, so a card you passed is not shown on a later
+  visit. Any other action may still follow a pass, since the card stays on the
+  screen for the rest of the visit.
+- **Scrolling past** marks it `passed` the same way (plan #835), once a card
+  that was on the screen has left it through the top. A card that never came
+  into view, or that leaves off the bottom because you scrolled back up, is not
+  marked. Each card is marked at most once a visit, so Next and the scroll it
+  causes are one write, and a card you saved or turned down this visit is not
+  marked at all.
 - **Opening the source** marks it `opened`, only if nothing else has been done
   to it.
 - **Save** marks it `saved` and puts the section on one reading list, "Saved
@@ -122,8 +134,12 @@ Each deliberate action sets the card's status in `learn.feed_cards`, with
 The first decision stands: once a card is saved, dismissed or tested, nothing
 but Test me after a Save moves it again.
 
-Passing a card records nothing, so the page keeps the list of cards already on
-the screen and asks only for others. A card you passed comes back on your next
+A pass, by Next or by scrolling, takes a card out of the ready pool like the
+other actions, and asks for a top-up once the response has gone, so passing
+enough cards to leave fewer than ten ready starts more being written. Cards
+still ready stay in the pool while they are on the screen, so the page keeps the
+list of cards already shown and asks only for others. A card that never reached
+the screen, or that you scrolled back up away from, comes back on your next
 visit, newest cards first. The tab's badge counts your queued readings, not the
 cards, since there are always about twenty of those.
 
@@ -131,8 +147,8 @@ cards, since there are always about twenty of those.
 
 The picking pass counts, per theme and per field, the cards you saved (any
 card with `saved_reading_id`, including one later tested) and the cards you
-marked Not interested. Opening the source, Test me without a Save, and passing
-count for nothing. An interest card counts towards its theme and its field; a
+marked Not interested. Opening the source, Test me without a Save, and a
+`passed` card, whether passed by Next or by scrolling, count for nothing. An interest card counts towards its theme and its field; a
 gap card has no theme and counts towards its field.
 
 Each save multiplies the weight by 1.4 and each Not interested by 0.7, and the
@@ -207,6 +223,12 @@ A downward swipe counts only from the top of the page, since further down the
 same gesture is scrolling back up. Swipes are not final: a card that came back
 can be swiped again. Save, Test me on this and Not interested stay on the card
 as smaller buttons; Not interested also takes the card off the deck.
+
+The deck replaces the Next button and the scroll-past marking of plans #833
+and #835, described under "What is recorded". Both existed so a card you had
+moved past would not come back; on the deck every card is left by a swipe,
+which says that and more. Cards already marked `passed` keep the status and
+are not shown again.
 
 The deck asks for more cards while four are still ahead, so moving on never
 waits for the network. It serves returning "work on this" cards first, then
