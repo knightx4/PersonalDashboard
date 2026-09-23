@@ -257,3 +257,19 @@ describe('the Overnight card before the browser clock arrives', () => {
     vi.doUnmock('@/lib/use-clock-now');
   });
 });
+
+describe('the steps a night left blocked', () => {
+  const blocked = night({
+    blocked: [{ ref: '#700', title: 'Needs a key', feature: null, ask: 'Add the token' }],
+  });
+
+  it('are listed on the plan page', () => {
+    expect(draw({ night: blocked })).toContain('1 step blocked on you');
+  });
+
+  it('are left to the waiting list on Dash, where the status card turns them off', () => {
+    const html = draw({ night: blocked, showBlocked: false });
+    expect(html).not.toContain('blocked on you');
+    expect(html).not.toContain('Needs a key');
+  });
+});
