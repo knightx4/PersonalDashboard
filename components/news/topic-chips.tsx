@@ -14,8 +14,15 @@ export type TopicChipsProps = {
   className?: string;
 };
 
+/**
+ * A filled pill with no border, the same shape FilterChips draws, so the chip
+ * in force reads like the filter chips on other pages (law 11: no hand-drawn
+ * bordered box).
+ */
 const CHIP =
-  'press inline-flex items-center rounded-full border px-2.5 py-1 text-small transition-colors duration-150';
+  'press inline-flex items-center rounded-full px-2.5 py-1 text-small transition-colors duration-150';
+const CHIP_OFF = 'bg-sunken text-ink-muted hover:bg-accent-tint hover:text-accent';
+const CHIP_ON = 'bg-accent-tint font-medium text-accent';
 
 /**
  * A row of topic chips above Quick read and the newsletter list (plan #860).
@@ -35,12 +42,7 @@ export function TopicChips({ topics, selected, hrefs, allHref, className }: Topi
       <Link
         href={allHref}
         aria-current={selected ? undefined : 'true'}
-        className={cn(
-          CHIP,
-          selected
-            ? 'border-border text-ink-muted hover:bg-sunken hover:text-ink'
-            : 'border-transparent bg-accent-tint font-medium text-accent',
-        )}
+        className={cn(CHIP, selected ? CHIP_OFF : CHIP_ON)}
       >
         All topics
       </Link>
@@ -51,12 +53,7 @@ export function TopicChips({ topics, selected, hrefs, allHref, className }: Topi
             key={topic}
             href={current ? allHref : (hrefs[topic] ?? allHref)}
             aria-current={current ? 'true' : undefined}
-            className={cn(
-              CHIP,
-              current
-                ? 'border-transparent bg-accent-tint font-medium text-accent'
-                : 'border-border text-ink-muted hover:bg-sunken hover:text-ink',
-            )}
+            className={cn(CHIP, current ? CHIP_ON : CHIP_OFF)}
           >
             {topic}
           </Link>
