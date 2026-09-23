@@ -221,6 +221,38 @@ describe('runSweepSlice', () => {
     expect(v.rows.get('id-A.md')).toMatchObject({ outcome: 'failed', detail: 'overloaded' });
     expect(v.rows.get('id-B.md')?.outcome).toBe('read');
   });
+
+  it('offers each note the themes nearest it ahead of the strongest', async () => {
+    const v = vault([note('A.md'), note('B.md')]);
+    const offered = new Map<string, string[]>();
+    v.ports.nearestThemes = async (n) => (n.path === 'A.md' ? ['Zoning', 'Housing'] : ['Transit']);
+    v.ports.propose = async (n, themes) => {
+      offered.set(n.path, themes);
+      return { ok: true, proposal: proposal(n) };
+    };
+
+    await runSweepSlice({ afterPath: null, ports: v.ports, budgetMs: 200_000 });
+
+    expect(offered.get('A.md')).toEqual(['Zoning', 'Housing']);
+    expect(offered.get('B.md')).toEqual(['Transit', 'Housing']);
+  });
+
+  it('reads the note with the strongest themes when finding the nearest fails', async () => {
+    const v = vault([note('A.md')]);
+    let offered: string[] = [];
+    v.ports.nearestThemes = async () => {
+      throw new Error('voyage down');
+    };
+    v.ports.propose = async (n, themes) => {
+      offered = themes;
+      return { ok: true, proposal: proposal(n) };
+    };
+
+    await runSweepSlice({ afterPath: null, ports: v.ports, budgetMs: 200_000 });
+
+    expect(offered).toEqual(['Housing']);
+    expect(v.rows.get('id-A.md')?.outcome).toBe('read');
+  });
 });
 
 describe('the row for each note', () => {
