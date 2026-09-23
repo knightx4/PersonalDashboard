@@ -8,6 +8,7 @@ import type { LearnOperation } from '@/lib/learn/spend';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { acceptNoteMap } from '@/lib/vault/map/accept';
 import { embedMapRows, type MapEmbedResult } from '@/lib/vault/map/embed';
+import { applyMergeProposals, type ApplyResult } from '@/lib/vault/map/merge-apply';
 import { proposePositionMerges, type PositionMergeResult } from '@/lib/vault/map/merge-positions';
 import { proposeThemeMerges, type ThemeMergeResult } from '@/lib/vault/map/merge-themes';
 import { proposeNoteMap, type MapNote } from '@/lib/vault/map/extract';
@@ -48,11 +49,22 @@ export const EMBED_UNTIL_MS = 280_000;
 export const THEME_MERGE_UNTIL_MS = 150_000;
 
 /**
- * When the position merge pass stops starting new calls. One call over twenty
- * pairs takes ten to twenty seconds, so this leaves room inside the route's
- * 300 seconds for the call in flight.
+ * When applying the theme proposals stops (plan #820). Normally a few
+ * seconds after the theme pass, since a merge takes about 25ms; the first run
+ * over a backlog of two thousand uses the whole window and finishes on later
+ * ticks.
  */
-export const POSITION_MERGE_UNTIL_MS = 270_000;
+export const THEME_APPLY_UNTIL_MS = 180_000;
+
+/**
+ * When the position merge pass stops starting new calls. One call over twenty
+ * pairs takes ten to twenty seconds, so this leaves room for the call in
+ * flight and for applying what the pass proposed.
+ */
+export const POSITION_MERGE_UNTIL_MS = 255_000;
+
+/** When applying the position proposals stops, inside the route's 300 seconds. */
+export const POSITION_APPLY_UNTIL_MS = 285_000;
 
 const OPERATION: LearnOperation = 'map-sweep';
 
@@ -79,6 +91,11 @@ export type MapSweepTickSummary = {
    * when it did not run, for the same three reasons as the theme pass.
    */
   positionMerges: Pick<PositionMergeResult, 'proposed' | 'same' | 'stopped'> | null;
+  /**
+   * Same-subject proposals merged after each pass (plan #820), themes before
+   * positions. Null when that kind's apply threw.
+   */
+  applied: { theme: ApplyResult | null; position: ApplyResult | null };
 };
 
 export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
@@ -92,6 +109,7 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
     embedded: null,
     themeMerges: null,
     positionMerges: null,
+    applied: { theme: null, position: null },
   };
 
   const nowIso = new Date().toISOString();
@@ -159,6 +177,11 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
     }
   }
 
+  // Every theme pair judged one subject is merged (decision #814), this
+  // tick's and any left over from earlier ones. No model call, so it runs
+  // whether or not the pass above could.
+  summary.applied.theme = await applyKind(supabase, 'theme', startedAt + THEME_APPLY_UNTIL_MS);
+
   // Position pairs from different notes, after the theme pass. It has its
   // own share of the tick, from wherever the theme pass stopped until
   // POSITION_MERGE_UNTIL_MS, so it runs even when themes ran out of time.
@@ -180,7 +203,25 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
     }
   }
 
+  summary.applied.position = await applyKind(supabase, 'position', startedAt + POSITION_APPLY_UNTIL_MS);
+
   return summary;
+}
+
+async function applyKind(
+  supabase: VaultSupabaseClient,
+  kind: 'theme' | 'position',
+  deadline: number,
+): Promise<ApplyResult | null> {
+  try {
+    const result = await applyMergeProposals(supabase, kind, { userId: null, deadline });
+    if (result.stopped?.reason === 'error')
+      console.error(`[map sweep] applying ${kind} merges`, result.stopped.detail);
+    return result;
+  } catch (err) {
+    console.error(`[map sweep] applying ${kind} merges`, err instanceof Error ? err.message : err);
+    return null;
+  }
 }
 
 /**
