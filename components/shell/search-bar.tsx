@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn';
 import { popoverSurface } from '@/components/ui/popover';
 import { SearchRowLine } from '@/components/shell/search-row';
 import { SearchScopeChip } from '@/components/shell/search-scope-chip';
+import { Kbd } from '@/components/shell/key-hints';
 import {
   searchRowKey,
   useSearchRows,
@@ -206,7 +207,7 @@ export function SearchBar({
         * laid across it rather than as one control among the icons beside it
         * -- note ca910aa3. The edge is what says you can type here, and with
         * the bar showing through it says it without the rest. */}
-      <div className="flex h-(--control-h) items-center gap-2 rounded-full border border-control bg-transparent px-(--control-px) focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/40">
+      <div className="group/searchbox flex h-(--control-h) items-center gap-2 rounded-full border border-control bg-transparent px-(--control-px) focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/40">
         <Search className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
         <input
           ref={inputRef}
@@ -245,6 +246,7 @@ export function SearchBar({
           }}
           placeholder="Search"
           aria-label="Search"
+          aria-keyshortcuts="Meta+K Control+K"
           // No focus ring on the field itself: the box around the field and
           // the chip carries it, and two rings on one control is a thickening
           // rather than an indication. See globals.css.
@@ -252,6 +254,16 @@ export function SearchBar({
           // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
           className="h-full w-full min-w-0 bg-transparent text-base text-ink outline-none placeholder:text-ink-ghost sm:text-ui"
         />
+
+        {/* The key that lands here, said where it lands (note 3fbdac0b). Shown
+            at rest rather than only while a modifier is held, because this is
+            where somebody learns it; gone once the field has the cursor or
+            any text, when it has done its job. */}
+        {!query && (
+          <Kbd always className="shrink-0 group-focus-within/searchbox:hidden">
+            ⌘K
+          </Kbd>
+        )}
 
         <SearchScopeChip
           scope={scope}
