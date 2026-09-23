@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, FieldError, Input, Select } from '@/components/ui/field';
 import type { Person } from '@/lib/people/load';
+import type { OrderFormPrefill } from '@/lib/review/read-order';
 import {
   computeOrderTotalCents,
   formatMoney,
@@ -60,19 +61,31 @@ export function OrderForm({
   defaultDate,
   people = [],
   defaultPersonId = null,
+  prefill = null,
+  sourceMessageId = null,
 }: {
   merchants: MerchantOption[];
   categories: CategoryOption[];
   defaultDate: string;
   people?: Person[];
   defaultPersonId?: string | null;
+  /** Starting values read out of an email. */
+  prefill?: OrderFormPrefill | null;
+  /** The review email the order is made from; saving links it to the order. */
+  sourceMessageId?: string | null;
 }) {
   const [state, action, pending] = useActionState(createManualOrder, initialState);
-  const [lines, setLines] = useState<LineDraft[]>([newLine()]);
-  const [tax, setTax] = useState('');
-  const [shipping, setShipping] = useState('');
-  const [discount, setDiscount] = useState('');
-  const [merchantMode, setMerchantMode] = useState<'pick' | 'custom'>('pick');
+  const [lines, setLines] = useState<LineDraft[]>(() =>
+    prefill && prefill.lines.length > 0
+      ? prefill.lines.map((line) => ({ ...line, key: crypto.randomUUID() }))
+      : [newLine()],
+  );
+  const [tax, setTax] = useState(prefill?.tax ?? '');
+  const [shipping, setShipping] = useState(prefill?.shipping ?? '');
+  const [discount, setDiscount] = useState(prefill?.discount ?? '');
+  const [merchantMode, setMerchantMode] = useState<'pick' | 'custom'>(
+    prefill && !prefill.merchantId ? 'custom' : 'pick',
+  );
 
   const preview = useMemo(() => {
     const pricedLines = lines.flatMap((line) => {
@@ -95,6 +108,10 @@ export function OrderForm({
 
   return (
     <form action={action} className="space-y-8">
+      {sourceMessageId && (
+        <input type="hidden" name="source_message_id" value={sourceMessageId} />
+      )}
+      {prefill && <input type="hidden" name="currency" value={prefill.currency} />}
       <section className="grid gap-4 sm:grid-cols-2">
         {/* One field whose control swaps: the label follows whichever is showing. */}
         <Field
@@ -106,7 +123,7 @@ export function OrderForm({
             <Select
               id="merchant_id"
               name="merchant_id"
-              defaultValue=""
+              defaultValue={prefill?.merchantId ?? ''}
               onChange={(event) => {
                 if (event.target.value === '__custom__') {
                   setMerchantMode('custom');
@@ -128,7 +145,8 @@ export function OrderForm({
                 id="custom_merchant_name"
                 name="custom_merchant_name"
                 placeholder="Merchant name"
-                autoFocus
+                defaultValue={prefill?.merchantName}
+                autoFocus={!prefill}
                 required
               />
               <Button
@@ -147,6 +165,7 @@ export function OrderForm({
             id="external_order_number"
             name="external_order_number"
             placeholder="Optional"
+            defaultValue={prefill?.externalOrderNumber}
           />
         </Field>
 
@@ -156,7 +175,7 @@ export function OrderForm({
             name="order_date"
             type="date"
             required
-            defaultValue={defaultDate}
+            defaultValue={prefill?.orderDate ?? defaultDate}
           />
         </Field>
 

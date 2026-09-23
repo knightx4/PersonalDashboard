@@ -3,7 +3,7 @@ import { domainFromAddress, type MerchantDomainHit } from '@/lib/email/extract/c
 import { displayNameFromAddress, extractOrderNumber } from '@/lib/email/extract/heuristic';
 import { extractedLineSchema, type ExtractedOrder } from '@/lib/email/extract/schema';
 import { isPlatformMerchantSlug, isPlatformSenderDomain } from '@/lib/merchants/platform';
-import { todayInTimezone } from '@/lib/money';
+import { formatCentsAsDollarsInput, todayInTimezone } from '@/lib/money';
 
 /** One line of an order draft, in the terms the order form's line rows take. */
 export type OrderDraftLine = {
@@ -182,6 +182,69 @@ export function draftFromExtraction(input: {
     reconciled: Boolean(ok),
     source: extraction && lines.length > 0 ? extraction.source : 'none',
     issues,
+  };
+}
+
+/** One line row of the order form, as the text its inputs hold. */
+export type OrderFormLine = {
+  name: string;
+  variant: string;
+  quantity: string;
+  unitPrice: string;
+  categoryId: string;
+};
+
+/**
+ * The order form's starting values, in the strings its inputs hold. The form
+ * at app/shopping/orders/new opens with these when it is reached from a review
+ * email.
+ */
+export type OrderFormPrefill = {
+  /** Set only when the merchant is one of the form's options. */
+  merchantId: string | null;
+  /** For the "Other (type a name)" field when `merchantId` is null. */
+  merchantName: string;
+  orderDate: string;
+  externalOrderNumber: string;
+  currency: string;
+  /** Empty when the email gave up no items; the form then shows one blank row. */
+  lines: OrderFormLine[];
+  tax: string;
+  shipping: string;
+  discount: string;
+};
+
+function moneyInput(cents: number): string {
+  return cents > 0 ? formatCentsAsDollarsInput(cents) : '';
+}
+
+/**
+ * Put a draft in the form's terms. A merchant or category id the form does not
+ * offer is dropped rather than sent as a value no option matches: the merchant
+ * falls back to its name, the category to Uncategorized.
+ */
+export function prefillFromDraft(
+  draft: OrderDraft,
+  options: { merchantIds: ReadonlySet<string>; categoryIds: ReadonlySet<string> },
+): OrderFormPrefill {
+  return {
+    merchantId:
+      draft.merchantId && options.merchantIds.has(draft.merchantId) ? draft.merchantId : null,
+    merchantName: draft.merchantName,
+    orderDate: draft.orderDate,
+    externalOrderNumber: draft.externalOrderNumber ?? '',
+    currency: draft.currency,
+    lines: draft.lines.map((line) => ({
+      name: line.name,
+      variant: line.variant ?? '',
+      quantity: String(line.quantity),
+      unitPrice: formatCentsAsDollarsInput(line.unitPriceCents),
+      categoryId:
+        line.categoryId && options.categoryIds.has(line.categoryId) ? line.categoryId : '',
+    })),
+    tax: moneyInput(draft.taxCents),
+    shipping: moneyInput(draft.shippingCents),
+    discount: moneyInput(draft.discountCents),
   };
 }
 
