@@ -46,7 +46,7 @@ function Submit({ on }: { on: boolean }) {
       )}
     >
       <BookOpen className="size-3.5" strokeWidth={1.75} aria-hidden />
-      {on ? 'On Read now' : 'Read now'}
+      {on ? 'On Learn now' : 'Read now'}
     </button>
   );
 }

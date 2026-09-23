@@ -10,9 +10,16 @@ import { openReading } from '../r/[id]/actions';
 import { FinishButton } from './finish-button';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Read now' };
+export const metadata = { title: 'Learn now' };
 
 /**
+ * Learn now, the first tab and what opening Learn lands on (plan #805).
+ *
+ * Until the feed in docs/LEARN-NOW-SPEC.md is built (plan #808), this is the
+ * Read now shelf it replaced, under the new name: the readings you queued,
+ * which the feed will show first, ahead of anything it picked. What follows is
+ * why the shelf was built the way it is.
+ *
  * The shelf you actually read from.
  *
  * A track is a curriculum: ordered, reasoned, read over weeks. That is the
@@ -26,14 +33,14 @@ export const metadata = { title: 'Read now' };
  * page, one click away, and none of it is the reason you opened this tab. The
  * whole point is that nothing here asks you a question before you can read.
  */
-export default async function ReadNowPage() {
+export default async function LearnNowPage() {
   const supabase = await createLearnClient();
   const readings = await loadReadNow(supabase);
 
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
-        title="Read now"
+        title="Learn now"
         description={
           readings.length === 0
             ? 'What you said you would read next.'

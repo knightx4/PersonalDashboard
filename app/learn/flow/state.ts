@@ -29,12 +29,6 @@ export type FlowState = AskState & {
    */
   track?: TrackMove;
   /**
-   * A reading you queued and never opened, offered under the answer. Set by
-   * the answer and nowhere else, like the track: it is what Learn next used
-   * to list as its third kind of row, before the flow took that page over.
-   */
-  reading?: FlowReading;
-  /**
    * A new track from a theme in your notes, offered when the flow is running
    * low (plan #778). Set by the answer in a mixed flow, and by the page when
    * there is nothing left to ask; never on a question by itself.
@@ -50,14 +44,6 @@ export type FlowState = AskState & {
 };
 
 export type { TrackOffer };
-
-/** A queued reading as the answer panel offers it. */
-export type FlowReading = {
-  id: string;
-  title: string;
-  /** Why it is offered, in one line: which claim it was queued about. */
-  reason: string;
-};
 
 /** What the screen shows for the next question, or why there is none. */
 export function toFlowState(next: NextQuestion): FlowState {

@@ -41,23 +41,34 @@ export default async function LearnLayout({ children }: { children: React.ReactN
   const brief = await loadLearnBrief();
 
   /**
-   * Practice Flow first, because it is what Learn opens on (plan #773), then
-   * the subjects the flow asks about, then the rest. A subject and a single
-   * idea are reached through What you know, and a reading list and a reading
-   * through Reading lists, so they are `alsoMatches` rather than tabs of their
-   * own -- a nav that grows an entry per depth level stops being navigation.
+   * Learn now first, because it is what Learn opens on (plan #805), then
+   * Practice Flow, then the subjects the flow asks about, then the rest. A
+   * subject and a single idea are reached through Tracks, and a reading list
+   * and a reading through Reading lists, so they are `alsoMatches` rather than
+   * tabs of their own -- a nav that grows an entry per depth level stops being
+   * navigation.
    *
-   * There is no Learn next tab. Its re-checks are asked in the flow and its
-   * readings are offered there after an answer, and /learn/next redirects.
+   * There is no Learn next tab. Its re-checks are asked in the flow, its
+   * readings are on Learn now, and /learn/next redirects.
    */
   const learnClient = await createLearnClient();
   const readNow = await countReadNow(learnClient);
 
   const sections: NavSection[] = [
+    // Learn now replaced the Read now tab (plan #805). Until its feed is
+    // built (plan #808) it shows the readings you queued, so the badge is still
+    // their count: the tab answers "is there anything" from the column.
+    {
+      href: '/learn/now',
+      label: 'Learn now',
+      icon: 'readNow',
+      exact: true,
+      badge: readNow,
+    },
     // No badge, because there is always a question waiting and a number that
     // never goes down is not information.
     {
-      href: '/learn',
+      href: '/learn/flow',
       label: 'Practice Flow',
       icon: 'practiceFlow',
       exact: true,
@@ -76,17 +87,6 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       icon: 'tracks',
       exact: true,
       alsoMatches: ['/learn/t/', '/learn/r/', '/learn/new'],
-    },
-    // Read now earns a tab because it is not a deeper view of a reading list:
-    // it is every list's next thing on one shelf, and it is the page you open
-    // when you have twenty minutes rather than a decision to make. The badge
-    // is the count, so the tab answers "is there anything" from the column.
-    {
-      href: '/learn/now',
-      label: 'Read now',
-      icon: 'readNow',
-      exact: true,
-      badge: readNow,
     },
     // Quizzes are not a deeper view of anything else here: they are over
     // material you chose out of the vault rather than over a subject the graph

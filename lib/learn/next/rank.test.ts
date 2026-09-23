@@ -8,7 +8,6 @@ import {
   rankNext,
   rankQueuedReadings,
   readingReason,
-  readingToOffer,
   readyReason,
   recheckReason,
   RECORD_WINDOW_DAYS,
@@ -419,47 +418,5 @@ describe('a row you pushed aside', () => {
       NOW,
     );
     expect(keys(rows)).toEqual(['recheck:newer', 'recheck:older']);
-  });
-});
-
-describe('readingToOffer', () => {
-  const readings = [
-    queued('oldest', '2026-05-01T12:00:00Z', 'refraction'),
-    queued('about-lenses', '2026-07-01T12:00:00Z', 'lenses'),
-  ];
-
-  it('offers nothing when nothing is queued', () => {
-    expect(readingToOffer([], [], NOW, 'lenses')).toBeNull();
-  });
-
-  it('offers the reading about the claim just answered', () => {
-    expect(readingToOffer(readings, [], NOW, 'lenses')?.readingId).toBe('about-lenses');
-  });
-
-  it('offers the one that has waited longest when none is about that claim', () => {
-    expect(readingToOffer(readings, [], NOW, 'mirrors')?.readingId).toBe('oldest');
-  });
-
-  it('leaves out a reading pushed aside until its few weeks are up', () => {
-    expect(
-      readingToOffer(readings, [pushedAside({ readingId: 'about-lenses' }, 3)], NOW, 'lenses')
-        ?.readingId,
-    ).toBe('oldest');
-    expect(
-      readingToOffer(
-        readings,
-        [pushedAside({ readingId: 'about-lenses' }, PUSHED_ASIDE_DAYS + 1)],
-        NOW,
-        'lenses',
-      )?.readingId,
-    ).toBe('about-lenses');
-  });
-
-  it('offers nothing when every reading is pushed aside', () => {
-    const record = [
-      pushedAside({ readingId: 'oldest' }, 1),
-      pushedAside({ readingId: 'about-lenses' }, 1),
-    ];
-    expect(readingToOffer(readings, record, NOW, null)).toBeNull();
   });
 });

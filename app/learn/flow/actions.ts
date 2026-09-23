@@ -4,7 +4,6 @@ import { after } from 'next/server';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { fillQueue, nextQuestion } from '@/lib/learn/flow/ahead';
 import {
   loadTrackOffer,
@@ -14,8 +13,7 @@ import {
   themeStrength,
 } from '@/lib/learn/flow/offer';
 import { trackMove } from '@/lib/learn/flow/track';
-import { loadGraph, loadReadingToOffer } from '@/lib/learn/graph/load';
-import { recordOutcome } from '@/lib/learn/next/record';
+import { loadGraph } from '@/lib/learn/graph/load';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { answerQuestion } from '../s/[id]/probe/actions';
 import { toFlowState, type FlowState } from './state';
@@ -141,7 +139,6 @@ export async function fillFlowQueue(track: string | null): Promise<void> {
  * answer settles is decided inside `answerQuestion` (the claim itself, and by
  * inference what it rests on) and the counts on either side are the only
  * record of it. Failing to read either loses the track line, not the answer.
- * The reading offered under the answer is looked up alongside the second read.
  */
 async function answerFlowQuestion(
   prev: FlowState,
@@ -155,7 +152,6 @@ async function answerFlowQuestion(
   const answered: FlowState = {
     ...prev,
     track: undefined,
-    reading: undefined,
     offer: undefined,
     offerError: undefined,
     started: undefined,
@@ -165,56 +161,15 @@ async function answerFlowQuestion(
 
   // A new track is offered only when the flow mixes: focused on one track,
   // running low means that track is nearly done, not that you need another.
-  const [after, reading, offer] = await Promise.all([
+  const [after, offer] = await Promise.all([
     before && subjectId ? loadGraph(supabase, subjectId).catch(() => null) : null,
-    readingFor(supabase, prev.conceptId ?? null),
     focus === null ? createVaultClient().then((vault) => loadTrackOffer(supabase, vault)) : null,
   ]);
   return {
     ...answered,
     ...(before && after ? { track: trackMove(before, after) } : {}),
-    ...(reading ? { reading } : {}),
     ...(offer ? { offer } : {}),
   };
-}
-
-/**
- * The queued reading to offer under an answer, preferring one about the claim
- * just answered. A failure to read the queue loses the offer, not the answer.
- */
-async function readingFor(
-  supabase: LearnSupabaseClient,
-  conceptId: string | null,
-): Promise<FlowState['reading'] | null> {
-  const row = await loadReadingToOffer(supabase, conceptId).catch(() => null);
-  return row ? { id: row.readingId, title: row.title, reason: row.reason } : null;
-}
-
-const ReadingId = z.string().uuid();
-
-/**
- * Not now, on a reading the flow offered.
- *
- * The same outcome Learn next's Not now wrote, so the reading stays out of
- * the offer for the few weeks `lib/learn/next/rank.ts` holds it. Nothing is
- * revalidated: the panel hides the offer itself, and refreshing /learn would
- * run the page again and take a new question off the queue.
- *
- * The id comes from the form and is not trusted for ownership. The insert goes
- * through the session client, so RLS decides whether there is a reading there.
- */
-// latency: optimistic
-export async function pushReadingAside(formData: FormData): Promise<void> {
-  const user = await requireUser();
-  const readingId = ReadingId.safeParse(formData.get('readingId'));
-  if (!readingId.success) return;
-
-  const supabase = await createLearnClient();
-  await recordOutcome(supabase, user.id, {
-    kind: 'reading',
-    readingId: readingId.data,
-    outcome: 'not_now',
-  });
 }
 
 const OfferAnswer = z.object({
@@ -227,8 +182,9 @@ const OfferAnswer = z.object({
  *
  * Not now holds the theme back for a few weeks; Never stops it being offered
  * again. Both are kept in `learn.track_offers`, which is also what plan #780
- * reads to learn which offers you take up. Nothing is revalidated, for the
- * reason `pushReadingAside` gives: the card hides itself.
+ * reads to learn which offers you take up. Nothing is revalidated: the card
+ * hides itself, and refreshing the flow would run the page again and take a
+ * new question off the queue.
  *
  * The theme is read back through the session's own client for its name, so an
  * id from the form that is not one of your themes records nothing.

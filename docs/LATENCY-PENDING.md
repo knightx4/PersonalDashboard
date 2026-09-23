@@ -66,7 +66,7 @@ The pending flag is already in scope at every one of these; it reaches
 | `app/dev/ideas/ideas-view.tsx:190` | Delete | `deleteIdea` |
 | `app/dev/plan/plan-view.tsx:1198` | icon only, "Stop waiting on #n" | `removePlanDependency` |
 | `app/dev/ui/review/review-view.tsx:137` | Dismiss | `decideUiFinding` |
-| `app/learn/r/[id]/read-now-button.tsx:39` | Read now / On Read now | `toggleReadNow` |
+| `app/learn/r/[id]/read-now-button.tsx:39` | Read now / On Learn now | `toggleReadNow` |
 | `app/learn/r/[id]/status-buttons.tsx:38` | the four reading statuses | `updateStatus` |
 | `app/learn/s/[id]/probe/session.tsx:66` | the answer options | `answerQuestion` |
 | `app/shopping/inventory/[id]/copies-panel.tsx:149` | Separate | `separateCopy` |
