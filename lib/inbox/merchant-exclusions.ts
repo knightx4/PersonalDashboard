@@ -4,7 +4,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { MerchantExclusionRow } from '@/lib/inbox/merchant-exclusion-match';
 
 export type { MerchantExclusionRow } from '@/lib/inbox/merchant-exclusion-match';
-export { isExcludedSender } from '@/lib/inbox/merchant-exclusion-match';
+export {
+  EXCLUDED_SENDER_ERROR,
+  isExcludedMessage,
+  isExcludedSender,
+} from '@/lib/inbox/merchant-exclusion-match';
 
 export async function loadMerchantExclusions(
   supabase: SupabaseClient,
