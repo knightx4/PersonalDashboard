@@ -9,7 +9,10 @@ const merchants = [
 
 describe('the merchant field', () => {
   it('uses a merchant on file when the name matches, ignoring case', () => {
-    expect(resolveMerchant(merchants, '  best buy ')).toEqual({ merchantId: 'b', customName: null });
+    expect(resolveMerchant(merchants, '  best buy ')).toEqual({
+      merchantId: 'b',
+      customName: null,
+    });
   });
 
   it('saves anything else as a new merchant', () => {

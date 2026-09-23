@@ -3,11 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { Input } from '@/components/ui/field';
-import {
-  resolveMerchant,
-  suggestMerchants,
-  type MerchantOption,
-} from '@/lib/merchants/suggest';
+import { resolveMerchant, suggestMerchants, type MerchantOption } from '@/lib/merchants/suggest';
 
 /**
  * Type the merchant; known ones are suggested as you go, and anything else is
@@ -18,13 +14,7 @@ import {
  * controls for one answer. What the form submits is still the two fields the
  * action already reads, so the server side is unchanged.
  */
-export function MerchantField({
-  id,
-  merchants,
-}: {
-  id: string;
-  merchants: MerchantOption[];
-}) {
+export function MerchantField({ id, merchants }: { id: string; merchants: MerchantOption[] }) {
   const listId = `${id}-list`;
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
