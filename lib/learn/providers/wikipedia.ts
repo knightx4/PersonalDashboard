@@ -210,11 +210,30 @@ export function parseArticleResponse(body: string): WikipediaResult {
  * this caller can say something useful about; everything else is `error` with
  * the detail it gave.
  */
-export async function fetchWikipediaArticle(title: string): Promise<WikipediaResult> {
+/**
+ * How long to wait before asking again after Wikipedia answers 429.
+ *
+ * The Learn now picking pass fetches a few articles one after another, and the
+ * first live run had five of eight refused as too many requests. Two waits,
+ * short enough to stay inside a cron call's budget, turn a burst into a
+ * trickle; a third refusal is reported rather than retried.
+ */
+export const RATE_LIMIT_WAITS_MS = [2_000, 6_000];
+
+export async function fetchWikipediaArticle(
+  title: string,
+  options: { sleep?: (ms: number) => Promise<void> } = {},
+): Promise<WikipediaResult> {
   const wanted = title.trim();
   if (!wanted) return fail('error', 'no article named');
+  const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
 
-  const fetched = await fetchDocument(articleRequestUrl(wanted));
+  let fetched = await fetchDocument(articleRequestUrl(wanted));
+  for (const wait of RATE_LIMIT_WAITS_MS) {
+    if (fetched.ok || fetched.reason !== 'error' || fetched.detail !== '429') break;
+    await sleep(wait);
+    fetched = await fetchDocument(articleRequestUrl(wanted));
+  }
   if (!fetched.ok) {
     if (fetched.reason === 'not-found') return fail('not-found', fetched.detail);
     if (fetched.reason === 'blocked') return fail('blocked', fetched.detail);
