@@ -1,13 +1,18 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { after, NextResponse, type NextRequest } from 'next/server';
+import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { newsDomain } from '@/lib/news/address';
 import { createNewsServiceClient } from '@/lib/news/auth/service';
 import { deliver } from '@/lib/news/inbound/deliver';
+import { digestOnArrival } from '@/lib/news/issues/summarise';
 import { newsStore } from '@/lib/news/inbound/supabase';
 import { createMailgunProvider, mailgunSigningKey } from '@/lib/news/providers/mailgun';
 
 // node:crypto for the signature, and nothing here is ever cached.
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Room for the one Haiku call that summarises a new issue after the answer
+// has gone (plan #787). Storing the issue itself takes well under a second.
+export const maxDuration = 120;
 
 /**
  * Where a newsletter arrives.
@@ -28,6 +33,9 @@ export const dynamic = 'force-dynamic';
  *        tell a stranger which addresses exist.
  *   500  the database could not be reached. This is the one case worth a
  *        retry, and Mailgun will make it.
+ *
+ * A newly stored issue is then summarised inside after(), once the answer has
+ * been sent, so a slow or failed digest never changes what Mailgun is told.
  */
 export async function POST(request: NextRequest) {
   const provider = createMailgunProvider({ signingKey: mailgunSigningKey() });
@@ -49,11 +57,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ stored: false }, { status: 200 });
   }
 
-  const outcome = await deliver(
-    newsStore(createNewsServiceClient()),
-    message,
-    newsDomain(),
-  );
+  const news = createNewsServiceClient();
+  const outcome = await deliver(newsStore(news), message, newsDomain());
 
-  return NextResponse.json({ stored: outcome === 'stored' }, { status: 200 });
+  if (outcome.status === 'stored') {
+    after(() =>
+      digestOnArrival({
+        news,
+        spend: createCoreServiceSupabase(),
+        userId: outcome.userId,
+        issueId: outcome.issueId,
+        anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+      }),
+    );
+  }
+
+  return NextResponse.json({ stored: outcome.status === 'stored' }, { status: 200 });
 }

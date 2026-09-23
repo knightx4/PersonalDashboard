@@ -44,7 +44,7 @@ function fakeStore(addresses: Record<string, string> = { [MINE]: ME }) {
       );
       if (already) return 'repeat';
       issues.push({ userId, senderId, messageId: incoming.messageId });
-      return 'stored';
+      return { issueId: `issue-${issues.length}` };
     },
   };
 
@@ -54,7 +54,11 @@ function fakeStore(addresses: Record<string, string> = { [MINE]: ME }) {
 describe('deliver', () => {
   it('stores one issue and its sender', async () => {
     const { store, senders, issues } = fakeStore();
-    expect(await deliver(store, message(), DOMAIN)).toBe('stored');
+    expect(await deliver(store, message(), DOMAIN)).toEqual({
+      status: 'stored',
+      userId: ME,
+      issueId: 'issue-1',
+    });
     expect(issues).toHaveLength(1);
     expect(senders).toEqual([
       { id: 'sender-1', userId: ME, email: 'hello@thepaper.com', name: 'The Paper' },
@@ -63,8 +67,8 @@ describe('deliver', () => {
 
   it('leaves one issue when the same message is delivered twice', async () => {
     const { store, senders, issues } = fakeStore();
-    expect(await deliver(store, message(), DOMAIN)).toBe('stored');
-    expect(await deliver(store, message(), DOMAIN)).toBe('repeat');
+    expect((await deliver(store, message(), DOMAIN)).status).toBe('stored');
+    expect(await deliver(store, message(), DOMAIN)).toEqual({ status: 'repeat' });
     expect(issues).toHaveLength(1);
     expect(senders).toHaveLength(1);
   });
@@ -79,22 +83,22 @@ describe('deliver', () => {
 
   it('stores nothing at all for an address nobody owns', async () => {
     const { store, senders, issues } = fakeStore({});
-    expect(await deliver(store, message(), DOMAIN)).toBe('unaddressed');
+    expect(await deliver(store, message(), DOMAIN)).toEqual({ status: 'unaddressed' });
     expect(issues).toHaveLength(0);
     expect(senders).toHaveLength(0);
   });
 
   it('stores nothing for mail addressed to another domain', async () => {
     const { store, issues } = fakeStore();
-    expect(await deliver(store, message({ recipient: `${MINE}@elsewhere.com` }), DOMAIN)).toBe(
-      'unaddressed',
-    );
+    expect(await deliver(store, message({ recipient: `${MINE}@elsewhere.com` }), DOMAIN)).toEqual({
+      status: 'unaddressed',
+    });
     expect(issues).toHaveLength(0);
   });
 
   it('stops answering the old address once it has been replaced', async () => {
     const { store, issues } = fakeStore({ 'newaddress1234567': ME });
-    expect(await deliver(store, message(), DOMAIN)).toBe('unaddressed');
+    expect(await deliver(store, message(), DOMAIN)).toEqual({ status: 'unaddressed' });
     expect(issues).toHaveLength(0);
   });
 });

@@ -15,10 +15,13 @@ export type NewsStore = {
   accountFor(localPart: string): Promise<string | null>;
   /** The sender's id, creating the row the first time that address writes. */
   senderFor(userId: string, email: string, name: string | null): Promise<string>;
-  /** `repeat` when this account already holds that message id. */
+  /**
+   * The new issue's id, or `repeat` when this account already holds that
+   * message id.
+   */
   storeIssue(issue: {
     userId: string;
     senderId: string;
     message: InboundMessage;
-  }): Promise<'stored' | 'repeat'>;
+  }): Promise<{ issueId: string } | 'repeat'>;
 };

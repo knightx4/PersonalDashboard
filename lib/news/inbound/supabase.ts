@@ -63,17 +63,21 @@ export function newsStore(client: NewsSupabaseClient): NewsStore {
     },
 
     async storeIssue({ userId, senderId, message }) {
-      const { error } = await client.from('issues').insert({
-        user_id: userId,
-        sender_id: senderId,
-        message_id: message.messageId,
-        subject: message.subject,
-        text_body: message.textBody,
-        html_body: message.htmlBody,
-        unsubscribe_url: message.unsubscribeUrl,
-        unsubscribe_email: message.unsubscribeEmail,
-      });
-      if (!error) return 'stored';
+      const { data, error } = await client
+        .from('issues')
+        .insert({
+          user_id: userId,
+          sender_id: senderId,
+          message_id: message.messageId,
+          subject: message.subject,
+          text_body: message.textBody,
+          html_body: message.htmlBody,
+          unsubscribe_url: message.unsubscribeUrl,
+          unsubscribe_email: message.unsubscribeEmail,
+        })
+        .select('id')
+        .single();
+      if (!error) return { issueId: data.id as string };
       // issues_user_message_key. The service retries anything it did not get a
       // 200 for, and the second attempt lands on the row the first one wrote.
       if (error.code === UNIQUE_VIOLATION) return 'repeat';
