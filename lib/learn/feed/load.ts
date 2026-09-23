@@ -20,9 +20,10 @@ const MAX_EXCLUDED = 300;
 
 /**
  * The next ready cards, newest first, leaving out the ones already on the
- * screen. Only `ready` cards, so one you pressed Next on (`passed`) or acted on
- * is not shown again. Newest first so a card the top-up has just written comes
- * up before one you scrolled past on an earlier visit.
+ * screen. Only `ready` cards, so one you pressed Next on or scrolled past
+ * (`passed`) or acted on is not shown again. Newest first so a card the top-up
+ * has just written comes up before one that reached the screen on an earlier
+ * visit without being passed.
  */
 export async function loadFeedPage(
   supabase: LearnSupabaseClient,
