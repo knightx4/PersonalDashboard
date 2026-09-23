@@ -24,11 +24,16 @@ import type { NavSection } from '@/components/shell/app-shell';
  * `focus` reports back whether the cursor actually landed there. Below lg the
  * bar is drawn with `display: none`, and an input inside a hidden box cannot
  * take focus, so a `false` answers "is the bar on screen" without a second
- * copy of the breakpoint anywhere (#663). Nothing else is exposed: the query,
- * the scope and the list stay the bar's own.
+ * copy of the breakpoint anywhere (#663). Nothing else is exposed: the query
+ * and the list stay the bar's own.
+ *
+ * `scope` is what ⌘K passes: the key searches everything you own (note
+ * cdf684fa), while a click into the field keeps the workspace the page is in.
+ * It is applied only when the cursor landed, so a bar that is not on screen is
+ * left as it was.
  */
 export type SearchBarHandle = {
-  focus: () => boolean;
+  focus: (options?: { scope?: SearchScope }) => boolean;
 };
 
 /**
@@ -95,14 +100,19 @@ export function SearchBar({
   useImperativeHandle(
     ref,
     () => ({
-      focus() {
+      focus(options) {
         const input = inputRef.current;
         if (!input) return false;
         input.focus();
         // Asked of the document rather than assumed: `focus()` on an input
         // inside a `display: none` box is a no-op that throws nothing, and
         // this is how the caller finds out.
-        return document.activeElement === input;
+        const landed = document.activeElement === input;
+        if (landed && options?.scope) {
+          setScope(options.scope);
+          setActive(0);
+        }
+        return landed;
       },
     }),
     [],

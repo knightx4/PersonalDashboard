@@ -153,6 +153,8 @@ export function AppShell({
    * reaches this same box (#713); see the effect further down.
    */
   const [searching, setSearching] = useState(false);
+  /** ⌘K opened the box, so it starts on everything rather than this workspace. */
+  const [searchingEverything, setSearchingEverything] = useState(false);
   /** The field in the top bar, so the shortcut can put the cursor in it. */
   const searchBar = useRef<SearchBarHandle>(null);
   const [collapsed, setCollapsed] = useState(false);
@@ -270,7 +272,11 @@ export function AppShell({
         setSearching(false);
         return;
       }
-      if (searchBar.current?.focus()) return;
+      // Everything you own, whichever surface: the key is the way to look
+      // across workspaces, and a click into the bar is the way to look in
+      // this one (note cdf684fa).
+      if (searchBar.current?.focus({ scope: 'everything' })) return;
+      setSearchingEverything(true);
       setSearching(true);
     }
     document.addEventListener('keydown', onKey);
@@ -756,7 +762,10 @@ export function AppShell({
                   for one thing. */}
                   <button
                     type="button"
-                    onClick={() => setSearching(true)}
+                    onClick={() => {
+                      setSearchingEverything(false);
+                      setSearching(true);
+                    }}
                     title="Search"
                     className="press flex size-8 shrink-0 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink lg:hidden"
                   >
@@ -852,6 +861,7 @@ export function AppShell({
             theme={theme}
             open={searching}
             onOpenChange={setSearching}
+            everything={searchingEverything}
           />
         </div>
       </CaptureProvider>
