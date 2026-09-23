@@ -112,16 +112,16 @@ describe('issueReturn', () => {
 });
 
 describe('issueHref', () => {
-  it('is the bare address when nothing is chosen', () => {
-    expect(issueHref('i1', { original: false, pictures: false, from: null })).toBe('/news/i/i1');
+  it('is the bare address with pictures on and nothing else chosen', () => {
+    expect(issueHref('i1', { original: false, pictures: true, from: null })).toBe('/news/i/i1');
   });
 
   it('keeps every choice it is given', () => {
-    expect(issueHref('i1', { original: true, pictures: true, from: 's1' })).toBe(
-      '/news/i/i1?view=original&pictures=1&from=s1',
+    expect(issueHref('i1', { original: true, pictures: false, from: 's1' })).toBe(
+      '/news/i/i1?view=original&pictures=0&from=s1',
     );
-    expect(issueHref('i1', { original: false, pictures: true, from: null })).toBe(
-      '/news/i/i1?pictures=1',
+    expect(issueHref('i1', { original: false, pictures: false, from: null })).toBe(
+      '/news/i/i1?pictures=0',
     );
   });
 });

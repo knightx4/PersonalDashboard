@@ -27,6 +27,8 @@ export type CleanIssue = {
    * them, and the number to offer to load when they have not.
    */
   blockedImages: number;
+  /** How many pictures the issue has, loaded or not. */
+  images: number;
 };
 
 /**
@@ -172,15 +174,17 @@ function cleanStyle(style: string, images: boolean): string {
 /**
  * Clean one newsletter.
  *
- * `images` is the reader's answer to "load the pictures?". Until it is true,
- * every remote address a picture would be fetched from is moved out of `src`
- * into `data-news-src`, so nothing is requested and nothing tells the sender
- * the mail was opened. Turning it on puts the same addresses back.
+ * `images` is the reader's answer to "load the pictures?". The issue page
+ * passes true unless the reader turned pictures off. While it is false, every
+ * remote address a picture would be fetched from is moved out of `src` into
+ * `data-news-src`, so nothing is requested from the sender. Turning it on puts
+ * the same addresses back.
  */
 export function cleanIssueHtml(html: string | null, images = false): CleanIssue {
-  if (!html || html.trim() === '') return { html: '', blockedImages: 0 };
+  if (!html || html.trim() === '') return { html: '', blockedImages: 0, images: 0 };
 
   let blockedImages = 0;
+  let pictureCount = 0;
 
   const clean = sanitizeHtml(html, {
     allowedTags: ALLOWED_TAGS,
@@ -227,6 +231,7 @@ export function cleanIssueHtml(html: string | null, images = false): CleanIssue 
         // one back and fetching another.
         delete next.srcset;
         delete next.loading;
+        if (next.src) pictureCount += 1;
         if (!images && next.src) {
           next['data-news-src'] = next.src;
           delete next.src;
@@ -237,5 +242,5 @@ export function cleanIssueHtml(html: string | null, images = false): CleanIssue 
     },
   });
 
-  return { html: clean, blockedImages };
+  return { html: clean, blockedImages, images: pictureCount };
 }

@@ -80,8 +80,9 @@ describe('cleanIssueHtml', () => {
   });
 
   it('puts the pictures back when they are asked for', () => {
-    const { html, blockedImages } = cleanIssueHtml('<img src="https://cdn/hero.jpg">', true);
+    const { html, blockedImages, images } = cleanIssueHtml('<img src="https://cdn/hero.jpg">', true);
     expect(blockedImages).toBe(0);
+    expect(images).toBe(1);
     expect(html).toContain('src="https://cdn/hero.jpg"');
     expect(html).not.toContain('data-news-src');
   });
@@ -127,7 +128,7 @@ describe('cleanIssueHtml', () => {
   });
 
   it('has nothing to say about an empty body', () => {
-    expect(cleanIssueHtml(null)).toEqual({ html: '', blockedImages: 0 });
-    expect(cleanIssueHtml('   ')).toEqual({ html: '', blockedImages: 0 });
+    expect(cleanIssueHtml(null)).toEqual({ html: '', blockedImages: 0, images: 0 });
+    expect(cleanIssueHtml('   ')).toEqual({ html: '', blockedImages: 0, images: 0 });
   });
 });
