@@ -1,13 +1,14 @@
 'use client';
 
-import { startTransition } from 'react';
+import { startTransition, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useFormStatus } from 'react-dom';
 import { ArrowRight, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { swipeAxis, swipeFarEnough } from '@/lib/news/quick/swipe';
 import { passQuickStory, recordArticleOpened } from './actions';
 
 /**
- * The id of the form Next submits. A swipe on the card (#855) can submit the
+ * The id of the form Next submits. A swipe on the card (#855) submits the
  * same form with `requestSubmit()`, so both go through one action and one
  * pending state.
  */
@@ -65,5 +66,102 @@ export function ArticleLink({
       Read the article
       <ExternalLink className="size-3" strokeWidth={1.75} aria-hidden />
     </a>
+  );
+}
+
+/**
+ * A left swipe on the card does what Next does (#855), and nothing more:
+ * it submits the Next form, so the story is recorded by the same action and
+ * the button shows the same pending state.
+ *
+ * Touch only. A laptop has the button, and a mouse drag across the card is
+ * how text gets selected. A drag counts once it is mostly sideways and to the
+ * left; anything mostly up or down is left to the page, so a long story
+ * scrolls as usual. A touch that starts on a link, a button or the full-story
+ * fold keeps its tap, and nothing is sent while a Next is still pending or
+ * while text is selected.
+ *
+ * The card follows the finger and springs back when let go. Under
+ * prefers-reduced-motion it stays still and the swipe still works. Keyed on
+ * the story by the caller, so a drag never carries over to the next card.
+ */
+export function QuickSwipe({ children }: { children: ReactNode }) {
+  const surface = useRef<HTMLDivElement>(null);
+  const [offset, setOffset] = useState<number | null>(null);
+
+  // Attached by hand rather than through React so the move handler can be
+  // non-passive: it cancels the page's own scroll once a drag is a swipe.
+  useEffect(() => {
+    const element = surface.current;
+    if (!element) return;
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    let start: { x: number; y: number } | null = null;
+    let axis: 'swipe' | 'page' | null = null;
+    let dx = 0;
+
+    const selecting = () => {
+      const selection = window.getSelection();
+      return !!selection && !selection.isCollapsed;
+    };
+
+    const onStart = (event: TouchEvent) => {
+      start = null;
+      if (event.touches.length !== 1 || selecting()) return;
+      const target = event.target as Element | null;
+      if (target?.closest('a, button, summary, input, textarea, select, label')) return;
+      start = { x: event.touches[0]!.clientX, y: event.touches[0]!.clientY };
+      axis = null;
+      dx = 0;
+    };
+    const onMove = (event: TouchEvent) => {
+      if (!start) return;
+      if (event.touches.length !== 1) {
+        start = null;
+        setOffset(null);
+        return;
+      }
+      const moveX = event.touches[0]!.clientX - start.x;
+      const moveY = event.touches[0]!.clientY - start.y;
+      axis ??= swipeAxis(moveX, moveY);
+      if (axis !== 'swipe') return;
+      event.preventDefault();
+      dx = Math.min(0, moveX);
+      if (!still?.matches) setOffset(dx);
+    };
+    const onEnd = () => {
+      if (!start) return;
+      const claimed = axis === 'swipe';
+      start = null;
+      axis = null;
+      setOffset(null);
+      if (!claimed || !swipeFarEnough(dx, element.offsetWidth) || selecting()) return;
+      const form = document.getElementById(QUICK_NEXT_FORM);
+      if (!(form instanceof HTMLFormElement)) return;
+      // The button is disabled while Next is pending, so a second swipe
+      // before the next card arrives sends nothing.
+      if (form.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled) return;
+      form.requestSubmit();
+    };
+
+    element.addEventListener('touchstart', onStart, { passive: true });
+    element.addEventListener('touchmove', onMove, { passive: false });
+    element.addEventListener('touchend', onEnd);
+    element.addEventListener('touchcancel', onEnd);
+    return () => {
+      element.removeEventListener('touchstart', onStart);
+      element.removeEventListener('touchmove', onMove);
+      element.removeEventListener('touchend', onEnd);
+      element.removeEventListener('touchcancel', onEnd);
+    };
+  }, []);
+
+  return (
+    <div
+      ref={surface}
+      className={offset === null ? 'transition-transform duration-150 ease-out-soft' : undefined}
+      style={offset === null ? undefined : { transform: `translateX(${offset}px)` }}
+    >
+      {children}
+    </div>
   );
 }
