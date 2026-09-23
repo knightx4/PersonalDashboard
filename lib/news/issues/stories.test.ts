@@ -45,12 +45,37 @@ describe('readStories', () => {
     ).toEqual([{ headline: 'x', summary: 'y' }]);
   });
 
+  it('keeps a topic from the list, drops one not on it, and reads none as none', () => {
+    expect(
+      readStories([
+        { headline: 'Tagged', summary: 'y', topic: 'Climate' },
+        { headline: 'Lower case', summary: 'y', topic: 'sport' },
+        { headline: 'Untagged', summary: 'y' },
+        { headline: 'Off the list', summary: 'y', topic: 'Crypto' },
+        { headline: 'Blank', summary: 'y', topic: ' ' },
+      ]),
+    ).toEqual([
+      { headline: 'Tagged', summary: 'y', topic: 'Climate' },
+      { headline: 'Lower case', summary: 'y', topic: 'Sport' },
+      { headline: 'Untagged', summary: 'y' },
+      { headline: 'Off the list', summary: 'y' },
+      { headline: 'Blank', summary: 'y' },
+    ]);
+  });
+
   it("keeps a story's picture and its own text", () => {
     expect(
       readStories([
-        { headline: 'x', summary: 'y', image: ' https://cdn.example/a.jpg ', text: ' One.\n\nTwo. ' },
+        {
+          headline: 'x',
+          summary: 'y',
+          image: ' https://cdn.example/a.jpg ',
+          text: ' One.\n\nTwo. ',
+        },
       ]),
-    ).toEqual([{ headline: 'x', summary: 'y', image: 'https://cdn.example/a.jpg', text: 'One.\n\nTwo.' }]);
+    ).toEqual([
+      { headline: 'x', summary: 'y', image: 'https://cdn.example/a.jpg', text: 'One.\n\nTwo.' },
+    ]);
   });
 });
 
