@@ -10,6 +10,7 @@
  * The composite key carrying user_id is what refuses it, and this file is where
  * that is checked rather than assumed.
  */
+import type postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { admin, asUser, closeDb, createUser, truncateAll } from './helpers/db-news';
 
@@ -263,6 +264,74 @@ describe('news.hidden_topics', () => {
   });
 });
 
+describe('news.saved_stories', () => {
+  const story = {
+    headline: 'The quiet return of the tram',
+    summary: 'Cities are laying track again. Most of it follows old routes.',
+  };
+
+  function save(tx: postgres.TransactionSql, userId: string, issueId: string | null) {
+    return tx`
+      insert into saved_stories (user_id, issue_id, headline, summary, sender_name, received_at)
+      values (${userId}, ${issueId}, ${story.headline}, ${story.summary}, 'Letters From Work', now())
+      on conflict (user_id, issue_id, headline) do nothing`;
+  }
+
+  it('saves a story once, and removes it', async () => {
+    await asUser(userA, (tx) => save(tx, userA, issueA));
+    await asUser(userA, (tx) => save(tx, userA, issueA));
+
+    const saved = await asUser(userA, (tx) => tx<{ headline: string }[]>`
+      select headline from saved_stories where issue_id = ${issueA}`);
+    expect(saved.map((r) => r.headline)).toEqual([story.headline]);
+
+    await asUser(userA, (tx) => tx`
+      delete from saved_stories where issue_id = ${issueA} and headline = ${story.headline}`);
+    const after = await asUser(userA, (tx) => tx`select 1 from saved_stories`);
+    expect(after).toHaveLength(0);
+  });
+
+  it('does not let another account read, change or remove a saved story', async () => {
+    await asUser(userA, (tx) => save(tx, userA, issueA));
+
+    await asUser(userB, async (tx) => {
+      const read = await tx`select 1 from saved_stories`;
+      const changed = await tx`update saved_stories set headline = 'Mine now'`;
+      const removed = await tx`delete from saved_stories`;
+      expect(read).toHaveLength(0);
+      expect(changed.count).toBe(0);
+      expect(removed.count).toBe(0);
+    });
+
+    const [row] = await admin<{ headline: string }[]>`
+      select headline from saved_stories where user_id = ${userA}`;
+    expect(row.headline).toBe(story.headline);
+  });
+
+  it('refuses a save on another account\'s newsletter, or under their id', async () => {
+    await expect(asUser(userB, (tx) => save(tx, userB, issueA))).rejects.toThrow(
+      /saved_stories_issue_fk/,
+    );
+    await expect(asUser(userB, (tx) => save(tx, userA, null))).rejects.toThrow(
+      /row-level security/,
+    );
+  });
+
+  it('keeps the saved copy when its newsletter is deleted', async () => {
+    const [issue] = await admin<{ id: string }[]>`
+      insert into issues (user_id, sender_id, message_id, subject, text_body)
+      values (${userA}, ${senderA}, '<5@lettersfromwork.com>', 'Week 16', 'Trams.')
+      returning id`;
+    await admin.begin((tx) => save(tx, userA, issue.id));
+
+    await admin`delete from issues where id = ${issue.id}`;
+
+    const rows = await admin<{ issue_id: string | null; user_id: string }[]>`
+      select issue_id, user_id from saved_stories where user_id = ${userA} and issue_id is null`;
+    expect(rows).toEqual([{ issue_id: null, user_id: userA }]);
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`
@@ -285,6 +354,7 @@ describe('RLS coverage', () => {
       'addresses',
       'hidden_topics',
       'issues',
+      'saved_stories',
       'senders',
       'story_passes',
     ]);
