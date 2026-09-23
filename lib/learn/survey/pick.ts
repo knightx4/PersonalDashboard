@@ -27,7 +27,15 @@ export type SurveyTheme = {
 };
 
 /** Survey questions written and answered, for one field or one theme. */
-export type SurveyCount = { asked: number; answered: number };
+export type SurveyCount = {
+  asked: number;
+  answered: number;
+  /**
+   * When the latest of those answers was given. Set by `tallySurvey` when the
+   * probes it was given carry their answer times, for the Know grid's date.
+   */
+  lastAnswered?: string;
+};
 
 export type SurveyCounts = {
   byField: Map<string, SurveyCount>;
@@ -155,7 +163,7 @@ export function tallySurvey(input: {
   placements: ReadonlyMap<string, string>;
   concepts: { id: string; subjectId: string }[];
   /** Survey questions not thrown away. */
-  probes: { conceptId: string; answered: boolean }[];
+  probes: { conceptId: string; answered: boolean; answeredAt?: string | null }[];
 }): SurveyCounts {
   const themeOfSubject = new Map(input.subjects.map((subject) => [subject.id, subject.themeId]));
   const themeOfConcept = new Map<string, string>();
@@ -166,19 +174,24 @@ export function tallySurvey(input: {
 
   const byField = new Map<string, SurveyCount>();
   const byTheme = new Map<string, SurveyCount>();
-  const add = (map: Map<string, SurveyCount>, id: string, answered: boolean) => {
+  type Probe = (typeof input.probes)[number];
+  const add = (map: Map<string, SurveyCount>, id: string, probe: Probe) => {
     const count = map.get(id) ?? { asked: 0, answered: 0 };
     count.asked += 1;
-    if (answered) count.answered += 1;
+    if (probe.answered) count.answered += 1;
+    const at = probe.answered ? probe.answeredAt : null;
+    if (at && (!count.lastAnswered || Date.parse(at) > Date.parse(count.lastAnswered))) {
+      count.lastAnswered = at;
+    }
     map.set(id, count);
   };
 
   for (const probe of input.probes) {
     const themeId = themeOfConcept.get(probe.conceptId);
     if (!themeId) continue;
-    add(byTheme, themeId, probe.answered);
+    add(byTheme, themeId, probe);
     const fieldId = input.placements.get(themeId);
-    if (fieldId) add(byField, fieldId, probe.answered);
+    if (fieldId) add(byField, fieldId, probe);
   }
   return { byField, byTheme };
 }

@@ -82,8 +82,10 @@ the flow is next opened with no filter. When your tracks have nothing left to
 ask, the default flow asks survey questions alone. When a survey question
 cannot be written, a track question takes its turn.
 
-Survey answers are graded like any other answer. Counting them towards a field
-being tested on the Know grid is plan #843.
+Survey answers are graded like any other answer. An answered survey question
+counts towards its field being tested on the Know grid, the same as an answer
+in a track placed there, and a field tested that way is no longer offered as
+one you have never been tested in (plan #843).
 
 ## Two rules this overturns
 
