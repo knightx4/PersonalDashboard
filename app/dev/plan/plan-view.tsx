@@ -1737,22 +1737,27 @@ function TreeGuides({ trail }: { trail: readonly boolean[] }) {
 }
 
 /**
- * Done, underway, blocked, not started: the leaf steps beneath a feature, as
- * dots. Read from the roll-up rather than from the children on the page, so
- * a narrowed view that has folded the done steps away still counts them.
+ * Ready, not ready, underway, done: the leaf steps beneath a feature, as dots.
+ * Read from the roll-up rather than from the children on the page, so a
+ * narrowed view that has folded the done steps away still counts them.
+ *
+ * Ready leads in blue and everything else still to do follows in amber,
+ * blocked and waiting alike (note c12fe73a): what can be taken next and what
+ * cannot are the two numbers worth reading here. Underway and done come after
+ * them and quieter.
  */
 function Breakdown({ node }: { node: PlanNode }) {
-  const { done, inProgress, blocked, live } = node.rollup;
+  const { done, inProgress, ready, live } = node.rollup;
   if (live === 0) return <span className="text-small text-ink-ghost">—</span>;
 
-  const counts: Array<{ status: PlanStatus; tone: Health['tone']; n: number }> = [
-    { status: 'done', tone: 'positive', n: done },
-    { status: 'in_progress', tone: 'accent', n: inProgress },
-    { status: 'blocked', tone: 'caution', n: blocked },
-    { status: 'not_started', tone: 'quiet', n: live - done - inProgress - blocked },
+  const counts: Array<{ key: string; word: string; tone: Health['tone']; n: number }> = [
+    { key: 'ready', word: 'ready', tone: 'accent', n: ready },
+    { key: 'not-ready', word: 'not ready', tone: 'caution', n: live - done - inProgress - ready },
+    { key: 'underway', word: 'underway', tone: 'quiet', n: inProgress },
+    { key: 'done', word: 'done', tone: 'positive', n: done },
   ];
   const shown = counts.filter((c) => c.n > 0);
-  const title = shown.map((c) => `${c.n} ${STATUS_LABEL[c.status].toLowerCase()}`).join(', ');
+  const title = shown.map((c) => `${c.n} ${c.word}`).join(', ');
 
   return (
     <span
@@ -1761,7 +1766,7 @@ function Breakdown({ node }: { node: PlanNode }) {
       aria-label={`${title} of ${live} steps`}
     >
       {shown.map((c) => (
-        <span key={c.status} className="inline-flex items-center gap-1">
+        <span key={c.key} className="inline-flex items-center gap-1">
           <span className={cn('size-1.5 rounded-full', TONE_DOT[c.tone])} aria-hidden />
           {c.n}
         </span>

@@ -122,9 +122,21 @@ describe('planProgress', () => {
       done: 1,
       inProgress: 0,
       blocked: 1,
+      ready: 0,
       live: 2,
       fraction: 0.5,
     });
+  });
+
+  // Note c12fe73a: the Steps column shows what is ready apart from the rest.
+  it('counts a ready step once, and never one that is blocked', () => {
+    expect(
+      planProgress([
+        { ...at('not_started', 'a'), ready: true },
+        { ...at('not_started', 'b'), ready: false },
+        { ...at('blocked', 'c'), ready: true },
+      ]),
+    ).toMatchObject({ ready: 1, blocked: 1, live: 3 });
   });
 });
 
@@ -1529,6 +1541,17 @@ describe('searchSections', () => {
   it('finds a step by its number, with or without the hash', () => {
     expect(countMatches(searchSections(plan(), '400'))).toBe(1);
     expect(countMatches(searchSections(plan(), '#400'))).toBe(1);
+  });
+
+  // Note 843f7506: a link to one step arrives filtered to that step alone.
+  it('takes a hashed number as that step exactly, not as text', () => {
+    const sections = tree([
+      item({ id: 'a', number: 81, title: 'The one' }),
+      item({ id: 'b', number: 812, title: 'Not this', detail: 'Mentions #81 in passing' }),
+    ]);
+
+    expect(titles(searchSections(sections, '#81'))).toEqual(['The one']);
+    expect(countMatches(searchSections(sections, '81'))).toBe(2);
   });
 
   it('requires every term, across any of the fields', () => {

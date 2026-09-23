@@ -25,6 +25,13 @@ export type PlanProgress = {
   done: number;
   inProgress: number;
   blocked: number;
+  /**
+   * Steps nothing is holding up, so the next session can take them: not
+   * started, nothing they wait on still open. Counted apart from `blocked`, so
+   * a step is never in both. Zero where the items carry no `ready` of their
+   * own.
+   */
+  ready: number;
   /** Steps that count toward the total: everything not dropped. */
   live: number;
   /** 0 to 1 over the live steps, or null when there are none to be through. */
@@ -207,6 +214,8 @@ export function planProgress(
     dismissedAt?: string | null;
     /** Read by `isBlocked` for the blocked count. Absent reads as `outside`. */
     blockKind?: PlanBlockKind | null;
+    /** Whether the step is ready, where it has been worked out (`isReady`). */
+    ready?: boolean;
   }[],
 ): PlanProgress {
   // A dismissed question is out of the denominator with the proposals and the
@@ -221,11 +230,15 @@ export function planProgress(
   const done = live.filter((item) => item.status === 'done').length;
   const inProgress = live.filter((item) => item.status === 'in_progress').length;
   const blocked = live.filter((item) => isBlocked(item)).length;
+  const ready = live.filter(
+    (item) => item.ready === true && item.status === 'not_started' && !isBlocked(item),
+  ).length;
 
   return {
     done,
     inProgress,
     blocked,
+    ready,
     live: live.length,
     fraction: live.length === 0 ? null : done / live.length,
   };
@@ -1262,7 +1275,14 @@ function matchesQuery(node: PlanNode, terms: readonly string[]): boolean {
   const haystack = [`#${node.number}`, node.outline, node.title, node.detail ?? '']
     .join(' ')
     .toLowerCase();
-  return terms.every((term) => haystack.includes(term));
+  return terms.every((term) => {
+    // `#812` is that step and no other (note 843f7506): read as text it also
+    // found #8120, and any detail that mentioned 812 in passing, so a link to
+    // one step arrived at several.
+    const number = /^#(\d+)$/.exec(term);
+    if (number) return node.number === Number(number[1]);
+    return haystack.includes(term.replace(/^#/, ''));
+  });
 }
 
 /** A query split into the terms every step has to carry. Empty when blank. */
@@ -1270,8 +1290,7 @@ export function searchTerms(query: string): string[] {
   return query
     .toLowerCase()
     .split(/\s+/)
-    .map((term) => term.replace(/^#/, ''))
-    .filter(Boolean);
+    .filter((term) => term.replace(/^#/, '') !== '');
 }
 
 /** A whole subtree kept for context, so nothing under a hit reads as a hit. */

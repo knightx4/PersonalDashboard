@@ -227,7 +227,7 @@ const WANTS_AN_ANSWER =
  * switch to throw, finished by doing it rather than by saying anything.
  */
 const NAMES_A_JOB =
-  /^(set|add|create|make|install|enable|allow|grant|connect|configure|apply|run|rotate|buy|register|sign|upload|deploy|verify|invite|link|generate|issue|provide|supply|put)\b|\b(token|api key|secret|credential|password|env(ironment)? var(iable)?|allowlist|network access|billing)\b/i;
+  /^(set|add|create|make|install|enable|allow|grant|connect|configure|apply|run|rotate|buy|register|sign|upload|deploy|verify|invite|link|generate|issue|provide|supply|put)\b|\b(token|api key|secret|credential|password|env(ironment)? var(iable)?|allowlist|network access|billing|usage limit|rate limit|spend(ing)? limit|quota|credits)\b/i;
 
 /**
  * Whether a blocked step is a job for you rather than a question.
@@ -239,6 +239,10 @@ const NAMES_A_JOB =
  * so the ask is what decides. A job is named outright and asks nothing back;
  * anything short of that is a question, because a question drawn as a chore
  * is the mistake the note was about.
+ *
+ * Note 09ca992e: a step stopped on the Anthropic usage limit (#811, #812) was
+ * drawn as a question. Raising a limit is a job like adding a token, so the
+ * account limits are named here alongside it.
  */
 export function isJobForYou(ask: string | null): boolean {
   if (!ask) return false;
