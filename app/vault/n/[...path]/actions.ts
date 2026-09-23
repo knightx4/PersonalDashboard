@@ -4,7 +4,9 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
 import { acceptNoteMap } from '@/lib/vault/map/accept';
+import { embedMapRowsAfterResponse } from '@/lib/vault/map/embed';
 import { proposeNoteMap } from '@/lib/vault/map/extract';
 import { keepTickedMap } from '@/lib/vault/map/keep';
 import { noteMapSchema, type NoteMapProposal } from '@/lib/vault/map/proposal';
@@ -87,7 +89,7 @@ export async function acceptMap(
   _prev: AcceptMapState,
   formData: FormData,
 ): Promise<AcceptMapState> {
-  await requireUser();
+  const user = await requireUser();
 
   const input = AcceptInput.safeParse({
     notePath: formData.get('notePath') ?? '',
@@ -132,6 +134,9 @@ export async function acceptMap(
     map,
   });
   if (!result.ok) return { error: result.detail };
+
+  // The new themes and positions get their vectors once this has answered.
+  embedMapRowsAfterResponse(supabase, await createCoreClient(), user.id);
 
   return { added: addedSentence(result) };
 }

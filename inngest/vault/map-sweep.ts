@@ -7,6 +7,7 @@ import { recordSpend } from '@/lib/core/spend/record';
 import type { LearnOperation } from '@/lib/learn/spend';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { acceptNoteMap } from '@/lib/vault/map/accept';
+import { embedMapRows, type MapEmbedResult } from '@/lib/vault/map/embed';
 import { proposeNoteMap, type MapNote } from '@/lib/vault/map/extract';
 import { runSweepSlice, type SweepNoteRow, type SweepPorts } from '@/lib/vault/map/sweep';
 import { loadThemeNames } from '@/lib/vault/map/themes';
@@ -30,6 +31,13 @@ export const SWEEP_BUDGET_MS = 240_000;
  */
 const LEASE_MS = 310_000;
 
+/**
+ * When, from the start of a call, embedding stops starting new chunks. After
+ * the sweeps and inside the route's 300-second limit, with room for the chunk
+ * in flight.
+ */
+export const EMBED_UNTIL_MS = 280_000;
+
 const OPERATION: LearnOperation = 'map-sweep';
 
 type SweepRow = { id: string; user_id: string; after_path: string | null; notes_total: number | null };
@@ -39,11 +47,23 @@ export type MapSweepTickSummary = {
   reached: number;
   finished: number;
   failed: { sweepId: string; error: string }[];
+  /**
+   * Themes and positions given a vector after the sweeps (plan #810): the
+   * backfill, and the rows this call's sweeps accepted. Null when it threw.
+   */
+  embedded: Pick<MapEmbedResult, 'themes' | 'positions' | 'stopped'> | null;
 };
 
 export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
+  const startedAt = Date.now();
   const supabase = createVaultServiceSupabase();
-  const summary: MapSweepTickSummary = { sweeps: 0, reached: 0, finished: 0, failed: [] };
+  const summary: MapSweepTickSummary = {
+    sweeps: 0,
+    reached: 0,
+    finished: 0,
+    failed: [],
+    embedded: null,
+  };
 
   const nowIso = new Date().toISOString();
   const { data, error } = await supabase
@@ -69,6 +89,23 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
         .update({ last_error: message, lease_until: null, updated_at: new Date().toISOString() })
         .eq('id', id);
     }
+  }
+
+  // Every account's rows with no vector, whether a sweep ran or not. Without
+  // EMBEDDING_API_KEY this stops at once with reason `no-key` and spends
+  // nothing.
+  try {
+    const embedded = await embedMapRows(supabase, createCoreServiceSupabase(), {
+      userId: null,
+      deadline: startedAt + EMBED_UNTIL_MS,
+    });
+    summary.embedded = {
+      themes: embedded.themes,
+      positions: embedded.positions,
+      stopped: embedded.stopped,
+    };
+  } catch (err) {
+    console.error('[map sweep] embedding', err instanceof Error ? err.message : err);
   }
 
   return summary;

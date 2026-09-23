@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/inngest/vault/map-sweep', () => ({
-  runMapSweepTick: vi.fn(async () => ({ sweeps: 0, reached: 0, finished: 0, failed: [] })),
+  runMapSweepTick: vi.fn(async () => ({ sweeps: 0, reached: 0, finished: 0, failed: [], embedded: null })),
 }));
 
 const { GET, POST } = await import('@/app/api/cron/map-sweep/route');
@@ -42,7 +42,7 @@ describe('the map sweep route', () => {
   it('works the sweeps for the secret the cron job carries', async () => {
     const response = await POST(tickRequest('secret-token'));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, sweeps: 0, reached: 0, finished: 0, failed: [] });
+    expect(await response.json()).toEqual({ ok: true, sweeps: 0, reached: 0, finished: 0, failed: [], embedded: null });
     expect(runMapSweepTick).toHaveBeenCalled();
   });
 });

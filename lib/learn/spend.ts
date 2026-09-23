@@ -107,6 +107,10 @@ export const LEARN_OPERATIONS = [
   // call per picked row, dropped or not, recorded through the service role
   // from the top-up against the account the card belongs to.
   'write-feed-card',
+  // Embedding vault themes and positions so the merge passes can find two
+  // names for one subject (plan #810). Recorded against the account whose
+  // rows were embedded, from the map sweep's cron tick and after an accept.
+  'embed-map',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
