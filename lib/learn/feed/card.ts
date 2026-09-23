@@ -210,9 +210,9 @@ export const FEED_PAGE = 5;
  *
  * `writing`: fewer than `low` cards are ready, so the top-up is running (the
  * action that loaded the page started it) and more will arrive.
- * `passed`: plenty are ready but you have been through all of them this
- * visit. They are the cards you scrolled past without pressing anything, and
- * they come back next time.
+ * `passed`: plenty are ready but all of them are already on the screen this
+ * visit. The ones you have not scrolled past or pressed Next on are still
+ * ready, and they come back next time.
  */
 export function feedEnd(ready: number, low: number): 'writing' | 'passed' {
   return ready < low ? 'writing' : 'passed';
