@@ -415,6 +415,9 @@ function DeckCard({
             {card.title}
           </h2>
 
+          {/* What this is about, before anything argues about it: the card
+              has to stand on its own for someone who never saw the source. */}
+          {card.context && <p className="mt-3 text-body text-ink">{card.context}</p>}
           {card.hook && <p className="mt-3 text-body font-semibold text-ink">{card.hook}</p>}
           <p className="mt-2 text-body text-ink">{card.summary}</p>
 

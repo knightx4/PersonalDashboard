@@ -19,7 +19,7 @@ import {
  */
 
 const CARD_SELECT =
-  'id, reason, status, summary, why, hook, example, check_question, check_answer, depth, ' +
+  'id, reason, status, summary, why, context, hook, example, check_question, check_answer, depth, ' +
   'item:catalogue_items!feed_cards_item_id_fkey(title, canonical_url, licence), ' +
   'segment:catalogue_segments!feed_cards_segment_id_fkey(heading, text, section_anchor)';
 
@@ -41,7 +41,10 @@ function returnCutoff(status: 'review' | 'skipped', now: number): string {
  *
  * Only cards with a hook: a card written before cards carried one is the
  * summary-only card the owner asked to stop seeing (LEARN-NOW-SPEC, "Cards
- * after the first week").
+ * after the first week"). A ready card also needs its context paragraph, so
+ * new cards always open by saying what they are about; a card coming back
+ * after a skip or "work on this" is shown without one if it was written
+ * before the paragraph existed.
  */
 export async function loadFeedPage(
   supabase: LearnSupabaseClient,
@@ -56,11 +59,23 @@ export async function loadFeedPage(
     taken: string[],
   ): Promise<FeedCardRow[]> => {
     if (count <= 0) return [];
-    let query = supabase.from('feed_cards').select(CARD_SELECT).eq('status', status).not('hook', 'is', null);
-    query =
-      status === 'ready'
-        ? query.order('written_at', { ascending: false, nullsFirst: false })
-        : query.lt('acted_at', returnCutoff(status, now)).order('acted_at', { ascending: true });
+    // A new ready card needs its context paragraph; a returning one does not.
+    // Written as one `or` because a second `.not` here makes the query
+    // builder's types recurse too deeply; `id` is never null, so the other
+    // branch lets every row through.
+    let query = supabase
+      .from('feed_cards')
+      .select(CARD_SELECT)
+      .eq('status', status)
+      .not('hook', 'is', null)
+      .or(status === 'ready' ? 'context.not.is.null' : 'id.not.is.null');
+    if (status === 'ready') {
+      query = query.order('written_at', { ascending: false, nullsFirst: false });
+    } else {
+      query = query
+        .lt('acted_at', returnCutoff(status, now))
+        .order('acted_at', { ascending: true });
+    }
     const leaveOut = [...skip, ...taken];
     if (leaveOut.length > 0) query = query.not('id', 'in', `(${leaveOut.join(',')})`);
     const { data, error } = await query.order('id').limit(count);
@@ -71,7 +86,13 @@ export async function loadFeedPage(
 
   const rows: FeedCardRow[] = [];
   for (const status of ['review', 'ready', 'skipped'] as const) {
-    rows.push(...(await read(status, limit - rows.length, rows.map((row) => row.id))));
+    rows.push(
+      ...(await read(
+        status,
+        limit - rows.length,
+        rows.map((row) => row.id),
+      )),
+    );
   }
   return rows.flatMap((row) => {
     const card = toFeedCard(row);
@@ -85,7 +106,8 @@ export async function countReadyCards(supabase: LearnSupabaseClient): Promise<nu
     .from('feed_cards')
     .select('id', { count: 'exact', head: true })
     .eq('status', 'ready')
-    .not('hook', 'is', null);
+    .not('hook', 'is', null)
+    .not('context', 'is', null);
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) return 0;
   return count ?? 0;

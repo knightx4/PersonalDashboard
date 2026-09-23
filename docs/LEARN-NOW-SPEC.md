@@ -242,14 +242,19 @@ card without the first three is dropped:
 
 | Part | What it is |
 |---|---|
-| Hook | One or two sentences, first on the card: the most interesting thing in the section, stated concretely. Never a definition. |
+| Context | One paragraph, first on the card: what the subject is, where and when it sits, who the people and works it mentions are, and any term the rest relies on. Written at the card's depth, in plain words, and may draw on well-established knowledge. Added after the owner found a card that opened on "the section argues, following Eisenstein" with no word on who Eisenstein was. |
+| Hook | One or two sentences after the context: the most interesting thing in the section, stated concretely. Never a definition. |
 | Summary | Two or three sentences from the section's text alone. |
 | In practice | The idea applied to one specific case, or a worked calculation. The model may use what it knows here, and only this part. |
 | Try this | A question that makes you use the idea, with the answer behind a tap. Left off when the model writes no answer. |
 
+No part may refer to "the section", "the article" or "the text": the reader has not seen them, and the card has to stand on its own.
+
 The section's own text is folded under "Read the section". This overturns the
 earlier rule that the summary uses only the fetched text: the owner asked for
 applied material, and a Wikipedia section rarely carries a worked case.
+
+A card written before the context paragraph existed is not served as a new ready card, and does not count towards the twenty, so the top-up replaces it; if one comes back after a skip or "work on this" it is shown without the paragraph.
 
 Cards written before this have no hook. They are no longer shown and no longer
 count towards the twenty kept ready, so the top-up replaces them. Their rows
