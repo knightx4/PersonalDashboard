@@ -90,4 +90,9 @@ describe('the shortcut', () => {
     expect(html).toContain('⌘K');
     expect(html).toContain('aria-keyshortcuts="Meta+K Control+K"');
   });
+
+  it('hides the cap until a modifier is held, like every other hint', () => {
+    const html = render('jobs');
+    expect(html).toMatch(/<kbd[^>]*class="keyhint [^"]*"[^>]*>⌘K<\/kbd>/);
+  });
 });

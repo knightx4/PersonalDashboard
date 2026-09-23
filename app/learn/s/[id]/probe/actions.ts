@@ -15,6 +15,7 @@ import {
   probesFor,
   recordAnswer,
   recordAppliedCase,
+  recordDontKnow,
   recordProbe,
   recordWrittenAnswer,
   setMisconception,
@@ -61,6 +62,8 @@ export type AskState = {
     reason: string;
     correctIndex?: number;
     chosenIndex?: number;
+    /** Answered with "I don't know": a miss with nothing picked. */
+    dontKnow?: boolean;
     /** What was typed, and the answer the case was written with. Applied only. */
     response?: string;
     expected?: string;
@@ -280,21 +283,34 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
     });
   }
 
-  const parsed = PickedAnswer.safeParse({ chosenIndex: formData.get('chosenIndex') });
-  if (!parsed.success) return { ...prev, error: 'Could not work out what you picked.' };
+  // "I don't know" (note a62b132f): a miss with nothing picked. Weighed and
+  // settled the way a wrong pick is, with nothing to name as a misconception.
+  const parsed =
+    formData.get('dontKnow') === '1'
+      ? null
+      : PickedAnswer.safeParse({ chosenIndex: formData.get('chosenIndex') });
+  if (parsed && !parsed.success) return { ...prev, error: 'Could not work out what you picked.' };
+
+  // Only for a concept with no checks. One that carries them is weighed by
+  // what earlier answers did with the check this question aimed at, and
+  // whether the concept as a whole was settled decides nothing.
+  const wasSettled = concept !== undefined && concept.mastery.length === 0 && isSettled(concept);
 
   let outcome;
   try {
-    outcome = await recordAnswer(supabase, user.id, {
-      probeId: asked.data.probeId,
-      conceptId: asked.data.conceptId,
-      chosenIndex: parsed.data.chosenIndex,
-      // Only for a concept with no checks. One that carries them is weighed by
-      // what earlier answers did with the check this question aimed at, and
-      // whether the concept as a whole was settled decides nothing.
-      wasSettled: concept !== undefined && concept.mastery.length === 0 && isSettled(concept),
-      graph,
-    });
+    outcome = parsed
+      ? await recordAnswer(supabase, user.id, {
+          probeId: asked.data.probeId,
+          conceptId: asked.data.conceptId,
+          chosenIndex: parsed.data.chosenIndex,
+          wasSettled,
+          graph,
+        })
+      : await recordDontKnow(supabase, user.id, {
+          probeId: asked.data.probeId,
+          conceptId: asked.data.conceptId,
+          wasSettled,
+        });
   } catch (error) {
     return { ...prev, error: error instanceof Error ? error.message : 'Could not save that.' };
   }
@@ -378,7 +394,8 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
       reason: outcome.reason,
       weight: outcome.weight,
       correctIndex: answeredRow?.correctIndex ?? -1,
-      chosenIndex: parsed.data.chosenIndex,
+      chosenIndex: parsed?.data.chosenIndex,
+      dontKnow: parsed === null || undefined,
       misconception,
       couldGoDeeper,
     },

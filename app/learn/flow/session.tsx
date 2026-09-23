@@ -90,6 +90,26 @@ function TrackBar({ name, move }: { name?: string; move: TrackMove }) {
   );
 }
 
+/**
+ * "I don't know" (note a62b132f): a submit on the answer form carrying no
+ * index. It counts as a miss, and the right answer and its reason come back
+ * the same as after a wrong pick.
+ */
+function DontKnowButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      name="dontKnow"
+      value="1"
+      disabled={pending}
+      className="text-ui text-ink-muted underline-offset-2 hover:text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-70"
+    >
+      I don&rsquo;t know
+    </button>
+  );
+}
+
 function StartButton() {
   const { pending } = useFormStatus();
   // One call to write the track's ideas and one to write its first question,
@@ -257,12 +277,21 @@ export function FlowSession({ first, track }: { first: FlowState; track: FlowTra
         <input type="hidden" name="subjectId" value={live.subjectId} />
 
         <ProbeOptions options={live.options} answered={live.answered ?? null} />
+        {!live.answered && (
+          <div className="pt-1">
+            <DontKnowButton />
+          </div>
+        )}
       </form>
 
       {live.answered && (
         <div className="mt-4 border-t border-border pt-4">
           <p className="text-ui font-semibold text-ink">
-            {live.answered.correct ? 'Right.' : 'Not this time.'}
+            {live.answered.correct
+              ? 'Right.'
+              : live.answered.dontKnow
+                ? 'Counted as a miss. The answer is ticked.'
+                : 'Not this time.'}
           </p>
           {/* Written when the question was, not in response to what was
               picked. That is what makes it worth reading. */}

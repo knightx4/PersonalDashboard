@@ -150,10 +150,16 @@ export type AskedRung = {
   /** Null on a written row, which has no options and no index that is right. */
   correctIndex: number | null;
   responseCorrect: boolean | null;
+  /**
+   * Answered by saying you did not know (note a62b132f). Multiple choice only,
+   * with nothing picked, so it reads as a miss everywhere a wrong pick would.
+   */
+  dontKnow?: boolean;
 };
 
 /** Whether a question has been answered at all. */
 export function wasAnswered(probe: AskedRung): boolean {
+  if (probe.dontKnow) return true;
   return probe.rung === 'recognise' ? probe.chosenIndex !== null : probe.responseCorrect !== null;
 }
 
