@@ -36,11 +36,26 @@ const nextConfig: NextConfig = {
   },
 
   async redirects() {
-    return MOVED_TO_SHOPPING.map((section) => ({
-      source: `/${section}/:path*`,
-      destination: `/shopping/${section}/:path*`,
-      permanent: false,
-    }));
+    return [
+      ...MOVED_TO_SHOPPING.map((section) => ({
+        source: `/${section}/:path*`,
+        destination: `/shopping/${section}/:path*`,
+        permanent: false,
+      })),
+      /**
+       * News opens on Quick read and the newsletter list moved to /news/all
+       * (#848). A list filtered to one sender was /news?from=, so that still
+       * reaches the list; the query is carried across. Quick read itself was
+       * /news/quick for a day, and that comes back to /news.
+       */
+      {
+        source: '/news',
+        has: [{ type: 'query' as const, key: 'from' }],
+        destination: '/news/all',
+        permanent: false,
+      },
+      { source: '/news/quick', destination: '/news', permanent: false },
+    ];
   },
 };
 

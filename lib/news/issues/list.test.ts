@@ -91,7 +91,7 @@ describe('countLabel', () => {
 describe('issueReturn', () => {
   it('goes back to the whole list when that is where you were', () => {
     expect(issueReturn(undefined, paper)).toEqual({
-      href: '/news',
+      href: '/news/all',
       label: 'Newsletters',
       from: null,
     });
@@ -99,15 +99,15 @@ describe('issueReturn', () => {
 
   it('goes back to the sender list when that is where you were', () => {
     expect(issueReturn('s1', paper)).toEqual({
-      href: '/news?from=s1',
+      href: '/news/all?from=s1',
       label: 'The Paper',
       from: 's1',
     });
   });
 
   it('ignores a filter that names another sender, or none at all', () => {
-    expect(issueReturn('s2', paper).href).toBe('/news');
-    expect(issueReturn('s1', null).href).toBe('/news');
+    expect(issueReturn('s2', paper).href).toBe('/news/all');
+    expect(issueReturn('s1', null).href).toBe('/news/all');
   });
 });
 
