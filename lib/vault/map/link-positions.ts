@@ -135,9 +135,9 @@ For every relation but none, say which side the edge runs from, reading the
 definitions above with that side as A. "from": "B" with "supports" means B is
 part of why A is true.
 
-Give one short line for every pair saying what the relation actually is, or
-why there is none; for an edge it is shown on the map as the edge's
-description. Give a confidence from 0 to 1.`;
+For an edge, give a reason of at most twelve words saying what the relation
+actually is; it is shown on the map as the edge's description. For none, give
+no reason. Give a confidence from 0 to 1.`;
 
 /** The user message: the pairs, numbered from 1 as the model sees them. */
 export function renderLinkPairs(pairs: LinkPair[]): string {
@@ -154,7 +154,7 @@ const verdictSchema = z.object({
   pair: z.number().int(),
   relation: z.enum(RELATIONS),
   from: z.enum(['A', 'B']).nullish(),
-  reason: z.string(),
+  reason: z.string().nullish(),
   confidence: z.number(),
 });
 
@@ -164,9 +164,9 @@ const replySchema = z.object({ verdicts: z.array(z.unknown()) });
  * The verdicts the model reported, keyed back to the pairs sent.
  *
  * The model numbers pairs from 1. A verdict for a pair that was not sent, a
- * second verdict for one pair, an unknown relation, an edge with no direction
- * and one with no reason are all dropped, and the pair stays unjudged for a
- * later call.
+ * second verdict for one pair, an unknown relation, and an edge with no
+ * direction or no reason are all dropped, and the pair stays unjudged for a
+ * later call. A `none` carries no reason, since nothing shows one.
  */
 export function parseLinkVerdicts(input: unknown, pairCount: number): LinkVerdict[] {
   const reply = replySchema.safeParse(input);
@@ -179,11 +179,10 @@ export function parseLinkVerdicts(input: unknown, pairCount: number): LinkVerdic
     if (!parsed.success) continue;
     const index = parsed.data.pair - 1;
     if (index < 0 || index >= pairCount || seen.has(index)) continue;
-    const reason = parsed.data.reason.trim();
-    if (reason === '') continue;
     const relation = parsed.data.relation;
+    const reason = relation === 'none' ? '' : (parsed.data.reason?.trim() ?? '');
     const from = relation === 'none' ? null : (parsed.data.from ?? null);
-    if (relation !== 'none' && from === null) continue;
+    if (relation !== 'none' && (from === null || reason === '')) continue;
     seen.add(index);
     verdicts.push({
       pair: index,
@@ -280,7 +279,7 @@ export async function judgeLinkPairs(input: {
   try {
     const response = await client.messages.create({
       model: MERGE_MODEL,
-      // About sixty tokens a verdict, with room for a longer line.
+      // About forty tokens a verdict, with room for a longer line.
       max_tokens: 200 + input.pairs.length * 120,
       system: LINK_SYSTEM,
       tools: [
@@ -302,10 +301,13 @@ export async function judgeLinkPairs(input: {
                       enum: ['A', 'B'],
                       description: 'The side the edge runs from. Omit for none.',
                     },
-                    reason: { type: 'string' },
+                    reason: {
+                      type: 'string',
+                      description: 'For an edge: at most twelve words. Omit for none.',
+                    },
                     confidence: { type: 'number' },
                   },
-                  required: ['pair', 'relation', 'reason', 'confidence'],
+                  required: ['pair', 'relation', 'confidence'],
                 },
               },
             },

@@ -93,8 +93,8 @@ For same, give the name the merged theme should carry. Usually that is
 whichever of the two names already covers both. Coin a new name only when
 neither does, and keep it as short as the names you were shown.
 
-Give one short sentence of reason for every pair; it is shown to the person.
-Give a confidence from 0 to 1.`;
+For same, give a reason of at most twelve words; it is shown to the person
+beside the merge. For different, give no reason. Give a confidence from 0 to 1.`;
 
 /** The user message: the pairs, numbered from 1 as the model sees them. */
 export function renderPairs(pairs: ThemePair[]): string {

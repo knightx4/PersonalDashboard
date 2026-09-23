@@ -76,7 +76,7 @@ const verdictSchema = z.object({
   pair: z.number().int(),
   same: z.boolean(),
   name: z.string().nullish(),
-  reason: z.string(),
+  reason: z.string().nullish(),
   confidence: z.number(),
 });
 
@@ -86,8 +86,10 @@ const replySchema = z.object({ verdicts: z.array(z.unknown()) });
  * The verdicts the model reported, keyed back to the pairs sent.
  *
  * The model numbers pairs from 1. A verdict for a pair that was not sent, a
- * second verdict for one pair, a malformed entry and one with no reason are
- * all dropped, and the pair stays unjudged for the next run to ask again.
+ * second verdict for one pair, a malformed entry and a `same` with no reason
+ * are all dropped, and the pair stays unjudged for the next run to ask again.
+ * A `different` carries no reason: nothing shows one, and asking for it was
+ * most of what these calls cost.
  */
 export function parseVerdicts(input: unknown, pairCount: number): MergeVerdict[] {
   const reply = replySchema.safeParse(input);
@@ -100,8 +102,8 @@ export function parseVerdicts(input: unknown, pairCount: number): MergeVerdict[]
     if (!parsed.success) continue;
     const index = parsed.data.pair - 1;
     if (index < 0 || index >= pairCount || seen.has(index)) continue;
-    const reason = parsed.data.reason.trim();
-    if (reason === '') continue;
+    const reason = parsed.data.same ? (parsed.data.reason?.trim() ?? '') : '';
+    if (parsed.data.same && reason === '') continue;
     seen.add(index);
     const name = parsed.data.name?.trim() || null;
     verdicts.push({
@@ -260,7 +262,7 @@ export async function judgePairs(input: {
   try {
     const response = await client.messages.create({
       model: MERGE_MODEL,
-      // About sixty tokens a verdict, with room for a longer reason.
+      // About forty tokens a verdict, with room for a longer reason.
       max_tokens: 200 + input.pairCount * 120,
       system: input.system,
       tools: [
@@ -278,10 +280,13 @@ export async function judgePairs(input: {
                     pair: { type: 'integer', description: 'The pair number, from 1.' },
                     same: { type: 'boolean' },
                     name: { type: 'string', description: input.nameDescription },
-                    reason: { type: 'string' },
+                    reason: {
+                      type: 'string',
+                      description: 'When same: at most twelve words. Omit when different.',
+                    },
                     confidence: { type: 'number' },
                   },
-                  required: ['pair', 'same', 'reason', 'confidence'],
+                  required: ['pair', 'same', 'confidence'],
                 },
               },
             },

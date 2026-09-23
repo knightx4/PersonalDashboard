@@ -60,11 +60,11 @@ describe('parseLinkVerdicts', () => {
       ),
     ).toEqual([
       { pair: 0, relation: 'supports', from: 'B', reason: 'B is why A holds.', confidence: 0.8 },
-      { pair: 1, relation: 'none', from: null, reason: 'Only the subject is shared.', confidence: 1 },
+      { pair: 1, relation: 'none', from: null, reason: '', confidence: 1 },
     ]);
   });
 
-  it('drops an edge with no direction, an unknown relation, a repeat, an empty reason and a pair not sent', () => {
+  it('drops an edge with no direction or an empty reason, an unknown relation, a repeat and a pair not sent', () => {
     expect(
       parseLinkVerdicts(
         {
@@ -73,13 +73,17 @@ describe('parseLinkVerdicts', () => {
             { pair: 1, relation: 'mentions', from: 'A', reason: 'Closed type.', confidence: 0.5 },
             { pair: 2, relation: 'qualifies', from: 'A', reason: 'A bounds B.', confidence: 0.5 },
             { pair: 2, relation: 'supports', from: 'A', reason: 'Second answer.', confidence: 0.5 },
-            { pair: 3, relation: 'none', reason: '  ', confidence: 0.5 },
-            { pair: 4, relation: 'none', reason: 'Not sent.', confidence: 0.5 },
+            { pair: 3, relation: 'supports', from: 'A', reason: '  ', confidence: 0.5 },
+            { pair: 4, relation: 'none', confidence: 0.5 },
+            { pair: 5, relation: 'none', reason: 'Not sent.', confidence: 0.5 },
           ],
         },
-        3,
+        4,
       ).map((v) => [v.pair, v.relation]),
-    ).toEqual([[1, 'qualifies']]);
+    ).toEqual([
+      [1, 'qualifies'],
+      [3, 'none'],
+    ]);
   });
 
   it('reads nothing from a reply of the wrong shape', () => {

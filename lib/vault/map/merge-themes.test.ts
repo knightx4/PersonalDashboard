@@ -64,11 +64,27 @@ describe('parseVerdicts', () => {
     );
     expect(verdicts).toEqual([
       { pair: 0, same: true, name: 'Urbanism', reason: 'Both about cities.', confidence: 0.9 },
-      { pair: 1, same: false, name: null, reason: 'Different fields.', confidence: 0.7 },
+      { pair: 1, same: false, name: null, reason: '', confidence: 0.7 },
     ]);
   });
 
-  it('drops a pair not sent, a repeat, a malformed entry and an empty reason', () => {
+  it('keeps a different with no reason and drops the reason a different sends anyway', () => {
+    const verdicts = parseVerdicts(
+      {
+        verdicts: [
+          { pair: 1, same: false, confidence: 0.6 },
+          { pair: 2, same: false, reason: 'Two fields.', confidence: 0.6 },
+        ],
+      },
+      2,
+    );
+    expect(verdicts.map((v) => [v.pair, v.same, v.reason])).toEqual([
+      [0, false, ''],
+      [1, false, ''],
+    ]);
+  });
+
+  it('drops a pair not sent, a repeat, a malformed entry and a same with an empty reason', () => {
     const verdicts = parseVerdicts(
       {
         verdicts: [
@@ -82,7 +98,7 @@ describe('parseVerdicts', () => {
       },
       2,
     );
-    expect(verdicts.map((v) => [v.pair, v.reason])).toEqual([[0, 'first']]);
+    expect(verdicts.map((v) => [v.pair, v.same])).toEqual([[0, false]]);
   });
 
   it('clamps confidence into 0 to 1 and reads a reply with no verdicts as none', () => {
