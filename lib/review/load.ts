@@ -3,6 +3,14 @@ import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { connectedAccountIds, connectedInboxes } from '@/lib/core/inbox/accounts';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { orderItemsSummary } from '@/lib/orders/search';
+import {
+  buildOrderEvidence,
+  suggestOrdersForEmail,
+  SUGGESTABLE_CLASSIFICATIONS,
+  type LinkedMessage,
+  type OrderCandidate,
+  type SuggestOrder,
+} from '@/lib/orders/suggest-for-email';
 
 export const REVIEW_VIEWS = [
   { id: 'all', label: 'All' },
@@ -47,6 +55,12 @@ export type ReviewEmailRow = {
   gmailHref: string | null;
   inboxEmail: string | null;
   linkedOrderId: string | null;
+  /**
+   * Orders a shipping, delivery or return email probably belongs to, strongest
+   * first, at most three. Empty for every other kind of email and when nothing
+   * matched. Worked out on each load and never stored.
+   */
+  candidates: OrderCandidate[];
   sortAt: string;
 };
 
@@ -212,7 +226,17 @@ export async function loadReviewQueue(
     };
   });
 
-  const emailRows: ReviewEmailRow[] = (messagesResult.data ?? []).map((message) => {
+  const messages = messagesResult.data ?? [];
+  const suggestable = messages.filter((message) =>
+    SUGGESTABLE_CLASSIFICATIONS.has(message.classification as string),
+  );
+  const { orders: suggestOrders, linked } =
+    suggestable.length > 0
+      ? await loadCandidateInputs(supabase, userId, accountIds)
+      : { orders: [], linked: [] };
+  const evidenceByOrder = buildOrderEvidence(linked);
+
+  const emailRows: ReviewEmailRow[] = messages.map((message) => {
     const inboxEmail = inboxById.get(message.email_account_id as string) ?? null;
     const receivedAt = (message.received_at as string | null) ?? null;
     return {
@@ -236,6 +260,20 @@ export async function loadReviewQueue(
       }),
       inboxEmail,
       linkedOrderId: (message.resulting_order_id as string | null) ?? null,
+      candidates: SUGGESTABLE_CLASSIFICATIONS.has(message.classification as string)
+        ? suggestOrdersForEmail(
+            {
+              messageId: message.id as string,
+              threadId: (message.thread_id as string | null) ?? null,
+              subject: (message.subject as string | null) ?? null,
+              fromAddress: (message.from_address as string | null) ?? null,
+              replyToAddress: (message.reply_to_address as string | null) ?? null,
+              receivedAt,
+            },
+            suggestOrders,
+            evidenceByOrder,
+          )
+        : [],
       // Sorted newest first, so a message that never carried a received date
       // has nothing to sort by and goes to the bottom rather than the top.
       sortAt: receivedAt ?? '',
@@ -253,6 +291,67 @@ export async function loadReviewQueue(
   );
 
   return { rows, counts };
+}
+
+/** Most orders read when suggesting candidates, newest first. */
+const CANDIDATE_ORDER_LIMIT = 1000;
+
+/**
+ * The user's orders and every message already linked to one, which is all
+ * suggestOrdersForEmail needs. Read only when the queue holds an email that
+ * gets candidates. A failed read throws, for the reason given in
+ * loadReviewQueue: an empty list of suggestions looks the same as none found.
+ */
+async function loadCandidateInputs(
+  supabase: SupabaseClient,
+  userId: string,
+  accountIds: string[],
+): Promise<{ orders: SuggestOrder[]; linked: LinkedMessage[] }> {
+  const [ordersResult, linkedResult] = await Promise.all([
+    supabase
+      .from('orders')
+      .select('id, order_date, external_order_number, total_cents, currency, merchants ( name, domains )')
+      .eq('user_id', userId)
+      .is('deleted_at', null)
+      .order('order_date', { ascending: false })
+      .limit(CANDIDATE_ORDER_LIMIT),
+    supabase
+      .from('inbox_messages')
+      .select('id, resulting_order_id, thread_id, from_address, reply_to_address')
+      .in('email_account_id', accountIds)
+      .not('resulting_order_id', 'is', null),
+  ]);
+  if (ordersResult.error) {
+    throw new Error(`Review queue could not read orders to suggest: ${ordersResult.error.message}`);
+  }
+  if (linkedResult.error) {
+    throw new Error(
+      `Review queue could not read linked emails to suggest orders: ${linkedResult.error.message}`,
+    );
+  }
+
+  const orders: SuggestOrder[] = (ordersResult.data ?? []).map((order) => {
+    const merchant = Array.isArray(order.merchants) ? order.merchants[0] : order.merchants;
+    return {
+      id: order.id as string,
+      merchantName: (merchant?.name as string | undefined) ?? 'Unknown merchant',
+      merchantDomains: ((merchant?.domains as string[] | null | undefined) ?? []).filter(Boolean),
+      orderDate: order.order_date as string,
+      externalOrderNumber: (order.external_order_number as string | null) ?? null,
+      totalCents: order.total_cents as number,
+      currency: (order.currency as string | null) ?? 'USD',
+    };
+  });
+
+  const linked: LinkedMessage[] = (linkedResult.data ?? []).map((row) => ({
+    messageId: row.id as string,
+    orderId: row.resulting_order_id as string,
+    threadId: (row.thread_id as string | null) ?? null,
+    fromAddress: (row.from_address as string | null) ?? null,
+    replyToAddress: (row.reply_to_address as string | null) ?? null,
+  }));
+
+  return { orders, linked };
 }
 
 export function filterReviewRows(rows: ReviewRow[], view: ReviewView): ReviewRow[] {

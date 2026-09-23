@@ -48,6 +48,7 @@ describe('filterReviewRows', () => {
       gmailHref: null,
       inboxEmail: null,
       linkedOrderId: null,
+      candidates: [],
       sortAt: '2026-01-02',
     },
   ];
