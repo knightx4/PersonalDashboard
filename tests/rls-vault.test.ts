@@ -158,6 +158,12 @@ beforeAll(async () => {
     values (${userA}, 'theme', ${first}, ${second}, ${proposalA}, '{}', '{}')
     returning id`;
   mergeA = merge.id;
+
+  // What a reset did with that merge (plan #879). Written directly for the
+  // same reason.
+  await admin`
+    insert into map_merge_resets (user_id, reset, kind, merge_id, outcome, detail)
+    values (${userA}, 'plan #879', 'theme', ${mergeA}, 'failed', 'name-taken: taken')`;
 });
 
 afterAll(async () => {
@@ -185,6 +191,7 @@ describe('RLS coverage', () => {
       order by 1`;
     expect(rows.map((r) => r.tablename)).toEqual([
       'map_merge_proposals',
+      'map_merge_resets',
       'map_merges',
       'map_sweep_notes',
       'map_sweeps',
@@ -796,6 +803,15 @@ describe('the merge log, across users', () => {
     ).rejects.toThrow(/permission denied/);
     await expect(
       asUser(userA, (tx) => tx`delete from map_merges where id = ${mergeA}`),
+    ).rejects.toThrow(/permission denied/);
+  });
+
+  it('shows the owner what a reset did and another user nothing, and lets neither write it', async () => {
+    const own = await asUser(userA, (tx) => tx`select id from map_merge_resets`);
+    const other = await asUser(userB, (tx) => tx`select id from map_merge_resets`);
+    expect([own.length, other.length]).toEqual([1, 0]);
+    await expect(
+      asUser(userA, (tx) => tx`delete from map_merge_resets where merge_id = ${mergeA}`),
     ).rejects.toThrow(/permission denied/);
   });
 });
