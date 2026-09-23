@@ -201,7 +201,7 @@ export function BriefForm({
   }
 
   return (
-    <form action={propose} className={cn(cardVariants({ padding: 'standard' }), 'mt-6')}>
+    <form action={propose} className={cardVariants({ padding: 'standard' })}>
       {subjects.length > 0 && (
         <Field
           label="Which track?"
