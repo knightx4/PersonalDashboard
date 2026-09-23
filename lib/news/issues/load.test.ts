@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
-import { loadIssue } from './load';
+import { loadIssue, loadIssues } from './load';
 
 const BASE = {
   id: 'i1',
@@ -63,5 +63,46 @@ describe('loadIssue', () => {
     );
     expect(issue?.digest).toBeNull();
     expect(issue?.digestError).toBe('the model call timed out');
+  });
+});
+
+/** A client whose list read returns `rows`, recording the columns it asked for. */
+function listClient(rows: Record<string, unknown>[], asked: string[] = []): NewsSupabaseClient {
+  const query = {
+    contains: () => query,
+    order: () => query,
+    limit: async () => ({ data: rows, error: null }),
+  };
+  return {
+    from: () => ({
+      select: (columns: string) => {
+        asked.push(columns);
+        return query;
+      },
+    }),
+  } as unknown as NewsSupabaseClient;
+}
+
+const LIST_ROW = {
+  id: 'i1',
+  sender_id: 's1',
+  subject: 'Weekly',
+  received_at: '2026-09-23T08:00:00Z',
+  read_at: null,
+};
+
+describe('loadIssues', () => {
+  it('reads the summary line and carries it on the issue', async () => {
+    const asked: string[] = [];
+    const [issue] = await loadIssues(
+      listClient([{ ...LIST_ROW, summary_line: 'Rates held and oil fell.' }], asked),
+    );
+    expect(asked[0]).toContain('summary_line');
+    expect(issue.summaryLine).toBe('Rates held and oil fell.');
+  });
+
+  it('gives an issue without a summary line no line', async () => {
+    const [issue] = await loadIssues(listClient([{ ...LIST_ROW, summary_line: null }]));
+    expect(issue.summaryLine).toBeNull();
   });
 });

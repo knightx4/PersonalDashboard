@@ -28,6 +28,7 @@ function issue(id: string, senderId: string, over: Partial<NewsIssue> = {}): New
     subject: 'This week',
     receivedAt: '2026-05-01T09:00:00Z',
     readAt: null,
+    summaryLine: null,
     ...over,
   };
 }
