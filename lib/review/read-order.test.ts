@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { draftFromExtraction, summarizeReads, type ReadOutcome } from './read-order';
+import {
+  draftFromExtraction,
+  prefillFromDraft,
+  summarizeReads,
+  type OrderDraft,
+  type ReadOutcome,
+} from './read-order';
 
 const merchants = [
   { id: 'm-target', slug: 'target', name: 'Target', domains: ['target.com'] },
@@ -147,6 +153,72 @@ describe('summarizeReads', () => {
         { issue: 'no_extraction', count: 2 },
         { issue: 'reconcile', count: 1 },
       ],
+    });
+  });
+});
+
+describe('prefillFromDraft', () => {
+  const draft: OrderDraft = {
+    merchantId: 'm-target',
+    merchantName: 'Target',
+    orderDate: '2026-09-19',
+    externalOrderNumber: '102-3',
+    currency: 'USD',
+    lines: [
+      { name: 'Lamp', variant: null, quantity: 2, unitPriceCents: 1999, categoryId: 'c-home' },
+      { name: 'Bulb', variant: 'Warm', quantity: 1, unitPriceCents: 500, categoryId: 'c-gone' },
+    ],
+    taxCents: 350,
+    shippingCents: 0,
+    discountCents: 1000,
+    totalCents: 4848,
+    reconciled: true,
+    source: 'llm',
+    issues: [],
+  };
+  const options = {
+    merchantIds: new Set(['m-target']),
+    categoryIds: new Set(['c-home']),
+  };
+
+  it('fills every field the draft has, in the strings the inputs hold', () => {
+    expect(prefillFromDraft(draft, options)).toEqual({
+      merchantId: 'm-target',
+      merchantName: 'Target',
+      orderDate: '2026-09-19',
+      externalOrderNumber: '102-3',
+      currency: 'USD',
+      lines: [
+        { name: 'Lamp', variant: '', quantity: '2', unitPrice: '19.99', categoryId: 'c-home' },
+        { name: 'Bulb', variant: 'Warm', quantity: '1', unitPrice: '5.00', categoryId: '' },
+      ],
+      tax: '3.50',
+      shipping: '',
+      discount: '10.00',
+    });
+  });
+
+  it('falls back to the merchant name when the form does not offer the merchant', () => {
+    const prefill = prefillFromDraft(
+      { ...draft, merchantId: 'm-elsewhere' },
+      { ...options, merchantIds: new Set() },
+    );
+    expect(prefill.merchantId).toBeNull();
+    expect(prefill.merchantName).toBe('Target');
+  });
+
+  it('keeps merchant, date and order number when the email gave up no items', () => {
+    const prefill = prefillFromDraft(
+      { ...draft, lines: [], taxCents: 0, discountCents: 0, source: 'none', reconciled: false },
+      options,
+    );
+    expect(prefill).toMatchObject({
+      merchantId: 'm-target',
+      orderDate: '2026-09-19',
+      externalOrderNumber: '102-3',
+      lines: [],
+      tax: '',
+      discount: '',
     });
   });
 });

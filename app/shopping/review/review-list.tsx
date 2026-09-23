@@ -339,7 +339,15 @@ function EmailRow({
               Linked order
             </Link>
           )}
-          {!row.linkedOrderId && (
+          {!row.linkedOrderId && row.classification === 'order_confirmation' && (
+            <Link
+              href={`/shopping/orders/new?from_email=${row.messageId}`}
+              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+            >
+              Add from this email
+            </Link>
+          )}
+          {!row.linkedOrderId && row.classification !== 'order_confirmation' && (
             <Link
               href="/shopping/orders/new"
               className={buttonVariants({ variant: 'ghost', size: 'sm' })}
