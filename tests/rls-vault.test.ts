@@ -29,6 +29,7 @@ let positionA2 = '';
 let positionB = '';
 let sweepA = '';
 let proposalA = '';
+let mergeA = '';
 
 async function seedConnection(userId: string, tag: string): Promise<string> {
   const [row] = await admin<{ id: string }[]>`
@@ -129,6 +130,15 @@ beforeAll(async () => {
             0.8, 'same', ${first}, 'Urbanism', 'One subject.', 0.9, 'claude-haiku-4-5')
     returning id`;
   proposalA = proposal.id;
+
+  // A merge log row (plan #813). Written directly: the functions that write it
+  // are tests/vault-map-merge.test.ts's subject.
+  const [merge] = await admin<{ id: string }[]>`
+    insert into map_merges (user_id, kind, survivor_id, absorbed_id, proposal_id,
+                            survivor_before, absorbed)
+    values (${userA}, 'theme', ${first}, ${second}, ${proposalA}, '{}', '{}')
+    returning id`;
+  mergeA = merge.id;
 });
 
 afterAll(async () => {
@@ -156,6 +166,7 @@ describe('RLS coverage', () => {
       order by 1`;
     expect(rows.map((r) => r.tablename)).toEqual([
       'map_merge_proposals',
+      'map_merges',
       'map_sweep_notes',
       'map_sweeps',
       'notes',
@@ -204,7 +215,8 @@ describe('cross-user reads', () => {
     // The list page searches; the search must not be a way around the policy.
     const rows = await asUser(
       userB,
-      (tx) => tx`select id, body from notes where search_tsv @@ plainto_tsquery('english', 'quitting')`,
+      (tx) =>
+        tx`select id, body from notes where search_tsv @@ plainto_tsquery('english', 'quitting')`,
     );
     expect(rows).toHaveLength(0);
   });
@@ -307,9 +319,7 @@ describe('integrity the database enforces itself', () => {
     // The .md-only rule is enforced at the transport layer, where it stops the
     // bytes being fetched at all. This is the second line: if a bug ever gets
     // a photo this far, the row does not exist.
-    await expect(
-      seedNote(userA, connectionA, 'Attachments/photo.png', 'binary'),
-    ).rejects.toThrow();
+    await expect(seedNote(userA, connectionA, 'Attachments/photo.png', 'binary')).rejects.toThrow();
   });
 
   it('refuses an absolute path', async () => {
@@ -419,7 +429,10 @@ describe('the map, across users', () => {
     // that is dimmed for its owner is still theirs.
     await admin`update positions set ungrounded_at = now() where id = ${positionA2}`;
 
-    const theirs = await asUser(userB, (tx) => tx`select id from positions where id = ${positionA2}`);
+    const theirs = await asUser(
+      userB,
+      (tx) => tx`select id from positions where id = ${positionA2}`,
+    );
     expect(theirs).toHaveLength(0);
 
     const own = await asUser(userA, (tx) => tx`select id from positions where id = ${positionA2}`);
@@ -563,8 +576,10 @@ describe('the sweep, across users', () => {
     const seen = await asUser(userA, async (tx) => ({
       sweeps: (await tx`select id from map_sweeps`).length,
       notes: (await tx`select id from map_sweep_notes`).length,
-      counts: (await tx<{ c: { outcomes: Record<string, number> } }[]>`
-        select map_sweep_counts(${sweepA}) as c`)[0].c.outcomes,
+      counts: (
+        await tx<{ c: { outcomes: Record<string, number> } }[]>`
+        select map_sweep_counts(${sweepA}) as c`
+      )[0].c.outcomes,
     }));
     expect(seen).toEqual({ sweeps: 1, notes: 1, counts: { journal: 1 } });
   });
@@ -573,8 +588,10 @@ describe('the sweep, across users', () => {
     const seen = await asUser(userB, async (tx) => ({
       sweeps: (await tx`select id from map_sweeps where id = ${sweepA}`).length,
       notes: (await tx`select id from map_sweep_notes where sweep_id = ${sweepA}`).length,
-      counts: (await tx<{ c: { outcomes: Record<string, number> } }[]>`
-        select map_sweep_counts(${sweepA}) as c`)[0].c.outcomes,
+      counts: (
+        await tx<{ c: { outcomes: Record<string, number> } }[]>`
+        select map_sweep_counts(${sweepA}) as c`
+      )[0].c.outcomes,
     }));
     expect(seen).toEqual({ sweeps: 0, notes: 0, counts: {} });
   });
@@ -669,5 +686,24 @@ describe('merge proposals, across users', () => {
             values (${userA}, 'theme', ${row.a_id}, ${row.b_id}, 'x', 'y', 'trigram',
                     'different', 'r', 0.5, 'm')`,
     ).rejects.toThrow();
+  });
+});
+
+describe('the merge log, across users', () => {
+  it('shows the owner their merges and another user none', async () => {
+    const own = await asUser(userA, (tx) => tx`select id from map_merges`);
+    const other = await asUser(userB, (tx) => tx`select id from map_merges where id = ${mergeA}`);
+    expect([own.length, other.length]).toEqual([1, 0]);
+  });
+
+  it('lets nobody signed in write the log, the owner included', async () => {
+    // Only merge_themes, merge_positions and undo_map_merge write it; a row
+    // edited by hand would make undo put back something that never was.
+    await expect(
+      asUser(userA, (tx) => tx`update map_merges set undone_at = now() where id = ${mergeA}`),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      asUser(userA, (tx) => tx`delete from map_merges where id = ${mergeA}`),
+    ).rejects.toThrow(/permission denied/);
   });
 });

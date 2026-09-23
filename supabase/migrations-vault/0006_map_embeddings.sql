@@ -28,6 +28,11 @@
 
 set search_path = obsidian, public, extensions;
 
+-- learn/0022 creates the extension on the live project, but the vault
+-- migrations run before learn's when a database is built from the files
+-- (scripts/db-reset.sh), so this one cannot rely on it being there.
+create extension if not exists vector with schema extensions;
+
 alter table obsidian.themes
   add column embedding extensions.vector(1024),
   add column embedding_model text,
