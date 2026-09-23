@@ -961,10 +961,10 @@ export function tallyHealth(nodes: readonly PlanNode[], liveness?: PlanLiveness)
 /**
  * The order the progress bar draws its states in, left to right.
  *
- * Finished at the left and untouched at the right, with everything else
- * between them in the order work actually moves: done, an answered question,
- * underway, ready to pick up, then the stuck states and the ones sitting on
- * you, then not reached.
+ * Amber, blue, green (note 42aa1fa4), the three colours the health column
+ * gives these states: first everything that cannot be taken yet -- stuck, on
+ * you, waiting or not reached -- then what is ready or underway, then what is
+ * finished. The bar reads in the same order as the counts beside a feature.
  * A bar whose bands moved around as the counts changed would be a different
  * picture every week, so the order is fixed here and never sorted by size.
  *
@@ -973,15 +973,8 @@ export function tallyHealth(nodes: readonly PlanNode[], liveness?: PlanLiveness)
  * beside it into disagreement about how many steps a module has.
  */
 export const PLAN_BAND_ORDER: readonly PlanHealth[] = [
-  'done',
-  'answered',
-  'working',
-  'quiet',
-  'in_progress',
-  'ready',
-  // With the stuck states rather than with the underway ones: a claim whose
-  // run ended is not work in hand, it is a step waiting to be handed over
-  // again.
+  // A claim whose run ended is not work in hand, it is a step waiting to be
+  // handed over again, so it sits with the stuck states.
   'abandoned',
   'blocked',
   'unanswered',
@@ -991,6 +984,12 @@ export const PLAN_BAND_ORDER: readonly PlanHealth[] = [
   'setup',
   'waiting',
   'not_started',
+  'ready',
+  'in_progress',
+  'quiet',
+  'working',
+  'answered',
+  'done',
 ];
 
 /** One band of the progress bar: a state, and how much of the bar it owns. */
