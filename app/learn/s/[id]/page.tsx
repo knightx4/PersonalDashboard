@@ -153,11 +153,13 @@ function UnitSection({
           </span>
         </span>
       </div>
-      <p className="mt-1 text-ui text-ink-muted">{unit.covers}</p>
-      <p className="mt-1 text-ui text-ink">
-        <span className="text-ink-muted">By the end: </span>
-        {unit.outcome}
-      </p>
+      {unit.covers && <p className="mt-1 text-ui text-ink-muted">{unit.covers}</p>}
+      {unit.outcome && (
+        <p className="mt-1 text-ui text-ink">
+          <span className="text-ink-muted">By the end: </span>
+          {unit.outcome}
+        </p>
+      )}
 
       {row.state === 'not-opened' ? (
         // Opening a unit is the same goal form, pointed at the unit: its words

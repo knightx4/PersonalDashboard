@@ -39,10 +39,31 @@ function clean(value: string): string {
  *
  * `goal_unit` counts from 1 over what the model sent. It is mapped to the unit
  * kept at that place, and dropped when that unit was left out.
+ *
+ * With `fixed`, the person wrote the units themselves: their titles and their
+ * order are kept whatever the model sent, and the model's covers and outcome
+ * are matched to them by place. A unit the model wrote nothing for keeps an
+ * empty line rather than being dropped, since the person asked for it.
  */
-export function readCurriculum(input: unknown): CurriculumResult {
+export function readCurriculum(input: unknown, fixed?: readonly string[]): CurriculumResult {
   const parsed = payloadSchema.safeParse(input);
   if (!parsed.success) return { ok: false, detail: 'The curriculum did not match its schema.' };
+
+  if (fixed && fixed.length > 0) {
+    const units = fixed.slice(0, MAX_UNITS).map((title, index) => {
+      const written = parsed.data.units[index];
+      const covers = written ? clean(written.covers) : '';
+      const outcome = written ? clean(written.outcome) : '';
+      return {
+        title,
+        covers: covers.length <= MAX_TEXT ? covers : '',
+        outcome: outcome.length <= MAX_TEXT ? outcome : '',
+      };
+    });
+    const goal = parsed.data.goal_unit;
+    const goalUnit = goal && goal >= 1 && goal <= units.length ? goal - 1 : null;
+    return { ok: true, units, goalUnit };
+  }
 
   const units: CurriculumUnit[] = [];
   const seen = new Set<string>();
@@ -65,8 +86,30 @@ export function readCurriculum(input: unknown): CurriculumResult {
   return { ok: true, units, goalUnit };
 }
 
+/**
+ * The units a person wrote, one per line, as the form sends them. Bullets and
+ * numbering are taken off, blank lines and repeats dropped.
+ */
+export function parseOwnUnits(
+  text: string,
+): { ok: true; titles: string[] } | { ok: false; detail: string } {
+  const seen = new Set<string>();
+  const titles: string[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const title = clean(line.replace(/^\s*(?:[-*\u2022]|\d+[.)])\s*/, ''));
+    if (!title || seen.has(title.toLowerCase())) continue;
+    if (title.length > MAX_TITLE)
+      return { ok: false, detail: `"${title.slice(0, 40)}…" is too long for a unit title.` };
+    seen.add(title.toLowerCase());
+    titles.push(title);
+  }
+  if (titles.length > MAX_UNITS)
+    return { ok: false, detail: `A curriculum holds at most ${MAX_UNITS} units.` };
+  return { ok: true, titles };
+}
+
 /** What a unit's chain is asked for, when it is opened. */
 export function unitGoal(unit: Pick<CurriculumUnit, 'title' | 'outcome'>): string {
-  const text = `${unit.title}: ${unit.outcome}`;
+  const text = unit.outcome ? `${unit.title}: ${unit.outcome}` : unit.title;
   return text.length > 300 ? text.slice(0, 299) : text;
 }
