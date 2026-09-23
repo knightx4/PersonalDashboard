@@ -183,6 +183,11 @@ export async function editFeedback(
   return { message: 'Saved.' };
 }
 
+/** What Dash says under an answer to a blocked note. */
+const ANSWERED_REPLY =
+  'Got it. This note is back in the queue with your answer, and the next notes run builds ' +
+  'it from that. Run Feature Routine on this page starts one now.';
+
 const respondSchema = z.object({
   id: z.string().uuid(),
   body: z.string().trim().min(1, 'Write your answer first.').max(4000),
@@ -250,6 +255,20 @@ export async function respondToFeedback(
     .eq('id', parsed.data.id)
     .eq('user_id', user.id);
   if (error) return { error: error.message };
+
+  // And the thread says so. An answer here never goes to the fast reply -- the
+  // run that asked is the one that reads it -- so without this the last turn
+  // was yours, and a tagged one drew "replying…" for two hours over a reply
+  // that was never coming. Every comment that reaches Dash gets a turn back,
+  // even when all there is to say is where the answer went. A failed write
+  // does not undo the answer: it is saved and the note is back in the queue.
+  const { error: unsaid } = await supabase.from('dev_comments').insert({
+    user_id: user.id,
+    feedback_item_id: parsed.data.id,
+    author: 'claude',
+    body: ANSWERED_REPLY,
+  });
+  if (unsaid) console.error(`answer reply not written on note ${parsed.data.id}: ${unsaid.message}`);
 
   revalidateFeedback();
   return { message: 'Answered, and back in the queue.' };
