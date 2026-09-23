@@ -26,9 +26,38 @@
 --   select obsidian.requeue_merge_proposals('theme', 'plan #879',
 --            '2026-09-23 19:28:29+00');
 --
--- The cutoff is when #879 was claimed. #883 can undo only the chained
--- position merges with the same pair of calls, kind 'position' and
--- p_chained_only true.
+-- The cutoff is when #879 was claimed.
+--
+-- #883 undid the chained position merges with the same pair of calls, kind
+-- 'position' and p_chained_only true, cutoff when #883 was claimed:
+--
+--   select obsidian.undo_merges_for_rule('position', 'plan #883',
+--            '2026-09-23 20:06:41.27323+00', '<owner>', true, 300, 40000);
+--   select obsidian.requeue_merge_proposals('position', 'plan #883',
+--            '2026-09-23 20:06:41.27323+00', '<owner>');
+--
+-- Of the 138 chained merges, 128 were undone and 10 were refused with
+-- survivor-gone: nine because a direct merge later absorbed the survivor,
+-- and one because its survivor was absorbed by another of the ten. Those ten
+-- still stand, and map_merge_resets lists them. The requeue put back 128
+-- merged proposals and 72 joined ones. The 576 direct merges were left alone.
+--
+-- #886 undid those ten and every standing merge above them, after decision
+-- #885 chose to undo the direct merges too. undo_merges_for_rule selects by
+-- cutoff rather than by chain, so the run was a one-off block: collect the
+-- ten failed merges under 'plan #883' and, repeatedly, any standing position
+-- merge whose absorbed position is the survivor of one already collected;
+-- undo them newest first with obsidian.undo_map_merge, mark each rule-change,
+-- and record each in map_merge_resets as 'plan #886'. Then:
+--
+--   select obsidian.requeue_merge_proposals('position', 'plan #886',
+--            '2026-09-23 23:36:42.005175+00', '<owner>');
+--
+-- The chain held 21 merges, not 19: the ten chained ones, the nine direct
+-- ones #885 counted, one direct merge sitting on one of those nine, and one
+-- the 20:09 tick made on top of that. All 21 were undone, none refused, and
+-- positions went from 4,932 to 4,953. The requeue put back 21 merged
+-- proposals and 185 absorbed ones.
 
 set search_path = obsidian, public, extensions;
 
