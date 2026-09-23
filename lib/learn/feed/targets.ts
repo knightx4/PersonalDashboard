@@ -1,4 +1,5 @@
 import { shadeFor } from '@/lib/learn/areas/grid';
+import { NO_PREFERENCES, fieldWeight, themeWeight, type FeedPreferences } from './preference';
 
 /**
  * Choosing what the next Learn now cards are about (LEARN-NOW-SPEC, "How cards
@@ -15,6 +16,12 @@ import { shadeFor } from '@/lib/learn/areas/grid';
  * target is a gap whenever gap cards are behind a quarter of every card picked
  * for the person, so the ratio holds across calls and a run of bad luck cannot
  * give someone twelve interest cards in a row.
+ *
+ * What the person saved and turned down leans each draw (plan #809): a theme's
+ * strength is multiplied by `themeWeight`, and within each kind of gap a field
+ * is drawn in proportion to `fieldWeight`. Both are in `preference.ts`. The
+ * lean changes how often something comes up and never which kind of gap comes
+ * first.
  */
 
 /** A theme placed in a field. Themes placed at a domain, or nowhere, are not drawn. */
@@ -117,6 +124,8 @@ export type DrawInput = {
   /** Themes and fields with a card picked in the last RECENT_TARGET_DAYS. */
   recentThemeIds: ReadonlySet<string>;
   recentFieldIds: ReadonlySet<string>;
+  /** Saves and dismissals on earlier cards. None when left out. */
+  preferences?: FeedPreferences;
   random?: () => number;
 };
 
@@ -136,12 +145,17 @@ export function createDrawer(input: DrawInput): Drawer {
   const usedThemes = new Set(input.recentThemeIds);
   const usedFields = new Set(input.recentFieldIds);
   const gaps = gapFields(input.fields, input.themes, input.tests);
+  const preferences = input.preferences ?? NO_PREFERENCES;
 
   const drawInterest = (): FeedTarget | null => {
     const pool = input.themes.filter(
       (theme) => !usedThemes.has(theme.id) && theme.strength > 0 && fieldById.has(theme.fieldId),
     );
-    const theme = weightedPick(pool, (item) => item.strength, random);
+    const theme = weightedPick(
+      pool,
+      (item) => item.strength * themeWeight(preferences, item.id, item.fieldId),
+      random,
+    );
     if (!theme) return null;
     usedThemes.add(theme.id);
     return { reason: 'interest', theme, field: fieldById.get(theme.fieldId)! };
@@ -150,8 +164,8 @@ export function createDrawer(input: DrawInput): Drawer {
   const drawGap = (): FeedTarget | null => {
     for (const gap of ['untested', 'untouched'] as const) {
       const pool = gaps[gap].filter((field) => !usedFields.has(field.id));
-      if (pool.length === 0) continue;
-      const field = pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))];
+      const field = weightedPick(pool, (item) => fieldWeight(preferences, item.id), random);
+      if (!field) continue;
       usedFields.add(field.id);
       return { reason: 'gap', gap, field };
     }

@@ -15,6 +15,7 @@ import {
   type FeedPickSummary,
   type PersonInputs,
 } from '@/lib/learn/feed/pass';
+import { preferencesFrom } from '@/lib/learn/feed/preference';
 import { RECENT_TARGET_DAYS, type FeedField, type FeedTheme, type FieldTests } from '@/lib/learn/feed/targets';
 import type { LearnOperation } from '@/lib/learn/spend';
 import { fetchWikipediaArticle } from '@/lib/learn/providers/wikipedia';
@@ -74,6 +75,8 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
     field_id: string | null;
     named_article: string | null;
     created_at: string;
+    status: string;
+    saved_reading_id: string | null;
   };
 
   const [placements, themes, cards, tests] = await Promise.all([
@@ -97,7 +100,7 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
       (from, to) =>
         learn
           .from('feed_cards')
-          .select('reason, theme_id, field_id, named_article, created_at')
+          .select('reason, theme_id, field_id, named_article, created_at, status, saved_reading_id')
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
           .range(from, to),
@@ -140,6 +143,8 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
     tests: fieldTests,
     recentThemeIds,
     recentFieldIds,
+    // Saves and Not interested on every earlier card lean the draw (plan #809).
+    preferences: preferencesFrom(cards),
     picked,
     articlesHeld: [...new Set(cards.flatMap((card) => (card.named_article ? [card.named_article] : [])))],
   };

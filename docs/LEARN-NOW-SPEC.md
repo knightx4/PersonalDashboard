@@ -125,6 +125,28 @@ the screen and asks only for others. A card you passed comes back on your next
 visit, newest cards first. The tab's badge counts your queued readings, not the
 cards, since there are always about twenty of those.
 
+### How the draw uses it (plan #809)
+
+The picking pass counts, per theme and per field, the cards you saved (any
+card with `saved_reading_id`, including one later tested) and the cards you
+marked Not interested. Opening the source, Test me without a Save, and passing
+count for nothing. An interest card counts towards its theme and its field; a
+gap card has no theme and counts towards its field.
+
+Each save multiplies the weight by 1.4 and each Not interested by 0.7, and the
+result is held between 0.2 and 3. A theme is drawn in proportion to its
+strength times its own weight times its field's, held between the same bounds
+once, so a card you turned down moves its own theme further than its
+neighbours. Within each kind of gap, untested and then untouched, a field is
+drawn in proportion to its weight; the order of the two kinds does not change.
+The floor keeps a field you turned down coming up now and then, and the cap
+stops a couple of saves crowding out everything else.
+
+The counts are worked out from `learn.feed_cards` each time the pass runs,
+with no table of their own: the action is already on the card, and the pass
+already reads every card for the person. The code is
+`lib/learn/feed/preference.ts`.
+
 ## Cost
 
 Two model calls per card, one to name the material and one to write the card.
