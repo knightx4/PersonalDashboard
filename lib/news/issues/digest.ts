@@ -27,6 +27,11 @@ import { readStories, type NewsStory } from '@/lib/news/issues/stories';
  * supabase/migrations-news/0005_issues_digest.sql expect: a summary and its
  * stories on success, or `digest_error` on failure, with `digested_at` set
  * either way. A failed digest leaves the issue readable as it was.
+ *
+ * The line (plan #824). Alongside the summary Haiku writes one line of about
+ * ninety characters for the newsletter list, stored as `summary_line` by
+ * 0006_issues_summary_line.sql. A reply that leaves it out still stores the
+ * summary, with the line null.
  */
 
 export const DIGEST_MODEL = 'claude-haiku-4-5';
@@ -49,8 +54,14 @@ const MAX_TOKENS = 4_000;
 /** Longest error kept on the row, so a provider's error page is not stored whole. */
 const MAX_ERROR_CHARS = 500;
 
+/** The length the line is asked for, and the most that is stored. */
+export const LINE_CHARS = 90;
+
 const SYSTEM = `You summarise one email newsletter so its reader can see what
 is in it without reading the email.
+
+LINE. One line of at most ${LINE_CHARS} characters saying what this issue covers,
+for a list of newsletters. Name the main subjects, not the newsletter.
 
 SUMMARY. Two or three plain sentences on what this issue covers as a whole.
 Say what it says, not that it is a newsletter.
@@ -79,6 +90,10 @@ const TOOL = {
   input_schema: {
     type: 'object' as const,
     properties: {
+      line: {
+        type: 'string',
+        description: `What this issue covers, in one line of at most ${LINE_CHARS} characters.`,
+      },
       summary: { type: 'string' },
       stories: {
         type: 'array',
@@ -97,7 +112,7 @@ const TOOL = {
         },
       },
     },
-    required: ['summary', 'stories'],
+    required: ['line', 'summary', 'stories'],
   },
 };
 
@@ -108,7 +123,8 @@ export type DigestSource = {
   htmlBody: string | null;
 };
 
-export type Digest = { summary: string; stories: NewsStory[] };
+/** `line` is null when the reply left it out. */
+export type Digest = { line: string | null; summary: string; stories: NewsStory[] };
 
 /** What became of one issue. */
 export type DigestOutcome =
@@ -145,6 +161,21 @@ function decodeEntities(text: string): string {
     .replace(/&#x([0-9a-f]+);/gi, (_, code: string) => String.fromCodePoint(parseInt(code, 16)))
     .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
     .replace(/&amp;/gi, '&');
+}
+
+/**
+ * The line as it is stored: one line, spaces collapsed, and cut at a word
+ * boundary with an ellipsis when it runs past LINE_CHARS. Null when there is
+ * no text.
+ */
+export function readLine(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const line = value.replace(/\s+/g, ' ').trim();
+  if (!line) return null;
+  if (line.length <= LINE_CHARS) return line;
+  const cut = line.slice(0, LINE_CHARS - 1);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > LINE_CHARS / 2 ? cut.slice(0, space) : cut).replace(/[\s,;:.-]+$/, '')}…`;
 }
 
 const ANCHOR = /<a\b([^>]*)>([\s\S]*?)<\/a\s*>/gi;
@@ -232,7 +263,7 @@ export function bodyText(source: DigestSource): BodyText {
  */
 export function readDigest(input: unknown, links: readonly string[] = []): Digest | string {
   if (!input || typeof input !== 'object') return 'The model returned no digest.';
-  const { summary, stories } = input as Record<string, unknown>;
+  const { line, summary, stories } = input as Record<string, unknown>;
   if (typeof summary !== 'string' || !summary.trim()) return 'The model returned no summary.';
   const linked = Array.isArray(stories)
     ? stories.map((story: unknown) => {
@@ -246,7 +277,7 @@ export function readDigest(input: unknown, links: readonly string[] = []): Diges
         return address ? { ...rest, link: address } : rest;
       })
     : stories;
-  return { summary: summary.trim(), stories: readStories(linked) };
+  return { line: readLine(line), summary: summary.trim(), stories: readStories(linked) };
 }
 
 /**
@@ -342,8 +373,13 @@ export async function digestIssue(input: {
 
   const row =
     outcome.status === 'digested'
-      ? { summary: outcome.summary, stories: outcome.stories, digest_error: null }
-      : { summary: null, stories: null, digest_error: outcome.error };
+      ? {
+          summary: outcome.summary,
+          summary_line: outcome.line,
+          stories: outcome.stories,
+          digest_error: null,
+        }
+      : { summary: null, summary_line: null, stories: null, digest_error: outcome.error };
 
   const saved = await input.news
     .from('issues')
