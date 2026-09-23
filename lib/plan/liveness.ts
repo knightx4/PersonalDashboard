@@ -104,6 +104,40 @@ export function featureRunIdle(startedAt: string, trail: FeatureTrail, now: numb
 }
 
 /**
+ * Whether a feature's session is between one step and the next: its newest run
+ * is a feature run still marked started, nothing under the feature is claimed,
+ * and something beneath it changed within `FEATURE_IDLE_AFTER_MINUTES`.
+ *
+ * The send guards refuse a live claim, and a session sent at a feature holds
+ * one only while it builds a step. From closing that step to claiming the next
+ * it holds none, and a press in that gap started a second session on the same
+ * feature: the overnight tick did it to #866 on 23 September, 21 seconds after
+ * #868 closed. The overnight runner reads the same gap through
+ * `featureRunIdle`; this is that rule for the buttons.
+ */
+export function featureBetweenSteps(
+  steps: readonly { updatedAt: string }[],
+  run: { status: string; createdAt: string; job: string } | undefined,
+  now: number,
+): boolean {
+  if (!run || run.job !== 'feature' || run.status !== 'started') return false;
+  let touchedAt: string | null = null;
+  for (const step of steps) {
+    if (!touchedAt || new Date(step.updatedAt) > new Date(touchedAt)) touchedAt = step.updatedAt;
+  }
+  return !featureRunIdle(run.createdAt, { claimed: false, touchedAt }, now);
+}
+
+/** The refusal for a press that lands between a feature session's steps. */
+export function betweenStepsRefusal(feature: { number: number }): string {
+  return (
+    `#${feature.number} has a session working through its steps, between one and the next. ` +
+    `Wait for it to finish, or send again once nothing under #${feature.number} has changed ` +
+    `for ${FEATURE_IDLE_AFTER_MINUTES} minutes.`
+  );
+}
+
+/**
  * What a run is doing.
  *
  * `finished` is the one state that is not read off pushes: the step the run

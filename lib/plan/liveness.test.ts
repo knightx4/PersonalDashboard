@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  betweenStepsRefusal,
+  FEATURE_IDLE_AFTER_MINUTES,
+  featureBetweenSteps,
   featureRunIdle,
   abandonedClaim,
   claimIsLive,
@@ -710,5 +713,37 @@ describe('featureRunIdle', () => {
     const quiet = { claimed: true, touchedAt: null };
     expect(featureRunIdle(started, quiet, at('2026-09-23T03:00:00Z'))).toBe(false);
     expect(featureRunIdle(started, { claimed: false, touchedAt: null }, 0)).toBe(false);
+  });
+});
+
+describe('featureBetweenSteps', () => {
+  const now = Date.parse('2026-09-23T20:14:26.000Z');
+  const minutesAgo = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
+  const run = { status: 'started', createdAt: minutesAgo(10), job: 'feature' };
+
+  it('holds a feature whose session closed a step moments ago', () => {
+    // #866 on 23 September: #868 closed at 20:14:05 and the press came at 20:14:26.
+    const steps = [{ updatedAt: minutesAgo(30) }, { updatedAt: '2026-09-23T20:14:05.000Z' }];
+    expect(featureBetweenSteps(steps, run, now)).toBe(true);
+  });
+
+  it('lets a feature go once nothing under it has changed for twenty minutes', () => {
+    const old = { ...run, createdAt: minutesAgo(90) };
+    expect(
+      featureBetweenSteps([{ updatedAt: minutesAgo(FEATURE_IDLE_AFTER_MINUTES) }], old, now),
+    ).toBe(false);
+  });
+
+  it('only reads a feature session still marked started', () => {
+    const steps = [{ updatedAt: minutesAgo(1) }];
+    expect(featureBetweenSteps(steps, undefined, now)).toBe(false);
+    expect(featureBetweenSteps(steps, { ...run, status: 'finished' }, now)).toBe(false);
+    expect(featureBetweenSteps(steps, { ...run, job: 'step' }, now)).toBe(false);
+  });
+
+  it('says what to wait for', () => {
+    expect(betweenStepsRefusal({ number: 866 })).toContain(
+      '#866 has a session working through its steps',
+    );
   });
 });
