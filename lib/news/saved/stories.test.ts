@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
-import { loadSavedHeadlines, removeSavedStory, saveStory } from './stories';
+import {
+  loadSavedHeadlines,
+  loadSavedStories,
+  removeSavedStory,
+  removeSavedStoryById,
+  saveStory,
+} from './stories';
 
 type Call = { table: string; op: string; args: unknown[] };
 
@@ -17,6 +23,8 @@ function fakeClient(rows: { issue?: unknown; sender?: unknown; saved?: unknown[]
         select: (...args: unknown[]) => (calls.push({ table, op: 'select', args }), chain),
         delete: () => (calls.push({ table, op: 'delete', args: [] }), chain),
         eq: (...args: unknown[]) => (calls.push({ table, op: 'eq', args }), chain),
+        order: (...args: unknown[]) => (calls.push({ table, op: 'order', args }), chain),
+        limit: (...args: unknown[]) => (calls.push({ table, op: 'limit', args }), chain),
         maybeSingle: async () => ({
           data: table === 'issues' ? (rows.issue ?? null) : (rows.sender ?? null),
           error: null,
@@ -126,5 +134,58 @@ describe('loadSavedHeadlines', () => {
     const saved = await loadSavedHeadlines(client, 'i1');
     expect([...saved]).toEqual(['Rates held']);
     expect(calls).toContainEqual({ table: 'saved_stories', op: 'eq', args: ['issue_id', 'i1'] });
+  });
+});
+
+describe('loadSavedStories', () => {
+  it('reads the list newest saved first and maps each row', async () => {
+    const { client, calls } = fakeClient({
+      saved: [
+        {
+          id: 'r1',
+          issue_id: null,
+          headline: 'Rates held',
+          summary: 'The bank kept rates.',
+          text: null,
+          link: 'https://example.com/a',
+          image: null,
+          sender_name: 'Infra Weekly',
+          received_at: '2026-09-23T07:14:00Z',
+          saved_at: '2026-09-23T08:00:00Z',
+        },
+      ],
+    });
+    expect(await loadSavedStories(client)).toEqual([
+      {
+        id: 'r1',
+        issueId: null,
+        headline: 'Rates held',
+        summary: 'The bank kept rates.',
+        text: null,
+        link: 'https://example.com/a',
+        image: null,
+        senderName: 'Infra Weekly',
+        receivedAt: '2026-09-23T07:14:00Z',
+        savedAt: '2026-09-23T08:00:00Z',
+      },
+    ]);
+    expect(calls).toContainEqual({
+      table: 'saved_stories',
+      op: 'order',
+      args: ['saved_at', { ascending: false }],
+    });
+  });
+});
+
+describe('removeSavedStoryById', () => {
+  it('deletes by row id and says which issue the story came from', async () => {
+    const { client, calls } = fakeClient({ saved: [{ issue_id: 'i1' }] });
+    expect(await removeSavedStoryById(client, 'r1')).toEqual({ issueId: 'i1' });
+    expect(calls).toContainEqual({ table: 'saved_stories', op: 'eq', args: ['id', 'r1'] });
+  });
+
+  it('gives no issue when the row was not there', async () => {
+    const { client } = fakeClient({ saved: [] });
+    expect(await removeSavedStoryById(client, 'r1')).toEqual({ issueId: null });
   });
 });
