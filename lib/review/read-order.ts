@@ -202,7 +202,7 @@ export type OrderFormLine = {
 export type OrderFormPrefill = {
   /** Set only when the merchant is one of the form's options. */
   merchantId: string | null;
-  /** For the "Other (type a name)" field when `merchantId` is null. */
+  /** The name the merchant field starts with when `merchantId` is null. */
   merchantName: string;
   orderDate: string;
   externalOrderNumber: string;

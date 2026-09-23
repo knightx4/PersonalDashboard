@@ -73,7 +73,7 @@ describe('planRefHref', () => {
   // `all`, not the default view: a link has to reach a step that is finished,
   // dropped or filed away, and the open view by definition does not hold those.
   it('points at the widest view, anchored on the row', () => {
-    expect(planRefHref(494)).toBe('/dev/plan?view=all#plan-494');
+    expect(planRefHref(494)).toBe('/dev/plan?view=all&q=%23494#plan-494');
   });
 
   it('agrees with the id the row carries', () => {

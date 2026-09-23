@@ -910,6 +910,64 @@ export async function answerPlanDecision(
   };
 }
 
+/**
+ * An answer to a step that stopped on a question, from where the question is
+ * read.
+ *
+ * Note e663940b: a blocked step drawn under Questions for you offered only
+ * "I have done this", which is the press for a job. A question is finished by
+ * saying something, so this takes the words, writes them where the session
+ * that picks the step up reads them (the step's thread, as a line of yours,
+ * and a dated line on its comment), and lifts the block the same way
+ * `setPlanItemStatus` does, back to not started with the mark taken off.
+ *
+ * Not `answerPlanDecision`: that closes a decision as done, and a blocked
+ * step is work that still has to be built once it has its answer.
+ */
+// latency: pending
+export async function answerBlockedStep(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing step.' };
+
+  const answer = text(4000).safeParse(field(formData, 'answer'));
+  if (!answer.success) return { error: 'That answer is too long.' };
+  if (!answer.data) return { error: 'Write the answer the step is waiting on.' };
+
+  const { data: current } = await supabase
+    .from('plan_items')
+    .select('status, comment')
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .maybeSingle();
+  if (!current) return { error: 'That step no longer exists.' };
+  if (current.status !== 'blocked') return { error: 'That step is no longer blocked.' };
+
+  const { error: unsaid } = await supabase
+    .from('dev_comments')
+    .insert({ user_id: user.id, plan_item_id: id.data, author: 'me', body: answer.data });
+  if (unsaid) return { error: unsaid.message };
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  const line = `Answered ${stamp}: ${answer.data}`;
+  const comment = current.comment ? `${current.comment}\n\n${line}` : line;
+
+  const { error } = await supabase
+    .from('plan_items')
+    .update({ status: 'not_started', ...blockPatch('not_started'), assignee: null, comment })
+    .eq('id', id.data)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePlan();
+  return { message: 'Answered. The step is back to not started.' };
+}
+
 /** Deleting a step takes its sub-steps with it; the confirm says how many. */
 // latency: pending
 export async function deletePlanItem(

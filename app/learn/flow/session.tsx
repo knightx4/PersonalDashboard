@@ -110,6 +110,26 @@ function DontKnowButton() {
   );
 }
 
+/**
+ * Not now (note 7ccc6f99): the question goes back to the end of the queue with
+ * nothing recorded against it, and the next one comes up. On the answer form
+ * so it sits beside I don't know, and told apart by its own field.
+ */
+function NotNowButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      name="notNow"
+      value="1"
+      disabled={pending}
+      className="text-ui text-ink-muted underline-offset-2 hover:text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-70"
+    >
+      Not now
+    </button>
+  );
+}
+
 function StartButton() {
   const { pending } = useFormStatus();
   // One call to write the track's ideas and one to write its first question,
@@ -278,8 +298,9 @@ export function FlowSession({ first, track }: { first: FlowState; track: FlowTra
 
         <ProbeOptions options={live.options} answered={live.answered ?? null} />
         {!live.answered && (
-          <div className="pt-1">
+          <div className="flex flex-wrap items-center gap-4 pt-1">
             <DontKnowButton />
+            <NotNowButton />
           </div>
         )}
       </form>
