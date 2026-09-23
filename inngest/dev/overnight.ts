@@ -715,21 +715,26 @@ export async function featureRunLiveness(input: {
     ]);
   }
 
-  // A step claimed under the feature is a session at work in its module,
-  // whatever closed before it. A run sent at a feature closes one step and
-  // claims the next, and reading the first close as the end of the run freed
-  // its slot and its module while it went on working: #749 on 23 September
-  // closed #878 at 19:27, claimed #879 at 19:28, and the next tick offered
-  // #749 again. A claim whose session died is put back by the stale-claim
-  // sweep, which runs ahead of this on every tick.
-  if (trail?.claimed) return 'working';
-
-  // A close or block since the start is still `finished`, which says more.
-  const endedOnRows = endsRun(closedAt, row.created_at) || endsRun(blockedAt, row.created_at);
-  if (row.plan_item_id && !endedOnRows) {
-    if (trail && featureRunIdle(row.created_at, trail, input.now)) return 'ended';
+  // The feature's own rows decide when they can be read. A claimed step, or
+  // any change beneath the feature in the last twenty minutes, is a session
+  // at work in its module; neither, for that long, is a session that is done.
+  //
+  // A close since the start used to settle it as finished. A session sent at
+  // a feature closes one step and claims the next, so that freed its slot and
+  // its module while it went on working, twice on 23 September: #749 closed
+  // #878 at 19:27 and claimed #879 at 19:28, and the 19:44 tick offered #749
+  // again; #857 closed #861 at 20:04:03, holding no claim for the moment
+  // between steps, and the 20:04:18 tick started #866 in the same module.
+  // `FEATURE_IDLE_AFTER_MINUTES` is the gap between one step and the next.
+  // A claim whose session died is put back by the stale-claim sweep, which
+  // runs ahead of this on every tick.
+  if (trail) {
+    if (!featureRunIdle(row.created_at, trail, input.now)) return 'working';
+    const endedOnRows = endsRun(closedAt, row.created_at) || endsRun(blockedAt, row.created_at);
+    return endedOnRows ? 'finished' : 'ended';
   }
 
+  // The rows could not be read, so the pushes are all there is.
   return runLiveness(
     {
       startedAt: row.created_at,
