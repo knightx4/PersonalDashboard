@@ -4,8 +4,9 @@
  *   npm run news:digest
  *   npm run news:digest -- --limit 5
  *
- * New issues are summarised as they arrive (plan #787). This is the catch-up
- * for the rest: the issues stored before that existed, and any arrival whose
+ * New issues are summarised as they arrive (plan #787), and an hourly job
+ * (/api/cron/news-digest) works through anything left pending. This is the
+ * same catch-up run by hand: the issues stored before that existed, and any arrival whose
  * summary never finished. It takes every issue with no `digested_at`, oldest
  * first, and makes one Haiku call for each, recorded in core.model_spend
  * against the account that owns the issue. An issue the model could not read

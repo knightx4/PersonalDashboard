@@ -108,7 +108,7 @@ describe('digestPending', () => {
       ['b', 'user-2'],
       ['c', 'user-1'],
     ]);
-    expect(tally).toEqual({ digested: 2, failed: 1, missing: 0 });
+    expect(tally).toEqual({ digested: 2, failed: 1, missing: 0, left: 0 });
     expect(seen).toEqual(['a:digested', 'b:failed', 'c:digested']);
   });
 
@@ -118,7 +118,27 @@ describe('digestPending', () => {
       digested: 0,
       failed: 0,
       missing: 0,
+      left: 0,
     });
     expect(called).toEqual([]);
+  });
+
+  it('starts no issue once its deadline has passed', async () => {
+    const { client } = pendingClient([
+      { id: 'a', user_id: 'user-1' },
+      { id: 'b', user_id: 'user-1' },
+      { id: 'c', user_id: 'user-1' },
+    ]);
+    reply({ status: 'digested', summary: 'S', stories: [] });
+    const clock = [0, 100];
+    const tally = await digestPending({
+      news: client,
+      spend,
+      anthropicApiKey: 'key',
+      deadline: 50,
+      now: () => clock.shift() ?? 100,
+    });
+    expect(called.map((input) => input.issueId)).toEqual(['a']);
+    expect(tally).toEqual({ digested: 1, failed: 0, missing: 0, left: 2 });
   });
 });

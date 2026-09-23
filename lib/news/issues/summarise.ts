@@ -58,7 +58,11 @@ export async function digestOnArrival(
 /** Most issues one catch-up run takes on. Well above the 42 stored now. */
 const PENDING_LIMIT = 500;
 
-export type PendingTally = { digested: number; failed: number; missing: number };
+/**
+ * What one catch-up run did. `left` counts issues it listed but did not reach
+ * before its deadline; they are still pending and the next run takes them.
+ */
+export type PendingTally = { digested: number; failed: number; missing: number; left: number };
 
 /**
  * Summarise every issue not yet attempted, oldest first, one at a time.
@@ -67,12 +71,15 @@ export type PendingTally = { digested: number; failed: number; missing: number }
  * each issue's own `user_id` is passed on, so the spend lands on the account
  * that owns the newsletter. Stops on the first issue that cannot be saved,
  * since the next one would fail the same way; running it again carries on from
- * there.
+ * there. With `deadline` (a time in epoch milliseconds) it starts no issue
+ * after that time, so a scheduled run ends inside its route's limit.
  */
 export async function digestPending(
   input: Clients & {
     anthropicApiKey: string;
     limit?: number;
+    deadline?: number;
+    now?: () => number;
     onIssue?: (issueId: string, outcome: DigestOutcome) => void;
   },
 ): Promise<PendingTally> {
@@ -84,8 +91,14 @@ export async function digestPending(
     .limit(input.limit ?? PENDING_LIMIT);
   if (error) throw new Error(`news: listing issues to summarise failed (${error.message})`);
 
-  const tally: PendingTally = { digested: 0, failed: 0, missing: 0 };
-  for (const row of data ?? []) {
+  const rows = data ?? [];
+  const now = input.now ?? Date.now;
+  const tally: PendingTally = { digested: 0, failed: 0, missing: 0, left: 0 };
+  for (const [index, row] of rows.entries()) {
+    if (input.deadline !== undefined && now() >= input.deadline) {
+      tally.left = rows.length - index;
+      break;
+    }
     const issueId = row.id as string;
     const outcome = await digestIssue({
       news: input.news,
