@@ -75,3 +75,19 @@ describe('the bar at rest', () => {
     expect(fetched).not.toHaveBeenCalled();
   });
 });
+
+describe('the chip at rest', () => {
+  it('shows the mark and leaves the name to its label and the menu', () => {
+    const html = render('jobs');
+    expect(html).toContain('title="Searching Job search"');
+    expect(html).not.toContain('>Job search</span>');
+  });
+});
+
+describe('the shortcut', () => {
+  it('says ⌘K beside the field, the key that puts the cursor there', () => {
+    const html = render('jobs');
+    expect(html).toContain('⌘K');
+    expect(html).toContain('aria-keyshortcuts="Meta+K Control+K"');
+  });
+});

@@ -89,7 +89,7 @@ function refusedKeyAsOfNow(runs: Record<string, LastRun>): string | null {
 export default async function DevPlanPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string | string[] }>;
+  searchParams: Promise<{ view?: string | string[]; q?: string | string[] }>;
 }) {
   const user = await requireUser();
   const supabase = await createClient();
@@ -97,6 +97,9 @@ export default async function DevPlanPage({
 
   const requested = Array.isArray(params.view) ? params.view[0] : params.view;
   const view: PlanView = requested && isPlanView(requested) ? requested : 'open';
+  // What to put in the plan's own search box on arrival. The app-wide search
+  // sends a step here as `q=#612`, which unfolds the feature it sits under.
+  const query = (Array.isArray(params.q) ? params.q[0] : params.q) ?? '';
 
   // Before the load, so anything new appears on this render rather than the
   // next one. It carries its failure back instead of throwing: a plan that
@@ -227,6 +230,10 @@ export default async function DevPlanPage({
         finished={finished}
         summary={summary}
         view={view}
+        initialQuery={query}
+        // A second search hit while already here changes only `q`, and the box
+        // holds its own state, so it is started again rather than kept.
+        key={query}
         catalog={catalog}
         lastRuns={lastRuns}
         runRaises={runRaises}

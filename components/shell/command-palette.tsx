@@ -54,6 +54,7 @@ export function CommandPalette({
   theme,
   open,
   onOpenChange,
+  everything = false,
 }: {
   /** Whose pages these are. The held list is only searched when it is theirs. */
   account: string;
@@ -65,6 +66,12 @@ export function CommandPalette({
   /** Whether the box is up. Held by the shell, so the magnifier can open it. */
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Start this opening on everything you own rather than on the workspace.
+   * The shell sets it when ⌘K opened the box (note cdf684fa); the magnifier
+   * leaves it off, the same split as a click into the bar.
+   */
+  everything?: boolean;
 }) {
   const [query, setQuery] = useState('');
   /**
@@ -81,6 +88,17 @@ export function CommandPalette({
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Opened by ⌘K: start on everything. Adjusted while rendering the opening
+  // rather than in an effect, so the first frame of the box already says so.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open && everything) {
+      setScope('everything');
+      setActive(0);
+    }
+  }
 
   const { rows, looking, run, reset } = useSearchRows({
     account,

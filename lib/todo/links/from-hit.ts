@@ -32,6 +32,12 @@ export const TARGET_FOR_HIT: Record<HitKind, LinkTarget | null> = {
   reading: 'reading',
   track: 'track',
   subject: 'subject',
+  // The Dev workspace is about the app rather than about your life, and a
+  // task pointing into the build plan has no column to live in.
+  plan: null,
+  spec: null,
+  idea: null,
+  feedback: null,
 };
 
 /** What a task would point at if it were pointed at this hit. */
