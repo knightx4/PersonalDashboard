@@ -57,6 +57,17 @@ const createOrderSchema = z.object({
   shipping: moneyField('Shipping', true),
   discount: moneyField('Discount', true),
   lines: z.array(lineSchema).min(1, 'Add at least one line item.'),
+  // Set when the form was opened from a waiting order confirmation.
+  sourceMessageId: z
+    .string()
+    .uuid()
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  currency: z
+    .string()
+    .regex(/^[A-Z]{3}$/)
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
 });
 
 function parseLines(formData: FormData) {
@@ -103,6 +114,8 @@ export async function createManualOrder(
     shipping: String(formData.get('shipping') ?? ''),
     discount: String(formData.get('discount') ?? ''),
     lines: parseLines(formData),
+    sourceMessageId: String(formData.get('source_message_id') ?? ''),
+    currency: String(formData.get('currency') ?? ''),
   });
 
   if (!parsed.success) {
@@ -110,6 +123,23 @@ export async function createManualOrder(
   }
 
   const data = parsed.data;
+  const sourceMessageId = data.sourceMessageId ?? null;
+
+  if (sourceMessageId) {
+    const { data: message, error } = await supabase
+      .from('inbox_messages')
+      .select('id, classification, parse_status')
+      .eq('id', sourceMessageId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (error) return { error: error.message };
+    if (!message || message.classification !== 'order_confirmation') {
+      return { error: 'That email is not an order confirmation.' };
+    }
+    if (message.parse_status !== 'needs_review') {
+      return { error: 'That email has already left the review queue.' };
+    }
+  }
   let merchantId: string | null = data.merchantId ?? null;
   let merchantSlug: string | null = null;
 
@@ -161,6 +191,8 @@ export async function createManualOrder(
     merchantSlug,
     externalOrderNumber: data.externalOrderNumber,
     orderDate: data.orderDate,
+    source: sourceMessageId ? 'email' : 'manual',
+    currency: data.currency,
     taxCents: data.tax,
     shippingCents: data.shipping,
     discountCents: data.discount,
@@ -248,6 +280,24 @@ export async function createManualOrder(
   if (inventoryError) {
     await supabase.from('orders').delete().eq('id', built.order.id);
     return { error: inventoryError.message };
+  }
+
+  if (sourceMessageId) {
+    // Conditional on the email still waiting, so a second press, or another
+    // tab, that got this far finds it taken and removes its duplicate order.
+    const { data: linked, error: linkError } = await supabase
+      .from('ingested_messages')
+      .update({ parse_status: 'parsed', resulting_order_id: built.order.id, error: null })
+      .eq('id', sourceMessageId)
+      .eq('parse_status', 'needs_review')
+      .select('id');
+    if (linkError || !linked || linked.length === 0) {
+      await supabase.from('orders').delete().eq('id', built.order.id);
+      return { error: linkError?.message ?? 'That email has already left the review queue.' };
+    }
+    revalidatePath('/shopping/review');
+    // The layout reads the review count for the nav badge.
+    revalidatePath('/', 'layout');
   }
 
   revalidatePath('/shopping/orders');

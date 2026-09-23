@@ -14,9 +14,18 @@ import { resolveMerchant, suggestMerchants, type MerchantOption } from '@/lib/me
  * controls for one answer. What the form submits is still the two fields the
  * action already reads, so the server side is unchanged.
  */
-export function MerchantField({ id, merchants }: { id: string; merchants: MerchantOption[] }) {
+export function MerchantField({
+  id,
+  merchants,
+  defaultValue,
+}: {
+  id: string;
+  merchants: MerchantOption[];
+  /** A name to start with, such as the merchant read out of an email. */
+  defaultValue?: string;
+}) {
   const listId = `${id}-list`;
-  const [text, setText] = useState('');
+  const [text, setText] = useState(defaultValue ?? '');
   const [open, setOpen] = useState(false);
   // -1 is nothing highlighted, so Enter on a new name submits the name rather
   // than swapping in the first suggestion.

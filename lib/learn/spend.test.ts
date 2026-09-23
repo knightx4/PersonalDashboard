@@ -81,6 +81,7 @@ describe('the operation names', () => {
       'propose-position-merges',
       'link-positions',
       'write-survey-idea',
+      'write-survey-question',
     ]);
   });
 });
