@@ -8,6 +8,7 @@ import type { LearnOperation } from '@/lib/learn/spend';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { acceptNoteMap } from '@/lib/vault/map/accept';
 import { embedMapRows, type MapEmbedResult } from '@/lib/vault/map/embed';
+import { proposePositionMerges, type PositionMergeResult } from '@/lib/vault/map/merge-positions';
 import { proposeThemeMerges, type ThemeMergeResult } from '@/lib/vault/map/merge-themes';
 import { proposeNoteMap, type MapNote } from '@/lib/vault/map/extract';
 import { runSweepSlice, type SweepNoteRow, type SweepPorts } from '@/lib/vault/map/sweep';
@@ -40,7 +41,7 @@ const LEASE_MS = 310_000;
 export const EMBED_UNTIL_MS = 280_000;
 
 /**
- * When the theme merge pass stops starting new calls. One call over twenty
+ * When the merge passes stop starting new calls. One call over twenty
  * pairs takes ten to twenty seconds, so this leaves room inside the route's
  * 300 seconds for the call in flight.
  */
@@ -66,6 +67,12 @@ export type MapSweepTickSummary = {
    * it threw.
    */
   themeMerges: Pick<ThemeMergeResult, 'proposed' | 'same' | 'stopped'> | null;
+  /**
+   * Position merge proposals written after the theme pass (plan #812). Null
+   * when it did not run: the same three reasons, or the theme pass threw or
+   * ran out of time.
+   */
+  positionMerges: Pick<PositionMergeResult, 'proposed' | 'same' | 'stopped'> | null;
 };
 
 export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
@@ -78,6 +85,7 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
     failed: [],
     embedded: null,
     themeMerges: null,
+    positionMerges: null,
   };
 
   const nowIso = new Date().toISOString();
@@ -142,6 +150,26 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
       };
     } catch (err) {
       console.error('[map sweep] theme merges', err instanceof Error ? err.message : err);
+    }
+  }
+
+  // Position pairs from different notes, after the theme pass. It shares the
+  // deadline, so a tick that ran out of time on themes leaves the positions
+  // for the next one. Writing a proposal changes no position.
+  if (apiKey && summary.themeMerges && summary.themeMerges.stopped?.reason !== 'time') {
+    try {
+      const merges = await proposePositionMerges(supabase, createCoreServiceSupabase(), {
+        userId: null,
+        anthropicApiKey: apiKey,
+        deadline: startedAt + MERGE_UNTIL_MS,
+      });
+      summary.positionMerges = {
+        proposed: merges.proposed,
+        same: merges.same,
+        stopped: merges.stopped,
+      };
+    } catch (err) {
+      console.error('[map sweep] position merges', err instanceof Error ? err.message : err);
     }
   }
 
