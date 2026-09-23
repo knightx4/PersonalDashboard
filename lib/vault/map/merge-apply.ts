@@ -126,7 +126,7 @@ export function mergeInputFromProposal(proposal: ApplicableProposal): MergeInput
 }
 
 /** What the apply run did with a proposal (obsidian.map_merge_proposals.apply_outcome). */
-export type ApplyOutcome = 'merged' | 'joined' | 'undone' | 'gone' | 'failed';
+export type ApplyOutcome = 'merged' | 'joined' | 'undone' | 'gone' | 'failed' | 'absorbed';
 
 export type ApplyResult = {
   kind: MergeKind;
@@ -144,8 +144,10 @@ export const APPLY_CALL_BUDGET_MS = 4_000;
 /**
  * Merge every `same` proposal of one kind that has not been applied yet
  * (plan #820), by calling obsidian.apply_merge_proposals until nothing is
- * left or the deadline passes. The function follows each side through earlier
- * merges, skips a pair whose merge was undone, and marks every proposal it
+ * left or the deadline passes. The function merges a theme proposal only
+ * while both of its themes are still there (plan #878), marking one with a
+ * side absorbed since; it still follows a position's sides through earlier
+ * merges. It skips a pair whose merge was undone, and marks every proposal it
  * looks at with the outcome, so a call that is cut off loses nothing.
  *
  * Needs the service-role client: the function is not granted to a signed-in
@@ -157,7 +159,14 @@ export async function applyMergeProposals(
   options: { userId: string | null; deadline: number; now?: () => number },
 ): Promise<ApplyResult> {
   const now = options.now ?? Date.now;
-  const counts: Record<ApplyOutcome, number> = { merged: 0, joined: 0, undone: 0, gone: 0, failed: 0 };
+  const counts: Record<ApplyOutcome, number> = {
+    merged: 0,
+    joined: 0,
+    undone: 0,
+    gone: 0,
+    failed: 0,
+    absorbed: 0,
+  };
   let remaining = 0;
 
   for (;;) {
