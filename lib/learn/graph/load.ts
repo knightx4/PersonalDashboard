@@ -48,6 +48,8 @@ export type Goal = {
   asked: string;
   conceptId: string | null;
   status: 'proposed' | 'active' | 'reached' | 'abandoned';
+  /** The curriculum unit it was opened from, or null for a goal asked outside it. */
+  unitId: string | null;
 };
 
 function fail(action: string, error: { message: string }): Error {
@@ -295,7 +297,7 @@ export async function loadGoals(
 ): Promise<Goal[]> {
   const { data, error } = await supabase
     .from('goals')
-    .select('id, asked, concept_id, status')
+    .select('id, asked, concept_id, status, unit_id')
     .eq('subject_id', subjectId)
     .order('created_at', { ascending: false });
 
@@ -307,11 +309,13 @@ export async function loadGoals(
     asked: string;
     concept_id: string | null;
     status: Goal['status'];
+    unit_id: string | null;
   }[]).map((row) => ({
     id: row.id,
     asked: row.asked,
     conceptId: row.concept_id,
     status: row.status,
+    unitId: row.unit_id,
   }));
 }
 

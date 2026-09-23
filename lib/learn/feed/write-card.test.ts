@@ -22,6 +22,14 @@ const interest: CardToWrite = {
   article: 'Autoencoder',
   section: null,
   text: 'An autoencoder is a type of neural network used to learn efficient codings of unlabeled data.',
+  depth: 'working',
+};
+
+const parts = {
+  hook: 'A bottleneck of 30 numbers can rebuild a 784-pixel digit.',
+  example: 'Fraud teams train one on normal transactions and flag the ones it rebuilds badly.',
+  question: 'Why would a large rebuild error mark a transaction as unusual?',
+  answer: 'The network only learned to compress normal data, so unusual inputs come back distorted.',
 };
 
 describe('the why line', () => {
@@ -46,23 +54,49 @@ describe('the why line', () => {
 });
 
 describe('reading the report', () => {
-  it('makes the card ready with the summary, whitespace collapsed', () => {
+  it('makes the card ready with every part, whitespace collapsed', () => {
     expect(
-      readCardReport({ fit: 'It covers autoencoders.', matches: true, summary: '  Autoencoders compress.\n Then rebuild. ' }),
-    ).toEqual({ verdict: 'ready', summary: 'Autoencoders compress. Then rebuild.' });
+      readCardReport({
+        fit: 'It covers autoencoders.',
+        matches: true,
+        ...parts,
+        summary: '  Autoencoders compress.\n Then rebuild. ',
+      }),
+    ).toEqual({ verdict: 'ready', ...parts, summary: 'Autoencoders compress. Then rebuild.' });
   });
 
   it('drops a section that does not fit, with the model sentence as the reason', () => {
-    expect(readCardReport({ fit: 'It is a list of references.', matches: false, summary: null })).toEqual({
+    expect(
+      readCardReport({ fit: 'It only defines the term.', matches: false, summary: null, hook: null, example: null }),
+    ).toEqual({
       verdict: 'dropped',
-      reason: 'It is a list of references.',
+      reason: 'It only defines the term.',
     });
   });
 
   it('drops a match with no summary, or one too long to be four sentences', () => {
-    expect(readCardReport({ fit: 'Fits.', matches: true, summary: ' ' })).toMatchObject({ verdict: 'dropped' });
-    expect(readCardReport({ fit: 'Fits.', matches: true, summary: 'x'.repeat(1300) })).toMatchObject({
+    expect(readCardReport({ fit: 'Fits.', matches: true, ...parts, summary: ' ' })).toMatchObject({ verdict: 'dropped' });
+    expect(readCardReport({ fit: 'Fits.', matches: true, ...parts, summary: 'x'.repeat(1300) })).toMatchObject({
       verdict: 'dropped',
+    });
+  });
+
+  it('drops a card with no hook or no example, since that is the old summary-only card', () => {
+    expect(readCardReport({ fit: 'Fits.', matches: true, ...parts, summary: 'S.', hook: null })).toEqual({
+      verdict: 'dropped',
+      reason: 'The report wrote no hook.',
+    });
+    expect(readCardReport({ fit: 'Fits.', matches: true, ...parts, summary: 'S.', example: '' })).toEqual({
+      verdict: 'dropped',
+      reason: 'The report wrote no example.',
+    });
+  });
+
+  it('keeps the card but leaves off a question with no answer', () => {
+    expect(readCardReport({ fit: 'Fits.', matches: true, ...parts, summary: 'S.', answer: null })).toMatchObject({
+      verdict: 'ready',
+      question: null,
+      answer: null,
     });
   });
 
@@ -81,6 +115,7 @@ describe('the prompt', () => {
     expect(text).toContain('Article: Autoencoder');
     expect(text).toContain('Section: the lead');
     expect(text).toContain(interest.text);
+    expect(text).toContain('past the introduction');
   });
 
   it('says so when a long section is cut', () => {
@@ -112,7 +147,7 @@ describe('the call', () => {
         {
           type: 'tool_use',
           name: 'report_card',
-          input: { fit: 'Covers autoencoders.', matches: true, summary: 'Autoencoders learn codings.' },
+          input: { fit: 'Covers autoencoders.', matches: true, summary: 'Autoencoders learn codings.', ...parts },
         },
       ],
       stop_reason: 'tool_use',
@@ -128,6 +163,7 @@ describe('the call', () => {
     expect(result).toEqual({
       outcome: 'ready',
       summary: 'Autoencoders learn codings.',
+      ...parts,
       why: 'You write about machine learning architecture (Computing).',
     });
     expect(spent).toEqual(['claude-sonnet-5']);

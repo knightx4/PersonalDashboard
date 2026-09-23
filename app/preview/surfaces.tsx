@@ -29,6 +29,8 @@ import {
 import { NoteProperties } from '@/components/vault/note-properties';
 import { NoteBody } from '@/components/vault/note-body';
 import { ReadingCard } from '@/components/learn/reading-card';
+import { LearnNowFeed } from '@/app/learn/now/feed';
+import type { FeedCard } from '@/lib/learn/feed/card';
 import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
 import type { Concept } from '@/lib/learn/graph/model';
@@ -1604,6 +1606,58 @@ const shellSections: NavSection[] = [
   { href: '/jobs/review', label: 'Review', icon: 'review', badge: 4 },
 ];
 
+/** Two Learn now cards in the form the writer now produces, for the deck. */
+const deckCards: FeedCard[] = [
+  {
+    id: '00000000-0000-4000-8000-000000000001',
+    reason: 'interest',
+    title: 'Cobweb model: Mechanism',
+    article: 'Cobweb model',
+    section: 'Mechanism',
+    why: 'You write about economic system design (Economics).',
+    hook: 'US hog prices swung in a four-year cycle for decades because farmers set next year’s herd from this year’s price.',
+    summary:
+      'When producers must commit to output before they see the price it will fetch, they plan from the last price. A high price brings a glut the following season, the glut drives the price down, and the low price brings a shortage. Whether the swings die out depends on whether supply responds to price more or less steeply than demand does.',
+    example:
+      'Suppose demand is P = 100 − Q and farmers plant Q = P from last year’s price. Starting at P = 60, they plant 60, which sells at 40; next year they plant 40, which sells at 60. With equal slopes the cycle neither grows nor shrinks, and any steeper supply response makes it explode.',
+    question:
+      'A government starts publishing forecasts of next season’s price that farmers trust. What happens to the cycle, and why?',
+    answer:
+      'It damps or disappears. The cycle comes from planting on last year’s price; if farmers plant on an accurate forecast instead, output matches what the market will clear at, so the overshoot never starts.',
+    depth: 'working',
+    returning: null,
+    shown: [
+      'The cobweb model or cobweb theory is an economic model that explains why prices might be subject to periodic fluctuations in certain types of markets.',
+    ],
+    rest: ['It describes cyclical supply and demand in a market where the amount produced must be chosen before prices are observed.'],
+    restMinutes: 1,
+    link: 'https://en.wikipedia.org/wiki/Cobweb_model#Mechanism',
+    site: 'Wikipedia',
+    licence: 'CC BY-SA 4.0',
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000002',
+    reason: 'gap',
+    title: 'Tax incidence: Elasticity',
+    article: 'Tax incidence',
+    section: 'Elasticity',
+    why: 'A field you write about but have never been tested in: Public economics.',
+    hook: 'Who legally pays a tax has no effect on who bears it; the less elastic side of the market ends up carrying most of it.',
+    summary: 'The burden of a tax splits between buyers and sellers in proportion to how little each can walk away.',
+    example: 'Cigarette taxes fall mostly on smokers, because demand barely moves with price.',
+    question: null,
+    answer: null,
+    depth: 'advanced',
+    returning: 'review',
+    shown: ['Tax incidence is the analysis of the effect of a particular tax on the distribution of economic welfare.'],
+    rest: [],
+    restMinutes: 0,
+    link: 'https://en.wikipedia.org/wiki/Tax_incidence',
+    site: 'Wikipedia',
+    licence: 'CC BY-SA 4.0',
+  },
+];
+
 export const SURFACES: readonly Surface[] = [
   {
     id: 'jobs-role-timeline',
@@ -1926,6 +1980,15 @@ export const SURFACES: readonly Surface[] = [
         ))}
       </ul>
     ),
+  },
+  {
+    /* Learn now as a deck: one card, the three swipes at its foot. Nothing
+     * here is recorded; the swipes only reach the server from the real page. */
+    id: 'learn-now-deck',
+    label: 'Learn now · One card at a time',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnNowFeed first={deckCards} ready={20} low={10} />,
   },
   {
     /* The chain a subject reads as: the doors it turns on, then everything

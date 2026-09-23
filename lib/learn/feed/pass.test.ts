@@ -166,6 +166,31 @@ describe('running the pass once', () => {
     expect(run.cards.map((card) => card.named_article)).toEqual(['Article 1', 'Article 3']);
   });
 
+  it('drops a pick whose section is not in the article rather than using the lead', async () => {
+    const run = ports();
+    run.ports.name = async () => ({ ok: true, named: [{ article: 'Supply and demand', section: 'Nope', basis: 'B.' }] });
+    const summary = await runFeedPicksFor(run.ports, { userId: 'u1', targets: 1, deadline: Number.MAX_SAFE_INTEGER, model: 'm' });
+    expect(summary.sectionMissing).toBe(1);
+    expect(run.cards).toEqual([]);
+  });
+
+  it('names each target at the depth its swipes earned, and stores the depth on the pick', async () => {
+    const progress = {
+      themes: new Map([['t0', { known: ['A', 'B'], review: ['C'] }]]),
+      fields: new Map(),
+    };
+    const run = ports({ loaded: person({ themes: person().themes.slice(0, 1), progress }) });
+    const depths: unknown[] = [];
+    const name = run.ports.name;
+    run.ports.name = async (target, avoid, depth) => {
+      depths.push(depth);
+      return name(target, avoid, depth);
+    };
+    await runFeedPicksFor(run.ports, { userId: 'u1', targets: 1, deadline: Number.MAX_SAFE_INTEGER, model: 'm' });
+    expect(depths[0]).toEqual({ depth: 'advanced', known: ['A', 'B'], review: ['C'] });
+    expect(run.cards.every((card) => card.depth === 'advanced')).toBe(true);
+  });
+
   it('tells the model which articles the person already has, including this run\'s', async () => {
     const run = ports({ loaded: person({ articlesHeld: ['Money'] }) });
     await runFeedPicksFor(run.ports, { userId: 'u1', targets: 2, deadline: Number.MAX_SAFE_INTEGER, model: 'm' });

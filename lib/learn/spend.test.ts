@@ -75,6 +75,7 @@ describe('the operation names', () => {
       'place-track',
       'name-feed-material',
       'write-feed-card',
+      'write-curriculum',
       'embed-map',
       'propose-theme-merges',
       'propose-position-merges',

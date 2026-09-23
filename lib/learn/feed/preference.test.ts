@@ -39,6 +39,16 @@ function seeded(seed: number): () => number {
 }
 
 describe('counting what you did with cards', () => {
+  it('counts a "work on this" swipe as a save, and known or skipped as nothing', () => {
+    const preferences = preferencesFrom([
+      card({ status: 'review', theme_id: 't', field_id: 'f' }),
+      card({ status: 'known', theme_id: 't', field_id: 'f' }),
+      card({ status: 'skipped', theme_id: 't', field_id: 'f' }),
+    ]);
+    expect(preferences.themes.get('t')).toEqual({ saved: 1, dismissed: 0 });
+    expect(preferences.fields.get('f')).toEqual({ saved: 1, dismissed: 0 });
+  });
+
   it('counts saves and dismissals, and nothing else', () => {
     const preferences = preferencesFrom([
       card({ status: 'dismissed', theme_id: 't1', field_id: 'a' }),

@@ -36,6 +36,7 @@ function card(id: string): CardToWrite {
     article: `Article ${id}`,
     section: null,
     text: 'Text.',
+    depth: 'working',
   };
 }
 
@@ -81,7 +82,7 @@ function fake(options: {
       if (outcome !== 'failed') state.picked = state.picked.filter((row) => row.id !== written.id);
       if (outcome === 'ready') {
         state.ready += 1;
-        return { outcome, summary: 'S.', why: 'W.' };
+        return { outcome, hook: 'H.', summary: 'S.', example: 'E.', question: null, answer: null, why: 'W.' };
       }
       return outcome === 'dropped' ? { outcome, reason: 'Off topic.' } : { outcome, detail: 'Down.' };
     },

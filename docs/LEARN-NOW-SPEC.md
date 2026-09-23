@@ -1,8 +1,10 @@
 # Learn now
 
-The first tab in Learn: an endless feed of things to read next, one card at a
+The first tab in Learn: an endless deck of things to learn next, one card at a
 time, chosen from what you write about and from the fields you have never
-touched. You scroll, read, and move on. Nothing on it asks you a question.
+touched. You read a card and swipe it away, saying whether you know it. Since
+"Cards after the first week" below, each card carries a question to try, but
+nothing is graded.
 
 Practice Flow keeps the questions, and only the questions. The two tabs split
 Learn by what you are in the mood for: taking something in, or being tested on
@@ -162,6 +164,75 @@ The counts are worked out from `learn.feed_cards` each time the pass runs,
 with no table of their own: the action is already on the card, and the pass
 already reads every card for the person. The code is
 `lib/learn/feed/preference.ts`.
+
+## Cards after the first week
+
+Decided by the owner on 23 September 2026, after using the feed. The first
+cards were dull: each was a summary of a Wikipedia section, so most of them
+restated definitions, nothing was applied, and many were pitched too low (one
+card was the lead of "Supply and demand"). Scrolling past a card also told the
+app nothing about whether the person knew it. Four changes follow.
+
+### What a card carries
+
+The writer (plan #807's call) now writes four parts from the section, and a
+card without the first three is dropped:
+
+| Part | What it is |
+|---|---|
+| Hook | One or two sentences, first on the card: the most interesting thing in the section, stated concretely. Never a definition. |
+| Summary | Two or three sentences from the section's text alone. |
+| In practice | The idea applied to one specific case, or a worked calculation. The model may use what it knows here, and only this part. |
+| Try this | A question that makes you use the idea, with the answer behind a tap. Left off when the model writes no answer. |
+
+The section's own text is folded under "Read the section". This overturns the
+earlier rule that the summary uses only the fetched text: the owner asked for
+applied material, and a Wikipedia section rarely carries a worked case.
+
+Cards written before this have no hook. They are no longer shown and no longer
+count towards the twenty kept ready, so the top-up replaces them. Their rows
+are kept.
+
+### How deep a pick goes
+
+Every pick starts at `working`: past the definitions and basics. The naming
+call is told not to name the lead of a broad article, and to prefer a narrow
+article about one mechanism, case or model. A named section the article does
+not have is now dropped rather than replaced by the lead.
+
+Each card on a theme swiped as known counts towards the next level: two for
+`advanced`, five for `specialist`. A gap card counts towards its field. The
+naming call is given the titles swiped as known and told to go past them, and
+the titles swiped as "work on this" and told to come at those ideas from
+another article. The level is stored on the pick as `depth`, shown on the
+card, and passed to the writer, which drops a section that only restates what
+that level is past. Code: `lib/learn/feed/depth.ts`.
+
+### The three swipes
+
+One card is on the screen at a time. It is left by a swipe, an arrow key, or
+the three buttons held at the foot of the card:
+
+| Swipe | Key | Status | What follows |
+|---|---|---|---|
+| Down: Got it | ↓ | `known` | The next picks on its theme go deeper. |
+| Right: Work on this | → | `review` | The card comes back after two days. Its theme counts it as a save and is drawn again without waiting out the three weeks. |
+| Left: Not now | ← | `skipped` | The card comes back after three days. Nothing else changes. |
+
+A downward swipe counts only from the top of the page, since further down the
+same gesture is scrolling back up. Swipes are not final: a card that came back
+can be swiped again. Save, Test me on this and Not interested stay on the card
+as smaller buttons; Not interested also takes the card off the deck.
+
+The deck replaces the Next button and the scroll-past marking of plans #833
+and #835, described under "What is recorded". Both existed so a card you had
+moved past would not come back; on the deck every card is left by a swipe,
+which says that and more. Cards already marked `passed` keep the status and
+are not shown again.
+
+The deck asks for more cards while four are still ahead, so moving on never
+waits for the network. It serves returning "work on this" cards first, then
+ready cards newest first, then returning skipped ones.
 
 ## Cost
 

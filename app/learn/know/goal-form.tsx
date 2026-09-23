@@ -83,10 +83,12 @@ function Proposal({
   chain,
   asked,
   sweepId,
+  unitId,
 }: {
   chain: ProposedChain;
   asked: string;
   sweepId?: string;
+  unitId?: string;
 }) {
   const [state, approve] = useActionState<ApproveState, FormData>(approveChain, {});
   const added = chain.nodes.filter((node) => !node.existingId).length;
@@ -95,6 +97,7 @@ function Proposal({
     <form action={approve} className="mt-6">
       <input type="hidden" name="asked" value={asked} />
       {sweepId && <input type="hidden" name="sweepId" value={sweepId} />}
+      {unitId && <input type="hidden" name="unitId" value={unitId} />}
       <input type="hidden" name="chain" value={JSON.stringify(chain)} />
 
       <p className="mb-2 text-body text-ink-muted">
@@ -136,9 +139,12 @@ export function GoalForm({
   subjects,
   goal,
   sweepId,
+  unitId,
   bare = false,
 }: {
   subjectId?: string;
+  /** The curriculum unit this goal opens; the approved chain is filed under it. */
+  unitId?: string;
   /**
    * Pick the subject here instead of being fixed to one, for the places that
    * offer a goal away from a subject page. The first one is selected, since
@@ -155,7 +161,7 @@ export function GoalForm({
   const [state, propose] = useActionState<ProposeState, FormData>(proposeGoal, {});
 
   if (state.chain && state.asked) {
-    return <Proposal chain={state.chain} asked={state.asked} sweepId={sweepId} />;
+    return <Proposal chain={state.chain} asked={state.asked} sweepId={sweepId} unitId={state.unitId} />;
   }
 
   const picker = subjects !== undefined && subjects.length > 0;
@@ -167,6 +173,7 @@ export function GoalForm({
     >
       {subjectId && <input type="hidden" name="subjectId" value={subjectId} />}
       {sweepId && <input type="hidden" name="sweepId" value={sweepId} />}
+      {unitId && <input type="hidden" name="unitId" value={unitId} />}
 
       {picker && (
         <Field

@@ -69,6 +69,41 @@ does not, the app proposes a subject and you can override it in one click.
 Nothing is auto-created silently, because the subject is the thing that
 accumulates and getting it wrong twice leaves you with two half-graphs.
 
+## The curriculum
+
+Decided by the owner on 23 September 2026. A track used to be only the chains
+its goals laid out, so its shape was whatever had been asked about so far. A
+track you create now starts with a fixed curriculum.
+
+- **Written once.** When the first chain is approved into a new track, one
+  Sonnet call lays out 6 to 12 units in teaching order. Each has a title, one
+  or two sentences on what it covers, and one sentence on what you can do
+  once it is learned. The same call names the unit your first question falls
+  in, and that goal is filed under it.
+- **Fixed after that.** Nothing regenerates, reorders or edits the units. The
+  table takes inserts and reads only, and the units go when the track is
+  deleted.
+- **Detail comes per unit.** Opening a unit runs the ordinary goal form with
+  the unit's title and outcome filled in, inside the track. The approved chain
+  is filed under the unit with `goals.unit_id`, and "Go deeper in this unit"
+  adds more goals to it later. This is how the graph gets more granular over
+  time without the top level moving.
+- **On the track page** the curriculum comes first. A unit reads as not
+  opened, in progress (with the ideas left across its goals), or done. The
+  first unit that is not done is marked Next. Goals asked outside the
+  curriculum are listed after it.
+- **Tracks without one** (made before this, started from a Learn now card or a
+  briefing, or whose first attempt failed) show a "Write the curriculum"
+  button that makes the same call.
+
+Tables: `learn.curriculum_units`, and `learn.goals.unit_id`. Code:
+`lib/learn/graph/curriculum.ts`, `curriculum-payload.ts`, `curriculum-store.ts`
+and `curriculum-view.ts`. Cost: one Sonnet call per track, recorded as
+`write-curriculum`.
+
+A track can be deleted from its page. Its units, ideas, states and probes go
+on the cascades; readings that pointed at one of its ideas stay on their lists.
+
 ## What a concept is
 
 A node is **one claim you can be right or wrong about**, not a topic heading.

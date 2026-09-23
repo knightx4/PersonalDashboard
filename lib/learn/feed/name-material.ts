@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { describeDepth, type DepthContext } from './depth';
 import type { FeedTarget } from './targets';
 
 /**
@@ -41,22 +42,37 @@ export type NameResult = { ok: true; named: NamedSection[] } | { ok: false; deta
 const SYSTEM = `You choose what one person should read next on English Wikipedia.
 
 You are given either a theme from their own notes, with the field of study it
-belongs to, or a field of study they have never looked at. Name two or three
-Wikipedia articles, and one section in each, that would teach them something
-worth knowing about it.
+belongs to, or a field of study they have never been tested in, and how far
+into it they already are. Name two or three Wikipedia articles, and one section
+in each, that would teach them something they do not already know.
 
+What makes a good pick:
+- It is about how something works, what happens when it is applied, a real
+  case, a measured result, a failure, or a disagreement. Sections such as
+  "Mechanism", "Applications", "Criticism", "Empirical evidence", "History" of
+  a specific result, or a named example are usually right.
+- It is never a definition or an overview. Do not name the lead of a broad
+  article ("Supply and demand", "Inflation", "Machine learning"): the lead of a
+  broad article restates what the person already knows. Name the lead only for
+  a narrow article, such as a named effect, case, model or experiment, where
+  the lead is the substance.
+- Prefer a narrow article about one specific thing over a broad one about a
+  whole topic. "Cobweb model" beats "Supply and demand"; "Hyperinflation in
+  Zimbabwe" beats "Inflation".
+
+Rules:
 - Use exact English Wikipedia article titles, as they appear at the top of the
-  article. Prefer established articles over obscure ones: a title that does not
-  exist is thrown away.
-- Name a real section heading from that article, as written there. Use null for
-  the article's lead when the lead is the part worth reading.
-- For a theme, pick sections that go deeper into the ideas behind it, not a
-  restatement of it. For a field they have never looked at, pick sections that
-  would make a good first read: a central idea, a founding result, a clear
-  overview.
+  article. A title that does not exist is thrown away.
+- Name a real section heading from that article, as written there, or null for
+  the lead of a narrow article.
 - Each pick is a different article.
-- "basis" is one sentence, under 25 words, saying why this section suits this
-  person.
+- When you are told which cards they already know, go past them: a harder or
+  more specific idea that builds on them, never the same ground again.
+- When you are told which cards they want to work on, come at those ideas from
+  a different article: an application, a case, or a related model that makes
+  the same idea concrete.
+- "basis" is one sentence, under 25 words, saying what this section adds for
+  this person.
 
 Report through ${TOOL_NAME}.`;
 
@@ -83,6 +99,20 @@ export function describeTarget(target: FeedTarget): string {
   return target.gap === 'untested'
     ? `A field they write about and have never been tested in: ${field}`
     : `A field they have never written about or studied: ${field}`;
+}
+
+/** How far in they are, and what they swiped on this target. Exported for the test. */
+export function describeProgress(context: DepthContext): string {
+  const lines = [`How deep to go: ${describeDepth(context.depth)}`];
+  if (context.known.length > 0) {
+    lines.push('', 'Cards on this they said they already know; go past these:');
+    lines.push(...context.known.map((title) => `- ${title}`));
+  }
+  if (context.review.length > 0) {
+    lines.push('', 'Cards on this they said they need to work on; make these ideas concrete from another angle:');
+    lines.push(...context.review.map((title) => `- ${title}`));
+  }
+  return lines.join('\n');
 }
 
 /**
@@ -120,6 +150,8 @@ export function articleKey(title: string): string {
 
 export async function nameMaterial(input: {
   target: FeedTarget;
+  /** How deep to pitch it, and what they swiped on this target before. */
+  depth: DepthContext;
   /** Articles this person already has cards from, by title. */
   avoid: string[];
   anthropicApiKey: string;
@@ -165,6 +197,8 @@ export async function nameMaterial(input: {
           role: 'user',
           content: [
             describeTarget(input.target),
+            '',
+            describeProgress(input.depth),
             '',
             avoidList.length > 0
               ? `They already have these articles; name others:\n${avoidList.map((title) => `- ${title}`).join('\n')}`
