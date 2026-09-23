@@ -1,9 +1,11 @@
 import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
+import { readAll } from '@/lib/learn/db/read-all';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { Subject } from '@/lib/learn/graph/load';
 import type { Graph } from '@/lib/learn/graph/model';
+import { loadSurveyCounts } from '@/lib/learn/survey/load';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import {
   buildAreaGrid,
@@ -27,26 +29,10 @@ import {
  * The tracks' graphs are passed in rather than read again. The Know page has
  * already loaded every one to count the tracks list, and reading them twice
  * would double the page's slowest part.
+ *
+ * Survey answers are read with `loadSurveyCounts` (plan #843), so a field
+ * whose only answered question came from the survey reads as tested.
  */
-
-/** PostgREST returns at most this many rows per request, so longer reads page. */
-const PAGE = 1000;
-
-export async function readAll<T>(
-  page: (
-    from: number,
-    to: number,
-  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
-): Promise<T[]> {
-  const rows: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await page(from, from + PAGE - 1);
-    if (error) throw new Error(error.message);
-    const batch = (data ?? []) as T[];
-    rows.push(...batch);
-    if (batch.length < PAGE) return rows;
-  }
-}
 
 export type LoadedAreaGrid = {
   grid: AreaGrid;
@@ -63,10 +49,11 @@ export async function loadAreaGrid(
   vault: VaultSupabaseClient,
   tracks: { subject: Subject; graph: Graph }[],
 ): Promise<LoadedAreaGrid> {
-  const [domainRead, fieldRead, placementRead] = await Promise.all([
+  const [domainRead, fieldRead, placementRead, survey] = await Promise.all([
     learn.from('area_domains').select('id, slug, name, position').order('position'),
     learn.from('area_fields').select('id, domain_id, name, slug, position'),
     learn.from('subjects').select('id, field_id, domain_id, placed_at'),
+    loadSurveyCounts(learn),
   ]);
   assertSchemaExposed(domainRead.error ?? fieldRead.error ?? placementRead.error, LEARN_SCHEMA);
   if (domainRead.error) throw new Error(`Reading the domains failed: ${domainRead.error.message}`);
@@ -167,7 +154,14 @@ export async function loadAreaGrid(
   }
 
   return {
-    grid: buildAreaGrid({ domains, fields, themes, tracks: gridTracks, unplacedTracks }),
+    grid: buildAreaGrid({
+      domains,
+      fields,
+      themes,
+      tracks: gridTracks,
+      survey: survey.byField,
+      unplacedTracks,
+    }),
     interestFailed,
   };
 }

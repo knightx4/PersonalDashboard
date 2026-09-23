@@ -25,6 +25,68 @@ by the owner on 23 September 2026.
   because starting a track is how the flow gets more questions.
 - The other tabs (Tracks, Reading lists, Quizzes) are unchanged.
 
+## Practice Flow
+
+Practice Flow, at `/learn/flow`, asks one question after another. Since plan
+#842 it asks about two kinds of subject:
+
+- **Your tracks.** The ideas in each track, shared between tracks by how much
+  you engage with each, as "What to do next" in
+  [LEARN-GRAPH-SPEC.md](LEARN-GRAPH-SPEC.md) describes.
+- **Subjects you write about that are not tracks.** A theme from your vault
+  map with notes linked to it and no track made from it. The question tests
+  one idea taken from those notes. These are survey questions. Each is kept in
+  a hidden subject that no list of your tracks shows (decision #838), and the
+  screen names the vault subject and its field above the question, with a line
+  saying it is not one of your tracks.
+
+A filter at the top of the page chooses between them:
+
+| Filter | What it asks about |
+|---|---|
+| Everything, the default (`/learn/flow`) | Your tracks, and survey questions at the rate below |
+| Tracks only (`/learn/flow?only=tracks`) | Your tracks and nothing else |
+
+Practice this on a track, and Test me on this on a Learn now card, open the
+flow on that one track (`?track=`). It asks only about that track, and the
+filter is not shown.
+
+### How often a survey question comes up
+
+Decision #839 set the rate. It is worked out from the fields you write about,
+meaning the fields with at least one of your themes placed in them:
+
+- While any of those fields has no answered question, in a track or in the
+  survey, one question in two is a survey question.
+- Once each has at least one, the rate falls with the share of fields that
+  still have fewer than three answered survey questions. A field where a track
+  has an answered question counts as having three.
+- Once every field has three, one question in five.
+
+At one in n, the next question is a survey question when none of the n - 1
+before it was. So at one in two the flow alternates, and at one in five it
+asks one survey question after every four about your tracks. The rate and the
+turn order are `surveyShare` and `surveySlots` in `lib/learn/survey/rate.ts`,
+with tests beside them.
+
+The subject a survey question is about is picked field by field, an untested
+field first, so the questions spread across fields rather than all coming
+from your strongest theme.
+
+### Written ahead
+
+Survey questions are written ahead into the same queue as track questions, so
+the next question is on the screen without waiting for a model call. Tracks
+only and a focused track leave a waiting survey question in the queue until
+the flow is next opened with no filter. When your tracks have nothing left to
+ask, the default flow asks survey questions alone. When a survey question
+cannot be written, a track question takes its turn.
+
+Survey answers are graded like any other answer. An answered survey question
+counts towards its field being tested on the Know grid, the same as an answer
+in a track placed there, and a field tested that way is no longer offered as
+one you have never been tested in (plan #843).
+
 ## Two rules this overturns
 
 [LEARN-SPEC.md](LEARN-SPEC.md) was written for a reading queue, and two of its

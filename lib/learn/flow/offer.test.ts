@@ -174,6 +174,17 @@ describe('the field you write about most and have never been tested in (plan #80
     expect(field?.name).toBe('Physics');
   });
 
+  it('passes over a field whose only answered question came from the survey', () => {
+    const field = strongestUntestedField({
+      fields: FIELDS,
+      placements,
+      strengths,
+      tracks: [{ fieldId: 'f-phys', answered: true }],
+      surveyed: new Set(['f-econ']),
+    });
+    expect(field?.name).toBe('History');
+  });
+
   it('is null when every field with themes has been tested', () => {
     const field = strongestUntestedField({
       fields: FIELDS,

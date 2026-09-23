@@ -131,18 +131,59 @@ describe('building the areas grid', () => {
       known: 14,
       total: 20,
       answered: 16,
+      surveyed: 0,
       lastAnswered: '2026-03-03T10:00:00Z',
     });
     expect(physics.kind).toBe('strong');
   });
+
+  it('counts a field tested when its only answer came from the survey', () => {
+    const g = buildAreaGrid({
+      domains: DOMAINS,
+      fields: FIELDS,
+      themes: [theme('Money', 10, { fieldId: 'f-econ' })],
+      tracks: [],
+      survey: new Map([['f-econ', { answered: 2, lastAnswered: '2026-09-20T10:00:00Z' }]]),
+    });
+    const econ = cell(g, 'f-econ');
+    expect(econ.tested).toEqual({
+      tracks: [],
+      known: 0,
+      total: 0,
+      answered: 0,
+      surveyed: 2,
+      lastAnswered: '2026-09-20T10:00:00Z',
+    });
+    expect(econ.kind).toBe('getting-there');
+    expect(kindLabel(econ)).toBe('Getting there');
+    expect(g.domains[0].total.tested.surveyed).toBe(2);
+  });
+
+  it('leaves a field untested when its survey questions are unanswered', () => {
+    const g = buildAreaGrid({
+      domains: DOMAINS,
+      fields: FIELDS,
+      themes: [theme('Money', 10, { fieldId: 'f-econ' })],
+      tracks: [],
+      survey: new Map([['f-econ', { answered: 0 }]]),
+    });
+    expect(cell(g, 'f-econ').kind).toBe('untested');
+  });
 });
 
 describe('the four kinds', () => {
-  const tested = (known: number, total: number, answered: number, tracks = ['T']) => ({
+  const tested = (
+    known: number,
+    total: number,
+    answered: number,
+    tracks = ['T'],
+    surveyed = 0,
+  ) => ({
     tracks,
     known,
     total,
     answered,
+    surveyed,
     lastAnswered: null,
   });
 
@@ -150,6 +191,12 @@ describe('the four kinds', () => {
     expect(kindOf(0, tested(10, 20, 3))).toBe('strong');
     expect(kindOf(3, tested(2, 20, 5))).toBe('getting-there');
     expect(kindOf(0, tested(0, 19, 0))).toBe('untested');
+  });
+
+  it('calls a field answered only through the survey getting there, never strong', () => {
+    expect(kindOf(3, tested(0, 0, 0, [], 5))).toBe('getting-there');
+    expect(kindOf(0, tested(0, 19, 0, ['T'], 1))).toBe('getting-there');
+    expect(kindOf(0, tested(10, 20, 3, ['T'], 1))).toBe('strong');
   });
 
   it('calls a field written about only once it is a tenth of the strongest', () => {
@@ -173,14 +220,35 @@ describe('the lines a cell says', () => {
 
   it('gives every count its size and its date, never a share', () => {
     expect(
-      testedLine({ tracks: ['T'], known: 14, total: 20, answered: 18, lastAnswered: 'x' }, day),
+      testedLine(
+        { tracks: ['T'], known: 14, total: 20, answered: 18, surveyed: 0, lastAnswered: 'x' },
+        day,
+      ),
     ).toBe('14 of 20 ideas known, last answered 3 March');
     expect(
-      testedLine({ tracks: ['T'], known: 0, total: 19, answered: 0, lastAnswered: null }, day),
+      testedLine(
+        { tracks: ['T'], known: 0, total: 19, answered: 0, surveyed: 0, lastAnswered: null },
+        day,
+      ),
     ).toBe('0 of 19 ideas known, nothing answered yet');
     expect(
-      testedLine({ tracks: [], known: 0, total: 0, answered: 0, lastAnswered: null }, day),
+      testedLine(
+        { tracks: [], known: 0, total: 0, answered: 0, surveyed: 0, lastAnswered: null },
+        day,
+      ),
     ).toBe('No track here');
+    expect(
+      testedLine(
+        { tracks: [], known: 0, total: 0, answered: 0, surveyed: 1, lastAnswered: 'x' },
+        day,
+      ),
+    ).toBe('1 survey answer, last answered 3 March');
+    expect(
+      testedLine(
+        { tracks: ['T'], known: 0, total: 19, answered: 0, surveyed: 2, lastAnswered: 'x' },
+        day,
+      ),
+    ).toBe('0 of 19 ideas known, 2 survey answers, last answered 3 March');
     expect(interestLine({ themes: 1, strength: 2, lastWritten: 'x', strongest: [] }, day)).toBe(
       '1 theme, last written 3 March',
     );

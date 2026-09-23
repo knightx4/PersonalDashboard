@@ -156,6 +156,7 @@ function domainTotal(row: DomainRow): string {
   const parts = [plural(interest.themes, 'theme', 'themes')];
   if (tested.total > 0)
     parts.push(`${tested.known} of ${plural(tested.total, 'idea', 'ideas')} known`);
+  if (tested.surveyed > 0) parts.push(plural(tested.surveyed, 'survey answer', 'survey answers'));
   return parts.join(' · ');
 }
 

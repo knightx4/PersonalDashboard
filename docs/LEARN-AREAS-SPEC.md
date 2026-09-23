@@ -197,7 +197,7 @@ field inside it. Each cell shows two signals side by side.
 | Signal | Read from | Shown as |
 |---|---|---|
 | Interest | The `strength` of the themes placed in the field | A shade, and the names of the strongest two themes |
-| Tested knowledge | Concept states in subjects placed in the field | Settled out of total, and the date of the last answer |
+| Tested knowledge | Concept states in subjects placed in the field, and survey questions answered about its themes | Settled out of total, the number of survey answers, and the date of the last answer |
 
 Together they sort each field into one of four kinds:
 
@@ -232,9 +232,13 @@ thresholds decide what a cell looks like, and each is a constant in that file:
   ordering with no unit. A field under a tenth of the strongest is drawn
   lightest and does not count as written about; one at two fifths or more is
   drawn darkest.
-- **Tested** needs one answered question in a track placed in the field. A
-  track with nothing answered makes its field "not tested yet", never "getting
-  there".
+- **Tested** needs one answered question in a track placed in the field, or
+  one answered survey question about a theme placed there (plan #843, and
+  Practice Flow in [LEARN-NOW-SPEC.md](LEARN-NOW-SPEC.md)). A track with
+  nothing answered makes its field "not tested yet", never "getting there". A
+  field answered only through the survey is "getting there" and never
+  "strong", because strong is a share of a track's ideas and the survey asks
+  about a few ideas from your notes.
 - **Strong** is half or more of the field's ideas known, once something has
   been answered. It is read off the tested side alone, since the shade already
   says whether you also write about it.
@@ -252,8 +256,8 @@ the basis as what the pass had said. The pure part is `lib/learn/areas/move.ts`.
 
 `/learn/next` gains a fourth kind of row: **a field you write about and have
 never been tested in.** A field qualifies when the themes placed in it are
-among your strongest and no subject placed in it has a single answered
-question. The row offers what the page already offers when it is empty, naming
+among your strongest, no subject placed in it has a single answered
+question, and no survey question about its themes has been answered. The row offers what the page already offers when it is empty, naming
 a goal, scoped to that field. It says why it is there in one line, like every
 other row.
 

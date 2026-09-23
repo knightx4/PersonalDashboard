@@ -33,6 +33,14 @@ import { readStories, type NewsStory } from '@/lib/news/issues/stories';
  * 0006_issues_summary_line.sql. A reply that leaves it out still stores the
  * summary, with the line null.
  *
+ * A redo. An issue that already has a summary can be digested again, which is
+ * how the issues summarised before the line existed get one. A redo that fails
+ * keeps the summary it had and only moves `digested_at`, since the row cannot
+ * hold a summary and an error at once and the old summary is still worth
+ * reading. A redo that succeeds deletes the issue's rows in `story_passes`
+ * (plan #849, 0007_story_passes.sql): a pass names a story by its position in
+ * the array, and the new array puts different stories at those positions.
+ *
  * Pictures and the story's own text. Each picture in the HTML is replaced by
  * an `[image N]` marker the same way links are, and the model gives the
  * number of the one printed with each story; the stored address is the
@@ -448,7 +456,9 @@ function errorText(error: unknown): string {
  * `spend` is a client bound to the core schema; the call's cost is written to
  * core.model_spend under module 'news', operation 'digest-issue', whether the
  * reply was usable or not. Throws only when the row itself cannot be read or
- * written; a failed model call is saved as `digest_error` and returned.
+ * written; a failed model call is saved as `digest_error` and returned, unless
+ * the issue already had a summary, which is then kept. A new summary over an
+ * old one also clears the issue's story passes.
  */
 export async function digestIssue(input: {
   news: NewsSupabaseClient;
@@ -460,7 +470,7 @@ export async function digestIssue(input: {
 }): Promise<DigestOutcome> {
   const { data, error } = await input.news
     .from('issues')
-    .select('subject, text_body, html_body')
+    .select('subject, text_body, html_body, summary')
     .eq('id', input.issueId)
     .eq('user_id', input.userId)
     .maybeSingle();
@@ -493,7 +503,9 @@ export async function digestIssue(input: {
           stories: outcome.stories,
           digest_error: null,
         }
-      : { summary: null, summary_line: null, stories: null, digest_error: outcome.error };
+      : data.summary
+        ? {}
+        : { summary: null, summary_line: null, stories: null, digest_error: outcome.error };
 
   const saved = await input.news
     .from('issues')
@@ -511,5 +523,19 @@ export async function digestIssue(input: {
   }
 
   if (saved.error) throw new Error(`news: saving the summary failed (${saved.error.message})`);
+
+  // A new summary over an old one rewrites the stories array, and a pass names
+  // a story by its position in it, so the old passes would now skip the wrong
+  // stories. A first summary has none to clear.
+  if (outcome.status === 'digested' && data.summary) {
+    const cleared = await input.news
+      .from('story_passes')
+      .delete()
+      .eq('issue_id', input.issueId)
+      .eq('user_id', input.userId);
+    if (cleared.error) {
+      throw new Error(`news: clearing the stories passed failed (${cleared.error.message})`);
+    }
+  }
   return outcome;
 }

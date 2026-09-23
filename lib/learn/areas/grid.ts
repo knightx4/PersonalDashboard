@@ -8,7 +8,8 @@ import type { StatusGlyph } from '@/lib/status-glyphs';
  * reading. One row per domain in the table's order, one cell per field, and
  * two signals in every cell that are never added together. Interest is what
  * the vault's themes say you write about; tested is what the tracks placed
- * in the field say you have shown. KNOWLEDGE-SPEC removed the idea that
+ * in the field, and the survey questions about its themes, say you have
+ * shown. KNOWLEDGE-SPEC removed the idea that
  * writing about something counts as knowing it, and one combined number
  * would bring it back, so nothing below produces one.
  */
@@ -50,6 +51,12 @@ export type GridTrack = TrackTested & {
   domainId: string | null;
 };
 
+/**
+ * Survey questions answered about the themes placed in one field (plan #843).
+ * The same shape `loadSurveyCounts` returns per field.
+ */
+export type GridSurvey = { answered: number; lastAnswered?: string };
+
 export type Interest = {
   themes: number;
   /** Summed strength. An ordering, never printed (see the vault's map). */
@@ -63,7 +70,11 @@ export type Tested = {
   tracks: string[];
   known: number;
   total: number;
+  /** Ideas in those tracks with an answered question behind them. */
   answered: number;
+  /** Survey questions answered about themes placed here. */
+  surveyed: number;
+  /** The latest answer, in a track or in the survey. */
   lastAnswered: string | null;
 };
 
@@ -73,6 +84,9 @@ export type Tested = {
  * `strong` and `getting-there` both need at least one answered question: a
  * track placed in a field with nothing answered has shown nothing yet, and
  * calling its field "getting there" would claim a test that never happened.
+ * A survey answer counts as that question. A field answered only through the
+ * survey is `getting-there` and never `strong`, since `strong` is a share of
+ * a track's ideas and the survey asks about a handful of ideas, not a chain.
  * `strong` is read off the tested side alone; the shade beside it already
  * says whether you also write about it, and folding that in would make the
  * kind a combined score by another route.
@@ -168,13 +182,17 @@ function interestOf(themes: GridTheme[]): Interest {
   };
 }
 
-function testedOf(tracks: GridTrack[]): Tested {
+function testedOf(tracks: GridTrack[], survey?: GridSurvey): Tested {
   return {
     tracks: tracks.map((track) => track.name).sort((a, b) => a.localeCompare(b)),
     known: tracks.reduce((sum, track) => sum + track.known, 0),
     total: tracks.reduce((sum, track) => sum + track.total, 0),
     answered: tracks.reduce((sum, track) => sum + track.answered, 0),
-    lastAnswered: tracks.reduce<string | null>((at, track) => later(at, track.lastAnswered), null),
+    surveyed: survey?.answered ?? 0,
+    lastAnswered: tracks.reduce<string | null>(
+      (at, track) => later(at, track.lastAnswered),
+      survey?.lastAnswered ?? null,
+    ),
   };
 }
 
@@ -195,6 +213,7 @@ function sumTested(parts: Tested[]): Tested {
     known: parts.reduce((sum, part) => sum + part.known, 0),
     total: parts.reduce((sum, part) => sum + part.total, 0),
     answered: parts.reduce((sum, part) => sum + part.answered, 0),
+    surveyed: parts.reduce((sum, part) => sum + part.surveyed, 0),
     lastAnswered: parts.reduce<string | null>((at, part) => later(at, part.lastAnswered), null),
   };
 }
@@ -211,6 +230,7 @@ export function kindOf(shade: InterestShade, tested: Tested): AreaKind {
   if (tested.answered > 0) {
     return tested.known >= tested.total * STRONG_KNOWN_SHARE ? 'strong' : 'getting-there';
   }
+  if (tested.surveyed > 0) return 'getting-there';
   // A track placed here with nothing answered yet is still something on the
   // way to being tested, so its field is not drawn as though it were empty.
   if (shade >= 2 || tested.tracks.length > 0) return 'untested';
@@ -222,6 +242,8 @@ export function buildAreaGrid(input: {
   fields: GridField[];
   themes: GridTheme[];
   tracks: GridTrack[];
+  /** Survey answers by field id. A field missing from it has none. */
+  survey?: ReadonlyMap<string, GridSurvey>;
   /** Tracks not placed yet, or placed across domains. Counted, not drawn. */
   unplacedTracks?: number;
 }): AreaGrid {
@@ -266,7 +288,7 @@ export function buildAreaGrid(input: {
         .sort((a, b) => a.position - b.position)
         .map((field): FieldCell => {
           const interest = fieldInterest.get(field.id) ?? blankInterest();
-          const tested = testedOf(tracksAt.get(field.id) ?? []);
+          const tested = testedOf(tracksAt.get(field.id) ?? [], input.survey?.get(field.id));
           const shade = shadeFor(interest.strength, strongest);
           return {
             id: field.id,
@@ -349,10 +371,20 @@ export function interestLine(
  * percentage of nineteen ideas claims a precision the answers do not have.
  */
 export function testedLine(tested: Tested, day: (at: string | null) => string | null): string {
-  if (tested.tracks.length === 0) return 'No track here';
-  if (tested.total === 0) return 'No ideas yet';
-  const size = `${tested.known} of ${plural(tested.total, 'idea', 'ideas')} known`;
-  if (tested.answered === 0) return `${size}, nothing answered yet`;
+  const survey =
+    tested.surveyed > 0 ? plural(tested.surveyed, 'survey answer', 'survey answers') : null;
+  let size: string;
+  if (tested.tracks.length === 0) {
+    if (!survey) return 'No track here';
+    size = survey;
+  } else if (tested.total === 0 && !survey) {
+    return 'No ideas yet';
+  } else {
+    const known =
+      tested.total > 0 ? `${tested.known} of ${plural(tested.total, 'idea', 'ideas')} known` : null;
+    size = [known, survey].filter(Boolean).join(', ');
+    if (tested.answered === 0 && !survey) return `${size}, nothing answered yet`;
+  }
   const when = day(tested.lastAnswered);
   return when ? `${size}, last answered ${when}` : size;
 }

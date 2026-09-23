@@ -4,7 +4,7 @@ import { after } from 'next/server';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { fillQueue, nextQuestion, putBack } from '@/lib/learn/flow/ahead';
+import { fillQueue, nextQuestion, putBack, type FlowScope } from '@/lib/learn/flow/ahead';
 import {
   loadTrackOffer,
   recordTrackOffer,
@@ -49,6 +49,15 @@ function trackFrom(formData: FormData): string | null {
 }
 
 /**
+ * Which questions the flow asks, from the form's hidden `track` and `only`
+ * fields. `only=tracks` is the Tracks only filter (plan #842): with it, and
+ * with a track, no survey questions are asked.
+ */
+function scopeFrom(formData: FormData): FlowScope {
+  return { track: trackFrom(formData), tracksOnly: formData.get('only') === 'tracks' };
+}
+
+/**
  * Asks, or answers, depending on which form was submitted.
  *
  * One action rather than two, because the flow alternates between them
@@ -63,23 +72,25 @@ function trackFrom(formData: FormData): string | null {
 // latency: pending
 export async function flowStep(prev: FlowState, formData: FormData): Promise<FlowState> {
   const user = await requireUser();
-  const supabase = await createLearnClient();
+  const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
 
-  const track = trackFrom(formData);
+  const scope = scopeFrom(formData);
   const intent = formData.get('intent');
 
   // Not now is a button on the answer form, so it arrives carrying that
   // form's intent and is told apart by its own field.
   const state =
     formData.get('notNow') === '1'
-      ? await notNow(prev, track, user.id)
+      ? await notNow(prev, scope, user.id)
       : intent === 'answer'
-        ? await answerFlowQuestion(prev, formData, track)
+        ? await answerFlowQuestion(prev, formData, scope)
         : intent === 'start-track'
           ? await startOfferedTrack(prev, formData, user.id)
-          : toFlowState(await nextQuestion(supabase, user.id, { resume: false, track }));
+          : toFlowState(
+              await nextQuestion(supabase, user.id, { resume: false, ...scope, vault }),
+            );
 
-  after(() => fillQueue(supabase, user.id, track));
+  after(() => fillQueue(supabase, user.id, scope, vault));
   return state;
 }
 
@@ -92,11 +103,11 @@ export async function flowStep(prev: FlowState, formData: FormData): Promise<Flo
  * aside cannot be the one that comes up. With nothing else to ask, the same
  * question stays on the screen rather than the flow saying it is finished.
  */
-async function notNow(prev: FlowState, track: string | null, userId: string): Promise<FlowState> {
+async function notNow(prev: FlowState, scope: FlowScope, userId: string): Promise<FlowState> {
   if (!prev.probeId || prev.answered) return prev;
-  const supabase = await createLearnClient();
+  const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
 
-  const next = await nextQuestion(supabase, userId, { resume: false, track });
+  const next = await nextQuestion(supabase, userId, { resume: false, ...scope, vault });
   if (next.kind === 'error') return { ...prev, error: next.detail };
   if (next.kind === 'nothing') {
     return { ...prev, error: 'Nothing else to ask right now, so this one stays.' };
@@ -147,11 +158,12 @@ async function startOfferedTrack(
  * have answered the question already on the screen.
  */
 // latency: instant
-export async function fillFlowQueue(track: string | null): Promise<void> {
+export async function fillFlowQueue(track: string | null, tracksOnly = false): Promise<void> {
   const user = await requireUser();
-  const supabase = await createLearnClient();
+  const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
   const focus = TrackId.safeParse(track);
-  after(() => fillQueue(supabase, user.id, focus.success ? focus.data : null));
+  const scope = { track: focus.success ? focus.data : null, tracksOnly: tracksOnly === true };
+  after(() => fillQueue(supabase, user.id, scope, vault));
 }
 
 /**
@@ -170,10 +182,12 @@ export async function fillFlowQueue(track: string | null): Promise<void> {
 async function answerFlowQuestion(
   prev: FlowState,
   formData: FormData,
-  focus: string | null,
+  scope: FlowScope,
 ): Promise<FlowState> {
   const supabase = await createLearnClient();
-  const subjectId = prev.subjectId;
+  // A survey question's subject is hidden, not a track, so it has no track
+  // line to move.
+  const subjectId = prev.survey ? undefined : prev.subjectId;
   const before = subjectId ? await loadGraph(supabase, subjectId).catch(() => null) : null;
 
   const answered: FlowState = {
@@ -190,7 +204,7 @@ async function answerFlowQuestion(
   // running low means that track is nearly done, not that you need another.
   const [after, offer] = await Promise.all([
     before && subjectId ? loadGraph(supabase, subjectId).catch(() => null) : null,
-    focus === null ? createVaultClient().then((vault) => loadTrackOffer(supabase, vault)) : null,
+    scope.track === null ? createVaultClient().then((vault) => loadTrackOffer(supabase, vault)) : null,
   ]);
   return {
     ...answered,

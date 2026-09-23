@@ -382,7 +382,7 @@ existing vault-provider boundary.
 |---|---|
 | `/learn` | redirects to `/learn/now`, Learn now, the first tab ([LEARN-NOW-SPEC](LEARN-NOW-SPEC.md)). It was the tracks until plan #773 and Practice Flow until #805 |
 | `/learn/now` | Learn now. Until its feed is built, the readings you queued with Read now |
-| `/learn/flow` | Practice Flow, a question on the screen when the page opens ([LEARN-GRAPH-SPEC](LEARN-GRAPH-SPEC.md)) |
+| `/learn/flow` | Practice Flow, a question on the screen when the page opens ([LEARN-GRAPH-SPEC](LEARN-GRAPH-SPEC.md)). What it asks about, and the Tracks only filter, are in [LEARN-NOW-SPEC](LEARN-NOW-SPEC.md) |
 | `/learn/lists` | tracks, shown as reading lists, with progress. `EmptyState` pointing at `/learn/new` when there are none |
 | `/learn/new` | question + paste, then the confirm list |
 | `/learn/t/[id]` | one track: the question at the top, then ordered readings |
