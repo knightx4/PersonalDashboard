@@ -118,7 +118,7 @@ function OpenedPanel({ opened }: { opened: OpenedThemes }) {
   return (
     <div
       id={OPENED_ID}
-      className="mt-3 scroll-mt-16 rounded-control border border-border bg-surface p-3"
+      className="mt-3 scroll-mt-16 rounded-control bg-sunken p-3"
     >
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-ui font-semibold text-ink">

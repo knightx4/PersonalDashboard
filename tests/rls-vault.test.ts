@@ -772,10 +772,10 @@ describe('link pairs, across users', () => {
     const [first, second] = [positionA, positionA2].sort();
     const [row] = await asUser(
       userB,
-      (tx) => tx`select * from record_position_links(${JSON.stringify([
+      (tx) => tx`select * from record_position_links(${tx.json([
         { a_id: first, b_id: second, relation: 'contradicts', from_id: first,
           reason: 'x', confidence: 0.5, model: 'm' },
-      ])}::jsonb)`,
+      ] as never)})`,
     );
     expect([row.recorded, row.edges]).toEqual([0, 0]);
   });

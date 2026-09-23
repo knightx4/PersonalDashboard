@@ -115,6 +115,7 @@ describe('RLS coverage', () => {
       'concept_state',
       'concept_subjects',
       'concepts',
+      'curriculum_units',
       'feed_cards',
       'goals',
       'imports',
@@ -455,6 +456,71 @@ describe('the cards behind Learn now', () => {
     const [row] = await admin<{ theme_id: string | null; theme_name: string }[]>`
       select theme_id, theme_name from feed_cards where id = ${cardA}`;
     expect(row).toEqual({ theme_id: null, theme_name: 'Central banks' });
+  });
+});
+
+describe('the curriculum at the top of a track', () => {
+  // 0038_curriculum.sql. Units are written once when a track is made, so a
+  // signed-in user may add and read them and never change one; the composite
+  // key to subjects is what stops a unit landing on someone else's track.
+  let subjectA = '';
+  let subjectB = '';
+  let unitA = '';
+
+  beforeAll(async () => {
+    const [a] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Economics') returning id`;
+    const [b] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userB}, 'Bob studies') returning id`;
+    subjectA = a.id;
+    subjectB = b.id;
+    const [unit] = await admin<{ id: string }[]>`
+      insert into curriculum_units (user_id, subject_id, ordinal, title, covers, outcome)
+      values (${userA}, ${subjectA}, 1, 'Price elasticity', 'How demand answers price.',
+              'Say which goods are elastic.')
+      returning id`;
+    unitA = unit.id;
+  });
+
+  it('shows the owner their units and another user none of them', async () => {
+    const own = await asUser(userA, (tx) => tx`select id from curriculum_units`);
+    const other = await asUser(userB, (tx) => tx`select id from curriculum_units`);
+    expect(own).toHaveLength(1);
+    expect(other).toHaveLength(0);
+  });
+
+  it('lets the owner add a unit to their own track', async () => {
+    await asUser(
+      userB,
+      (tx) => tx`insert into curriculum_units (user_id, subject_id, ordinal, title, covers, outcome)
+                 values (${userB}, ${subjectB}, 1, 'Bob unit', 'Covers.', 'Outcome.')`,
+    );
+    const [row] = await admin<{ count: number }[]>`
+      select count(*)::int as count from curriculum_units where subject_id = ${subjectB}`;
+    expect(row.count).toBe(1);
+  });
+
+  it("refuses a unit on another user's track", async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into curriculum_units (user_id, subject_id, ordinal, title, covers, outcome)
+                   values (${userB}, ${subjectA}, 2, 'Smuggled', 'Covers.', 'Outcome.')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('does not let a signed-in user change a unit once written', async () => {
+    await expect(
+      asUser(userA, (tx) => tx`update curriculum_units set title = 'Renamed' where id = ${unitA}`),
+    ).rejects.toThrow();
+  });
+
+  it('goes with its track', async () => {
+    await admin`delete from subjects where id = ${subjectA}`;
+    const [row] = await admin<{ count: number }[]>`
+      select count(*)::int as count from curriculum_units where id = ${unitA}`;
+    expect(row.count).toBe(0);
   });
 });
 
