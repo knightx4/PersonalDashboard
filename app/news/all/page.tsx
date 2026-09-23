@@ -4,20 +4,24 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { FilterChips } from '@/components/shell/filter-chips';
+import { FilterChips, type FilterChip } from '@/components/shell/filter-chips';
+import { TopicChips, topicHrefs } from '@/components/news/topic-chips';
 import { requireUser } from '@/lib/auth/server';
 import { cn } from '@/lib/cn';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { deliveryGap } from '@/lib/news/inbound/readiness';
-import { loadIssues, loadSenders } from '@/lib/news/issues/load';
+import { loadIssues, loadSenders, loadUnreadStories } from '@/lib/news/issues/load';
 import {
   countLabel,
   formatArrival,
+  listHref,
   senderLabel,
   sortSenders,
+  unreadTopics,
   visibleIssues,
 } from '@/lib/news/issues/list';
+import { readTopic } from '@/lib/news/issues/topics';
 import { setSenderMuted } from '../actions';
 
 export const metadata = { title: 'Newsletters' };
@@ -34,28 +38,44 @@ export const dynamic = 'force-dynamic';
  *
  * The confirmation mail a publisher sends when you sign up arrives here like
  * anything else, which is how you reach the link in it.
+ *
+ * A topic chip (#860) narrows the list to newsletters with at least one story
+ * on that topic, as `?topic=` beside the sender's `?from=`; each keeps the
+ * other.
  */
 export default async function NewsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string }>;
+  searchParams: Promise<{ from?: string; topic?: string }>;
 }) {
-  const { from } = await searchParams;
+  const { from, topic: topicParam } = await searchParams;
+  const topic = readTopic(topicParam) ?? null;
   const user = await requireUser();
   const client = await createNewsClient();
 
-  const [settings, senders, issues] = await Promise.all([
+  const [settings, senders, issues, unread] = await Promise.all([
     loadAccountSettings(user.id),
     loadSenders(client),
-    loadIssues(client),
+    loadIssues(client, { topic }),
+    loadUnreadStories(client),
   ]);
 
   const byId = new Map(senders.map((sender) => [sender.id, sender]));
   const selected = from && byId.has(from) ? from : null;
   const shown = visibleIssues(issues, senders, selected);
   const column = sortSenders(senders);
+  const topics = unreadTopics(unread, senders, selected);
+  // The topic in force is shown by its own chip row below, so only the sender is here.
+  const filters: FilterChip[] = [];
+  if (selected) {
+    filters.push({
+      label: 'From',
+      value: senderLabel(byId.get(selected)!),
+      clearHref: listHref({ from: null, topic }),
+    });
+  }
 
-  if (issues.length === 0) {
+  if (issues.length === 0 && !topic) {
     /**
      * Empty has two meanings and they must not read alike. Nothing has been
      * sent yet is a waiting room. Nothing *can* be received is a broken
@@ -94,19 +114,21 @@ export default async function NewsPage({
         description="What has been sent to the address that belongs to this app."
       />
 
-      {selected && (
-        <FilterChips
-          chips={[{ label: 'From', value: senderLabel(byId.get(selected)!), clearHref: '/news/all' }]}
-          clearAllHref="/news/all"
-        />
-      )}
+      <FilterChips chips={filters} clearAllHref="/news/all" />
+      <TopicChips
+        topics={topics}
+        selected={topic}
+        hrefs={topicHrefs(topics, (t) => listHref({ from: selected, topic: t }))}
+        allHref={listHref({ from: selected, topic: null })}
+        className="mb-4"
+      />
 
       <div className="grid gap-5 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
         <nav aria-label="Filter by sender" className="space-y-1">
           {column.map((sender) => (
             <div key={sender.id} className="flex items-center gap-1">
               <a
-                href={selected === sender.id ? '/news/all' : `/news/all?from=${sender.id}`}
+                href={listHref({ from: selected === sender.id ? null : sender.id, topic })}
                 aria-current={selected === sender.id ? 'true' : undefined}
                 className={cn(
                   'min-w-0 flex-1 truncate rounded-control px-2 py-1.5 text-ui transition-colors duration-150 hover:bg-canvas',
@@ -143,13 +165,27 @@ export default async function NewsPage({
           {shown.length === 0 ? (
             <EmptyState
               icon={Mail}
-              title={selected ? 'Nothing from them yet' : 'Every sender is muted'}
-              description={
-                selected
-                  ? 'This sender has written to you before, but nothing of theirs is here now.'
-                  : 'Everything that has arrived is from a sender you have muted. Unmute one in the column, or pick it to read what it sent.'
+              title={
+                topic
+                  ? `Nothing on ${topic}`
+                  : selected
+                    ? 'Nothing from them yet'
+                    : 'Every sender is muted'
               }
-              action={selected ? { label: 'Show everything', href: '/news/all' } : undefined}
+              description={
+                topic
+                  ? 'No newsletter here has a story on this topic.'
+                  : selected
+                    ? 'This sender has written to you before, but nothing of theirs is here now.'
+                    : 'Everything that has arrived is from a sender you have muted. Unmute one in the column, or pick it to read what it sent.'
+              }
+              action={
+                topic
+                  ? { label: 'Show every topic', href: listHref({ from: selected, topic: null }) }
+                  : selected
+                    ? { label: 'Show everything', href: '/news/all' }
+                    : undefined
+              }
             />
           ) : (
             <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
@@ -162,7 +198,9 @@ export default async function NewsPage({
                       // comes back to it. An issue knows its sender and
                       // cannot know whether you were filtered to them, so the
                       // list is the only thing that can say -- note 71889d79.
-                      href={selected ? `/news/i/${issue.id}?from=${selected}` : `/news/i/${issue.id}`}
+                      href={
+                        selected ? `/news/i/${issue.id}?from=${selected}` : `/news/i/${issue.id}`
+                      }
                       className="flex items-baseline gap-3 px-4 py-3 transition-colors duration-150 hover:bg-canvas"
                     >
                       <span

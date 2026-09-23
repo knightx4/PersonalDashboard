@@ -1,4 +1,6 @@
 import { safeTimeZone } from '@/lib/core/timezone';
+import { readStories } from './stories';
+import { NEWS_TOPICS, type NewsTopic } from './topics';
 
 /** One newsletter in the list. The body is not read until you open it. */
 export type NewsIssue = {
@@ -39,14 +41,55 @@ export function sortSenders(senders: readonly NewsSender[]): NewsSender[] {
  *
  * Issues arrive newest first from the query and stay in that order.
  */
-export function visibleIssues(
-  issues: readonly NewsIssue[],
+export function visibleIssues<T extends { senderId: string }>(
+  issues: readonly T[],
   senders: readonly NewsSender[],
   senderId: string | null,
-): NewsIssue[] {
+): T[] {
   if (senderId) return issues.filter((issue) => issue.senderId === senderId);
   const muted = new Set(senders.filter((sender) => sender.muted).map((sender) => sender.id));
   return issues.filter((issue) => !muted.has(issue.senderId));
+}
+
+/** An unread newsletter's stories as stored, for the list's topic chips. */
+export type UnreadStories = { senderId: string; stories: unknown };
+
+/**
+ * The topics the list offers as chips (plan #860), in NEWS_TOPICS order: every
+ * topic carried by a story in an unread newsletter the list would draw, under
+ * the same sender and muting rules as visibleIssues. A topic with nothing
+ * unread gets no chip.
+ */
+export function unreadTopics(
+  unread: readonly UnreadStories[],
+  senders: readonly NewsSender[],
+  senderId: string | null,
+): NewsTopic[] {
+  const found = new Set<NewsTopic>();
+  for (const issue of visibleIssues(unread, senders, senderId)) {
+    for (const story of readStories(issue.stories)) {
+      if (story.topic) found.add(story.topic);
+    }
+  }
+  return NEWS_TOPICS.filter((topic) => found.has(topic));
+}
+
+/**
+ * The list's address with its filters on it: one sender, one topic, both or
+ * neither. Each link on the list that changes one filter keeps the other.
+ */
+export function listHref({
+  from,
+  topic,
+}: {
+  from: string | null;
+  topic: NewsTopic | null;
+}): string {
+  const query = new URLSearchParams();
+  if (from) query.set('from', from);
+  if (topic) query.set('topic', topic);
+  const search = query.toString();
+  return search ? `/news/all?${search}` : '/news/all';
 }
 
 /**
