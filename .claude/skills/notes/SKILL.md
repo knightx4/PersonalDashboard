@@ -193,12 +193,18 @@ closing.
 **Run the full gate once, before the merge.** These are the checks each note
 skipped, and this is where they are paid for:
 
-    npx eslint app lib components scripts --max-warnings 0
-    npx vitest run lib      # two FX tests fail without network; that is pre-existing
-    npx next build
+    npm run gate
+
+It runs what CI runs on main: the test database, migrations, typecheck, lint,
+contrast, UI laws, the whole test suite including tests/, and the build, and
+stops at the first failure with the step's name. Run it after merging
+`origin/main` into the batch branch, so it checks what main will be. The old
+gate was lint, `vitest run lib` and the build, and every failure that kept
+main red on 23 September 2026 came through what that left out.
 
 Anything that fails here belongs to whichever note broke it: fix it, and amend
-or add a commit against that note. Do not merge a batch that has not been
+or add a commit against that note. A failure another session merged is yours
+too, since main is what you are about to push. Do not merge a batch that has not been
 through this — the per-note checks were narrowed on the understanding that it
 happens here.
 

@@ -38,6 +38,19 @@ configure could not get through the cloud proxy, and its failure notice at
 session start kept being read as the connector being down. Do not recreate
 it, even where the vendored Supabase skill says to.
 
+## Run the gate before pushing to main
+
+Every session that pushes to main runs `npm run gate` first, after merging
+`origin/main` into its branch, and pushes only when it ends with `gate: all
+clear`. The gate ([scripts/gate.sh](scripts/gate.sh)) runs the same checks as
+CI's check and design jobs, starting the local test database the tests/ suite
+needs. It takes about six minutes.
+
+Several sessions merge to main at once, and nothing on GitHub stops a red
+merge. On 23 September 2026 main stayed red for fourteen hours through seven
+failures, every one of which the gate catches. If the gate fails on something
+another session merged, fix that too before pushing: what you push is main.
+
 ## Write to the writing guide
 
 [docs/WRITING-GUIDE.md](docs/WRITING-GUIDE.md) is the standard for everything

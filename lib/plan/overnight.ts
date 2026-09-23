@@ -1,9 +1,9 @@
 /**
  * The overnight runner's standing intention, and the reading of it.
  *
- * One button before bed starts a night; from then on a cron tick fires one
- * feature at a time and waits for it, until the budget is spent, the stop time
- * passes, nothing assigned to Claude is ready, or you pause it. None of that
+ * One button before bed starts a night; from then on a cron tick keeps up to
+ * `OVERNIGHT_AT_ONCE` features going, each in a different module, until the
+ * budget is spent, the stop time passes, or you stop or pause it. None of that
  * can live in the page: the tick runs with nobody's tab open, and the answer
  * has to survive the laptop closing. So it is a row -- one per account, in
  * `plan_overnight_runs` (migration 0077) -- and this file is the only thing
@@ -30,6 +30,18 @@ type Db = SupabaseClient<any, 'public'>;
 
 /** The most features one night may be given. The check constraint agrees. */
 export const OVERNIGHT_FEATURE_CAP = 100;
+
+/**
+ * How many feature sessions the runner keeps going at once, each in a
+ * different module.
+ *
+ * It was one until 23 September 2026. Sessions working at once in different
+ * modules rarely touch the same files, and the merge gate (`npm run gate`)
+ * catches it when they do, so the night no longer waits for each feature in
+ * turn. Three rather than more because each session merges through the
+ * six-minute gate onto a main the others are also moving.
+ */
+export const OVERNIGHT_AT_ONCE = 3;
 
 /** The night as the app reads it. One of these per account, or none. */
 export type OvernightRun = {
@@ -465,8 +477,8 @@ export async function stopOvernightRun(input: {
  * The budget goes down at the fire rather than at the finish: a feature that
  * fell over cost the night the same as one that worked, and a counter that
  * only moves on success is a counter that never stops. The count comes from
- * the row the caller already loaded -- the tick is one at a time, by
- * construction, so there is nobody to race.
+ * the row the caller already loaded -- a tick fires at most one feature per
+ * account and ticks do not overlap, so there is nobody to race.
  */
 export async function recordOvernightFire(input: {
   supabase: Db;

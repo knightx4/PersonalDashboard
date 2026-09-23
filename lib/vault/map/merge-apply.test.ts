@@ -134,7 +134,17 @@ describe('mergeInputFromProposal', () => {
 
 describe('applyMergeProposals', () => {
   const reply = (counts: Partial<Record<string, number>>, remaining: number) => ({
-    data: { merged: 0, joined: 0, undone: 0, gone: 0, failed: 0, ...counts, kind: 'theme', remaining },
+    data: {
+      merged: 0,
+      joined: 0,
+      undone: 0,
+      gone: 0,
+      failed: 0,
+      absorbed: 0,
+      ...counts,
+      kind: 'theme',
+      remaining,
+    },
     error: null,
   });
 
@@ -150,7 +160,7 @@ describe('applyMergeProposals', () => {
     });
     expect(result).toEqual({
       kind: 'theme',
-      counts: { merged: 175, joined: 20, undone: 5, gone: 0, failed: 0 },
+      counts: { merged: 175, joined: 20, undone: 5, gone: 0, failed: 0, absorbed: 0 },
       remaining: 0,
       stopped: null,
     });

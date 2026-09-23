@@ -16,9 +16,8 @@
 # Nothing else belongs in here. The full `npm test` suite needs a Postgres 16
 # on port 5433 for the RLS and coexistence tests, but nothing a session
 # usually runs does -- `npx vitest run lib`, eslint, tsc and `next build` all
-# work with the dependencies alone. Standing a database up on every session
-# start to serve the tests most sessions never run would cost far more than it
-# saves.
+# work with the dependencies alone. The merge gate (`npm run gate`) starts the
+# database itself through scripts/test-db-up.sh, which is where it is needed.
 set -euo pipefail
 
 # Local machines have their own node_modules and their own opinions about when
