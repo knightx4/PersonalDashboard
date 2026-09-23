@@ -79,9 +79,15 @@ count drops below ten.
    happens.
 3. **Fetch it.** The existing Wikipedia sweep pulls the article into the
    catalogue as items and segments.
-4. **Write the card.** One model call reads the fetched section and writes the
-   summary and the "why" line. A section the model finds does not match the
-   target is dropped, and no card is made.
+4. **Write the card.** One model call reads the fetched section, says whether
+   it serves the target, and writes the summary. A section that does not serve
+   the target is dropped, no card is made, and the model's reason is kept on
+   the row. The "why" line is built from the row rather than written by the
+   model, so it always names the right field and reason.
+
+The hourly run tops up anyone with fewer than twenty ready cards. After a
+response on the feed page, it runs only once fewer than ten are ready. It
+writes the picked rows first and picks more targets only when they run out.
 
 Wikipedia first, because it needs no key and its text can be shown. Lecture
 clips join once the catalogue has courses in it (plan #789).

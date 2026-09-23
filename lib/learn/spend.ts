@@ -102,6 +102,11 @@ export const LEARN_OPERATIONS = [
   // One Sonnet call per target, recorded through the service role from the
   // picking pass against the account the target belongs to.
   'name-feed-material',
+  // Writing a Learn now card from its fetched section: the summary, and
+  // whether the section serves what it was picked for (plan #807). One Sonnet
+  // call per picked row, dropped or not, recorded through the service role
+  // from the top-up against the account the card belongs to.
+  'write-feed-card',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
