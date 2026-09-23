@@ -41,11 +41,18 @@ const LEASE_MS = 310_000;
 export const EMBED_UNTIL_MS = 280_000;
 
 /**
- * When the merge passes stop starting new calls. One call over twenty
+ * When the theme merge pass stops starting new calls. Themes get the tick up
+ * to here and positions get the rest (decision #844), so a theme backlog can
+ * no longer use the whole tick and leave positions unjudged.
+ */
+export const THEME_MERGE_UNTIL_MS = 150_000;
+
+/**
+ * When the position merge pass stops starting new calls. One call over twenty
  * pairs takes ten to twenty seconds, so this leaves room inside the route's
  * 300 seconds for the call in flight.
  */
-export const MERGE_UNTIL_MS = 270_000;
+export const POSITION_MERGE_UNTIL_MS = 270_000;
 
 const OPERATION: LearnOperation = 'map-sweep';
 
@@ -69,8 +76,7 @@ export type MapSweepTickSummary = {
   themeMerges: Pick<ThemeMergeResult, 'proposed' | 'same' | 'stopped'> | null;
   /**
    * Position merge proposals written after the theme pass (plan #812). Null
-   * when it did not run: the same three reasons, or the theme pass threw or
-   * ran out of time.
+   * when it did not run, for the same three reasons as the theme pass.
    */
   positionMerges: Pick<PositionMergeResult, 'proposed' | 'same' | 'stopped'> | null;
 };
@@ -141,7 +147,7 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
       const merges = await proposeThemeMerges(supabase, createCoreServiceSupabase(), {
         userId: null,
         anthropicApiKey: apiKey,
-        deadline: startedAt + MERGE_UNTIL_MS,
+        deadline: startedAt + THEME_MERGE_UNTIL_MS,
       });
       summary.themeMerges = {
         proposed: merges.proposed,
@@ -153,15 +159,16 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
     }
   }
 
-  // Position pairs from different notes, after the theme pass. It shares the
-  // deadline, so a tick that ran out of time on themes leaves the positions
-  // for the next one. Writing a proposal changes no position.
-  if (apiKey && summary.themeMerges && summary.themeMerges.stopped?.reason !== 'time') {
+  // Position pairs from different notes, after the theme pass. It has its
+  // own share of the tick, from wherever the theme pass stopped until
+  // POSITION_MERGE_UNTIL_MS, so it runs even when themes ran out of time.
+  // Writing a proposal changes no position.
+  if (apiKey && summary.embedded && summary.embedded.stopped?.reason !== 'time') {
     try {
       const merges = await proposePositionMerges(supabase, createCoreServiceSupabase(), {
         userId: null,
         anthropicApiKey: apiKey,
-        deadline: startedAt + MERGE_UNTIL_MS,
+        deadline: startedAt + POSITION_MERGE_UNTIL_MS,
       });
       summary.positionMerges = {
         proposed: merges.proposed,
