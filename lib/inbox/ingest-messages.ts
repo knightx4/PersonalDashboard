@@ -13,7 +13,8 @@ import { buildEmailOrder } from '@/lib/orders/create-email-order';
 import { applyLifecycleToOrder } from '@/lib/orders/apply-lifecycle';
 import { findOrderForLifecycleEmail } from '@/lib/orders/find-for-lifecycle';
 import {
-  isExcludedSender,
+  EXCLUDED_SENDER_ERROR,
+  isExcludedMessage,
   type MerchantExclusionRow,
 } from '@/lib/inbox/merchant-exclusions';
 import { isPlatformMerchantSlug } from '@/lib/merchants/platform';
@@ -206,7 +207,6 @@ async function handleOrderConfirmation(
     coreId: string;
     message: FetchedMessage;
     classified: ReturnType<typeof classifyMessage>;
-    exclusions: MerchantExclusionRow[];
     categoryIdsBySlug: Map<string, string>;
     categoryOptions?: Array<{ slug: string; name: string }>;
     counters: IngestCounters;
@@ -219,29 +219,11 @@ async function handleOrderConfirmation(
     coreId,
     message,
     classified,
-    exclusions,
     categoryIdsBySlug,
     categoryOptions,
     counters,
     personId = null,
   } = opts;
-
-  if (
-    isExcludedSender(exclusions, {
-      merchantId: classified.merchant?.id ?? null,
-      fromAddress: message.fromAddress,
-    })
-  ) {
-    await supabase.from('ingested_messages').upsert({
-      id: coreId,
-      classification: 'order_confirmation',
-      parse_status: 'skipped',
-      parser_version: PARSER_VERSION,
-      error: 'Excluded by user merchant mute',
-    });
-    counters.skipped += 1;
-    return;
-  }
 
   const platformSender = isPlatformMerchantSlug(classified.merchant?.slug);
   const extraction = await extractOrderFromEmail({
@@ -509,7 +491,7 @@ export async function linkEnvelopes(
   // now rather than provider id: the envelope already resolved that.
   const { data: existingRows } = await supabase
     .from('ingested_messages')
-    .select('id, classification, parse_status')
+    .select('id, classification, parse_status, error')
     .in(
       'id',
       envelopes.map((e) => e.id),
@@ -525,6 +507,7 @@ export async function linkEnvelopes(
       id: string;
       classification: string;
       parse_status: string;
+      error: string | null;
     } | null;
   };
 
@@ -537,6 +520,7 @@ export async function linkEnvelopes(
             id: row.id as string,
             classification: row.classification as string,
             parse_status: row.parse_status as string,
+            error: (row.error as string | null) ?? null,
           }
         : null,
     };
@@ -557,11 +541,14 @@ export async function linkEnvelopes(
   for (const item of work) {
     counters.messagesSeen += 1;
 
+    // A muted email stays skipped. Restoring the sender stops future mail
+    // being skipped; it does not bring back what was already muted.
     const retryLifecycle =
       item.existing &&
       LIFECYCLE.has(item.existing.classification as MessageClassification) &&
       (item.existing.parse_status === 'skipped' ||
-        item.existing.parse_status === 'needs_review');
+        item.existing.parse_status === 'needs_review') &&
+      item.existing.error !== EXCLUDED_SENDER_ERROR;
 
     if (item.existing && !retryLifecycle) {
       counters.skipped += 1;
@@ -592,6 +579,28 @@ export async function linkEnvelopes(
           parser_version: PARSER_VERSION,
         });
       }
+      counters.skipped += 1;
+      continue;
+    }
+
+    // Muted senders are skipped here, before the body is fetched, for order
+    // confirmations and for the shipping, delivery, return and cancellation
+    // mail that follows them.
+    if (
+      isExcludedMessage(exclusions, {
+        classification: classified.classification,
+        merchantId: classified.merchant?.id ?? null,
+        fromAddress: item.envelope.fromAddress,
+        replyToAddress: item.envelope.replyToAddress,
+      })
+    ) {
+      await supabase.from('ingested_messages').upsert({
+        id: item.envelope.id,
+        classification: classified.classification,
+        parse_status: 'skipped',
+        parser_version: PARSER_VERSION,
+        error: EXCLUDED_SENDER_ERROR,
+      });
       counters.skipped += 1;
       continue;
     }
@@ -633,7 +642,6 @@ export async function linkEnvelopes(
         coreId: item.envelope.id,
         message,
         classified: item.classified,
-        exclusions,
         categoryIdsBySlug,
         categoryOptions,
         counters,
@@ -700,6 +708,8 @@ export async function reprocessPendingLifecycleMessages(
     .eq('email_account_id', opts.accountId)
     .in('classification', ['shipping', 'delivery', 'return', 'cancellation'])
     .in('parse_status', ['skipped', 'needs_review'])
+    // Muted rows are never retried, so they must not take up this page either.
+    .or(`error.is.null,error.neq."${EXCLUDED_SENDER_ERROR}"`)
     .order('received_at', { ascending: true })
     .limit(limit);
 

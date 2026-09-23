@@ -29,7 +29,12 @@ import {
   type DiscardedOrder,
   type DismissedEmail,
 } from './actions';
-import { ConfirmOrderButton, DiscardOrderButton, DismissEmailButton } from './review-buttons';
+import {
+  ConfirmOrderButton,
+  DiscardOrderButton,
+  DismissEmailButton,
+  ExcludeSenderButton,
+} from './review-buttons';
 
 function classificationLabel(value: string): string {
   return value.replaceAll('_', ' ');
@@ -321,6 +326,11 @@ function EmailRow({ row }: { row: ReviewEmailRow }) {
             </a>
           )}
           <DismissEmailButton messageId={row.messageId} />
+          <ExcludeSenderButton
+            messageId={row.messageId}
+            fromAddress={row.fromAddress}
+            replyToAddress={row.replyToAddress}
+          />
         </div>
       </div>
     </li>

@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { connectedAccountIds } from '@/lib/core/inbox/accounts';
+import { EXCLUDED_SENDER_ERROR, isExcludedSender } from '@/lib/inbox/merchant-exclusion-match';
+import { chooseExclusionDomain } from '@/lib/review/exclude-sender';
 
 export interface ActionState {
   error?: string;
@@ -155,6 +157,100 @@ export async function dismissEmailReview(
 
   revalidateReviewSurfaces();
   return { message: 'Email dismissed.' };
+}
+
+/**
+ * Mute an email's sender domain: every waiting email from it leaves the queue,
+ * and mail from it that syncs later is skipped, whatever its kind.
+ *
+ * The domain is the Reply-To one where there is one (see
+ * chooseExclusionDomain), and a domain many shops share is refused with the
+ * reason rather than written. The mute is listed under Muted merchants in
+ * shopping settings, which is where it is undone; there is no undo here.
+ */
+// latency: pending
+export async function excludeSenderReview(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const messageId = String(formData.get('messageId') ?? '');
+  if (!z.string().uuid().safeParse(messageId).success) {
+    return { error: 'Invalid message.' };
+  }
+
+  const { data: message, error: loadError } = await supabase
+    .from('inbox_messages')
+    .select('id, from_address, reply_to_address')
+    .eq('id', messageId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (loadError) return { error: loadError.message };
+  if (!message) return { error: 'Message not found.' };
+
+  const choice = chooseExclusionDomain({
+    fromAddress: (message.from_address as string | null) ?? null,
+    replyToAddress: (message.reply_to_address as string | null) ?? null,
+  });
+  if (!choice.ok) return { error: choice.reason };
+  const domain = choice.domain;
+
+  const { data: existing, error: existingError } = await supabase
+    .from('merchant_exclusions')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('match_domain', domain)
+    .maybeSingle();
+  if (existingError) return { error: existingError.message };
+
+  if (!existing) {
+    const { error: insertError } = await supabase
+      .from('merchant_exclusions')
+      .insert({ user_id: user.id, merchant_id: null, match_domain: domain });
+    // A second press racing the first lands on the unique index; that is fine.
+    if (insertError && !/duplicate|unique/i.test(insertError.message)) {
+      return { error: insertError.message };
+    }
+  }
+
+  // The waiting emails, matched the same way the sync matches new mail, so
+  // the queue empties of exactly what a later sync would skip.
+  const { data: waiting, error: waitingError } = await supabase
+    .from('inbox_messages')
+    .select('id, from_address, reply_to_address')
+    .eq('user_id', user.id)
+    .eq('parse_status', 'needs_review');
+  if (waitingError) return { error: waitingError.message };
+
+  const mute = [{ merchant_id: null, match_domain: domain }];
+  const ids = (waiting ?? [])
+    .filter((row) =>
+      isExcludedSender(mute, {
+        merchantId: null,
+        fromAddress: (row.from_address as string | null) ?? null,
+        replyToAddress: (row.reply_to_address as string | null) ?? null,
+      }),
+    )
+    .map((row) => row.id as string);
+
+  // Row-level security scopes the verdict table to the owner's messages; the
+  // ids above were read with the user's id already.
+  if (ids.length > 0) {
+    const { error: skipError } = await supabase
+      .from('ingested_messages')
+      .update({ parse_status: 'skipped', error: EXCLUDED_SENDER_ERROR })
+      .in('id', ids)
+      .eq('parse_status', 'needs_review');
+    if (skipError) return { error: skipError.message };
+  }
+
+  revalidateReviewSurfaces();
+  revalidatePath('/shopping/settings');
+  return {
+    message: `Excluded ${domain}. ${ids.length} waiting ${ids.length === 1 ? 'email' : 'emails'} removed.`,
+  };
 }
 
 /**

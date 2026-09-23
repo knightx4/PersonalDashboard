@@ -38,6 +38,8 @@ export type ReviewEmailRow = {
   messageId: string;
   subject: string | null;
   fromAddress: string | null;
+  /** Read before From when excluding the sender; see chooseExclusionDomain. */
+  replyToAddress: string | null;
   receivedAt: string | null;
   classification: string;
   error: string | null;
@@ -113,7 +115,8 @@ export async function loadReviewQueue(
           .select(
             `
             id, email_account_id, provider_message_id, thread_id, subject,
-            from_address, received_at, classification, error, resulting_order_id
+            from_address, reply_to_address, received_at, classification, error,
+            resulting_order_id
           `,
           )
           .in('email_account_id', accountIds)
@@ -218,6 +221,7 @@ export async function loadReviewQueue(
       messageId: message.id as string,
       subject: (message.subject as string | null) ?? null,
       fromAddress: (message.from_address as string | null) ?? null,
+      replyToAddress: (message.reply_to_address as string | null) ?? null,
       receivedAt,
       classification: message.classification as string,
       error: (message.error as string | null) ?? null,
