@@ -18,6 +18,9 @@ import { readCurriculum, MAX_UNITS, MIN_UNITS, type CurriculumResult } from './c
  * It also says which unit the person's own first question belongs to, so the
  * chain approved alongside it is filed under that unit.
  *
+ * A custom track may come with units the person wrote. Then the model keeps
+ * them as given and only writes what each covers and its outcome.
+ *
  * Sonnet, for the reason the chain generator gives: this is laying out what
  * everybody who teaches the subject already agrees on.
  */
@@ -47,6 +50,8 @@ export async function writeCurriculum(input: {
   subject: string;
   /** What the person typed when the track was started, when there was something. */
   asked: string | null;
+  /** Units the person wrote themselves, in their order. Kept exactly. */
+  units?: readonly string[];
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
@@ -93,6 +98,13 @@ export async function writeCurriculum(input: {
             input.asked
               ? `What they asked for when they started it: ${input.asked}`
               : 'They did not say more than the name.',
+            ...(input.units && input.units.length > 0
+              ? [
+                  '',
+                  'They wrote the units themselves. Keep exactly these, with these titles, in this order: add none, drop none, reorder none. Write covers and outcome for each. The count rule does not apply.',
+                  ...input.units.map((title, index) => `${index + 1}. ${title}`),
+                ]
+              : []),
             '',
             `Call ${TOOL_NAME}.`,
           ].join('\n'),
@@ -113,5 +125,5 @@ export async function writeCurriculum(input: {
     (part) => part.type === 'tool_use' && part.name === TOOL_NAME,
   );
   if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  return readCurriculum(block.input);
+  return readCurriculum(block.input, input.units);
 }

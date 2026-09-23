@@ -92,6 +92,14 @@ track you create now starts with a fixed curriculum.
   opened, in progress (with the ideas left across its goals), or done. The
   first unit that is not done is marked Next. Goals asked outside the
   curriculum are listed after it.
+- **Making a track by name.** The Tracks page leads with "Make a track": a
+  name, optionally what you want out of it, and optionally your own units,
+  one per line, up to twelve. The track and its curriculum are written at
+  once. Units you wrote are kept exactly and in your order; the model only
+  writes what each covers and its outcome, and if that call fails the units
+  are kept with their titles alone. A name you already have a track under
+  goes to that track rather than making a second one. Starting from one
+  question is still there, folded underneath.
 - **Tracks without one** (made before this, started from a Learn now card or a
   briefing, or whose first attempt failed) show a "Write the curriculum"
   button that makes the same call.

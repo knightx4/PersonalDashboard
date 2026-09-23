@@ -4,6 +4,7 @@ import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { CURRICULUM_MODEL, writeCurriculum } from './curriculum';
+import type { CurriculumResult } from './curriculum-payload';
 
 /**
  * Reading and writing a track's curriculum (LEARN-GRAPH-SPEC, "The
@@ -57,22 +58,38 @@ export async function ensureCurriculum(
   userId: string,
   subject: { id: string; name: string },
   asked: string | null,
+  /** Units the person wrote for a custom track, in their order. */
+  ownUnits?: readonly string[],
 ): Promise<EnsuredCurriculum> {
   const existing = await loadCurriculum(supabase, subject.id);
   if (existing.length > 0) return { ok: true, units: existing, goalUnitId: null, written: false };
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey)
-    return { ok: false, detail: 'Writing a curriculum needs ANTHROPIC_API_KEY to be set.' };
-
-  const spend = collectSpend();
-  const result = await writeCurriculum({
-    subject: subject.name,
-    asked,
-    anthropicApiKey: apiKey,
-    onSpend: spend.sink,
-  });
-  await recordLearnSpend(userId, 'write-curriculum', spend.reports);
+  let result: CurriculumResult = {
+    ok: false,
+    detail: 'Writing a curriculum needs ANTHROPIC_API_KEY to be set.',
+  };
+  if (apiKey) {
+    const spend = collectSpend();
+    result = await writeCurriculum({
+      subject: subject.name,
+      asked,
+      units: ownUnits,
+      anthropicApiKey: apiKey,
+      onSpend: spend.sink,
+    });
+    await recordLearnSpend(userId, 'write-curriculum', spend.reports);
+  }
+  // Units the person wrote are theirs whether or not the model could describe
+  // them: the curriculum is kept with the titles alone.
+  const written = result.ok;
+  if (!result.ok && ownUnits && ownUnits.length > 0) {
+    result = {
+      ok: true,
+      units: ownUnits.map((title) => ({ title, covers: '', outcome: '' })),
+      goalUnit: null,
+    };
+  }
   if (!result.ok) return result;
 
   const { data, error } = await supabase
@@ -85,7 +102,7 @@ export async function ensureCurriculum(
         title: unit.title,
         covers: unit.covers,
         outcome: unit.outcome,
-        write_model: CURRICULUM_MODEL,
+        write_model: written ? CURRICULUM_MODEL : null,
       })),
     )
     .select('id, ordinal, title, covers, outcome');
