@@ -33,8 +33,8 @@ export async function passQuickStory(formData: FormData): Promise<void> {
   const client = await createNewsClient();
   const { finished } = await passStory(client, { userId: user.id, ...parsed.data });
 
-  revalidatePath('/news/quick');
-  if (finished) revalidatePath('/news');
+  revalidatePath('/news');
+  if (finished) revalidatePath('/news/all');
 }
 
 /**
