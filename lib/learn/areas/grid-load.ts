@@ -32,7 +32,7 @@ import {
 /** PostgREST returns at most this many rows per request, so longer reads page. */
 const PAGE = 1000;
 
-async function readAll<T>(
+export async function readAll<T>(
   page: (
     from: number,
     to: number,
