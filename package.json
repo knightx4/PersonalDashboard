@@ -18,7 +18,8 @@
     "typecheck": "tsc --noEmit",
     "share:add": "tsx scripts/share-add.ts",
     "catalogue": "tsx --conditions=react-server scripts/learn-catalogue.ts",
-    "news:digest": "tsx --conditions=react-server scripts/news-digest.ts"
+    "news:digest": "tsx --conditions=react-server scripts/news-digest.ts",
+    "gate": "./scripts/gate.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
