@@ -6,6 +6,7 @@ import { loadIssue } from '@/lib/news/issues/load';
 import { formatArrival, issueHref, issueReturn, senderLabel } from '@/lib/news/issues/list';
 import { markRead } from '@/lib/news/issues/read';
 import { cleanIssueHtml } from '@/lib/news/issues/sanitize';
+import { loadSavedHeadlines } from '@/lib/news/saved/stories';
 import { IssueView } from './issue-view';
 
 export const metadata = { title: 'Newsletter' };
@@ -55,6 +56,11 @@ export default async function IssuePage({
   ]);
   if (!issue) notFound();
 
+  // Only a summarised issue shows its stories, so only one of those has any
+  // to mark Saved. After the notFound, since a saved-stories read on an id
+  // that is not a uuid would fail rather than come back empty.
+  const saved = issue.digest ? await loadSavedHeadlines(client, issue.id) : new Set<string>();
+
   if (!issue.readAt) await markRead(client, issue.id);
 
   const sender = issue.sender;
@@ -91,6 +97,7 @@ export default async function IssuePage({
       picturesHref={picturesHref}
       originalHref={originalHref}
       summaryHref={summaryHref}
+      savedHeadlines={[...saved]}
     />
   );
 }
