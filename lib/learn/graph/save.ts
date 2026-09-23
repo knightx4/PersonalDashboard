@@ -71,14 +71,23 @@ export async function findOrCreateSubject(
 ): Promise<{ id: string; created: boolean; placed: boolean }> {
   const { data, error } = await supabase
     .from('subjects')
-    .select('id, name, placed_at')
+    .select('id, name, placed_at, survey')
     .ilike('name', name)
     .maybeSingle();
 
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw fail('Looking up the track', error);
   if (data) {
-    const found = data as { id: string; placed_at?: string | null };
+    const found = data as { id: string; placed_at?: string | null; survey?: boolean };
+    // A hidden subject holding survey questions about this theme (plan #838)
+    // becomes the track, so the ideas already tested there are its start.
+    if (found.survey) {
+      const { error: takeError } = await supabase
+        .from('subjects')
+        .update({ survey: false })
+        .eq('id', found.id);
+      if (takeError) throw fail('Turning the survey subject into a track', takeError);
+    }
     return { id: found.id, created: false, placed: Boolean(found.placed_at) };
   }
 

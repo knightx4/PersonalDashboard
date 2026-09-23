@@ -2,6 +2,7 @@ import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { loadSurveySubjectIds } from '@/lib/learn/survey/subject';
 import {
   INTEREST_WINDOW_DAYS,
   trackWeights,
@@ -88,13 +89,16 @@ export async function loadTrackInterest(
   const conceptIds = [...new Set([...rows.map((row) => row.concept_id), ...pushed])];
   const subjectOf = new Map<string, string>();
   if (conceptIds.length > 0) {
-    const { data, error } = await supabase
-      .from('concepts')
-      .select('id, subject_id')
-      .in('id', conceptIds);
+    const [{ data, error }, surveyed] = await Promise.all([
+      supabase.from('concepts').select('id, subject_id').in('id', conceptIds),
+      loadSurveySubjectIds(supabase),
+    ]);
     assertSchemaExposed(error, LEARN_SCHEMA);
     if (error) throw fail('Reading which track those ideas are in', error);
     for (const concept of (data ?? []) as { id: string; subject_id: string }[]) {
+      // A survey question is not a track's (plan #838): it neither weighs as
+      // a track nor counts as answering elsewhere.
+      if (surveyed.has(concept.subject_id)) continue;
       subjectOf.set(concept.id, concept.subject_id);
     }
   }
