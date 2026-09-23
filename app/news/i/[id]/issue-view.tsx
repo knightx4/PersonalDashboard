@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import {
   ArrowLeft,
-  ChevronRight,
   ExternalLink,
   FileText,
   Image as ImageIcon,
@@ -12,7 +11,8 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardBody, CardSection } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import { storyParagraphs, type NewsStory } from '@/lib/news/issues/stories';
+import { StoryText } from '@/components/news/story-text';
+import type { NewsStory } from '@/lib/news/issues/stories';
 import { markIssueUnread } from './actions';
 import { IssueFrame } from './issue-frame';
 
@@ -270,34 +270,5 @@ function StoryLink({ link }: { link: string | undefined }) {
       Read the article
       <ExternalLink className="size-3" strokeWidth={1.75} aria-hidden />
     </a>
-  );
-}
-
-/**
- * The story as the email told it, folded under its summary. A details element,
- * so opening it needs no script and no second request.
- */
-function StoryText({ text }: { text: string | undefined }) {
-  const paragraphs = storyParagraphs(text);
-  if (paragraphs.length === 0) return null;
-  return (
-    <details className="group mt-1.5">
-      <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-ui text-accent hover:underline [&::-webkit-details-marker]:hidden">
-        <ChevronRight
-          className="size-3 transition-transform group-open:rotate-90"
-          strokeWidth={2}
-          aria-hidden
-        />
-        <span className="group-open:hidden">Read the full story</span>
-        <span className="hidden group-open:inline">Hide the full story</span>
-      </summary>
-      <div className="mt-2 space-y-2 border-l-2 border-border pl-3">
-        {paragraphs.map((paragraph, index) => (
-          <p key={index} className="break-words text-body leading-relaxed text-ink">
-            {paragraph}
-          </p>
-        ))}
-      </div>
-    </details>
   );
 }
