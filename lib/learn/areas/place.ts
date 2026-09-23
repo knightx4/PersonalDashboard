@@ -7,39 +7,48 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { Level3Article } from '@/lib/learn/areas/level3';
 
 /**
- * Placing Level 3 articles into the areas, for the check in
- * docs/LEARN-AREAS-SPEC.md.
+ * Placing things into the areas (docs/LEARN-AREAS-SPEC.md).
  *
- * One call per batch. The model is given every field with its scope, which is
- * where the boundary rules live, and a batch of articles with the heading each
- * sat under. For each article it names a field, a runner-up when one is worth
- * naming, and how sure it is. The findings the check exists for are the
- * articles it is not sure about, so the prompt asks it to say so rather than
- * to pick confidently.
+ * Two callers, one call. The check places Wikipedia's Level 3 articles to test
+ * the grid, and theme placement puts each vault theme where it belongs. Both
+ * hand the model every field with its scope, which is where the boundary rules
+ * live, and a batch of named items with a line of context each. For each item
+ * it names a field (or, for an umbrella, a domain), a runner-up when one is
+ * worth naming, and how sure it is.
  *
- * Opus, because the whole value of the run is in the close calls, and a
- * thousand short titles in batches of forty is about twenty-five calls.
+ * They differ in one respect. An encyclopedia article is always about
+ * something a field studies, so the check never leaves one out. A theme can be
+ * a trip being planned or the plot of a story being written, so theme
+ * placement may answer "unplaced".
+ *
+ * Opus, because the value is in the close calls. Forty items is one call.
  */
 
 export const PLACE_MODEL = 'claude-opus-5';
 
-/** Articles per call. Small enough that one reply fits well inside max_tokens. */
+/** Items per call. Small enough that one reply fits well inside max_tokens. */
 export const PLACE_BATCH = 40;
 
 const TOOL_NAME = 'report_placements';
 
 export type AreaField = { slug: string; name: string; scope: string; domain: string };
 
-/** A domain, which an umbrella article is placed at instead of a field. */
+/** A domain, which an umbrella item is placed at instead of a field. */
 export type AreaDomain = { slug: string; name: string; scope: string };
+
+/** One thing to place: its name, and a line saying what it is. */
+export type PlaceItem = { title: string; context: string };
 
 /** How a domain is named to the model, so it cannot be mistaken for a field slug. */
 const DOMAIN_PREFIX = 'domain:';
 
+/** The answer for a theme that is not about any field of study. */
+export const UNPLACED = 'unplaced';
+
 export type Placement = {
   title: string;
   kind: 'topic' | 'person' | 'place' | 'work';
-  /** Exactly one of these two is set: a field, or for an umbrella article, its domain. */
+  /** At most one of these two is set: a field, or for an umbrella, its domain. Neither is unplaced. */
   field: string | null;
   domain: string | null;
   runnerUp: string | null;
@@ -51,21 +60,39 @@ export type PlaceResult =
   | { ok: true; placements: Placement[]; dropped: string[] }
   | { ok: false; detail: string };
 
-const SYSTEM = `You are checking whether a fixed list of fields of study is
+/** What the check says about its items, ahead of the shared rules. */
+const CHECK_INTRO = `You are checking whether a fixed list of fields of study is
 mutually exclusive and collectively exhaustive. You are given the fields, each
 with a scope that says what belongs there and where the nearest things that do
 not belong there go instead. Then you are given a batch of encyclopedia
 articles, each with the heading Wikipedia filed it under.
 
-For every article, decide which ONE field it belongs in.
+For every article, decide which ONE field it belongs in.`;
 
-- A topic goes in the field that studies it. Follow the scope sentences: they
+/** What theme placement says about its items, ahead of the shared rules. */
+const THEME_INTRO = `You are placing the themes of one person's notes into a fixed
+list of fields of study, so they can see which fields their writing falls in.
+You are given the fields, each with a scope that says what belongs there and
+where the nearest things that do not belong there go instead. Then you are given
+a batch of themes, each with a line saying what the writing under it is about.
+The themes were found by reading the notes, so they are often phrased as ideas
+or tensions rather than as subjects.
+
+For every theme, decide which ONE field its subject matter belongs in: the field
+a person would study to go deeper on what the theme is about.
+
+A theme that is not about any field of study goes nowhere: answer "${UNPLACED}"
+as field. That covers personal logistics and errands, and the plot, setting or
+characters of a story the person is writing, unless the theme is really about
+an idea the story explores, in which case place the idea.`;
+
+const SHARED_RULES = `- A topic goes in the field that studies it. Follow the scope sentences: they
   settle the common overlaps, and where one says something belongs elsewhere,
   it does.
-- An umbrella article that covers a whole domain rather than one of its
-  fields ("Technology", "The arts") goes at the domain itself: give
-  "domain:<slug>" as field. Use this only when the article spans every field
-  in the domain. An article that is mostly about one field goes in that field.
+- An umbrella that covers a whole domain rather than one of its fields
+  ("Technology", "The arts") goes at the domain itself: give "domain:<slug>" as
+  field. Use this only when it spans every field in the domain. Something that
+  is mostly about one field goes in that field.
 - A person goes in the field of the work they are known for. A place goes where
   most writing about it would go: its history, its politics, or, for a place
   in general, Human geography. A work (a book, a painting, a piece of music)
@@ -74,17 +101,15 @@ For every article, decide which ONE field it belongs in.
 Then say how sure you are:
 
 - "clear": one field fits and no other comes close.
-- "close": a second field fits nearly as well. Name it as runner_up. This is a
-  finding, not a failure: it shows a boundary the scopes do not settle, so say
-  so honestly rather than picking confidently.
-- "none": no field really fits. Give the least bad one as field. This is the
-  most useful finding of all, because it shows a field is missing.
+- "close": a second field fits nearly as well. Name it as runner_up. Say so
+  honestly rather than picking confidently.
+- "none": no field really fits. Give the least bad one as field.
 
 "basis" is one sentence, under 25 words, saying why. For "close" and "none",
 say what the scopes fail to settle.
 
-Report every article in the batch through ${TOOL_NAME}, using the field slugs
-(or "domain:" slugs) exactly as given, and the article titles exactly as given.`;
+Report every item in the batch through ${TOOL_NAME}, using the field slugs
+(or "domain:" slugs) exactly as given, and the titles exactly as given.`;
 
 const payloadSchema = z.object({
   placements: z.array(
@@ -117,21 +142,23 @@ function fieldList(fields: AreaField[], domains: AreaDomain[]): string {
  * Read the tool payload against the batch it answers.
  *
  * Pure, and exported for the test. A placement is kept only when its title is
- * one that was asked about and its field is a real field slug, or
- * `domain:` and a real domain slug; a runner-up that is not a real field slug,
- * or is the same as the field, is dropped rather than kept wrong. Titles asked about and not answered come back in `dropped`, and stay
- * unplaced for the next call.
+ * one that was asked about and its target is a real field slug, `domain:` and
+ * a real domain slug, or, where `allowUnplaced` is set, `unplaced`. A runner-up
+ * that is not a real field slug, or is the same as the field, is dropped
+ * rather than kept wrong. Titles asked about and not answered come back in
+ * `dropped`, and stay unplaced for the next call.
  */
 export function readPlacements(
   input: unknown,
-  batch: Level3Article[],
+  batch: { title: string }[],
   slugs: ReadonlySet<string>,
   domainSlugs: ReadonlySet<string> = new Set(),
+  allowUnplaced = false,
 ): PlaceResult {
   const parsed = payloadSchema.safeParse(input);
   if (!parsed.success) return { ok: false, detail: 'The report did not match its schema.' };
 
-  const asked = new Map(batch.map((article) => [article.title.toLowerCase(), article.title]));
+  const asked = new Map(batch.map((item) => [item.title.toLowerCase(), item.title]));
   const placements: Placement[] = [];
   const answered = new Set<string>();
 
@@ -139,13 +166,16 @@ export function readPlacements(
     const title = asked.get(item.title.trim().toLowerCase());
     const basis = item.basis.trim();
     const target = item.field.trim();
+    const unplaced = allowUnplaced && target === UNPLACED;
     const domain = target.startsWith(DOMAIN_PREFIX) ? target.slice(DOMAIN_PREFIX.length) : null;
-    const field = domain === null ? target : null;
-    const known = domain !== null ? domainSlugs.has(domain) : slugs.has(target);
+    const field = unplaced || domain !== null ? null : target;
+    const known = unplaced || (domain !== null ? domainSlugs.has(domain) : slugs.has(target));
     if (!title || answered.has(title) || !known || !basis) continue;
 
     const runnerUp =
-      item.runner_up && slugs.has(item.runner_up) && item.runner_up !== field ? item.runner_up : null;
+      !unplaced && item.runner_up && slugs.has(item.runner_up) && item.runner_up !== field
+        ? item.runner_up
+        : null;
 
     answered.add(title);
     placements.push({
@@ -159,18 +189,21 @@ export function readPlacements(
     });
   }
 
-  const dropped = batch.map((article) => article.title).filter((title) => !answered.has(title));
+  const dropped = batch.map((item) => item.title).filter((title) => !answered.has(title));
   return { ok: true, placements, dropped };
 }
 
-export async function placeArticles(input: {
-  batch: Level3Article[];
+type PlaceInput = {
   fields: AreaField[];
   domains: AreaDomain[];
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
-}): Promise<PlaceResult> {
+};
+
+async function placeItems(
+  input: PlaceInput & { items: PlaceItem[]; intro: string; listHeading: string; allowUnplaced: boolean },
+): Promise<PlaceResult> {
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
   const slugs = new Set(input.fields.map((field) => field.slug));
   const domainSlugs = new Set(input.domains.map((domain) => domain.slug));
@@ -180,11 +213,11 @@ export async function placeArticles(input: {
     response = await client.messages.create({
       model: PLACE_MODEL,
       max_tokens: 8192,
-      system: SYSTEM,
+      system: `${input.intro}\n\n${SHARED_RULES}`,
       tools: [
         {
           name: TOOL_NAME,
-          description: 'Report the field each article in the batch belongs in.',
+          description: 'Report the field each item in the batch belongs in.',
           input_schema: {
             type: 'object',
             properties: {
@@ -217,11 +250,11 @@ export async function placeArticles(input: {
             '',
             fieldList(input.fields, input.domains),
             '',
-            'The articles, as "title (where Wikipedia filed it)":',
+            input.listHeading,
             '',
-            ...input.batch.map((article) => `- ${article.title} (${article.section})`),
+            ...input.items.map((item) => `- ${item.title} (${item.context})`),
             '',
-            `Call ${TOOL_NAME} with all ${input.batch.length}.`,
+            `Call ${TOOL_NAME} with all ${input.items.length}.`,
           ].join('\n'),
         },
       ],
@@ -239,5 +272,27 @@ export async function placeArticles(input: {
   const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
   if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
 
-  return readPlacements(block.input, input.batch, slugs, domainSlugs);
+  return readPlacements(block.input, input.items, slugs, domainSlugs, input.allowUnplaced);
+}
+
+/** The check: Level 3 articles, each always placed somewhere. */
+export function placeArticles(input: PlaceInput & { batch: Level3Article[] }): Promise<PlaceResult> {
+  return placeItems({
+    ...input,
+    items: input.batch.map((article) => ({ title: article.title, context: article.section })),
+    intro: CHECK_INTRO,
+    listHeading: 'The articles, as "title (where Wikipedia filed it)":',
+    allowUnplaced: false,
+  });
+}
+
+/** Theme placement: vault themes, which may be left unplaced. */
+export function placeThemes(input: PlaceInput & { themes: PlaceItem[] }): Promise<PlaceResult> {
+  return placeItems({
+    ...input,
+    items: input.themes,
+    intro: THEME_INTRO,
+    listHeading: 'The themes, as "name (what the writing under it is about)":',
+    allowUnplaced: true,
+  });
 }

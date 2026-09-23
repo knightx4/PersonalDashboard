@@ -71,6 +71,7 @@ describe('the operation names', () => {
       'map-note',
       'map-sweep',
       'check-areas',
+      'place-themes',
     ]);
   });
 });

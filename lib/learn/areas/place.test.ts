@@ -72,6 +72,19 @@ describe('readPlacements', () => {
     expect(result.dropped).toEqual(['Tea']);
   });
 
+  it('accepts "unplaced" only when the caller allows it', () => {
+    const payload = {
+      placements: [
+        { title: 'Tea', kind: 'topic', field: 'unplaced', confidence: 'none', basis: 'An errand, not a subject.' },
+      ],
+    };
+    const themes = readPlacements(payload, BATCH, SLUGS, new Set(), true);
+    expect(themes.ok && themes.placements[0]).toMatchObject({ title: 'Tea', field: null, domain: null, runnerUp: null });
+
+    const check = readPlacements(payload, BATCH, SLUGS, new Set(), false);
+    expect(check.ok && check.placements).toEqual([]);
+  });
+
   it('refuses a payload in the wrong shape rather than reading part of it', () => {
     expect(readPlacements({ placements: [{ title: 'Tea' }] }, BATCH, SLUGS).ok).toBe(false);
   });

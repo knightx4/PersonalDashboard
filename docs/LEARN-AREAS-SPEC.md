@@ -158,9 +158,20 @@ elsewhere are what `concept_subjects` already exists for.
 
 **Themes.** Learn never writes to the vault map, so a theme's placement lives in
 Learn: a `learn.theme_fields` table holding the account, the theme, the field
-or domain, and a basis. It points at `obsidian.themes` the way `quiz_sources` points at
-`obsidian.notes`, with an ownership check on insert. Themes are placed by the
-same call after each vault sweep, and only themes with no placement are sent.
+or domain, and a basis (`0031_theme_fields.sql`). It points at `obsidian.themes` with a
+composite key carrying `user_id`, so a placement cannot name another account's
+theme, and it goes when its theme goes. A theme a later sweep renames or merges
+is placed again.
+
+Themes are placed by `/api/cron/theme-placement`, which a pg_cron job calls
+hourly (`0097_theme_placement_tick_cron.sql`). A call sends every theme with no
+row yet, forty to a model call, and inserts one row per theme. It never updates
+a row, so a placement moved by hand is never overwritten.
+
+A theme can also be left unplaced, because not everything in a vault is about a
+field of study: a trip being planned, or the plot of a story being written. The
+row is still written, with neither a field nor a domain and a basis saying why,
+so the theme is not sent again. Unplaced themes appear nowhere on the grid.
 
 Both placements can be moved by hand from the Know page, and a moved placement
 records that you moved it so the pass never overwrites it.
@@ -319,8 +330,12 @@ Geography, so a thin field here says more about the list than about the field.
    `/api/cron/area-check`, which place the thousand articles and leave the three
    kinds of finding above in a table. Any changes to the grid land as a
    migration.
-3. **Placement.** `subjects.field_id`, `theme_fields`, the placement call, and
-   moving a placement by hand.
+3. **Placement.**
+   - ✅ Themes: `0031_theme_fields.sql`, `/api/cron/theme-placement` and its
+     hourly schedule.
+   - Subjects: `subjects.field_id` and `domain_id`, placed when a subject is
+     created.
+   - Moving a placement by hand, from the Know page.
 4. **The grid on the Know page.** The two signals per field and the four kinds.
 5. **The fourth row on `/learn/next`.**
 
