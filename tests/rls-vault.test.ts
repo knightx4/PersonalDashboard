@@ -28,6 +28,7 @@ let positionA = '';
 let positionA2 = '';
 let positionB = '';
 let sweepA = '';
+let proposalA = '';
 
 async function seedConnection(userId: string, tag: string): Promise<string> {
   const [row] = await admin<{ id: string }[]>`
@@ -115,6 +116,19 @@ beforeAll(async () => {
     insert into map_sweep_notes (user_id, sweep_id, note_id, blob_sha, outcome, detail)
     values (${userA}, ${sweepA}, ${noteA}, 'sha-Journal/2019-04-02.md', 'journal',
             'Not read: notes in Me/ are journals.')`;
+
+  // A merge proposal (plan #811). The pair carries no foreign key, so any two
+  // of A's ids stand in for two themes without adding a theme the map counts
+  // above would see.
+  const [first, second] = [positionA, positionA2].sort();
+  const [proposal] = await admin<{ id: string }[]>`
+    insert into map_merge_proposals (user_id, kind, a_id, b_id, a_name, b_name, source,
+                                     similarity, verdict, survivor_id, survivor_name,
+                                     reason, confidence, model)
+    values (${userA}, 'theme', ${first}, ${second}, 'first', 'second', 'embedding',
+            0.8, 'same', ${first}, 'Urbanism', 'One subject.', 0.9, 'claude-haiku-4-5')
+    returning id`;
+  proposalA = proposal.id;
 });
 
 afterAll(async () => {
@@ -141,6 +155,7 @@ describe('RLS coverage', () => {
       where n.nspname = 'obsidian' and c.relkind = 'r'
       order by 1`;
     expect(rows.map((r) => r.tablename)).toEqual([
+      'map_merge_proposals',
       'map_sweep_notes',
       'map_sweeps',
       'notes',
@@ -602,6 +617,57 @@ describe('the sweep, across users', () => {
     await expect(
       admin`insert into map_sweep_notes (user_id, sweep_id, note_id, blob_sha, outcome)
             values (${userA}, ${sweepA}, ${noteB.id}, 'sha', 'read')`,
+    ).rejects.toThrow();
+  });
+});
+
+describe('merge proposals, across users', () => {
+  it('shows the owner their proposals and another user none', async () => {
+    const own = await asUser(userA, (tx) => tx`select id from map_merge_proposals`);
+    const other = await asUser(
+      userB,
+      (tx) => tx`select id from map_merge_proposals where id = ${proposalA}`,
+    );
+    expect([own.length, other.length]).toEqual([1, 0]);
+  });
+
+  it('does not let another user rewrite, delete or file a proposal as you', async () => {
+    const updated = await asUser(
+      userB,
+      (tx) => tx`update map_merge_proposals set verdict = 'different', survivor_id = null,
+                   survivor_name = null where id = ${proposalA} returning id`,
+    );
+    const deleted = await asUser(
+      userB,
+      (tx) => tx`delete from map_merge_proposals where id = ${proposalA} returning id`,
+    );
+    expect([updated.length, deleted.length]).toEqual([0, 0]);
+
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into map_merge_proposals (user_id, kind, a_id, b_id, a_name, b_name,
+                     source, verdict, reason, confidence, model)
+                   values (${userA}, 'theme', ${themeB}, ${themeA}, 'x', 'y', 'trigram',
+                           'different', 'r', 0.5, 'm')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('refuses a same verdict with no survivor, and a pair judged twice', async () => {
+    const [row] = await admin<{ a_id: string; b_id: string }[]>`
+      select a_id, b_id from map_merge_proposals where id = ${proposalA}`;
+    await expect(
+      admin`insert into map_merge_proposals (user_id, kind, a_id, b_id, a_name, b_name, source,
+                                             verdict, reason, confidence, model)
+            values (${userA}, 'position', ${row.a_id}, ${row.b_id}, 'x', 'y', 'trigram',
+                    'same', 'r', 0.5, 'm')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into map_merge_proposals (user_id, kind, a_id, b_id, a_name, b_name, source,
+                                             verdict, reason, confidence, model)
+            values (${userA}, 'theme', ${row.a_id}, ${row.b_id}, 'x', 'y', 'trigram',
+                    'different', 'r', 0.5, 'm')`,
     ).rejects.toThrow();
   });
 });

@@ -8,6 +8,7 @@ import type { LearnOperation } from '@/lib/learn/spend';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { acceptNoteMap } from '@/lib/vault/map/accept';
 import { embedMapRows, type MapEmbedResult } from '@/lib/vault/map/embed';
+import { proposeThemeMerges, type ThemeMergeResult } from '@/lib/vault/map/merge-themes';
 import { proposeNoteMap, type MapNote } from '@/lib/vault/map/extract';
 import { runSweepSlice, type SweepNoteRow, type SweepPorts } from '@/lib/vault/map/sweep';
 import { loadThemeNames } from '@/lib/vault/map/themes';
@@ -38,6 +39,13 @@ const LEASE_MS = 310_000;
  */
 export const EMBED_UNTIL_MS = 280_000;
 
+/**
+ * When the theme merge pass stops starting new calls. One call over twenty
+ * pairs takes ten to twenty seconds, so this leaves room inside the route's
+ * 300 seconds for the call in flight.
+ */
+export const MERGE_UNTIL_MS = 270_000;
+
 const OPERATION: LearnOperation = 'map-sweep';
 
 type SweepRow = { id: string; user_id: string; after_path: string | null; notes_total: number | null };
@@ -52,6 +60,12 @@ export type MapSweepTickSummary = {
    * backfill, and the rows this call's sweeps accepted. Null when it threw.
    */
   embedded: Pick<MapEmbedResult, 'themes' | 'positions' | 'stopped'> | null;
+  /**
+   * Theme merge proposals written after embedding (plan #811). Null when the
+   * pass did not run: no ANTHROPIC_API_KEY, embedding still catching up, or
+   * it threw.
+   */
+  themeMerges: Pick<ThemeMergeResult, 'proposed' | 'same' | 'stopped'> | null;
 };
 
 export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
@@ -63,6 +77,7 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
     finished: 0,
     failed: [],
     embedded: null,
+    themeMerges: null,
   };
 
   const nowIso = new Date().toISOString();
@@ -106,6 +121,28 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
     };
   } catch (err) {
     console.error('[map sweep] embedding', err instanceof Error ? err.message : err);
+  }
+
+  // Theme pairs that have no merge proposal yet. Waits while embedding is
+  // still working through a backlog, so pairs are found from vectors rather
+  // than from names alone; a pair is judged once, so a tick with nothing new
+  // asks nothing. Writing a proposal changes no theme.
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (apiKey && summary.embedded && summary.embedded.stopped?.reason !== 'time') {
+    try {
+      const merges = await proposeThemeMerges(supabase, createCoreServiceSupabase(), {
+        userId: null,
+        anthropicApiKey: apiKey,
+        deadline: startedAt + MERGE_UNTIL_MS,
+      });
+      summary.themeMerges = {
+        proposed: merges.proposed,
+        same: merges.same,
+        stopped: merges.stopped,
+      };
+    } catch (err) {
+      console.error('[map sweep] theme merges', err instanceof Error ? err.message : err);
+    }
   }
 
   return summary;
