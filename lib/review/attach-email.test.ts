@@ -3,21 +3,52 @@ import {
   attachedMessage,
   extractionForAttach,
   isAttachableClassification,
+  lifecycleKindForAttach,
   matchOrders,
   type SearchableOrder,
 } from '@/lib/review/attach-email';
 
 describe('isAttachableClassification', () => {
-  it('takes shipping, delivery and return emails', () => {
+  it('takes confirmations, shipping, delivery and return emails', () => {
+    expect(isAttachableClassification('order_confirmation')).toBe(true);
     expect(isAttachableClassification('shipping')).toBe(true);
     expect(isAttachableClassification('delivery')).toBe(true);
     expect(isAttachableClassification('return')).toBe(true);
   });
 
-  it('refuses confirmations and anything else', () => {
-    expect(isAttachableClassification('order_confirmation')).toBe(false);
+  it('refuses anything else', () => {
+    expect(isAttachableClassification('not_relevant')).toBe(false);
     expect(isAttachableClassification('cancellation')).toBe(false);
     expect(isAttachableClassification(null)).toBe(false);
+  });
+});
+
+describe('lifecycleKindForAttach', () => {
+  it('keeps a lifecycle email as what it is', () => {
+    expect(lifecycleKindForAttach('return', 'Your order')).toBe('return');
+    expect(lifecycleKindForAttach('shipping', null)).toBe('shipping');
+  });
+
+  it('reads a confirmation that is really a shipping notice from its subject', () => {
+    const kind = (subject: string) => lifecycleKindForAttach('order_confirmation', subject);
+    expect(kind('A shipment from order #431949 is out for delivery!')).toBe('shipping');
+    expect(kind('A shipment from order #11888 is on the way')).toBe('shipping');
+    expect(kind('Your Order #6413918145  Has Shipped')).toBe('shipping');
+    expect(kind('And it’s off! DHL has your order 🚚')).toBe('shipping');
+    expect(kind('Delivery estimate update for your Amazon.com order #114-3630811-7869015')).toBe(
+      'shipping',
+    );
+    expect(kind('An item has arrived from order #102003572839771!')).toBe('delivery');
+    expect(kind('Your order was delivered')).toBe('delivery');
+    expect(kind('Your refund for order #1234')).toBe('return');
+  });
+
+  it('links a confirmation with no lifecycle subject without applying anything', () => {
+    const kind = (subject: string | null) => lifecycleKindForAttach('order_confirmation', subject);
+    expect(kind('Your order from Burgerway is ready')).toBeNull();
+    expect(kind("#58253392 - Where is my Mother's Day order?")).toBeNull();
+    expect(kind('Order #613080 confirmed')).toBeNull();
+    expect(kind(null)).toBeNull();
   });
 });
 
@@ -63,6 +94,12 @@ describe('attachedMessage', () => {
     expect(
       attachedMessage('delivery', { merchantName: 'Acme', orderDate: '2026-08-01' }),
     ).toBe('Delivery email attached to the Acme order of 2026-08-01.');
+  });
+
+  it('says only "Email" when nothing was applied', () => {
+    expect(attachedMessage(null, { merchantName: 'Burgerway', orderDate: '2026-06-23' })).toBe(
+      'Email attached to the Burgerway order of 2026-06-23.',
+    );
   });
 });
 

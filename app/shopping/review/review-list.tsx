@@ -68,9 +68,9 @@ const emptyCopy: Record<ReviewView, { title: string; description: string }> = {
  * is the only reason this is one component instead of the page rendering a
  * header and a list.
  *
- * With the keyboard on a shipping, delivery or return email (j and k move it),
- * 1, 2 and 3 attach it to the first, second or third suggested order, as they
- * link a message on the jobs review queue.
+ * With the keyboard on a confirmation, shipping, delivery or return email (j
+ * and k move it), 1, 2 and 3 attach it to the first, second or third suggested
+ * order, as they link a message on the jobs review queue.
  */
 export function ReviewQueue({
   rows,

@@ -3,7 +3,8 @@ import { isSharedSenderDomain } from '@/lib/merchants/platform';
 
 /**
  * Which orders a shipping, delivery or return email in the review queue
- * probably belongs to, strongest first, each with the reason it was picked.
+ * probably belongs to (or an order confirmation, which is often a shipping
+ * notice the classifier misread), strongest first, each with the reason it was picked.
  *
  * The signals are the ones findOrderForLifecycleEmail uses at sync time, in
  * the same order: the email's Gmail thread already holds a message linked to
@@ -18,8 +19,14 @@ import { isSharedSenderDomain } from '@/lib/merchants/platform';
  * lib/jobs/email/link.ts.
  */
 
-/** The review emails that get candidates. Confirmations become orders instead. */
+/**
+ * The review emails that get candidates. Confirmations are included because
+ * most of the ones that wait in review are "on the way" and "out for delivery"
+ * notices whose subject carries "order #", which the classifier reads as a
+ * confirmation. A real confirmation still offers "Add from this email".
+ */
 export const SUGGESTABLE_CLASSIFICATIONS: ReadonlySet<string> = new Set([
+  'order_confirmation',
   'shipping',
   'delivery',
   'return',
