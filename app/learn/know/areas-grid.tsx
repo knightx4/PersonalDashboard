@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Banner } from '@/components/ui/banner';
 import { Card } from '@/components/ui/card';
-import { Group } from '@/components/ui/disclosure';
+import { Disclosure } from '@/components/ui/disclosure';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { cn } from '@/lib/cn';
 import {
@@ -246,10 +246,16 @@ export function AreasGrid({
           const domainOpen = isOpen(opened, 'domain', row.slug);
           const fieldOpen = row.fields.some((cell) => isOpen(opened, 'field', cell.slug));
           return (
-            <Group
+            // A fold per domain, so a big one like Mathematics and logic can be
+            // put away (note f877038d). Open to start with, since the grid is
+            // the point of the page, and the closed line keeps the domain's
+            // total so folding it hides nothing you would open it to check.
+            <Disclosure
               key={row.id}
               title={row.name}
-              action={<span className="tabular text-small text-ink-muted">{domainTotal(row)}</span>}
+              meta={<span className="tabular">{domainTotal(row)}</span>}
+              defaultOpen
+              className="[&>div]:space-y-2"
             >
               {own && (
                 <p className="text-small text-ink-muted">
@@ -281,7 +287,7 @@ export function AreasGrid({
                 ))}
               </ul>
               {opened && (domainOpen || fieldOpen) && <OpenedPanel opened={opened} />}
-            </Group>
+            </Disclosure>
           );
         })}
       </Card>

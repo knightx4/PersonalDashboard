@@ -19,7 +19,7 @@ function render(body: string): string {
 describe('CommentBody', () => {
   it('links a step number to the row on the plan', () => {
     const html = render('Feature #494 has been fired at three times today.');
-    expect(html).toContain('href="/dev/plan?view=all#plan-494"');
+    expect(html).toContain('href="/dev/plan?view=all&amp;q=%23494#plan-494"');
     expect(html).toContain('>#494</a>');
   });
 
@@ -32,7 +32,7 @@ describe('CommentBody', () => {
         titles={{ 760: { title: 'Try Wikipedia sections', outline: '723.20' } }}
       />,
     );
-    expect(html).toContain('href="/dev/plan?view=all#plan-760"');
+    expect(html).toContain('href="/dev/plan?view=all&amp;q=%23760#plan-760"');
     expect(html).toContain('>#723.20</a>');
     expect(html).toContain('title="#723.20 — Try Wikipedia sections"');
   });
@@ -40,7 +40,7 @@ describe('CommentBody', () => {
   it('links every number in a run of them', () => {
     const html = render('#500, #501 and #505 all wait on #499.');
     for (const number of [499, 500, 501, 505]) {
-      expect(html).toContain(`href="/dev/plan?view=all#plan-${number}"`);
+      expect(html).toContain(`href="/dev/plan?view=all&amp;q=%23${number}#plan-${number}"`);
     }
   });
 
@@ -49,7 +49,7 @@ describe('CommentBody', () => {
   it('leaves a number inside code alone', () => {
     const html = render('the literal `#494` stays put');
     expect(html).toContain('<code>#494</code>');
-    expect(html).not.toContain('href="/dev/plan?view=all#plan-494"');
+    expect(html).not.toContain('href="/dev/plan?view=all&amp;q=%23494#plan-494"');
   });
 
   it('leaves a number inside a fenced block alone', () => {
@@ -60,7 +60,7 @@ describe('CommentBody', () => {
   // The reason the walk skips `link`: an anchor inside an anchor is not markup.
   it('does not put a link inside a link', () => {
     const html = render('[step #494](https://example.com/x)');
-    expect(html).not.toContain('href="/dev/plan?view=all#plan-494"');
+    expect(html).not.toContain('href="/dev/plan?view=all&amp;q=%23494#plan-494"');
     expect(html).toContain('https://example.com/x');
     // One anchor, not two nested.
     expect(html.match(/<a /g)?.length).toBe(1);
@@ -69,7 +69,7 @@ describe('CommentBody', () => {
   it('still marks a mention, and marks one beside a reference', () => {
     const html = render('@dash what is #494 waiting on?');
     expect(html).toContain('comment-mention');
-    expect(html).toContain('href="/dev/plan?view=all#plan-494"');
+    expect(html).toContain('href="/dev/plan?view=all&amp;q=%23494#plan-494"');
   });
 
   it('leaves an ordinary comment untouched', () => {

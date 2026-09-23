@@ -13,11 +13,8 @@ import {
   orderSubtotalCents,
   parseDollarsToCents,
 } from '@/lib/money';
-
-interface MerchantOption {
-  id: string;
-  name: string;
-}
+import { MerchantField } from './merchant-field';
+import type { MerchantOption } from '@/lib/merchants/suggest';
 
 interface CategoryOption {
   id: string;
@@ -72,7 +69,6 @@ export function OrderForm({
   const [tax, setTax] = useState('');
   const [shipping, setShipping] = useState('');
   const [discount, setDiscount] = useState('');
-  const [merchantMode, setMerchantMode] = useState<'pick' | 'custom'>('pick');
 
   const preview = useMemo(() => {
     const pricedLines = lines.flatMap((line) => {
@@ -96,50 +92,8 @@ export function OrderForm({
   return (
     <form action={action} className="space-y-8">
       <section className="grid gap-4 sm:grid-cols-2">
-        {/* One field whose control swaps: the label follows whichever is showing. */}
-        <Field
-          id={merchantMode === 'pick' ? 'merchant_id' : 'custom_merchant_name'}
-          label="Merchant"
-          className="sm:col-span-2"
-        >
-          {merchantMode === 'pick' ? (
-            <Select
-              id="merchant_id"
-              name="merchant_id"
-              defaultValue=""
-              onChange={(event) => {
-                if (event.target.value === '__custom__') {
-                  setMerchantMode('custom');
-                  event.target.value = '';
-                }
-              }}
-            >
-              <option value="">Select a merchant</option>
-              {merchants.map((merchant) => (
-                <option key={merchant.id} value={merchant.id}>
-                  {merchant.name}
-                </option>
-              ))}
-              <option value="__custom__">Other (type a name)…</option>
-            </Select>
-          ) : (
-            <div className="flex gap-2">
-              <Input
-                id="custom_merchant_name"
-                name="custom_merchant_name"
-                placeholder="Merchant name"
-                autoFocus
-                required
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setMerchantMode('pick')}
-              >
-                Back
-              </Button>
-            </div>
-          )}
+        <Field id="merchant" label="Merchant" className="sm:col-span-2">
+          <MerchantField id="merchant" merchants={merchants} />
         </Field>
 
         <Field id="external_order_number" label="Order number">
