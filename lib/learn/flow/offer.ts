@@ -1,13 +1,14 @@
 import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
-import { readAll } from '@/lib/learn/areas/grid-load';
+import { readAll } from '@/lib/learn/db/read-all';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { generateChain } from '@/lib/learn/graph/generate';
 import { loadReadyAndSettled, loadSubjects } from '@/lib/learn/graph/load';
 import { saveChain } from '@/lib/learn/graph/save';
 import { PUSHED_ASIDE_DAYS } from '@/lib/learn/next/rank';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
+import { loadSurveyCounts } from '@/lib/learn/survey/load';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { loadThemeMap } from '@/lib/vault/map/read';
 import { NEVER_PULL, offerLean, type ThemeAnchor, type TrackWeight } from './interest';
@@ -35,7 +36,7 @@ import { loadTrackInterest } from './interest-load';
  * Before that, the offer looks at the field you write about most and have
  * never been tested in (plan #800), read the way the Know grid reads it: the
  * fields with themes placed in them and no answered question in any track
- * placed there, ordered by summed theme strength. When that field has a theme
+ * placed there or in the survey, ordered by summed theme strength. When that field has a theme
  * left to offer, the strongest one is offered and the card names the field.
  */
 
@@ -144,8 +145,7 @@ export function trackToOffer(input: {
   const closedIds = new Set<string>();
   const closedNames = new Set<string>();
   for (const row of input.record) {
-    const closes =
-      row.outcome !== 'not_now' || new Date(row.happenedAt).getTime() >= heldUntil;
+    const closes = row.outcome !== 'not_now' || new Date(row.happenedAt).getTime() >= heldUntil;
     if (!closes) continue;
     closedIds.add(row.themeId);
     closedNames.add(key(row.themeName));
@@ -181,8 +181,9 @@ export function trackToOffer(input: {
  * The field you write about most and have never been tested in, or null.
  *
  * The Know grid's reading: a field counts when at least one theme is placed
- * in it and no track placed there has an answered question. A track placed
- * there with nothing answered does not rule the field out. Fields are ordered
+ * in it, no track placed there has an answered question, and no survey
+ * question about its themes has been answered (`surveyed`, plan #843). A
+ * track placed there with nothing answered does not rule the field out. Fields are ordered
  * by the summed strength of the themes placed in them; a placement whose
  * theme is not in `strengths` is left out, as the grid leaves it out.
  */
@@ -191,10 +192,15 @@ export function strongestUntestedField(input: {
   placements: ThemePlacement[];
   strengths: ReadonlyMap<string, number>;
   tracks: TrackPlacement[];
+  /** Fields with an answered survey question. */
+  surveyed?: ReadonlySet<string>;
 }): UntestedField | null {
-  const tested = new Set(
-    input.tracks.filter((track) => track.answered && track.fieldId).map((track) => track.fieldId),
-  );
+  const tested = new Set([
+    ...input.tracks
+      .filter((track) => track.answered && track.fieldId)
+      .map((track) => track.fieldId),
+    ...(input.surveyed ?? []),
+  ]);
   const themesIn = new Map<string, string[]>();
   for (const placement of input.placements) {
     if (!input.strengths.has(placement.themeId)) continue;
@@ -351,7 +357,8 @@ function toCandidate(row: ThemeRow): ThemeCandidate {
  * `learn.theme_fields`, strengths from `obsidian.themes`, tracks' placements
  * from `learn.subjects`. Answered is any idea in the track with a `tested_at`,
  * which is what `trackTested` counts off the graph, read here without loading
- * every graph.
+ * every graph, or any answered survey question about a theme placed in the
+ * field, from `loadSurveyCounts`.
  */
 async function loadUntestedField(
   supabase: LearnSupabaseClient,
@@ -387,6 +394,10 @@ async function loadUntestedField(
   const answeredTracks = new Set(
     answered.flatMap((row) => (row.concepts ? [row.concepts.subject_id] : [])),
   );
+  const survey = await loadSurveyCounts(
+    supabase,
+    new Map(placements.map((row) => [row.theme_id, row.field_id])),
+  );
   const field = strongestUntestedField({
     fields: (fieldRead.data ?? []) as { id: string; name: string }[],
     placements: placements.map((row) => ({ themeId: row.theme_id, fieldId: row.field_id })),
@@ -397,6 +408,9 @@ async function loadUntestedField(
       fieldId: row.placed_at ? row.field_id : null,
       answered: answeredTracks.has(row.id),
     })),
+    surveyed: new Set(
+      [...survey.byField].flatMap(([fieldId, count]) => (count.answered > 0 ? [fieldId] : [])),
+    ),
   });
   if (!field) return null;
 

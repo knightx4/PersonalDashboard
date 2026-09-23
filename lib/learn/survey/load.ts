@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
-import { readAll } from '@/lib/learn/areas/grid-load';
+import { readAll } from '@/lib/learn/db/read-all';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { tallySurvey, type SurveyCounts, type SurveyPool, type SurveyTheme } from './pick';
@@ -97,6 +97,7 @@ export async function loadSurveyCounts(
     probes: probes.map((row) => ({
       conceptId: row.concept_id,
       answered: row.answered_at !== null,
+      answeredAt: row.answered_at,
     })),
   });
 }
