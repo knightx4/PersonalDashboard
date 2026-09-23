@@ -1508,8 +1508,9 @@ function SharedDisplayOptions() {
 
 /**
  * A newsletter issue as /news/i/[id] draws it (plan #788). A weekly roundup
- * with four stories: one headline is a single long unbroken word, the way a
- * link-roundup names a repository, and two stories carry no link.
+ * with four stories: the first leads with a picture, one headline is a single
+ * long unbroken word, the way a link-roundup names a repository, and two
+ * stories carry no link.
  */
 const issueBase: IssueViewProps = {
   issueId: 'issue-1',
@@ -1525,9 +1526,10 @@ const issueBase: IssueViewProps = {
         summary:
           'A replica promoted during a network partition kept its warm cache, so reads served balances from before the split. The fix was to tie cache generations to the primary\'s timeline ID rather than to wall-clock expiry.',
         link: 'https://example.com/blog/2026/09/stale-balances-post-mortem',
-        // Drawn inline so the gallery needs no network for it.
+        // Drawn inline so the gallery needs no network for it, and wide
+        // because the lead story spreads it across the card (plan #856).
         image:
-          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' fill='%23334155'/%3E%3Cpath d='M0 70 L30 44 L52 62 L70 48 L96 70 V96 H0Z' fill='%2394a3b8'/%3E%3Ccircle cx='70' cy='26' r='10' fill='%23fbbf24'/%3E%3C/svg%3E",
+          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 160'%3E%3Crect width='320' height='160' fill='%23334155'/%3E%3Cpath d='M0 118 L70 70 L130 104 L190 62 L250 96 L320 74 V160 H0Z' fill='%2394a3b8'/%3E%3Ccircle cx='236' cy='40' r='16' fill='%23fbbf24'/%3E%3C/svg%3E",
         text:
           'At 02:14 a network partition split the primary from two of its replicas. The failover promoted one of them within forty seconds, which is what it is meant to do.\n\nWhat nobody had planned for was the cache in front of it. Its keys expired on a timer, not on a change of primary, so for six hours it went on serving balances written before the split.\n\nThe fix ties each cache generation to the primary\'s timeline ID. A promotion now empties the cache on the spot.',
       },
@@ -2094,6 +2096,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'news',
     width: 'page',
     render: () => <IssueView {...issueBase} />,
+  },
+  {
+    id: 'news-issue-digest-no-pictures',
+    label: 'News · Issue summary with pictures off',
+    module: 'news',
+    width: 'page',
+    render: () => <IssueView {...issueBase} pictures={false} picturesHref="/news/i/issue-1" />,
   },
   {
     id: 'news-issue-essay',
