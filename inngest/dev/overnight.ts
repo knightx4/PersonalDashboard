@@ -6,10 +6,17 @@ import { createServiceSupabase } from '@/inngest/supabase-admin';
 import { listPushes, refreshMainCheck } from '@/lib/plan/ci';
 import { handFeatureToClaude } from '@/lib/plan/handover';
 import type { CheckConclusion } from '@/lib/plan/checks';
-import { featureRunIdle, lastPushSince, runLiveness, type RunLiveness } from '@/lib/plan/liveness';
+import {
+  featureRunIdle,
+  lastPushSince,
+  runLiveness,
+  type Push,
+  type RunLiveness,
+} from '@/lib/plan/liveness';
 import { loadPlan } from '@/lib/plan/load';
 import {
   loadOvernightRun,
+  OVERNIGHT_AT_ONCE,
   overnightVerdict,
   recordOvernightFire,
   stopOvernightRun,
@@ -23,18 +30,19 @@ import { buildPlanTree, flatten, type PlanNode, type PlanSection } from '@/lib/p
 /**
  * One tick of the overnight runner: fire a feature, or leave everything alone.
  *
- * The clock calls this every few minutes all night. Almost every call does
- * nothing, and that is the shape of the thing: the runner starts one feature
- * and then waits for it, so the ordinary answer is "the last session is still
- * working" and the answer that costs anything happens a handful of times a
- * night.
+ * The clock calls this every few minutes all night. Most calls do nothing: the
+ * runner keeps up to `OVERNIGHT_AT_ONCE` feature sessions going, each in a
+ * different module, and starts at most one a tick. So the ordinary answer is
+ * "every slot is taken" and the answer that costs anything happens a handful
+ * of times a night.
  *
  * Three questions, in the order that makes the cheapest refusal first. The
  * row -- is the runner on, is the budget gone, is the clock gone, is it held
- * -- is `overnightVerdict` and needs no reads at all. The last session -- is
- * it still going -- is `runLiveness` and costs one listing of what has been
- * pushed. The plan -- what should go next -- is `chooseOvernightFeature` and
- * costs the whole tree. Only the last one can fire. The stale-claim sweep runs
+ * -- is `overnightVerdict` and needs no reads at all. The sessions -- which of
+ * them are still going -- is `runLiveness` for each and costs one listing of
+ * what has been pushed. The plan -- what should go next -- is
+ * `chooseOvernightFeature` over the features outside the running ones'
+ * modules, and costs the whole tree. Only the last one can fire. The stale-claim sweep runs
  * ahead of both of those reads, so a claim whose session has ended comes back
  * on a tick that ends up waiting as well as on the tick that fires.
  *
@@ -153,6 +161,40 @@ function without(sections: readonly PlanSection[], featureId: string): PlanSecti
 }
 
 /**
+ * The sections with every feature a running session could collide with taken
+ * out: the running features themselves, and every other feature in one of
+ * their modules.
+ *
+ * Module is the line because it is where the files are. Two sessions in the
+ * same module edit the same pages, loaders and tests, and the second to merge
+ * inherits a conflict it did not write. Across modules what they share is the
+ * handful of common files (globals.css, components/ui, the test helpers), and
+ * the merge gate is what catches a collision there.
+ *
+ * A feature with no module is its own group: two of them are not run at once.
+ * A running feature the tree no longer shows, closed or dropped since it was
+ * fired, names no module and holds back only itself.
+ */
+export function outsideRunning(
+  sections: readonly PlanSection[],
+  runningIds: readonly string[],
+): PlanSection[] {
+  const running = new Set(runningIds);
+  const busyModules = new Set<string>();
+  for (const section of sections) {
+    for (const node of section.nodes) {
+      if (running.has(node.id)) busyModules.add(node.module ?? '');
+    }
+  }
+  return sections.map((section) => ({
+    ...section,
+    nodes: section.nodes.filter(
+      (node) => !running.has(node.id) && !busyModules.has(node.module ?? ''),
+    ),
+  }));
+}
+
+/**
  * The feature to fire now, with the ones that got nowhere last time passed
  * over.
  *
@@ -204,8 +246,12 @@ export function chooseOvernightFire(
 export type OvernightTick =
   | { act: 'idle' }
   | { act: 'paused' }
-  /** The last session is still going, so nothing was started or written. */
-  | { act: 'waiting'; liveness: RunLiveness }
+  /**
+   * Nothing was started or written: every slot is taken, or what is ready is
+   * in the modules the running sessions are already in. `running` is how many
+   * are going; `liveness` is `unknown` when any of them could not be read.
+   */
+  | { act: 'waiting'; liveness: RunLiveness; running: number }
   /**
    * Nothing was ready this minute, and the night was left running.
    *
@@ -229,6 +275,8 @@ export type OvernightTick =
       featuresLeft: number | null;
       /** Features the send refused on the way here, in the order they were tried. */
       refused: number[];
+      /** Sessions going now, this one included. */
+      running: number;
     }
   /**
    * The send broke. The night is left running.
@@ -249,13 +297,21 @@ export type OvernightTick =
 export function tickNote(tick: OvernightTick): string | null {
   switch (tick.act) {
     case 'waiting':
-      return tick.liveness === 'unknown'
-        ? 'Waiting. GitHub could not be asked whether the last session is still going, so nothing new is started until it can.'
-        : 'Waiting for the session on the current feature to finish.';
+      if (tick.liveness === 'unknown') {
+        return 'Waiting. GitHub could not be asked whether a session is still going, so nothing new is started until it can.';
+      }
+      if (tick.running >= OVERNIGHT_AT_ONCE) {
+        return `Waiting: ${tick.running} sessions are running, the most it starts at once.`;
+      }
+      return tick.running === 1
+        ? 'Waiting: one session is running, and nothing else is ready outside its module.'
+        : `Waiting: ${tick.running} sessions are running, and nothing else is ready outside their modules.`;
     case 'nothing-ready':
       return `Waiting until something is ready. ${tick.reason}`;
     case 'fired':
-      return `Started #${tick.feature}.`;
+      return tick.running > 1
+        ? `Started #${tick.feature}. ${tick.running} sessions are running.`
+        : `Started #${tick.feature}.`;
     case 'ended':
       return tick.reason;
     case 'failed':
@@ -278,8 +334,12 @@ export type OvernightPorts = {
   loadSections: () => Promise<readonly PlanSection[]>;
   /** When each feature was last fired, by feature id. */
   lastFiredAt: () => Promise<Record<string, string>>;
-  /** What the run this night last fired is doing, or null if it fired none. */
-  lastRunLiveness: (run: OvernightRun) => Promise<RunLiveness | null>;
+  /**
+   * The feature sessions still going, each with the feature it was sent at.
+   * Sessions that have finished or ended are left out. A fire that left no
+   * record comes back as one with no feature and an `unknown` reading.
+   */
+  runsInFlight: (run: OvernightRun) => Promise<InFlightRun[]>;
   /** Put back the claims of sessions that died. Run on every tick of a running night. */
   sweepClaims: () => Promise<void>;
   /**
@@ -297,9 +357,18 @@ export type OvernightPorts = {
   stop: (reason: string) => Promise<void>;
 };
 
-/** A run that has stopped, so the next feature may be fired. */
+/** A feature session that is still going, as the tick counts it. */
+export type InFlightRun = { featureId: string | null; liveness: RunLiveness };
+
+/** A run that has stopped, so its slot is free. */
 function isOver(liveness: RunLiveness | null): boolean {
   return liveness === null || liveness === 'ended' || liveness === 'finished';
+}
+
+/** The reading a waiting tick reports: `unknown` if any could not be read. */
+function waitingOn(runs: readonly InFlightRun[]): RunLiveness {
+  if (runs.some((one) => one.liveness === 'unknown')) return 'unknown';
+  return runs[0]?.liveness ?? 'working';
 }
 
 /**
@@ -308,8 +377,10 @@ function isOver(liveness: RunLiveness | null): boolean {
  * `unknown` counts as still going, deliberately. It means GitHub could not be
  * asked, and silence the app could not hear is not evidence that a session
  * stopped -- firing on it is how two sessions end up building the same feature
- * at once. A night that stays unknown fires nothing and ends on its own stop
- * time, which is the safe way round.
+ * at once. An unknown session keeps its slot and its module. A fire that left
+ * no record at all is worse, since nothing says which feature it was, so the
+ * tick fires nothing while one is outstanding and the night ends on its own
+ * stop time, which is the safe way round.
  */
 export async function overnightTick(ports: OvernightPorts): Promise<OvernightTick> {
   const run = await ports.loadRun();
@@ -360,8 +431,12 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
     );
   }
 
-  const liveness = await ports.lastRunLiveness(run);
-  if (!isOver(liveness)) return { act: 'waiting', liveness: liveness as RunLiveness };
+  const inFlight = (await ports.runsInFlight(run)).filter((one) => !isOver(one.liveness));
+  const unrecorded = inFlight.some((one) => one.featureId === null);
+  if (inFlight.length >= OVERNIGHT_AT_ONCE || unrecorded) {
+    return { act: 'waiting', liveness: waitingOn(inFlight), running: inFlight.length };
+  }
+  const runningIds = inFlight.map((one) => one.featureId as string);
 
   const [allFires, sections] = await Promise.all([ports.lastFiredAt(), ports.loadSections()]);
 
@@ -398,8 +473,8 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
   // refusal costs one candidate, and the loop can go round at most once per
   // top-level feature.
   const refused: RefusedFeature[] = [];
-  let remaining: readonly PlanSection[] = sections;
-  const rounds = sections.reduce((total, section) => total + section.nodes.length, 0) + 1;
+  let remaining: readonly PlanSection[] = outsideRunning(sections, runningIds);
+  const rounds = remaining.reduce((total, section) => total + section.nodes.length, 0) + 1;
 
   for (let round = 0; round < rounds; round += 1) {
     const choice = chooseOvernightFire(remaining, run, ports.now, lastFiredAt);
@@ -433,6 +508,11 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
       // end a run, and that is the whole rule. A run told to go until you stop
       // it has neither, so it goes until you stop it.
       if (choice.reason === OVERNIGHT_NOTHING_READY || choice.reason === OVERNIGHT_NO_PROGRESS) {
+        // With sessions going, what is ready may only be in their modules, and
+        // one of them finishing changes that. Said as waiting on them.
+        if (inFlight.length > 0 && refused.length === 0) {
+          return { act: 'waiting', liveness: waitingOn(inFlight), running: inFlight.length };
+        }
         return { act: 'nothing-ready', reason };
       }
       await ports.stop(reason);
@@ -451,6 +531,7 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
         step: choice.step.number,
         featuresLeft: run.featuresLeft === null ? null : Math.max(0, run.featuresLeft - 1),
         refused: refused.map((one) => one.number),
+        running: inFlight.length + 1,
       };
     }
 
@@ -506,92 +587,146 @@ async function lastFeatureFires(supabase: Db, userId: string): Promise<Record<st
 }
 
 /**
- * What the feature this night last fired is doing.
+ * How far back a feature run marked started is still read as possibly going.
  *
- * Null when the night has fired nothing yet, which is the first tick of every
- * night. Otherwise the newest feature run is found and read: a row already
- * written back as finished or failed is over and costs nothing further, and
- * one still marked started is judged from what has been pushed since it began,
- * by the same `runLiveness` the plan page uses.
- *
- * A newest run older than the fire this row records means the run that was
- * fired left no record -- `startRoutineRun` logs a failed insert and carries
- * on -- and that is `unknown` rather than `ended`: something was started and
- * the app cannot see it.
+ * Nothing sweeps plan_runs rows while nobody has the plan page open, so rows
+ * from sessions long over still say `started`. Each one read costs a few
+ * queries, and `runLiveness` calls a run ended after two hours without a push,
+ * so a run older than this is not worth the reads.
  */
-async function lastFireLiveness(input: {
+const IN_FLIGHT_LOOKBACK_MS = 6 * 60 * 60 * 1000;
+
+type FeatureRunRow = { plan_item_id: string | null; status: string; created_at: string };
+
+/**
+ * The feature sessions still going, whoever fired them.
+ *
+ * Every feature run started in the last six hours is read, not only this
+ * night's, because a feature sent by hand is a session in a module like any
+ * other and counts against the three. A row already written back as finished
+ * or failed is over and costs nothing further; one still marked started is
+ * judged from its own rows and from what has been pushed since it began, by
+ * the same `runLiveness` the plan page uses.
+ *
+ * A newest run older than the fire the night records means the run that was
+ * fired left no record -- `startRoutineRun` logs a failed insert and carries
+ * on -- and that comes back as a session with no feature and an `unknown`
+ * reading: something was started and the app cannot see it.
+ */
+export async function featureRunsInFlight(input: {
   supabase: Db;
   userId: string;
   run: OvernightRun;
   now: number;
   fetch?: typeof globalThis.fetch;
-}): Promise<RunLiveness | null> {
-  const { supabase, userId, run } = input;
-  if (!run.lastFiredAt) return null;
+}): Promise<InFlightRun[]> {
+  const { supabase, userId, run, now } = input;
+  const since = now - IN_FLIGHT_LOOKBACK_MS;
 
   const { data, error } = await supabase
     .from('plan_runs')
-    .select('id, plan_item_id, status, created_at')
+    .select('plan_item_id, status, created_at')
     .eq('user_id', userId)
     .eq('job', 'feature')
+    .gte('created_at', new Date(since).toISOString())
     .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(50);
   if (error) {
     console.error(`plan_runs could not be read for the overnight tick: ${error.message}`);
-    return 'unknown';
+    return [{ featureId: null, liveness: 'unknown' }];
   }
-  const last = data as { plan_item_id: string | null; status: string; created_at: string } | null;
-  if (!last) return 'unknown';
+  const rows = (data ?? []) as FeatureRunRow[];
 
-  const fired = new Date(run.lastFiredAt).getTime();
-  if (new Date(last.created_at).getTime() < fired - FIRE_WINDOW_MS) return 'unknown';
+  const out: InFlightRun[] = [];
+  const fired = run.lastFiredAt ? new Date(run.lastFiredAt).getTime() : null;
+  // Only a fire recent enough for its row to be in this read can be missing
+  // one. An older fire's row is outside the window whether or not it landed.
+  if (fired !== null && fired - FIRE_WINDOW_MS >= since) {
+    const newest = rows[0];
+    if (!newest || new Date(newest.created_at).getTime() < fired - FIRE_WINDOW_MS) {
+      out.push({ featureId: null, liveness: 'unknown' });
+    }
+  }
 
-  if (last.status === 'finished') return 'finished';
-  if (last.status === 'failed') return 'ended';
+  const started = rows.filter((row) => row.status !== 'finished' && row.status !== 'failed');
+  if (started.length === 0) return out;
 
-  // Still marked started, which is the ordinary case at three in the morning:
-  // nothing sweeps these rows while nobody has the plan page open.
-  //
-  // The whole subtree, not the feature row. A run is fired at a feature and a
-  // feature closes only once every step beneath it closes, so a feature with
-  // one blocked or `proposed` step never closes and this test never fired --
-  // which sent every run to the two-hour silence fallback below, however well
-  // it had gone. See 0089 for the nights that measured it.
-  //
-  // The newest block under the feature is read beside the newest close, and
-  // `runLiveness` treats either as the end of the run. A session that stops to
-  // ask a question closes nothing, so on the close alone it read as silence
-  // and the tick waited out the no-output mark before firing again. #679.
+  // One listing of pushes for all of them, from the oldest start: the listing
+  // is the whole repository and each run takes the pushes after its own start.
+  const oldest = Math.min(...started.map((row) => new Date(row.created_at).getTime()));
+  const { pushes, error: pushError } = await listPushes({ since: oldest, fetch: input.fetch });
+
+  const seen = new Set<string>();
+  for (const row of started) {
+    // Two runs at one feature: the newer one is the session that counts.
+    if (row.plan_item_id) {
+      if (seen.has(row.plan_item_id)) continue;
+      seen.add(row.plan_item_id);
+    }
+    const liveness = await featureRunLiveness({
+      supabase,
+      userId,
+      row,
+      now,
+      pushes: pushError ? null : pushes,
+    });
+    out.push({ featureId: row.plan_item_id, liveness });
+  }
+  return out;
+}
+
+/**
+ * What one feature run still marked started is doing.
+ *
+ * The whole subtree, not the feature row. A run is fired at a feature and a
+ * feature closes only once every step beneath it closes, so a feature with
+ * one blocked or `proposed` step never closes and a test on the feature row
+ * never fired -- which sent every run to the two-hour silence fallback,
+ * however well it had gone. See 0089 for the nights that measured it.
+ *
+ * The newest block under the feature is read beside the newest close, and
+ * `runLiveness` treats either as the end of the run. A session that stops to
+ * ask a question closes nothing, so on the close alone it read as silence and
+ * the tick waited out the no-output mark before firing again. #679.
+ *
+ * The feature's own rows come before the pushes. The push listing is the whole
+ * repository, so another session pushing anywhere keeps this run reading as
+ * alive, which matters more with three going at once; a run that has left its
+ * own rows alone, with nothing claimed, is over whatever else is being pushed.
+ * See `FEATURE_IDLE_AFTER_MINUTES`.
+ */
+async function featureRunLiveness(input: {
+  supabase: Db;
+  userId: string;
+  row: FeatureRunRow;
+  now: number;
+  /** Null when GitHub could not be read. */
+  pushes: readonly Push[] | null;
+}): Promise<RunLiveness> {
+  const { supabase, userId, row } = input;
   let closedAt: string | null = null;
   let blockedAt: string | null = null;
-  if (last.plan_item_id) {
+  if (row.plan_item_id) {
     [closedAt, blockedAt] = await Promise.all([
-      subtreeClosedAt(supabase, last.plan_item_id),
-      subtreeBlockedAt(supabase, last.plan_item_id),
+      subtreeClosedAt(supabase, row.plan_item_id),
+      subtreeBlockedAt(supabase, row.plan_item_id),
     ]);
   }
 
-  // The feature's own rows, before the pushes. The push listing is the whole
-  // repository, so another session pushing anywhere keeps this run reading as
-  // alive; a run that has left its own rows alone, with nothing claimed, is
-  // over whatever else is being pushed. See `FEATURE_IDLE_AFTER_MINUTES`.
   // A close or block since the start is still `finished`, which says more.
-  const endedOnRows = endsRun(closedAt, last.created_at) || endsRun(blockedAt, last.created_at);
-  if (last.plan_item_id && !endedOnRows) {
-    const trail = await subtreeTrail(supabase, userId, last.plan_item_id);
-    if (trail && featureRunIdle(last.created_at, trail, input.now)) return 'ended';
+  const endedOnRows = endsRun(closedAt, row.created_at) || endsRun(blockedAt, row.created_at);
+  if (row.plan_item_id && !endedOnRows) {
+    const trail = await subtreeTrail(supabase, userId, row.plan_item_id);
+    if (trail && featureRunIdle(row.created_at, trail, input.now)) return 'ended';
   }
 
-  const since = new Date(last.created_at).getTime();
-  const { pushes, error: pushError } = await listPushes({ since, fetch: input.fetch });
   return runLiveness(
     {
-      startedAt: last.created_at,
-      lastPush: pushError ? null : lastPushSince(pushes, last.created_at),
+      startedAt: row.created_at,
+      lastPush: input.pushes ? lastPushSince(input.pushes, row.created_at) : null,
       stepClosedAt: closedAt,
       stepBlockedAt: blockedAt,
-      read: !pushError,
+      read: input.pushes !== null,
     },
     input.now,
   );
@@ -616,7 +751,7 @@ function portsFor(input: {
     loadRun: () => loadOvernightRun(supabase, userId),
     loadSections,
     lastFiredAt: () => lastFeatureFires(supabase, userId),
-    lastRunLiveness: (run) => lastFireLiveness({ supabase, userId, run, now, fetch: input.fetch }),
+    runsInFlight: (run) => featureRunsInFlight({ supabase, userId, run, now, fetch: input.fetch }),
     sweepClaims: async () => {
       // The same sweep the daily cron runs, and every account's claims at once
       // -- a claim nobody is working is wrong in the same way in every account,
@@ -675,7 +810,7 @@ function portsFor(input: {
 export type OvernightTickSummary = {
   /** Accounts with a night running when the tick looked. */
   accounts: number;
-  /** Features started, which is at most one per account. */
+  /** Features started, which is at most one per account a tick. */
   fired: number;
   /** What happened to each, by user id, so the response says why nothing did. */
   results: Record<string, OvernightTick>;
@@ -694,7 +829,7 @@ export type OvernightTickSummary = {
 
 /**
  * The cron's entry point: main's CI, then every account mid-run, one feature
- * at most each.
+ * at most each a tick.
  *
  * The CI reading comes first and happens on every tick, including the ones
  * where no night is running and this function used to do nothing at all. That
