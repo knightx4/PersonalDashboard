@@ -41,7 +41,8 @@ export default async function NewsLayout({ children }: { children: React.ReactNo
   /**
    * Quick read first, because it is where News opens (#848). Reading an issue
    * is a deeper view of the list rather than a place of its own, so it lights
-   * the Newsletters tab instead of growing one.
+   * the Newsletters tab instead of growing one. Saved comes last (#870): it
+   * is where you go back to, after reading.
    */
   const sections: NavSection[] = [
     { href: '/news', label: 'Quick read', icon: 'quickRead', exact: true },
@@ -52,6 +53,7 @@ export default async function NewsLayout({ children }: { children: React.ReactNo
       exact: true,
       alsoMatches: ['/news/i/'],
     },
+    { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
   ];
 
   return (

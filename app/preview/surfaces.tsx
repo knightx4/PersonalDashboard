@@ -54,6 +54,7 @@ import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { IssueView, type IssueViewProps } from '@/app/news/i/[id]/issue-view';
 import { QuickReadView, type QuickReadViewProps } from '@/app/news/quick/quick-view';
+import { SavedView, type SavedViewProps } from '@/app/news/saved/saved-view';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -1650,6 +1651,55 @@ const quickEssay: QuickReadViewProps = {
   issueHref: '/news/i/issue-2',
 };
 
+/**
+ * The Saved tab (plan #870): three stories, newest saved first. The first has
+ * its picture, full text and link; the second's newsletter has been deleted,
+ * so its sender is not a link; the third has no link or text of its own.
+ */
+const savedStories: SavedViewProps = {
+  stories: [
+    {
+      id: 'saved-1',
+      issueId: 'issue-1',
+      headline: issueBase.digest!.stories[0].headline,
+      summary: issueBase.digest!.stories[0].summary,
+      text: issueBase.digest!.stories[0].text ?? null,
+      link: issueBase.digest!.stories[0].link ?? null,
+      image: issueBase.digest!.stories[0].image ?? null,
+      senderName: 'Infra Weekly',
+      receivedAt: '2026-09-22T07:14:00Z',
+      savedAt: '2026-09-23T08:02:00Z',
+      arrived: '22 Sep, 07:14',
+    },
+    {
+      id: 'saved-2',
+      issueId: null,
+      headline: issueBase.digest!.stories[1].headline,
+      summary: issueBase.digest!.stories[1].summary,
+      text: null,
+      link: issueBase.digest!.stories[1].link ?? null,
+      image: null,
+      senderName: 'Infra Weekly',
+      receivedAt: '2026-09-15T07:10:00Z',
+      savedAt: '2026-09-16T21:40:00Z',
+      arrived: '15 Sep, 07:10',
+    },
+    {
+      id: 'saved-3',
+      issueId: 'issue-2',
+      headline: 'Keep a list of what you stopped, and why',
+      summary: issueEssay.digest!.summary,
+      text: null,
+      link: null,
+      image: null,
+      senderName: 'Slow Letters',
+      receivedAt: '2026-09-20T09:02:00Z',
+      savedAt: '2026-09-20T12:30:00Z',
+      arrived: '20 Sep, 09:02',
+    },
+  ],
+};
+
 /** The job search's ten sections, as its layout lists them. */
 const shellSections: NavSection[] = [
   { href: '/jobs/today', label: 'This week', icon: 'week' },
@@ -2201,6 +2251,20 @@ export const SURFACES: readonly Surface[] = [
     module: 'news',
     width: 'page',
     render: () => <QuickReadView {...quickStory} card={null} arrived={null} issueHref={null} />,
+  },
+  {
+    id: 'news-saved',
+    label: 'News · Saved stories',
+    module: 'news',
+    width: 'page',
+    render: () => <SavedView {...savedStories} />,
+  },
+  {
+    id: 'news-saved-empty',
+    label: 'News · Saved with nothing saved',
+    module: 'news',
+    width: 'page',
+    render: () => <SavedView stories={[]} />,
   },
 
   /* The page anatomies, framed at two widths by the anatomy section on

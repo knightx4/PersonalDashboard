@@ -103,3 +103,68 @@ export async function removeSavedStory(
   assertSchemaExposed(error, NEWS_SCHEMA);
   if (error) throw new Error(`news: removing the saved story failed (${error.message})`);
 }
+
+/** One story on the Saved list, as the Saved tab draws it (plan #870). */
+export type SavedStory = {
+  id: string;
+  /** Null once the newsletter it came from has been deleted; the copy stays. */
+  issueId: string | null;
+  headline: string;
+  summary: string;
+  text: string | null;
+  link: string | null;
+  image: string | null;
+  senderName: string;
+  receivedAt: string;
+  savedAt: string;
+};
+
+/**
+ * How many saved stories the tab reads. A cap on one page rather than on what
+ * is kept, the same as the newsletter list's.
+ */
+const SAVED_PAGE = 500;
+
+/** Everything on the Saved list, the most recently saved first. */
+export async function loadSavedStories(client: NewsSupabaseClient): Promise<SavedStory[]> {
+  const { data, error } = await client
+    .from('saved_stories')
+    .select('id, issue_id, headline, summary, text, link, image, sender_name, received_at, saved_at')
+    .order('saved_at', { ascending: false })
+    .limit(SAVED_PAGE);
+  assertSchemaExposed(error, NEWS_SCHEMA);
+  if (error) throw new Error(`news: reading your saved stories failed (${error.message})`);
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    issueId: (row.issue_id as string | null) ?? null,
+    headline: row.headline as string,
+    summary: row.summary as string,
+    text: (row.text as string | null) ?? null,
+    link: (row.link as string | null) ?? null,
+    image: (row.image as string | null) ?? null,
+    senderName: row.sender_name as string,
+    receivedAt: row.received_at as string,
+    savedAt: row.saved_at as string,
+  }));
+}
+
+/**
+ * Take one row off the Saved list by its id, which is the only key a story
+ * whose newsletter was deleted still has. Returns the issue it came from, so
+ * the caller can refresh that page's Save button, or null when the issue is
+ * gone or the row was not there.
+ */
+export async function removeSavedStoryById(
+  client: NewsSupabaseClient,
+  id: string,
+): Promise<{ issueId: string | null }> {
+  const { data, error } = await client
+    .from('saved_stories')
+    .delete()
+    .eq('id', id)
+    .select('issue_id');
+  assertSchemaExposed(error, NEWS_SCHEMA);
+  if (error) throw new Error(`news: removing the saved story failed (${error.message})`);
+  const rows = (data ?? []) as { issue_id: string | null }[];
+  return { issueId: rows[0]?.issue_id ?? null };
+}
