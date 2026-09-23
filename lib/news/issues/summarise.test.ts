@@ -15,13 +15,13 @@ vi.mock('./digest', () => ({
 }));
 const reply = (value: unknown) => replies.push(async () => value);
 
-const { digestOnArrival, digestPending } = await import('./summarise');
+const { digestOnArrival, digestPending, LINE_SINCE, PENDING_FILTER } = await import('./summarise');
 
 /**
  * When a newsletter is summarised. digestIssue is stubbed: its own tests cover
  * what it sends and saves. These check that arrival never throws and skips
- * cleanly without a key, and that the catch-up takes only the unattempted
- * issues and passes each one's own account.
+ * cleanly without a key, and that the catch-up takes the unattempted issues
+ * and the ones summarised without a line, and passes each one's own account.
  */
 
 const spend = { from: vi.fn() } as never;
@@ -30,7 +30,7 @@ function pendingClient(rows: { id: string; user_id: string }[]) {
   const calls: unknown[][] = [];
   const query = {
     select: (...args: unknown[]) => (calls.push(['select', ...args]), query),
-    is: (...args: unknown[]) => (calls.push(['is', ...args]), query),
+    or: (...args: unknown[]) => (calls.push(['or', ...args]), query),
     order: (...args: unknown[]) => (calls.push(['order', ...args]), query),
     limit: async (...args: unknown[]) => (
       calls.push(['limit', ...args]),
@@ -78,7 +78,7 @@ describe('digestOnArrival', () => {
 });
 
 describe('digestPending', () => {
-  it('takes only unattempted issues, oldest first, each under its own account', async () => {
+  it('takes unattempted issues first, then ones to redo, each under its own account', async () => {
     const { client, calls } = pendingClient([
       { id: 'a', user_id: 'user-1' },
       { id: 'b', user_id: 'user-2' },
@@ -99,7 +99,8 @@ describe('digestPending', () => {
 
     expect(calls).toEqual([
       ['select', 'id, user_id'],
-      ['is', 'digested_at', null],
+      ['or', PENDING_FILTER],
+      ['order', 'digested_at', { ascending: true, nullsFirst: true }],
       ['order', 'received_at', { ascending: true }],
       ['limit', 3],
     ]);
@@ -110,6 +111,15 @@ describe('digestPending', () => {
     ]);
     expect(tally).toEqual({ digested: 2, failed: 1, missing: 0, left: 0 });
     expect(seen).toEqual(['a:digested', 'b:failed', 'c:digested']);
+  });
+
+  it('redoes only issues summarised without a line before the line existed', () => {
+    expect(PENDING_FILTER).toBe(
+      `digested_at.is.null,and(summary.not.is.null,summary_line.is.null,digested_at.lt."${LINE_SINCE}")`,
+    );
+    // After the last summary written without a line, before the first with one.
+    expect(Date.parse(LINE_SINCE)).toBeGreaterThan(Date.parse('2026-09-23T06:13:28Z'));
+    expect(Date.parse(LINE_SINCE)).toBeLessThan(Date.parse('2026-09-23T10:57:47Z'));
   });
 
   it('does nothing when every issue has been attempted', async () => {
