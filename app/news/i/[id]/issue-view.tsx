@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import {
   ArrowLeft,
-  ChevronRight,
   ExternalLink,
   FileText,
   Image as ImageIcon,
@@ -12,7 +11,8 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardBody, CardSection } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import { storyParagraphs, type NewsStory } from '@/lib/news/issues/stories';
+import { StoryText } from '@/components/news/story-text';
+import type { NewsStory } from '@/lib/news/issues/stories';
 import { markIssueUnread } from './actions';
 import { IssueFrame } from './issue-frame';
 
@@ -168,9 +168,12 @@ export function IssueView({
             <p className="break-words text-body leading-relaxed text-ink">{digest.summary}</p>
           </Card>
           {digest.stories.length > 0 && (
-            <CardSection title="Stories">
+            <LeadStory story={digest.stories[0]} pictures={pictures} />
+          )}
+          {digest.stories.length > 1 && (
+            <CardSection title="More stories">
               <ul className="divide-y divide-border">
-                {digest.stories.map((story, index) => (
+                {digest.stories.slice(1).map((story, index) => (
                   <li key={index} className="py-3 first:pt-0 last:pb-0">
                     <div className="flex items-start gap-3">
                       <div className="min-w-0 flex-1">
@@ -196,17 +199,7 @@ export function IssueView({
                       )}
                     </div>
                     <StoryText text={story.text} />
-                    {story.link && (
-                      <a
-                        href={story.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-1.5 inline-flex items-center gap-1 text-ui text-accent hover:underline"
-                      >
-                        Read the article
-                        <ExternalLink className="size-3" strokeWidth={1.75} aria-hidden />
-                      </a>
-                    )}
+                    <StoryLink link={story.link} />
                   </li>
                 ))}
               </ul>
@@ -235,30 +228,47 @@ export function IssueView({
 }
 
 /**
- * The story as the email told it, folded under its summary. A details element,
- * so opening it needs no script and no second request.
+ * The issue's first story, given the most room so the page says where to
+ * start (plan #856): its picture across the card's full width, its headline a
+ * size up. With pictures off, or no picture in the email, it is the larger
+ * headline alone. The fold and the link are the same as every other story's.
  */
-function StoryText({ text }: { text: string | undefined }) {
-  const paragraphs = storyParagraphs(text);
-  if (paragraphs.length === 0) return null;
+function LeadStory({ story, pictures }: { story: NewsStory; pictures: boolean }) {
   return (
-    <details className="group mt-1.5">
-      <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-ui text-accent hover:underline [&::-webkit-details-marker]:hidden">
-        <ChevronRight
-          className="size-3 transition-transform group-open:rotate-90"
-          strokeWidth={2}
-          aria-hidden
+    <Card padding="none" className="overflow-hidden">
+      {pictures && story.image && (
+        // A plain img for the same reason as the smaller ones below.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={story.image}
+          alt=""
+          referrerPolicy="no-referrer"
+          className="aspect-[16/9] w-full bg-sunken object-cover sm:aspect-[2/1]"
         />
-        <span className="group-open:hidden">Read the full story</span>
-        <span className="hidden group-open:inline">Hide the full story</span>
-      </summary>
-      <div className="mt-2 space-y-2 border-l-2 border-border pl-3">
-        {paragraphs.map((paragraph, index) => (
-          <p key={index} className="break-words text-body leading-relaxed text-ink">
-            {paragraph}
-          </p>
-        ))}
+      )}
+      <div className="card-pad">
+        <h2 className="break-words text-title font-semibold tracking-tight text-ink">
+          {story.headline}
+        </h2>
+        <p className="mt-2 text-body leading-relaxed text-ink-muted">{story.summary}</p>
+        <StoryText text={story.text} />
+        <StoryLink link={story.link} />
       </div>
-    </details>
+    </Card>
+  );
+}
+
+function StoryLink({ link }: { link: string | undefined }) {
+  if (!link) return null;
+  return (
+    <a
+      href={link}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-1.5 inline-flex items-center gap-1 text-ui text-accent hover:underline"
+    >
+      Read the article
+      <ExternalLink className="size-3" strokeWidth={1.75} aria-hidden />
+    </a>
   );
 }

@@ -202,6 +202,42 @@ describe('news.senders', () => {
   });
 });
 
+describe('news.story_passes', () => {
+  it('shows a user only the stories they have passed', async () => {
+    await asUser(userA, (tx) => tx`
+      insert into story_passes (user_id, issue_id, story_index) values (${userA}, ${issueA}, 0)`);
+
+    const mine = await asUser(userA, (tx) => tx<{ story_index: number }[]>`
+      select story_index from story_passes`);
+    expect(mine.map((r) => r.story_index)).toEqual([0]);
+
+    const theirs = await asUser(userB, (tx) => tx`select 1 from story_passes`);
+    expect(theirs).toHaveLength(0);
+  });
+
+  it('records a story once per newsletter', async () => {
+    await expect(
+      admin`insert into story_passes (user_id, issue_id, story_index) values (${userA}, ${issueA}, 0)`,
+    ).rejects.toThrow(/story_passes_pkey/);
+
+    await expect(
+      admin`insert into story_passes (user_id, issue_id, story_index) values (${userA}, ${issueA}, -1)`,
+    ).rejects.toThrow(/story_passes_index_ck/);
+  });
+
+  it('refuses a pass on another account\'s newsletter, even under their id', async () => {
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into story_passes (user_id, issue_id, story_index) values (${userB}, ${issueA}, 1)`),
+    ).rejects.toThrow(/story_passes_issue_fk/);
+
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into story_passes (user_id, issue_id, story_index) values (${userA}, ${issueA}, 1)`),
+    ).rejects.toThrow(/row-level security/);
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`
@@ -220,7 +256,7 @@ describe('RLS coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'news' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['addresses', 'issues', 'senders']);
+    expect(rows.map((r) => r.tablename)).toEqual(['addresses', 'issues', 'senders', 'story_passes']);
   });
 
   it('reaches nothing in the schema as an anonymous visitor', async () => {

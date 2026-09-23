@@ -24,11 +24,29 @@ const ISSUE = {
   html_body: '<p>ignored</p>',
 };
 
-function newsClient(row: unknown = ISSUE, saveError: { message: string } | null = null) {
+function newsClient(
+  row: unknown = ISSUE,
+  saveError: { message: string } | null = null,
+  clearError: { message: string } | null = null,
+) {
   const updates: Record<string, unknown>[] = [];
   const filters: [string, unknown][] = [];
+  // Each delete, as the table it ran on and the filters it carried.
+  const deletes: { table: string; filters: [string, unknown][] }[] = [];
   const client = {
-    from: vi.fn(() => ({
+    from: vi.fn((table: string) => ({
+      delete: () => {
+        const removal = { table, filters: [] as [string, unknown][] };
+        deletes.push(removal);
+        const query = {
+          eq: (column: string, value: unknown) => {
+            removal.filters.push([column, value]);
+            return query;
+          },
+          then: (resolve: (value: unknown) => void) => resolve({ error: clearError }),
+        };
+        return query;
+      },
       select: () => {
         const query = {
           eq: (column: string, value: unknown) => {
@@ -52,7 +70,7 @@ function newsClient(row: unknown = ISSUE, saveError: { message: string } | null 
       },
     })),
   };
-  return { client: client as never, updates, filters };
+  return { client: client as never, updates, filters, deletes };
 }
 
 function spendClient() {
@@ -249,6 +267,47 @@ describe('digesting a newsletter', () => {
 
     expect(outcome).toEqual({ status: 'failed', error: '529 overloaded' });
     expect(Object.keys(news.updates[0])).toEqual(['digested_at']);
+    // The stories did not change, so what was passed still names them.
+    expect(news.deletes).toEqual([]);
+  });
+
+  it('clears the stories passed when a redo rewrites them', async () => {
+    const { news } = await run(
+      reported({ summary: 'New.', stories: [{ headline: 'First', summary: 'One. Two.' }] }),
+      { ...ISSUE, summary: 'Old.' },
+    );
+
+    expect(news.deletes).toEqual([
+      {
+        table: 'story_passes',
+        filters: [
+          ['issue_id', 'issue-1'],
+          ['user_id', 'user-1'],
+        ],
+      },
+    ]);
+  });
+
+  it('clears nothing on a first summary, which has no passes yet', async () => {
+    const { news } = await run(reported({ summary: 'Two stories.', stories: [] }));
+
+    expect(news.deletes).toEqual([]);
+  });
+
+  it('throws when the passes cannot be cleared', async () => {
+    const news = newsClient({ ...ISSUE, summary: 'Old.' }, null, { message: 'permission denied' });
+    await expect(
+      digestIssue({
+        news: news.client,
+        spend: spendClient().client,
+        userId: 'user-1',
+        issueId: 'issue-1',
+        anthropicApiKey: 'test',
+        client: model(reported({ summary: 'Fine.', stories: [] })).client,
+      }),
+    ).rejects.toThrow('clearing the stories passed failed (permission denied)');
+    // The new summary was saved first; the passes are what failed.
+    expect(news.updates).toHaveLength(1);
   });
 
   it('saves an error, and still records the spend, when the reply is unusable', async () => {
