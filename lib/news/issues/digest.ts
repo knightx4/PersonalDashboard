@@ -14,9 +14,14 @@ import { readStories, type NewsStory } from '@/lib/news/issues/stories';
  * stored (plan #786).
  *
  * One call per issue. Nothing is fetched from the sender: the model reads the
- * text body, or the HTML with its tags stripped when there is no text body,
- * and links in it are left unfollowed. A newsletter that is one essay gets its
- * summary and an empty story list.
+ * body already stored, and links in it are kept but never followed. A
+ * newsletter that is one essay gets its summary and an empty story list.
+ *
+ * Links (plan #803). Each link in the text sent is replaced by a marker such as
+ * `[link 3]`, and the model reports the number beside a story rather than the
+ * address. The number is looked up in the list built here, so the stored link
+ * is the address the email itself carried; a tracked address runs to hundreds
+ * of characters, and one retyped by the model could break.
  *
  * `digestIssue` saves the outcome on the row, as the columns added by
  * supabase/migrations-news/0005_issues_digest.sql expect: a summary and its
@@ -57,6 +62,13 @@ sentences on what it says. Use the newsletter's own facts and do not add any.
 LEAVE OUT sponsor messages and advertisements, housekeeping such as "view in
 browser", subscription and unsubscribe text, social links, and the sign-off.
 
+LINKS. Each link in the email appears as a marker such as [link 3], placed
+after the words it was attached to. For each story, give the number of the
+link to that story's own article, usually the one on or next to its headline
+or its "read more". Leave the number out when the story has no such link.
+Never give a link to a sponsor, a share or subscribe button, or the
+newsletter's own site.
+
 ONE ESSAY. When the issue is a single article or essay rather than a set of
 items, the summary covers it and the story list is empty. Do not cut one essay
 into stories by its sections.`;
@@ -75,6 +87,11 @@ const TOOL = {
           properties: {
             headline: { type: 'string' },
             summary: { type: 'string' },
+            link: {
+              type: 'integer',
+              description:
+                "The N of the [link N] marker for this story's own article. Omit when there is none.",
+            },
           },
           required: ['headline', 'summary'],
         },
@@ -102,31 +119,98 @@ export type DigestOutcome =
 /** Characters a newsletter pads its preview text with, which carry nothing. */
 const INVISIBLE = /[\u00AD\u034F\u200B-\u200D\u2060\uFEFF]/g;
 
-/** HTML to readable text, for an issue with no text body. */
-export function htmlToText(html: string): string {
-  return html
-    .replace(/<head[\s\S]*?<\/head>/gi, ' ')
-    .replace(/<(script|style|noscript|svg)[\s\S]*?<\/\1>/gi, ' ')
-    .replace(/<\/(p|div|section|li|h[1-6]|tr|table)>/gi, '\n')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, ' ')
+/**
+ * Hands out the `[link N]` markers, one number per distinct address, and keeps
+ * the addresses in order so number N is `links[N - 1]`.
+ */
+class LinkNumbers {
+  readonly links: string[] = [];
+
+  marker(address: string): string {
+    const url = address.trim();
+    if (!/^https?:\/\//i.test(url)) return '';
+    let index = this.links.indexOf(url);
+    if (index === -1) index = this.links.push(url) - 1;
+    return ` [link ${index + 1}] `;
+  }
+}
+
+function decodeEntities(text: string): string {
+  return text
     .replace(/&nbsp;/gi, ' ')
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
     .replace(/&quot;/gi, '"')
     .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&#x([0-9a-f]+);/gi, (_, code: string) => String.fromCodePoint(parseInt(code, 16)))
     .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
     .replace(/&amp;/gi, '&');
 }
 
+const ANCHOR = /<a\b([^>]*)>([\s\S]*?)<\/a\s*>/gi;
+const HREF = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
+
 /**
- * The text Haiku reads: the text body when there is one, since every stored
- * issue has one and it is the sender's own plain version, else the HTML
- * stripped. Padding characters and runs of blank space are collapsed.
+ * HTML to readable text. Given `numbers`, each http(s) link is kept as a
+ * `[link N]` marker after its words; without it, links are dropped with the
+ * tags.
  */
-export function bodyText(source: DigestSource): string {
-  const raw = source.textBody?.trim() ? source.textBody : htmlToText(source.htmlBody ?? '');
-  return raw
+export function htmlToText(html: string, numbers?: LinkNumbers): string {
+  const cleared = html
+    .replace(/<head[\s\S]*?<\/head>/gi, ' ')
+    .replace(/<(script|style|noscript|svg)[\s\S]*?<\/\1>/gi, ' ');
+  const linked = numbers
+    ? cleared.replace(ANCHOR, (_, attributes: string, inner: string) => {
+        const href = HREF.exec(attributes);
+        const address = href ? decodeEntities(href[1] ?? href[2] ?? href[3] ?? '') : '';
+        return `${inner}${numbers.marker(address)}`;
+      })
+    : cleared;
+  return decodeEntities(
+    linked
+      .replace(/<\/(p|div|section|li|h[1-6]|tr|table)>/gi, '\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, ' '),
+  );
+}
+
+/**
+ * A plain-text body with each address it carries replaced by a marker. Senders
+ * write them as `(https://…)`, `[ https://… ]`, `<https://…>` or bare, and the
+ * brackets go with the address.
+ */
+function numberTextLinks(text: string, numbers: LinkNumbers): string {
+  return text.replace(
+    /[[(<]\s*(https?:\/\/[^\s<>[\]()]+)\s*[\])>]|(https?:\/\/[^\s<>[\]()]+)/gi,
+    (_, bracketed: string | undefined, bare: string | undefined) =>
+      numbers.marker(bracketed ?? bare ?? ''),
+  );
+}
+
+/** The text Haiku reads, and the addresses its `[link N]` markers stand for. */
+export type BodyText = { text: string; links: string[] };
+
+/**
+ * The text Haiku reads.
+ *
+ * The HTML, stripped, when it carries any http(s) link: its links are what
+ * clicking in the email opens, and some senders' text bodies leave the story
+ * links out (Morning Brew's carries two addresses where its HTML carries
+ * about ninety). Otherwise the text body, with the addresses it writes out
+ * numbered, and the stripped HTML only when there is no text body.
+ * Padding characters and runs of blank space are collapsed.
+ */
+export function bodyText(source: DigestSource): BodyText {
+  const numbers = new LinkNumbers();
+  const html = source.htmlBody ?? '';
+  const htmlText = htmlToText(html, numbers);
+  let raw: string;
+  if (numbers.links.length > 0) raw = htmlText;
+  else if (source.textBody?.trim()) {
+    raw = numberTextLinks(source.textBody, numbers);
+  } else raw = htmlText;
+
+  const text = raw
     .replace(/\r\n?/g, '\n')
     .replace(INVISIBLE, '')
     .replace(/[ \t]+/g, ' ')
@@ -134,19 +218,35 @@ export function bodyText(source: DigestSource): string {
     .replace(/\n{3,}/g, '\n\n')
     .trim()
     .slice(0, MAX_BODY_CHARS);
+  return { text, links: numbers.links };
 }
 
 /**
  * The model's report as something that can be stored, or why it cannot.
  *
- * Stories go through `readStories`, the same reading the page applies, so a
- * story without a headline or summary is dropped here rather than stored.
+ * Each story's link number is looked up in `links`, the addresses behind the
+ * `[link N]` markers; a number that is not a whole number from 1 to the
+ * number of links is dropped, and the story kept without a link. Stories then
+ * go through `readStories`, the same reading the page applies, so a story
+ * without a headline or summary is dropped here rather than stored.
  */
-export function readDigest(input: unknown): Digest | string {
+export function readDigest(input: unknown, links: readonly string[] = []): Digest | string {
   if (!input || typeof input !== 'object') return 'The model returned no digest.';
   const { summary, stories } = input as Record<string, unknown>;
   if (typeof summary !== 'string' || !summary.trim()) return 'The model returned no summary.';
-  return { summary: summary.trim(), stories: readStories(stories) };
+  const linked = Array.isArray(stories)
+    ? stories.map((story: unknown) => {
+        if (!story || typeof story !== 'object') return story;
+        const { link, ...rest } = story as Record<string, unknown>;
+        const n = typeof link === 'string' && /^\d+$/.test(link.trim()) ? Number(link) : link;
+        const address =
+          typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= links.length
+            ? links[n - 1]
+            : undefined;
+        return address ? { ...rest, link: address } : rest;
+      })
+    : stories;
+  return { summary: summary.trim(), stories: readStories(linked) };
 }
 
 /**
@@ -158,7 +258,7 @@ export async function writeDigest(
   source: DigestSource,
   options: { client: Pick<Anthropic, 'messages'>; onSpend?: (report: SpendReport) => void },
 ): Promise<Digest> {
-  const text = bodyText(source);
+  const { text, links } = bodyText(source);
   if (!text) throw new Error('The issue has no text to summarise.');
 
   const response = await options.client.messages.create({
@@ -186,7 +286,7 @@ export async function writeDigest(
   if (!block || block.type !== 'tool_use') {
     throw new Error(`The model did not report a digest (stopped: ${response.stop_reason ?? 'unknown'}).`);
   }
-  const digest = readDigest(block.input);
+  const digest = readDigest(block.input, links);
   if (typeof digest === 'string') throw new Error(digest);
   return digest;
 }
