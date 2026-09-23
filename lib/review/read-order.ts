@@ -1,5 +1,6 @@
 import type { ApplyExtractionResult } from '@/lib/email/extract/apply';
 import { domainFromAddress, type MerchantDomainHit } from '@/lib/email/extract/classify';
+import { quotedOriginal } from '@/lib/email/extract/forwarded';
 import { displayNameFromAddress, extractOrderNumber } from '@/lib/email/extract/heuristic';
 import { extractedLineSchema, type ExtractedOrder } from '@/lib/email/extract/schema';
 import { isPlatformMerchantSlug, isPlatformSenderDomain } from '@/lib/merchants/platform';
@@ -144,12 +145,18 @@ export function draftFromExtraction(input: {
     ? [...(refused.reason === 'reconcile' ? ['reconcile'] : []), ...(refused.issues ?? [])]
     : [];
 
-  const known = knownMerchant(email.fromAddress, input.merchants);
-  const domain = domainFromAddress(email.fromAddress);
+  // A forward or reply is named after the sender of the message it quotes,
+  // not the person who forwarded it. The outer sender still counts when it is
+  // itself a known merchant, as when a shop replies to a customer's question.
+  const sender = quotedOriginal(email.text)?.fromAddress ?? email.fromAddress;
+  const known =
+    knownMerchant(sender, input.merchants) ??
+    (sender !== email.fromAddress ? knownMerchant(email.fromAddress, input.merchants) : null);
+  const domain = domainFromAddress(sender);
   const merchantName =
     known?.name ??
     read.merchantName ??
-    displayNameFromAddress(email.fromAddress) ??
+    displayNameFromAddress(sender) ??
     (domain && !isPlatformSenderDomain(domain) ? titleFromDomain(domain) : null) ??
     email.fromAddress ??
     'Unknown merchant';
