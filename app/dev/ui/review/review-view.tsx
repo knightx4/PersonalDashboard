@@ -112,7 +112,13 @@ function FindingRow({ finding }: { finding: UiFinding }) {
           {finding.file}
           {finding.line !== null && `:${finding.line}`}
         </span>
-        {finding.law && <span className="text-small text-ink-muted">law {finding.law}</span>}
+        {/* A numbered law, or a rule list from /dev/ui named by its export
+            (SAVE_MODEL): only the first is a "law". */}
+        {finding.law && (
+          <span className="text-small text-ink-muted">
+            {/^\d+$/.test(finding.law) ? `law ${finding.law}` : finding.law}
+          </span>
+        )}
         {finding.surface && (
           <Link
             href={`/preview?s=${finding.surface}`}

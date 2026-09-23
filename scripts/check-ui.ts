@@ -39,8 +39,8 @@
  * reason after the colon is not checked -- it is there so the next reader
  * knows it was a decision rather than an oversight.
  */
-import { readFileSync, readdirSync, writeFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { existsSync, readFileSync, readdirSync, writeFileSync, statSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
 import { MODULE_IDS, isModuleId, type ModuleId } from '../lib/modules';
 import { scopeForFile, UI_SCOPES } from '../lib/ui-review/scope';
 
@@ -136,6 +136,10 @@ type Rule = {
  * around before deciding.
  */
 type RuleContext = {
+  /** The file, relative to the root, for a rule about where a file sits. */
+  file: string;
+  /** Which line this is, counting from zero. */
+  index: number;
   /** The six lines below, for a shape that opens on one line and lands on another. */
   after: string[];
   /** Every line above, for walking out to what encloses this one. */
@@ -241,6 +245,46 @@ const FULL_BORDER = /(?:^|\s)border(?=\s|$)/;
  */
 const CLASS_STRING =
   /className=(?:"([^"]*)"|\{`([^`]*)`\})|'([^']*\b(?:rounded|border|bg)-[^']*)'/g;
+
+
+/**
+ * Whether a route segment, or any segment above it, has this file.
+ *
+ * Next resolves loading.tsx and error.tsx from the nearest ancestor, so a page
+ * is covered by one written anywhere between it and app/. The walk stops at
+ * app/ itself: the root layout's own files cover every route, and this gate
+ * wants each workspace to draw its own shape.
+ */
+function routeHas(file: string, name: 'loading.tsx' | 'error.tsx'): boolean {
+  let dir = dirname(file);
+  while (dir !== 'app' && dir !== '.' && dir.startsWith('app')) {
+    if (existsSync(join(ROOT, dir, name))) return true;
+    dir = dirname(dir);
+  }
+  return false;
+}
+
+/** The class strings on this line, however they are spelled. */
+function classStrings(line: string): string[] {
+  return [...line.matchAll(CLASS_STRING)].map((match) => match[1] ?? match[2] ?? match[3] ?? '');
+}
+
+/**
+ * The opening tag that starts on this line, up to its closing `>`, joined into
+ * one string. Props in this codebase are one per line once there are more than
+ * two, so a rule reading only the first line of a tag misses most of them.
+ */
+function openingTag(line: string, after: string[]): string {
+  const parts = [line];
+  for (const next of after) {
+    if (/>\s*$|\/>/.test(parts[parts.length - 1]!)) break;
+    parts.push(next);
+  }
+  return parts.join(' ');
+}
+
+/** Text a person reads: JSX text between tags, and quoted strings. */
+const READ_TEXT = />([^<>{}]*[A-Za-z][^<>{}]*)</g;
 
 const RULES: Rule[] = [
   {
@@ -442,6 +486,158 @@ const RULES: Rule[] = [
       return [`${declared[1]}() has no tier`];
     },
   },
+
+  {
+    id: 'window-dialog',
+    law: '-',
+    says: 'the browser’s own confirm, alert or prompt',
+    instead: 'an inline two-step confirm that names what will be lost, or undo in the toast',
+    find: (line) => [...line.matchAll(/\bwindow\.(?:confirm|alert|prompt)\(/g)].map((m) => m[0]),
+  },
+  {
+    id: 'hover-only-action',
+    law: '-',
+    says: 'a control that only appears on hover, so a phone never shows it',
+    instead: 'opacity-100 sm:opacity-0 sm:group-hover:opacity-100, visible on touch and revealed for a pointer',
+    /**
+     * A bare `opacity-0` with a hover reveal in the same class list. The right
+     * spelling starts visible and hides only from `sm:` up; the wrong one
+     * starts hidden everywhere, and a phone has no hover to reveal it with.
+     */
+    find: (line) =>
+      classStrings(line)
+        .filter((value) => /(?<![\w:-])opacity-0\b/.test(value))
+        .filter((value) => /group-(?:hover|focus-within):opacity-100/.test(value))
+        .map((value) => value.slice(0, 64)),
+  },
+  {
+    id: 'icon-stroke',
+    law: '-',
+    says: 'a Lucide icon at a stroke other than 1.75',
+    instead: 'strokeWidth={1.75}: one library, one weight',
+    /**
+     * PascalCase tags only. A lower-case `<path>` or `<line>` in a chart or a
+     * mark is drawn by hand and chooses its own weight; an icon does not.
+     */
+    find: (line, { after }) => {
+      if (!/<[A-Z]\w*\b/.test(line)) return [];
+      const tag = openingTag(line, after);
+      const stroke = /strokeWidth=\{([\d.]+)\}/.exec(tag);
+      return stroke && stroke[1] !== '1.75' ? [`strokeWidth={${stroke[1]}}`] : [];
+    },
+  },
+  {
+    id: 'focus-removed',
+    law: '-',
+    says: 'outline-none with no focus style to replace it',
+    instead: 'a focus: or focus-visible: ring in the same class list, so the keyboard can still see where it is',
+    /**
+     * A bare field inside a frame that lights up with `focus-within:` is fine:
+     * the frame is the focus style. So an enclosing focus-within excuses it.
+     */
+    find: (line, { before }) => {
+      if (encloses(line, before, /focus-within:/)) return [];
+      return classStrings(line)
+        .filter((value) => /(?<![\w:-])outline-none\b/.test(value))
+        .filter((value) => !/\bfocus(?:-visible|-within)?:/.test(value))
+        .map((value) => value.slice(0, 64));
+    },
+  },
+  {
+    id: 'spinner',
+    law: '-',
+    says: 'a spinner',
+    instead: 'a skeleton of the real shape, or a pending label on the control that is working',
+    find: (line) => [...line.matchAll(/\banimate-spin\b|\bLoader2\b/g)].map((m) => m[0]),
+  },
+  {
+    id: 'resting-shadow',
+    law: '11',
+    says: 'a drop shadow on something that does not float',
+    instead: 'a hairline: depth is a border, and shadow is for popovers, menus and sheets',
+    find: (line) =>
+      classStrings(line)
+        .filter((value) => /(?<![\w:-])shadow-(?:sm|md|lg|xl|2xl)\b/.test(value))
+        .filter((value) => !/\b(?:absolute|fixed|z-overlay|z-popover|popover)/.test(value))
+        .map((value) => value.slice(0, 64)),
+  },
+  {
+    id: 'two-hue-gradient',
+    law: '-',
+    says: 'a gradient between two hues',
+    instead: 'one colour; the home mark is the only two-hue gradient in the app',
+    find: (line) =>
+      classStrings(line)
+        .filter((value) => /\bbg-(?:gradient|linear|radial)-/.test(value))
+        .filter((value) => /\bfrom-/.test(value) && /\bto-/.test(value))
+        .map((value) => value.slice(0, 64)),
+  },
+  {
+    id: 'small-input',
+    law: '-',
+    says: 'a text input under 16px on a phone, which makes iOS zoom the page on focus',
+    instead: 'Input, Select or Textarea from components/ui/field, or text-base sm:text-ui on the raw element',
+    find: (line, { after }) => {
+      if (!/<(?:input|select|textarea)\b/.test(line)) return [];
+      const tag = openingTag(line, after);
+      if (/type="(?:checkbox|radio|hidden|range|file|color|submit|button)"/.test(tag)) return [];
+      if (!/\btext-(?:micro|small|ui|body)\b/.test(tag) || /\btext-base\b/.test(tag)) return [];
+      return [tag.match(/<\w+/)![0]];
+    },
+  },
+  {
+    id: 'product-copy',
+    law: '-',
+    says: 'copy the voice rules rule out: "successfully", an exclamation mark, or a Submit/OK button',
+    instead: 'say what happened, with no exclamation; name the button for what it does',
+    /**
+     * Read text only -- JSX text between tags, and strings -- so `!ok` and
+     * `a !== b` in code are not copy. /dev/ui quotes the don'ts to show them,
+     * so it is the one place allowed to write them.
+     */
+    skip: /^app\/dev\/ui\//,
+    find: (line) => {
+      const out: string[] = [];
+      if (/\bsuccessfully\b/i.test(line)) out.push('"successfully"');
+      for (const match of line.matchAll(READ_TEXT)) {
+        const text = match[1]!.trim();
+        if (/[A-Za-z]!(?:\s|$)/.test(text)) out.push(text.slice(0, 48));
+        if (/^(?:Submit|OK|Okay)$/.test(text)) out.push(text);
+      }
+      for (const match of line.matchAll(/(['"`])([A-Z][^'"`]*[a-z]!)\1/g)) out.push(match[2]!.slice(0, 48));
+      // The pictographic planes only: a star or a tick is a text character
+      // this app sets on purpose, and neither is an emoji.
+      if (/[\u{1F300}-\u{1FAFF}]/u.test(line)) out.push('emoji');
+      return out;
+    },
+  },
+  {
+    id: 'streak',
+    law: '-',
+    says: 'a streak: a count that punishes a missed day',
+    instead: 'progress that is earned, shown over time; see Progress on /dev/ui',
+    /** /dev/ui is where the rule against streaks is written, so it says the word. */
+    skip: /^app\/dev\/ui\//,
+    find: (line) => [...line.matchAll(/\bstreaks?\b/gi)].map((m) => m[0]),
+  },
+  {
+    id: 'route-without-loading',
+    law: '-',
+    says: 'a page with no loading.tsx between it and app/',
+    instead: 'a loading.tsx rendering the page’s real shape, so the layout does not jump when data lands',
+    only: /^app\/.+\/page\.tsx$/,
+    find: (_line, { file, index }) =>
+      index === 0 && !routeHas(file, 'loading.tsx') ? ['no loading.tsx'] : [],
+  },
+  {
+    id: 'route-without-error',
+    law: '2',
+    says: 'a page with no error.tsx between it and app/',
+    instead: 'an error.tsx that says what could not be read, so a failure is stated rather than a blank',
+    only: /^app\/.+\/page\.tsx$/,
+    find: (_line, { file, index }) =>
+      index === 0 && !routeHas(file, 'error.tsx') ? ['no error.tsx'] : [],
+  },
 ];
 
 // -- The walk ---------------------------------------------------------------
@@ -501,6 +697,8 @@ function scan(target: ModuleId | null): Hit[] {
           if (rule.skip?.test(file)) continue;
           if (rule.only && !rule.only.test(file)) continue;
           const context: RuleContext = {
+            file,
+            index,
             after: lines.slice(index + 1, index + 7),
             before: lines.slice(0, index),
             source,

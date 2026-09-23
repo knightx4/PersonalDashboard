@@ -21,6 +21,27 @@ evidence. Fixing is `.claude/agents/ui-sweep.md` (the mechanical work) and
 `.claude/agents/ui-polish.md` (the visual work), and each runs after somebody
 has confirmed there is something to do.
 
+## Two kinds of pass
+
+`app/dev/ui/audit.ts` tags every law and every rule list on `/dev/ui` with how
+it is checked. A pass takes one module and one tag, never a single rule across
+the whole app, so the module's files are read once for every rule that shares
+the tag.
+
+- **`read`**: the files alone settle it. Read the module's pages and views
+  once and check each `read` law and each rule in a `read` list against them.
+  No build, no screenshots. This is most of the guide, and the cheap pass.
+- **`look`**: only the picture settles it. The build, the shots and the
+  reading below are for these rules, and only these.
+
+Rules tagged `gate`, and everything in `HELD_BY_GATE`, are already counted by
+`npm run check:ui`, lint or the contrast check. Do not file them. `summary`
+lists restate other rules and are never checked on their own.
+
+Say which kind of pass it was in the review's note. For a finding against a
+rule list rather than a law, put the list's export name in `law` (`SAVE_MODEL`,
+`SEARCH`) so the finding points at the rule it breaks.
+
 ## What a pass reads
 
 Which files belong to the module is not a judgement call: `scopeForFile()` in
