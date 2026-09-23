@@ -26,6 +26,8 @@ const interest: CardToWrite = {
 };
 
 const parts = {
+  context:
+    'An autoencoder is a kind of neural network that learns to squeeze its input into a few numbers and rebuild it.',
   hook: 'A bottleneck of 30 numbers can rebuild a 784-pixel digit.',
   example: 'Fraud teams train one on normal transactions and flag the ones it rebuilds badly.',
   question: 'Why would a large rebuild error mark a transaction as unusual?',
@@ -89,6 +91,13 @@ describe('reading the report', () => {
     expect(readCardReport({ fit: 'Fits.', matches: true, ...parts, summary: 'S.', example: '' })).toEqual({
       verdict: 'dropped',
       reason: 'The report wrote no example.',
+    });
+  });
+
+  it('drops a card with no context paragraph, since it would open on the argument', () => {
+    expect(readCardReport({ fit: 'Fits.', matches: true, ...parts, summary: 'S.', context: ' ' })).toEqual({
+      verdict: 'dropped',
+      reason: 'The report wrote no context.',
     });
   });
 

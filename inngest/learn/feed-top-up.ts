@@ -58,10 +58,10 @@ async function countReady(learn: LearnSupabaseClient, userId: string): Promise<n
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
     .eq('status', 'ready')
-    // Cards written before they carried a hook are no longer shown, so they
-    // do not count towards the twenty (LEARN-NOW-SPEC, "Cards after the
-    // first week").
-    .not('hook', 'is', null);
+    // Cards written before they carried a context paragraph are no longer
+    // served as new, so they do not count towards the twenty (LEARN-NOW-SPEC,
+    // "Cards after the first week").
+    .not('context', 'is', null);
   if (error) throw new Error(`Counting your ready cards failed: ${error.message}`);
   return count ?? 0;
 }
@@ -163,6 +163,7 @@ async function topUpWith(
         result.outcome === 'ready'
           ? {
               status: 'ready',
+              context: result.context,
               hook: result.hook,
               summary: result.summary,
               example: result.example,

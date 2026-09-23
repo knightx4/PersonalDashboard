@@ -15,6 +15,8 @@ import { describeDepth, type Depth } from './depth';
  * for, at the depth it was picked at. When it does, the model writes the
  * card's teaching parts (LEARN-NOW-SPEC, "Cards after the first week"):
  *
+ *   context   one plain paragraph setting the scene: what the subject is,
+ *             who the names are, when and where, at the person's level
  *   hook      the most interesting thing in the section, stated concretely
  *   summary   what the section says, from its text alone
  *   example   the idea applied to a real case or a worked number
@@ -42,6 +44,8 @@ export const MAX_SECTION_CHARS = 24_000;
 
 /** A summary longer than this is not three or four sentences. */
 const MAX_SUMMARY_CHARS = 1_200;
+/** The context is one short paragraph. */
+const MAX_CONTEXT_CHARS = 900;
 /** The hook is one or two sentences. */
 const MAX_HOOK_CHARS = 400;
 /** The example is two to four sentences, and a worked number can run long. */
@@ -74,6 +78,8 @@ export type CardToWrite = {
 
 /** What a ready card carries besides its why line. */
 export type CardParts = {
+  /** One paragraph that sets the scene, first on the card. */
+  context: string;
   hook: string;
   summary: string;
   example: string;
@@ -82,7 +88,9 @@ export type CardParts = {
   answer: string | null;
 };
 
-export type CardReport = ({ verdict: 'ready' } & CardParts) | { verdict: 'dropped'; reason: string };
+export type CardReport =
+  | ({ verdict: 'ready' } & CardParts)
+  | { verdict: 'dropped'; reason: string };
 
 /**
  * What writing one card came to.
@@ -125,23 +133,26 @@ You are given what the section was picked for, how deep to pitch it, and the sec
 
 1. Decide whether the section serves what it was picked for at that depth. Say it does not when the text is about something else, is a list of links, names or references, is too thin to learn anything from, or only defines terms and restates basics the person is past.
 
-2. When it does, write four parts.
+2. When it does, write five parts. The person reads them in this order, knowing nothing about the section beforehand.
 
-hook: One or two sentences, first on the card. The most interesting, useful or surprising thing in the section, stated concretely: a number, a named case, a consequence, a result that goes against intuition. Never a definition. Never "X is a Y that...".
+context: One paragraph of three or four sentences, first on the card, that lets someone who has never seen this section follow the rest. Say what the subject is in plain terms, where and when it sits, and who any person, school or work the card mentions is (for example: "Elizabeth Eisenstein was a historian who argued in 1979 that..."). Define any term the other parts rely on. Pitch it at the level you were given: skip what someone at that level already knows, and never talk down. You may draw on well-established knowledge here. Simple, clear, descriptive words; no hook, no argument yet.
 
-summary: Two or three sentences on what the section explains, using only what the text says. Add nothing from memory here.
+hook: One or two sentences, after the context. The most interesting, useful or surprising thing in the section, stated concretely: a number, a named case, a consequence, a result that goes against intuition. Never a definition. Never "X is a Y that...".
+
+summary: Two or three sentences on what the section explains, using only what the text says. Add nothing from memory here. State the ideas themselves ("Scribal copying was slow and costly, so..."), never a report on the text ("The section argues...", "It also notes...").
 
 example: Two to four sentences applying the idea to one specific situation: a real event, firm, experiment or policy, or a worked calculation with numbers. You may draw on what you know for this part, but only what is well established; name the case specifically and do not invent figures you are unsure of. If the idea has an obvious everyday application, prefer a less obvious one.
 
 question and answer: One question that makes the person use the idea on a situation, predict an outcome, or explain why something happens. Never ask them to recall a definition or a date. The answer is two or three sentences, and says why.
 
-Style for every part: plain sentences. No slogans, no rhetorical questions outside the question field, no "not X, but Y" contrasts, no dashes used for rhythm. Do not open with "This section" or "The article", and do not address the reader as "you" outside the question.
+Style for every part: plain sentences. No slogans, no rhetorical questions outside the question field, no "not X, but Y" contrasts, no dashes used for rhythm. Never refer to "the section", "the article", "the text" or "the author" in any part: the reader has not seen them and the card has to stand on its own. Do not address the reader as "you" outside the question.
 
 Report through ${TOOL_NAME}.`;
 
 const payloadSchema = z.object({
   fit: z.string(),
   matches: z.boolean(),
+  context: z.string().nullable().optional(),
   hook: z.string().nullable().optional(),
   summary: z.string().nullable().optional(),
   example: z.string().nullable().optional(),
@@ -176,37 +187,63 @@ function clean(value: string | null | undefined): string {
  */
 export function readCardReport(input: unknown): CardReport {
   const parsed = payloadSchema.safeParse(input);
-  if (!parsed.success) return { verdict: 'dropped', reason: 'The report did not match its schema.' };
+  if (!parsed.success)
+    return { verdict: 'dropped', reason: 'The report did not match its schema.' };
 
   const fit = parsed.data.fit.trim();
   if (!parsed.data.matches) {
-    return { verdict: 'dropped', reason: fit || 'The section does not serve what it was picked for.' };
+    return {
+      verdict: 'dropped',
+      reason: fit || 'The section does not serve what it was picked for.',
+    };
   }
 
   const summary = clean(parsed.data.summary);
+  const context = clean(parsed.data.context);
   const hook = clean(parsed.data.hook);
   const example = clean(parsed.data.example);
-  if (!summary) return { verdict: 'dropped', reason: 'The report matched the section but wrote no summary.' };
+  if (!summary)
+    return { verdict: 'dropped', reason: 'The report matched the section but wrote no summary.' };
   if (summary.length > MAX_SUMMARY_CHARS) {
     return { verdict: 'dropped', reason: `The summary ran to ${summary.length} characters.` };
   }
   // A card with no hook or no example is the old card again, which is the
   // thing the owner asked to stop seeing.
+  // A card that opens on the argument with nothing before it is the card
+  // the owner found hard to follow.
+  if (!context || context.length > MAX_CONTEXT_CHARS) {
+    return {
+      verdict: 'dropped',
+      reason: context
+        ? `The context ran to ${context.length} characters.`
+        : 'The report wrote no context.',
+    };
+  }
   if (!hook || hook.length > MAX_HOOK_CHARS) {
-    return { verdict: 'dropped', reason: hook ? `The hook ran to ${hook.length} characters.` : 'The report wrote no hook.' };
+    return {
+      verdict: 'dropped',
+      reason: hook ? `The hook ran to ${hook.length} characters.` : 'The report wrote no hook.',
+    };
   }
   if (!example || example.length > MAX_EXAMPLE_CHARS) {
     return {
       verdict: 'dropped',
-      reason: example ? `The example ran to ${example.length} characters.` : 'The report wrote no example.',
+      reason: example
+        ? `The example ran to ${example.length} characters.`
+        : 'The report wrote no example.',
     };
   }
 
   const question = clean(parsed.data.question);
   const answer = clean(parsed.data.answer);
-  const asked = question && answer && question.length <= MAX_QUESTION_CHARS && answer.length <= MAX_ANSWER_CHARS;
+  const asked =
+    question &&
+    answer &&
+    question.length <= MAX_QUESTION_CHARS &&
+    answer.length <= MAX_ANSWER_CHARS;
   return {
     verdict: 'ready',
+    context,
     hook,
     summary,
     example,
@@ -266,28 +303,47 @@ export async function writeCard(input: {
                   'One sentence on what the section covers and whether it serves what it was picked for at that depth.',
               },
               matches: { type: 'boolean' },
+              context: {
+                type: ['string', 'null'],
+                description:
+                  'One plain paragraph setting the scene: what the subject is, who the names are, when and where, and any term the card relies on. Null when it does not match.',
+              },
               hook: {
                 type: ['string', 'null'],
-                description: 'One or two concrete sentences: the most interesting thing in it. Null when it does not match.',
+                description:
+                  'One or two concrete sentences: the most interesting thing in it. Null when it does not match.',
               },
               summary: {
                 type: ['string', 'null'],
-                description: 'Two or three sentences from the text alone. Null when it does not match.',
+                description:
+                  'Two or three sentences from the text alone. Null when it does not match.',
               },
               example: {
                 type: ['string', 'null'],
-                description: 'The idea applied to one specific case or a worked number. Null when it does not match.',
+                description:
+                  'The idea applied to one specific case or a worked number. Null when it does not match.',
               },
               question: {
                 type: ['string', 'null'],
-                description: 'One question that makes them use the idea. Null when it does not match.',
+                description:
+                  'One question that makes them use the idea. Null when it does not match.',
               },
               answer: {
                 type: ['string', 'null'],
-                description: 'The answer, with why, in two or three sentences. Null when it does not match.',
+                description:
+                  'The answer, with why, in two or three sentences. Null when it does not match.',
               },
             },
-            required: ['fit', 'matches', 'hook', 'summary', 'example', 'question', 'answer'],
+            required: [
+              'fit',
+              'matches',
+              'context',
+              'hook',
+              'summary',
+              'example',
+              'question',
+              'answer',
+            ],
           },
         },
       ],
@@ -295,20 +351,28 @@ export async function writeCard(input: {
       messages: [{ role: 'user', content: cardPrompt(card) }],
     });
   } catch (error) {
-    if (error instanceof Anthropic.RateLimitError) return { outcome: 'failed', detail: 'Rate limited.' };
-    return { outcome: 'failed', detail: error instanceof Error ? error.message : 'The writing call failed.' };
+    if (error instanceof Anthropic.RateLimitError)
+      return { outcome: 'failed', detail: 'Rate limited.' };
+    return {
+      outcome: 'failed',
+      detail: error instanceof Error ? error.message : 'The writing call failed.',
+    };
   }
 
   // Before the reply is read: a malformed report still cost what it cost.
   input.onSpend?.({ model: WRITE_CARD_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { outcome: 'dropped', reason: whyNoReport(response) };
+  const block = response.content.find(
+    (part) => part.type === 'tool_use' && part.name === TOOL_NAME,
+  );
+  if (!block || block.type !== 'tool_use')
+    return { outcome: 'dropped', reason: whyNoReport(response) };
 
   const report = readCardReport(block.input);
   if (report.verdict === 'dropped') return { outcome: 'dropped', reason: report.reason };
   return {
     outcome: 'ready',
+    context: report.context,
     hook: report.hook,
     summary: report.summary,
     example: report.example,

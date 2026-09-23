@@ -15,6 +15,7 @@ export type FeedCardRow = {
   status: string;
   summary: string | null;
   why: string | null;
+  context?: string | null;
   hook?: string | null;
   example?: string | null;
   check_question?: string | null;
@@ -32,7 +33,9 @@ export type FeedCard = {
   article: string;
   section: string | null;
   why: string;
-  /** The most interesting thing in the section, first on the card. */
+  /** One paragraph setting the scene, first on the card. Null on older cards. */
+  context: string | null;
+  /** The most interesting thing in the section, after the context. */
   hook: string | null;
   summary: string;
   /** The idea applied to a specific case. */
@@ -146,7 +149,11 @@ export function splitForReading(
   }
 
   const restWords = rest.reduce((sum, paragraph) => sum + words(paragraph), 0);
-  return { shown, rest, restMinutes: rest.length ? Math.max(1, Math.ceil(restWords / WORDS_PER_MINUTE)) : 0 };
+  return {
+    shown,
+    rest,
+    restMinutes: rest.length ? Math.max(1, Math.ceil(restWords / WORDS_PER_MINUTE)) : 0,
+  };
 }
 
 /** Where to cut one long paragraph: after the last sentence end before the limit. */
@@ -176,12 +183,16 @@ export function toFeedCard(row: FeedCardRow): FeedCard | null {
     article: row.item.title,
     section: row.segment.heading,
     why: row.why,
+    context: row.context?.trim() || null,
     hook: row.hook?.trim() || null,
     summary: row.summary,
     example: row.example?.trim() || null,
     question: row.check_question && row.check_answer ? row.check_question : null,
     answer: row.check_question && row.check_answer ? row.check_answer : null,
-    depth: row.depth === 'working' || row.depth === 'advanced' || row.depth === 'specialist' ? row.depth : null,
+    depth:
+      row.depth === 'working' || row.depth === 'advanced' || row.depth === 'specialist'
+        ? row.depth
+        : null,
     returning: row.status === 'review' || row.status === 'skipped' ? row.status : null,
     shown,
     rest,
@@ -204,7 +215,10 @@ export type SwipeAction = 'known' | 'review' | 'skipped';
 export const SWIPES: readonly SwipeAction[] = ['known', 'review', 'skipped'];
 
 /** Days a card waits before it comes back, after each swipe that brings one back. */
-export const RETURN_AFTER_DAYS: Record<Exclude<SwipeAction, 'known'>, number> = { review: 2, skipped: 3 };
+export const RETURN_AFTER_DAYS: Record<Exclude<SwipeAction, 'known'>, number> = {
+  review: 2,
+  skipped: 3,
+};
 
 /**
  * The statuses each action may move a card from.
