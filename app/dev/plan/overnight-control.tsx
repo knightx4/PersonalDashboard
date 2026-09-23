@@ -328,6 +328,7 @@ export function OvernightControl({
   ready,
   label = 'Overnight',
   bare = false,
+  showBlocked = true,
   progress = null,
   refreshReadings = false,
 }: {
@@ -362,6 +363,12 @@ export function OvernightControl({
    * (law 11).
    */
   bare?: boolean;
+  /**
+   * List the steps the night left blocked on you. Dash leaves it off: the same
+   * steps are the first rows of its "waiting on you" list a little further
+   * down, and the status card saying it again was note 7a08286c.
+   */
+  showBlocked?: boolean;
   /**
    * Progress through the feature the night is on, as `featureProgress` reads
    * it. Passed by the Status panel on Dash; the plan page shows the steps
@@ -588,7 +595,7 @@ export function OvernightControl({
 
           {standing === 'running' && <TickNote run={run} now={now} />}
 
-          {night.blocked.length > 0 && <BlockedSteps night={night} />}
+          {showBlocked && night.blocked.length > 0 && <BlockedSteps night={night} />}
 
           <StopsIn run={run} now={now} />
 
@@ -608,7 +615,7 @@ export function OvernightControl({
             now={now}
             said={night.features.length > 0 ? (night.endedReason ?? '') : 'It fired nothing.'}
           />
-          {night.blocked.length > 0 && <BlockedSteps night={night} />}
+          {showBlocked && night.blocked.length > 0 && <BlockedSteps night={night} />}
           {night.closed.length > 0 && <WhichSteps night={night} />}
         </div>
       )}

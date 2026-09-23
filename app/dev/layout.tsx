@@ -79,10 +79,11 @@ export default async function DevLayout({ children }: { children: React.ReactNod
    * on, and every conversation you have had with Dash. A question nobody reads
    * is a session that guessed.
    *
-   * Then three lists, and the order is the point: what is wrong now, what was
-   * decided and is being built, and what is only being thought about. A thing
-   * moves up this list as it acquires commitment — an idea becomes a plan step
-   * when it is decided on, and a bug is filed when something built is wrong.
+   * Then three lists: what was decided and is being built, what is wrong now,
+   * and what is only being thought about. The plan leads them because it is
+   * the page worked from most days (note ab08d2d3); a bug is filed when
+   * something built is wrong, and an idea becomes a plan step when it is
+   * decided on.
    *
    * UI sits below the three because it is not a list of work; it is the
    * standard the work is held to, and Surfaces below that because it is where
@@ -104,8 +105,8 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     // The route stays /dev/raised, which keeps every link already written into
     // a notification, a comment and an old summary working.
     { href: '/dev/raised', label: 'Dash', icon: 'raised', badge: raised.length + waiting.length },
-    { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
     { href: '/dev/plan', label: 'Plan', icon: 'plan' },
+    { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
     { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },
     { href: '/dev/specs', label: 'Specs', icon: 'specs' },
     { href: '/dev/ui', label: 'UI', icon: 'ui' },

@@ -99,7 +99,8 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
   const canAnswer = row.status === 'blocked' || row.status === 'planned';
 
   return (
-    <li className="row-pad flex flex-col gap-2 px-4">
+    // The id is where the app-wide search lands a note: /dev/bugs#note-<id>.
+    <li id={`note-${row.id}`} className="row-pad flex scroll-mt-20 flex-col gap-2 px-4">
       <div className="flex flex-wrap items-center gap-2">
         <span
           className={cn(

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Network } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SectionFold } from '@/components/ui/disclosure';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { requireUser } from '@/lib/auth/server';
@@ -184,29 +185,35 @@ export default async function KnowPage({
           what you already have, which is the only thing on this page that can
           reach what you learned before any of this existed. Second because it
           is the rarer move -- written once for a field, not once a week. */}
-      <h2 className="mt-8 text-body font-medium text-ink">Or start from what you already know</h2>
-      <PriorForm />
+      {/* Each of the three ways in below folds shut under its own heading
+          (note f877038d). They are the rarer moves, and open they were three
+          large fields stacked under the goal form. */}
+      <SectionFold title="Or start from what you already know" defaultOpen={false} className="mt-8">
+        <PriorForm />
+      </SectionFold>
 
       {/* And the third way in, the only one that starts from a document
           somebody else wrote. Last because it is the rarest: a prepared
           briefing arrives when you are about to be examined on something, not
           on an ordinary week. */}
-      <h2 className="mt-8 text-body font-medium text-ink">Or import a briefing you were handed</h2>
-      <BriefForm
-        subjects={subjects.map((subject) => ({ id: subject.id, name: subject.name }))}
-        maxChars={MAX_BRIEFING_CHARS}
-      />
+      <SectionFold title="Or import a briefing you were handed" defaultOpen={false} className="mt-4">
+        <BriefForm
+          subjects={subjects.map((subject) => ({ id: subject.id, name: subject.name }))}
+          maxChars={MAX_BRIEFING_CHARS}
+        />
+      </SectionFold>
 
       {/* The fourth way in, and the one that needs nothing typed. The vault
           already holds years of notes arguing things; this reads one of them.
           Last because it is the first slice of a sweep that will eventually
           read all of them without being asked, at which point this form is
           for checking what the sweep would do rather than for doing it. */}
-      <h2 className="mt-8 text-body font-medium text-ink">Or read a note from your vault</h2>
-      <FromVaultForm
-        subjects={subjects.map((subject) => ({ id: subject.id, name: subject.name }))}
-        notes={vaultNotes}
-      />
+      <SectionFold title="Or read a note from your vault" defaultOpen={false} className="mt-4">
+        <FromVaultForm
+          subjects={subjects.map((subject) => ({ id: subject.id, name: subject.name }))}
+          notes={vaultNotes}
+        />
+      </SectionFold>
     </>
   );
 }

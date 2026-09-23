@@ -5,7 +5,6 @@ import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Field, Select } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
-import { cn } from '@/lib/cn';
 import type { ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { proposeFromNote, type FromNoteState } from './actions';
 import { Proposal } from './brief-form';
@@ -53,7 +52,7 @@ export function FromVaultForm({
   }
 
   return (
-    <form action={propose} className={cn(cardVariants({ padding: 'standard' }), 'mt-6')}>
+    <form action={propose} className={cardVariants({ padding: 'standard' })}>
       {subjects.length > 0 && (
         <Field
           label="Into which track?"

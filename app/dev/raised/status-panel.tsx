@@ -62,6 +62,7 @@ export function StatusPanel({
         ready={ready}
         label="Plan"
         bare
+        showBlocked={false}
       />
       <div className="border-t border-border pt-3">
         <RunRoutineButton

@@ -118,7 +118,7 @@ export function PriorForm({ subjectId }: { subjectId?: string }) {
   if (state.chain) return <Proposal chain={state.chain} />;
 
   return (
-    <form action={propose} className={cn(cardVariants({ padding: 'standard' }), 'mt-6')}>
+    <form action={propose} className={cardVariants({ padding: 'standard' })}>
       {subjectId && <input type="hidden" name="subjectId" value={subjectId} />}
 
       <Field

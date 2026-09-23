@@ -213,7 +213,8 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
   );
 
   return (
-    <li className="flex flex-col gap-2 px-4 py-3">
+    // The id is where the app-wide search lands an idea: /dev/ideas#idea-<id>.
+    <li id={`idea-${idea.id}`} className="flex scroll-mt-20 flex-col gap-2 px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="rounded-full bg-accent-tint px-2 py-0.5 text-micro font-semibold uppercase tracking-wide text-accent">
           {scopeLabel(idea.module)}

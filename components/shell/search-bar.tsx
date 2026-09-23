@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn';
 import { popoverSurface } from '@/components/ui/popover';
 import { SearchRowLine } from '@/components/shell/search-row';
 import { SearchScopeChip } from '@/components/shell/search-scope-chip';
+import { Kbd } from '@/components/shell/key-hints';
 import {
   searchRowKey,
   useSearchRows,
@@ -23,11 +24,16 @@ import type { NavSection } from '@/components/shell/app-shell';
  * `focus` reports back whether the cursor actually landed there. Below lg the
  * bar is drawn with `display: none`, and an input inside a hidden box cannot
  * take focus, so a `false` answers "is the bar on screen" without a second
- * copy of the breakpoint anywhere (#663). Nothing else is exposed: the query,
- * the scope and the list stay the bar's own.
+ * copy of the breakpoint anywhere (#663). Nothing else is exposed: the query
+ * and the list stay the bar's own.
+ *
+ * `scope` is what ⌘K passes: the key searches everything you own (note
+ * cdf684fa), while a click into the field keeps the workspace the page is in.
+ * It is applied only when the cursor landed, so a bar that is not on screen is
+ * left as it was.
  */
 export type SearchBarHandle = {
-  focus: () => boolean;
+  focus: (options?: { scope?: SearchScope }) => boolean;
 };
 
 /**
@@ -94,14 +100,19 @@ export function SearchBar({
   useImperativeHandle(
     ref,
     () => ({
-      focus() {
+      focus(options) {
         const input = inputRef.current;
         if (!input) return false;
         input.focus();
         // Asked of the document rather than assumed: `focus()` on an input
         // inside a `display: none` box is a no-op that throws nothing, and
         // this is how the caller finds out.
-        return document.activeElement === input;
+        const landed = document.activeElement === input;
+        if (landed && options?.scope) {
+          setScope(options.scope);
+          setActive(0);
+        }
+        return landed;
       },
     }),
     [],
@@ -206,7 +217,7 @@ export function SearchBar({
         * laid across it rather than as one control among the icons beside it
         * -- note ca910aa3. The edge is what says you can type here, and with
         * the bar showing through it says it without the rest. */}
-      <div className="flex h-(--control-h) items-center gap-2 rounded-full border border-control bg-transparent px-(--control-px) focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/40">
+      <div className="group/searchbox flex h-(--control-h) items-center gap-2 rounded-full border border-control bg-transparent px-(--control-px) focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/40">
         <Search className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
         <input
           ref={inputRef}
@@ -245,6 +256,7 @@ export function SearchBar({
           }}
           placeholder="Search"
           aria-label="Search"
+          aria-keyshortcuts="Meta+K Control+K"
           // No focus ring on the field itself: the box around the field and
           // the chip carries it, and two rings on one control is a thickening
           // rather than an indication. See globals.css.
@@ -252,6 +264,16 @@ export function SearchBar({
           // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
           className="h-full w-full min-w-0 bg-transparent text-base text-ink outline-none placeholder:text-ink-ghost sm:text-ui"
         />
+
+        {/* The key that lands here, said where it lands (note 3fbdac0b). Shown
+            at rest rather than only while a modifier is held, because this is
+            where somebody learns it; gone once the field has the cursor or
+            any text, when it has done its job. */}
+        {!query && (
+          <Kbd always className="shrink-0 group-focus-within/searchbox:hidden">
+            ⌘K
+          </Kbd>
+        )}
 
         <SearchScopeChip
           scope={scope}
