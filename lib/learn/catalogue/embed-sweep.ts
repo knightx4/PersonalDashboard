@@ -96,6 +96,14 @@ export type EmbedSweepOptions = {
   chunk?: number;
   /** Stop after this many segments, for a first run somebody is watching. */
   limit?: number;
+  /**
+   * A time, in epoch milliseconds, after which no further chunk is started.
+   * For a caller inside a function with a time limit, which needs to say how
+   * far it got rather than be cut off halfway. It stops with reason `time`.
+   */
+  deadline?: number;
+  /** The clock the deadline is read against. Date.now unless a test sets it. */
+  now?: () => number;
 };
 
 export type EmbedSweepResult = {
@@ -197,8 +205,8 @@ export function catalogueLedger(
 /**
  * The loop, over the two ports.
  *
- * It stops on three things: nothing left to embed, the limit, and a chunk that
- * wrote nothing. The last one is what keeps a re-sweep racing this run from
+ * It stops on four things: nothing left to embed, the limit, the deadline,
+ * and a chunk that wrote nothing. The last one is what keeps a re-sweep racing this run from
  * spinning: the same rows would be read again, and a chunk where every write
  * was refused has made no progress to build on.
  */
@@ -209,6 +217,7 @@ export async function runEmbedSweep(
   const model = options.model ?? DEFAULT_EMBEDDING_MODEL;
   const chunk = Math.max(1, options.chunk ?? DEFAULT_CHUNK);
   const limit = options.limit ?? null;
+  const now = options.now ?? Date.now;
 
   const result: EmbedSweepResult = {
     embedded: 0,
@@ -225,6 +234,16 @@ export async function runEmbedSweep(
 
     const segments = await ports.store.unembedded(remaining);
     if (segments.length === 0) break;
+
+    // Checked after the read rather than before it, so a run that has nothing
+    // left to embed ends clean instead of reporting that it ran out of time.
+    if (options.deadline !== undefined && now() >= options.deadline) {
+      result.stopped = {
+        reason: 'time',
+        detail: 'the press ran out of time with segments still to embed',
+      };
+      break;
+    }
 
     const reports: SpendReport[] = [];
     const outcome = await ports.embed({

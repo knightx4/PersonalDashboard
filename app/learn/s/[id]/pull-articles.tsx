@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Field, Textarea } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import { MAX_TITLES, type PullReport } from '@/lib/learn/catalogue/pull';
+import { MAX_TITLES, type EmbeddingReport, type PullReport } from '@/lib/learn/catalogue/pull';
 import { pullWikipediaArticles, type PullState } from './actions';
 
 /**
@@ -134,10 +134,20 @@ function Report({ report }: { report: PullReport }) {
   );
 }
 
-function embeddingLine(embedding: PullReport['embedding']): string {
+/**
+ * The embedding pass as one line. Shared with the course form, which names
+ * what it embedded as segments rather than sections.
+ */
+export function embeddingLine(
+  embedding: EmbeddingReport | null,
+  noun: { one: string; many: string } = { one: 'section', many: 'sections' },
+): string {
   if (!embedding) return 'Nothing was stored, so nothing was embedded.';
 
-  const done = `${embedding.embedded} ${embedding.embedded === 1 ? 'section' : 'sections'} embedded`;
+  const done = `${embedding.embedded} ${embedding.embedded === 1 ? noun.one : noun.many} embedded`;
+  if (embedding.stopped?.reason === 'time') {
+    return `${done} before the press ran out of time. Press again to embed the rest.`;
+  }
   if (embedding.stopped) {
     const why =
       embedding.stopped.reason === 'no-key'
