@@ -265,12 +265,11 @@ export function SearchBar({
           className="h-full w-full min-w-0 bg-transparent text-base text-ink outline-none placeholder:text-ink-ghost sm:text-ui"
         />
 
-        {/* The key that lands here, said where it lands (note 3fbdac0b). Shown
-            at rest rather than only while a modifier is held, because this is
-            where somebody learns it; gone once the field has the cursor or
-            any text, when it has done its job. */}
+        {/* The key that lands here, said where it lands (note 3fbdac0b). A
+            hint like every other one: invisible until ⌘ or ⌥ is held (note
+            935820d9), and gone once the field has the cursor or any text. */}
         {!query && (
-          <Kbd always className="shrink-0 group-focus-within/searchbox:hidden">
+          <Kbd className="shrink-0 group-focus-within/searchbox:hidden">
             ⌘K
           </Kbd>
         )}
