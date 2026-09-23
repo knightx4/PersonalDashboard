@@ -121,6 +121,9 @@ describe('digesting a newsletter', () => {
     expect(sent.tool_choice).toEqual({ type: 'tool', name: 'report_digest' });
     expect(sent.tools[0].input_schema.required).toContain('line');
     expect(sent.system).toContain(`at most ${LINE_CHARS} characters`);
+    // A section of short items is where stories went missing (Morning Brew's
+    // "Tour de headlines"), so the prompt names it.
+    expect(sent.system).toContain('Each item in such\na section is a story of its own');
     expect(sent.messages[0].content).toBe(
       'Subject: Morning roundup\n\nView in browser\n\nFirst story.\n\nSecond story.',
     );
@@ -271,7 +274,7 @@ describe('the text Haiku reads', () => {
         htmlBody:
           '<html><head><style>p{}</style></head><body><p>Rates &amp; bonds</p><p>Oil&nbsp;up</p></body></html>',
       }),
-    ).toEqual({ text: 'Rates & bonds\nOil up', links: [] });
+    ).toEqual({ text: 'Rates & bonds\nOil up', links: [], images: [] });
   });
 
   it('reads the HTML when it has links, numbering each address once', () => {
@@ -288,7 +291,46 @@ describe('the text Haiku reads', () => {
     ).toEqual({
       text: 'Rates rose [link 1]\nOil fell [link 2] more [link 1] write to us',
       links: ['https://t.example/c/1?a=1&b=2', 'https://t.example/c/2'],
+      images: [],
     });
+  });
+
+  it('numbers each picture where it sat, skipping pixels and icons', () => {
+    expect(
+      bodyText({
+        subject: null,
+        textBody: 'MIT is first.',
+        htmlBody:
+          '<p><img src="https://cdn.example/logo.png" alt="Brew"></p>' +
+          '<h2><a href="https://t.example/c/1">MIT is first</a></h2>' +
+          '<p><a href="https://t.example/c/1"><img src="https://cdn.example/mit.jpg?w=600&amp;h=400"></a></p>' +
+          '<p>Rankings out.</p>' +
+          '<img src="https://open.example/o/abc" width="1" height="1">' +
+          '<img src="https://cdn.example/spacer.gif" style="display:block; width:1px">' +
+          '<img src="https://cdn.example/share.png" style="width:25px;display:inline-block">' +
+          '<img src="https://cdn.example/arrow.png" width="20" style="width:22%">' +
+          '<img src="https://cdn.example/wide.jpg" width="670" style="width:100%;max-width:670px">' +
+          '<img src="data:image/gif;base64,R0lGOD">',
+      }),
+    ).toEqual({
+      text: '[image 1]\nMIT is first [link 1]\n[image 2] [link 1]\nRankings out.\n[image 3]',
+      links: ['https://t.example/c/1'],
+      images: [
+        'https://cdn.example/logo.png',
+        'https://cdn.example/mit.jpg?w=600&h=400',
+        'https://cdn.example/wide.jpg',
+      ],
+    });
+  });
+
+  it('numbers no pictures when the text body is what is read', () => {
+    expect(
+      bodyText({
+        subject: null,
+        textBody: 'Rates rose.',
+        htmlBody: '<p><img src="https://cdn.example/a.jpg">Rates rose.</p>',
+      }),
+    ).toEqual({ text: 'Rates rose.', links: [], images: [] });
   });
 
   it('numbers the addresses a text body writes out when the HTML has no links', () => {
@@ -302,6 +344,7 @@ describe('the text Haiku reads', () => {
     ).toEqual({
       text: 'Rates rose [link 1] and oil fell [link 2] .\n[link 3]',
       links: ['https://substack.com/redirect/abc', 'https://t.example/2', 'https://t.example/3'],
+      images: [],
     });
   });
 });
@@ -340,11 +383,69 @@ describe('reading the report', () => {
     });
   });
 
+  it('puts the picture behind each image number on its story', () => {
+    const images = ['https://cdn.example/logo.png', 'https://cdn.example/mit.jpg'];
+    expect(
+      readDigest(
+        {
+          summary: 'Two stories.',
+          stories: [
+            { headline: 'MIT', summary: 'MIT is first.', image: 2 },
+            { headline: 'Made up', summary: 'No such picture.', image: 9 },
+          ],
+        },
+        [],
+        images,
+      ),
+    ).toEqual({
+      line: null,
+      summary: 'Two stories.',
+      stories: [
+        { headline: 'MIT', summary: 'MIT is first.', image: 'https://cdn.example/mit.jpg' },
+        { headline: 'Made up', summary: 'No such picture.' },
+      ],
+    });
+  });
+
+  it("keeps each story's own text, without any markers left in it", () => {
+    expect(
+      readDigest({
+        summary: 'One story.',
+        stories: [
+          {
+            headline: 'MIT',
+            summary: 'MIT is first.',
+            text: 'MIT rose to first [link 2], while Princeton fell.\n\n[image 1] Harvard held third.',
+          },
+          { headline: 'Blank', summary: 'Its text is empty.', text: '  ' },
+        ],
+      }),
+    ).toEqual({
+      line: null,
+      summary: 'One story.',
+      stories: [
+        {
+          headline: 'MIT',
+          summary: 'MIT is first.',
+          text: 'MIT rose to first, while Princeton fell.\n\nHarvard held third.',
+        },
+        { headline: 'Blank', summary: 'Its text is empty.' },
+      ],
+    });
+  });
+
   it('never stores an address the model wrote itself', () => {
     expect(
       readDigest({
         summary: 'One story.',
-        stories: [{ headline: 'Typed', summary: 'Wrote a URL.', link: 'https://evil.example' }],
+        stories: [
+          {
+            headline: 'Typed',
+            summary: 'Wrote a URL.',
+            link: 'https://evil.example',
+            image: 'https://evil.example/pixel.gif',
+          },
+        ],
       }),
     ).toEqual({
       line: null,

@@ -32,6 +32,13 @@ import { readStories, type NewsStory } from '@/lib/news/issues/stories';
  * ninety characters for the newsletter list, stored as `summary_line` by
  * 0006_issues_summary_line.sql. A reply that leaves it out still stores the
  * summary, with the line null.
+ *
+ * Pictures and the story's own text. Each picture in the HTML is replaced by
+ * an `[image N]` marker the same way links are, and the model gives the
+ * number of the one printed with each story; the stored address is the
+ * email's own. The model also copies each story's text out of the email, so
+ * the page can show the whole story under its summary. Both live on the story
+ * inside the `stories` jsonb, so neither needed a column.
  */
 
 export const DIGEST_MODEL = 'claude-haiku-4-5';
@@ -48,8 +55,12 @@ const TOOL_NAME = 'report_digest';
  */
 const MAX_BODY_CHARS = 60_000;
 
-/** Enough for a summary and a roundup of about thirty stories. */
-const MAX_TOKENS = 4_000;
+/**
+ * Enough for a summary and about thirty stories with their text copied out.
+ * A long issue's copied text runs to a few thousand tokens; Haiku allows far
+ * more than this, and the cap is only there to end a reply that runs away.
+ */
+const MAX_TOKENS = 16_000;
 
 /** Longest error kept on the row, so a provider's error page is not stored whole. */
 const MAX_ERROR_CHARS = 500;
@@ -70,6 +81,18 @@ STORIES. List each separate story, article or item the issue covers, in the
 order it appears. For each, give a short headline in your own words and two
 sentences on what it says. Use the newsletter's own facts and do not add any.
 
+ROUNDUPS. Many issues have a section of short items under one heading, such as
+"Tour de headlines", "Quick hits" or "What else is brewing". Each item in such
+a section is a story of its own: list every one, not the section as a whole.
+An issue that opens with a list of what it covers is naming its main stories
+only; the stories are everything in the body, not just that list.
+
+TEXT. For each story, copy its text from the email word for word: every
+paragraph of it, in order, with a blank line between paragraphs. For a short
+roundup item that is its one paragraph. Leave out the headline, the [link N]
+and [image N] markers, photo credits, and any sponsor message that sits inside
+the story.
+
 LEAVE OUT sponsor messages and advertisements, housekeeping such as "view in
 browser", subscription and unsubscribe text, social links, and the sign-off.
 
@@ -79,6 +102,12 @@ link to that story's own article, usually the one on or next to its headline
 or its "read more". Leave the number out when the story has no such link.
 Never give a link to a sponsor, a share or subscribe button, or the
 newsletter's own site.
+
+PICTURES. Each picture in the email appears as a marker such as [image 4],
+where the picture sat. For each story, give the number of the picture printed
+with it, usually just above or below its headline. Leave the number out when
+the story has none. Never give a logo, an icon, an advertisement, or a picture
+that belongs to a different story.
 
 ONE ESSAY. When the issue is a single article or essay rather than a set of
 items, the summary covers it and the story list is empty. Do not cut one essay
@@ -106,6 +135,16 @@ const TOOL = {
               type: 'integer',
               description:
                 "The N of the [link N] marker for this story's own article. Omit when there is none.",
+            },
+            image: {
+              type: 'integer',
+              description:
+                'The N of the [image N] marker for the picture printed with this story. Omit when there is none.',
+            },
+            text: {
+              type: 'string',
+              description:
+                "The story's own text from the email, word for word, paragraphs separated by a blank line.",
             },
           },
           required: ['headline', 'summary'],
@@ -136,20 +175,26 @@ export type DigestOutcome =
 const INVISIBLE = /[\u00AD\u034F\u200B-\u200D\u2060\uFEFF]/g;
 
 /**
- * Hands out the `[link N]` markers, one number per distinct address, and keeps
- * the addresses in order so number N is `links[N - 1]`.
+ * Hands out one kind of marker, `[link N]` or `[image N]`, one number per
+ * distinct address, and keeps the addresses in order so number N is
+ * `addresses[N - 1]`.
  */
-class LinkNumbers {
-  readonly links: string[] = [];
+class Numbers {
+  readonly addresses: string[] = [];
+
+  constructor(private readonly kind: 'link' | 'image') {}
 
   marker(address: string): string {
     const url = address.trim();
     if (!/^https?:\/\//i.test(url)) return '';
-    let index = this.links.indexOf(url);
-    if (index === -1) index = this.links.push(url) - 1;
-    return ` [link ${index + 1}] `;
+    let index = this.addresses.indexOf(url);
+    if (index === -1) index = this.addresses.push(url) - 1;
+    return ` [${this.kind} ${index + 1}] `;
   }
 }
+
+/** The numbers handed out while reading one email's HTML. */
+type Markers = { links: Numbers; images: Numbers };
 
 function decodeEntities(text: string): string {
   return text
@@ -180,23 +225,59 @@ export function readLine(value: unknown): string | null {
 
 const ANCHOR = /<a\b([^>]*)>([\s\S]*?)<\/a\s*>/gi;
 const HREF = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
+const IMG = /<img\b([^>]*)>/gi;
+
+/** The value of one attribute in a tag's attribute text, or null. */
+function attribute(attributes: string, name: string): string | null {
+  const match = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i').exec(
+    attributes,
+  );
+  return match ? (match[1] ?? match[2] ?? match[3] ?? '') : null;
+}
 
 /**
- * HTML to readable text. Given `numbers`, each http(s) link is kept as a
- * `[link N]` marker after its words; without it, links are dropped with the
- * tags.
+ * A picture too small to be a story's: a tracking pixel, a spacer, or an icon
+ * such as a share button or a market arrow, going by the size the email gives
+ * it. Fewer markers means less for the model to pick wrongly from. A picture
+ * with no size given is kept.
  */
-export function htmlToText(html: string, numbers?: LinkNumbers): string {
+const ICON_PX = 48;
+
+function isIcon(attributes: string): boolean {
+  const small = (value: string | null) => {
+    const match = value === null ? null : /^\s*(\d+)(px)?\s*$/i.exec(value);
+    return match !== null && Number(match[1]) < ICON_PX;
+  };
+  if (small(attribute(attributes, 'width')) || small(attribute(attributes, 'height'))) return true;
+  const style = attribute(attributes, 'style') ?? '';
+  return [...style.matchAll(/(?:^|;)\s*(?:width|height)\s*:\s*(\d+)px/gi)].some(
+    (match) => Number(match[1]) < ICON_PX,
+  );
+}
+
+/**
+ * HTML to readable text. Given `markers`, each http(s) link is kept as a
+ * `[link N]` marker after its words and each picture as an `[image N]` marker
+ * where it sat; without it, links and pictures are dropped with the tags.
+ */
+export function htmlToText(html: string, markers?: Markers): string {
   const cleared = html
     .replace(/<head[\s\S]*?<\/head>/gi, ' ')
     .replace(/<(script|style|noscript|svg)[\s\S]*?<\/\1>/gi, ' ');
-  const linked = numbers
-    ? cleared.replace(ANCHOR, (_, attributes: string, inner: string) => {
-        const href = HREF.exec(attributes);
-        const address = href ? decodeEntities(href[1] ?? href[2] ?? href[3] ?? '') : '';
-        return `${inner}${numbers.marker(address)}`;
+  // Pictures first, so one inside a link keeps its marker ahead of the link's.
+  const pictured = markers
+    ? cleared.replace(IMG, (_, attributes: string) => {
+        if (isIcon(attributes)) return ' ';
+        return markers.images.marker(decodeEntities(attribute(attributes, 'src') ?? ''));
       })
     : cleared;
+  const linked = markers
+    ? pictured.replace(ANCHOR, (_, attributes: string, inner: string) => {
+        const href = HREF.exec(attributes);
+        const address = href ? decodeEntities(href[1] ?? href[2] ?? href[3] ?? '') : '';
+        return `${inner}${markers.links.marker(address)}`;
+      })
+    : pictured;
   return decodeEntities(
     linked
       .replace(/<\/(p|div|section|li|h[1-6]|tr|table)>/gi, '\n')
@@ -210,7 +291,7 @@ export function htmlToText(html: string, numbers?: LinkNumbers): string {
  * write them as `(https://…)`, `[ https://… ]`, `<https://…>` or bare, and the
  * brackets go with the address.
  */
-function numberTextLinks(text: string, numbers: LinkNumbers): string {
+function numberTextLinks(text: string, numbers: Numbers): string {
   return text.replace(
     /[[(<]\s*(https?:\/\/[^\s<>[\]()]+)\s*[\])>]|(https?:\/\/[^\s<>[\]()]+)/gi,
     (_, bracketed: string | undefined, bare: string | undefined) =>
@@ -218,8 +299,11 @@ function numberTextLinks(text: string, numbers: LinkNumbers): string {
   );
 }
 
-/** The text Haiku reads, and the addresses its `[link N]` markers stand for. */
-export type BodyText = { text: string; links: string[] };
+/**
+ * The text Haiku reads, and the addresses its `[link N]` and `[image N]`
+ * markers stand for.
+ */
+export type BodyText = { text: string; links: string[]; images: string[] };
 
 /**
  * The text Haiku reads.
@@ -229,16 +313,19 @@ export type BodyText = { text: string; links: string[] };
  * links out (Morning Brew's carries two addresses where its HTML carries
  * about ninety). Otherwise the text body, with the addresses it writes out
  * numbered, and the stripped HTML only when there is no text body.
- * Padding characters and runs of blank space are collapsed.
+ * Pictures are numbered only when the HTML is what is read, since a text body
+ * has none. Padding characters and runs of blank space are collapsed.
  */
 export function bodyText(source: DigestSource): BodyText {
-  const numbers = new LinkNumbers();
+  const markers: Markers = { links: new Numbers('link'), images: new Numbers('image') };
   const html = source.htmlBody ?? '';
-  const htmlText = htmlToText(html, numbers);
+  const htmlText = htmlToText(html, markers);
   let raw: string;
-  if (numbers.links.length > 0) raw = htmlText;
+  let images = markers.images.addresses;
+  if (markers.links.addresses.length > 0) raw = htmlText;
   else if (source.textBody?.trim()) {
-    raw = numberTextLinks(source.textBody, numbers);
+    raw = numberTextLinks(source.textBody, markers.links);
+    images = [];
   } else raw = htmlText;
 
   const text = raw
@@ -249,32 +336,59 @@ export function bodyText(source: DigestSource): BodyText {
     .replace(/\n{3,}/g, '\n\n')
     .trim()
     .slice(0, MAX_BODY_CHARS);
-  return { text, links: numbers.links };
+  return { text, links: markers.links.addresses, images };
+}
+
+/**
+ * The address behind a marker number the model gave, or undefined when the
+ * number is not a whole number from 1 to the count of addresses. A number
+ * sent as text is read as the number.
+ */
+function lookUp(value: unknown, addresses: readonly string[]): string | undefined {
+  const n = typeof value === 'string' && /^\d+$/.test(value.trim()) ? Number(value) : value;
+  return typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= addresses.length
+    ? addresses[n - 1]
+    : undefined;
+}
+
+/** A story's copied text without the markers, if the model left any in. */
+function withoutMarkers(text: unknown): unknown {
+  if (typeof text !== 'string') return text;
+  return text
+    .replace(/ ?\[(link|image) \d+\] ?/g, ' ')
+    .replace(/[ \t]+([,.;:!?])/g, '$1')
+    .replace(/[ \t]*\n[ \t]*/g, '\n')
+    .replace(/[ \t]{2,}/g, ' ');
 }
 
 /**
  * The model's report as something that can be stored, or why it cannot.
  *
- * Each story's link number is looked up in `links`, the addresses behind the
- * `[link N]` markers; a number that is not a whole number from 1 to the
- * number of links is dropped, and the story kept without a link. Stories then
- * go through `readStories`, the same reading the page applies, so a story
- * without a headline or summary is dropped here rather than stored.
+ * Each story's link number is looked up in `links` and its picture number in
+ * `images`, the addresses behind the markers; a number that is not a whole
+ * number from 1 to the count of addresses is dropped, and the story kept
+ * without it. Stories then go through `readStories`, the same reading the page
+ * applies, so a story without a headline or summary is dropped here rather
+ * than stored.
  */
-export function readDigest(input: unknown, links: readonly string[] = []): Digest | string {
+export function readDigest(
+  input: unknown,
+  links: readonly string[] = [],
+  images: readonly string[] = [],
+): Digest | string {
   if (!input || typeof input !== 'object') return 'The model returned no digest.';
   const { line, summary, stories } = input as Record<string, unknown>;
   if (typeof summary !== 'string' || !summary.trim()) return 'The model returned no summary.';
   const linked = Array.isArray(stories)
     ? stories.map((story: unknown) => {
         if (!story || typeof story !== 'object') return story;
-        const { link, ...rest } = story as Record<string, unknown>;
-        const n = typeof link === 'string' && /^\d+$/.test(link.trim()) ? Number(link) : link;
-        const address =
-          typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= links.length
-            ? links[n - 1]
-            : undefined;
-        return address ? { ...rest, link: address } : rest;
+        const { link, image, text, ...rest } = story as Record<string, unknown>;
+        const out: Record<string, unknown> = { ...rest, text: withoutMarkers(text) };
+        const linkAddress = lookUp(link, links);
+        if (linkAddress) out.link = linkAddress;
+        const imageAddress = lookUp(image, images);
+        if (imageAddress) out.image = imageAddress;
+        return out;
       })
     : stories;
   return { line: readLine(line), summary: summary.trim(), stories: readStories(linked) };
@@ -289,7 +403,7 @@ export async function writeDigest(
   source: DigestSource,
   options: { client: Pick<Anthropic, 'messages'>; onSpend?: (report: SpendReport) => void },
 ): Promise<Digest> {
-  const { text, links } = bodyText(source);
+  const { text, links, images } = bodyText(source);
   if (!text) throw new Error('The issue has no text to summarise.');
 
   const response = await options.client.messages.create({
@@ -317,7 +431,7 @@ export async function writeDigest(
   if (!block || block.type !== 'tool_use') {
     throw new Error(`The model did not report a digest (stopped: ${response.stop_reason ?? 'unknown'}).`);
   }
-  const digest = readDigest(block.input, links);
+  const digest = readDigest(block.input, links, images);
   if (typeof digest === 'string') throw new Error(digest);
   return digest;
 }

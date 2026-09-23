@@ -19,10 +19,12 @@ export const dynamic = 'force-dynamic';
  * at. "Mark unread" is on the page for the issue you opened by mistake or want
  * to come back to.
  *
- * Pictures are a link rather than a switch, so the choice survives a reload
- * and costs no script: `?pictures=1` is the reader asking for them, and until
- * it is there nothing in the issue is fetched from the sender. That is what
- * keeps a tracking pixel from reporting the issue as opened.
+ * Pictures load unless the reader turned them off with `?pictures=0`, a link
+ * rather than a switch so the choice survives a reload and costs no script.
+ * They were off by default until the reader said they did not mind the sender
+ * seeing the issue opened; a sender that never sees an open can drop the
+ * address from its list as inactive. The same setting covers the thumbnails
+ * beside the stories, which load straight from the sender too.
  *
  * Unsubscribe is shown only for an issue whose sender offered a link in its
  * List-Unsubscribe header, and it opens that link in a new tab.
@@ -57,15 +59,15 @@ export default async function IssuePage({
 
   const sender = issue.sender;
   const from = sender ? senderLabel(sender) : 'Unknown sender';
-  const wanted = pictures === '1';
-  const { html, blockedImages } = cleanIssueHtml(issue.htmlBody, wanted);
+  const wanted = pictures !== '0';
+  const { html, blockedImages, images } = cleanIssueHtml(issue.htmlBody, wanted);
   const back = issueReturn(cameFrom, sender);
   const digest = issue.digest;
   const showDigest = digest !== null && view !== 'original';
-  /** Asking for the pictures reloads this page, and keeps where you were with it. */
+  /** Turning the pictures on or off reloads this page, and keeps where you were with it. */
   const picturesHref = issueHref(issue.id, {
-    original: digest !== null,
-    pictures: true,
+    original: digest !== null && !showDigest,
+    pictures: !wanted,
     from: back.from,
   });
   const originalHref = issueHref(issue.id, { original: true, pictures: wanted, from: back.from });
@@ -82,6 +84,8 @@ export default async function IssuePage({
       showDigest={showDigest}
       html={html}
       textBody={issue.textBody}
+      pictures={wanted}
+      pictureCount={showDigest ? digest.stories.filter((story) => story.image).length : images}
       blockedImages={blockedImages}
       unsubscribeUrl={issue.unsubscribeUrl}
       picturesHref={picturesHref}

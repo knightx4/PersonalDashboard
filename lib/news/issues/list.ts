@@ -89,7 +89,7 @@ export function countLabel(total: number): string {
  * whole list is the honest answer to it.
  *
  * The filter comes back out as `from` so the issue's own links can keep it:
- * asking for the pictures reloads this page, and it should not be the press
+ * turning the pictures off reloads this page, and it should not be the press
  * that loses where you were.
  */
 export function issueReturn(
@@ -108,8 +108,10 @@ export function issueReturn(
  * Every link on the issue page that reloads it goes through here, so each one
  * keeps the choices it does not change: asking for the pictures keeps you on
  * the original email, and switching between the summary and the original
- * keeps the pictures you asked for and the list you came from. The choices
- * are query parameters so that none of this needs script on the page.
+ * keeps the pictures setting and the list you came from. The choices are
+ * query parameters so that none of this needs script on the page.
+ *
+ * Pictures are on unless turned off, so only `pictures=0` is ever written.
  */
 export function issueHref(
   id: string,
@@ -117,7 +119,7 @@ export function issueHref(
 ): string {
   const query = new URLSearchParams();
   if (original) query.set('view', 'original');
-  if (pictures) query.set('pictures', '1');
+  if (!pictures) query.set('pictures', '0');
   if (from) query.set('from', from);
   const search = query.toString();
   return search ? `/news/i/${id}?${search}` : `/news/i/${id}`;
