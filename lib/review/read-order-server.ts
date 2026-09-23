@@ -5,6 +5,7 @@ import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { mapPool } from '@/lib/async/map-pool';
 import { classifyMessage, type MerchantDomainHit } from '@/lib/email/extract/classify';
 import { extractOrderFromEmail } from '@/lib/email/extract/extract-order';
+import { quotedOriginal } from '@/lib/email/extract/forwarded';
 import { displayNameFromAddress } from '@/lib/email/extract/heuristic';
 import { fetchMessageBody } from '@/lib/inbox/fetch-message-body';
 import { loadCategoryContext } from '@/lib/inbox/context';
@@ -70,8 +71,10 @@ async function readRow(
   const fromAddress = message.fromAddress ?? row.from_address;
   const subject = message.subject ?? row.subject;
   const date = message.internalDate ?? (row.received_at ? new Date(row.received_at) : null);
+  // A forward is classified by the shop it quotes, so a known merchant's slug
+  // reaches the extractor instead of nothing for the forwarder's own address.
   const classified = classifyMessage({
-    fromAddress,
+    fromAddress: quotedOriginal(message.text)?.fromAddress ?? fromAddress,
     subject,
     merchants: context.merchants,
   });

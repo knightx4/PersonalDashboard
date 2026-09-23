@@ -131,6 +131,70 @@ describe('draftFromExtraction', () => {
     expect(relay.merchantId).toBeNull();
     expect(relay.merchantName).toBe('store+123@shopifyemail.com');
   });
+
+  it('names a Gmail forward after the shop it quotes, not the person who forwarded it', () => {
+    const draft = draftFromExtraction({
+      extraction: null,
+      email: {
+        subject: 'Fwd: Order Confirmation #1RGJRCL',
+        fromAddress: 'Samantha Kuo <samantha.kuo@gmail.com>',
+        date: new Date('2026-09-20T02:00:00Z'),
+        text: [
+          'For the records.',
+          '',
+          '---------- Forwarded message ---------',
+          'From: Target <orders@e.target.com>',
+          'Date: Fri, Sep 18, 2026 at 9:14 AM',
+          'Subject: Order Confirmation #1RGJRCL',
+          'To: <samantha.kuo@gmail.com>',
+          '',
+          'Thanks for your order.',
+        ].join('\n'),
+      },
+      merchants,
+      categoryIdsBySlug,
+      timezone: 'UTC',
+    });
+    expect(draft.merchantId).toBe('m-target');
+    expect(draft.merchantName).toBe('Target');
+  });
+
+  it('names an Outlook forward of an unknown shop from the quoted sender', () => {
+    const draft = draftFromExtraction({
+      extraction: null,
+      email: {
+        subject: 'Fw: Your order #827907000579 is out for delivery!',
+        fromAddress: 'Samantha Kuo <kuosamantha@yahoo.com>',
+        date: new Date('2026-09-20T02:00:00Z'),
+        text: [
+          '',
+          '________________________________',
+          'From: Hen & Heifer <hello@henandheifer.com>',
+          'Sent: Thursday, September 17, 2026 4:02 PM',
+          'To: kuosamantha@yahoo.com',
+          'Subject: Your order #827907000579 is out for delivery!',
+          '',
+          'Your package is on its way.',
+        ].join('\n'),
+      },
+      merchants,
+      categoryIdsBySlug,
+      timezone: 'UTC',
+    });
+    expect(draft.merchantId).toBeNull();
+    expect(draft.merchantName).toBe('Hen & Heifer');
+  });
+
+  it('keeps the sender of an email that quotes nothing', () => {
+    const draft = draftFromExtraction({
+      extraction: null,
+      email: { ...email, subject: 'Re: my order', fromAddress: 'Samantha Kuo <samantha.kuo@gmail.com>' },
+      merchants,
+      categoryIdsBySlug,
+      timezone: 'UTC',
+    });
+    expect(draft.merchantName).toBe('Samantha Kuo');
+  });
 });
 
 describe('summarizeReads', () => {

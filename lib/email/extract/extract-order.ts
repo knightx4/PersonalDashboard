@@ -3,6 +3,7 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { applyExtraction, type ApplyExtractionResult } from './apply';
 import { parseAmazonQuantityLines } from './amazon-lines';
+import { unwrapQuotedOriginal } from './forwarded';
 import { heuristicExtractOrder } from './heuristic';
 import { guessCategorySlug } from './guess-category';
 import {
@@ -169,6 +170,25 @@ export async function extractOrderFromEmail(input: {
    * True when a structured merchant heuristic reconciled without needing the
    * LLM. Callers should not force needs_review for these.
    */
+  trusted?: boolean;
+  parserVersion: string;
+  raw?: unknown;
+  /**
+   * Who the order came from: the quoted original's sender when the email is a
+   * forward or reply with one, and otherwise the email's own sender.
+   */
+  senderAddress?: string | null;
+}> {
+  const unwrapped = unwrapQuotedOriginal(input);
+  const result = await extractFrom(unwrapped);
+  return { ...result, senderAddress: unwrapped.fromAddress ?? null };
+}
+
+type ExtractInput = Parameters<typeof extractOrderFromEmail>[0];
+
+async function extractFrom(input: ExtractInput): Promise<{
+  result: ApplyExtractionResult;
+  source: 'llm' | 'heuristic';
   trusted?: boolean;
   parserVersion: string;
   raw?: unknown;

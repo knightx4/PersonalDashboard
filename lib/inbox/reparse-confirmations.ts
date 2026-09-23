@@ -182,7 +182,8 @@ export async function reparseInboxConfirmations(
       const resolvedMerchant = await resolveOrderMerchant(supabase, {
         userId: opts.userId,
         classified: classified.merchant,
-        fromAddress: message.fromAddress,
+        // A forward's merchant is the shop it quotes, not the person forwarding.
+        fromAddress: extraction.senderAddress ?? message.fromAddress,
         extractedName: extraction.result.order.merchantName,
       });
 
