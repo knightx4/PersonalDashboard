@@ -326,11 +326,12 @@ about the same part of one.
 
 ## What to do next
 
-Since plan #773 there is no `/learn/next` page. Practice Flow at `/learn` asks
-the claims to start and the ones worth checking again, and offers a queued
-reading under an answer (`readingToOffer` in `lib/learn/next/rank.ts`). What
-follows describes the list as it was, and the ordering it used still lives in
-that file.
+Since plan #773 there is no `/learn/next` page. Practice Flow at `/learn/flow`
+asks the claims to start and the ones worth checking again. From #773 to #805
+it also offered a queued reading under an answer; since #805 it asks questions
+and offers new tracks, and queued readings are on Learn now
+([LEARN-NOW-SPEC](LEARN-NOW-SPEC.md)). What follows describes the list as it
+was, and the ordering it used still lives in `lib/learn/next/rank.ts`.
 
 Since plan #780 the mixed flow shares its questions between tracks by weight
 (`lib/learn/flow/interest.ts`). A track's weight comes from the last four
@@ -493,8 +494,9 @@ and a per-module cost table would be three tables with the same columns.
 | `/learn/s/[id]` | one subject: the graph, its goals, what you know and what is shaky |
 | `/learn/s/[id]/probe` | a probe session: one question at whichever rung is next, the bar, and afterwards the reason or the answer that was expected |
 | `/learn/c/[id]` | one concept: the claim, where it stands, what it sits between, what was asked |
-| `/learn` | Practice Flow: one question after another across every subject, with a reading you left offered under an answer |
-| `/learn/next` | redirects to `/learn`. Its list went in plan #773 and the flow serves what it held |
+| `/learn` | redirects to Learn now at `/learn/now` (plan #805), or to the flow when the link carries `?track=` |
+| `/learn/flow` | Practice Flow: one question after another across every subject, and a new track offered when it runs low. It was `/learn` from plan #773 to #805 |
+| `/learn/next` | redirects to `/learn/now`. Its list went in plan #773: the flow asks its re-checks and Learn now holds its readings |
 
 Same shell and design system as the other four workspaces. The graph view shows
 the pruned graph by default with a toggle for everything, because the pruned one

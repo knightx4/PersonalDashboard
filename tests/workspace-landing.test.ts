@@ -3,7 +3,7 @@ import { rememberedPath } from '@/components/shell/workspace-switcher';
 
 /**
  * Where switching to a workspace lands (plan #773): where you last were in
- * it, except Learn, which always opens on Practice Flow at /learn.
+ * it, except Learn, which always opens on its home, Learn now (plan #805).
  */
 
 function rememberLastPaths(paths: Record<string, string>) {
@@ -24,7 +24,7 @@ describe('rememberedPath', () => {
 
   it('lands Learn on its home whatever page you left it on', () => {
     rememberLastPaths({ learn: '/learn/lists' });
-    expect(rememberedPath('learn', '/learn')).toBe('/learn');
+    expect(rememberedPath('learn', '/learn/now')).toBe('/learn/now');
   });
 
   it('lands on the home when nothing is remembered', () => {

@@ -431,29 +431,3 @@ export function rankNext(input: NextInput, now: Date, limit: number = NEXT_LIMIT
 
   return takeTurns([ready, recheck, readings], limit);
 }
-
-/**
- * The one queued reading Practice Flow offers after an answer, or null.
- *
- * The reading row Learn next used to list, moved into the flow when that page
- * went (plan #773). A reading queued about the claim just answered comes
- * first, because that is when it is about what is on your mind. Otherwise the
- * one that has waited longest, with subjects you are getting through ahead.
- * A reading you pushed aside is left out until its few weeks are up rather
- * than sent to the back: the flow offers one thing, and a held one at the
- * front would be the same thing you just said no to.
- */
-export function readingToOffer(
-  readings: QueuedReading[],
-  record: NextRecord[],
-  now: Date,
-  answeredConceptId: string | null,
-): NextReading | null {
-  const digest = readRecord(record, now);
-  const rows = byRecord(
-    rankQueuedReadings(readings).map((row) => toReadingRow(row, digest)),
-    digest,
-  ).filter((row) => !held(row, digest));
-
-  return rows.find((row) => row.conceptId === answeredConceptId) ?? rows[0] ?? null;
-}

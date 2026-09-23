@@ -188,7 +188,7 @@ export default async function SubjectPage({
               </Link>
               {/* The flow limited to this track (plan #779), left again with
                   All tracks on the flow itself. */}
-              <Link href={`/learn?track=${id}`} className={buttonVariants({ variant: 'primary' })}>
+              <Link href={`/learn/flow?track=${id}`} className={buttonVariants({ variant: 'primary' })}>
                 Practice this
               </Link>
             </>

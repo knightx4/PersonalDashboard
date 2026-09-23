@@ -109,7 +109,7 @@ directory joins the loop in `scripts/db-reset.sh` after `migrations-todo`.
 A fifth entry in `MODULES` in `lib/modules.ts` gets it into the switcher and
 onto `/home` in one edit, which is what that list exists for.
 
-- `id: 'learn'`, `prefix: '/learn'`, `home: '/learn'`
+- `id: 'learn'`, `prefix: '/learn'`, `home: '/learn/now'`
 - Accent: the four existing hues are stops on one sweep — todo at sky
   (`#036695`), jobs at violet (`#7c3aed`), vault at fuchsia (`#a21caf`),
   shopping at rose (`#be1250`). A fifth belongs at the cold end, before todo:
@@ -380,7 +380,9 @@ existing vault-provider boundary.
 
 | Route | |
 |---|---|
-| `/learn` | Practice Flow, a question on the screen when the page opens ([LEARN-GRAPH-SPEC](LEARN-GRAPH-SPEC.md)). It was the tracks until plan #773 |
+| `/learn` | redirects to `/learn/now`, Learn now, the first tab ([LEARN-NOW-SPEC](LEARN-NOW-SPEC.md)). It was the tracks until plan #773 and Practice Flow until #805 |
+| `/learn/now` | Learn now. Until its feed is built, the readings you queued with Read now |
+| `/learn/flow` | Practice Flow, a question on the screen when the page opens ([LEARN-GRAPH-SPEC](LEARN-GRAPH-SPEC.md)) |
 | `/learn/lists` | tracks, shown as reading lists, with progress. `EmptyState` pointing at `/learn/new` when there are none |
 | `/learn/new` | question + paste, then the confirm list |
 | `/learn/t/[id]` | one track: the question at the top, then ordered readings |

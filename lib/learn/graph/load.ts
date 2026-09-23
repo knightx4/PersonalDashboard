@@ -20,14 +20,6 @@ import {
   READY_LIMIT,
   type ReadyConcept,
 } from '@/lib/learn/graph/ready';
-import {
-  readingToOffer,
-  recordWindowStart,
-  type NextOutcome,
-  type NextReading,
-  type NextRecord,
-  type QueuedReading,
-} from '@/lib/learn/next/rank';
 
 /**
  * Reading a subject's graph.
@@ -323,40 +315,6 @@ export async function loadGoals(
   }));
 }
 
-type QueuedReadingRow = {
-  id: string;
-  title: string | null;
-  concept_id: string;
-  created_at: string;
-  sources: { title: string } | null;
-};
-
-/**
- * The readings you queued about a claim and have not opened.
- *
- * One query for every track at once, because a reading belongs to a track and
- * a track belongs to no subject -- there is nothing per-subject to fold this
- * into. `queued` and nothing else: a reading you have started, finished or
- * put down is not a thing to offer you again. A reading with no `concept_id`
- * is one you wrote down yourself, and it cannot say which claim it is about,
- * so it is left out rather than shown with a blank reason.
- */
-async function loadQueuedAboutAClaim(
-  supabase: LearnSupabaseClient,
-): Promise<QueuedReadingRow[]> {
-  const { data, error } = await supabase
-    .from('readings')
-    .select('id, title, concept_id, created_at, sources!readings_source_fk ( title )')
-    .eq('status', 'queued')
-    .not('concept_id', 'is', null)
-    .order('created_at');
-
-  assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw fail('Reading what you queued', error);
-
-  return (data ?? []) as unknown as QueuedReadingRow[];
-}
-
 /**
  * Everything you could start on and everything you have settled, in every
  * subject, or in the one named by `onlySubjectId`.
@@ -402,101 +360,6 @@ async function everywhere(
   };
 }
 
-type OutcomeRow = {
-  concept_id: string | null;
-  reading_id: string | null;
-  outcome: NextOutcome;
-  happened_at: string;
-};
-
-/**
- * What you have done with what Learn offered, recently.
- *
- * `learn.next_outcomes` holds a claim or a reading, and the order needs the
- * subject as well -- a subject you are getting through is what lifts its other
- * rows. So a reading is followed to the claim it was queued against and the
- * claim to its subject, two reads by id that only run when there is something
- * to look up. Nothing is written here and nothing is inferred from a page
- * being opened; the rows this reads are written by the probe action, the
- * reading status action and Not now.
- */
-async function loadNextRecord(
-  supabase: LearnSupabaseClient,
-  now: Date,
-): Promise<NextRecord[]> {
-  const { data, error } = await supabase
-    .from('next_outcomes')
-    .select('concept_id, reading_id, outcome, happened_at')
-    .gte('happened_at', recordWindowStart(now).toISOString())
-    .order('happened_at', { ascending: false });
-
-  assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw fail('Reading what you have done', error);
-
-  const rows = (data ?? []) as unknown as OutcomeRow[];
-  if (rows.length === 0) return [];
-
-  const readingIds = [...new Set(rows.map((row) => row.reading_id).filter((id) => id !== null))];
-  const claimOfReading = new Map<string, string>();
-  if (readingIds.length > 0) {
-    const { data: readings, error: readingError } = await supabase
-      .from('readings')
-      .select('id, concept_id')
-      .in('id', readingIds);
-
-    assertSchemaExposed(readingError, LEARN_SCHEMA);
-    if (readingError) throw fail('Reading what you have read', readingError);
-
-    for (const reading of (readings ?? []) as unknown as {
-      id: string;
-      concept_id: string | null;
-    }[]) {
-      if (reading.concept_id !== null) claimOfReading.set(reading.id, reading.concept_id);
-    }
-  }
-
-  const conceptIds = [
-    ...new Set(
-      rows
-        .map((row) => row.concept_id ?? (row.reading_id && claimOfReading.get(row.reading_id)))
-        .filter((id): id is string => typeof id === 'string'),
-    ),
-  ];
-
-  const subjectOfClaim = new Map<string, string>();
-  if (conceptIds.length > 0) {
-    const { data: concepts, error: conceptError } = await supabase
-      .from('concepts')
-      .select('id, subject_id')
-      .in('id', conceptIds);
-
-    assertSchemaExposed(conceptError, LEARN_SCHEMA);
-    if (conceptError) throw fail('Reading which track those ideas are in', conceptError);
-
-    for (const concept of (concepts ?? []) as unknown as {
-      id: string;
-      subject_id: string;
-    }[]) {
-      subjectOfClaim.set(concept.id, concept.subject_id);
-    }
-  }
-
-  return rows.map((row) => {
-    const conceptId =
-      row.concept_id ?? (row.reading_id ? claimOfReading.get(row.reading_id) ?? null : null);
-
-    return {
-      outcome: row.outcome,
-      conceptId,
-      readingId: row.reading_id,
-      // Null when the claim has been deleted since, which credits the outcome
-      // to no subject rather than to a guess.
-      subjectId: conceptId === null ? null : subjectOfClaim.get(conceptId) ?? null,
-      happenedAt: row.happened_at,
-    };
-  });
-}
-
 /**
  * What Practice Flow's questions are picked from.
  *
@@ -515,59 +378,4 @@ export async function loadReadyAndSettled(
 ): Promise<{ ready: ReadyConcept[]; settled: SettledConcept[] }> {
   const { ready, settled } = await everywhere(supabase, onlySubjectId);
   return { ready: rankReady(ready, limit), settled: rankByLastChecked(settled) };
-}
-
-/**
- * The queued reading Practice Flow offers after an answer, or null.
- *
- * What Learn next listed as its third kind of row, read on its own now that
- * the list has gone (plan #773). The queue first, and only when something is
- * in it the claims those readings are about and what you have pushed aside:
- * a reading whose claim has since been deleted is dropped, because it cannot
- * say what it is about. The choice itself is `readingToOffer`, where it is
- * tested against rows written by hand.
- */
-export async function loadReadingToOffer(
-  supabase: LearnSupabaseClient,
-  answeredConceptId: string | null,
-  now: Date = new Date(),
-): Promise<NextReading | null> {
-  const queued = await loadQueuedAboutAClaim(supabase);
-  if (queued.length === 0) return null;
-
-  const conceptIds = [...new Set(queued.map((row) => row.concept_id))];
-  const [claims, subjects, record] = await Promise.all([
-    supabase.from('concepts').select('id, name, subject_id').in('id', conceptIds),
-    loadSubjects(supabase),
-    loadNextRecord(supabase, now),
-  ]);
-
-  assertSchemaExposed(claims.error, LEARN_SCHEMA);
-  if (claims.error) throw fail('Reading which ideas those readings are about', claims.error);
-
-  const subjectName = new Map(subjects.map((subject) => [subject.id, subject.name]));
-  const claimById = new Map(
-    ((claims.data ?? []) as unknown as { id: string; name: string; subject_id: string }[]).map(
-      (claim) => [claim.id, claim],
-    ),
-  );
-
-  const readings: QueuedReading[] = [];
-  for (const row of queued) {
-    const claim = claimById.get(row.concept_id);
-    if (!claim) continue;
-    readings.push({
-      id: row.id,
-      // The same rule `tracks/load.ts` uses: the source's title when one has
-      // been found, your own words when it has not.
-      title: row.sources?.title ?? row.title ?? 'Untitled',
-      conceptId: claim.id,
-      conceptName: claim.name,
-      subjectId: claim.subject_id,
-      subjectName: subjectName.get(claim.subject_id) ?? '',
-      queuedAt: row.created_at,
-    });
-  }
-
-  return readingToOffer(readings, record, now, answeredConceptId);
 }

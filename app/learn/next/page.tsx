@@ -2,9 +2,10 @@ import { redirect } from 'next/navigation';
 
 /**
  * Learn next was folded into Practice Flow (plan #773). The flow asks the
- * re-checks it listed, and offers the readings it listed after an answer, so
- * the list itself went. Kept as a redirect so old links land on the flow.
+ * re-checks it listed; the readings it listed are on Learn now (plan #805).
+ * Kept as a redirect to Learn now, because a list of what to do next is closer
+ * to Learn now's feed than to one question at a time.
  */
 export default function LearnNextMovedPage() {
-  redirect('/learn');
+  redirect('/learn/now');
 }
