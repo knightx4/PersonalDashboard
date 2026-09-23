@@ -131,6 +131,14 @@ beforeAll(async () => {
     returning id`;
   proposalA = proposal.id;
 
+  // A kept position pair and the search that found it (plan #836).
+  await admin`
+    insert into position_pairs (user_id, a_id, b_id, similarity, trigram)
+    values (${userA}, ${first}, ${second}, 0.8, null)`;
+  await admin`
+    insert into position_pair_scans (user_id, position_id, name, embedded_at)
+    values (${userA}, ${positionA}, 'the name searched with', null)`;
+
   // A merge log row (plan #813). Written directly: the functions that write it
   // are tests/vault-map-merge.test.ts's subject.
   const [merge] = await admin<{ id: string }[]>`
@@ -171,6 +179,8 @@ describe('RLS coverage', () => {
       'map_sweeps',
       'notes',
       'position_edges',
+      'position_pair_scans',
+      'position_pairs',
       'position_sources',
       'positions',
       'sync_runs',
@@ -685,6 +695,39 @@ describe('merge proposals, across users', () => {
                                              verdict, reason, confidence, model)
             values (${userA}, 'theme', ${row.a_id}, ${row.b_id}, 'x', 'y', 'trigram',
                     'different', 'r', 0.5, 'm')`,
+    ).rejects.toThrow();
+  });
+});
+
+describe('kept position pairs, across users', () => {
+  it('shows the owner their pairs and searches and another user none', async () => {
+    const own = await asUser(userA, async (tx) => ({
+      pairs: (await tx`select a_id from position_pairs`).length,
+      scans: (await tx`select position_id from position_pair_scans`).length,
+    }));
+    const other = await asUser(userB, async (tx) => ({
+      pairs: (await tx`select a_id from position_pairs`).length,
+      scans: (await tx`select position_id from position_pair_scans`).length,
+    }));
+    expect([own, other]).toEqual([
+      { pairs: 1, scans: 1 },
+      { pairs: 0, scans: 0 },
+    ]);
+  });
+
+  it('does not let another user delete a pair or file one as you', async () => {
+    const deleted = await asUser(
+      userB,
+      (tx) => tx`delete from position_pairs where user_id = ${userA} returning a_id`,
+    );
+    expect(deleted.length).toBe(0);
+
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into position_pair_scans (user_id, position_id, name)
+                   values (${userA}, ${positionA2}, 'x')`,
+      ),
     ).rejects.toThrow();
   });
 });
