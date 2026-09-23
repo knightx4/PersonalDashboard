@@ -97,9 +97,9 @@ export function issueReturn(
   sender: NewsSender | null,
 ): { href: string; label: string; from: string | null } {
   if (from && sender && from === sender.id) {
-    return { href: `/news?from=${sender.id}`, label: senderLabel(sender), from: sender.id };
+    return { href: `/news/all?from=${sender.id}`, label: senderLabel(sender), from: sender.id };
   }
-  return { href: '/news', label: 'Newsletters', from: null };
+  return { href: '/news/all', label: 'Newsletters', from: null };
 }
 
 /**

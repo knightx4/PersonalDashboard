@@ -39,13 +39,14 @@ export default async function NewsLayout({ children }: { children: React.ReactNo
     ]);
 
   /**
-   * One section, because there is one page of content. Reading an issue is a
-   * deeper view of the list rather than a place of its own, so it matches this
-   * tab instead of growing one.
+   * Quick read first, because it is where News opens (#848). Reading an issue
+   * is a deeper view of the list rather than a place of its own, so it lights
+   * the Newsletters tab instead of growing one.
    */
   const sections: NavSection[] = [
+    { href: '/news', label: 'Quick read', icon: 'quickRead', exact: true },
     {
-      href: '/news',
+      href: '/news/all',
       label: 'Newsletters',
       icon: 'newsletters',
       exact: true,
