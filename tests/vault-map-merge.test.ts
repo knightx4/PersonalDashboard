@@ -517,3 +517,114 @@ describe('apply_merge_proposals (plan #820)', () => {
     expect(found).toHaveLength(0);
   });
 });
+
+describe('undo_merges_for_rule and requeue_merge_proposals (plan #879)', () => {
+  let userC = '';
+
+  beforeAll(async () => {
+    userC = await createUser('merge-reset@example.com');
+  });
+
+  async function themeOf(name: string): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into themes (user_id, name, about) values (${userC}, ${name}, ${`About ${name}.`})
+      returning id`;
+    return row.id;
+  }
+
+  async function propose(x: string, y: string, survivor: string, name: string, confidence: number) {
+    const [lo, hi] = [x, y].sort();
+    const [row] = await admin<{ id: string }[]>`
+      insert into map_merge_proposals (user_id, kind, a_id, b_id, a_name, b_name, source,
+                                       verdict, survivor_id, survivor_name, reason, confidence, model)
+      values (${userC}, 'theme', ${lo}, ${hi},
+              (select name from themes where id = ${lo}), (select name from themes where id = ${hi}),
+              'embedding', 'same', ${survivor}, ${name}, 'One subject.', ${confidence}, 'claude-haiku-4-5')
+      returning id`;
+    return row.id;
+  }
+
+  async function outcome(proposalId: string) {
+    const [row] = await admin<{ apply_outcome: string | null }[]>`
+      select apply_outcome from map_merge_proposals where id = ${proposalId}`;
+    return row.apply_outcome;
+  }
+
+  it('undoes chained merges newest first without keeping the pairs apart, lists a refusal, and requeues', async () => {
+    const hub = await themeOf('Rivers');
+    const b = await themeOf('Streams');
+    const c = await themeOf('Brooks');
+    const d = await themeOf('Coasts');
+    const e = await themeOf('Estuaries');
+    const p1 = await propose(hub, b, hub, 'Running water', 0.95);
+    const p2 = await propose(b, c, b, 'Streams', 0.9);
+    const p3 = await propose(hub, c, hub, 'Rivers', 0.85);
+    const p4 = await propose(d, e, d, 'Coasts', 0.8);
+
+    // The old rule, as 0013 applied it: one transaction, so every merge
+    // shares a merged_at. p2 followed b into the hub and merged the brook
+    // there; p3 then found both sides in one row.
+    await admin.begin(async (tx) => {
+      await tx`select merge_themes(${hub}, ${b}, 'Running water', ${p1})`;
+      await tx`select merge_themes(${hub}, ${c}, null, ${p2})`;
+      await tx`select merge_themes(${d}, ${e}, null, ${p4})`;
+      await tx`update map_merge_proposals set applied_at = now(), apply_outcome = 'merged'
+               where id in (${p1}, ${p2}, ${p4})`;
+      await tx`update map_merge_proposals set applied_at = now(), apply_outcome = 'joined'
+               where id = ${p3}`;
+    });
+    // A theme made since takes the absorbed estuary's name, so that undo is refused.
+    const taken = await themeOf('Estuaries');
+
+    const [cut] = await admin<{ at: string }[]>`select clock_timestamp()::text as at`;
+    const [run] = await admin<{ r: Record<string, number> }[]>`
+      select undo_merges_for_rule('theme', 'test reset', ${cut.at}::timestamptz, ${userC}) as r`;
+    expect(run.r).toMatchObject({ undone: 2, failed: 1, remaining: 0 });
+
+    const themes = await admin<{ id: string; name: string }[]>`
+      select id, name from themes where id in (${hub}, ${b}, ${c}) order by name`;
+    expect(themes.map((t) => t.name)).toEqual(['Brooks', 'Rivers', 'Streams']);
+
+    const resets = await admin<{ merge_id: string; outcome: string; detail: string | null }[]>`
+      select x.merge_id, x.outcome, x.detail from map_merge_resets x
+      join map_merges m on m.id = x.merge_id
+      where x.reset = 'test reset' and m.proposal_id = ${p4}`;
+    expect(resets).toHaveLength(1);
+    expect(resets[0].outcome).toBe('failed');
+    expect(resets[0].detail).toMatch(/^name-taken: /);
+
+    // Undone for the rule, so neither pair is kept apart.
+    const [apart] = await admin<{ x: boolean; y: boolean }[]>`
+      select map_merge_pair_undone(${userC}, 'theme', ${hub}, ${b}) as x,
+             map_merge_pair_undone(${userC}, 'theme', ${hub}, ${c}) as y`;
+    expect(apart).toEqual({ x: false, y: false });
+    const [reasons] = await admin<{ n: number }[]>`
+      select count(*)::int as n from map_merges
+      where user_id = ${userC} and undo_reason = 'rule-change'`;
+    expect(reasons.n).toBe(2);
+
+    // A second call finds nothing left to try.
+    const [again] = await admin<{ r: Record<string, number> }[]>`
+      select undo_merges_for_rule('theme', 'test reset', ${cut.at}::timestamptz, ${userC}) as r`;
+    expect(again.r).toMatchObject({ undone: 0, failed: 0, remaining: 0 });
+
+    const [requeued] = await admin<{ r: Record<string, number> }[]>`
+      select requeue_merge_proposals('theme', 'test reset', ${cut.at}::timestamptz, ${userC}) as r`;
+    expect(requeued.r).toMatchObject({ merged: 2, joinedOrAbsorbed: 1 });
+    // The refused merge still stands, so its proposal keeps its mark.
+    expect(await outcome(p4)).toBe('merged');
+
+    // The next apply takes them under the current rule: the hub absorbs the
+    // stream, the brook proposal now has a side gone, and the hub and brook
+    // are compared directly.
+    const [applied] = await admin<{ r: Record<string, number> }[]>`
+      select apply_merge_proposals('theme', ${userC}) as r`;
+    expect(applied.r).toMatchObject({ merged: 2, absorbed: 1, undone: 0, remaining: 0 });
+    expect([await outcome(p1), await outcome(p2), await outcome(p3)]).toEqual([
+      'merged',
+      'absorbed',
+      'merged',
+    ]);
+    await admin`delete from themes where id = ${taken}`;
+  });
+});
