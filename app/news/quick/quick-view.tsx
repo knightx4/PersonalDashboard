@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
 import type { QuickCard } from '@/lib/news/quick/next';
-import { ArticleLink, QuickNextForm } from './quick-controls';
+import { ArticleLink, QuickNextForm, QuickSwipe } from './quick-controls';
 
 export type QuickReadViewProps = {
   /** The story to show, or null when there is none left. */
@@ -97,50 +97,56 @@ export function QuickReadView({
         }
       />
 
-      <Card padding="none" className="overflow-hidden">
-        <article>
-          {pictures && image && (
-            // A plain img for the reason given on the issue page: the address
-            // is the sender's, and next/image would need every sender's host.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={image}
-              alt=""
-              referrerPolicy="no-referrer"
-              className="aspect-[16/9] w-full border-b border-border bg-sunken object-cover"
-            />
-          )}
-          <div className="card-pad">
-            <p className="truncate text-ui text-ink-muted">
-              {card.from ?? 'Unknown sender'}
-              {arrived && ` · ${arrived}`}
-            </p>
-            <h2 className="mt-1 break-words font-display text-title tracking-tight text-ink">
-              {headline}
-            </h2>
-            <p className="mt-2 break-words text-body leading-relaxed text-ink">{summary}</p>
-            {story && <StoryText text={story.text} />}
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-              {story?.link && (
-                <ArticleLink href={story.link} issueId={card.issueId} storyIndex={card.storyIndex} />
-              )}
-              {issueHref && (
-                <Link href={issueHref} className="text-ui text-accent hover:underline">
-                  {card.kind === 'essay' ? 'Read the newsletter' : 'Open the whole newsletter'}
-                </Link>
-              )}
+      <QuickSwipe key={`${card.issueId}:${card.storyIndex}`}>
+        <Card padding="none" className="overflow-hidden">
+          <article>
+            {pictures && image && (
+              // A plain img for the reason given on the issue page: the address
+              // is the sender's, and next/image would need every sender's host.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={image}
+                alt=""
+                referrerPolicy="no-referrer"
+                className="aspect-[16/9] w-full border-b border-border bg-sunken object-cover"
+              />
+            )}
+            <div className="card-pad">
+              <p className="truncate text-ui text-ink-muted">
+                {card.from ?? 'Unknown sender'}
+                {arrived && ` · ${arrived}`}
+              </p>
+              <h2 className="mt-1 break-words font-display text-title tracking-tight text-ink">
+                {headline}
+              </h2>
+              <p className="mt-2 break-words text-body leading-relaxed text-ink">{summary}</p>
+              {story && <StoryText text={story.text} />}
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                {story?.link && (
+                  <ArticleLink
+                    href={story.link}
+                    issueId={card.issueId}
+                    storyIndex={card.storyIndex}
+                  />
+                )}
+                {issueHref && (
+                  <Link href={issueHref} className="text-ui text-accent hover:underline">
+                    {card.kind === 'essay' ? 'Read the newsletter' : 'Open the whole newsletter'}
+                  </Link>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="card-pad-x flex flex-wrap items-center justify-between gap-3 border-t border-border py-3">
-            <p className="text-ui text-ink-muted">
-              {left === 0
-                ? 'The last story from this newsletter'
-                : `${left} more from this newsletter`}
-            </p>
-            <QuickNextForm issueId={card.issueId} storyIndex={card.storyIndex} />
-          </div>
-        </article>
-      </Card>
+            <div className="card-pad-x flex flex-wrap items-center justify-between gap-3 border-t border-border py-3">
+              <p className="text-ui text-ink-muted">
+                {left === 0
+                  ? 'The last story from this newsletter'
+                  : `${left} more from this newsletter`}
+              </p>
+              <QuickNextForm issueId={card.issueId} storyIndex={card.storyIndex} />
+            </div>
+          </article>
+        </Card>
+      </QuickSwipe>
     </div>
   );
 }
