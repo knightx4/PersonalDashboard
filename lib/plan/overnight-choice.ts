@@ -67,11 +67,12 @@ export type OvernightChoice =
  *
  * `now` is the tick's real clock, the same one `overnightVerdict` takes.
  *
- * Liveness is deliberately not folded in. Whether the *last* feature's session
- * is still working is a different question, answered from GitHub by
+ * Liveness is deliberately not folded in. Whether the running features'
+ * sessions are still working is a different question, answered from GitHub by
  * `readRunLiveness` in `lib/plan/liveness.ts`, and the caller checks it before
- * asking this: one feature at a time is the tick's rule, not the chooser's, and
- * a chooser that reached for the network would stop being pure.
+ * asking this: how many run at once, and in which modules, is the tick's rule,
+ * not the chooser's, and a chooser that reached for the network would stop
+ * being pure.
  */
 export function chooseOvernightFeature(
   sections: readonly PlanSection[],

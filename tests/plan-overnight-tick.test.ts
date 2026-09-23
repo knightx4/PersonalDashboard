@@ -1,5 +1,6 @@
 /**
- * The clock tick that fires one feature a night at a time.
+ * The clock tick that keeps up to three features going a night, each in a
+ * different module.
  *
  * The properties that matter are the ones about restraint: a tick with a
  * session still working must change nothing at all, a tick with the runner off
@@ -19,7 +20,9 @@ import {
   closedNothingSince,
   overnightRefusedReason,
   overnightTick,
+  featureRunsInFlight,
   OVERNIGHT_NO_PROGRESS,
+  outsideRunning,
   runOvernightTick,
   tickNote,
   type OvernightPorts,
@@ -126,7 +129,7 @@ function ports(over: Partial<OvernightPorts> = {}) {
       return sections;
     },
     lastFiredAt: async () => ({}),
-    lastRunLiveness: async () => null,
+    runsInFlight: async () => [],
     sweepClaims: async () => {
       calls.swept += 1;
       calls.order.push('sweep');
@@ -293,49 +296,118 @@ describe('overnightTick', () => {
     expect(calls).toMatchObject({ sections: 0, swept: 0, fired: [], recorded: [], stopped: [] });
   });
 
-  it('changes nothing while the last run is still going', async () => {
+  it('changes nothing while three sessions are running', async () => {
     for (const liveness of ['working', 'quiet'] as const) {
       const { ports: p, calls } = ports({
         loadRun: async () => night({ lastFiredAt: '2026-09-17T23:30:00.000Z' }),
-        lastRunLiveness: async () => liveness,
+        runsInFlight: async () => [
+          { featureId: 'a', liveness },
+          { featureId: 'b', liveness },
+          { featureId: 'c', liveness },
+        ],
       });
 
-      await expect(overnightTick(p)).resolves.toEqual({ act: 'waiting', liveness });
-      // The tree is not read: there is nothing to choose from while the last
-      // session is still going. The claims are still swept, because the ones
-      // that go stale belong to other sessions under other features and the
-      // night spends most of its ticks here.
+      await expect(overnightTick(p)).resolves.toEqual({ act: 'waiting', liveness, running: 3 });
+      // The tree is not read: every slot is taken. The claims are still
+      // swept, because the ones that go stale belong to other sessions and
+      // the night spends most of its ticks here.
       expect(calls).toMatchObject({ sections: 0, swept: 1, fired: [], recorded: [], stopped: [] });
     }
   });
 
-  it('will not fire on a reading it could not take', async () => {
+  it('will not fire while a fire it made left no record', async () => {
     const { ports: p, calls } = ports({
       loadRun: async () => night({ lastFiredAt: '2026-09-17T23:30:00.000Z' }),
-      lastRunLiveness: async () => 'unknown',
+      runsInFlight: async () => [{ featureId: null, liveness: 'unknown' }],
     });
 
-    await expect(overnightTick(p)).resolves.toEqual({ act: 'waiting', liveness: 'unknown' });
+    await expect(overnightTick(p)).resolves.toEqual({
+      act: 'waiting',
+      liveness: 'unknown',
+      running: 1,
+    });
     expect(calls.fired).toEqual([]);
     expect(calls.swept).toBe(1);
   });
 
-  it('fires the next one once the last run is over', async () => {
+  it('fires the next one once a run is over', async () => {
     for (const liveness of ['ended', 'finished'] as const) {
       const { ports: p, calls } = ports({
         loadRun: async () => night({ lastFiredAt: '2026-09-17T23:30:00.000Z' }),
-        lastRunLiveness: async () => liveness,
+        runsInFlight: async () => [
+          { featureId: 'a', liveness },
+          { featureId: 'b', liveness: 'working' },
+          { featureId: 'c', liveness: 'working' },
+        ],
       });
 
-      await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired' });
+      await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired', running: 3 });
       expect(calls.fired).toHaveLength(1);
     }
   });
 
+  it('fires a feature in another module while one is running', async () => {
+    const sections = tree([
+      item({ id: 'news-feature', module: 'news', priority: 1 }),
+      item({ id: 'news-step', parentId: 'news-feature', module: 'news', priority: 1 }),
+      item({ id: 'learn-feature', module: 'learn', priority: 3 }),
+      item({ id: 'learn-step', parentId: 'learn-feature', module: 'learn', priority: 3 }),
+    ]);
+    const { ports: p, calls } = ports({
+      loadSections: async () => sections,
+      runsInFlight: async () => [{ featureId: 'news-feature', liveness: 'working' }],
+    });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({
+      act: 'fired',
+      step: expect.any(Number),
+      running: 2,
+    });
+    expect(calls.fired).toEqual([{ feature: 'learn-feature', step: 'learn-step' }]);
+  });
+
+  it('waits rather than fire into a module a session is already in', async () => {
+    const sections = tree([
+      item({ id: 'running', module: 'news' }),
+      item({ id: 'running-step', parentId: 'running', module: 'news' }),
+      item({ id: 'neighbour', module: 'news' }),
+      item({ id: 'neighbour-step', parentId: 'neighbour', module: 'news' }),
+    ]);
+    const { ports: p, calls } = ports({
+      loadSections: async () => sections,
+      runsInFlight: async () => [{ featureId: 'running', liveness: 'working' }],
+    });
+
+    await expect(overnightTick(p)).resolves.toEqual({
+      act: 'waiting',
+      liveness: 'working',
+      running: 1,
+    });
+    expect(calls).toMatchObject({ fired: [], recorded: [], stopped: [] });
+  });
+
+  it('keeps an unreadable session in its slot and its module, and fires elsewhere', async () => {
+    const sections = tree([
+      item({ id: 'unread', module: 'vault', priority: 1 }),
+      item({ id: 'unread-step', parentId: 'unread', module: 'vault', priority: 1 }),
+      item({ id: 'vault-next', module: 'vault', priority: 1 }),
+      item({ id: 'vault-next-step', parentId: 'vault-next', module: 'vault', priority: 1 }),
+      item({ id: 'todo-feature', module: 'todo', priority: 3 }),
+      item({ id: 'todo-step', parentId: 'todo-feature', module: 'todo', priority: 3 }),
+    ]);
+    const { ports: p, calls } = ports({
+      loadSections: async () => sections,
+      runsInFlight: async () => [{ featureId: 'unread', liveness: 'unknown' }],
+    });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired', running: 2 });
+    expect(calls.fired).toEqual([{ feature: 'todo-feature', step: 'todo-step' }]);
+  });
+
   it('ends the night when the budget is spent, without asking anything else', async () => {
     const run = night({ featuresLeft: 0 });
-    const liveness = vi.fn(async () => 'working' as const);
-    const { ports: p, calls } = ports({ loadRun: async () => run, lastRunLiveness: liveness });
+    const liveness = vi.fn(async () => [{ featureId: 'a', liveness: 'working' as const }]);
+    const { ports: p, calls } = ports({ loadRun: async () => run, runsInFlight: liveness });
 
     await expect(overnightTick(p)).resolves.toEqual({
       act: 'ended',
@@ -609,19 +681,117 @@ describe('tickNote', () => {
     expect(tickNote({ act: 'nothing-ready', reason: '#723 is being re-read.' })).toBe(
       'Waiting until something is ready. #723 is being re-read.',
     );
-    expect(tickNote({ act: 'waiting', liveness: 'working' })).toBe(
-      'Waiting for the session on the current feature to finish.',
+    expect(tickNote({ act: 'waiting', liveness: 'working', running: 3 })).toBe(
+      'Waiting: 3 sessions are running, the most it starts at once.',
     );
-    expect(tickNote({ act: 'waiting', liveness: 'unknown' })).toContain(
+    expect(tickNote({ act: 'waiting', liveness: 'working', running: 1 })).toBe(
+      'Waiting: one session is running, and nothing else is ready outside its module.',
+    );
+    expect(tickNote({ act: 'waiting', liveness: 'unknown', running: 2 })).toContain(
       'GitHub could not be asked',
     );
   });
 
   it('names what it started, and says nothing for an idle or held runner', () => {
     expect(
-      tickNote({ act: 'fired', feature: 791, step: 792, featuresLeft: null, refused: [] }),
+      tickNote({
+        act: 'fired',
+        feature: 791,
+        step: 792,
+        featuresLeft: null,
+        refused: [],
+        running: 1,
+      }),
     ).toBe('Started #791.');
+    expect(
+      tickNote({
+        act: 'fired',
+        feature: 791,
+        step: 792,
+        featuresLeft: null,
+        refused: [],
+        running: 2,
+      }),
+    ).toBe('Started #791. 2 sessions are running.');
     expect(tickNote({ act: 'idle' })).toBeNull();
     expect(tickNote({ act: 'paused' })).toBeNull();
+  });
+});
+
+describe('outsideRunning', () => {
+  it('takes out the running features and every feature in their modules', () => {
+    const sections = tree([
+      item({ id: 'news-a', module: 'news' }),
+      item({ id: 'news-b', module: 'news' }),
+      item({ id: 'learn-a', module: 'learn' }),
+    ]);
+    const ids = outsideRunning(sections, ['news-a']).flatMap((one) => one.nodes.map((n) => n.id));
+    expect(ids).toEqual(['learn-a']);
+  });
+
+  it('treats features with no module as one group', () => {
+    const sections = tree([
+      item({ id: 'loose-a', module: null }),
+      item({ id: 'loose-b', module: null }),
+      item({ id: 'todo-a', module: 'todo' }),
+    ]);
+    const ids = outsideRunning(sections, ['loose-a']).flatMap((one) => one.nodes.map((n) => n.id));
+    expect(ids).toEqual(['todo-a']);
+  });
+
+  it('holds back only itself when the running feature is not in the tree', () => {
+    const sections = tree([item({ id: 'todo-a', module: 'todo' })]);
+    const ids = outsideRunning(sections, ['gone']).flatMap((one) => one.nodes.map((n) => n.id));
+    expect(ids).toEqual(['todo-a']);
+  });
+});
+
+describe('featureRunsInFlight', () => {
+  /** plan_runs as a chain that answers the one read with these rows. */
+  function runsTable(
+    rows: Array<{ plan_item_id: string | null; status: string; created_at: string }>,
+  ) {
+    const chain = {
+      select: () => chain,
+      eq: () => chain,
+      gte: () => chain,
+      order: () => chain,
+      limit: async () => ({ data: rows, error: null }),
+    };
+    return { from: () => chain } as never;
+  }
+  const hoursBefore = (hours: number) => new Date(MIDNIGHT - hours * 3_600_000).toISOString();
+
+  it('says a recent fire that left no row is an unreadable session', async () => {
+    const runs = await featureRunsInFlight({
+      supabase: runsTable([]),
+      userId: 'u',
+      run: night({ lastFiredAt: hoursBefore(1) }),
+      now: MIDNIGHT,
+    });
+    expect(runs).toEqual([{ featureId: null, liveness: 'unknown' }]);
+  });
+
+  it('does not hold a long night on a fire too old for its row to be read', async () => {
+    const runs = await featureRunsInFlight({
+      supabase: runsTable([]),
+      userId: 'u',
+      run: night({ lastFiredAt: hoursBefore(7) }),
+      now: MIDNIGHT,
+    });
+    expect(runs).toEqual([]);
+  });
+
+  it('leaves out runs already written back as over', async () => {
+    const runs = await featureRunsInFlight({
+      supabase: runsTable([
+        { plan_item_id: 'a', status: 'finished', created_at: hoursBefore(1) },
+        { plan_item_id: 'b', status: 'failed', created_at: hoursBefore(2) },
+      ]),
+      userId: 'u',
+      run: night({ lastFiredAt: hoursBefore(1) }),
+      now: MIDNIGHT,
+    });
+    expect(runs).toEqual([]);
   });
 });
