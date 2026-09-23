@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
+import { readAll } from '@/lib/learn/areas/grid-load';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { generateChain } from '@/lib/learn/graph/generate';
 import { loadReadyAndSettled, loadSubjects } from '@/lib/learn/graph/load';
@@ -30,6 +31,12 @@ import { loadTrackInterest } from './interest-load';
  * Which theme is offered leans towards the tracks you engage with (plan #780):
  * a theme's strength is multiplied by `offerLean` from `interest.ts`, which
  * counts how many notes it shares with the theme behind each weighted track.
+ *
+ * Before that, the offer looks at the field you write about most and have
+ * never been tested in (plan #800), read the way the Know grid reads it: the
+ * fields with themes placed in them and no answered question in any track
+ * placed there, ordered by summed theme strength. When that field has a theme
+ * left to offer, the strongest one is offered and the card names the field.
  */
 
 /**
@@ -79,7 +86,21 @@ export type TrackOffer = {
   name: string;
   about: string;
   notes: number;
+  /**
+   * The field the theme was chosen from, when the offer came from the field
+   * you write about most and have never been tested in. Unset otherwise.
+   */
+  field?: string;
 };
+
+/** A theme's placement in a field, from `learn.theme_fields`. */
+export type ThemePlacement = { themeId: string; fieldId: string };
+
+/** A track's placement, and whether any question in it has been answered. */
+export type TrackPlacement = { fieldId: string | null; answered: boolean };
+
+/** The field an offer is chosen from, with the ids of the themes placed in it. */
+export type UntestedField = { id: string; name: string; themeIds: string[] };
 
 function fail(action: string, error: { message: string }): Error {
   return new Error(`${action} failed: ${error.message}`);
@@ -110,6 +131,12 @@ export function trackToOffer(input: {
   record: OfferRecord[];
   now: Date;
   lean?: ReadonlyMap<string, number>;
+  /**
+   * The field you write about most and have never been tested in, with the
+   * themes placed in it. Its strongest theme left after the exclusions below
+   * is offered first; when there is none, the offer falls back to `themes`.
+   */
+  field?: { name: string; themes: ThemeCandidate[] } | null;
 }): TrackOffer | null {
   const taken = new Set(input.trackNames.map(key));
   const heldUntil = input.now.getTime() - PUSHED_ASIDE_DAYS * DAY_MS;
@@ -124,17 +151,76 @@ export function trackToOffer(input: {
     closedNames.add(key(row.themeName));
   }
 
+  const open = (candidate: ThemeCandidate) =>
+    candidate.notes > 0 &&
+    !taken.has(key(candidate.name)) &&
+    !closedIds.has(candidate.id) &&
+    !closedNames.has(key(candidate.name));
+  const card = (theme: ThemeCandidate) => ({
+    themeId: theme.id,
+    name: theme.name,
+    about: theme.about,
+    notes: theme.notes,
+  });
+
+  if (input.field) {
+    const fromField = [...input.field.themes]
+      .sort((a, b) => b.strength - a.strength || a.name.localeCompare(b.name))
+      .find(open);
+    if (fromField) return { ...card(fromField), field: input.field.name };
+  }
+
   const weighed = (theme: ThemeCandidate) => theme.strength * (input.lean?.get(theme.id) ?? 1);
   const theme = [...input.themes]
     .sort((a, b) => weighed(b) - weighed(a) || a.name.localeCompare(b.name))
-    .find(
-      (candidate) =>
-        candidate.notes > 0 &&
-        !taken.has(key(candidate.name)) &&
-        !closedIds.has(candidate.id) &&
-        !closedNames.has(key(candidate.name)),
-    );
-  return theme ? { themeId: theme.id, name: theme.name, about: theme.about, notes: theme.notes } : null;
+    .find(open);
+  return theme ? card(theme) : null;
+}
+
+/**
+ * The field you write about most and have never been tested in, or null.
+ *
+ * The Know grid's reading: a field counts when at least one theme is placed
+ * in it and no track placed there has an answered question. A track placed
+ * there with nothing answered does not rule the field out. Fields are ordered
+ * by the summed strength of the themes placed in them; a placement whose
+ * theme is not in `strengths` is left out, as the grid leaves it out.
+ */
+export function strongestUntestedField(input: {
+  fields: { id: string; name: string }[];
+  placements: ThemePlacement[];
+  strengths: ReadonlyMap<string, number>;
+  tracks: TrackPlacement[];
+}): UntestedField | null {
+  const tested = new Set(
+    input.tracks.filter((track) => track.answered && track.fieldId).map((track) => track.fieldId),
+  );
+  const themesIn = new Map<string, string[]>();
+  for (const placement of input.placements) {
+    if (!input.strengths.has(placement.themeId)) continue;
+    const ids = themesIn.get(placement.fieldId) ?? [];
+    ids.push(placement.themeId);
+    themesIn.set(placement.fieldId, ids);
+  }
+  const summed = (ids: string[]) =>
+    ids.reduce((sum, id) => sum + (input.strengths.get(id) ?? 0), 0);
+
+  let best: UntestedField | null = null;
+  let bestStrength = 0;
+  for (const field of input.fields) {
+    const themeIds = themesIn.get(field.id);
+    if (!themeIds || tested.has(field.id)) continue;
+    const strength = summed(themeIds);
+    if (
+      !best ||
+      strength > bestStrength ||
+      (strength === bestStrength && field.name.localeCompare(best.name) < 0)
+    ) {
+      best = { id: field.id, name: field.name, themeIds };
+      bestStrength = strength;
+    }
+  }
+  return best;
 }
 
 /** Whether this many ready ideas counts as running low. */
@@ -152,25 +238,7 @@ async function loadThemes(vault: VaultSupabaseClient): Promise<ThemeCandidate[]>
     .limit(THEMES_READ);
   if (error) throw fail('Reading the themes in your notes', error);
 
-  return (
-    (data ?? []) as unknown as {
-      id: string;
-      name: string;
-      about: string;
-      strength: number | string;
-      theme_notes: NoteLinks;
-    }[]
-  ).map((row) => {
-    const noteIds = (row.theme_notes ?? []).map((link) => link.note_id);
-    return {
-      id: row.id,
-      name: row.name,
-      about: row.about,
-      strength: Number(row.strength) || 0,
-      notes: noteIds.length,
-      noteIds,
-    };
-  });
+  return ((data ?? []) as unknown as ThemeRow[]).map(toCandidate);
 }
 
 /** Every press on a track offer, newest first. */
@@ -217,12 +285,21 @@ export async function loadTrackOffer(
     const rows = await loadReadyAndSettled(supabase, LOW_WATER, null);
     if (!runningLow(rows.ready.length)) return null;
 
-    const [themes, subjects, record, interest] = await Promise.all([
+    const [themes, subjects, record, interest, field] = await Promise.all([
       loadThemes(vault),
       loadSubjects(supabase),
       loadOfferRecord(supabase),
       loadTrackInterest(supabase, now).catch((error: unknown) => {
         console.error('[learn flow] track weights', error instanceof Error ? error.message : error);
+        return null;
+      }),
+      // A field that could not be read leaves today's choice, the same as no
+      // field qualifying.
+      loadUntestedField(supabase, vault).catch((error: unknown) => {
+        console.error(
+          '[learn flow] untested field',
+          error instanceof Error ? error.message : error,
+        );
         return null;
       }),
     ]);
@@ -238,11 +315,97 @@ export async function loadTrackOffer(
         themes.map((theme) => ({ id: theme.id, notes: new Set(theme.noteIds ?? []) })),
         anchors,
       ),
+      field,
     });
   } catch (error) {
     console.error('[learn flow] track offer', error instanceof Error ? error.message : error);
     return null;
   }
+}
+
+type ThemeRow = {
+  id: string;
+  name: string;
+  about: string;
+  strength: number | string;
+  theme_notes: NoteLinks;
+};
+
+function toCandidate(row: ThemeRow): ThemeCandidate {
+  const noteIds = (row.theme_notes ?? []).map((link) => link.note_id);
+  return {
+    id: row.id,
+    name: row.name,
+    about: row.about,
+    strength: Number(row.strength) || 0,
+    notes: noteIds.length,
+    noteIds,
+  };
+}
+
+/**
+ * The field you write about most and have never been tested in, with every
+ * theme placed in it, or null when no field qualifies.
+ *
+ * The same rows the Know grid reads (`grid-load.ts`): placements from
+ * `learn.theme_fields`, strengths from `obsidian.themes`, tracks' placements
+ * from `learn.subjects`. Answered is any idea in the track with a `tested_at`,
+ * which is what `trackTested` counts off the graph, read here without loading
+ * every graph.
+ */
+async function loadUntestedField(
+  supabase: LearnSupabaseClient,
+  vault: VaultSupabaseClient,
+): Promise<{ name: string; themes: ThemeCandidate[] } | null> {
+  const [fieldRead, trackRead, placements, strengths, answered] = await Promise.all([
+    supabase.from('area_fields').select('id, name'),
+    supabase.from('subjects').select('id, field_id, placed_at'),
+    readAll<{ theme_id: string; field_id: string }>((from, to) =>
+      supabase
+        .from('theme_fields')
+        .select('theme_id, field_id')
+        .not('field_id', 'is', null)
+        .order('theme_id')
+        .range(from, to),
+    ),
+    readAll<{ id: string; strength: number | string | null }>((from, to) =>
+      vault.from('themes').select('id, strength').order('id').range(from, to),
+    ),
+    readAll<{ concept_id: string; concepts: { subject_id: string } | null }>((from, to) =>
+      supabase
+        .from('concept_state')
+        .select('concept_id, concepts!concept_state_concept_fk(subject_id)')
+        .not('tested_at', 'is', null)
+        .order('concept_id')
+        .range(from, to),
+    ),
+  ]);
+  assertSchemaExposed(fieldRead.error ?? trackRead.error, LEARN_SCHEMA);
+  if (fieldRead.error) throw fail('Reading the fields', fieldRead.error);
+  if (trackRead.error) throw fail('Reading where your tracks are placed', trackRead.error);
+
+  const answeredTracks = new Set(
+    answered.flatMap((row) => (row.concepts ? [row.concepts.subject_id] : [])),
+  );
+  const field = strongestUntestedField({
+    fields: (fieldRead.data ?? []) as { id: string; name: string }[],
+    placements: placements.map((row) => ({ themeId: row.theme_id, fieldId: row.field_id })),
+    strengths: new Map(strengths.map((row) => [row.id, Number(row.strength ?? 0)])),
+    tracks: (
+      (trackRead.data ?? []) as { id: string; field_id: string | null; placed_at: string | null }[]
+    ).map((row) => ({
+      fieldId: row.placed_at ? row.field_id : null,
+      answered: answeredTracks.has(row.id),
+    })),
+  });
+  if (!field) return null;
+
+  const { data, error } = await vault
+    .from('themes')
+    .select('id, name, about, strength, theme_notes(note_id)')
+    .in('id', field.themeIds);
+  if (error) throw fail('Reading the themes in that field', error);
+  return { name: field.name, themes: ((data ?? []) as unknown as ThemeRow[]).map(toCandidate) };
 }
 
 /**

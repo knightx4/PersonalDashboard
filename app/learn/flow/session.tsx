@@ -105,7 +105,8 @@ function StartButton() {
  * A new track from a theme in your notes, offered when the flow is running
  * low (plan #778). Start writes the track and puts its first question on the
  * screen; Not now and Never hide the card here at once, and keep the theme
- * back for a few weeks or for good.
+ * back for a few weeks or for good. When the theme came from the field you
+ * write about most and have never been tested in, one line says so (#800).
  */
 function TrackOfferCard({
   offer,
@@ -134,6 +135,11 @@ function TrackOfferCard({
         <p className="mt-0.5 text-small text-ink-muted">
           From {offer.notes} of your {offer.notes === 1 ? 'note' : 'notes'}. {offer.about}
         </p>
+        {offer.field && (
+          <p className="mt-0.5 text-small text-ink-muted">
+            You write a lot about {offer.field} and have never been tested in it.
+          </p>
+        )}
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <form action={step}>
             <input type="hidden" name="intent" value="start-track" />
