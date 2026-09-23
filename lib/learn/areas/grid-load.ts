@@ -64,7 +64,7 @@ export async function loadAreaGrid(
   tracks: { subject: Subject; graph: Graph }[],
 ): Promise<LoadedAreaGrid> {
   const [domainRead, fieldRead, placementRead] = await Promise.all([
-    learn.from('area_domains').select('id, name, position').order('position'),
+    learn.from('area_domains').select('id, slug, name, position').order('position'),
     learn.from('area_fields').select('id, domain_id, name, slug, position'),
     learn.from('subjects').select('id, field_id, domain_id, placed_at'),
   ]);
@@ -76,8 +76,8 @@ export async function loadAreaGrid(
   }
 
   const domains: GridDomain[] = (
-    (domainRead.data ?? []) as { id: string; name: string; position: number }[]
-  ).map((row) => ({ id: row.id, name: row.name, position: row.position }));
+    (domainRead.data ?? []) as { id: string; slug: string; name: string; position: number }[]
+  ).map((row) => ({ id: row.id, slug: row.slug, name: row.name, position: row.position }));
   const fields: GridField[] = (
     (fieldRead.data ?? []) as {
       id: string;

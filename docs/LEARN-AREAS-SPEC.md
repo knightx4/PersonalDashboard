@@ -239,6 +239,15 @@ thresholds decide what a cell looks like, and each is a constant in that file:
   been answered. It is read off the tested side alone, since the shade already
   says whether you also write about it.
 
+Opening a field (`/learn/know?field=<slug>`) lists the themes placed in it,
+strongest first, each with the basis the placement pass wrote and its runner-up
+field. The themes placed at a domain as a whole open from that domain's row
+(`?domain=<slug>`), and the unplaced themes from the line under the grid
+(`?unplaced=1`). Any of them can be moved to another field, to a whole domain,
+or off the grid. A move writes the field or domain and sets `moved_by_hand`,
+and leaves the basis and runner-up as the pass wrote them, so the list shows
+the basis as what the pass had said. The pure part is `lib/learn/areas/move.ts`.
+
 ## What to do next
 
 `/learn/next` gains a fourth kind of row: **a field you write about and have
@@ -360,7 +369,8 @@ Geography, so a thin field here says more about the list than about the field.
      hourly schedule.
    - Subjects: `subjects.field_id` and `domain_id`, placed when a subject is
      created.
-   - Moving a placement by hand, from the Know page.
+   - ✅ Moving a theme by hand, from the Know page.
+   - Moving a track by hand.
 4. ✅ **The grid on the Know page.** The two signals per field and the four kinds.
 5. **The fourth row on `/learn/next`.**
 
