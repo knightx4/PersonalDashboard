@@ -13,7 +13,7 @@ import type { StatusGlyph } from '@/lib/status-glyphs';
  * would bring it back, so nothing below produces one.
  */
 
-export type GridDomain = { id: string; name: string; position: number };
+export type GridDomain = { id: string; slug: string; name: string; position: number };
 export type GridField = {
   id: string;
   domainId: string;
@@ -92,6 +92,7 @@ export type FieldCell = {
 
 export type DomainRow = {
   id: string;
+  slug: string;
   name: string;
   fields: FieldCell[];
   /** Themes and tracks placed at the domain itself, in none of its cells. */
@@ -284,6 +285,7 @@ export function buildAreaGrid(input: {
       };
       return {
         id: domain.id,
+        slug: domain.slug,
         name: domain.name,
         fields,
         own,

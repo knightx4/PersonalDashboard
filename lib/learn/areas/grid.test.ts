@@ -13,8 +13,8 @@ import {
 } from './grid';
 
 const DOMAINS = [
-  { id: 'd-phys', name: 'Physical sciences', position: 2 },
-  { id: 'd-soc', name: 'Social sciences', position: 1 },
+  { id: 'd-phys', slug: 'physical-sciences', name: 'Physical sciences', position: 2 },
+  { id: 'd-soc', slug: 'social-sciences', name: 'Social sciences', position: 1 },
 ];
 const FIELDS = [
   { id: 'f-econ', domainId: 'd-soc', name: 'Economics', slug: 'economics', position: 1 },

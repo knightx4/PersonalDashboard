@@ -14,7 +14,9 @@ import { countStates, settledCount } from '@/lib/learn/graph/model';
 import { MAX_BRIEFING_CHARS } from '@/lib/learn/graph/from-brief';
 import { BriefForm } from './brief-form';
 import { FromVaultForm } from './from-vault-form';
-import { AreasGrid } from './areas-grid';
+import { AreasGrid, type OpenedThemes } from './areas-grid';
+import { destinationsFor, openedPlace, runnerUpOf, targetValue } from '@/lib/learn/areas/move';
+import { loadPlacedThemes } from '@/lib/learn/areas/themes-load';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { loadNotes } from '@/lib/vault/notes/load';
 
@@ -51,7 +53,12 @@ function settledLine(counts: ReturnType<typeof countStates>): string {
   return parts.join(' · ');
 }
 
-export default async function KnowPage() {
+export default async function KnowPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ field?: string; domain?: string; unplaced?: string }>;
+}) {
+  const params = await searchParams;
   const user = await requireUser();
   const supabase = await createLearnClient();
   const vault = await createVaultClient();
@@ -62,9 +69,10 @@ export default async function KnowPage() {
   // Scaffolding for the first slice of the vault pass: a list to pick one note
   // out of. The sweep that follows picks its own and needs no list, so this is
   // capped rather than paged.
-  const vaultNotes = (await loadNotes(vault, { limit: VAULT_PICKER_LIMIT })).map(
-    (note) => ({ path: note.path, title: note.title }),
-  );
+  const vaultNotes = (await loadNotes(vault, { limit: VAULT_PICKER_LIMIT })).map((note) => ({
+    path: note.path,
+    title: note.title,
+  }));
 
   const graphs = await Promise.all(
     subjects.map(async (subject) => ({ subject, graph: await loadGraph(supabase, subject.id) })),
@@ -78,6 +86,28 @@ export default async function KnowPage() {
     areas = await loadAreaGrid(supabase, vault, graphs);
   } catch {
     areas = null;
+  }
+
+  // The place the URL opens, with the reasons behind each theme in it. Read
+  // for this one place only; a failed read is said inside the panel.
+  let opened: OpenedThemes | null = null;
+  const place = areas ? openedPlace(params, areas.grid) : null;
+  if (areas && place) {
+    const grid = areas.grid;
+    let themes: OpenedThemes['themes'] = null;
+    try {
+      themes = (await loadPlacedThemes(supabase, vault, place.target)).map((theme) => ({
+        placementId: theme.placementId,
+        name: theme.name,
+        basis: theme.basis,
+        runnerUp: runnerUpOf(theme, grid),
+        movedByHand: theme.movedByHand,
+        at: targetValue(theme.target),
+      }));
+    } catch {
+      themes = null;
+    }
+    opened = { place, themes, groups: destinationsFor(grid) };
   }
 
   return (
@@ -115,9 +145,16 @@ export default async function KnowPage() {
       )}
 
       {areas ? (
-        <AreasGrid grid={areas.grid} interestFailed={areas.interestFailed} timezone={settings.timezone} />
+        <AreasGrid
+          grid={areas.grid}
+          interestFailed={areas.interestFailed}
+          timezone={settings.timezone}
+          opened={opened}
+        />
       ) : (
-        <p className="mt-8 text-ui text-ink-muted">The fields could not be read, so the grid is missing.</p>
+        <p className="mt-8 text-ui text-ink-muted">
+          The fields could not be read, so the grid is missing.
+        </p>
       )}
 
       {/* The way back into a set of opening questions somebody walked away
@@ -126,10 +163,7 @@ export default async function KnowPage() {
       {unfinished && (
         <Link
           href={`/learn/opening/${unfinished.id}`}
-          className={cn(
-            cardVariants({ padding: 'standard', interactive: true }),
-            'mt-6 block',
-          )}
+          className={cn(cardVariants({ padding: 'standard', interactive: true }), 'mt-6 block')}
         >
           <span className="block text-body font-medium text-ink">
             Finish the questions on {unfinished.subjectName}
