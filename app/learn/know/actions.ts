@@ -12,7 +12,9 @@ import {
   conceptsFromBrief,
   MAX_BRIEFING_CHARS,
 } from '@/lib/learn/graph/from-brief';
-import { declareKnown, existingConcepts, saveChain } from '@/lib/learn/graph/save';
+import { declareKnown, existingConcepts, findOrCreateSubject, saveChain } from '@/lib/learn/graph/save';
+import { parseOwnUnits } from '@/lib/learn/graph/curriculum-payload';
+import { placeTrackAfterResponse } from '@/lib/learn/areas/place-track';
 import { ensureCurriculum, fileGoalUnder } from '@/lib/learn/graph/curriculum-store';
 import { loadSubject, loadSubjects } from '@/lib/learn/graph/load';
 import { nameOpeningClaims } from '@/lib/learn/graph/opening-claims';
@@ -642,4 +644,93 @@ export async function proposeFromNote(
       : { verdict: seen, error: result.detail };
   }
   return { verdict: seen, chain: result.chain };
+}
+
+export type CustomTrackState = { error?: string; existing?: { id: string; name: string } };
+
+const CustomTrackInput = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, 'Name the track.')
+    .max(80, 'Keep the name short; say the rest in what you want from it.'),
+  want: z.string().trim().max(500, 'Shorter, please: a sentence or two.'),
+  units: z.string().max(4000),
+});
+
+/**
+ * Make a track by name, with its curriculum, and nothing else yet
+ * (LEARN-GRAPH-SPEC, "The curriculum").
+ *
+ * The other ways in start from a question and lay out a chain first. This one
+ * starts from the track: you name it, say what you want out of it if you
+ * like, and optionally write the units yourself. The curriculum is written
+ * straight away (your units kept exactly, in your order, when you gave them)
+ * and you land on the track to open its first unit.
+ *
+ * A name you already have a track under goes to that track instead of making
+ * a second one: one track per subject is the rule the whole graph rests on.
+ */
+// latency: pending
+export async function createCustomTrack(
+  _prev: CustomTrackState,
+  formData: FormData,
+): Promise<CustomTrackState> {
+  const user = await requireUser();
+
+  const parsed = CustomTrackInput.safeParse({
+    name: formData.get('name') ?? '',
+    want: formData.get('want') ?? '',
+    units: formData.get('units') ?? '',
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Could not read that.' };
+  const own = parseOwnUnits(parsed.data.units);
+  if (!own.ok) return { error: own.detail };
+
+  const supabase = await createLearnClient();
+  const name = parsed.data.name;
+  const want = parsed.data.want || null;
+
+  let subject: { id: string; created: boolean; placed: boolean };
+  try {
+    subject = await findOrCreateSubject(supabase, user.id, name);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not make that track.' };
+  }
+
+  if (subject.created) {
+    if (want) await supabase.from('subjects').update({ note: want }).eq('id', subject.id);
+    // Placed in the areas once the response has gone, as a track from a
+    // chain is; a track with no field yet is still a track.
+    placeTrackAfterResponse(supabase, user.id, {
+      id: subject.id,
+      name,
+      context: [want ? `aimed at: ${want}` : '', own.titles.length > 0 ? `units: ${own.titles.join('; ')}` : '']
+        .filter(Boolean)
+        .join('. '),
+    });
+  }
+
+  const curriculum = await ensureCurriculum(
+    supabase,
+    user.id,
+    { id: subject.id, name },
+    want,
+    own.titles,
+  ).catch((error: unknown) => ({
+    ok: false as const,
+    detail: error instanceof Error ? error.message : 'Could not write the curriculum.',
+  }));
+  // An existing track with a curriculum already keeps it; say so rather than
+  // quietly dropping the units that were typed.
+  if (!subject.created && curriculum.ok && !curriculum.written && own.titles.length > 0) {
+    return {
+      error: `You already have a track called ${name}, and its curriculum is fixed.`,
+      existing: { id: subject.id, name },
+    };
+  }
+
+  revalidatePath('/learn/know');
+  // A failed curriculum still leaves the track, whose page offers to write it.
+  redirect(`/learn/s/${subject.id}`);
 }
