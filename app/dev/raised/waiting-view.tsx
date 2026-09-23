@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useActionState, useState } from 'react';
 import {
+  answerBlockedStep,
   answerPlanDecision,
   approvePlanItem,
   approveProposals,
@@ -19,7 +20,7 @@ import { planRefHref, type PlanRefTitles } from '@/lib/comments/refs';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { PLAN_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { WAITING_WORD } from '@/lib/dev/words';
-import type { WaitingEntry, WaitingRow } from '@/lib/plan/waiting';
+import { isJobForYou, type WaitingEntry, type WaitingRow } from '@/lib/plan/waiting';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -72,6 +73,9 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
   const setup = row.health === 'setup';
   const question = row.health === 'unanswered';
   const blocked = row.health === 'blocked';
+  // The same test that put it under Your actions or Questions for you, so the
+  // press matches the heading it is drawn under (note e663940b).
+  const blockedJob = blocked && isJobForYou(row.ask);
   const proposed = row.health === 'proposed';
 
   return (
@@ -115,6 +119,7 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
       )}
 
       {question && <AnswerQuestion row={row} />}
+      {blocked && !blockedJob && <AnswerBlocked row={row} />}
 
       {/* The same thread the plan page keeps on the step, on the page the row
           is read from. Dash could be answered but not talked to: a raise took
@@ -136,7 +141,7 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
           {row.module ? MODULE_LABEL[row.module] : 'Everything'}
         </p>
         {setup && <SetupDone row={row} />}
-        {blocked && <BlockedDone row={row} />}
+        {blockedJob && <BlockedDone row={row} />}
         {proposed && <ApprovePlanRow row={row} />}
       </div>
     </li>
@@ -333,5 +338,42 @@ function AnswerQuestion({ row }: { row: WaitingRow }) {
         </Button>
       )}
     </div>
+  );
+}
+
+/**
+ * An answer to a step that stopped on a question.
+ *
+ * Note e663940b: a blocked row under Questions for you carried "I have done
+ * this", which is the claim for a job. What finishes a question is the answer,
+ * so the row gets the same box a decision does, and `answerBlockedStep` puts
+ * the words where the session that resumes the step will read them and lifts
+ * the block.
+ */
+function AnswerBlocked({ row }: { row: WaitingRow }) {
+  const [state, action, pending] = useActionState(answerBlockedStep, {} as PlanActionState);
+  const [answering, setAnswering] = useState(false);
+  const [answer, setAnswer] = useState('');
+
+  return answering ? (
+    <AnswerBox
+      id={row.id}
+      detail={row.ask}
+      resolution={null}
+      action={action}
+      pending={pending}
+      answer={answer}
+      onAnswer={setAnswer}
+      autoFocus
+      error={state.error}
+      onCancel={() => {
+        setAnswer('');
+        setAnswering(false);
+      }}
+    />
+  ) : (
+    <Button type="button" size="sm" variant="ghost" onClick={() => setAnswering(true)}>
+      Answer
+    </Button>
   );
 }

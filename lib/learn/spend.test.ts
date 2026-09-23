@@ -79,6 +79,8 @@ describe('the operation names', () => {
       'embed-map',
       'propose-theme-merges',
       'propose-position-merges',
+      'write-survey-idea',
+      'write-survey-question',
     ]);
   });
 });

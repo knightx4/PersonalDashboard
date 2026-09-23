@@ -359,7 +359,7 @@ async function loadUntestedField(
 ): Promise<{ name: string; themes: ThemeCandidate[] } | null> {
   const [fieldRead, trackRead, placements, strengths, answered] = await Promise.all([
     supabase.from('area_fields').select('id, name'),
-    supabase.from('subjects').select('id, field_id, placed_at'),
+    supabase.from('subjects').select('id, field_id, placed_at').eq('survey', false),
     readAll<{ theme_id: string; field_id: string }>((from, to) =>
       supabase
         .from('theme_fields')

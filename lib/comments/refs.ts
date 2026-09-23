@@ -29,9 +29,14 @@
 /** Steps are numbered from 1; five digits is a plan far larger than this one. */
 const REF = /(^|[^A-Za-z0-9_&#])#(\d{1,5})(?![A-Za-z0-9_])/;
 
-/** Where a step number is read. `all`, because a link must reach a closed one. */
+/**
+ * Where a step number is read. `all`, because a link must reach a closed one,
+ * and searched for the number, so the plan arrives filtered to that step
+ * rather than scrolled to it among the rest (note 843f7506). The same address
+ * the app-wide search sends a step to.
+ */
 export function planRefHref(number: number): string {
-  return `/dev/plan?view=all#plan-${number}`;
+  return `/dev/plan?view=all&q=${encodeURIComponent(`#${number}`)}#plan-${number}`;
 }
 
 /** The id a plan row carries, so the link above lands on it. */

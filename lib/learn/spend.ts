@@ -125,6 +125,13 @@ export const LEARN_OPERATIONS = [
   // (plan #812), twenty pairs a call. Recorded the same way as the theme pass,
   // against the account whose positions were judged.
   'propose-position-merges',
+  // Writing the one idea a survey question about an untracked theme tests,
+  // read from the theme's notes (plan #853). One Haiku call per idea, kept
+  // apart so what the survey costs can be read on its own.
+  'write-survey-idea',
+  // Writing the multiple-choice question about that idea (plan #841). The same
+  // call as 'write-probe', kept apart for the same reason as the idea.
+  'write-survey-question',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

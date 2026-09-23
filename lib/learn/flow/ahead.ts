@@ -290,6 +290,27 @@ export async function takeWaiting(
 }
 
 /**
+ * Not now, on the question on the screen (note 7ccc6f99): it goes back to the
+ * end of the queue unanswered, so nothing is counted against the claim and the
+ * question is asked again after the ones already waiting.
+ *
+ * Unshown again, and dated now, because the queue is read oldest first by
+ * `created_at`. Only while it is still unanswered, so a Not now that races an
+ * answer cannot take the answer back.
+ */
+export async function putBack(supabase: LearnSupabaseClient, probeId: string): Promise<void> {
+  const { error } = await supabase
+    .from('probes')
+    .update({ shown_at: null, created_at: new Date().toISOString() })
+    .eq('id', probeId)
+    .not('picked_state', 'is', null)
+    .is('answered_at', null);
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Putting the question back for later', error);
+}
+
+/**
  * Write one question for a pick and store it.
  *
  * `shownAt` is now for a question somebody is waiting on and null for one
