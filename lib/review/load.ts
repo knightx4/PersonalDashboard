@@ -11,6 +11,7 @@ import {
   type OrderCandidate,
   type SuggestOrder,
 } from '@/lib/orders/suggest-for-email';
+import type { SearchableOrder } from '@/lib/review/attach-email';
 
 export const REVIEW_VIEWS = [
   { id: 'all', label: 'All' },
@@ -96,7 +97,15 @@ export async function loadReviewQueue(
   supabase: SupabaseClient,
   core: CoreSupabaseClient,
   userId: string,
-): Promise<{ rows: ReviewRow[]; counts: ReviewCounts }> {
+): Promise<{
+  rows: ReviewRow[];
+  counts: ReviewCounts;
+  /**
+   * Every live order, newest first, for attaching an email to one the
+   * suggestions missed. Empty unless an email in the queue can be attached.
+   */
+  searchOrders: SearchableOrder[];
+}> {
   // The mailbox is core's now; the verdicts below are still ours.
   const accounts = await connectedInboxes(core, userId);
   const accountIds = accounts.map((row) => row.id);
@@ -290,7 +299,16 @@ export async function loadReviewQueue(
     b.sortAt.localeCompare(a.sortAt),
   );
 
-  return { rows, counts };
+  const searchOrders: SearchableOrder[] = suggestOrders.map((order) => ({
+    orderId: order.id,
+    merchantName: order.merchantName,
+    orderDate: order.orderDate,
+    externalOrderNumber: order.externalOrderNumber,
+    totalCents: order.totalCents,
+    currency: order.currency,
+  }));
+
+  return { rows, counts, searchOrders };
 }
 
 /** Most orders read when suggesting candidates, newest first. */
