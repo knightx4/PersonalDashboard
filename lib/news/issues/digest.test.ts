@@ -8,6 +8,7 @@ import {
   DIGEST_OPERATION,
   LINE_CHARS,
 } from './digest';
+import { NEWS_TOPICS } from './topics';
 
 /**
  * One stored newsletter into a summary and stories, without a network.
@@ -116,16 +117,20 @@ describe('digesting a newsletter', () => {
         line: ' Two stories:\nthe first and the second. ',
         summary: ' Two stories today. ',
         stories: [
-          { headline: 'First', summary: 'The first story. It happened.' },
-          { headline: 'Second', summary: 'The second story. It also happened.' },
-          { headline: '', summary: 'A story with no headline is dropped.' },
+          { headline: 'First', summary: 'The first story. It happened.', topic: 'Business' },
+          {
+            headline: 'Second',
+            summary: 'The second story. It also happened.',
+            topic: ' technology ',
+          },
+          { headline: '', summary: 'A story with no headline is dropped.', topic: 'World' },
         ],
       }),
     );
 
     const stories = [
-      { headline: 'First', summary: 'The first story. It happened.' },
-      { headline: 'Second', summary: 'The second story. It also happened.' },
+      { headline: 'First', summary: 'The first story. It happened.', topic: 'Business' },
+      { headline: 'Second', summary: 'The second story. It also happened.', topic: 'Technology' },
     ];
     expect(outcome).toEqual({
       status: 'digested',
@@ -138,6 +143,11 @@ describe('digesting a newsletter', () => {
     expect(sent.model).toBe(DIGEST_MODEL);
     expect(sent.tool_choice).toEqual({ type: 'tool', name: 'report_digest' });
     expect(sent.tools[0].input_schema.required).toContain('line');
+    const storySchema = sent.tools[0].input_schema.properties.stories.items;
+    expect(storySchema.required).toContain('topic');
+    expect(storySchema.properties.topic.enum).toEqual([...NEWS_TOPICS]);
+    expect(sent.system).toContain(`TOPIC. For each story, pick the one topic from this list`);
+    expect(sent.system).toContain(NEWS_TOPICS.join(', '));
     expect(sent.system).toContain(`at most ${LINE_CHARS} characters`);
     // A section of short items is where stories went missing (Morning Brew's
     // "Tour de headlines"), so the prompt names it.
@@ -191,8 +201,13 @@ describe('digesting a newsletter', () => {
       'Subject: Roundup\n\nParamount may leave LA [link 1]\nOil fell.',
     );
     const stories = [
-      { headline: 'Paramount', summary: 'It may leave LA. Critics call it a bluff.', link: tracked },
-      { headline: 'Oil', summary: 'Oil fell. Nobody linked it.' },
+      {
+        headline: 'Paramount',
+        summary: 'It may leave LA. Critics call it a bluff.',
+        link: tracked,
+        topic: 'Other',
+      },
+      { headline: 'Oil', summary: 'Oil fell. Nobody linked it.', topic: 'Other' },
     ];
     expect(outcome).toEqual({ status: 'digested', line: null, summary: 'Two stories.', stories });
     expect(news.updates[0]).toMatchObject({ stories });
@@ -455,11 +470,21 @@ describe('reading the report', () => {
       line: null,
       summary: 'Two stories.',
       stories: [
-        { headline: 'Linked', summary: 'Has a link.', link: 'https://t.example/c/2' },
-        { headline: 'Unlinked', summary: 'Has none.' },
-        { headline: 'Made up', summary: 'Its number is not in the email.' },
-        { headline: 'Zero', summary: 'Numbers start at one.' },
-        { headline: 'Quoted', summary: 'A number sent as text.', link: 'https://t.example/c/1' },
+        {
+          headline: 'Linked',
+          summary: 'Has a link.',
+          link: 'https://t.example/c/2',
+          topic: 'Other',
+        },
+        { headline: 'Unlinked', summary: 'Has none.', topic: 'Other' },
+        { headline: 'Made up', summary: 'Its number is not in the email.', topic: 'Other' },
+        { headline: 'Zero', summary: 'Numbers start at one.', topic: 'Other' },
+        {
+          headline: 'Quoted',
+          summary: 'A number sent as text.',
+          link: 'https://t.example/c/1',
+          topic: 'Other',
+        },
       ],
     });
   });
@@ -482,8 +507,13 @@ describe('reading the report', () => {
       line: null,
       summary: 'Two stories.',
       stories: [
-        { headline: 'MIT', summary: 'MIT is first.', image: 'https://cdn.example/mit.jpg' },
-        { headline: 'Made up', summary: 'No such picture.' },
+        {
+          headline: 'MIT',
+          summary: 'MIT is first.',
+          image: 'https://cdn.example/mit.jpg',
+          topic: 'Other',
+        },
+        { headline: 'Made up', summary: 'No such picture.', topic: 'Other' },
       ],
     });
   });
@@ -509,8 +539,9 @@ describe('reading the report', () => {
           headline: 'MIT',
           summary: 'MIT is first.',
           text: 'MIT rose to first, while Princeton fell.\n\nHarvard held third.',
+          topic: 'Other',
         },
-        { headline: 'Blank', summary: 'Its text is empty.' },
+        { headline: 'Blank', summary: 'Its text is empty.', topic: 'Other' },
       ],
     });
   });
@@ -531,7 +562,51 @@ describe('reading the report', () => {
     ).toEqual({
       line: null,
       summary: 'One story.',
-      stories: [{ headline: 'Typed', summary: 'Wrote a URL.' }],
+      stories: [{ headline: 'Typed', summary: 'Wrote a URL.', topic: 'Other' }],
+    });
+  });
+
+  it('keeps a topic from the list, matched without regard to case', () => {
+    expect(
+      readDigest({
+        summary: 'Two stories.',
+        stories: [
+          { headline: 'Rates', summary: 'Rates held.', topic: 'Markets' },
+          { headline: 'Chips', summary: 'A new chip.', topic: '  SCIENCE ' },
+        ],
+      }),
+    ).toEqual({
+      line: null,
+      summary: 'Two stories.',
+      stories: [
+        { headline: 'Rates', summary: 'Rates held.', topic: 'Markets' },
+        { headline: 'Chips', summary: 'A new chip.', topic: 'Science' },
+      ],
+    });
+  });
+
+  it('gives a story with no topic, or one not on the list, the topic Other', () => {
+    expect(
+      readDigest({
+        summary: 'Three stories.',
+        stories: [
+          { headline: 'Untagged', summary: 'The reply gave no topic.' },
+          {
+            headline: 'Invented',
+            summary: 'The reply made one up.',
+            topic: 'Artificial intelligence',
+          },
+          { headline: 'Not text', summary: 'The reply sent a number.', topic: 4 },
+        ],
+      }),
+    ).toEqual({
+      line: null,
+      summary: 'Three stories.',
+      stories: [
+        { headline: 'Untagged', summary: 'The reply gave no topic.', topic: 'Other' },
+        { headline: 'Invented', summary: 'The reply made one up.', topic: 'Other' },
+        { headline: 'Not text', summary: 'The reply sent a number.', topic: 'Other' },
+      ],
     });
   });
 

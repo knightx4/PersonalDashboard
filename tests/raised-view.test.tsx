@@ -275,6 +275,9 @@ describe('a question on the page', () => {
     const html = render([], [question()]);
 
     expect(html).toContain('>Answer<');
+    // Bottom right with the card's other presses, after the module line and
+    // the comment thread rather than under the question (note fdf6bc83).
+    expect(html.indexOf('>Answer<')).toBeGreaterThan(html.indexOf('>Comment<'));
     // Law 14: the box is asked for, not standing open on every card in the
     // list. Nothing to type in until the press.
     expect(html).not.toContain('What you decided');
