@@ -3,6 +3,7 @@ import 'server-only';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { NEWS_SCHEMA, type NewsSupabaseClient } from '@/lib/news/db/schema-name';
 import type { NewsIssue, NewsSender } from './list';
+import { readStories, type NewsStory } from './stories';
 
 /**
  * How many issues one page holds.
@@ -79,6 +80,18 @@ export type NewsIssueDetail = {
    * offering the button a second time.
    */
   unsubscribeSentAt: string | null;
+  /**
+   * The issue's summary and stories, or null while it has not been
+   * summarised. #786 writes them; an issue that is one long essay has a
+   * summary and an empty story list.
+   */
+  digest: { summary: string; stories: NewsStory[] } | null;
+  /**
+   * Why the last attempt to summarise this issue failed, or null when it
+   * succeeded or none has run. The page shows the original email when it is
+   * set.
+   */
+  digestError: string | null;
 };
 
 /**
@@ -91,7 +104,7 @@ export type NewsIssueDetail = {
  * type inside loadIssue are the only places the issue's shape is written down.
  */
 const ISSUE_DETAIL_COLUMNS =
-  'id, sender_id, subject, received_at, read_at, text_body, html_body, unsubscribe_url, unsubscribe_email, unsubscribe_sent_at';
+  'id, sender_id, subject, received_at, read_at, text_body, html_body, unsubscribe_url, unsubscribe_email, unsubscribe_sent_at, summary, stories, digest_error';
 
 /**
  * One issue, by id, or null when there is no such issue for this account.
@@ -129,6 +142,9 @@ export async function loadIssue(
     unsubscribe_url: string | null;
     unsubscribe_email: string | null;
     unsubscribe_sent_at: string | null;
+    summary: string | null;
+    stories: unknown;
+    digest_error: string | null;
   };
 
   const { data: senderRow } = await client
@@ -148,5 +164,7 @@ export async function loadIssue(
     unsubscribeUrl: row.unsubscribe_url ?? null,
     unsubscribeEmail: row.unsubscribe_email ?? null,
     unsubscribeSentAt: row.unsubscribe_sent_at ?? null,
+    digest: row.summary ? { summary: row.summary, stories: readStories(row.stories) } : null,
+    digestError: row.digest_error ?? null,
   };
 }
