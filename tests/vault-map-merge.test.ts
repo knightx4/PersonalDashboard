@@ -376,6 +376,12 @@ describe('merging across users', () => {
 });
 
 describe('apply_merge_proposals (plan #820)', () => {
+  // The apply pass takes every pending proposal the user has, so one left by
+  // an earlier block (the refused pair above) would be merged and counted here.
+  beforeAll(async () => {
+    await admin`delete from map_merge_proposals where user_id = ${userA} and applied_at is null`;
+  });
+
   async function propose(x: string, y: string, survivor: string, name: string, confidence = 0.9) {
     const [lo, hi] = [x, y].sort();
     const [labels] = await admin<{ lo: string; hi: string }[]>`
@@ -425,8 +431,12 @@ describe('apply_merge_proposals (plan #820)', () => {
     ]);
 
     const merges = await admin<{ proposal_id: string; survivor_id: string; absorbed_id: string }[]>`
-      select proposal_id, survivor_id, absorbed_id from map_merges
-      where user_id = ${userA} and proposal_id in (${p1}, ${p2}) order by merged_at`;
+      select m.proposal_id, m.survivor_id, m.absorbed_id from map_merges m
+      join map_merge_proposals p on p.id = m.proposal_id
+      where m.user_id = ${userA} and m.proposal_id in (${p1}, ${p2})
+      -- One apply is one transaction, so both merges share a merged_at; the
+      -- proposals' confidence is the order the pass took them in.
+      order by p.confidence desc`;
     expect(merges).toEqual([
       { proposal_id: p1, survivor_id: hub, absorbed_id: bus },
       { proposal_id: p2, survivor_id: hub, absorbed_id: tram },
