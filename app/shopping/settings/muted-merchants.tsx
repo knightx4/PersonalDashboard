@@ -12,8 +12,9 @@ export function MutedMerchantsSection({ exclusions }: { exclusions: MutedMerchan
   return (
     <div className="space-y-3">
       <p className="text-body text-ink-muted">
-        Muted senders are skipped on Import and Reset &amp; re-scan. Open any order and choose
-        “Don’t import from…” to add one — it’s remembered automatically.
+        Muted senders are skipped on Import and Reset &amp; re-scan, for orders and for their
+        shipping, delivery and return emails. Add one from an order with “Don’t import from…”, or
+        from an email in Review with “Exclude sender”.
       </p>
       {exclusions.length === 0 ? (
         <p className="text-body text-ink-muted">Nothing muted yet.</p>
