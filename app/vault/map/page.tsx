@@ -5,8 +5,10 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { cardVariants } from '@/components/ui/card';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { loadThemeList, THEME_LIST_LIMIT } from '@/lib/vault/map/read';
+import { loadMergeLog } from '@/lib/vault/map/merge-log';
 import { loadLatestSweep } from '@/lib/vault/map/sweep-read';
 import { cn } from '@/lib/cn';
+import { MergeLog } from './merge-log';
 import { SweepPanel } from './sweep-panel';
 
 export const dynamic = 'force-dynamic';
@@ -21,13 +23,23 @@ export const dynamic = 'force-dynamic';
  *
  * Opening a theme is the first of the two taps to a sentence; the note link
  * under each quote on the theme's page is the second.
+ *
+ * Below the themes, every merge the map has made, a page at a time, with an
+ * undo on each (#821). `?merges=` is the page.
  */
-export default async function VaultMapPage() {
+export default async function VaultMapPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ merges?: string | string[] }>;
+}) {
+  const { merges } = await searchParams;
   const supabase = await createVaultClient();
-  const [{ themes, capped }, sweep] = await Promise.all([
+  const [{ themes, capped }, sweep, mergeLog] = await Promise.all([
     loadThemeList(supabase),
     loadLatestSweep(supabase),
+    loadMergeLog(supabase, merges),
   ]);
+  const mergeTotal = mergeLog.counts.theme + mergeLog.counts.position;
 
   if (themes.length === 0) {
     return (
@@ -54,6 +66,14 @@ export default async function VaultMapPage() {
       <p className="mb-3 text-body text-ink-muted">
         {themes.length} {themes.length === 1 ? 'theme' : 'themes'}, most written about first
         {capped && ` (the first ${THEME_LIST_LIMIT} are shown)`}
+        {mergeTotal > 0 && (
+          <>
+            {' · '}
+            <a href="#merges" className="text-ink underline-offset-2 hover:underline">
+              {mergeTotal.toLocaleString('en-GB')} {mergeTotal === 1 ? 'merge' : 'merges'} below
+            </a>
+          </>
+        )}
       </p>
 
       <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
@@ -74,6 +94,8 @@ export default async function VaultMapPage() {
           </li>
         ))}
       </ul>
+
+      <MergeLog log={mergeLog} />
     </>
   );
 }
