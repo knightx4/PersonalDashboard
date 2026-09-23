@@ -122,9 +122,21 @@ describe('planProgress', () => {
       done: 1,
       inProgress: 0,
       blocked: 1,
+      ready: 0,
       live: 2,
       fraction: 0.5,
     });
+  });
+
+  // Note c12fe73a: the Steps column shows what is ready apart from the rest.
+  it('counts a ready step once, and never one that is blocked', () => {
+    expect(
+      planProgress([
+        { ...at('not_started', 'a'), ready: true },
+        { ...at('not_started', 'b'), ready: false },
+        { ...at('blocked', 'c'), ready: true },
+      ]),
+    ).toMatchObject({ ready: 1, blocked: 1, live: 3 });
   });
 });
 
