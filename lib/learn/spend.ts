@@ -115,6 +115,10 @@ export const LEARN_OPERATIONS = [
   // #811), twenty pairs a call. Recorded through the service role from the map
   // sweep's cron tick, against the account whose themes were judged.
   'propose-theme-merges',
+  // Asking Haiku which vault positions from different notes are one position
+  // (plan #812), twenty pairs a call. Recorded the same way as the theme pass,
+  // against the account whose positions were judged.
+  'propose-position-merges',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
