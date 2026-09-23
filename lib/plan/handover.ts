@@ -19,7 +19,14 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { planRoutine } from '@/lib/feedback/routine';
-import { claimIsLive, runReplacedNote, sendOverClaim, underwayRefusal } from './liveness';
+import {
+  betweenStepsRefusal,
+  claimIsLive,
+  featureBetweenSteps,
+  runReplacedNote,
+  sendOverClaim,
+  underwayRefusal,
+} from './liveness';
 import { planBrief } from './brief';
 import { endRunsOnStep, loadLastRuns, reshapeUnderway, startRoutineRun } from './runs';
 import { isClosed, loadPlan } from './load';
@@ -188,6 +195,12 @@ export async function handStepToClaude(input: {
         now,
       }),
     };
+  }
+
+  // A session sent at the whole feature, between one step and the next, holds
+  // no claim for that moment. See `featureBetweenSteps`.
+  if (featureBetweenSteps(flatten([feature]), runs[feature.id], now)) {
+    return { ok: false, error: betweenStepsRefusal(feature) };
   }
 
   // The run this press is replacing stops here.
@@ -383,6 +396,12 @@ export async function handFeatureToClaude(input: {
     };
   }
 
+  // The same session between one step and the next holds no claim for that
+  // moment, and a batch started then is a second session on the feature.
+  if (featureBetweenSteps(flatten([node]), runs[node.id], now)) {
+    return { ok: false, error: betweenStepsRefusal(node), refused: true };
+  }
+
   // Itself included: a feature is closed when its steps are, and the session
   // needs it to be its own to close.
   //
@@ -426,7 +445,7 @@ export async function handFeatureToClaude(input: {
   const text =
     `Work plan feature #${node.number}, "${node.title}", to completion, following ` +
     '.claude/skills/plan/SKILL.md. This is a batch, so it is orchestrated: send each step ' +
-    'to its own subagent, in the order the plan gives, and do not read the steps\' source ' +
+    "to its own subagent, in the order the plan gives, and do not read the steps' source " +
     'files or make the edits yourself. Keep the carry-forward between them. Stop at the ' +
     'first step that needs a decision from me: block it with the exact question rather ' +
     'than guessing, and do not skip past it to a later step that depends on it. Merge ' +
