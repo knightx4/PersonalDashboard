@@ -31,6 +31,10 @@
  * and sat flush left. An auto margin travels with them onto whichever line they
  * end up on. It also keeps the mark and the title next to each other instead of
  * letting justification push them to opposite ends of a wide header.
+ *
+ * The actions wrap among themselves too. Three buttons are wider than a phone,
+ * and without the wrap they squeezed each other until their labels broke onto
+ * two lines inside a button one line tall (seen on a newsletter, plan #788).
  */
 export function PageHeader({
   title,
@@ -54,7 +58,9 @@ export function PageHeader({
           <h1 className="font-display text-title tracking-tight text-ink">{title}</h1>
           {description && <p className="mt-0.5 text-body text-ink-muted">{description}</p>}
         </div>
-        {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
+        {actions && (
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">{actions}</div>
+        )}
       </div>
       {bulk}
     </div>
