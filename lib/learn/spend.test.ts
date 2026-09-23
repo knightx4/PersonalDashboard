@@ -76,6 +76,7 @@ describe('the operation names', () => {
       'name-feed-material',
       'write-feed-card',
       'embed-map',
+      'propose-theme-merges',
     ]);
   });
 });

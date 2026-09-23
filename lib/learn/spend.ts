@@ -111,6 +111,10 @@ export const LEARN_OPERATIONS = [
   // names for one subject (plan #810). Recorded against the account whose
   // rows were embedded, from the map sweep's cron tick and after an accept.
   'embed-map',
+  // Asking Haiku which vault themes are one subject under two names (plan
+  // #811), twenty pairs a call. Recorded through the service role from the map
+  // sweep's cron tick, against the account whose themes were judged.
+  'propose-theme-merges',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
