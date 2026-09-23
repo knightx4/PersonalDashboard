@@ -798,11 +798,11 @@ describe('featureRunsInFlight', () => {
 });
 
 describe('featureRunLiveness', () => {
-  const started = new Date(MIDNIGHT - 30 * 60_000).toISOString();
-  const closed = new Date(MIDNIGHT - 15 * 60_000).toISOString();
+  const started = new Date(MIDNIGHT - 60 * 60_000).toISOString();
+  const minutesAgo = (minutes: number) => new Date(MIDNIGHT - minutes * 60_000).toISOString();
 
   /** A feature with one closed step and one more, claimed or not. */
-  function plan(nextStatus: string) {
+  function plan(nextStatus: string, closed = minutesAgo(25)) {
     const rows = [
       { id: 'feature', parent_id: null, status: 'not_started', updated_at: started },
       { id: 'first', parent_id: 'feature', status: 'done', updated_at: closed },
@@ -829,7 +829,18 @@ describe('featureRunLiveness', () => {
     expect(liveness).toBe('working');
   });
 
-  it('reads it as finished once nothing under the feature is claimed', async () => {
+  it('reads a session between one step and the next as still working', async () => {
+    const liveness = await featureRunLiveness({
+      supabase: plan('not_started', minutesAgo(1)),
+      userId: 'u',
+      row: { plan_item_id: 'feature', status: 'started', created_at: started },
+      now: MIDNIGHT,
+      pushes: [],
+    });
+    expect(liveness).toBe('working');
+  });
+
+  it('reads it as finished once nothing is claimed or changed for twenty minutes', async () => {
     const liveness = await featureRunLiveness({
       supabase: plan('not_started'),
       userId: 'u',
