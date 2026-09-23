@@ -24,6 +24,7 @@ import { loadNotes } from '@/lib/vault/notes/load';
 /** How many notes the picker offers. Scaffolding; the sweep needs no picker. */
 const VAULT_PICKER_LIMIT = 500;
 import { GoalForm } from './goal-form';
+import { CustomTrackForm } from './custom-track-form';
 import { PriorForm } from './prior-form';
 
 export const dynamic = 'force-dynamic';
@@ -122,7 +123,7 @@ export default async function KnowPage({
         <EmptyState
           icon={Network}
           title="No tracks yet"
-          description="A track is the container: Economics, not the Phillips curve. Name a goal below and the chain of things leading to it gets laid out, in whichever track it belongs to."
+          description="A track is the container: Economics, not the Phillips curve. Make one below and it gets a fixed curriculum, or ask one question and the track forms around it."
         />
       ) : (
         <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
@@ -176,10 +177,15 @@ export default async function KnowPage({
         </Link>
       )}
 
-      {/* Naming a goal is how a subject comes into being, so the form is here
-          rather than behind a button: with no subjects yet, it is the only
-          thing on the page worth doing. */}
-      <GoalForm />
+      {/* Making a track by name comes first: a track you create gets its
+          fixed curriculum at once, and its units are opened from there. */}
+      <CustomTrackForm />
+
+      {/* Naming a goal is the other way a track comes into being: the chain
+          for one question first, and the curriculum around it. */}
+      <SectionFold title="Or start from one question" defaultOpen={rows.length === 0} className="mt-8">
+        <GoalForm bare />
+      </SectionFold>
 
       {/* And the other direction. A goal says what you are missing; this says
           what you already have, which is the only thing on this page that can

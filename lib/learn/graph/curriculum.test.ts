@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_UNITS, readCurriculum, unitGoal } from './curriculum-payload';
+import { MAX_UNITS, parseOwnUnits, readCurriculum, unitGoal } from './curriculum-payload';
 import { curriculumRows, type UnitGoal } from './curriculum-view';
 import type { Concept, Graph, KnowledgeState } from './model';
 
@@ -57,8 +57,40 @@ describe('reading the curriculum', () => {
     expect(readCurriculum({ units: 'many' })).toMatchObject({ ok: false });
   });
 
+  it('keeps units the person wrote exactly, in their order, whatever the model sent', () => {
+    const result = readCurriculum(
+      {
+        units: [
+          { title: 'Renamed by the model', covers: 'Parity.', outcome: 'Price a put from a call.' },
+        ],
+        goal_unit: null,
+      },
+      ['Put-call parity', 'Binomial trees'],
+    );
+    expect(result).toEqual({
+      ok: true,
+      goalUnit: null,
+      units: [
+        { title: 'Put-call parity', covers: 'Parity.', outcome: 'Price a put from a call.' },
+        { title: 'Binomial trees', covers: '', outcome: '' },
+      ],
+    });
+  });
+
+  it('reads units typed one per line, without bullets, numbers, blanks or repeats', () => {
+    expect(parseOwnUnits('1. Parity\n\n- Trees\n* Greeks\n2) trees\n  Smiles  ')).toEqual({
+      ok: true,
+      titles: ['Parity', 'Trees', 'Greeks', 'Smiles'],
+    });
+    expect(parseOwnUnits('')).toEqual({ ok: true, titles: [] });
+    expect(parseOwnUnits(Array.from({ length: 13 }, (_, i) => `Unit ${i}`).join('\n'))).toMatchObject({
+      ok: false,
+    });
+  });
+
   it('asks a unit for its title and outcome when it is opened', () => {
     expect(unitGoal(unit(4))).toBe('Unit 4: Do the thing from unit 4.');
+    expect(unitGoal({ title: 'Binomial trees', outcome: '' })).toBe('Binomial trees');
   });
 });
 
