@@ -29,10 +29,14 @@ import { addDays, type Task } from '@/lib/todo/tasks/model';
  * What the task is about sits on the same row, as a chip. It is optional and
  * costs nothing when it is not used, which is the only way it could go on a
  * form whose whole argument is that writing something down has to be cheap.
+ *
+ * The day starts on Today, as the capture panel's does, and goes back to it
+ * after each add. Most of what gets written here is for today, and Today is a
+ * toggle, so "no day at all" still costs one press.
  */
 export function AddTask({ today }: { today: string }) {
   const [noting, setNoting] = useState(false);
-  const [dueOn, setDueOn] = useState('');
+  const [dueOn, setDueOn] = useState(today);
   const [time, setTime] = useState('');
   const [pinned, setPinned] = useState(false);
   const [about, setAbout] = useState<LinkChoice | null>(null);
@@ -53,7 +57,7 @@ export function AddTask({ today }: { today: string }) {
         formRef.current?.reset();
         // The date, the hour and the pin are held here rather than by the
         // form, so the form's own reset does not reach them.
-        setDueOn('');
+        setDueOn(today);
         setTime('');
         setPinned(false);
         setAbout(null);

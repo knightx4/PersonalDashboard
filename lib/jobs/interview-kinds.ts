@@ -37,3 +37,40 @@ export function interviewKindLabel(kind: string): string {
     kind.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
   );
 }
+
+type KindedInterview = { kind: string; scheduledAt: string | null };
+
+function latest(interviews: readonly KindedInterview[]): KindedInterview | null {
+  return interviews.reduce<KindedInterview | null>((top, interview) => {
+    if (!top) return interview;
+    // An unscheduled interview sorts after a scheduled one: it is the newer plan.
+    if (interview.scheduledAt === null) return interview;
+    if (top.scheduledAt === null) return top;
+    return interview.scheduledAt > top.scheduledAt ? interview : top;
+  }, null);
+}
+
+/**
+ * The kind a new interview's form starts on.
+ *
+ * Inside a round that already has interviews, the round's latest kind: the
+ * conversations in one round are almost always the same sort. Otherwise, the
+ * step after the pursuit's latest interview, because nobody does the recruiter
+ * screen twice. Informal sits outside that ladder, and final is where it stops.
+ * It is a starting value in a visible select, so a wrong guess is one change.
+ */
+export function startingInterviewKind(
+  round: readonly KindedInterview[],
+  pursuit: readonly KindedInterview[],
+): InterviewKind {
+  const inRound = latest(round);
+  if (inRound && (INTERVIEW_KINDS as readonly string[]).includes(inRound.kind)) {
+    return inRound.kind as InterviewKind;
+  }
+  const ladder = INTERVIEW_KINDS.filter((kind) => kind !== 'informal');
+  const before = latest(pursuit.filter((interview) => interview.kind !== 'informal'));
+  if (!before) return 'recruiter_screen';
+  const at = ladder.indexOf(before.kind as (typeof ladder)[number]);
+  if (at === -1) return 'recruiter_screen';
+  return ladder[Math.min(at + 1, ladder.length - 1)];
+}

@@ -56,6 +56,7 @@ export function OrderForm({
   merchants,
   categories,
   defaultDate,
+  currency,
   people = [],
   defaultPersonId = null,
   prefill = null,
@@ -64,6 +65,11 @@ export function OrderForm({
   merchants: MerchantOption[];
   categories: CategoryOption[];
   defaultDate: string;
+  /**
+   * The account's display currency. A typed order is in it unless the email
+   * said otherwise; left unsent, the server used to store USD for everyone.
+   */
+  currency: string;
   people?: Person[];
   defaultPersonId?: string | null;
   /** Starting values read out of an email. */
@@ -105,7 +111,7 @@ export function OrderForm({
       {sourceMessageId && (
         <input type="hidden" name="source_message_id" value={sourceMessageId} />
       )}
-      {prefill && <input type="hidden" name="currency" value={prefill.currency} />}
+      <input type="hidden" name="currency" value={prefill?.currency ?? currency} />
       <section className="grid gap-4 sm:grid-cols-2">
         <Field id="merchant" label="Merchant" className="sm:col-span-2">
           <MerchantField

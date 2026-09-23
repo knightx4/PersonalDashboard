@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { todayInTimezone } from '@/lib/money';
+import { loadDisplayCurrency } from '@/lib/fx/display';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -23,7 +24,7 @@ export default async function NewOrderPage({
   const user = await requireUser();
   const supabase = await createClient();
 
-  const [{ data: merchants }, { data: categories }, { data: profile }] = await Promise.all([
+  const [{ data: merchants }, { data: categories }, { data: profile }, currency] = await Promise.all([
     supabase.from('merchants').select('id, name').order('name'),
     supabase
       .from('categories')
@@ -31,6 +32,7 @@ export default async function NewOrderPage({
       .is('parent_id', null)
       .order('name'),
     supabase.from('profiles').select('timezone').eq('id', user.id).single(),
+    loadDisplayCurrency(supabase, user.id),
   ]);
 
   const core = await createCoreClient();
@@ -99,6 +101,7 @@ export default async function NewOrderPage({
         merchants={merchants ?? []}
         categories={categories ?? []}
         defaultDate={defaultDate}
+        currency={currency}
         prefill={prefill}
         sourceMessageId={sourceMessageId}
       />

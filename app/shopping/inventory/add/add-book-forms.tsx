@@ -23,9 +23,12 @@ import type { CanonicalBook } from '@/lib/books/types';
  */
 export function AddBookManualForm({
   isbn,
+  title,
   compact,
 }: {
   isbn?: string | null;
+  /** The title searched for, when the lookup that failed was by title. */
+  title?: string;
   compact?: boolean;
 }) {
   const [state, action, pending] = useActionState(
@@ -58,7 +61,13 @@ export function AddBookManualForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <Label htmlFor="manual_title">Title</Label>
-          <Input id="manual_title" name="title" required autoComplete="off" />
+          <Input
+            id="manual_title"
+            name="title"
+            required
+            autoComplete="off"
+            defaultValue={title ?? ''}
+          />
         </div>
         <div className="sm:col-span-2">
           <Label htmlFor="manual_authors">Authors</Label>
@@ -316,7 +325,13 @@ export function AddBookSearchForm() {
       )}
 
       {!shown && searchState.error && (
-        <AddBookManualForm compact isbn={searchState.manualIsbn} />
+        // What was searched for carries over: the ISBN into its field, or the
+        // words into the title, so the fallback does not start by retyping.
+        <AddBookManualForm
+          compact
+          isbn={searchState.manualIsbn}
+          title={searchState.manualIsbn ? '' : query.trim()}
+        />
       )}
     </div>
   );

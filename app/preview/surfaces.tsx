@@ -1964,7 +1964,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'Role · New',
     module: 'jobs',
     width: 'wide',
-    render: () => <RoleForm companies={knownCompanies} />,
+    render: () => <RoleForm companies={knownCompanies} defaultDate="2026-09-15" />,
   },
   {
     id: 'jobs-roles-table',

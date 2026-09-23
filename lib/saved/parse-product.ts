@@ -16,7 +16,8 @@ export const scrapedProductSchema = z.object({
   title: z.string().nullable(),
   imageUrl: z.string().url().nullable(),
   priceCents: z.number().int().nullable(),
-  currency: z.string().length(3),
+  /** Null when the page does not say; the caller supplies the account's own. */
+  currency: z.string().length(3).nullable(),
   source: z.enum(['json_ld', 'open_graph', 'none']),
 });
 
@@ -50,7 +51,7 @@ export function parsePriceToCents(raw: unknown): number | null {
   }
 }
 
-function normalizeCurrency(raw: unknown, fallback = 'USD'): string {
+function normalizeCurrency(raw: unknown, fallback: string | null = null): string | null {
   if (typeof raw !== 'string') return fallback;
   const code = raw.trim().toUpperCase();
   return /^[A-Z]{3}$/.test(code) ? code : fallback;
@@ -198,7 +199,7 @@ function fromJsonLd(html: string, baseUrl: string): Partial<ScrapedProduct> | nu
         title,
         imageUrl,
         priceCents,
-        currency: currency ?? 'USD',
+        currency,
         source: 'json_ld',
       });
     });
@@ -206,7 +207,7 @@ function fromJsonLd(html: string, baseUrl: string): Partial<ScrapedProduct> | nu
 
   if (products.length === 0) return null;
 
-  const best: Partial<ScrapedProduct> = { source: 'json_ld', currency: 'USD' };
+  const best: Partial<ScrapedProduct> = { source: 'json_ld', currency: null };
   for (const candidate of products) {
     if (!best.title && candidate.title) best.title = candidate.title;
     if (!best.imageUrl && candidate.imageUrl) best.imageUrl = candidate.imageUrl;
@@ -255,7 +256,7 @@ export function parseProductHtml(html: string, pageUrl: string): ScrapedProduct 
     title: jsonLd?.title ?? og?.title ?? null,
     imageUrl: jsonLd?.imageUrl ?? og?.imageUrl ?? null,
     priceCents: jsonLd?.priceCents ?? og?.priceCents ?? null,
-    currency: jsonLd?.currency ?? og?.currency ?? 'USD',
+    currency: jsonLd?.currency ?? og?.currency ?? null,
     source: (usedJsonLd ? 'json_ld' : og ? 'open_graph' : 'none') as ScrapedProduct['source'],
   };
 
@@ -268,7 +269,7 @@ export function emptyScrapedProduct(pageUrl: string): ScrapedProduct {
     title: null,
     imageUrl: null,
     priceCents: null,
-    currency: 'USD',
+    currency: null,
     source: 'none',
   });
 }

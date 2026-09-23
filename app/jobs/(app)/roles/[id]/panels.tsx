@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { todayIn } from '@/lib/todo/tasks/model';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState, useTransition } from 'react';
 import {
@@ -84,6 +85,8 @@ import {
   INTERVIEW_KIND_LABEL,
   INTERVIEW_KINDS,
   interviewKindLabel,
+  startingInterviewKind,
+  type InterviewKind,
 } from '@/lib/jobs/interview-kinds';
 import { groupableDays, sectionInterviews } from '@/lib/jobs/interview-groups';
 import { ReminderActions } from '@/app/jobs/(app)/today/reminder-actions';
@@ -490,7 +493,9 @@ function Todos({
   messages: PanelProps['messages'];
 }) {
   const [body, setBody] = useState('');
-  const [dueAt, setDueAt] = useState('');
+  // The date is required, so it starts on today rather than blank: Add used
+  // to stay disabled until a day had been picked.
+  const [dueAt, setDueAt] = useState(() => todayIn(timezone));
   const [adding, setAdding] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -534,7 +539,7 @@ function Todos({
               setError(result.error);
               if (!result.error) {
                 setBody('');
-                setDueAt('');
+                setDueAt(todayIn(timezone));
                 setAdding(false);
               }
             });
@@ -1999,6 +2004,7 @@ function Interviews({
       <AddRound applicationId={applicationId} nextRound={nextRoundNumber} />
       <AddInterview
         applicationId={applicationId}
+        defaultKind={startingInterviewKind([], interviews)}
         triggerLabel="Add an interview in a round of its own"
         seed={seed}
         onSeedUsed={onSeedUsed}
@@ -2708,6 +2714,7 @@ function InterviewGroupCard({
             <AddInterview
               applicationId={applicationId}
               groupId={group.id}
+              defaultKind={startingInterviewKind(interviews, interviews)}
               mailOptions={schedulingMail}
               triggerLabel={
                 interviews.length === 0 ? 'Add an interview' : 'Add another interview to this round'
@@ -3187,10 +3194,13 @@ function AddInterview({
   groupId = null,
   mailOptions = [],
   triggerLabel = 'Add an interview',
+  defaultKind = 'recruiter_screen',
   seed,
   onSeedUsed,
 }: {
   applicationId: string;
+  /** What the kind starts on; see startingInterviewKind. */
+  defaultKind?: InterviewKind;
   /** The round this goes in. Null means a new round holding just this one. */
   groupId?: string | null;
   /** Scheduling mail on this pursuit, offered as a starting point. */
@@ -3202,7 +3212,7 @@ function AddInterview({
 }) {
   const fieldId = useId();
   const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState('recruiter_screen');
+  const [kind, setKind] = useState<string>(defaultKind);
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [pending, startTransition] = useTransition();
@@ -3233,7 +3243,12 @@ function AddInterview({
     return (
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          // Worked out again on each open: the interview just added may have
+          // moved what the next one is likely to be.
+          setKind(defaultKind);
+          setOpen(true);
+        }}
         className={cn(
           cardVariants(),
           'press w-full border-dashed py-2.5 text-center text-ui text-ink-muted hover:border-accent hover:text-accent',
@@ -3270,7 +3285,7 @@ function AddInterview({
               onChange={(event) => {
                 const message = mailOptions.find((option) => option.id === event.target.value);
                 if (!message) return;
-                setFromMail({ kind: 'recruiter_screen', fromSubject: message.subject });
+                setFromMail({ kind: defaultKind, fromSubject: message.subject });
                 setError(null);
               }}
             >

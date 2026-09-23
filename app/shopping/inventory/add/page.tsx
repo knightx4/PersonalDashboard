@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { todayInTimezone } from '@/lib/money';
 import { AddItemForm, type CategoryOption } from './add-item-form';
 
 export const metadata = { title: 'Add new item' };
@@ -34,16 +35,17 @@ const CATALOGUED = [
  * have to walk through.
  */
 export default async function AddItemPage() {
-  await requireUser();
+  const user = await requireUser();
   const supabase = await createClient();
 
   // Same shape the inventory list's category rail uses: top level only, and
   // RLS is what decides whose categories come back.
-  const { data: categories } = await supabase
-    .from('categories')
-    .select('id, name')
-    .is('parent_id', null)
-    .order('name');
+  const [{ data: categories }, { data: profile }] = await Promise.all([
+    supabase.from('categories').select('id, name').is('parent_id', null).order('name'),
+    supabase.from('profiles').select('timezone').eq('id', user.id).single(),
+  ]);
+  // The action saves today when the date is left out, so the field says so.
+  const today = todayInTimezone(profile?.timezone ?? 'UTC');
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -77,7 +79,7 @@ export default async function AddItemPage() {
       </div>
 
       <h2 className="mb-3 text-ui font-semibold text-ink">Or add it by hand</h2>
-      <AddItemForm categories={(categories ?? []) as CategoryOption[]} />
+      <AddItemForm categories={(categories ?? []) as CategoryOption[]} defaultDate={today} />
     </div>
   );
 }

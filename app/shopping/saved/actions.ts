@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { loadDisplayCurrency } from '@/lib/fx/display';
 import { fingerprintLoose } from '@/lib/fingerprint';
 import { formatCentsAsDollarsInput, parseDollarsToCents } from '@/lib/money';
 import { findMerchantByUrl } from '@/lib/saved/resolve-merchant';
@@ -117,7 +118,8 @@ export async function previewSavedUrl(
     imageUrl: scraped.imageUrl ?? '',
     price:
       scraped.priceCents != null ? formatCentsAsDollarsInput(scraped.priceCents) : '',
-    currency: scraped.currency,
+    // A page that states no currency is priced in yours, not in USD.
+    currency: scraped.currency ?? (await loadDisplayCurrency(supabase, user.id)),
     merchantId: merchant?.id ?? null,
     merchantName: merchant?.name ?? null,
     source: scraped.source,

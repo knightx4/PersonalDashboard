@@ -15,7 +15,14 @@ export type CategoryOption = { id: string; name: string };
  * than an item you gave up entering. Everything else is here because it is
  * what the inventory list actually filters and totals by.
  */
-export function AddItemForm({ categories }: { categories: readonly CategoryOption[] }) {
+export function AddItemForm({
+  categories,
+  defaultDate,
+}: {
+  categories: readonly CategoryOption[];
+  /** Today in the account's timezone. */
+  defaultDate: string;
+}) {
   const [state, action, pending] = useActionState(saveManualItem, {} as ItemActionState);
 
   return (
@@ -51,7 +58,7 @@ export function AddItemForm({ categories }: { categories: readonly CategoryOptio
         </div>
         <div className="sm:col-span-2">
           <Label htmlFor="item_acquired">Acquired</Label>
-          <Input id="item_acquired" name="acquired_at" type="date" />
+          <Input id="item_acquired" name="acquired_at" type="date" defaultValue={defaultDate} />
         </div>
         <div className="sm:col-span-2">
           <Label htmlFor="item_notes">Notes</Label>

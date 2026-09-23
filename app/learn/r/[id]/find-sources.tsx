@@ -170,6 +170,9 @@ export function FindSources({ readingId }: { readingId: string }) {
   const [chosen, setChosen] = useState<number | null>(null);
 
   if (findState.candidates && findState.candidates.length > 0) {
+    // A single result is already the choice, so it starts picked and Attach is
+    // live. With several, picking one is the decision, so none starts picked.
+    const picked = chosen ?? (findState.candidates.length === 1 ? 0 : null);
     return (
       <form action={attach}>
         <input type="hidden" name="readingId" value={readingId} />
@@ -179,7 +182,7 @@ export function FindSources({ readingId }: { readingId: string }) {
 
         <p className="mb-2 text-body text-ink-muted">
           {findState.candidates.length === 1
-            ? 'One thing worth reading. Nothing is saved until you pick it.'
+            ? 'One thing worth reading. Nothing is saved until you attach it.'
             : `${findState.candidates.length} worth reading. Pick the one for this — nothing is saved until you do.`}
         </p>
 
@@ -189,14 +192,14 @@ export function FindSources({ readingId }: { readingId: string }) {
               key={`${source.title}-${index}`}
               source={source}
               index={index}
-              checked={chosen === index}
+              checked={picked === index}
               onChoose={() => setChosen(index)}
             />
           ))}
         </ul>
 
         <div className="mt-4 flex items-center gap-3">
-          <AttachButton disabled={chosen === null} />
+          <AttachButton disabled={picked === null} />
           {attachState.error && <span className="text-ui text-danger">{attachState.error}</span>}
         </div>
       </form>

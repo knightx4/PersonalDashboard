@@ -139,9 +139,12 @@ export function GameCard({
 
 export function AddGameManualForm({
   barcode,
+  title,
   compact,
 }: {
   barcode?: string | null;
+  /** The name searched for, when the lookup that failed was by name. */
+  title?: string;
   compact?: boolean;
 }) {
   const [state, action, pending] = useActionState(
@@ -167,7 +170,13 @@ export function AddGameManualForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <Label htmlFor="game_title">Title</Label>
-          <Input id="game_title" name="title" required autoComplete="off" />
+          <Input
+            id="game_title"
+            name="title"
+            required
+            autoComplete="off"
+            defaultValue={title ?? ''}
+          />
         </div>
         <div>
           <Label htmlFor="game_publisher">Publisher</Label>
@@ -215,6 +224,7 @@ export function GameSearchForm() {
     saveGame,
     {} as GameActionState,
   );
+  const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<CanonicalGame | null>(null);
   const shown = picked ?? searchState.game ?? null;
 
@@ -238,6 +248,8 @@ export function GameSearchForm() {
           <Input
             id="game_query"
             name="query"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Wingspan, or 0810011725195"
             autoComplete="off"
           />
@@ -261,7 +273,13 @@ export function GameSearchForm() {
         <GameCard game={shown} onSave={save} onPick={setPicked} pending={savePending} />
       )}
       {!shown && searchState.error && (
-        <AddGameManualForm compact barcode={searchState.manualBarcode} />
+        // The name searched for becomes the title, as a scanned barcode
+        // becomes the barcode, so the fallback does not start by retyping.
+        <AddGameManualForm
+          compact
+          barcode={searchState.manualBarcode}
+          title={searchState.manualBarcode ? '' : query.trim()}
+        />
       )}
     </div>
   );

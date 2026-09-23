@@ -10,6 +10,7 @@ import { ReminderActions } from '@/app/jobs/(app)/today/reminder-actions';
 import { CompanyName } from './company-name';
 import { CompanyPanels } from './panels';
 import { RolesList } from './roles-list';
+import { newRoleHref } from './new-role-href';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { loadTasksFor } from '@/lib/todo/links/load';
 
@@ -166,9 +167,21 @@ export default async function CompanyDetailPage({
         }
       />
 
-      <CardSection title="Roles here, across cycles" className="mb-6">
+      <CardSection
+        title="Roles here, across cycles"
+        className="mb-6"
+        action={
+          <Link
+            href={newRoleHref(company.name as string)}
+            className="text-ui text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-ink"
+          >
+            Add a role
+          </Link>
+        }
+      >
         <RolesList
           companyId={company.id as string}
+          companyName={company.name as string}
           timezone={timezone}
           roles={roleRows.map((role) => ({
             id: role.id,

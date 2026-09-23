@@ -10,6 +10,26 @@ import { logTouch, markTouchAnswered, updateContact } from '../actions';
 import type { ContactRow } from '../view';
 
 const CHANNELS = ['linkedin_dm', 'linkedin_connect', 'email', 'intro', 'event', 'other'] as const;
+type Channel = (typeof CHANNELS)[number];
+
+/**
+ * The channel a new send to this person starts on: the one the last send to
+ * them went by, since that is how you reach them. With no sends yet, email
+ * when email is all there is, and a LinkedIn message otherwise.
+ */
+function startingChannel(contact: ContactRow): Channel {
+  const last = contact.touches
+    .filter((touch) => touch.direction === 'outbound')
+    .reduce<ContactRow['touches'][number] | null>(
+      (latest, touch) => (!latest || touch.sentAt > latest.sentAt ? touch : latest),
+      null,
+    );
+  if (last && (CHANNELS as readonly string[]).includes(last.channel)) {
+    return last.channel as Channel;
+  }
+  if (contact.email && !contact.linkedinUrl) return 'email';
+  return 'linkedin_dm';
+}
 
 /**
  * Everything about one person: their details (editable), and the log of
@@ -19,7 +39,7 @@ const CHANNELS = ['linkedin_dm', 'linkedin_connect', 'email', 'intro', 'event', 
 export function ContactDetail({ contact: initial, timezone }: { contact: ContactRow; timezone: string }) {
   const [contact, setContact] = useState(initial);
   const [editing, setEditing] = useState(false);
-  const [channel, setChannel] = useState<(typeof CHANNELS)[number]>('linkedin_dm');
+  const [channel, setChannel] = useState<Channel>(() => startingChannel(initial));
   const [message, setMessage] = useState('');
   const [note, setNote] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

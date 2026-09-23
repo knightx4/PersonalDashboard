@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { newRoleHref } from './new-role-href';
 import Link from 'next/link';
 import { Briefcase, GitMerge } from 'lucide-react';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
@@ -33,10 +34,13 @@ export interface CompanyRoleRow {
  */
 export function RolesList({
   companyId,
+  companyName,
   roles,
   timezone,
 }: {
   companyId: string;
+  /** Carried into the new-role form so it opens with this company filled in. */
+  companyName: string;
   roles: CompanyRoleRow[];
   timezone: string;
 }) {
@@ -53,7 +57,7 @@ export function RolesList({
         icon={Briefcase}
         title="No roles saved at this company yet"
         description="A role you add here is what the inbox links its mail to."
-        action={{ label: 'Add a role', href: '/jobs/roles/new' }}
+        action={{ label: 'Add a role', href: newRoleHref(companyName) }}
         className="border-0 py-8"
       />
     );

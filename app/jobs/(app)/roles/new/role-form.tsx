@@ -26,7 +26,17 @@ function Submit({ label }: { label: string }) {
  * never work — that burying the paste box as a fallback would be dishonest
  * about how the feature actually behaves.
  */
-export function RoleForm({ companies }: { companies: Array<{ name: string }> }) {
+export function RoleForm({
+  companies,
+  defaultCompany = '',
+  defaultDate,
+}: {
+  companies: Array<{ name: string }>;
+  /** Set when the form is opened from a company's page. */
+  defaultCompany?: string;
+  /** Today in the account's timezone: what the action saves when the date is left out. */
+  defaultDate: string;
+}) {
   const [fetchState, fetchAction] = useActionState<RoleFormState, FormData>(
     fetchJobDescription,
     {},
@@ -34,6 +44,8 @@ export function RoleForm({ companies }: { companies: Array<{ name: string }> }) 
   const [createState, createAction] = useActionState<RoleFormState, FormData>(createRole, {});
 
   const [jdUrl, setJdUrl] = useState('');
+  // A lead has not been applied to, so its date field stands down.
+  const [lead, setLead] = useState(false);
 
   /*
    * The fetched posting fills the fields by REMOUNTING them, not by syncing
@@ -94,7 +106,13 @@ export function RoleForm({ companies }: { companies: Array<{ name: string }> }) 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <Field id="companyName" label="Company">
-              <Input name="companyName" list="known-companies" required placeholder="Ramp" />
+              <Input
+                name="companyName"
+                list="known-companies"
+                required
+                defaultValue={defaultCompany}
+                placeholder="Ramp"
+              />
             </Field>
             <datalist id="known-companies">
               {companies.map((company) => (
@@ -135,7 +153,7 @@ export function RoleForm({ companies }: { companies: Array<{ name: string }> }) 
           </Field>
 
           <Field id="submittedAt" label="Date applied">
-            <Input name="submittedAt" type="date" />
+            <Input name="submittedAt" type="date" defaultValue={defaultDate} disabled={lead} />
           </Field>
 
           <Field id="excitement" label="Excitement">
@@ -167,7 +185,13 @@ export function RoleForm({ companies }: { companies: Array<{ name: string }> }) 
         </Field>
 
         <label className="flex items-center gap-2 text-ui text-ink">
-          <input type="checkbox" name="saveAsLead" className="size-4 rounded border-border" />
+          <input
+            type="checkbox"
+            name="saveAsLead"
+            checked={lead}
+            onChange={(event) => setLead(event.target.checked)}
+            className="size-4 rounded border-border"
+          />
           Save as a lead — I have not applied yet
         </label>
 
