@@ -39,6 +39,8 @@ import {
  * are kept in obsidian.position_pairs and each call searches only up to 100
  * positions not yet searched as they stand, so a call stays near a second
  * rather than the eleven that PostgREST's eight-second timeout cancelled.
+ * Since 0018 (plan #882) the pair a proposal leads to after one of its sides
+ * was absorbed, the survivor and the other side, is offered first.
  *
  * The model judges against the node test from position-prompt.ts, so a claim
  * and its qualification, which pass that test separately, stay two positions.

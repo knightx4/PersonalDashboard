@@ -144,11 +144,11 @@ export const APPLY_CALL_BUDGET_MS = 4_000;
 /**
  * Merge every `same` proposal of one kind that has not been applied yet
  * (plan #820), by calling obsidian.apply_merge_proposals until nothing is
- * left or the deadline passes. The function merges a theme proposal only
- * while both of its themes are still there (plan #878), marking one with a
- * side absorbed since; it still follows a position's sides through earlier
- * merges. It skips a pair whose merge was undone, and marks every proposal it
- * looks at with the outcome, so a call that is cut off loses nothing.
+ * left or the deadline passes. The function merges a proposal only while
+ * both of the rows it compared are still there (plans #878 for themes, #882
+ * for positions), marking one with a side absorbed since. It skips a pair
+ * whose merge was undone, and marks every proposal it looks at with the
+ * outcome, so a call that is cut off loses nothing.
  *
  * Needs the service-role client: the function is not granted to a signed-in
  * caller. `userId` null applies every owner's proposals.
