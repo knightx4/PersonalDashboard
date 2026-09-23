@@ -2,7 +2,15 @@ import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import { ACTION_FROM, FEED_PAGE, toFeedCard, type FeedAction, type FeedCard, type FeedCardRow } from './card';
+import {
+  ACTION_FROM,
+  FEED_PAGE,
+  RETURN_AFTER_DAYS,
+  toFeedCard,
+  type FeedAction,
+  type FeedCard,
+  type FeedCardRow,
+} from './card';
 
 /**
  * Reading and marking Learn now cards through the person's own session
@@ -11,37 +19,61 @@ import { ACTION_FROM, FEED_PAGE, toFeedCard, type FeedAction, type FeedCard, typ
  */
 
 const CARD_SELECT =
-  'id, reason, status, summary, why, ' +
+  'id, reason, status, summary, why, hook, example, check_question, check_answer, depth, ' +
   'item:catalogue_items!feed_cards_item_id_fkey(title, canonical_url, licence), ' +
   'segment:catalogue_segments!feed_cards_segment_id_fkey(heading, text, section_anchor)';
 
 /** The most card ids a request excludes. Past this, the oldest shown come back. */
 const MAX_EXCLUDED = 300;
 
+/** When a card swiped with `status` last acted on before this may come back. */
+function returnCutoff(status: 'review' | 'skipped', now: number): string {
+  return new Date(now - RETURN_AFTER_DAYS[status] * 24 * 60 * 60 * 1000).toISOString();
+}
+
 /**
- * The next ready cards, newest first, leaving out the ones already on the
- * screen. Newest first so a card the top-up has just written comes up before
- * one you passed on an earlier visit.
+ * The next cards for the deck, leaving out the ones already on the screen.
+ *
+ * Cards you swiped "work on this" come first once their two days are up, then
+ * the ready cards newest first, so a card the top-up has just written comes
+ * up before one you passed on an earlier visit, then cards you skipped once
+ * their three days are up.
+ *
+ * Only cards with a hook: a card written before cards carried one is the
+ * summary-only card the owner asked to stop seeing (LEARN-NOW-SPEC, "Cards
+ * after the first week").
  */
 export async function loadFeedPage(
   supabase: LearnSupabaseClient,
   exclude: string[],
   limit: number = FEED_PAGE,
+  now: number = Date.now(),
 ): Promise<FeedCard[]> {
-  let query = supabase
-    .from('feed_cards')
-    .select(CARD_SELECT)
-    .eq('status', 'ready')
-    .order('written_at', { ascending: false, nullsFirst: false })
-    .order('id')
-    .limit(limit);
   const skip = exclude.slice(-MAX_EXCLUDED);
-  if (skip.length > 0) query = query.not('id', 'in', `(${skip.join(',')})`);
+  const read = async (
+    status: 'ready' | 'review' | 'skipped',
+    count: number,
+    taken: string[],
+  ): Promise<FeedCardRow[]> => {
+    if (count <= 0) return [];
+    let query = supabase.from('feed_cards').select(CARD_SELECT).eq('status', status).not('hook', 'is', null);
+    query =
+      status === 'ready'
+        ? query.order('written_at', { ascending: false, nullsFirst: false })
+        : query.lt('acted_at', returnCutoff(status, now)).order('acted_at', { ascending: true });
+    const leaveOut = [...skip, ...taken];
+    if (leaveOut.length > 0) query = query.not('id', 'in', `(${leaveOut.join(',')})`);
+    const { data, error } = await query.order('id').limit(count);
+    assertSchemaExposed(error, LEARN_SCHEMA);
+    if (error) throw new Error(`Reading your cards failed: ${error.message}`);
+    return (data ?? []) as unknown as FeedCardRow[];
+  };
 
-  const { data, error } = await query;
-  assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw new Error(`Reading your cards failed: ${error.message}`);
-  return ((data ?? []) as unknown as FeedCardRow[]).flatMap((row) => {
+  const rows: FeedCardRow[] = [];
+  for (const status of ['review', 'ready', 'skipped'] as const) {
+    rows.push(...(await read(status, limit - rows.length, rows.map((row) => row.id))));
+  }
+  return rows.flatMap((row) => {
     const card = toFeedCard(row);
     return card ? [card] : [];
   });
@@ -52,7 +84,8 @@ export async function countReadyCards(supabase: LearnSupabaseClient): Promise<nu
   const { count, error } = await supabase
     .from('feed_cards')
     .select('id', { count: 'exact', head: true })
-    .eq('status', 'ready');
+    .eq('status', 'ready')
+    .not('hook', 'is', null);
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) return 0;
   return count ?? 0;

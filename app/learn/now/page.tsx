@@ -33,8 +33,8 @@ export const maxDuration = 300;
  * Read it. Nothing on it asks you a question before you can read, and all the
  * rest is on the reading's own page, one click away.
  *
- * Then the cards the app wrote, one after another (`./feed.tsx`), loaded a
- * few at a time as you scroll.
+ * Then the cards the app wrote, one at a time (`./feed.tsx`), with the next
+ * few already loaded behind the one on screen.
  */
 export default async function LearnNowPage() {
   const user = await requireUser();
@@ -54,8 +54,8 @@ export default async function LearnNowPage() {
         title="Learn now"
         description={
           readings.length === 0
-            ? 'Something worth reading next, one after another.'
-            : 'What you said you would read next, then something new.'
+            ? 'One card at a time. Swipe down if you know it, right to work on it, left for later.'
+            : 'What you said you would read next, then one card at a time.'
         }
       />
 

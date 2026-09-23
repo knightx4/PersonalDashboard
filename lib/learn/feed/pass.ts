@@ -1,4 +1,5 @@
 import type { WikipediaArticle, WikipediaResult, WikipediaSection } from '@/lib/learn/providers/wikipedia';
+import { contextFor, NO_PROGRESS, type Depth, type DepthContext, type DepthProgress } from './depth';
 import type { NameResult, NamedSection } from './name-material';
 import { createDrawer, wantsGap, type DrawInput, type FeedTarget } from './targets';
 
@@ -15,8 +16,12 @@ import { createDrawer, wantsGap, type DrawInput, type FeedTarget } from './targe
  * model or the web; `inngest/learn/feed-picks.ts` supplies the real ones.
  * A title Wikipedia does not have is dropped, which is the check the spec
  * asks for before anything is stored. A named section the fetched article
- * does not have falls back to the article's lead, so a real article with a
- * guessed heading still yields a card rather than nothing.
+ * does not have is dropped too. It used to fall back to the article's lead,
+ * and the lead of a broad article is the definition the owner already knows
+ * (LEARN-NOW-SPEC, "Cards after the first week").
+ *
+ * Each target is named at a depth worked out from the person's swipes on it
+ * (`depth.ts`), and the pick carries that depth so the card writer knows it.
  */
 
 /** Targets drawn per person per call. At two or three picks each, about ten picks. */
@@ -27,6 +32,8 @@ export type PersonInputs = Omit<DrawInput, 'random'> & {
   picked: { interest: number; gap: number };
   /** Articles this person already has cards from, most recent first. */
   articlesHeld: string[];
+  /** What they swiped known and review, per theme and field. None when left out. */
+  progress?: DepthProgress;
 };
 
 export type FeedCardInsert = {
@@ -41,11 +48,12 @@ export type FeedCardInsert = {
   named_section: string | null;
   pick_basis: string;
   pick_model: string;
+  depth: Depth;
 };
 
 export type FeedPickPorts = {
   loadPerson(userId: string): Promise<PersonInputs>;
-  name(target: FeedTarget, avoid: string[]): Promise<NameResult>;
+  name(target: FeedTarget, avoid: string[], depth: DepthContext): Promise<NameResult>;
   fetchArticle(title: string): Promise<WikipediaResult>;
   storeArticle(article: WikipediaArticle): Promise<{ itemId: string; segments: { id: string; ordinal: number }[] }>;
   /** Insert one row; 'duplicate' when this person already has the section. */
@@ -61,8 +69,8 @@ export type FeedPickSummary = {
   picked: { interest: number; gap: number };
   /** Titles the model named that Wikipedia does not have. */
   notFound: string[];
-  /** Named sections that were not in the article, so the lead was used. */
-  fellBackToLead: number;
+  /** Named sections that were not in the article, so the pick was dropped. */
+  sectionMissing: number;
   duplicates: number;
   failed: string[];
 };
@@ -113,6 +121,7 @@ async function pickOne(
   target: FeedTarget,
   named: NamedSection,
   model: string,
+  depth: Depth,
   summary: FeedPickSummary,
 ): Promise<boolean> {
   const article = await ports.fetchArticle(named.article);
@@ -127,7 +136,10 @@ async function pickOne(
     summary.notFound.push(named.article);
     return false;
   }
-  if (!match.matched) summary.fellBackToLead += 1;
+  if (!match.matched) {
+    summary.sectionMissing += 1;
+    return false;
+  }
 
   const stored = await ports.storeArticle(article);
   const segment = stored.segments.find((row) => row.ordinal === match.section.ordinal);
@@ -148,6 +160,7 @@ async function pickOne(
     named_section: named.section,
     pick_basis: named.basis,
     pick_model: model,
+    depth,
   });
   if (outcome === 'duplicate') {
     summary.duplicates += 1;
@@ -170,7 +183,7 @@ export async function runFeedPicksFor(
     targets: [],
     picked: { interest: 0, gap: 0 },
     notFound: [],
-    fellBackToLead: 0,
+    sectionMissing: 0,
     duplicates: 0,
     failed: [],
   };
@@ -181,7 +194,13 @@ export async function runFeedPicksFor(
     if (!target) break;
     summary.targets.push({ reason: target.reason, name: targetName(target) });
 
-    const named = await ports.name(target, avoid);
+    const depth = contextFor(
+      person.progress ?? NO_PROGRESS,
+      target.reason === 'interest'
+        ? { reason: 'interest', themeId: target.theme.id }
+        : { reason: 'gap', fieldId: target.field.id },
+    );
+    const named = await ports.name(target, avoid, depth);
     if (!named.ok) {
       summary.failed.push(`${targetName(target)}: ${named.detail}`);
       continue;
@@ -190,7 +209,7 @@ export async function runFeedPicksFor(
     for (const pick of named.named) {
       avoid.unshift(pick.article);
       try {
-        if (await pickOne(ports, userId, target, pick, options.model, summary)) {
+        if (await pickOne(ports, userId, target, pick, options.model, depth.depth, summary)) {
           counts[target.reason] += 1;
           summary.picked[target.reason] += 1;
         }

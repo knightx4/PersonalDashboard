@@ -4,16 +4,24 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { describeDepth, type Depth } from './depth';
 
 /**
  * Writing one Learn now card from its fetched section (LEARN-NOW-SPEC, "How
  * cards are made", step 4; plan #807).
  *
  * One call per picked row. The model reads the section as it was stored from
- * Wikipedia and reports two things: whether the section serves the target it
- * was picked for, and a summary of three or four sentences written from that
- * text alone. A section that does not serve the target is dropped and no card
- * is made.
+ * Wikipedia and reports whether the section serves the target it was picked
+ * for, at the depth it was picked at. When it does, the model writes the
+ * card's teaching parts (LEARN-NOW-SPEC, "Cards after the first week"):
+ *
+ *   hook      the most interesting thing in the section, stated concretely
+ *   summary   what the section says, from its text alone
+ *   example   the idea applied to a real case or a worked number
+ *   question  one question that makes you use the idea, and its answer
+ *
+ * A section that does not serve the target, or only restates basics the
+ * person is past, is dropped and no card is made.
  *
  * The why line is not the model's. The spec fixes what it says (the field, and
  * either the theme or the gap), so it is built here from the row, and a card
@@ -34,6 +42,12 @@ export const MAX_SECTION_CHARS = 24_000;
 
 /** A summary longer than this is not three or four sentences. */
 const MAX_SUMMARY_CHARS = 1_200;
+/** The hook is one or two sentences. */
+const MAX_HOOK_CHARS = 400;
+/** The example is two to four sentences, and a worked number can run long. */
+const MAX_EXAMPLE_CHARS = 1_000;
+const MAX_QUESTION_CHARS = 400;
+const MAX_ANSWER_CHARS = 800;
 
 const TOOL_NAME = 'report_card';
 
@@ -54,11 +68,21 @@ export type CardToWrite = {
   /** The section heading, or null for the lead. */
   section: string | null;
   text: string;
+  /** The level the pick was made at. Null for a pick made before depth existed. */
+  depth: Depth | null;
 };
 
-export type CardReport =
-  | { verdict: 'ready'; summary: string }
-  | { verdict: 'dropped'; reason: string };
+/** What a ready card carries besides its why line. */
+export type CardParts = {
+  hook: string;
+  summary: string;
+  example: string;
+  /** Both set, or both null: a question with no answer to check against is left off. */
+  question: string | null;
+  answer: string | null;
+};
+
+export type CardReport = ({ verdict: 'ready' } & CardParts) | { verdict: 'dropped'; reason: string };
 
 /**
  * What writing one card came to.
@@ -68,7 +92,7 @@ export type CardReport =
  * the model did answer ends in `ready` or `dropped`.
  */
 export type WriteResult =
-  | { outcome: 'ready'; summary: string; why: string }
+  | ({ outcome: 'ready'; why: string } & CardParts)
   | { outcome: 'dropped'; reason: string }
   | { outcome: 'failed'; detail: string };
 
@@ -95,36 +119,51 @@ export function whyLine(card: Pick<CardToWrite, 'reason' | 'themeName' | 'field'
     : `A field you write about but have never been tested in: ${field}.`;
 }
 
-const SYSTEM = `You write the cards in a reading feed. Each card is one section of an English Wikipedia article, picked for one person.
+const SYSTEM = `You write the cards in a learning feed. Each card is one section of an English Wikipedia article, picked for one person. The person found the first version of this feed dull: it summarised sections and so mostly restated definitions they already knew. Your job is to make each card teach something.
 
-You are given what the section was picked for and the section's text. Do two things.
+You are given what the section was picked for, how deep to pitch it, and the section's text.
 
-1. Decide whether the section serves what it was picked for. For a theme from the person's notes, it has to teach something about the ideas behind that theme. For a field they have never studied, it has to be a sensible first read in that field. Say it does not when the text is about something else, is a list of links, names or references, or is too thin to learn anything from.
+1. Decide whether the section serves what it was picked for at that depth. Say it does not when the text is about something else, is a list of links, names or references, is too thin to learn anything from, or only defines terms and restates basics the person is past.
 
-2. When it does, write a summary of three or four sentences that tells the person what they will learn if they read it.
+2. When it does, write four parts.
 
-The summary:
-- Uses only what the text says. Add nothing from memory, even when you know more about the subject.
-- States the section's content directly. Do not open with "This section" or "The article", and do not address the reader.
-- Is plain: no slogans, no rhetorical questions, no "not X, but Y" contrasts, no dashes used for rhythm.
+hook: One or two sentences, first on the card. The most interesting, useful or surprising thing in the section, stated concretely: a number, a named case, a consequence, a result that goes against intuition. Never a definition. Never "X is a Y that...".
+
+summary: Two or three sentences on what the section explains, using only what the text says. Add nothing from memory here.
+
+example: Two to four sentences applying the idea to one specific situation: a real event, firm, experiment or policy, or a worked calculation with numbers. You may draw on what you know for this part, but only what is well established; name the case specifically and do not invent figures you are unsure of. If the idea has an obvious everyday application, prefer a less obvious one.
+
+question and answer: One question that makes the person use the idea on a situation, predict an outcome, or explain why something happens. Never ask them to recall a definition or a date. The answer is two or three sentences, and says why.
+
+Style for every part: plain sentences. No slogans, no rhetorical questions outside the question field, no "not X, but Y" contrasts, no dashes used for rhythm. Do not open with "This section" or "The article", and do not address the reader as "you" outside the question.
 
 Report through ${TOOL_NAME}.`;
 
 const payloadSchema = z.object({
   fit: z.string(),
   matches: z.boolean(),
+  hook: z.string().nullable().optional(),
   summary: z.string().nullable().optional(),
+  example: z.string().nullable().optional(),
+  question: z.string().nullable().optional(),
+  answer: z.string().nullable().optional(),
 });
 
 /** What the model is told the section was picked for. Exported for the test. */
 export function describePick(card: CardToWrite): string {
   const field = `${card.field.name}. ${card.field.scope}`;
-  if (card.reason === 'interest' && card.themeName) {
-    return `Picked for a theme from their notes: ${card.themeName}. The field it sits in: ${field}`;
-  }
-  return card.gap === 'untouched'
-    ? `Picked as a first read in a field they have never studied: ${field}`
-    : `Picked as a first read in a field they write about and have never been tested in: ${field}`;
+  const pick =
+    card.reason === 'interest' && card.themeName
+      ? `Picked for a theme from their notes: ${card.themeName}. The field it sits in: ${field}`
+      : card.gap === 'untouched'
+        ? `Picked as a way into a field they have never studied: ${field}`
+        : `Picked as a way into a field they write about and have never been tested in: ${field}`;
+  return `${pick}\nHow deep to go: ${describeDepth(card.depth ?? 'working')}`;
+}
+
+/** Collapse whitespace; null for nothing. */
+function clean(value: string | null | undefined): string {
+  return (value ?? '').replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -144,12 +183,36 @@ export function readCardReport(input: unknown): CardReport {
     return { verdict: 'dropped', reason: fit || 'The section does not serve what it was picked for.' };
   }
 
-  const summary = (parsed.data.summary ?? '').replace(/\s+/g, ' ').trim();
+  const summary = clean(parsed.data.summary);
+  const hook = clean(parsed.data.hook);
+  const example = clean(parsed.data.example);
   if (!summary) return { verdict: 'dropped', reason: 'The report matched the section but wrote no summary.' };
   if (summary.length > MAX_SUMMARY_CHARS) {
     return { verdict: 'dropped', reason: `The summary ran to ${summary.length} characters.` };
   }
-  return { verdict: 'ready', summary };
+  // A card with no hook or no example is the old card again, which is the
+  // thing the owner asked to stop seeing.
+  if (!hook || hook.length > MAX_HOOK_CHARS) {
+    return { verdict: 'dropped', reason: hook ? `The hook ran to ${hook.length} characters.` : 'The report wrote no hook.' };
+  }
+  if (!example || example.length > MAX_EXAMPLE_CHARS) {
+    return {
+      verdict: 'dropped',
+      reason: example ? `The example ran to ${example.length} characters.` : 'The report wrote no example.',
+    };
+  }
+
+  const question = clean(parsed.data.question);
+  const answer = clean(parsed.data.answer);
+  const asked = question && answer && question.length <= MAX_QUESTION_CHARS && answer.length <= MAX_ANSWER_CHARS;
+  return {
+    verdict: 'ready',
+    hook,
+    summary,
+    example,
+    question: asked ? question : null,
+    answer: asked ? answer : null,
+  };
 }
 
 /** The user message: what it was picked for, then the section. Exported for the test. */
@@ -188,7 +251,7 @@ export async function writeCard(input: {
   try {
     response = await client.messages.create({
       model: WRITE_CARD_MODEL,
-      max_tokens: 1024,
+      max_tokens: 2048,
       system: SYSTEM,
       tools: [
         {
@@ -199,15 +262,32 @@ export async function writeCard(input: {
             properties: {
               fit: {
                 type: 'string',
-                description: 'One sentence on what the section covers and whether it serves what it was picked for.',
+                description:
+                  'One sentence on what the section covers and whether it serves what it was picked for at that depth.',
               },
               matches: { type: 'boolean' },
+              hook: {
+                type: ['string', 'null'],
+                description: 'One or two concrete sentences: the most interesting thing in it. Null when it does not match.',
+              },
               summary: {
                 type: ['string', 'null'],
-                description: 'Three or four sentences from the text alone. Null when it does not match.',
+                description: 'Two or three sentences from the text alone. Null when it does not match.',
+              },
+              example: {
+                type: ['string', 'null'],
+                description: 'The idea applied to one specific case or a worked number. Null when it does not match.',
+              },
+              question: {
+                type: ['string', 'null'],
+                description: 'One question that makes them use the idea. Null when it does not match.',
+              },
+              answer: {
+                type: ['string', 'null'],
+                description: 'The answer, with why, in two or three sentences. Null when it does not match.',
               },
             },
-            required: ['fit', 'matches', 'summary'],
+            required: ['fit', 'matches', 'hook', 'summary', 'example', 'question', 'answer'],
           },
         },
       ],
@@ -227,5 +307,13 @@ export async function writeCard(input: {
 
   const report = readCardReport(block.input);
   if (report.verdict === 'dropped') return { outcome: 'dropped', reason: report.reason };
-  return { outcome: 'ready', summary: report.summary, why: whyLine(card) };
+  return {
+    outcome: 'ready',
+    hook: report.hook,
+    summary: report.summary,
+    example: report.example,
+    question: report.question,
+    answer: report.answer,
+    why: whyLine(card),
+  };
 }

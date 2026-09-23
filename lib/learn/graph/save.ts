@@ -123,7 +123,7 @@ export async function saveChain(
    * track then takes that theme's placement in the areas rather than asking
    * the model for one.
    */
-  options: { goal?: boolean; origin?: ConceptOrigin; theme?: TrackTheme } = {},
+  options: { goal?: boolean; origin?: ConceptOrigin; theme?: TrackTheme; unitId?: string | null } = {},
 ): Promise<SavedChain> {
   const { id: subjectId, placed } = await findOrCreateSubject(supabase, userId, chain.subject);
 
@@ -243,6 +243,8 @@ export async function saveChain(
       // Approved by the person who is looking at it, which is what makes it
       // active rather than proposed.
       status: 'active',
+      // The curriculum unit it was opened from, when it was.
+      unit_id: options.unitId ?? null,
     })
     .select('id')
     .single();

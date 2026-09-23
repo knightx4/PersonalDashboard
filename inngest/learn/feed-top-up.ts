@@ -12,6 +12,7 @@ import {
   type TopUpPorts,
   type TopUpSummary,
 } from '@/lib/learn/feed/top-up';
+import type { Depth } from '@/lib/learn/feed/depth';
 import { WRITE_CARD_MODEL, writeCard, type CardToWrite } from '@/lib/learn/feed/write-card';
 import type { LearnOperation } from '@/lib/learn/spend';
 import { createFeedPicker, loadFeedFields, peopleWithThemes } from './feed-picks';
@@ -45,6 +46,7 @@ type PickedRow = {
   theme_name: string | null;
   field_id: string | null;
   named_article: string | null;
+  depth: Depth | null;
   item: { title: string } | null;
   segment: { heading: string | null; text: string } | null;
   field: { name: string; scope: string } | null;
@@ -55,7 +57,11 @@ async function countReady(learn: LearnSupabaseClient, userId: string): Promise<n
     .from('feed_cards')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .eq('status', 'ready');
+    .eq('status', 'ready')
+    // Cards written before they carried a hook are no longer shown, so they
+    // do not count towards the twenty (LEARN-NOW-SPEC, "Cards after the
+    // first week").
+    .not('hook', 'is', null);
   if (error) throw new Error(`Counting your ready cards failed: ${error.message}`);
   return count ?? 0;
 }
@@ -80,7 +86,7 @@ async function loadPicked(
   const { data, error } = await learn
     .from('feed_cards')
     .select(
-      'id, reason, theme_name, field_id, named_article, ' +
+      'id, reason, theme_name, field_id, named_article, depth, ' +
         'item:catalogue_items!feed_cards_item_id_fkey(title), ' +
         'segment:catalogue_segments!feed_cards_segment_id_fkey(heading, text), ' +
         'field:area_fields!feed_cards_field_id_fkey(name, scope)',
@@ -103,6 +109,7 @@ async function loadPicked(
         article: row.item?.title ?? row.named_article ?? 'Wikipedia',
         section: row.segment.heading,
         text: row.segment.text,
+        depth: row.depth,
       },
     ];
   });
@@ -154,7 +161,17 @@ async function topUpWith(
       const written_at = new Date().toISOString();
       const change =
         result.outcome === 'ready'
-          ? { status: 'ready', summary: result.summary, why: result.why, write_model: WRITE_CARD_MODEL, written_at }
+          ? {
+              status: 'ready',
+              hook: result.hook,
+              summary: result.summary,
+              example: result.example,
+              check_question: result.question,
+              check_answer: result.answer,
+              why: result.why,
+              write_model: WRITE_CARD_MODEL,
+              written_at,
+            }
           : { status: 'dropped', drop_reason: result.reason, write_model: WRITE_CARD_MODEL, written_at };
       // Only a row still picked: a second top-up running at the same time
       // may have written it already, and its card stands.

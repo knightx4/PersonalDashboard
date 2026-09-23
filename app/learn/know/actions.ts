@@ -13,6 +13,7 @@ import {
   MAX_BRIEFING_CHARS,
 } from '@/lib/learn/graph/from-brief';
 import { declareKnown, existingConcepts, saveChain } from '@/lib/learn/graph/save';
+import { ensureCurriculum, fileGoalUnder } from '@/lib/learn/graph/curriculum-store';
 import { loadSubject, loadSubjects } from '@/lib/learn/graph/load';
 import { nameOpeningClaims } from '@/lib/learn/graph/opening-claims';
 import { MIN_CLAIMS } from '@/lib/learn/graph/opening-payload';
@@ -54,6 +55,8 @@ export type ProposeState = {
   chain?: ProposedChain;
   /** The words that were typed, kept for the approval that follows. */
   asked?: string;
+  /** The curriculum unit this goal opens, carried to the approval. */
+  unitId?: string;
 };
 
 export type ApproveState = { error?: string };
@@ -67,7 +70,14 @@ const ProposeInput = z.object({
   subjectId: z.string().uuid().nullable(),
   /** Set once the opening questions have been asked, so they are not asked twice. */
   sweepId: z.string().uuid().nullable(),
+  /** The curriculum unit being opened, when the goal came from one. */
+  unitId: z.string().uuid().nullable(),
 });
+
+/** A form field that is either a uuid or left empty. */
+function optionalId(value: FormDataEntryValue | null): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
 
 /** The answered questions from a sweep, as generation reads them. */
 function sweptClaims(sweep: OpeningSweep | null): SweptClaim[] {
@@ -142,6 +152,7 @@ export async function proposeGoal(
     goal: formData.get('goal') ?? '',
     subjectId: typeof raw === 'string' && raw.length > 0 ? raw : null,
     sweepId: typeof sweptRaw === 'string' && sweptRaw.length > 0 ? sweptRaw : null,
+    unitId: optionalId(formData.get('unitId')),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Could not read that goal.' };
@@ -187,7 +198,7 @@ export async function proposeGoal(
   await recordLearnSpend(user.id, 'generate-chain', spend.reports);
 
   if (!result.ok) return { error: result.detail };
-  return { chain: result.chain, asked: parsed.data.goal };
+  return { chain: result.chain, asked: parsed.data.goal, unitId: parsed.data.unitId ?? undefined };
 }
 
 // latency: pending
@@ -220,14 +231,38 @@ export async function approveChain(
 
   const sweptRaw = formData.get('sweepId');
   const sweepId = typeof sweptRaw === 'string' && sweptRaw.length > 0 ? sweptRaw : null;
+  const unit = z.string().uuid().safeParse(formData.get('unitId'));
+  const unitId = unit.success ? unit.data : null;
 
   const supabase = await createLearnClient();
   let subjectId: string;
+  let goalId: string | null;
   try {
-    const saved = await saveChain(supabase, user.id, safe.data as ProposedChain, asked.data);
+    const saved = await saveChain(supabase, user.id, safe.data as ProposedChain, asked.data, { unitId });
     subjectId = saved.subjectId;
+    goalId = saved.goalId;
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Could not save that chain.' };
+  }
+
+  // A track gets its curriculum the first time a chain is approved into it
+  // (LEARN-GRAPH-SPEC, "The curriculum"), and the goal just approved is filed
+  // under the unit it falls in. A failure here costs the track its curriculum
+  // for now, never the chain: the track page offers to write it again.
+  if (!unitId) {
+    try {
+      const curriculum = await ensureCurriculum(
+        supabase,
+        user.id,
+        { id: subjectId, name: (safe.data as ProposedChain).subject },
+        asked.data,
+      );
+      if (curriculum.ok && curriculum.goalUnitId && goalId) {
+        await fileGoalUnder(supabase, goalId, curriculum.goalUnitId);
+      }
+    } catch (error) {
+      console.error('[learn curriculum]', error instanceof Error ? error.message : error);
+    }
   }
 
   // What they showed before any of this was laid out becomes the state the

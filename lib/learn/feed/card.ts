@@ -15,6 +15,11 @@ export type FeedCardRow = {
   status: string;
   summary: string | null;
   why: string | null;
+  hook?: string | null;
+  example?: string | null;
+  check_question?: string | null;
+  check_answer?: string | null;
+  depth?: string | null;
   item: { title: string; canonical_url: string; licence: string | null } | null;
   segment: { heading: string | null; text: string; section_anchor: string | null } | null;
 };
@@ -27,7 +32,18 @@ export type FeedCard = {
   article: string;
   section: string | null;
   why: string;
+  /** The most interesting thing in the section, first on the card. */
+  hook: string | null;
   summary: string;
+  /** The idea applied to a specific case. */
+  example: string | null;
+  /** A question to try, and its answer behind a tap. Both or neither. */
+  question: string | null;
+  answer: string | null;
+  /** How deep the pick was pitched, said on the card. */
+  depth: 'working' | 'advanced' | 'specialist' | null;
+  /** Set when the card is back after a skip or a "work on this" swipe. */
+  returning: 'review' | 'skipped' | null;
   /** The paragraphs shown before "Read the rest". */
   shown: string[];
   /** The paragraphs behind it. Empty when the section is short enough to show whole. */
@@ -160,7 +176,13 @@ export function toFeedCard(row: FeedCardRow): FeedCard | null {
     article: row.item.title,
     section: row.segment.heading,
     why: row.why,
+    hook: row.hook?.trim() || null,
     summary: row.summary,
+    example: row.example?.trim() || null,
+    question: row.check_question && row.check_answer ? row.check_question : null,
+    answer: row.check_question && row.check_answer ? row.check_answer : null,
+    depth: row.depth === 'working' || row.depth === 'advanced' || row.depth === 'specialist' ? row.depth : null,
+    returning: row.status === 'review' || row.status === 'skipped' ? row.status : null,
     shown,
     rest,
     restMinutes,
@@ -171,7 +193,18 @@ export function toFeedCard(row: FeedCardRow): FeedCard | null {
 }
 
 /** The deliberate actions a card records (LEARN-NOW-SPEC "What is recorded"). */
-export type FeedAction = 'opened' | 'saved' | 'dismissed' | 'tested';
+export type FeedAction = 'opened' | 'saved' | 'dismissed' | 'tested' | SwipeAction;
+
+/**
+ * The three swipes (LEARN-NOW-SPEC, "Cards after the first week"): down for
+ * "I'm good on this", right for "I need to work on this", left for "not now".
+ */
+export type SwipeAction = 'known' | 'review' | 'skipped';
+
+export const SWIPES: readonly SwipeAction[] = ['known', 'review', 'skipped'];
+
+/** Days a card waits before it comes back, after each swipe that brings one back. */
+export const RETURN_AFTER_DAYS: Record<Exclude<SwipeAction, 'known'>, number> = { review: 2, skipped: 3 };
 
 /**
  * The statuses each action may move a card from.
@@ -180,14 +213,24 @@ export type FeedAction = 'opened' | 'saved' | 'dismissed' | 'tested';
  * already saved leaves it saved. The other three may follow an open, since
  * reading the source is often how you decide to save it or to be tested on it.
  * Test me may also follow a Save, and the card keeps `saved_reading_id`, so
- * both are still readable. Otherwise nothing moves a card that was saved,
- * dismissed or tested: the first decision stands.
+ * both are still readable. Not interested and Test me are final: nothing moves
+ * a card out of `dismissed` or `tested`.
+ *
+ * The swipes are not final. Each card on the deck is left by a swipe, so a
+ * card you opened or saved is swiped too, and a card that came back after a
+ * skip or a "work on this" can be swiped again.
  */
 export const ACTION_FROM: Record<FeedAction, readonly string[]> = {
   opened: ['ready'],
-  saved: ['ready', 'opened'],
-  dismissed: ['ready', 'opened'],
-  tested: ['ready', 'opened', 'saved'],
+  saved: ['ready', 'opened', 'review', 'skipped'],
+  dismissed: ['ready', 'opened', 'review', 'skipped'],
+  tested: ['ready', 'opened', 'saved', 'review', 'skipped'],
+  // A card that came back after a skip or a "work on this" can be swiped
+  // again, and one you saved or opened can still be marked known. Swiping is
+  // how you leave a card, so a saved card is swiped off the screen as well.
+  known: ['ready', 'opened', 'saved', 'review', 'skipped'],
+  review: ['ready', 'opened', 'saved', 'review', 'skipped'],
+  skipped: ['ready', 'opened', 'saved', 'review', 'skipped'],
 };
 
 /** Append a page of cards, skipping any already on the screen. */
@@ -196,8 +239,11 @@ export function appendCards(current: FeedCard[], incoming: FeedCard[]): FeedCard
   return [...current, ...incoming.filter((card) => !seen.has(card.id))];
 }
 
-/** Cards loaded at a time: the first screen, and each time the last comes into view. */
-export const FEED_PAGE = 5;
+/** Cards loaded at a time: the first deck, and each time it runs low. */
+export const FEED_PAGE = 6;
+
+/** Cards still ahead in the deck when the next page is asked for. */
+export const PRELOAD_AHEAD = 4;
 
 /**
  * What the foot of the feed says once a page came back short.

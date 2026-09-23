@@ -8,6 +8,8 @@ import { recordSpend } from '@/lib/core/spend/record';
 import { loadAreas } from '@/lib/learn/areas/load';
 import { storeArticleOverRest } from '@/lib/learn/catalogue/store-rest';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { cardTitle } from '@/lib/learn/feed/card';
+import { progressFrom } from '@/lib/learn/feed/depth';
 import { NAME_MATERIAL_MODEL, nameMaterial } from '@/lib/learn/feed/name-material';
 import {
   runFeedPicksFor,
@@ -77,6 +79,9 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
     created_at: string;
     status: string;
     saved_reading_id: string | null;
+    acted_at: string | null;
+    item: { title: string } | null;
+    segment: { heading: string | null } | null;
   };
 
   const [placements, themes, cards, tests] = await Promise.all([
@@ -100,7 +105,11 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
       (from, to) =>
         learn
           .from('feed_cards')
-          .select('reason, theme_id, field_id, named_article, created_at, status, saved_reading_id')
+          .select(
+            'reason, theme_id, field_id, named_article, created_at, status, saved_reading_id, acted_at, ' +
+              'item:catalogue_items!feed_cards_item_id_fkey(title), ' +
+              'segment:catalogue_segments!feed_cards_segment_id_fkey(heading)',
+          )
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
           .range(from, to),
@@ -129,13 +138,39 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
   const recentThemeIds = new Set<string>();
   const recentFieldIds = new Set<string>();
   const picked = { interest: 0, gap: 0 };
+  // A theme or field with a card swiped "I need to work on this" is drawn
+  // again without waiting out RECENT_TARGET_DAYS: the person asked for more.
+  const wantMoreThemes = new Set<string>();
+  const wantMoreFields = new Set<string>();
+  for (const card of cards) {
+    if (card.status !== 'review') continue;
+    if (card.theme_id) wantMoreThemes.add(card.theme_id);
+    if (card.reason === 'gap' && card.field_id) wantMoreFields.add(card.field_id);
+  }
   for (const card of cards) {
     if (card.reason === 'queued') continue;
     picked[card.reason] += 1;
     if (Date.parse(card.created_at) < since) continue;
-    if (card.reason === 'interest' && card.theme_id) recentThemeIds.add(card.theme_id);
-    if (card.reason === 'gap' && card.field_id) recentFieldIds.add(card.field_id);
+    if (card.reason === 'interest' && card.theme_id && !wantMoreThemes.has(card.theme_id)) {
+      recentThemeIds.add(card.theme_id);
+    }
+    if (card.reason === 'gap' && card.field_id && !wantMoreFields.has(card.field_id)) {
+      recentFieldIds.add(card.field_id);
+    }
   }
+
+  // Newest action first, so the titles passed to the naming call are the
+  // latest swipes.
+  const swiped = cards
+    .filter((card) => card.status === 'known' || card.status === 'review')
+    .sort((a, b) => Date.parse(b.acted_at ?? b.created_at) - Date.parse(a.acted_at ?? a.created_at))
+    .map((card) => ({
+      status: card.status,
+      theme_id: card.theme_id,
+      field_id: card.field_id,
+      reason: card.reason,
+      title: card.item ? cardTitle(card.item.title, card.segment?.heading ?? null) : card.named_article,
+    }));
 
   return {
     themes: feedThemes,
@@ -145,6 +180,8 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
     recentFieldIds,
     // Saves and Not interested on every earlier card lean the draw (plan #809).
     preferences: preferencesFrom(cards),
+    // Known and review swipes set how deep the next picks go (depth.ts).
+    progress: progressFrom(swiped),
     picked,
     articlesHeld: [...new Set(cards.flatMap((card) => (card.named_article ? [card.named_article] : [])))],
   };
@@ -181,10 +218,11 @@ export function createFeedPicker(context: {
   return (userId, options) => {
     const ports: FeedPickPorts = {
       loadPerson: (id) => loadPerson(learn, fields, id),
-      name: async (target, avoid) => {
+      name: async (target, avoid, depth) => {
         const spend: SpendReport[] = [];
         const result = await nameMaterial({
           target,
+          depth,
           avoid,
           anthropicApiKey: apiKey,
           onSpend: (report) => spend.push(report),

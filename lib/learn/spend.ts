@@ -107,6 +107,10 @@ export const LEARN_OPERATIONS = [
   // call per picked row, dropped or not, recorded through the service role
   // from the top-up against the account the card belongs to.
   'write-feed-card',
+  // Writing a track's curriculum, once, when the track is made or when its
+  // page asks for one it never got (LEARN-GRAPH-SPEC, "The curriculum"). One
+  // Sonnet call per track.
+  'write-curriculum',
   // Embedding vault themes and positions so the merge passes can find two
   // names for one subject (plan #810). Recorded against the account whose
   // rows were embedded, from the map sweep's cron tick and after an accept.

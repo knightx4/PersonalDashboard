@@ -10,7 +10,8 @@ import {
   searchCatalogueIfNew,
   searchCompleted,
 } from '@/lib/learn/catalogue/search';
-import { loadGraph, loadSubject } from '@/lib/learn/graph/load';
+import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
+import { ensureCurriculum, fileGoalUnder } from '@/lib/learn/graph/curriculum-store';
 import { queueConcept } from '@/lib/learn/graph/to-queue';
 import { recordLearnSpend } from '@/lib/learn/spend';
 import { catalogueSql } from '@/lib/learn/catalogue/connection';
@@ -273,4 +274,64 @@ export async function pullLectureCourse(
   });
 
   return { report };
+}
+
+/**
+ * Delete a whole track: its curriculum, its ideas, their states and the
+ * questions asked on them, all on the foreign keys' cascades. Readings that
+ * pointed at one of its ideas stay on their reading lists with the link
+ * cleared, and a Learn now card that started it keeps its row.
+ *
+ * Throws rather than returning an error, because ConfirmStep renders what a
+ * rejected promise says.
+ */
+// latency: pending
+export async function deleteSubject(formData: FormData): Promise<void> {
+  await requireUser();
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
+  if (!subjectId.success) throw new Error('Could not work out which track to delete.');
+
+  const supabase = await createLearnClient();
+  const { data, error } = await supabase.from('subjects').delete().eq('id', subjectId.data).select('id');
+  if (error) throw new Error(`Deleting the track failed: ${error.message}`);
+  if ((data ?? []).length === 0) throw new Error('That track is already gone.');
+
+  revalidatePath('/learn/know');
+  revalidatePath('/learn/flow');
+  redirect('/learn/know');
+}
+
+export type CurriculumState = { error?: string };
+
+/**
+ * Write the curriculum for a track that has none: one made before tracks had
+ * them, one started from a Learn now card or a briefing, or one whose first
+ * attempt failed. A track that already has one keeps it.
+ */
+// latency: pending
+export async function writeTrackCurriculum(_prev: CurriculumState, formData: FormData): Promise<CurriculumState> {
+  const user = await requireUser();
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
+  if (!subjectId.success) return { error: 'Could not work out which track this was.' };
+
+  const supabase = await createLearnClient();
+  const [subject, goals] = await Promise.all([
+    loadSubject(supabase, subjectId.data),
+    loadGoals(supabase, subjectId.data),
+  ]);
+  if (!subject) return { error: 'That track is gone.' };
+
+  // The oldest goal is what the track was started for.
+  const first = goals.at(-1) ?? null;
+  const result = await ensureCurriculum(
+    supabase,
+    user.id,
+    { id: subject.id, name: subject.name },
+    first?.asked ?? subject.note ?? null,
+  );
+  if (!result.ok) return { error: result.detail };
+  if (result.goalUnitId && first && !first.unitId) await fileGoalUnder(supabase, first.id, result.goalUnitId);
+
+  revalidatePath(`/learn/s/${subject.id}`);
+  return {};
 }

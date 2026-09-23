@@ -3,11 +3,14 @@
  * the person did with earlier cards (LEARN-NOW-SPEC, "What is recorded";
  * plan #809).
  *
- * Only two actions count. Not interested (a card left `dismissed`) lowers the
- * weight of the card's theme and field, and Save (a card with a
+ * Three actions count. Not interested (a card left `dismissed`) lowers the
+ * weight of the card's theme and field. Save (a card with a
  * `saved_reading_id`, which a saved card keeps after Test me moves it to
- * `tested`) raises it. Opening the source, testing without saving and passing
- * a card by count for nothing.
+ * `tested`) raises it, and so does swiping a card right, "I need to work on
+ * this" (a card left `review`), which counts as a save. Opening the source,
+ * testing without saving, passing a card, skipping it and swiping it down as
+ * known count for nothing here: known changes how deep the next pick goes
+ * (`depth.ts`), not how often the theme comes up.
  *
  * Each save multiplies the weight by SAVE_STEP and each dismissal by
  * DISMISS_STEP, and the product is held between FLOOR and CAP. The floor means
@@ -65,7 +68,11 @@ export function preferencesFrom(cards: readonly CardSignal[]): FeedPreferences {
   const fields = new Map<string, Signals>();
   for (const card of cards) {
     const kind: keyof Signals | null =
-      card.saved_reading_id !== null ? 'saved' : card.status === 'dismissed' ? 'dismissed' : null;
+      card.saved_reading_id !== null || card.status === 'review'
+        ? 'saved'
+        : card.status === 'dismissed'
+          ? 'dismissed'
+          : null;
     if (!kind) continue;
     if (card.theme_id) add(themes, card.theme_id, kind);
     if (card.field_id) add(fields, card.field_id, kind);

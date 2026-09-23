@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { topUpFeedAfterResponse } from '@/inngest/learn/feed-top-up';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { ACTION_FROM, cardTitle, sectionLink, type FeedCard } from '@/lib/learn/feed/card';
+import { ACTION_FROM, cardTitle, sectionLink, SWIPES, type FeedCard, type SwipeAction } from '@/lib/learn/feed/card';
 import { countReadyCards, loadFeedCardRow, loadFeedPage, recordFeedAction } from '@/lib/learn/feed/load';
 import { startTrackFromCard } from '@/lib/learn/feed/test-me';
 import { SAVED_FROM_FEED, saveFeedSection } from '@/lib/learn/tracks/save';
@@ -14,10 +14,9 @@ import { SAVED_FROM_FEED, saveFeedSection } from '@/lib/learn/tracks/save';
 /**
  * The Learn now feed's actions (plan #808).
  *
- * Four of these record something, and each is a deliberate press: opening
- * the source, Save, Not interested, Test me on this. Loading more cards
- * records nothing, which is how scrolling past a card stays unrecorded
- * (LEARN-NOW-SPEC "What is recorded").
+ * Five of these record something, and each is deliberate: opening the
+ * source, Save, Not interested, Test me on this, and the three swipes.
+ * Loading more cards records nothing (LEARN-NOW-SPEC "What is recorded").
  *
  * Every action that can take a card out of the ready pool, and loading more,
  * asks for a top-up once the response has gone. It costs one count when
@@ -66,6 +65,27 @@ export async function dismissCard(id: string): Promise<CardActionResult> {
   const supabase = await createLearnClient();
   try {
     await recordFeedAction(supabase, card.data, 'dismissed');
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not record that.' };
+  }
+  after(() => topUpFeedAfterResponse(user.id));
+  return {};
+}
+
+/**
+ * One of the three swipes: down for "I'm good on this" (`known`), right for
+ * "I need to work on this" (`review`), left for "not now" (`skipped`). The
+ * deck moves on before this returns, so a failure only comes back as a line
+ * under the next card.
+ */
+// latency: optimistic
+export async function swipeCard(id: string, swipe: SwipeAction): Promise<CardActionResult> {
+  const user = await requireUser();
+  const card = CardId.safeParse(id);
+  if (!card.success || !SWIPES.includes(swipe)) return { error: 'Could not tell which card that was.' };
+  const supabase = await createLearnClient();
+  try {
+    await recordFeedAction(supabase, card.data, swipe);
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Could not record that.' };
   }

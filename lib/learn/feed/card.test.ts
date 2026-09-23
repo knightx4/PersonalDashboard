@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ACTION_FROM,
+  SWIPES,
   appendCards,
   cardTitle,
   feedEnd,
@@ -131,10 +132,20 @@ describe('what each action may move', () => {
     }
   });
 
-  it('lets Test me follow a Save, and nothing else move a saved card', () => {
+  it('lets Test me and the swipes follow a Save, and not a second Save or a dismissal', () => {
     expect(ACTION_FROM.tested).toContain('saved');
+    expect(ACTION_FROM.known).toContain('saved');
     expect(ACTION_FROM.saved).not.toContain('saved');
     expect(ACTION_FROM.dismissed).not.toContain('saved');
+  });
+
+  it('lets a card that came back be swiped again, and never moves a dismissed or tested one', () => {
+    for (const swipe of SWIPES) {
+      expect(ACTION_FROM[swipe]).toEqual(expect.arrayContaining(['ready', 'review', 'skipped']));
+      expect(ACTION_FROM[swipe]).not.toContain('dismissed');
+      expect(ACTION_FROM[swipe]).not.toContain('tested');
+      expect(ACTION_FROM[swipe]).not.toContain('known');
+    }
   });
 });
 

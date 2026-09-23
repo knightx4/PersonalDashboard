@@ -100,6 +100,7 @@ describe('the call', () => {
     const spent: string[] = [];
     const result = await nameMaterial({
       target: interest,
+      depth: { depth: 'advanced', known: ['Inflation: Causes'], review: ['Money: Functions'] },
       avoid: ['Money'],
       anthropicApiKey: 'unused',
       client,
@@ -109,6 +110,11 @@ describe('the call', () => {
     expect(spent).toEqual(['claude-sonnet-5']);
     expect(calls[0]).toMatchObject({ tool_choice: { type: 'tool', name: 'report_reading' } });
     expect(JSON.stringify(calls[0])).toContain('- Money');
+    // The swipes reach the call: what they know is gone past, what they want
+    // to work on is come at again.
+    expect(JSON.stringify(calls[0])).toContain('go past these:\\n- Inflation: Causes');
+    expect(JSON.stringify(calls[0])).toContain('- Money: Functions');
+    expect(JSON.stringify(calls[0])).toContain('advanced student');
   });
 
   it('records the spend and says why when there is no report', async () => {
@@ -116,6 +122,7 @@ describe('the call', () => {
     const spent: string[] = [];
     const result = await nameMaterial({
       target: interest,
+      depth: { depth: 'working', known: [], review: [] },
       avoid: [],
       anthropicApiKey: 'unused',
       client,
