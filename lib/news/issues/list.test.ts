@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   countLabel,
   formatArrival,
+  issueHref,
   issueReturn,
   senderLabel,
   sortSenders,
@@ -107,5 +108,20 @@ describe('issueReturn', () => {
   it('ignores a filter that names another sender, or none at all', () => {
     expect(issueReturn('s2', paper).href).toBe('/news');
     expect(issueReturn('s1', null).href).toBe('/news');
+  });
+});
+
+describe('issueHref', () => {
+  it('is the bare address when nothing is chosen', () => {
+    expect(issueHref('i1', { original: false, pictures: false, from: null })).toBe('/news/i/i1');
+  });
+
+  it('keeps every choice it is given', () => {
+    expect(issueHref('i1', { original: true, pictures: true, from: 's1' })).toBe(
+      '/news/i/i1?view=original&pictures=1&from=s1',
+    );
+    expect(issueHref('i1', { original: false, pictures: true, from: null })).toBe(
+      '/news/i/i1?pictures=1',
+    );
   });
 });

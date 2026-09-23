@@ -101,3 +101,24 @@ export function issueReturn(
   }
   return { href: '/news', label: 'Newsletters', from: null };
 }
+
+/**
+ * The address of an issue with the reader's choices on it.
+ *
+ * Every link on the issue page that reloads it goes through here, so each one
+ * keeps the choices it does not change: asking for the pictures keeps you on
+ * the original email, and switching between the summary and the original
+ * keeps the pictures you asked for and the list you came from. The choices
+ * are query parameters so that none of this needs script on the page.
+ */
+export function issueHref(
+  id: string,
+  { original, pictures, from }: { original: boolean; pictures: boolean; from: string | null },
+): string {
+  const query = new URLSearchParams();
+  if (original) query.set('view', 'original');
+  if (pictures) query.set('pictures', '1');
+  if (from) query.set('from', from);
+  const search = query.toString();
+  return search ? `/news/i/${id}?${search}` : `/news/i/${id}`;
+}
