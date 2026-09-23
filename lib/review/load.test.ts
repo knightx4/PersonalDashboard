@@ -40,6 +40,7 @@ describe('filterReviewRows', () => {
       messageId: '2',
       subject: 'Hi',
       fromAddress: null,
+      replyToAddress: null,
       receivedAt: null,
       classification: 'order_confirmation',
       error: 'bad math',
