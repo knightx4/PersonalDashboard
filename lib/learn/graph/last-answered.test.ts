@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { claimWordingLine, lastAnsweredLine, lastCheckedLine } from './last-answered';
+import { claimWordingLine, dayWords, lastAnsweredLine, lastCheckedLine } from './last-answered';
 
 /**
  * The line is about days in the account's timezone, not about hours elapsed,
@@ -94,5 +94,14 @@ describe('whose words a claim is in', () => {
 
   it('still says whose words it is when the date will not parse', () => {
     expect(claimWordingLine('not a date', NOW, 'Europe/London')).toBe('In your words.');
+  });
+});
+
+describe('the day on its own', () => {
+  it('says today, the date, or nothing', () => {
+    expect(dayWords('2026-09-13T07:30:00Z', NOW, 'Europe/London')).toBe('today');
+    expect(dayWords('2026-03-03T12:00:00Z', NOW, 'Europe/London')).toBe('3 March');
+    expect(dayWords('2025-03-03T12:00:00Z', NOW, 'Europe/London')).toBe('3 March 2025');
+    expect(dayWords(null, NOW, 'Europe/London')).toBeNull();
   });
 });

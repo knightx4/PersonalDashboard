@@ -224,6 +224,21 @@ domain itself. That works because every placement names exactly one of a
 field or a domain, so nothing is counted twice. An umbrella placement shows on
 the domain's row and in none of its cells.
 
+The grid is built by `lib/learn/areas/grid.ts` from rows read in
+`grid-load.ts`, and drawn under the tracks list on `/learn/know`. Three
+thresholds decide what a cell looks like, and each is a constant in that file:
+
+- **The shade** is relative to the strongest field, because strength is an
+  ordering with no unit. A field under a tenth of the strongest is drawn
+  lightest and does not count as written about; one at two fifths or more is
+  drawn darkest.
+- **Tested** needs one answered question in a track placed in the field. A
+  track with nothing answered makes its field "not tested yet", never "getting
+  there".
+- **Strong** is half or more of the field's ideas known, once something has
+  been answered. It is read off the tested side alone, since the shade already
+  says whether you also write about it.
+
 ## What to do next
 
 `/learn/next` gains a fourth kind of row: **a field you write about and have
@@ -346,7 +361,7 @@ Geography, so a thin field here says more about the list than about the field.
    - Subjects: `subjects.field_id` and `domain_id`, placed when a subject is
      created.
    - Moving a placement by hand, from the Know page.
-4. **The grid on the Know page.** The two signals per field and the four kinds.
+4. ✅ **The grid on the Know page.** The two signals per field and the four kinds.
 5. **The fourth row on `/learn/next`.**
 
 ## Open questions

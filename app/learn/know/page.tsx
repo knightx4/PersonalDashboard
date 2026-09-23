@@ -4,6 +4,9 @@ import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { requireUser } from '@/lib/auth/server';
+import { loadAccountSettings } from '@/lib/core/account/settings';
+import { loadAreaGrid, type LoadedAreaGrid } from '@/lib/learn/areas/grid-load';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGraph, loadSubjects } from '@/lib/learn/graph/load';
 import { outstandingCount, unfinishedSweep } from '@/lib/learn/graph/opening';
@@ -11,6 +14,7 @@ import { countStates, settledCount } from '@/lib/learn/graph/model';
 import { MAX_BRIEFING_CHARS } from '@/lib/learn/graph/from-brief';
 import { BriefForm } from './brief-form';
 import { FromVaultForm } from './from-vault-form';
+import { AreasGrid } from './areas-grid';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { loadNotes } from '@/lib/vault/notes/load';
 
@@ -48,23 +52,33 @@ function settledLine(counts: ReturnType<typeof countStates>): string {
 }
 
 export default async function KnowPage() {
+  const user = await requireUser();
   const supabase = await createLearnClient();
+  const vault = await createVaultClient();
   const subjects = await loadSubjects(supabase);
   const unfinished = await unfinishedSweep(supabase);
+  const settings = await loadAccountSettings(user.id);
 
   // Scaffolding for the first slice of the vault pass: a list to pick one note
   // out of. The sweep that follows picks its own and needs no list, so this is
   // capped rather than paged.
-  const vaultNotes = (await loadNotes(await createVaultClient(), { limit: VAULT_PICKER_LIMIT })).map(
+  const vaultNotes = (await loadNotes(vault, { limit: VAULT_PICKER_LIMIT })).map(
     (note) => ({ path: note.path, title: note.title }),
   );
 
-  const rows = await Promise.all(
-    subjects.map(async (subject) => ({
-      subject,
-      counts: countStates(await loadGraph(supabase, subject.id)),
-    })),
+  const graphs = await Promise.all(
+    subjects.map(async (subject) => ({ subject, graph: await loadGraph(supabase, subject.id) })),
   );
+  const rows = graphs.map(({ subject, graph }) => ({ subject, counts: countStates(graph) }));
+
+  // The grid failing must not take the tracks list and the forms with it, so
+  // a failed read becomes one line where the grid would be (law 2).
+  let areas: LoadedAreaGrid | null = null;
+  try {
+    areas = await loadAreaGrid(supabase, vault, graphs);
+  } catch {
+    areas = null;
+  }
 
   return (
     <>
@@ -98,6 +112,12 @@ export default async function KnowPage() {
             </li>
           ))}
         </ul>
+      )}
+
+      {areas ? (
+        <AreasGrid grid={areas.grid} interestFailed={areas.interestFailed} timezone={settings.timezone} />
+      ) : (
+        <p className="mt-8 text-ui text-ink-muted">The fields could not be read, so the grid is missing.</p>
       )}
 
       {/* The way back into a set of opening questions somebody walked away

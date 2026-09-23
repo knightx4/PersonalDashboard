@@ -49,6 +49,17 @@ function dayOrToday(
 }
 
 /**
+ * The day on its own, for a line that writes its own sentence around it:
+ * "today", "14 March", or "14 March 2025". Null on the same inputs as the
+ * lines below, so a caller leaves its clause off rather than saying "never".
+ */
+export function dayWords(at: string | null, now: Date, timezone: string): string | null {
+  const when = dayOrToday(at, now, timezone);
+  if (!when) return null;
+  return when.today ? 'today' : when.date;
+}
+
+/**
  * Null when nothing has ever been answered, which the screen says nothing
  * about: a line about a session that has never happened is noise on the one
  * screen where somebody is about to start.
