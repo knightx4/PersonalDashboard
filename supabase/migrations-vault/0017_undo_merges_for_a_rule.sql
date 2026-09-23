@@ -26,9 +26,21 @@
 --   select obsidian.requeue_merge_proposals('theme', 'plan #879',
 --            '2026-09-23 19:28:29+00');
 --
--- The cutoff is when #879 was claimed. #883 can undo only the chained
--- position merges with the same pair of calls, kind 'position' and
--- p_chained_only true.
+-- The cutoff is when #879 was claimed.
+--
+-- #883 undid the chained position merges with the same pair of calls, kind
+-- 'position' and p_chained_only true, cutoff when #883 was claimed:
+--
+--   select obsidian.undo_merges_for_rule('position', 'plan #883',
+--            '2026-09-23 20:06:41.27323+00', '<owner>', true, 300, 40000);
+--   select obsidian.requeue_merge_proposals('position', 'plan #883',
+--            '2026-09-23 20:06:41.27323+00', '<owner>');
+--
+-- Of the 138 chained merges, 128 were undone and 10 were refused with
+-- survivor-gone: nine because a direct merge later absorbed the survivor,
+-- and one because its survivor was absorbed by another of the ten. Those ten
+-- still stand, and map_merge_resets lists them. The requeue put back 128
+-- merged proposals and 72 joined ones. The 576 direct merges were left alone.
 
 set search_path = obsidian, public, extensions;
 
