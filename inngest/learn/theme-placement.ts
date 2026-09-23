@@ -5,14 +5,8 @@ import { createLearnServiceSupabase } from '@/inngest/learn/supabase-admin';
 import { createVaultServiceSupabase } from '@/inngest/vault/supabase-admin';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
-import {
-  PLACE_BATCH,
-  PLACE_MODEL,
-  placeThemes,
-  type AreaDomain,
-  type AreaField,
-  type PlaceItem,
-} from '@/lib/learn/areas/place';
+import { loadAreas } from '@/lib/learn/areas/load';
+import { PLACE_BATCH, PLACE_MODEL, placeThemes, type PlaceItem } from '@/lib/learn/areas/place';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { LearnOperation } from '@/lib/learn/spend';
 
@@ -86,42 +80,6 @@ async function pendingThemes(learn: LearnSupabaseClient): Promise<ThemeRow[]> {
   }
 
   return themes.filter((theme) => !placed.has(theme.id));
-}
-
-async function loadAreas(learn: LearnSupabaseClient) {
-  const [fieldResult, domainResult] = await Promise.all([
-    learn.from('area_fields').select('id, slug, name, scope, position, domain:area_domains(name, position)'),
-    learn.from('area_domains').select('id, slug, name, scope, position').order('position'),
-  ]);
-  if (fieldResult.error) throw new Error(`Reading the areas failed: ${fieldResult.error.message}`);
-  if (domainResult.error) throw new Error(`Reading the domains failed: ${domainResult.error.message}`);
-
-  type FieldRow = {
-    id: string;
-    slug: string;
-    name: string;
-    scope: string;
-    position: number;
-    domain: { name: string; position: number } | null;
-  };
-  const rows = ((fieldResult.data ?? []) as unknown as FieldRow[]).sort(
-    (a, b) => (a.domain?.position ?? 0) - (b.domain?.position ?? 0) || a.position - b.position,
-  );
-  const domainRows = (domainResult.data ?? []) as { id: string; slug: string; name: string; scope: string }[];
-
-  const fields: AreaField[] = rows.map((row) => ({
-    slug: row.slug,
-    name: row.name,
-    scope: row.scope,
-    domain: row.domain?.name ?? '',
-  }));
-  const domains: AreaDomain[] = domainRows.map((row) => ({ slug: row.slug, name: row.name, scope: row.scope }));
-  return {
-    fields,
-    domains,
-    fieldIds: new Map(rows.map((row) => [row.slug, row.id])),
-    domainIds: new Map(domainRows.map((row) => [row.slug, row.id])),
-  };
 }
 
 export async function runThemePlacementTick(): Promise<ThemePlacementSummary> {

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { declareConceptKnown, declareKnown, saveChain } from './save';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { declareConceptKnown, declareKnown, saveChain, trackContext } from './save';
 import type { ProposedChain } from './chain-payload';
 
 /**
@@ -15,6 +15,13 @@ import type { ProposedChain } from './chain-payload';
  * link -- belong to the database and are asserted in tests/rls-learn-graph.
  */
 
+// Placement runs after the response and makes a model call; here it is only
+// checked that it is asked for, and with what.
+const placeTrackAfterResponse = vi.fn();
+vi.mock('@/lib/learn/areas/place-track', () => ({
+  placeTrackAfterResponse: (...args: unknown[]) => placeTrackAfterResponse(...args),
+}));
+
 type Insert = { table: string; rows: unknown };
 
 /**
@@ -23,7 +30,7 @@ type Insert = { table: string; rows: unknown };
  * Enough of the builder to record what each insert was handed, and to give the
  * concepts insert its rows back, which is how the edges find their ids.
  */
-function clientReturningIds(existingSubject: string | null = null) {
+function clientReturningIds(existingSubject: string | null = null, placed = true) {
   const inserts: Insert[] = [];
 
   const client = {
@@ -32,7 +39,9 @@ function clientReturningIds(existingSubject: string | null = null) {
         select: () => ({
           ilike: () => ({
             maybeSingle: async () =>
-              existingSubject ? { data: { id: existingSubject }, error: null } : { data: null, error: null },
+              existingSubject
+                ? { data: { id: existingSubject, placed_at: placed ? '2026-09-01T00:00:00Z' : null }, error: null }
+                : { data: null, error: null },
           }),
           eq: () => ({ order: async () => ({ data: [], error: null }) }),
         }),
@@ -310,5 +319,40 @@ describe('waving a case through', () => {
       expect(row.tested_at).toBeNull();
       expect(new Date(row.declared_at!).toDateString()).toBe(new Date().toDateString());
     }
+  });
+});
+
+describe('placing the track a chain is written into', () => {
+  beforeEach(() => placeTrackAfterResponse.mockClear());
+
+  it('places a new track, passing on the theme it was started from', async () => {
+    const { client } = clientReturningIds(null);
+    const theme = { id: 'theme-1', about: 'How money reaches prices.' };
+    await saveChain(client, 'user-1', CHAIN, 'how rates reach prices', { theme });
+
+    expect(placeTrackAfterResponse).toHaveBeenCalledTimes(1);
+    const [, userId, track, passed] = placeTrackAfterResponse.mock.calls[0];
+    expect(userId).toBe('user-1');
+    expect(track).toMatchObject({ id: 'subjects-id', name: 'Economics' });
+    expect(passed).toBe(theme);
+  });
+
+  it('leaves a track that is already placed alone', async () => {
+    const { client } = clientReturningIds('subject-1');
+    await saveChain(client, 'user-1', CHAIN, 'how rates reach prices');
+    expect(placeTrackAfterResponse).not.toHaveBeenCalled();
+  });
+
+  it('tries again on an existing track whose placement failed', async () => {
+    const { client } = clientReturningIds('subject-1', false);
+    await saveChain(client, 'user-1', CHAIN, 'how rates reach prices');
+    expect(placeTrackAfterResponse).toHaveBeenCalledTimes(1);
+    expect(placeTrackAfterResponse.mock.calls[0][2]).toMatchObject({ id: 'subject-1' });
+  });
+
+  it('describes the track by what was asked and its first ideas', () => {
+    expect(trackContext('how rates reach prices', CHAIN)).toBe(
+      'aimed at: how rates reach prices. ideas: Wage stickiness; Expectations close the gap',
+    );
   });
 });

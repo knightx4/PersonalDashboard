@@ -156,6 +156,16 @@ field that contains it. A subject that straddles two fields is placed in the
 one where most of its concepts would be taught, and the concepts that belong
 elsewhere are what `concept_subjects` already exists for.
 
+The columns are in `0032_subject_fields.sql`: `field_id` and `domain_id`, a
+runner-up field, a confidence, a basis, the model, `placement_moved_by_hand`,
+and `placed_at`. A null `placed_at` means the track has not been placed yet;
+a set one with neither a field nor a domain is the track that spans domains.
+The call is made from `saveChain` once the response has gone
+(`lib/learn/areas/place-track.ts`), so it never holds up or fails the write.
+A failed call leaves `placed_at` null, and the next chain written into that
+track tries again. A track started from a vault theme through the Practice
+Flow offer takes that theme's row from `theme_fields` and makes no call.
+
 **Themes.** Learn never writes to the vault map, so a theme's placement lives in
 Learn: a `learn.theme_fields` table holding the account, the theme, the field
 or domain, and a basis (`0031_theme_fields.sql`). It points at `obsidian.themes` with a

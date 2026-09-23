@@ -391,7 +391,7 @@ export async function startTrackFromTheme(
       userId,
       { ...result.chain, subject: map.theme.name },
       map.theme.name,
-      { origin: 'generated' },
+      { origin: 'generated', theme: { id: themeId, about: map.theme.about } },
     );
     subjectId = saved.subjectId;
   } catch (error) {
