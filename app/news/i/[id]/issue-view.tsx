@@ -191,7 +191,7 @@ export function IssueView({
                           alt=""
                           loading="lazy"
                           referrerPolicy="no-referrer"
-                          className="size-20 shrink-0 rounded-card border border-border bg-sunken object-cover sm:size-24"
+                          className="size-20 shrink-0 rounded-card bg-sunken object-cover sm:size-24"
                         />
                       )}
                     </div>

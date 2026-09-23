@@ -381,7 +381,7 @@ function DeckCard({
         <div
           aria-hidden
           className={cn(
-            'pointer-events-none absolute inset-x-0 top-3 z-10 mx-auto w-fit rounded-pill px-3 py-1 text-ui font-semibold',
+            'pointer-events-none absolute inset-x-0 top-3 z-over-link mx-auto w-fit rounded-pill px-3 py-1 text-ui font-semibold',
             toward === 'known' && 'bg-positive-tint text-positive',
             toward === 'review' && 'bg-caution-tint text-caution',
             toward === 'skipped' && 'bg-sunken text-ink-muted',
