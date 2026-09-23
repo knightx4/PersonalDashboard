@@ -77,6 +77,10 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
   // press matches the heading it is drawn under (note e663940b).
   const blockedJob = blocked && isJobForYou(row.ask);
   const proposed = row.health === 'proposed';
+  // Held here rather than in the answering box, so the press that opens the
+  // box can sit bottom right with the card's other presses (note fdf6bc83).
+  const answerable = question || (blocked && !blockedJob);
+  const [answering, setAnswering] = useState(false);
 
   return (
     <li className="space-y-1 p-3">
@@ -118,8 +122,12 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
         </p>
       )}
 
-      {question && <AnswerQuestion row={row} />}
-      {blocked && !blockedJob && <AnswerBlocked row={row} />}
+      {question && (
+        <AnswerQuestion row={row} answering={answering} setAnswering={setAnswering} />
+      )}
+      {blocked && !blockedJob && answering && (
+        <AnswerBlocked row={row} onClose={() => setAnswering(false)} />
+      )}
 
       {/* The same thread the plan page keeps on the step, on the page the row
           is read from. Dash could be answered but not talked to: a raise took
@@ -143,6 +151,13 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
         {setup && <SetupDone row={row} />}
         {blockedJob && <BlockedDone row={row} />}
         {proposed && <ApprovePlanRow row={row} />}
+        {/* Filled, the same as "I have set this up": on a question the answer
+            is the one thing the card is asking of you (note fdf6bc83). */}
+        {answerable && !answering && (
+          <Button type="button" size="sm" onClick={() => setAnswering(true)}>
+            {question && row.resolution ? 'Change the answer' : 'Answer'}
+          </Button>
+        )}
       </div>
     </li>
   );
@@ -305,9 +320,16 @@ export function ApproveAll({ entries }: { entries: readonly WaitingEntry[] }) {
  * revalidates this page as well as that one, so answering takes the row off
  * the list rather than leaving it sitting there answered.
  */
-function AnswerQuestion({ row }: { row: WaitingRow }) {
+function AnswerQuestion({
+  row,
+  answering,
+  setAnswering,
+}: {
+  row: WaitingRow;
+  answering: boolean;
+  setAnswering: (answering: boolean) => void;
+}) {
   const [state, action, pending] = useActionState(answerPlanDecision, {} as PlanActionState);
-  const [answering, setAnswering] = useState(false);
   const { answer, setAnswer, choose } = useAnswerDraft(() => setAnswering(true));
 
   return (
@@ -316,7 +338,7 @@ function AnswerQuestion({ row }: { row: WaitingRow }) {
 
       {row.resolution && <TheAnswered resolution={row.resolution} />}
 
-      {answering ? (
+      {answering && (
         <AnswerBox
           id={row.id}
           detail={row.detail}
@@ -332,10 +354,6 @@ function AnswerQuestion({ row }: { row: WaitingRow }) {
             setAnswering(false);
           }}
         />
-      ) : (
-        <Button type="button" size="sm" variant="ghost" onClick={() => setAnswering(true)}>
-          {row.resolution ? 'Change the answer' : 'Answer'}
-        </Button>
       )}
     </div>
   );
@@ -350,12 +368,11 @@ function AnswerQuestion({ row }: { row: WaitingRow }) {
  * the words where the session that resumes the step will read them and lifts
  * the block.
  */
-function AnswerBlocked({ row }: { row: WaitingRow }) {
+function AnswerBlocked({ row, onClose }: { row: WaitingRow; onClose: () => void }) {
   const [state, action, pending] = useActionState(answerBlockedStep, {} as PlanActionState);
-  const [answering, setAnswering] = useState(false);
   const [answer, setAnswer] = useState('');
 
-  return answering ? (
+  return (
     <AnswerBox
       id={row.id}
       detail={row.ask}
@@ -368,12 +385,8 @@ function AnswerBlocked({ row }: { row: WaitingRow }) {
       error={state.error}
       onCancel={() => {
         setAnswer('');
-        setAnswering(false);
+        onClose();
       }}
     />
-  ) : (
-    <Button type="button" size="sm" variant="ghost" onClick={() => setAnswering(true)}>
-      Answer
-    </Button>
   );
 }

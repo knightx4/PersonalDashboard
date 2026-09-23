@@ -393,8 +393,8 @@ describe('PlanView', () => {
     expect(html).toContain('>Ready<');
     expect(html).toContain('Waits on #3');
     // Of the feature's three leaf steps one is done, one is ready and one waits
-    // on #3; ready and not ready lead (note c12fe73a).
-    expect(html).toContain('1 ready, 1 not ready, 1 done of 3');
+    // on #3; amber, blue, green in that order (note 42aa1fa4).
+    expect(html).toContain('1 not ready, 1 ready or underway, 1 done of 3');
     // The note stands in for the missing detail under the title.
     expect(html).toContain('Note: Waiting on the RPC review.');
   });
@@ -418,7 +418,7 @@ describe('PlanView', () => {
     const html = render('all');
     // Not one green length and a blank remainder: a module held up by
     // questions and a module nobody has reached drew the same bar.
-    expect(html).toContain('aria-label="Shopping: 1 done, 2 ready, 1 waiting"');
+    expect(html).toContain('aria-label="Shopping: 1 waiting, 2 ready, 1 done"');
     // A blocked step says who can unblock it, which is the word every dev
     // queue now uses for a row stopped on the person.
     expect(html).toContain('aria-label="Job search: 1 waiting on you"');

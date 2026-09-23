@@ -22,6 +22,13 @@ import { digestIssue, type DigestOutcome } from './digest';
  * in between. It picks those by `digested_at` before LINE_SINCE: a redo moves
  * `digested_at` past it whether or not it wrote a line, so no issue is redone
  * twice, and a failed redo keeps the summary it had.
+ *
+ * It also redoes every issue whose stories were written before topics existed
+ * (plan #859), found by its first story having no topic. Every story digested
+ * since gets one (Other when the model names none), so a successful redo takes
+ * the issue out of the set. An issue with no stories, one essay, has nothing to
+ * tag and is never picked. A redo that fails keeps the old stories, so that
+ * issue is tried again on a later run, after every other pending issue.
  */
 
 /**
@@ -30,8 +37,15 @@ import { digestIssue, type DigestOutcome } from './digest';
  */
 export const LINE_SINCE = '2026-09-23T06:48:00Z';
 
-/** Never attempted, or summarised without a line before LINE_SINCE. */
-export const PENDING_FILTER = `digested_at.is.null,and(summary.not.is.null,summary_line.is.null,digested_at.lt."${LINE_SINCE}")`;
+/**
+ * Never attempted, summarised without a line before LINE_SINCE, or holding
+ * stories without topics. PostgREST reads `stories->0` as the first element.
+ */
+export const PENDING_FILTER = [
+  'digested_at.is.null',
+  `and(summary.not.is.null,summary_line.is.null,digested_at.lt."${LINE_SINCE}")`,
+  'and(summary.not.is.null,stories->0.not.is.null,stories->0->>topic.is.null)',
+].join(',');
 
 type Clients = {
   /** May be the service role: digestIssue names the account on every query. */
@@ -81,8 +95,8 @@ export type PendingTally = { digested: number; failed: number; missing: number; 
 
 /**
  * Summarise every issue not yet attempted, oldest first, one at a time, then
- * redo the ones summarised without a line. The never-attempted come first so
- * the redo never holds up a new issue.
+ * redo the ones summarised without a line or without topics. The
+ * never-attempted come first so the redo never holds up a new issue.
  *
  * Reads across all accounts, which is why it takes the service-role client;
  * each issue's own `user_id` is passed on, so the spend lands on the account

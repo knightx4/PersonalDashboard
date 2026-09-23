@@ -113,9 +113,10 @@ describe('digestPending', () => {
     expect(seen).toEqual(['a:digested', 'b:failed', 'c:digested']);
   });
 
-  it('redoes only issues summarised without a line before the line existed', () => {
+  it('redoes issues summarised without a line before it existed, or without topics', () => {
     expect(PENDING_FILTER).toBe(
-      `digested_at.is.null,and(summary.not.is.null,summary_line.is.null,digested_at.lt."${LINE_SINCE}")`,
+      `digested_at.is.null,and(summary.not.is.null,summary_line.is.null,digested_at.lt."${LINE_SINCE}"),` +
+        'and(summary.not.is.null,stories->0.not.is.null,stories->0->>topic.is.null)',
     );
     // After the last summary written without a line, before the first with one.
     expect(Date.parse(LINE_SINCE)).toBeGreaterThan(Date.parse('2026-09-23T06:13:28Z'));
