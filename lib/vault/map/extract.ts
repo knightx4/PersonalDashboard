@@ -24,6 +24,7 @@ import {
   type MapVerdict,
   type NotRead,
 } from '@/lib/vault/map/rules';
+import { MAX_EXISTING_THEMES } from '@/lib/vault/map/themes';
 
 /**
  * Stages 0 to 2 of LEARN-MAP-SPEC.md for one note: classify it, cut it into
@@ -47,8 +48,6 @@ const TOOL_NAME = 'report_note_map';
 /** Chunks read at once. Enough to keep a long note under a minute. */
 const CHUNKS_AT_ONCE = 4;
 
-/** Existing theme names sent with each chunk, so the model reuses them. */
-const MAX_EXISTING_THEMES = 200;
 
 const SYSTEM = `You are reading one section of somebody's personal note, to map
 what they write about and what they argue.
@@ -205,7 +204,10 @@ async function inBatches<T, R>(
 
 export async function proposeNoteMap(input: {
   note: MapNote;
-  /** The person's theme names, strongest first. */
+  /**
+   * The person's theme names to reuse: the nearest to this note, then the
+   * strongest (`offerThemes`). The first MAX_EXISTING_THEMES are sent.
+   */
   existingThemes?: string[];
   anthropicApiKey: string;
   client?: Anthropic;

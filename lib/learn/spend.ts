@@ -110,6 +110,8 @@ export const LEARN_OPERATIONS = [
   // Embedding vault themes and positions so the merge passes can find two
   // names for one subject (plan #810). Recorded against the account whose
   // rows were embedded, from the map sweep's cron tick and after an accept.
+  // Also each note embedded to find the themes nearest it before it is read
+  // (plan #818), from the sweep and from reading one note on its page.
   'embed-map',
   // Asking Haiku which vault themes are one subject under two names (plan
   // #811), twenty pairs a call. Recorded through the service role from the map

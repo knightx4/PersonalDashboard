@@ -11,7 +11,7 @@ import { proposeNoteMap } from '@/lib/vault/map/extract';
 import { keepTickedMap } from '@/lib/vault/map/keep';
 import { noteMapSchema, type NoteMapProposal } from '@/lib/vault/map/proposal';
 import { quoteInNote } from '@/lib/vault/map/rules';
-import { loadThemeNames } from '@/lib/vault/map/themes';
+import { loadNearestThemeNames, loadThemeNames, offerThemes } from '@/lib/vault/map/themes';
 import { loadNote } from '@/lib/vault/notes/load';
 
 /**
@@ -60,7 +60,13 @@ export async function proposeMap(
   const note = await loadNote(supabase, path.data);
   if (!note) return { error: 'That note is not in the vault any more.' };
 
-  const existingThemes = await loadThemeNames(supabase);
+  const embedSpend = collectSpend();
+  const [nearest, strongest] = await Promise.all([
+    loadNearestThemeNames(supabase, note, { onSpend: embedSpend.sink }),
+    loadThemeNames(supabase),
+  ]);
+  await recordLearnSpend(user.id, 'embed-map', embedSpend.reports);
+  const existingThemes = offerThemes(nearest, strongest);
 
   const spend = collectSpend();
   const result = await proposeNoteMap({

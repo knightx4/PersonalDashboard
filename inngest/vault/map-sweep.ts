@@ -12,7 +12,7 @@ import { proposePositionMerges, type PositionMergeResult } from '@/lib/vault/map
 import { proposeThemeMerges, type ThemeMergeResult } from '@/lib/vault/map/merge-themes';
 import { proposeNoteMap, type MapNote } from '@/lib/vault/map/extract';
 import { runSweepSlice, type SweepNoteRow, type SweepPorts } from '@/lib/vault/map/sweep';
-import { loadThemeNames } from '@/lib/vault/map/themes';
+import { loadNearestThemeNames, loadThemeNames } from '@/lib/vault/map/themes';
 
 /**
  * One call of the map sweep's clock: work every running sweep for a few
@@ -225,6 +225,8 @@ async function workSweep(supabase: VaultSupabaseClient, sweep: SweepRow) {
   }
 
   let spend: SpendReport[] = [];
+  // Embedding each note to find its nearest themes, recorded as embed-map.
+  let embedSpend: SpendReport[] = [];
   const core = createCoreServiceSupabase();
 
   const ports: SweepPorts = {
@@ -275,7 +277,13 @@ async function workSweep(supabase: VaultSupabaseClient, sweep: SweepRow) {
       return settled;
     },
 
-    themeNames: () => loadThemeNames(supabase, 200, userId),
+    themeNames: () => loadThemeNames(supabase, undefined, userId),
+
+    nearestThemes: (note) =>
+      loadNearestThemeNames(supabase, note, {
+        userId,
+        onSpend: (report) => embedSpend.push(report),
+      }),
 
     propose: (note, existingThemes) =>
       proposeNoteMap({
@@ -348,6 +356,16 @@ async function workSweep(supabase: VaultSupabaseClient, sweep: SweepRow) {
         await recordSpend(core, userId, {
           module: 'learn',
           operation: OPERATION,
+          model: report.model,
+          usage: report.usage,
+        });
+      }
+      const embedded = embedSpend;
+      embedSpend = [];
+      for (const report of embedded) {
+        await recordSpend(core, userId, {
+          module: 'learn',
+          operation: 'embed-map',
           model: report.model,
           usage: report.usage,
         });

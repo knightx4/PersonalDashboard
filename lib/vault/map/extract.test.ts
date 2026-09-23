@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { proposeNoteMap, type MapNote } from './extract';
 import { CREDENTIAL_PATTERN, isGenerated, quoteInNote, whyNotRead } from './rules';
 import { mergeChunkReports, noteMapSchema, readChunkReport } from './proposal';
+import { offerThemes } from './themes';
 
 /**
  * One note into a proposed map, without a network.
@@ -176,6 +177,25 @@ describe('a note that is read', () => {
     expect(result.proposal.positions.map((p) => p.name)).toEqual([PEOPLE.name]);
     expect(result.proposal.dropped).toEqual([{ name: PARKING.name, why: 'quote-missing' }]);
     expect(result.proposal.edges).toEqual([]);
+  });
+
+  it('sends the offered theme names with each section, nearest first, capped at 200', async () => {
+    const { client, create } = stub(classified(), report({ themes: [], positions: [], edges: [] }));
+    const strongest = Array.from({ length: 200 }, (_, i) => `Strong ${i}`);
+    await proposeNoteMap({
+      note: note(),
+      existingThemes: offerThemes(['Walkable neighbourhoods', 'Car dependence'], strongest),
+      anthropicApiKey: 't',
+      client,
+    });
+    const sent = create.mock.calls[1][0].messages[0].content as string;
+    const listed = sent
+      .split('\n')
+      .filter((line) => line.startsWith('- '))
+      .map((line) => line.slice(2));
+    expect(listed.slice(0, 3)).toEqual(['Walkable neighbourhoods', 'Car dependence', 'Strong 0']);
+    expect(listed).toHaveLength(200);
+    expect(listed).not.toContain('Strong 198');
   });
 
   it('does not read a note the classifier calls operational', async () => {

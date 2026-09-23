@@ -4,6 +4,7 @@ import type { AcceptResult } from '@/lib/vault/map/accept';
 import type { MapNote, ProposeResult } from '@/lib/vault/map/extract';
 import type { NoteMapProposal } from '@/lib/vault/map/proposal';
 import { tooShortForMap, whyNotRead } from '@/lib/vault/map/rules';
+import { offerThemes } from '@/lib/vault/map/themes';
 
 /**
  * The sweep: every note in the vault read into the map, a few minutes at a
@@ -92,6 +93,12 @@ export type SweepPorts = {
   settledVersions(noteIds: string[]): Promise<Map<string, string>>;
   /** The person's theme names, strongest first. */
   themeNames(): Promise<string[]>;
+  /**
+   * The person's theme names nearest this note, closest first (plan #818).
+   * Offered ahead of the strongest. Returns none rather than throwing when
+   * the note cannot be embedded; the note is then offered the strongest only.
+   */
+  nearestThemes?(note: MapNote): Promise<string[]>;
   propose(note: MapNote, existingThemes: string[]): Promise<ProposeResult>;
   accept(proposal: NoteMapProposal): Promise<AcceptResult>;
   /** Write or replace this note's row in the sweep. */
@@ -201,9 +208,16 @@ async function sweepOne(
 
   await ports.record(row(note, 'reading', null));
 
+  let nearest: string[] = [];
+  try {
+    nearest = (await ports.nearestThemes?.(note)) ?? [];
+  } catch {
+    // Only a nudge towards names in use: the note is read without it.
+  }
+
   let result: ProposeResult;
   try {
-    result = await ports.propose(note, await themes());
+    result = await ports.propose(note, offerThemes(nearest, await themes()));
   } catch (error) {
     return row(note, 'failed', message(error, 'Reading the note failed.'));
   }
