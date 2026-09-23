@@ -223,6 +223,11 @@ export default async function NewsPage({
                         <span className="mt-0.5 block truncate text-ui text-ink-muted">
                           {sender ? senderLabel(sender) : 'Unknown sender'}
                         </span>
+                        {issue.summaryLine && (
+                          <span className="mt-0.5 block truncate text-ui text-ink-muted">
+                            {issue.summaryLine}
+                          </span>
+                        )}
                       </span>
                       <span className="shrink-0 text-ui text-ink-muted">
                         {formatArrival(issue.receivedAt, settings.timezone)}

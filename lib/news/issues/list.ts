@@ -9,6 +9,12 @@ export type NewsIssue = {
   subject: string | null;
   receivedAt: string;
   readAt: string | null;
+  /**
+   * The one-line summary Haiku wrote for the list (#824), or null while the
+   * issue has not been summarised or its summary failed. The list draws it
+   * under the sender and draws nothing extra without it (#825).
+   */
+  summaryLine: string | null;
 };
 
 /** Who has written to your address. */

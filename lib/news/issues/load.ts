@@ -41,7 +41,7 @@ export async function loadIssues(
   client: NewsSupabaseClient,
   { topic = null }: { topic?: NewsTopic | null } = {},
 ): Promise<NewsIssue[]> {
-  let query = client.from('issues').select('id, sender_id, subject, received_at, read_at');
+  let query = client.from('issues').select('id, sender_id, subject, received_at, read_at, summary_line');
   if (topic) query = query.contains('stories', JSON.stringify([{ topic }]));
   const { data, error } = await query.order('received_at', { ascending: false }).limit(PAGE);
   assertSchemaExposed(error, NEWS_SCHEMA);
@@ -52,6 +52,7 @@ export async function loadIssues(
     subject: (row.subject as string | null) ?? null,
     receivedAt: row.received_at as string,
     readAt: (row.read_at as string | null) ?? null,
+    summaryLine: (row.summary_line as string | null) ?? null,
   }));
 }
 
