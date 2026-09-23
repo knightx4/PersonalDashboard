@@ -1617,6 +1617,17 @@ const quickStory: QuickReadViewProps = {
   picturesHref: '/news?pictures=0',
   issueHref: '/news/i/issue-1',
   seed: 'preview:2026-09-23:news',
+  topics: {
+    topics: ['Politics', 'Business', 'Technology', 'Culture'],
+    selected: null,
+    hrefs: {
+      Politics: '/news?topic=Politics',
+      Business: '/news?topic=Business',
+      Technology: '/news?topic=Technology',
+      Culture: '/news?topic=Culture',
+    },
+    allHref: '/news',
+  },
 };
 
 /** A single-essay newsletter as one card: its subject and its summary, no picture. */

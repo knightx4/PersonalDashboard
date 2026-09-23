@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Image as ImageIcon, ImageOff, Mail } from 'lucide-react';
 import { StoryText } from '@/components/news/story-text';
+import { TopicChips, type TopicChipsProps } from '@/components/news/topic-chips';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -23,6 +24,8 @@ export type QuickReadViewProps = {
   issueHref: string | null;
   /** What the caught-up mark is drawn from: the account and the day. */
   seed: string;
+  /** The topic chips above the card (plan #860); `selected` is the topic in force. */
+  topics: Omit<TopicChipsProps, 'className'>;
 };
 
 const DESCRIPTION = 'One story at a time from your newsletters, newest first.';
@@ -39,12 +42,25 @@ export function QuickReadView({
   picturesHref,
   issueHref,
   seed,
+  topics,
 }: QuickReadViewProps) {
+  const topic = topics.selected;
+  const chips = <TopicChips {...topics} className="mb-4" />;
+
   if (!card) {
     return (
       <div className="mx-auto max-w-2xl">
         <PageHeader title="Quick read" description={DESCRIPTION} />
-        {nothingYet ? (
+        {chips}
+        {topic ? (
+          <EmptyState
+            tone="finished"
+            seed={seed}
+            title={`Nothing left on ${topic}`}
+            description="You have been through every story on this topic from the newsletters you have not muted. The other topics are still waiting."
+            action={{ label: 'Show every topic', href: topics.allHref }}
+          />
+        ) : nothingYet ? (
           <EmptyState
             icon={Mail}
             title="Nothing to read yet"
@@ -96,6 +112,7 @@ export function QuickReadView({
           )
         }
       />
+      {chips}
 
       <QuickSwipe key={`${card.issueId}:${card.storyIndex}`}>
         <Card padding="none" className="overflow-hidden">
@@ -139,8 +156,8 @@ export function QuickReadView({
             <div className="card-pad-x flex flex-wrap items-center justify-between gap-3 border-t border-border py-3">
               <p className="text-ui text-ink-muted">
                 {left === 0
-                  ? 'The last story from this newsletter'
-                  : `${left} more from this newsletter`}
+                  ? `The last ${topic ? `${topic} story` : 'story'} from this newsletter`
+                  : `${left} more ${topic ? `on ${topic} ` : ''}from this newsletter`}
               </p>
               <QuickNextForm issueId={card.issueId} storyIndex={card.storyIndex} />
             </div>
