@@ -23,7 +23,7 @@ vi.mock('@/lib/learn/graph/load', () => ({
 const TRACK_A = '00000000-0000-4000-8000-00000000000a';
 const TRACK_B = '00000000-0000-4000-8000-00000000000b';
 
-const { takeWaiting } = await import('./ahead');
+const { putBack, takeWaiting } = await import('./ahead');
 
 type Row = {
   id: string;
@@ -128,3 +128,32 @@ describe('takeWaiting with a track', () => {
     expect((await takeWaiting(client, { resume: true, track: TRACK_A }))?.probeId).toBe('p2');
   });
 });
+
+/**
+ * Note 7ccc6f99: Not now puts the question back, unshown and at the end of the
+ * queue, and only while it is unanswered.
+ */
+describe('putBack', () => {
+  it('unshows the question, dates it now, and leaves an answered one alone', async () => {
+    const calls: { update?: Record<string, unknown>; eq?: [string, string]; is: string[] } = {
+      is: [],
+    };
+    const builder = {
+      update: (values: Record<string, unknown>) => ((calls.update = values), builder),
+      eq: (column: string, value: string) => ((calls.eq = [column, value]), builder),
+      not: () => builder,
+      is: (column: string) => (calls.is.push(column), builder),
+      then: (resolve: (value: unknown) => void) => resolve({ error: null }),
+    };
+    const client = { from: () => builder } as unknown as LearnSupabaseClient;
+
+    const before = Date.now();
+    await putBack(client, 'p1');
+
+    expect(calls.eq).toEqual(['id', 'p1']);
+    expect(calls.update?.shown_at).toBeNull();
+    expect(new Date(String(calls.update?.created_at)).getTime()).toBeGreaterThanOrEqual(before);
+    expect(calls.is).toContain('answered_at');
+  });
+});
+
