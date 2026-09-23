@@ -179,9 +179,8 @@ export const MODULES: readonly AppModule[] = [
   {
     id: 'news',
     prefix: '/news',
-    // The list of what has arrived. "What have I been sent" is the question
-    // this module answers, and the address is a setting rather than a page you
-    // come back to.
+    // Quick read, one story at a time (#848). The list of what has arrived is
+    // /news/all, the second tab.
     home: '/news',
     label: 'News',
     description: 'Newsletters sent to an address of your own',

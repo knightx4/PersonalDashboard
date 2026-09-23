@@ -33,5 +33,6 @@ export async function setSenderMuted(formData: FormData): Promise<void> {
   assertSchemaExposed(error, NEWS_SCHEMA);
   if (error) throw new Error(`news: muting that sender failed (${error.message})`);
 
+  revalidatePath('/news/all');
   revalidatePath('/news');
 }

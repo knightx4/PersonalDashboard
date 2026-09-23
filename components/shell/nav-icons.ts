@@ -9,6 +9,7 @@ import {
   Bug,
   Building2,
   FileText,
+  GalleryHorizontalEnd,
   CalendarClock,
   CalendarDays,
   CalendarRange,
@@ -112,6 +113,9 @@ export const NAV_ICONS = {
   // the tab and the mark name the same thing and picking a second object for
   // it would say there are two.
   newsletters: Mail,
+  // Quick read deals the stories out one card at a time, so it gets the
+  // stack of cards.
+  quickRead: GalleryHorizontalEnd,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
 } as const;

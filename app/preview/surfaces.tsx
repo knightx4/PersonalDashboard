@@ -1517,7 +1517,7 @@ const issueBase: IssueViewProps = {
   issueId: 'issue-1',
   subject: 'The Week in Infrastructure #212: queues, caches and one bad deploy',
   byline: 'Infra Weekly · Tue 22 Sep, 07:14',
-  back: { href: '/news', label: 'Newsletters' },
+  back: { href: '/news/all', label: 'Newsletters' },
   digest: {
     summary:
       'A quieter week for launches and a busy one for post-mortems. The lead piece walks through how a payments company lost six hours to a cache that kept serving stale balances after a failover, and what they changed. Elsewhere: a benchmark of three Postgres-backed job queues, a new release of a popular tracing library, and a short essay on why most teams do not need Kubernetes yet.',
@@ -1614,7 +1614,7 @@ const quickStory: QuickReadViewProps = {
   arrived: '22 Sep, 07:14',
   nothingYet: false,
   pictures: true,
-  picturesHref: '/news/quick?pictures=0',
+  picturesHref: '/news?pictures=0',
   issueHref: '/news/i/issue-1',
   seed: 'preview:2026-09-23:news',
 };
