@@ -482,6 +482,7 @@ const CONTENTS: readonly (readonly [string, string])[] = [
   ['shell', 'The shell'],
   ['states', 'States'],
   ['first-run', 'First run'],
+  ['progress', 'Progress'],
   ['touch', 'Touch'],
   ['alive', 'Alive'],
   ['a11y', 'Accessibility'],
@@ -1577,6 +1578,10 @@ export default function DevUiPage() {
 
       <Section id="first-run" title="First run">
         <Rules items={C.FIRST_RUN} />
+      </Section>
+
+      <Section id="progress" title="Progress" lead={C.PROGRESS_LEAD}>
+        <Rules items={C.PROGRESS} />
       </Section>
 
       <Section id="touch" title="Touch">

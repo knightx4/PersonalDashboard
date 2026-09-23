@@ -180,6 +180,7 @@ export const SEARCH: readonly string[] = [
 
 export const SAVE_MODEL: readonly string[] = [
   'Pick one model per surface and make it obvious which. Settings-shaped things autosave on blur with a quiet "saved" in the toast. Object-shaped things — an order, a role — have an explicit Save. Never mix them in one panel.',
+  'Every field the app can answer starts answered. Today’s date, the merchant you usually buy from, the stage a new application starts in, the timezone the browser already knows. The person checks and changes a default; they should not have to type what the app already had. A default is a guess and must read as one: prefilled, editable, and never saved without being seen.',
   'Validate on blur, not on keystroke. Telling someone their email is invalid while they are still typing it is scolding them for not having finished.',
   'Re-validate and show every error on submit, and move focus to the first one.',
   'Never lose typing. A form with unsaved changes warns before navigation; a multi-step form keeps its state in the URL or in storage.',
@@ -283,6 +284,22 @@ export const FIRST_RUN: readonly string[] = [
   'Onboarding asks for exactly one thing and explains what it gets you before it asks. The Gmail pre-consent screen is the model.',
   'Skip is always available and never punished. A workspace that will not open without a connected mailbox loses the person who wanted to try it.',
   'The empty-to-full transition is a designed moment. A first sync mid-flight says so, says what it has found so far, and does not pretend to be finished.',
+];
+
+// ---------------------------------------------------------------------------
+// Progress
+// ---------------------------------------------------------------------------
+
+export const PROGRESS_LEAD =
+  'This is a tool for one person, so nothing here exists to keep anyone coming back. Progress is shown when it is real, and never invented to create a reason to open the app.';
+
+export const PROGRESS: readonly string[] = [
+  'Show that you got better at the thing, not that you opened the app. A Learn concept moving from shaky to solid is progress; a count of sessions is not.',
+  'Show change over time where the state is earned. A page that shows where you stand today should also be able to say how far you moved this month.',
+  'Finishing is the reward. A cleared list gets the finished state and the sigil, and nothing louder.',
+  'No streaks, points, badges or levels. A run count turns a habit into something you can lose, and missing a day should cost nothing.',
+  'Compare against your own past, not against anyone else. This month against your own average is a fair comparison; there is nobody else to rank against.',
+  'Every mechanic added is one more thing to manage. If the progress display needs looking after, it is getting in the way of the work it measures.',
 ];
 
 // ---------------------------------------------------------------------------
@@ -553,6 +570,7 @@ export const CHECKLIST: readonly string[] = [
   'A section with nothing in it is not rendered, and a source that could fail says so in place when it does.',
   'Filters, search, sort, group and tab live in the URL and survive a refresh and the back button. Search works with JavaScript off.',
   'There is a loading file rendering this page’s real shape, and an error file.',
+  'Every field the app could answer arrives prefilled.',
   'Every write has a latency tier, and an optimistic one has its failure path in the same commit.',
   'Reversible actions offer undo. Only irreversible ones confirm, in place.',
   'The list can be worked from the keyboard: move, open, select, act, escape. Focus is visible; popovers trap and return it.',
@@ -578,4 +596,5 @@ export const NEVER: readonly string[] = [
   'A spinner where a skeleton of the real shape would do.',
   'A flourish next to a number, or a flourish that cannot be turned off.',
   'Delay the user to be charming.',
+  'A streak, or any count that punishes a missed day.',
 ];
