@@ -4,7 +4,7 @@ import { after } from 'next/server';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { fillQueue, nextQuestion } from '@/lib/learn/flow/ahead';
+import { fillQueue, nextQuestion, putBack } from '@/lib/learn/flow/ahead';
 import {
   loadTrackOffer,
   recordTrackOffer,
@@ -68,15 +68,42 @@ export async function flowStep(prev: FlowState, formData: FormData): Promise<Flo
   const track = trackFrom(formData);
   const intent = formData.get('intent');
 
+  // Not now is a button on the answer form, so it arrives carrying that
+  // form's intent and is told apart by its own field.
   const state =
-    intent === 'answer'
-      ? await answerFlowQuestion(prev, formData, track)
-      : intent === 'start-track'
-        ? await startOfferedTrack(prev, formData, user.id)
-        : toFlowState(await nextQuestion(supabase, user.id, { resume: false, track }));
+    formData.get('notNow') === '1'
+      ? await notNow(prev, track, user.id)
+      : intent === 'answer'
+        ? await answerFlowQuestion(prev, formData, track)
+        : intent === 'start-track'
+          ? await startOfferedTrack(prev, formData, user.id)
+          : toFlowState(await nextQuestion(supabase, user.id, { resume: false, track }));
 
   after(() => fillQueue(supabase, user.id, track));
   return state;
+}
+
+/**
+ * Not now, on a question (note 7ccc6f99): the next question comes up and this
+ * one goes back to the end of the queue, unanswered, so it counts neither way
+ * and is asked again later.
+ *
+ * The next one is taken before this one is put back, so the question just set
+ * aside cannot be the one that comes up. With nothing else to ask, the same
+ * question stays on the screen rather than the flow saying it is finished.
+ */
+async function notNow(prev: FlowState, track: string | null, userId: string): Promise<FlowState> {
+  if (!prev.probeId || prev.answered) return prev;
+  const supabase = await createLearnClient();
+
+  const next = await nextQuestion(supabase, userId, { resume: false, track });
+  if (next.kind === 'error') return { ...prev, error: next.detail };
+  if (next.kind === 'nothing') {
+    return { ...prev, error: 'Nothing else to ask right now, so this one stays.' };
+  }
+
+  await putBack(supabase, prev.probeId);
+  return toFlowState(next);
 }
 
 const ThemeId = z.string().uuid();

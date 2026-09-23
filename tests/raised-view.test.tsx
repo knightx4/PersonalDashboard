@@ -24,6 +24,7 @@ vi.mock('@/app/dev/raised/actions', () => {
 // only needs them to be functions.
 vi.mock('@/app/dev/plan/actions', () => ({
   setPlanItemStatus: async () => ({}),
+  answerBlockedStep: async () => ({}),
   answerPlanDecision: async () => ({}),
   approvePlanItem: async () => ({}),
   approveProposals: async () => ({}),
@@ -87,7 +88,9 @@ function groupsFrom(waiting: WaitingRow[], open: readonly RaisedRow[]): WaitingG
 
 function render(rows: RaisedRow[], waiting: WaitingRow[] = []): string {
   const queue = raisedQueueFrom(rows);
-  return renderToStaticMarkup(<RaisedView queue={queue} groups={groupsFrom(waiting, queue.open)} />);
+  return renderToStaticMarkup(
+    <RaisedView queue={queue} groups={groupsFrom(waiting, queue.open)} />,
+  );
 }
 
 /** A question as the plan writes one: the options lettered, one to a line. */
@@ -252,7 +255,7 @@ describe('a question on the page', () => {
     waitingRow({
       id: 'q1',
       number: 630,
-      title: 'Does Approve all cover Claude\'s requests too?',
+      title: "Does Approve all cover Claude's requests too?",
       health: 'unanswered',
       ask: QUESTION_DETAIL,
       detail: QUESTION_DETAIL,
@@ -328,6 +331,15 @@ describe('a stopped step on the page', () => {
     expect(html).not.toContain('value="done"');
   });
 
+  // Note e663940b: a step stopped on a question is drawn under Questions for
+  // you, and what finishes it is an answer, not the press for a job.
+  it('offers an answer rather than the job press when the step asks a question', () => {
+    const html = render([], [stopped({ ask: 'Should the digest go out on Sunday or Monday?' })]);
+
+    expect(html).toContain('Answer');
+    expect(html).not.toContain('I have done this');
+  });
+
   it('offers no such press on the three that are not stopped', () => {
     for (const health of ['setup', 'unanswered', 'proposed'] as const) {
       const html = render([], [waitingRow({ health })]);
@@ -388,7 +400,12 @@ describe('approving the whole group', () => {
   const request = (over: Record<string, unknown> = {}) =>
     raise({
       id: 'r9',
-      consequence: { name: 'file_idea', text: 'Refuse a second session', module: null, field: null },
+      consequence: {
+        name: 'file_idea',
+        text: 'Refuse a second session',
+        module: null,
+        field: null,
+      },
       ...over,
     });
 

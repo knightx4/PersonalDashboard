@@ -392,8 +392,9 @@ describe('PlanView', () => {
     expect(render('claude')).toContain('The anonymous page');
     expect(html).toContain('>Ready<');
     expect(html).toContain('Waits on #3');
-    // One of the feature's three leaf steps is done; the rest are not started.
-    expect(html).toContain('1 done, 2 not started of 3');
+    // Of the feature's three leaf steps one is done, one is ready and one waits
+    // on #3; ready and not ready lead (note c12fe73a).
+    expect(html).toContain('1 ready, 1 not ready, 1 done of 3');
     // The note stands in for the missing detail under the title.
     expect(html).toContain('Note: Waiting on the RPC review.');
   });

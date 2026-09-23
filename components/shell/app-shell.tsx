@@ -550,7 +550,15 @@ export function AppShell({
             // The ground, not a container: the sidebar and the page pane are both
             // laid on it, and it carries the workspace's wash. See `.shell-ground`
             // in globals.css.
-            'shell-ground min-h-dvh lg:grid lg:h-dvh lg:overflow-hidden',
+            'shell-ground min-h-dvh lg:relative lg:grid lg:h-dvh lg:overflow-hidden',
+            // `relative` so the clip holds. Overflow only clips what it is the
+            // containing block for, and an unpositioned ground left every
+            // `sr-only` label deep in a long pane positioned against the
+            // viewport instead, below its foot. The document grew by that much,
+            // and a wheel over the sidebar scrolled it past the status line
+            // (note 13cc41c1). The ground fills the window, so nothing that was
+            // placed against the viewport moves.
+
             // The inset the page pane floats in. Six pixels of ground showing on
             // every side is what turns two panels butted together into an object
             // laid on a surface.

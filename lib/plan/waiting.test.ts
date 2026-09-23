@@ -310,6 +310,11 @@ describe('waitingGroups', () => {
     expect(isJobForYou('Add the Mailgun API key to the Vercel project.')).toBe(true);
     expect(isJobForYou('A token, scoped to this repo.')).toBe(true);
     expect(isJobForYou('Allow ocw.mit.edu in the session network policy.')).toBe(true);
+    expect(
+      isJobForYou(
+        'The code is on main, but no proposals can be written until the Anthropic API usage limit is raised or lifts on 1 October.',
+      ),
+    ).toBe(true);
     expect(isJobForYou('Which of the two layouts do you want?')).toBe(false);
     expect(
       isJobForYou('Answer twenty applied cases and say whether a second turn is worth it.'),
