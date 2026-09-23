@@ -15,6 +15,8 @@ import {
 } from '@/lib/review/attach-email';
 import { fetchMessageBody } from '@/lib/inbox/fetch-message-body';
 import { applyLifecycleToOrder } from '@/lib/orders/apply-lifecycle';
+import type { ReadOutcome } from '@/lib/review/read-order';
+import { loadReadOrderContext, readOrderFromMessage } from '@/lib/review/read-order-server';
 
 export interface ActionState {
   error?: string;
@@ -397,6 +399,26 @@ export async function attachEmailToOrder(
       orderDate: order.order_date as string,
     }),
   };
+}
+
+/**
+ * Read an order out of a waiting order confirmation, without saving anything.
+ *
+ * Fetches the email from Gmail again and runs the extractor over it; what the
+ * extractor misses comes from the email (sender, date, order number). The
+ * draft is in the order form's terms, for the form or a save to start from.
+ * Nothing is written, so nothing is revalidated.
+ */
+// latency: pending
+export async function readOrderFromEmail(messageId: string): Promise<ReadOutcome> {
+  if (!z.string().uuid().safeParse(messageId).success) {
+    return { messageId, subject: null, ok: false, error: 'That email is not one we can read.' };
+  }
+  const user = await requireUser();
+  const supabase = await createClient();
+  const core = await createCoreClient();
+  const context = await loadReadOrderContext(supabase, user.id);
+  return readOrderFromMessage(supabase, core, context, messageId);
 }
 
 /**
