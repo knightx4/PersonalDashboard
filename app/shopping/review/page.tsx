@@ -35,7 +35,7 @@ export default async function ReviewPage({
   const params = await searchParams;
   const view = parseReviewView(params.view);
 
-  const { rows: allRows, counts } = await loadReviewQueue(supabase, core, user.id);
+  const { rows: allRows, counts, searchOrders } = await loadReviewQueue(supabase, core, user.id);
   const rows = filterReviewRows(allRows, view);
 
   return (
@@ -57,6 +57,7 @@ export default async function ReviewPage({
         <ReviewQueue
           rows={rows}
           view={view}
+          searchOrders={searchOrders}
           seed={`${user.id}:${new Date().toISOString().slice(0, 10)}:review`}
         />
       </div>
