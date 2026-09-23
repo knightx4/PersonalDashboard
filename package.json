@@ -17,7 +17,8 @@
     "check:ebay": "tsx scripts/check-ebay.ts",
     "typecheck": "tsc --noEmit",
     "share:add": "tsx scripts/share-add.ts",
-    "catalogue": "tsx --conditions=react-server scripts/learn-catalogue.ts"
+    "catalogue": "tsx --conditions=react-server scripts/learn-catalogue.ts",
+    "news:digest": "tsx --conditions=react-server scripts/news-digest.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

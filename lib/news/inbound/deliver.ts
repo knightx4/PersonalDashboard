@@ -5,13 +5,19 @@ import type { NewsStore } from './store';
 /**
  * What became of one delivery.
  *
+ * `stored` carries the account and the new issue's id, which is what the
+ * inbound route needs to summarise the issue once it has answered.
+ *
  * `unaddressed` is not an error. Mail arrives at this domain addressed to
  * names nobody has ever held -- a guess, a harvested list, an address that was
  * replaced -- and the answer to all of it is to drop the message and tell the
  * service everything is fine. A bounce would answer the one question the
  * sender wanted answered, which is whether the address exists.
  */
-export type Delivery = 'stored' | 'repeat' | 'unaddressed';
+export type Delivery =
+  | { status: 'stored'; userId: string; issueId: string }
+  | { status: 'repeat' }
+  | { status: 'unaddressed' };
 
 /**
  * Store one message, or decide not to.
@@ -25,11 +31,13 @@ export async function deliver(
   domain: string,
 ): Promise<Delivery> {
   const localPart = localPartOf(message.recipient, domain);
-  if (!localPart) return 'unaddressed';
+  if (!localPart) return { status: 'unaddressed' };
 
   const userId = await store.accountFor(localPart);
-  if (!userId) return 'unaddressed';
+  if (!userId) return { status: 'unaddressed' };
 
   const senderId = await store.senderFor(userId, message.senderEmail, message.senderName);
-  return store.storeIssue({ userId, senderId, message });
+  const stored = await store.storeIssue({ userId, senderId, message });
+  if (stored === 'repeat') return { status: 'repeat' };
+  return { status: 'stored', userId, issueId: stored.issueId };
 }

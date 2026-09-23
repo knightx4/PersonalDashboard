@@ -11,7 +11,9 @@ import { NEWS_SCHEMA, type NewsSupabaseClient } from '@/lib/news/db/schema-name'
  * Bypasses RLS, so every query made through it must say whose rows it is
  * touching. Import it only from the inbound route, which genuinely has no
  * session: a message posted by the mail service arrives with nobody signed in,
- * and the address it was sent to is the only thing that says whose it is.
+ * and the address it was sent to is the only thing that says whose it is. The
+ * one other caller is scripts/news-digest.ts, which summarises stored issues
+ * across accounts and passes each issue's own user id down.
  * Everything a page or an action does goes through lib/news/auth/server.ts and
  * the policies instead.
  *
