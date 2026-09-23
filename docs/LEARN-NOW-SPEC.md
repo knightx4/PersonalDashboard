@@ -99,6 +99,32 @@ opening the source. Scrolling past a card records nothing, the same rule
 LEARN-GRAPH-SPEC holds What next to. Not interested lowers the weight of that
 card's theme or field for later draws; Save raises it.
 
+### How the page records it (plan #808)
+
+Each deliberate action sets the card's status in `learn.feed_cards`, with
+`acted_at`:
+
+- **Opening the source** marks it `opened`, only if nothing else has been done
+  to it.
+- **Save** marks it `saved` and puts the section on one reading list, "Saved
+  from Learn now", made the first time something is saved. The article is the
+  source and the section is the reading's locator. The reading's id is kept on
+  the card as `saved_reading_id`.
+- **Not interested** marks it `dismissed`.
+- **Test me on this** starts a track and marks the card `tested`, with the
+  track in `subject_id`. The track is the article and the goal is the card's
+  title ("Urbanization: Causes"), written with the same call a track from a
+  theme uses and no approval screen. A second card from the same article adds
+  to the same track. Practice Flow then opens on that track.
+
+The first decision stands: once a card is saved, dismissed or tested, nothing
+but Test me after a Save moves it again.
+
+Passing a card records nothing, so the page keeps the list of cards already on
+the screen and asks only for others. A card you passed comes back on your next
+visit, newest cards first. The tab's badge counts your queued readings, not the
+cards, since there are always about twenty of those.
+
 ## Cost
 
 Two model calls per card, one to name the material and one to write the card.

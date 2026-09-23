@@ -55,9 +55,10 @@ export default async function LearnLayout({ children }: { children: React.ReactN
   const readNow = await countReadNow(learnClient);
 
   const sections: NavSection[] = [
-    // Learn now replaced the Read now tab (plan #805). Until its feed is
-    // built (plan #808) it shows the readings you queued, so the badge is still
-    // their count: the tab answers "is there anything" from the column.
+    // Learn now replaced the Read now tab (plan #805). The badge counts the
+    // readings you queued, which the feed shows first, and not the cards it
+    // wrote: there are always about twenty of those, and a number that never
+    // goes down is not information (plan #808).
     {
       href: '/learn/now',
       label: 'Learn now',

@@ -42,6 +42,8 @@ async function upsertSource(
   supabase: LearnSupabaseClient,
   userId: string,
   resolved: ResolvedSource,
+  /** The catalogue row this source was read from, when it came out of the catalogue. */
+  catalogueItemId: string | null = null,
 ): Promise<string> {
   const url = resolved.canonical_url ?? null;
 
@@ -70,6 +72,7 @@ async function upsertSource(
       price_cents: resolved.price_cents ?? null,
       page_count: resolved.page_count ?? null,
       access_checked_at: new Date().toISOString(),
+      catalogue_item_id: catalogueItemId,
     })
     .select('id')
     .single();
@@ -511,4 +514,104 @@ export async function savePlan(
   if (error) throw messageFor('Saving the plan', error);
 
   return readings.length;
+}
+
+/** The reading list Save on a Learn now card puts the section on. */
+export const SAVED_FROM_FEED = 'Saved from Learn now';
+
+/**
+ * Save a Learn now card's section to a reading list (plan #808).
+ *
+ * One list, "Saved from Learn now", found by its title and made the first time
+ * something is saved. The article is the source, deduped on its URL like any
+ * other, and the section is the reading's locator, opened at its anchor. The
+ * card's why line comes with it, so the list says why each row is there.
+ *
+ * The section was fetched when the card was written, but the locator is still
+ * written unverified: promoting a locator is the locate pass's job alone.
+ */
+export async function saveFeedSection(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  input: {
+    article: string;
+    section: string | null;
+    articleUrl: string;
+    link: string;
+    why: string;
+    catalogueItemId: string;
+  },
+): Promise<{ trackId: string; readingId: string }> {
+  const { data: found, error: findError } = await supabase
+    .from('tracks')
+    .select('id')
+    .eq('title', SAVED_FROM_FEED)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  assertSchemaExposed(findError, LEARN_SCHEMA);
+  if (findError) throw messageFor('Finding your saved list', findError);
+
+  const trackId =
+    (found as { id: string } | null)?.id ??
+    (await createTrack(supabase, userId, {
+      title: SAVED_FROM_FEED,
+      question: 'What you saved from the Learn now feed.',
+    }));
+
+  const sourceId = await upsertSource(
+    supabase,
+    userId,
+    {
+      title: input.article,
+      author: null,
+      kind: 'article',
+      year: null,
+      canonical_url: input.articleUrl,
+      access: 'open',
+      price_cents: null,
+      page_count: null,
+      locator_kind: input.section ? 'section' : 'whole',
+      locator_label: input.section,
+      page_from: null,
+      page_to: null,
+      locator_basis: 'Saved from a Learn now card, which was written from this section.',
+      locator_verified: false,
+      why: input.why,
+      not_found: false,
+    },
+    input.catalogueItemId,
+  );
+
+  const { data: last } = await supabase
+    .from('readings')
+    .select('position')
+    .eq('track_id', trackId)
+    .order('position', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const position = ((last as { position: number } | null)?.position ?? 0) + 10;
+
+  const { data, error } = await supabase
+    .from('readings')
+    .insert({
+      user_id: userId,
+      track_id: trackId,
+      source_id: sourceId,
+      position,
+      locator_kind: input.section ? 'section' : 'whole',
+      locator_label: input.section,
+      open_url: input.link,
+      locator_confidence: 'unverified',
+      locator_basis: input.section
+        ? `The "${input.section}" section, saved from a Learn now card.`
+        : 'The article’s opening, saved from a Learn now card.',
+      why: input.why,
+    })
+    .select('id')
+    .single();
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error || !data) throw messageFor('Saving that', error ?? { message: 'no row' });
+  return { trackId, readingId: (data as { id: string }).id };
 }
