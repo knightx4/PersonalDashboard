@@ -628,3 +628,102 @@ describe('undo_merges_for_rule and requeue_merge_proposals (plan #879)', () => {
     await admin`delete from themes where id = ${taken}`;
   });
 });
+
+describe('apply_merge_proposals for positions (plan #882)', () => {
+  let userD = '';
+  let connectionD = '';
+
+  beforeAll(async () => {
+    userD = await createUser('merge-positions@example.com');
+    const [conn] = await admin<{ id: string }[]>`
+      insert into vault_connections (user_id, repo_owner, repo_name, branch, access_token)
+      values (${userD}, 'dora', 'dora-vault', 'main', 'encrypted')
+      returning id`;
+    connectionD = conn.id;
+  });
+
+  /** A position quoted from a note of its own, so no two share a note. */
+  async function positionIn(name: string): Promise<string> {
+    const [n] = await admin<{ id: string }[]>`
+      insert into notes (user_id, connection_id, path, title, body, blob_sha, size_bytes, git_updated_at)
+      values (${userD}, ${connectionD}, ${`${name}.md`}, ${name}, ${`Body of ${name}.`},
+              ${`sha-${name}`}, 2000, now() - interval '100 days')
+      returning id`;
+    const [p] = await admin<{ id: string }[]>`
+      insert into positions (user_id, name, statement, basis, kind, stance)
+      values (${userD}, ${name}, ${`${name}, stated.`}, 'Stated in the note.', 'claim', 'held')
+      returning id`;
+    await admin`insert into position_sources (user_id, position_id, note_id, quote, blob_sha)
+                values (${userD}, ${p.id}, ${n.id}, ${`${name}.`}, 'sha')`;
+    return p.id;
+  }
+
+  async function propose(x: string, y: string, survivor: string, name: string, confidence: number) {
+    const [lo, hi] = [x, y].sort();
+    const [row] = await admin<{ id: string }[]>`
+      insert into map_merge_proposals (user_id, kind, a_id, b_id, a_name, b_name, source,
+                                       verdict, survivor_id, survivor_name, reason, confidence, model)
+      values (${userD}, 'position', ${lo}, ${hi},
+              (select name from positions where id = ${lo}), (select name from positions where id = ${hi}),
+              'embedding', 'same', ${survivor}, ${name}, 'One position.', ${confidence}, 'claude-haiku-4-5')
+      returning id`;
+    return row.id;
+  }
+
+  async function apply() {
+    const [row] = await admin<{ r: Record<string, number> }[]>`
+      select apply_merge_proposals('position', ${userD}) as r`;
+    return row.r;
+  }
+
+  async function outcome(proposalId: string) {
+    const [row] = await admin<{ apply_outcome: string | null }[]>`
+      select apply_outcome from map_merge_proposals where id = ${proposalId}`;
+    return row.apply_outcome;
+  }
+
+  it('marks a proposal whose side was absorbed since, and offers the survivor and the other side as a new pair', async () => {
+    // Names far apart and no embeddings, so the search would not find the
+    // carried pair on its own.
+    const kept = await positionIn('Walking is transport');
+    const gone = await positionIn('Feet count as a mode');
+    const other = await positionIn('Pavements are infrastructure');
+    const p1 = await propose(kept, gone, kept, 'Walking is transport', 0.95);
+    const p2 = await propose(gone, other, gone, 'Feet count as a mode', 0.9);
+
+    expect(await apply()).toMatchObject({ merged: 1, absorbed: 1, joined: 0, remaining: 0 });
+    expect(await outcome(p1)).toBe('merged');
+    expect(await outcome(p2)).toBe('absorbed');
+    // Nothing was merged into the survivor for p2.
+    const [left] = await admin<{ n: number }[]>`
+      select count(*)::int as n from positions where id = ${other}`;
+    expect(left.n).toBe(1);
+    const merges = await admin<{ proposal_id: string }[]>`
+      select proposal_id from map_merges where user_id = ${userD}`;
+    expect(merges.map((m) => m.proposal_id)).toEqual([p1]);
+
+    const [lo, hi] = [kept, other].sort();
+    const candidates = async () =>
+      admin<{ a_id: string; b_id: string; a_name: string; b_name: string }[]>`
+        select a_id, b_id, a_name, b_name
+        from position_merge_candidates(1000, ${userD}, 5, 0.75, 0.5)`;
+    const first = await candidates();
+    // The carried pair comes first, named as the two positions read now.
+    expect(first[0]).toMatchObject({ a_id: lo, b_id: hi });
+    expect([first[0].a_name, first[0].b_name].sort()).toEqual([
+      'Pavements are infrastructure',
+      'Walking is transport',
+    ]);
+    // It is read from the absorbed proposal, not written into the search's cache.
+    const [cached] = await admin<{ n: number }[]>`
+      select count(*)::int as n from position_pairs where a_id = ${lo} and b_id = ${hi}`;
+    expect(cached.n).toBe(0);
+
+    // Judged as one position, it merges directly, and is not offered again.
+    const p3 = await propose(kept, other, kept, 'Walking is transport', 0.9);
+    expect(await apply()).toMatchObject({ merged: 1, absorbed: 0, remaining: 0 });
+    expect(await outcome(p3)).toBe('merged');
+    const after = await candidates();
+    expect(after.some((c) => [c.a_id, c.b_id].includes(other))).toBe(false);
+  });
+});
