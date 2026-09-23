@@ -80,6 +80,7 @@ describe('the operation names', () => {
       'propose-theme-merges',
       'propose-position-merges',
       'write-survey-idea',
+      'write-survey-question',
     ]);
   });
 });
