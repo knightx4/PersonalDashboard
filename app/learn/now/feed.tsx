@@ -6,16 +6,17 @@ import { ArrowDown, Bookmark, Check, ExternalLink, GraduationCap, X } from 'luci
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { appendCards, feedEnd, FEED_PAGE, type FeedCard } from '@/lib/learn/feed/card';
-import { dismissCard, loadMoreCards, openCardSource, saveCard, testMeOnCard } from './actions';
+import { dismissCard, loadMoreCards, openCardSource, passCard, saveCard, testMeOnCard } from './actions';
 
 /**
  * The Learn now feed (plan #808, LEARN-NOW-SPEC "A card").
  *
  * One card after another. The next few are loaded as the last one comes into
- * view, leaving out the ones already on the screen, so a card you scrolled
- * past or pressed Next on is not shown twice in one visit. Neither records
- * anything: the list of what is on the screen lives here and nowhere else, and
- * a card you passed comes back on your next visit.
+ * view, leaving out the ones already on the screen, so a card is not shown
+ * twice in one visit. Pressing Next marks the card passed (plan #833), and a
+ * passed card is not shown on a later visit either. Scrolling past a card
+ * records nothing, so one you scrolled past without pressing Next comes back
+ * next time.
  *
  * A card per item, which law 13 otherwise forbids for a list. This is not a
  * list to scan: each card is read on its own, one to a screen on a phone, and
@@ -102,7 +103,7 @@ export function LearnNowFeed({
                   ? cards.length === 0
                     ? 'No cards are ready yet. More are being written from what you write about, a few minutes each.'
                     : 'More are being written. They take a few minutes each.'
-                  : 'That is every card ready now. The ones you passed come back on your next visit.')}
+                  : 'That is every card ready now. Any you scrolled past without pressing Next come back on your next visit.')}
             </p>
             <Button type="button" variant="secondary" onClick={() => void loadMore()}>
               Check again
@@ -146,6 +147,14 @@ function FeedCardView({ card, onNext }: { card: FeedCard; onNext: () => void }) 
         setError(result.error);
       }
     });
+  };
+
+  // Next scrolls on at once and records the pass behind it. Not interested
+  // also scrolls on, through onNext, without recording a pass: its own write
+  // is the one that counts.
+  const pass = () => {
+    onNext();
+    void passCard(card.id).catch(() => undefined);
   };
 
   const testMe = () =>
@@ -212,7 +221,7 @@ function FeedCardView({ card, onNext }: { card: FeedCard; onNext: () => void }) 
         </p>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Button type="button" variant="primary" onClick={onNext}>
+          <Button type="button" variant="primary" onClick={pass}>
             <ArrowDown className="size-3.5" strokeWidth={2} aria-hidden />
             Next
           </Button>

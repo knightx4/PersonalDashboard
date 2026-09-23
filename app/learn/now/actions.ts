@@ -14,9 +14,9 @@ import { SAVED_FROM_FEED, saveFeedSection } from '@/lib/learn/tracks/save';
 /**
  * The Learn now feed's actions (plan #808).
  *
- * Four of these record something, and each is a deliberate press: opening
- * the source, Save, Not interested, Test me on this. Loading more cards
- * records nothing, which is how scrolling past a card stays unrecorded
+ * Five of these record something, and each is a press: opening the source,
+ * Next, Save, Not interested, Test me on this. Loading more cards records
+ * nothing, which is how scrolling past a card stays unrecorded
  * (LEARN-NOW-SPEC "What is recorded").
  *
  * Every action that can take a card out of the ready pool, and loading more,
@@ -71,6 +71,24 @@ export async function dismissCard(id: string): Promise<CardActionResult> {
   }
   after(() => topUpFeedAfterResponse(user.id));
   return {};
+}
+
+/**
+ * Next: mark the card passed so it is not shown on a later visit (plan #833).
+ * A pass is not read as dislike; the draw's weighting ignores it. Only a
+ * `ready` card moves, so a second call, or a card already saved, opened or
+ * dismissed, changes nothing and asks for no top-up. The page moves on
+ * without waiting, and a failure is not worth showing: the card would only
+ * come back next visit.
+ */
+// latency: optimistic
+export async function passCard(id: string): Promise<void> {
+  const user = await requireUser();
+  const card = CardId.safeParse(id);
+  if (!card.success) return;
+  const supabase = await createLearnClient();
+  const moved = await recordFeedAction(supabase, card.data, 'passed').catch(() => false);
+  if (moved) after(() => topUpFeedAfterResponse(user.id));
 }
 
 export type SaveCardResult = { error?: string; list?: { id: string; title: string } };

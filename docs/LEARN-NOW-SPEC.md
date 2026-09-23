@@ -94,16 +94,21 @@ clips join once the catalogue has courses in it (plan #789).
 
 ## What is recorded
 
-Only what you do on purpose: Save, Not interested, Test me on this, and
+Only what you do on purpose: Next, Save, Not interested, Test me on this, and
 opening the source. Scrolling past a card records nothing, the same rule
 LEARN-GRAPH-SPEC holds What next to. Not interested lowers the weight of that
-card's theme or field for later draws; Save raises it.
+card's theme or field for later draws; Save raises it. Next only takes the card
+out of the feed and is never read as dislike.
 
 ### How the page records it (plan #808)
 
 Each deliberate action sets the card's status in `learn.feed_cards`, with
 `acted_at`:
 
+- **Next** marks it `passed` (plan #833), only if it was still `ready`. The
+  feed shows `ready` cards only, so a card you passed is not shown on a later
+  visit. Any other action may still follow a pass, since the card stays on the
+  screen for the rest of the visit.
 - **Opening the source** marks it `opened`, only if nothing else has been done
   to it.
 - **Save** marks it `saved` and puts the section on one reading list, "Saved
@@ -120,8 +125,11 @@ Each deliberate action sets the card's status in `learn.feed_cards`, with
 The first decision stands: once a card is saved, dismissed or tested, nothing
 but Test me after a Save moves it again.
 
-Passing a card records nothing, so the page keeps the list of cards already on
-the screen and asks only for others. A card you passed comes back on your next
+Next, like the other actions, takes a card out of the ready pool, and asks for a
+top-up once the response has gone, so passing enough cards to leave fewer than
+ten ready starts more being written. Scrolling past a card without pressing
+Next records nothing, so the page keeps the list of cards already on the screen
+and asks only for others. A card you only scrolled past comes back on your next
 visit, newest cards first. The tab's badge counts your queued readings, not the
 cards, since there are always about twenty of those.
 
@@ -129,8 +137,8 @@ cards, since there are always about twenty of those.
 
 The picking pass counts, per theme and per field, the cards you saved (any
 card with `saved_reading_id`, including one later tested) and the cards you
-marked Not interested. Opening the source, Test me without a Save, and passing
-count for nothing. An interest card counts towards its theme and its field; a
+marked Not interested. Opening the source, Test me without a Save, Next (a
+`passed` card) and scrolling past count for nothing. An interest card counts towards its theme and its field; a
 gap card has no theme and counts towards its field.
 
 Each save multiplies the weight by 1.4 and each Not interested by 0.7, and the

@@ -6,8 +6,9 @@
  * Only two actions count. Not interested (a card left `dismissed`) lowers the
  * weight of the card's theme and field, and Save (a card with a
  * `saved_reading_id`, which a saved card keeps after Test me moves it to
- * `tested`) raises it. Opening the source, testing without saving and passing
- * a card by count for nothing.
+ * `tested`) raises it. Opening the source, testing without saving, pressing
+ * Next (a card left `passed`) and scrolling past a card count for nothing: a
+ * pass only takes the card out of the feed.
  *
  * Each save multiplies the weight by SAVE_STEP and each dismissal by
  * DISMISS_STEP, and the product is held between FLOOR and CAP. The floor means

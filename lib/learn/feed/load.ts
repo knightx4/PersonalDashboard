@@ -20,8 +20,9 @@ const MAX_EXCLUDED = 300;
 
 /**
  * The next ready cards, newest first, leaving out the ones already on the
- * screen. Newest first so a card the top-up has just written comes up before
- * one you passed on an earlier visit.
+ * screen. Only `ready` cards, so one you pressed Next on (`passed`) or acted on
+ * is not shown again. Newest first so a card the top-up has just written comes
+ * up before one you scrolled past on an earlier visit.
  */
 export async function loadFeedPage(
   supabase: LearnSupabaseClient,
@@ -76,7 +77,8 @@ export async function loadFeedCardRow(
 }
 
 /**
- * Record a deliberate action on a card: its status, when, and what it made.
+ * Record an action on a card: its status, when, and what it made. Next is one
+ * of these (`passed`), and takes the card out of the ready pool like the rest.
  *
  * Only from the statuses `ACTION_FROM` allows, so the first decision on a card
  * stands. Returns whether the row moved; a card already decided returns false
