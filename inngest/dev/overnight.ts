@@ -240,6 +240,32 @@ export type OvernightTick =
   | { act: 'failed'; error: string };
 
 /**
+ * What a tick decided, as the sentence the page shows under the runner.
+ *
+ * Stored on the row (migration 0098) so the page says why the runner is
+ * waiting instead of guessing from pushes. Null for a tick that has nothing
+ * to say: an idle or held runner, where the row already says so.
+ */
+export function tickNote(tick: OvernightTick): string | null {
+  switch (tick.act) {
+    case 'waiting':
+      return tick.liveness === 'unknown'
+        ? 'Waiting. GitHub could not be asked whether the last session is still going, so nothing new is started until it can.'
+        : 'Waiting for the session on the current feature to finish.';
+    case 'nothing-ready':
+      return `Waiting until something is ready. ${tick.reason}`;
+    case 'fired':
+      return `Started #${tick.feature}.`;
+    case 'ended':
+      return tick.reason;
+    case 'failed':
+      return `The last check could not finish: ${tick.error}`;
+    default:
+      return null;
+  }
+}
+
+/**
  * Everything the tick needs from outside itself.
  *
  * Handed in rather than reached for, so the decision -- which is the whole of
@@ -735,6 +761,7 @@ export async function runOvernightTick(
       const tick = await overnightTick(portsFor({ supabase, userId, now, fetch: input.fetch }));
       results[userId] = tick;
       if (tick.act === 'fired') fired += 1;
+      await recordTick(supabase, userId, now, tickNote(tick));
       // A tick that fires says so; a tick that waits used to say nothing at
       // all, and the run that waited two hours for a session which had already
       // merged looked exactly like a quiet night. The reason is the whole
@@ -747,9 +774,34 @@ export async function runOvernightTick(
         console.log(`overnight: nothing ready this tick, still running -- ${tick.reason}`);
       }
     } catch (err) {
-      results[userId] = { act: 'failed', error: err instanceof Error ? err.message : 'failed' };
+      const failed: OvernightTick = {
+        act: 'failed',
+        error: err instanceof Error ? err.message : 'failed',
+      };
+      results[userId] = failed;
+      await recordTick(supabase, userId, now, tickNote(failed));
     }
   }
 
   return { accounts: users.length, fired, results, main };
+}
+
+/**
+ * Write when the tick ran and what it decided onto the account's row.
+ *
+ * Logged and stepped over when it fails: the note is for the page, and a
+ * night that could not write it still has features to fire.
+ */
+async function recordTick(
+  supabase: Db,
+  userId: string,
+  now: number,
+  note: string | null,
+): Promise<void> {
+  if (note === null) return;
+  const { error } = await supabase
+    .from('plan_overnight_runs')
+    .update({ last_tick_at: new Date(now).toISOString(), last_tick_note: note.slice(0, 2000) })
+    .eq('user_id', userId);
+  if (error) console.error(`the tick's note could not be written: ${error.message}`);
 }
