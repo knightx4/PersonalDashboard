@@ -16,7 +16,19 @@ import { recordLearnSpend } from '@/lib/learn/spend';
 import { catalogueSql } from '@/lib/learn/catalogue/connection';
 import { embedCatalogueSegments } from '@/lib/learn/catalogue/embed-sweep';
 import { parseTitles, pullArticles, type PullReport } from '@/lib/learn/catalogue/pull';
-import { sweepWikipediaArticle } from '@/lib/learn/catalogue/sweep';
+import {
+  DEFAULT_COURSE_PROVIDER,
+  sweepWikipediaArticle,
+  sweepYouTubeCourse,
+} from '@/lib/learn/catalogue/sweep';
+import { transcriptCutVideos } from '@/lib/learn/catalogue/store';
+import {
+  EMBED_BUDGET_MS,
+  TRANSCRIPT_BUDGET_MS,
+  parsePlaylistId,
+  pullCourse,
+  type CoursePullReport,
+} from '@/lib/learn/catalogue/pull-course';
 
 /**
  * Taking a gap to the reading queue, or to what has already been written about
@@ -196,6 +208,69 @@ export async function pullWikipediaArticles(
     },
     parsed.titles,
   );
+
+  return { report };
+}
+
+export type CoursePullState = { report?: CoursePullReport; error?: string };
+
+/**
+ * Fetching a lecture course from its YouTube playlist into the catalogue, and
+ * embedding it.
+ *
+ * What `npm run catalogue -- --course <playlist> --embed` does, from a subject
+ * page, as #789 settled. The course goes under MIT OpenCourseWare, so each
+ * lecture's transcript comes from ocw.mit.edu, and the embedding is billed to
+ * the account that pressed, as #741 settled.
+ *
+ * One press has 300 seconds. Past TRANSCRIPT_BUDGET_MS it stops looking up
+ * transcripts and stores the remaining lectures with their chapter or
+ * whole-video cut, so the course is always stored whole and in order. Past
+ * EMBED_BUDGET_MS it stops embedding. The report says how far it got, and a
+ * second press finishes: lectures already cut from a transcript are left as
+ * they are, so it spends its time on the ones the first press did not reach,
+ * and the embedding pass picks up whatever has no vector yet.
+ *
+ * Pressing again on the same playlist updates the rows in place, keyed on the
+ * playlist and video ids, so it never adds a second course or lecture.
+ */
+// latency: pending
+export async function pullLectureCourse(
+  _previous: CoursePullState,
+  formData: FormData,
+): Promise<CoursePullState> {
+  const user = await requireUser();
+  const startedAt = Date.now();
+
+  const parsed = parsePlaylistId(String(formData.get('playlist') ?? ''));
+  if (!parsed.ok) return { error: parsed.error };
+
+  let sql;
+  try {
+    sql = catalogueSql();
+  } catch (error) {
+    return {
+      error: `The catalogue cannot be written from this deployment: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    };
+  }
+
+  const report = await pullCourse({
+    sweep: () =>
+      sweepYouTubeCourse(sql, {
+        providerSlug: DEFAULT_COURSE_PROVIDER,
+        playlistId: parsed.playlistId,
+        keep: (videoIds) => transcriptCutVideos(sql, DEFAULT_COURSE_PROVIDER, videoIds),
+        deadline: startedAt + TRANSCRIPT_BUDGET_MS,
+      }),
+    embed: (limit) =>
+      embedCatalogueSegments(sql, {
+        userId: user.id,
+        limit,
+        deadline: startedAt + EMBED_BUDGET_MS,
+      }),
+  });
 
   return { report };
 }

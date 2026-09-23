@@ -141,6 +141,39 @@ describe('runEmbedSweep', () => {
     expect(store.rows.every((row) => row.embedding !== null)).toBe(true);
   });
 
+  it('stops at the deadline and leaves the rest for the next press', async () => {
+    const store = fakeStore(segments(10));
+    const embed = fakeEmbed();
+    let clock = 0;
+
+    const first = await runEmbedSweep(
+      {
+        store,
+        embed: async (input) => {
+          clock += 100;
+          return embed(input);
+        },
+      },
+      { chunk: 4, deadline: 150, now: () => clock },
+    );
+
+    expect(first.embedded).toBe(8);
+    expect(first.stopped?.reason).toBe('time');
+
+    const second = await runEmbedSweep({ store, embed }, { chunk: 4 });
+    expect(second.embedded).toBe(2);
+    expect(second.stopped).toBeNull();
+  });
+
+  it('ends clean past the deadline when nothing is left', async () => {
+    const store = fakeStore(segments(0));
+    const result = await runEmbedSweep(
+      { store, embed: fakeEmbed() },
+      { deadline: 0, now: () => 1 },
+    );
+    expect(result.stopped).toBeNull();
+  });
+
   it('keeps what it wrote before a failure', async () => {
     const store = fakeStore(segments(4));
     const embed: EmbedCall = async ({ texts, onSpend }) =>

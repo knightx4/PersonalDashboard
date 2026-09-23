@@ -14,6 +14,7 @@ import { loadTrackInterest } from '@/lib/learn/flow/interest-load';
 import { GoalForm } from '@/app/learn/know/goal-form';
 import { ConceptList } from '@/components/learn/concept-list';
 import { PullArticles } from './pull-articles';
+import { PullCourse } from './pull-course';
 import {
   countStates,
   learningOrder,
@@ -263,6 +264,7 @@ export default async function SubjectPage({
       <GoalForm subjectId={subject.id} />
 
       <PullArticles />
+      <PullCourse />
     </>
   );
 }

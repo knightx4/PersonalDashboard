@@ -233,7 +233,13 @@ export async function storeArticle(
 export type CourseVideoInput = CatalogueItemInput & {
   /** The provider's own numbering, verbatim: `Lecture 7`. Null when it has none. */
   providerLabel: string | null;
-  segments: CatalogueSegmentInput[];
+  /**
+   * Null keeps the segments already stored for this lecture, untouched. A
+   * press from the app passes null for a lecture it already cut from a
+   * transcript, so a second press spends its time on the lectures the first
+   * did not reach instead of fetching the same captions again.
+   */
+  segments: CatalogueSegmentInput[] | null;
 };
 
 export type CatalogueCourseInput = {
@@ -253,6 +259,8 @@ export type StoredCourse = {
   written: number;
   /** Segments dropped because a lecture is now cut into fewer of them. */
   removed: number;
+  /** Lectures whose stored segments were kept as they were. */
+  kept: number;
 };
 
 export async function storeCourse(
@@ -274,13 +282,18 @@ export async function storeCourse(
 
     let written = 0;
     let removed = 0;
+    let kept = 0;
     const members: { course_item_id: string; member_item_id: string; position: number; provider_label: string | null }[] = [];
 
     for (const [position, video] of course.videos.entries()) {
       const memberItemId = await upsertItem(tx, providerId, video);
-      await upsertSegments(tx, memberItemId, video.segments);
-      removed += await deleteTrailingSegments(tx, memberItemId, video.segments.length);
-      written += video.segments.length;
+      if (video.segments === null) {
+        kept += 1;
+      } else {
+        await upsertSegments(tx, memberItemId, video.segments);
+        removed += await deleteTrailingSegments(tx, memberItemId, video.segments.length);
+        written += video.segments.length;
+      }
       members.push({
         course_item_id: courseItemId,
         member_item_id: memberItemId,
@@ -296,6 +309,37 @@ export async function storeCourse(
           ${tx(members, 'course_item_id', 'member_item_id', 'position', 'provider_label')}`;
     }
 
-    return { courseItemId, videos: course.videos.length, written, removed };
+    return { courseItemId, videos: course.videos.length, written, removed, kept };
   }) as Promise<StoredCourse>;
+}
+
+/**
+ * The lectures of a provider already cut from a transcript, out of the ones
+ * named.
+ *
+ * Read from the segments' shape, because no column records how a lecture was
+ * cut: a transcript span is timed and has no heading, a chapter always has
+ * one, and a whole-video segment has no time. So any timed segment with a
+ * null heading means the lecture was cut from its transcript.
+ */
+export async function transcriptCutVideos(
+  sql: postgres.Sql,
+  providerSlug: string,
+  videoIds: string[],
+): Promise<Set<string>> {
+  if (videoIds.length === 0) return new Set();
+  const rows = await sql<{ external_id: string }[]>`
+    select i.external_id
+      from learn.catalogue_items i
+      join learn.catalogue_providers p on p.id = i.provider_id
+     where p.slug = ${providerSlug}
+       and i.kind = 'video'
+       and i.external_id in ${sql(videoIds)}
+       and exists (
+         select 1 from learn.catalogue_segments s
+          where s.item_id = i.id
+            and s.t_start_seconds is not null
+            and s.heading is null
+       )`;
+  return new Set(rows.map((row) => row.external_id));
 }

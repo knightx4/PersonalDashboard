@@ -74,17 +74,38 @@ export const noTranscripts: TranscriptLookup = async () => null;
  * `learn.catalogue_providers`. A fresh one per call, because the OCW adapter
  * remembers the courses it has read and that memory belongs to one sweep.
  */
-export function transcriptsForProvider(providerSlug: string): TranscriptLookup {
-  if (providerSlug === 'mit-ocw') return ocwTranscriptLookup();
+export function transcriptsForProvider(
+  providerSlug: string,
+  onRefused?: (detail: string) => void,
+): TranscriptLookup {
+  if (providerSlug === 'mit-ocw') return ocwTranscriptLookup(onRefused);
   return noTranscripts;
 }
+
+/**
+ * The provider a course belongs to unless another is named. MIT
+ * OpenCourseWare is the one docs/LEARN-SOURCES-SPEC.md puts first, and the
+ * slug has to match a row seeded in `learn.catalogue_providers`.
+ */
+export const DEFAULT_COURSE_PROVIDER = 'mit-ocw';
 
 export type CourseSweepResult =
   | ({
       ok: true;
       title: string;
-      /** How many lectures were cut each of the three ways. */
+      /**
+       * How many lectures were cut each of the three ways this time. A lecture
+       * kept as it was stored is in none of them; it is counted in `kept`.
+       */
       cutBy: { transcript: number; chapters: number; whole: number };
+      /**
+       * Lectures whose transcript was not looked for because the deadline had
+       * passed. They are stored with the chapter or whole-video cut, and the
+       * next sweep that is given `keep` looks for their transcripts again.
+       */
+      notReached: number;
+      /** Pages the transcript site would not hand over, one line each. */
+      refused: string[];
     } & StoredCourse)
   | { ok: false; reason: string; detail: string };
 
@@ -118,14 +139,35 @@ function videoToStore(video: YouTubeVideo, cues: TranscriptCue[] | null): {
   };
 }
 
+export type CourseSweepOptions = {
+  providerSlug: string;
+  playlistId: string;
+  transcripts?: TranscriptLookup;
+  /**
+   * Which of these lectures to leave as they are stored, asked once the
+   * playlist is known. A lecture it names is not looked up and its segments
+   * are not rewritten. Absent, every lecture is cut afresh, which is what the
+   * script does.
+   */
+  keep?: (videoIds: string[]) => Promise<Set<string>>;
+  /**
+   * Epoch milliseconds after which no further transcript is looked up. The
+   * lectures left are stored with their fallback cut, so the course is whole
+   * and in order even when the time ran out.
+   */
+  deadline?: number;
+  now?: () => number;
+};
+
 /**
  * Naming a playlist and having a course stored.
  *
  * Walk, cut, write, in the order the spec's build order puts them: the
  * catalogue is filled here and nothing is embedded, because a press only
  * searches again once something has been embedded since it last looked. So
- * pulling a course in is two moves, and the second is
- * `npm run catalogue -- --embed`.
+ * pulling a course in is two moves: this, then the embedding pass, which the
+ * script runs with `--embed` and the subject page's course form runs in the
+ * same press.
  *
  * A refusal is returned rather than thrown, the same as the article sweep: a
  * playlist id typed by hand can be wrong, and a spent daily quota is an
@@ -133,17 +175,32 @@ function videoToStore(video: YouTubeVideo, cues: TranscriptCue[] | null): {
  */
 export async function sweepYouTubeCourse(
   sql: postgres.Sql,
-  options: { providerSlug: string; playlistId: string; transcripts?: TranscriptLookup },
+  options: CourseSweepOptions,
 ): Promise<CourseSweepResult> {
   const playlist = await fetchYouTubePlaylist(options.playlistId);
   if (!playlist.ok) return { ok: false, reason: playlist.reason, detail: playlist.detail };
 
-  const transcripts = options.transcripts ?? transcriptsForProvider(options.providerSlug);
+  const refused: string[] = [];
+  const transcripts =
+    options.transcripts ??
+    transcriptsForProvider(options.providerSlug, (detail) => refused.push(detail));
+  const keep = options.keep
+    ? await options.keep(playlist.videos.map((video) => video.videoId))
+    : new Set<string>();
+  const now = options.now ?? Date.now;
   const cutBy = { transcript: 0, chapters: 0, whole: 0 };
+  let notReached = 0;
   const videos: CourseVideoInput[] = [];
 
   for (const video of playlist.videos) {
-    const cues = await transcripts({
+    if (keep.has(video.videoId)) {
+      videos.push({ ...videoToStore(video, null).input, segments: null });
+      continue;
+    }
+
+    const late = options.deadline !== undefined && now() >= options.deadline;
+    if (late) notReached += 1;
+    const cues = late ? null : await transcripts({
       videoId: video.videoId,
       title: video.title,
       canonicalUrl: video.canonicalUrl,
@@ -163,5 +220,5 @@ export async function sweepYouTubeCourse(
     videos,
   });
 
-  return { ok: true, title: playlist.title, cutBy, ...written };
+  return { ok: true, title: playlist.title, cutBy, notReached, refused, ...written };
 }

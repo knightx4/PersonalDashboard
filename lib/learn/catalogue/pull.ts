@@ -87,20 +87,22 @@ export type PulledArticle =
   | { ok: true; asked: string; title: string; segments: number; removed: number }
   | { ok: false; asked: string; reason: string; detail: string };
 
+/**
+ * The embedding pass that follows a pull. `stopped` is set when Voyage
+ * refused, the key is missing, the press ran out of time, or the pass threw.
+ */
+export type EmbeddingReport = {
+  embedded: number;
+  tokens: number;
+  stopped: { reason: string; detail: string } | null;
+  /** True when it stopped at MAX_EMBEDDED with segments possibly left. */
+  capped: boolean;
+};
+
 export type PullReport = {
   articles: PulledArticle[];
-  /**
-   * The embedding pass, or null when it did not run because no article was
-   * stored. `stopped` is set when Voyage refused, the key is missing, or the
-   * pass threw.
-   */
-  embedding: {
-    embedded: number;
-    tokens: number;
-    stopped: { reason: string; detail: string } | null;
-    /** True when it stopped at MAX_EMBEDDED with segments possibly left. */
-    capped: boolean;
-  } | null;
+  /** Null when the pass did not run because no article was stored. */
+  embedding: EmbeddingReport | null;
 };
 
 export type PullPorts = {
@@ -137,21 +139,25 @@ export async function pullArticles(ports: PullPorts, titles: string[]): Promise<
 
   if (!articles.some((article) => article.ok)) return { articles, embedding: null };
 
+  return { articles, embedding: await embedAfterPull(ports.embed) };
+}
+
+/**
+ * The embedding pass after something was stored, as a report line. Shared by
+ * the article pull and the course pull, and like them it throws nothing.
+ */
+export async function embedAfterPull(
+  embed: (limit: number) => Promise<EmbedSweepResult>,
+): Promise<EmbeddingReport> {
   try {
-    const swept = await ports.embed(MAX_EMBEDDED);
+    const swept = await embed(MAX_EMBEDDED);
     return {
-      articles,
-      embedding: {
-        embedded: swept.embedded,
-        tokens: swept.tokens,
-        stopped: swept.stopped,
-        capped: swept.stopped === null && swept.embedded + swept.skipped >= MAX_EMBEDDED,
-      },
+      embedded: swept.embedded,
+      tokens: swept.tokens,
+      stopped: swept.stopped,
+      capped: swept.stopped === null && swept.embedded + swept.skipped >= MAX_EMBEDDED,
     };
   } catch (error) {
-    return {
-      articles,
-      embedding: { embedded: 0, tokens: 0, stopped: { reason: 'error', detail: message(error) }, capped: false },
-    };
+    return { embedded: 0, tokens: 0, stopped: { reason: 'error', detail: message(error) }, capped: false };
   }
 }

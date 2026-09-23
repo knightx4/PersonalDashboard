@@ -177,21 +177,39 @@ export function cuesFromVtt(text: string): TranscriptCue[] {
   return cues;
 }
 
+/**
+ * Told when ocw.mit.edu would not hand over a page: a timeout, a 403, a
+ * redirect off the site. The lecture still falls back to chapters or one
+ * segment, but a caller showing the result can say the site refused rather
+ * than that the lecture has no transcript.
+ */
+export type OcwRefused = (detail: string) => void;
+
 /** Fetch a page and hand back its text, or null for anything but a readable page. */
-async function getText(url: string): Promise<{ url: string; text: string } | null> {
+async function getText(
+  url: string,
+  onRefused?: OcwRefused,
+): Promise<{ url: string; text: string } | null> {
   const fetched = await fetchDocument(url);
-  if (!fetched.ok || fetched.contentType === 'pdf' || fetched.contentType === 'json') return null;
+  if (!fetched.ok) {
+    onRefused?.(`${url}: ${fetched.reason}, ${fetched.detail}`);
+    return null;
+  }
+  if (fetched.contentType === 'pdf' || fetched.contentType === 'json') return null;
   return { url: fetched.url, text: fetched.text };
 }
 
 /** Video id to lecture page, for every gallery a course links. */
-async function lecturePagesForCourse(courseUrl: string): Promise<Map<string, string>> {
+async function lecturePagesForCourse(
+  courseUrl: string,
+  onRefused?: OcwRefused,
+): Promise<Map<string, string>> {
   const pages = new Map<string, string>();
-  const course = await getText(courseUrl);
+  const course = await getText(courseUrl, onRefused);
   if (!course) return pages;
 
   for (const galleryUrl of galleryUrlsFromCoursePage(course.text, course.url)) {
-    const gallery = await getText(galleryUrl);
+    const gallery = await getText(galleryUrl, onRefused);
     if (!gallery) continue;
     for (const [videoId, page] of lecturePagesFromGallery(gallery.text, gallery.url)) {
       if (!pages.has(videoId)) pages.set(videoId, page);
@@ -210,7 +228,9 @@ export type OcwVideo = { videoId: string; description: string };
  * lecture with no track, a page that did not load -- because the sweep falls
  * back to chapters or a whole-video segment and that is an ordinary answer.
  */
-export function ocwTranscriptLookup(): (video: OcwVideo) => Promise<TranscriptCue[] | null> {
+export function ocwTranscriptLookup(
+  onRefused?: OcwRefused,
+): (video: OcwVideo) => Promise<TranscriptCue[] | null> {
   const courses = new Map<string, Promise<Map<string, string>>>();
 
   return async (video) => {
@@ -219,19 +239,19 @@ export function ocwTranscriptLookup(): (video: OcwVideo) => Promise<TranscriptCu
 
     let lectures = courses.get(courseUrl);
     if (!lectures) {
-      lectures = lecturePagesForCourse(courseUrl);
+      lectures = lecturePagesForCourse(courseUrl, onRefused);
       courses.set(courseUrl, lectures);
     }
 
     const pageUrl = (await lectures).get(video.videoId);
     if (!pageUrl) return null;
 
-    const page = await getText(pageUrl);
+    const page = await getText(pageUrl, onRefused);
     if (!page) return null;
     const captionUrl = captionUrlFromLecturePage(page.text, page.url, video.videoId);
     if (!captionUrl) return null;
 
-    const captions = await getText(captionUrl);
+    const captions = await getText(captionUrl, onRefused);
     if (!captions) return null;
     const cues = cuesFromVtt(captions.text);
     return cues.length > 0 ? cues : null;

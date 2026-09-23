@@ -54,14 +54,11 @@
  */
 import postgres from 'postgres';
 import { embedCatalogueSegments } from '../lib/learn/catalogue/embed-sweep';
-import { sweepWikipediaArticle, sweepYouTubeCourse } from '../lib/learn/catalogue/sweep';
-
-/**
- * The provider a `--course` belongs to unless another is named. MIT
- * OpenCourseWare is the one docs/LEARN-SOURCES-SPEC.md puts first, and the
- * slug has to match a row seeded in `learn.catalogue_providers`.
- */
-const DEFAULT_COURSE_PROVIDER = 'mit-ocw';
+import {
+  DEFAULT_COURSE_PROVIDER,
+  sweepWikipediaArticle,
+  sweepYouTubeCourse,
+} from '../lib/learn/catalogue/sweep';
 
 type Args = {
   titles: string[];
