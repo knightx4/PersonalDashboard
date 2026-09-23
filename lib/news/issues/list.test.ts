@@ -4,14 +4,21 @@ import {
   formatArrival,
   issueHref,
   issueReturn,
+  listHref,
   senderLabel,
   sortSenders,
+  unreadTopics,
   visibleIssues,
   type NewsIssue,
   type NewsSender,
 } from '@/lib/news/issues/list';
 
-const paper: NewsSender = { id: 's1', email: 'hello@thepaper.com', name: 'The Paper', muted: false };
+const paper: NewsSender = {
+  id: 's1',
+  email: 'hello@thepaper.com',
+  name: 'The Paper',
+  muted: false,
+};
 const weekly: NewsSender = { id: 's2', email: 'wk@weekly.com', name: null, muted: true };
 
 function issue(id: string, senderId: string, over: Partial<NewsIssue> = {}): NewsIssue {
@@ -123,5 +130,39 @@ describe('issueHref', () => {
     expect(issueHref('i1', { original: false, pictures: false, from: null })).toBe(
       '/news/i/i1?pictures=0',
     );
+  });
+});
+
+describe('unreadTopics', () => {
+  const tagged = (...topics: string[]) =>
+    topics.map((topic, i) => ({ headline: `h${i}`, summary: 's', topic }));
+
+  it('lists the topics of unread newsletters in the fixed order, once each', () => {
+    const unread = [
+      { senderId: 's1', stories: tagged('Technology', 'Politics') },
+      { senderId: 's1', stories: tagged('Politics', 'not a topic') },
+    ];
+    expect(unreadTopics(unread, [paper, weekly], null)).toEqual(['Politics', 'Technology']);
+  });
+
+  it('leaves out muted senders unless one is picked, and other senders when one is', () => {
+    const unread = [
+      { senderId: 's1', stories: tagged('Sport') },
+      { senderId: 's2', stories: tagged('Health') },
+    ];
+    expect(unreadTopics(unread, [paper, weekly], null)).toEqual(['Sport']);
+    expect(unreadTopics(unread, [paper, weekly], 's2')).toEqual(['Health']);
+  });
+
+  it('offers nothing when nothing unread carries a topic', () => {
+    expect(unreadTopics([{ senderId: 's1', stories: [] }], [paper], null)).toEqual([]);
+  });
+});
+
+describe('listHref', () => {
+  it('keeps each filter the link does not change', () => {
+    expect(listHref({ from: null, topic: null })).toBe('/news/all');
+    expect(listHref({ from: 's1', topic: null })).toBe('/news/all?from=s1');
+    expect(listHref({ from: 's1', topic: 'Business' })).toBe('/news/all?from=s1&topic=Business');
   });
 });

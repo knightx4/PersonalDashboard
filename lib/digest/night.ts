@@ -7,8 +7,8 @@ import { oneLine } from './build';
 /**
  * The night the runner just had, as the morning summary says it.
  *
- * The runner works while nobody is watching -- a cron tick fires one feature,
- * waits for it, fires the next -- and the whole of what it did is scattered
+ * The runner works while nobody is watching -- a cron tick keeps up to three
+ * features going, starting the next as one finishes -- and the whole of what it did is scattered
  * across three tables by morning. This gathers it into the one thing you want
  * at breakfast: what it worked, what closed, what it left stopped on you, and
  * why it stopped.

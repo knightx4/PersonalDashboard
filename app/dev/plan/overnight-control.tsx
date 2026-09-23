@@ -153,8 +153,8 @@ const TICK_SILENT_AFTER_MINUTES = 15;
  * What the runner last decided, in its own words, and when.
  *
  * The tick writes this on every pass of a running night (migration 0098):
- * waiting for the session on the current feature, or waiting until something
- * is ready and why. That is the answer to "is it stuck", read off the runner
+ * waiting on the sessions it has running, or waiting until something is
+ * ready and why. That is the answer to "is it stuck", read off the runner
  * rather than guessed. The one thing said as a warning is a runner that has
  * stopped checking in at all, because that is the only state in which nothing
  * will move without somebody looking.
