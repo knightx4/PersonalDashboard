@@ -76,6 +76,10 @@ export type Step = {
   resultUrl: string | null;
   /** When you marked the result read; null while it waits on you. */
   reviewedAt: string | null;
+  /** The collection an information step fills (plan #954). */
+  collectionId?: string | null;
+  /** The field keys it needs filled; null for every field the form shows. */
+  asksFor?: string[] | null;
 };
 
 export type StepNode = Step & { children: StepNode[] };
