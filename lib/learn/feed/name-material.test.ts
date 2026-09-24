@@ -100,7 +100,12 @@ describe('the call', () => {
     const spent: string[] = [];
     const result = await nameMaterial({
       target: interest,
-      depth: { depth: 'advanced', known: ['Inflation: Causes'], review: ['Money: Functions'] },
+      depth: {
+        depth: 'advanced',
+        known: ['Inflation: Causes'],
+        review: ['Money: Functions'],
+        tooHard: ['Monetary base: Measurement'],
+      },
       avoid: ['Money'],
       anthropicApiKey: 'unused',
       client,
@@ -114,6 +119,8 @@ describe('the call', () => {
     // to work on is come at again.
     expect(JSON.stringify(calls[0])).toContain('go past these:\\n- Inflation: Causes');
     expect(JSON.stringify(calls[0])).toContain('- Money: Functions');
+    // The cards rated too hard reach it too, with the instruction to go easier.
+    expect(JSON.stringify(calls[0])).toContain('easier than these:\\n- Monetary base: Measurement');
     expect(JSON.stringify(calls[0])).toContain('advanced student');
   });
 
@@ -122,7 +129,7 @@ describe('the call', () => {
     const spent: string[] = [];
     const result = await nameMaterial({
       target: interest,
-      depth: { depth: 'working', known: [], review: [] },
+      depth: { depth: 'working', known: [], review: [], tooHard: [] },
       avoid: [],
       anthropicApiKey: 'unused',
       client,
