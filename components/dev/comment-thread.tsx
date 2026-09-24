@@ -410,6 +410,7 @@ export function CommentThread({
                   aria-pressed={tagged}
                   title={tagged ? 'Dash will read this' : `Tag ${MENTION}`}
                   className={
+                    // ui-ok: hand-rolled-box -- the subtle circle is what note 66f5a513 asked for, to set Dash's head apart from the words beside it.
                     'press -ml-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border transition-colors duration-150 ' +
                     (tagged
                       ? 'border-accent bg-accent-tint text-accent'
