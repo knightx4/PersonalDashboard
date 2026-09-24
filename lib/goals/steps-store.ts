@@ -50,13 +50,15 @@ type ItemRow = {
   rhythm_count: number | null;
   rhythm_period: RhythmPeriod | null;
   on_todo: boolean;
+  unit: string | null;
+  target: number | string | null;
 };
 
 type LinkRow = { id: string; item_id: string; goal_id: string };
 
 const ITEM_COLUMNS =
   'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, resolution, ' +
-  'due_on, position, rhythm_count, rhythm_period, on_todo';
+  'due_on, position, rhythm_count, rhythm_period, on_todo, unit, target';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -82,6 +84,8 @@ const toGoal = (row: ItemRow): Goal => ({
   fog: row.fog,
   status: row.status,
   position: row.position,
+  unit: row.unit,
+  target: row.target === null ? null : Number(row.target),
 });
 
 export type GoalMap = {

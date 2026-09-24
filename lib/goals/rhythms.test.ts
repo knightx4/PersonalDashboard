@@ -194,6 +194,8 @@ describe('liveRhythms', () => {
     fog: null,
     status,
     position: 10,
+    unit: null,
+    target: null,
   });
   const step = (id: string, parentId: string, extra: Partial<Step> = {}): Step => ({
     id,

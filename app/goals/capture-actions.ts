@@ -75,7 +75,8 @@ export async function fileGoalCapture(body: string): Promise<GoalCaptureState> {
       context: () => loadCaptureContext(reader, { userId: user.id, today }),
       ask: (message) =>
         askCaptureModel({ apiKey: key, onSpend: (report) => spend.push(report) }, message),
-      apply: (_id, action) => applyCaptureAction(client, user.id, action),
+      apply: (id, action) =>
+        applyCaptureAction(client, { userId: user.id, today, captureId: id }, action),
       save: (id, filed) => saveFiled(client, id, filed),
     });
     await recordSessionSpend(user.id, { module: 'goals', operation: 'file-capture' }, spend);

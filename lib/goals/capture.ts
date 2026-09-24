@@ -18,11 +18,13 @@
  *   action, save the list of what was done.
  * - `undoMove` and `markUndone` are the Undo on one line.
  *
- * Four moves, and only four. Close a step, count one towards a rhythm, note
- * progress against a goal, add a step. Anything needing research is added as
+ * Five moves, and only five. Close a step, count one towards a rhythm, note
+ * progress against a goal, add a step, record a reading of a goal's number
+ * (plan #930). Anything needing research is added as
  * a `claude` step for the next scheduled run; capture never starts a run.
  */
 import type { RhythmRecord } from '@/lib/goals/rhythms';
+import { formatReading, parseNumber } from '@/lib/goals/readings';
 import { progressLine } from '@/lib/goals/rhythms';
 import { STEP_TITLE_MAX, type RhythmPeriod, type StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
@@ -40,7 +42,15 @@ export const MAX_CONTEXT_STEPS = 300;
 // What the model is shown
 // ---------------------------------------------------------------------------
 
-export type CaptureGoal = { ref: string; id: string; title: string; areaName: string };
+export type CaptureGoal = {
+  ref: string;
+  id: string;
+  title: string;
+  areaName: string;
+  /** What the goal is measured in; a reading can only be recorded when it has one. */
+  unit: string | null;
+  target: number | null;
+};
 
 export type CaptureStep = {
   ref: string;
@@ -73,7 +83,14 @@ export function captureContext(
   for (const { goal, areaName } of goals) {
     if (goal.status !== 'open') continue;
     const goalRef = `g${out.goals.length + 1}`;
-    out.goals.push({ ref: goalRef, id: goal.id, title: goal.title, areaName });
+    out.goals.push({
+      ref: goalRef,
+      id: goal.id,
+      title: goal.title,
+      areaName,
+      unit: goal.unit,
+      target: goal.target,
+    });
 
     const walk = (nodes: StepNode[], depth: number) => {
       for (const node of nodes) {
@@ -113,7 +130,11 @@ export function captureMessage(context: CaptureContext, body: string, today: str
   const lines: string[] = [`Today is ${today}.`, '', 'Open goals and their open steps:'];
   if (context.goals.length === 0) lines.push('(none)');
   for (const goal of context.goals) {
-    lines.push(`${goal.ref}: ${goal.title} (area: ${goal.areaName})`);
+    const measured = goal.unit
+      ? `; measured in ${goal.unit}` +
+        (goal.target !== null ? `, target ${formatReading(goal.target, goal.unit)}` : '')
+      : '';
+    lines.push(`${goal.ref}: ${goal.title} (area: ${goal.areaName}${measured})`);
     for (const step of context.steps.filter((s) => s.goalRef === goal.ref)) {
       const indent = '  '.repeat(step.depth);
       const shape =
@@ -137,6 +158,7 @@ export type PlannedAction =
   | { kind: 'close'; step: CaptureStep }
   | { kind: 'count'; step: CaptureStep }
   | { kind: 'note'; goal: CaptureGoal; text: string }
+  | { kind: 'reading'; goal: CaptureGoal; value: number }
   | {
       kind: 'add';
       goal: CaptureGoal;
@@ -151,8 +173,9 @@ const text = (value: unknown): string => (typeof value === 'string' ? value.trim
 /**
  * The moves the model asked for, against real rows, in the order it gave
  * them. Anything that names a ref it was not shown, closes a rhythm, counts a
- * step that is not a rhythm with an open period, or repeats a move already
- * listed is dropped rather than guessed at. At most MAX_FILED.
+ * step that is not a rhythm with an open period, records a reading against a
+ * goal with no unit or without a number, or repeats a move already listed is
+ * dropped rather than guessed at. At most MAX_FILED.
  */
 export function parseFiling(raw: unknown, context: CaptureContext): PlannedAction[] {
   const list =
@@ -192,6 +215,14 @@ export function parseFiling(raw: unknown, context: CaptureContext): PlannedActio
         if (!goal || !note) break;
         planned = { kind: 'note', goal, text: note };
         key = `note:${goal.id}`;
+        break;
+      }
+      case 'reading': {
+        const goal = goals.get(text(entry.goal));
+        const value = parseNumber(entry.value);
+        if (!goal || !goal.unit || value === null) break;
+        planned = { kind: 'reading', goal, value };
+        key = `reading:${goal.id}`;
         break;
       }
       case 'add': {
@@ -259,6 +290,16 @@ export type FiledEntry =
       undone_at: string | null;
     }
   | {
+      kind: 'reading';
+      /** The reading the capture wrote, so Undo can delete it. */
+      reading_id: string;
+      goal_id: string;
+      goal_title: string;
+      value: number;
+      unit: string | null;
+      undone_at: string | null;
+    }
+  | {
       kind: 'add';
       /** The step the capture wrote. */
       step_id: string;
@@ -277,6 +318,8 @@ export function describeFiled(entry: FiledEntry): string {
       return `Counted one towards "${entry.title}" in ${entry.goal_title}`;
     case 'note':
       return `Noted against ${entry.goal_title}: ${entry.text}`;
+    case 'reading':
+      return `Recorded ${formatReading(entry.value, entry.unit)} for ${entry.goal_title}`;
     case 'add':
       return entry.step_kind === 'claude'
         ? `Added a step for Claude in ${entry.goal_title}: "${entry.title}"`
@@ -291,7 +334,7 @@ export function readFiled(raw: unknown): FiledEntry[] {
     (entry): entry is FiledEntry =>
       !!entry &&
       typeof entry === 'object' &&
-      ['close', 'count', 'note', 'add'].includes((entry as { kind?: unknown }).kind as string),
+      ['close', 'count', 'note', 'reading', 'add'].includes((entry as { kind?: unknown }).kind as string),
   );
 }
 
@@ -368,6 +411,8 @@ export type UndoMove =
   | { move: 'reopen'; stepId: string }
   | { move: 'uncount'; stepId: string; startsOn: string }
   | { move: 'archive'; stepId: string }
+  /** A reading is deleted outright: it was never true, and the history keeps it. */
+  | { move: 'delete-reading'; readingId: string }
   /** A note changes no row, so marking it undone is the whole of taking it back. */
   | { move: 'none' };
 
@@ -379,6 +424,8 @@ export function undoMove(entry: FiledEntry): UndoMove {
       return { move: 'uncount', stepId: entry.step_id, startsOn: entry.starts_on };
     case 'add':
       return { move: 'archive', stepId: entry.step_id };
+    case 'reading':
+      return { move: 'delete-reading', readingId: entry.reading_id };
     case 'note':
       return { move: 'none' };
   }

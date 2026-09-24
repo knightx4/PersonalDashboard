@@ -220,6 +220,37 @@ describe('goals shape', () => {
       values (${userA}, 'step', ${goalA}, 'rhythm', 'One city event', 1, 'week') returning id`;
     expect(row.id).toBeTruthy();
   });
+
+  it('gives a unit and target to goals only, and no target without a unit', async () => {
+    await expect(
+      admin`insert into items (user_id, level, parent_id, kind, title, unit)
+            values (${userA}, 'step', ${goalA}, 'mine', 'Weigh in', 'lb')`,
+    ).rejects.toThrow(/items_unit_ck/);
+    await expect(
+      admin`insert into items (user_id, level, area_id, title, target)
+            values (${userA}, 'goal', ${areaA}, 'Bench more', 225)`,
+    ).rejects.toThrow(/items_target_ck/);
+    const [row] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title, unit, target)
+      values (${userA}, 'goal', ${areaA}, 'Bench more', 'lb', 225) returning id`;
+    expect(row.id).toBeTruthy();
+  });
+
+  it('never overwrites a reading, but lets its note change and the row go', async () => {
+    const [reading] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into readings (user_id, item_id, value, read_on)
+      values (${userA}, ${goalA}, 4200, '2026-09-01') returning id`);
+    await expect(
+      asUser(userA, (tx) => tx`update readings set value = 4100 where id = ${reading.id}`),
+    ).rejects.toThrow(/never overwritten/);
+    await expect(
+      asUser(userA, (tx) => tx`update readings set read_on = '2026-09-02' where id = ${reading.id}`),
+    ).rejects.toThrow(/never overwritten/);
+    await asUser(userA, (tx) => tx`update readings set note = 'after payday' where id = ${reading.id}`);
+    await asUser(userA, (tx) => tx`delete from readings where id = ${reading.id}`);
+    const rows = await historyOf(reading.id);
+    expect(rows.map((r) => r.action)).toEqual(['insert', 'update', 'delete']);
+  });
 });
 
 describe('goals step tree', () => {

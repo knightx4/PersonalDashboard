@@ -31,6 +31,8 @@ type GoalRow = {
   fog: string | null;
   status: GoalStatus;
   position: number;
+  unit: string | null;
+  target: number | string | null;
 };
 
 const toArea = (row: AreaRow): Area => ({ id: row.id, name: row.name, position: row.position });
@@ -43,6 +45,8 @@ const toGoal = (row: GoalRow): Goal => ({
   fog: row.fog,
   status: row.status,
   position: row.position,
+  unit: row.unit,
+  target: row.target === null ? null : Number(row.target),
 });
 
 export async function loadAreas(client: GoalsSupabaseClient): Promise<Area[]> {
@@ -61,7 +65,7 @@ export async function loadAreas(client: GoalsSupabaseClient): Promise<Area[]> {
 export async function loadGoals(client: GoalsSupabaseClient): Promise<Goal[]> {
   const { data, error } = await client
     .from('items')
-    .select('id, area_id, title, acceptance, fog, status, position')
+    .select('id, area_id, title, acceptance, fog, status, position, unit, target')
     .eq('level', 'goal')
     .is('archived_at', null)
     .order('position')

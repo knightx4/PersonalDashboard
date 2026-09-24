@@ -10,6 +10,7 @@ import {
   type FiledEntry,
   type PlannedAction,
 } from '@/lib/goals/capture';
+import { addReading, deleteReading } from '@/lib/goals/readings-store';
 import { liveRhythms } from '@/lib/goals/rhythms';
 import { countTowards, syncRhythms } from '@/lib/goals/rhythms-store';
 import {
@@ -63,7 +64,7 @@ export async function loadCaptureContext(
 /** Carry out one move. Null when it no longer applies. */
 export async function applyCaptureAction(
   client: GoalsSupabaseClient,
-  userId: string,
+  { userId, today, captureId }: Today & { captureId: string },
   action: PlannedAction,
 ): Promise<FiledEntry | null> {
   switch (action.kind) {
@@ -101,6 +102,24 @@ export async function applyCaptureAction(
         text: action.text,
         undone_at: null,
       };
+    case 'reading': {
+      // Read on the day the sentence was filed, tied to the capture.
+      const id = await addReading(client, userId, action.goal.id, {
+        value: action.value,
+        readOn: today,
+        captureId,
+      });
+      if (!id) return null;
+      return {
+        kind: 'reading',
+        reading_id: id,
+        goal_id: action.goal.id,
+        goal_title: action.goal.title,
+        value: action.value,
+        unit: action.goal.unit,
+        undone_at: null,
+      };
+    }
     case 'add': {
       const id = await insertStep(client, userId, action.parent?.id ?? action.goal.id, {
         title: action.title,
@@ -136,7 +155,8 @@ export type UndoResult =
 /**
  * Reverse one line of a capture and mark it undone. Only that line's row is
  * touched: a reopened step goes back to open, a count is taken back from the
- * period it was added to, an added step is archived. A note changes no row.
+ * period it was added to, an added step is archived, a recorded reading is
+ * deleted. A note changes no row.
  */
 export async function undoFiled(
   client: GoalsSupabaseClient,
@@ -174,6 +194,10 @@ export async function undoFiled(
     }
     case 'archive':
       await setStepArchived(client, move.stepId, true);
+      break;
+    case 'delete-reading':
+      // False when it was already deleted by hand; either way it is gone.
+      await deleteReading(client, move.readingId);
       break;
     case 'none':
       break;
