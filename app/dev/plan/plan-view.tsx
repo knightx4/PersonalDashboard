@@ -2979,6 +2979,48 @@ function useRefreshedRuns(
   return { runs, refusal: answer ? answer.error : stored };
 }
 
+/**
+ * What CI said about each closed step's commit, asked for once the page has
+ * drawn.
+ *
+ * The page draws with the answers already stored and this asks
+ * `app/api/plan/checks` for anything due to be asked again. That used to happen
+ * during the render, which held every open of /dev/plan on GitHub. A request
+ * that fails changes nothing; one GitHub refused carries the reason, which the
+ * page prints.
+ */
+function useRefreshedChecks(stored: Record<string, CommitCheck>): {
+  checks: Record<string, CommitCheck>;
+  error: string | null;
+} {
+  const [answer, setAnswer] = useState<{
+    checks: Record<string, CommitCheck> | null;
+    error: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    const leaving = new AbortController();
+
+    void (async () => {
+      try {
+        const res = await fetch('/api/plan/checks', { method: 'POST', signal: leaving.signal });
+        if (!res.ok) return;
+        const body = (await res.json()) as {
+          checks?: Record<string, CommitCheck> | null;
+          error?: string | null;
+        };
+        setAnswer({ checks: body.checks ?? null, error: body.error ?? null });
+      } catch {
+        // Left as it was drawn.
+      }
+    })();
+
+    return () => leaving.abort();
+  }, []);
+
+  return { checks: answer?.checks ?? stored, error: answer?.error ?? null };
+}
+
 export function PlanView({
   sections,
   finished,
@@ -3055,6 +3097,7 @@ export function PlanView({
     keyRefusal,
   );
   const runs = refreshed.runs;
+  const ci = useRefreshedChecks(commitChecks);
 
   // The whole tree is already on the page, so the search runs here rather than
   // as a round trip: a plan is tens of steps, and a filter you feel keeping up
@@ -3100,6 +3143,8 @@ export function PlanView({
           </p>
         </Banner>
       )}
+
+      {ci.error && <p className="text-small text-caution">Could not read CI. {ci.error}</p>}
 
       <SummaryStrip summary={summary} view={view} />
 
@@ -3195,7 +3240,7 @@ export function PlanView({
                       lastRuns={runs}
                       runRaises={runRaises}
                       liveness={liveness}
-                      commitChecks={commitChecks}
+                      commitChecks={ci.checks}
                       view={view}
                       searching={searching}
                       unfolded={unfolded}
@@ -3277,7 +3322,7 @@ export function PlanView({
                 lastRuns={runs}
                 runRaises={runRaises}
                 liveness={liveness}
-                commitChecks={commitChecks}
+                commitChecks={ci.checks}
                 view={view}
                 searching={searching}
                 unfolded={unfolded}

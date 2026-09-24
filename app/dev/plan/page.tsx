@@ -9,7 +9,7 @@ import {
   loadRunRaises,
   loadStartedRuns,
 } from '@/lib/plan/runs';
-import { loadCommitChecks, refreshCommitChecks } from '@/lib/plan/ci';
+import { loadCommitChecks } from '@/lib/plan/ci';
 import { loadOvernightRun } from '@/lib/plan/overnight';
 import { runnerCard } from '@/lib/plan/runner-card';
 import { keyRefusal } from '@/lib/plan/work';
@@ -116,17 +116,16 @@ export default async function DevPlanPage({
   // end of a run, so this is where it gets noticed.
   await endQuietRuns({ supabase, userId: user.id });
 
-  // And what CI said about the commits the closed steps shipped in. Nothing is
-  // asked of GitHub unless some commit has no answer yet, so this costs a
-  // request only after something new has been closed.
-  const checks = await refreshCommitChecks({ supabase, userId: user.id });
-
   const [data, lastRuns, runRaises, commitChecks, overnight, fires, started] = await Promise.all([
     loadPlan(supabase, user.id),
     loadLastRuns(supabase, user.id),
     // What sessions have raised against a step, so an opened step can say what
     // its run asked for as well as what it pushed and closed.
     loadRunRaises(supabase, user.id),
+    // What CI said about the commits the closed steps shipped in, as last
+    // stored. The page asks GitHub for anything newer once it has drawn,
+    // through `app/api/plan/checks`: asked here, it held every open of the page
+    // on a walk of main's history.
     loadCommitChecks(supabase, user.id),
     // The runner's standing intention, one row, which is about the plan as a
     // whole rather than about any part of the tree.
@@ -211,11 +210,6 @@ export default async function DevPlanPage({
       {sync.error && (
         <p className="text-small text-caution">Could not check for new steps: {sync.error}</p>
       )}
-      {/* A sentence now rather than a status code, so it is printed as one and
-        in the same tone as the sync failure above it -- a setting nobody can
-        act on until they are told which one is not a quieter problem than a
-        step that did not arrive. */}
-      {checks.error && <p className="text-small text-caution">Could not read CI. {checks.error}</p>}
       <OvernightControl
         run={overnight}
         canSend={Boolean(planRoutine().token)}

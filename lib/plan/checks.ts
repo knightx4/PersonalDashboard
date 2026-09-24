@@ -55,6 +55,19 @@ export const RECHECK_AFTER_MINUTES = 10;
 /** The conclusions that will not change, so nothing asks about them again. */
 const FINAL: ReadonlySet<CheckConclusion> = new Set<CheckConclusion>(['passed', 'failed']);
 
+/**
+ * How long after a step closes a `none` stops being worth asking about.
+ *
+ * `none` means the merge that carried the step ran no workflows. A workflow
+ * that had not registered yet shows up within minutes, so a `none` read a day
+ * after the close will not change. Before this, the thirty-five such commits
+ * on the plan were asked about every ten minutes for weeks, and because the
+ * oldest were further back than the listing reaches, each open of /dev/plan
+ * paged through all of main and asked a comparison for each of them before
+ * anything was drawn.
+ */
+export const NONE_SETTLES_AFTER_HOURS = 24;
+
 /** Conclusions on a completed run that mean the commit did not pass. */
 const FAILING = new Set(['failure', 'timed_out', 'action_required', 'cancelled', 'startup_failure']);
 
@@ -138,10 +151,23 @@ export function conclusionFrom(runs: readonly CheckRun[]): CheckConclusion {
   return 'passed';
 }
 
-/** Whether GitHub should be asked about this commit again. */
-export function shouldRecheck(check: CommitCheck | undefined, now: number): boolean {
+/**
+ * Whether GitHub should be asked about this commit again.
+ *
+ * `closedAt` is when the step that records the commit was closed. Without it a
+ * `none` is asked about again every ten minutes, as it always was.
+ */
+export function shouldRecheck(
+  check: CommitCheck | undefined,
+  now: number,
+  closedAt?: string | null,
+): boolean {
   if (!check) return true;
   if (FINAL.has(check.conclusion)) return false;
+  if (check.conclusion === 'none' && closedAt) {
+    const settled = Date.parse(closedAt) + NONE_SETTLES_AFTER_HOURS * 3_600_000;
+    if (Date.parse(check.checkedAt) >= settled) return false;
+  }
   return (now - new Date(check.checkedAt).getTime()) / 60_000 >= RECHECK_AFTER_MINUTES;
 }
 
