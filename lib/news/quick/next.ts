@@ -148,7 +148,7 @@ export function nextCard(
 }
 
 /** How many stories a laptop page of Quick read holds at most. */
-export const QUICK_PAGE_SIZE = 6;
+export const QUICK_PAGE_SIZE = 5;
 
 /**
  * The stories a laptop page of Quick read shows, or an empty list when you

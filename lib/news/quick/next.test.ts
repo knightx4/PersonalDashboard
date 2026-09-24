@@ -272,11 +272,11 @@ describe('quickPage', () => {
   });
   const quiet = issue('quiet', 's3', '2026-09-24T08:00:00Z');
 
-  it('holds the first six cards nextCard would show, in its order, when none has a picture', () => {
+  it('holds the first five cards nextCard would show, in its order, when none has a picture', () => {
     const page = quickPage([b, a, quiet], senders, []);
-    expect(page.map(key)).toEqual(oneByOne([b, a, quiet], []).slice(0, 6));
-    expect(page.map(key)).toEqual(['a:0', 'a:1', 'a:2', 'b:0', 'b:1', 'b:2']);
-    expect(page.map((card) => card.remainingInIssue)).toEqual([3, 2, 1, 4, 3, 2]);
+    expect(page.map(key)).toEqual(oneByOne([b, a, quiet], []).slice(0, 5));
+    expect(page.map(key)).toEqual(['a:0', 'a:1', 'a:2', 'b:0', 'b:1']);
+    expect(page.map((card) => card.remainingInIssue)).toEqual([3, 2, 1, 4, 3]);
   });
 
   it('moves the first story with a picture to the front and keeps the rest in order', () => {
@@ -297,7 +297,7 @@ describe('quickPage', () => {
   it('only leads with a picture from the page itself, not from a later page', () => {
     const late = issue('late', 's2', '2026-09-20T08:00:00Z', { stories: [pictured('late-0')] });
     const page = quickPage([a, b, late], senders, []);
-    expect(page.map(key)).toEqual(['a:0', 'a:1', 'a:2', 'b:0', 'b:1', 'b:2']);
+    expect(page.map(key)).toEqual(['a:0', 'a:1', 'a:2', 'b:0', 'b:1']);
   });
 
   it('never shows a passed, muted or hidden story, and is shorter when fewer are left', () => {

@@ -1780,6 +1780,43 @@ const gridStories: GridStory[] = [
 ];
 
 /**
+ * A full laptop page of Quick read (note a5a59857): five stories, every one
+ * with a picture, the case that has to fit a laptop screen without scrolling.
+ */
+const quickFullPage: QuickReadViewProps = {
+  ...quickStory,
+  page: gridStories.slice(0, 5).map((story, index) => {
+    const from = story.from ?? 'Infra Weekly';
+    return {
+      card: {
+        kind: 'story' as const,
+        story: {
+          headline: story.headline,
+          summary: story.summary,
+          image: previewPicture(
+            ['1e3a8a', '7c2d12', '14532d', '4c1d95', '713f12'][index],
+            '93c5fd',
+          ),
+          link: 'https://example.com/story',
+          text: index === 0 ? issueBase.digest!.stories[0].text : undefined,
+          topic: 'Business' as const,
+        },
+        issueId: `issue-${index + 1}`,
+        storyIndex: 0,
+        subject: issueBase.subject,
+        receivedAt: '2026-09-22T07:14:00Z',
+        sender: { id: `sender-${index + 1}`, email: 'hello@example.com', name: from, muted: false },
+        from,
+        remainingInIssue: 1,
+      },
+      arrived: '22 Sep, 07:14',
+      saved: false,
+      issueHref: `/news/i/issue-${index + 1}`,
+    };
+  }),
+};
+
+/**
  * The Saved tab (plan #870): three stories, newest saved first. The first has
  * its picture, full text and link; the second's newsletter has been deleted,
  * so its sender is not a link; the third has no link or text of its own.
@@ -2486,6 +2523,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'news',
     width: 'page',
     render: () => <QuickReadView {...quickPageView} />,
+  },
+  {
+    id: 'news-quick-page-full',
+    label: 'News · A full Quick read page, every story with a picture',
+    module: 'news',
+    width: 'page',
+    render: () => <QuickReadView {...quickFullPage} />,
   },
   {
     id: 'news-quick-caught-up',
