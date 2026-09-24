@@ -139,8 +139,18 @@ The Level 3 goal takes its turn in the same one card in three, but its cards
 skip the naming call (plan #910). Each draw takes two articles at random from
 the Level 3 list that you have shown no sign of knowing (nothing in the
 evidence view: no Got it, no save, no right Test me answer) and that have never
-been on a card of yours, and makes a card from each article's lead. Claimed but
-untested articles coming back after a gap join the same draw later (#912).
+been on a card of yours, and makes a card from each article's lead.
+
+An article you claimed (a Got it or a save) but have not been tested on comes
+back in the same draw once it is due (plan #912): a week after the claim, then
+a month after that return, then every three months, until a right answer on
+its Test me track moves it to tested. The gaps are `LEVEL3_RETURN_GAP_DAYS` in
+`lib/learn/feed/level3.ts`. When one is due, the draw takes an untouched
+article and a return in turn. A return stays on the same article, so its Test
+me track still counts for it, but at a section no earlier card was cut from: a
+naming call is given the earlier cards' titles and the open sections, and asked
+for one that goes past them, a step harder each time. A reply naming anything
+it was not offered is dropped.
 
 Your own queued readings are served before either, in the order you queued
 them.

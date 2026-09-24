@@ -35,9 +35,16 @@ export type NamedSection = {
   section: string | null;
   /** One sentence on why it suits the target. */
   basis: string;
+  /** The model that chose it, when not the pass's own naming model (a Level 3 return, plan #912). */
+  model?: string;
+  /** Set on a Level 3 article coming back: the titles of the cards already had on it. */
+  returning?: { earlier: string[] };
 };
 
-export type NameResult = { ok: true; named: NamedSection[] } | { ok: false; detail: string };
+/** `skipped` says why any pick the call meant to make was left out. */
+export type NameResult =
+  | { ok: true; named: NamedSection[]; skipped?: string[] }
+  | { ok: false; detail: string };
 
 const SYSTEM = `You choose what one person should read next on English Wikipedia.
 
