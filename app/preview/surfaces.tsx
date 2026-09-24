@@ -1691,6 +1691,28 @@ const quickEssay: QuickReadViewProps = {
   issueHref: '/news/i/issue-2',
 };
 
+/**
+ * Quick read on a laptop (plan #941): the story card above leading a page with
+ * the essay beside it. Below md the gallery shows the single card instead.
+ */
+const quickPageView: QuickReadViewProps = {
+  ...quickStory,
+  page: [
+    {
+      card: quickStory.card!,
+      arrived: '22 Sep, 07:14',
+      saved: false,
+      issueHref: '/news/i/issue-1',
+    },
+    {
+      card: quickEssay.card!,
+      arrived: '20 Sep, 09:02',
+      saved: false,
+      issueHref: '/news/i/issue-2',
+    },
+  ],
+};
+
 /** A picture drawn inline, so the gallery needs no network for it. */
 function previewPicture(sky: string, hill: string): string {
   return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180'%3E%3Crect width='320' height='180' fill='%23${sky}'/%3E%3Cpath d='M0 130 L80 84 L150 116 L220 70 L320 104 V180 H0Z' fill='%23${hill}'/%3E%3C/svg%3E`;
@@ -2446,6 +2468,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'news',
     width: 'page',
     render: () => <QuickReadView {...quickEssay} />,
+  },
+  {
+    id: 'news-quick-page',
+    label: 'News · Quick read page on a laptop',
+    module: 'news',
+    width: 'page',
+    render: () => <QuickReadView {...quickPageView} />,
   },
   {
     id: 'news-quick-caught-up',
