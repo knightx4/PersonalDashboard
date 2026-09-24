@@ -8,7 +8,7 @@ import { recordSpend } from '@/lib/core/spend/record';
 import { loadAreas } from '@/lib/learn/areas/load';
 import { storeArticleOverRest } from '@/lib/learn/catalogue/store-rest';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import { cardTitle } from '@/lib/learn/feed/card';
+import { cardTitle, isCardDifficulty } from '@/lib/learn/feed/card';
 import { progressFrom } from '@/lib/learn/feed/depth';
 import { NAME_MATERIAL_MODEL, nameMaterial } from '@/lib/learn/feed/name-material';
 import {
@@ -78,6 +78,7 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
     named_article: string | null;
     created_at: string;
     status: string;
+    difficulty: string | null;
     saved_reading_id: string | null;
     acted_at: string | null;
     item: { title: string } | null;
@@ -106,7 +107,7 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
         learn
           .from('feed_cards')
           .select(
-            'reason, theme_id, field_id, named_article, created_at, status, saved_reading_id, acted_at, ' +
+            'reason, theme_id, field_id, named_article, created_at, status, difficulty, saved_reading_id, acted_at, ' +
               'item:catalogue_items!feed_cards_item_id_fkey(title), ' +
               'segment:catalogue_segments!feed_cards_segment_id_fkey(heading)',
           )
@@ -160,15 +161,17 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
   }
 
   // Newest action first, so the titles passed to the naming call are the
-  // latest swipes.
+  // latest swipes. A card rated Too hard or Too easy counts even when it has
+  // not been swiped (plan #894).
   const swiped = cards
-    .filter((card) => card.status === 'known' || card.status === 'review')
+    .filter((card) => card.status === 'known' || card.status === 'review' || isCardDifficulty(card.difficulty))
     .sort((a, b) => Date.parse(b.acted_at ?? b.created_at) - Date.parse(a.acted_at ?? a.created_at))
     .map((card) => ({
       status: card.status,
       theme_id: card.theme_id,
       field_id: card.field_id,
       reason: card.reason,
+      difficulty: isCardDifficulty(card.difficulty) ? card.difficulty : null,
       title: card.item ? cardTitle(card.item.title, card.segment?.heading ?? null) : card.named_article,
     }));
 
@@ -180,7 +183,8 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
     recentFieldIds,
     // Saves and Not interested on every earlier card lean the draw (plan #809).
     preferences: preferencesFrom(cards),
-    // Known and review swipes set how deep the next picks go (depth.ts).
+    // Known and review swipes, and the difficulty ratings, set how deep the
+    // next picks go (depth.ts).
     progress: progressFrom(swiped),
     picked,
     articlesHeld: [...new Set(cards.flatMap((card) => (card.named_article ? [card.named_article] : [])))],

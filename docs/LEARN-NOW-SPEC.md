@@ -275,6 +275,20 @@ another article. The level is stored on the pick as `depth`, shown on the
 card, and passed to the writer, which drops a section that only restates what
 that level is past. Code: `lib/learn/feed/depth.ts`.
 
+The Too hard and Too easy buttons on a card (plan #894) move the same count.
+A card rated too easy adds one and a card rated too hard takes one off, so the
+count is known cards plus too-easy cards minus too-hard cards, never below
+zero. One Too hard on an advanced theme takes it back to working. A rating is
+read apart from the swipe: a card rated but never swiped still counts, and a
+card swiped as known and rated too easy counts twice. Ratings on a gap card
+count towards its field, as its swipes do.
+
+Working stays the lowest level (plan #892). Too hard on a working theme leaves
+the level where it is. The naming call is given the titles rated too hard on
+that theme or field and told to come at those ideas from a simpler angle,
+easier than those cards. A rating does not fetch new cards on its own; it
+changes the next picks made for that theme or field.
+
 ### The three swipes
 
 One card is on the screen at a time. It is left by a swipe, an arrow key, or
