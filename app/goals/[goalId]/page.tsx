@@ -11,11 +11,13 @@ import { loadAimChoices, loadGoalLinks } from '@/lib/goals/links-store';
 import { loadReadings } from '@/lib/goals/readings-store';
 import {
   approvalLine,
+  changesLine,
   countOpenQuestions,
   countProposed,
   runInFlight,
   runLine,
   type GoalRun,
+  type RunChanges,
 } from '@/lib/goals/shaping';
 import type { StepNode } from '@/lib/goals/steps';
 import type { GoalStatus } from '@/lib/goals/tree';
@@ -47,7 +49,7 @@ export const dynamic = 'force-dynamic';
 function shapingLines(
   goalStatus: GoalStatus,
   steps: StepNode[],
-  shaping: { approvedAt: string | null; lastRun: GoalRun | null },
+  shaping: { approvedAt: string | null; lastRun: GoalRun | null; changes: RunChanges | null },
   timeZone: string,
 ) {
   const now = Date.now();
@@ -58,6 +60,7 @@ function shapingLines(
     hour: 'numeric',
     minute: '2-digit',
   });
+  const running = runInFlight(shaping.lastRun, now);
   return {
     approval: approvalLine({
       goalStatus,
@@ -66,7 +69,9 @@ function shapingLines(
       questions: countOpenQuestions(steps),
     }),
     runLine: runLine(shaping.lastRun, now, (iso) => `on ${stamp.format(new Date(iso))}`),
-    running: runInFlight(shaping.lastRun, now),
+    runFailed: shaping.lastRun?.status === 'failed',
+    changes: changesLine(shaping.changes),
+    runningSince: running && shaping.lastRun ? shaping.lastRun.createdAt : null,
   };
 }
 

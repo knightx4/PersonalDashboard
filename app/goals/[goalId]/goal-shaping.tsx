@@ -1,6 +1,8 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { RunningFor } from '@/app/dev/plan/plan-run-status';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FogNote } from '@/components/dev/fog-note';
@@ -14,6 +16,13 @@ import {
 const initial: ShapingActionState = {};
 
 /**
+ * How often the page looks again while a run is going, so the working line
+ * turns into what the run changed without a reload. A run takes minutes, so
+ * a quarter of one is soon enough.
+ */
+const RUN_POLL_MS = 15_000;
+
+/**
  * Claude on this goal (plan #932): whether you have approved it, what Claude
  * has proposed and asked, how its last run went, and the two presses. Work on
  * this fires the goals routine for this goal; Approve opens what it proposed
@@ -23,18 +32,31 @@ export function GoalShaping({
   goalId,
   approval,
   runLine,
+  runFailed,
+  changes,
+  runningSince,
   canRun,
-  running,
 }: {
   goalId: string;
   approval: { text: string; approve: string | null };
   /** The latest run in a sentence, or null when there has not been one. */
   runLine: string | null;
+  /** Whether that run failed, so its line reads as an error. */
+  runFailed: boolean;
+  /** What the ended run changed, counted from history (plan #961). */
+  changes: string | null;
+  /** When the run still going started, or null when none is. */
+  runningSince: string | null;
   /** Whether this account can start a run (the owner's only). */
   canRun: boolean;
-  /** Whether a run is still taken to be going. */
-  running: boolean;
 }) {
+  const router = useRouter();
+  const running = runningSince !== null;
+  useEffect(() => {
+    if (!running) return;
+    const timer = setInterval(() => router.refresh(), RUN_POLL_MS);
+    return () => clearInterval(timer);
+  }, [running, router]);
   const [approveState, approve, approving] = useActionState(approveGoalAction, initial);
   const [workState, work, starting] = useActionState(workOnGoalAction, initial);
   const error = approveState.error ?? workState.error;
@@ -47,7 +69,22 @@ export function GoalShaping({
       </h2>
       <Card className="space-y-2 p-3">
         <p className="text-ui text-ink">{approval.text}</p>
-        {runLine && <p className="text-small text-ink-muted">{runLine}</p>}
+        {runningSince ? (
+          <p role="status" className="flex items-center gap-1.5 text-small text-accent">
+            <span className="size-1.5 animate-pulse rounded-full bg-accent" aria-hidden />
+            <span>
+              Claude is working on this
+              <RunningFor startedAt={runningSince} claim={undefined} />
+            </span>
+          </p>
+        ) : (
+          runLine && (
+            <div className="space-y-0.5">
+              <p className={runFailed ? 'text-small text-danger' : 'text-small text-ink-muted'}>{runLine}</p>
+              {changes && <p className="text-small text-ink-muted">{changes}</p>}
+            </div>
+          )
+        )}
         {(approval.approve || canRun) && (
           <div className="flex flex-wrap items-center gap-2">
             {approval.approve && (

@@ -86,7 +86,8 @@ export async function workOnGoalAction(
     revalidatePath(`/goals/${goalId.data}`);
     return { error: result.error };
   }
-  return saved('Claude is working on this goal. Proposed steps and questions will show here.');
+  // No message: the working line in the panel says it, with its clock (plan #961).
+  return saved();
 }
 
 // latency: pending
