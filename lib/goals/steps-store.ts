@@ -12,6 +12,14 @@ import {
   type StepKind,
   type StepNode,
 } from '@/lib/goals/steps';
+import {
+  atRiskRhythms,
+  liveRhythms,
+  type AtRiskRhythm,
+  type LiveRhythm,
+  type RhythmRecord,
+} from '@/lib/goals/rhythms';
+import { syncRhythms } from '@/lib/goals/rhythms-store';
 import { todoSteps, type TodoStep } from '@/lib/goals/todo';
 import { nextPosition, reorder, type Goal, type GoalStatus } from '@/lib/goals/tree';
 
@@ -86,7 +94,12 @@ export type GoalMap = {
   otherGoals: { id: string; title: string }[];
   /** For each step shown, the other goals it is linked to. */
   linksOf: Record<string, { linkId: string; goalId: string; title: string }[]>;
+  /** Each rhythm step's current period and the closed ones before it (plan #928). */
+  rhythms: Record<string, RhythmRecord>;
 };
+
+/** Whose rows, and which day it is for them, for bringing rhythm periods up to date. */
+export type Today = { userId: string; today: string };
 
 /**
  * One goal and everything under it, or null when it is not a live goal of
@@ -97,6 +110,7 @@ export type GoalMap = {
 export async function loadGoalMap(
   client: GoalsSupabaseClient,
   goalId: string,
+  { userId, today }: Today,
 ): Promise<GoalMap | null> {
   const [items, links, areas] = await Promise.all([
     client
@@ -143,13 +157,37 @@ export async function loadGoalMap(
     }
   }
 
+  const steps = byGoal.get(goalId) ?? [];
+  const shown: string[] = [];
+  const collect = (list: StepNode[]) => {
+    for (const node of list) {
+      if (node.kind === 'rhythm') shown.push(node.id);
+      collect(node.children);
+    }
+  };
+  collect(steps);
+  collect(linked.map((entry) => entry.step));
+  const records = await syncRhythms(
+    client,
+    userId,
+    liveRhythms(goals.map(toGoal), byGoal),
+    today,
+    shown,
+  );
+
   return {
     goal: toGoal(goal),
     areaName: areaNames.get(goal.area_id as string) ?? '',
-    steps: byGoal.get(goalId) ?? [],
+    steps,
     linked,
     otherGoals: goals.filter((g) => g.id !== goalId).map((g) => ({ id: g.id, title: g.title })),
     linksOf,
+    rhythms: Object.fromEntries(
+      shown.flatMap((id) => {
+        const record = records.get(id);
+        return record ? [[id, record]] : [];
+      }),
+    ),
   };
 }
 
@@ -414,22 +452,45 @@ async function loadLiveTree(
  * Everything the daily view on the home needs (plan #926). The selection
  * itself is dailyView in lib/goals/daily.ts.
  */
-export async function loadDailyView(client: GoalsSupabaseClient): Promise<DailyView> {
+export async function loadDailyView(
+  client: GoalsSupabaseClient,
+  { userId, today }: Today,
+): Promise<DailyView & { atRisk: AtRiskRhythm[] }> {
   const { goals, byGoal } = await loadLiveTree(client);
-  return dailyView(goals, byGoal);
-}
-
-/**
- * The steps on Todo (plan #927), for the agenda source in
- * lib/todo/agenda/sources/goal-steps.ts. The rule is todoSteps in
- * lib/goals/todo.ts.
- */
-export async function loadTodoSteps(client: GoalsSupabaseClient): Promise<TodoStep[]> {
-  const { goals, byGoal } = await loadLiveTree(client);
-  return todoSteps(
+  const live = liveRhythms(
     goals.map((g) => g.goal),
     byGoal,
   );
+  const records = await syncRhythms(client, userId, live, today);
+  return { ...dailyView(goals, byGoal), atRisk: atRiskRhythms(live, records, today) };
+}
+
+/** A live rhythm whose current period is not yet met, for Todo (plan #928). */
+export type TodoRhythm = LiveRhythm & { startsOn: string; count: number };
+
+/**
+ * What Goals puts on Todo, for the agenda source in
+ * lib/todo/agenda/sources/goal-steps.ts: the steps you pressed Show on Todo
+ * on (plan #927; the rule is todoSteps in lib/goals/todo.ts), and every live
+ * rhythm until its current period's count is met (plan #928). Rhythms need no
+ * flag, as the spec says; "Not this one" on Todo hides only this period.
+ */
+export async function loadTodoGoals(
+  client: GoalsSupabaseClient,
+  { userId, today }: Today,
+): Promise<{ steps: TodoStep[]; rhythms: TodoRhythm[] }> {
+  const { goals, byGoal } = await loadLiveTree(client);
+  const goalList = goals.map((g) => g.goal);
+  const live = liveRhythms(goalList, byGoal);
+  const records = await syncRhythms(client, userId, live, today);
+  const rhythms = live.flatMap((rhythm) => {
+    const current = records.get(rhythm.id)?.current;
+    if (!current || current.count >= current.target) return [];
+    return [
+      { ...rhythm, target: current.target, startsOn: current.startsOn, count: current.count },
+    ];
+  });
+  return { steps: todoSteps(goalList, byGoal), rhythms };
 }
 
 /**
