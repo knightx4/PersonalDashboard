@@ -132,6 +132,8 @@ describe('RLS coverage', () => {
       'theme_fields',
       'track_offers',
       'tracks',
+      'transcript_calls',
+      'video_transcripts',
     ]);
   });
 });
@@ -346,6 +348,30 @@ describe('the catalogue, which belongs to nobody', () => {
         userB,
         (tx) => tx`insert into catalogue_providers (slug, name, home_url, licence, ingest_note)
                    values ('planted', 'Planted', 'https://example.com', 'none', 'planted')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('lets anyone read the transcript states and the credit ledger, and nobody write them', async () => {
+    // Shared like the catalogue (learn 0042): the state of a video's
+    // transcript and a record of what a call cost belong to nobody, and only
+    // the service role writes them. The ledger is append-only even for it.
+    for (const table of ['video_transcripts', 'transcript_calls']) {
+      const seen = await asUser(userB, (tx) => tx`select 1 from ${tx(table)} limit 1`);
+      expect(Array.isArray(seen)).toBe(true);
+    }
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into video_transcripts (video_id, state, requested_by)
+                   values ('ZK3O402wf1c', 'queued', 'press')`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into transcript_calls (video_id, status, credits, outcome, trigger)
+                   values ('ZK3O402wf1c', 200, 0, 'fetched', 'press')`,
       ),
     ).rejects.toThrow();
   });

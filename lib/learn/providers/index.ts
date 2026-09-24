@@ -25,13 +25,21 @@ export type { WikipediaArticle, WikipediaFailure, WikipediaResult, WikipediaSect
 
 export {
   chaptersFromDescription,
+  fetchChannelPlaylists,
+  fetchPlaylistVideoIds,
+  fetchVideosByIds,
+  fetchYouTubeChannel,
   fetchYouTubePlaylist,
   lectureLabel,
+  parseChannelInput,
   parseIsoDuration,
   playlistUrl,
   watchUrl,
 } from './youtube';
 export type {
+  ChannelInput,
+  YouTubeChannel,
+  YouTubeChannelPlaylist,
   YouTubeChapter,
   YouTubeFailure,
   YouTubePlaylist,
@@ -48,3 +56,10 @@ export {
   ocwTranscriptLookup,
 } from './ocw';
 export type { OcwVideo } from './ocw';
+
+export {
+  fetchTranscript,
+  isVideoId,
+  parseTranscriptResponse,
+} from './transcriptapi';
+export type { TranscriptFailure, TranscriptOutcome, TranscriptResult } from './transcriptapi';

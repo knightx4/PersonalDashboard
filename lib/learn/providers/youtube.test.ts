@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  channelsRequestUrl,
   chaptersFromDescription,
   lectureLabel,
+  parseChannelInput,
+  parseChannelPlaylistsPage,
+  parseChannelsResponse,
   parseIsoDuration,
   parsePlaylistItemsPage,
   parsePlaylistResponse,
@@ -202,5 +206,89 @@ describe('the requests themselves', () => {
     const url = new URL(videosRequestUrl(ids, 'the-key'));
     expect(url.searchParams.get('id')?.split(',')).toHaveLength(50);
     expect(url.searchParams.get('part')).toBe('snippet,contentDetails');
+  });
+});
+
+describe('parseChannelInput', () => {
+  it('takes a handle, a channel link, or a channel id', () => {
+    expect(parseChannelInput('@MITOCW')).toEqual({ ok: true, handle: '@MITOCW' });
+    expect(parseChannelInput('MITOCW')).toEqual({ ok: true, handle: '@MITOCW' });
+    expect(parseChannelInput('https://www.youtube.com/@MITOCW/playlists')).toEqual({ ok: true, handle: '@MITOCW' });
+    expect(parseChannelInput('youtube.com/@3blue1brown')).toEqual({ ok: true, handle: '@3blue1brown' });
+    expect(parseChannelInput('https://www.youtube.com/channel/UCEBb1b_L6zDS3xTUrIALZOw')).toEqual({
+      ok: true,
+      channelId: 'UCEBb1b_L6zDS3xTUrIALZOw',
+    });
+    expect(parseChannelInput('UCEBb1b_L6zDS3xTUrIALZOw')).toEqual({ ok: true, channelId: 'UCEBb1b_L6zDS3xTUrIALZOw' });
+  });
+
+  it('says what to do with an old-style link rather than guessing', () => {
+    const parsed = parseChannelInput('https://www.youtube.com/user/MIT');
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) expect(parsed.error).toMatch(/@handle/);
+  });
+
+  it('refuses what is not a channel', () => {
+    expect(parseChannelInput('').ok).toBe(false);
+    expect(parseChannelInput('https://example.com/@someone').ok).toBe(false);
+  });
+});
+
+describe('channelsRequestUrl', () => {
+  it('looks a handle up with forHandle, for one quota unit', () => {
+    const url = new URL(channelsRequestUrl({ handle: '@MITOCW' }, 'k'));
+    expect(url.pathname).toBe('/youtube/v3/channels');
+    expect(url.searchParams.get('forHandle')).toBe('@MITOCW');
+    expect(url.searchParams.get('part')).toBe('snippet,contentDetails');
+  });
+});
+
+describe('parseChannelsResponse', () => {
+  it('finds the uploads playlist and the handle', () => {
+    const parsed = parseChannelsResponse(
+      JSON.stringify({
+        items: [
+          {
+            id: 'UCEBb1b_L6zDS3xTUrIALZOw',
+            snippet: { title: 'MIT OpenCourseWare', customUrl: '@mitocw' },
+            contentDetails: { relatedPlaylists: { uploads: 'UUEBb1b_L6zDS3xTUrIALZOw' } },
+          },
+        ],
+      }),
+    );
+    expect(parsed).toEqual({
+      ok: true,
+      channelId: 'UCEBb1b_L6zDS3xTUrIALZOw',
+      title: 'MIT OpenCourseWare',
+      handle: '@mitocw',
+      uploadsPlaylistId: 'UUEBb1b_L6zDS3xTUrIALZOw',
+      canonicalUrl: 'https://www.youtube.com/@mitocw',
+    });
+  });
+
+  it('answers not-found for a handle nobody has', () => {
+    const parsed = parseChannelsResponse(JSON.stringify({ items: [] }));
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) expect(parsed.reason).toBe('not-found');
+  });
+});
+
+describe('parseChannelPlaylistsPage', () => {
+  it('reads each playlist with its size and the next page', () => {
+    const parsed = parseChannelPlaylistsPage(
+      JSON.stringify({
+        nextPageToken: 'CDIQAA',
+        items: [
+          { id: 'PLE7DDD91010BC51F8', snippet: { title: 'MIT 18.06 Linear Algebra' }, contentDetails: { itemCount: 35 } },
+          { id: 'PLbroken' },
+        ],
+      }),
+    );
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.nextPageToken).toBe('CDIQAA');
+    expect(parsed.playlists).toEqual([
+      { playlistId: 'PLE7DDD91010BC51F8', title: 'MIT 18.06 Linear Algebra', description: '', itemCount: 35 },
+    ]);
   });
 });

@@ -27,6 +27,7 @@ import {
   PencilLine,
   MessageCircleQuestion,
   MessageSquareText,
+  MonitorPlay,
   Receipt,
   Share2,
   Shapes,
@@ -109,6 +110,10 @@ export const NAV_ICONS = {
   // A quiz is answered in writing, which is the whole of what separates it
   // from being asked to recognise something, so it gets the pencil.
   quiz: PencilLine,
+  // The YouTube library: channels, playlists and the transcripts fetched for
+  // them. A screen with a play mark, not the YouTube logo, because a brand
+  // mark in the nav would be the only one.
+  videos: MonitorPlay,
   // News. An envelope, the same object the workspace's own mark draws, because
   // the tab and the mark name the same thing and picking a second object for
   // it would say there are two.

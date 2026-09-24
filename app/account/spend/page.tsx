@@ -14,6 +14,9 @@ import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { formatMicroDollars, todayInTimezone } from '@/lib/money';
 import { loadSpend } from '@/lib/core/spend/load';
+import { TranscriptCredits } from '@/components/learn/transcript-credits';
+import { createLearnClient } from '@/lib/learn/auth/server';
+import { loadUsage, type Usage } from '@/lib/learn/youtube/load';
 import {
   monthStart,
   rollUp,
@@ -127,6 +130,9 @@ export default async function SpendPage() {
 
   const supabase = await createCoreClient();
   const rows = await loadSpend(supabase);
+  // TranscriptAPI is billed in credits, not per token, so it is not a row in
+  // model_spend. The owner, whose key it is, sees the month's credits here too.
+  const transcripts: Usage | null = owner ? await loadUsage(await createLearnClient()) : null;
 
   const timezone = settings.timezone;
   const localDateOf = (instant: string) => todayInTimezone(timezone, new Date(instant));
@@ -165,6 +171,12 @@ export default async function SpendPage() {
             title="Spend"
             description="What the models have cost, per call, since this was switched on."
           />
+
+          {transcripts && (transcripts.credits.used > 0 || transcripts.queue.fetched > 0) && (
+            <div className="mb-6">
+              <TranscriptCredits usage={transcripts} />
+            </div>
+          )}
 
           {rows.length === 0 ? (
             <p
