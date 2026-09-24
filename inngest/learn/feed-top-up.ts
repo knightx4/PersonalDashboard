@@ -15,7 +15,7 @@ import {
 import type { Depth } from '@/lib/learn/feed/depth';
 import { WRITE_CARD_MODEL, writeCard, type CardToWrite } from '@/lib/learn/feed/write-card';
 import type { LearnOperation } from '@/lib/learn/spend';
-import { createFeedPicker, loadFeedFields, peopleWithThemes } from './feed-picks';
+import { createFeedPicker, loadFeedFields, peopleToPickFor } from './feed-picks';
 
 /**
  * The Learn now top-up (plan #807, LEARN-NOW-SPEC "How cards are made").
@@ -42,8 +42,9 @@ const OPERATION: LearnOperation = 'write-feed-card';
 
 type PickedRow = {
   id: string;
-  reason: 'interest' | 'gap' | 'queued';
+  reason: 'interest' | 'gap' | 'goal' | 'queued';
   theme_name: string | null;
+  aim_name: string | null;
   field_id: string | null;
   named_article: string | null;
   depth: Depth | null;
@@ -86,7 +87,7 @@ async function loadPicked(
   const { data, error } = await learn
     .from('feed_cards')
     .select(
-      'id, reason, theme_name, field_id, named_article, depth, ' +
+      'id, reason, theme_name, aim_name, field_id, named_article, depth, ' +
         'item:catalogue_items!feed_cards_item_id_fkey(title), ' +
         'segment:catalogue_segments!feed_cards_segment_id_fkey(heading, text), ' +
         'field:area_fields!feed_cards_field_id_fkey(name, scope)',
@@ -98,12 +99,14 @@ async function loadPicked(
   if (error) throw new Error(`Reading your picked cards failed: ${error.message}`);
 
   return ((data ?? []) as unknown as PickedRow[]).flatMap((row): CardToWrite[] => {
-    if (row.reason === 'queued' || !row.field || !row.segment) return [];
+    // A goal card has no field when its goal is not placed in one.
+    if (row.reason === 'queued' || !row.segment || (!row.field && row.reason !== 'goal')) return [];
     return [
       {
         id: row.id,
         reason: row.reason,
         themeName: row.theme_name,
+        aimName: row.aim_name,
         field: row.field,
         gap: row.reason === 'gap' ? (row.field_id && written.has(row.field_id) ? 'untested' : 'untouched') : null,
         article: row.item?.title ?? row.named_article ?? 'Wikipedia',
@@ -147,7 +150,7 @@ async function topUpWith(
     },
     pick: async (id, targets, deadline) => {
       const summary = await pickFor(id, { targets, deadline });
-      return summary.picked.interest + summary.picked.gap;
+      return summary.picked.interest + summary.picked.gap + summary.picked.goal;
     },
     write: async (id, card) => {
       const spend: SpendReport[] = [];
@@ -196,14 +199,15 @@ async function topUpWith(
 export type FeedTopUpResult = { people: TopUpSummary[] };
 
 /**
- * The hourly call: everyone with placed themes and fewer than twenty ready
- * cards is topped up, one person after another, inside one budget.
+ * The hourly call: everyone with placed themes or an active goal, and fewer
+ * than twenty ready cards, is topped up, one person after another, inside one
+ * budget.
  */
 export async function runFeedTopUp(): Promise<FeedTopUpResult> {
   const deadline = Date.now() + FEED_TOP_UP_BUDGET_MS;
   const context = await createContext();
   const people: TopUpSummary[] = [];
-  for (const userId of await peopleWithThemes(context.learn)) {
+  for (const userId of await peopleToPickFor(context.learn)) {
     if (Date.now() >= deadline) break;
     people.push(await topUpWith(context, userId, { threshold: READY_TARGET, deadline }));
   }

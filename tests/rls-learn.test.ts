@@ -580,6 +580,32 @@ describe('the cards behind Learn now', () => {
       select theme_id, theme_name from feed_cards where id = ${cardA}`;
     expect(row).toEqual({ theme_id: null, theme_name: 'Central banks' });
   });
+
+  it('takes a goal card only with the goal named, and keeps the name when the goal goes', async () => {
+    // 0046_feed_card_goals.sql. A goal card may have no field, when its goal
+    // sits in none.
+    const [{ item_id: itemId }] = await admin<{ item_id: string }[]>`
+      select item_id from feed_cards where id = ${cardA}`;
+    const [segment] = await admin<{ id: string }[]>`
+      insert into catalogue_segments (item_id, ordinal, section_anchor, heading, text)
+      values (${itemId}, 2, 'Effects', 'Effects', 'Savers lose...')
+      returning id`;
+    const [aim] = await admin<{ id: string }[]>`
+      insert into aims (user_id, name, depth) values (${userA}, 'Startup finance', 'solid') returning id`;
+    await expect(
+      admin`insert into feed_cards (user_id, reason, aim_id, item_id, segment_id)
+            values (${userA}, 'goal', ${aim.id}, ${itemId}, ${segment.id})`,
+    ).rejects.toThrow();
+    const [card] = await admin<{ id: string }[]>`
+      insert into feed_cards (user_id, reason, aim_id, aim_name, item_id, segment_id)
+      values (${userA}, 'goal', ${aim.id}, 'Startup finance', ${itemId}, ${segment.id})
+      returning id`;
+
+    await admin`delete from aims where id = ${aim.id}`;
+    const [row] = await admin<{ aim_id: string | null; aim_name: string }[]>`
+      select aim_id, aim_name from feed_cards where id = ${card.id}`;
+    expect(row).toEqual({ aim_id: null, aim_name: 'Startup finance' });
+  });
 });
 
 describe('the curriculum at the top of a track', () => {
