@@ -42,6 +42,7 @@ import {
   unlinkStepAction,
   type StepActionState,
 } from './actions';
+import { answerQuestionAction, type ShapingActionState } from './shaping-actions';
 
 /**
  * A goal's full tree (plan #925).
@@ -440,6 +441,9 @@ function StepItem({
           {rhythm && rhythm.past.length > 0 && node.rhythmPeriod && (
             <PastPeriods past={rhythm.past} period={node.rhythmPeriod} />
           )}
+          {node.kind === 'decision' && node.status === 'open' && node.resolution === null && (
+            <AnswerForm id={node.id} title={node.title} />
+          )}
           {editState.error && <p className="px-1 text-small text-danger">{editState.error}</p>}
           {details && (
             <StepDetails node={node} links={stepLinks} otherGoals={otherGoals} edit={edit} />
@@ -471,6 +475,35 @@ function StepItem({
         </div>
       )}
     </li>
+  );
+}
+
+const answerInitial: ShapingActionState = {};
+
+/**
+ * Answer a question Claude asked (plan #932). The answer is kept on the step
+ * and the step closes; the next run on this goal reads it.
+ */
+function AnswerForm({ id, title }: { id: string; title: string }) {
+  const [state, answer, answering] = useActionState(answerQuestionAction, answerInitial);
+  return (
+    <form action={answer} className="mt-1 space-y-1 px-1">
+      <input type="hidden" name="id" value={id} />
+      {/* ui-ok: the answer to this question, shown only while it is unanswered */}
+      <Textarea
+        name="answer"
+        rows={2}
+        required
+        placeholder="Your answer"
+        aria-label={`Your answer to ${title}`}
+      />
+      <div className="flex items-center gap-2">
+        <Button type="submit" size="sm" variant="secondary" pending={answering}>
+          Answer
+        </Button>
+        {state.error && <span className="text-small text-danger">{state.error}</span>}
+      </div>
+    </form>
   );
 }
 

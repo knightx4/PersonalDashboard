@@ -78,6 +78,21 @@ export function reviewRoutine(): RoutineTarget {
   };
 }
 
+/**
+ * The routine that shapes and works personal goals -- "Work on this" on a
+ * goal's page (plan #932), and the scheduled goals runs after it.
+ *
+ * No fallback to the shared id, for the reason the review routine has none:
+ * a goals press sent to the plan routine would not fail, it would build a dev
+ * step. With no id set the page says so and starts nothing.
+ */
+export function goalsRoutine(): RoutineTarget {
+  return {
+    id: firstSet(process.env.CLAUDE_GOALS_ROUTINE_ID),
+    token: firstSet(process.env.CLAUDE_GOALS_ROUTINE_TOKEN, process.env.CLAUDE_API_KEY),
+  };
+}
+
 /** The beta header the routine API requires, as documented. */
 const ROUTINE_BETA = 'experimental-cc-routine-2026-04-01';
 const ANTHROPIC_VERSION = '2023-06-01';
