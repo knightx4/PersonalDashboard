@@ -135,6 +135,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // One call per section, writing a card for each of up to three ideas.
   'write-feed-card': background(unit(SONNET, 4_000, 2_000)),
   'embed-feed-ideas': background(unit(VOYAGE_LITE, 1_500, 0)),
+  // One call per lesson: the concept, its checks, and at most one catalogue section.
+  'write-lesson': background(unit(SONNET, 3_500, 1_200)),
 
   // Jobs.
   'enrich-company': run(HAIKU, 10_000, 500),

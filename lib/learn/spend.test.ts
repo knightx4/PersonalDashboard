@@ -84,6 +84,7 @@ describe('the operation names', () => {
       'link-positions',
       'write-survey-idea',
       'write-survey-question',
+      'write-lesson',
     ]);
   });
 });
