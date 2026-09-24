@@ -176,7 +176,7 @@ describe('running the pass once', () => {
 
   it('names each target at the depth its swipes earned, and stores the depth on the pick', async () => {
     const progress = {
-      themes: new Map([['t0', { known: ['A', 'B'], review: ['C'] }]]),
+      themes: new Map([['t0', { known: ['A', 'B'], review: ['C'], tooHard: [], tooEasy: [] }]]),
       fields: new Map(),
     };
     const run = ports({ loaded: person({ themes: person().themes.slice(0, 1), progress }) });
@@ -187,7 +187,7 @@ describe('running the pass once', () => {
       return name(target, avoid, depth);
     };
     await runFeedPicksFor(run.ports, { userId: 'u1', targets: 1, deadline: Number.MAX_SAFE_INTEGER, model: 'm' });
-    expect(depths[0]).toEqual({ depth: 'advanced', known: ['A', 'B'], review: ['C'] });
+    expect(depths[0]).toEqual({ depth: 'advanced', known: ['A', 'B'], review: ['C'], tooHard: [] });
     expect(run.cards.every((card) => card.depth === 'advanced')).toBe(true);
   });
 
