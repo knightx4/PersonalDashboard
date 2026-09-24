@@ -222,6 +222,88 @@ describe('goals shape', () => {
   });
 });
 
+describe('goals step tree', () => {
+  it('nests steps under steps, and records closing, reopening and archiving one', async () => {
+    const [first] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Work out the payoff order') returning id`;
+    const [second] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${first.id}, 'claude', 'Compare avalanche and snowball')
+      returning id`;
+    const [third] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${second.id}, 'decision', 'Lowest balance or highest rate?')
+      returning id`;
+
+    await asUser(userA, (tx) => tx`update items set status = 'done' where id = ${third.id}`);
+    await asUser(userA, (tx) => tx`update items set status = 'open' where id = ${third.id}`);
+    await asUser(userA, (tx) => tx`update items set archived_at = now() where id = ${third.id}`);
+
+    const rows = await historyOf(third.id);
+    expect(rows.map((r) => r.action)).toEqual(['insert', 'update', 'update', 'archive']);
+    expect(rows[1].new_values).toMatchObject({ status: 'done' });
+    expect(rows[2].new_values).toMatchObject({ status: 'open', closed_at: null });
+  });
+
+  it('links a step to a second goal, with history, and never to its own', async () => {
+    const [cityArea] = await admin<{ id: string }[]>`
+      insert into areas (user_id, name) values (${userA}, 'The city') returning id`;
+    const [city] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title)
+      values (${userA}, 'goal', ${cityArea.id}, 'Get plugged into city life') returning id`;
+    const [parent] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Cut spending') returning id`;
+    const [step] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${parent.id}, 'mine', 'Find free events') returning id`;
+
+    const link = await asUser(userA, async (tx) => {
+      const [row] = await tx<{ id: string }[]>`
+        insert into item_goals (user_id, item_id, goal_id)
+        values (${userA}, ${step.id}, ${city.id}) returning id`;
+      return row.id;
+    });
+    const rows = await historyOf(link);
+    expect(rows[0]).toMatchObject({ table_name: 'item_goals', action: 'insert', actor: 'me' });
+
+    // The goal it already sits under, two levels up, is refused.
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into item_goals (user_id, item_id, goal_id)
+        values (${userA}, ${step.id}, ${goalA})`),
+    ).rejects.toThrow(/already sits under that goal/);
+    // A goal is not a step, and a step is not a goal.
+    await expect(
+      admin`insert into item_goals (user_id, item_id, goal_id)
+            values (${userA}, ${goalA}, ${city.id})`,
+    ).rejects.toThrow(/is not a step/);
+    await expect(
+      admin`insert into item_goals (user_id, item_id, goal_id)
+            values (${userA}, ${step.id}, ${parent.id})`,
+    ).rejects.toThrow(/is not a goal/);
+  });
+
+  it('refuses a link to another account\'s goal', async () => {
+    const [areaB] = await admin<{ id: string }[]>`
+      insert into areas (user_id, name) values (${userB}, 'Health') returning id`;
+    const [goalB] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title)
+      values (${userB}, 'goal', ${areaB.id}, 'Run a 10k') returning id`;
+    const [step] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Walk to work') returning id`;
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into item_goals (user_id, item_id, goal_id)
+        values (${userA}, ${step.id}, ${goalB.id})`),
+      // The shape trigger reads under row level security, so it cannot see the
+      // other account's goal and refuses first; the composite key would too.
+    ).rejects.toThrow(/is not a goal|item_goals_goal_fk/);
+  });
+});
+
 describe('goals and the account', () => {
   it('goes with the account when it is deleted', async () => {
     const leaving = await createUser('goals-leaving@example.com');
@@ -273,6 +355,7 @@ describe('RLS coverage', () => {
     expect(tables.map((r) => r.tablename)).toEqual([
       'areas',
       'captures',
+      'item_goals',
       'items',
       'periods',
       'readings',
