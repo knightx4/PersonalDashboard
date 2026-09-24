@@ -66,6 +66,8 @@ import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import { IssueView, type IssueViewProps } from '@/app/news/i/[id]/issue-view';
 import { QuickReadView, type QuickReadViewProps } from '@/app/news/quick/quick-view';
 import { SavedView, type SavedViewProps } from '@/app/news/saved/saved-view';
+import { StoryGrid, type GridStory } from '@/components/news/story-grid';
+import { StoryText } from '@/components/news/story-text';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -1689,6 +1691,72 @@ const quickEssay: QuickReadViewProps = {
   issueHref: '/news/i/issue-2',
 };
 
+/** A picture drawn inline, so the gallery needs no network for it. */
+function previewPicture(sky: string, hill: string): string {
+  return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180'%3E%3Crect width='320' height='180' fill='%23${sky}'/%3E%3Cpath d='M0 130 L80 84 L150 116 L220 70 L320 104 V180 H0Z' fill='%23${hill}'/%3E%3C/svg%3E`;
+}
+
+/**
+ * A page of the News grid (plan #940): six stories from four newsletters, as
+ * Quick read fills a page. Three carry a picture and three do not, the way a
+ * page mixes newsletters summarised before and after pictures were kept. One
+ * headline is a single long word, and one summary runs long.
+ */
+const gridStories: GridStory[] = [
+  {
+    key: 'issue-1:0',
+    headline: issueBase.digest!.stories[0].headline,
+    summary: issueBase.digest!.stories[0].summary,
+    image: issueBase.digest!.stories[0].image,
+    from: 'Infra Weekly',
+    link: issueBase.digest!.stories[0].link,
+    body: (
+      <StoryText
+        text={issueBase.digest!.stories[0].text}
+        summary={issueBase.digest!.stories[0].summary}
+      />
+    ),
+  },
+  {
+    key: 'issue-4:0',
+    headline: 'Rail freight volumes rise for a third month',
+    summary:
+      'Container traffic on the main northern routes is up nine percent on last year, mostly from ports diverting cargo away from congested motorways.',
+    image: previewPicture('1e3a8a', '60a5fa'),
+    from: 'The Morning Ledger',
+    link: 'https://example.com/ledger/rail-freight',
+  },
+  {
+    key: 'issue-1:1',
+    headline: issueBase.digest!.stories[1].headline,
+    summary: issueBase.digest!.stories[1].summary,
+    from: 'Infra Weekly',
+    link: issueBase.digest!.stories[1].link,
+  },
+  {
+    key: 'issue-5:0',
+    headline: 'A museum reopens its print room after four years',
+    summary:
+      'The collection of eighteenth-century engravings is back on view by appointment, with a new reading room and a catalogue that is online for the first time. The curators have added a short guide to the printing methods behind each plate, and the first two months of slots were gone within a day.',
+    from: 'Culture Desk',
+  },
+  {
+    key: 'issue-6:0',
+    headline: 'Council votes to keep the late-night bus routes',
+    summary:
+      'The three routes were due to be cut in January. A funding deal with two neighbouring boroughs keeps them running for another two years.',
+    image: previewPicture('7c2d12', 'fb923c'),
+    from: 'Local Brief',
+    link: 'https://example.com/local/night-buses',
+  },
+  {
+    key: 'issue-1:2',
+    headline: issueBase.digest!.stories[2].headline,
+    summary: issueBase.digest!.stories[2].summary,
+    from: 'Infra Weekly',
+  },
+];
+
 /**
  * The Saved tab (plan #870): three stories, newest saved first. The first has
  * its picture, full text and link; the second's newsletter has been deleted,
@@ -2385,6 +2453,22 @@ export const SURFACES: readonly Surface[] = [
     module: 'news',
     width: 'page',
     render: () => <QuickReadView {...quickStory} card={null} arrived={null} issueHref={null} />,
+  },
+  {
+    id: 'news-story-grid',
+    label: 'News · Story grid with pictures',
+    module: 'news',
+    width: 'page',
+    render: () => <StoryGrid stories={gridStories} pictures />,
+  },
+  {
+    id: 'news-story-grid-no-pictures',
+    label: 'News · Story grid with no pictures',
+    module: 'news',
+    width: 'page',
+    render: () => (
+      <StoryGrid stories={gridStories.map((story) => ({ ...story, image: null }))} pictures />
+    ),
   },
   {
     id: 'news-saved',
