@@ -4,6 +4,7 @@ import {
   issueFinished,
   nextCard,
   quickHref,
+  quickPage,
   quickTopics,
   type QuickIssue,
   type StoryPass,
@@ -236,5 +237,104 @@ describe('the topic filter', () => {
   it('keeps the pictures setting and the topic on the address', () => {
     expect(quickHref({ pictures: true, topic: null })).toBe('/news');
     expect(quickHref({ pictures: false, topic: 'Sport' })).toBe('/news?pictures=0&topic=Sport');
+  });
+});
+
+describe('quickPage', () => {
+  const pictured = (headline: string) => ({
+    ...story(headline),
+    image: `https://img.example/${headline}.jpg`,
+  });
+  const key = (card: { issueId: string; storyIndex: number }) =>
+    `${card.issueId}:${card.storyIndex}`;
+
+  /** What nextCard shows one card at a time, passing each before asking again. */
+  function oneByOne(
+    issues: QuickIssue[],
+    passes: StoryPass[],
+    filter: Parameters<typeof quickPage>[3] = {},
+  ): string[] {
+    const seen = [...passes];
+    const found: string[] = [];
+    for (let card = nextCard(issues, senders, seen, filter); card; ) {
+      found.push(key(card));
+      seen.push({ issueId: card.issueId, storyIndex: card.storyIndex });
+      card = nextCard(issues, senders, seen, filter);
+    }
+    return found;
+  }
+
+  const a = issue('a', 's1', '2026-09-23T08:00:00Z', {
+    stories: [story('a-0'), story('a-1'), story('a-2')],
+  });
+  const b = issue('b', 's2', '2026-09-22T08:00:00Z', {
+    stories: [story('b-0'), story('b-1'), story('b-2'), story('b-3')],
+  });
+  const quiet = issue('quiet', 's3', '2026-09-24T08:00:00Z');
+
+  it('holds the first six cards nextCard would show, in its order, when none has a picture', () => {
+    const page = quickPage([b, a, quiet], senders, []);
+    expect(page.map(key)).toEqual(oneByOne([b, a, quiet], []).slice(0, 6));
+    expect(page.map(key)).toEqual(['a:0', 'a:1', 'a:2', 'b:0', 'b:1', 'b:2']);
+    expect(page.map((card) => card.remainingInIssue)).toEqual([3, 2, 1, 4, 3, 2]);
+  });
+
+  it('moves the first story with a picture to the front and keeps the rest in order', () => {
+    const shown = issue('shown', 's1', '2026-09-23T08:00:00Z', {
+      stories: [story('s-0'), story('s-1'), pictured('s-2'), pictured('s-3')],
+    });
+    const page = quickPage([shown], senders, []);
+    expect(page.map(key)).toEqual(['shown:2', 'shown:0', 'shown:1', 'shown:3']);
+  });
+
+  it('leaves a page alone when its first card already has a picture', () => {
+    const first = issue('first', 's1', '2026-09-23T08:00:00Z', {
+      stories: [pictured('f-0'), story('f-1'), pictured('f-2')],
+    });
+    expect(quickPage([first], senders, []).map(key)).toEqual(['first:0', 'first:1', 'first:2']);
+  });
+
+  it('only leads with a picture from the page itself, not from a later page', () => {
+    const late = issue('late', 's2', '2026-09-20T08:00:00Z', { stories: [pictured('late-0')] });
+    const page = quickPage([a, b, late], senders, []);
+    expect(page.map(key)).toEqual(['a:0', 'a:1', 'a:2', 'b:0', 'b:1', 'b:2']);
+  });
+
+  it('never shows a passed, muted or hidden story, and is shorter when fewer are left', () => {
+    const tagged = issue('tag', 's1', '2026-09-23T08:00:00Z', {
+      stories: [
+        { ...story('t-0'), topic: 'Sport' },
+        { ...story('t-1'), topic: 'Politics' },
+        { ...story('t-2'), topic: 'Sport' },
+      ],
+    });
+    const passes = [{ issueId: 'tag', storyIndex: 2 }];
+    const hide = { hidden: ['Sport'] as const };
+    const page = quickPage([tagged, quiet, older], senders, passes, hide);
+    expect(page.map(key)).toEqual(oneByOne([tagged, quiet, older], passes, hide));
+    expect(page.map(key)).toEqual(['tag:1', 'old:0', 'old:1']);
+  });
+
+  it('keeps to the picked topic', () => {
+    const tagged = issue('tag', 's1', '2026-09-23T08:00:00Z', {
+      stories: [
+        { ...story('t-0'), topic: 'Sport' },
+        { ...pictured('t-1'), topic: 'Politics' },
+        { ...story('t-2'), topic: 'Sport' },
+      ],
+    });
+    expect(quickPage([tagged], senders, [], { topic: 'Sport' }).map(key)).toEqual([
+      'tag:0',
+      'tag:2',
+    ]);
+  });
+
+  it('is empty when you are caught up', () => {
+    const passes = [
+      { issueId: 'old', storyIndex: 0 },
+      { issueId: 'old', storyIndex: 1 },
+    ];
+    expect(quickPage([older], senders, passes)).toEqual([]);
+    expect(quickPage([], senders, [])).toEqual([]);
   });
 });
