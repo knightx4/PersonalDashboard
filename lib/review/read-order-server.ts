@@ -12,7 +12,7 @@ import { displayNameFromAddress } from '@/lib/email/extract/heuristic';
 import { fetchMessageBody } from '@/lib/inbox/fetch-message-body';
 import { loadCategoryContext } from '@/lib/inbox/context';
 import { loadMerchantsForUser } from '@/lib/merchants/resolve-order-merchant';
-import { draftFromExtraction, type ReadOutcome } from '@/lib/review/read-order';
+import { canReadAsOrder, draftFromExtraction, type ReadOutcome } from '@/lib/review/read-order';
 
 export type ReadOrderContext = {
   userId: string;
@@ -116,7 +116,10 @@ async function readRow(
   return { messageId: row.id, subject, ok: true, draft };
 }
 
-/** One order confirmation waiting in review, read by its inbox message id. */
+/**
+ * One email waiting in review, read by its inbox message id: a confirmation,
+ * or a shipping or delivery notice for an order that was never imported.
+ */
 export async function readOrderFromMessage(
   supabase: SupabaseClient,
   core: CoreSupabaseClient,
@@ -131,12 +134,12 @@ export async function readOrderFromMessage(
     .maybeSingle();
   if (error) return { messageId, subject: null, ok: false, error: error.message };
   if (!data) return { messageId, subject: null, ok: false, error: 'Email not found.' };
-  if (data.classification !== 'order_confirmation') {
+  if (!canReadAsOrder(data.classification as string | null)) {
     return {
       messageId,
       subject: data.subject as string | null,
       ok: false,
-      error: 'Only an order confirmation can be read as an order.',
+      error: 'Only an order confirmation, shipping or delivery email can be read as an order.',
     };
   }
   return readRow(core, context, data as MessageRow);

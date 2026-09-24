@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canReadAsOrder,
   draftFromExtraction,
   prefillFromDraft,
   summarizeReads,
@@ -284,5 +285,20 @@ describe('prefillFromDraft', () => {
       tax: '',
       discount: '',
     });
+  });
+});
+
+describe('canReadAsOrder', () => {
+  it('reads confirmations, shipping and delivery notices', () => {
+    expect(canReadAsOrder('order_confirmation')).toBe(true);
+    expect(canReadAsOrder('shipping')).toBe(true);
+    expect(canReadAsOrder('delivery')).toBe(true);
+  });
+
+  it('leaves returns, cancellations and unclassified email to be attached or added by hand', () => {
+    expect(canReadAsOrder('return')).toBe(false);
+    expect(canReadAsOrder('cancellation')).toBe(false);
+    expect(canReadAsOrder('not_relevant')).toBe(false);
+    expect(canReadAsOrder(null)).toBe(false);
   });
 });

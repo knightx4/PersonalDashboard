@@ -38,6 +38,7 @@ import {
 } from './review-buttons';
 import { AttachChoices, useAttachEmail } from './attach-email';
 import { PaidHint } from '@/components/ui/paid-hint';
+import { canReadAsOrder } from '@/lib/review/read-order';
 
 function classificationLabel(value: string): string {
   return value.replaceAll('_', ' ');
@@ -304,6 +305,7 @@ function EmailRow({
 }) {
   const className = useSelectionRowClass(row.id, 'row-pad flex items-start gap-3 px-4');
   const subject = row.subject?.trim() || 'Email without subject';
+  const readable = !row.linkedOrderId && canReadAsOrder(row.classification);
 
   return (
     <li className={className}>
@@ -340,7 +342,7 @@ function EmailRow({
               Linked order
             </Link>
           )}
-          {!row.linkedOrderId && row.classification === 'order_confirmation' && (
+          {readable && (
             <Link
               href={`/shopping/orders/new?from_email=${row.messageId}`}
               className={buttonVariants({ variant: 'secondary', size: 'sm' })}
@@ -348,7 +350,7 @@ function EmailRow({
               Add from this email
             </Link>
           )}
-          {!row.linkedOrderId && row.classification === 'order_confirmation' && (
+          {readable && (
             // The order form reads the email as it opens.
             <PaidHint
               action="app/shopping/orders/new/page.tsx#NewOrderPage"
@@ -357,7 +359,7 @@ function EmailRow({
               className="self-center"
             />
           )}
-          {!row.linkedOrderId && row.classification !== 'order_confirmation' && (
+          {!row.linkedOrderId && !readable && (
             <Link
               href="/shopping/orders/new"
               className={buttonVariants({ variant: 'ghost', size: 'sm' })}

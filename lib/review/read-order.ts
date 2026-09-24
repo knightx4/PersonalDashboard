@@ -255,6 +255,22 @@ export function prefillFromDraft(
   };
 }
 
+/**
+ * The kinds of waiting email an order can be read out of: a confirmation, and
+ * the shipping and delivery notices that most shops send with the order
+ * number, the items and often the prices. A return or cancellation describes
+ * an order that already exists, so it is attached to one instead.
+ */
+const READABLE_AS_ORDER: ReadonlySet<string> = new Set([
+  'order_confirmation',
+  'shipping',
+  'delivery',
+]);
+
+export function canReadAsOrder(classification: string | null | undefined): boolean {
+  return classification != null && READABLE_AS_ORDER.has(classification);
+}
+
 export type ReadOutcome =
   | { messageId: string; subject: string | null; ok: true; draft: OrderDraft }
   | { messageId: string; subject: string | null; ok: false; error: string };
