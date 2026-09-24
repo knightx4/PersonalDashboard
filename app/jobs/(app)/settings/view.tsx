@@ -23,6 +23,7 @@ import {
 import { addExcludedSender, removeExcludedSender } from './sender-actions';
 import { DEFAULT_BANNED_CONSTRUCTIONS } from '@/lib/jobs/evidence/draft-payload';
 import { cardVariants } from '@/components/ui/card';
+import { PaidHint } from '@/components/ui/paid-hint';
 
 /** The page's own three tones, in the four the Banner primitive names. */
 const BANNER_TONE = { ok: 'info', warn: 'warn', err: 'bad' } as const;
@@ -953,6 +954,10 @@ function SeedFromWriting({
         >
           {busy ? 'Reading…' : 'Propose'}
         </Button>
+        <PaidHint
+          action="app/jobs/(app)/settings/evidence-actions.ts#proposeEvidence"
+          what="Cost of proposing evidence"
+        />
 
         {error && <span className="text-small text-danger">{error}</span>}
         {message && <span className="text-small text-ink-muted">{message}</span>}

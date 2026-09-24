@@ -13,6 +13,7 @@ import { commentWhen, exactTime, shortWhen } from '@/lib/comments/when';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { useClockNow } from '@/lib/use-clock-now';
 import type { CommentAuthor, CommentTarget, DevComment } from '@/lib/comments/load';
+import { PaidHint } from '@/components/ui/paid-hint';
 
 /**
  * The thread on one row of the dev pages, and the box for adding to it.
@@ -465,6 +466,15 @@ export function CommentThread({
                       ? 'Dash will read this and reply in the thread.'
                       : 'A note on the row. Nothing reads it.'}
                 </p>
+              )}
+              {/* Only a tagged comment is answered by Dash; the rest are free. */}
+              {!submit && tagged && (
+                <PaidHint
+                  action="app/dev/comment-actions.ts#addComment"
+                  what="Cost of Dash's reply"
+                  align="end"
+                  className="self-center"
+                />
               )}
               {/* A glyph, so the send control is the same size wherever it
                   sits. What a caller's own action is called -- "Answer and

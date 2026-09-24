@@ -10,6 +10,7 @@ import { allKeys, edgeKey, keepTickedMap } from '@/lib/vault/map/keep';
 import { EDGE_VERB } from '@/lib/vault/map/labels';
 import type { NoteMap, NoteMapProposal } from '@/lib/vault/map/proposal';
 import { acceptMap, proposeMap, type AcceptMapState, type ProposeMapState } from './actions';
+import { PaidHint } from '@/components/ui/paid-hint';
 
 /**
  * What the map would make of this note, and the tick that decides what of it
@@ -73,8 +74,12 @@ export function MapReview({ notePath }: { notePath: string }) {
           </p>
           {state.message && <p className="mt-2 text-ui text-ink">{state.message}</p>}
           {state.error && <p className="mt-2 text-ui text-caution">{state.error}</p>}
-          <div className="mt-3">
+          <div className="mt-3 flex items-center gap-3">
             <ReadButton again={Boolean(state.message || state.error || discarded)} />
+            <PaidHint
+              action="app/vault/n/[...path]/actions.ts#proposeMap"
+              what="Cost of reading the note"
+            />
           </div>
         </form>
       )}
@@ -227,6 +232,12 @@ function Review({
         <AcceptButton
           label={label}
           disabled={kept.themes.length === 0 && kept.positions.length === 0}
+        />
+        {/* Each theme and position kept is embedded as it is saved. */}
+        <PaidHint
+          action="app/vault/n/[...path]/actions.ts#acceptMap"
+          count={kept.themes.length + kept.positions.length}
+          what="Cost of adding them"
         />
         {/* Writes nothing: the proposal is thrown away and the read button
             comes back. */}

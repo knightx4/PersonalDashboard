@@ -22,12 +22,23 @@ import {
  * entry in PAID_ACTIONS says. The hint is priced from that same entry, so a
  * hint that passes here names the operations its press writes rows under.
  *
- * Learn's actions are the ones walked for now (plan #917). #918 adds the other
- * modules' entries and #919 widens the walk to every action in the app.
+ * Learn's actions were walked first (plan #917); #918 added Jobs, Shopping,
+ * Vault and News, and #919 widens the walk to every action in the app.
+ *
+ * The walker does not follow a dynamic `import()`, and it does not need to
+ * here. The resale estimate reaches the model through
+ * `import('@/lib/sell/web-estimate')` in lib/sell/expected-price.ts, but the
+ * sell actions record that spend themselves, under their own ESTIMATE_SPEND
+ * constant, so the operation is read at the action. A dynamic import that
+ * hid the recording call as well would be a real gap; none does today, and
+ * lib/core/spend/coverage.test.ts is what catches a model call that records
+ * nothing.
  */
 
 const KNOWN = new Set(Object.keys(OPERATION_GUESSES));
-const WALKED = ['app/learn'];
+// News is walked and has no paid action: its summaries and story groups are
+// made by the digest cron, which no button starts.
+const WALKED = ['app/learn', 'app/jobs', 'app/shopping', 'app/vault', 'app/news'];
 
 function files(dir: string, match: RegExp): string[] {
   const out: string[] = [];

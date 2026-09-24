@@ -23,8 +23,9 @@ import type { OperationName } from '@/lib/core/spend/guesses';
  * Per-unit operations are listed without a count. The button knows how many
  * it is working on and passes that to the hint.
  *
- * Learn is filled in (plan #917). Jobs, Shopping, Vault and News join the
- * same list in #918.
+ * Learn is filled in by plan #917; Jobs, Shopping, Vault and Dash's comment
+ * replies by #918. News has no paid button: its summaries and story groups
+ * are made by the digest cron when an issue arrives.
  */
 export const PAID_ACTIONS = {
   // Learn: a track and its ideas
@@ -75,6 +76,37 @@ export const PAID_ACTIONS = {
   'app/learn/r/[id]/actions.ts#approveNoteConcepts': ['place-track'],
   'app/learn/youtube/actions.ts#transcribeVideoAction': ['embed-catalogue'],
   'app/learn/youtube/actions.ts#transcribePlaylistAction': ['embed-catalogue'],
+
+  // Jobs
+  'app/jobs/(app)/companies/actions.ts#proposeAiCompanyEnrichment': ['enrich-company'],
+  'app/jobs/(app)/roles/[id]/actions.ts#matchRoleRequirements': ['match-evidence'],
+  'app/jobs/(app)/roles/[id]/actions.ts#writeRoundPrepNote': ['write-interview-prep'],
+  'app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence': ['draft-answer'],
+  'app/jobs/(app)/settings/evidence-actions.ts#proposeEvidence': ['propose-evidence'],
+
+  // Shopping
+  'app/shopping/inventory/add/actions.ts#previewPasteBookList': ['parse-paste-list'],
+  'app/shopping/inventory/add/games/actions.ts#extractGamesFromPhoto': ['read-shelf-photo'],
+  'app/shopping/inventory/add/photo-actions.ts#extractBooksFromPhoto': ['read-book-photo'],
+  'app/shopping/orders/receipt/actions.ts#previewReceiptPhoto': ['read-receipt-photo'],
+  'app/shopping/sell/actions.ts#priceSellItems': ['estimate-resale-price'],
+  'app/shopping/sell/actions.ts#priceOneItem': ['estimate-resale-price'],
+  'app/shopping/sell/actions.ts#searchItemPrice': ['estimate-resale-price'],
+  'app/shopping/settings/actions.ts#reparseInboxOrders': ['extract-email-order'],
+  // Not an action: "Import orders from Gmail" and "Sync now" in Shopping
+  // settings post here, and the import reads each order confirmation it finds.
+  'app/api/inbox/sync/route.ts#POST': ['extract-email-order'],
+  // Not an action either: "Add from this email" on the review list opens this page,
+  // which reads the confirmation into the order form as it renders.
+  'app/shopping/orders/new/page.tsx#NewOrderPage': ['extract-email-order'],
+
+  // Vault
+  'app/vault/n/[...path]/actions.ts#proposeMap': ['map-note', 'embed-map'],
+  'app/vault/n/[...path]/actions.ts#acceptMap': ['embed-map'],
+
+  // Dev: Dash's reply to a comment that tags it
+  'app/dev/comment-actions.ts#addComment': ['reply-to-comment'],
+  'app/dev/raised/actions.ts#decideRaise': ['reply-to-comment'],
 } as const satisfies Record<string, readonly OperationName[]>;
 
 export type PaidAction = keyof typeof PAID_ACTIONS;
@@ -86,6 +118,8 @@ export type PaidAction = keyof typeof PAID_ACTIONS;
 export const PAID_WITHOUT_BUTTON: Record<string, string> = {
   'app/learn/goals/actions.ts#editGoal':
     'Saved when a goal\'s name or line loses focus after a change, and a reworded goal is placed again (place-aim). There is no button, only the field.',
+  'app/shopping/review/actions.ts#readOrderFromEmail':
+    'Nothing calls it. "Add from this email" on the review list opens the order form, whose page makes the same read as it renders, so the hint sits on that link under app/shopping/orders/new/page.tsx#NewOrderPage.',
 };
 
 /** Every paid press, in the order written. */

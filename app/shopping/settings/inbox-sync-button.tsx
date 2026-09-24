@@ -4,6 +4,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { reparseInboxOrders, resetInboxImport } from './actions';
+import { PaidHint } from '@/components/ui/paid-hint';
+
+const SYNC_HINT = 'app/api/inbox/sync/route.ts#POST';
 
 export type InboxSyncProgress = {
   jobId: string;
@@ -125,7 +128,7 @@ export function InboxSyncButton({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
           variant="secondary"
@@ -148,6 +151,8 @@ export function InboxSyncButton({
             {syncingNow || (active && isIncremental) ? 'Syncing…' : 'Sync now'}
           </Button>
         )}
+        {/* Per order email the import reads, which it finds out as it goes. */}
+        <PaidHint action={SYNC_HINT} what="Cost of reading each order email" />
         {backfillCompleted && (
           <Button
             type="button"
@@ -158,6 +163,14 @@ export function InboxSyncButton({
           >
             {reparsing ? 'Reparsing…' : 'Re-parse with latest parser'}
           </Button>
+        )}
+        {/* Per order email: how many there are is known only once the
+            reparse has looked. */}
+        {backfillCompleted && (
+          <PaidHint
+            action="app/shopping/settings/actions.ts#reparseInboxOrders"
+            what="Cost of re-reading each order email"
+          />
         )}
         <ConfirmStep
           variant="ghost"

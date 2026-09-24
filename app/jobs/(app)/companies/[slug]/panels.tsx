@@ -19,6 +19,7 @@ import {
   type EnrichmentProposal,
 } from '../actions';
 import { updateCompany } from '../actions';
+import { PaidHint } from '@/components/ui/paid-hint';
 
 export function CompanyPanels(props: {
   companyId: string;
@@ -505,6 +506,10 @@ function AiEnrichment({ companyId }: { companyId: string }) {
         <Button type="button" size="sm" variant="secondary" pending={pending} onClick={lookUp}>
           {pending ? 'Searching…' : 'Search with AI'}
         </Button>
+        <PaidHint
+          action="app/jobs/(app)/companies/actions.ts#proposeAiCompanyEnrichment"
+          what="Cost of the search"
+        />
         {message && <span className="text-small text-ink-muted">{message}</span>}
       </div>
 

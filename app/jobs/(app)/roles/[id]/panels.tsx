@@ -88,6 +88,7 @@ import {
 import { groupableDays, sectionInterviews } from '@/lib/jobs/interview-groups';
 import { ReminderActions } from '@/app/jobs/(app)/today/reminder-actions';
 import { ChipInput, ComposeTitle, InlineInput, Input, Label, Select } from '@/components/ui/field';
+import { PaidHint } from '@/components/ui/paid-hint';
 
 type Tab = 'timeline' | 'posting' | 'answers' | 'interviews' | 'notes' | 'mail';
 
@@ -933,6 +934,12 @@ function Posting({
               >
                 {matching ? 'Matching…' : matches ? 'Match again' : 'Match my evidence'}
               </Button>
+            )}
+            {lines.length > 0 && (
+              <PaidHint
+                action="app/jobs/(app)/roles/[id]/actions.ts#matchRoleRequirements"
+                what="Cost of matching"
+              />
             )}
           </div>
         }
@@ -1811,6 +1818,12 @@ function AnswerCard({
         >
           {drafting ? 'Drafting…' : 'Draft from my evidence'}
         </Button>
+        {bankSize > 0 && (
+          <PaidHint
+            action="app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence"
+            what="Cost of drafting"
+          />
+        )}
         {saved && <span className="text-small text-ink-muted">{saved}</span>}
         {draftError && <span className="text-small text-danger">{draftError}</span>}
       </div>

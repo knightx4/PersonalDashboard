@@ -13,6 +13,7 @@ import {
   UnsupportedImageError,
 } from '@/lib/images/prepare-photo';
 import type { CanonicalBook } from '@/lib/books/types';
+import { PaidHint } from '@/components/ui/paid-hint';
 
 /**
  * Shelf / cover photo capture. Image is sent to a server action, extracted,
@@ -113,14 +114,15 @@ export function PhotoCapturePanel() {
         </Card>
       )}
 
-      <Button
-        type="button"
-        disabled={!preview || extractPending}
-        onClick={runExtract}
-        className="self-start"
-      >
-        {extractPending ? 'Reading photo…' : 'Detect books'}
-      </Button>
+      <div className="flex items-center gap-3">
+        <Button type="button" disabled={!preview || extractPending} onClick={runExtract}>
+          {extractPending ? 'Reading photo…' : 'Detect books'}
+        </Button>
+        <PaidHint
+          action="app/shopping/inventory/add/photo-actions.ts#extractBooksFromPhoto"
+          what="Cost of reading the photo"
+        />
+      </div>
 
       <FieldError>{imageError ?? extractState.error ?? saveState.error}</FieldError>
       {extractState.message && (
