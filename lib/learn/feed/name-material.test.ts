@@ -67,6 +67,20 @@ describe('describing the target', () => {
     expect(describeTarget({ reason: 'gap', gap: 'untested', field })).toContain('never been tested in');
     expect(describeTarget({ reason: 'gap', gap: 'untouched', field })).toContain('never written about or studied');
   });
+
+  it('gives a goal in its own words, with where it sits', () => {
+    const goal = { id: 'g', name: 'Startup finance', about: 'FP&A for a seed-stage company', depth: 'working' as const };
+    const placed = describeTarget({ reason: 'goal', goal: { ...goal, field, domain: null } });
+    expect(placed).toContain('A goal they set themselves: Startup finance.');
+    expect(placed).toContain('What they mean by it: FP&A for a seed-stage company');
+    expect(placed).toContain('Economics (Social sciences)');
+    expect(describeTarget({ reason: 'goal', goal: { ...goal, field: null, domain: 'Social sciences' } })).toContain(
+      'It covers a whole domain: Social sciences.',
+    );
+    expect(describeTarget({ reason: 'goal', goal: { ...goal, about: null, field: null, domain: null } })).toBe(
+      'A goal they set themselves: Startup finance.\nIt is not placed in one field; work from its wording.',
+    );
+  });
 });
 
 describe('the call', () => {

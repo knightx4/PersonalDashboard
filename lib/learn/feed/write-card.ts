@@ -58,10 +58,13 @@ const TOOL_NAME = 'report_card';
 /** One picked row, with what it points at. */
 export type CardToWrite = {
   id: string;
-  reason: 'interest' | 'gap';
+  reason: 'interest' | 'gap' | 'goal';
   /** The theme it was picked for; set for interest. */
   themeName: string | null;
-  field: { name: string; scope: string };
+  /** The goal it was picked for; set for a goal card (plan #900). */
+  aimName: string | null;
+  /** Null only for a goal card whose goal is not placed in a field. */
+  field: { name: string; scope: string } | null;
   /**
    * For a gap: whether the person writes about the field (untested) or has
    * nothing in it at all (untouched). Null for interest.
@@ -117,8 +120,9 @@ function midSentence(name: string): string {
 }
 
 /** The line under the card's title saying why it is in the feed. */
-export function whyLine(card: Pick<CardToWrite, 'reason' | 'themeName' | 'field' | 'gap'>): string {
-  const field = card.field.name;
+export function whyLine(card: Pick<CardToWrite, 'reason' | 'themeName' | 'aimName' | 'field' | 'gap'>): string {
+  if (card.reason === 'goal' && card.aimName) return `For your goal: ${card.aimName.trim()}.`;
+  const field = card.field?.name ?? 'a field';
   if (card.reason === 'interest' && card.themeName) {
     return `You write about ${midSentence(card.themeName)} (${field}).`;
   }
@@ -162,9 +166,12 @@ const payloadSchema = z.object({
 
 /** What the model is told the section was picked for. Exported for the test. */
 export function describePick(card: CardToWrite): string {
-  const field = `${card.field.name}. ${card.field.scope}`;
+  const field = card.field ? `${card.field.name}. ${card.field.scope}` : '';
   const pick =
-    card.reason === 'interest' && card.themeName
+    card.reason === 'goal' && card.aimName
+      ? `Picked for a goal they set themselves: ${card.aimName}.` +
+        (card.field ? ` The field it sits in: ${field}` : ' It sits in no one field.')
+      : card.reason === 'interest' && card.themeName
       ? `Picked for a theme from their notes: ${card.themeName}. The field it sits in: ${field}`
       : card.gap === 'untouched'
         ? `Picked as a way into a field they have never studied: ${field}`

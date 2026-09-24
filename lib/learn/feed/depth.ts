@@ -113,11 +113,22 @@ export function progressFrom(cards: readonly CardSwipe[]): DepthProgress {
   return { themes, fields };
 }
 
-/** The context for one target: a theme for interest, a field for a gap. */
+/**
+ * The context for one target: a theme for interest, a field for a gap.
+ *
+ * A goal (plan #900) starts at the depth the person set on it and carries no
+ * swiped titles yet: its cards are not counted by goal, so a goal card swiped
+ * known does not move it. Plan #909 keys the swipes by goal with this depth as
+ * the starting level.
+ */
 export function contextFor(
   progress: DepthProgress,
-  target: { reason: 'interest'; themeId: string } | { reason: 'gap'; fieldId: string },
+  target:
+    | { reason: 'interest'; themeId: string }
+    | { reason: 'gap'; fieldId: string }
+    | { reason: 'goal'; aimId: string; start: Depth },
 ): DepthContext {
+  if (target.reason === 'goal') return { depth: target.start, known: [], review: [], tooHard: [] };
   const swiped = (target.reason === 'interest'
     ? progress.themes.get(target.themeId)
     : progress.fields.get(target.fieldId)) ?? NOTHING_SWIPED;

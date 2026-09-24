@@ -31,6 +31,7 @@ function card(id: string): CardToWrite {
     id,
     reason: 'interest',
     themeName: 'Theme',
+    aimName: null,
     field: { name: 'Field', scope: '' },
     gap: null,
     article: `Article ${id}`,

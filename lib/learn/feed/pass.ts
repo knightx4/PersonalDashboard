@@ -1,7 +1,7 @@
 import type { WikipediaArticle, WikipediaResult, WikipediaSection } from '@/lib/learn/providers/wikipedia';
 import { contextFor, NO_PROGRESS, type Depth, type DepthContext, type DepthProgress } from './depth';
 import type { NameResult, NamedSection } from './name-material';
-import { createDrawer, wantsGap, type DrawInput, type FeedTarget } from './targets';
+import { createDrawer, wantsGap, wantsGoal, type DrawInput, type FeedTarget } from './targets';
 
 /**
  * The picking pass behind Learn now (LEARN-NOW-SPEC, "How cards are made",
@@ -22,6 +22,7 @@ import { createDrawer, wantsGap, type DrawInput, type FeedTarget } from './targe
  *
  * Each target is named at a depth worked out from the person's swipes on it
  * (`depth.ts`), and the pick carries that depth so the card writer knows it.
+ * A goal's target is named at the depth set on the goal (plan #900).
  */
 
 /** Targets drawn per person per call. At two or three picks each, about ten picks. */
@@ -29,19 +30,31 @@ export const TARGETS_PER_CALL = 4;
 
 export type PersonInputs = Omit<DrawInput, 'random'> & {
   /** Cards already picked for this person, by reason. */
-  picked: { interest: number; gap: number };
+  picked: PickedCounts;
+  /**
+   * Cards picked since the oldest goal still active was set: how many for a
+   * goal, and how many in all. What the one-in-three share is kept against.
+   * None when left out, which with no goals draws none.
+   */
+  goalWindow?: { goal: number; total: number };
   /** Articles this person already has cards from, most recent first. */
   articlesHeld: string[];
   /** What they swiped known and review, per theme and field. None when left out. */
   progress?: DepthProgress;
 };
 
+export type PickedCounts = { interest: number; gap: number; goal: number };
+
 export type FeedCardInsert = {
   user_id: string;
-  reason: 'interest' | 'gap';
+  reason: FeedTarget['reason'];
   theme_id: string | null;
   theme_name: string | null;
-  field_id: string;
+  /** The goal a goal card is for, by id and by name. Null otherwise. */
+  aim_id: string | null;
+  aim_name: string | null;
+  /** Null only for a goal that is not placed in a field. */
+  field_id: string | null;
   item_id: string;
   segment_id: string;
   named_article: string;
@@ -65,8 +78,8 @@ export type FeedPickPorts = {
 
 export type FeedPickSummary = {
   userId: string;
-  targets: { reason: 'interest' | 'gap'; name: string }[];
-  picked: { interest: number; gap: number };
+  targets: { reason: FeedTarget['reason']; name: string }[];
+  picked: PickedCounts;
   /** Titles the model named that Wikipedia does not have. */
   notFound: string[];
   /** Named sections that were not in the article, so the pick was dropped. */
@@ -112,7 +125,30 @@ export function matchSection(
 }
 
 function targetName(target: FeedTarget): string {
-  return target.reason === 'interest' ? target.theme.name : target.field.name;
+  switch (target.reason) {
+    case 'interest':
+      return target.theme.name;
+    case 'goal':
+      return target.goal.name;
+    case 'gap':
+      return target.field.name;
+  }
+}
+
+/** The field a pick is filed under: the theme's, the gap's, or the goal's when it is placed in one. */
+function targetFieldId(target: FeedTarget): string | null {
+  return target.reason === 'goal' ? (target.goal.field?.id ?? null) : target.field.id;
+}
+
+function depthTarget(target: FeedTarget): Parameters<typeof contextFor>[1] {
+  switch (target.reason) {
+    case 'interest':
+      return { reason: 'interest', themeId: target.theme.id };
+    case 'goal':
+      return { reason: 'goal', aimId: target.goal.id, start: target.goal.depth };
+    case 'gap':
+      return { reason: 'gap', fieldId: target.field.id };
+  }
 }
 
 async function pickOne(
@@ -153,7 +189,9 @@ async function pickOne(
     reason: target.reason,
     theme_id: target.reason === 'interest' ? target.theme.id : null,
     theme_name: target.reason === 'interest' ? target.theme.name : null,
-    field_id: target.field.id,
+    aim_id: target.reason === 'goal' ? target.goal.id : null,
+    aim_name: target.reason === 'goal' ? target.goal.name : null,
+    field_id: targetFieldId(target),
     item_id: stored.itemId,
     segment_id: segment.id,
     named_article: named.article,
@@ -177,11 +215,12 @@ export async function runFeedPicksFor(
   const person = await ports.loadPerson(userId);
   const drawer = createDrawer({ ...person, random: ports.random });
   const counts = { ...person.picked };
+  const window = { ...(person.goalWindow ?? { goal: 0, total: 0 }) };
   const avoid = [...person.articlesHeld];
   const summary: FeedPickSummary = {
     userId,
     targets: [],
-    picked: { interest: 0, gap: 0 },
+    picked: { interest: 0, gap: 0, goal: 0 },
     notFound: [],
     sectionMissing: 0,
     duplicates: 0,
@@ -190,16 +229,11 @@ export async function runFeedPicksFor(
 
   const wanted = options.targets ?? TARGETS_PER_CALL;
   while (summary.targets.length < wanted && ports.now() < options.deadline) {
-    const target = drawer.next(wantsGap(counts));
+    const target = drawer.next(wantsGap(counts), wantsGoal(window));
     if (!target) break;
     summary.targets.push({ reason: target.reason, name: targetName(target) });
 
-    const depth = contextFor(
-      person.progress ?? NO_PROGRESS,
-      target.reason === 'interest'
-        ? { reason: 'interest', themeId: target.theme.id }
-        : { reason: 'gap', fieldId: target.field.id },
-    );
+    const depth = contextFor(person.progress ?? NO_PROGRESS, depthTarget(target));
     const named = await ports.name(target, avoid, depth);
     if (!named.ok) {
       summary.failed.push(`${targetName(target)}: ${named.detail}`);
@@ -212,6 +246,8 @@ export async function runFeedPicksFor(
         if (await pickOne(ports, userId, target, pick, options.model, depth.depth, summary)) {
           counts[target.reason] += 1;
           summary.picked[target.reason] += 1;
+          window.total += 1;
+          if (target.reason === 'goal') window.goal += 1;
         }
       } catch (error) {
         summary.failed.push(`${pick.article}: ${error instanceof Error ? error.message : 'failed'}`);
