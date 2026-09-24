@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
+import { requireUser } from '@/lib/auth/server';
+import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { loadGoalMap } from '@/lib/goals/steps-store';
 import { StepTree } from './step-tree';
@@ -19,7 +21,11 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
   const { goalId } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(goalId)) notFound();
 
-  const map = await loadGoalMap(await createGoalsClient(), goalId);
+  const user = await requireUser();
+  const [map, account] = await Promise.all([
+    loadGoalMap(await createGoalsClient(), goalId),
+    loadAccountSettings(user.id),
+  ]);
   if (!map) notFound();
 
   return (
@@ -34,7 +40,7 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
         title={map.goal.title}
         description={map.goal.acceptance ?? map.goal.fog ?? undefined}
       />
-      <StepTree map={map} />
+      <StepTree map={map} todoOn={moduleEnabled(account, 'todo')} />
     </div>
   );
 }

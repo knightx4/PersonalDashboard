@@ -12,6 +12,7 @@ import {
   type StepKind,
   type StepNode,
 } from '@/lib/goals/steps';
+import { todoSteps, type TodoStep } from '@/lib/goals/todo';
 import { nextPosition, reorder, type Goal, type GoalStatus } from '@/lib/goals/tree';
 
 /**
@@ -40,13 +41,14 @@ type ItemRow = {
   position: number;
   rhythm_count: number | null;
   rhythm_period: RhythmPeriod | null;
+  on_todo: boolean;
 };
 
 type LinkRow = { id: string; item_id: string; goal_id: string };
 
 const ITEM_COLUMNS =
   'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, resolution, ' +
-  'due_on, position, rhythm_count, rhythm_period';
+  'due_on, position, rhythm_count, rhythm_period, on_todo';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -61,6 +63,7 @@ const toStep = (row: ItemRow): Step => ({
   position: row.position,
   rhythmCount: row.rhythm_count,
   rhythmPeriod: row.rhythm_period,
+  onTodo: row.on_todo,
 });
 
 const toGoal = (row: ItemRow): Goal => ({
@@ -361,11 +364,12 @@ export async function unlinkStep(client: GoalsSupabaseClient, linkId: string): P
 }
 
 /**
- * Everything the daily view on the home needs (plan #926): every live goal in
- * page order, area by area, with its area's name and its step tree. The
- * selection itself is dailyView in lib/goals/daily.ts.
+ * Every live goal in page order, area by area, with its area's name and its
+ * step tree. A goal in an archived area is out of view with it.
  */
-export async function loadDailyView(client: GoalsSupabaseClient): Promise<DailyView> {
+async function loadLiveTree(
+  client: GoalsSupabaseClient,
+): Promise<{ goals: { goal: Goal; areaName: string }[]; byGoal: Map<string, StepNode[]> }> {
   const [items, areas] = await Promise.all([
     client
       .from('items')
@@ -392,7 +396,6 @@ export async function loadDailyView(client: GoalsSupabaseClient): Promise<DailyV
     list.push(row);
     goalsByArea.set(row.area_id as string, list);
   }
-  // A goal in an archived area is out of view with it.
   const goals = (areas.data ?? []).flatMap((area) =>
     (goalsByArea.get(area.id as string) ?? []).map((row) => ({
       goal: toGoal(row),
@@ -404,5 +407,51 @@ export async function loadDailyView(client: GoalsSupabaseClient): Promise<DailyV
     goals.map((g) => g.goal.id),
     rows.filter((r) => r.level === 'step').map(toStep),
   );
+  return { goals, byGoal };
+}
+
+/**
+ * Everything the daily view on the home needs (plan #926). The selection
+ * itself is dailyView in lib/goals/daily.ts.
+ */
+export async function loadDailyView(client: GoalsSupabaseClient): Promise<DailyView> {
+  const { goals, byGoal } = await loadLiveTree(client);
   return dailyView(goals, byGoal);
+}
+
+/**
+ * The steps on Todo (plan #927), for the agenda source in
+ * lib/todo/agenda/sources/goal-steps.ts. The rule is todoSteps in
+ * lib/goals/todo.ts.
+ */
+export async function loadTodoSteps(client: GoalsSupabaseClient): Promise<TodoStep[]> {
+  const { goals, byGoal } = await loadLiveTree(client);
+  return todoSteps(
+    goals.map((g) => g.goal),
+    byGoal,
+  );
+}
+
+/**
+ * Show a step on Todo, or take it off. Only your own open steps can go on:
+ * the database allows the flag on any step, and this is where "yours" is
+ * kept. Taking one off works whatever it is, so nothing can be stranded
+ * there. False when nothing changed.
+ */
+export async function setStepOnTodo(
+  client: GoalsSupabaseClient,
+  id: string,
+  onTodo: boolean,
+): Promise<boolean> {
+  let query = client
+    .from('items')
+    .update({ on_todo: onTodo })
+    .eq('id', id)
+    .eq('level', 'step')
+    .eq('on_todo', !onTodo)
+    .is('archived_at', null);
+  if (onTodo) query = query.eq('kind', 'mine').eq('status', 'open');
+  const { data, error } = await query.select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
 }

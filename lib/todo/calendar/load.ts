@@ -1,13 +1,13 @@
 import 'server-only';
 
-import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
+import { loadAccountSettings } from '@/lib/core/account/settings';
 import { loadAllTasks } from '@/lib/todo/tasks/load';
 import { loadEventsInWindow } from '@/lib/todo/events/load';
 import { loadFeedEventsInWindow } from '@/lib/todo/feeds/load';
 import { refreshStaleFeeds } from '@/lib/todo/feeds/refresh';
 import { loadDismissals } from '@/lib/todo/agenda/dismissals';
 import { loadAgendaSettings } from '@/lib/todo/agenda/settings';
-import { allSources } from '@/lib/todo/agenda/registry';
+import { activeSources } from '@/lib/todo/agenda/registry';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { buildRange, viewWindow, type CalendarRange, type CalendarView } from '@/lib/todo/calendar/range';
 import type { AgendaItem, DayContext, SourceContext } from '@/lib/todo/agenda/sources';
@@ -59,11 +59,7 @@ export async function loadCalendar(
     now,
   };
 
-  const active = allSources().filter(
-    (source) =>
-      agendaSettings.enabledSources.includes(source.id) &&
-      moduleEnabled(account, source.module),
-  );
+  const active = activeSources(account, agendaSettings.enabledSources);
 
   // The events you typed are read over the same window the sources are asked
   // for, so a month you page forward to holds the appointments that are in it.
@@ -104,7 +100,7 @@ export async function loadCalendar(
  * matters -- a silently shorter month looks exactly like a quiet one.
  */
 async function runSources(
-  sources: ReturnType<typeof allSources>,
+  sources: ReturnType<typeof activeSources>,
   ctx: SourceContext,
 ): Promise<[AgendaItem[], DayContext[], string[]]> {
   const settled = await Promise.allSettled(

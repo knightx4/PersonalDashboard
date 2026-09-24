@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useId, useState } from 'react';
+import { createContext, useActionState, useContext, useId, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, CircleHelp, ListTree, Repeat, Sparkles, User } from 'lucide-react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
@@ -28,12 +28,14 @@ import {
   type StepKind,
   type StepNode,
 } from '@/lib/goals/steps';
+import { canShowOnTodo } from '@/lib/goals/todo';
 import {
   addStep,
   archiveStepAction,
   editStep,
   linkStepAction,
   moveStepAction,
+  setStepOnTodoAction,
   setStepStatusAction,
   unlinkStepAction,
   type StepActionState,
@@ -59,6 +61,12 @@ const KIND_ICONS: Record<StepKind, typeof User> = {
   rhythm: Repeat,
 };
 
+/**
+ * Whether the Todo workspace is on, so a step offers Show on Todo only where
+ * there is a Todo to show it on. Read once by the page and given to every row.
+ */
+const TodoOn = createContext(false);
+
 type Links = GoalMap['linksOf'];
 type OtherGoals = GoalMap['otherGoals'];
 
@@ -82,59 +90,66 @@ function commitOnBlur(before: string, { required = false }: { required?: boolean
   };
 }
 
-export function StepTree({ map }: { map: GoalMap }) {
+export function StepTree({ map, todoOn }: { map: GoalMap; todoOn: boolean }) {
   const { total, closed } = countSteps(map.steps);
   return (
-    <div className="space-y-6">
-      <section aria-label="Steps" className="space-y-2">
-        {total > 0 && (
-          <p className="px-1 text-small text-ink-muted">
-            {closed} of {total} {total === 1 ? 'step' : 'steps'} closed
-          </p>
-        )}
-        {map.steps.length === 0 ? (
-          <EmptyState
-            icon={ListTree}
-            title="No steps yet"
-            description="Break the goal into the things that have to happen. Any step can hold sub-steps of its own."
-          />
-        ) : (
-          <Card>
-            <StepList nodes={map.steps} depth={0} links={map.linksOf} otherGoals={map.otherGoals} />
-          </Card>
-        )}
-        <StepComposer parentId={map.goal.id} label="New step" />
-      </section>
-
-      {map.linked.length > 0 && (
-        <section aria-labelledby="linked-heading" className="space-y-2">
-          <h2 id="linked-heading" className="px-1 text-ui font-semibold text-ink">
-            Also counts towards this goal
-          </h2>
-          <Card>
-            <ul className="divide-y divide-border">
-              {map.linked.map((entry) => (
-                <li key={entry.linkId}>
-                  <p className="px-3 pt-2 text-small text-ink-muted">
-                    From{' '}
-                    <Link href={`/goals/${entry.fromGoal.id}`} className="underline">
-                      {entry.fromGoal.title}
-                    </Link>
-                  </p>
-                  <StepList
-                    nodes={[entry.step]}
-                    depth={0}
-                    links={map.linksOf}
-                    otherGoals={map.otherGoals}
-                    unlinkId={entry.linkId}
-                  />
-                </li>
-              ))}
-            </ul>
-          </Card>
+    <TodoOn.Provider value={todoOn}>
+      <div className="space-y-6">
+        <section aria-label="Steps" className="space-y-2">
+          {total > 0 && (
+            <p className="px-1 text-small text-ink-muted">
+              {closed} of {total} {total === 1 ? 'step' : 'steps'} closed
+            </p>
+          )}
+          {map.steps.length === 0 ? (
+            <EmptyState
+              icon={ListTree}
+              title="No steps yet"
+              description="Break the goal into the things that have to happen. Any step can hold sub-steps of its own."
+            />
+          ) : (
+            <Card>
+              <StepList
+                nodes={map.steps}
+                depth={0}
+                links={map.linksOf}
+                otherGoals={map.otherGoals}
+              />
+            </Card>
+          )}
+          <StepComposer parentId={map.goal.id} label="New step" />
         </section>
-      )}
-    </div>
+
+        {map.linked.length > 0 && (
+          <section aria-labelledby="linked-heading" className="space-y-2">
+            <h2 id="linked-heading" className="px-1 text-ui font-semibold text-ink">
+              Also counts towards this goal
+            </h2>
+            <Card>
+              <ul className="divide-y divide-border">
+                {map.linked.map((entry) => (
+                  <li key={entry.linkId}>
+                    <p className="px-3 pt-2 text-small text-ink-muted">
+                      From{' '}
+                      <Link href={`/goals/${entry.fromGoal.id}`} className="underline">
+                        {entry.fromGoal.title}
+                      </Link>
+                    </p>
+                    <StepList
+                      nodes={[entry.step]}
+                      depth={0}
+                      links={map.linksOf}
+                      otherGoals={map.otherGoals}
+                      unlinkId={entry.linkId}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </section>
+        )}
+      </div>
+    </TodoOn.Provider>
   );
 }
 
@@ -194,6 +209,7 @@ function StepItem({
   const menuAction = useMenuAction();
   const toast = useToast();
   const childrenId = useId();
+  const todoOn = useContext(TodoOn);
 
   const closed = node.status === 'done' || node.status === 'dropped';
   const hasChildren = node.children.length > 0;
@@ -219,6 +235,29 @@ function StepItem({
   }
 
   const status = menuAction(setStepStatusAction);
+  // Show on Todo is offered on your open steps; taking one off is offered on
+  // any step still flagged, so nothing can be stranded on Todo.
+  const todoItem: ActionMenuItem[] = !todoOn
+    ? []
+    : node.onTodo
+      ? [
+          {
+            id: 'todo',
+            label: 'Take off Todo',
+            formAction: menuAction(setStepOnTodoAction),
+            formFields: { id: node.id, on: 'false' },
+          },
+        ]
+      : canShowOnTodo(node)
+        ? [
+            {
+              id: 'todo',
+              label: 'Show on Todo',
+              formAction: menuAction(setStepOnTodoAction),
+              formFields: { id: node.id, on: 'true' },
+            },
+          ]
+        : [];
   const move = menuAction(moveStepAction);
   const items: ActionMenuItem[] = [
     closed
@@ -234,6 +273,7 @@ function StepItem({
           formAction: status,
           formFields: { id: node.id, status: 'done' },
         },
+    ...todoItem,
     ...(closed
       ? []
       : [
@@ -302,6 +342,7 @@ function StepItem({
       ? describeRhythm(node.rhythmCount, node.rhythmPeriod)
       : null,
     node.dueOn ? `Due ${formatDate(node.dueOn)}` : null,
+    todoOn && node.onTodo && canShowOnTodo(node) ? 'On Todo' : null,
     !open && hasChildren ? `${countSteps(node.children).total} under it` : null,
   ].filter(Boolean);
 
