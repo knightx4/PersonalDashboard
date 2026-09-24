@@ -1,5 +1,8 @@
 import { redirect } from 'next/navigation';
 import { createClient, getUser } from '@/lib/auth/server';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { estimatePaidActions, paidActionsUnder } from '@/lib/core/spend/paid-actions';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { isOwner } from '@/lib/dev/owner';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
@@ -25,7 +28,8 @@ export default async function GoalsLayout({ children }: { children: React.ReactN
   if (!user) redirect('/login');
 
   const supabase = await createClient();
-  const [{ data: profile }, settings, counts, activity, raised, mainCheck, owner] =
+  const core = await createCoreClient();
+  const [{ data: profile }, settings, counts, activity, raised, mainCheck, owner, costs] =
     await Promise.all([
       supabase.from('profiles').select('display_name').eq('id', user.id).single(),
       loadAccountSettings(user.id),
@@ -34,6 +38,9 @@ export default async function GoalsLayout({ children }: { children: React.ReactN
       loadRaisedNotifications(user.id),
       loadMainCheck(),
       isOwner({ user }),
+      // Every paid button's $ hint in Goals, from one read of the spend
+      // ledger: so far, reading a paste or a document into a form (#955).
+      estimatePaidActions(core, user.id, paidActionsUnder('app/goals/')).catch(() => ({})),
     ]);
 
   const sections: NavSection[] = [
@@ -57,7 +64,7 @@ export default async function GoalsLayout({ children }: { children: React.ReactN
         activity={activity}
         mainCheck={mainCheck}
       >
-        {children}
+        <PaidCostsProvider costs={costs}>{children}</PaidCostsProvider>
       </AppShell>
     </div>
   );

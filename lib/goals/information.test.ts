@@ -9,6 +9,7 @@ import {
   inputValue,
   progressLine,
   sourceHref,
+  sourceLabel,
   unfinishedReason,
 } from '@/lib/goals/information';
 
@@ -130,10 +131,23 @@ describe('formValues', () => {
 });
 
 describe('sourceHref', () => {
-  it('links a Gmail message id and a web address, and nothing else', () => {
+  it('links a Gmail message id, a stored document and a web address, and nothing else', () => {
     expect(sourceHref('gmail', '18c2f0a9b1')).toBe('https://mail.google.com/mail/u/0/#all/18c2f0a9b1');
-    expect(sourceHref('document', 'goals/abc/statement.pdf')).toBeNull();
+    expect(sourceHref('document', 'u1/abc-statement.pdf')).toBe(
+      '/goals/document?path=u1%2Fabc-statement.pdf',
+    );
+    expect(sourceHref('comment', 'c9')).toBeNull();
     expect(sourceHref('pasted', 'https://servicer.example/loans')).toBe('https://servicer.example/loans');
     expect(sourceHref('gmail', null)).toBeNull();
+  });
+});
+
+describe('sourceLabel', () => {
+  it('names the file a record came from, and the source otherwise', () => {
+    expect(
+      sourceLabel('document', 'u1/0b6f3c1e-8a2d-4f7b-9c1a-2d3e4f5a6b7c-May-statement.pdf'),
+    ).toBe('From May-statement.pdf');
+    expect(sourceLabel('document', null)).toBe('From a document');
+    expect(sourceLabel('pasted', null)).toBe('From pasted text');
   });
 });
