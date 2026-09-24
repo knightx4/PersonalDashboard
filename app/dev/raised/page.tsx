@@ -6,7 +6,7 @@ import { buildPlanTree, flattenSections } from '@/lib/plan/tree';
 import { waitingGroups } from '@/lib/plan/waiting';
 import { loadDigest } from '@/lib/digest/load';
 import { loadConversations } from '@/lib/comments/recent';
-import { endQuietRuns, loadFeatureFires, loadLastRuns, loadStartedRuns } from '@/lib/plan/runs';
+import { loadFeatureFires, loadLastRuns, loadStartedRuns } from '@/lib/plan/runs';
 import { loadOvernightRun } from '@/lib/plan/overnight';
 import { runnerCard } from '@/lib/plan/runner-card';
 import { planRoutine } from '@/lib/feedback/routine';
@@ -43,10 +43,6 @@ export const metadata = { title: 'Dash' };
 export default async function DevRaisedPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  // Before the runs are read, as the plan page does, so a run that ended hours
-  // ago is not named here as a session still going.
-  await endQuietRuns({ supabase, userId: user.id });
-
   const [
     queue,
     digest,
