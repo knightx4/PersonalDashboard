@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { usageFrom } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
+import type { NewsOperation } from '@/lib/core/spend/operations';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { forceTool } from '@/lib/learn/graph/tool-call';
 import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
@@ -59,7 +60,7 @@ import { FALLBACK_TOPIC, NEWS_TOPICS, readTopic } from '@/lib/news/issues/topics
 export const DIGEST_MODEL = 'claude-haiku-4-5';
 
 /** The name this call has in core.model_spend. Stable: renaming it splits the history. */
-export const DIGEST_OPERATION = 'digest-issue';
+export const DIGEST_OPERATION: NewsOperation = 'digest-issue';
 
 const TOOL_NAME = 'report_digest';
 
