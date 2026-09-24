@@ -16,8 +16,9 @@ import { switcherCounts } from '@/lib/modules/switcher-counts';
  * second line, not the first. No onboarding gate: nothing here needs a Gmail
  * grant.
  *
- * One tab for now, the home. The full tree of a goal opens from it (#925), so
- * it is a deeper view of the home rather than a tab of its own.
+ * Two tabs: the home, which is the daily view (#926), and All goals, where
+ * areas and goals are added and arranged (#924). The full tree of a goal
+ * opens from either (#925), so it is a deeper view rather than a tab.
  */
 export default async function GoalsLayout({ children }: { children: React.ReactNode }) {
   const user = await getUser();
@@ -37,6 +38,7 @@ export default async function GoalsLayout({ children }: { children: React.ReactN
 
   const sections: NavSection[] = [
     { href: '/goals', label: 'Home', icon: 'goalsHome', exact: true },
+    { href: '/goals/all', label: 'All goals', icon: 'goalsAll' },
   ];
 
   return (
