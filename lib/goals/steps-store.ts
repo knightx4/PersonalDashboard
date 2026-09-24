@@ -1,6 +1,11 @@
 import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
+import {
+  loadInformation,
+  type Collection,
+  type CollectionRecord,
+} from '@/lib/goals/collections-store';
 import { dailyView, type DailyView } from '@/lib/goals/daily';
 import { GOALS_SCHEMA, type GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
@@ -55,6 +60,8 @@ type ItemRow = {
   reviewed_at: string | null;
   unit: string | null;
   target: number | string | null;
+  collection_id: string | null;
+  asks_for: string[] | null;
 };
 
 type LinkRow = { id: string; item_id: string; goal_id: string };
@@ -62,7 +69,7 @@ type LinkRow = { id: string; item_id: string; goal_id: string };
 const ITEM_COLUMNS =
   'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, resolution, ' +
   'due_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
-  'unit, target';
+  'unit, target, collection_id, asks_for';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -81,6 +88,8 @@ const toStep = (row: ItemRow): Step => ({
   result: row.result,
   resultUrl: row.result_url,
   reviewedAt: row.reviewed_at,
+  collectionId: row.collection_id,
+  asksFor: row.asks_for,
 });
 
 const toGoal = (row: ItemRow): Goal => ({
@@ -107,6 +116,8 @@ export type GoalMap = {
   linksOf: Record<string, { linkId: string; goalId: string; title: string }[]>;
   /** Each rhythm step's current period and the closed ones before it (plan #928). */
   rhythms: Record<string, RhythmRecord>;
+  /** The collections the information steps shown fill, with their records (plan #954). */
+  information: Record<string, { collection: Collection; records: CollectionRecord[] }>;
 };
 
 /** Whose rows, and which day it is for them, for bringing rhythm periods up to date. */
@@ -170,21 +181,20 @@ export async function loadGoalMap(
 
   const steps = byGoal.get(goalId) ?? [];
   const shown: string[] = [];
+  const collectionIds: string[] = [];
   const collect = (list: StepNode[]) => {
     for (const node of list) {
       if (node.kind === 'rhythm') shown.push(node.id);
+      if (node.collectionId) collectionIds.push(node.collectionId);
       collect(node.children);
     }
   };
   collect(steps);
   collect(linked.map((entry) => entry.step));
-  const records = await syncRhythms(
-    client,
-    userId,
-    liveRhythms(goals.map(toGoal), byGoal),
-    today,
-    shown,
-  );
+  const [records, information] = await Promise.all([
+    syncRhythms(client, userId, liveRhythms(goals.map(toGoal), byGoal), today, shown),
+    loadInformation(client, collectionIds),
+  ]);
 
   return {
     goal: toGoal(goal),
@@ -199,6 +209,7 @@ export async function loadGoalMap(
         return record ? [[id, record]] : [];
       }),
     ),
+    information,
   };
 }
 
@@ -527,4 +538,47 @@ export async function setStepOnTodo(
   const { data, error } = await query.select('id');
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;
+}
+
+/**
+ * Make a step an information step by pointing it at a collection, or stop it
+ * being one (plan #954). asksFor names the fields the step needs filled; null
+ * for every field the form shows. False when no live step has that id.
+ */
+export async function setStepCollection(
+  client: GoalsSupabaseClient,
+  id: string,
+  collectionId: string | null,
+  asksFor: string[] | null = null,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('items')
+    .update({ collection_id: collectionId, asks_for: collectionId ? asksFor : null })
+    .eq('id', id)
+    .eq('level', 'step')
+    .is('archived_at', null)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/** An information step as its form's writes need it: its collection, what it asks for, and its status. */
+export async function loadInformationStep(
+  client: GoalsSupabaseClient,
+  id: string,
+): Promise<{ collectionId: string; asksFor: string[] | null; status: GoalStatus } | null> {
+  const { data, error } = await client
+    .from('items')
+    .select('collection_id, asks_for, status')
+    .eq('id', id)
+    .eq('level', 'step')
+    .is('archived_at', null)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data || !data.collection_id) return null;
+  return {
+    collectionId: data.collection_id as string,
+    asksFor: (data.asks_for as string[] | null) ?? null,
+    status: data.status as GoalStatus,
+  };
 }

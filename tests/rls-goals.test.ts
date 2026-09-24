@@ -739,6 +739,47 @@ describe('collections and records (plan #953)', () => {
     ).rejects.toThrow(/holds one record/);
   });
 
+  it('points a step at a collection, and keeps confirming a draft yours (plan #954)', async () => {
+    const [step] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, collection_id, asks_for)
+      values (${userA}, 'step', ${goalA}, 'mine', 'List your loans', ${collection},
+              array['name', 'balance'])
+      returning id`);
+    expect(step.id).toBeTruthy();
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into items (user_id, level, area_id, title, collection_id)
+        values (${userA}, 'goal', ${areaA}, 'Not a step', ${collection})`),
+    ).rejects.toThrow(/items_collection_step_ck/);
+
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into records (user_id, collection_id, data, draft)
+        values (${userA}, ${collection}, '{}'::jsonb, true)`),
+    ).rejects.toThrow(/records_draft_source_ck/);
+
+    const asClaude = <T,>(fn: (tx: postgres.TransactionSql) => Promise<T>) =>
+      admin.begin(async (tx) => {
+        await tx.unsafe(`set local goals.actor = 'claude'`);
+        return fn(tx);
+      }) as Promise<T>;
+    await expect(
+      asClaude((tx) => tx`
+        insert into records (user_id, collection_id, data, source)
+        values (${userA}, ${collection}, '{"name": "Found"}'::jsonb, 'gmail')`),
+    ).rejects.toThrow(/only as a draft/);
+    const [draft] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into records (user_id, collection_id, data, source, source_ref, draft)
+      values (${userA}, ${collection}, '{"name": "Found"}'::jsonb, 'gmail', 'msg-1', true)
+      returning id`);
+    await expect(
+      asClaude((tx) => tx`update records set draft = false where id = ${draft.id}`),
+    ).rejects.toThrow(/may not confirm a draft/);
+    const [confirmed] = await asUser(userA, (tx) => tx<{ draft: boolean; source: string }[]>`
+      update records set draft = false where id = ${draft.id} returning draft, source`);
+    expect(confirmed).toEqual({ draft: false, source: 'gmail' });
+  });
+
   it("keeps each account's collections and records to itself", async () => {
     const seen = await asUser(userB, (tx) => tx`select id from records`);
     expect(seen).toHaveLength(0);
