@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { optionAnswer, planOptions } from './options';
+import { optionAnswer, planOptions, recommendedLetter } from './options';
 
 describe('planOptions', () => {
   // The two shapes the plan has actually used, taken from real decisions.
@@ -132,5 +132,24 @@ describe('the forms the plan actually contains', () => {
     // why nothing may be inferred from an unlabelled paragraph.
     const detail = 'A — One thing.\n\nB — Another thing.\n\nI would build B, for the reason above.';
     expect(planOptions(detail)).toHaveLength(2);
+  });
+});
+
+describe('recommendedLetter (note 3a57b12f)', () => {
+  const detail = 'A. Keep it.\nB. Drop it.\nC. Split it.';
+  const options = planOptions(detail);
+
+  it('reads the forms decisions are written in', () => {
+    expect(recommendedLetter(`${detail}\nRecommend B: it is cheaper.`, options)).toBe('B');
+    expect(recommendedLetter(`${detail}\nRecommendation: C, because it lasts.`, options)).toBe('C');
+    expect(recommendedLetter(`${detail}\nRecommendation: A. It is simplest.`, options)).toBe('A');
+    expect(recommendedLetter(`${detail}\nI recommend (b).`, options)).toBe('B');
+    expect(recommendedLetter(`${detail}\nRecommend option C.`, options)).toBe('C');
+  });
+
+  it('does not read an article or a missing option as a choice', () => {
+    expect(recommendedLetter(`${detail}\nI recommend a smaller cap.`, options)).toBeNull();
+    expect(recommendedLetter(`${detail}\nRecommend D: none of these.`, options)).toBeNull();
+    expect(recommendedLetter(detail, options)).toBeNull();
   });
 });

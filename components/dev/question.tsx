@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError, FieldHint, Label, Textarea } from '@/components/ui/field';
-import { optionAnswer, planOptions, type PlanOption } from '@/lib/plan/options';
+import { optionAnswer, planOptions, recommendedLetter, type PlanOption } from '@/lib/plan/options';
 
 /**
  * A question put to you, wherever it is read.
@@ -82,6 +82,9 @@ export function TheOptions({
 }) {
   if (!detail) return null;
   const options = planOptions(detail);
+  // The letter the prose recommends wears a green ring, so the choice a
+  // session would make shows before its paragraph is read (note 3a57b12f).
+  const recommended = recommendedLetter(detail, options);
 
   if (options.length === 0) {
     return (
@@ -97,15 +100,24 @@ export function TheOptions({
       <QuestionPartLabel>The options</QuestionPartLabel>
       <ul className="space-y-1">
         {options.map((option) => {
+          const isRecommended = option.letter === recommended;
           const body = (
             <>
               <span
                 aria-hidden
-                className="flex size-5 shrink-0 items-center justify-center rounded-control bg-surface text-micro font-semibold uppercase text-ink"
+                className={
+                  'flex size-5 shrink-0 items-center justify-center rounded-control text-micro font-semibold uppercase ' +
+                  (isRecommended
+                    ? 'bg-positive-tint text-positive ring-1 ring-positive shadow-[0_0_6px_var(--color-positive)]'
+                    : 'bg-surface text-ink')
+                }
               >
                 {option.letter}
               </span>
-              <span className="min-w-0 flex-1 text-left text-small text-ink">{option.label}</span>
+              <span className="min-w-0 flex-1 text-left text-small text-ink">
+                {option.label}
+                {isRecommended && <span className="sr-only"> (recommended)</span>}
+              </span>
             </>
           );
 
@@ -115,7 +127,7 @@ export function TheOptions({
                 <button
                   type="button"
                   onClick={() => onChoose(option)}
-                  title={`Answer ${option.letter}: ${option.label}`}
+                  title={`Answer ${option.letter}: ${option.label}${isRecommended ? ' (recommended)' : ''}`}
                   className="press flex w-full items-start gap-2 rounded-control px-1.5 py-1 transition-colors duration-150 hover:bg-accent-tint"
                 >
                   {body}
