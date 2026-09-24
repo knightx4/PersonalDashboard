@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { goalMoveLabel, goalProgress, questionsBeneath, stepHealth, stepState } from './status';
+import {
+  goalMoveLabel,
+  goalProgress,
+  questionsBeneath,
+  stepHealth,
+  stepNeeds,
+  stepState,
+} from './status';
 import type { StepNode } from './steps';
 
 function node(id: string, extra: Partial<StepNode> = {}): StepNode {
@@ -135,5 +142,35 @@ describe('goalProgress', () => {
   it('has nothing to say about an empty or finished goal', () => {
     expect(goalProgress([]).live).toBe(0);
     expect(goalProgress([node('a', { status: 'done' })]).move).toBe('settled');
+  });
+});
+
+describe('stepNeeds', () => {
+  it('names the open steps a waiting step waits on', () => {
+    const parent = node('p', {
+      children: [
+        node('Get the numbers'),
+        node('Check refinancing', { kind: 'claude' }),
+        node('Old', { status: 'done' }),
+        node('Maybe', { status: 'proposed' }),
+      ],
+    });
+    expect(stepNeeds(parent)).toBe(
+      'Get the numbers (on you), Check refinancing (with Claude) to close first.',
+    );
+  });
+
+  it('counts the open steps past the first three', () => {
+    const parent = node('p', {
+      children: ['a', 'b', 'c', 'd', 'e'].map((id) => node(id)),
+    });
+    expect(stepNeeds(parent)).toBe('a (on you), b (on you), c (on you), 2 more to close first.');
+  });
+
+  it('asks for approval on a proposal and says nothing when nothing holds a step', () => {
+    expect(stepNeeds(node('p', { status: 'proposed' }))).toMatch(/^Your approval/);
+    expect(stepNeeds(node('a'))).toBeNull();
+    expect(stepNeeds(node('q', { kind: 'decision' }))).toBeNull();
+    expect(stepNeeds(node('d', { status: 'done', children: [node('x')] }))).toBeNull();
   });
 });
