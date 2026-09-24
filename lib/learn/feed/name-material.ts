@@ -41,10 +41,15 @@ export type NameResult = { ok: true; named: NamedSection[] } | { ok: false; deta
 
 const SYSTEM = `You choose what one person should read next on English Wikipedia.
 
-You are given either a theme from their own notes, with the field of study it
-belongs to, or a field of study they have never been tested in, and how far
-into it they already are. Name two or three Wikipedia articles, and one section
-in each, that would teach them something they do not already know.
+You are given a theme from their own notes, with the field of study it belongs
+to, a field of study they have never been tested in, or a goal they set
+themselves, and how far into it they already are. Name two or three Wikipedia
+articles, and one section in each, that would teach them something they do not
+already know.
+
+For a goal, pick what moves them towards the goal as they worded it. Take the
+goal's own words and their line on what they mean as the subject, and use the
+field it sits in only to place it.
 
 What makes a good pick:
 - It is about how something works, what happens when it is applied, a real
@@ -88,6 +93,19 @@ const payloadSchema = z.object({
 
 /** What the model is told about the target. Exported for the test. */
 export function describeTarget(target: FeedTarget): string {
+  if (target.reason === 'goal') {
+    const { goal } = target;
+    const where = goal.field
+      ? `The field it sits in: ${goal.field.name} (${goal.field.domain}). ${goal.field.scope}`
+      : goal.domain
+        ? `It covers a whole domain: ${goal.domain}.`
+        : 'It is not placed in one field; work from its wording.';
+    return [
+      `A goal they set themselves: ${goal.name}.`,
+      ...(goal.about ? [`What they mean by it: ${goal.about}`] : []),
+      where,
+    ].join('\n');
+  }
   const field = `${target.field.name} (${target.field.domain}). ${target.field.scope}`;
   if (target.reason === 'interest') {
     return [

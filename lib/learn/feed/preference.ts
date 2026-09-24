@@ -36,19 +36,23 @@ export const PREFERENCE_CAP = 3;
 
 export type Signals = { saved: number; dismissed: number };
 
-/** What the draw needs: the signals on each theme and on each field. */
+/** What the draw needs: the signals on each theme, field and goal. */
 export type FeedPreferences = {
   themes: ReadonlyMap<string, Signals>;
   fields: ReadonlyMap<string, Signals>;
+  /** By aim id (plan #900). None when left out. */
+  aims?: ReadonlyMap<string, Signals>;
 };
 
-export const NO_PREFERENCES: FeedPreferences = { themes: new Map(), fields: new Map() };
+export const NO_PREFERENCES: FeedPreferences = { themes: new Map(), fields: new Map(), aims: new Map() };
 
 /** The columns of a feed card this reads. */
 export type CardSignal = {
   status: string;
   theme_id: string | null;
   field_id: string | null;
+  /** The goal a goal card was drawn for. */
+  aim_id?: string | null;
   saved_reading_id: string | null;
 };
 
@@ -62,11 +66,13 @@ function add(map: Map<string, Signals>, id: string, kind: keyof Signals) {
  * Counts saves and dismissals per theme and per field.
  *
  * An interest card counts towards its theme and its field; a gap card has no
- * theme and counts towards its field only.
+ * theme and counts towards its field only. A goal card counts towards its goal,
+ * and towards its field when the goal is placed in one.
  */
 export function preferencesFrom(cards: readonly CardSignal[]): FeedPreferences {
   const themes = new Map<string, Signals>();
   const fields = new Map<string, Signals>();
+  const aims = new Map<string, Signals>();
   for (const card of cards) {
     const kind: keyof Signals | null =
       card.saved_reading_id !== null || card.status === 'review'
@@ -77,8 +83,9 @@ export function preferencesFrom(cards: readonly CardSignal[]): FeedPreferences {
     if (!kind) continue;
     if (card.theme_id) add(themes, card.theme_id, kind);
     if (card.field_id) add(fields, card.field_id, kind);
+    if (card.aim_id) add(aims, card.aim_id, kind);
   }
-  return { themes, fields };
+  return { themes, fields, aims };
 }
 
 function clamp(value: number): number {
@@ -93,6 +100,11 @@ function factor(signals: Signals | undefined): number {
 /** The multiplier on a field, for drawing gap fields. */
 export function fieldWeight(preferences: FeedPreferences, fieldId: string): number {
   return clamp(factor(preferences.fields.get(fieldId)));
+}
+
+/** The multiplier on a goal, for drawing among goals (plan #900). */
+export function goalWeight(preferences: FeedPreferences, aimId: string): number {
+  return clamp(factor(preferences.aims?.get(aimId)));
 }
 
 /**
