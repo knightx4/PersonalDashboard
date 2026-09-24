@@ -88,3 +88,25 @@ export function planOptions(detail: string | null): PlanOption[] {
 export function optionAnswer(option: PlanOption): string {
   return `${option.letter} — ${option.label}`;
 }
+
+/**
+ * The letter the decision recommends, when its prose names one among its
+ * options: "Recommend A: …", "Recommendation: B, because …", "I recommend (c)."
+ *
+ * Note 3a57b12f asked for the recommended option's letter to stand out, so the
+ * choice a session would make is visible before its paragraph is read. The
+ * first recommendation in the text wins. A lower-case letter counts only with
+ * punctuation after it, so "recommend a smaller cap" is not option a.
+ */
+const RECOMMENDS =
+  /\b[Rr]ecommend(?:s|ed|ation)?\b[\s:,—–-]*(?:option\s+)?(?:\(([A-Za-z])\)|([A-Z])(?![A-Za-z])|([a-z])(?=[).:,;]))/g;
+
+export function recommendedLetter(detail: string | null, options: readonly PlanOption[]): string | null {
+  if (!detail || options.length === 0) return null;
+  for (const match of detail.matchAll(RECOMMENDS)) {
+    const letter = (match[1] ?? match[2] ?? match[3]).toLowerCase();
+    const option = options.find((candidate) => candidate.letter.toLowerCase() === letter);
+    if (option) return option.letter;
+  }
+  return null;
+}

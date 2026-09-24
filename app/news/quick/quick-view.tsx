@@ -148,7 +148,7 @@ export function QuickReadView({
                 {headline}
               </h2>
               <p className="mt-2 break-words text-body leading-relaxed text-ink">{summary}</p>
-              {story && <StoryText text={story.text} />}
+              {story && <StoryText text={story.text} summary={summary} />}
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
                 {story?.link && (
                   <ArticleLink

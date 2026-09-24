@@ -294,6 +294,34 @@ describe('news.hidden_topics', () => {
   });
 });
 
+describe('news.preferences', () => {
+  it('shows a user only their own local area, one row each', async () => {
+    await asUser(userA, (tx) => tx`
+      insert into preferences (user_id, local_area) values (${userA}, 'NYC')`);
+
+    const mine = await asUser(userA, (tx) => tx<{ local_area: string }[]>`
+      select local_area from preferences`);
+    expect(mine.map((r) => r.local_area)).toEqual(['NYC']);
+
+    const theirs = await asUser(userB, (tx) => tx`select 1 from preferences`);
+    expect(theirs).toHaveLength(0);
+
+    await expect(
+      admin`insert into preferences (user_id, local_area) values (${userA}, 'Boston')`,
+    ).rejects.toThrow(/preferences_pkey/);
+  });
+
+  it('refuses an area written under another account\'s id, or a blank one', async () => {
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into preferences (user_id, local_area) values (${userA}, 'Boston')`),
+    ).rejects.toThrow(/row-level security/);
+    await expect(
+      admin`insert into preferences (user_id, local_area) values (${userB}, '  ')`,
+    ).rejects.toThrow(/preferences_local_area_ck/);
+  });
+});
+
 describe('news.saved_stories', () => {
   const story = {
     headline: 'The quiet return of the tram',
@@ -384,6 +412,7 @@ describe('RLS coverage', () => {
       'addresses',
       'hidden_topics',
       'issues',
+      'preferences',
       'saved_stories',
       'senders',
       'story_groups',

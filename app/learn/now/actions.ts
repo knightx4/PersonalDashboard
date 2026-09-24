@@ -35,7 +35,7 @@ import { SAVED_FROM_FEED, saveFeedSection } from '@/lib/learn/tracks/save';
  *
  * Every action that can take a card out of the ready pool, and loading more,
  * asks for a top-up once the response has gone. It costs one count when
- * enough cards are ready, and writes more only when fewer than ten are.
+ * enough cards are ready, and writes fifteen more only when seven or fewer are.
  */
 
 const CardId = z.string().uuid();

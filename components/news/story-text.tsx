@@ -1,5 +1,5 @@
 import { ChevronRight } from 'lucide-react';
-import { storyParagraphs } from '@/lib/news/issues/stories';
+import { storyAddsToSummary, storyParagraphs } from '@/lib/news/issues/stories';
 
 /**
  * The story as the email told it, folded under its summary. A details element,
@@ -7,11 +7,12 @@ import { storyParagraphs } from '@/lib/news/issues/stories';
  *
  * Shared by the issue page's story list and the Quick read card. Draws nothing
  * for a story with no text of its own, which is every story summarised before
- * the text was kept.
+ * the text was kept, and for one whose text is the summary shown above it
+ * word for word (note 86b9c6d1).
  */
-export function StoryText({ text }: { text: string | undefined }) {
+export function StoryText({ text, summary }: { text: string | undefined; summary?: string }) {
   const paragraphs = storyParagraphs(text);
-  if (paragraphs.length === 0) return null;
+  if (paragraphs.length === 0 || !storyAddsToSummary(text, summary)) return null;
   return (
     <details className="group mt-1.5">
       <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-ui text-accent hover:underline [&::-webkit-details-marker]:hidden">

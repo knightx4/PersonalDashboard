@@ -44,7 +44,7 @@ export default async function LearnNowPage() {
     loadFeedPage(supabase, []),
     countReadyCards(supabase),
   ]);
-  // Opening the page counts as a response: when fewer than ten are ready,
+  // Opening the page counts as a response: when seven or fewer are ready,
   // more are written while you read the first.
   after(() => topUpFeedAfterResponse(user.id));
 

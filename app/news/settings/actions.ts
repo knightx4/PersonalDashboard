@@ -6,6 +6,7 @@ import { createNewsClient } from '@/lib/news/auth/server';
 import { readTopic } from '@/lib/news/issues/topics';
 import { showTopic } from '@/lib/news/quick/hidden-topics';
 import { loadOrCreateLocalPart, replaceLocalPart } from '@/lib/news/settings/address';
+import { readLocalArea, saveLocalArea } from '@/lib/news/settings/local-area';
 
 /**
  * Give this account a new address.
@@ -50,4 +51,21 @@ export async function showHiddenTopic(formData: FormData): Promise<void> {
 
   revalidatePath('/news/settings');
   revalidatePath('/news');
+}
+
+/**
+ * Name, change or clear the place the Local topic is about (note 552a9407).
+ * Only newsletters summarised from now on are tagged by it.
+ */
+// latency: pending
+export async function setLocalArea(value: string): Promise<{ error?: string }> {
+  const user = await requireUser();
+  const client = await createNewsClient();
+  try {
+    await saveLocalArea(client, { userId: user.id, area: readLocalArea(value) });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Your local area could not be saved.' };
+  }
+  revalidatePath('/news/settings');
+  return {};
 }

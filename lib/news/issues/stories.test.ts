@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { readStories, storyParagraphs } from './stories';
+import { readStories, storyAddsToSummary, storyParagraphs } from './stories';
 
 describe('readStories', () => {
   it('keeps each story with its headline, summary and link', () => {
@@ -87,5 +87,32 @@ describe('storyParagraphs', () => {
       'Three.',
     ]);
     expect(storyParagraphs(undefined)).toEqual([]);
+  });
+});
+
+describe('storyAddsToSummary (note 86b9c6d1)', () => {
+  it('is false when the text is the summary word for word', () => {
+    expect(storyAddsToSummary('The Fed held rates.\n\nMarkets rose!', 'The Fed held rates. Markets rose.')).toBe(false);
+    expect(storyAddsToSummary('the fed held rates', 'The Fed held rates, markets rose.')).toBe(false);
+  });
+
+  it('is false when the text differs from the summary by a word or two', () => {
+    expect(
+      storyAddsToSummary(
+        'A judge has ordered Fox Corp. to hand over hundreds of documents about how Murdoch ran his companies.',
+        'A judge has ordered Fox Corp. to turn over hundreds of documents about how Murdoch ran his companies.',
+      ),
+    ).toBe(false);
+  });
+
+  it('is true when the text says more', () => {
+    expect(storyAddsToSummary('The Fed held rates. Powell said more cuts may come.', 'The Fed held rates.')).toBe(
+      true,
+    );
+    expect(storyAddsToSummary('Anything at all.', undefined)).toBe(true);
+  });
+
+  it('is false with no text', () => {
+    expect(storyAddsToSummary(undefined, 'A summary.')).toBe(false);
   });
 });
