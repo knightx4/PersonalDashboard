@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ComposeBody, ComposeTitle, InlineInput } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
+import type { GoalProgress as GoalProgressData } from '@/lib/goals/status';
 import {
   AREA_NAME_MAX,
   GOAL_ACCEPTANCE_MAX,
@@ -29,6 +30,7 @@ import {
   renameAreaAction,
   type GoalsActionState,
 } from './actions';
+import { GoalProgress } from './goal-progress';
 
 /**
  * Areas and the goals under them (plan #924).
@@ -42,8 +44,8 @@ import {
 
 const initial: GoalsActionState = {};
 
-/** Live steps under each goal, keyed by goal id; a goal with none is absent. */
-type StepCounts = Record<string, { total: number; open: number }>;
+/** Each goal's bar and whose move it is, keyed by goal id; a goal with no steps is absent. */
+type Progress = Record<string, GoalProgressData>;
 
 /** Save on blur when the words changed. A required field cleared to nothing is put back. */
 function commitOnBlur(before: string, { required = false }: { required?: boolean } = {}) {
@@ -101,10 +103,10 @@ function moveItems(
 
 export function GoalsView({
   areas,
-  stepCounts,
+  progress,
 }: {
   areas: AreaWithGoals[];
-  stepCounts: StepCounts;
+  progress: Progress;
 }) {
   return (
     <div className="space-y-6">
@@ -121,7 +123,7 @@ export function GoalsView({
             area={area}
             index={index}
             count={areas.length}
-            stepCounts={stepCounts}
+            progress={progress}
           />
         ))
       )}
@@ -134,12 +136,12 @@ function AreaSection({
   area,
   index,
   count,
-  stepCounts,
+  progress,
 }: {
   area: AreaWithGoals;
   index: number;
   count: number;
-  stepCounts: StepCounts;
+  progress: Progress;
 }) {
   const [renameState, rename, renaming] = useActionState(renameAreaAction, initial);
   const menuAction = useMenuAction();
@@ -210,7 +212,7 @@ function AreaSection({
                 goal={goal}
                 index={i}
                 count={goalCount}
-                steps={stepCounts[goal.id]}
+                steps={progress[goal.id]}
               />
             ))}
           </ul>
@@ -230,7 +232,7 @@ function GoalRow({
   goal: Goal;
   index: number;
   count: number;
-  steps: { total: number; open: number } | undefined;
+  steps: GoalProgressData | undefined;
 }) {
   const [editState, edit, editing] = useActionState(editGoal, initial);
   // Fog is shown when the goal has some, or once you choose to add it.
@@ -335,10 +337,9 @@ function GoalRow({
           className="ml-1 inline-flex items-center gap-1 text-small text-ink-muted underline-offset-2 hover:text-ink hover:underline"
         >
           <ListTree className="size-3" strokeWidth={1.75} aria-hidden />
-          {steps
-            ? `${steps.open} open of ${steps.total} ${steps.total === 1 ? 'step' : 'steps'}`
-            : 'Break into steps'}
+          {steps ? 'Full tree' : 'Break into steps'}
         </Link>
+        {steps && <GoalProgress progress={steps} label={goal.title} className="px-1 pt-1" />}
         {editState.error && <p className="px-1 text-small text-danger">{editState.error}</p>}
       </div>
       <ActionMenu label={`${goal.title} actions`} items={items} />

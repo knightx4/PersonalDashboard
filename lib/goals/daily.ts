@@ -13,6 +13,7 @@
  * Pure, so the ordering and the cap are tested without a database, in the
  * way lib/plan/waiting.ts is for the dev plan's Dash section.
  */
+import type { GoalProgress } from '@/lib/goals/status';
 import type { StepKind, StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
 
@@ -40,6 +41,8 @@ export type DailyGoal = {
   more: number;
   /** Whether the goal has any live steps at all, so the page can offer a breakdown. */
   hasSteps: boolean;
+  /** Its bar and whose move it is (plan #958); added by the loader, not by dailyView. */
+  progress?: GoalProgress;
 };
 
 export type WaitingItem =

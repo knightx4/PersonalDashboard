@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ComposeTitle, InlineInput, Input, Select, Textarea } from '@/components/ui/field';
+import { StateLabel, TONE_TEXT } from '@/components/dev/state-label';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
@@ -22,8 +23,6 @@ import {
   STEP_DETAIL_MAX,
   STEP_KINDS,
   STEP_KIND_LABELS,
-  STEP_STATUS_GLYPHS,
-  STEP_STATUS_LABELS,
   STEP_TITLE_MAX,
   countSteps,
   describeRhythm,
@@ -32,6 +31,7 @@ import {
 } from '@/lib/goals/steps';
 import { awaitsReview } from '@/lib/goals/daily';
 import { countAside } from '@/lib/goals/shaping';
+import { goalProgress, questionsBeneath, stepState } from '@/lib/goals/status';
 import { canShowOnTodo } from '@/lib/goals/todo';
 import { progressLine, type RhythmRecord } from '@/lib/goals/rhythms';
 import {
@@ -46,6 +46,7 @@ import {
   unlinkStepAction,
   type StepActionState,
 } from './actions';
+import { GoalProgress, QuestionMark } from '../goal-progress';
 import { GoalThread } from './goal-comments';
 import { InformationStep } from './information-step';
 import {
@@ -120,7 +121,7 @@ function commitOnBlur(before: string, { required = false }: { required?: boolean
 }
 
 export function StepTree({ map, todoOn }: { map: GoalMap; todoOn: boolean }) {
-  const { total, closed } = countSteps(map.steps);
+  const progress = goalProgress(map.steps);
   const [showAside, setShowAside] = useState(false);
   const aside = countAside(map.steps);
   return (
@@ -131,11 +132,7 @@ export function StepTree({ map, todoOn }: { map: GoalMap; todoOn: boolean }) {
             <Threads.Provider value={map.threads}>
               <div className="space-y-6">
                 <section aria-label="Steps" className="space-y-2">
-                  {total > 0 && (
-                    <p className="px-1 text-small text-ink-muted">
-                      {closed} of {total} {total === 1 ? 'step' : 'steps'} closed
-                    </p>
-                  )}
+                  <GoalProgress progress={progress} label={map.goal.title} className="px-1" />
                   {map.steps.length === 0 ? (
                     <EmptyState
                       icon={ListTree}
@@ -275,6 +272,7 @@ function StepItem({
   const hasChildren = node.children.length > 0;
   const stepLinks = links[node.id] ?? [];
   const KindIcon = KIND_ICONS[node.kind];
+  const state = stepState(node);
 
   async function archive(form: FormData) {
     const result = await archiveStepAction(form);
@@ -453,11 +451,9 @@ function StepItem({
         ) : (
           <span className="size-6 shrink-0" aria-hidden />
         )}
-        <StatusGlyph
-          glyph={STEP_STATUS_GLYPHS[node.status]}
-          label={STEP_STATUS_LABELS[node.status]}
-          className={cn('mt-2', closed ? 'text-ink-muted' : 'text-ink')}
-        />
+        <span className={cn('mt-2', TONE_TEXT[state.tone])} title={state.title}>
+          <StatusGlyph glyph={state.glyph} label={state.word} />
+        </span>
         <div className="min-w-0 flex-1">
           <form action={edit}>
             <input type="hidden" name="id" value={node.id} />
@@ -474,6 +470,10 @@ function StepItem({
             />
           </form>
           <p className="flex flex-wrap items-center gap-x-2 px-1 text-small text-ink-muted">
+            <StateLabel glyph={null} word={state.word} tone={state.tone} title={state.title} />
+            {/* Questions waiting on you under a folded step, where they
+                cannot be seen. Unfolded, they are on their own rows. */}
+            {!open && <QuestionMark count={questionsBeneath(node)} />}
             <span className="inline-flex items-center gap-1">
               <KindIcon className="size-3" strokeWidth={1.75} aria-hidden />
               {STEP_KIND_LABELS[node.kind]}

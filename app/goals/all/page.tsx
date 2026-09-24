@@ -1,7 +1,7 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { loadAreas, loadGoals } from '@/lib/goals/store';
-import { loadStepCounts } from '@/lib/goals/steps-store';
+import { loadGoalProgress } from '@/lib/goals/steps-store';
 import { groupGoals } from '@/lib/goals/tree';
 import { GoalsView } from '../goals-view';
 
@@ -19,10 +19,10 @@ export const dynamic = 'force-dynamic';
  */
 export default async function AllGoalsPage() {
   const client = await createGoalsClient();
-  const [areas, goals, stepCounts] = await Promise.all([
+  const [areas, goals, progress] = await Promise.all([
     loadAreas(client),
     loadGoals(client),
-    loadStepCounts(client),
+    loadGoalProgress(client),
   ]);
 
   return (
@@ -31,7 +31,7 @@ export default async function AllGoalsPage() {
         title="All goals"
         description="What you are working towards, grouped by the areas of your life they belong to."
       />
-      <GoalsView areas={groupGoals(areas, goals)} stepCounts={stepCounts} />
+      <GoalsView areas={groupGoals(areas, goals)} progress={progress} />
     </div>
   );
 }
