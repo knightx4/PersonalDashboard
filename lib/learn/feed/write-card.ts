@@ -15,6 +15,8 @@ import { describeDepth, type Depth } from './depth';
  * for, at the depth it was picked at. When it does, the model writes the
  * card's teaching parts (LEARN-NOW-SPEC, "Cards after the first week"):
  *
+ *   takeaway  the one thing to remember, in a plain-English sentence, shown
+ *             first in a callout (note 125f60f2)
  *   context   one plain paragraph setting the scene: what the subject is,
  *             who the names are, when and where, at the person's level
  *   hook      the most interesting thing in the section, stated concretely
@@ -44,6 +46,8 @@ export const MAX_SECTION_CHARS = 24_000;
 
 /** A summary longer than this is not three or four sentences. */
 const MAX_SUMMARY_CHARS = 1_200;
+/** The takeaway is one sentence. */
+const MAX_TAKEAWAY_CHARS = 280;
 /** The context is one short paragraph. */
 const MAX_CONTEXT_CHARS = 900;
 /** The hook is one or two sentences. */
@@ -81,6 +85,12 @@ export type CardToWrite = {
 
 /** What a ready card carries besides its why line. */
 export type CardParts = {
+  /**
+   * The one thing to remember, in one plain sentence, shown first. Null when
+   * the model wrote none or wrote more than a sentence: the rest of the card
+   * still stands, so it is not dropped for it.
+   */
+  takeaway: string | null;
   /** One paragraph that sets the scene, first on the card. */
   context: string;
   hook: string;
@@ -137,7 +147,9 @@ You are given what the section was picked for, how deep to pitch it, and the sec
 
 1. Decide whether the section serves what it was picked for at that depth. Say it does not when the text is about something else, is a list of links, names or references, is too thin to learn anything from, or only defines terms and restates basics the person is past.
 
-2. When it does, write five parts. The person reads them in this order, knowing nothing about the section beforehand.
+2. When it does, write six parts. The person reads them in this order, knowing nothing about the section beforehand.
+
+takeaway: One sentence, shown first in a callout above the rest of the card: the single most important thing to take from it, the one line someone should remember if they read nothing else. Plain English, everyday words, no jargon and no term that needs defining, no names the reader would have to look up. State the idea itself, not what the card covers.
 
 context: One paragraph of three or four sentences, first on the card, that lets someone who has never seen this section follow the rest. Say what the subject is in plain terms, where and when it sits, and who any person, school or work the card mentions is (for example: "Elizabeth Eisenstein was a historian who argued in 1979 that..."). Define any term the other parts rely on. Pitch it at the level you were given: skip what someone at that level already knows, and never talk down. You may draw on well-established knowledge here. Simple, clear, descriptive words; no hook, no argument yet.
 
@@ -156,6 +168,7 @@ Report through ${TOOL_NAME}.`;
 const payloadSchema = z.object({
   fit: z.string(),
   matches: z.boolean(),
+  takeaway: z.string().nullable().optional(),
   context: z.string().nullable().optional(),
   hook: z.string().nullable().optional(),
   summary: z.string().nullable().optional(),
@@ -241,6 +254,7 @@ export function readCardReport(input: unknown): CardReport {
     };
   }
 
+  const takeaway = clean(parsed.data.takeaway);
   const question = clean(parsed.data.question);
   const answer = clean(parsed.data.answer);
   const asked =
@@ -250,6 +264,7 @@ export function readCardReport(input: unknown): CardReport {
     answer.length <= MAX_ANSWER_CHARS;
   return {
     verdict: 'ready',
+    takeaway: takeaway && takeaway.length <= MAX_TAKEAWAY_CHARS ? takeaway : null,
     context,
     hook,
     summary,
@@ -310,6 +325,11 @@ export async function writeCard(input: {
                   'One sentence on what the section covers and whether it serves what it was picked for at that depth.',
               },
               matches: { type: 'boolean' },
+              takeaway: {
+                type: ['string', 'null'],
+                description:
+                  'One plain-English sentence: the most important thing to take from it. Null when it does not match.',
+              },
               context: {
                 type: ['string', 'null'],
                 description:
@@ -344,6 +364,7 @@ export async function writeCard(input: {
             required: [
               'fit',
               'matches',
+              'takeaway',
               'context',
               'hook',
               'summary',
@@ -379,6 +400,7 @@ export async function writeCard(input: {
   if (report.verdict === 'dropped') return { outcome: 'dropped', reason: report.reason };
   return {
     outcome: 'ready',
+    takeaway: report.takeaway,
     context: report.context,
     hook: report.hook,
     summary: report.summary,

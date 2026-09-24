@@ -167,6 +167,7 @@ async function topUpWith(
         result.outcome === 'ready'
           ? {
               status: 'ready',
+              takeaway: result.takeaway,
               context: result.context,
               hook: result.hook,
               summary: result.summary,

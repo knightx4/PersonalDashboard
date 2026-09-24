@@ -27,6 +27,7 @@ const interest: CardToWrite = {
 };
 
 const parts = {
+  takeaway: 'Squeezing data through a small gap forces a network to keep only what matters.',
   context:
     'An autoencoder is a kind of neural network that learns to squeeze its input into a few numbers and rebuild it.',
   hook: 'A bottleneck of 30 numbers can rebuild a 784-pixel digit.',
@@ -114,6 +115,16 @@ describe('reading the report', () => {
       verdict: 'dropped',
       reason: 'The report wrote no context.',
     });
+  });
+
+  it('keeps the card but leaves off a takeaway that is missing or longer than a sentence (note 125f60f2)', () => {
+    expect(readCardReport({ fit: 'Fits.', matches: true, ...parts, summary: 'S.', takeaway: null })).toMatchObject({
+      verdict: 'ready',
+      takeaway: null,
+    });
+    expect(
+      readCardReport({ fit: 'Fits.', matches: true, ...parts, summary: 'S.', takeaway: 'x'.repeat(300) }),
+    ).toMatchObject({ verdict: 'ready', takeaway: null });
   });
 
   it('keeps the card but leaves off a question with no answer', () => {

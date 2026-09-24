@@ -15,6 +15,7 @@ export type FeedCardRow = {
   status: string;
   summary: string | null;
   why: string | null;
+  takeaway?: string | null;
   context?: string | null;
   hook?: string | null;
   example?: string | null;
@@ -34,6 +35,8 @@ export type FeedCard = {
   article: string;
   section: string | null;
   why: string;
+  /** The one thing to remember, in a plain sentence, shown first. Null on older cards. */
+  takeaway: string | null;
   /** One paragraph setting the scene, first on the card. Null on older cards. */
   context: string | null;
   /** The most interesting thing in the section, after the context. */
@@ -186,6 +189,7 @@ export function toFeedCard(row: FeedCardRow): FeedCard | null {
     article: row.item.title,
     section: row.segment.heading,
     why: row.why,
+    takeaway: row.takeaway?.trim() || null,
     context: row.context?.trim() || null,
     hook: row.hook?.trim() || null,
     summary: row.summary,

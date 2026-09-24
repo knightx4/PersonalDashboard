@@ -1888,6 +1888,8 @@ const deckCards: FeedCard[] = [
     article: 'Cobweb model',
     section: 'Mechanism',
     why: 'You write about economic system design (Economics).',
+    takeaway:
+      'When farmers plant based on last year’s price, prices can swing up and down for years instead of settling.',
     context:
       'The cobweb model is a way economists explain boom-and-bust cycles in farm markets. It was worked out in the 1930s by Nicholas Kaldor and others, looking at crops and livestock where output has to be planned a season before it is sold. The name comes from the spiral the price and quantity trace on a supply and demand chart.',
     hook: 'US hog prices swung in a four-year cycle for decades because farmers set next year’s herd from this year’s price.',
@@ -1920,6 +1922,7 @@ const deckCards: FeedCard[] = [
     article: 'Tax incidence',
     section: 'Elasticity',
     why: 'A field you write about but have never been tested in: Public economics.',
+    takeaway: null,
     context: null,
     hook: 'Who legally pays a tax has no effect on who bears it; the less elastic side of the market ends up carrying most of it.',
     summary:
