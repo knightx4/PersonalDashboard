@@ -5,6 +5,14 @@ import { SurfaceReview } from '@/app/dev/surfaces/review';
 import DevUiPage from '@/app/dev/ui/page';
 import { ANATOMIES } from '@/app/dev/ui/anatomy';
 import { ItemDetailsPanel } from '@/app/shopping/inventory/[id]/item-details-panel';
+import { EstimatesTable } from '@/app/account/spend/estimates-table';
+import { compareEstimate } from '@/lib/core/spend/comparison';
+import {
+  ESTIMATE_WINDOW_DAYS,
+  MEASURED_MIN_RUNS,
+  type MeasuredRange,
+} from '@/lib/core/spend/estimate';
+import type { OperationName } from '@/lib/core/spend/guesses';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
 import { ReviewQueue } from '@/app/jobs/(app)/review/list';
 import { SettingsView } from '@/app/jobs/(app)/settings/view';
@@ -1182,7 +1190,8 @@ const subjectConcepts: Concept[] = [
   {
     id: 'k3',
     name: 'Sunk cost',
-    claim: 'Money already spent is not a reason to continue, because it is gone under either choice.',
+    claim:
+      'Money already spent is not a reason to continue, because it is gone under either choice.',
     claimOriginal: null,
     claimRewrittenAt: null,
     catalogueSearchedAt: null,
@@ -1198,7 +1207,8 @@ const subjectConcepts: Concept[] = [
   {
     id: 'k4',
     name: 'Deadweight loss',
-    claim: 'A tax that changes behaviour destroys trades that both sides wanted, and that loss goes to nobody.',
+    claim:
+      'A tax that changes behaviour destroys trades that both sides wanted, and that loss goes to nobody.',
     claimOriginal: null,
     claimRewrittenAt: null,
     catalogueSearchedAt: null,
@@ -1381,8 +1391,16 @@ const orderDisplay: ListDisplaySpec<SampleOrder> = {
   sorts: [
     { id: 'newest', label: 'Newest', compare: (a, b) => b.month.localeCompare(a.month) },
     { id: 'oldest', label: 'Oldest', compare: (a, b) => a.month.localeCompare(b.month) },
-    { id: 'total_desc', label: 'Total: high to low', compare: (a, b) => b.totalCents - a.totalCents },
-    { id: 'total_asc', label: 'Total: low to high', compare: (a, b) => a.totalCents - b.totalCents },
+    {
+      id: 'total_desc',
+      label: 'Total: high to low',
+      compare: (a, b) => b.totalCents - a.totalCents,
+    },
+    {
+      id: 'total_asc',
+      label: 'Total: low to high',
+      compare: (a, b) => a.totalCents - b.totalCents,
+    },
   ],
   groups: [
     {
@@ -1391,8 +1409,16 @@ const orderDisplay: ListDisplaySpec<SampleOrder> = {
       order: 'key-desc',
       bucket: (row) => ({ key: row.month, label: row.monthLabel }),
     },
-    { id: 'merchant', label: 'Merchant', bucket: (row) => ({ key: row.merchant, label: row.merchant }) },
-    { id: 'person', label: 'Whose order', bucket: (row) => ({ key: row.person, label: row.person }) },
+    {
+      id: 'merchant',
+      label: 'Merchant',
+      bucket: (row) => ({ key: row.merchant, label: row.merchant }),
+    },
+    {
+      id: 'person',
+      label: 'Whose order',
+      bucket: (row) => ({ key: row.person, label: row.person }),
+    },
   ],
   properties: [
     { id: 'merchant', label: 'Merchant', alwaysOn: true },
@@ -1479,7 +1505,12 @@ function SharedDisplayOptions() {
       {groups.map((group) => (
         <section key={group.key} className="space-y-2">
           <GroupHeader label={group.label} count={group.count} subtotal={group.subtotal} />
-          <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}>
+          <ul
+            className={cn(
+              cardVariants({ padding: 'none' }),
+              'divide-y divide-border overflow-hidden',
+            )}
+          >
             {group.rows.map((row) => (
               <li key={row.id} className="flex items-baseline justify-between gap-3 px-4 py-3">
                 <div className="min-w-0">
@@ -1529,14 +1560,13 @@ const issueBase: IssueViewProps = {
       {
         headline: 'Six hours of stale balances: a failover post-mortem',
         summary:
-          'A replica promoted during a network partition kept its warm cache, so reads served balances from before the split. The fix was to tie cache generations to the primary\'s timeline ID rather than to wall-clock expiry.',
+          "A replica promoted during a network partition kept its warm cache, so reads served balances from before the split. The fix was to tie cache generations to the primary's timeline ID rather than to wall-clock expiry.",
         link: 'https://example.com/blog/2026/09/stale-balances-post-mortem',
         // Drawn inline so the gallery needs no network for it, and wide
         // because the lead story spreads it across the card (plan #856).
         image:
           "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 160'%3E%3Crect width='320' height='160' fill='%23334155'/%3E%3Cpath d='M0 118 L70 70 L130 104 L190 62 L250 96 L320 74 V160 H0Z' fill='%2394a3b8'/%3E%3Ccircle cx='236' cy='40' r='16' fill='%23fbbf24'/%3E%3C/svg%3E",
-        text:
-          'At 02:14 a network partition split the primary from two of its replicas. The failover promoted one of them within forty seconds, which is what it is meant to do.\n\nWhat nobody had planned for was the cache in front of it. Its keys expired on a timer, not on a change of primary, so for six hours it went on serving balances written before the split.\n\nThe fix ties each cache generation to the primary\'s timeline ID. A promotion now empties the cache on the spot.',
+        text: "At 02:14 a network partition split the primary from two of its replicas. The failover promoted one of them within forty seconds, which is what it is meant to do.\n\nWhat nobody had planned for was the cache in front of it. Its keys expired on a timer, not on a change of primary, so for six hours it went on serving balances written before the split.\n\nThe fix ties each cache generation to the primary's timeline ID. A promotion now empties the cache on the spot.",
       },
       {
         headline: 'github.com/example-org/postgres-backed-job-queue-benchmarks-2026',
@@ -1547,7 +1577,7 @@ const issueBase: IssueViewProps = {
       {
         headline: 'Tracing library 4.0 drops the global registry',
         summary:
-          'Every tracer is now passed explicitly, which breaks most existing setups. The maintainers say the upgrade is a morning\'s work for a typical service.',
+          "Every tracer is now passed explicitly, which breaks most existing setups. The maintainers say the upgrade is a morning's work for a typical service.",
       },
       {
         headline: 'You probably do not need Kubernetes yet',
@@ -1579,7 +1609,7 @@ const issueEssay: IssueViewProps = {
   byline: 'Slow Letters · Sun 20 Sep, 09:02',
   digest: {
     summary:
-      'An essay about the half-built projects that pile up in any maker\'s life, and the argument that abandoning one on purpose is a skill. The writer keeps a list of what they stopped and why, and rereads it before starting anything new. Their point is that the list is less about guilt than about noticing which kinds of project they never finish.',
+      "An essay about the half-built projects that pile up in any maker's life, and the argument that abandoning one on purpose is a skill. The writer keeps a list of what they stopped and why, and rereads it before starting anything new. Their point is that the list is less about guilt than about noticing which kinds of project they never finish.",
     stories: [],
   },
   unsubscribeUrl: null,
@@ -1613,7 +1643,12 @@ const quickStory: QuickReadViewProps = {
     storyIndex: 0,
     subject: issueBase.subject,
     receivedAt: '2026-09-22T07:14:00Z',
-    sender: { id: 'sender-1', email: 'hello@infraweekly.example', name: 'Infra Weekly', muted: false },
+    sender: {
+      id: 'sender-1',
+      email: 'hello@infraweekly.example',
+      name: 'Infra Weekly',
+      muted: false,
+    },
     from: 'Infra Weekly',
     remainingInIssue: 4,
   },
@@ -1743,7 +1778,9 @@ const deckCards: FeedCard[] = [
     shown: [
       'The cobweb model or cobweb theory is an economic model that explains why prices might be subject to periodic fluctuations in certain types of markets.',
     ],
-    rest: ['It describes cyclical supply and demand in a market where the amount produced must be chosen before prices are observed.'],
+    rest: [
+      'It describes cyclical supply and demand in a market where the amount produced must be chosen before prices are observed.',
+    ],
     restMinutes: 1,
     link: 'https://en.wikipedia.org/wiki/Cobweb_model#Mechanism',
     site: 'Wikipedia',
@@ -1758,14 +1795,17 @@ const deckCards: FeedCard[] = [
     why: 'A field you write about but have never been tested in: Public economics.',
     context: null,
     hook: 'Who legally pays a tax has no effect on who bears it; the less elastic side of the market ends up carrying most of it.',
-    summary: 'The burden of a tax splits between buyers and sellers in proportion to how little each can walk away.',
+    summary:
+      'The burden of a tax splits between buyers and sellers in proportion to how little each can walk away.',
     example: 'Cigarette taxes fall mostly on smokers, because demand barely moves with price.',
     question: null,
     answer: null,
     depth: 'advanced',
     difficulty: null,
     returning: 'review',
-    shown: ['Tax incidence is the analysis of the effect of a particular tax on the distribution of economic welfare.'],
+    shown: [
+      'Tax incidence is the analysis of the effect of a particular tax on the distribution of economic welfare.',
+    ],
     rest: [],
     restMinutes: 0,
     link: 'https://en.wikipedia.org/wiki/Tax_incidence',
@@ -1814,15 +1854,41 @@ function CostHintRows() {
       </div>
       <div className="flex items-center justify-end gap-1">
         <Button variant="secondary">Grade 12 readings</Button>
-        <CostHint
-          estimate={perReading}
-          count={12}
-          what="Cost of grading"
-          align="end"
-          defaultOpen
-        />
+        <CostHint estimate={perReading} count={12} what="Cost of grading" align="end" defaultOpen />
       </div>
     </div>
+  );
+}
+
+/* The spend page's estimates against the ledger, from ranges shaped like the
+ * live ledger's in September 2026: one measured row, uncertain rows with and
+ * without runs, a per-item row, and two background ones. */
+function SpendEstimates() {
+  const ranges = new Map<OperationName, MeasuredRange>([
+    ['classify-note', { runs: 7, lowMicros: 1_402, medianMicros: 1_538, highMicros: 1_710 }],
+    [
+      'write-opening-question',
+      { runs: 1, lowMicros: 16_065, medianMicros: 16_065, highMicros: 16_065 },
+    ],
+    ['plan-topic', { runs: 2, lowMicros: 113_270, medianMicros: 400_732, highMicros: 688_194 }],
+    ['map-sweep', { runs: 2_127, lowMicros: 1_533, medianMicros: 6_110, highMicros: 12_426 }],
+    ['digest-issue', { runs: 91, lowMicros: 1_957, medianMicros: 4_370, highMicros: 16_446 }],
+  ]);
+  const pick = (names: OperationName[]) =>
+    names.map((name) => compareEstimate(name, ranges.get(name)));
+  return (
+    <EstimatesTable
+      foreground={pick([
+        'plan-topic',
+        'resolve-reference',
+        'classify-note',
+        'write-opening-question',
+        'draft-answer',
+      ])}
+      background={pick(['map-sweep', 'digest-issue', 'classify-job-email'])}
+      days={ESTIMATE_WINDOW_DAYS}
+      minRuns={MEASURED_MIN_RUNS}
+    />
   );
 }
 
@@ -2282,7 +2348,15 @@ export const SURFACES: readonly Surface[] = [
     label: 'News · Issue original email',
     module: 'news',
     width: 'page',
-    render: () => <IssueView {...issueBase} showDigest={false} html={issueFailed.html} pictures={false} blockedImages={1} />,
+    render: () => (
+      <IssueView
+        {...issueBase}
+        showDigest={false}
+        html={issueFailed.html}
+        pictures={false}
+        blockedImages={1}
+      />
+    ),
   },
   {
     id: 'news-issue-failed',
@@ -2338,6 +2412,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <CostHintRows />,
+  },
+  {
+    /* /account/spend: every operation's estimate beside its thirty-day median.
+     * At phone width the rows stack into label/value pairs. */
+    id: 'core-spend-estimates',
+    label: 'Spend · Estimates against actual spend',
+    module: 'learn',
+    width: 'page',
+    render: () => <SpendEstimates />,
   },
 
   /* The page anatomies, framed at two widths by the anatomy section on
