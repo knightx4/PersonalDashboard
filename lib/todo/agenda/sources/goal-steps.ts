@@ -3,8 +3,11 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { countTowards } from '@/lib/goals/rhythms-store';
-import { progressLine } from '@/lib/goals/rhythms';
+import { periodOf, progressLine } from '@/lib/goals/rhythms';
+import { RHYTHM_PERIODS, type RhythmPeriod } from '@/lib/goals/steps';
 import { loadTodoGoals, setStepStatus } from '@/lib/goals/steps-store';
+import { todoSuggestions } from '@/lib/goals/suggestions';
+import { loadGoingSuggestions, markAttended } from '@/lib/goals/suggestions-store';
 import { dismiss, undismiss } from '@/lib/todo/agenda/dismissals';
 import { SNOOZE_DAYS, todayIn } from '@/lib/todo/tasks/model';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
@@ -30,10 +33,17 @@ import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/
  * this period, and ticking it counts one towards the period rather than
  * closing the step. A rhythm of three a week stays on the list, reading
  * "1 of 3 this week", until the third.
+ *
+ * **So do suggestions you are going to** (plan #934): a city event from the
+ * weekly run that you pressed going on shows on its date, linked to the
+ * event's page. Ticking it records that you went and, when it was suggested
+ * for a rhythm, counts one towards that rhythm's current period. One whose
+ * date has passed leaves the list rather than piling up.
  */
 
 const PREFIX = 'goal_steps:';
 const RHYTHM_PREFIX = 'goal_rhythms:';
+const SUGGESTION_PREFIX = 'goal_suggestions:';
 
 export const goalStepsSource: AgendaSource = {
   id: 'goal_steps',
@@ -45,10 +55,25 @@ export const goalStepsSource: AgendaSource = {
 
   async fetch(ctx: SourceContext): Promise<AgendaItem[]> {
     const today = todayIn(ctx.timezone, ctx.now);
-    const { steps, rhythms } = await loadTodoGoals(await createGoalsClient(), {
-      userId: ctx.userId,
-      today,
-    });
+    const client = await createGoalsClient();
+    const [{ steps, rhythms }, going] = await Promise.all([
+      loadTodoGoals(client, { userId: ctx.userId, today }),
+      loadGoingSuggestions(client),
+    ]);
+
+    const suggestionItems: AgendaItem[] = todoSuggestions(going, today, ctx.to).map((s) => ({
+      key: `${SUGGESTION_PREFIX}${s.id}`,
+      source: 'goal_steps',
+      title: s.title,
+      day: s.happensOn,
+      at: s.startsAt,
+      link: s.url
+        ? { href: s.url, label: s.source ?? 'Event page' }
+        : { href: '/goals', label: 'Goals' },
+      action: null,
+      detail: s.place,
+      completable: true,
+    }));
 
     const rhythmItems: AgendaItem[] = rhythms.map((rhythm) => ({
       key: `${RHYTHM_PREFIX}${rhythm.id}:${rhythm.startsOn}`,
@@ -66,6 +91,7 @@ export const goalStepsSource: AgendaSource = {
 
     return [
       ...rhythmItems,
+      ...suggestionItems,
       ...steps
         // An undated step is always in the window: it goes in "Someday", as an
         // undated task does. A dated one waits until the horizon reaches it.
@@ -86,11 +112,13 @@ export const goalStepsSource: AgendaSource = {
     ];
   },
 
-  async complete(_ctx, key) {
+  async complete(ctx, key) {
     const client = await createGoalsClient();
     const rhythm = rhythmOf(key);
     if (rhythm) await countTowards(client, rhythm.itemId, rhythm.startsOn, 1);
-    else await setStepStatus(client, idOf(key), 'done');
+    else if (key.startsWith(SUGGESTION_PREFIX)) {
+      await attendSuggestion(client, key.slice(SUGGESTION_PREFIX.length), todayIn(ctx.timezone, ctx.now));
+    } else await setStepStatus(client, idOf(key), 'done');
     revalidatePath('/goals', 'layout');
   },
 
@@ -104,6 +132,33 @@ export const goalStepsSource: AgendaSource = {
     await dismiss(ctx.userId, 'goal_step', key, null);
   },
 };
+
+/**
+ * You went: record it on the suggestion, and when it was suggested for a
+ * rhythm, count one towards that rhythm's current period.
+ */
+async function attendSuggestion(
+  client: Awaited<ReturnType<typeof createGoalsClient>>,
+  id: string,
+  today: string,
+): Promise<void> {
+  if (!(await markAttended(client, id))) return;
+  const { data: suggestion } = await client
+    .from('suggestions')
+    .select('item_id')
+    .eq('id', id)
+    .maybeSingle();
+  const itemId = (suggestion?.item_id as string | null | undefined) ?? null;
+  if (!itemId) return;
+  const { data: item } = await client
+    .from('items')
+    .select('kind, rhythm_period')
+    .eq('id', itemId)
+    .maybeSingle();
+  const period = item?.rhythm_period as RhythmPeriod | null | undefined;
+  if (item?.kind !== 'rhythm' || !period || !RHYTHM_PERIODS.includes(period)) return;
+  await countTowards(client, itemId, periodOf(period, today).startsOn, 1);
+}
 
 function idOf(key: string): string {
   return key.slice(PREFIX.length);

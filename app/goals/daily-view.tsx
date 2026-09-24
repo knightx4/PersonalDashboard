@@ -14,6 +14,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import type { DailyGoal, DailyView as Daily, NextItem, WaitingItem } from '@/lib/goals/daily';
 import { missedLine, progressLine, type HomeRhythm } from '@/lib/goals/rhythms';
 import { STEP_KIND_LABELS } from '@/lib/goals/steps';
+import type { Suggestion } from '@/lib/goals/suggestions';
+import { SuggestionsList } from './suggestions-list';
 
 /**
  * The daily view on the Goals home (plan #926).
@@ -31,9 +33,13 @@ import { STEP_KIND_LABELS } from '@/lib/goals/steps';
  * missed periods behind it gets one line saying how many, beside this
  * period's progress, and a step whose date has passed is listed as a plain
  * next item.
+ *
+ * The weekly run's suggestions (plan #934) come after the waiting list, with
+ * their own going and not for me buttons: the one part of the home that
+ * writes, because a reaction is quicker here than a trip into the tree.
  */
 
-type View = Daily & { rhythms: HomeRhythm[] };
+type View = Daily & { rhythms: HomeRhythm[]; suggestions: Suggestion[] };
 
 const KIND_ICONS: Record<NextItem['kind'], typeof User> = { mine: User, claude: Sparkles };
 
@@ -109,6 +115,8 @@ export function DailyView({ view }: { view: View }) {
           </Card>
         </section>
       )}
+
+      {view.suggestions.length > 0 && <SuggestionsList suggestions={view.suggestions} />}
 
       {view.rhythms.length > 0 && (
         <section aria-labelledby="risk-heading" className="space-y-2">

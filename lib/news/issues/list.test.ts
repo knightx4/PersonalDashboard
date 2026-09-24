@@ -190,6 +190,8 @@ describe('the by-newsletter view (note 20a58f93)', () => {
     expect(readListView('newsletters')).toBe('newsletters');
     expect(readListView(undefined)).toBe('latest');
     expect(readListView('cards')).toBe('latest');
+    expect(readListView('recommended')).toBe('recommended');
+    expect(listHref({ from: null, topic: null, view: 'recommended' })).toBe('/news/all?view=recommended');
     expect(listHref({ from: null, topic: null, view: 'newsletters' })).toBe('/news/all?view=newsletters');
     expect(listHref({ from: 's1', topic: null, view: 'latest' })).toBe('/news/all?from=s1');
   });
