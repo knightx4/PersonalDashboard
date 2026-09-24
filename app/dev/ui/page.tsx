@@ -631,7 +631,7 @@ export default function DevUiPage() {
       <Section
         id="laws"
         title="The laws"
-        lead="Fifteen, grouped by what they govern. Everything else on this page is one of these applied to a surface. The numbers are fixed for life: they are cited in code and in commits."
+        lead="Sixteen, grouped by what they govern. Everything else on this page is one of these applied to a surface. The numbers are fixed for life: they are cited in code and in commits."
       >
         {/* One surface. The groups are told apart by a heading and air, and
          * the laws inside each by hairlines -- law 11 and law 13 applied to

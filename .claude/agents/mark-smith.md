@@ -12,7 +12,7 @@ judged by a script.
 
 ## Read these first, every time
 
-- `app/dev/ui/laws.ts` — the fifteen laws, and `/dev/ui` (app/dev/ui/page.tsx) the whole standard around them. They are the standard, not a
+- `app/dev/ui/laws.ts` — the sixteen laws, and `/dev/ui` (app/dev/ui/page.tsx) the whole standard around them. They are the standard, not a
   suggestion. Law 7 in particular: personality lives in the chrome, and a mark
   is chrome, so this is one of the few places flourish is *welcome*.
 - `components/ui/module-mark.tsx` — the current mark, and a long set of
