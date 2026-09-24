@@ -3,9 +3,10 @@
  * "Fog and refining a goal" and "Approval"; plan #932).
  *
  * "Work on this" on a goal fires the goals routine for that goal. The session
- * follows .claude/skills/goals: on a new or foggy goal it proposes steps and
- * asks one or two questions; once you approve the goal it may add, split and
- * reorder steps beneath it without asking. The database holds it to that
+ * follows .claude/skills/goals: it maps the whole path for the goal (phases,
+ * Claude steps, information steps pre-filled from Gmail, provisional steps,
+ * questions with lettered options), proposed until you approve the goal;
+ * after that it may add, split and reorder steps beneath it without asking. The database holds it to that
  * (supabase/migrations-goals/0006).
  *
  * The rules that need no database live here: what a run looks like on the
@@ -196,9 +197,10 @@ export function goalRunText(input: {
   return [
     `Work on one goal: "${input.goalTitle}" (goals.items id ${input.goalId}).`,
     '',
-    'Follow .claude/skills/goals/SKILL.md. Read it first: it says how to shape a new or',
-    'foggy goal, what you may change before and after the goal is approved, and how every',
-    'write is labelled.',
+    'Follow .claude/skills/goals/SKILL.md. Read it first: it says how to map the whole path',
+    'for a goal (phases, Claude steps, information steps pre-filled from Gmail, provisional',
+    'steps, questions with lettered options), what you may change before and after the goal',
+    'is approved, and how every write is labelled.',
     '',
     `The goals belong to user_id ${input.userId}. This run is goals.runs id ${input.runId},`,
     'already written as started. Set goals.run_id to it on every write, and close that row',
