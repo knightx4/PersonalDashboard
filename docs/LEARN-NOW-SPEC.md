@@ -346,6 +346,82 @@ The deck asks for more cards while four are still ahead, so moving on never
 waits for the network. It serves returning "work on this" cards first, then
 ready cards newest first, then returning skipped ones.
 
+## One idea per card
+
+Decided by the owner on 24 September 2026, after a card on "Startup company:
+Failure". The card read as a summary of the section. It gave a paragraph to who
+PwC is and what a startup studio is, because the section names them. It also
+packed four loose points into one card: failure rates, the causes of failure,
+founders blaming the wrong cause, and patents. A Wikipedia section is the
+source. The card should teach one idea from it.
+
+### What an idea is
+
+An idea is one claim that can be stated in a sentence and tested: "Startups
+that run out of money have usually run out of demand first." A definition, a
+statistic with nothing to explain, or a passing mention is not an idea. A
+section holds between none and three ideas worth a card. "Startup company:
+Failure" holds two: that demand fails before cash does, and that the founding
+team predicts failure more than the product does. The failure-rate range is
+evidence for the first, and the line on patents is dropped.
+
+### How a section becomes cards
+
+The writing call (step 4 of "How cards are made") still reads one section per
+picked row, and is still the one call that decides whether the section serves
+its target. It now lists the section's ideas, at most three, and writes a card
+for each in the same call, so the section is read once however many cards come
+out of it.
+
+Before the call, the ideas this person has already met that sit nearest the
+section are looked up by embedding, and their claims are passed in. The call
+writes no card for any of them. After the call, each new claim is embedded, and
+one within a very short distance of an idea already held is taken as the same
+idea: the card is dropped rather than shown twice.
+
+The first idea's card is written onto the picked row. Each further idea gets a
+row of its own, on the same section and target, numbered by `idea_index`.
+
+### What an idea card carries
+
+| Part | What it is |
+|---|---|
+| Title | The idea's short name, two to six words ("Demand fails before cash"). The article and section are named under it, as the source. |
+| Takeaway | The claim itself, in one plain sentence. |
+| Context | Only what the claim needs to be followed: the terms it uses and the one or two facts it rests on. No person, organisation or term the rest of the card does not use. |
+| Evidence | The concrete number, case or result from the section that supports the claim, in the place the hook had. |
+| Why it holds | Two or three sentences on the mechanism, from the section. Where the section gives a result without its reason, the well-established reason may be given. |
+| In practice | The idea applied to one specific case, as before. |
+| Try this | A question that makes you use the idea, as before. |
+
+### Where ideas are kept
+
+Each idea is also a concept in `learn.concepts`, with `origin = 'feed'`, its
+claim embedded in the concept's `embedding` column. Every concept must belong to
+a subject, so feed ideas are filed under a hidden subject named after the
+article, the same kind of hidden subject the survey uses (`survey = true`, with
+no theme). It is not listed as a track. Pressing Test me on this for a card
+starts the track on the article's subject, so the hidden subject becomes the
+track and its feed ideas are the track's first ideas.
+
+The swipes set the idea's state in `learn.concept_state`, on your word:
+
+| Swipe | State | Established |
+|---|---|---|
+| Got it | `known` | `declared` |
+| Work on this | `shaky` | `declared` |
+| Not now | unchanged | |
+
+A state that a test established is never overwritten by a swipe.
+
+This is what later picking builds on: which ideas under a subject are known,
+which are shaky, and which have never been met. Choosing the next pick from the
+unknown ideas under a concept, and a reading made of several ideas in order
+that ends in a written answer, are the next two steps and are not built yet.
+
+Cards written before this carry no idea name. They are shown as before, titled
+by article and section, until the top-up has replaced them.
+
 ## Cost
 
 Two model calls per card, one to name the material and one to write the card.

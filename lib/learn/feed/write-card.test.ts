@@ -1,14 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
-import { MAX_SECTION_CHARS, cardPrompt, readCardReport, whyLine, writeCard, type CardToWrite } from './write-card';
+import {
+  MAX_IDEAS,
+  MAX_SECTION_CHARS,
+  cardPrompt,
+  readCardReport,
+  whyLine,
+  writeCard,
+  type CardToWrite,
+} from './write-card';
 
 /**
- * Writing a card, and reading the answer.
+ * Writing the cards for one section, and reading the answer.
  *
  * The call itself is stubbed. What is tested is what happens to its answer: a
- * section the model says does not fit is dropped with its reason, a usable
- * summary makes the card ready, and the why line always names the field and
- * the reason, whatever the model said.
+ * section the model says does not fit is dropped with its reason, each usable
+ * idea becomes a card, and the why line always names the field and the reason,
+ * whatever the model said.
  */
 
 const field = { name: 'Computing', scope: 'Machines that compute.' };
@@ -26,13 +34,28 @@ const interest: CardToWrite = {
   depth: 'working',
 };
 
-const parts = {
-  context:
-    'An autoencoder is a kind of neural network that learns to squeeze its input into a few numbers and rebuild it.',
-  hook: 'A bottleneck of 30 numbers can rebuild a 784-pixel digit.',
+/** One idea as the model reports it. */
+const reported = {
+  name: 'Bottlenecks keep what matters',
+  claim: 'Squeezing data through a small gap forces a network to keep only what matters.',
+  context: 'An autoencoder is a neural network that squeezes its input into a few numbers and rebuilds it.',
+  evidence: 'A bottleneck of 30 numbers can rebuild a 784-pixel digit.',
+  why: 'The network is scored on the rebuild, so the few numbers it keeps are the ones that carry the most.',
   example: 'Fraud teams train one on normal transactions and flag the ones it rebuilds badly.',
   question: 'Why would a large rebuild error mark a transaction as unusual?',
   answer: 'The network only learned to compress normal data, so unusual inputs come back distorted.',
+};
+
+/** The same idea as the card stores it. */
+const stored = {
+  name: reported.name,
+  takeaway: reported.claim,
+  context: reported.context,
+  hook: reported.evidence,
+  summary: reported.why,
+  example: reported.example,
+  question: reported.question,
+  answer: reported.answer,
 };
 
 describe('the why line', () => {
@@ -71,56 +94,58 @@ describe('the why line for a goal', () => {
 });
 
 describe('reading the report', () => {
-  it('makes the card ready with every part, whitespace collapsed', () => {
-    expect(
-      readCardReport({
-        fit: 'It covers autoencoders.',
-        matches: true,
-        ...parts,
-        summary: '  Autoencoders compress.\n Then rebuild. ',
-      }),
-    ).toEqual({ verdict: 'ready', ...parts, summary: 'Autoencoders compress. Then rebuild.' });
+  it('makes a card for each idea, named by the columns it is stored in, whitespace collapsed', () => {
+    const second = { ...reported, name: 'Rebuild error flags outliers', why: '  Unusual inputs\n rebuild badly. ' };
+    expect(readCardReport({ fit: 'It covers autoencoders.', matches: true, ideas: [reported, second] })).toEqual({
+      verdict: 'ready',
+      ideas: [stored, { ...stored, name: 'Rebuild error flags outliers', summary: 'Unusual inputs rebuild badly.' }],
+    });
   });
 
   it('drops a section that does not fit, with the model sentence as the reason', () => {
-    expect(
-      readCardReport({ fit: 'It only defines the term.', matches: false, summary: null, hook: null, example: null }),
-    ).toEqual({
+    expect(readCardReport({ fit: 'It only defines the term.', matches: false, ideas: null })).toEqual({
       verdict: 'dropped',
       reason: 'It only defines the term.',
     });
   });
 
-  it('drops a match with no summary, or one too long to be four sentences', () => {
-    expect(readCardReport({ fit: 'Fits.', matches: true, ...parts, summary: ' ' })).toMatchObject({ verdict: 'dropped' });
-    expect(readCardReport({ fit: 'Fits.', matches: true, ...parts, summary: 'x'.repeat(1300) })).toMatchObject({
+  it('drops a match with no idea in it', () => {
+    expect(readCardReport({ fit: 'Fits.', matches: true, ideas: [] })).toEqual({
       verdict: 'dropped',
+      reason: 'The report matched the section but wrote no idea.',
     });
   });
 
-  it('drops a card with no hook or no example, since that is the old summary-only card', () => {
-    expect(readCardReport({ fit: 'Fits.', matches: true, ...parts, summary: 'S.', hook: null })).toEqual({
-      verdict: 'dropped',
-      reason: 'The report wrote no hook.',
+  it('leaves out an idea with a part missing or too long, and keeps the rest', () => {
+    const report = readCardReport({
+      fit: 'Fits.',
+      matches: true,
+      ideas: [{ ...reported, name: 'No evidence', evidence: ' ' }, { ...reported, why: 'x'.repeat(1000) }, reported],
     });
-    expect(readCardReport({ fit: 'Fits.', matches: true, ...parts, summary: 'S.', example: '' })).toEqual({
+    expect(report).toEqual({ verdict: 'ready', ideas: [stored] });
+  });
+
+  it('says what was wrong when no idea was usable', () => {
+    expect(readCardReport({ fit: 'Fits.', matches: true, ideas: [{ ...reported, context: null }] })).toEqual({
       verdict: 'dropped',
-      reason: 'The report wrote no example.',
+      reason: 'No idea was usable: no context.',
     });
   });
 
-  it('drops a card with no context paragraph, since it would open on the argument', () => {
-    expect(readCardReport({ fit: 'Fits.', matches: true, ...parts, summary: 'S.', context: ' ' })).toEqual({
-      verdict: 'dropped',
-      reason: 'The report wrote no context.',
-    });
+  it('keeps one of two ideas with the same name, and no more than the cap', () => {
+    const many = Array.from({ length: MAX_IDEAS + 2 }, (_, index) => ({ ...reported, name: `Idea ${index}` }));
+    const report = readCardReport({ fit: 'Fits.', matches: true, ideas: [reported, { ...reported, name: reported.name.toUpperCase() }, ...many] });
+    expect(report.verdict === 'ready' && report.ideas.map((idea) => idea.name)).toEqual([
+      reported.name,
+      'Idea 0',
+      'Idea 1',
+    ]);
   });
 
   it('keeps the card but leaves off a question with no answer', () => {
-    expect(readCardReport({ fit: 'Fits.', matches: true, ...parts, summary: 'S.', answer: null })).toMatchObject({
+    expect(readCardReport({ fit: 'Fits.', matches: true, ideas: [{ ...reported, answer: null }] })).toEqual({
       verdict: 'ready',
-      question: null,
-      answer: null,
+      ideas: [{ ...stored, question: null, answer: null }],
     });
   });
 
@@ -140,6 +165,16 @@ describe('the prompt', () => {
     expect(text).toContain('Section: the lead');
     expect(text).toContain(interest.text);
     expect(text).toContain('past the introduction');
+    expect(text).toContain('They have met no ideas close to this section yet.');
+  });
+
+  it('lists the ideas already met, so the call writes no card for them', () => {
+    const text = cardPrompt({
+      ...interest,
+      known: [{ name: 'Demand fails before cash', claim: 'Startups run out of demand before money.' }],
+    });
+    expect(text).toContain('Ideas they have already met, which get no card:');
+    expect(text).toContain('- Demand fails before cash: Startups run out of demand before money.');
   });
 
   it('says so when a long section is cut', () => {
@@ -165,13 +200,13 @@ describe('the call', () => {
 
   const usage = { input_tokens: 900, output_tokens: 150 };
 
-  it('forces the report, records what it spent, and returns the summary with the why line', async () => {
+  it('forces the report, records what it spent, and returns the ideas with the why line', async () => {
     const { client, calls } = stubClient({
       content: [
         {
           type: 'tool_use',
-          name: 'report_card',
-          input: { fit: 'Covers autoencoders.', matches: true, summary: 'Autoencoders learn codings.', ...parts },
+          name: 'report_ideas',
+          input: { fit: 'Covers autoencoders.', matches: true, ideas: [reported] },
         },
       ],
       stop_reason: 'tool_use',
@@ -186,12 +221,11 @@ describe('the call', () => {
     });
     expect(result).toEqual({
       outcome: 'ready',
-      summary: 'Autoencoders learn codings.',
-      ...parts,
+      ideas: [stored],
       why: 'You write about machine learning architecture (Computing).',
     });
     expect(spent).toEqual(['claude-sonnet-5']);
-    expect(calls[0]).toMatchObject({ tool_choice: { type: 'tool', name: 'report_card' } });
+    expect(calls[0]).toMatchObject({ tool_choice: { type: 'tool', name: 'report_ideas' } });
   });
 
   it('drops the pick, and still records the spend, when there is no report', async () => {

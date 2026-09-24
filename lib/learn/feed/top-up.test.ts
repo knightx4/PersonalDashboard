@@ -65,6 +65,8 @@ function fake(options: {
   ready: number;
   picked: number;
   outcome?: (id: string) => WriteResult['outcome'];
+  /** Ideas a ready section makes cards for; one unless said. */
+  ideas?: (id: string) => number;
   perPick?: number;
   clock?: () => number;
 }): Fake {
@@ -90,8 +92,10 @@ function fake(options: {
       const outcome = options.outcome?.(written.id) ?? 'ready';
       if (outcome !== 'failed') state.picked = state.picked.filter((row) => row.id !== written.id);
       if (outcome === 'ready') {
-        state.ready += 1;
-        return { outcome, context: 'C.', hook: 'H.', summary: 'S.', example: 'E.', question: null, answer: null, why: 'W.' };
+        const count = options.ideas?.(written.id) ?? 1;
+        state.ready += count;
+        const idea = { name: 'N', takeaway: 'T.', context: 'C.', hook: 'H.', summary: 'S.', example: 'E.', question: null, answer: null };
+        return { outcome, ideas: Array.from({ length: count }, () => idea), why: 'W.' };
       }
       return outcome === 'dropped' ? { outcome, reason: 'Off topic.' } : { outcome, detail: 'Down.' };
     },
@@ -131,6 +135,15 @@ describe('topping up one person', () => {
       deadline: far,
     });
     expect(summary).toMatchObject({ readyBefore: 7, readyAfter: 22, written: 15 });
+  });
+
+  it('counts every idea a section made a card for, and starts no batch past the target', async () => {
+    // Six short: one batch of four sections makes twelve cards, and the two
+    // rows after it are left picked.
+    const run = fake({ ready: 14, picked: 10, ideas: () => 3 });
+    const summary = await runTopUpFor(run.ports, { userId: 'u', threshold: 20, deadline: far });
+    expect(summary).toMatchObject({ readyAfter: 26, written: 12 });
+    expect(run.writes).toEqual(['p0', 'p1', 'p2', 'p3']);
   });
 
   it('makes up drops from the next picked rows', async () => {

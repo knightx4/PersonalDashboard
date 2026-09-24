@@ -1,12 +1,13 @@
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadRaised } from '@/lib/raised/load';
-import { loadPlan, planRefTitles } from '@/lib/plan/load';
+import { planRefTitles } from '@/lib/plan/load';
+import { loadPlanForRequest } from '@/lib/plan/request-plan';
 import { buildPlanTree, flattenSections } from '@/lib/plan/tree';
 import { waitingGroups } from '@/lib/plan/waiting';
 import { loadDigest } from '@/lib/digest/load';
 import { loadConversations } from '@/lib/comments/recent';
-import { endQuietRuns, loadFeatureFires, loadLastRuns, loadStartedRuns } from '@/lib/plan/runs';
+import { loadFeatureFires, loadLastRuns, loadStartedRuns } from '@/lib/plan/runs';
 import { loadOvernightRun } from '@/lib/plan/overnight';
 import { runnerCard } from '@/lib/plan/runner-card';
 import { planRoutine } from '@/lib/feedback/routine';
@@ -43,10 +44,6 @@ export const metadata = { title: 'Dash' };
 export default async function DevRaisedPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  // Before the runs are read, as the plan page does, so a run that ended hours
-  // ago is not named here as a session still going.
-  await endQuietRuns({ supabase, userId: user.id });
-
   const [
     queue,
     digest,
@@ -62,7 +59,7 @@ export default async function DevRaisedPage() {
     loadRaised(supabase, user.id),
     loadDigest(supabase, user.id),
     loadConversations(supabase, user.id),
-    loadPlan(supabase, user.id),
+    loadPlanForRequest(user.id),
     // The runner's standing intention, and the presses its night has made:
     // the same rows and the same loaders /dev/plan reads, so the two pages
     // cannot come to different answers about what is running.

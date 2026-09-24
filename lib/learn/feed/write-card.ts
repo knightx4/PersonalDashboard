@@ -7,31 +7,34 @@ import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { describeDepth, type Depth } from './depth';
 
 /**
- * Writing one Learn now card from its fetched section (LEARN-NOW-SPEC, "How
- * cards are made", step 4; plan #807).
+ * Writing the Learn now cards for one fetched section (LEARN-NOW-SPEC, "How
+ * cards are made", step 4, and "One idea per card"; plan #807).
  *
  * One call per picked row. The model reads the section as it was stored from
  * Wikipedia and reports whether the section serves the target it was picked
- * for, at the depth it was picked at. When it does, the model writes the
- * card's teaching parts (LEARN-NOW-SPEC, "Cards after the first week"):
+ * for, at the depth it was picked at. When it does, the model lists the
+ * section's ideas, at most three, and writes a card for each:
  *
- *   context   one plain paragraph setting the scene: what the subject is,
- *             who the names are, when and where, at the person's level
- *   hook      the most interesting thing in the section, stated concretely
- *   summary   what the section says, from its text alone
+ *   name      the idea in two to six words, the card's title
+ *   takeaway  the claim itself, one plain sentence, shown first
+ *   context   only what the claim needs to be followed
+ *   hook      the evidence: the number, case or result from the section
+ *   summary   why the claim holds, from the section
  *   example   the idea applied to a real case or a worked number
  *   question  one question that makes you use the idea, and its answer
  *
- * A section that does not serve the target, or only restates basics the
- * person is past, is dropped and no card is made.
+ * The call is given the ideas the person has already met nearest the section,
+ * and writes no card for any of them. A section with no idea left, or one that
+ * does not serve the target, is dropped and no card is made.
  *
  * The why line is not the model's. The spec fixes what it says (the field, and
  * either the theme or the gap), so it is built here from the row, and a card
  * can never carry a why line that names the wrong field.
  *
  * Sonnet, for the same reason as the naming call: the spec prices the feed at
- * two Sonnet calls per card.
+ * two Sonnet calls per section.
  */
+
 
 export const WRITE_CARD_MODEL = 'claude-sonnet-5';
 
@@ -42,22 +45,37 @@ export const WRITE_CARD_MODEL = 'claude-sonnet-5';
  */
 export const MAX_SECTION_CHARS = 24_000;
 
-/** A summary longer than this is not three or four sentences. */
-const MAX_SUMMARY_CHARS = 1_200;
+/** Cards one section can make. More than three is a section summarised in pieces. */
+export const MAX_IDEAS = 3;
+
+/** Ideas already met that are passed to the call, at most. */
+export const MAX_KNOWN_IDEAS = 10;
+
+/** The name is a title of two to six words. */
+const MAX_NAME_CHARS = 60;
+/** The claim is one sentence. */
+const MAX_TAKEAWAY_CHARS = 280;
+/** Why it holds is two or three sentences. */
+const MAX_SUMMARY_CHARS = 900;
 /** The context is one short paragraph. */
-const MAX_CONTEXT_CHARS = 900;
-/** The hook is one or two sentences. */
+const MAX_CONTEXT_CHARS = 700;
+/** The evidence is one or two sentences. */
 const MAX_HOOK_CHARS = 400;
 /** The example is two to four sentences, and a worked number can run long. */
 const MAX_EXAMPLE_CHARS = 1_000;
 const MAX_QUESTION_CHARS = 400;
 const MAX_ANSWER_CHARS = 800;
 
-const TOOL_NAME = 'report_card';
+const TOOL_NAME = 'report_ideas';
+
+/** An idea the person has already met, passed so the call does not write it again. */
+export type KnownIdea = { name: string; claim: string };
 
 /** One picked row, with what it points at. */
 export type CardToWrite = {
   id: string;
+  /** The catalogue segment, for finding the ideas already held near it. */
+  segmentId?: string | null;
   reason: 'interest' | 'gap' | 'goal';
   /** The theme it was picked for; set for interest. */
   themeName: string | null;
@@ -77,13 +95,21 @@ export type CardToWrite = {
   text: string;
   /** The level the pick was made at. Null for a pick made before depth existed. */
   depth: Depth | null;
+  /** Ideas already met nearest the section. Empty when none are held or none could be looked up. */
+  known?: KnownIdea[];
 };
 
-/** What a ready card carries besides its why line. */
-export type CardParts = {
-  /** One paragraph that sets the scene, first on the card. */
+/** One idea's card, named by the columns it is stored in. */
+export type IdeaCard = {
+  /** Two to six words: the card's title and the concept's name. */
+  name: string;
+  /** The claim, in one plain sentence, shown first. */
+  takeaway: string;
+  /** Only what the claim needs to be followed. */
   context: string;
+  /** The evidence from the section. */
   hook: string;
+  /** Why the claim holds. */
   summary: string;
   example: string;
   /** Both set, or both null: a question with no answer to check against is left off. */
@@ -92,18 +118,18 @@ export type CardParts = {
 };
 
 export type CardReport =
-  | ({ verdict: 'ready' } & CardParts)
+  | { verdict: 'ready'; ideas: IdeaCard[] }
   | { verdict: 'dropped'; reason: string };
 
 /**
- * What writing one card came to.
+ * What writing one section came to.
  *
  * `failed` leaves the row picked to be tried again on a later run: the call
  * itself did not happen, so nothing is known about the section. Everything
  * the model did answer ends in `ready` or `dropped`.
  */
 export type WriteResult =
-  | ({ outcome: 'ready'; why: string } & CardParts)
+  | { outcome: 'ready'; why: string; ideas: IdeaCard[] }
   | { outcome: 'dropped'; reason: string }
   | { outcome: 'failed'; detail: string };
 
@@ -131,37 +157,51 @@ export function whyLine(card: Pick<CardToWrite, 'reason' | 'themeName' | 'aimNam
     : `A field you write about but have never been tested in: ${field}.`;
 }
 
-const SYSTEM = `You write the cards in a learning feed. Each card is one section of an English Wikipedia article, picked for one person. The person found the first version of this feed dull: it summarised sections and so mostly restated definitions they already knew. Your job is to make each card teach something.
+const SYSTEM = `You write the cards in a learning feed for one person. Each card teaches one idea, taken from a section of an English Wikipedia article. The section is only the source. The card is not a summary of it.
 
-You are given what the section was picked for, how deep to pitch it, and the section's text.
+An idea is one claim that can be stated in a sentence and tested, such as "Startups that run out of money have usually run out of demand first." A definition, a statistic with nothing to explain, a list, or a passing mention is not an idea.
 
-1. Decide whether the section serves what it was picked for at that depth. Say it does not when the text is about something else, is a list of links, names or references, is too thin to learn anything from, or only defines terms and restates basics the person is past.
+You are given what the section was picked for, how deep to pitch it, the ideas this person has already met, and the section's text.
 
-2. When it does, write five parts. The person reads them in this order, knowing nothing about the section beforehand.
+1. Decide whether the section serves what it was picked for at that depth. Say it does not when the text is about something else, is a list of links, names or references, is too thin to hold an idea, or only defines terms and restates basics the person is past.
 
-context: One paragraph of three or four sentences, first on the card, that lets someone who has never seen this section follow the rest. Say what the subject is in plain terms, where and when it sits, and who any person, school or work the card mentions is (for example: "Elizabeth Eisenstein was a historian who argued in 1979 that..."). Define any term the other parts rely on. Pitch it at the level you were given: skip what someone at that level already knows, and never talk down. You may draw on well-established knowledge here. Simple, clear, descriptive words; no hook, no argument yet.
+2. When it does, list the ideas in the section worth a card, most important first, at most ${MAX_IDEAS}. One is fine; most sections hold one or two. Leave out any idea the person has already met, including one that says the same thing in other words. A fact that supports an idea is evidence for that idea, not an idea of its own. If no idea is left, say the section does not serve.
 
-hook: One or two sentences, after the context. The most interesting, useful or surprising thing in the section, stated concretely: a number, a named case, a consequence, a result that goes against intuition. Never a definition. Never "X is a Y that...".
+3. Write a card for each idea. The person reads its parts in this order, knowing nothing about the section beforehand, and each card must stand on its own.
 
-summary: Two or three sentences on what the section explains, using only what the text says. Add nothing from memory here. State the ideas themselves ("Scribal copying was slow and costly, so..."), never a report on the text ("The section argues...", "It also notes...").
+name: The idea in two to six words, as a title ("Demand fails before cash"). Sentence case.
 
-example: Two to four sentences applying the idea to one specific situation: a real event, firm, experiment or policy, or a worked calculation with numbers. You may draw on what you know for this part, but only what is well established; name the case specifically and do not invent figures you are unsure of. If the idea has an obvious everyday application, prefer a less obvious one.
+claim: The idea as one plain sentence: the thing to remember if they read nothing else. Everyday words, no jargon, no names the reader would have to look up.
 
-question and answer: One question that makes the person use the idea on a situation, predict an outcome, or explain why something happens. Never ask them to recall a definition or a date. The answer is two or three sentences, and says why.
+context: Two or three sentences giving only what this claim needs to be followed: the terms it uses and the one or two facts it rests on, pitched at the level you were given. Do not introduce any person, organisation, place or term that the other parts of this card do not use, even if the section mentions it. You may draw on well-established knowledge here.
 
-Style for every part: plain sentences. No slogans, no rhetorical questions outside the question field, no "not X, but Y" contrasts, no dashes used for rhythm. Never refer to "the section", "the article", "the text" or "the author" in any part: the reader has not seen them and the card has to stand on its own. Do not address the reader as "you" outside the question.
+evidence: One or two sentences with the concrete support from the section: a number, a named case, a measured result. Never a definition.
+
+why: Two or three sentences on why the claim holds: the mechanism or reasoning. Use the section. Where it gives a result without the reason, you may give the well-established reason. State the reasoning itself, never a report on the text ("The section argues...").
+
+example: Two to four sentences applying the idea to one specific situation: a real event, firm, experiment or policy, or a worked calculation with numbers. Only what is well established; name the case and do not invent figures you are unsure of. If the idea has an obvious everyday application, prefer a less obvious one.
+
+question and answer: One question that makes the person use this idea on a situation, predict an outcome, or explain why something happens. Never ask them to recall a definition, a figure or a date. The answer is two or three sentences, and says why.
+
+Style for every part: plain sentences. No slogans, no rhetorical questions outside the question field, no "not X, but Y" contrasts, no dashes used for rhythm. Never refer to "the section", "the article", "the text" or "the author". Do not address the reader as "you" outside the question.
 
 Report through ${TOOL_NAME}.`;
+
+const ideaSchema = z.object({
+  name: z.string().nullable().optional(),
+  claim: z.string().nullable().optional(),
+  context: z.string().nullable().optional(),
+  evidence: z.string().nullable().optional(),
+  why: z.string().nullable().optional(),
+  example: z.string().nullable().optional(),
+  question: z.string().nullable().optional(),
+  answer: z.string().nullable().optional(),
+});
 
 const payloadSchema = z.object({
   fit: z.string(),
   matches: z.boolean(),
-  context: z.string().nullable().optional(),
-  hook: z.string().nullable().optional(),
-  summary: z.string().nullable().optional(),
-  example: z.string().nullable().optional(),
-  question: z.string().nullable().optional(),
-  answer: z.string().nullable().optional(),
+  ideas: z.array(z.unknown()).nullable().optional(),
 });
 
 /** What the model is told the section was picked for. Exported for the test. */
@@ -179,18 +219,66 @@ export function describePick(card: CardToWrite): string {
   return `${pick}\nHow deep to go: ${describeDepth(card.depth ?? 'working')}`;
 }
 
-/** Collapse whitespace; null for nothing. */
+/** Collapse whitespace; empty for nothing. */
 function clean(value: string | null | undefined): string {
   return (value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+/** A part that is missing or over its cap, named for the drop reason. */
+function badPart(label: string, value: string, cap: number): string | null {
+  if (!value) return `no ${label}`;
+  if (value.length > cap) return `a ${label} of ${value.length} characters`;
+  return null;
+}
+
+/** One idea read from the payload, or why it was left out. */
+function readIdea(input: unknown): IdeaCard | string {
+  const parsed = ideaSchema.safeParse(input);
+  if (!parsed.success) return 'an idea that did not match its schema';
+
+  const name = clean(parsed.data.name);
+  const takeaway = clean(parsed.data.claim);
+  const context = clean(parsed.data.context);
+  const hook = clean(parsed.data.evidence);
+  const summary = clean(parsed.data.why);
+  const example = clean(parsed.data.example);
+  const problem =
+    badPart('name', name, MAX_NAME_CHARS) ??
+    badPart('claim', takeaway, MAX_TAKEAWAY_CHARS) ??
+    badPart('context', context, MAX_CONTEXT_CHARS) ??
+    badPart('evidence', hook, MAX_HOOK_CHARS) ??
+    badPart('reason why', summary, MAX_SUMMARY_CHARS) ??
+    badPart('example', example, MAX_EXAMPLE_CHARS);
+  if (problem) return problem;
+
+  const question = clean(parsed.data.question);
+  const answer = clean(parsed.data.answer);
+  const asked =
+    question &&
+    answer &&
+    question.length <= MAX_QUESTION_CHARS &&
+    answer.length <= MAX_ANSWER_CHARS;
+  return {
+    name,
+    takeaway,
+    context,
+    hook,
+    summary,
+    example,
+    question: asked ? question : null,
+    answer: asked ? answer : null,
+  };
 }
 
 /**
  * Read the tool payload.
  *
- * Pure, and exported for the test. `matches: false` drops the card with the
- * model's sentence as the reason. A match with no usable summary, empty or too
- * long to be three or four sentences, is dropped too: the model has answered,
- * and asking it again next hour costs the same call for the same answer.
+ * Pure, and exported for the test. `matches: false` drops the section with the
+ * model's sentence as the reason. Each idea is read on its own: one with a part
+ * missing or too long is left out and the others stand. A match with no usable
+ * idea is dropped too: the model has answered, and asking it again next hour
+ * costs the same call for the same answer. Two ideas with the same name are one
+ * idea, and ideas past the third are not kept.
  */
 export function readCardReport(input: unknown): CardReport {
   const parsed = payloadSchema.safeParse(input);
@@ -205,66 +293,37 @@ export function readCardReport(input: unknown): CardReport {
     };
   }
 
-  const summary = clean(parsed.data.summary);
-  const context = clean(parsed.data.context);
-  const hook = clean(parsed.data.hook);
-  const example = clean(parsed.data.example);
-  if (!summary)
-    return { verdict: 'dropped', reason: 'The report matched the section but wrote no summary.' };
-  if (summary.length > MAX_SUMMARY_CHARS) {
-    return { verdict: 'dropped', reason: `The summary ran to ${summary.length} characters.` };
+  const ideas: IdeaCard[] = [];
+  const problems: string[] = [];
+  for (const raw of parsed.data.ideas ?? []) {
+    const idea = readIdea(raw);
+    if (typeof idea === 'string') problems.push(idea);
+    else if (!ideas.some((kept) => kept.name.toLowerCase() === idea.name.toLowerCase())) ideas.push(idea);
   }
-  // A card with no hook or no example is the old card again, which is the
-  // thing the owner asked to stop seeing.
-  // A card that opens on the argument with nothing before it is the card
-  // the owner found hard to follow.
-  if (!context || context.length > MAX_CONTEXT_CHARS) {
+  if (ideas.length === 0) {
     return {
       verdict: 'dropped',
-      reason: context
-        ? `The context ran to ${context.length} characters.`
-        : 'The report wrote no context.',
+      reason: problems.length > 0
+        ? `No idea was usable: ${problems.join('; ')}.`
+        : 'The report matched the section but wrote no idea.',
     };
   }
-  if (!hook || hook.length > MAX_HOOK_CHARS) {
-    return {
-      verdict: 'dropped',
-      reason: hook ? `The hook ran to ${hook.length} characters.` : 'The report wrote no hook.',
-    };
-  }
-  if (!example || example.length > MAX_EXAMPLE_CHARS) {
-    return {
-      verdict: 'dropped',
-      reason: example
-        ? `The example ran to ${example.length} characters.`
-        : 'The report wrote no example.',
-    };
-  }
-
-  const question = clean(parsed.data.question);
-  const answer = clean(parsed.data.answer);
-  const asked =
-    question &&
-    answer &&
-    question.length <= MAX_QUESTION_CHARS &&
-    answer.length <= MAX_ANSWER_CHARS;
-  return {
-    verdict: 'ready',
-    context,
-    hook,
-    summary,
-    example,
-    question: asked ? question : null,
-    answer: asked ? answer : null,
-  };
+  return { verdict: 'ready', ideas: ideas.slice(0, MAX_IDEAS) };
 }
 
-/** The user message: what it was picked for, then the section. Exported for the test. */
+/** The user message: what it was picked for, what they have met, then the section. Exported for the test. */
 export function cardPrompt(card: CardToWrite): string {
   const text = card.text.trim();
   const cut = text.length > MAX_SECTION_CHARS;
+  const known = (card.known ?? []).slice(0, MAX_KNOWN_IDEAS);
   return [
     describePick(card),
+    '',
+    known.length > 0
+      ? `Ideas they have already met, which get no card:\n${known
+          .map((idea) => `- ${idea.name}: ${idea.claim}`)
+          .join('\n')}`
+      : 'They have met no ideas close to this section yet.',
     '',
     `Article: ${card.article}`,
     `Section: ${card.section ?? 'the lead, before the first heading'}`,
@@ -279,6 +338,8 @@ export function cardPrompt(card: CardToWrite): string {
     .filter((line, index, lines) => line !== '' || lines[index - 1] !== '')
     .join('\n');
 }
+
+const ideaPart = (description: string) => ({ type: ['string', 'null'], description });
 
 export async function writeCard(input: {
   card: CardToWrite;
@@ -295,12 +356,12 @@ export async function writeCard(input: {
   try {
     response = await client.messages.create({
       model: WRITE_CARD_MODEL,
-      max_tokens: 2048,
+      max_tokens: 6144,
       system: SYSTEM,
       tools: [
         {
           name: TOOL_NAME,
-          description: 'Report whether the section serves what it was picked for, and its summary.',
+          description: 'Report whether the section serves what it was picked for, and a card for each of its ideas.',
           input_schema: {
             type: 'object',
             properties: {
@@ -310,47 +371,26 @@ export async function writeCard(input: {
                   'One sentence on what the section covers and whether it serves what it was picked for at that depth.',
               },
               matches: { type: 'boolean' },
-              context: {
-                type: ['string', 'null'],
-                description:
-                  'One plain paragraph setting the scene: what the subject is, who the names are, when and where, and any term the card relies on. Null when it does not match.',
-              },
-              hook: {
-                type: ['string', 'null'],
-                description:
-                  'One or two concrete sentences: the most interesting thing in it. Null when it does not match.',
-              },
-              summary: {
-                type: ['string', 'null'],
-                description:
-                  'Two or three sentences from the text alone. Null when it does not match.',
-              },
-              example: {
-                type: ['string', 'null'],
-                description:
-                  'The idea applied to one specific case or a worked number. Null when it does not match.',
-              },
-              question: {
-                type: ['string', 'null'],
-                description:
-                  'One question that makes them use the idea. Null when it does not match.',
-              },
-              answer: {
-                type: ['string', 'null'],
-                description:
-                  'The answer, with why, in two or three sentences. Null when it does not match.',
+              ideas: {
+                type: ['array', 'null'],
+                description: `One card per idea, most important first, at most ${MAX_IDEAS}. Null when it does not match.`,
+                items: {
+                  type: 'object',
+                  properties: {
+                    name: ideaPart('The idea in two to six words, as a title.'),
+                    claim: ideaPart('The idea as one plain sentence.'),
+                    context: ideaPart('Only the terms and facts this claim needs, in two or three sentences.'),
+                    evidence: ideaPart('The concrete support from the section: a number, a case or a result.'),
+                    why: ideaPart('Why the claim holds, in two or three sentences.'),
+                    example: ideaPart('The idea applied to one specific case or a worked number.'),
+                    question: ideaPart('One question that makes them use the idea.'),
+                    answer: ideaPart('The answer, with why, in two or three sentences.'),
+                  },
+                  required: ['name', 'claim', 'context', 'evidence', 'why', 'example', 'question', 'answer'],
+                },
               },
             },
-            required: [
-              'fit',
-              'matches',
-              'context',
-              'hook',
-              'summary',
-              'example',
-              'question',
-              'answer',
-            ],
+            required: ['fit', 'matches', 'ideas'],
           },
         },
       ],
@@ -377,14 +417,5 @@ export async function writeCard(input: {
 
   const report = readCardReport(block.input);
   if (report.verdict === 'dropped') return { outcome: 'dropped', reason: report.reason };
-  return {
-    outcome: 'ready',
-    context: report.context,
-    hook: report.hook,
-    summary: report.summary,
-    example: report.example,
-    question: report.question,
-    answer: report.answer,
-    why: whyLine(card),
-  };
+  return { outcome: 'ready', ideas: report.ideas, why: whyLine(card) };
 }

@@ -56,4 +56,11 @@ describe('gridSpans with a lead that has no picture', () => {
     expect(spans.slice(1).map((s) => s.lg)).toEqual([1, 1, 1, 1, 3]);
     expect(spans.every((s) => !s.tall)).toBe(true);
   });
+
+  it('lays a compact Quick read page of five out in two full rows (note a5a59857)', () => {
+    const spans = gridSpans(5, { tallLead: false });
+    // The lead and one story, then three: no card widened, nothing tall.
+    expect(spans.map((s) => s.lg)).toEqual([2, 1, 1, 1, 1]);
+    expect(spans.every((s) => !s.tall)).toBe(true);
+  });
 });

@@ -102,9 +102,16 @@ describe('folding the section', () => {
 });
 
 describe('turning a row into a card', () => {
+  it('titles an idea card by its idea, with the section named as its source', () => {
+    const card = toFeedCard(row({ idea_name: ' Cities pull in labour ' }))!;
+    expect(card.title).toBe('Cities pull in labour');
+    expect(card.source).toBe('Urbanization: Causes');
+  });
+
   it('carries the title, why, summary, link and licence', () => {
     const card = toFeedCard(row())!;
     expect(card.title).toBe('Urbanization: Causes');
+    expect(card.source).toBeNull();
     expect(card.link).toBe('https://en.wikipedia.org/wiki/Urbanization#Causes');
     expect(card.licence).toBe('CC BY-SA 4.0');
     expect(card.shown).toEqual(['Short text.']);

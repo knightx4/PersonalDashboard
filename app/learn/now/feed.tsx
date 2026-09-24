@@ -442,6 +442,18 @@ function DeckCard({
           <h2 className="mt-1 font-display text-title tracking-tight break-words text-ink">
             {card.title}
           </h2>
+          {/* An idea card is titled by its idea, so the section it came from
+              is named under it. */}
+          {card.source && <p className="mt-0.5 text-small text-ink-muted">From {card.source}</p>}
+
+          {/* The one thing to remember, first, for someone who reads no
+              further (note 125f60f2). Older cards have none. */}
+          {card.takeaway && (
+            <section className="mt-3 rounded-control border-l-2 border-accent bg-accent-tint px-3 py-2.5">
+              <h3 className="text-small font-semibold text-accent">The takeaway</h3>
+              <p className="mt-1 text-body font-medium text-ink">{card.takeaway}</p>
+            </section>
+          )}
 
           {/* What this is about, before anything argues about it: the card
               has to stand on its own for someone who never saw the source. */}

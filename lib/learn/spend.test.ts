@@ -76,6 +76,7 @@ describe('the operation names', () => {
       'place-aim',
       'name-feed-material',
       'write-feed-card',
+      'embed-feed-ideas',
       'write-curriculum',
       'embed-map',
       'propose-theme-merges',

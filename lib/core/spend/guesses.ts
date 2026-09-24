@@ -132,7 +132,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
 
   // Learn now cards, written by the hourly top-up.
   'name-feed-material': background(unit(SONNET, 2_500, 100)),
-  'write-feed-card': background(unit(SONNET, 4_000, 600)),
+  // One call per section, writing a card for each of up to three ideas.
+  'write-feed-card': background(unit(SONNET, 4_000, 2_000)),
+  'embed-feed-ideas': background(unit(VOYAGE_LITE, 1_500, 0)),
 
   // Jobs.
   'enrich-company': run(HAIKU, 10_000, 500),
