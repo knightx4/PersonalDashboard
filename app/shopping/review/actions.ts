@@ -170,7 +170,8 @@ export async function dismissEmailReview(
  *
  * The domain is the Reply-To one where there is one (see
  * chooseExclusionDomain), and a domain many shops share is refused with the
- * reason rather than written. The mute is listed under Muted merchants in
+ * reason rather than written, except a personal mailbox such as gmail.com,
+ * where the sender's exact address is muted instead. The mute is listed under Muted merchants in
  * shopping settings, which is where it is undone; there is no undo here.
  */
 // latency: pending

@@ -69,7 +69,8 @@ export function DismissEmailButton({ messageId }: { messageId: string }) {
 }
 
 /**
- * Mute the email's sender domain. There is no undo toast, because the mute is
+ * Mute the email's sender domain, or its exact address when it is a personal
+ * mailbox such as gmail.com. There is no undo toast, because the mute is
  * undone from Muted merchants in shopping settings, so it confirms in place
  * and says where. A sender whose domain many shops share gets the server's
  * refusal and its reason rather than a confirm.

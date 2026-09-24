@@ -25,6 +25,26 @@ export function isPlatformSenderDomain(domain: string | null | undefined): boole
 }
 
 /**
+ * Personal mailbox providers. Many shops share the domain, but an address at
+ * one of them is one person, so the review queue mutes that exact address
+ * where it would refuse to mute the domain.
+ */
+export const PERSONAL_MAILBOX_DOMAINS = [
+  'gmail.com',
+  'googlemail.com',
+  'outlook.com',
+  'hotmail.com',
+  'yahoo.com',
+  'icloud.com',
+] as const;
+
+export function isPersonalMailboxDomain(domain: string | null | undefined): boolean {
+  if (!domain) return false;
+  const lower = domain.toLowerCase();
+  return PERSONAL_MAILBOX_DOMAINS.some((d) => lower === d);
+}
+
+/**
  * Sender domains that many unrelated shops share, so muting one mutes them all.
  *
  * The platform domains above, plus the payment processors, help desks, bulk
@@ -52,12 +72,7 @@ export const SHARED_SENDER_DOMAINS = [
   'sendgrid.net',
   'mailchimpapp.net',
   'amazonses.com',
-  'gmail.com',
-  'googlemail.com',
-  'outlook.com',
-  'hotmail.com',
-  'yahoo.com',
-  'icloud.com',
+  ...PERSONAL_MAILBOX_DOMAINS,
 ] as const;
 
 export function isSharedSenderDomain(domain: string | null | undefined): boolean {

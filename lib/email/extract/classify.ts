@@ -26,7 +26,14 @@ function domainFromAddress(from: string | null): string | null {
   return match?.[1] ?? null;
 }
 
-export { domainFromAddress };
+/** The bare address in a From or Reply-To header, lowercased. */
+function bareAddress(from: string | null): string | null {
+  if (!from) return null;
+  const match = from.toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/);
+  return match?.[0] ?? null;
+}
+
+export { bareAddress, domainFromAddress };
 
 function findMerchant(
   domain: string | null,

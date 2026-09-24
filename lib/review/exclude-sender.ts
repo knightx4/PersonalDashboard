@@ -1,9 +1,9 @@
-import { domainFromAddress } from '@/lib/email/extract/classify';
-import { isSharedSenderDomain } from '@/lib/merchants/platform';
+import { bareAddress, domainFromAddress } from '@/lib/email/extract/classify';
+import { isPersonalMailboxDomain, isSharedSenderDomain } from '@/lib/merchants/platform';
 
 export type SenderDomainChoice =
-  | { ok: true; domain: string }
-  | { ok: false; reason: string };
+  /** A domain, or a full address when the sender is a personal mailbox. */
+  { ok: true; domain: string } | { ok: false; reason: string };
 
 /**
  * Which domain to mute when the person excludes a review email's sender.
@@ -13,6 +13,10 @@ export type SenderDomainChoice =
  * many shops share is never written, following the job review's refusal of
  * ATS domains: if Reply-To is a help desk or PayPal, From is tried instead,
  * and if both are shared the exclusion is refused with the reason.
+ *
+ * The exception is a personal mailbox (gmail.com and the like): the domain is
+ * shared, but the address is one person, so that exact address is muted
+ * instead, Reply-To first as above.
  */
 export function chooseExclusionDomain(opts: {
   fromAddress: string | null;
@@ -26,6 +30,11 @@ export function chooseExclusionDomain(opts: {
 
   const own = known.find((domain) => !isSharedSenderDomain(domain));
   if (own) return { ok: true, domain: own };
+
+  const personal = [opts.replyToAddress, opts.fromAddress]
+    .map(bareAddress)
+    .find((address) => isPersonalMailboxDomain(domainFromAddress(address)));
+  if (personal) return { ok: true, domain: personal };
 
   return {
     ok: false,

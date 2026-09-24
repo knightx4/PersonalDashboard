@@ -7,6 +7,23 @@ describe('isExcludedSender', () => {
     { merchant_id: null, match_domain: 'toasttab.com' },
   ];
 
+  it('matches a muted address exactly and leaves the rest of its domain alone', () => {
+    const mute = [{ merchant_id: null, match_domain: 'jane.seller@gmail.com' }];
+    expect(
+      isExcludedSender(mute, { merchantId: null, fromAddress: 'Jane <Jane.Seller@gmail.com>' }),
+    ).toBe(true);
+    expect(
+      isExcludedSender(mute, {
+        merchantId: null,
+        fromAddress: 'service@paypal.com',
+        replyToAddress: 'jane.seller@gmail.com',
+      }),
+    ).toBe(true);
+    expect(
+      isExcludedSender(mute, { merchantId: null, fromAddress: 'someone.else@gmail.com' }),
+    ).toBe(false);
+  });
+
   it('matches by merchant id', () => {
     expect(
       isExcludedSender(exclusions, {

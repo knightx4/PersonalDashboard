@@ -1,8 +1,9 @@
-import { domainFromAddress } from '@/lib/email/extract/classify';
+import { bareAddress, domainFromAddress } from '@/lib/email/extract/classify';
 import type { MessageClassification } from '@/lib/email/extract/schema';
 
 export type MerchantExclusionRow = {
   merchant_id: string | null;
+  /** A sender domain, or a full address for one person at a personal mailbox. */
   match_domain: string | null;
 };
 
@@ -33,6 +34,9 @@ function domainMatches(domain: string | null, needle: string): boolean {
  * on a hosted platform sends From the platform's domain and puts its own in
  * Reply-To, and the review queue writes the Reply-To domain for exactly that
  * reason, so a check on From alone would never match those mutes again.
+ *
+ * A mute holding a full address (one gmail.com sender, say) matches only that
+ * address, never the rest of its domain.
  */
 export function isExcludedSender(
   exclusions: readonly MerchantExclusionRow[],
@@ -46,12 +50,20 @@ export function isExcludedSender(
     }
   }
 
-  const domains = [domainFromAddress(opts.fromAddress), domainFromAddress(opts.replyToAddress ?? null)];
+  const domains = [
+    domainFromAddress(opts.fromAddress),
+    domainFromAddress(opts.replyToAddress ?? null),
+  ];
   if (!domains[0] && !domains[1]) return false;
+  const addresses = [bareAddress(opts.fromAddress), bareAddress(opts.replyToAddress ?? null)];
 
   for (const row of exclusions) {
     const needle = row.match_domain?.toLowerCase();
     if (!needle) continue;
+    if (needle.includes('@')) {
+      if (addresses.includes(needle)) return true;
+      continue;
+    }
     if (domains.some((domain) => domainMatches(domain, needle))) return true;
   }
 
