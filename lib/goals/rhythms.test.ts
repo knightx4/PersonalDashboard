@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   MAX_BACKFILL,
-  atRiskRhythms,
+  homeRhythms,
   isAtRisk,
   liveRhythms,
+  missedLine,
   periodOf,
   progressLine,
   recordsOf,
@@ -168,7 +169,7 @@ describe('isAtRisk', () => {
   });
 });
 
-describe('recordsOf and atRiskRhythms', () => {
+describe('recordsOf and homeRhythms', () => {
   it('splits the open current period from the closed ones, oldest first', () => {
     const rows = [
       row({ id: 'now' }),
@@ -178,10 +179,81 @@ describe('recordsOf and atRiskRhythms', () => {
     const record = recordsOf(rows, '2026-09-25').get('r');
     expect(record?.current?.id).toBe('now');
     expect(record?.past.map((p) => p.id)).toEqual(['a', 'b']);
+    expect(record?.missed).toBe(1);
 
-    const risk = atRiskRhythms([rhythm()], recordsOf(rows, '2026-09-25'), '2026-09-25');
-    expect(risk).toEqual([{ ...rhythm(), count: 0, daysLeft: 3 }]);
-    expect(progressLine('week', risk[0])).toBe('0 of 1 this week');
+    const shown = homeRhythms([rhythm()], recordsOf(rows, '2026-09-25'), '2026-09-25');
+    expect(shown).toEqual([{ ...rhythm(), count: 0, daysLeft: 3, atRisk: true, missed: 1 }]);
+    expect(progressLine('week', shown[0])).toBe('0 of 1 this week');
+  });
+
+  it('counts the whole run of misses, not only the periods kept for display', () => {
+    const rows = [row({ id: 'now', startsOn: '2026-09-25', endsOn: '2026-09-26' })];
+    for (let day = 1; day <= 20; day++) {
+      const startsOn = `2026-09-${String(day + 4).padStart(2, '0')}`;
+      const endsOn = `2026-09-${String(day + 5).padStart(2, '0')}`;
+      rows.push(row({ id: `d${day}`, startsOn, endsOn, kept: day === 1, closedAt: 'x' }));
+    }
+    const record = recordsOf(rows, '2026-09-25').get('r');
+    expect(record?.past).toHaveLength(8);
+    expect(record?.missed).toBe(19);
+  });
+});
+
+describe('coming back after time away', () => {
+  /** Carry out a sync plan on the rows, as rhythms-store does. */
+  function applyPlan(rows: PeriodRow[], today: string, live: LiveRhythm[]): PeriodRow[] {
+    const plan = syncPlan(live, rows, today);
+    const out = rows.map((r) => {
+      const close = plan.close.find((c) => c.id === r.id);
+      return close ? { ...r, kept: close.kept, closedAt: 'x' } : r;
+    });
+    plan.insert.forEach((r, i) =>
+      out.push({
+        id: `new${i}`,
+        itemId: r.itemId,
+        startsOn: r.startsOn,
+        endsOn: r.endsOn,
+        target: r.target,
+        count: 0,
+        kept: r.kept,
+        closedAt: r.kept === null ? null : 'x',
+      }),
+    );
+    return out;
+  }
+
+  it('folds a two-week gap into one line per rhythm', () => {
+    // Last opened in the week of 7 September, then nothing until Tuesday the 22nd.
+    const live = [rhythm(), rhythm({ id: 'r2', title: 'Call a friend', target: 2 })];
+    const rows = [
+      row({ id: 'old1', startsOn: '2026-09-07', endsOn: '2026-09-14' }),
+      row({ id: 'old2', itemId: 'r2', startsOn: '2026-09-07', endsOn: '2026-09-14', target: 2 }),
+    ];
+    const today = '2026-09-22';
+    const after = applyPlan(rows, today, live);
+
+    // Each missed week is still stored, so the history records every one.
+    expect(after.filter((r) => r.kept === false)).toHaveLength(4);
+
+    const shown = homeRhythms(live, recordsOf(after, today), today);
+    expect(shown.map((r) => [r.id, r.missed, r.atRisk])).toEqual([
+      ['r', 2, false],
+      ['r2', 2, false],
+    ]);
+    expect(missedLine('week', shown[0].missed)).toBe('2 weeks missed');
+  });
+
+  it('stops showing the misses once this period is met', () => {
+    const rows = [
+      row({ id: 'now', count: 1 }),
+      row({ id: 'b', startsOn: '2026-09-14', endsOn: MON, kept: false, closedAt: 'x' }),
+    ];
+    expect(homeRhythms([rhythm()], recordsOf(rows, '2026-09-22'), '2026-09-22')).toEqual([]);
+  });
+
+  it('names the period in the missed line', () => {
+    expect(missedLine('day', 1)).toBe('1 day missed');
+    expect(missedLine('month', 3)).toBe('3 months missed');
   });
 });
 

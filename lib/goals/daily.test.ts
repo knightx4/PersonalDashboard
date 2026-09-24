@@ -40,12 +40,14 @@ function step(id: string, parentId: string, extra: Partial<Step> = {}): Step {
   };
 }
 
-function view(goals: ReturnType<typeof goal>[], steps: Step[]) {
+const TODAY = '2026-09-24';
+
+function view(goals: ReturnType<typeof goal>[], steps: Step[], today = TODAY) {
   const { byGoal } = buildForest(
     goals.map((g) => g.goal.id),
     steps,
   );
-  return dailyView(goals, byGoal);
+  return dailyView(goals, byGoal, today);
 }
 
 const nextIds = (result: ReturnType<typeof view>, goalId: string) =>
@@ -197,5 +199,36 @@ describe('dailyView waiting on you', () => {
       ['breakdown', 'b'],
       ['goal', 'a'],
     ]);
+  });
+});
+
+describe('dailyView after time away', () => {
+  it('lists overdue steps as ordinary next items with no date', () => {
+    // Two weeks away: both dated steps have passed.
+    const result = view(
+      [goal('g')],
+      [
+        step('late', 'g', { dueOn: '2026-09-08' }),
+        step('later', 'g', { dueOn: '2026-09-15' }),
+        step('undated', 'g'),
+      ],
+    );
+    const next = result.goals[0].next;
+    expect(next.map((n) => n.id)).toEqual(['late', 'later', 'undated']);
+    expect(next.map((n) => n.dueOn)).toEqual([null, null, null]);
+  });
+
+  it('ranks an overdue step as due today, not ahead of what is due today', () => {
+    const result = view(
+      [goal('g')],
+      [
+        step('today', 'g', { dueOn: TODAY }),
+        step('late', 'g', { dueOn: '2026-09-01' }),
+        step('soon', 'g', { dueOn: '2026-09-26' }),
+      ],
+    );
+    const next = result.goals[0].next;
+    expect(next.map((n) => n.id)).toEqual(['today', 'late', 'soon']);
+    expect(next.map((n) => n.dueOn)).toEqual([TODAY, null, '2026-09-26']);
   });
 });

@@ -93,7 +93,7 @@ const city = contextOf(
     step('under-ask', 'ask', { kind: 'claude' }),
     step('mine', 'friends'),
   ],
-  new Map([['events', { current: period('events'), past: [] }]]),
+  new Map([['events', { current: period('events'), past: [], missed: 0 }]]),
 );
 
 const ref = (id: string) => city.steps.find((s) => s.id === id)?.ref ?? city.goals.find((g) => g.id === id)?.ref;

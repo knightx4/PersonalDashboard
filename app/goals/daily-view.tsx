@@ -12,7 +12,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { DailyGoal, DailyView as Daily, NextItem, WaitingItem } from '@/lib/goals/daily';
-import { progressLine, type AtRiskRhythm } from '@/lib/goals/rhythms';
+import { missedLine, progressLine, type HomeRhythm } from '@/lib/goals/rhythms';
 import { STEP_KIND_LABELS } from '@/lib/goals/steps';
 
 /**
@@ -26,9 +26,14 @@ import { STEP_KIND_LABELS } from '@/lib/goals/steps';
  * Rhythms at risk this period (plan #928) sit between the two: they are
  * running out of days, which makes them more pressing than a goal's next step
  * and less than a question holding a branch up.
+ *
+ * After time away (plan #935) nothing is shown as overdue. A rhythm with
+ * missed periods behind it gets one line saying how many, beside this
+ * period's progress, and a step whose date has passed is listed as a plain
+ * next item.
  */
 
-type View = Daily & { atRisk: AtRiskRhythm[] };
+type View = Daily & { rhythms: HomeRhythm[] };
 
 const KIND_ICONS: Record<NextItem['kind'], typeof User> = { mine: User, claude: Sparkles };
 
@@ -45,9 +50,9 @@ function formatDate(isoDate: string): string {
   });
 }
 
-function riskLine(rhythm: AtRiskRhythm): string {
+function rhythmLine(rhythm: HomeRhythm): string {
   const left =
-    rhythm.period === 'day'
+    !rhythm.atRisk || rhythm.period === 'day'
       ? null
       : rhythm.daysLeft === 1
         ? 'last day'
@@ -55,6 +60,7 @@ function riskLine(rhythm: AtRiskRhythm): string {
   return [
     progressLine(rhythm.period, { count: rhythm.count, target: rhythm.target }),
     left,
+    rhythm.missed > 0 ? missedLine(rhythm.period, rhythm.missed) : null,
     rhythm.goalTitle,
   ]
     .filter(Boolean)
@@ -101,14 +107,14 @@ export function DailyView({ view }: { view: View }) {
         </section>
       )}
 
-      {view.atRisk.length > 0 && (
+      {view.rhythms.length > 0 && (
         <section aria-labelledby="risk-heading" className="space-y-2">
           <h2 id="risk-heading" className="px-1 text-ui font-semibold text-ink">
-            Rhythms at risk
+            Rhythms to keep up
           </h2>
           <Card>
             <ul className="divide-y divide-border">
-              {view.atRisk.map((rhythm) => (
+              {view.rhythms.map((rhythm) => (
                 <li key={rhythm.id}>
                   <Link
                     href={`/goals/${rhythm.goalId}`}
@@ -122,7 +128,7 @@ export function DailyView({ view }: { view: View }) {
                     <span className="min-w-0 flex-1">
                       <span className="block text-ui break-words text-ink">{rhythm.title}</span>
                       <span className="block text-small break-words text-ink-muted">
-                        {riskLine(rhythm)}
+                        {rhythmLine(rhythm)}
                       </span>
                     </span>
                     <ChevronRight

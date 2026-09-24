@@ -13,9 +13,9 @@ import {
   type StepNode,
 } from '@/lib/goals/steps';
 import {
-  atRiskRhythms,
+  homeRhythms,
   liveRhythms,
-  type AtRiskRhythm,
+  type HomeRhythm,
   type LiveRhythm,
   type RhythmRecord,
 } from '@/lib/goals/rhythms';
@@ -459,14 +459,14 @@ export async function loadLiveTree(
 export async function loadDailyView(
   client: GoalsSupabaseClient,
   { userId, today }: Today,
-): Promise<DailyView & { atRisk: AtRiskRhythm[] }> {
+): Promise<DailyView & { rhythms: HomeRhythm[] }> {
   const { goals, byGoal } = await loadLiveTree(client);
   const live = liveRhythms(
     goals.map((g) => g.goal),
     byGoal,
   );
   const records = await syncRhythms(client, userId, live, today);
-  return { ...dailyView(goals, byGoal), atRisk: atRiskRhythms(live, records, today) };
+  return { ...dailyView(goals, byGoal, today), rhythms: homeRhythms(live, records, today) };
 }
 
 /** A live rhythm whose current period is not yet met, for Todo (plan #928). */
