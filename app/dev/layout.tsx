@@ -9,7 +9,7 @@ import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadActivity } from '@/lib/shell/activity';
 import { loadMainCheck } from '@/lib/shell/main-check';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
-import { loadPlan } from '@/lib/plan/load';
+import { loadPlanForRequest } from '@/lib/plan/request-plan';
 import { buildPlanTree } from '@/lib/plan/tree';
 import { waitingOnYou } from '@/lib/plan/waiting';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -60,7 +60,7 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     loadModuleCounts(user.id),
     loadActivity(),
     loadRaisedNotifications(user.id),
-    loadPlan(supabase, user.id),
+    loadPlanForRequest(user.id),
     loadMainCheck(),
     // The $ hint on a comment that asks Dash, and on a raise's "Yes, and…"
     // (plan #918).

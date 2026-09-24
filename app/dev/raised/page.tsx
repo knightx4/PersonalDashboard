@@ -1,7 +1,8 @@
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadRaised } from '@/lib/raised/load';
-import { loadPlan, planRefTitles } from '@/lib/plan/load';
+import { planRefTitles } from '@/lib/plan/load';
+import { loadPlanForRequest } from '@/lib/plan/request-plan';
 import { buildPlanTree, flattenSections } from '@/lib/plan/tree';
 import { waitingGroups } from '@/lib/plan/waiting';
 import { loadDigest } from '@/lib/digest/load';
@@ -58,7 +59,7 @@ export default async function DevRaisedPage() {
     loadRaised(supabase, user.id),
     loadDigest(supabase, user.id),
     loadConversations(supabase, user.id),
-    loadPlan(supabase, user.id),
+    loadPlanForRequest(user.id),
     // The runner's standing intention, and the presses its night has made:
     // the same rows and the same loaders /dev/plan reads, so the two pages
     // cannot come to different answers about what is running.
