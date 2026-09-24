@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
+import { buttonVariants } from '@/components/ui/button';
 import { CardSection } from '@/components/ui/card';
 import { Group } from '@/components/ui/disclosure';
 import {
@@ -211,6 +212,12 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
     }),
   ]);
 
+  // The probe session opens on a named concept when it is given one, which is
+  // the same link the row on /learn/next uses. The first question is asked at
+  // whichever rung `nextRung` says, so it is a multiple choice until those are
+  // right and an applied case after.
+  const askHref = `/learn/s/${subject.id}/probe?concept=${concept.id}`;
+
   const connected =
     prerequisites.length > 0 ||
     dependents.length > 0 ||
@@ -229,7 +236,14 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
         </Link>
       </p>
 
-      <PageHeader title={concept.name} />
+      <PageHeader
+        title={concept.name}
+        actions={
+          <Link href={askHref} className={buttonVariants()}>
+            Ask me about this
+          </Link>
+        }
+      />
 
       {/* The claim, the offer to branch off a phrase in it, and the way to
           write it yourself. */}
@@ -291,6 +305,12 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
           it is a list, and the card above is about where the claim stands. */}
       <CardSection title="What understanding it looks like" className="mb-5">
         <MasteryChecks checks={concept.mastery} answers={probes} />
+        <p className="mt-3 text-ui text-ink-muted">
+          <Link href={askHref} className="underline underline-offset-2 hover:text-ink">
+            Ask me about this
+          </Link>{' '}
+          to be tested against these.
+        </p>
       </CardSection>
 
       {connected && (
@@ -370,13 +390,10 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
         {probes.length === 0 ? (
           <p className="text-ui text-ink-muted">
             Nothing has been asked about this yet.{' '}
-            <Link
-              href={`/learn/s/${subject.id}/probe`}
-              className="underline underline-offset-2 hover:text-ink"
-            >
-              Ask about this track
+            <Link href={askHref} className="underline underline-offset-2 hover:text-ink">
+              Ask me about this
             </Link>{' '}
-            and it will come up.
+            to start.
           </p>
         ) : (
           <ul className="space-y-3">
