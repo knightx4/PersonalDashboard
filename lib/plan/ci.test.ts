@@ -122,7 +122,15 @@ type Chain = {
  * The two reads and the one write the refresh makes: the closed steps with
  * commits, what is already known about them, and the rows it writes back.
  */
-function db(steps: Array<{ commit_sha: string }>) {
+function db(
+  steps: Array<{ commit_sha: string; completed_at?: string | null }>,
+  known: Array<{
+    commit_sha: string;
+    merge_sha: string | null;
+    conclusion: string;
+    checked_at: string;
+  }> = [],
+) {
   const upsert = vi.fn(async () => ({ error: null as null }));
   const answering = (result: unknown): Chain => {
     const node: Chain = {
@@ -136,7 +144,9 @@ function db(steps: Array<{ commit_sha: string }>) {
   };
   const supabase = {
     from: (table: string) =>
-      answering(table === 'plan_items' ? { data: steps, error: null } : { data: [], error: null }),
+      answering(
+        table === 'plan_items' ? { data: steps, error: null } : { data: known, error: null },
+      ),
   };
   return { supabase, upsert };
 }
@@ -169,6 +179,27 @@ async function refreshAgainst(runs: Array<{ status: string; conclusion: string |
 }
 
 describe('refreshCommitChecks', () => {
+  it('asks GitHub nothing about a none that has settled', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const sha = BRANCH.slice(0, 7);
+    const { supabase, upsert } = db(
+      [{ commit_sha: sha, completed_at: '2026-09-10T01:45:00Z' }],
+      [{ commit_sha: sha, merge_sha: MERGE, conclusion: 'none', checked_at: '2026-09-15T00:00:00Z' }],
+    );
+    const fetchFn = github([]);
+    const result = await refreshCommitChecks({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: Date.parse('2026-09-17T12:00:00Z'),
+      fetch: fetchFn as never,
+    });
+
+    expect(result).toEqual({ checked: 0, error: null });
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(upsert).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
+  });
+
   it('reads the merge from the workflow runs rather than the check runs', async () => {
     vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
     const { result, written, fetchFn } = await refreshAgainst([
@@ -233,8 +264,8 @@ describe('refreshCommitChecks on a commit the listing never reaches', () => {
       };
     });
 
-  async function refresh(compare: () => Response) {
-    const { supabase, upsert } = db([{ commit_sha: LOST }]);
+  async function refresh(compare: () => Response, known: Parameters<typeof db>[1] = []) {
+    const { supabase, upsert } = db([{ commit_sha: LOST }], known);
     const fetchFn = vi.fn(async (url: string) => {
       const path = String(url);
       if (path.includes('/compare/')) return compare();
@@ -284,6 +315,32 @@ describe('refreshCommitChecks on a commit the listing never reaches', () => {
 
     expect(result).toEqual({ checked: 0, error: null });
     expect(written).toBeUndefined();
+    vi.unstubAllEnvs();
+  });
+
+  it('stamps a none it already had when main confirms it, so it settles', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { result, written } = await refresh(
+      () => new Response(JSON.stringify({ status: 'behind' }), { status: 200 }),
+      [
+        {
+          commit_sha: LOST,
+          merge_sha: MERGE,
+          conclusion: 'none',
+          checked_at: '2026-09-16T12:00:00Z',
+        },
+      ],
+    );
+
+    expect(result).toEqual({ checked: 1, error: null });
+    expect(written).toEqual([
+      expect.objectContaining({
+        commit_sha: LOST,
+        merge_sha: MERGE,
+        conclusion: 'none',
+        checked_at: '2026-09-17T12:00:00.000Z',
+      }),
+    ]);
     vi.unstubAllEnvs();
   });
 

@@ -149,6 +149,32 @@ describe('shouldRecheck', () => {
   });
 });
 
+describe('shouldRecheck on a merge that ran no checks', () => {
+  const now = Date.parse('2026-09-24T12:00:00Z');
+  const none = (checkedAt: string): CommitCheck => ({
+    mergeSha: 'm2',
+    conclusion: 'none',
+    checkedAt,
+  });
+
+  it('stops asking once none was read a day after the step closed', () => {
+    expect(shouldRecheck(none('2026-09-22T12:00:00Z'), now, '2026-09-10T01:45:00Z')).toBe(false);
+  });
+
+  it('keeps asking while the step closed less than a day before the reading', () => {
+    expect(shouldRecheck(none('2026-09-24T11:00:00Z'), now, '2026-09-24T05:00:00Z')).toBe(true);
+  });
+
+  it('keeps asking every ten minutes when nobody says when the step closed', () => {
+    expect(shouldRecheck(none('2026-09-22T12:00:00Z'), now)).toBe(true);
+  });
+
+  it('does not settle a run still going, however old', () => {
+    const running: CommitCheck = { ...none('2026-09-22T12:00:00Z'), conclusion: 'running' };
+    expect(shouldRecheck(running, now, '2026-09-10T01:45:00Z')).toBe(true);
+  });
+});
+
 describe('what the page says', () => {
   const check = (conclusion: CommitCheck['conclusion']): CommitCheck => ({
     mergeSha: 'm2',

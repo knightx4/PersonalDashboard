@@ -465,10 +465,13 @@ export async function loadCommitChecks(
  * Ask about the commits that have no answer yet, and write down what comes
  * back.
  *
- * Carried back rather than thrown, the same as the seed sync and the run
- * sweep above it: a plan page that could not reach GitHub is still a plan page
- * worth reading, and the steps it could not answer for say "not checked",
- * which is true.
+ * Carried back rather than thrown: a plan page that could not reach GitHub is
+ * still a plan page worth reading, and the steps it could not answer for say
+ * "not checked", which is true.
+ *
+ * Called from `app/api/plan/checks` once the page has drawn, not while it
+ * renders. Asked during the render, this held every open of /dev/plan on a
+ * walk of main's history and a round of comparisons.
  */
 export async function refreshCommitChecks(input: {
   supabase: Db;
@@ -485,17 +488,27 @@ export async function refreshCommitChecks(input: {
 
   const { data: steps, error: stepsError } = await input.supabase
     .from('plan_items')
-    .select('commit_sha')
+    .select('commit_sha, completed_at')
     .eq('user_id', input.userId)
     .eq('status', 'done')
     .not('commit_sha', 'is', null);
   if (stepsError) return { checked: 0, error: stepsError.message };
 
+  // When each commit's step closed, the latest where two steps share one, so
+  // a `none` read a day after that stops being asked about.
+  const closedAt = new Map<string, string | null>();
+  for (const step of (steps ?? []) as Array<{ commit_sha: string; completed_at?: string | null }>) {
+    const at = step.completed_at ?? null;
+    const before = closedAt.get(step.commit_sha);
+    if (before === undefined || (at && (!before || at > before))) closedAt.set(step.commit_sha, at);
+  }
+
   const known = await loadCommitChecks(input.supabase, input.userId);
   const wanted = new Set(
-    ((steps ?? []) as Array<{ commit_sha: string }>)
-      .map((step) => step.commit_sha)
-      .filter((sha) => /^[0-9a-f]{7,40}$/.test(sha) && shouldRecheck(known[sha], now)),
+    [...closedAt.keys()].filter(
+      (sha) =>
+        /^[0-9a-f]{7,40}$/.test(sha) && shouldRecheck(known[sha], now, closedAt.get(sha)),
+    ),
   );
   if (wanted.size === 0) return { checked: 0, error: null };
 
@@ -524,13 +537,19 @@ export async function refreshCommitChecks(input: {
     // answer GitHub would not give is not an answer. Both leave the commit
     // unwritten and asked again next time, which reads as "not checked" --
     // true, where "never reached main" would be a guess.
-    const unmerged = (
-      await inLanes(missing.slice(0, LANDING_BUDGET), async (sha) => ({
-        sha,
-        landing: await commitOnMain({ sha, fetch: doFetch }),
-      }))
-    )
+    const landings = await inLanes(missing.slice(0, LANDING_BUDGET), async (sha) => ({
+      sha,
+      landing: await commitOnMain({ sha, fetch: doFetch }),
+    }));
+    const unmerged = landings
       .filter(({ landing }) => landing.onMain === false)
+      .map(({ sha }) => sha);
+    // A definite yes on a commit already answered `none` keeps that answer and
+    // stamps when it was confirmed. Without the stamp an old commit past
+    // the listing was compared again on every open of the page, forever; with
+    // it, a `none` settles the same way one the listing reached does.
+    const confirmed = landings
+      .filter(({ sha, landing }) => landing.onMain === true && known[sha]?.conclusion === 'none')
       .map(({ sha }) => sha);
 
     const merges = [...byMerge.keys()].slice(0, MERGE_BUDGET);
@@ -543,6 +562,13 @@ export async function refreshCommitChecks(input: {
         commit_sha: sha,
         merge_sha: null,
         conclusion: 'unmerged' as CheckConclusion,
+        checked_at: stamp,
+      })),
+      ...confirmed.map((sha) => ({
+        user_id: input.userId,
+        commit_sha: sha,
+        merge_sha: known[sha].mergeSha,
+        conclusion: known[sha].conclusion,
         checked_at: stamp,
       })),
       ...merges.flatMap((merge, i) =>
