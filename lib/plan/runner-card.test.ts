@@ -86,6 +86,7 @@ function read(over: Partial<Parameters<typeof runnerCard>[0]> = {}) {
     sections,
     started,
     lastRuns: [],
+    now: Date.parse('2026-09-17T23:30:00.000Z'),
     ...over,
   });
 }
@@ -95,6 +96,11 @@ describe('runnerCard', () => {
     const card = read();
     expect(card.on.map((line) => line.ref)).toEqual([`#${busy.number}`]);
     expect(card.on[0].progress).toEqual({ done: 1, total: 2 });
+  });
+
+  it('leaves out a run the sweep would write off as quiet', () => {
+    const card = read({ now: Date.parse('2026-09-18T03:00:00.000Z') });
+    expect(card.on).toEqual([]);
   });
 
   it('names what would be fired next, leaving out what a session is already on', () => {

@@ -23,7 +23,7 @@ import {
 import { oneLine } from '@/lib/digest/build';
 import type { PlanItem } from './load';
 import { lastStoredPush, type StoredPush } from './liveness';
-import type { StoredRunReading } from './run-end';
+import { runEnd, type StoredRunReading } from './run-end';
 import { overnightStanding, type OvernightRun } from './overnight';
 import { readyFeatureCount } from './overnight-choice';
 import { topFeatureOf, workOrder, type PlanSection } from './tree';
@@ -54,6 +54,7 @@ export function runnerCard(input: {
   /** The runs still going, as `loadStartedRuns` reads them. */
   started: readonly { planItemId: string; at: string }[];
   lastRuns: Iterable<{ reading: StoredRunReading | null }>;
+  now?: number;
 }): RunnerCard {
   const { run, items, sections } = input;
   const standing = overnightStanding(run);
@@ -69,8 +70,22 @@ export function runnerCard(input: {
   // credit the night with it.
   const push = live && run?.startedAt ? lastStoredPush(input.lastRuns, run.startedAt) : null;
 
+  // The runs still marked going, less the ones `endQuietRuns` would write off:
+  // the plan page sweeps before it reads, but Dash does not wait on that write,
+  // so the same rule is read here instead of the sweep being waited for.
+  const now = input.now ?? Date.now();
+  const itemById = new Map(items.map((item) => [item.id, item]));
+  const going = input.started.filter(
+    (started) =>
+      runEnd(
+        { status: 'started', createdAt: started.at },
+        itemById.get(started.planItemId) ?? null,
+        now,
+      ) === null,
+  );
+
   const on = live
-    ? onNow(input.started, items).map((line) => ({
+    ? onNow(going, items).map((line) => ({
         ...line,
         progress: featureProgress(items, line.ref),
       }))

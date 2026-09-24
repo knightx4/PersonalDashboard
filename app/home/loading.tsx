@@ -25,7 +25,10 @@ export default function Loading() {
         </div>
         <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} className={cn(cardVariants({ padding: 'dense' }), 'flex items-center gap-3')}>
+            <div
+              key={index}
+              className={cn(cardVariants({ padding: 'dense' }), 'flex items-center gap-3')}
+            >
               <Skeleton className="size-8 shrink-0 rounded-[9px]" />
               <div className="min-w-0 flex-1 space-y-2">
                 <Skeleton className="h-3.5 w-24" />
