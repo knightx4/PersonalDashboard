@@ -23,6 +23,7 @@ import {
   recordFeedAction,
   setCardDifficulty,
 } from '@/lib/learn/feed/load';
+import { settleIdeaFromSwipe } from '@/lib/learn/feed/ideas-store';
 import { startTrackFromCard } from '@/lib/learn/feed/test-me';
 import { SAVED_FROM_FEED, saveFeedSection } from '@/lib/learn/tracks/save';
 
@@ -130,6 +131,9 @@ export async function swipeCard(id: string, swipe: SwipeAction): Promise<CardAct
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Could not record that.' };
   }
+  // What the swipe says about the card's idea (LEARN-NOW-SPEC, "Where ideas
+  // are kept"). Never fails the swipe.
+  await settleIdeaFromSwipe(supabase, user.id, card.data, swipe);
   after(() => topUpFeedAfterResponse(user.id));
   return {};
 }
@@ -187,7 +191,8 @@ export async function testMeOnCard(id: string): Promise<CardActionResult> {
   if (row.status === 'tested' && row.subject_id) redirect(`/learn/flow?track=${row.subject_id}`);
 
   const started = await startTrackFromCard(supabase, user.id, {
-    title: cardTitle(row.item.title, row.segment.heading),
+    // The idea is what "this" is on an idea card; older cards are the section.
+    title: row.idea_name?.trim() || cardTitle(row.item.title, row.segment.heading),
     article: row.item.title,
   }).catch((error: unknown) => ({
     ok: false as const,

@@ -112,6 +112,11 @@ export const LEARN_OPERATIONS = [
   // call per picked row, dropped or not, recorded through the service role
   // from the top-up against the account the card belongs to.
   'write-feed-card',
+  // Embedding a Learn now section and the claims written from it, to find the
+  // ideas the person already holds near it and to save each new idea as a
+  // concept (LEARN-NOW-SPEC, "One idea per card"). Recorded through the
+  // service role from the top-up, against the account the cards belong to.
+  'embed-feed-ideas',
   // Writing a track's curriculum, once, when the track is made or when its
   // page asks for one it never got (LEARN-GRAPH-SPEC, "The curriculum"). One
   // Sonnet call per track.

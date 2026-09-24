@@ -20,7 +20,7 @@ import {
  */
 
 const CARD_SELECT =
-  'id, reason, status, summary, why, takeaway, context, hook, example, check_question, check_answer, depth, difficulty, ' +
+  'id, reason, status, idea_name, summary, why, takeaway, context, hook, example, check_question, check_answer, depth, difficulty, ' +
   'item:catalogue_items!feed_cards_item_id_fkey(title, canonical_url, licence), ' +
   'segment:catalogue_segments!feed_cards_segment_id_fkey(heading, text, section_anchor)';
 

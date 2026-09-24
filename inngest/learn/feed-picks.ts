@@ -147,6 +147,7 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
     aim_id: string | null;
     field_id: string | null;
     named_article: string | null;
+    idea_name: string | null;
     created_at: string;
     status: string;
     difficulty: string | null;
@@ -178,7 +179,7 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
         learn
           .from('feed_cards')
           .select(
-            'reason, theme_id, aim_id, field_id, named_article, created_at, status, difficulty, saved_reading_id, acted_at, ' +
+            'reason, theme_id, aim_id, field_id, named_article, idea_name, created_at, status, difficulty, saved_reading_id, acted_at, ' +
               'item:catalogue_items!feed_cards_item_id_fkey(title), ' +
               'segment:catalogue_segments!feed_cards_segment_id_fkey(heading)',
           )
@@ -261,7 +262,13 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
       aim_id: card.aim_id,
       reason: card.reason,
       difficulty: isCardDifficulty(card.difficulty) ? card.difficulty : null,
-      title: card.item ? cardTitle(card.item.title, card.segment?.heading ?? null) : card.named_article,
+      // An idea card is named by its idea, so the naming call is told which
+      // ideas were known, with the section they came from.
+      title: card.item
+        ? card.idea_name
+          ? `${card.idea_name} (from ${cardTitle(card.item.title, card.segment?.heading ?? null)})`
+          : cardTitle(card.item.title, card.segment?.heading ?? null)
+        : card.named_article,
     }));
 
   return {
@@ -411,7 +418,8 @@ export function createFeedPicker(context: {
       insertCard: async (row) => {
         const { data, error } = await learn
           .from('feed_cards')
-          .upsert(row, { onConflict: 'user_id,segment_id', ignoreDuplicates: true })
+          // A pick is idea 0 of its section; the writer adds rows for the rest.
+          .upsert(row, { onConflict: 'user_id,segment_id,idea_index', ignoreDuplicates: true })
           .select('id');
         if (error) throw new Error(`Writing the pick failed: ${error.message}`);
         return (data ?? []).length > 0 ? 'inserted' : 'duplicate';

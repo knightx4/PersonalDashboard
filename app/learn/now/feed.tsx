@@ -442,6 +442,9 @@ function DeckCard({
           <h2 className="mt-1 font-display text-title tracking-tight break-words text-ink">
             {card.title}
           </h2>
+          {/* An idea card is titled by its idea, so the section it came from
+              is named under it. */}
+          {card.source && <p className="mt-0.5 text-small text-ink-muted">From {card.source}</p>}
 
           {/* The one thing to remember, first, for someone who reads no
               further (note 125f60f2). Older cards have none. */}

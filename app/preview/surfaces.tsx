@@ -1879,22 +1879,26 @@ const shellSections: NavSection[] = [
   { href: '/jobs/review', label: 'Review', icon: 'review', badge: 4 },
 ];
 
-/** Two Learn now cards in the form the writer now produces, for the deck. */
+/**
+ * Two Learn now cards for the deck: one idea card in the form the writer now
+ * produces, and one written before cards carried one idea each.
+ */
 const deckCards: FeedCard[] = [
   {
     id: '00000000-0000-4000-8000-000000000001',
     reason: 'interest',
-    title: 'Cobweb model: Mechanism',
+    title: 'Planting on last year’s price',
+    source: 'Cobweb model: Mechanism',
     article: 'Cobweb model',
     section: 'Mechanism',
     why: 'You write about economic system design (Economics).',
     takeaway:
       'When farmers plant based on last year’s price, prices can swing up and down for years instead of settling.',
     context:
-      'The cobweb model is a way economists explain boom-and-bust cycles in farm markets. It was worked out in the 1930s by Nicholas Kaldor and others, looking at crops and livestock where output has to be planned a season before it is sold. The name comes from the spiral the price and quantity trace on a supply and demand chart.',
+      'Some goods, such as crops and livestock, must be planned a season or more before they are sold. The producer has to commit to an amount before seeing the price it will fetch.',
     hook: 'US hog prices swung in a four-year cycle for decades because farmers set next year’s herd from this year’s price.',
     summary:
-      'When producers must commit to output before they see the price it will fetch, they plan from the last price. A high price brings a glut the following season, the glut drives the price down, and the low price brings a shortage. Whether the swings die out depends on whether supply responds to price more or less steeply than demand does.',
+      'A high price brings a glut the following season, the glut drives the price down, and the low price brings a shortage. Whether the swings die out depends on whether supply responds to price more or less steeply than demand does.',
     example:
       'Suppose demand is P = 100 − Q and farmers plant Q = P from last year’s price. Starting at P = 60, they plant 60, which sells at 40; next year they plant 40, which sells at 60. With equal slopes the cycle neither grows nor shrinks, and any steeper supply response makes it explode.',
     question:
@@ -1919,6 +1923,7 @@ const deckCards: FeedCard[] = [
     id: '00000000-0000-4000-8000-000000000002',
     reason: 'gap',
     title: 'Tax incidence: Elasticity',
+    source: null,
     article: 'Tax incidence',
     section: 'Elasticity',
     why: 'A field you write about but have never been tested in: Public economics.',

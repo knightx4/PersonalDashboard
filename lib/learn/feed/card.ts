@@ -13,6 +13,8 @@ export type FeedCardRow = {
   id: string;
   reason: 'interest' | 'gap' | 'goal' | 'queued';
   status: string;
+  /** The idea's short name. Null on cards written before one idea per card. */
+  idea_name?: string | null;
   summary: string | null;
   why: string | null;
   takeaway?: string | null;
@@ -30,8 +32,10 @@ export type FeedCardRow = {
 export type FeedCard = {
   id: string;
   reason: 'interest' | 'gap' | 'goal';
-  /** "Article: Section", or the article alone for its lead. */
+  /** The idea's name, or "Article: Section" on a card written before ideas. */
   title: string;
+  /** "Article: Section", named under an idea's title as its source. Null when the title already is. */
+  source: string | null;
   article: string;
   section: string | null;
   why: string;
@@ -185,7 +189,8 @@ export function toFeedCard(row: FeedCardRow): FeedCard | null {
   return {
     id: row.id,
     reason: row.reason,
-    title: cardTitle(row.item.title, row.segment.heading),
+    title: row.idea_name?.trim() || cardTitle(row.item.title, row.segment.heading),
+    source: row.idea_name?.trim() ? cardTitle(row.item.title, row.segment.heading) : null,
     article: row.item.title,
     section: row.segment.heading,
     why: row.why,

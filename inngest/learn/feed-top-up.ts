@@ -14,7 +14,8 @@ import {
   type TopUpSummary,
 } from '@/lib/learn/feed/top-up';
 import type { Depth } from '@/lib/learn/feed/depth';
-import { WRITE_CARD_MODEL, writeCard, type CardToWrite } from '@/lib/learn/feed/write-card';
+import { nearbyIdeas, saveIdeas } from '@/lib/learn/feed/ideas-store';
+import { WRITE_CARD_MODEL, writeCard, type CardToWrite, type IdeaCard, type WriteResult } from '@/lib/learn/feed/write-card';
 import type { LearnOperation } from '@/lib/learn/spend';
 import { createFeedPicker, loadFeedFields, peopleToPickFor } from './feed-picks';
 
@@ -40,9 +41,39 @@ export const FEED_TOP_UP_BUDGET_MS = 230_000;
 export const FEED_TOP_UP_AFTER_RESPONSE_MS = 120_000;
 
 const OPERATION: LearnOperation = 'write-feed-card';
+const EMBED_OPERATION: LearnOperation = 'embed-feed-ideas';
+
+/**
+ * The columns that say what a card was picked for and from, copied from the
+ * picked row onto the row for each further idea in its section.
+ */
+const PICK_COLUMNS =
+  'reason, theme_id, theme_name, field_id, reading_id, item_id, segment_id, named_article, named_section, ' +
+  'pick_basis, pick_model, depth, aim_id, aim_name, created_at';
+
+/** What a ready card's row holds for one idea. */
+function ideaColumns(idea: IdeaCard, index: number, conceptId: string | null, why: string, written_at: string) {
+  return {
+    status: 'ready',
+    idea_name: idea.name,
+    idea_index: index,
+    concept_id: conceptId,
+    takeaway: idea.takeaway,
+    context: idea.context,
+    hook: idea.hook,
+    summary: idea.summary,
+    example: idea.example,
+    check_question: idea.question,
+    check_answer: idea.answer,
+    why,
+    write_model: WRITE_CARD_MODEL,
+    written_at,
+  };
+}
 
 type PickedRow = {
   id: string;
+  segment_id: string | null;
   reason: 'interest' | 'gap' | 'goal' | 'queued';
   theme_name: string | null;
   aim_name: string | null;
@@ -88,7 +119,7 @@ async function loadPicked(
   const { data, error } = await learn
     .from('feed_cards')
     .select(
-      'id, reason, theme_name, aim_name, field_id, named_article, depth, ' +
+      'id, segment_id, reason, theme_name, aim_name, field_id, named_article, depth, ' +
         'item:catalogue_items!feed_cards_item_id_fkey(title), ' +
         'segment:catalogue_segments!feed_cards_segment_id_fkey(heading, text), ' +
         'field:area_fields!feed_cards_field_id_fkey(name, scope)',
@@ -105,6 +136,7 @@ async function loadPicked(
     return [
       {
         id: row.id,
+        segmentId: row.segment_id,
         reason: row.reason,
         themeName: row.theme_name,
         aimName: row.aim_name,
@@ -155,30 +187,68 @@ async function topUpWith(
     },
     write: async (id, card) => {
       const spend: SpendReport[] = [];
-      const result = await writeCard({ card, anthropicApiKey: apiKey, onSpend: (report) => spend.push(report) });
-      // Awaited, so the row lands before the function is frozen.
-      for (const report of spend) {
-        await recordSpend(core, id, { module: 'learn', operation: OPERATION, model: report.model, usage: report.usage });
+      const embedSpend: SpendReport[] = [];
+      const record = async () => {
+        // Awaited, so the rows land before the function is frozen.
+        for (const report of spend) {
+          await recordSpend(core, id, { module: 'learn', operation: OPERATION, model: report.model, usage: report.usage });
+        }
+        for (const report of embedSpend) {
+          await recordSpend(core, id, { module: 'learn', operation: EMBED_OPERATION, model: report.model, usage: report.usage });
+        }
+      };
+
+      const known = await nearbyIdeas(
+        learn,
+        id,
+        { segmentId: card.segmentId ?? null, article: card.article, heading: card.section, text: card.text },
+        (report) => embedSpend.push(report),
+      );
+      const result = await writeCard({
+        card: { ...card, known },
+        anthropicApiKey: apiKey,
+        onSpend: (report) => spend.push(report),
+      });
+      if (result.outcome === 'failed') {
+        await record();
+        return result;
       }
-      if (result.outcome === 'failed') return result;
 
       const written_at = new Date().toISOString();
+      let outcome: WriteResult = result;
+      let ideas: { idea: IdeaCard; conceptId: string | null }[] = [];
+      if (result.outcome === 'ready') {
+        const saved = await saveIdeas(
+          learn,
+          id,
+          { article: card.article, section: card.section },
+          result.ideas,
+          (report) => embedSpend.push(report),
+        );
+        ideas = result.ideas.flatMap((idea, index) => {
+          const kept = saved[index] ?? { kind: 'unsaved' };
+          if (kept.kind === 'duplicate') return [];
+          return [{ idea, conceptId: kept.kind === 'new' ? kept.conceptId : null }];
+        });
+        if (ideas.length === 0) {
+          const names = saved.flatMap((kept) => (kept.kind === 'duplicate' ? [kept.name] : []));
+          outcome = { outcome: 'dropped', reason: `Every idea was one already held: ${names.join('; ')}.` };
+        } else {
+          outcome = { ...result, ideas: ideas.map((kept) => kept.idea) };
+        }
+      }
+      await record();
+
+      const [first, ...rest] = ideas;
       const change =
-        result.outcome === 'ready'
-          ? {
-              status: 'ready',
-              takeaway: result.takeaway,
-              context: result.context,
-              hook: result.hook,
-              summary: result.summary,
-              example: result.example,
-              check_question: result.question,
-              check_answer: result.answer,
-              why: result.why,
+        outcome.outcome === 'ready' && first && result.outcome === 'ready'
+          ? ideaColumns(first.idea, 0, first.conceptId, result.why, written_at)
+          : {
+              status: 'dropped',
+              drop_reason: outcome.outcome === 'dropped' ? outcome.reason : 'No idea was kept.',
               write_model: WRITE_CARD_MODEL,
               written_at,
-            }
-          : { status: 'dropped', drop_reason: result.reason, write_model: WRITE_CARD_MODEL, written_at };
+            };
       // Only a row still picked: a second top-up running at the same time
       // may have written it already, and its card stands.
       const { data, error } = await learn
@@ -187,10 +257,24 @@ async function topUpWith(
         .eq('id', card.id)
         .eq('user_id', id)
         .eq('status', 'picked')
-        .select('id');
+        .select(PICK_COLUMNS);
       if (error) return { outcome: 'failed', detail: `Saving the card failed: ${error.message}` };
-      if ((data ?? []).length === 0) return { outcome: 'failed', detail: 'Written by another run first.' };
-      return result;
+      const picked = (data ?? [])[0] as unknown as Record<string, unknown> | undefined;
+      if (!picked) return { outcome: 'failed', detail: 'Written by another run first.' };
+      if (outcome.outcome !== 'ready' || result.outcome !== 'ready') return outcome;
+
+      // The section's further ideas, each a card of its own on the same pick.
+      let stored = 1;
+      for (const [offset, kept] of rest.entries()) {
+        const { error: insertError } = await learn.from('feed_cards').insert({
+          ...picked,
+          user_id: id,
+          ...ideaColumns(kept.idea, offset + 1, kept.conceptId, result.why, written_at),
+        });
+        if (insertError) console.error('[learn feed top-up] saving a further idea', insertError.message);
+        else stored += 1;
+      }
+      return { ...outcome, ideas: outcome.ideas.slice(0, stored) };
     },
     now: Date.now,
   };

@@ -151,7 +151,7 @@ export async function runTopUpFor(
     const plan = planTopUp({ ready: summary.readyAfter, picked: waiting.length, target });
 
     if (plan.write > 0) {
-      const settled = await writeSome(ports, userId, waiting.slice(0, plan.write), deadline, summary, failedIds);
+      const settled = await writeSome(ports, userId, waiting.slice(0, plan.write), deadline, target, summary, failedIds);
       if (settled === 0) {
         summary.stopped = ports.now() >= deadline ? 'deadline' : 'no-progress';
         break;
@@ -180,20 +180,27 @@ export async function runTopUpFor(
 }
 
 /**
- * Write the given cards, `WRITE_CONCURRENCY` at a time, until they are done or
- * the deadline passes. Returns how many were settled, ready or dropped.
+ * Write the given cards, `WRITE_CONCURRENCY` at a time, until they are done,
+ * the target is reached, or the deadline passes. Returns how many were
+ * settled, ready or dropped.
+ *
+ * The plan counts one card per picked row, but a section can make a card for
+ * each of up to three ideas, so a batch can reach the target early; no batch
+ * is started after it has.
  */
 async function writeSome(
   ports: TopUpPorts,
   userId: string,
   cards: CardToWrite[],
   deadline: number,
+  target: number,
   summary: TopUpSummary,
   failedIds: Set<string>,
 ): Promise<number> {
   let settled = 0;
   for (let start = 0; start < cards.length; start += WRITE_CONCURRENCY) {
     if (ports.now() >= deadline) break;
+    if (summary.readyAfter >= target) break;
     const batch = cards.slice(start, start + WRITE_CONCURRENCY);
     const results = await Promise.all(
       batch.map((card) =>
@@ -208,8 +215,9 @@ async function writeSome(
     results.forEach((result, index) => {
       const card = batch[index];
       if (result.outcome === 'ready') {
-        summary.written += 1;
-        summary.readyAfter += 1;
+        // One section can make a card for each of its ideas.
+        summary.written += result.ideas.length;
+        summary.readyAfter += result.ideas.length;
         settled += 1;
       } else if (result.outcome === 'dropped') {
         summary.dropped.push({ article: card.article, section: card.section, reason: result.reason });
