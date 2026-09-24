@@ -12,6 +12,7 @@ import { storeArticleOverRest } from '@/lib/learn/catalogue/store-rest';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { cardTitle, isCardDifficulty } from '@/lib/learn/feed/card';
 import { progressFrom } from '@/lib/learn/feed/depth';
+import { LEVEL3_PICKS_PER_DRAW, untouchedPicks, type Level3Article } from '@/lib/learn/feed/level3';
 import { NAME_MATERIAL_MODEL, nameMaterial } from '@/lib/learn/feed/name-material';
 import {
   runFeedPicksFor,
@@ -66,8 +67,9 @@ async function readAll<T>(
 }
 
 /**
- * Every account with at least one theme placed in a field, or an active
- * open-subject goal (plan #900), which is enough to draw cards for.
+ * Every account with at least one theme placed in a field, or an active goal
+ * (plan #900; the Level 3 goal counts, plan #910), which is enough to draw
+ * cards for.
  */
 export async function peopleToPickFor(learn: LearnSupabaseClient): Promise<string[]> {
   const [themed, aiming] = await Promise.all([
@@ -82,7 +84,6 @@ export async function peopleToPickFor(learn: LearnSupabaseClient): Promise<strin
           .from('aims')
           .select('user_id')
           .is('archived_at', null)
-          .is('list_source', null)
           .order('user_id')
           .range(from, to),
       'goals',
@@ -92,10 +93,10 @@ export async function peopleToPickFor(learn: LearnSupabaseClient): Promise<strin
 }
 
 /**
- * This person's active open-subject goals, as the draw needs them, oldest
- * first. The Level 3 goal is left out: its cards come from its list (plan
- * #910). A goal not placed yet is drawn from its wording, since nothing
- * retries a placement that failed.
+ * This person's active goals, as the draw needs them, oldest first. The Level
+ * 3 goal is among them, marked by `list`, and the pass takes its cards from
+ * the list rather than naming them (plan #910). A goal not placed yet is drawn
+ * from its wording, since nothing retries a placement that failed.
  */
 async function loadGoals(
   learn: LearnSupabaseClient,
@@ -107,7 +108,6 @@ async function loadGoals(
     .select(AIM_COLUMNS)
     .eq('user_id', userId)
     .is('archived_at', null)
-    .is('list_source', null)
     .order('created_at', { ascending: true });
   if (error) throw new Error(`Reading your goals failed: ${error.message}`);
   const aims = ((data ?? []) as AimRow[]).map(toAim);
@@ -117,6 +117,7 @@ async function loadGoals(
     goals: aims.map((aim) => ({
       id: aim.id,
       name: aim.name,
+      ...(aim.listSource ? { list: aim.listSource } : {}),
       about: aim.about,
       depth: cardDepthForAim(aim.depth),
       field: aim.fieldId ? (fieldById.get(aim.fieldId) ?? null) : null,
@@ -323,6 +324,17 @@ export function createFeedPicker(context: {
           });
         }
         return result;
+      },
+      drawFromList: async (_goal, avoid) => {
+        // The Level 3 list is the only list. Untouched articles only for now;
+        // claimed ones due back join these picks in #912.
+        const { data, error } = await learn.rpc('level3_untouched_articles', {
+          p_user_id: userId,
+          p_count: LEVEL3_PICKS_PER_DRAW,
+          p_exclude: avoid,
+        });
+        if (error) return { ok: false, detail: `Reading the Level 3 list failed: ${error.message}` };
+        return { ok: true, named: untouchedPicks((data ?? []) as Level3Article[], avoid) };
       },
       fetchArticle: fetchWikipediaArticle,
       storeArticle: (article) => storeArticleOverRest(learn, article),
