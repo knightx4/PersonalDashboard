@@ -10,7 +10,7 @@ import {
   setPlanItemStatus,
   type PlanActionState,
 } from '@/app/dev/plan/actions';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { AnswerBox, TheAnswered, TheOptions, useAnswerDraft } from '@/components/dev/question';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
@@ -21,6 +21,7 @@ import { MODULES, type ModuleId } from '@/lib/modules';
 import { PLAN_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { WAITING_WORD } from '@/lib/dev/words';
 import { isJobForYou, type WaitingEntry, type WaitingRow } from '@/lib/plan/waiting';
+import { whereToDoIt } from '@/lib/plan/where';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -81,6 +82,9 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
   // box can sit bottom right with the card's other presses (note fdf6bc83).
   const answerable = question || (blocked && !blockedJob);
   const [answering, setAnswering] = useState(false);
+  // A job is done somewhere, and the card says where when its own text does
+  // (note 331c5a56). Questions and proposals are settled on this card.
+  const where = setup || blockedJob ? whereToDoIt(row.ask) : null;
 
   return (
     <li className="space-y-1 p-3">
@@ -122,9 +126,7 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
         </p>
       )}
 
-      {question && (
-        <AnswerQuestion row={row} answering={answering} setAnswering={setAnswering} />
-      )}
+      {question && <AnswerQuestion row={row} answering={answering} setAnswering={setAnswering} />}
       {blocked && !blockedJob && answering && (
         <AnswerBlocked row={row} onClose={() => setAnswering(false)} />
       )}
@@ -148,8 +150,30 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
         <p className="text-micro text-ink-ghost">
           {row.module ? MODULE_LABEL[row.module] : 'Everything'}
         </p>
-        {setup && <SetupDone row={row} />}
-        {blockedJob && <BlockedDone row={row} />}
+        {(setup || blockedJob) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {where &&
+              (where.external ? (
+                <a
+                  href={where.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                >
+                  Open {where.label} ↗
+                </a>
+              ) : (
+                <Link
+                  href={where.href}
+                  className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                >
+                  {where.label}
+                </Link>
+              ))}
+            {setup && <SetupDone row={row} />}
+            {blockedJob && <BlockedDone row={row} />}
+          </div>
+        )}
         {proposed && <ApprovePlanRow row={row} />}
         {/* Filled, the same as "I have set this up": on a question the answer
             is the one thing the card is asking of you (note fdf6bc83). */}
