@@ -5,11 +5,19 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { parseAimFields, type AimFields } from '@/lib/learn/aims';
-import { archiveAim, insertAim, insertLevel3Aim, updateAim } from '@/lib/learn/aims-store';
+import {
+  archiveAim,
+  insertAim,
+  insertLevel3Aim,
+  rewordsAim,
+  updateAim,
+} from '@/lib/learn/aims-store';
+import { placeAimsAfterResponse } from '@/lib/learn/areas/place-aim';
 
 /**
  * The Goals page's writes (plan #897): add a goal, add the Level 3 goal in one
- * press, change a goal's wording or depth, and archive one.
+ * press, change a goal's wording or depth, and archive one. Adding or
+ * rewording an open goal places it in the area grid after the response (#898).
  *
  * Each returns a sentence to show rather than throwing, so a refused write
  * leaves the page standing with the reason beside the control.
@@ -30,6 +38,8 @@ export async function addGoal(_prev: GoalActionState, form: FormData): Promise<G
   try {
     const supabase = await createLearnClient();
     await insertAim(supabase, user.id, parsed.fields as AimFields);
+    // Into a field once the response has gone (#898); the page checks back.
+    placeAimsAfterResponse(supabase, user.id);
   } catch {
     return { error: 'The goal could not be saved. Try again.' };
   }
@@ -55,7 +65,7 @@ export async function addLevel3Goal(): Promise<GoalActionState> {
 /** An edit sends only the field that changed: the name, the line or the depth. */
 // latency: pending
 export async function editGoal(_prev: GoalActionState, form: FormData): Promise<GoalActionState> {
-  await requireUser();
+  const user = await requireUser();
   const id = AimId.safeParse(form.get('id'));
   if (!id.success) return { error: 'Could not tell which goal that was.' };
   const parsed = parseAimFields((key) => form.get(key), { partial: true });
@@ -66,6 +76,8 @@ export async function editGoal(_prev: GoalActionState, form: FormData): Promise<
     const supabase = await createLearnClient();
     const changed = await updateAim(supabase, id.data, parsed.fields);
     if (!changed) return { error: 'That goal is no longer in your list.' };
+    // A new name or line cleared the placement; place it again.
+    if (rewordsAim(parsed.fields)) placeAimsAfterResponse(supabase, user.id);
   } catch {
     return { error: 'The change could not be saved. Try again.' };
   }

@@ -29,13 +29,16 @@ export type Aim = {
   listSource: AimListSource | null;
   fieldId: string | null;
   domainId: string | null;
+  /** Set once placement has answered, even when it left the aim out of every field. */
+  placedAt: string | null;
   archivedAt: string | null;
   createdAt: string;
+  updatedAt: string;
 };
 
 /** The columns `toAim` reads, for a `.select()`. */
 export const AIM_COLUMNS =
-  'id, name, about, depth, list_source, field_id, domain_id, archived_at, created_at';
+  'id, name, about, depth, list_source, field_id, domain_id, placed_at, archived_at, created_at, updated_at';
 
 export type AimRow = {
   id: string;
@@ -45,8 +48,10 @@ export type AimRow = {
   list_source: string | null;
   field_id: string | null;
   domain_id: string | null;
+  placed_at: string | null;
   archived_at: string | null;
   created_at: string;
+  updated_at: string;
 };
 
 export function isAimDepth(value: unknown): value is AimDepth {
@@ -62,9 +67,50 @@ export function toAim(row: AimRow): Aim {
     listSource: row.list_source === 'level3' ? 'level3' : null,
     fieldId: row.field_id,
     domainId: row.domain_id,
+    placedAt: row.placed_at,
     archivedAt: row.archived_at,
     createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
+}
+
+/**
+ * Where an aim sits in the area grid, as the Goals page says it (plan #898).
+ *
+ * `list`: the Level 3 goal, which covers every field and is never placed.
+ * `field` or `domain`: placed, with the area's name.
+ * `spans`: placement answered that it spans domains, so it sits in none.
+ * `pending`: saved or reworded in the last few minutes and not placed yet.
+ * The call runs after the save's response and takes seconds, so the page
+ * checks back while any goal is pending.
+ * `unplaced`: still not placed after that, because the call failed. Saving
+ * any goal, or rewording this one, tries again.
+ */
+export type AimPlace =
+  | { kind: 'list' }
+  | { kind: 'field' | 'domain'; name: string }
+  | { kind: 'spans' }
+  | { kind: 'pending' }
+  | { kind: 'unplaced' };
+
+/** How long after a save an unplaced aim still reads as on its way. */
+export const AIM_PLACING_MS = 2 * 60 * 1000;
+
+export function aimPlace(
+  aim: Pick<Aim, 'listSource' | 'fieldId' | 'domainId' | 'placedAt' | 'updatedAt'>,
+  areaNames: ReadonlyMap<string, string>,
+  now: number = Date.now(),
+): AimPlace {
+  if (aim.listSource) return { kind: 'list' };
+  if (aim.placedAt) {
+    if (aim.fieldId) return { kind: 'field', name: areaNames.get(aim.fieldId) ?? 'a field' };
+    if (aim.domainId) return { kind: 'domain', name: areaNames.get(aim.domainId) ?? 'a domain' };
+    return { kind: 'spans' };
+  }
+  const since = Date.parse(aim.updatedAt);
+  return Number.isFinite(since) && now - since < AIM_PLACING_MS
+    ? { kind: 'pending' }
+    : { kind: 'unplaced' };
 }
 
 /** The Learn now card depth an aim's cards start at. */
