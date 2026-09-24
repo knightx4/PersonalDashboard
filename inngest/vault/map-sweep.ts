@@ -7,6 +7,7 @@ import { recordSpend } from '@/lib/core/spend/record';
 import type { LearnOperation } from '@/lib/learn/spend';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { acceptNoteMap } from '@/lib/vault/map/accept';
+import { scorePositionCentrality, type CentralityResult } from '@/lib/vault/map/centrality';
 import { embedMapRows, type MapEmbedResult } from '@/lib/vault/map/embed';
 import { linkPositions, type LinkPassResult } from '@/lib/vault/map/link-positions';
 import { applyMergeProposals, type ApplyResult } from '@/lib/vault/map/merge-apply';
@@ -75,6 +76,13 @@ export const POSITION_APPLY_UNTIL_MS = 285_000;
  */
 export const LINK_UNTIL_MS = 255_000;
 
+/**
+ * When scoring centrality stops starting new calls (plan #817). It runs last,
+ * after the merges and links that change the graph, and a call takes one to
+ * five seconds, so this leaves room inside the route's 300 seconds.
+ */
+export const CENTRALITY_UNTIL_MS = 292_000;
+
 const OPERATION: LearnOperation = 'map-sweep';
 
 type SweepRow = { id: string; user_id: string; after_path: string | null; notes_total: number | null };
@@ -111,6 +119,11 @@ export type MapSweepTickSummary = {
    * had pairs to judge or did not run, or it threw.
    */
   links: Pick<LinkPassResult, 'judged' | 'edges' | 'stopped'> | null;
+  /**
+   * Positions rescored by PageRank over their edges (plan #817), after every
+   * merge and link pass. Null when it threw.
+   */
+  centrality: Pick<CentralityResult, 'written' | 'remaining' | 'stopped'> | null;
 };
 
 export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
@@ -126,6 +139,7 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
     positionMerges: null,
     applied: { theme: null, position: null },
     links: null,
+    centrality: null,
   };
 
   const nowIso = new Date().toISOString();
@@ -236,6 +250,20 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
     } catch (err) {
       console.error('[map sweep] position links', err instanceof Error ? err.message : err);
     }
+  }
+
+  // Centrality from the graph as the merges and links above left it. Every
+  // tick, since an undo or a merge applied elsewhere changes it too; a tick
+  // that changed nothing writes nothing.
+  try {
+    const scored = await scorePositionCentrality(supabase, {
+      userId: null,
+      deadline: startedAt + CENTRALITY_UNTIL_MS,
+    });
+    if (scored.stopped?.reason === 'error') console.error('[map sweep] centrality', scored.stopped.detail);
+    summary.centrality = { written: scored.written, remaining: scored.remaining, stopped: scored.stopped };
+  } catch (err) {
+    console.error('[map sweep] centrality', err instanceof Error ? err.message : err);
   }
 
   return summary;
