@@ -335,6 +335,59 @@ describe('goals step tree', () => {
   });
 });
 
+describe('goals links', () => {
+  it('links a goal to a Learn aim and the job search, with history', async () => {
+    const [aim] = await admin<{ id: string }[]>`
+      insert into learn.aims (user_id, name) values (${userA}, 'Urban planning basics')
+      returning id`;
+
+    const link = await asUser(userA, async (tx) => {
+      const [row] = await tx<{ id: string }[]>`
+        insert into links (user_id, item_id, kind, target_id)
+        values (${userA}, ${goalA}, 'aim', ${aim.id}) returning id`;
+      await tx`
+        insert into links (user_id, item_id, kind) values (${userA}, ${goalA}, 'job_search')`;
+      return row.id;
+    });
+    const rows = await historyOf(link);
+    expect(rows[0]).toMatchObject({ table_name: 'links', action: 'insert', actor: 'me' });
+
+    // The job search has no target, and a goal holds it once.
+    await expect(
+      admin`insert into links (user_id, item_id, kind) values (${userA}, ${goalA}, 'job_search')`,
+    ).rejects.toThrow(/links_target_key/);
+    await expect(
+      admin`insert into links (user_id, item_id, kind, target_id)
+            values (${userA}, ${goalA}, 'job_search', ${aim.id})`,
+    ).rejects.toThrow(/links_target_ck/);
+
+    // Unlinking an aim Learn has since archived is still allowed.
+    await admin`update learn.aims set archived_at = now() where id = ${aim.id}`;
+    await asUser(userA, (tx) => tx`update links set archived_at = now() where id = ${link}`);
+    // Bringing it back is not, while the aim is archived.
+    await expect(
+      asUser(userA, (tx) => tx`update links set archived_at = null where id = ${link}`),
+    ).rejects.toThrow(/no aim/);
+  });
+
+  it("refuses a link to another account's aim or a target that does not exist", async () => {
+    const [aimB] = await admin<{ id: string }[]>`
+      insert into learn.aims (user_id, name) values (${userB}, 'Their aim') returning id`;
+    await expect(
+      admin`insert into links (user_id, item_id, kind, target_id)
+            values (${userA}, ${goalA}, 'aim', ${aimB.id})`,
+    ).rejects.toThrow(/no aim/);
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into links (user_id, item_id, kind, target_id)
+        values (${userA}, ${goalA}, 'application', gen_random_uuid())`),
+    ).rejects.toThrow(/no application/);
+    // And the other account cannot see A's links at all.
+    const seen = await asUser(userB, (tx) => tx`select id from links`);
+    expect(seen).toHaveLength(0);
+  });
+});
+
 describe('goals and the account', () => {
   it('goes with the account when it is deleted', async () => {
     const leaving = await createUser('goals-leaving@example.com');
@@ -388,6 +441,7 @@ describe('RLS coverage', () => {
       'captures',
       'item_goals',
       'items',
+      'links',
       'periods',
       'readings',
       'runs',
