@@ -7,6 +7,7 @@ import { runVaultSyncForAll } from '@/inngest/vault/sync';
 import { runClaimSweep } from '@/inngest/dev/claims';
 import { runDevDigest } from '@/inngest/dev/digest';
 import { runGoalsDaily } from '@/inngest/goals/daily';
+import { runGoalsWeekly } from '@/inngest/goals/weekly';
 
 // Long enough for the pump it starts: PUMP_BUDGET_MS is what that work is
 // allowed to take, and a route that ends first takes the hand-off with it.
@@ -29,7 +30,11 @@ export const maxDuration = 300;
  *
  * The morning goals run (plan #933) only fires the goals routine and returns,
  * so it costs a few reads and one request. It comes before the dev stages
- * because its results are what the person opens the app for.
+ * because its results are what the person opens the app for. The weekly
+ * goals run (plan #934) follows it: every day it marks last week's unanswered
+ * suggestions ignored, and once a week, kept by the gap since the last weekly
+ * run, it fires the same routine to research city events. There is no second
+ * cron for it because the Hobby plan allows one.
  *
  * The claim sweep and the digest are both about the dev pages, and they are in
  * that order because the sweep corrects rows the digest then reports: a step
@@ -57,6 +62,7 @@ export async function GET(request: NextRequest) {
     { name: 'jd-backfill', run: () => runJdBackfill() },
     { name: 'vault', run: () => runVaultSyncForAll() },
     { name: 'goals-daily', run: () => runGoalsDaily() },
+    { name: 'goals-weekly', run: () => runGoalsWeekly() },
     { name: 'plan-claims', run: () => runClaimSweep() },
     { name: 'dev-digest', run: () => runDevDigest() },
   ];

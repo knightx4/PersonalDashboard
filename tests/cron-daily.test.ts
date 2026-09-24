@@ -116,6 +116,12 @@ vi.mock('@/inngest/vault/sync', () => ({
     failed: [],
   })),
 }));
+vi.mock('@/inngest/goals/daily', () => ({
+  runGoalsDaily: vi.fn(async () => ({ skipped: 'no Claude steps are ready' })),
+}));
+vi.mock('@/inngest/goals/weekly', () => ({
+  runGoalsWeekly: vi.fn(async () => ({ started: true, runId: 'run-1', rhythms: 1, past: 0, ignored: 2 })),
+}));
 vi.mock('@/inngest/dev/claims', () => ({
   runClaimSweep: vi.fn(async () => ({ released: 2, steps: [42, 43] })),
 }));
@@ -128,6 +134,8 @@ const { runJobSweep } = await import('@/inngest/jobs/cron/sweep');
 const { runJdBackfill } = await import('@/inngest/jobs/cron/jd-backfill');
 const { runVaultSyncForAll } = await import('@/inngest/vault/sync');
 const { runClaimSweep } = await import('@/inngest/dev/claims');
+const { runGoalsDaily } = await import('@/inngest/goals/daily');
+const { runGoalsWeekly } = await import('@/inngest/goals/weekly');
 const { runDevDigest } = await import('@/inngest/dev/digest');
 
 function cronRequest(token: string | null) {
@@ -180,6 +188,12 @@ describe('the daily cron route', () => {
 
     expect(runVaultSyncForAll).toHaveBeenCalled();
     expect(body.results['vault']).toMatchObject({ synced: 1, notesWritten: 4 });
+
+    // The weekly goals run is a stage of this cron, not a cron of its own:
+    // the Hobby plan allows one, and the stage keeps the week itself.
+    expect(runGoalsDaily).toHaveBeenCalled();
+    expect(runGoalsWeekly).toHaveBeenCalled();
+    expect(body.results['goals-weekly']).toMatchObject({ started: true, ignored: 2 });
 
     // The claim sweep runs before the digest, so the summary reports the rows
     // it has already corrected rather than the ones it is about to.
