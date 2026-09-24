@@ -36,6 +36,9 @@ function step(id: string, parentId: string, extra: Partial<Step> = {}): Step {
     rhythmCount: null,
     rhythmPeriod: null,
     onTodo: false,
+    result: null,
+    resultUrl: null,
+    reviewedAt: null,
     ...extra,
   };
 }
@@ -199,6 +202,33 @@ describe('dailyView waiting on you', () => {
       ['breakdown', 'b'],
       ['goal', 'a'],
     ]);
+  });
+
+  it('lists a Claude result until you mark it read, after breakdowns and before proposed goals', () => {
+    const result = view(
+      [goal('a', { status: 'proposed' }), goal('b')],
+      [
+        step('b-prop', 'b', { status: 'proposed' }),
+        step('draft', 'b', { kind: 'claude', status: 'done', result: 'Three gyms…' }),
+        step('linked', 'b', { kind: 'claude', status: 'done', resultUrl: 'https://example.test' }),
+        step('read', 'b', {
+          kind: 'claude',
+          status: 'done',
+          result: 'Old note',
+          reviewedAt: '2026-09-23T12:00:00Z',
+        }),
+        step('dropped', 'b', { kind: 'claude', status: 'dropped', result: 'Never mind' }),
+        step('pending', 'b', { kind: 'claude' }),
+      ],
+    );
+    expect(result.waiting.map((w) => [w.kind, w.id])).toEqual([
+      ['breakdown', 'b'],
+      ['review', 'draft'],
+      ['review', 'linked'],
+      ['goal', 'a'],
+    ]);
+    // The unworked Claude step is still a next item, and a closed one is not.
+    expect(nextIds(result, 'b')).toEqual(['pending']);
   });
 });
 

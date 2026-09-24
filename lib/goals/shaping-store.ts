@@ -66,25 +66,54 @@ export async function startGoalRun(input: {
   routine: RoutineTarget;
   fetch?: typeof globalThis.fetch;
 }): Promise<{ ok: true; detail: string } | { ok: false; error: string }> {
-  const { client, userId, goal, routine } = input;
+  const { goal, userId } = input;
+  const result = await recordAndFire({
+    ...input,
+    job: 'goal',
+    itemId: goal.id,
+    text: (runId) => goalRunText({ goalId: goal.id, goalTitle: goal.title, userId, runId }),
+  });
+  return result.ok ? { ok: true, detail: result.detail } : { ok: false, error: result.error };
+}
+
+/**
+ * The run row and the fire, for any job: "Work on this" on one goal, or the
+ * morning run (plan #933). `text` is the brief, given the new run's id. The
+ * run id comes back either way, null only when the row itself could not be
+ * written and nothing was started.
+ */
+export async function recordAndFire(input: {
+  client: GoalsSupabaseClient;
+  userId: string;
+  job: 'goal' | 'daily' | 'weekly';
+  itemId: string | null;
+  routine: RoutineTarget;
+  text: (runId: string) => string;
+  fetch?: typeof globalThis.fetch;
+}): Promise<
+  { ok: true; detail: string; runId: string } | { ok: false; error: string; runId: string | null }
+> {
+  const { client, userId, routine } = input;
   const { data, error } = await client
     .from('runs')
     .insert({
       user_id: userId,
-      job: 'goal',
-      item_id: goal.id,
+      job: input.job,
+      item_id: input.itemId,
       status: 'started',
       routine_id: resolveRoutineId(routine.id),
     })
     .select('id')
     .single();
-  if (error || !data) return { ok: false, error: 'The run could not be recorded, so nothing was started.' };
+  if (error || !data) {
+    return { ok: false, error: 'The run could not be recorded, so nothing was started.', runId: null };
+  }
   const runId = data.id as string;
 
   const result = await fireFeatureRoutine({
     apiKey: routine.token,
     routineId: routine.id,
-    text: goalRunText({ goalId: goal.id, goalTitle: goal.title, userId, runId }),
+    text: input.text(runId),
     fetch: input.fetch,
   });
 
@@ -95,12 +124,14 @@ export async function startGoalRun(input: {
         error: result.error.slice(0, ERROR_LIMIT),
         ended_at: new Date().toISOString(),
       };
-  const written = await client.from('runs').update(update).eq('id', runId);
+  const written = await client.from('runs').update(update).eq('id', runId).eq('user_id', userId);
   if (written.error) {
     console.error(`goals.runs update failed for run ${runId}: ${written.error.message}`);
   }
 
-  return result.ok ? { ok: true, detail: result.detail } : { ok: false, error: result.error };
+  return result.ok
+    ? { ok: true, detail: result.detail, runId }
+    : { ok: false, error: result.error, runId };
 }
 
 /**
@@ -131,6 +162,23 @@ export async function answerQuestion(
     .eq('kind', 'decision')
     .is('resolution', null)
     .is('archived_at', null)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Mark what Claude produced for a step as read (plan #933), which takes it
+ * off the home's waiting list. False when there is no unread result on it.
+ */
+export async function markReviewed(client: GoalsSupabaseClient, id: string): Promise<boolean> {
+  const { data, error } = await client
+    .from('items')
+    .update({ reviewed_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('kind', 'claude')
+    .is('reviewed_at', null)
+    .or('result.not.is.null,result_url.not.is.null')
     .select('id');
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;

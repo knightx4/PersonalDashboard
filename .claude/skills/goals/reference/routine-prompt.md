@@ -1,15 +1,18 @@
 # The goals routine
 
 The standing prompt for the Claude Code routine that **Work on this** on a
-goal's page fires (`app/goals/[goalId]/shaping-actions.ts`). The app appends a
-turn naming the goal, the account and the `goals.runs` row it wrote; the
-prompt below is what the routine carries when it starts.
+goal's page fires (`app/goals/[goalId]/shaping-actions.ts`), and that the
+daily cron fires each morning when a Claude step is ready
+(`inngest/goals/daily.ts`). The app appends a turn naming the goal or the
+steps, the account and the `goals.runs` row it wrote; the prompt below is what
+the routine carries when it starts.
 
 ## Setting it up
 
 1. On claude.ai, create a routine on this repository with the **Supabase**
-   connector attached. It needs no schedule for Work on this; the daily and
-   weekly runs (plan #933 and #934) add schedules later.
+   connector attached. It needs no schedule of its own: the app's daily cron
+   (`vercel.json`, `/api/cron/daily`) fires the morning run through the API,
+   with the same id and token as Work on this.
 2. Paste the prompt below as its instructions.
 3. Copy the routine's id (`trig_…`) and create a token for it.
 4. In Vercel, on the project's Production environment, set
@@ -30,8 +33,8 @@ goal, how to shape a new or vague one into proposed steps and one or two
 questions, what you may change before and after the person approves a goal,
 and how every write is labelled with goals.actor and goals.run_id.
 
-The turn after this one says which goal, which user_id and which goals.runs
-row this run is. If there is no such turn, write a goals.runs row yourself as
+The turn after this one says what to work (one goal, or the morning's Claude
+steps), which user_id and which goals.runs row this run is. If there is no such turn, write a goals.runs row yourself as
 the skill says and work every open goal that is new or has fog.
 
 You change rows, not code. Do not commit or push. Close the run row with a

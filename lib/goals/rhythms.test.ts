@@ -283,6 +283,9 @@ describe('liveRhythms', () => {
     rhythmCount: 1,
     rhythmPeriod: 'week',
     onTodo: false,
+    result: null,
+    resultUrl: null,
+    reviewedAt: null,
     ...extra,
   });
 

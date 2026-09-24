@@ -50,6 +50,9 @@ type ItemRow = {
   rhythm_count: number | null;
   rhythm_period: RhythmPeriod | null;
   on_todo: boolean;
+  result: string | null;
+  result_url: string | null;
+  reviewed_at: string | null;
   unit: string | null;
   target: number | string | null;
 };
@@ -58,7 +61,8 @@ type LinkRow = { id: string; item_id: string; goal_id: string };
 
 const ITEM_COLUMNS =
   'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, resolution, ' +
-  'due_on, position, rhythm_count, rhythm_period, on_todo, unit, target';
+  'due_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
+  'unit, target';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -74,6 +78,9 @@ const toStep = (row: ItemRow): Step => ({
   rhythmCount: row.rhythm_count,
   rhythmPeriod: row.rhythm_period,
   onTodo: row.on_todo,
+  result: row.result,
+  resultUrl: row.result_url,
+  reviewedAt: row.reviewed_at,
 });
 
 const toGoal = (row: ItemRow): Goal => ({
@@ -408,23 +415,24 @@ export async function unlinkStep(client: GoalsSupabaseClient, linkId: string): P
 /**
  * Every live goal in page order, area by area, with its area's name and its
  * step tree. A goal in an archived area is out of view with it.
+ *
+ * `userId` is for the service-role client the morning run reads with (plan
+ * #933), which row level security does not narrow to one account. The
+ * signed-in client leaves it out.
  */
 export async function loadLiveTree(
   client: GoalsSupabaseClient,
+  { userId }: { userId?: string } = {},
 ): Promise<{ goals: { goal: Goal; areaName: string }[]; byGoal: Map<string, StepNode[]> }> {
+  let itemsQuery = client.from('items').select(ITEM_COLUMNS).is('archived_at', null);
+  let areasQuery = client.from('areas').select('id, name').is('archived_at', null);
+  if (userId) {
+    itemsQuery = itemsQuery.eq('user_id', userId);
+    areasQuery = areasQuery.eq('user_id', userId);
+  }
   const [items, areas] = await Promise.all([
-    client
-      .from('items')
-      .select(ITEM_COLUMNS)
-      .is('archived_at', null)
-      .order('position')
-      .order('created_at'),
-    client
-      .from('areas')
-      .select('id, name')
-      .is('archived_at', null)
-      .order('position')
-      .order('created_at'),
+    itemsQuery.order('position').order('created_at'),
+    areasQuery.order('position').order('created_at'),
   ]);
   assertSchemaExposed(items.error, GOALS_SCHEMA);
   if (items.error) throw new Error(`Could not read steps: ${items.error.message}`);
