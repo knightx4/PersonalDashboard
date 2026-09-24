@@ -1,7 +1,8 @@
 import type { WikipediaArticle, WikipediaResult, WikipediaSection } from '@/lib/learn/providers/wikipedia';
 import { contextFor, NO_PROGRESS, type Depth, type DepthContext, type DepthProgress } from './depth';
+import { LEVEL3_LIST_PICKER } from './level3';
 import type { NameResult, NamedSection } from './name-material';
-import { createDrawer, wantsGap, wantsGoal, type DrawInput, type FeedTarget } from './targets';
+import { createDrawer, wantsGap, wantsGoal, type DrawInput, type FeedGoal, type FeedTarget } from './targets';
 
 /**
  * The picking pass behind Learn now (LEARN-NOW-SPEC, "How cards are made",
@@ -23,6 +24,11 @@ import { createDrawer, wantsGap, wantsGoal, type DrawInput, type FeedTarget } fr
  * Each target is named at a depth worked out from the person's swipes on it
  * (`depth.ts`), and the pick carries that depth so the card writer knows it.
  * A goal's target is named at the depth set on the goal (plan #900).
+ *
+ * The Level 3 goal skips the naming call (plan #910): its picks come from its
+ * list through `drawFromList`, one card per article, and are written as goal
+ * cards under its aim like any other goal's, so they share the one card in
+ * three and their swipes set its depth.
  */
 
 /** Targets drawn per person per call. At two or three picks each, about ten picks. */
@@ -67,6 +73,11 @@ export type FeedCardInsert = {
 export type FeedPickPorts = {
   loadPerson(userId: string): Promise<PersonInputs>;
   name(target: FeedTarget, avoid: string[], depth: DepthContext): Promise<NameResult>;
+  /**
+   * Picks for a goal with a list (the Level 3 goal), in place of `name`:
+   * articles from the list, none of them in `avoid`, each read from its lead.
+   */
+  drawFromList(goal: FeedGoal & { list: 'level3' }, avoid: string[]): Promise<NameResult>;
   fetchArticle(title: string): Promise<WikipediaResult>;
   storeArticle(article: WikipediaArticle): Promise<{ itemId: string; segments: { id: string; ordinal: number }[] }>;
   /** Insert one row; 'duplicate' when this person already has the section. */
@@ -234,7 +245,9 @@ export async function runFeedPicksFor(
     summary.targets.push({ reason: target.reason, name: targetName(target) });
 
     const depth = contextFor(person.progress ?? NO_PROGRESS, depthTarget(target));
-    const named = await ports.name(target, avoid, depth);
+    const listGoal = target.reason === 'goal' && target.goal.list ? { ...target.goal, list: target.goal.list } : null;
+    const named = listGoal ? await ports.drawFromList(listGoal, avoid) : await ports.name(target, avoid, depth);
+    const model = listGoal ? LEVEL3_LIST_PICKER : options.model;
     if (!named.ok) {
       summary.failed.push(`${targetName(target)}: ${named.detail}`);
       continue;
@@ -243,7 +256,7 @@ export async function runFeedPicksFor(
     for (const pick of named.named) {
       avoid.unshift(pick.article);
       try {
-        if (await pickOne(ports, userId, target, pick, options.model, depth.depth, summary)) {
+        if (await pickOne(ports, userId, target, pick, model, depth.depth, summary)) {
           counts[target.reason] += 1;
           summary.picked[target.reason] += 1;
           window.total += 1;

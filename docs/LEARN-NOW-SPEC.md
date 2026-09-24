@@ -133,8 +133,14 @@ names the goal, and it starts at the depth set on the goal: familiar, solid and
 deep pick at working, advanced and specialist. From there it moves the way a
 theme does, counted by goal (plan #909): two goal cards marked Got it take a
 familiar goal from working to advanced, and cards you said you need to work on
-come back from another angle rather than deeper. The Level 3 goal is drawn from
-its own list instead (plan #910).
+come back from another angle rather than deeper.
+
+The Level 3 goal takes its turn in the same one card in three, but its cards
+skip the naming call (plan #910). Each draw takes two articles at random from
+the Level 3 list that you have shown no sign of knowing (nothing in the
+evidence view: no Got it, no save, no right Test me answer) and that have never
+been on a card of yours, and makes a card from each article's lead. Claimed but
+untested articles coming back after a gap join the same draw later (#912).
 
 Your own queued readings are served before either, in the order you queued
 them.
