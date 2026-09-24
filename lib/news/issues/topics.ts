@@ -12,6 +12,10 @@
 export const NEWS_TOPICS = [
   'Politics',
   'World',
+  // A story mainly about the place the reader lives, as named in News
+  // settings (note 552a9407, news.preferences). With no place set, nothing
+  // is tagged Local.
+  'Local',
   'Business',
   'Markets',
   'Technology',
