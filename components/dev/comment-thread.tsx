@@ -384,30 +384,69 @@ export function CommentThread({
                 every chat window does and what makes this one feel like a
                 message rather than a field with a Save under it. Escape puts
                 the box away. */}
-            <ComposeBody
-              ref={box}
-              name="body"
-              rows={1}
-              autoFocus
-              placeholder={placeholder}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape') {
+            <div className="flex items-start gap-2">
+              {/* Dash's own head, at the left of the line you type on, puts
+                  the tag in front of what you have written (note 66f5a513).
+                  It replaced a "Tag @dash" word in the row underneath, which
+                  sat on the far side of the box from where a comment
+                  addressed to somebody starts. Lit once the tag is in, so it
+                  also says who will read this. Left off a box writing
+                  somewhere else, where nothing reads the tag. */}
+              {!submit && (
+                <button
+                  type="button"
+                  // Keeps the caret where it is. Without this the box loses
+                  // focus on the press, and a browser that does not focus a
+                  // button on click -- Safari, Firefox on a Mac -- hands the
+                  // blur no target inside the form, so an empty box would
+                  // close under the tag before the tag ran.
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    if (!tagged) {
+                      setDraft((current) => (current ? `${MENTION} ${current}` : `${MENTION} `));
+                    }
+                    box.current?.focus();
+                  }}
+                  aria-pressed={tagged}
+                  title={tagged ? 'Dash will read this' : `Tag ${MENTION}`}
+                  className={
+                    'press -ml-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border transition-colors duration-150 ' +
+                    (tagged
+                      ? 'border-accent bg-accent-tint text-accent'
+                      : 'border-control text-ink-ghost hover:bg-sunken hover:text-ink')
+                  }
+                >
+                  <Bot className="size-3.5" strokeWidth={2} aria-hidden />
+                  <span className="sr-only">
+                    {tagged ? 'Dash will read this' : `Tag ${MENTION}`}
+                  </span>
+                </button>
+              )}
+              <ComposeBody
+                ref={box}
+                name="body"
+                rows={1}
+                autoFocus
+                placeholder={placeholder}
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    setWriting(false);
+                    return;
+                  }
+                  if (event.key !== 'Enter' || event.shiftKey) return;
+                  // A composing keystroke is part of typing a character, not a
+                  // send: an IME candidate confirmed with Enter would post the
+                  // half-written word otherwise.
+                  if (event.nativeEvent.isComposing) return;
+                  if (!draft.trim()) return;
                   event.preventDefault();
-                  setWriting(false);
-                  return;
-                }
-                if (event.key !== 'Enter' || event.shiftKey) return;
-                // A composing keystroke is part of typing a character, not a
-                // send: an IME candidate confirmed with Enter would post the
-                // half-written word otherwise.
-                if (event.nativeEvent.isComposing) return;
-                if (!draft.trim()) return;
-                event.preventDefault();
-                form.current?.requestSubmit();
-              }}
-            />
+                  form.current?.requestSubmit();
+                }}
+              />
+            </div>
 
             <div className="mt-1 flex items-end gap-1">
               {/* Which of the two things you are writing, while you are
@@ -425,26 +464,6 @@ export function CommentThread({
                       ? 'Dash will read this and reply in the thread.'
                       : 'A note on the row. Nothing reads it.'}
                 </p>
-              )}
-              {!submit && !tagged && (
-                <button
-                  type="button"
-                  // Keeps the caret where it is. Without this the box loses
-                  // focus on the press, and a browser that does not focus a
-                  // button on click -- Safari, Firefox on a Mac -- hands the
-                  // blur no target inside the form, so an empty box would
-                  // close under the tag before the tag ran.
-                  onMouseDown={(event) => event.preventDefault()}
-                  // In front of what you have written, which is where a comment
-                  // addressed to somebody starts.
-                  onClick={() => {
-                    setDraft((current) => (current ? `${MENTION} ${current}` : `${MENTION} `));
-                    box.current?.focus();
-                  }}
-                  className="press shrink-0 rounded-control px-1.5 py-0.5 text-small text-ink-ghost hover:bg-sunken hover:text-ink"
-                >
-                  Tag {MENTION}
-                </button>
               )}
               {/* A glyph, so the send control is the same size wherever it
                   sits. What a caller's own action is called -- "Answer and
