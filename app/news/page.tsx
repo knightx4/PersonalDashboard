@@ -7,7 +7,7 @@ import { loadQuickRead } from '@/lib/news/issues/quick';
 import { readTopic } from '@/lib/news/issues/topics';
 import { loadHiddenTopics } from '@/lib/news/quick/hidden-topics';
 import { loadSavedHeadlines } from '@/lib/news/saved/stories';
-import { nextCard, quickHref, quickTopics } from '@/lib/news/quick/next';
+import { nextCard, quickHref, quickPage, quickTopics, type QuickCard } from '@/lib/news/quick/next';
 import { topicHrefs } from '@/components/news/topic-chips';
 import { QuickReadView } from './quick/quick-view';
 
@@ -28,6 +28,11 @@ export const dynamic = 'force-dynamic';
  * as `?topic=`, and a value that is not a topic reads as every topic.
  * Topics hidden with Fewer like this (#861) are left out of both the card and
  * the chips.
+ *
+ * The laptop page (#941) is worked out beside the card, from the same rows:
+ * quickPage gives the stories Next would show one at a time, and the view
+ * draws the card below md and the grid from md up, so the server never needs
+ * the screen size. Next page records every story on it (#939).
  */
 export default async function QuickReadPage({
   searchParams,
@@ -47,11 +52,20 @@ export default async function QuickReadPage({
   ]);
 
   const card = nextCard(issues, senders, passes, { topic, hidden });
+  const page = quickPage(issues, senders, passes, { topic, hidden });
   const wanted = params.pictures !== '0';
   const topics = quickTopics(issues, senders, passes, hidden);
-  const saved =
-    card?.kind === 'story' &&
-    (await loadSavedHeadlines(client, card.issueId)).has(card.story.headline);
+
+  // The saved headlines of every newsletter on the page, read once each.
+  const issueIds = [...new Set([card, ...page].flatMap((c) => (c ? [c.issueId] : [])))];
+  const savedIn = new Map(
+    await Promise.all(
+      issueIds.map(async (id) => [id, await loadSavedHeadlines(client, id)] as const),
+    ),
+  );
+  const isSaved = (c: QuickCard) =>
+    c.kind === 'story' && Boolean(savedIn.get(c.issueId)?.has(c.story.headline));
+  const saved = card ? isSaved(card) : false;
 
   return (
     <QuickReadView
@@ -65,6 +79,12 @@ export default async function QuickReadPage({
       issueHref={
         card ? issueHref(card.issueId, { original: false, pictures: wanted, from: null }) : null
       }
+      page={page.map((c) => ({
+        card: c,
+        arrived: formatArrival(c.receivedAt, settings.timezone),
+        saved: isSaved(c),
+        issueHref: issueHref(c.issueId, { original: false, pictures: wanted, from: null }),
+      }))}
       seed={`${user.id}:${new Date().toISOString().slice(0, 10)}:news`}
       topics={{
         topics,

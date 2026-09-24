@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createNewsClient } from '@/lib/news/auth/server';
-import { passStory } from '@/lib/news/issues/quick';
+import { passStories, passStory } from '@/lib/news/issues/quick';
 import { readTopic } from '@/lib/news/issues/topics';
 import { hideTopic } from '@/lib/news/quick/hidden-topics';
 
@@ -34,6 +34,37 @@ export async function passQuickStory(formData: FormData): Promise<void> {
   const user = await requireUser();
   const client = await createNewsClient();
   const { finished } = await passStory(client, { userId: user.id, ...parsed.data });
+
+  revalidatePath('/news');
+  if (finished) revalidatePath('/news/all');
+}
+
+/** A page of Quick read holds at most QUICK_PAGE_SIZE stories; a little room over that is harmless. */
+const PageInput = z.array(PassInput).min(1).max(24);
+
+/**
+ * Next page on a laptop (plan #941): record every story the grid showed and
+ * bring up the next set.
+ *
+ * #939 settled that one press marks the whole page as seen, read or not. The
+ * form carries one issueId and one storyIndex per story, in the same order, and
+ * the pairs are read back together. As with passQuickStory the next page is
+ * whatever the page works out once this has run, and the newsletter list is
+ * refreshed when a pass finished one of them.
+ */
+// latency: pending
+export async function passQuickPage(formData: FormData): Promise<void> {
+  const issueIds = formData.getAll('issueId');
+  const indexes = formData.getAll('storyIndex');
+  if (issueIds.length !== indexes.length) return;
+  const parsed = PageInput.safeParse(
+    issueIds.map((issueId, i) => ({ issueId, storyIndex: indexes[i] })),
+  );
+  if (!parsed.success) return;
+
+  const user = await requireUser();
+  const client = await createNewsClient();
+  const { finished } = await passStories(client, { userId: user.id, stories: parsed.data });
 
   revalidatePath('/news');
   if (finished) revalidatePath('/news/all');

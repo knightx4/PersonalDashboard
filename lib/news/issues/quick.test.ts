@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
-import { loadQuickRead, passStory } from './quick';
+import { loadQuickRead, passStories, passStory } from './quick';
 
 type Call = { table: string; method: string; args: unknown[] };
 
@@ -62,7 +62,11 @@ describe('loadQuickRead', () => {
       },
     ]);
     expect(passes).toEqual([{ issueId: 'i1', storyIndex: 1 }]);
-    expect(calls).toContainEqual({ table: 'story_passes', method: 'in', args: ['issue_id', ['i1']] });
+    expect(calls).toContainEqual({
+      table: 'story_passes',
+      method: 'in',
+      args: ['issue_id', ['i1']],
+    });
   });
 
   it('asks for no passes when nothing has been summarised', async () => {
@@ -109,5 +113,53 @@ describe('passStory', () => {
     const update = calls.find((call) => call.method === 'update');
     expect(update?.table).toBe('issues');
     expect(calls).toContainEqual({ table: 'issues', method: 'is', args: ['read_at', null] });
+  });
+});
+
+describe('passStories', () => {
+  it('records every story on the page in one upsert and checks each newsletter once', async () => {
+    const { client, calls } = fakeClient((table) =>
+      table === 'issues'
+        ? { data: ISSUE, error: null }
+        : {
+            data: [
+              { issue_id: 'i1', story_index: 0 },
+              { issue_id: 'i1', story_index: 1 },
+            ],
+            error: null,
+          },
+    );
+    const result = await passStories(client, {
+      userId: 'u1',
+      stories: [
+        { issueId: 'i1', storyIndex: 0 },
+        { issueId: 'i1', storyIndex: 1 },
+      ],
+    });
+    expect(result).toEqual({ finished: true });
+    const upserts = calls.filter((call) => call.method === 'upsert');
+    expect(upserts).toEqual([
+      {
+        table: 'story_passes',
+        method: 'upsert',
+        args: [
+          [
+            { user_id: 'u1', issue_id: 'i1', story_index: 0 },
+            { user_id: 'u1', issue_id: 'i1', story_index: 1 },
+          ],
+          { onConflict: 'issue_id,story_index', ignoreDuplicates: true },
+        ],
+      },
+    ]);
+    expect(
+      calls.filter((call) => call.table === 'issues' && call.method === 'select'),
+    ).toHaveLength(1);
+    expect(calls.filter((call) => call.method === 'update')).toHaveLength(1);
+  });
+
+  it('writes nothing for an empty page', async () => {
+    const { client, calls } = fakeClient(() => ({ data: [], error: null }));
+    expect(await passStories(client, { userId: 'u1', stories: [] })).toEqual({ finished: false });
+    expect(calls).toEqual([]);
   });
 });

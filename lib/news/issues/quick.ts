@@ -112,13 +112,55 @@ export async function passStory(
     throw new Error(`news: recording that story failed (${recorded.error.message})`);
   }
 
+  return { finished: await finishIfDone(client, issueId) };
+}
+
+/**
+ * Record that you moved past a whole page of stories (plan #939: Next page
+ * marks every story on it), and mark each newsletter on the page read once
+ * nothing of it is left.
+ *
+ * One upsert for the page, with the same key and duplicate rule as passStory,
+ * then the finished check once per newsletter rather than once per story.
+ * Returns whether any newsletter was finished, so the caller knows to refresh
+ * the list.
+ */
+export async function passStories(
+  client: NewsSupabaseClient,
+  { userId, stories }: { userId: string; stories: readonly StoryPass[] },
+): Promise<{ finished: boolean }> {
+  if (!stories.length) return { finished: false };
+  const recorded = await client.from('story_passes').upsert(
+    stories.map((story) => ({
+      user_id: userId,
+      issue_id: story.issueId,
+      story_index: story.storyIndex,
+    })),
+    { onConflict: 'issue_id,story_index', ignoreDuplicates: true },
+  );
+  assertSchemaExposed(recorded.error, NEWS_SCHEMA);
+  if (recorded.error) {
+    throw new Error(`news: recording those stories failed (${recorded.error.message})`);
+  }
+
+  const issueIds = [...new Set(stories.map((story) => story.issueId))];
+  const finished = await Promise.all(issueIds.map((issueId) => finishIfDone(client, issueId)));
+  return { finished: finished.some(Boolean) };
+}
+
+/**
+ * Read one newsletter and its passes again, rather than trusting the page, and
+ * mark it read when every card it makes has been passed. markRead leaves a
+ * newsletter already read alone.
+ */
+async function finishIfDone(client: NewsSupabaseClient, issueId: string): Promise<boolean> {
   const [issue, passes] = await Promise.all([
     client.from('issues').select(QUICK_COLUMNS).eq('id', issueId).maybeSingle(),
     client.from('story_passes').select('issue_id, story_index').eq('issue_id', issueId),
   ]);
-  if (issue.error || !issue.data || passes.error) return { finished: false };
+  if (issue.error || !issue.data || passes.error) return false;
 
   const finished = issueFinished(toQuickIssue(issue.data as QuickRow), toPasses(passes.data));
   if (finished) await markRead(client, issueId);
-  return { finished };
+  return finished;
 }
