@@ -146,8 +146,11 @@ export async function approveGoal(client: GoalsSupabaseClient, goalId: string): 
 }
 
 /**
- * Answer a question step: the answer goes in its resolution and the step
- * closes. False when it is not a live, unanswered question.
+ * Answer a question step, or change the answer it already has (plan #956):
+ * the answer goes in its resolution, the step closes, and a question put
+ * aside comes back into view. A change is an update like any other, so the
+ * history trigger keeps the answer it replaced. False when it is not a live
+ * question, or it was withdrawn.
  */
 export async function answerQuestion(
   client: GoalsSupabaseClient,
@@ -156,7 +159,30 @@ export async function answerQuestion(
 ): Promise<boolean> {
   const { data, error } = await client
     .from('items')
-    .update({ resolution: answer, status: 'done' })
+    .update({ resolution: answer, status: 'done', dismissed_at: null })
+    .eq('id', id)
+    .eq('level', 'step')
+    .eq('kind', 'decision')
+    .neq('status', 'dropped')
+    .is('archived_at', null)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Put an unanswered question aside with Not now, or bring it back (plan
+ * #956). It stays open and unanswered either way. False when it is not a
+ * live, unanswered question.
+ */
+export async function setQuestionAside(
+  client: GoalsSupabaseClient,
+  id: string,
+  aside: boolean,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('items')
+    .update({ dismissed_at: aside ? new Date().toISOString() : null })
     .eq('id', id)
     .eq('level', 'step')
     .eq('kind', 'decision')

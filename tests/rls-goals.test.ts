@@ -572,6 +572,56 @@ describe('Claude results on steps (plan #933)', () => {
   });
 });
 
+describe('questions put aside and answers changed (plan #956)', () => {
+  async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  it('lets only you put an unanswered question aside', async () => {
+    const [question] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, detail)
+      values (${userA}, 'step', ${goalA}, 'decision', 'Avalanche or snowball?',
+              ${'A — Avalanche. Highest rate first.\nB — Snowball. Smallest balance first.'})
+      returning id`);
+    const [step] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Set up autopay') returning id`);
+
+    await expect(
+      asClaude((tx) => tx`update items set dismissed_at = now() where id = ${question.id}`),
+    ).rejects.toThrow(/may not put a question aside/);
+    await expect(
+      asUser(userA, (tx) => tx`update items set dismissed_at = now() where id = ${step.id}`),
+    ).rejects.toThrow(/items_dismissed_question_ck/);
+
+    await asUser(userA, (tx) => tx`update items set dismissed_at = now() where id = ${question.id}`);
+    await expect(
+      asUser(userA, (tx) => tx`update items set resolution = 'A' where id = ${question.id}`),
+    ).rejects.toThrow(/items_dismissed_question_ck/);
+    await asUser(userA, (tx) => tx`
+      update items set resolution = 'A', status = 'done', dismissed_at = null
+      where id = ${question.id}`);
+  });
+
+  it('keeps the answer a change replaced in history', async () => {
+    const [question] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, resolution, status)
+      values (${userA}, 'step', ${goalA}, 'decision', 'Refinance?', 'A — Refinance', 'done')
+      returning id`);
+    await asUser(userA, (tx) => tx`
+      update items set resolution = 'B — Keep the federal loans' where id = ${question.id}`);
+
+    const history = await historyOf(question.id);
+    const change = history.at(-1);
+    expect(change?.action).toBe('update');
+    expect(change?.old_values).toMatchObject({ resolution: 'A — Refinance' });
+    expect(change?.new_values).toMatchObject({ resolution: 'B — Keep the federal loans' });
+  });
+});
+
 describe('weekly suggestions (plan #934)', () => {
   async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
     return admin.begin(async (tx) => {

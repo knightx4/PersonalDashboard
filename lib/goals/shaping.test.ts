@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   approvalLine,
+  awaitsAnswer,
+  countAside,
   countOpenQuestions,
   countProposed,
   goalRunText,
@@ -67,6 +69,21 @@ describe('counting what waits on you', () => {
       node('q4', { kind: 'decision', status: 'proposed' }),
     ];
     expect(countOpenQuestions(tree)).toBe(2);
+  });
+});
+
+describe('questions put aside (plan #956)', () => {
+  it('leaves a question put aside out of what waits on you, and counts it as aside', () => {
+    const aside = node('q1', { kind: 'decision', dismissedAt: '2026-09-24T10:00:00Z' });
+    const live = node('q2', { kind: 'decision' });
+    const answered = node('q3', { kind: 'decision', status: 'done', resolution: 'A — Avalanche' });
+    const tree = [node('s', { children: [aside, live] }), answered];
+
+    expect(awaitsAnswer(aside)).toBe(false);
+    expect(awaitsAnswer(live)).toBe(true);
+    expect(awaitsAnswer(answered)).toBe(false);
+    expect(countOpenQuestions(tree)).toBe(1);
+    expect(countAside(tree)).toBe(1);
   });
 });
 

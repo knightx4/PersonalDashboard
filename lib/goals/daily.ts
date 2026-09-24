@@ -148,7 +148,7 @@ export function dailyView(
         if (node.status !== 'open') continue;
 
         if (node.kind === 'decision') {
-          if (node.resolution === null) {
+          if (node.resolution === null && !node.dismissedAt) {
             waiting.push(
               place({
                 kind: 'question',

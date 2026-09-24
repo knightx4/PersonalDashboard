@@ -50,12 +50,35 @@ export function countProposed(nodes: StepNode[]): number {
   return count;
 }
 
-/** Open questions with no answer yet, anywhere in the tree. */
+/**
+ * Whether a question is waiting on you: open, unanswered and not put aside
+ * with Not now (plan #956).
+ */
+export function awaitsAnswer(node: StepNode): boolean {
+  return (
+    node.kind === 'decision' &&
+    node.status === 'open' &&
+    node.resolution === null &&
+    !node.dismissedAt
+  );
+}
+
+/** Open questions with no answer yet and not put aside, anywhere in the tree. */
 export function countOpenQuestions(nodes: StepNode[]): number {
   let count = 0;
   for (const node of nodes) {
-    if (node.kind === 'decision' && node.status === 'open' && node.resolution === null) count += 1;
+    if (awaitsAnswer(node)) count += 1;
     count += countOpenQuestions(node.children);
+  }
+  return count;
+}
+
+/** Questions put aside with Not now and not answered since, anywhere in the tree. */
+export function countAside(nodes: StepNode[]): number {
+  let count = 0;
+  for (const node of nodes) {
+    if (node.kind === 'decision' && node.resolution === null && node.dismissedAt) count += 1;
+    count += countAside(node.children);
   }
   return count;
 }

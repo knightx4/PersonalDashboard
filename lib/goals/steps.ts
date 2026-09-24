@@ -63,6 +63,8 @@ export type Step = {
   acceptance: string | null;
   /** A question's answer, once there is one. */
   resolution: string | null;
+  /** When you put an unanswered question aside with Not now (plan #956). */
+  dismissedAt?: string | null;
   /** YYYY-MM-DD. */
   dueOn: string | null;
   position: number;

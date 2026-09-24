@@ -3,6 +3,7 @@
 import { createContext, useActionState, useContext, useId, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, CircleHelp, ListTree, Repeat, Sparkles, User } from 'lucide-react';
+import { AnswerBox, TheAnswered, TheOptions, useAnswerDraft } from '@/components/dev/question';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,7 @@ import {
   type StepNode,
 } from '@/lib/goals/steps';
 import { awaitsReview } from '@/lib/goals/daily';
+import { countAside } from '@/lib/goals/shaping';
 import { canShowOnTodo } from '@/lib/goals/todo';
 import { progressLine, type RhythmRecord } from '@/lib/goals/rhythms';
 import {
@@ -47,6 +49,7 @@ import { InformationStep } from './information-step';
 import {
   answerQuestionAction,
   reviewResultAction,
+  setQuestionAsideAction,
   type ShapingActionState,
 } from './shaping-actions';
 
@@ -79,6 +82,12 @@ const TodoOn = createContext(false);
 /** Each rhythm step's current period and recent past ones (plan #928). */
 const Rhythms = createContext<GoalMap['rhythms']>({});
 
+/**
+ * Whether questions put aside with Not now are shown (plan #956). Off, they
+ * are left out of the tree until you ask to see them.
+ */
+const ShowAside = createContext(false);
+
 /** The collections the information steps fill, with their records (plan #954). */
 const Information = createContext<GoalMap['information']>({});
 
@@ -107,68 +116,85 @@ function commitOnBlur(before: string, { required = false }: { required?: boolean
 
 export function StepTree({ map, todoOn }: { map: GoalMap; todoOn: boolean }) {
   const { total, closed } = countSteps(map.steps);
+  const [showAside, setShowAside] = useState(false);
+  const aside = countAside(map.steps);
   return (
-    <TodoOn.Provider value={todoOn}>
-      <Rhythms.Provider value={map.rhythms}>
-        <Information.Provider value={map.information}>
-          <div className="space-y-6">
-            <section aria-label="Steps" className="space-y-2">
-              {total > 0 && (
-                <p className="px-1 text-small text-ink-muted">
-                  {closed} of {total} {total === 1 ? 'step' : 'steps'} closed
-                </p>
-              )}
-              {map.steps.length === 0 ? (
-                <EmptyState
-                  icon={ListTree}
-                  title="No steps yet"
-                  description="Break the goal into the things that have to happen. Any step can hold sub-steps of its own."
-                />
-              ) : (
-                <Card>
-                  <StepList
-                    nodes={map.steps}
-                    depth={0}
-                    links={map.linksOf}
-                    otherGoals={map.otherGoals}
+    <ShowAside.Provider value={showAside}>
+      <TodoOn.Provider value={todoOn}>
+        <Rhythms.Provider value={map.rhythms}>
+          <Information.Provider value={map.information}>
+            <div className="space-y-6">
+              <section aria-label="Steps" className="space-y-2">
+                {total > 0 && (
+                  <p className="px-1 text-small text-ink-muted">
+                    {closed} of {total} {total === 1 ? 'step' : 'steps'} closed
+                  </p>
+                )}
+                {map.steps.length === 0 ? (
+                  <EmptyState
+                    icon={ListTree}
+                    title="No steps yet"
+                    description="Break the goal into the things that have to happen. Any step can hold sub-steps of its own."
                   />
-                </Card>
-              )}
-              <StepComposer parentId={map.goal.id} label="New step" />
-            </section>
-
-            {map.linked.length > 0 && (
-              <section aria-labelledby="linked-heading" className="space-y-2">
-                <h2 id="linked-heading" className="px-1 text-ui font-semibold text-ink">
-                  Also counts towards this goal
-                </h2>
-                <Card>
-                  <ul className="divide-y divide-border">
-                    {map.linked.map((entry) => (
-                      <li key={entry.linkId}>
-                        <p className="px-3 pt-2 text-small text-ink-muted">
-                          From{' '}
-                          <Link href={`/goals/${entry.fromGoal.id}`} className="underline">
-                            {entry.fromGoal.title}
-                          </Link>
-                        </p>
-                        <StepList
-                          nodes={[entry.step]}
-                          depth={0}
-                          links={map.linksOf}
-                          otherGoals={map.otherGoals}
-                          unlinkId={entry.linkId}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
+                ) : (
+                  <Card>
+                    <StepList
+                      nodes={map.steps}
+                      depth={0}
+                      links={map.linksOf}
+                      otherGoals={map.otherGoals}
+                    />
+                  </Card>
+                )}
+                {aside > 0 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    aria-pressed={showAside}
+                    onClick={() => setShowAside(!showAside)}
+                  >
+                    {showAside
+                      ? 'Hide the questions put aside'
+                      : `Show ${aside === 1 ? 'the question' : `the ${aside} questions`} put aside`}
+                  </Button>
+                )}
+                <StepComposer parentId={map.goal.id} label="New step" />
               </section>
-            )}
-          </div>
-        </Information.Provider>
-      </Rhythms.Provider>
-    </TodoOn.Provider>
+
+              {map.linked.length > 0 && (
+                <section aria-labelledby="linked-heading" className="space-y-2">
+                  <h2 id="linked-heading" className="px-1 text-ui font-semibold text-ink">
+                    Also counts towards this goal
+                  </h2>
+                  <Card>
+                    <ul className="divide-y divide-border">
+                      {map.linked.map((entry) => (
+                        <li key={entry.linkId}>
+                          <p className="px-3 pt-2 text-small text-ink-muted">
+                            From{' '}
+                            <Link href={`/goals/${entry.fromGoal.id}`} className="underline">
+                              {entry.fromGoal.title}
+                            </Link>
+                          </p>
+                          <StepList
+                            nodes={[entry.step]}
+                            depth={0}
+                            links={map.linksOf}
+                            otherGoals={map.otherGoals}
+                            unlinkId={entry.linkId}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                </section>
+              )}
+            </div>
+          </Information.Provider>
+        </Rhythms.Provider>
+      </TodoOn.Provider>
+    </ShowAside.Provider>
   );
 }
 
@@ -186,15 +212,17 @@ function StepList({
   /** Set on a step shown here through a link, so its menu can remove the link. */
   unlinkId?: string;
 }) {
+  const showAside = useContext(ShowAside);
+  const shown = showAside ? nodes : nodes.filter((node) => !node.dismissedAt);
   return (
     <ul className={cn(depth > 0 && 'ml-4 border-l border-border pl-1')}>
-      {nodes.map((node, index) => (
+      {shown.map((node, index) => (
         <StepItem
           key={node.id}
           node={node}
           depth={depth}
           index={index}
-          count={nodes.length}
+          count={shown.length}
           links={links}
           otherGoals={otherGoals}
           unlinkId={unlinkId}
@@ -454,9 +482,9 @@ function StepItem({
           {rhythm && rhythm.past.length > 0 && node.rhythmPeriod && (
             <PastPeriods past={rhythm.past} period={node.rhythmPeriod} />
           )}
-          {node.kind === 'decision' && node.status === 'open' && node.resolution === null && (
-            <AnswerForm id={node.id} title={node.title} />
-          )}
+          {node.kind === 'decision' &&
+            node.status !== 'dropped' &&
+            (node.status === 'open' || node.resolution !== null) && <Question node={node} />}
           {awaitsReview(node) && <ClaudeResult node={node} />}
           {filled && (
             <InformationStep node={node} collection={filled.collection} records={filled.records} />
@@ -498,29 +526,89 @@ function StepItem({
 const answerInitial: ShapingActionState = {};
 
 /**
- * Answer a question Claude asked (plan #932). The answer is kept on the step
- * and the step closes; the next run on this goal reads it.
+ * A question Claude asked (plan #932), answered with its options (plan #956).
+ *
+ * The lettered options in its detail are buttons, with the one Claude
+ * recommends marked; pressing one writes it into the box, where it can be
+ * sent as it is or said differently. Answering closes the step and the next
+ * run reads the answer. Not now puts an unanswered question out of sight
+ * until it is brought back. An answered question shows its answer and can be
+ * given a new one, which is kept in the goal's history with the one it
+ * replaced. The pieces are the dev plan's, from components/dev/question.tsx.
  */
-function AnswerForm({ id, title }: { id: string; title: string }) {
-  const [state, answer, answering] = useActionState(answerQuestionAction, answerInitial);
+function Question({ node }: { node: StepNode }) {
+  const [state, answerAction, answering] = useActionState(answerQuestionAction, answerInitial);
+  const [asideState, asideAction, putting] = useActionState(setQuestionAsideAction, answerInitial);
+  // The box is open when it was opened since the last answer was saved, so a
+  // save closes it without an effect.
+  const [openedAt, setOpenedAt] = useState<number | null>(null);
+  const saved = state.done ?? 0;
+  const { answer, setAnswer, choose } = useAnswerDraft(() => setOpenedAt(saved));
+  const unanswered = node.resolution === null;
+  const aside = Boolean(node.dismissedAt);
+  const changing = openedAt === saved;
+  const answerable = unanswered || changing;
+
   return (
-    <form action={answer} className="mt-1 space-y-1 px-1">
-      <input type="hidden" name="id" value={id} />
-      {/* ui-ok: the answer to this question, shown only while it is unanswered */}
-      <Textarea
-        name="answer"
-        rows={2}
-        required
-        placeholder="Your answer"
-        aria-label={`Your answer to ${title}`}
-      />
-      <div className="flex items-center gap-2">
-        <Button type="submit" size="sm" variant="secondary" pending={answering}>
-          Answer
+    <div className="mt-1 space-y-2 px-1">
+      {node.resolution !== null && <TheAnswered resolution={node.resolution} />}
+      {answerable && <TheOptions detail={node.detail} onChoose={choose} />}
+      {answerable ? (
+        <AnswerBox
+          id={node.id}
+          detail={node.detail}
+          resolution={node.resolution}
+          action={answerAction}
+          pending={answering}
+          answer={answer}
+          onAnswer={setAnswer}
+          autoFocus={!unanswered}
+          onCancel={
+            unanswered
+              ? undefined
+              : () => {
+                  setAnswer('');
+                  setOpenedAt(null);
+                }
+          }
+          error={state.error ?? asideState.error}
+          extra={
+            unanswered && !aside ? (
+              <Button
+                type="submit"
+                size="sm"
+                variant="ghost"
+                formAction={asideAction}
+                pending={putting}
+              >
+                Not now
+              </Button>
+            ) : undefined
+          }
+        />
+      ) : (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            setAnswer('');
+            setOpenedAt(saved);
+          }}
+        >
+          Change the answer
         </Button>
-        {state.error && <span className="text-small text-danger">{state.error}</span>}
-      </div>
-    </form>
+      )}
+      {unanswered && aside && (
+        <form action={asideAction}>
+          <input type="hidden" name="id" value={node.id} />
+          <input type="hidden" name="aside" value="0" />
+          <Button type="submit" size="sm" variant="secondary" pending={putting}>
+            Bring back
+          </Button>
+        </form>
+      )}
+    </div>
   );
 }
 
@@ -654,12 +742,6 @@ function StepDetails({
           onBlur={commitOnBlur(node.acceptance ?? '')}
         />
       </form>
-      {node.resolution && (
-        <p className="px-1 text-small text-ink">
-          <span className="text-ink-muted">Answer: </span>
-          {node.resolution}
-        </p>
-      )}
       {node.kind === 'claude' && !awaitsReview(node) && (node.result || node.resultUrl) && (
         <ClaudeResult node={node} />
       )}
