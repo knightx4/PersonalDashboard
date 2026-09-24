@@ -1,8 +1,8 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { loadActiveAims, loadAimAreaNames } from '@/lib/learn/aims-store';
-import { aimPlace, type Aim, type AimPlace } from '@/lib/learn/aims';
+import { loadActiveAims, loadAimAreaNames, loadLevel3Counts } from '@/lib/learn/aims-store';
+import { aimPlace, type Aim, type AimPlace, type Level3Counts } from '@/lib/learn/aims';
 import { GoalsView } from './goals-view';
 
 export const dynamic = 'force-dynamic';
@@ -44,6 +44,17 @@ export default async function GoalsPage() {
   }
   const places = placesOf(aims ?? [], areaNames);
 
+  // The Level 3 goal's claimed and tested counts (#906), read only when that
+  // goal is on the page. A failed read says so on the goal's own line.
+  let level3Counts: Level3Counts | null = null;
+  if (aims?.some((aim) => aim.listSource === 'level3')) {
+    try {
+      level3Counts = await loadLevel3Counts(supabase);
+    } catch {
+      level3Counts = null;
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -51,7 +62,7 @@ export default async function GoalsPage() {
         description="A few broad things you want to learn, and how well. Learn now brings you cards towards them."
       />
       {aims ? (
-        <GoalsView aims={aims} places={places} />
+        <GoalsView aims={aims} places={places} level3Counts={level3Counts} />
       ) : (
         <p className="text-ui text-ink-muted">Your goals could not be read. Reload to try again.</p>
       )}
