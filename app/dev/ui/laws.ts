@@ -1,5 +1,5 @@
 /**
- * The fifteen laws, as data.
+ * The sixteen laws, as data.
  *
  * They live in a module rather than in the page's JSX so that the page is a
  * layout and this is the content, and so that anything else that needs to
@@ -115,8 +115,23 @@ export const SHAPE_LAWS: readonly Law[] = [
   },
 ];
 
+/**
+ * The spend law. Written after the other fifteen, once the app had enough
+ * buttons that call a paid model that pressing one could cost forty cents
+ * with nothing on screen to say so. It is a truth law and is read under
+ * Truth; it has its own array only because the numbers are the order the
+ * laws were written in.
+ */
+export const SPEND_LAWS: readonly Law[] = [
+  {
+    n: 16,
+    title: 'A press that costs money says so first.',
+    body: 'Any control that sends work to a paid service, such as a Claude call or an embedding, has a cost hint beside it: the Lucide circle-dollar-sign, which opens on hover, click or focus to say about what that press will cost. The figure comes from what the operation has actually cost. Where there is too little history it is a best guess, and it says "uncertain" beside the number rather than hiding the guess. A cost that grows with the input says what it is per, such as per note. Paid work that runs on its own, with no button, is still recorded and shown on the spend page.',
+  },
+];
+
 /** Every law, in the order written. */
-export const ALL_LAWS: readonly Law[] = [...LAWS, ...RESTRAINT_LAWS, ...SHAPE_LAWS];
+export const ALL_LAWS: readonly Law[] = [...LAWS, ...RESTRAINT_LAWS, ...SHAPE_LAWS, ...SPEND_LAWS];
 
 /** Kept for the page that renders the ninth on its own. */
 export const DENSITY_LAW: Law = RESTRAINT_LAWS[0];
@@ -127,7 +142,7 @@ export const DENSITY_LAW: Law = RESTRAINT_LAWS[0];
  * The numbers are the order they were written in, and that order was three
  * batches -- what the interface may claim, how much of itself it may show,
  * and what shape a page is. A reader does not need that history; they need
- * to know that laws 1 to 3 are about telling the truth and 9 to 15 are about
+ * to know that laws 1 to 3 and 16 are about telling the truth and 9 to 15 are about
  * getting out of the way. So the page groups them and keeps the numbers.
  */
 export type LawGroup = { title: string; lead: string; laws: readonly Law[] };
@@ -144,7 +159,7 @@ export const LAW_GROUPS: readonly LawGroup[] = [
   {
     title: 'Truth',
     lead: 'What the interface is allowed to claim.',
-    laws: byNumber(1, 2, 3),
+    laws: byNumber(1, 2, 3, 16),
   },
   {
     title: 'Colour',
