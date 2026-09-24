@@ -200,6 +200,36 @@ steps, and credit from city events you attended. No people list for now.
 **Have good relationships** (Relationships). Starts as fog, refined by
 questions into goals you can act on.
 
+## History
+
+Goals keeps a record of everything that happens to it, including what looks
+unimportant now. A year of history is what later answers questions nobody has
+thought to ask yet: which kinds of events you actually went to, how long goals
+of a given size took, which weeks the rhythms slipped, how the debt balance
+moved.
+
+- **Every change is an event.** Creating, editing, moving, closing, reopening
+  or dropping an area, goal or step writes a row to the history, with the old
+  and new values and whether you, Claude or capture made it.
+- **Nothing is deleted.** Removing a goal or step archives it. It leaves the
+  views and stays in the history. Hard delete is only for rows made by
+  mistake, and it is a separate action.
+- **Numbers are kept as a series.** Anything measured, such as a debt balance
+  or a bench weight, is stored as a dated reading every time it is given,
+  rather than overwriting one value.
+- **Captures are kept whole.** The sentence you typed is stored as written,
+  next to what was filed from it and any later Undo.
+- **Suggestions and reactions are kept.** Every event or opportunity Claude
+  suggested is stored with your reaction (going, not for me, ignored) and
+  whether you then went.
+- **Rhythm periods are kept.** Each period records its target, its count and
+  whether it was kept, so the record does not depend on recomputing old weeks.
+- **Routine runs are kept**, with what each one changed.
+
+The history is written by the database, from triggers on the goals tables,
+wherever that is possible. A write that forgets to record itself then cannot
+happen.
+
 ## Not in this version
 
 - A people list (names, where you met, last contact). Deferred by choice.
@@ -223,10 +253,19 @@ A sketch for the migration, not the migration itself.
 - `goals.item_goals`: extra goals a step counts towards, beyond its own
   parent.
 - `goals.links`: a goal or step to a Learn aim, a job application, a role.
-- `goals.log`: what capture filed and what rhythms counted, one row per
-  event, with a reference to the capture it came from so **Undo** can reverse
-  it.
+- `goals.history`: one row per change to any goals table, written by
+  trigger: table, row id, action, old and new values, actor (`me`, `claude`,
+  `capture`), capture id where there is one, and time. Append-only.
+- `goals.captures`: each capture sentence as typed, what was filed from it,
+  and when any of it was undone.
+- `goals.readings`: dated numeric readings against a goal (a balance, a
+  weight, a count), never overwritten.
+- `goals.periods`: one row per rhythm per period, with target, count and
+  whether it was kept.
+- `goals.suggestions`: what Claude suggested, your reaction, and whether it
+  happened.
 - `goals.runs`: one row per routine run, as `plan_runs` does for the dev plan.
+- `archived_at` on areas and items, in place of deleting them.
 
 Its own schema, as `job_search` and `todo` have theirs, with row level security
 on every table. Reusing `plan_items` itself was considered and rejected: its
@@ -236,18 +275,19 @@ surfaces that other signed-in accounts cannot see and should not.
 
 ## Build order
 
-Each is roughly one plan step.
+Filed on the plan as a proposed feature. Each is one step.
 
-1. Schema and module registration: `goals` in `lib/modules.ts`, the tables
-   above, and an empty Goals home.
-2. Areas and goals: add, edit, reorder; fog on a goal.
+1. The workspace and its tables: `goals` in `lib/modules.ts`, the schema
+   above with history triggers and archiving, and an empty Goals home.
+2. Areas and goals: add, edit, reorder, archive; fog on a goal.
 3. The step tree with sub-steps, the four kinds, and the full-tree view.
 4. The daily view, with the next items per goal and what is waiting on you.
 5. Show on Todo: the flag, the agenda source, ticking closes the step.
-6. Rhythms: period counting, the at-risk line, the Todo item per period.
-7. Capture: the fast filing call, the filed list with Undo.
-8. Links to Learn aims and Jobs, and progress read from them.
-9. The goals routine and its skill: shaping, working `claude` steps, approval
-   once per goal.
-10. Weekly research for rhythm goals, with going / not for me feedback.
-11. Coming back after time away.
+6. Rhythms: period rows, the at-risk line, the Todo item per period.
+7. Capture: the fast filing call, the filed list with Undo, captures kept.
+8. Readings: dated numbers against a goal, and a small chart of them.
+9. Links to Learn aims and Jobs, and progress read from them.
+10. The goals routine and skill, shaping goals with approval once per goal.
+11. The daily run working `claude` steps.
+12. Weekly research for rhythm goals, with suggestions and reactions kept.
+13. Coming back after time away.
