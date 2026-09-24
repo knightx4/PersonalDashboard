@@ -22,6 +22,7 @@ import {
   nightClosedLine,
   nightRows,
   type DigestNight,
+  type DigestNightRef,
   type FeatureProgress,
   type OnNow,
 } from '@/lib/digest/night';
@@ -277,14 +278,40 @@ function BlockedSteps({ night }: { night: DigestNight }) {
   );
 }
 
-/** How much clock is left, or that there is none. */
-function StopsIn({ run, now }: { run: OvernightRun; now: number }) {
-  if (run.stopBy === null || now === 0) return null;
-  const past = new Date(run.stopBy).getTime() <= now;
+/** How long the night has been going, and how much clock it has left. */
+function Clock({ run, now }: { run: OvernightRun; now: number }) {
+  if (now === 0) return null;
+  const going = run.startedAt ? elapsedSince(run.startedAt, now) : null;
+  const stops =
+    run.stopBy === null
+      ? 'no stop time'
+      : new Date(run.stopBy).getTime() <= now
+        ? 'its stop time has passed'
+        : `stops in ${remainingUntil(run.stopBy, now)}`;
 
   return (
-    <p className="text-small text-ink-muted">
-      {past ? 'Its stop time has passed.' : `stops in ${remainingUntil(run.stopBy, now)}`}
+    <p className="tabular text-small text-ink-muted">
+      {going && <>{going === 'just now' ? 'Started just now' : `Started ${going} ago`} · </>}
+      {stops}
+    </p>
+  );
+}
+
+/**
+ * The features the next ticks would fire, in order, so "1 feature ready" says
+ * which one. Features a session is already on are left out.
+ */
+function NextUp({ next }: { next: readonly DigestNightRef[] }) {
+  return (
+    <p className="min-w-0 text-small text-ink-muted">
+      Next up{' '}
+      {next.map((feature, index) => (
+        <span key={feature.ref}>
+          {index > 0 && ', then '}
+          <span className="tabular text-ink">{feature.ref}</span>{' '}
+          <span className="text-ink">{feature.title}</span>
+        </span>
+      ))}
     </p>
   );
 }
@@ -333,6 +360,7 @@ export function OvernightControl({
   progress = null,
   refreshReadings = false,
   on = [],
+  next = [],
 }: {
   run: OvernightRun | null;
   canSend: boolean;
@@ -372,18 +400,23 @@ export function OvernightControl({
    */
   showBlocked?: boolean;
   /**
-   * Progress through the feature the night is on, as `featureProgress` reads
-   * it. Passed by the Status panel on Dash; the plan page shows the steps
-   * themselves and leaves it out.
+   * Progress through the night's last fire, as `featureProgress` reads it,
+   * for the fallback line drawn when no run is going. Each line in `on`
+   * carries its own.
    */
   progress?: FeatureProgress | null;
   /**
    * Every row a session is on right now, as `onNow` reads the runs still
    * going (note 39576272). With sessions running in parallel each gets its own
-   * "On" line; with none, the card falls back to the night's last fire. Dash
-   * leaves it out and keeps the one line.
+   * "On" line; with none, the card falls back to the night's last fire. Both
+   * pages pass it, from `runnerCard`, so they name the same sessions.
    */
-  on?: readonly OnNow[];
+  on?: readonly (OnNow & { progress?: FeatureProgress | null })[];
+  /**
+   * The features the next ticks would fire, as `runnerCard` reads them. Named
+   * under the ready count so it says which ones.
+   */
+  next?: readonly DigestNightRef[];
   /**
    * Ask GitHub for fresh push readings once the page has drawn, while a night
    * is live, and redraw with them. The plan page does its own asking for every
@@ -395,9 +428,8 @@ export function OvernightControl({
    * The night so far, as `nightFrom` reads it, or the last night once it has
    * stopped, as `lastNightFrom` reads it. Null when there is nothing to say.
    *
-   * The plan page passes only a live night and goes back to its resting shape
-   * when the night stops. The Status panel on Dash passes the stopped one too,
-   * so the row still says what the last run did when nothing is running.
+   * Both pages pass the stopped one too, from `runnerCard`, so the card still
+   * says what the last run did when nothing is running.
    */
   night: DigestNight | null;
   /**
@@ -593,7 +625,7 @@ export function OvernightControl({
                 key={fire.ref}
                 fire={fire}
                 now={now}
-                progress={fire.ref === night.lastFire?.ref ? progress : null}
+                progress={fire.progress ?? (fire.ref === night.lastFire?.ref ? progress : null)}
               />
             ))
           ) : night.lastFire ? (
@@ -615,7 +647,7 @@ export function OvernightControl({
 
           {showBlocked && night.blocked.length > 0 && <BlockedSteps night={night} />}
 
-          <StopsIn run={run} now={now} />
+          <Clock run={run} now={now} />
 
           {night.closed.length > 0 && <WhichSteps night={night} />}
         </div>
@@ -637,6 +669,8 @@ export function OvernightControl({
           {night.closed.length > 0 && <WhichSteps night={night} />}
         </div>
       )}
+
+      {next.length > 0 && standing !== 'paused' && <NextUp next={next} />}
 
       {/* Law 2: a runner that cannot fire says so where the button is, rather
           than starting a night that writes a row and then sends nothing. */}

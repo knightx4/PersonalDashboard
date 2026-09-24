@@ -1,10 +1,9 @@
 import { OvernightControl } from '@/app/dev/plan/overnight-control';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { Card } from '@/components/ui/card';
-import type { DigestNight, FeatureProgress } from '@/lib/digest/night';
 import type { NotesLastRun } from '@/lib/feedback/last-worked';
-import type { StoredPush } from '@/lib/plan/liveness';
 import type { OvernightRun } from '@/lib/plan/overnight';
+import type { RunnerCard } from '@/lib/plan/runner-card';
 
 /**
  * What is running, at the top of the page you open in the morning.
@@ -28,22 +27,15 @@ import type { OvernightRun } from '@/lib/plan/overnight';
 export function StatusPanel({
   run,
   canSend,
-  night,
-  progress,
-  push,
-  ready,
+  card,
   openNotes,
   notesLastRun,
 }: {
   run: OvernightRun | null;
   /** Whether the deployment has the token the plan runner fires through. */
   canSend: boolean;
-  night: DigestNight | null;
-  /** How far the night is through the feature it is on. */
-  progress: FeatureProgress | null;
-  push: StoredPush | null;
-  /** Features the plan runner could pick up now. The card's own note says how. */
-  ready: number;
+  /** What the runner's card says, as `runnerCard` reads it for both pages. */
+  card: RunnerCard;
   /** Outstanding notes, so "run it" is an answerable question. */
   openNotes: number;
   /** What the notes routine did last, so the row says something between runs. */
@@ -55,11 +47,13 @@ export function StatusPanel({
       <OvernightControl
         run={run}
         canSend={canSend}
-        night={night}
-        progress={progress}
+        night={card.night}
+        on={card.on}
+        progress={card.progress}
         refreshReadings
-        push={push}
-        ready={ready}
+        push={card.push}
+        ready={card.ready}
+        next={card.next}
         label="Plan"
         bare
         showBlocked={false}

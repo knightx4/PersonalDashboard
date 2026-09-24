@@ -198,6 +198,33 @@ describe('the Overnight card while a night is running', () => {
     expect(html).toContain('Newest session');
   });
 
+  it('gives each session its own progress through its feature', () => {
+    const html = draw({
+      on: [
+        {
+          ref: '#723',
+          title: 'Newest session',
+          at: '2026-09-17T04:20:00Z',
+          step: null,
+          progress: { done: 2, total: 5 },
+        },
+      ],
+    });
+    expect(html).toContain('2 of 5 steps done');
+  });
+
+  it('says how long the night has been going and that it has no stop time', () => {
+    const html = draw({ run: run({ stopBy: null }) });
+    expect(html).toContain('Started 5h 30m ago');
+    expect(html).toContain('no stop time');
+  });
+
+  it('names the features the next ticks would fire', () => {
+    const html = draw({ next: [{ ref: '#950', title: 'Add a payment method' }] });
+    expect(html).toContain('Next up');
+    expect(html).toContain('Add a payment method');
+  });
+
   it('falls back to the last fire when no run is going', () => {
     const html = draw({ on: [] });
     expect((html.match(/On <span/g) ?? []).length).toBe(1);

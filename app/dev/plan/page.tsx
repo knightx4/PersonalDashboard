@@ -10,11 +10,9 @@ import {
   loadStartedRuns,
 } from '@/lib/plan/runs';
 import { loadCommitChecks, refreshCommitChecks } from '@/lib/plan/ci';
-import { loadOvernightRun, overnightStanding } from '@/lib/plan/overnight';
-import { readyFeatureCount } from '@/lib/plan/overnight-choice';
+import { loadOvernightRun } from '@/lib/plan/overnight';
+import { runnerCard } from '@/lib/plan/runner-card';
 import { keyRefusal } from '@/lib/plan/work';
-import { lastStoredPush } from '@/lib/plan/liveness';
-import { nightFrom, onNow } from '@/lib/digest/night';
 import type { LastRun } from '@/lib/plan/run-end';
 import { planRoutine } from '@/lib/feedback/routine';
 import {
@@ -145,25 +143,6 @@ export default async function DevPlanPage({
     loadStartedRuns(supabase, user.id),
   ]);
 
-  const standing = overnightStanding(overnight);
-  const startedAt = overnight?.startedAt ?? null;
-  const live = (standing === 'running' || standing === 'paused') && startedAt !== null;
-
-  // The night as `nightFrom` reads it -- the same reading the morning report is
-  // written from. `since` is the night's own start rather than a day's window:
-  // the report is asked whether last night is still news, and this is asked
-  // what is happening right now, which a window could only get wrong.
-  const night = live
-    ? nightFrom({ run: overnight, fires, items: data.items, since: startedAt })
-    : null;
-
-  // And what the night has pushed, off the readings the run rows already carry.
-  // Nothing here asks GitHub: #563 settled that the render never waits on it,
-  // and #569's route refreshes these readings from the browser once the page is
-  // up -- so the card names the same push every other surface is reading rather
-  // than taking a second reading that could disagree with it.
-  const nightPush = live ? lastStoredPush(Object.values(lastRuns), startedAt) : null;
-
   // What the runs say about the steps that are claimed, so the counts beside a
   // module heading and the bands in its bar read the claims the same way the
   // health column under them does. The rows are classified again in the browser
@@ -178,6 +157,18 @@ export default async function DevPlanPage({
   const whole = buildPlanTree(data, liveness);
   const narrowed = applyView(whole, view);
   const summary = summarize(whole);
+
+  // The runner's card, read by the same function Dash reads it with, so the
+  // two pages say the same thing about what is running. Off the whole tree
+  // rather than the view: what is ready does not change with the filter.
+  const card = runnerCard({
+    run: overnight,
+    fires,
+    items: data.items,
+    sections: whole,
+    started,
+    lastRuns: Object.values(lastRuns),
+  });
 
   // Only on Everything, which is the one view a finished feature reaches at
   // all: it goes into the fold at the foot of the page rather than sitting in
@@ -224,16 +215,16 @@ export default async function DevPlanPage({
         in the same tone as the sync failure above it -- a setting nobody can
         act on until they are told which one is not a quieter problem than a
         step that did not arrive. */}
-      {checks.error && (
-        <p className="text-small text-caution">Could not read CI. {checks.error}</p>
-      )}
+      {checks.error && <p className="text-small text-caution">Could not read CI. {checks.error}</p>}
       <OvernightControl
         run={overnight}
         canSend={Boolean(planRoutine().token)}
-        night={night}
-        on={onNow(started, data.items)}
-        push={nightPush}
-        ready={readyFeatureCount(sections)}
+        night={card.night}
+        on={card.on}
+        progress={card.progress}
+        push={card.push}
+        ready={card.ready}
+        next={card.next}
       />
       <PlanViewComponent
         sections={sections}

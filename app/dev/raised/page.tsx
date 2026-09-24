@@ -6,11 +6,9 @@ import { buildPlanTree, flattenSections } from '@/lib/plan/tree';
 import { waitingGroups } from '@/lib/plan/waiting';
 import { loadDigest } from '@/lib/digest/load';
 import { loadConversations } from '@/lib/comments/recent';
-import { loadFeatureFires, loadLastRuns } from '@/lib/plan/runs';
-import { lastStoredPush } from '@/lib/plan/liveness';
-import { loadOvernightRun, overnightStanding } from '@/lib/plan/overnight';
-import { readyFeatureCount } from '@/lib/plan/overnight-choice';
-import { featureProgress, lastNightFrom } from '@/lib/digest/night';
+import { endQuietRuns, loadFeatureFires, loadLastRuns, loadStartedRuns } from '@/lib/plan/runs';
+import { loadOvernightRun } from '@/lib/plan/overnight';
+import { runnerCard } from '@/lib/plan/runner-card';
 import { planRoutine } from '@/lib/feedback/routine';
 import { loadNotesLastRun } from '@/lib/feedback/last-worked';
 import { ConversationsView } from './conversations-view';
@@ -45,45 +43,42 @@ export const metadata = { title: 'Dash' };
 export default async function DevRaisedPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  const [queue, digest, conversations, plan, overnight, fires, lastRuns, openNotes, notesLastRun] =
-    await Promise.all([
-      loadRaised(supabase, user.id),
-      loadDigest(supabase, user.id),
-      loadConversations(supabase, user.id),
-      loadPlan(supabase, user.id),
-      // The runner's standing intention, and the presses its night has made:
-      // the same rows and the same loaders /dev/plan reads, so the two pages
-      // cannot come to different answers about what is running.
-      loadOvernightRun(supabase, user.id),
-      loadFeatureFires(supabase, user.id),
-      loadLastRuns(supabase, user.id),
-      // A count, not the rows: what makes "run it" answerable is how many are
-      // waiting, and the queue itself is one link away.
-      supabase
-        .from('feedback_items')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .in('status', ['open', 'in_progress', 'blocked', 'planned']),
-      loadNotesLastRun(supabase, user.id),
-    ]);
+  // Before the runs are read, as the plan page does, so a run that ended hours
+  // ago is not named here as a session still going.
+  await endQuietRuns({ supabase, userId: user.id });
 
-  // The night as `nightFrom` reads it, exactly as the plan page reads it: the
-  // control's totals come from the same rows the morning report is written
-  // from, so nothing here can disagree with the digest below it.
-  //
-  // Unlike the plan page, a night that has stopped is read too. With nothing
-  // running, the row would otherwise have nothing to say but the ready count,
-  // and "what did the last run do" is the question it is opened to answer.
-  const standing = overnightStanding(overnight);
-  const startedAt = overnight?.startedAt ?? null;
-  const shown = standing !== 'off' && startedAt !== null;
-  const night = shown ? lastNightFrom({ run: overnight, fires, items: plan.items }) : null;
-  // The last push only while the night is live. After it stops, the newest
-  // push on the run rows can belong to a later session, and the row would
-  // credit the night with it.
-  const live = standing === 'running' || standing === 'paused';
-  const nightPush = shown && live ? lastStoredPush(Object.values(lastRuns), startedAt) : null;
-  const progress = live && night?.lastFire ? featureProgress(plan.items, night.lastFire.ref) : null;
+  const [
+    queue,
+    digest,
+    conversations,
+    plan,
+    overnight,
+    fires,
+    lastRuns,
+    started,
+    openNotes,
+    notesLastRun,
+  ] = await Promise.all([
+    loadRaised(supabase, user.id),
+    loadDigest(supabase, user.id),
+    loadConversations(supabase, user.id),
+    loadPlan(supabase, user.id),
+    // The runner's standing intention, and the presses its night has made:
+    // the same rows and the same loaders /dev/plan reads, so the two pages
+    // cannot come to different answers about what is running.
+    loadOvernightRun(supabase, user.id),
+    loadFeatureFires(supabase, user.id),
+    loadLastRuns(supabase, user.id),
+    loadStartedRuns(supabase, user.id),
+    // A count, not the rows: what makes "run it" answerable is how many are
+    // waiting, and the queue itself is one link away.
+    supabase
+      .from('feedback_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .in('status', ['open', 'in_progress', 'blocked', 'planned']),
+    loadNotesLastRun(supabase, user.id),
+  ]);
 
   // Everything waiting on you, in the three groups the section is drawn in:
   // what you have to go and do, what you have to answer, what you only have to
@@ -96,6 +91,16 @@ export default async function DevRaisedPage() {
   // how many features the runner could pick up.
   const sections = buildPlanTree(plan);
   const groups = waitingGroups(sections, queue);
+
+  // The runner's card, read by the same function the plan page reads it with.
+  const card = runnerCard({
+    run: overnight,
+    fires,
+    items: plan.items,
+    sections,
+    started,
+    lastRuns: Object.values(lastRuns),
+  });
 
   // What every "#494" on this page is called. Built once here rather than
   // looked up where each one is drawn: a raise with nine references in it
@@ -111,10 +116,7 @@ export default async function DevRaisedPage() {
       <StatusPanel
         run={overnight}
         canSend={Boolean(planRoutine().token)}
-        night={night}
-        progress={progress}
-        push={nightPush}
-        ready={readyFeatureCount(sections)}
+        card={card}
         openNotes={openNotes.count ?? 0}
         notesLastRun={notesLastRun}
       />
