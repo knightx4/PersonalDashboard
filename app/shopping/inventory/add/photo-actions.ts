@@ -10,6 +10,10 @@ import { mapPool } from '@/lib/async/map-pool';
 import { serverEnv } from '@/lib/env';
 import { parseImageDataUrl } from '@/lib/images/data-url';
 import type { BookActionState } from './actions';
+import { usageFrom } from '@/lib/core/spend/pricing';
+import { recordSessionSpend } from '@/lib/core/spend/session';
+
+const PHOTO_MODEL = 'claude-haiku-4-5-20251001';
 
 const spineSchema = z.object({
   spines: z
@@ -49,7 +53,7 @@ export async function extractBooksFromPhoto(
   _prev: BookActionState,
   formData: FormData,
 ): Promise<BookActionState> {
-  await requireUser();
+  const user = await requireUser();
   const keys = envKeys();
   if (!keys.anthropicApiKey) {
     return { error: 'Photo capture needs ANTHROPIC_API_KEY on the server.' };
@@ -71,7 +75,7 @@ Return ONLY JSON: {"spines":[{"title":"...","author":"...|null","isbn":"...|null
 One object per visible spine. Skip unreadable spines. Max 40.`;
 
   const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: PHOTO_MODEL,
     max_tokens: 2048,
     system,
     messages: [
@@ -96,6 +100,11 @@ One object per visible spine. Skip unreadable spines. Max 40.`;
       },
     ],
   });
+  await recordSessionSpend(
+    user.id,
+    { module: 'shopping', operation: 'read-book-photo' },
+    [{ model: PHOTO_MODEL, usage: usageFrom(response.usage) }],
+  );
 
   const block = response.content.find((c) => c.type === 'text');
   if (!block || block.type !== 'text') return { error: 'Model returned no text.' };

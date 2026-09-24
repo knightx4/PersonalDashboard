@@ -18,6 +18,7 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { mapPool } from '@/lib/async/map-pool';
+import type { SpendSink } from '@/lib/core/spend/pricing';
 import { lookupPriceByIsbn, lookupPriceBySubject } from '@/lib/sell/price-lookup';
 import { createBuybackProvider } from '@/lib/sell/buyback';
 import {
@@ -192,6 +193,8 @@ export async function runPriceLookups(input: {
   ids?: string[];
   /** True for the "fill in the gaps" run, false when fresh prices were asked for. */
   skipPriced: boolean;
+  /** What each web-search estimate cost; record it as 'estimate-resale-price'. */
+  onSpend?: SpendSink;
 }): Promise<PriceRunResult> {
   const { supabase, userId, ids, skipPriced } = input;
 
@@ -226,7 +229,7 @@ export async function runPriceLookups(input: {
   const todo = candidates.slice(0, ESTIMATE_BATCH_LIMIT);
   if (todo.length === 0) return { ...empty, skipped };
 
-  const provider = await createExpectedPriceSource(keys);
+  const provider = await createExpectedPriceSource({ ...keys, onSpend: input.onSpend });
   const buybackProvider = process.env.BOOKSCOUTER_API_KEY
     ? createBuybackProvider({ apiKey: process.env.BOOKSCOUTER_API_KEY })
     : null;

@@ -1,6 +1,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { z } from 'zod';
 import { MAX_SUGGESTIONS } from '@/lib/digest/build';
 
@@ -141,6 +142,8 @@ export async function suggestForDigest(input: {
   context: DigestContext;
   apiKey: string;
   client?: Anthropic;
+  /** What the call cost; record it as 'suggest-from-digest'. */
+  onSpend?: SpendSink;
 }): Promise<DigestReading> {
   const client = input.client ?? new Anthropic({ apiKey: input.apiKey });
 
@@ -180,6 +183,7 @@ export async function suggestForDigest(input: {
     console.error('[dev digest] suggestions', error instanceof Error ? error.message : error);
     return NOTHING;
   }
+  input.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
   const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
   if (!block || block.type !== 'tool_use') return NOTHING;

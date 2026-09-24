@@ -7,6 +7,8 @@ import { linkEnvelopes, reprocessPendingLifecycleMessages } from '@/lib/inbox/in
 import { loadMerchantExclusions } from '@/lib/inbox/merchant-exclusions';
 import { loadMerchantsForUser } from '@/lib/merchants/resolve-order-merchant';
 import { loadCategoryContext } from '@/lib/inbox/context';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSpendReports, type SpendClient } from '@/lib/core/spend/record';
 
 /**
  * The commerce workspace, as something the shared sync can hand mail to.
@@ -17,7 +19,11 @@ import { loadCategoryContext } from '@/lib/inbox/context';
  * the sender and subject it was given, decides whether the message is a
  * purchase, and only then spends an API call on the body.
  */
-export function commerceLinker(supabase: SupabaseClient): DomainLinker {
+export function commerceLinker(
+  supabase: SupabaseClient,
+  /** Where the extraction spend is written: the core schema, service role. */
+  core?: SpendClient,
+): DomainLinker {
   return {
     domain: 'commerce',
 
@@ -83,6 +89,7 @@ export function commerceLinker(supabase: SupabaseClient): DomainLinker {
         domains: m.domains,
       }));
 
+      const spend: SpendReport[] = [];
       const ingest = {
         messagesSeen: 0,
         messagesClassified: 0,
@@ -102,7 +109,16 @@ export function commerceLinker(supabase: SupabaseClient): DomainLinker {
         categoryOptions: categories.categoryOptions,
         counters: ingest,
         personId,
+        onSpend: (report) => spend.push(report),
       });
+      if (core) {
+        await recordSpendReports(
+          core,
+          userId,
+          { module: 'shopping', operation: 'extract-email-order' },
+          spend,
+        );
+      }
 
       counters.alreadyJudged = ingest.skipped;
       counters.classified = ingest.messagesClassified;
