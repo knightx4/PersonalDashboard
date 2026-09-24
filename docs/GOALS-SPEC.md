@@ -337,6 +337,32 @@ than rebuilding them:
 Dependencies between steps, priority, filters and search stay on the dev
 plan for now.
 
+## Third round: the plan's own tree
+
+The second round borrowed the dev plan's small pieces (the status glyph, the
+comment thread, the question buttons) and rebuilt the row around them in
+`app/goals/[goalId]/step-tree.tsx`. The result reads worse than the plan: the
+thread is only reachable through the row's menu, rows run together without the
+plan's cards, guides and tallies, and a goal step cannot be blocked or wait on
+another step at all.
+
+So Goals stops having its own tree. The plan's row and tree move out of
+`app/dev/plan/plan-view.tsx` into shared components that take a node and a set
+of actions, the dev plan is moved onto them first with no visible change, and
+the goal page then renders through the same components. Anything the plan
+gains later reaches Goals without a second build.
+
+- **Blocking comes across whole**: a `blocked` status with the one-sentence
+  ask shown as Needs, `goals.dependencies` with the same loop and ownership
+  triggers as `plan_dependencies`, and the Waiting word and waits-on line the
+  plan shows. The routine can block a step on you and make steps wait on each
+  other.
+- **What Goals has and the plan does not** (information forms, rhythms,
+  readings, Claude results) is drawn in the slot the shared row keeps for a
+  row's body, beside the thread.
+- **What the plan has and Goals does not** (commits, CI checks, size) is left
+  out by passing nothing for it, not by a Goals copy of the row.
+
 ## Not in this version
 
 - A people list (names, where you met, last contact). Deferred by choice.
@@ -413,3 +439,10 @@ Second round, filed as its own feature:
 21. Approving or rejecting one proposal, and fog on the page.
 22. Run status on a goal.
 23. The skill: full maps, information steps, Gmail pre-fill, options required.
+
+Third round, filed as its own feature:
+
+24. Shared row and tree components, with the dev plan moved onto them unchanged.
+25. Blocking and waits-on for goal steps.
+26. The goal page rendered through the shared tree.
+27. A side-by-side check of both pages at phone and laptop width.
