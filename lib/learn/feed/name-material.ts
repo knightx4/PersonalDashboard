@@ -35,16 +35,28 @@ export type NamedSection = {
   section: string | null;
   /** One sentence on why it suits the target. */
   basis: string;
+  /** The model that chose it, when not the pass's own naming model (a Level 3 return, plan #912). */
+  model?: string;
+  /** Set on a Level 3 article coming back: the titles of the cards already had on it. */
+  returning?: { earlier: string[] };
 };
 
-export type NameResult = { ok: true; named: NamedSection[] } | { ok: false; detail: string };
+/** `skipped` says why any pick the call meant to make was left out. */
+export type NameResult =
+  | { ok: true; named: NamedSection[]; skipped?: string[] }
+  | { ok: false; detail: string };
 
 const SYSTEM = `You choose what one person should read next on English Wikipedia.
 
-You are given either a theme from their own notes, with the field of study it
-belongs to, or a field of study they have never been tested in, and how far
-into it they already are. Name two or three Wikipedia articles, and one section
-in each, that would teach them something they do not already know.
+You are given a theme from their own notes, with the field of study it belongs
+to, a field of study they have never been tested in, or a goal they set
+themselves, and how far into it they already are. Name two or three Wikipedia
+articles, and one section in each, that would teach them something they do not
+already know.
+
+For a goal, pick what moves them towards the goal as they worded it. Take the
+goal's own words and their line on what they mean as the subject, and use the
+field it sits in only to place it.
 
 What makes a good pick:
 - It is about how something works, what happens when it is applied, a real
@@ -88,6 +100,19 @@ const payloadSchema = z.object({
 
 /** What the model is told about the target. Exported for the test. */
 export function describeTarget(target: FeedTarget): string {
+  if (target.reason === 'goal') {
+    const { goal } = target;
+    const where = goal.field
+      ? `The field it sits in: ${goal.field.name} (${goal.field.domain}). ${goal.field.scope}`
+      : goal.domain
+        ? `It covers a whole domain: ${goal.domain}.`
+        : 'It is not placed in one field; work from its wording.';
+    return [
+      `A goal they set themselves: ${goal.name}.`,
+      ...(goal.about ? [`What they mean by it: ${goal.about}`] : []),
+      where,
+    ].join('\n');
+  }
   const field = `${target.field.name} (${target.field.domain}). ${target.field.scope}`;
   if (target.reason === 'interest') {
     return [
@@ -111,6 +136,10 @@ export function describeProgress(context: DepthContext): string {
   if (context.review.length > 0) {
     lines.push('', 'Cards on this they said they need to work on; make these ideas concrete from another angle:');
     lines.push(...context.review.map((title) => `- ${title}`));
+  }
+  if (context.tooHard.length > 0) {
+    lines.push('', 'Cards on this they rated too hard; come at these ideas from a simpler angle and pitch the next ones easier than these:');
+    lines.push(...context.tooHard.map((title) => `- ${title}`));
   }
   return lines.join('\n');
 }

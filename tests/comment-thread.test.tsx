@@ -36,15 +36,16 @@ describe('the open box', () => {
     const html = open();
 
     // The box's own border, then the words, then the control -- in that order
-    // and with nothing closed in between, which is what puts the send inside
-    // the box rather than under it.
+    // and with only the words' own row closed in between (it carries Dash's
+    // tag button beside them, note 66f5a513), which is what puts the send
+    // inside the box rather than under it.
     const border = html.indexOf('border-control');
     const words = html.indexOf('<textarea');
     const send = html.indexOf('Send</span>');
     expect(border).toBeGreaterThan(-1);
     expect(border).toBeLessThan(words);
     expect(send).toBeGreaterThan(words);
-    expect(html.slice(words, send)).not.toContain('</div>');
+    expect(html.slice(words, send).match(/<\/div>/g)).toHaveLength(1);
 
     // The pair that used to sit below the form. Cancel has no replacement: the
     // way out is Escape, or leaving an empty box.
@@ -75,6 +76,17 @@ describe('the open box', () => {
 
     expect(html).toContain('A note on the row. Nothing reads it.');
     expect(html).toContain('Tag @dash');
+    // Dash's head, left of the words, in its own circle (note 66f5a513).
+    expect(html.indexOf('Tag @dash')).toBeLessThan(html.indexOf('<textarea'));
+    expect(html).toContain('rounded-full');
+    expect(html).toContain('aria-pressed="false"');
+  });
+
+  it('lights the tag button once the comment reaches Dash', () => {
+    const html = open({ target: 'raise' });
+
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('Dash will read this');
   });
 });
 

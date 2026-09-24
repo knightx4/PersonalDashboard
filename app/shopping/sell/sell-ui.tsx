@@ -24,6 +24,9 @@ import type { SellQueueRow } from '@/lib/sell/load-for-sale';
 import type { SellPath } from '@/lib/sell/route';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { PaidHint } from '@/components/ui/paid-hint';
+
+const PRICE_HINT = 'app/shopping/sell/actions.ts#priceSellItems';
 
 const PATH_LABEL: Record<SellPath, string> = {
   list_individually: 'List individually',
@@ -431,8 +434,9 @@ export function SellQueue({
   const present = new Set(rows.map((r) => r.inventoryItemId));
   const selectedIds = [...selected].filter((id) => present.has(id));
 
-  const cost = (count: number) =>
-    paid ? ` · about ${formatMoney(Math.ceil(count * 2.5))} of API usage` : '';
+  // Only a web estimate is billed; a catalog lookup costs nothing.
+  const hint = (count: number, what: string) =>
+    paid ? <PaidHint action={PRICE_HINT} count={count} what={what} /> : null;
   const thisRun = Math.min(unpricedCount, batchLimit);
 
   const donate = rows.filter((r) => r.path === 'donate');
@@ -449,6 +453,7 @@ export function SellQueue({
                 </Button>
               </form>
             )}
+            {unpricedCount > 0 && hint(thisRun, 'Cost of pricing the unpriced')}
 
             <form action={priceAction}>
               <input type="hidden" name="ids" value={selectedIds.join(',')} />
@@ -461,6 +466,7 @@ export function SellQueue({
                 {`Price ${selectedIds.length} selected`}
               </Button>
             </form>
+            {selectedIds.length > 0 && hint(selectedIds.length, 'Cost of pricing the selected')}
 
             {/* Prices go stale and lookups come back empty, so "already priced"
                 cannot be the end of it. */}
@@ -470,6 +476,7 @@ export function SellQueue({
                 Rescan everything
               </Button>
             </form>
+            {hint(Math.min(rows.length, batchLimit), 'Cost of the rescan')}
 
             <Button
               type="button"
@@ -489,7 +496,6 @@ export function SellQueue({
 
           <p className="text-ui text-ink-muted">
             {unpricedCount} of {rows.length} have no price
-            {cost(Math.max(thisRun, selectedIds.length))}
             {unpricedCount > batchLimit ? ' · one run covers ' + batchLimit : ''}
           </p>
 

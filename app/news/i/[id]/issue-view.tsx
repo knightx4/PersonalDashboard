@@ -12,6 +12,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardBody, CardSection } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { SaveStoryButton } from '@/components/news/save-story-button';
+import { StoryGrid } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
 import type { NewsStory } from '@/lib/news/issues/stories';
 import { markIssueUnread } from './actions';
@@ -71,8 +72,12 @@ export function IssueView({
   savedHeadlines = [],
 }: IssueViewProps) {
   const isSaved = (story: NewsStory) => savedHeadlines.includes(story.headline);
+  // From md up a summarised issue's stories are a grid (plan #942), so the
+  // page widens to hold it. An essay, the original email and anything below
+  // md keep the one column they had.
+  const grid = showDigest && digest !== null && digest.stories.length > 0;
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className={cn('mx-auto max-w-3xl', grid && 'md:max-w-5xl')}>
       <p className="mb-3">
         <Link
           href={back.href}
@@ -172,16 +177,40 @@ export function IssueView({
           <Card padding="standard">
             <p className="break-words text-body leading-relaxed text-ink">{digest.summary}</p>
           </Card>
-          {digest.stories.length > 0 && (
-            <LeadStory
-              story={digest.stories[0]}
+          {grid && (
+            <StoryGrid
+              className="hidden md:grid"
+              stories={digest.stories.map((story, index) => ({
+                key: `${issueId}:${index}`,
+                headline: story.headline,
+                summary: story.summary,
+                image: story.image ?? null,
+                link: story.link ?? null,
+                body: <StoryText text={story.text} summary={story.summary} />,
+                actions: (
+                  <SaveStoryButton
+                    issueId={issueId}
+                    headline={story.headline}
+                    saved={isSaved(story)}
+                    className="-mr-2.5"
+                  />
+                ),
+              }))}
               pictures={pictures}
-              issueId={issueId}
-              saved={isSaved(digest.stories[0])}
             />
           )}
+          {digest.stories.length > 0 && (
+            <div className="md:hidden">
+              <LeadStory
+                story={digest.stories[0]}
+                pictures={pictures}
+                issueId={issueId}
+                saved={isSaved(digest.stories[0])}
+              />
+            </div>
+          )}
           {digest.stories.length > 1 && (
-            <CardSection title="More stories">
+            <CardSection title="More stories" className="md:hidden">
               <ul className="divide-y divide-border">
                 {digest.stories.slice(1).map((story, index) => (
                   <li key={index} className="py-3 first:pt-0 last:pb-0">
@@ -208,7 +237,7 @@ export function IssueView({
                         />
                       )}
                     </div>
-                    <StoryText text={story.text} />
+                    <StoryText text={story.text} summary={story.summary} />
                     <StoryActions story={story} issueId={issueId} saved={isSaved(story)} />
                   </li>
                 ))}
@@ -271,7 +300,7 @@ function LeadStory({
           {story.headline}
         </h2>
         <p className="mt-2 text-body leading-relaxed text-ink-muted">{story.summary}</p>
-        <StoryText text={story.text} />
+        <StoryText text={story.text} summary={story.summary} />
         <StoryActions story={story} issueId={issueId} saved={saved} />
       </div>
     </Card>
@@ -307,7 +336,12 @@ function StoryActions({
       ) : (
         <span aria-hidden />
       )}
-      <SaveStoryButton issueId={issueId} headline={story.headline} saved={saved} className="-mr-2.5" />
+      <SaveStoryButton
+        issueId={issueId}
+        headline={story.headline}
+        saved={saved}
+        className="-mr-2.5"
+      />
     </div>
   );
 }

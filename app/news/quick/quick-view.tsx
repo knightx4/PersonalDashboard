@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Image as ImageIcon, ImageOff, Mail } from 'lucide-react';
 import { SaveStoryButton } from '@/components/news/save-story-button';
+import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
 import { TopicChips, type TopicChipsProps } from '@/components/news/topic-chips';
 import { PageHeader } from '@/components/shell/page-header';
@@ -9,7 +10,13 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
 import type { QuickCard } from '@/lib/news/quick/next';
-import { ArticleLink, HideTopicForm, QuickNextForm, QuickSwipe } from './quick-controls';
+import {
+  ArticleLink,
+  HideTopicForm,
+  QuickNextForm,
+  QuickPageForm,
+  QuickSwipe,
+} from './quick-controls';
 
 export type QuickReadViewProps = {
   /** The story to show, or null when there is none left. */
@@ -31,6 +38,20 @@ export type QuickReadViewProps = {
   seed: string;
   /** The topic chips above the card (plan #860); `selected` is the topic in force. */
   topics: Omit<TopicChipsProps, 'className'>;
+  /**
+   * The laptop page (plan #941): the stories the grid shows from md up, the
+   * first of them `card` or a picture story moved ahead of it. Left out, the
+   * single card shows at every width, as it did before the grid.
+   */
+  page?: readonly QuickPageStory[];
+};
+
+/** One story of the laptop page, with what the grid card needs beside the story. */
+export type QuickPageStory = {
+  card: QuickCard;
+  arrived: string | null;
+  saved: boolean;
+  issueHref: string;
 };
 
 const DESCRIPTION = 'One story at a time from your newsletters, newest first.';
@@ -50,6 +71,7 @@ export function QuickReadView({
   issueHref,
   seed,
   topics,
+  page = [],
 }: QuickReadViewProps) {
   const topic = topics.selected;
   const chips = <TopicChips {...topics} className="mb-4" />;
@@ -96,17 +118,29 @@ export function QuickReadView({
   const summary = card.kind === 'story' ? card.story.summary : card.summary;
   const image = story?.image ?? null;
   const left = card.remainingInIssue - 1;
+  const grid = page.length > 0;
+  // The pictures button shows where there is a picture to hide: on a phone
+  // when the card has one, on a laptop when any story on the page has one.
+  const pagePictures = page.some(({ card: c }) => c.kind === 'story' && Boolean(c.story.image));
+  const phonePictures = Boolean(image);
+  const showToggle = grid ? phonePictures || pagePictures : phonePictures;
+  const toggleWidth =
+    !grid || phonePictures === pagePictures
+      ? ''
+      : phonePictures
+        ? 'md:hidden'
+        : 'hidden md:inline-flex';
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className={cn('mx-auto max-w-2xl', grid && 'md:max-w-5xl')}>
       <PageHeader
         title="Quick read"
         description={DESCRIPTION}
         actions={
-          image && (
+          showToggle && (
             <Link
               href={picturesHref}
-              className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}
+              className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), toggleWidth)}
             >
               {pictures ? (
                 <>
@@ -125,62 +159,127 @@ export function QuickReadView({
       />
       {chips}
 
-      <QuickSwipe key={`${card.issueId}:${card.storyIndex}`}>
-        <Card padding="none" className="overflow-hidden">
-          <article>
-            {pictures && image && (
-              // A plain img for the reason given on the issue page: the address
-              // is the sender's, and next/image would need every sender's host.
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={image}
-                alt=""
-                referrerPolicy="no-referrer"
-                className="aspect-[16/9] w-full border-b border-border bg-sunken object-cover"
-              />
-            )}
-            <div className="card-pad">
-              <p className="truncate text-ui text-ink-muted">
-                {card.from ?? 'Unknown sender'}
-                {arrived && ` · ${arrived}`}
-              </p>
-              <h2 className="mt-1 break-words font-display text-title tracking-tight text-ink">
-                {headline}
-              </h2>
-              <p className="mt-2 break-words text-body leading-relaxed text-ink">{summary}</p>
-              {story && <StoryText text={story.text} />}
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                {story?.link && (
-                  <ArticleLink
-                    href={story.link}
-                    issueId={card.issueId}
-                    storyIndex={card.storyIndex}
-                  />
-                )}
-                {issueHref && (
-                  <Link href={issueHref} className="text-ui text-accent hover:underline">
-                    {card.kind === 'essay' ? 'Read the newsletter' : 'Open the whole newsletter'}
-                  </Link>
-                )}
+      {/* One card below md and the grid from md up, chosen by CSS so the server never needs the screen size. */}
+      <div className={grid ? 'md:hidden' : undefined}>
+        <QuickSwipe key={`${card.issueId}:${card.storyIndex}`}>
+          <Card padding="none" className="overflow-hidden">
+            <article>
+              {pictures && image && (
+                // A plain img for the reason given on the issue page: the address
+                // is the sender's, and next/image would need every sender's host.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={image}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  className="aspect-[16/9] w-full border-b border-border bg-sunken object-cover"
+                />
+              )}
+              <div className="card-pad">
+                <p className="truncate text-ui text-ink-muted">
+                  {card.from ?? 'Unknown sender'}
+                  {arrived && ` · ${arrived}`}
+                </p>
+                <h2 className="mt-1 break-words font-display text-title tracking-tight text-ink">
+                  {headline}
+                </h2>
+                <p className="mt-2 break-words text-body leading-relaxed text-ink">{summary}</p>
+                {story && <StoryText text={story.text} summary={summary} />}
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                  {story?.link && (
+                    <ArticleLink
+                      href={story.link}
+                      issueId={card.issueId}
+                      storyIndex={card.storyIndex}
+                    />
+                  )}
+                  {issueHref && (
+                    <Link href={issueHref} className="text-ui text-accent hover:underline">
+                      {card.kind === 'essay' ? 'Read the newsletter' : 'Open the whole newsletter'}
+                    </Link>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="card-pad-x flex flex-wrap items-center justify-between gap-3 border-t border-border py-3">
-              <p className="text-ui text-ink-muted">
-                {left === 0
-                  ? `The last ${topic ? `${topic} story` : 'story'} from this newsletter`
-                  : `${left} more ${topic ? `on ${topic} ` : ''}from this newsletter`}
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                {story && (
-                  <SaveStoryButton issueId={card.issueId} headline={story.headline} saved={saved} />
-                )}
-                {story?.topic && <HideTopicForm topic={story.topic} />}
-                <QuickNextForm issueId={card.issueId} storyIndex={card.storyIndex} />
+              <div className="card-pad-x flex flex-wrap items-center justify-between gap-3 border-t border-border py-3">
+                <p className="text-ui text-ink-muted">
+                  {left === 0
+                    ? `The last ${topic ? `${topic} story` : 'story'} from this newsletter`
+                    : `${left} more ${topic ? `on ${topic} ` : ''}from this newsletter`}
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {story && (
+                    <SaveStoryButton
+                      issueId={card.issueId}
+                      headline={story.headline}
+                      saved={saved}
+                    />
+                  )}
+                  {story?.topic && <HideTopicForm topic={story.topic} />}
+                  <QuickNextForm issueId={card.issueId} storyIndex={card.storyIndex} />
+                </div>
               </div>
-            </div>
-          </article>
-        </Card>
-      </QuickSwipe>
+            </article>
+          </Card>
+        </QuickSwipe>
+      </div>
+
+      {grid && (
+        <div className="hidden md:block">
+          <StoryGrid stories={page.map(gridStory)} pictures={pictures} />
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-ui text-ink-muted">
+              Next page marks {page.length === 1 ? 'this story' : `all ${page.length} stories`} as
+              seen.
+            </p>
+            <QuickPageForm
+              stories={page.map(({ card: c }) => ({
+                issueId: c.issueId,
+                storyIndex: c.storyIndex,
+              }))}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+/**
+ * One laptop-page story as the grid draws it. The article link is the
+ * recording ArticleLink rather than the grid's own, so opening one still
+ * counts as seen, and an essay, which has no article, links to its newsletter.
+ */
+function gridStory({ card, arrived, saved, issueHref }: QuickPageStory): GridStory {
+  const from = [card.from ?? 'Unknown sender', arrived].filter(Boolean).join(' · ');
+  if (card.kind === 'essay') {
+    return {
+      key: `${card.issueId}:${card.storyIndex}`,
+      headline: card.subject ?? 'No subject',
+      summary: card.summary,
+      from,
+      actions: (
+        <Link href={issueHref} className="text-ui text-accent hover:underline">
+          Read the newsletter
+        </Link>
+      ),
+    };
+  }
+  const { story } = card;
+  return {
+    key: `${card.issueId}:${card.storyIndex}`,
+    headline: story.headline,
+    summary: story.summary,
+    image: story.image ?? null,
+    from,
+    body: <StoryText text={story.text} summary={story.summary} />,
+    actions: (
+      <>
+        {story.link && (
+          <ArticleLink href={story.link} issueId={card.issueId} storyIndex={card.storyIndex} />
+        )}
+        <SaveStoryButton issueId={card.issueId} headline={story.headline} saved={saved} />
+        {story.topic && <HideTopicForm topic={story.topic} />}
+      </>
+    ),
+  };
 }

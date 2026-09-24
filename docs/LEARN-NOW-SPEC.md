@@ -125,6 +125,33 @@ write about most, weighted by theme strength. About one in four comes from a
 **gap**: a field you write about but have never been tested in first, then a
 field with nothing in it at all. Every card says which it is.
 
+Once you set an open-subject goal on the Goals page, one card in three is drawn
+for a goal instead, and the other two keep the three-to-one split (plan #900).
+The share is counted from when the oldest active goal was set, so a first goal
+added after months of cards is not flooded to catch up. A goal card's why line
+names the goal, and it starts at the depth set on the goal: familiar, solid and
+deep pick at working, advanced and specialist. From there it moves the way a
+theme does, counted by goal (plan #909): two goal cards marked Got it take a
+familiar goal from working to advanced, and cards you said you need to work on
+come back from another angle rather than deeper.
+
+The Level 3 goal takes its turn in the same one card in three, but its cards
+skip the naming call (plan #910). Each draw takes two articles at random from
+the Level 3 list that you have shown no sign of knowing (nothing in the
+evidence view: no Got it, no save, no right Test me answer) and that have never
+been on a card of yours, and makes a card from each article's lead.
+
+An article you claimed (a Got it or a save) but have not been tested on comes
+back in the same draw once it is due (plan #912): a week after the claim, then
+a month after that return, then every three months, until a right answer on
+its Test me track moves it to tested. The gaps are `LEVEL3_RETURN_GAP_DAYS` in
+`lib/learn/feed/level3.ts`. When one is due, the draw takes an untouched
+article and a return in turn. A return stays on the same article, so its Test
+me track still counts for it, but at a section no earlier card was cut from: a
+naming call is given the earlier cards' titles and the open sections, and asked
+for one that goes past them, a step harder each time. A reply naming anything
+it was not offered is dropped.
+
 Your own queued readings are served before either, in the order you queued
 them.
 
@@ -132,11 +159,14 @@ them.
 
 The catalogue is empty, so the feed has to fill it. A background pass keeps
 about twenty cards ready per person, and runs hourly and whenever the ready
-count drops below ten.
+count drops to seven or fewer.
 
 1. **Pick a target.** Three in four draws take a strong theme, weighted by
    strength; one in four takes a gap field. The draw skips anything with a
-   card made in the last few weeks.
+   card made in the last few weeks. With goals, one draw in three takes a
+   goal, weighted by what you saved and turned down on its cards. A goal with
+   a card in the last three days is passed over only for another goal, so a
+   single goal still gets its share.
 2. **Name the material.** One model call names two or three Wikipedia
    articles, and the section in each, that someone interested in the target
    should read next. The code checks each title exists before anything else
@@ -150,8 +180,9 @@ count drops below ten.
    model, so it always names the right field and reason.
 
 The hourly run tops up anyone with fewer than twenty ready cards. After a
-response on the feed page, it runs only once fewer than ten are ready. It
-writes the picked rows first and picks more targets only when they run out.
+response on the feed page, it runs only once seven or fewer are ready, and
+then writes fifteen. It writes the picked rows first and picks more targets
+only when they run out.
 
 Wikipedia first, because it needs no key and its text can be shown. Lecture
 clips join once the catalogue has courses in it (plan #789).
@@ -198,7 +229,7 @@ but Test me after a Save moves it again.
 
 A pass, by Next or by scrolling, takes a card out of the ready pool like the
 other actions, and asks for a top-up once the response has gone, so passing
-enough cards to leave fewer than ten ready starts more being written. Cards
+enough cards to leave seven or fewer ready starts more being written. Cards
 still ready stay in the pool while they are on the screen, so the page keeps the
 list of cards already shown and asks only for others. A card that never reached
 the screen, or that you scrolled back up away from, comes back on your next
@@ -274,6 +305,20 @@ the titles swiped as "work on this" and told to come at those ideas from
 another article. The level is stored on the pick as `depth`, shown on the
 card, and passed to the writer, which drops a section that only restates what
 that level is past. Code: `lib/learn/feed/depth.ts`.
+
+The Too hard and Too easy buttons on a card (plan #894) move the same count.
+A card rated too easy adds one and a card rated too hard takes one off, so the
+count is known cards plus too-easy cards minus too-hard cards, never below
+zero. One Too hard on an advanced theme takes it back to working. A rating is
+read apart from the swipe: a card rated but never swiped still counts, and a
+card swiped as known and rated too easy counts twice. Ratings on a gap card
+count towards its field, as its swipes do.
+
+Working stays the lowest level (plan #892). Too hard on a working theme leaves
+the level where it is. The naming call is given the titles rated too hard on
+that theme or field and told to come at those ideas from a simpler angle,
+easier than those cards. A rating does not fetch new cards on its own; it
+changes the next picks made for that theme or field.
 
 ### The three swipes
 

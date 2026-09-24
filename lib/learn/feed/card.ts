@@ -11,7 +11,7 @@
 
 export type FeedCardRow = {
   id: string;
-  reason: 'interest' | 'gap' | 'queued';
+  reason: 'interest' | 'gap' | 'goal' | 'queued';
   status: string;
   summary: string | null;
   why: string | null;
@@ -28,7 +28,7 @@ export type FeedCardRow = {
 
 export type FeedCard = {
   id: string;
-  reason: 'interest' | 'gap';
+  reason: 'interest' | 'gap' | 'goal';
   /** "Article: Section", or the article alone for its lead. */
   title: string;
   article: string;

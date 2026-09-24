@@ -1,6 +1,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { applyExtraction, type ApplyExtractionResult } from './apply';
 import { parseAmazonQuantityLines } from './amazon-lines';
 import { unwrapQuotedOriginal } from './forwarded';
@@ -152,6 +153,8 @@ function enrichExtractedOrder(
   };
 }
 
+const EXTRACT_MODEL = 'claude-haiku-4-5-20251001';
+
 export async function extractOrderFromEmail(input: {
   subject: string;
   text: string;
@@ -163,6 +166,8 @@ export async function extractOrderFromEmail(input: {
   apiKey?: string | null;
   /** System + user category slugs the model may assign. */
   categoryOptions?: readonly CategoryOption[];
+  /** What the model call cost, when one was made; record it as 'extract-email-order'. */
+  onSpend?: SpendSink;
 }): Promise<{
   result: ApplyExtractionResult;
   source: 'llm' | 'heuristic';
@@ -238,7 +243,7 @@ async function extractFrom(input: ExtractInput): Promise<{
       const client = new Anthropic({ apiKey });
       const truncated = input.text.slice(0, 14_000);
       const message = await client.messages.create({
-        model: 'claude-haiku-4-5-20251001',
+        model: EXTRACT_MODEL,
         max_tokens: 1800,
         system: buildSystemPrompt(categoryOptions),
         messages: [
@@ -248,6 +253,7 @@ async function extractFrom(input: ExtractInput): Promise<{
           },
         ],
       });
+      input.onSpend?.({ model: EXTRACT_MODEL, usage: usageFrom(message.usage) });
       const textBlock = message.content.find((b) => b.type === 'text');
       const text = textBlock && textBlock.type === 'text' ? textBlock.text : '';
       const jsonMatch = text.match(/\{[\s\S]*\}/);

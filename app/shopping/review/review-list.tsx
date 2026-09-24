@@ -37,6 +37,7 @@ import {
   ExcludeSenderButton,
 } from './review-buttons';
 import { AttachChoices, useAttachEmail } from './attach-email';
+import { PaidHint } from '@/components/ui/paid-hint';
 
 function classificationLabel(value: string): string {
   return value.replaceAll('_', ' ');
@@ -346,6 +347,15 @@ function EmailRow({
             >
               Add from this email
             </Link>
+          )}
+          {!row.linkedOrderId && row.classification === 'order_confirmation' && (
+            // The order form reads the email as it opens.
+            <PaidHint
+              action="app/shopping/orders/new/page.tsx#NewOrderPage"
+              count={1}
+              what="Cost of reading the email"
+              className="self-center"
+            />
           )}
           {!row.linkedOrderId && row.classification !== 'order_confirmation' && (
             <Link

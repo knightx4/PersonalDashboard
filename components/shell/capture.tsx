@@ -10,22 +10,27 @@ import {
   useState,
   useTransition,
 } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Undo2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
 import { popoverSurface, scrim } from '@/components/ui/popover';
 import { ModuleMark } from '@/components/ui/module-mark';
+import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
 import { Kbd } from '@/components/shell/key-hints';
 import { usePopover } from '@/lib/use-popover';
 import {
-  captureAction,
+  availableCaptureActions,
   DEFAULT_CAPTURE_ACTION,
   type CaptureAction,
   type CaptureActionId,
 } from '@/lib/capture/actions';
 import { isCalendarDay, todoCaptureForm, type CaptureDay } from '@/lib/capture/todo';
+import type { PaidCosts } from '@/lib/core/spend/paid-actions';
+import { describeFiled, type FiledEntry } from '@/lib/goals/capture';
+import type { ModuleId } from '@/lib/modules';
 import { addTask, type TaskFormState } from '@/app/todo/actions';
+import { fileGoalCapture, goalCaptureCosts, undoGoalCapture } from '@/app/goals/capture-actions';
 import type { RelativeDay } from '@/lib/todo/tasks/model';
 
 /**
@@ -55,6 +60,8 @@ type CaptureHandle = {
   /** Open the panel on an action, optionally with what was already typed. */
   open: (action?: CaptureActionId, seed?: string) => void;
   close: () => void;
+  /** The actions this account can use, for the palette's rows. */
+  actions: readonly CaptureAction[];
 };
 
 const CaptureContext = createContext<CaptureHandle | null>(null);
@@ -68,24 +75,50 @@ export function useCapture(): CaptureHandle {
 /** The action being taken dictation for, and what it started with. */
 type Session = { action: CaptureAction; seed: string };
 
-/** What the shortcut opens: the default action, or nothing if it went away. */
-function defaultSession(): Session | null {
-  const action = captureAction(DEFAULT_CAPTURE_ACTION);
+/**
+ * What the shortcut opens: the default action, or the first this account has
+ * when the default's workspace is switched off, or nothing at all.
+ */
+function defaultSession(actions: readonly CaptureAction[]): Session | null {
+  const action = actions.find((a) => a.id === DEFAULT_CAPTURE_ACTION) ?? actions[0];
   return action ? { action, seed: '' } : null;
 }
 
-export function CaptureProvider({ children }: { children: React.ReactNode }) {
+export function CaptureProvider({
+  modules,
+  children,
+}: {
+  /** The workspaces this account has; an action for one it lacks is not offered. */
+  modules?: readonly ModuleId[];
+  children: React.ReactNode;
+}) {
   const [session, setSession] = useState<Session | null>(null);
+  // Keyed on the list's contents: the shell hands a fresh array on every
+  // render, and a new handle each time would re-render every consumer.
+  const moduleKey = modules?.join(',');
+  const actions = useMemo(
+    () =>
+      availableCaptureActions(
+        moduleKey === undefined ? undefined : (moduleKey.split(',').filter(Boolean) as ModuleId[]),
+      ),
+    [moduleKey],
+  );
 
-  const open = useCallback((id: CaptureActionId = DEFAULT_CAPTURE_ACTION, seed = '') => {
-    const action = captureAction(id);
-    if (!action) return;
-    setSession({ action, seed });
-  }, []);
+  const open = useCallback(
+    (id: CaptureActionId = DEFAULT_CAPTURE_ACTION, seed = '') => {
+      const action = actions.find((a) => a.id === id);
+      if (!action) return;
+      setSession({ action, seed });
+    },
+    [actions],
+  );
 
   const close = useCallback(() => setSession(null), []);
 
-  const handle = useMemo<CaptureHandle>(() => ({ open, close }), [open, close]);
+  const handle = useMemo<CaptureHandle>(
+    () => ({ open, close, actions }),
+    [open, close, actions],
+  );
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -104,11 +137,11 @@ export function CaptureProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       event.preventDefault();
-      setSession((current) => (current ? null : defaultSession()));
+      setSession((current) => (current ? null : defaultSession(actions)));
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, []);
+  }, [actions]);
 
   // The page underneath stays exactly where it was while the panel is over it.
   useEffect(() => {
@@ -122,34 +155,99 @@ export function CaptureProvider({ children }: { children: React.ReactNode }) {
   return (
     <CaptureContext.Provider value={handle}>
       {children}
-      {session && <CapturePanel session={session} onClose={close} />}
+      {session && (
+        <CapturePanel
+          // A fresh panel per action: switching from a todo to logging what
+          // happened starts with that action's own empty state.
+          key={session.action.id}
+          session={session}
+          actions={actions}
+          onSwitch={(action) => setSession({ action, seed: '' })}
+          onClose={close}
+        />
+      )}
     </CaptureContext.Provider>
   );
 }
+
+/** One sentence filed into Goals, and the lines it was filed as. */
+type Filed = { captureId: string; entries: FiledEntry[] };
+
+/**
+ * What the panel did with what you wrote: the sentence shown back for a todo,
+ * and for Goals the list of what it was filed as, each line with an Undo.
+ */
+type FileResult = TaskFormState & { filed?: Filed };
 
 /**
  * What the panel does with what you wrote.
  *
  * Filing is the module's own server action -- `addTask` is the one the add
- * form on /todo submits -- so nothing here is a second way to write a task.
- * The switch is exhaustive on purpose: the next action in the registry, note
- * creation or whatever follows it, will not compile until it says where what
- * you typed goes.
+ * form on /todo submits, `fileGoalCapture` the one Goals files a sentence
+ * with -- so nothing here is a second way to write a task or a step. The
+ * switch is exhaustive on purpose: the next action in the registry will not
+ * compile until it says where what you typed goes.
  */
-async function file(
-  action: CaptureAction,
-  text: string,
-  day: CaptureDay,
-): Promise<TaskFormState> {
+async function file(action: CaptureAction, text: string, day: CaptureDay): Promise<FileResult> {
   switch (action.id) {
     case 'todo':
       return addTask({}, todoCaptureForm(text, day));
+    case 'goals': {
+      const result = await fileGoalCapture(text);
+      if (result.error || !result.captureId) return { error: result.error ?? 'Nothing was filed.' };
+      const entries = result.filed ?? [];
+      return {
+        message:
+          entries.length === 0
+            ? 'Kept. Nothing in it matched an open goal.'
+            : entries.length === 1
+              ? 'Filed as one change.'
+              : `Filed as ${entries.length} changes.`,
+        filed: { captureId: result.captureId, entries },
+      };
+    }
   }
 }
 
-function CapturePanel({ session, onClose }: { session: Session; onClose: () => void }) {
+/** The paid press the panel's File it button makes, where there is one. */
+const PAID_PRESS: Partial<Record<CaptureActionId, 'app/goals/capture-actions.ts#fileGoalCapture'>> = {
+  goals: 'app/goals/capture-actions.ts#fileGoalCapture',
+};
+
+function CapturePanel({
+  session,
+  actions,
+  onSwitch,
+  onClose,
+}: {
+  session: Session;
+  actions: readonly CaptureAction[];
+  onSwitch: (action: CaptureAction) => void;
+  onClose: () => void;
+}) {
   const { action, seed } = session;
   const [text, setText] = useState(seed);
+  /** What this panel has filed into Goals since it opened, newest first. */
+  const [filed, setFiled] = useState<Filed[]>([]);
+  /**
+   * The $ figure for a paid press. The panel lives in the shell, outside any
+   * module's layout that would otherwise hand it over, so it is asked for
+   * once when an action that spends is opened.
+   */
+  const [costs, setCosts] = useState<PaidCosts>({});
+  const paid = PAID_PRESS[action.id];
+  useEffect(() => {
+    if (!paid) return;
+    let live = true;
+    goalCaptureCosts()
+      .then((found) => {
+        if (live) setCosts(found);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [paid]);
   /**
    * Today, until it is told otherwise.
    *
@@ -159,7 +257,7 @@ function CapturePanel({ session, onClose }: { session: Session; onClose: () => v
    * so "no day at all" costs the same one press it always did.
    */
   const [day, setDay] = useState<CaptureDay>('today');
-  const [state, setState] = useState<TaskFormState>({});
+  const [state, setState] = useState<FileResult>({});
   const [pending, start] = useTransition();
   const panelRef = useRef<HTMLFormElement>(null);
   const fieldRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
@@ -205,6 +303,8 @@ function CapturePanel({ session, onClose }: { session: Session; onClose: () => v
       const result = await file(action, text, day);
       setState(result);
       if (!result.message) return;
+      const added = result.filed;
+      if (added) setFiled((list) => [added, ...list]);
       setText('');
       // Back to the default rather than to blank: the panel stays open for
       // the next thing, and the next thing is a fresh answer to "when".
@@ -217,6 +317,12 @@ function CapturePanel({ session, onClose }: { session: Session; onClose: () => v
     setText(value);
     // The last result was about the last thing typed.
     if (state.error || state.message) setState({});
+  }
+
+  function undone(captureId: string, entries: FiledEntry[]) {
+    setFiled((list) =>
+      list.map((item) => (item.captureId === captureId ? { captureId, entries } : item)),
+    );
   }
 
   const field =
@@ -249,6 +355,22 @@ function CapturePanel({ session, onClose }: { session: Session; onClose: () => v
           <span className="min-w-0 flex-1 truncate text-ui font-medium text-ink">
             {action.label}
           </span>
+          {/* The other things this box can take, one press away, so the
+              header button and ⌥C reach every action and not only the
+              default one. */}
+          {actions
+            .filter((other) => other.id !== action.id)
+            .map((other) => (
+              <button
+                key={other.id}
+                type="button"
+                onClick={() => onSwitch(other)}
+                className="press flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-small text-ink-muted transition-colors duration-150 hover:bg-accent-tint hover:text-accent"
+              >
+                <ModuleMark module={other.module} size="sm" />
+                {other.label}
+              </button>
+            ))}
           {/* `always`: inside an open panel there is no modifier being held. */}
           <Kbd always>esc</Kbd>
         </div>
@@ -333,6 +455,11 @@ function CapturePanel({ session, onClose }: { session: Session; onClose: () => v
               <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
               {pending ? 'Filing…' : 'File it'}
             </Button>
+            {paid && (
+              <PaidCostsProvider costs={costs}>
+                <PaidHint action={paid} what="Cost of filing it" align="end" />
+              </PaidCostsProvider>
+            )}
           </span>
         </div>
 
@@ -341,7 +468,84 @@ function CapturePanel({ session, onClose }: { session: Session; onClose: () => v
             <FieldError>{state.error}</FieldError>
           </div>
         )}
+
+        {filed.length > 0 && (
+          <div className="max-h-[40vh] overflow-y-auto border-t border-border">
+            {filed.map((item) => (
+              <FiledLines key={item.captureId} filed={item} onUndone={undone} />
+            ))}
+          </div>
+        )}
       </form>
+    </div>
+  );
+}
+
+/**
+ * What one sentence was filed as, each line with its own Undo.
+ *
+ * The model will sometimes put a note against the wrong goal, so every line
+ * can be reversed on its own, in one press, without touching the others. An
+ * undone line stays in the list, marked, because the capture keeps it too.
+ */
+function FiledLines({
+  filed,
+  onUndone,
+}: {
+  filed: Filed;
+  onUndone: (captureId: string, entries: FiledEntry[]) => void;
+}) {
+  const [busy, setBusy] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [, start] = useTransition();
+
+  function undo(index: number) {
+    setBusy(index);
+    setError(null);
+    start(async () => {
+      const result = await undoGoalCapture(filed.captureId, index);
+      setBusy(null);
+      if (result.error || !result.filed) {
+        setError(result.error ?? 'That could not be undone.');
+        return;
+      }
+      onUndone(filed.captureId, result.filed);
+    });
+  }
+
+  if (filed.entries.length === 0) return null;
+
+  return (
+    <div className="px-3 py-2">
+      <ul className="space-y-1">
+        {filed.entries.map((entry, index) => (
+          <li key={index} className="flex items-start gap-2 text-small">
+            <span
+              className={cn(
+                'min-w-0 flex-1 py-1',
+                entry.undone_at ? 'text-ink-muted line-through' : 'text-ink',
+              )}
+            >
+              {describeFiled(entry)}
+            </span>
+            {entry.undone_at ? (
+              <span className="shrink-0 py-1 text-ink-muted">Undone</span>
+            ) : (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                pending={busy === index}
+                onClick={() => undo(index)}
+              >
+                <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+                Undo
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {error && <FieldError>{error}</FieldError>}
     </div>
   );
 }

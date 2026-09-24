@@ -17,8 +17,16 @@ import type { ModuleId } from '@/lib/modules';
  * sources and needs their names.
  */
 
-/** Every source that exists. Off unless the account says otherwise. */
-export const SOURCE_IDS = ['job_reminders', 'job_interviews', 'return_deadlines'] as const;
+/**
+ * Every source that exists. Off unless the account says otherwise, except a
+ * source marked `alwaysOn`, whose items were each put here by hand.
+ */
+export const SOURCE_IDS = [
+  'job_reminders',
+  'job_interviews',
+  'return_deadlines',
+  'goal_steps',
+] as const;
 
 export type SourceId = (typeof SOURCE_IDS)[number];
 
@@ -44,8 +52,11 @@ export interface AgendaItem {
   key: string;
   source: SourceId;
   title: string;
-  /** A calendar day, YYYY-MM-DD. What the item sorts by. */
-  day: string;
+  /**
+   * A calendar day, YYYY-MM-DD. What the item sorts by. Null for something
+   * with no date, which goes in "Someday" as an undated task does.
+   */
+  day: string | null;
   /** An instant, when the item has a clock rather than only a day. */
   at: string | null;
   /** Where to go to actually deal with it. */
@@ -102,6 +113,13 @@ export interface AgendaSource {
   label: string;
   /** Which workspace this reads. An off module's sources never run. */
   module: ModuleId;
+  /**
+   * Runs without a switch on the Todo settings page. For a source where every
+   * item was already asked for one at a time -- a goal step is on Todo because
+   * you pressed "Show on Todo" on it -- so a second, source-wide switch could
+   * only ever hide what you had just asked to see.
+   */
+  alwaysOn?: boolean;
   /** One line, shown beside the switch. Say what appears, not how it works. */
   description: string;
   /** Everything this source has for the window. */

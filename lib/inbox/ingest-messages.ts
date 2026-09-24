@@ -3,6 +3,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { classifyMessage, type MerchantDomainHit } from '@/lib/email/extract/classify';
 import { extractOrderFromEmail } from '@/lib/email/extract/extract-order';
+import type { SpendSink } from '@/lib/core/spend/pricing';
 import { displayNameFromAddress } from '@/lib/email/extract/heuristic';
 import { extractLifecycleFromEmail } from '@/lib/email/extract/lifecycle';
 import { PARSER_VERSION, type MessageClassification } from '@/lib/email/extract/schema';
@@ -212,6 +213,8 @@ async function handleOrderConfirmation(
     counters: IngestCounters;
     /** Whose mailbox this arrived in; null when nobody owns it yet. */
     personId?: string | null;
+    /** What the extraction's model call cost, when one was made. */
+    onSpend?: SpendSink;
   },
 ): Promise<void> {
   const {
@@ -223,6 +226,7 @@ async function handleOrderConfirmation(
     categoryOptions,
     counters,
     personId = null,
+    onSpend,
   } = opts;
 
   const platformSender = isPlatformMerchantSlug(classified.merchant?.slug);
@@ -237,6 +241,7 @@ async function handleOrderConfirmation(
     fromAddress: message.fromAddress,
     receivedAt: message.internalDate,
     categoryOptions,
+    onSpend,
   });
 
   if (!extraction.result.ok) {
@@ -469,6 +474,8 @@ export async function linkEnvelopes(
      * mailbox, and every order out of this batch inherits it.
      */
     personId?: string | null;
+    /** What each extraction cost; the linker records it as 'extract-email-order'. */
+    onSpend?: SpendSink;
   },
 ): Promise<void> {
   const {
@@ -647,6 +654,7 @@ export async function linkEnvelopes(
         categoryOptions,
         counters,
         personId,
+        onSpend: opts.onSpend,
       });
     } catch (err) {
       console.error('sync message failed', item.envelope.providerMessageId, err);

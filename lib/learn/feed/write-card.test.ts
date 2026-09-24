@@ -17,6 +17,7 @@ const interest: CardToWrite = {
   id: 'c1',
   reason: 'interest',
   themeName: 'Machine learning architecture',
+  aimName: null,
   field,
   gap: null,
   article: 'Autoencoder',
@@ -51,6 +52,20 @@ describe('the why line', () => {
     );
     expect(whyLine({ ...interest, reason: 'gap', themeName: null, gap: 'untouched' })).toBe(
       'A field you have never touched: Computing.',
+    );
+  });
+});
+
+describe('the why line for a goal', () => {
+  it('names the goal the card was drawn for', () => {
+    expect(
+      whyLine({ ...interest, reason: 'goal', themeName: null, aimName: 'City design and urbanism ' }),
+    ).toBe('For your goal: City design and urbanism.');
+  });
+
+  it('names it when the goal sits in no field', () => {
+    expect(whyLine({ ...interest, reason: 'goal', themeName: null, aimName: 'Startup finance', field: null })).toBe(
+      'For your goal: Startup finance.',
     );
   });
 });

@@ -11,6 +11,9 @@ import { loadLearnBrief } from '@/lib/shell/brief';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { countReadNow } from '@/lib/learn/tracks/load';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { estimatePaidActions, paidActionsUnder } from '@/lib/core/spend/paid-actions';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 
 /**
  * Shell for the learn workspace.
@@ -27,7 +30,11 @@ export default async function LearnLayout({ children }: { children: React.ReactN
   if (!user) redirect('/login');
 
   const supabase = await createClient();
-  const [{ data: profile }, settings, counts, activity, raised, mainCheck, owner] =
+  // Every paid button's $ hint in Learn, from one read of the spend ledger
+  // (plan #917). Here rather than on each page because the buttons sit in
+  // forms several components deep, and the figures change slowly enough that
+  // one read per visit to the module is plenty.
+  const [{ data: profile }, settings, counts, activity, raised, mainCheck, owner, costs] =
     await Promise.all([
       supabase.from('profiles').select('display_name').eq('id', user.id).single(),
       loadAccountSettings(user.id),
@@ -36,6 +43,9 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       loadRaisedNotifications(user.id),
       loadMainCheck(),
       isOwner({ user }),
+      createCoreClient()
+        .then((core) => estimatePaidActions(core, user.id, paidActionsUnder('app/learn/')))
+        .catch(() => ({})),
     ]);
 
   const brief = await loadLearnBrief();
@@ -82,6 +92,14 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       exact: true,
       alsoMatches: ['/learn/s/', '/learn/c/'],
     },
+    // What you want to learn and how well, which Learn now draws cards
+    // towards (plan #895). The page says Goals; the code says aims.
+    {
+      href: '/learn/goals',
+      label: 'Goals',
+      icon: 'goals',
+      exact: true,
+    },
     {
       href: '/learn/lists',
       label: 'Reading lists',
@@ -100,6 +118,19 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       exact: true,
       alsoMatches: ['/learn/quiz/'],
     },
+    // The owner's alone, because every transcript it fetches spends the
+    // owner's TranscriptAPI credits.
+    ...(owner
+      ? [
+          {
+            href: '/learn/youtube',
+            label: 'YouTube',
+            icon: 'videos' as const,
+            exact: true,
+            alsoMatches: ['/learn/youtube/'],
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -119,7 +150,7 @@ export default async function LearnLayout({ children }: { children: React.ReactN
         mainCheck={mainCheck}
         brief={brief}
       >
-        {children}
+        <PaidCostsProvider costs={costs}>{children}</PaidCostsProvider>
       </AppShell>
     </div>
   );

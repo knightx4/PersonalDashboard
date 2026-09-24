@@ -16,6 +16,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MODULE_IDS } from '@/lib/modules';
 import { ACTIONS, parseReplyPayload, type DashReply } from './reply-payload';
 
@@ -140,6 +141,8 @@ export type ReplyOptions = {
   apiKey: string;
   /** Overridable for tests. */
   client?: Anthropic;
+  /** What the call cost; record it as 'reply-to-comment'. */
+  onSpend?: SpendSink;
 };
 
 /** Ask, and get back an answer, something done, a hand-off to a session, or why none of them happened. */
@@ -194,6 +197,7 @@ export async function replyToComment(options: ReplyOptions, message: string): Pr
     }
     return { kind: 'error', error: error instanceof Error ? error.message : 'The reply failed.' };
   }
+  options.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
   const reported = response.content.find(
     (block) => block.type === 'tool_use' && block.name === TOOL_NAME,

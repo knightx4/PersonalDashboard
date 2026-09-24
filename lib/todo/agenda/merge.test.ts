@@ -253,10 +253,15 @@ describe('mergeAgenda', () => {
   });
 
   it('files an item with no day under someday, not under overdue', () => {
-    // Sources always give a day today, but a future one might not, and
-    // "unknown" must never present as "late".
+    // An undated goal step is one (plan #927), and "unknown" must never
+    // present as "late".
     const piles = merge({ tasks: [task({ id: 'x' })] });
     expect(piles[0].bucket).toBe('someday');
+
+    const items = merge({
+      items: [item({ key: 'goal_steps:s1', source: 'goal_steps', day: null })],
+    });
+    expect(items.map((pile) => pile.bucket)).toEqual(['someday']);
   });
 
   it('puts a hand-placed pile in the order it was placed in', () => {

@@ -3,6 +3,7 @@ import { after } from 'next/server';
 import { ExternalLink } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { Card } from '@/components/ui/card';
 import { topUpFeedAfterResponse } from '@/inngest/learn/feed-top-up';
 import { requireUser } from '@/lib/auth/server';
@@ -44,7 +45,7 @@ export default async function LearnNowPage() {
     loadFeedPage(supabase, []),
     countReadyCards(supabase),
   ]);
-  // Opening the page counts as a response: when fewer than ten are ready,
+  // Opening the page counts as a response: when seven or fewer are ready,
   // more are written while you read the first.
   after(() => topUpFeedAfterResponse(user.id));
 
@@ -89,12 +90,16 @@ export default async function LearnNowPage() {
 
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {url ? (
-                      <form action={openReading}>
+                      <form action={openReading} className="flex flex-wrap items-center gap-1">
                         <input type="hidden" name="readingId" value={reading.id} />
                         <Button type="submit" variant="primary" size="sm">
                           <ExternalLink className="size-3.5" strokeWidth={2} aria-hidden />
                           Open
                         </Button>
+                        <PaidHint
+                          action="app/learn/r/[id]/actions.ts#openReading"
+                          what="Cost of finding the passage"
+                        />
                       </form>
                     ) : (
                       <Link

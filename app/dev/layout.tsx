@@ -12,6 +12,9 @@ import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { loadPlan } from '@/lib/plan/load';
 import { buildPlanTree } from '@/lib/plan/tree';
 import { waitingOnYou } from '@/lib/plan/waiting';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { estimatePaidActions, paidActionsUnder } from '@/lib/core/spend/paid-actions';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 
 /**
  * Shell for the workspace the app keeps about itself.
@@ -52,13 +55,18 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     return <NoPermission what="The Dev workspace" />;
   }
 
-  const [settings, counts, activity, raised, plan, mainCheck] = await Promise.all([
+  const [settings, counts, activity, raised, plan, mainCheck, costs] = await Promise.all([
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
     loadActivity(),
     loadRaisedNotifications(user.id),
     loadPlan(supabase, user.id),
     loadMainCheck(),
+    // The $ hint on a comment that asks Dash, and on a raise's "Yes, and…"
+    // (plan #918).
+    createCoreClient()
+      .then((core) => estimatePaidActions(core, user.id, paidActionsUnder('app/dev/')))
+      .catch(() => ({})),
   ]);
 
   /**
@@ -132,7 +140,7 @@ export default async function DevLayout({ children }: { children: React.ReactNod
         activity={activity}
         mainCheck={mainCheck}
       >
-        {children}
+        <PaidCostsProvider costs={costs}>{children}</PaidCostsProvider>
       </AppShell>
     </div>
   );

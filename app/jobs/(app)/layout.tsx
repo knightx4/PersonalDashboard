@@ -14,6 +14,8 @@ import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { InboxSyncBanner } from '@/components/shell/inbox-sync-banner';
 import { onboardingNeeded } from '@/lib/jobs/onboarding';
 import { countReviewItems } from '@/lib/jobs/review/load';
+import { estimatePaidActions, paidActionsUnder } from '@/lib/core/spend/paid-actions';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 
 /**
  * Shell for every signed-in section.
@@ -48,6 +50,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     raised,
     mainCheck,
     owner,
+    costs,
   ] = await Promise.all([
     supabase.from('profiles').select('display_name').eq('id', user.id).single(),
     countReviewItems(supabase, core, user.id),
@@ -58,6 +61,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     loadRaisedNotifications(user.id),
     loadMainCheck(),
     isOwner({ user }),
+    // Every paid button's $ hint in Jobs, from one read of the spend ledger
+    // (plan #918, the same as Learn's in #917).
+    estimatePaidActions(core, user.id, paidActionsUnder('app/jobs/')).catch(() => ({})),
   ]);
 
   const brief = await loadJobsBrief(user.id, reviewCount);
@@ -104,7 +110,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         brief={brief}
         banner={<InboxSyncBanner accountIds={accountIds} initialJob={initialJob} />}
       >
-        {children}
+        <PaidCostsProvider costs={costs}>{children}</PaidCostsProvider>
       </AppShell>
     </div>
   );

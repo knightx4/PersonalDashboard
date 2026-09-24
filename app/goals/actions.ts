@@ -1,0 +1,174 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
+import { requireUser } from '@/lib/auth/server';
+import { createGoalsClient } from '@/lib/goals/auth/server';
+import {
+  archiveArea,
+  insertArea,
+  insertGoal,
+  moveArea,
+  moveGoal,
+  renameArea,
+  setGoalArchived,
+  unarchiveArea,
+  updateGoal,
+} from '@/lib/goals/store';
+import { parseAreaName, parseGoalFields } from '@/lib/goals/tree';
+
+/**
+ * The Goals home's writes for areas and goals (plan #924): add, rename,
+ * reorder and archive both, and write a goal's done-when or its fog.
+ *
+ * Each returns a sentence to show rather than throwing, so a refused write
+ * leaves the page standing with the reason beside the control. History is
+ * written by the database on every one of them.
+ */
+
+export type GoalsActionState = { error?: string; done?: number };
+
+const Id = z.string().uuid();
+const Direction = z.enum(['up', 'down']);
+
+function saved(): GoalsActionState {
+  // The layout, so the daily view on the home and the All goals list both
+  // redraw after a change made on either.
+  revalidatePath('/goals', 'layout');
+  // A new number each time, so a form can tell one save from the next.
+  return { done: Date.now() };
+}
+
+// latency: pending
+export async function addArea(_prev: GoalsActionState, form: FormData): Promise<GoalsActionState> {
+  const user = await requireUser();
+  const name = parseAreaName(form.get('name'));
+  if (!name.ok) return { error: name.error };
+  try {
+    await insertArea(await createGoalsClient(), user.id, name.value);
+  } catch {
+    return { error: 'The area could not be saved. Try again.' };
+  }
+  return saved();
+}
+
+// latency: pending
+export async function renameAreaAction(
+  _prev: GoalsActionState,
+  form: FormData,
+): Promise<GoalsActionState> {
+  await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which area that was.' };
+  const name = parseAreaName(form.get('name'));
+  if (!name.ok) return { error: name.error };
+  try {
+    const changed = await renameArea(await createGoalsClient(), id.data, name.value);
+    if (!changed) return { error: 'That area is no longer on the page.' };
+  } catch {
+    return { error: 'The name could not be saved. Try again.' };
+  }
+  return saved();
+}
+
+// latency: pending
+export async function moveAreaAction(form: FormData): Promise<GoalsActionState> {
+  await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  const direction = Direction.safeParse(form.get('direction'));
+  if (!id.success || !direction.success) return { error: 'Could not tell which area to move.' };
+  try {
+    await moveArea(await createGoalsClient(), id.data, direction.data);
+  } catch {
+    return { error: 'The area could not be moved. Try again.' };
+  }
+  return saved();
+}
+
+/** Archive an area, or with `restore` bring it back with the goals that went with it. */
+// latency: pending
+export async function archiveAreaAction(form: FormData): Promise<GoalsActionState> {
+  await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which area that was.' };
+  const restore = form.get('restore') === 'true';
+  try {
+    const client = await createGoalsClient();
+    const changed = restore
+      ? await unarchiveArea(client, id.data)
+      : await archiveArea(client, id.data);
+    if (!changed) return { error: 'That area has already changed. Reload to see it.' };
+  } catch {
+    return { error: 'The area could not be archived. Try again.' };
+  }
+  return saved();
+}
+
+// latency: pending
+export async function addGoal(_prev: GoalsActionState, form: FormData): Promise<GoalsActionState> {
+  const user = await requireUser();
+  const areaId = Id.safeParse(form.get('areaId'));
+  if (!areaId.success) return { error: 'Could not tell which area that goal is for.' };
+  const parsed = parseGoalFields((key) => form.get(key), { requireTitle: true });
+  if (!parsed.ok) return { error: parsed.error };
+  const { title, ...rest } = parsed.value;
+  if (!title) return { error: 'Give the goal a title.' };
+  try {
+    const added = await insertGoal(await createGoalsClient(), user.id, areaId.data, {
+      title,
+      ...rest,
+    });
+    if (!added) return { error: 'That area is no longer on the page.' };
+  } catch {
+    return { error: 'The goal could not be saved. Try again.' };
+  }
+  return saved();
+}
+
+/** An edit sends only the field that changed: the title, the done-when or the fog. */
+// latency: pending
+export async function editGoal(_prev: GoalsActionState, form: FormData): Promise<GoalsActionState> {
+  await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which goal that was.' };
+  const parsed = parseGoalFields((key) => form.get(key));
+  if (!parsed.ok) return { error: parsed.error };
+  if (Object.keys(parsed.value).length === 0) return {};
+  try {
+    const changed = await updateGoal(await createGoalsClient(), id.data, parsed.value);
+    if (!changed) return { error: 'That goal is no longer on the page.' };
+  } catch {
+    return { error: 'The change could not be saved. Try again.' };
+  }
+  return saved();
+}
+
+// latency: pending
+export async function moveGoalAction(form: FormData): Promise<GoalsActionState> {
+  await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  const direction = Direction.safeParse(form.get('direction'));
+  if (!id.success || !direction.success) return { error: 'Could not tell which goal to move.' };
+  try {
+    await moveGoal(await createGoalsClient(), id.data, direction.data);
+  } catch {
+    return { error: 'The goal could not be moved. Try again.' };
+  }
+  return saved();
+}
+
+/** Archive a goal, or with `restore` bring it back. */
+// latency: pending
+export async function archiveGoalAction(form: FormData): Promise<GoalsActionState> {
+  await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which goal that was.' };
+  const restore = form.get('restore') === 'true';
+  try {
+    const changed = await setGoalArchived(await createGoalsClient(), id.data, !restore);
+    if (!changed) return { error: 'That goal has already changed. Reload to see it.' };
+  } catch {
+    return { error: 'The goal could not be archived. Try again.' };
+  }
+  return saved();
+}

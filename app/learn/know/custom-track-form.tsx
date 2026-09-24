@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { cardVariants } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
 import { Field, Input, Textarea } from '@/components/ui/field';
@@ -25,37 +26,35 @@ function MakeButton() {
  * Make a track by name (LEARN-GRAPH-SPEC, "The curriculum"). The curriculum
  * is written as it is made, from your own units when you give them, and you
  * land on the track to open its first unit.
+ *
+ * Opened by the Make a track button at the top of the page and nowhere else
+ * (note c6e981e0): an always-open form under the tracks was the form-feel law
+ * 14 rules out. Two short strings, so placeholders rather than labels (law 9),
+ * and no heading restating the button that opened it (law 15).
  */
 export function CustomTrackForm() {
   const [state, make] = useActionState<CustomTrackState, FormData>(createCustomTrack, {});
 
   return (
-    <form action={make} className={cn(cardVariants({ padding: 'standard' }), 'mt-6')}>
-      <h2 className="text-body font-semibold text-ink">Make a track</h2>
-      <p className="mt-1 mb-4 text-ui text-ink-muted">
-        Name what you want to study. It gets a fixed curriculum of units in teaching order, and you
-        open one unit at a time.
-      </p>
-
-      <Field label="Track" id="track-name">
-        <Input id="track-name" name="name" required maxLength={80} placeholder="Options pricing" />
-      </Field>
-
-      <Field
-        label="What you want out of it"
+    <form action={make} className={cn(cardVariants({ padding: 'standard' }), 'mb-6 space-y-3')}>
+      <Input
+        id="track-name"
+        name="name"
+        aria-label="Track"
+        required
+        autoFocus
+        maxLength={80}
+        placeholder="The track, like Options pricing"
+      />
+      <Input
         id="track-want"
-        hint="Optional. Shapes what the curriculum covers and how far it goes."
-        className="mt-4"
-      >
-        <Input
-          id="track-want"
-          name="want"
-          maxLength={500}
-          placeholder="Enough to price and hedge vanilla options at work"
-        />
-      </Field>
+        name="want"
+        aria-label="What you want out of it"
+        maxLength={500}
+        placeholder="What you want out of it, if you know (optional)"
+      />
 
-      <SectionFold title="Write the units yourself" defaultOpen={false} className="mt-4">
+      <SectionFold title="Write the units yourself" defaultOpen={false}>
         <Field
           label="Units, one per line"
           id="track-units"
@@ -74,8 +73,15 @@ export function CustomTrackForm() {
         </Field>
       </SectionFold>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <MakeButton />
+        <PaidHint
+          action="app/learn/know/actions.ts#createCustomTrack"
+          what="Cost of making the track"
+        />
+        <Link href="/learn/know" className={buttonVariants({ variant: 'ghost' })}>
+          Cancel
+        </Link>
         {state.error && (
           <span className="text-ui text-danger">
             {state.error}{' '}

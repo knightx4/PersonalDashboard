@@ -240,6 +240,7 @@ const WORKSPACE_HUES: Record<(typeof MODULES)[number]['id'], string> = {
   vault: 'bg-w-vault',
   learn: 'bg-w-learn',
   news: 'bg-w-news',
+  goals: 'bg-w-goals',
   dev: 'bg-w-dev',
 };
 

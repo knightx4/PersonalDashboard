@@ -5,6 +5,14 @@ import { SurfaceReview } from '@/app/dev/surfaces/review';
 import DevUiPage from '@/app/dev/ui/page';
 import { ANATOMIES } from '@/app/dev/ui/anatomy';
 import { ItemDetailsPanel } from '@/app/shopping/inventory/[id]/item-details-panel';
+import { EstimatesTable } from '@/app/account/spend/estimates-table';
+import { compareEstimate } from '@/lib/core/spend/comparison';
+import {
+  ESTIMATE_WINDOW_DAYS,
+  MEASURED_MIN_RUNS,
+  type MeasuredRange,
+} from '@/lib/core/spend/estimate';
+import type { OperationName } from '@/lib/core/spend/guesses';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
 import { ReviewQueue } from '@/app/jobs/(app)/review/list';
 import { SettingsView } from '@/app/jobs/(app)/settings/view';
@@ -52,9 +60,14 @@ import { CommentThread } from '@/components/dev/comment-thread';
 import type { DevComment } from '@/lib/comments/load';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { Button } from '@/components/ui/button';
+import { CostHint } from '@/components/ui/cost-hint';
+import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import { IssueView, type IssueViewProps } from '@/app/news/i/[id]/issue-view';
 import { QuickReadView, type QuickReadViewProps } from '@/app/news/quick/quick-view';
 import { SavedView, type SavedViewProps } from '@/app/news/saved/saved-view';
+import { StoryGrid, type GridStory } from '@/components/news/story-grid';
+import { StoryText } from '@/components/news/story-text';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -1179,7 +1192,8 @@ const subjectConcepts: Concept[] = [
   {
     id: 'k3',
     name: 'Sunk cost',
-    claim: 'Money already spent is not a reason to continue, because it is gone under either choice.',
+    claim:
+      'Money already spent is not a reason to continue, because it is gone under either choice.',
     claimOriginal: null,
     claimRewrittenAt: null,
     catalogueSearchedAt: null,
@@ -1195,7 +1209,8 @@ const subjectConcepts: Concept[] = [
   {
     id: 'k4',
     name: 'Deadweight loss',
-    claim: 'A tax that changes behaviour destroys trades that both sides wanted, and that loss goes to nobody.',
+    claim:
+      'A tax that changes behaviour destroys trades that both sides wanted, and that loss goes to nobody.',
     claimOriginal: null,
     claimRewrittenAt: null,
     catalogueSearchedAt: null,
@@ -1378,8 +1393,16 @@ const orderDisplay: ListDisplaySpec<SampleOrder> = {
   sorts: [
     { id: 'newest', label: 'Newest', compare: (a, b) => b.month.localeCompare(a.month) },
     { id: 'oldest', label: 'Oldest', compare: (a, b) => a.month.localeCompare(b.month) },
-    { id: 'total_desc', label: 'Total: high to low', compare: (a, b) => b.totalCents - a.totalCents },
-    { id: 'total_asc', label: 'Total: low to high', compare: (a, b) => a.totalCents - b.totalCents },
+    {
+      id: 'total_desc',
+      label: 'Total: high to low',
+      compare: (a, b) => b.totalCents - a.totalCents,
+    },
+    {
+      id: 'total_asc',
+      label: 'Total: low to high',
+      compare: (a, b) => a.totalCents - b.totalCents,
+    },
   ],
   groups: [
     {
@@ -1388,8 +1411,16 @@ const orderDisplay: ListDisplaySpec<SampleOrder> = {
       order: 'key-desc',
       bucket: (row) => ({ key: row.month, label: row.monthLabel }),
     },
-    { id: 'merchant', label: 'Merchant', bucket: (row) => ({ key: row.merchant, label: row.merchant }) },
-    { id: 'person', label: 'Whose order', bucket: (row) => ({ key: row.person, label: row.person }) },
+    {
+      id: 'merchant',
+      label: 'Merchant',
+      bucket: (row) => ({ key: row.merchant, label: row.merchant }),
+    },
+    {
+      id: 'person',
+      label: 'Whose order',
+      bucket: (row) => ({ key: row.person, label: row.person }),
+    },
   ],
   properties: [
     { id: 'merchant', label: 'Merchant', alwaysOn: true },
@@ -1476,7 +1507,12 @@ function SharedDisplayOptions() {
       {groups.map((group) => (
         <section key={group.key} className="space-y-2">
           <GroupHeader label={group.label} count={group.count} subtotal={group.subtotal} />
-          <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}>
+          <ul
+            className={cn(
+              cardVariants({ padding: 'none' }),
+              'divide-y divide-border overflow-hidden',
+            )}
+          >
             {group.rows.map((row) => (
               <li key={row.id} className="flex items-baseline justify-between gap-3 px-4 py-3">
                 <div className="min-w-0">
@@ -1526,14 +1562,13 @@ const issueBase: IssueViewProps = {
       {
         headline: 'Six hours of stale balances: a failover post-mortem',
         summary:
-          'A replica promoted during a network partition kept its warm cache, so reads served balances from before the split. The fix was to tie cache generations to the primary\'s timeline ID rather than to wall-clock expiry.',
+          "A replica promoted during a network partition kept its warm cache, so reads served balances from before the split. The fix was to tie cache generations to the primary's timeline ID rather than to wall-clock expiry.",
         link: 'https://example.com/blog/2026/09/stale-balances-post-mortem',
         // Drawn inline so the gallery needs no network for it, and wide
         // because the lead story spreads it across the card (plan #856).
         image:
           "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 160'%3E%3Crect width='320' height='160' fill='%23334155'/%3E%3Cpath d='M0 118 L70 70 L130 104 L190 62 L250 96 L320 74 V160 H0Z' fill='%2394a3b8'/%3E%3Ccircle cx='236' cy='40' r='16' fill='%23fbbf24'/%3E%3C/svg%3E",
-        text:
-          'At 02:14 a network partition split the primary from two of its replicas. The failover promoted one of them within forty seconds, which is what it is meant to do.\n\nWhat nobody had planned for was the cache in front of it. Its keys expired on a timer, not on a change of primary, so for six hours it went on serving balances written before the split.\n\nThe fix ties each cache generation to the primary\'s timeline ID. A promotion now empties the cache on the spot.',
+        text: "At 02:14 a network partition split the primary from two of its replicas. The failover promoted one of them within forty seconds, which is what it is meant to do.\n\nWhat nobody had planned for was the cache in front of it. Its keys expired on a timer, not on a change of primary, so for six hours it went on serving balances written before the split.\n\nThe fix ties each cache generation to the primary's timeline ID. A promotion now empties the cache on the spot.",
       },
       {
         headline: 'github.com/example-org/postgres-backed-job-queue-benchmarks-2026',
@@ -1544,7 +1579,7 @@ const issueBase: IssueViewProps = {
       {
         headline: 'Tracing library 4.0 drops the global registry',
         summary:
-          'Every tracer is now passed explicitly, which breaks most existing setups. The maintainers say the upgrade is a morning\'s work for a typical service.',
+          "Every tracer is now passed explicitly, which breaks most existing setups. The maintainers say the upgrade is a morning's work for a typical service.",
       },
       {
         headline: 'You probably do not need Kubernetes yet',
@@ -1576,7 +1611,7 @@ const issueEssay: IssueViewProps = {
   byline: 'Slow Letters · Sun 20 Sep, 09:02',
   digest: {
     summary:
-      'An essay about the half-built projects that pile up in any maker\'s life, and the argument that abandoning one on purpose is a skill. The writer keeps a list of what they stopped and why, and rereads it before starting anything new. Their point is that the list is less about guilt than about noticing which kinds of project they never finish.',
+      "An essay about the half-built projects that pile up in any maker's life, and the argument that abandoning one on purpose is a skill. The writer keeps a list of what they stopped and why, and rereads it before starting anything new. Their point is that the list is less about guilt than about noticing which kinds of project they never finish.",
     stories: [],
   },
   unsubscribeUrl: null,
@@ -1610,7 +1645,12 @@ const quickStory: QuickReadViewProps = {
     storyIndex: 0,
     subject: issueBase.subject,
     receivedAt: '2026-09-22T07:14:00Z',
-    sender: { id: 'sender-1', email: 'hello@infraweekly.example', name: 'Infra Weekly', muted: false },
+    sender: {
+      id: 'sender-1',
+      email: 'hello@infraweekly.example',
+      name: 'Infra Weekly',
+      muted: false,
+    },
     from: 'Infra Weekly',
     remainingInIssue: 4,
   },
@@ -1650,6 +1690,94 @@ const quickEssay: QuickReadViewProps = {
   arrived: '20 Sep, 09:02',
   issueHref: '/news/i/issue-2',
 };
+
+/**
+ * Quick read on a laptop (plan #941): the story card above leading a page with
+ * the essay beside it. Below md the gallery shows the single card instead.
+ */
+const quickPageView: QuickReadViewProps = {
+  ...quickStory,
+  page: [
+    {
+      card: quickStory.card!,
+      arrived: '22 Sep, 07:14',
+      saved: false,
+      issueHref: '/news/i/issue-1',
+    },
+    {
+      card: quickEssay.card!,
+      arrived: '20 Sep, 09:02',
+      saved: false,
+      issueHref: '/news/i/issue-2',
+    },
+  ],
+};
+
+/** A picture drawn inline, so the gallery needs no network for it. */
+function previewPicture(sky: string, hill: string): string {
+  return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180'%3E%3Crect width='320' height='180' fill='%23${sky}'/%3E%3Cpath d='M0 130 L80 84 L150 116 L220 70 L320 104 V180 H0Z' fill='%23${hill}'/%3E%3C/svg%3E`;
+}
+
+/**
+ * A page of the News grid (plan #940): six stories from four newsletters, as
+ * Quick read fills a page. Three carry a picture and three do not, the way a
+ * page mixes newsletters summarised before and after pictures were kept. One
+ * headline is a single long word, and one summary runs long.
+ */
+const gridStories: GridStory[] = [
+  {
+    key: 'issue-1:0',
+    headline: issueBase.digest!.stories[0].headline,
+    summary: issueBase.digest!.stories[0].summary,
+    image: issueBase.digest!.stories[0].image,
+    from: 'Infra Weekly',
+    link: issueBase.digest!.stories[0].link,
+    body: (
+      <StoryText
+        text={issueBase.digest!.stories[0].text}
+        summary={issueBase.digest!.stories[0].summary}
+      />
+    ),
+  },
+  {
+    key: 'issue-4:0',
+    headline: 'Rail freight volumes rise for a third month',
+    summary:
+      'Container traffic on the main northern routes is up nine percent on last year, mostly from ports diverting cargo away from congested motorways.',
+    image: previewPicture('1e3a8a', '60a5fa'),
+    from: 'The Morning Ledger',
+    link: 'https://example.com/ledger/rail-freight',
+  },
+  {
+    key: 'issue-1:1',
+    headline: issueBase.digest!.stories[1].headline,
+    summary: issueBase.digest!.stories[1].summary,
+    from: 'Infra Weekly',
+    link: issueBase.digest!.stories[1].link,
+  },
+  {
+    key: 'issue-5:0',
+    headline: 'A museum reopens its print room after four years',
+    summary:
+      'The collection of eighteenth-century engravings is back on view by appointment, with a new reading room and a catalogue that is online for the first time. The curators have added a short guide to the printing methods behind each plate, and the first two months of slots were gone within a day.',
+    from: 'Culture Desk',
+  },
+  {
+    key: 'issue-6:0',
+    headline: 'Council votes to keep the late-night bus routes',
+    summary:
+      'The three routes were due to be cut in January. A funding deal with two neighbouring boroughs keeps them running for another two years.',
+    image: previewPicture('7c2d12', 'fb923c'),
+    from: 'Local Brief',
+    link: 'https://example.com/local/night-buses',
+  },
+  {
+    key: 'issue-1:2',
+    headline: issueBase.digest!.stories[2].headline,
+    summary: issueBase.digest!.stories[2].summary,
+    from: 'Infra Weekly',
+  },
+];
 
 /**
  * The Saved tab (plan #870): three stories, newest saved first. The first has
@@ -1740,7 +1868,9 @@ const deckCards: FeedCard[] = [
     shown: [
       'The cobweb model or cobweb theory is an economic model that explains why prices might be subject to periodic fluctuations in certain types of markets.',
     ],
-    rest: ['It describes cyclical supply and demand in a market where the amount produced must be chosen before prices are observed.'],
+    rest: [
+      'It describes cyclical supply and demand in a market where the amount produced must be chosen before prices are observed.',
+    ],
     restMinutes: 1,
     link: 'https://en.wikipedia.org/wiki/Cobweb_model#Mechanism',
     site: 'Wikipedia',
@@ -1755,14 +1885,17 @@ const deckCards: FeedCard[] = [
     why: 'A field you write about but have never been tested in: Public economics.',
     context: null,
     hook: 'Who legally pays a tax has no effect on who bears it; the less elastic side of the market ends up carrying most of it.',
-    summary: 'The burden of a tax splits between buyers and sellers in proportion to how little each can walk away.',
+    summary:
+      'The burden of a tax splits between buyers and sellers in proportion to how little each can walk away.',
     example: 'Cigarette taxes fall mostly on smokers, because demand barely moves with price.',
     question: null,
     answer: null,
     depth: 'advanced',
     difficulty: null,
     returning: 'review',
-    shown: ['Tax incidence is the analysis of the effect of a particular tax on the distribution of economic welfare.'],
+    shown: [
+      'Tax incidence is the analysis of the effect of a particular tax on the distribution of economic welfare.',
+    ],
     rest: [],
     restMinutes: 0,
     link: 'https://en.wikipedia.org/wiki/Tax_incidence',
@@ -1770,6 +1903,84 @@ const deckCards: FeedCard[] = [
     licence: 'CC BY-SA 4.0',
   },
 ];
+
+const measuredDraft: CostEstimate = {
+  lowMicros: 300_000,
+  medianMicros: 400_000,
+  highMicros: 760_000,
+  runs: 12,
+  basis: 'measured',
+  per: 'run',
+};
+
+const guessedSummary: CostEstimate = {
+  lowMicros: 30_000,
+  medianMicros: 50_000,
+  highMicros: 90_000,
+  runs: 2,
+  basis: 'guess',
+  per: 'run',
+};
+
+const perReading: CostEstimate = {
+  lowMicros: 12_000,
+  medianMicros: 18_000,
+  highMicros: 31_000,
+  runs: 40,
+  basis: 'measured',
+  per: 'unit',
+};
+
+function CostHintRows() {
+  return (
+    <div className="space-y-16 pb-16">
+      <div className="flex items-center gap-1">
+        <Button>Draft cover letter</Button>
+        <CostHint estimate={measuredDraft} what="Cost of drafting" defaultOpen />
+      </div>
+      <div className="flex items-center gap-1">
+        <Button variant="secondary">Summarise thread</Button>
+        <CostHint estimate={guessedSummary} what="Cost of summarising" defaultOpen />
+      </div>
+      <div className="flex items-center justify-end gap-1">
+        <Button variant="secondary">Grade 12 readings</Button>
+        <CostHint estimate={perReading} count={12} what="Cost of grading" align="end" defaultOpen />
+      </div>
+    </div>
+  );
+}
+
+/* The spend page's estimates against the ledger, from ranges shaped like the
+ * live ledger's in September 2026: one measured row, uncertain rows with and
+ * without runs, a per-item row, and two background ones. */
+function SpendEstimates() {
+  const ranges = new Map<OperationName, MeasuredRange>([
+    ['classify-note', { runs: 7, lowMicros: 1_402, medianMicros: 1_538, highMicros: 1_710 }],
+    [
+      'write-opening-question',
+      { runs: 1, lowMicros: 16_065, medianMicros: 16_065, highMicros: 16_065 },
+    ],
+    ['plan-topic', { runs: 2, lowMicros: 113_270, medianMicros: 400_732, highMicros: 688_194 }],
+    ['map-sweep', { runs: 2_127, lowMicros: 1_533, medianMicros: 6_110, highMicros: 12_426 }],
+    ['digest-issue', { runs: 91, lowMicros: 1_957, medianMicros: 4_370, highMicros: 16_446 }],
+  ]);
+  const pick = (names: OperationName[]) =>
+    names.map((name) => compareEstimate(name, ranges.get(name)));
+  return (
+    <EstimatesTable
+      foreground={pick([
+        'plan-topic',
+        'resolve-reference',
+        'classify-note',
+        'write-opening-question',
+        'draft-answer',
+      ])}
+      background={pick(['map-sweep', 'digest-issue', 'classify-job-email'])}
+      days={ESTIMATE_WINDOW_DAYS}
+      minRuns={MEASURED_MIN_RUNS}
+    />
+  );
+}
 
 export const SURFACES: readonly Surface[] = [
   {
@@ -2227,7 +2438,15 @@ export const SURFACES: readonly Surface[] = [
     label: 'News · Issue original email',
     module: 'news',
     width: 'page',
-    render: () => <IssueView {...issueBase} showDigest={false} html={issueFailed.html} pictures={false} blockedImages={1} />,
+    render: () => (
+      <IssueView
+        {...issueBase}
+        showDigest={false}
+        html={issueFailed.html}
+        pictures={false}
+        blockedImages={1}
+      />
+    ),
   },
   {
     id: 'news-issue-failed',
@@ -2251,11 +2470,34 @@ export const SURFACES: readonly Surface[] = [
     render: () => <QuickReadView {...quickEssay} />,
   },
   {
+    id: 'news-quick-page',
+    label: 'News · Quick read page on a laptop',
+    module: 'news',
+    width: 'page',
+    render: () => <QuickReadView {...quickPageView} />,
+  },
+  {
     id: 'news-quick-caught-up',
     label: 'News · Quick read caught up',
     module: 'news',
     width: 'page',
     render: () => <QuickReadView {...quickStory} card={null} arrived={null} issueHref={null} />,
+  },
+  {
+    id: 'news-story-grid',
+    label: 'News · Story grid with pictures',
+    module: 'news',
+    width: 'page',
+    render: () => <StoryGrid stories={gridStories} pictures />,
+  },
+  {
+    id: 'news-story-grid-no-pictures',
+    label: 'News · Story grid with no pictures',
+    module: 'news',
+    width: 'page',
+    render: () => (
+      <StoryGrid stories={gridStories.map((story) => ({ ...story, image: null }))} pictures />
+    ),
   },
   {
     id: 'news-saved',
@@ -2270,6 +2512,28 @@ export const SURFACES: readonly Surface[] = [
     module: 'news',
     width: 'page',
     render: () => <SavedView stories={[]} />,
+  },
+
+  {
+    /* The $ hint beside three paid buttons: one with enough runs to give a
+     * range, one that is a guess, and one priced per item and multiplied by
+     * the batch. Each starts open so the shot shows the figure as well as the
+     * mark; in the app it opens on hover, focus or a press. The rows are
+     * spaced for the popup that hangs below each. */
+    id: 'core-cost-hint',
+    label: 'Spend · The $ hint beside a paid button',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CostHintRows />,
+  },
+  {
+    /* /account/spend: every operation's estimate beside its thirty-day median.
+     * At phone width the rows stack into label/value pairs. */
+    id: 'core-spend-estimates',
+    label: 'Spend · Estimates against actual spend',
+    module: 'learn',
+    width: 'page',
+    render: () => <SpendEstimates />,
   },
 
   /* The page anatomies, framed at two widths by the anatomy section on

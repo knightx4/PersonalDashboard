@@ -147,6 +147,41 @@ export function nextCard(
   return null;
 }
 
+/** How many stories a laptop page of Quick read holds at most. */
+export const QUICK_PAGE_SIZE = 6;
+
+/**
+ * The stories a laptop page of Quick read shows, or an empty list when you
+ * are caught up.
+ *
+ * They are the cards nextCard would show one at a time, in that order, found
+ * by asking nextCard again as though each card before had been passed, so the
+ * muting, topic, hidden-topic and pass rules are the same ones and
+ * `remainingInIssue` on each card is what nextCard would have said when it
+ * got there. The first story with a picture is then moved to the front to
+ * lead the page; when none has a picture the order is left alone. With fewer
+ * than `size` cards left the page is shorter.
+ */
+export function quickPage(
+  issues: readonly QuickIssue[],
+  senders: readonly NewsSender[],
+  passes: readonly StoryPass[],
+  filter: QuickFilter = {},
+  size: number = QUICK_PAGE_SIZE,
+): QuickCard[] {
+  const cards: QuickCard[] = [];
+  const seen: StoryPass[] = [...passes];
+  while (cards.length < size) {
+    const card = nextCard(issues, senders, seen, filter);
+    if (!card) break;
+    cards.push(card);
+    seen.push({ issueId: card.issueId, storyIndex: card.storyIndex });
+  }
+  const lead = cards.findIndex((card) => card.kind === 'story' && Boolean(card.story.image));
+  if (lead > 0) cards.unshift(...cards.splice(lead, 1));
+  return cards;
+}
+
 /**
  * The topics Quick read has a story left on, in NEWS_TOPICS order: the chips
  * drawn above the card. Muted senders and passed stories do not count, the

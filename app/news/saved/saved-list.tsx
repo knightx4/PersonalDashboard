@@ -78,7 +78,7 @@ export function SavedList({ stories }: { stories: SavedListStory[] }) {
                   />
                 )}
               </div>
-              <StoryText text={story.text ?? undefined} />
+              <StoryText text={story.text ?? undefined} summary={story.summary} />
               <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
                 {story.link ? (
                   <a

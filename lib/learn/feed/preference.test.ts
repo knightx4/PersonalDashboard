@@ -5,6 +5,7 @@ import {
   PREFERENCE_FLOOR,
   SAVE_STEP,
   fieldWeight,
+  goalWeight,
   preferencesFrom,
   themeWeight,
   type CardSignal,
@@ -95,6 +96,48 @@ describe('counting what you did with cards', () => {
     expect(themeWeight(preferences, 't1', 'a')).toBeCloseTo(DISMISS_STEP ** 2);
     expect(themeWeight(preferences, 't2', 'a')).toBeCloseTo(DISMISS_STEP);
     expect(themeWeight(preferences, 't3', 'b')).toBe(1);
+  });
+});
+
+describe('leaning goals', () => {
+  it('counts saves and dismissals on goal cards towards the goal, and its field when it has one', () => {
+    const preferences = preferencesFrom([
+      card({ status: 'dismissed', aim_id: 'g1', field_id: 'a' }),
+      card({ status: 'dismissed', aim_id: 'g1' }),
+      card({ status: 'review', aim_id: 'g2' }),
+    ]);
+    expect(preferences.aims?.get('g1')).toEqual({ saved: 0, dismissed: 2 });
+    expect(preferences.aims?.get('g2')).toEqual({ saved: 1, dismissed: 0 });
+    expect(preferences.fields.get('a')).toEqual({ saved: 0, dismissed: 1 });
+    expect(goalWeight(preferences, 'g1')).toBeCloseTo(DISMISS_STEP ** 2);
+    expect(goalWeight(preferences, 'g2')).toBeCloseTo(SAVE_STEP);
+    expect(goalWeight(preferences, 'g3')).toBe(1);
+  });
+
+  it('draws a goal turned down several times less often than one saved', () => {
+    const preferences = preferencesFrom([
+      ...Array.from({ length: 4 }, () => card({ status: 'dismissed', aim_id: 'down' })),
+      card({ status: 'saved', aim_id: 'up', saved_reading_id: 'r' }),
+    ]);
+    const random = seeded(11);
+    let up = 0;
+    for (let i = 0; i < 1000; i += 1) {
+      const drawer = createDrawer({
+        themes: [],
+        fields: [],
+        tests: new Map(),
+        recentThemeIds: new Set(),
+        recentFieldIds: new Set(),
+        goals: ['up', 'down'].map((id) => ({ id, name: id, about: null, depth: 'working' as const, field: null, domain: null })),
+        preferences,
+        random,
+      });
+      const target = drawer.next(false, true);
+      if (target?.reason === 'goal' && target.goal.id === 'up') up += 1;
+    }
+    // Weights 1.4 and 0.7^4 = 0.24: about 85 in 100 go to the saved goal.
+    expect(up).toBeGreaterThan(800);
+    expect(up).toBeLessThan(900);
   });
 });
 

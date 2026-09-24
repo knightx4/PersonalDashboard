@@ -16,6 +16,7 @@ import type { ItemSellQuote } from '@/lib/sell/item-quote';
 import { formatRange } from '@/lib/sell/price-evidence';
 import { PriceEvidenceDetail } from './price-evidence-detail';
 import type { SellPath } from '@/lib/sell/route';
+import { PaidHint } from '@/components/ui/paid-hint';
 
 const PATH_LABEL: Record<SellPath, string> = {
   list_individually: 'List individually',
@@ -58,12 +59,15 @@ export function ItemSellPanel({
   const price = quote.expectedSelfListCents;
   const searchLabel = SEARCH_LABEL[quote.priceSource] ?? 'Search for a price';
 
+  // Only a web estimate is billed; a catalog lookup costs nothing.
+  const billed = quote.priceSource === 'web_estimate';
+
   return (
     <CardSection
       title="Sell"
       action={
         quote.priceSource !== 'none' ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Always offered: a title search needs no confirmed edition, so
                 this is the one button that works on an unpriceable item. */}
             <form action={searchAction}>
@@ -72,12 +76,26 @@ export function ItemSellPanel({
                 {searchPending ? 'Searching…' : searchLabel}
               </Button>
             </form>
+            {billed && (
+              <PaidHint
+                action="app/shopping/sell/actions.ts#searchItemPrice"
+                count={1}
+                what="Cost of the search"
+              />
+            )}
             <form action={priceAction}>
               <input type="hidden" name="inventory_item_id" value={itemId} />
               <Button type="submit" size="sm" pending={pricePending}>
                 {pricePending ? 'Pricing…' : price == null ? 'Price it' : 'Price it again'}
               </Button>
             </form>
+            {billed && (
+              <PaidHint
+                action="app/shopping/sell/actions.ts#priceOneItem"
+                count={1}
+                what="Cost of pricing it"
+              />
+            )}
           </div>
         ) : undefined
       }

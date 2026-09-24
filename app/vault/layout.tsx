@@ -8,6 +8,9 @@ import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadActivity } from '@/lib/shell/activity';
 import { loadMainCheck } from '@/lib/shell/main-check';
 import { loadVaultBrief } from '@/lib/shell/brief';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { estimatePaidActions, paidActionsUnder } from '@/lib/core/spend/paid-actions';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 
 /**
@@ -26,7 +29,7 @@ export default async function VaultLayout({ children }: { children: React.ReactN
   if (!user) redirect('/login');
 
   const supabase = await createClient();
-  const [{ data: profile }, settings, counts, activity, raised, mainCheck, owner] =
+  const [{ data: profile }, settings, counts, activity, raised, mainCheck, owner, costs] =
     await Promise.all([
       supabase.from('profiles').select('display_name').eq('id', user.id).single(),
       loadAccountSettings(user.id),
@@ -35,6 +38,11 @@ export default async function VaultLayout({ children }: { children: React.ReactN
       loadRaisedNotifications(user.id),
       loadMainCheck(),
       isOwner({ user }),
+      // Every paid button's $ hint in the vault, from one read of the spend
+      // ledger (plan #918).
+      createCoreClient()
+        .then((core) => estimatePaidActions(core, user.id, paidActionsUnder('app/vault/')))
+        .catch(() => ({})),
     ]);
 
   const brief = await loadVaultBrief();
@@ -68,7 +76,7 @@ export default async function VaultLayout({ children }: { children: React.ReactN
         mainCheck={mainCheck}
         brief={brief}
       >
-        {children}
+        <PaidCostsProvider costs={costs}>{children}</PaidCostsProvider>
       </AppShell>
     </div>
   );

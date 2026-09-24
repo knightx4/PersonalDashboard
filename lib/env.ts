@@ -68,6 +68,40 @@ function assertServer(name: string): void {
   }
 }
 
+/**
+ * The Postgres connection string: DATABASE_URL, or else the POSTGRES_URL that
+ * Vercel's Supabase integration sets.
+ *
+ * The Vercel project has never had a DATABASE_URL. Its database variables come
+ * from the Supabase integration, which names the pooled connection string
+ * POSTGRES_URL and keeps it in step with the project, so nobody has to copy a
+ * database password into a second variable. Everything that opened a direct
+ * connection from the deployed app (the catalogue pulls on a subject page,
+ * `adminDb`) failed there until this fell back to it.
+ *
+ * The integration's URL carries query parameters for its own use, such as
+ * `supa=base-pooler.x`. The `postgres` driver sends any parameter it does not
+ * know to the server as a setting, and the server refuses an unknown setting,
+ * so everything except `sslmode` is dropped. A DATABASE_URL is used exactly as
+ * written, since whoever set it chose its parameters.
+ */
+export function databaseUrl(env: Record<string, string | undefined> = process.env): string | undefined {
+  const explicit = env.DATABASE_URL?.trim();
+  if (explicit) return explicit;
+
+  const integrated = env.POSTGRES_URL?.trim();
+  if (!integrated) return undefined;
+  try {
+    const url = new URL(integrated);
+    for (const key of [...url.searchParams.keys()]) {
+      if (key !== 'sslmode') url.searchParams.delete(key);
+    }
+    return url.toString();
+  } catch {
+    return integrated;
+  }
+}
+
 export function serverEnv() {
   assertServer('serverEnv');
   return z
@@ -102,6 +136,10 @@ export function serverEnv() {
       CLAUDE_NOTES_ROUTINE_TOKEN: z.string().min(1).optional(),
       /** Bearer for the plan routine. Scoped to it, not to the account. */
       CLAUDE_PLAN_ROUTINE_TOKEN: z.string().min(1).optional(),
+      /** The routine "Work on this" on a goal fires (plan #932). No fallback. */
+      CLAUDE_GOALS_ROUTINE_ID: z.string().min(1).optional(),
+      /** Bearer for the goals routine. Scoped to it, not to the account. */
+      CLAUDE_GOALS_ROUTINE_TOKEN: z.string().min(1).optional(),
       /** BoardGameGeek approved-application token (bearer). */
       BGG_API_TOKEN: z.string().min(1).optional(),
       /** Optional. UPCitemdb paid key; the trial endpoint works without it. */
@@ -132,5 +170,5 @@ export function serverEnv() {
        */
       MAILGUN_API_KEY: z.string().min(1).optional(),
     })
-    .parse(process.env);
+    .parse({ ...process.env, DATABASE_URL: databaseUrl() });
 }

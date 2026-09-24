@@ -1,12 +1,13 @@
 'use client';
 
-import { startTransition, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, startTransition, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useFormStatus } from 'react-dom';
 import { ArrowRight, EyeOff, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { swipeAxis, swipeFarEnough } from '@/lib/news/quick/swipe';
 import type { NewsTopic } from '@/lib/news/issues/topics';
-import { hideQuickTopic, passQuickStory, recordArticleOpened } from './actions';
+import type { StoryPass } from '@/lib/news/quick/next';
+import { hideQuickTopic, passQuickPage, passQuickStory, recordArticleOpened } from './actions';
 
 /**
  * The id of the form Next submits. A swipe on the card (#855) submits the
@@ -34,6 +35,35 @@ function NextButton() {
   return (
     <Button type="submit" size="lg" pending={pending}>
       {pending ? 'Loading…' : 'Next story'}
+      {!pending && <ArrowRight className="size-4" strokeWidth={2} aria-hidden />}
+    </Button>
+  );
+}
+
+/**
+ * Next page, the laptop grid's one button (plan #941). #939 settled that it
+ * records every story on the page, read or not, and the page comes back with
+ * the next set. The stories go as issueId and storyIndex pairs, in order.
+ */
+export function QuickPageForm({ stories }: { stories: readonly StoryPass[] }) {
+  return (
+    <form action={passQuickPage}>
+      {stories.map((story) => (
+        <Fragment key={`${story.issueId}:${story.storyIndex}`}>
+          <input type="hidden" name="issueId" value={story.issueId} />
+          <input type="hidden" name="storyIndex" value={story.storyIndex} />
+        </Fragment>
+      ))}
+      <NextPageButton />
+    </form>
+  );
+}
+
+function NextPageButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" size="lg" pending={pending}>
+      {pending ? 'Loading…' : 'Next page'}
       {!pending && <ArrowRight className="size-4" strokeWidth={2} aria-hidden />}
     </Button>
   );

@@ -10,6 +10,8 @@ import { loadOrCreateLocalPart } from '@/lib/news/settings/address';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { AddressCard } from './address-card';
 import { HiddenTopicList } from './hidden-topics';
+import { LocalAreaField } from './local-area';
+import { loadLocalArea } from '@/lib/news/settings/local-area';
 import { replaceAddress } from './actions';
 
 export const metadata = { title: 'News settings' };
@@ -25,9 +27,10 @@ export const dynamic = 'force-dynamic';
 export default async function NewsSettingsPage() {
   const user = await requireUser();
   const client = await createNewsClient();
-  const [localPart, hidden] = await Promise.all([
+  const [localPart, hidden, localArea] = await Promise.all([
     loadOrCreateLocalPart(client, user.id),
     loadHiddenTopics(client),
+    loadLocalArea(client),
   ]);
   const domain = newsDomainOrNull();
   const address = domain ? newsAddress(localPart, domain) : null;
@@ -37,7 +40,7 @@ export default async function NewsSettingsPage() {
     <div className="mx-auto max-w-2xl">
       <PageHeader
         title="News settings"
-        description="The address newsletters are sent to, how to replace it, and the topics kept out of Quick read."
+        description="The address newsletters are sent to, how to replace it, where Local news is about, and the topics kept out of Quick read."
       />
 
       <div className="space-y-5">
@@ -93,6 +96,20 @@ export default async function NewsSettingsPage() {
             >
               Replace my address
             </ConfirmStep>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Local news</CardTitle>
+          </CardHeader>
+          <CardBody className="space-y-3">
+            <LocalAreaField area={localArea} />
+            <p className="text-body leading-relaxed text-ink-muted">
+              {localArea
+                ? `Stories mainly about ${localArea} are filed under Local. Newsletters that arrive from now on are tagged this way; ones already here keep the topic they had.`
+                : 'Name where you live and stories mainly about it are filed under Local.'}
+            </p>
           </CardBody>
         </Card>
 

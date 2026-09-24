@@ -16,6 +16,7 @@ import {
   UnsupportedImageError,
 } from '@/lib/images/prepare-photo';
 import { formatMoney } from '@/lib/money';
+import { PaidHint } from '@/components/ui/paid-hint';
 
 export function ReceiptPhotoForm() {
   const [preview, setPreview] = useState<string | null>(null);
@@ -78,15 +79,15 @@ export function ReceiptPhotoForm() {
           />
         </Card>
       )}
-      <Button
-        type="button"
-        disabled={!preview}
-        pending={previewPending}
-        onClick={runPreview}
-        className="self-start"
-      >
-        {previewPending ? 'Reading…' : 'Extract order'}
-      </Button>
+      <div className="flex items-center gap-3">
+        <Button type="button" disabled={!preview} pending={previewPending} onClick={runPreview}>
+          {previewPending ? 'Reading…' : 'Extract order'}
+        </Button>
+        <PaidHint
+          action="app/shopping/orders/receipt/actions.ts#previewReceiptPhoto"
+          what="Cost of reading the receipt"
+        />
+      </div>
       <FieldError>{imageError ?? previewState.error ?? saveState.error}</FieldError>
 
       {previewState.preview && previewState.rawOrder && (

@@ -67,6 +67,20 @@ describe('describing the target', () => {
     expect(describeTarget({ reason: 'gap', gap: 'untested', field })).toContain('never been tested in');
     expect(describeTarget({ reason: 'gap', gap: 'untouched', field })).toContain('never written about or studied');
   });
+
+  it('gives a goal in its own words, with where it sits', () => {
+    const goal = { id: 'g', name: 'Startup finance', about: 'FP&A for a seed-stage company', depth: 'working' as const };
+    const placed = describeTarget({ reason: 'goal', goal: { ...goal, field, domain: null } });
+    expect(placed).toContain('A goal they set themselves: Startup finance.');
+    expect(placed).toContain('What they mean by it: FP&A for a seed-stage company');
+    expect(placed).toContain('Economics (Social sciences)');
+    expect(describeTarget({ reason: 'goal', goal: { ...goal, field: null, domain: 'Social sciences' } })).toContain(
+      'It covers a whole domain: Social sciences.',
+    );
+    expect(describeTarget({ reason: 'goal', goal: { ...goal, about: null, field: null, domain: null } })).toBe(
+      'A goal they set themselves: Startup finance.\nIt is not placed in one field; work from its wording.',
+    );
+  });
 });
 
 describe('the call', () => {
@@ -100,7 +114,12 @@ describe('the call', () => {
     const spent: string[] = [];
     const result = await nameMaterial({
       target: interest,
-      depth: { depth: 'advanced', known: ['Inflation: Causes'], review: ['Money: Functions'] },
+      depth: {
+        depth: 'advanced',
+        known: ['Inflation: Causes'],
+        review: ['Money: Functions'],
+        tooHard: ['Monetary base: Measurement'],
+      },
       avoid: ['Money'],
       anthropicApiKey: 'unused',
       client,
@@ -114,6 +133,8 @@ describe('the call', () => {
     // to work on is come at again.
     expect(JSON.stringify(calls[0])).toContain('go past these:\\n- Inflation: Causes');
     expect(JSON.stringify(calls[0])).toContain('- Money: Functions');
+    // The cards rated too hard reach it too, with the instruction to go easier.
+    expect(JSON.stringify(calls[0])).toContain('easier than these:\\n- Monetary base: Measurement');
     expect(JSON.stringify(calls[0])).toContain('advanced student');
   });
 
@@ -122,7 +143,7 @@ describe('the call', () => {
     const spent: string[] = [];
     const result = await nameMaterial({
       target: interest,
-      depth: { depth: 'working', known: [], review: [] },
+      depth: { depth: 'working', known: [], review: [], tooHard: [] },
       avoid: [],
       anthropicApiKey: 'unused',
       client,

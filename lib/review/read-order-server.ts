@@ -5,6 +5,8 @@ import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { mapPool } from '@/lib/async/map-pool';
 import { classifyMessage, type MerchantDomainHit } from '@/lib/email/extract/classify';
 import { extractOrderFromEmail } from '@/lib/email/extract/extract-order';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSpendReports } from '@/lib/core/spend/record';
 import { quotedOriginal } from '@/lib/email/extract/forwarded';
 import { displayNameFromAddress } from '@/lib/email/extract/heuristic';
 import { fetchMessageBody } from '@/lib/inbox/fetch-message-body';
@@ -80,6 +82,7 @@ async function readRow(
   });
 
   let extraction: Awaited<ReturnType<typeof extractOrderFromEmail>> | null = null;
+  const spend: SpendReport[] = [];
   try {
     extraction = await extractOrderFromEmail({
       subject: subject ?? '',
@@ -90,11 +93,18 @@ async function readRow(
       fromAddress,
       receivedAt: date,
       categoryOptions: context.categoryOptions,
+      onSpend: (report) => spend.push(report),
     });
   } catch (err) {
     // The draft still carries merchant, date and order number from the email.
     console.error('read order: extraction failed', row.id, err);
   }
+  await recordSpendReports(
+    core,
+    context.userId,
+    { module: 'shopping', operation: 'extract-email-order' },
+    spend,
+  );
 
   const draft = draftFromExtraction({
     extraction,

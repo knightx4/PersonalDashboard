@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSpendReports } from '@/lib/core/spend/record';
 import { decryptToken } from '@/lib/crypto/tokens';
 import { gmailOAuthEnv } from '@/lib/email/gmail-env';
 import { gmailProvider } from '@/lib/email/providers/gmail';
@@ -238,6 +240,7 @@ export async function reparseInboxOrders(accountId: string): Promise<{
     const exclusions = await loadMerchantExclusions(supabase, user.id);
     const { categoryIdsBySlug, categoryOptions } = await loadCategoryContext(supabase, user.id);
 
+    const spend: SpendReport[] = [];
     const counters = await reparseInboxConfirmations(supabase, {
       userId: user.id,
       accountId: account.id,
@@ -247,7 +250,14 @@ export async function reparseInboxOrders(accountId: string): Promise<{
       categoryIdsBySlug,
       categoryOptions,
       onlyOutdated: true,
+      onSpend: (report) => spend.push(report),
     });
+    await recordSpendReports(
+      core,
+      user.id,
+      { module: 'shopping', operation: 'extract-email-order' },
+      spend,
+    );
 
     revalidatePath('/shopping/settings');
     revalidatePath('/shopping/orders');

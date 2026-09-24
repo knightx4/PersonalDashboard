@@ -9,6 +9,7 @@ import {
   Bug,
   Building2,
   FileText,
+  Flag,
   GalleryHorizontalEnd,
   CalendarClock,
   CalendarDays,
@@ -27,11 +28,13 @@ import {
   PencilLine,
   MessageCircleQuestion,
   MessageSquareText,
+  MonitorPlay,
   Receipt,
   Share2,
   Shapes,
   StickyNote,
   Tag,
+  Target,
   Timer,
   Undo2,
   Users,
@@ -102,6 +105,8 @@ export const NAV_ICONS = {
   tracks: BookOpen,
   readNow: BookOpenCheck,
   know: Network,
+  // Goals: the things you want to learn and how well (plan #897).
+  goals: Target,
   // Practice Flow, and so Learn's front page. Still the clock it had as the
   // five-minute session: the question mark is already the dev workspace's
   // raised tab.
@@ -109,6 +114,10 @@ export const NAV_ICONS = {
   // A quiz is answered in writing, which is the whole of what separates it
   // from being asked to recognise something, so it gets the pencil.
   quiz: PencilLine,
+  // The YouTube library: channels, playlists and the transcripts fetched for
+  // them. A screen with a play mark, not the YouTube logo, because a brand
+  // mark in the nav would be the only one.
+  videos: MonitorPlay,
   // News. An envelope, the same object the workspace's own mark draws, because
   // the tab and the mark name the same thing and picking a second object for
   // it would say there are two.
@@ -116,6 +125,12 @@ export const NAV_ICONS = {
   // Quick read deals the stories out one card at a time, so it gets the
   // stack of cards.
   quickRead: GalleryHorizontalEnd,
+  // Goals. A flag, the same object the workspace's own mark draws, as News
+  // does with its envelope. Not Target, which is Learn's Goals tab.
+  goalsHome: Flag,
+  // Every area and goal, for adding and arranging them; the home is the short
+  // daily list, so this is the long one.
+  goalsAll: List,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
 } as const;

@@ -2,6 +2,9 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
+import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSpendReports } from '@/lib/core/spend/record';
 import { suggestForDigest, type DigestContext } from '@/inngest/dev/suggest';
 import {
   MAX_SUGGESTIONS,
@@ -180,9 +183,11 @@ export async function writeDigestFor(
   const night = nightFrom({ run, fires, items: plan.items, since });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
+  const spend: SpendReport[] = [];
   const reading = apiKey
     ? await suggestForDigest({
         apiKey,
+        onSpend: (report) => spend.push(report),
         context: await contextFor({
           supabase,
           userId,
@@ -192,6 +197,14 @@ export async function writeDigestFor(
         }),
       })
     : { summary: null, suggestions: [] };
+  if (spend.length > 0) {
+    await recordSpendReports(
+      createCoreServiceSupabase(),
+      userId,
+      { module: 'core', operation: 'suggest-from-digest' },
+      spend,
+    );
+  }
 
   // What the run noticed, written to the ideas page under the person's own
   // list (#623). Best effort, the same as the reading above it: a summary

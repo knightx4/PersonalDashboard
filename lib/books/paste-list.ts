@@ -10,12 +10,15 @@ import { extractIsbnFromText } from '@/lib/books/isbn';
 import { resolveBook } from '@/lib/books/resolve';
 import type { CanonicalBook, ResolveBookInput } from '@/lib/books/types';
 import { mapPool } from '@/lib/async/map-pool';
+import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
   heuristicParseLines,
   type PasteCandidate,
 } from '@/lib/books/paste-list-heuristic';
 
 export type { PasteCandidate };
+
+const PASTE_MODEL = 'claude-haiku-4-5-20251001';
 
 export const pasteLineSchema = z.object({
   title: z.string().trim().min(1).optional(),
@@ -33,10 +36,14 @@ export type ResolvedPasteRow = {
   error?: string;
 };
 
-async function llmParseLines(text: string, apiKey: string): Promise<PasteCandidate[]> {
+async function llmParseLines(
+  text: string,
+  apiKey: string,
+  onSpend?: SpendSink,
+): Promise<PasteCandidate[]> {
   const client = new Anthropic({ apiKey });
   const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: PASTE_MODEL,
     max_tokens: 2048,
     system: `You parse a pasted list of owned books into structured lines.
 Return ONLY JSON: {"lines":[{"title":"...","author":"...|null","isbn":"...|null"}]}
@@ -47,6 +54,7 @@ Rules:
 - Do not invent books that are not in the text.`,
     messages: [{ role: 'user', content: text.slice(0, 12_000) }],
   });
+  onSpend?.({ model: PASTE_MODEL, usage: usageFrom(response.usage) });
 
   const block = response.content.find((c) => c.type === 'text');
   if (!block || block.type !== 'text') return heuristicParseLines(text);
@@ -81,13 +89,17 @@ Rules:
 
 export async function parsePasteList(
   text: string,
-  options: { anthropicApiKey?: string | null } = {},
+  options: {
+    anthropicApiKey?: string | null;
+    /** What the call cost; record it as 'parse-paste-list'. */
+    onSpend?: SpendSink;
+  } = {},
 ): Promise<PasteCandidate[]> {
   const trimmed = text.trim();
   if (!trimmed) return [];
   if (options.anthropicApiKey) {
     try {
-      return await llmParseLines(trimmed, options.anthropicApiKey);
+      return await llmParseLines(trimmed, options.anthropicApiKey, options.onSpend);
     } catch {
       return heuristicParseLines(trimmed);
     }
@@ -101,10 +113,13 @@ export async function resolvePasteList(
     anthropicApiKey?: string | null;
     googleBooksApiKey?: string | null;
     concurrency?: number;
+    /** What the parse cost; record it as 'parse-paste-list'. */
+    onSpend?: SpendSink;
   } = {},
 ): Promise<ResolvedPasteRow[]> {
   const candidates = await parsePasteList(text, {
     anthropicApiKey: options.anthropicApiKey,
+    onSpend: options.onSpend,
   });
   return mapPool(candidates, options.concurrency ?? 3, async (candidate) => {
     try {

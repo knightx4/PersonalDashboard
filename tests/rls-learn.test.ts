@@ -101,6 +101,7 @@ describe('RLS coverage', () => {
       where n.nspname = 'learn' and c.relkind = 'r'
       order by 1`;
     expect(rows.map((r) => r.tablename)).toEqual([
+      'aims',
       'area_check_articles',
       'area_domains',
       'area_fields',
@@ -132,6 +133,8 @@ describe('RLS coverage', () => {
       'theme_fields',
       'track_offers',
       'tracks',
+      'transcript_calls',
+      'video_transcripts',
     ]);
   });
 });
@@ -350,6 +353,30 @@ describe('the catalogue, which belongs to nobody', () => {
     ).rejects.toThrow();
   });
 
+  it('lets anyone read the transcript states and the credit ledger, and nobody write them', async () => {
+    // Shared like the catalogue (learn 0042): the state of a video's
+    // transcript and a record of what a call cost belong to nobody, and only
+    // the service role writes them. The ledger is append-only even for it.
+    for (const table of ['video_transcripts', 'transcript_calls']) {
+      const seen = await asUser(userB, (tx) => tx`select 1 from ${tx(table)} limit 1`);
+      expect(Array.isArray(seen)).toBe(true);
+    }
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into video_transcripts (video_id, state, requested_by)
+                   values ('ZK3O402wf1c', 'queued', 'press')`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into transcript_calls (video_id, status, credits, outcome, trigger)
+                   values ('ZK3O402wf1c', 200, 0, 'fetched', 'press')`,
+      ),
+    ).rejects.toThrow();
+  });
+
   it('keeps a catalogue link private to the graph it points into', async () => {
     // The one catalogue table that is somebody's. A link says this segment
     // teaches that claim, which is a fact about one person's graph.
@@ -382,6 +409,102 @@ describe('the catalogue, which belongs to nobody', () => {
                            'x', now())`,
       ),
     ).rejects.toThrow();
+  });
+});
+
+describe('learning goals, stored as aims', () => {
+  // 0044_aims.sql and 0045_aim_placement.sql. Added, edited and archived by
+  // their owner through their own session; the table is `aims` because `goals`
+  // already holds track concepts.
+  let aimA = '';
+  let physics = '';
+  let domain = '';
+
+  beforeAll(async () => {
+    const [field] = await admin<{ id: string; domain_id: string }[]>`
+      select id, domain_id from area_fields where slug = 'physics'`;
+    physics = field.id;
+    domain = field.domain_id;
+    const [row] = await asUser(
+      userA,
+      (tx) => tx<{ id: string }[]>`
+        insert into aims (user_id, name, about, depth)
+        values (${userA}, 'City design and urbanism', 'How cities are laid out and why.', 'solid')
+        returning id`,
+    );
+    aimA = row.id;
+  });
+
+  it('shows the owner their aims and another user none of them', async () => {
+    const own = await asUser(userA, (tx) => tx`select id from aims`);
+    const other = await asUser(userB, (tx) => tx`select id from aims`);
+    expect(own.map((r) => r.id)).toEqual([aimA]);
+    expect(other).toHaveLength(0);
+  });
+
+  it('does not let a user file an aim under another account', async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into aims (user_id, name) values (${userA}, 'Planted')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('lets the owner edit and archive an aim and nobody else', async () => {
+    await asUser(userB, (tx) => tx`update aims set archived_at = now(), depth = 'deep'`);
+    await asUser(userB, (tx) => tx`delete from aims`);
+    const [before] = await admin<{ archived_at: string | null; depth: string }[]>`
+      select archived_at, depth from aims where id = ${aimA}`;
+    expect(before).toEqual({ archived_at: null, depth: 'solid' });
+
+    // A placement is written whole (0045_aim_placement.sql, plan #898).
+    await asUser(
+      userA,
+      (tx) => tx`
+        update aims
+        set field_id = ${physics}, placement_confidence = 'clear',
+            placement_basis = 'Placed for the test.', placed_at = now()
+        where id = ${aimA}`,
+    );
+    const [placed] = await admin<{ field_id: string | null }[]>`
+      select field_id from aims where id = ${aimA}`;
+    expect(placed.field_id).toBe(physics);
+  });
+
+  it('refuses a field with no placement, and a placement with no basis', async () => {
+    const [row] = await admin<{ id: string }[]>`
+      insert into aims (user_id, name) values (${userB}, 'Half placed') returning id`;
+    await expect(
+      admin`update aims set field_id = ${physics} where id = ${row.id}`,
+    ).rejects.toThrow(/aims_placement_complete_ck/);
+    await expect(
+      admin`update aims set placed_at = now(), placement_confidence = 'clear' where id = ${row.id}`,
+    ).rejects.toThrow(/aims_placement_complete_ck/);
+    await admin`delete from aims where id = ${row.id}`;
+  });
+
+  it('refuses an unknown depth, a field and a domain at once, and a placed list', async () => {
+    await expect(
+      admin`insert into aims (user_id, name, depth) values (${userA}, 'Too deep', 'expert')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`update aims set domain_id = ${domain} where id = ${aimA}`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into aims (user_id, name, list_source, field_id)
+            values (${userA}, 'Level 3', 'level3', ${physics})`,
+    ).rejects.toThrow();
+  });
+
+  it('keeps one active Level 3 aim per person', async () => {
+    await admin`insert into aims (user_id, name, list_source) values (${userA}, 'Level 3', 'level3')`;
+    await expect(
+      admin`insert into aims (user_id, name, list_source) values (${userA}, 'Level 3 again', 'level3')`,
+    ).rejects.toThrow();
+    await admin`update aims set archived_at = now() where user_id = ${userA} and list_source = 'level3'`;
+    await admin`insert into aims (user_id, name, list_source) values (${userA}, 'Level 3 again', 'level3')`;
+    await admin`insert into aims (user_id, name, list_source) values (${userB}, 'Level 3', 'level3')`;
   });
 });
 
@@ -456,6 +579,32 @@ describe('the cards behind Learn now', () => {
     const [row] = await admin<{ theme_id: string | null; theme_name: string }[]>`
       select theme_id, theme_name from feed_cards where id = ${cardA}`;
     expect(row).toEqual({ theme_id: null, theme_name: 'Central banks' });
+  });
+
+  it('takes a goal card only with the goal named, and keeps the name when the goal goes', async () => {
+    // 0046_feed_card_goals.sql. A goal card may have no field, when its goal
+    // sits in none.
+    const [{ item_id: itemId }] = await admin<{ item_id: string }[]>`
+      select item_id from feed_cards where id = ${cardA}`;
+    const [segment] = await admin<{ id: string }[]>`
+      insert into catalogue_segments (item_id, ordinal, section_anchor, heading, text)
+      values (${itemId}, 2, 'Effects', 'Effects', 'Savers lose...')
+      returning id`;
+    const [aim] = await admin<{ id: string }[]>`
+      insert into aims (user_id, name, depth) values (${userA}, 'Startup finance', 'solid') returning id`;
+    await expect(
+      admin`insert into feed_cards (user_id, reason, aim_id, item_id, segment_id)
+            values (${userA}, 'goal', ${aim.id}, ${itemId}, ${segment.id})`,
+    ).rejects.toThrow();
+    const [card] = await admin<{ id: string }[]>`
+      insert into feed_cards (user_id, reason, aim_id, aim_name, item_id, segment_id)
+      values (${userA}, 'goal', ${aim.id}, 'Startup finance', ${itemId}, ${segment.id})
+      returning id`;
+
+    await admin`delete from aims where id = ${aim.id}`;
+    const [row] = await admin<{ aim_id: string | null; aim_name: string }[]>`
+      select aim_id, aim_name from feed_cards where id = ${card.id}`;
+    expect(row).toEqual({ aim_id: null, aim_name: 'Startup finance' });
   });
 });
 

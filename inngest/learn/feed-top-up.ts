@@ -6,6 +6,7 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import {
+  READY_BATCH,
   READY_LOW,
   READY_TARGET,
   runTopUpFor,
@@ -15,7 +16,7 @@ import {
 import type { Depth } from '@/lib/learn/feed/depth';
 import { WRITE_CARD_MODEL, writeCard, type CardToWrite } from '@/lib/learn/feed/write-card';
 import type { LearnOperation } from '@/lib/learn/spend';
-import { createFeedPicker, loadFeedFields, peopleWithThemes } from './feed-picks';
+import { createFeedPicker, loadFeedFields, peopleToPickFor } from './feed-picks';
 
 /**
  * The Learn now top-up (plan #807, LEARN-NOW-SPEC "How cards are made").
@@ -42,8 +43,9 @@ const OPERATION: LearnOperation = 'write-feed-card';
 
 type PickedRow = {
   id: string;
-  reason: 'interest' | 'gap' | 'queued';
+  reason: 'interest' | 'gap' | 'goal' | 'queued';
   theme_name: string | null;
+  aim_name: string | null;
   field_id: string | null;
   named_article: string | null;
   depth: Depth | null;
@@ -86,7 +88,7 @@ async function loadPicked(
   const { data, error } = await learn
     .from('feed_cards')
     .select(
-      'id, reason, theme_name, field_id, named_article, depth, ' +
+      'id, reason, theme_name, aim_name, field_id, named_article, depth, ' +
         'item:catalogue_items!feed_cards_item_id_fkey(title), ' +
         'segment:catalogue_segments!feed_cards_segment_id_fkey(heading, text), ' +
         'field:area_fields!feed_cards_field_id_fkey(name, scope)',
@@ -98,12 +100,14 @@ async function loadPicked(
   if (error) throw new Error(`Reading your picked cards failed: ${error.message}`);
 
   return ((data ?? []) as unknown as PickedRow[]).flatMap((row): CardToWrite[] => {
-    if (row.reason === 'queued' || !row.field || !row.segment) return [];
+    // A goal card has no field when its goal is not placed in one.
+    if (row.reason === 'queued' || !row.segment || (!row.field && row.reason !== 'goal')) return [];
     return [
       {
         id: row.id,
         reason: row.reason,
         themeName: row.theme_name,
+        aimName: row.aim_name,
         field: row.field,
         gap: row.reason === 'gap' ? (row.field_id && written.has(row.field_id) ? 'untested' : 'untouched') : null,
         article: row.item?.title ?? row.named_article ?? 'Wikipedia',
@@ -134,7 +138,7 @@ async function createContext(): Promise<Context> {
 async function topUpWith(
   context: Context,
   userId: string,
-  options: { threshold: number; deadline: number },
+  options: { threshold: number; target?: number; deadline: number },
 ): Promise<TopUpSummary> {
   const { learn, core, apiKey, pickFor } = context;
   let written: Set<string> | null = null;
@@ -147,7 +151,7 @@ async function topUpWith(
     },
     pick: async (id, targets, deadline) => {
       const summary = await pickFor(id, { targets, deadline });
-      return summary.picked.interest + summary.picked.gap;
+      return summary.picked.interest + summary.picked.gap + summary.picked.goal;
     },
     write: async (id, card) => {
       const spend: SpendReport[] = [];
@@ -190,20 +194,26 @@ async function topUpWith(
     now: Date.now,
   };
 
-  return runTopUpFor(ports, { userId, threshold: options.threshold, target: READY_TARGET, deadline: options.deadline });
+  return runTopUpFor(ports, {
+    userId,
+    threshold: options.threshold,
+    target: options.target ?? READY_TARGET,
+    deadline: options.deadline,
+  });
 }
 
 export type FeedTopUpResult = { people: TopUpSummary[] };
 
 /**
- * The hourly call: everyone with placed themes and fewer than twenty ready
- * cards is topped up, one person after another, inside one budget.
+ * The hourly call: everyone with placed themes or an active goal, and fewer
+ * than twenty ready cards, is topped up, one person after another, inside one
+ * budget.
  */
 export async function runFeedTopUp(): Promise<FeedTopUpResult> {
   const deadline = Date.now() + FEED_TOP_UP_BUDGET_MS;
   const context = await createContext();
   const people: TopUpSummary[] = [];
-  for (const userId of await peopleWithThemes(context.learn)) {
+  for (const userId of await peopleToPickFor(context.learn)) {
     if (Date.now() >= deadline) break;
     people.push(await topUpWith(context, userId, { threshold: READY_TARGET, deadline }));
   }
@@ -211,8 +221,8 @@ export async function runFeedTopUp(): Promise<FeedTopUpResult> {
 }
 
 /**
- * Top up one person after a response on the feed page, when fewer than ten
- * cards are ready. For the page's server action to call inside `after()`:
+ * Top up one person after a response on the feed page, when seven or fewer
+ * cards are ready, by fifteen more. For the page's server action to call inside `after()`:
  *
  *   after(() => topUpFeedAfterResponse(user.id));
  *
@@ -222,10 +232,12 @@ export async function runFeedTopUp(): Promise<FeedTopUpResult> {
 export async function topUpFeedAfterResponse(userId: string): Promise<TopUpSummary | null> {
   try {
     // One count first, so a response with plenty of cards ready costs no more.
-    if ((await countReady(createLearnServiceSupabase(), userId)) >= READY_LOW) return null;
+    const ready = await countReady(createLearnServiceSupabase(), userId);
+    if (ready >= READY_LOW) return null;
     const context = await createContext();
     return await topUpWith(context, userId, {
       threshold: READY_LOW,
+      target: ready + READY_BATCH,
       deadline: Date.now() + FEED_TOP_UP_AFTER_RESPONSE_MS,
     });
   } catch (error) {

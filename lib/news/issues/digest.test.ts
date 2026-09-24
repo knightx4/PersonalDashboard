@@ -4,6 +4,7 @@ import {
   digestIssue,
   readDigest,
   readLine,
+  writeDigest,
   DIGEST_MODEL,
   DIGEST_OPERATION,
   LINE_CHARS,
@@ -286,20 +287,19 @@ describe('digesting a newsletter', () => {
     expect(news.deletes).toEqual([]);
   });
 
-  it('clears the stories passed when a redo rewrites them', async () => {
+  it('clears the stories passed and their groups when a redo rewrites them', async () => {
     const { news } = await run(
       reported({ summary: 'New.', stories: [{ headline: 'First', summary: 'One. Two.' }] }),
       { ...ISSUE, summary: 'Old.' },
     );
 
+    const filters = [
+      ['issue_id', 'issue-1'],
+      ['user_id', 'user-1'],
+    ];
     expect(news.deletes).toEqual([
-      {
-        table: 'story_passes',
-        filters: [
-          ['issue_id', 'issue-1'],
-          ['user_id', 'user-1'],
-        ],
-      },
+      { table: 'story_passes', filters },
+      { table: 'story_groups', filters },
     ]);
   });
 
@@ -320,7 +320,7 @@ describe('digesting a newsletter', () => {
         anthropicApiKey: 'test',
         client: model(reported({ summary: 'Fine.', stories: [] })).client,
       }),
-    ).rejects.toThrow('clearing the stories passed failed (permission denied)');
+    ).rejects.toThrow('clearing story_passes failed (permission denied)');
     // The new summary was saved first; the passes are what failed.
     expect(news.updates).toHaveLength(1);
   });
@@ -632,5 +632,30 @@ describe('reading the line', () => {
     expect(long.length).toBeGreaterThan(LINE_CHARS);
     expect(line).toBe('The Fed holds rates, oil slides on supply news, and three startups raise money this week…');
     expect(line!.length).toBeLessThanOrEqual(LINE_CHARS);
+  });
+});
+
+describe('the Local topic (note 552a9407)', () => {
+  const localReport = reported({
+    line: 'City hall.',
+    summary: 'A city story.',
+    stories: [{ headline: 'Mayor', summary: 'The mayor spoke.', topic: 'Local' }],
+  });
+  const source = { subject: 'Today', textBody: 'The mayor spoke.', htmlBody: null };
+
+  it('names the reader\'s area to the model and keeps Local', async () => {
+    const haiku = model(localReport);
+    const digest = await writeDigest(source, { client: haiku.client, localArea: 'NYC' });
+    const message = haiku.create.mock.calls[0][0].messages[0].content as string;
+    expect(message.startsWith("Reader's local area: NYC\n")).toBe(true);
+    expect(digest.stories[0].topic).toBe('Local');
+  });
+
+  it('reads Local as Other when no area is set', async () => {
+    const haiku = model(localReport);
+    const digest = await writeDigest(source, { client: haiku.client });
+    const message = haiku.create.mock.calls[0][0].messages[0].content as string;
+    expect(message).not.toContain('local area');
+    expect(digest.stories[0].topic).toBe('Other');
   });
 });

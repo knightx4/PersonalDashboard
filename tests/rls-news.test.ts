@@ -239,6 +239,36 @@ describe('news.story_passes', () => {
   });
 });
 
+describe('news.story_groups', () => {
+  const vector = `[${new Array(1024).fill(0).map((_, i) => (i === 0 ? 1 : 0)).join(',')}]`;
+
+  function group(tx: postgres.TransactionSql, userId: string, index: number) {
+    return tx`
+      insert into story_groups (user_id, issue_id, story_index, group_id, embedding, embedding_model)
+      values (${userId}, ${issueA}, ${index}, gen_random_uuid(), ${vector}, 'voyage-4-lite')`;
+  }
+
+  it('shows a user only their own stories\' groups', async () => {
+    await asUser(userA, (tx) => group(tx, userA, 0));
+
+    const mine = await asUser(userA, (tx) => tx<{ story_index: number }[]>`
+      select story_index from story_groups`);
+    expect(mine.map((r) => r.story_index)).toEqual([0]);
+
+    const theirs = await asUser(userB, (tx) => tx`select 1 from story_groups`);
+    expect(theirs).toHaveLength(0);
+  });
+
+  it('refuses a group row on another account\'s newsletter, even under their id', async () => {
+    await expect(asUser(userB, (tx) => group(tx, userB, 1))).rejects.toThrow(
+      /story_groups_issue_fk/,
+    );
+    await expect(asUser(userB, (tx) => group(tx, userA, 1))).rejects.toThrow(
+      /row-level security/,
+    );
+  });
+});
+
 describe('news.hidden_topics', () => {
   it('shows a user only the topics they have hidden, once each', async () => {
     await asUser(userA, (tx) => tx`
@@ -261,6 +291,34 @@ describe('news.hidden_topics', () => {
       asUser(userB, (tx) => tx`
         insert into hidden_topics (user_id, topic) values (${userA}, 'Politics')`),
     ).rejects.toThrow(/row-level security/);
+  });
+});
+
+describe('news.preferences', () => {
+  it('shows a user only their own local area, one row each', async () => {
+    await asUser(userA, (tx) => tx`
+      insert into preferences (user_id, local_area) values (${userA}, 'NYC')`);
+
+    const mine = await asUser(userA, (tx) => tx<{ local_area: string }[]>`
+      select local_area from preferences`);
+    expect(mine.map((r) => r.local_area)).toEqual(['NYC']);
+
+    const theirs = await asUser(userB, (tx) => tx`select 1 from preferences`);
+    expect(theirs).toHaveLength(0);
+
+    await expect(
+      admin`insert into preferences (user_id, local_area) values (${userA}, 'Boston')`,
+    ).rejects.toThrow(/preferences_pkey/);
+  });
+
+  it('refuses an area written under another account\'s id, or a blank one', async () => {
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into preferences (user_id, local_area) values (${userA}, 'Boston')`),
+    ).rejects.toThrow(/row-level security/);
+    await expect(
+      admin`insert into preferences (user_id, local_area) values (${userB}, '  ')`,
+    ).rejects.toThrow(/preferences_local_area_ck/);
   });
 });
 
@@ -332,6 +390,57 @@ describe('news.saved_stories', () => {
   });
 });
 
+describe('news.recommendations', () => {
+  const picks = [
+    {
+      name: 'The Tram Letter',
+      publisher: 'Rail Weekly',
+      topic: 'Technology',
+      reason: 'You read two transport newsletters already.',
+      link: 'https://example.com/tram-letter',
+    },
+  ];
+
+  it('keeps one list per user, and a reload replaces it', async () => {
+    await asUser(userA, (tx) => tx`
+      insert into recommendations (user_id, picks) values (${userA}, ${tx.json(picks)})`);
+    await asUser(userA, (tx) => tx`
+      insert into recommendations (user_id, picks) values (${userA}, ${tx.json([])})
+      on conflict (user_id) do update set picks = excluded.picks, made_at = excluded.made_at`);
+
+    const mine = await asUser(userA, (tx) => tx<{ picks: unknown[] }[]>`
+      select picks from recommendations`);
+    expect(mine.map((r) => r.picks)).toEqual([[]]);
+
+    await admin`update recommendations set picks = ${admin.json(picks)} where user_id = ${userA}`;
+  });
+
+  it('does not let another account read, change or remove the list', async () => {
+    await asUser(userB, async (tx) => {
+      const read = await tx`select 1 from recommendations`;
+      const changed = await tx`update recommendations set picks = '[]'::jsonb`;
+      const removed = await tx`delete from recommendations`;
+      expect(read).toHaveLength(0);
+      expect(changed.count).toBe(0);
+      expect(removed.count).toBe(0);
+    });
+
+    const [row] = await admin<{ picks: unknown[] }[]>`
+      select picks from recommendations where user_id = ${userA}`;
+    expect(row.picks).toEqual(picks);
+  });
+
+  it('refuses a list written under another account\'s id, or one that is not an array', async () => {
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into recommendations (user_id, picks) values (${userA}, '[]'::jsonb)`),
+    ).rejects.toThrow(/row-level security/);
+    await expect(
+      admin`insert into recommendations (user_id, picks) values (${userB}, '{}'::jsonb)`,
+    ).rejects.toThrow(/recommendations_picks_ck/);
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`
@@ -354,8 +463,11 @@ describe('RLS coverage', () => {
       'addresses',
       'hidden_topics',
       'issues',
+      'preferences',
+      'recommendations',
       'saved_stories',
       'senders',
+      'story_groups',
       'story_passes',
     ]);
   });

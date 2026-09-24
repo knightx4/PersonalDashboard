@@ -14,6 +14,12 @@ import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { formatMicroDollars, todayInTimezone } from '@/lib/money';
 import { loadSpend } from '@/lib/core/spend/load';
+import { compareEstimates, EVERY_OPERATION } from '@/lib/core/spend/comparison';
+import { ESTIMATE_WINDOW_DAYS, loadCostRanges, MEASURED_MIN_RUNS } from '@/lib/core/spend/estimate';
+import { EstimatesTable } from './estimates-table';
+import { TranscriptCredits } from '@/components/learn/transcript-credits';
+import { createLearnClient } from '@/lib/learn/auth/server';
+import { loadUsage, type Usage } from '@/lib/learn/youtube/load';
 import {
   monthStart,
   rollUp,
@@ -102,9 +108,7 @@ function CallRow({ row, timezone }: { row: SpendRow; timezone: string }) {
         <span className="block truncate text-small text-ink-muted">
           {todayInTimezone(timezone, new Date(row.createdAt))} · {row.model} ·{' '}
           {formatTokens(tokensOf(row))} tokens
-          {row.cachedInputTokens > 0
-            ? ` (${formatTokens(row.cachedInputTokens)} cached)`
-            : ''}
+          {row.cachedInputTokens > 0 ? ` (${formatTokens(row.cachedInputTokens)} cached)` : ''}
         </span>
       </span>
       <span className="shrink-0 text-ui text-ink tabular-nums">
@@ -126,7 +130,27 @@ export default async function SpendPage() {
   ]);
 
   const supabase = await createCoreClient();
-  const rows = await loadSpend(supabase);
+  const [rows, ranges] = await Promise.all([
+    loadSpend(supabase),
+    // One read of the ledger for every operation's thirty-day range: the same
+    // figures the $ hints are drawn from. A failed read comes back empty, and
+    // every row then shows its guess.
+    loadCostRanges(supabase, user.id, EVERY_OPERATION),
+  ]);
+  const comparison = compareEstimates(ranges);
+  const estimates = (
+    <div className="mt-6">
+      <EstimatesTable
+        foreground={comparison.foreground}
+        background={comparison.background}
+        days={ESTIMATE_WINDOW_DAYS}
+        minRuns={MEASURED_MIN_RUNS}
+      />
+    </div>
+  );
+  // TranscriptAPI is billed in credits, not per token, so it is not a row in
+  // model_spend. The owner, whose key it is, sees the month's credits here too.
+  const transcripts: Usage | null = owner ? await loadUsage(await createLearnClient()) : null;
 
   const timezone = settings.timezone;
   const localDateOf = (instant: string) => todayInTimezone(timezone, new Date(instant));
@@ -166,31 +190,41 @@ export default async function SpendPage() {
             description="What the models have cost, per call, since this was switched on."
           />
 
-          {rows.length === 0 ? (
-            <p
-              className={cn(
-                cardVariants(),
-                'border-dashed px-4 py-6 text-center text-body text-ink-muted',
-              )}
-            >
-              Nothing has been spent yet. Every model call this app makes lands here — what it was
-              doing, which model ran, and what it cost.
-            </p>
-          ) : (
+          {transcripts && (transcripts.credits.used > 0 || transcripts.queue.fetched > 0) && (
+            <div className="mb-6">
+              <TranscriptCredits usage={transcripts} />
+            </div>
+          )}
+
+          {rows.length === 0 && (
+            <>
+              <p
+                className={cn(
+                  cardVariants(),
+                  'border-dashed px-4 py-6 text-center text-body text-ink-muted',
+                )}
+              >
+                Nothing has been spent yet. Every model call this app makes lands here — what it was
+                doing, which model ran, and what it cost.
+              </p>
+              {estimates}
+            </>
+          )}
+          {rows.length > 0 && (
             <>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Total label="This month" total={totalOf(thisMonth)} />
                 <Total label="All time" total={totalOf(rows)} />
               </div>
 
-              <h2 className="mt-6 mb-2 text-ui font-semibold text-ink-muted">
-                Where it goes
-              </h2>
+              <h2 className="mt-6 mb-2 text-ui font-semibold text-ink-muted">Where it goes</h2>
               <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
                 {groups.map((group) => (
                   <GroupRow key={`${group.module}-${group.operation}`} group={group} />
                 ))}
               </ul>
+
+              {estimates}
 
               <h2 className="mt-6 mb-2 text-ui font-semibold text-ink-muted">
                 The last {recent.length === 1 ? 'call' : `${recent.length} calls`}

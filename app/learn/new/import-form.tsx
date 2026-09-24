@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { Field, Input, Textarea } from '@/components/ui/field';
 import { formatMoney } from '@/lib/money';
 import {
@@ -233,9 +234,19 @@ function ResolvingList({ parsed }: { parsed: ParsedImport }) {
   );
 }
 
+/**
+ * About how many references a paste holds, before it is parsed: its non-blank
+ * lines. A reading list is usually one item a line, and the hint needs a
+ * count before the parse that would give the real one.
+ */
+function lineCount(text: string): number {
+  return text.split('\n').filter((line) => line.trim() !== '').length;
+}
+
 export function ImportForm() {
   const [parseState, parse] = useActionState<ParseState, FormData>(parseImport, {});
   const [confirmState, confirm] = useActionState<NewTrackState, FormData>(confirmImport, {});
+  const [lines, setLines] = useState(0);
   const parsed = parseState.parsed;
 
   if (parsed) {
@@ -284,7 +295,13 @@ export function ImportForm() {
       >
         {/* ui-ok: composer-always-open -- the create. The pasted text is the
           * whole point of the page and there is nothing to read before it. */}
-        <Textarea id="text" name="text" rows={10} required />
+        <Textarea
+          id="text"
+          name="text"
+          rows={10}
+          required
+          onChange={(event) => setLines(lineCount(event.target.value))}
+        />
       </Field>
 
       <Field label="Where did it come from?" id="sourceHint" hint="Optional.">
@@ -293,6 +310,13 @@ export function ImportForm() {
 
       <div className="mt-4 flex items-center gap-3">
         <SubmitButton idle="Read the list" busy="Reading…" />
+        {/* The press parses the paste and then looks every item up, one
+            request each, so the figure is the parse plus a lookup per line. */}
+        <PaidHint
+          action={['app/learn/new/actions.ts#parseImport', 'app/learn/new/actions.ts#resolveCandidate']}
+          count={Math.max(1, lines)}
+          what="Cost of reading the list and looking up each item"
+        />
         {parseState.error && <span className="text-ui text-danger">{parseState.error}</span>}
       </div>
 

@@ -1,5 +1,6 @@
 import { shadeFor } from '@/lib/learn/areas/grid';
-import { NO_PREFERENCES, fieldWeight, themeWeight, type FeedPreferences } from './preference';
+import type { Depth } from './depth';
+import { NO_PREFERENCES, fieldWeight, goalWeight, themeWeight, type FeedPreferences } from './preference';
 
 /**
  * Choosing what the next Learn now cards are about (LEARN-NOW-SPEC, "How cards
@@ -22,6 +23,15 @@ import { NO_PREFERENCES, fieldWeight, themeWeight, type FeedPreferences } from '
  * is drawn in proportion to `fieldWeight`. Both are in `preference.ts`. The
  * lean changes how often something comes up and never which kind of gap comes
  * first.
+ *
+ * Goals (plan #900) are a third source. One card in three is drawn for a
+ * goal on the Goals page, the Level 3 goal included (plan #910), by the same
+ * count-based rule, and the other two keep the three-to-one split between
+ * themes and gaps. The goal
+ * count starts when the oldest goal still active was set (`wantsGoal`), so
+ * adding a first goal after months of cards gives it its share from then on
+ * rather than a run of nothing but goal cards to catch up. Saves and
+ * dismissals lean each goal as they lean a theme (`goalWeight`).
  */
 
 /** A theme placed in a field. Themes placed at a domain, or nowhere, are not drawn. */
@@ -45,8 +55,30 @@ export type FeedField = {
 /** What the tracks placed in one field have shown. */
 export type FieldTests = { tracks: number; answered: number };
 
+/**
+ * A goal, as the draw needs it. The Level 3 goal is drawn here like the
+ * open-subject ones and shares their one card in three, but its `list` is set,
+ * and the pass takes its articles from that list instead of the naming call
+ * (plan #910, `level3.ts`).
+ */
+export type FeedGoal = {
+  id: string;
+  name: string;
+  /** 'level3' for the Level 3 goal, whose cards come from its list. Left out for an open subject. */
+  list?: 'level3';
+  /** What the person means by it, when they said. */
+  about: string | null;
+  /** The card depth the goal starts at, from its depth (`cardDepthForAim`). */
+  depth: Depth;
+  /** The field it is placed in. Null when placed at a domain, spanning domains, or not placed yet. */
+  field: FeedField | null;
+  /** The domain's name, when it is placed at a whole domain. */
+  domain: string | null;
+};
+
 export type FeedTarget =
   | { reason: 'interest'; theme: FeedTheme; field: FeedField }
+  | { reason: 'goal'; goal: FeedGoal }
   | {
       reason: 'gap';
       /** Which of the two gaps: written about and never tested, or nothing at all. */
@@ -57,8 +89,19 @@ export type FeedTarget =
 /** How long a target is left alone after a card is picked for it. */
 export const RECENT_TARGET_DAYS = 21;
 
-/** One card in this many is a gap. */
+/**
+ * How long a goal is passed over for another goal after a card is picked for
+ * it. Much shorter than for a theme, and only ever in favour of another goal:
+ * a person has a handful of goals rather than dozens of themes, and a goal
+ * left alone for three weeks could not have one card in three.
+ */
+export const RECENT_GOAL_DAYS = 3;
+
+/** One card in this many is a gap, of the cards not drawn for a goal. */
 const GAP_EVERY = 4;
+
+/** One card in this many is drawn for a goal (decision #899). */
+export const GOAL_EVERY = 3;
 
 /**
  * Whether the next target should be a gap, given the cards picked so far.
@@ -70,6 +113,18 @@ const GAP_EVERY = 4;
  */
 export function wantsGap(picked: { interest: number; gap: number }): boolean {
   return picked.gap * GAP_EVERY < picked.interest + picked.gap;
+}
+
+/**
+ * Whether the next target should be a goal, given the cards picked since the
+ * oldest goal still active was set: `goal` of them drawn for a goal, `total`
+ * in all.
+ *
+ * The same self-correcting rule as `wantsGap`, but at or under the share
+ * rather than strictly under it, so a goal set a minute ago is drawn first.
+ */
+export function wantsGoal(window: { goal: number; total: number }): boolean {
+  return window.goal * GOAL_EVERY <= window.total;
 }
 
 /**
@@ -124,6 +179,10 @@ export type DrawInput = {
   /** Themes and fields with a card picked in the last RECENT_TARGET_DAYS. */
   recentThemeIds: ReadonlySet<string>;
   recentFieldIds: ReadonlySet<string>;
+  /** Active open-subject goals. None when left out. */
+  goals?: FeedGoal[];
+  /** Goals with a card picked in the last RECENT_GOAL_DAYS. */
+  recentAimIds?: ReadonlySet<string>;
   /** Saves and dismissals on earlier cards. None when left out. */
   preferences?: FeedPreferences;
   random?: () => number;
@@ -134,9 +193,16 @@ export type Drawer = {
    * The next target, never one drawn before in this pass and never a recent
    * one. When the kind asked for has nothing left it returns the other kind,
    * so a person whose gap fields were all covered recently still gets cards.
-   * Null only when both are exhausted.
+   * Null only when every kind is exhausted.
+   *
+   * `wantGoal` asks for a goal first, and a goal asked for is never refused
+   * while the person has one: a goal drawn recently is passed over only for
+   * another goal, and once every goal has been drawn in this pass one is drawn
+   * again (the naming call is told the articles already picked, so it names
+   * others). Without `wantGoal`, a goal is the last resort, and only one not
+   * yet drawn in this pass.
    */
-  next(wantGap: boolean): FeedTarget | null;
+  next(wantGap: boolean, wantGoal?: boolean): FeedTarget | null;
 };
 
 export function createDrawer(input: DrawInput): Drawer {
@@ -146,6 +212,9 @@ export function createDrawer(input: DrawInput): Drawer {
   const usedFields = new Set(input.recentFieldIds);
   const gaps = gapFields(input.fields, input.themes, input.tests);
   const preferences = input.preferences ?? NO_PREFERENCES;
+  const goals = input.goals ?? [];
+  const recentAims = input.recentAimIds ?? new Set<string>();
+  const usedAims = new Set<string>();
 
   const drawInterest = (): FeedTarget | null => {
     const pool = input.themes.filter(
@@ -172,7 +241,21 @@ export function createDrawer(input: DrawInput): Drawer {
     return null;
   };
 
+  const drawGoal = (asked: boolean): FeedTarget | null => {
+    const unused = goals.filter((goal) => !usedAims.has(goal.id));
+    const fresh = unused.filter((goal) => !recentAims.has(goal.id));
+    const pool = fresh.length > 0 ? fresh : unused.length > 0 || !asked ? unused : goals;
+    const goal = weightedPick(pool, (item) => goalWeight(preferences, item.id), random);
+    if (!goal) return null;
+    usedAims.add(goal.id);
+    return { reason: 'goal', goal };
+  };
+
   return {
-    next: (wantGap) => (wantGap ? (drawGap() ?? drawInterest()) : (drawInterest() ?? drawGap())),
+    next: (wantGap, wantGoal = false) => {
+      const other = () => (wantGap ? (drawGap() ?? drawInterest()) : (drawInterest() ?? drawGap()));
+      if (wantGoal) return drawGoal(true) ?? other();
+      return other() ?? drawGoal(false);
+    },
   };
 }

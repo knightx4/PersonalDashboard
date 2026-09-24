@@ -2,6 +2,7 @@
  * Expected self-list price sources. v1: eBay Browse active listings (asking
  * prices). Later: paid sold-comps behind the same interface.
  */
+import type { SpendSink } from '@/lib/core/spend/pricing';
 import {
   priceStats,
   type EvidenceListing,
@@ -368,6 +369,8 @@ export async function createExpectedPriceSource(options: {
   /** Fallback while eBay approval is pending: search the open web. */
   anthropicApiKey?: string | null;
   fetch?: typeof globalThis.fetch;
+  /** What each web-search estimate cost; record it as 'estimate-resale-price'. */
+  onSpend?: SpendSink;
 }): Promise<ExpectedPriceSource> {
   if (options.ebayClientId && options.ebayClientSecret) {
     return new EbayBrowseExpectedPriceSource({
@@ -378,7 +381,10 @@ export async function createExpectedPriceSource(options: {
   }
   if (options.anthropicApiKey) {
     const { WebSearchExpectedPriceSource } = await import('@/lib/sell/web-estimate');
-    return new WebSearchExpectedPriceSource({ apiKey: options.anthropicApiKey });
+    return new WebSearchExpectedPriceSource({
+      apiKey: options.anthropicApiKey,
+      onSpend: options.onSpend,
+    });
   }
   return new NullExpectedPriceSource();
 }

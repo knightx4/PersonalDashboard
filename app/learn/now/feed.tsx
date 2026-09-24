@@ -9,15 +9,19 @@ import {
   Bookmark,
   Check,
   ExternalLink,
+  Feather,
   GraduationCap,
+  Weight,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import {
   appendCards,
   feedEnd,
+  type CardDifficulty,
   PRELOAD_AHEAD,
   type FeedCard,
   type SwipeAction,
@@ -26,6 +30,7 @@ import {
   dismissCard,
   loadMoreCards,
   openCardSource,
+  rateCard,
   saveCard,
   swipeCard,
   testMeOnCard,
@@ -278,6 +283,8 @@ function DeckCard({
   const [error, setError] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
   const [testing, startTest] = useTransition();
+  const [difficulty, setDifficulty] = useState<CardDifficulty | null>(card.difficulty);
+  const rating = useRef(0);
   const surface = useRef<HTMLDivElement>(null);
   const swipeRef = useRef(onSwipe);
   useEffect(() => {
@@ -357,6 +364,27 @@ function DeckCard({
       const result = await testMeOnCard(card.id);
       if (result?.error) setError(result.error);
     });
+
+  // Too hard and Too easy (plan #893). The card stays on screen (#891), so
+  // the button shows as pressed at once and goes back if the write fails.
+  // Pressing the one already pressed takes the rating back.
+  const rate = (pressed: CardDifficulty) => {
+    const before = difficulty;
+    const next = before === pressed ? null : pressed;
+    const request = ++rating.current;
+    setError(null);
+    setDifficulty(next);
+    const failed = (reason: string) => {
+      if (request !== rating.current) return;
+      setDifficulty(before);
+      setError(reason);
+    };
+    void rateCard(card.id, next)
+      .then((result) => {
+        if (result.error) failed(`That rating was not recorded: ${result.error}`);
+      })
+      .catch(() => failed('That rating was not recorded. Check your connection.'));
+  };
 
   const toward = leaving ?? heading(drag);
   const transform = leaving
@@ -492,10 +520,65 @@ function DeckCard({
               <GraduationCap className="size-3.5" strokeWidth={2} aria-hidden />
               {testing ? 'Starting a track…' : 'Test me on this'}
             </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={onDismiss} disabled={testing}>
-              <X className="size-3.5" strokeWidth={2} aria-hidden />
-              Not interested
-            </Button>
+            <PaidHint
+              action="app/learn/now/actions.ts#testMeOnCard"
+              what="Cost of starting a track from this card"
+            />
+            {/* Not interested and the two ratings stay on one line, the
+                ratings to its right, down to a 360px phone: that is why the
+                labels drop "Too" below sm. */}
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onDismiss}
+                disabled={testing}
+              >
+                <X className="size-3.5" strokeWidth={2} aria-hidden />
+                Not interested
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => rate('too_hard')}
+                aria-label="Too hard"
+                aria-pressed={difficulty === 'too_hard'}
+                className={cn(
+                  'text-danger hover:bg-danger-tint hover:text-danger',
+                  difficulty === 'too_hard' && 'bg-danger-tint',
+                )}
+              >
+                {difficulty === 'too_hard' ? (
+                  <Check className="size-3.5" strokeWidth={2} aria-hidden />
+                ) : (
+                  <Weight className="size-3.5" strokeWidth={2} aria-hidden />
+                )}
+                <span className="sm:hidden">Hard</span>
+                <span className="max-sm:hidden">Too hard</span>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => rate('too_easy')}
+                aria-label="Too easy"
+                aria-pressed={difficulty === 'too_easy'}
+                className={cn(
+                  'text-positive hover:bg-positive-tint hover:text-positive',
+                  difficulty === 'too_easy' && 'bg-positive-tint',
+                )}
+              >
+                {difficulty === 'too_easy' ? (
+                  <Check className="size-3.5" strokeWidth={2} aria-hidden />
+                ) : (
+                  <Feather className="size-3.5" strokeWidth={2} aria-hidden />
+                )}
+                <span className="sm:hidden">Easy</span>
+                <span className="max-sm:hidden">Too easy</span>
+              </Button>
+            </div>
           </div>
 
           {testing && (

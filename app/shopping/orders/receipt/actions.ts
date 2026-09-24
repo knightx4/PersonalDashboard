@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { extractOrderFromReceiptPhoto } from '@/lib/books/receipt-photo';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSessionSpend } from '@/lib/core/spend/session';
 import { resolveBook } from '@/lib/books/resolve';
 import { buildOwnedBookRows } from '@/lib/books/create-owned-book';
 import { CATEGORY_SLUGS } from '@/lib/email/extract/schema';
@@ -43,7 +45,7 @@ export async function previewReceiptPhoto(
   _prev: ReceiptActionState,
   formData: FormData,
 ): Promise<ReceiptActionState> {
-  await requireUser();
+  const user = await requireUser();
   const keys = envKeys();
   if (!keys.anthropicApiKey) {
     return { error: 'Receipt photos need ANTHROPIC_API_KEY on the server.' };
@@ -52,14 +54,17 @@ export async function previewReceiptPhoto(
   const dataUrl = String(formData.get('image_data_url') ?? '');
   if (!dataUrl) return { error: 'Choose a receipt photo.' };
 
+  const spend: SpendReport[] = [];
   const result = await extractOrderFromReceiptPhoto({
     imageDataUrl: dataUrl,
     apiKey: keys.anthropicApiKey,
+    onSpend: (report) => spend.push(report),
     categories: CATEGORY_SLUGS.map((slug) => ({
       slug,
       name: slug.charAt(0).toUpperCase() + slug.slice(1),
     })),
   });
+  await recordSessionSpend(user.id, { module: 'shopping', operation: 'read-receipt-photo' }, spend);
 
   if (!result.ok) {
     return {

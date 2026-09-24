@@ -13,7 +13,7 @@ import {
   type SearchScope,
 } from '@/lib/search/scope';
 import { useCapture } from '@/components/shell/capture';
-import { CAPTURE_ACTIONS, matchCaptureActions } from '@/lib/capture/actions';
+import { matchCaptureActions } from '@/lib/capture/actions';
 import { setTheme } from '@/app/theme-actions';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import {
@@ -299,7 +299,7 @@ export function useSearchRows({
   } | null>(null);
   const [matching, setMatching] = useState<Matching>(() => matchingNow(account));
   const router = useRouter();
-  const { open: openCapture } = useCapture();
+  const { open: openCapture, actions: captureActions } = useCapture();
 
   const commands = useMemo<SearchCommand[]>(() => {
     const visible = MODULES.filter(
@@ -370,7 +370,7 @@ export function useSearchRows({
    */
   const captures = useMemo(
     () =>
-      matchCaptureActions(query)
+      matchCaptureActions(query, captureActions)
         .filter(({ action }) => moduleInScope(action.module, scope))
         .map(({ action, points, seed }) => ({
           points,
@@ -382,7 +382,7 @@ export function useSearchRows({
             run: () => openCapture(action.id, seed),
           } satisfies SearchCommand,
         })),
-    [query, openCapture, scope],
+    [query, openCapture, captureActions, scope],
   );
 
   /**
@@ -398,7 +398,7 @@ export function useSearchRows({
    */
   const startable = useMemo<SearchCommand[]>(() => {
     if (scope === 'everything') return [];
-    return CAPTURE_ACTIONS.filter((action) => moduleInScope(action.module, scope)).map(
+    return captureActions.filter((action) => moduleInScope(action.module, scope)).map(
       (action) => ({
         id: `capture:${action.id}`,
         label: action.label,
@@ -407,7 +407,7 @@ export function useSearchRows({
         run: () => openCapture(action.id),
       }),
     );
-  }, [scope, openCapture]);
+  }, [scope, openCapture, captureActions]);
 
   const matches = useMemo(() => {
     if (!query.trim()) {

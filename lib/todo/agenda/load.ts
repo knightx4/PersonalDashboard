@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
+import { loadAccountSettings } from '@/lib/core/account/settings';
 import { loadOpenTasks } from '@/lib/todo/tasks/load';
 import { loadEventsInWindow } from '@/lib/todo/events/load';
 import { loadFeedEventsInWindow } from '@/lib/todo/feeds/load';
@@ -9,7 +9,7 @@ import { addDays, todayIn } from '@/lib/todo/tasks/model';
 import { resolveAnchors } from '@/lib/todo/agenda/anchors';
 import { loadDismissals } from '@/lib/todo/agenda/dismissals';
 import { loadAgendaSettings } from '@/lib/todo/agenda/settings';
-import { allSources } from '@/lib/todo/agenda/registry';
+import { activeSources } from '@/lib/todo/agenda/registry';
 import { eventContext, subscribedContext } from '@/lib/todo/agenda/events';
 import { mergeAgenda, type AgendaPile } from '@/lib/todo/agenda/merge';
 import type { AgendaItem, DayContext, SourceContext } from '@/lib/todo/agenda/sources';
@@ -50,13 +50,9 @@ export async function loadAgenda(userId: string, now: Date = new Date()): Promis
     now,
   };
 
-  const active = allSources().filter(
-    (source) =>
-      agendaSettings.enabledSources.includes(source.id) &&
-      // A switched-off module's sources never run, whatever this module's own
-      // settings say. Turning off a workspace has to mean it stops appearing.
-      moduleEnabled(account, source.module),
-  );
+  // A switched-off module's sources never run, whatever this module's own
+  // settings say. Turning off a workspace has to mean it stops appearing.
+  const active = activeSources(account, agendaSettings.enabledSources);
 
   // Events are this module's own, so they are read here beside the tasks
   // rather than through a source. A source is for an obligation another
@@ -100,7 +96,7 @@ export async function loadAgenda(userId: string, now: Date = new Date()): Promis
 }
 
 async function runSources(
-  sources: ReturnType<typeof allSources>,
+  sources: ReturnType<typeof activeSources>,
   ctx: SourceContext,
 ): Promise<[AgendaItem[], DayContext[], string[]]> {
   const settled = await Promise.allSettled(

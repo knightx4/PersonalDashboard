@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { GraduationCap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { Field, Textarea } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
@@ -106,6 +107,7 @@ function Proposal({ chain }: { chain: ProposedChain }) {
 
       <div className="mt-4 flex items-center gap-3">
         <KeepButton />
+        <PaidHint action="app/learn/know/actions.ts#approvePrior" what="Cost of saving the track" />
         {state.error && <span className="text-ui text-danger">{state.error}</span>}
       </div>
     </form>
@@ -141,6 +143,7 @@ export function PriorForm({ subjectId }: { subjectId?: string }) {
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <ReadButton />
+        <PaidHint action="app/learn/know/actions.ts#proposePrior" what="Cost of reading it" />
         {state.error && <span className="text-ui text-danger">{state.error}</span>}
         {/* Not an error: a paste with no claims in it is a normal thing to
             happen here, and the sentence that comes back says what would work

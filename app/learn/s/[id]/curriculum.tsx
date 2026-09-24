@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { ListOrdered } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { Card } from '@/components/ui/card';
 import { writeTrackCurriculum, type CurriculumState } from './actions';
 
@@ -37,6 +38,10 @@ export function WriteCurriculum({ subjectId }: { subjectId: string }) {
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <WriteButton />
+          <PaidHint
+            action="app/learn/s/[id]/actions.ts#writeTrackCurriculum"
+            what="Cost of writing the curriculum"
+          />
           {state.error && <span className="text-ui text-danger">{state.error}</span>}
         </div>
       </form>

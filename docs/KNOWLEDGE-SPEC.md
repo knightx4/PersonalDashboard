@@ -307,7 +307,7 @@ It does need a decision this document cannot make on its own.
 graph, which was the right target when that spec was written, because the graph
 was going to be filled from the vault. It is not any more. On the model here the
 graph starts nearly empty and fills a goal at a time, while the vault map holds
-on the order of two thousand positions and their themes from the first sweep.
+about five thousand positions and their themes from the first sweep.
 
 So the candidate targets are the richer store and the sparser one, and the
 question is whether a link should point at a vault-map position as well as a
@@ -401,8 +401,13 @@ Steps 7 and 8 are what make it more than a picture of your notes.
 
 ### What "it worked" looks like
 
-- 1,500 to 2,500 positions, with themes an order of magnitude fewer. Under 800
-  means the bar is too high and only the obvious is being caught.
+- 4,500 to 7,000 positions, with themes more than an order of magnitude
+  fewer. On 24 September 2026 the live map held 4,934 positions under 241
+  themes, drawn from 617 notes. That count comes from the full sweep of 23
+  September, taken after every merge made under the old chaining rule was
+  undone and re-applied. The sweep left 205 notes unread when it hit the API
+  usage limit, and the top of the range allows for them. Under 2,000 means the
+  bar is too high and only the obvious is being caught.
 - Every position traceable to a note and a verbatim sentence, verified present.
 - **Nothing anywhere claiming you know something.** The whole sweep writes
   interest, not knowledge.

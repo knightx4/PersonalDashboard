@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_TARGETS_PER_ROUND, PICK_RESERVE_MS, planTopUp, runTopUpFor, type TopUpPorts } from './top-up';
+import {
+  MAX_TARGETS_PER_ROUND,
+  PICK_RESERVE_MS,
+  READY_BATCH,
+  READY_LOW,
+  planTopUp,
+  runTopUpFor,
+  type TopUpPorts,
+} from './top-up';
 import type { CardToWrite, WriteResult } from './write-card';
 
 /**
@@ -31,6 +39,7 @@ function card(id: string): CardToWrite {
     id,
     reason: 'interest',
     themeName: 'Theme',
+    aimName: null,
     field: { name: 'Field', scope: '' },
     gap: null,
     article: `Article ${id}`,
@@ -106,6 +115,22 @@ describe('topping up one person', () => {
     const summary = await runTopUpFor(run.ports, { userId: 'u', threshold: 20, deadline: far });
     expect(summary).toMatchObject({ readyBefore: 5, readyAfter: 20, written: 15, pickRounds: 0, stopped: null });
     expect(run.writes).toHaveLength(15);
+  });
+
+  it('after a response, starts at seven ready and writes fifteen (note 832dd774)', async () => {
+    const eight = fake({ ready: 8, picked: 30 });
+    expect(await runTopUpFor(eight.ports, { userId: 'u', threshold: READY_LOW, deadline: far })).toMatchObject({
+      skipped: true,
+    });
+
+    const run = fake({ ready: 7, picked: 30 });
+    const summary = await runTopUpFor(run.ports, {
+      userId: 'u',
+      threshold: READY_LOW,
+      target: 7 + READY_BATCH,
+      deadline: far,
+    });
+    expect(summary).toMatchObject({ readyBefore: 7, readyAfter: 22, written: 15 });
   });
 
   it('makes up drops from the next picked rows', async () => {
