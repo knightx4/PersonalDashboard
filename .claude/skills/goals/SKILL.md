@@ -1,6 +1,6 @@
 ---
 name: goals
-description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Shaping - read a new or vague goal and propose steps under it, with one or two questions for the person. Re-shaping - read the answers to those questions and turn them into steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Use when the goals routine is fired from "Work on this" on a goal or by the morning run, or the user says "shape my goal …", "break down <goal>", "work on my goals".
+description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Shaping - read a new or vague goal and propose steps under it, with one or two questions for the person. Re-shaping - read the answers to those questions and turn them into steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - research NYC city events for rhythm goals and write them as suggestions, following past reactions. Use when the goals routine is fired from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "shape my goal …", "break down <goal>", "work on my goals".
 ---
 
 # Working a goal
@@ -187,10 +187,56 @@ facts are not findable) stays open with no result. Say why in the run
 summary, and where a question would unblock it, add it as a question step
 under the same goal. The summary names each step worked and each one left.
 
+## The weekly run
+
+Once a week the daily cron fires the routine to research what is on in New
+York City for the person's rhythm goals (`inngest/goals/weekly.ts`), with the
+`goals.runs` row it wrote with `job` `weekly`. The brief names each live
+rhythm and lists every suggestion from the last eight weeks with what the
+person did with it: `going`, `not_for_me`, `ignored` (no answer within the
+week), and whether they then went. Read those lines before searching. They
+are the only feedback there is, and the research should visibly follow them:
+more of the kinds marked going or attended, fewer of the kinds turned down or
+left unanswered. You can read further back yourself:
+
+```sql
+select title, source, place, happens_on, reaction, attended, created_at
+from goals.suggestions
+where user_id = '<user>'
+order by created_at desc limit 200;
+```
+
+1. Search for talks, events and volunteer openings in the coming seven to
+   ten days that serve the rhythms in the brief. Eventbrite, Meetup, museum
+   and library calendars, NYC Parks and org newsletters are the usual
+   sources; check each find is current and has a page you can link.
+2. Write five to eight suggestions, one row each. Every one needs a date
+   (`happens_on`, and `starts_at` when the time is known, in New York time
+   with its offset) and a link (`url`, the event's own page). A volunteer
+   opening with no single date takes the first date it can be done. `item_id`
+   is the rhythm it serves, `run_id` this run.
+
+   ```sql
+   set local goals.actor = 'claude';
+   set local goals.run_id = '<the run id>';
+   insert into goals.suggestions
+     (user_id, item_id, run_id, title, detail, url, place, source, happens_on, starts_at)
+   values ('<user>', '<rhythm id>', '<the run id>', 'Talk: …', 'One or two plain sentences on why it fits.',
+           'https://…', 'Brooklyn Public Library, Central', 'BPL events', '2026-10-01',
+           '2026-10-01T18:30:00-04:00');
+   ```
+
+3. Do not repeat a suggestion already in the table, and do not suggest
+   something that has already happened.
+
+Never write `reaction`, `reacted_at` or `attended`. Going and not for me are
+the person's buttons on the Goals home, whether they went is their tick on
+Todo, and marking the unanswered ones ignored is done by the cron. The guard
+(`goals` 0008) refuses a Claude write to any of them. The summary says how
+many you wrote, and what in the past reactions you followed.
+
 ## Stopping
 
 This routine writes rows and nothing else: there is no code to change and
 nothing to commit. Close the run row, then end with the same summary in your
 reply.
-
-Weekly event research is plan #934, not this routine's job yet.

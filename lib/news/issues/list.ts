@@ -94,7 +94,7 @@ export function listHref({
   view?: ListView;
 }): string {
   const query = new URLSearchParams();
-  if (view === 'newsletters') query.set('view', 'newsletters');
+  if (view !== 'latest') query.set('view', view);
   if (from) query.set('from', from);
   if (topic) query.set('topic', topic);
   const search = query.toString();
@@ -178,13 +178,15 @@ export function issueHref(
 }
 
 /**
- * The two ways the list is read (note 20a58f93): every issue newest first, or
- * one row per newsletter that opens onto that newsletter's editions.
+ * The ways the tab is read. Two are the list (note 20a58f93): every issue
+ * newest first, or one row per newsletter that opens onto that newsletter's
+ * editions. The third is the free newsletters recommended to you (plan #947,
+ * placed here by decision #948).
  */
-export type ListView = 'latest' | 'newsletters';
+export type ListView = 'latest' | 'newsletters' | 'recommended';
 
 export function readListView(value: string | undefined): ListView {
-  return value === 'newsletters' ? 'newsletters' : 'latest';
+  return value === 'newsletters' || value === 'recommended' ? value : 'latest';
 }
 
 /** One newsletter in the by-newsletter view, with what it has sent. */

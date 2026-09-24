@@ -572,6 +572,66 @@ describe('Claude results on steps (plan #933)', () => {
   });
 });
 
+describe('weekly suggestions (plan #934)', () => {
+  async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  async function suggest(title: string): Promise<string> {
+    const [row] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into suggestions (user_id, title, url, happens_on)
+      values (${userA}, ${title}, 'https://example.test/e', '2026-10-01') returning id`);
+    return row.id;
+  }
+
+  it('lets Claude suggest and mark an unanswered one ignored, and nothing more', async () => {
+    await expect(
+      asClaude((tx) => tx`
+        insert into suggestions (user_id, title, reaction, reacted_at)
+        values (${userA}, 'A talk', 'going', now())`),
+    ).rejects.toThrow(/may suggest but not react/);
+
+    const talk = await suggest('A talk at the library');
+    await expect(
+      asClaude((tx) => tx`
+        update suggestions set reaction = 'going', reacted_at = now() where id = ${talk}`),
+    ).rejects.toThrow(/may not react/);
+
+    await asClaude((tx) => tx`
+      update suggestions set reaction = 'ignored', reacted_at = now() where id = ${talk}`);
+    await expect(
+      asClaude((tx) => tx`update suggestions set reaction = null, reacted_at = null where id = ${talk}`),
+    ).rejects.toThrow(/may not react/);
+
+    const history = await historyOf(talk);
+    expect(history.map((h) => h.actor)).toEqual(['claude', 'claude']);
+  });
+
+  it('records your going, not for me and whether you went on the row', async () => {
+    const walk = await suggest('A walking tour');
+    await asUser(userA, (tx) => tx`
+      update suggestions set reaction = 'not_for_me', reacted_at = now() where id = ${walk}`);
+    await asUser(userA, (tx) => tx`
+      update suggestions set reaction = 'going', reacted_at = now() where id = ${walk}`);
+    await expect(
+      asClaude((tx) => tx`update suggestions set attended = true where id = ${walk}`),
+    ).rejects.toThrow(/whether you went/);
+    await asUser(userA, (tx) => tx`update suggestions set attended = true where id = ${walk}`);
+
+    const [row] = await admin<{ reaction: string; attended: boolean }[]>`
+      select reaction, attended from suggestions where id = ${walk}`;
+    expect(row).toEqual({ reaction: 'going', attended: true });
+    expect((await historyOf(walk)).map((h) => h.actor)).toEqual(['claude', 'me', 'me', 'me']);
+
+    const others = await asUser(userB, (tx) => tx`
+      update suggestions set reaction = 'going', reacted_at = now() where id = ${walk} returning id`);
+    expect(others).toHaveLength(0);
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`
