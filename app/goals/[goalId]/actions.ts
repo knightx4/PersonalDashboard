@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
+import { countTowards } from '@/lib/goals/rhythms-store';
 import { parseStepFields } from '@/lib/goals/steps';
 import {
   insertStep,
@@ -29,6 +30,7 @@ export type StepActionState = { error?: string; done?: number };
 const Id = z.string().uuid();
 const Direction = z.enum(['up', 'down']);
 const Status = z.enum(['open', 'done', 'dropped']);
+const Day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 function saved(): StepActionState {
   // The home counts steps and every goal's map can show a linked step, so the
@@ -115,6 +117,31 @@ export async function setStepOnTodoAction(form: FormData): Promise<StepActionSta
         ? 'The step could not be put on Todo. Try again.'
         : 'The step could not be taken off Todo. Try again.',
     };
+  }
+  revalidatePath('/todo', 'layout');
+  revalidatePath('/home');
+  return saved();
+}
+
+// latency: pending
+export async function countRhythmAction(form: FormData): Promise<StepActionState> {
+  await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  const startsOn = Day.safeParse(form.get('startsOn'));
+  if (!id.success || !startsOn.success) return { error: 'Could not tell which rhythm that was.' };
+  const by = form.get('by') === '-1' ? -1 : 1;
+  try {
+    const changed = await countTowards(await createGoalsClient(), id.data, startsOn.data, by);
+    if (!changed) {
+      return {
+        error:
+          by === 1
+            ? 'That period has closed. Reload to see the current one.'
+            : 'There is nothing to take back in this period.',
+      };
+    }
+  } catch {
+    return { error: 'The count could not be saved. Try again.' };
   }
   revalidatePath('/todo', 'layout');
   revalidatePath('/home');

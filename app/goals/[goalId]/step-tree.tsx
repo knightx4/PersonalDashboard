@@ -29,9 +29,11 @@ import {
   type StepNode,
 } from '@/lib/goals/steps';
 import { canShowOnTodo } from '@/lib/goals/todo';
+import { progressLine, type RhythmRecord } from '@/lib/goals/rhythms';
 import {
   addStep,
   archiveStepAction,
+  countRhythmAction,
   editStep,
   linkStepAction,
   moveStepAction,
@@ -67,6 +69,9 @@ const KIND_ICONS: Record<StepKind, typeof User> = {
  */
 const TodoOn = createContext(false);
 
+/** Each rhythm step's current period and recent past ones (plan #928). */
+const Rhythms = createContext<GoalMap['rhythms']>({});
+
 type Links = GoalMap['linksOf'];
 type OtherGoals = GoalMap['otherGoals'];
 
@@ -94,61 +99,63 @@ export function StepTree({ map, todoOn }: { map: GoalMap; todoOn: boolean }) {
   const { total, closed } = countSteps(map.steps);
   return (
     <TodoOn.Provider value={todoOn}>
-      <div className="space-y-6">
-        <section aria-label="Steps" className="space-y-2">
-          {total > 0 && (
-            <p className="px-1 text-small text-ink-muted">
-              {closed} of {total} {total === 1 ? 'step' : 'steps'} closed
-            </p>
-          )}
-          {map.steps.length === 0 ? (
-            <EmptyState
-              icon={ListTree}
-              title="No steps yet"
-              description="Break the goal into the things that have to happen. Any step can hold sub-steps of its own."
-            />
-          ) : (
-            <Card>
-              <StepList
-                nodes={map.steps}
-                depth={0}
-                links={map.linksOf}
-                otherGoals={map.otherGoals}
+      <Rhythms.Provider value={map.rhythms}>
+        <div className="space-y-6">
+          <section aria-label="Steps" className="space-y-2">
+            {total > 0 && (
+              <p className="px-1 text-small text-ink-muted">
+                {closed} of {total} {total === 1 ? 'step' : 'steps'} closed
+              </p>
+            )}
+            {map.steps.length === 0 ? (
+              <EmptyState
+                icon={ListTree}
+                title="No steps yet"
+                description="Break the goal into the things that have to happen. Any step can hold sub-steps of its own."
               />
-            </Card>
-          )}
-          <StepComposer parentId={map.goal.id} label="New step" />
-        </section>
-
-        {map.linked.length > 0 && (
-          <section aria-labelledby="linked-heading" className="space-y-2">
-            <h2 id="linked-heading" className="px-1 text-ui font-semibold text-ink">
-              Also counts towards this goal
-            </h2>
-            <Card>
-              <ul className="divide-y divide-border">
-                {map.linked.map((entry) => (
-                  <li key={entry.linkId}>
-                    <p className="px-3 pt-2 text-small text-ink-muted">
-                      From{' '}
-                      <Link href={`/goals/${entry.fromGoal.id}`} className="underline">
-                        {entry.fromGoal.title}
-                      </Link>
-                    </p>
-                    <StepList
-                      nodes={[entry.step]}
-                      depth={0}
-                      links={map.linksOf}
-                      otherGoals={map.otherGoals}
-                      unlinkId={entry.linkId}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </Card>
+            ) : (
+              <Card>
+                <StepList
+                  nodes={map.steps}
+                  depth={0}
+                  links={map.linksOf}
+                  otherGoals={map.otherGoals}
+                />
+              </Card>
+            )}
+            <StepComposer parentId={map.goal.id} label="New step" />
           </section>
-        )}
-      </div>
+
+          {map.linked.length > 0 && (
+            <section aria-labelledby="linked-heading" className="space-y-2">
+              <h2 id="linked-heading" className="px-1 text-ui font-semibold text-ink">
+                Also counts towards this goal
+              </h2>
+              <Card>
+                <ul className="divide-y divide-border">
+                  {map.linked.map((entry) => (
+                    <li key={entry.linkId}>
+                      <p className="px-3 pt-2 text-small text-ink-muted">
+                        From{' '}
+                        <Link href={`/goals/${entry.fromGoal.id}`} className="underline">
+                          {entry.fromGoal.title}
+                        </Link>
+                      </p>
+                      <StepList
+                        nodes={[entry.step]}
+                        depth={0}
+                        links={map.linksOf}
+                        otherGoals={map.otherGoals}
+                        unlinkId={entry.linkId}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </section>
+          )}
+        </div>
+      </Rhythms.Provider>
     </TodoOn.Provider>
   );
 }
@@ -210,6 +217,9 @@ function StepItem({
   const toast = useToast();
   const childrenId = useId();
   const todoOn = useContext(TodoOn);
+  const rhythms = useContext(Rhythms);
+  const rhythm: RhythmRecord | undefined = node.kind === 'rhythm' ? rhythms[node.id] : undefined;
+  const current = node.status === 'open' ? (rhythm?.current ?? null) : null;
 
   const closed = node.status === 'done' || node.status === 'dropped';
   const hasChildren = node.children.length > 0;
@@ -258,8 +268,33 @@ function StepItem({
             },
           ]
         : [];
+  const countOne = menuAction(countRhythmAction);
+  // Counting is offered on a rhythm with a period open now; the period is
+  // named in the form, so a press after the week has turned is refused
+  // rather than counted towards the new one.
+  const rhythmItems: ActionMenuItem[] = current
+    ? [
+        {
+          id: 'count',
+          label: 'Count one',
+          formAction: countOne,
+          formFields: { id: node.id, startsOn: current.startsOn, by: '1' },
+        },
+        ...(current.count > 0
+          ? [
+              {
+                id: 'uncount',
+                label: 'Take one back',
+                formAction: countOne,
+                formFields: { id: node.id, startsOn: current.startsOn, by: '-1' },
+              },
+            ]
+          : []),
+      ]
+    : [];
   const move = menuAction(moveStepAction);
   const items: ActionMenuItem[] = [
+    ...rhythmItems,
     closed
       ? {
           id: 'reopen',
@@ -341,6 +376,7 @@ function StepItem({
     node.kind === 'rhythm' && node.rhythmCount && node.rhythmPeriod
       ? describeRhythm(node.rhythmCount, node.rhythmPeriod)
       : null,
+    current && node.rhythmPeriod ? progressLine(node.rhythmPeriod, current) : null,
     node.dueOn ? `Due ${formatDate(node.dueOn)}` : null,
     todoOn && node.onTodo && canShowOnTodo(node) ? 'On Todo' : null,
     !open && hasChildren ? `${countSteps(node.children).total} under it` : null,
@@ -401,6 +437,9 @@ function StepItem({
               </Link>
             ))}
           </p>
+          {rhythm && rhythm.past.length > 0 && node.rhythmPeriod && (
+            <PastPeriods past={rhythm.past} period={node.rhythmPeriod} />
+          )}
           {editState.error && <p className="px-1 text-small text-danger">{editState.error}</p>}
           {details && (
             <StepDetails node={node} links={stepLinks} otherGoals={otherGoals} edit={edit} />
@@ -432,6 +471,42 @@ function StepItem({
         </div>
       )}
     </li>
+  );
+}
+
+const PERIOD_PLURAL = { day: 'days', week: 'weeks', month: 'months' } as const;
+
+/**
+ * The closed periods behind a rhythm's current one, oldest first: a tick for
+ * each one kept and a cross for each one missed, read from the stored rows.
+ */
+function PastPeriods({
+  past,
+  period,
+}: {
+  past: RhythmRecord['past'];
+  period: keyof typeof PERIOD_PLURAL;
+}) {
+  const kept = past.filter((row) => row.kept).length;
+  const summary =
+    past.length === 1
+      ? `${kept === 1 ? 'Kept' : 'Missed'} last ${period}`
+      : `Kept ${kept} of the last ${past.length} ${PERIOD_PLURAL[period]}`;
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-small text-ink-muted">
+      <span>{summary}</span>
+      <span className="inline-flex items-center gap-0.5">
+        {past.map((row) => (
+          <StatusGlyph
+            key={row.id}
+            glyph={row.kept ? 'check' : 'cross'}
+            label={`${period === 'day' ? formatDate(row.startsOn) : `From ${formatDate(row.startsOn)}`}: ${row.kept ? 'kept' : 'missed'}, ${row.count} of ${row.target}`}
+            size={14}
+            className={row.kept ? 'text-ink' : 'text-ink-muted'}
+          />
+        ))}
+      </span>
+    </div>
   );
 }
 

@@ -1,8 +1,18 @@
 import Link from 'next/link';
-import { ChevronRight, CircleHelp, Flag, ListChecks, ListTree, Sparkles, User } from 'lucide-react';
+import {
+  ChevronRight,
+  CircleHelp,
+  Flag,
+  ListChecks,
+  ListTree,
+  Repeat,
+  Sparkles,
+  User,
+} from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import type { DailyGoal, DailyView as View, NextItem, WaitingItem } from '@/lib/goals/daily';
+import type { DailyGoal, DailyView as Daily, NextItem, WaitingItem } from '@/lib/goals/daily';
+import { progressLine, type AtRiskRhythm } from '@/lib/goals/rhythms';
 import { STEP_KIND_LABELS } from '@/lib/goals/steps';
 
 /**
@@ -12,7 +22,13 @@ import { STEP_KIND_LABELS } from '@/lib/goals/steps';
  * else up. Then one card per active goal with its next one to three things,
  * yours first. Every row is a link into the goal's full tree, where the step
  * can be done, edited or broken down; the home itself only reads.
+ *
+ * Rhythms at risk this period (plan #928) sit between the two: they are
+ * running out of days, which makes them more pressing than a goal's next step
+ * and less than a question holding a branch up.
  */
+
+type View = Daily & { atRisk: AtRiskRhythm[] };
 
 const KIND_ICONS: Record<NextItem['kind'], typeof User> = { mine: User, claude: Sparkles };
 
@@ -27,6 +43,22 @@ function formatDate(isoDate: string): string {
     day: 'numeric',
     month: 'short',
   });
+}
+
+function riskLine(rhythm: AtRiskRhythm): string {
+  const left =
+    rhythm.period === 'day'
+      ? null
+      : rhythm.daysLeft === 1
+        ? 'last day'
+        : `${rhythm.daysLeft} days left`;
+  return [
+    progressLine(rhythm.period, { count: rhythm.count, target: rhythm.target }),
+    left,
+    rhythm.goalTitle,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 function waitingLine(item: WaitingItem): string {
@@ -63,6 +95,43 @@ export function DailyView({ view }: { view: View }) {
             <ul className="divide-y divide-border">
               {view.waiting.map((item) => (
                 <WaitingRow key={`${item.kind}-${item.id}`} item={item} />
+              ))}
+            </ul>
+          </Card>
+        </section>
+      )}
+
+      {view.atRisk.length > 0 && (
+        <section aria-labelledby="risk-heading" className="space-y-2">
+          <h2 id="risk-heading" className="px-1 text-ui font-semibold text-ink">
+            Rhythms at risk
+          </h2>
+          <Card>
+            <ul className="divide-y divide-border">
+              {view.atRisk.map((rhythm) => (
+                <li key={rhythm.id}>
+                  <Link
+                    href={`/goals/${rhythm.goalId}`}
+                    className="row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
+                  >
+                    <Repeat
+                      className="mt-0.5 size-4 shrink-0 text-ink-muted"
+                      strokeWidth={1.75}
+                      aria-hidden
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-ui break-words text-ink">{rhythm.title}</span>
+                      <span className="block text-small break-words text-ink-muted">
+                        {riskLine(rhythm)}
+                      </span>
+                    </span>
+                    <ChevronRight
+                      className="mt-0.5 size-4 shrink-0 text-ink-muted"
+                      strokeWidth={1.75}
+                      aria-hidden
+                    />
+                  </Link>
+                </li>
               ))}
             </ul>
           </Card>

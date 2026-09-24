@@ -6,6 +6,7 @@ import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { loadGoalMap } from '@/lib/goals/steps-store';
+import { todayIn } from '@/lib/todo/tasks/model';
 import { StepTree } from './step-tree';
 
 export const metadata = { title: 'Goal' };
@@ -22,10 +23,9 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
   if (!/^[0-9a-f-]{36}$/i.test(goalId)) notFound();
 
   const user = await requireUser();
-  const [map, account] = await Promise.all([
-    loadGoalMap(await createGoalsClient(), goalId),
-    loadAccountSettings(user.id),
-  ]);
+  const account = await loadAccountSettings(user.id);
+  const today = todayIn(account.timezone);
+  const map = await loadGoalMap(await createGoalsClient(), goalId, { userId: user.id, today });
   if (!map) notFound();
 
   return (
