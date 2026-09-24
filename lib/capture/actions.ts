@@ -19,7 +19,7 @@
 import { score } from '@/lib/search/score';
 import type { ModuleId } from '@/lib/modules';
 
-export type CaptureActionId = 'todo';
+export type CaptureActionId = 'todo' | 'goals';
 
 export type CaptureAction = {
   id: CaptureActionId;
@@ -65,7 +65,31 @@ export const CAPTURE_ACTIONS: readonly CaptureAction[] = [
     dated: true,
     keywords: ['add todo', 'new todo', 'add task', 'new task', 'capture'],
   },
+  {
+    // What happened, filed against your goals by a model call (plan #929).
+    // Prose, because "went to the talk, met someone, want to volunteer" is a
+    // sentence and not a title.
+    id: 'goals',
+    label: 'Log what happened',
+    module: 'goals',
+    placeholder: 'What happened? It is filed against your goals.',
+    field: 'prose',
+    dated: false,
+    keywords: ['log', 'what happened', 'log progress', 'goal progress', 'capture goal'],
+  },
 ];
+
+/**
+ * The actions an account can use: those whose workspace it has, plus any that
+ * belong to none. Filing into Goals for an account without Goals would write
+ * rows it cannot see.
+ */
+export function availableCaptureActions(
+  modules: readonly ModuleId[] | undefined,
+): readonly CaptureAction[] {
+  if (!modules) return CAPTURE_ACTIONS;
+  return CAPTURE_ACTIONS.filter((action) => action.module === null || modules.includes(action.module));
+}
 
 /** What the shortcut and the header control open when nothing else is named. */
 export const DEFAULT_CAPTURE_ACTION: CaptureActionId = 'todo';
@@ -107,12 +131,15 @@ export type CaptureMatch = {
  * match. An empty query names nothing: the palette with nothing typed in it
  * is a list of places to go, and it stays one.
  */
-export function matchCaptureActions(query: string): CaptureMatch[] {
+export function matchCaptureActions(
+  query: string,
+  actions: readonly CaptureAction[] = CAPTURE_ACTIONS,
+): CaptureMatch[] {
   const words = query.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return [];
 
   const matches: CaptureMatch[] = [];
-  for (const action of CAPTURE_ACTIONS) {
+  for (const action of actions) {
     const haystack = captureHaystack(action);
     for (let take = words.length; take > 0; take -= 1) {
       const points = score(haystack, words.slice(0, take).join(' '));

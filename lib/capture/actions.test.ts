@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { score } from '@/lib/search/score';
 import {
+  availableCaptureActions,
   CAPTURE_ACTIONS,
   DEFAULT_CAPTURE_ACTION,
   captureAction,
@@ -36,6 +37,22 @@ describe('the capture actions', () => {
 
   it('answers nothing for an id it does not have, rather than a stand-in', () => {
     expect(captureAction('note')).toBeNull();
+  });
+
+  it('offers an action only to an account that has its workspace', () => {
+    const ids = (modules?: Parameters<typeof availableCaptureActions>[0]) =>
+      availableCaptureActions(modules).map((action) => action.id);
+    expect(ids(['todo'])).toEqual(['todo']);
+    expect(ids(['todo', 'goals'])).toEqual(['todo', 'goals']);
+    expect(ids(undefined)).toEqual(CAPTURE_ACTIONS.map((action) => action.id));
+  });
+
+  it('finds logging what happened by the words for it', () => {
+    for (const typed of ['log what happened', 'log progress']) {
+      const [match] = matchCaptureActions(typed);
+      expect(match!.action.id).toBe('goals');
+      expect(match!.seed).toBe('');
+    }
   });
 
   it('is found by what somebody actually types', () => {

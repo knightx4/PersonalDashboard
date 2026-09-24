@@ -221,15 +221,15 @@ export async function loadStepCounts(
 }
 
 /**
- * A new step at the end of its siblings. The parent is a live goal or step of
- * yours; false when it is not.
+ * A new step at the end of its siblings, returning its id. The parent is a
+ * live goal or step of yours; null when it is not.
  */
 export async function insertStep(
   client: GoalsSupabaseClient,
   userId: string,
   parentId: string,
   fields: StepFields & { title: string; kind: StepKind },
-): Promise<boolean> {
+): Promise<string | null> {
   const { data: parent, error: parentError } = await client
     .from('items')
     .select('id')
@@ -237,7 +237,7 @@ export async function insertStep(
     .is('archived_at', null)
     .maybeSingle();
   if (parentError) throw new Error(parentError.message);
-  if (!parent) return false;
+  if (!parent) return null;
 
   const { data: siblings, error: readError } = await client
     .from('items')
@@ -246,15 +246,15 @@ export async function insertStep(
     .is('archived_at', null);
   if (readError) throw new Error(readError.message);
 
-  const { error } = await client.from('items').insert({
+  const { data, error } = await client.from('items').insert({
     user_id: userId,
     level: 'step',
     parent_id: parentId,
     ...fields,
     position: nextPosition((siblings ?? []).map((row) => row.position as number)),
-  });
+  }).select('id').single();
   if (error) throw new Error(error.message);
-  return true;
+  return data.id as string;
 }
 
 /** False when no live step has that id. */
@@ -405,7 +405,7 @@ export async function unlinkStep(client: GoalsSupabaseClient, linkId: string): P
  * Every live goal in page order, area by area, with its area's name and its
  * step tree. A goal in an archived area is out of view with it.
  */
-async function loadLiveTree(
+export async function loadLiveTree(
   client: GoalsSupabaseClient,
 ): Promise<{ goals: { goal: Goal; areaName: string }[]; byGoal: Map<string, StepNode[]> }> {
   const [items, areas] = await Promise.all([

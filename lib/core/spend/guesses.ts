@@ -1,5 +1,6 @@
 import type {
   CoreOperation,
+  GoalsOperation,
   JobsOperation,
   NewsOperation,
   ShoppingOperation,
@@ -34,7 +35,8 @@ export type OperationName =
   | JobsOperation
   | ShoppingOperation
   | CoreOperation
-  | NewsOperation;
+  | NewsOperation
+  | GoalsOperation;
 
 export type OperationGuess = {
   model: string;
@@ -159,4 +161,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'measure-repeats': background(run(VOYAGE_LITE, 100_000, 0)),
   // Up to 24 searches, whose results are read back in on each round.
   'recommend-newsletters': run(OPUS, 60_000, 5_000),
+
+  // Goals: one sentence filed against open goals and steps, which are
+  // listed in the prompt. Grows with the size of the tree.
+  'file-capture': run(HAIKU, 4_000, 300),
 };
