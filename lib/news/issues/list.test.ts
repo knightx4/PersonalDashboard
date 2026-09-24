@@ -5,6 +5,8 @@ import {
   issueHref,
   issueReturn,
   listHref,
+  newsletterRows,
+  readListView,
   senderLabel,
   sortSenders,
   unreadTopics,
@@ -165,5 +167,30 @@ describe('listHref', () => {
     expect(listHref({ from: null, topic: null })).toBe('/news/all');
     expect(listHref({ from: 's1', topic: null })).toBe('/news/all?from=s1');
     expect(listHref({ from: 's1', topic: 'Business' })).toBe('/news/all?from=s1&topic=Business');
+  });
+});
+
+describe('the by-newsletter view (note 20a58f93)', () => {
+  it('groups issues by sender, most recent sender first, counting unread', () => {
+    const rows = newsletterRows(
+      [
+        issue('a', 's1', { receivedAt: '2026-05-01T09:00:00Z', readAt: '2026-05-01T10:00:00Z' }),
+        issue('b', 's2', { receivedAt: '2026-05-03T09:00:00Z' }),
+        issue('c', 's1', { receivedAt: '2026-05-02T09:00:00Z' }),
+      ],
+      [paper, weekly],
+    );
+    expect(rows.map((row) => [row.sender.id, row.editions, row.unread, row.latest.id])).toEqual([
+      ['s2', 1, 1, 'b'],
+      ['s1', 2, 1, 'c'],
+    ]);
+  });
+
+  it('reads the view from the URL and writes it back', () => {
+    expect(readListView('newsletters')).toBe('newsletters');
+    expect(readListView(undefined)).toBe('latest');
+    expect(readListView('cards')).toBe('latest');
+    expect(listHref({ from: null, topic: null, view: 'newsletters' })).toBe('/news/all?view=newsletters');
+    expect(listHref({ from: 's1', topic: null, view: 'latest' })).toBe('/news/all?from=s1');
   });
 });
