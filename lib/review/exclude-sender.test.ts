@@ -35,12 +35,30 @@ describe('chooseExclusionDomain', () => {
     if (!choice.ok) expect(choice.reason).toMatch(/shopify\.com sends mail for many shops/);
   });
 
-  it('refuses when every address is shared, such as a PayPal receipt', () => {
+  it('refuses when every domain is shared and none is a personal mailbox', () => {
     const choice = chooseExclusionDomain({
       fromAddress: 'service@paypal.com',
-      replyToAddress: 'someone@gmail.com',
+      replyToAddress: 'support@shop.zendesk.com',
     });
     expect(choice.ok).toBe(false);
+  });
+
+  it('mutes the exact address of a gmail sender rather than all of gmail', () => {
+    expect(
+      chooseExclusionDomain({
+        fromAddress: 'Jane Seller <Jane.Seller@gmail.com>',
+        replyToAddress: null,
+      }),
+    ).toEqual({ ok: true, domain: 'jane.seller@gmail.com' });
+  });
+
+  it('mutes the gmail Reply-To of a seller behind PayPal', () => {
+    expect(
+      chooseExclusionDomain({
+        fromAddress: 'service@paypal.com',
+        replyToAddress: 'someone@gmail.com',
+      }),
+    ).toEqual({ ok: true, domain: 'someone@gmail.com' });
   });
 
   it('refuses an email with no usable address', () => {

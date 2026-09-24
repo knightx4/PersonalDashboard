@@ -53,7 +53,7 @@ const LG_ASPECT = { 1: 'lg:aspect-[16/9]', 2: 'lg:aspect-[2/1]', 3: 'lg:aspect-[
  * line up without fixed tiles. Below md it is one column.
  */
 export function StoryGrid({ stories, pictures, className }: StoryGridProps) {
-  const spans = gridSpans(stories.length);
+  const spans = gridSpans(stories.length, { tallLead: pictures && Boolean(stories[0]?.image) });
   return (
     <div className={cn('grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3', className)}>
       {stories.map((story, index) => {

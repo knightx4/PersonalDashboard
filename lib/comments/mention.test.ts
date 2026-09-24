@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mentionsDash, questionFrom, splitOnMention } from './mention';
+import { mentionsDash, questionFrom, splitOnMention, withoutMention } from './mention';
 
 describe('mentionsDash', () => {
   it('finds the tag anywhere in the comment', () => {
@@ -58,5 +58,22 @@ describe('splitOnMention', () => {
       { text: 'the @dashboard is slow', mention: false },
     ]);
     expect(splitOnMention('')).toEqual([{ text: '', mention: false }]);
+  });
+});
+
+describe('withoutMention', () => {
+  it('takes the tag and the space after it back out of a draft', () => {
+    expect(withoutMention('@dash ')).toBe('');
+    expect(withoutMention('@dash what next')).toBe('what next');
+    expect(withoutMention('is this @dash right')).toBe('is this right');
+    expect(withoutMention('ask @Dash')).toBe('ask ');
+  });
+
+  it('leaves words and addresses that only look like the tag', () => {
+    expect(withoutMention('see @dashboard or me@dash.io')).toBe('see @dashboard or me@dash.io');
+  });
+
+  it('leaves a draft that no longer reaches Dash', () => {
+    expect(mentionsDash(withoutMention('@dash one and @dash two'))).toBe(false);
   });
 });

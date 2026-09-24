@@ -33,6 +33,9 @@ export const dynamic = 'force-dynamic';
  * quickPage gives the stories Next would show one at a time, and the view
  * draws the card below md and the grid from md up, so the server never needs
  * the screen size. Next page records every story on it (#939).
+ *
+ * The story after the card is worked out too and drawn ahead, so Next on a
+ * phone shows it at once while the pass is recorded (note 452a90d9).
  */
 export default async function QuickReadPage({
   searchParams,
@@ -52,12 +55,22 @@ export default async function QuickReadPage({
   ]);
 
   const card = nextCard(issues, senders, passes, { topic, hidden });
+  // The story Next brings up, worked out as though this card had been passed,
+  // so the phone can show it without waiting for the page (note 452a90d9).
+  const upNext = card
+    ? nextCard(
+        issues,
+        senders,
+        [...passes, { issueId: card.issueId, storyIndex: card.storyIndex }],
+        { topic, hidden },
+      )
+    : null;
   const page = quickPage(issues, senders, passes, { topic, hidden });
   const wanted = params.pictures !== '0';
   const topics = quickTopics(issues, senders, passes, hidden);
 
   // The saved headlines of every newsletter on the page, read once each.
-  const issueIds = [...new Set([card, ...page].flatMap((c) => (c ? [c.issueId] : [])))];
+  const issueIds = [...new Set([card, upNext, ...page].flatMap((c) => (c ? [c.issueId] : [])))];
   const savedIn = new Map(
     await Promise.all(
       issueIds.map(async (id) => [id, await loadSavedHeadlines(client, id)] as const),
@@ -85,6 +98,14 @@ export default async function QuickReadPage({
         saved: isSaved(c),
         issueHref: issueHref(c.issueId, { original: false, pictures: wanted, from: null }),
       }))}
+      upNext={
+        upNext && {
+          card: upNext,
+          arrived: formatArrival(upNext.receivedAt, settings.timezone),
+          saved: isSaved(upNext),
+          issueHref: issueHref(upNext.issueId, { original: false, pictures: wanted, from: null }),
+        }
+      }
       seed={`${user.id}:${new Date().toISOString().slice(0, 10)}:news`}
       topics={{
         topics,

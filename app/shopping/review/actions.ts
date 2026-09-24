@@ -5,7 +5,6 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { connectedAccountIds } from '@/lib/core/inbox/accounts';
 import { EXCLUDED_SENDER_ERROR, isExcludedSender } from '@/lib/inbox/merchant-exclusion-match';
 import { chooseExclusionDomain } from '@/lib/review/exclude-sender';
 import {
@@ -138,12 +137,9 @@ export async function dismissEmailReview(
     return { error: 'Invalid message.' };
   }
 
-  const core = await createCoreClient();
-  const accountIds = await connectedAccountIds(core, user.id);
-  if (accountIds.length === 0) return { error: 'No inbox connected.' };
-
   // Ownership comes from the view's user_id: the verdict row has no account id
-  // of its own any more.
+  // of its own any more, and its RLS policy (core.owns_message) scopes the
+  // update below to the same owner.
   const { data: message, error: loadError } = await supabase
     .from('inbox_messages')
     .select('id, parse_status')
@@ -160,8 +156,7 @@ export async function dismissEmailReview(
       parse_status: 'skipped',
       error: 'Dismissed from review queue',
     })
-    .eq('id', messageId)
-    .in('email_account_id', accountIds);
+    .eq('id', messageId);
 
   if (error) return { error: error.message };
 
@@ -175,7 +170,8 @@ export async function dismissEmailReview(
  *
  * The domain is the Reply-To one where there is one (see
  * chooseExclusionDomain), and a domain many shops share is refused with the
- * reason rather than written. The mute is listed under Muted merchants in
+ * reason rather than written, except a personal mailbox such as gmail.com,
+ * where the sender's exact address is muted instead. The mute is listed under Muted merchants in
  * shopping settings, which is where it is undone; there is no undo here.
  */
 // latency: pending
@@ -616,8 +612,6 @@ export async function restoreDiscardedOrders(restore: DiscardedOrder[]): Promise
 
   const user = await requireUser();
   const supabase = await createClient();
-  const core = await createCoreClient();
-  const accountIds = await connectedAccountIds(core, user.id);
 
   const orderIds = parsed.data.map((entry) => entry.orderId);
   const { error } = await supabase
@@ -639,8 +633,7 @@ export async function restoreDiscardedOrders(restore: DiscardedOrder[]): Promise
           error: message.error,
           resulting_order_id: entry.orderId,
         })
-        .eq('id', message.id)
-        .in('email_account_id', accountIds);
+        .eq('id', message.id);
 
       if (messageError) return { changed: [], error: messageError.message };
     }
@@ -661,9 +654,6 @@ export async function dismissEmailsReview(
 
   const user = await requireUser();
   const supabase = await createClient();
-  const core = await createCoreClient();
-  const accountIds = await connectedAccountIds(core, user.id);
-  if (accountIds.length === 0) return { changed: [], restore: [], error: 'No inbox connected.' };
 
   const { data: messages, error: loadError } = await supabase
     .from('inbox_messages')
@@ -689,8 +679,7 @@ export async function dismissEmailsReview(
     .in(
       'id',
       restore.map((row) => row.id),
-    )
-    .in('email_account_id', accountIds);
+    );
 
   if (error) return { changed: [], restore: [], error: error.message };
 
@@ -704,18 +693,14 @@ export async function restoreDismissedEmails(restore: DismissedEmail[]): Promise
   const parsed = z.array(messageState).min(1).max(200).safeParse(restore);
   if (!parsed.success) return { changed: [], error: INVALID_SELECTION };
 
-  const user = await requireUser();
-  const core = await createCoreClient();
+  await requireUser();
   const supabase = await createClient();
-  const accountIds = await connectedAccountIds(core, user.id);
-  if (accountIds.length === 0) return { changed: [], error: 'No inbox connected.' };
 
   for (const message of parsed.data) {
     const { error } = await supabase
       .from('ingested_messages')
       .update({ parse_status: message.parseStatus, error: message.error })
-      .eq('id', message.id)
-      .in('email_account_id', accountIds);
+      .eq('id', message.id);
 
     if (error) return { changed: [], error: error.message };
   }
