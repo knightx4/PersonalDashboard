@@ -52,14 +52,26 @@ export const SPEND_OPERATIONS = {
     // Suggesting plan steps from the daily dev digest. Haiku; background.
     'suggest-from-digest',
   ],
+  news: [
+    // Reading one newsletter issue into its stories and a summary. Haiku, one
+    // call per issue; background, from the digest cron.
+    'digest-issue',
+    // Embedding a new issue's stories to find the same event in other
+    // newsletters. Voyage; background, beside the digest.
+    'group-stories',
+    // The one-off measurement script behind #872, run by hand. Voyage.
+    'measure-repeats',
+  ],
 } as const;
 
 export type JobsOperation = (typeof SPEND_OPERATIONS.jobs)[number];
 export type ShoppingOperation = (typeof SPEND_OPERATIONS.shopping)[number];
 export type CoreOperation = (typeof SPEND_OPERATIONS.core)[number];
+export type NewsOperation = (typeof SPEND_OPERATIONS.news)[number];
 
 /** A module and one of its operations, as a pair that cannot be mismatched. */
 export type SpendOperation =
   | { module: 'jobs'; operation: JobsOperation }
   | { module: 'shopping'; operation: ShoppingOperation }
-  | { module: 'core'; operation: CoreOperation };
+  | { module: 'core'; operation: CoreOperation }
+  | { module: 'news'; operation: NewsOperation };
