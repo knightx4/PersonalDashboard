@@ -26,6 +26,12 @@ import type { MatchVerdict } from '@/lib/jobs/evidence/match-payload';
 import type { PrepNote } from '@/lib/jobs/interview/prep-payload';
 
 import { writeRoundPrepNote } from './actions';
+import { PaidHint } from '@/components/ui/paid-hint';
+
+const PREP_HINT = {
+  action: 'app/jobs/(app)/roles/[id]/actions.ts#writeRoundPrepNote',
+  what: 'Cost of writing the prep note',
+} as const;
 
 /** What the page knows about one round's note before anything is pressed. */
 export type PrepNoteState = {
@@ -154,9 +160,12 @@ export function RoundPrep({
       <div className="mt-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           {heading}
-          <Button type="button" size="sm" disabled={pending} onClick={() => prepare(false)}>
-            {pending ? 'Preparing…' : 'Prepare me'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <PaidHint {...PREP_HINT} align="end" />
+            <Button type="button" size="sm" disabled={pending} onClick={() => prepare(false)}>
+              {pending ? 'Preparing…' : 'Prepare me'}
+            </Button>
+          </div>
         </div>
 
         {!error && (
@@ -302,14 +311,17 @@ export function RoundPrep({
         </div>
       </details>
 
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() => prepare(true)}
-        className="absolute right-0 top-0 text-small text-ink-muted underline underline-offset-2 hover:text-accent"
-      >
-        {pending ? 'Preparing…' : 'Regenerate'}
-      </button>
+      <div className="absolute right-0 top-0 flex items-center gap-2">
+        <PaidHint {...PREP_HINT} align="end" />
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => prepare(true)}
+          className="text-small text-ink-muted underline underline-offset-2 hover:text-accent"
+        >
+          {pending ? 'Preparing…' : 'Regenerate'}
+        </button>
+      </div>
     </div>
   );
 }

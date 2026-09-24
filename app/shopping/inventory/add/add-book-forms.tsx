@@ -16,6 +16,7 @@ import { Group } from '@/components/ui/disclosure';
 import { FieldError, Input, Label, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import type { CanonicalBook } from '@/lib/books/types';
+import { PaidHint } from '@/components/ui/paid-hint';
 
 /**
  * By-hand entry. The escape hatch for a book too new for any catalog — and
@@ -354,9 +355,15 @@ export function AddBookPasteForm() {
             placeholder={'Atomic Habits by James Clear\n9780143127550\nDune — Frank Herbert'}
           />
         </div>
-        <Button type="submit" disabled={previewPending} className="self-start">
-          {previewPending ? 'Resolving…' : 'Resolve list'}
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button type="submit" disabled={previewPending}>
+            {previewPending ? 'Resolving…' : 'Resolve list'}
+          </Button>
+          <PaidHint
+            action="app/shopping/inventory/add/actions.ts#previewPasteBookList"
+            what="Cost of reading the list"
+          />
+        </div>
       </form>
       <FieldError>{previewState.error ?? saveState.error}</FieldError>
       {saveState.message && <p className="text-body text-accent">{saveState.message}</p>}

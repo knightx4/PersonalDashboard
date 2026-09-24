@@ -27,6 +27,7 @@ import { cn } from '@/lib/cn';
 import { raisedHealth, type RaisedHealth } from '@/lib/dev/health';
 import { RAISED_HEALTH_WORD } from '@/lib/dev/words';
 import { RAISED_HEALTH_GLYPHS } from '@/lib/status-glyphs';
+import { PaidHint } from '@/components/ui/paid-hint';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -191,6 +192,10 @@ function Decide({ row }: { row: RaisedRow }) {
           <Button type="submit" size="sm" pending={pending}>
             Yes, do it
           </Button>
+        )}
+        {/* What is written beyond the yes is read by Dash as a comment. */}
+        {row.consequence && saying === 'more' && (
+          <PaidHint action="app/dev/raised/actions.ts#decideRaise" what="Cost of Dash's reply" />
         )}
         <Button
           type="button"

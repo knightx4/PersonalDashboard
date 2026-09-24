@@ -20,6 +20,7 @@ import {
   preparePhoto,
   UnsupportedImageError,
 } from '@/lib/images/prepare-photo';
+import { PaidHint } from '@/components/ui/paid-hint';
 
 /** Overlapping shots of one shelf see the same box twice. */
 function rowKey(row: ShelfRow): string {
@@ -136,6 +137,10 @@ export function GameShelfPhotoPanel() {
               ? 'Add more photos'
               : 'Choose photos'}
         </Button>
+        <PaidHint
+          action="app/shopping/inventory/add/games/actions.ts#extractGamesFromPhoto"
+          what="Cost of reading each photo"
+        />
         {rows.length > 0 && !reading && (
           <Button type="button" variant="ghost" size="sm" onClick={reset}>
             Start over

@@ -14,6 +14,8 @@ import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { InboxSyncBanner } from '@/components/shell/inbox-sync-banner';
 import { onboardingNeeded } from '@/lib/onboarding';
 import { countReviewItems } from '@/lib/review/load';
+import { estimatePaidActions, paidActionsUnder } from '@/lib/core/spend/paid-actions';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 
 /**
  * Shell for every signed-in section.
@@ -43,6 +45,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     raised,
     mainCheck,
     owner,
+    costs,
   ] = await Promise.all([
     supabase.from('profiles').select('display_name').eq('id', user.id).single(),
     countReviewItems(supabase, core, user.id),
@@ -53,6 +56,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     loadRaisedNotifications(user.id),
     loadMainCheck(),
     isOwner({ user }),
+    // Every paid button's $ hint in Shopping, from one read of the spend
+    // ledger (plan #918). The inbox import posts to an API route rather than
+    // an action, so its entry is named on its own.
+    estimatePaidActions(core, user.id, [
+      ...paidActionsUnder('app/shopping/'),
+      'app/api/inbox/sync/route.ts#POST',
+    ]).catch(() => ({})),
   ]);
 
   const brief = await loadShoppingBrief(user.id, settings.timezone, reviewCount);
@@ -95,7 +105,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         brief={brief}
         banner={<InboxSyncBanner accountIds={accountIds} initialJob={initialJob} />}
       >
-        {children}
+        <PaidCostsProvider costs={costs}>{children}</PaidCostsProvider>
       </AppShell>
     </div>
   );
