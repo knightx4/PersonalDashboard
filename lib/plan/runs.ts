@@ -187,6 +187,12 @@ export async function endQuietRuns(input: {
   now?: number;
   /** What has been pushed since these runs started, when somebody has read it. */
   pushes?: readonly Push[] | null;
+  /**
+   * The instant the listing starts from. A run started before it is judged on
+   * the clock: the listing cannot see its early pushes, and an empty slice of
+   * it is not evidence that the run pushed nothing.
+   */
+  pushesSince?: number;
 }): Promise<{ finished: number; failed: number; error: string | null }> {
   const now = input.now ?? Date.now();
   const nothing = { finished: 0, failed: 0 };
@@ -235,7 +241,9 @@ export async function endQuietRuns(input: {
       completedAt: null,
       blockedAt: null,
     };
-    if (!pushes) {
+    const listed =
+      input.pushesSince === undefined || new Date(row.created_at).getTime() >= input.pushesSince;
+    if (!pushes || !listed) {
       const end = runEnd({ status: 'started', createdAt: row.created_at }, step, now);
       if (end === 'finished') finished.push(row.id);
       if (end === 'failed') ended.push({ id: row.id, note: runQuietNote(row.created_at, now) });
@@ -348,6 +356,8 @@ export async function readRunLiveness(input: {
 }): Promise<{
   steps: Record<string, StepRunReading>;
   pushes: Push[];
+  /** Where the listing starts, or null when none was taken. */
+  since: number | null;
   error: string | null;
 }> {
   const now = input.now ?? Date.now();
@@ -357,14 +367,14 @@ export async function readRunLiveness(input: {
     .select('id, status, completed_at')
     .eq('user_id', input.userId)
     .eq('status', 'in_progress');
-  if (stepsError) return { steps: {}, pushes: [], error: stepsError.message };
+  if (stepsError) return { steps: {}, pushes: [], since: null, error: stepsError.message };
 
   const steps = (claimed ?? []) as Array<{
     id: string;
     status: string;
     completed_at: string | null;
   }>;
-  if (steps.length === 0) return { steps: {}, pushes: [], error: null };
+  if (steps.length === 0) return { steps: {}, pushes: [], since: null, error: null };
 
   const { data: runRows, error: runsError } = await input.supabase
     .from('plan_runs')
@@ -375,7 +385,7 @@ export async function readRunLiveness(input: {
       steps.map((step) => step.id),
     )
     .order('created_at', { ascending: false });
-  if (runsError) return { steps: {}, pushes: [], error: runsError.message };
+  if (runsError) return { steps: {}, pushes: [], since: null, error: runsError.message };
 
   // Newest first, so the first row seen for a step is the run that holds it.
   const latest = new Map<string, { id: string; created_at: string }>();
@@ -386,7 +396,7 @@ export async function readRunLiveness(input: {
   }>) {
     if (!latest.has(row.plan_item_id)) latest.set(row.plan_item_id, row);
   }
-  if (latest.size === 0) return { steps: {}, pushes: [], error: null };
+  if (latest.size === 0) return { steps: {}, pushes: [], since: null, error: null };
 
   const oldest = Math.min(...[...latest.values()].map((run) => new Date(run.created_at).getTime()));
   const { pushes, error: pushError } = await listPushes({ since: oldest, fetch: input.fetch });
@@ -415,7 +425,7 @@ export async function readRunLiveness(input: {
     };
   }
 
-  return { steps: readings, pushes, error: pushError };
+  return { steps: readings, pushes, since: oldest, error: pushError };
 }
 
 /**
@@ -473,13 +483,25 @@ export async function refreshRunReadings(input: {
   });
   // No evidence, so the sweep falls back to the clock exactly as the page's own
   // call does. #570: nothing repeats a reading nobody could take.
-  const pushes = live.error ? null : live.pushes;
+  //
+  // No listing is no evidence either. With nothing claimed through a button
+  // there is no listing, and on 24 September an empty one handed to the sweep
+  // wrote off the #922 and #936 sessions as having pushed nothing while both
+  // were merging to main, which freed their modules to the overnight runner.
+  const pushes = live.error || live.since === null ? null : live.pushes;
+  const pushesSince = live.since ?? undefined;
 
   const claimed = Object.entries(live.steps);
   if (claimed.length === 0) {
     // Nothing claimed has a run to ask about. The sweep still runs: a run whose
     // step closed is finished whatever is claimed now.
-    await endQuietRuns({ supabase: input.supabase, userId: input.userId, now, pushes });
+    await endQuietRuns({
+      supabase: input.supabase,
+      userId: input.userId,
+      now,
+      pushes,
+      pushesSince,
+    });
     return { readings: {}, written: 0, error: live.error };
   }
 
@@ -530,7 +552,7 @@ export async function refreshRunReadings(input: {
     written += group.ids.length;
   }
 
-  await endQuietRuns({ supabase: input.supabase, userId: input.userId, now, pushes });
+  await endQuietRuns({ supabase: input.supabase, userId: input.userId, now, pushes, pushesSince });
 
   return { readings, written, error: live.error };
 }
@@ -582,10 +604,7 @@ export async function reshapeUnderway(
  * One read of the account's runs rather than one per row: there are tens of
  * them, and the plan page wants the newest against every step it draws.
  */
-export async function loadLastRuns(
-  supabase: Db,
-  userId: string,
-): Promise<Record<string, LastRun>> {
+export async function loadLastRuns(supabase: Db, userId: string): Promise<Record<string, LastRun>> {
   const { data, error } = await supabase
     .from('plan_runs')
     .select(
@@ -648,12 +667,14 @@ export async function loadRunRaises(supabase: Db, userId: string): Promise<RunRa
     return [];
   }
 
-  return ((data ?? []) as Array<{
-    id: string;
-    title: string;
-    source: string | null;
-    created_at: string;
-  }>).map((row) => ({
+  return (
+    (data ?? []) as Array<{
+      id: string;
+      title: string;
+      source: string | null;
+      created_at: string;
+    }>
+  ).map((row) => ({
     id: row.id,
     title: row.title,
     source: row.source,

@@ -228,6 +228,25 @@ describe('endQuietRuns', () => {
     expect(updates).toEqual([]);
   });
 
+  it('judges a run older than the listing on the clock, not on the listing', async () => {
+    // The #922 session on 24 September: fired 40 minutes before, merging to
+    // main all along, and handed a listing that started after its pushes.
+    const { supabase, updates } = db([
+      { id: 'run-1', plan_item_id: 'feature-1', created_at: minutesAgo(40) },
+    ]);
+
+    const result = await endQuietRuns({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      pushes: [],
+      pushesSince: NOW - 5 * 60_000,
+    });
+
+    expect(result).toEqual({ finished: 0, failed: 0, error: null });
+    expect(updates).toEqual([]);
+  });
+
   it('ends a run that has pushed nothing for two hours, saying what it last did', async () => {
     const { supabase, updates } = db([
       { id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(300) },
@@ -607,6 +626,26 @@ describe('refreshRunReadings', () => {
     });
 
     expect(result).toEqual({ readings: {}, written: 0, error: null });
+    expect(writes).toEqual([]);
+    vi.unstubAllEnvs();
+  });
+
+  it('does not write off a run as silent when no listing was taken', async () => {
+    // Nothing claimed through a button, so nothing asked GitHub. A feature run
+    // 40 minutes in must not read that as having pushed nothing.
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, writes } = db(
+      [],
+      [{ id: 'run-1', plan_item_id: 'feature-1', created_at: minutesAgo(40) }],
+    );
+
+    await refreshRunReadings({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      fetch: github([]) as never,
+    });
+
     expect(writes).toEqual([]);
     vi.unstubAllEnvs();
   });
