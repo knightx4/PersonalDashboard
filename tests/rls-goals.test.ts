@@ -632,6 +632,128 @@ describe('weekly suggestions (plan #934)', () => {
   });
 });
 
+describe('collections and records (plan #953)', () => {
+  const loans = [
+    { key: 'name', label: 'Name', type: 'text' },
+    { key: 'balance', label: 'Balance', type: 'money', tracked: true },
+    { key: 'rate', label: 'Rate', type: 'percent' },
+    { key: 'kind', label: 'Kind', type: 'choice', options: ['Federal', 'Private'] },
+  ];
+  let collection = '';
+
+  beforeAll(async () => {
+    const [row] = await asUser(userA, (tx) => tx<{ id: string; version: number }[]>`
+      insert into collections (user_id, name, fields, version)
+      values (${userA}, 'Loans', ${JSON.stringify(loans)}::text::jsonb, 7) returning id, version`);
+    collection = row.id;
+    expect(row.version).toBe(1);
+    await asUser(userA, (tx) => tx`
+      insert into collection_goals (user_id, collection_id, goal_id)
+      values (${userA}, ${collection}, ${goalA})`);
+  });
+
+  async function addLoan(data: Record<string, unknown>): Promise<string> {
+    const [row] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into records (user_id, collection_id, data)
+      values (${userA}, ${collection}, ${JSON.stringify(data)}::text::jsonb) returning id`);
+    return row.id;
+  }
+
+  it('refuses a value that breaks its definition, with the field named', async () => {
+    await expect(addLoan({ name: 'Loan 1', rate: 'seven' })).rejects.toMatchObject({
+      message: 'records: Rate must be a percentage',
+      detail: 'rate',
+      constraint_name: 'records_values',
+    });
+    await expect(addLoan({ balance: 18250.405 })).rejects.toThrow(/Balance must be an amount of money/);
+    await expect(addLoan({ kind: 'State' })).rejects.toThrow(/Kind must be one of its options/);
+    await expect(addLoan({ colour: 'blue' })).rejects.toThrow(/Loans has no field colour/);
+    // Claude writing straight through SQL is held to the same check.
+    await expect(
+      admin`insert into records (user_id, collection_id, data)
+            values (${userA}, ${collection}, '{"rate": "high"}'::jsonb)`,
+    ).rejects.toThrow(/Rate must be a percentage/);
+  });
+
+  it('writes a reading when a tracked field changes, and only then', async () => {
+    const loan = await addLoan({ name: 'Loan 1', balance: 18250.4, rate: 6.8 });
+    await asUser(userA, (tx) => tx`
+      update records set data = data || '{"rate": 7.1}'::jsonb where id = ${loan}`);
+    await asUser(userA, (tx) => tx`
+      update records set data = data || '{"balance": 18000}'::jsonb where id = ${loan}`);
+
+    const readings = await admin<{ value: string; field: string; item_id: string | null }[]>`
+      select value::text, field, item_id from readings where record_id = ${loan} order by created_at`;
+    expect(readings).toEqual([
+      { value: '18250.4', field: 'balance', item_id: null },
+      { value: '18000', field: 'balance', item_id: null },
+    ]);
+    const history = await historyOf(loan);
+    expect(history.map((h) => [h.table_name, h.action, h.actor])).toEqual([
+      ['records', 'insert', 'me'],
+      ['records', 'update', 'me'],
+      ['records', 'update', 'me'],
+    ]);
+  });
+
+  it('raises the version on a definition change and keeps old records intact', async () => {
+    const loan = await addLoan({ name: 'Loan 2', kind: 'Federal' });
+    const revised = [
+      ...loans.map((f) => (f.key === 'kind' ? { ...f, options: ['Private'] } : f)),
+      { key: 'due_day', label: 'Due day', type: 'day_of_month' },
+    ];
+    const [after] = await asUser(userA, (tx) => tx<{ version: number }[]>`
+      update collections set fields = ${JSON.stringify(revised)}::text::jsonb, version = 1
+      where id = ${collection} returning version`);
+    expect(after.version).toBe(2);
+
+    // The old answer is kept, and an edit to another field leaves it alone.
+    await asUser(userA, (tx) => tx`
+      update records set data = data || '{"due_day": 15}'::jsonb where id = ${loan}`);
+    const [row] = await admin<{ data: Record<string, unknown>; version: number }[]>`
+      select data, version from records where id = ${loan}`;
+    expect(row).toEqual({ data: { name: 'Loan 2', kind: 'Federal', due_day: 15 }, version: 2 });
+
+    await expect(
+      asUser(userA, (tx) => tx`
+        update collections set fields = ${JSON.stringify(loans.slice(1))}::text::jsonb where id = ${collection}`),
+    ).rejects.toThrow(/cannot be taken out/);
+    await expect(
+      asUser(userA, (tx) => tx`
+        update collections
+        set fields = ${JSON.stringify(revised.map((f) => (f.key === 'rate' ? { ...f, type: 'number' } : f)))}::text::jsonb
+        where id = ${collection}`),
+    ).rejects.toThrow(/stays a percent/);
+  });
+
+  it('holds a one-record collection to one live record', async () => {
+    const [budget] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into collections (user_id, name, shape, fields)
+      values (${userA}, 'Budget', 'one', '[{"key": "rent", "label": "Rent", "type": "money"}]'::jsonb)
+      returning id`);
+    await asUser(userA, (tx) => tx`
+      insert into records (user_id, collection_id, data) values (${userA}, ${budget.id}, '{"rent": 2100}'::jsonb)`);
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into records (user_id, collection_id, data) values (${userA}, ${budget.id}, '{}'::jsonb)`),
+    ).rejects.toThrow(/holds one record/);
+  });
+
+  it("keeps each account's collections and records to itself", async () => {
+    const seen = await asUser(userB, (tx) => tx`select id from records`);
+    expect(seen).toHaveLength(0);
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into records (user_id, collection_id, data) values (${userB}, ${collection}, '{}'::jsonb)`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into collection_goals (user_id, collection_id, goal_id)
+        values (${userB}, ${collection}, ${goalA})`),
+    ).rejects.toThrow();
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`
@@ -662,11 +784,14 @@ describe('RLS coverage', () => {
     expect(tables.map((r) => r.tablename)).toEqual([
       'areas',
       'captures',
+      'collection_goals',
+      'collections',
       'item_goals',
       'items',
       'links',
       'periods',
       'readings',
+      'records',
       'runs',
       'suggestions',
     ]);
