@@ -522,6 +522,56 @@ describe('approval once per goal (plan #932)', () => {
   });
 });
 
+describe('Claude results on steps (plan #933)', () => {
+  async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  it('stores a result on a Claude step, and only you mark it read', async () => {
+    const [step] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'claude', 'List the three cheapest cards') returning id`);
+
+    await asClaude((tx) => tx`
+      update items set result = 'Card A at 0%', result_url = 'https://example.test/cards',
+        status = 'done'
+      where id = ${step.id}`);
+    await expect(
+      asClaude((tx) => tx`update items set reviewed_at = now() where id = ${step.id}`),
+    ).rejects.toThrow(/mark a result reviewed/);
+
+    await asUser(userA, (tx) => tx`update items set reviewed_at = now() where id = ${step.id}`);
+    const [row] = await admin<{ status: string; read: boolean }[]>`
+      select status, reviewed_at is not null as read from items where id = ${step.id}`;
+    expect(row).toEqual({ status: 'done', read: true });
+
+    const history = await historyOf(step.id);
+    expect(history.map((h) => h.actor)).toEqual(['me', 'claude', 'me']);
+  });
+
+  it('keeps results to Claude steps, with a link that is a web address', async () => {
+    const [mine] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Call the bank') returning id`;
+    await expect(
+      admin`update items set result = 'Done' where id = ${mine.id}`,
+    ).rejects.toThrow(/items_result_kind_ck/);
+
+    const [claude] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'claude', 'Draft the letter') returning id`;
+    await expect(
+      admin`update items set result_url = 'javascript:alert(1)' where id = ${claude.id}`,
+    ).rejects.toThrow(/items_result_url_ck/);
+    await expect(
+      admin`update items set reviewed_at = now() where id = ${claude.id}`,
+    ).rejects.toThrow(/items_reviewed_at_ck/);
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`

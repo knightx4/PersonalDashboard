@@ -1,6 +1,6 @@
 ---
 name: goals
-description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Shaping - read a new or vague goal and propose steps under it, with one or two questions for the person. Re-shaping - read the answers to those questions and turn them into steps. After the person approves a goal, add, split and reorder its steps without asking. Use when the goals routine is fired from "Work on this" on a goal, or the user says "shape my goal …", "break down <goal>", "work on my goals".
+description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Shaping - read a new or vague goal and propose steps under it, with one or two questions for the person. Re-shaping - read the answers to those questions and turn them into steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Use when the goals routine is fired from "Work on this" on a goal or by the morning run, or the user says "shape my goal …", "break down <goal>", "work on my goals".
 ---
 
 # Working a goal
@@ -36,14 +36,14 @@ refusal is the rule working, so read the message and do what it says instead
 of looking for another way round.
 
 Never write `closed_at` (a trigger keeps it), `goals.history` (triggers write
-it), `approved_at`, or a question's `resolution`.
+it), `approved_at`, `reviewed_at`, or a question's `resolution`.
 
 ## The run row
 
 Every run has a `goals.runs` row.
 
-- Fired from **Work on this**: the app has written the row as `started`, and
-  its id is in your brief. Use it.
+- Fired from **Work on this** or by the **morning run**: the app has written
+  the row as `started`, and its id is in your brief. Use it.
 - Started any other way: write one first, with `job` `goal` and `item_id` for
   one goal, or `daily` / `weekly` for a scheduled run, and use its id.
 
@@ -153,11 +153,44 @@ as option A.
 Nothing is deleted. Archive with `archived_at = now()` where you are allowed
 to, and delete only a row you wrote by mistake in this same run.
 
+## The morning run
+
+The daily cron fires the routine each morning when a `claude` step is ready
+(`inngest/goals/daily.ts`), with a brief listing those steps and the
+`goals.runs` row it wrote with `job` `daily`. Work only the steps it names.
+For each one:
+
+1. Read the step, its goal and the steps around it, as in "Reading the goal".
+   The title and `acceptance` say what to produce; the goal says what it is
+   for.
+2. Produce it: a research note, a draft, a list. Write it for the person to
+   read on a phone: plain words, the answer first, sources as links where
+   you used any. Use web search where the step needs current facts.
+3. Store it on the step and close the step in one write. `result` is the text
+   itself (up to 100,000 characters). `result_url` is optional, for when it
+   also lives at a link. Only a `claude` step takes either.
+
+   ```sql
+   set local goals.actor = 'claude';
+   set local goals.run_id = '<the run id>';
+   update goals.items
+   set result = '<what you produced>', result_url = null, status = 'done'
+   where id = '<step id>' and user_id = '<user>' and kind = 'claude';
+   ```
+
+The home then lists the step under "Waiting on you" until the person presses
+**Mark read**. Never write `reviewed_at`: reading it is theirs, and the guard
+refuses it.
+
+A step you cannot finish (it needs something only the person has, or the
+facts are not findable) stays open with no result. Say why in the run
+summary, and where a question would unblock it, add it as a question step
+under the same goal. The summary names each step worked and each one left.
+
 ## Stopping
 
 This routine writes rows and nothing else: there is no code to change and
 nothing to commit. Close the run row, then end with the same summary in your
 reply.
 
-Working the `claude` steps (research, drafts) is the daily run's job, not
-this one (plan #933), and weekly event research is #934.
+Weekly event research is plan #934, not this routine's job yet.

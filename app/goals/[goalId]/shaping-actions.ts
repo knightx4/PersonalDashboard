@@ -7,11 +7,18 @@ import { isOwner } from '@/lib/dev/owner';
 import { goalsRoutine } from '@/lib/feedback/routine';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { runInFlight } from '@/lib/goals/shaping';
-import { answerQuestion, approveGoal, loadShaping, startGoalRun } from '@/lib/goals/shaping-store';
+import {
+  answerQuestion,
+  approveGoal,
+  loadShaping,
+  markReviewed,
+  startGoalRun,
+} from '@/lib/goals/shaping-store';
 
 /**
  * Claude shaping a goal (plan #932): start a run on it, approve what it
- * proposed, and answer the questions it asked. Each returns a sentence to
+ * proposed, and answer the questions it asked. And marking what the morning
+ * run produced for a step as read (plan #933). Each returns a sentence to
  * show rather than throwing.
  */
 
@@ -117,6 +124,24 @@ export async function answerQuestionAction(
     if (!answered) return { error: 'That question has already been answered or is gone.' };
   } catch {
     return { error: 'The answer could not be saved. Try again.' };
+  }
+  return saved();
+}
+
+/** Mark a Claude step's result as read, which takes it off the home's list. */
+// latency: pending
+export async function reviewResultAction(
+  _prev: ShapingActionState,
+  form: FormData,
+): Promise<ShapingActionState> {
+  await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which step that was.' };
+  try {
+    const marked = await markReviewed(await createGoalsClient(), id.data);
+    if (!marked) return { error: 'That result has already been marked read or is gone.' };
+  } catch {
+    return { error: 'Could not mark it read. Try again.' };
   }
   return saved();
 }

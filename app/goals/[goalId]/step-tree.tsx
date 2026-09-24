@@ -28,6 +28,7 @@ import {
   type StepKind,
   type StepNode,
 } from '@/lib/goals/steps';
+import { awaitsReview } from '@/lib/goals/daily';
 import { canShowOnTodo } from '@/lib/goals/todo';
 import { progressLine, type RhythmRecord } from '@/lib/goals/rhythms';
 import {
@@ -42,7 +43,11 @@ import {
   unlinkStepAction,
   type StepActionState,
 } from './actions';
-import { answerQuestionAction, type ShapingActionState } from './shaping-actions';
+import {
+  answerQuestionAction,
+  reviewResultAction,
+  type ShapingActionState,
+} from './shaping-actions';
 
 /**
  * A goal's full tree (plan #925).
@@ -384,7 +389,7 @@ function StepItem({
   ].filter(Boolean);
 
   return (
-    <li className="py-1">
+    <li id={`step-${node.id}`} className="scroll-mt-4 py-1">
       <div className="flex items-start gap-1 px-2">
         {hasChildren ? (
           <button
@@ -444,6 +449,7 @@ function StepItem({
           {node.kind === 'decision' && node.status === 'open' && node.resolution === null && (
             <AnswerForm id={node.id} title={node.title} />
           )}
+          {awaitsReview(node) && <ClaudeResult node={node} />}
           {editState.error && <p className="px-1 text-small text-danger">{editState.error}</p>}
           {details && (
             <StepDetails node={node} links={stepLinks} otherGoals={otherGoals} edit={edit} />
@@ -504,6 +510,43 @@ function AnswerForm({ id, title }: { id: string; title: string }) {
         {state.error && <span className="text-small text-danger">{state.error}</span>}
       </div>
     </form>
+  );
+}
+
+/**
+ * What the morning run produced for a Claude step (plan #933): the note or
+ * draft, its link when it has one, and while it is unread a button to mark it
+ * read, which takes it off the home. Once read it moves into the details.
+ */
+function ClaudeResult({ node }: { node: StepNode }) {
+  const [state, review, reviewing] = useActionState(reviewResultAction, answerInitial);
+  const unread = node.reviewedAt === null;
+  return (
+    <div className="mt-1 space-y-1 px-1">
+      <p className="text-small text-ink-muted">{unread ? 'Claude’s result, to read' : 'Claude’s result'}</p>
+      {node.result && (
+        <p className="text-small break-words whitespace-pre-wrap text-ink">{node.result}</p>
+      )}
+      {node.resultUrl && (
+        <a
+          href={node.resultUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="block text-small break-all text-ink underline"
+        >
+          {node.resultUrl}
+        </a>
+      )}
+      {unread && (
+        <form action={review} className="flex items-center gap-2">
+          <input type="hidden" name="id" value={node.id} />
+          <Button type="submit" size="sm" variant="secondary" pending={reviewing}>
+            Mark read
+          </Button>
+          {state.error && <span className="text-small text-danger">{state.error}</span>}
+        </form>
+      )}
+    </div>
   );
 }
 
@@ -603,6 +646,9 @@ function StepDetails({
           <span className="text-ink-muted">Answer: </span>
           {node.resolution}
         </p>
+      )}
+      {node.kind === 'claude' && !awaitsReview(node) && (node.result || node.resultUrl) && (
+        <ClaudeResult node={node} />
       )}
       <div className="flex flex-wrap items-center gap-2">
         <form action={edit}>

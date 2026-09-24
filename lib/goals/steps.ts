@@ -70,6 +70,12 @@ export type Step = {
   rhythmPeriod: RhythmPeriod | null;
   /** Whether you pressed Show on Todo on it (plan #927). */
   onTodo: boolean;
+  /** What Claude produced for a `claude` step: the note or draft (plan #933). */
+  result: string | null;
+  /** Where that result also lives, when it has a link. */
+  resultUrl: string | null;
+  /** When you marked the result read; null while it waits on you. */
+  reviewedAt: string | null;
 };
 
 export type StepNode = Step & { children: StepNode[] };

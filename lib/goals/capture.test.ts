@@ -51,6 +51,9 @@ function step(id: string, parentId: string, extra: Partial<Step> = {}): Step {
     rhythmCount: null,
     rhythmPeriod: null,
     onTodo: false,
+    result: null,
+    resultUrl: null,
+    reviewedAt: null,
     ...extra,
   };
 }
