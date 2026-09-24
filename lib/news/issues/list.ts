@@ -87,11 +87,14 @@ export function unreadTopics(
 export function listHref({
   from,
   topic,
+  view = 'latest',
 }: {
   from: string | null;
   topic: NewsTopic | null;
+  view?: ListView;
 }): string {
   const query = new URLSearchParams();
+  if (view === 'newsletters') query.set('view', 'newsletters');
   if (from) query.set('from', from);
   if (topic) query.set('topic', topic);
   const search = query.toString();
@@ -172,4 +175,49 @@ export function issueHref(
   if (from) query.set('from', from);
   const search = query.toString();
   return search ? `/news/i/${id}?${search}` : `/news/i/${id}`;
+}
+
+/**
+ * The two ways the list is read (note 20a58f93): every issue newest first, or
+ * one row per newsletter that opens onto that newsletter's editions.
+ */
+export type ListView = 'latest' | 'newsletters';
+
+export function readListView(value: string | undefined): ListView {
+  return value === 'newsletters' ? 'newsletters' : 'latest';
+}
+
+/** One newsletter in the by-newsletter view, with what it has sent. */
+export type NewsletterRow = {
+  sender: NewsSender;
+  editions: number;
+  unread: number;
+  latest: NewsIssue;
+};
+
+/**
+ * One row per sender that has an issue in the list, the one that wrote most
+ * recently first, so the by-newsletter view still opens on what is new.
+ * Muted senders are listed as well: picking one is how their issues are read,
+ * the same as in the sender column.
+ */
+export function newsletterRows(
+  issues: readonly NewsIssue[],
+  senders: readonly NewsSender[],
+): NewsletterRow[] {
+  const byId = new Map(senders.map((sender) => [sender.id, sender]));
+  const rows = new Map<string, NewsletterRow>();
+  for (const issue of issues) {
+    const sender = byId.get(issue.senderId);
+    if (!sender) continue;
+    const row = rows.get(sender.id);
+    if (!row) {
+      rows.set(sender.id, { sender, editions: 1, unread: issue.readAt ? 0 : 1, latest: issue });
+      continue;
+    }
+    row.editions += 1;
+    if (!issue.readAt) row.unread += 1;
+    if (issue.receivedAt > row.latest.receivedAt) row.latest = issue;
+  }
+  return [...rows.values()].sort((a, b) => b.latest.receivedAt.localeCompare(a.latest.receivedAt));
 }

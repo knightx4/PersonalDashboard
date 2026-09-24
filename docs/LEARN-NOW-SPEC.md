@@ -143,7 +143,7 @@ them.
 
 The catalogue is empty, so the feed has to fill it. A background pass keeps
 about twenty cards ready per person, and runs hourly and whenever the ready
-count drops below ten.
+count drops to seven or fewer.
 
 1. **Pick a target.** Three in four draws take a strong theme, weighted by
    strength; one in four takes a gap field. The draw skips anything with a
@@ -164,8 +164,9 @@ count drops below ten.
    model, so it always names the right field and reason.
 
 The hourly run tops up anyone with fewer than twenty ready cards. After a
-response on the feed page, it runs only once fewer than ten are ready. It
-writes the picked rows first and picks more targets only when they run out.
+response on the feed page, it runs only once seven or fewer are ready, and
+then writes fifteen. It writes the picked rows first and picks more targets
+only when they run out.
 
 Wikipedia first, because it needs no key and its text can be shown. Lecture
 clips join once the catalogue has courses in it (plan #789).
@@ -212,7 +213,7 @@ but Test me after a Save moves it again.
 
 A pass, by Next or by scrolling, takes a card out of the ready pool like the
 other actions, and asks for a top-up once the response has gone, so passing
-enough cards to leave fewer than ten ready starts more being written. Cards
+enough cards to leave seven or fewer ready starts more being written. Cards
 still ready stay in the pool while they are on the screen, so the page keeps the
 list of cards already shown and asks only for others. A card that never reached
 the screen, or that you scrolled back up away from, comes back on your next

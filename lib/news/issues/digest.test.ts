@@ -4,6 +4,7 @@ import {
   digestIssue,
   readDigest,
   readLine,
+  writeDigest,
   DIGEST_MODEL,
   DIGEST_OPERATION,
   LINE_CHARS,
@@ -631,5 +632,30 @@ describe('reading the line', () => {
     expect(long.length).toBeGreaterThan(LINE_CHARS);
     expect(line).toBe('The Fed holds rates, oil slides on supply news, and three startups raise money this week…');
     expect(line!.length).toBeLessThanOrEqual(LINE_CHARS);
+  });
+});
+
+describe('the Local topic (note 552a9407)', () => {
+  const localReport = reported({
+    line: 'City hall.',
+    summary: 'A city story.',
+    stories: [{ headline: 'Mayor', summary: 'The mayor spoke.', topic: 'Local' }],
+  });
+  const source = { subject: 'Today', textBody: 'The mayor spoke.', htmlBody: null };
+
+  it('names the reader\'s area to the model and keeps Local', async () => {
+    const haiku = model(localReport);
+    const digest = await writeDigest(source, { client: haiku.client, localArea: 'NYC' });
+    const message = haiku.create.mock.calls[0][0].messages[0].content as string;
+    expect(message.startsWith("Reader's local area: NYC\n")).toBe(true);
+    expect(digest.stories[0].topic).toBe('Local');
+  });
+
+  it('reads Local as Other when no area is set', async () => {
+    const haiku = model(localReport);
+    const digest = await writeDigest(source, { client: haiku.client });
+    const message = haiku.create.mock.calls[0][0].messages[0].content as string;
+    expect(message).not.toContain('local area');
+    expect(digest.stories[0].topic).toBe('Other');
   });
 });

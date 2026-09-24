@@ -6,6 +6,7 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import {
+  READY_BATCH,
   READY_LOW,
   READY_TARGET,
   runTopUpFor,
@@ -137,7 +138,7 @@ async function createContext(): Promise<Context> {
 async function topUpWith(
   context: Context,
   userId: string,
-  options: { threshold: number; deadline: number },
+  options: { threshold: number; target?: number; deadline: number },
 ): Promise<TopUpSummary> {
   const { learn, core, apiKey, pickFor } = context;
   let written: Set<string> | null = null;
@@ -193,7 +194,12 @@ async function topUpWith(
     now: Date.now,
   };
 
-  return runTopUpFor(ports, { userId, threshold: options.threshold, target: READY_TARGET, deadline: options.deadline });
+  return runTopUpFor(ports, {
+    userId,
+    threshold: options.threshold,
+    target: options.target ?? READY_TARGET,
+    deadline: options.deadline,
+  });
 }
 
 export type FeedTopUpResult = { people: TopUpSummary[] };
@@ -215,8 +221,8 @@ export async function runFeedTopUp(): Promise<FeedTopUpResult> {
 }
 
 /**
- * Top up one person after a response on the feed page, when fewer than ten
- * cards are ready. For the page's server action to call inside `after()`:
+ * Top up one person after a response on the feed page, when seven or fewer
+ * cards are ready, by fifteen more. For the page's server action to call inside `after()`:
  *
  *   after(() => topUpFeedAfterResponse(user.id));
  *
@@ -226,10 +232,12 @@ export async function runFeedTopUp(): Promise<FeedTopUpResult> {
 export async function topUpFeedAfterResponse(userId: string): Promise<TopUpSummary | null> {
   try {
     // One count first, so a response with plenty of cards ready costs no more.
-    if ((await countReady(createLearnServiceSupabase(), userId)) >= READY_LOW) return null;
+    const ready = await countReady(createLearnServiceSupabase(), userId);
+    if (ready >= READY_LOW) return null;
     const context = await createContext();
     return await topUpWith(context, userId, {
       threshold: READY_LOW,
+      target: ready + READY_BATCH,
       deadline: Date.now() + FEED_TOP_UP_AFTER_RESPONSE_MS,
     });
   } catch (error) {

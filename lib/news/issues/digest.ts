@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { usageFrom } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
+import type { NewsOperation } from '@/lib/core/spend/operations';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { forceTool } from '@/lib/learn/graph/tool-call';
 import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
@@ -59,7 +60,7 @@ import { FALLBACK_TOPIC, NEWS_TOPICS, readTopic } from '@/lib/news/issues/topics
 export const DIGEST_MODEL = 'claude-haiku-4-5';
 
 /** The name this call has in core.model_spend. Stable: renaming it splits the history. */
-export const DIGEST_OPERATION = 'digest-issue';
+export const DIGEST_OPERATION: NewsOperation = 'digest-issue';
 
 const TOOL_NAME = 'report_digest';
 
@@ -127,6 +128,11 @@ that belongs to a different story.
 TOPIC. For each story, pick the one topic from this list that fits it best:
 ${NEWS_TOPICS.join(', ')}. Judge by what the story is about, not by what the
 newsletter usually covers. Use Other only when none of the rest fits.
+
+LOCAL. The message may name the reader's local area. A story mainly about that
+place, such as its city government, mayor, transit, schools, neighbourhoods or
+events there, is Local, even where another topic would also fit. When no local
+area is named, never pick Local.
 
 ONE ESSAY. When the issue is a single article or essay rather than a set of
 items, the summary covers it and the story list is empty. Do not cut one essay
@@ -429,7 +435,12 @@ export function readDigest(
  */
 export async function writeDigest(
   source: DigestSource,
-  options: { client: Pick<Anthropic, 'messages'>; onSpend?: (report: SpendReport) => void },
+  options: {
+    client: Pick<Anthropic, 'messages'>;
+    onSpend?: (report: SpendReport) => void;
+    /** Where the reader lives, from news.preferences, for the Local topic. */
+    localArea?: string | null;
+  },
 ): Promise<Digest> {
   const { text, links, images } = bodyText(source);
   if (!text) throw new Error('The issue has no text to summarise.');
@@ -443,7 +454,14 @@ export async function writeDigest(
     messages: [
       {
         role: 'user',
-        content: [`Subject: ${source.subject ?? '(none)'}`, '', text].join('\n'),
+        // The local area goes in the message rather than the system prompt,
+        // so the prompt stays one fixed string for every reader.
+        content: [
+          ...(options.localArea ? [`Reader's local area: ${options.localArea}`] : []),
+          `Subject: ${source.subject ?? '(none)'}`,
+          '',
+          text,
+        ].join('\n'),
       },
     ],
   });
@@ -461,6 +479,12 @@ export async function writeDigest(
   }
   const digest = readDigest(block.input, links, images);
   if (typeof digest === 'string') throw new Error(digest);
+  // Local means the reader's own place, so with none named it cannot be right.
+  if (!options.localArea) {
+    for (const story of digest.stories) {
+      if (story.topic === 'Local') story.topic = FALLBACK_TOPIC;
+    }
+  }
   return digest;
 }
 
@@ -499,6 +523,14 @@ export async function digestIssue(input: {
 
   const reports: SpendReport[] = [];
 
+  // Read before the call, and a failed read only costs the Local topic.
+  const { data: preferences } = await input.news
+    .from('preferences')
+    .select('local_area')
+    .eq('user_id', input.userId)
+    .maybeSingle();
+  const localArea = (preferences?.local_area as string | null | undefined) ?? null;
+
   let outcome: Exclude<DigestOutcome, { status: 'missing' }>;
   try {
     const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
@@ -508,7 +540,7 @@ export async function digestIssue(input: {
         textBody: data.text_body as string | null,
         htmlBody: data.html_body as string | null,
       },
-      { client, onSpend: (report) => reports.push(report) },
+      { client, onSpend: (report) => reports.push(report), localArea },
     );
     outcome = { status: 'digested', ...digest };
   } catch (failure) {
