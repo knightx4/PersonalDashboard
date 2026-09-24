@@ -33,6 +33,7 @@ import {
   Shapes,
   StickyNote,
   Tag,
+  Target,
   Timer,
   Undo2,
   Users,
@@ -103,6 +104,8 @@ export const NAV_ICONS = {
   tracks: BookOpen,
   readNow: BookOpenCheck,
   know: Network,
+  // Goals: the things you want to learn and how well (plan #897).
+  goals: Target,
   // Practice Flow, and so Learn's front page. Still the clock it had as the
   // five-minute session: the question mark is already the dev workspace's
   // raised tab.

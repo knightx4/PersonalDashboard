@@ -78,3 +78,67 @@ export function cardDepthForAim(depth: AimDepth): Depth {
       return 'specialist';
   }
 }
+
+/** What the page calls each depth, with the line that says what it means. */
+export const AIM_DEPTH_LABELS: Record<AimDepth, { label: string; means: string }> = {
+  familiar: { label: 'Familiar', means: 'enough to recognise it and follow a conversation' },
+  solid: { label: 'Solid', means: 'enough to use it and explain it' },
+  deep: { label: 'Deep', means: 'the detail a specialist would expect' },
+};
+
+/** The ready-made goal the Goals page offers in one press. */
+export const LEVEL3_AIM_NAME = 'Every Level 3 vital article';
+
+export const AIM_NAME_MAX = 200;
+export const AIM_ABOUT_MAX = 1000;
+
+/** The fields a goal's form sends, read and checked. */
+export type AimFields = { name: string; about: string | null; depth: AimDepth };
+
+/**
+ * Read a goal's name, line and depth from a form, or say what is wrong with
+ * them. The limits are the table's (0044_aims.sql), checked here so the
+ * person gets a sentence instead of a constraint name.
+ *
+ * `partial` is for an edit, which sends only the field that changed: a
+ * missing field is left out of the result instead of being an error.
+ */
+export function parseAimFields(
+  get: (key: string) => unknown,
+  { partial = false }: { partial?: boolean } = {},
+): { ok: true; fields: Partial<AimFields> } | { ok: false; error: string } {
+  const fields: Partial<AimFields> = {};
+
+  const name = get('name');
+  if (typeof name === 'string') {
+    const trimmed = name.trim();
+    if (trimmed === '') return { ok: false, error: 'A goal needs a name.' };
+    if (trimmed.length > AIM_NAME_MAX) {
+      return { ok: false, error: `Keep the name under ${AIM_NAME_MAX} characters.` };
+    }
+    fields.name = trimmed;
+  } else if (!partial) {
+    return { ok: false, error: 'A goal needs a name.' };
+  }
+
+  const about = get('about');
+  if (typeof about === 'string') {
+    const trimmed = about.trim();
+    if (trimmed.length > AIM_ABOUT_MAX) {
+      return { ok: false, error: `Keep the line under ${AIM_ABOUT_MAX} characters.` };
+    }
+    fields.about = trimmed === '' ? null : trimmed;
+  } else if (!partial) {
+    fields.about = null;
+  }
+
+  const depth = get('depth');
+  if (depth !== null && depth !== undefined) {
+    if (!isAimDepth(depth)) return { ok: false, error: 'Pick familiar, solid or deep.' };
+    fields.depth = depth;
+  } else if (!partial) {
+    fields.depth = 'familiar';
+  }
+
+  return { ok: true, fields };
+}
