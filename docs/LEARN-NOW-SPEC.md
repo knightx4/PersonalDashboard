@@ -130,7 +130,10 @@ for a goal instead, and the other two keep the three-to-one split (plan #900).
 The share is counted from when the oldest active goal was set, so a first goal
 added after months of cards is not flooded to catch up. A goal card's why line
 names the goal, and it starts at the depth set on the goal: familiar, solid and
-deep pick at working, advanced and specialist. The Level 3 goal is drawn from
+deep pick at working, advanced and specialist. From there it moves the way a
+theme does, counted by goal (plan #909): two goal cards marked Got it take a
+familiar goal from working to advanced, and cards you said you need to work on
+come back from another angle rather than deeper. The Level 3 goal is drawn from
 its own list instead (plan #910).
 
 Your own queued readings are served before either, in the order you queued

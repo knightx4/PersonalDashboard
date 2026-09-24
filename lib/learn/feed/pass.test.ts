@@ -178,6 +178,7 @@ describe('running the pass once', () => {
     const progress = {
       themes: new Map([['t0', { known: ['A', 'B'], review: ['C'], tooHard: [], tooEasy: [] }]]),
       fields: new Map(),
+      aims: new Map(),
     };
     const run = ports({ loaded: person({ themes: person().themes.slice(0, 1), progress }) });
     const depths: unknown[] = [];
@@ -249,6 +250,28 @@ describe('running the pass once', () => {
       expect(card.aim_id).toBeNull();
       expect(card.aim_name).toBeNull();
     }
+  });
+
+  it('names a goal past the cards swiped known on it, with its needs-work cards to come at differently', async () => {
+    const goals = [{ id: 'g1', name: 'Startup finance', about: null, depth: 'working' as const, field: null, domain: null }];
+    const progress = {
+      themes: new Map(),
+      fields: new Map(),
+      aims: new Map([['g1', { known: ['Runway: Burn', 'SaaS: Retention'], review: ['Cap table: Pro rata'], tooHard: [], tooEasy: [] }]]),
+    };
+    const run = ports({ loaded: person({ goals, goalWindow: { goal: 0, total: 0 }, progress }) });
+    const seen: { reason: string; depth: unknown }[] = [];
+    const name = run.ports.name;
+    run.ports.name = async (target, avoid, depth) => {
+      seen.push({ reason: target.reason, depth });
+      return name(target, avoid, depth);
+    };
+    await runFeedPicksFor(run.ports, { userId: 'u1', targets: 1, deadline: Number.MAX_SAFE_INTEGER, model: 'm' });
+    expect(seen[0]).toEqual({
+      reason: 'goal',
+      depth: { depth: 'advanced', known: ['Runway: Burn', 'SaaS: Retention'], review: ['Cap table: Pro rata'], tooHard: [] },
+    });
+    expect(run.cards.filter((card) => card.reason === 'goal').every((card) => card.depth === 'advanced')).toBe(true);
   });
 
   it('draws no goal cards for a person with no goals', async () => {

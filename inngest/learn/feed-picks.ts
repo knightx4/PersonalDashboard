@@ -248,6 +248,7 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
       status: card.status,
       theme_id: card.theme_id,
       field_id: card.field_id,
+      aim_id: card.aim_id,
       reason: card.reason,
       difficulty: isCardDifficulty(card.difficulty) ? card.difficulty : null,
       title: card.item ? cardTitle(card.item.title, card.segment?.heading ?? null) : card.named_article,
