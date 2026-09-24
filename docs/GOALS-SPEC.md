@@ -230,6 +230,113 @@ The history is written by the database, from triggers on the goals tables,
 wherever that is possible. A write that forgets to record itself then cannot
 happen.
 
+## Second round: making it useful
+
+The first round built the structure. Using it on the first real goal, *Pay off
+student debt*, showed three gaps. The routine wrote two steps and a question
+and stopped, because it was told to leave out anything that hung on an
+unanswered question. The question arrived with no options. And *List your
+loan balances, rates and minimum payments* had nowhere to list them.
+
+### Information steps and collections
+
+A step that needs facts from you carries a definition of what it needs, and
+the page draws a form from it: one set of fields, or a table with one row per
+item when the definition says so. For the loans step:
+
+```
+collection: loans   (one row per loan)
+  name       text
+  servicer   text
+  balance    money     tracked over time
+  rate       percent
+  minimum    money
+  due day    day of month
+```
+
+Field types are a fixed list the app knows how to draw and check: text, long
+text, number, money, percent, date, day of month, yes/no, choice from a list,
+and link. Claude picks fields from that list and never writes a table or a
+migration.
+
+- **Collections** (`goals.collections`) hold each definition: a name, the
+  fields, whether it is one record or a list, a version number, and the goals
+  it belongs to. One collection can serve several goals, so a budget can be
+  read by the debt goal and a savings goal.
+- **Records** (`goals.records`) hold what was entered, for every collection
+  in one table: the collection, the values as JSON, where they came from
+  (`typed`, `pasted`, `document`, `gmail`, `comment`, `capture`) with a
+  reference to the source, and archiving in place of deletion. History
+  triggers cover both tables.
+- **Every write is checked** against the definition, whoever makes it. A rate
+  must be a percent and a balance must be money; a value that fails is
+  refused with the field named.
+- **Tracked fields** also write a dated reading to `goals.readings` whenever
+  they change, so a balance becomes a series and a chart.
+- **Changing a definition** raises its version. Existing records keep their
+  values; a new field shows empty; a removed field is hidden but its values
+  stay in the record.
+
+An information step closes when its collection has what the step asked for.
+Later steps and runs read the collection instead of asking again.
+
+### Four ways to fill a form
+
+1. **Type it** into the form or table.
+2. **Paste text or a document.** A paste box and a file picker on the step
+   take servicer page text, a statement PDF, a screenshot or a Word file. A
+   direct model call extracts values against the definition and shows them
+   filled in for you to confirm or correct before anything is saved. The
+   original file is kept in storage and the records point to it.
+3. **Claude finds it first.** The goals routine has the Gmail connector. When
+   it writes an information step it searches for what it can (loan
+   statements, offer letters, receipts), fills in what it found as a draft,
+   and names the email each value came from. You confirm it.
+4. **Say it** in a comment on the step or in the capture box, and it is filed
+   into the same collection.
+
+### Fuller maps
+
+The goals skill changes from *leave out what hangs on a question* to *lay out
+the whole path and mark what is provisional*. A new goal gets its phases from
+the start, each with sub-steps, with `claude` steps wherever Claude can do the
+work, information steps with their definitions, and questions with lettered
+options. Steps that depend on an answer are written anyway, marked
+provisional, and re-shaped once it is answered. A question with fewer than two
+lettered options is refused by the database.
+
+For the debt goal the first run would write: get the numbers (an information
+step, pre-filled from Gmail); choose avalanche or snowball, with a Claude
+step checking whether refinancing, income-driven repayment or forgiveness
+applies; build the month-by-month schedule and payoff date (Claude); set up
+autopay (yours); then log the balance monthly and a quarterly Claude review.
+
+### Taken from the dev plan
+
+The dev plan page already has these, and Goals reuses the components rather
+than rebuilding them:
+
+1. **Question buttons**, from `components/dev/question.tsx` and
+   `lib/plan/options.ts`: the lettered options as buttons with the
+   recommended one marked, a written answer still possible, and Not now and
+   Change answer beside them.
+2. **Comments and @dash** on every goal and step, from
+   `components/dev/comment-thread.tsx`. The reply path needs a goals version
+   that writes out the goal, its collections and its steps for the model, and
+   hands anything bigger to the goals routine.
+3. **Status words and colours**: On you, With Claude, Waiting, the health
+   glyphs with their tooltips, a progress bar per goal, and the question
+   marker on rows waiting on you.
+4. **Read-only detail**: an opened step shows its detail, Done when and Needs
+   as text, with Edit as a separate action.
+5. **Proposals and fog**: approve or reject one proposed step, and the goal's
+   fog shown under it.
+6. **Run status**: Claude is working on this while a run is going, and what
+   it changed once it ends.
+
+Dependencies between steps, priority, filters and search stay on the dev
+plan for now.
+
 ## Not in this version
 
 - A people list (names, where you met, last contact). Deferred by choice.
@@ -291,3 +398,16 @@ Filed on the plan as a proposed feature. Each is one step.
 11. The daily run working `claude` steps.
 12. Weekly research for rhythm goals, with suggestions and reactions kept.
 13. Coming back after time away.
+
+Second round, filed as its own feature:
+
+14. Collections and records, checked writes, tracked fields to readings.
+15. The form or table on an information step.
+16. Filling a form from pasted text or a document, with confirmation.
+17. Question buttons, Not now and Change answer.
+18. Comments and @dash on goals and steps.
+19. Status words, colours and progress per goal.
+20. Read-only step detail.
+21. Approving or rejecting one proposal, and fog on the page.
+22. Run status on a goal.
+23. The skill: full maps, information steps, Gmail pre-fill, options required.
