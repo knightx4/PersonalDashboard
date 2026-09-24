@@ -5,6 +5,8 @@ import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createServiceSupabase } from '@/inngest/jobs/supabase-admin';
 import { APP_STORAGE_BUCKET } from '@/lib/jobs/db/schema-name';
+import { createGoalsClient } from '@/lib/goals/auth/server';
+import { DOCUMENT_BUCKET } from '@/lib/goals/extract';
 import { decryptToken } from '@/lib/crypto/tokens';
 import { gmailProvider } from '@/lib/email/providers/gmail';
 
@@ -99,6 +101,19 @@ export async function POST(request: NextRequest) {
     // This app's own bucket. Buckets are project-wide, so naming it explicitly
     // is what stops a deletion here from touching another app's files.
     await jobs.storage.from(APP_STORAGE_BUCKET).remove(paths);
+  }
+
+  //    Goals keeps the documents forms were filled from (plan #955) in its
+  //    own bucket, one folder per account, so the folder is the list.
+  try {
+    const goals = await createGoalsClient();
+    const { data: documents } = await goals.storage
+      .from(DOCUMENT_BUCKET)
+      .list(user.id, { limit: 1000 });
+    const documentPaths = (documents ?? []).map((file) => `${user.id}/${file.name}`);
+    if (documentPaths.length > 0) await goals.storage.from(DOCUMENT_BUCKET).remove(documentPaths);
+  } catch {
+    // A file left behind is not a reason to refuse the deletion.
   }
 
   // 3. The row everything else hangs off.

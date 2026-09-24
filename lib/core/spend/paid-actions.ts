@@ -115,6 +115,8 @@ export const PAID_ACTIONS = {
 
   // Goals: filing a sentence from the capture box, on every page
   'app/goals/capture-actions.ts#fileGoalCapture': ['file-capture'],
+  // Goals: reading pasted text or a document into an information step's form
+  'app/goals/[goalId]/document-actions.ts#readIntoFormAction': ['read-into-form'],
 } as const satisfies Record<string, readonly OperationName[]>;
 
 export type PaidAction = keyof typeof PAID_ACTIONS;
