@@ -11,6 +11,8 @@ import { findUnlinkedMessages, type UnlinkedMessage } from '@/lib/jobs/inbox/lin
 import { INTERVIEW_KINDS } from '@/lib/jobs/interview-kinds';
 import { extractRequirements, type Requirement } from '@/lib/jobs/jd/requirements';
 import { matchRequirements } from '@/lib/jobs/evidence/match';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSessionSpend } from '@/lib/core/spend/session';
 import { matchKey, type RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import { shortlistEvidence } from '@/lib/jobs/evidence/shortlist';
 import { buildPrepContext } from '@/lib/jobs/interview/prep-context';
@@ -1377,14 +1379,16 @@ export async function matchRoleRequirements(
   }
 
   const company = role.companies as unknown as { name: string } | null;
+  const spend: SpendReport[] = [];
   const result = await matchRequirements(
-    { apiKey },
+    { apiKey, onSpend: (report) => spend.push(report) },
     {
       requirements,
       bank: shortlistEvidence(requirements, items),
       roleLabel: [company?.name, role.title as string].filter(Boolean).join(', '),
     },
   );
+  await recordSessionSpend(user.id, { module: 'jobs', operation: 'match-evidence' }, spend);
 
   if (!result.ok) return { matches: null, error: result.error };
 
@@ -1804,10 +1808,12 @@ export async function writeRoundPrepNote(
     return { note: stored.prep_note as PrepNote, error: null };
   }
 
+  const spend: SpendReport[] = [];
   const result = await writePrepNote(
-    { apiKey },
+    { apiKey, onSpend: (report) => spend.push(report) },
     { context, banned: (profile?.banned_constructions as string[]) ?? [] },
   );
+  await recordSessionSpend(user.id, { module: 'jobs', operation: 'write-interview-prep' }, spend);
   if (!result.ok) return { note: null, error: result.error };
 
   const { error: writeError } = await supabase

@@ -12,6 +12,8 @@ import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { guessQuestionKind, questionFingerprint, splitQuestionBlock } from '@/lib/jobs/fingerprint';
 import { APPLICATION_SOURCES } from '@/lib/jobs/pipeline';
 import { draftAnswer } from '@/lib/jobs/evidence/draft';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSessionSpend } from '@/lib/core/spend/session';
 import { DEFAULT_BANNED_CONSTRUCTIONS, type AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
 import type { RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import { shortlistEvidence } from '@/lib/jobs/evidence/shortlist';
@@ -562,8 +564,9 @@ export async function draftAnswerFromEvidence(
 
   const banned = (profile?.banned_constructions as string[] | null) ?? [];
 
+  const spend: SpendReport[] = [];
   const result = await draftAnswer(
-    { apiKey },
+    { apiKey, onSpend: (report) => spend.push(report) },
     {
       question: question.text,
       roleLabel: [role.companies?.name, role.title].filter(Boolean).join(', '),
@@ -575,6 +578,7 @@ export async function draftAnswerFromEvidence(
       requirementSummary: wants || null,
     },
   );
+  await recordSessionSpend(user.id, { module: 'jobs', operation: 'draft-answer' }, spend);
 
   if (!result.ok) return { draft: null, error: result.error };
   return { draft: result.draft, error: null };

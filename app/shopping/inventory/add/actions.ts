@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { buildOwnedBookRows } from '@/lib/books/create-owned-book';
 import { resolvePasteList } from '@/lib/books/paste-list';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSessionSpend } from '@/lib/core/spend/session';
 import { resolveBook, resolveBookDetailed } from '@/lib/books/resolve';
 import type { ProviderFailure } from '@/lib/books/providers/http';
 import { normalizeIsbn } from '@/lib/books/isbn';
@@ -261,15 +263,18 @@ export async function previewPasteBookList(
   _prev: BookActionState,
   formData: FormData,
 ): Promise<BookActionState> {
-  await requireUser();
+  const user = await requireUser();
   const text = String(formData.get('paste') ?? '');
   if (!text.trim()) return { error: 'Paste at least one book.' };
 
   const keys = envKeys();
+  const spend: SpendReport[] = [];
   const results = await resolvePasteList(text, {
     anthropicApiKey: keys.anthropicApiKey,
     googleBooksApiKey: keys.googleBooksApiKey,
+    onSpend: (report) => spend.push(report),
   });
+  await recordSessionSpend(user.id, { module: 'shopping', operation: 'parse-paste-list' }, spend);
   return { results, message: `Resolved ${results.filter((r) => r.book).length} of ${results.length}.` };
 }
 

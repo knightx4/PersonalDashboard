@@ -8,6 +8,8 @@ import { classifyScannedCode } from '@/lib/barcodes/scan-code';
 import { buildOwnedGameRows } from '@/lib/games/create-owned-game';
 import { resolveGameDetailed } from '@/lib/games/resolve';
 import { readGameShelfPhoto, type ShelfSighting } from '@/lib/games/shelf-photo';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSessionSpend } from '@/lib/core/spend/session';
 import type { CanonicalGame, GameEditionCandidate } from '@/lib/games/types';
 import { mapPool } from '@/lib/async/map-pool';
 import type { ProviderFailure } from '@/lib/books/providers/http';
@@ -375,7 +377,7 @@ export async function extractGamesFromPhoto(
 }
 
 async function readShelfPhoto(formData: FormData): Promise<GameActionState> {
-  await requireUser();
+  const user = await requireUser();
   const keys = envKeys();
   if (!keys.anthropicApiKey) {
     return { error: 'Photo import needs ANTHROPIC_API_KEY on the server.' };
@@ -384,11 +386,14 @@ async function readShelfPhoto(formData: FormData): Promise<GameActionState> {
   const parsedImage = parseImageDataUrl(String(formData.get('image_data_url') ?? ''));
   if (!parsedImage.ok) return { error: parsedImage.error };
 
+  const spend: SpendReport[] = [];
   const reading = await readGameShelfPhoto({
     apiKey: keys.anthropicApiKey,
     mediaType: parsedImage.mediaType,
     base64Data: parsedImage.data,
+    onSpend: (report) => spend.push(report),
   });
+  await recordSessionSpend(user.id, { module: 'shopping', operation: 'read-shelf-photo' }, spend);
   if (!reading.ok) return { error: reading.error };
 
   const sightings = reading.reading.games;

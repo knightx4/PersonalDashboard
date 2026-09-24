@@ -1,6 +1,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { applyExtraction, buildSystemPrompt, PARSER_VERSION, type ExtractedMessage } from '@/lib/jobs/email/extract';
 import type { ClassifyResult } from '@/lib/jobs/email/classify';
 
@@ -13,6 +14,7 @@ import type { ClassifyResult } from '@/lib/jobs/email/classify';
  */
 
 const MAX_BODY_CHARS = 6_000;
+const TIER_B_MODEL = 'claude-haiku-4-5-20251001';
 
 export interface TierBResult {
   extracted: ExtractedMessage | null;
@@ -27,6 +29,8 @@ export async function extractWithModel(input: {
   body: string;
   tierA: ClassifyResult;
   apiKey?: string | null;
+  /** What the call cost; record it as 'classify-job-email'. */
+  onSpend?: SpendSink;
 }): Promise<TierBResult> {
   const apiKey = input.apiKey ?? process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -36,7 +40,7 @@ export async function extractWithModel(input: {
   try {
     const client = new Anthropic({ apiKey });
     const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: TIER_B_MODEL,
       max_tokens: 1200,
       system: buildSystemPrompt(),
       messages: [
@@ -53,6 +57,8 @@ export async function extractWithModel(input: {
         },
       ],
     });
+
+    input.onSpend?.({ model: TIER_B_MODEL, usage: usageFrom(message.usage) });
 
     const block = message.content.find((b) => b.type === 'text');
     const text = block && block.type === 'text' ? block.text : '';

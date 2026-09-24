@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { proposeEvidenceFromSource } from '@/lib/jobs/evidence/propose';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSessionSpend } from '@/lib/core/spend/session';
 import {
   MAX_CANDIDATES,
   normalizeSkills,
@@ -231,10 +233,12 @@ export async function proposeEvidence(
     .eq('user_id', user.id)
     .limit(60);
 
+  const spend: SpendReport[] = [];
   const result = await proposeEvidenceFromSource(
-    { apiKey },
+    { apiKey, onSpend: (report) => spend.push(report) },
     { kind, text, existingTitles: (existing ?? []).map((item) => item.title as string) },
   );
+  await recordSessionSpend(user.id, { module: 'jobs', operation: 'propose-evidence' }, spend);
   if (!result.ok) return { proposal: null, error: result.error };
 
   return { proposal: { kind, candidates: result.candidates }, error: null };
