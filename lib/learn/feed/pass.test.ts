@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { WikipediaArticle, WikipediaResult, WikipediaSection } from '@/lib/learn/providers/wikipedia';
 import { matchSection, runFeedPicksFor, type FeedCardInsert, type FeedPickPorts, type PersonInputs } from './pass';
-import { LEVEL3_LIST_PICKER, untouchedPicks, type Level3Article } from './level3';
+import {
+  dueReturns,
+  LEVEL3_LIST_PICKER,
+  level3Picks,
+  resolveLevel3Picks,
+  untouchedPicks,
+  type Level3Article,
+  type Level3Claimed,
+  type ReturnAngleRequest,
+} from './level3';
 import type { NameResult } from './name-material';
 import type { FeedTarget } from './targets';
 
@@ -88,11 +97,19 @@ function person(overrides: Partial<PersonInputs> = {}): PersonInputs {
  * learn.level3_untouched_articles: an article with evidence, or already
  * picked, is never offered.
  */
-type ListStub = { articles: Level3Article[]; evidence: Set<string> };
+type ListStub = {
+  articles: Level3Article[];
+  evidence: Set<string>;
+  /** Claimed, untested articles, standing in for learn.level3_claimed_articles. */
+  claimed?: Level3Claimed[];
+  /** The time the due rule is applied at. */
+  now?: number;
+};
 
 function ports(options: { missing?: Set<string>; loaded?: PersonInputs; list?: ListStub } = {}) {
   const cards: FeedCardInsert[] = [];
   const listed: string[][] = [];
+  const angles: ReturnAngleRequest[] = [];
   const stored: string[] = [];
   const named: { target: FeedTarget; avoid: string[] }[] = [];
   let articleNo = 0;
@@ -110,13 +127,26 @@ function ports(options: { missing?: Set<string>; loaded?: PersonInputs; list?: L
         }),
       };
     },
-    drawFromList: async (_goal, avoid) => {
+    drawFromList: async (_goal, { avoid, pickedNow, depth }) => {
       listed.push([...avoid]);
       const list = options.list ?? { articles: [], evidence: new Set<string>() };
       const untouched = list.articles.filter(
         (a) => !list.evidence.has(a.title) && !avoid.some((title) => title.toLowerCase() === a.title.toLowerCase()),
       );
-      return { ok: true, named: untouchedPicks(untouched, avoid) };
+      const picks = level3Picks({
+        untouched: untouchedPicks(untouched, avoid),
+        due: dueReturns(list.claimed ?? [], list.now ?? 0),
+        avoid: pickedNow,
+      });
+      const { named, failed } = await resolveLevel3Picks(picks, {
+        depth,
+        sections: async (title) => article(title).sections,
+        nameAngle: async (request) => {
+          angles.push(request);
+          return { ok: true, section: request.sections[0] ?? null, basis: 'Past the lead.', model: 'angle-model' };
+        },
+      });
+      return { ok: true, named, skipped: failed };
     },
     fetchArticle: async (title): Promise<WikipediaResult> =>
       options.missing?.has(title)
@@ -137,7 +167,7 @@ function ports(options: { missing?: Set<string>; loaded?: PersonInputs; list?: L
     now: () => (clock += 1),
     random: () => 0.5,
   };
-  return { ports: value, cards, stored, named, listed };
+  return { ports: value, cards, stored, named, listed, angles };
 }
 
 describe('running the pass once', () => {
@@ -369,5 +399,48 @@ describe('running the pass once', () => {
     });
     await runFeedPicksFor(run.ports, { userId: 'u1', targets: 3, deadline: Number.MAX_SAFE_INTEGER, model: 'm' });
     expect(run.cards.filter((card) => card.reason === 'goal').map((card) => card.named_article)).toEqual(['Glacier']);
+  });
+  it('brings a claimed Level 3 article back at a section no earlier card had, once it is due', async () => {
+    const level3 = {
+      id: 'l3',
+      name: 'Every Level 3 vital article',
+      about: null,
+      depth: 'working' as const,
+      field: null,
+      domain: null,
+      list: 'level3' as const,
+    };
+    const day = 24 * 60 * 60 * 1000;
+    const now = Date.parse('2026-09-24T12:00:00Z');
+    const claimed = (title: string, daysAgo: number): Level3Claimed => ({
+      title,
+      section: 'Science > Things',
+      claimedAt: new Date(now - daysAgo * day).toISOString(),
+      lastSeenAt: new Date(now - daysAgo * day).toISOString(),
+      returns: 0,
+      earlier: [null],
+    });
+    const run = ports({
+      // Held already, as a claimed article is: the return must not be kept out by that.
+      loaded: person({ goals: [level3], goalWindow: { goal: 0, total: 0 }, articlesHeld: ['Tide', 'Glacier'] }),
+      list: {
+        articles: [{ title: 'Vaccine', section: 'Science > Things' }],
+        evidence: new Set(),
+        // Tide's Got it was eight days ago, so it is due; Glacier's was three.
+        claimed: [claimed('Tide', 8), claimed('Glacier', 3)],
+        now,
+      },
+    });
+    await runFeedPicksFor(run.ports, { userId: 'u1', targets: 3, deadline: Number.MAX_SAFE_INTEGER, model: 'm' });
+
+    const goalCards = run.cards.filter((card) => card.reason === 'goal');
+    expect(goalCards.map((card) => card.named_article).sort()).toEqual(['Tide', 'Vaccine']);
+    const tide = goalCards.find((card) => card.named_article === 'Tide')!;
+    // Not the lead again: the first section the earlier card was not cut from.
+    expect(tide).toMatchObject({ named_section: 'History', pick_model: 'angle-model', pick_basis: 'Past the lead.' });
+    expect(tide.segment_id).toBe('seg:Tide:1');
+    expect(run.angles).toHaveLength(1);
+    expect(run.angles[0]).toMatchObject({ article: 'Tide', earlier: ['Tide'], sections: ['History', 'Causes'] });
+    expect(goalCards.find((card) => card.named_article === 'Vaccine')?.pick_model).toBe(LEVEL3_LIST_PICKER);
   });
 });
