@@ -1,18 +1,19 @@
 ---
 name: goals
-description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Shaping - read a new or vague goal and propose steps under it, with one or two questions for the person. Re-shaping - read the answers to those questions and turn them into steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - research NYC city events for rhythm goals and write them as suggestions, following past reactions. Use when the goals routine is fired from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "shape my goal …", "break down <goal>", "work on my goals".
+description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, provisional steps for what hangs on a question, and questions with lettered options. Re-shaping - read the answers to those questions and settle the provisional steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - research NYC city events for rhythm goals and write them as suggestions, following past reactions. Use when the goals routine is fired from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "shape my goal …", "break down <goal>", "work on my goals".
 ---
 
 # Working a goal
 
 Goals is the person's own workspace at `/goals`: areas (money, career, the
 city), goals under them, and a tree of steps under each goal. The spec is
-`docs/GOALS-SPEC.md`; read "The three levels", "Fog and refining a goal" and
-"Approval" before your first write.
+`docs/GOALS-SPEC.md`; read "The three levels", "Fog and refining a goal",
+"Approval" and "Second round: making it useful" before your first write.
 
-Most steps are the person's. Your part is the map: turning a goal into the
-things that have to happen, and asking the one or two questions whose answers
-change what those things are.
+Your part is the map: the whole path from where the person is to the goal's
+done-when, with every step on it that you can see. You do the steps you can
+do, you gather the facts you can find, and you ask only the questions whose
+answers change the path.
 
 ## How you read and write
 
@@ -36,7 +37,8 @@ refusal is the rule working, so read the message and do what it says instead
 of looking for another way round.
 
 Never write `closed_at` (a trigger keeps it), `goals.history` (triggers write
-it), `approved_at`, `reviewed_at`, or a question's `resolution`.
+it), `approved_at`, `reviewed_at`, a question's `resolution`, `dismissed_at`
+or `fog_dismissed_at`, and never set a record's `draft` to false.
 
 ## The run row
 
@@ -66,7 +68,8 @@ where id = '<run id>' and user_id = '<user>';
 ## Reading the goal
 
 ```sql
-select id, area_id, title, detail, acceptance, fog, status, approved_at, unit, target
+select id, area_id, title, detail, acceptance, fog, fog_dismissed_at, status,
+       approved_at, unit, target
 from goals.items
 where id = '<goal id>' and user_id = '<user>' and level = 'goal' and archived_at is null;
 
@@ -79,58 +82,278 @@ with recursive tree as (
   where c.archived_at is null
 )
 select id, parent_id, depth, kind, status, title, detail, acceptance, resolution,
-       position, due_on, rhythm_count, rhythm_period
+       dismissed_at, collection_id, asks_for, position, due_on, rhythm_count,
+       rhythm_period
 from tree order by depth, position;
+
+-- the collections this goal already has, and every live one on the account
+select c.id, c.name, c.shape, c.fields, c.version,
+       exists (select 1 from goals.collection_goals g
+               where g.collection_id = c.id and g.goal_id = '<goal id>'
+                 and g.archived_at is null) as serves_this_goal,
+       (select count(*) from goals.records r
+        where r.collection_id = c.id and r.archived_at is null) as records
+from goals.collections c
+where c.user_id = '<user>' and c.archived_at is null;
 ```
 
 Also worth a look where they exist: the area's other goals (so you do not
 propose a duplicate), `goals.readings` for a measured goal, `goals.links` for a
-goal tied to Learn or the job search, and the recent `goals.history` rows for
-this goal's steps. A step the person dropped or archived tells you what they
-did not want. Do not propose it again.
+goal tied to Learn or the job search, the comments on the goal and its steps
+(`goals.comments`), and the recent `goals.history` rows for this goal's steps.
+A step the person dropped or archived tells you what they did not want. Do not
+propose it again.
 
-## Shaping a new or vague goal
+Two things the person has put aside stay put aside:
 
-A goal is **not approved** while `approved_at` is null. Under it:
+- **A question with `dismissed_at` set** was put aside with Not now. It is
+  still unanswered: build on it as provisional, as for any open question, and
+  do not ask it again in other words. Never write `dismissed_at`.
+- **Fog with `fog_dismissed_at` set** was put aside. Do not raise the same
+  point again as fog or as a question. Rewriting the goal's fog to say
+  something new brings it back, which is allowed when there is something new
+  to say. Never write `fog_dismissed_at`.
 
-1. **Ask one or two questions**, only where the answer changes the steps.
-   Each is a step with `kind = 'decision'`, `status = 'open'` (a question is
-   the one thing that goes in open before approval), the question as the
-   title ending in a question mark, and in `detail` the real options lettered
-   from A, one per line, then which you would pick and why. "Strength or
-   endurance?" with where each leads is a question. "What are your goals?" is
-   not one.
-2. **Propose the steps you can already see**, with `status = 'proposed'`.
-   Three to eight at the top level is the usual shape, with sub-steps where a
-   step is more than one sitting. Each has a `kind`:
-   - `mine` for what the person does (go, call, apply, lift),
-   - `claude` for what you can produce later (a research note, a draft, a list),
-   - `rhythm` for a practice, with `rhythm_count` (1 to 100) and
-     `rhythm_period` (`day`, `week` or `month`).
+## Mapping a goal
 
-   Each has an `acceptance` saying when it is done, and a `position` in tens
-   (10, 20, 30) so the person's own steps can go between them.
-3. **Leave out what hangs on an unanswered question.** Say what is not known
-   in the goal's `fog` instead: one plain sentence or two.
-4. **A goal that turns out to be several goals** gets them proposed as goals:
-   `level = 'goal'`, the same `area_id`, `status = 'proposed'`. The person
-   approves each one on its own page.
+"Work on this" asks for the whole map, on the first run and on every run
+after. Lay out the full path from where the person is to the goal's
+`acceptance`, and mark what is not settled yet. Do not stop at the first
+question: a question is one step on the map, and the steps after it are
+written anyway.
+
+A goal is **not approved** while `approved_at` is null. Everything you write
+under it goes in `proposed`, except a question, which goes in `open`. Once the
+goal is approved, what you write goes in `open`, except a provisional step,
+which stays `proposed` (below). Before you add anything, read what is already
+there and build around it: keep the person's steps, fill in what is missing,
+and reuse a step that already says what you were about to write.
+
+### Phases and sub-steps
+
+1. **Phases at the top level.** Three to six steps under the goal, in the
+   order they happen, each a stage of the path: for a debt goal, get the
+   numbers, choose the order, build the schedule, set up the payments, keep it
+   on track. A phase has `kind = 'mine'`, an `acceptance` saying what is true
+   when the stage is over, and sub-steps. It reads Waiting while its sub-steps
+   are open, and comes up for the person to tick off once they are done.
+2. **Sub-steps under each phase.** Two to five, each one sitting of work, each
+   with its own `acceptance`. A sub-step bigger than one sitting gets
+   sub-steps of its own.
+3. **`position` in tens** (10, 20, 30) at every level, so the person's own
+   steps can go between yours.
+
+Every step has a `kind`:
+
+- `claude` wherever you can do the work: research, a comparison, a
+  calculation, a schedule, a draft letter or email, a checklist. **Make it a
+  `claude` step whenever you could produce it without the person's hands.** A
+  map with every step marked `mine` hands the person work you could have done.
+  The morning run works an open `claude` step once nothing beneath it is open.
+- `mine` for what only the person can do: log in, call, sign, pay, decide
+  something that is not a question you can put to them.
+- `rhythm` for a practice, with `rhythm_count` (1 to 100) and `rhythm_period`
+  (`day`, `week` or `month`): log the balance monthly, review every quarter.
+- `decision` for a question (below).
+
+### Information steps
+
+A step that needs facts from the person (balances, rates, dates, account
+names) is an information step: it points at a **collection**, and the page
+draws a form or a table from the collection's fields. "List your loan
+balances" with nowhere to list them is the gap these close.
+
+1. **Reuse before you define.** Read the account's collections (the query
+   above). If one already holds these facts, use it: serve it to this goal
+   and, if it lacks a field you need, add the field. Make a new collection
+   only when none fits. Names are one per account, case-insensitive, so
+   "loans" means one thing.
+2. **Define it from the field types.** You never write a table or a
+   migration; a collection is a row. `shape` is `list` for one row per thing
+   (loans, accounts) and `one` for a single set of facts (a budget, a
+   profile). Each field is `{"key", "label", "type"}` with, where it applies,
+   `"tracked": true` or `"options": [...]`:
+
+   | type | stores | use for |
+   |---|---|---|
+   | `text` | one line, up to 500 characters | a name, a servicer |
+   | `long_text` | up to 20,000 characters | notes |
+   | `number` | a number | a count |
+   | `money` | a number to the cent, `1234.56` | a balance, a payment |
+   | `percent` | `6.8` for 6.8% | an interest rate |
+   | `date` | `"YYYY-MM-DD"` | a payoff date |
+   | `day_of_month` | a whole number, 1 to 31 | a due day |
+   | `yes_no` | `true` or `false` | on autopay or not |
+   | `choice` | one of `options`, exactly | federal or private |
+   | `link` | an http or https address | the servicer's login page |
+
+   `key` is lower case letters, digits and `_`, at most 40 characters, and
+   never changes. `tracked` goes only on `number`, `money` or `percent`, and
+   makes every change to that value a dated reading, so a balance becomes a
+   chart: mark the numbers the goal is measured by. A field is never taken
+   out of the array; set `"removed": true` to hide one. Its type never
+   changes; add a new field instead. The database refuses a definition that
+   breaks any of this and names the field.
+3. **Serve it to the goal and point the step at it.** `asks_for` lists the
+   field keys the step needs; leave it null when it needs every field. The
+   step closes itself once the collection holds what it asks for.
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+with c as (
+  insert into goals.collections (user_id, name, shape, fields)
+  values ('<user>', 'loans', 'list', '[
+    {"key": "name", "label": "Loan", "type": "text"},
+    {"key": "servicer", "label": "Servicer", "type": "text"},
+    {"key": "kind", "label": "Federal or private", "type": "choice", "options": ["Federal", "Private"]},
+    {"key": "balance", "label": "Balance", "type": "money", "tracked": true},
+    {"key": "rate", "label": "Interest rate", "type": "percent"},
+    {"key": "minimum", "label": "Minimum payment", "type": "money"},
+    {"key": "due_day", "label": "Due day", "type": "day_of_month"}
+  ]'::jsonb)
+  returning id
+), served as (
+  insert into goals.collection_goals (user_id, collection_id, goal_id)
+  select '<user>', id, '<goal id>' from c
+)
+insert into goals.items (user_id, level, parent_id, kind, title, acceptance,
+                         collection_id, asks_for, status, position)
+select '<user>', 'step', '<phase id>', 'mine',
+       'Every loan listed with balance, rate and minimum',
+       'Each loan has a confirmed row with its balance, rate and minimum payment.',
+       id, array['name', 'balance', 'rate', 'minimum'], 'open', 10
+from c
+returning id, collection_id;
+```
+
+An existing step that already asks for these facts (say "List your loan
+balances, rates and minimum payments") is pointed at the collection with an
+update of `collection_id` and `asks_for`, rather than written again.
+
+### Pre-filling from Gmail
+
+When you write or find an information step, search the person's Gmail through
+the **Gmail** connector (load its tools with ToolSearch) for what would fill
+it: loan statements, servicer notices, offer letters, receipts, bills. Read
+the messages you find, and write what they say as **draft** records, one per
+thing, with the message named:
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+insert into goals.records (user_id, collection_id, data, draft, source, source_ref, position)
+values ('<user>', '<collection id>',
+        '{"name": "Direct Loan, subsidized", "servicer": "Nelnet", "balance": 12480.22,
+          "rate": 4.99, "minimum": 132.00, "due_day": 21}'::jsonb,
+        true, 'gmail', '<the Gmail message id>', 10);
+```
+
+- `source_ref` is the message's id as the connector gives it. The page turns
+  it into a link to that email beside the draft.
+- Values are stored in the forms in the table above. Leave out a value you
+  did not find; do not guess one. Use the newest statement for each loan.
+- Check what is already there first. A loan that already has a row gets no
+  second draft; if a newer email shows a changed balance, say so in the run
+  summary rather than writing over what the person confirmed.
+- Every record you write is a draft. The database refuses a record from you
+  that is not, and refuses you confirming one. Confirming is the person's
+  press on the step.
+- If the Gmail connector is not attached to this run, or finds nothing, write
+  the information step without drafts and say which in the run summary.
+
+Draft inserts count as forms filled on the goal's page, so write them in a
+call that sets `goals.run_id`.
+
+### Questions
+
+Ask only where the answer changes the path, and ask each one once. A question
+is a step with `kind = 'decision'`, `status = 'open'`, in the phase where the
+answer is needed:
+
+- **The title is the question**, one sentence ending in a question mark.
+  "Avalanche or snowball?" is a question; "What are your goals?" is not one.
+- **The `detail` holds the options, lettered from A, one per line**, each
+  opening with its name in a short sentence and then what it leads to:
+
+  ```
+  A — Avalanche. Pay the highest rate first; least interest overall.
+  B — Snowball. Pay the smallest balance first; a loan gone sooner.
+  Recommend A: the rates run from 3.7% to 7.1%, so order matters.
+  ```
+
+  Two or three options, then which you would pick and why. The page draws
+  each option as a button with your recommendation marked. **The database
+  refuses a question from you whose detail has fewer than two lettered
+  options** ("A — ", "A) ", "A. ", "A: ", "(a) " all count; the letters must
+  run A, B, C in order).
+- A question already on the goal with no options (written before this rule)
+  gets them: update its `detail` to the lettered form. That is allowed on a
+  question with no answer yet, and it is not asking it again.
+
+### Provisional steps
+
+A step that depends on an unanswered question is **written anyway, as
+provisional**: `status = 'proposed'`, with a `detail` that opens with the line
+
+```
+Provisional: depends on "<the question's title>".
+```
+
+and then the step as you would write it for the answer you recommend. A
+provisional step stays out of the morning run and the progress bar, and shows
+its approve and turn-down buttons: the person can take it as it stands. Put it
+where it belongs on the path, not under the question.
+
+This replaces leaving such steps out. Use the goal's `fog` only for what you
+cannot write even provisionally, in one or two plain sentences, and clear the
+fog once the map covers it.
+
+### A goal that is several goals
+
+A goal that turns out to be several goals gets them proposed as goals:
+`level = 'goal'`, the same `area_id`, `status = 'proposed'`. The person
+approves each one on its own page.
+
+### Titles
 
 Titles follow `.claude/skills/plan/reference/writing.md`: the title says what
 will be true when the step is done, in under about eight words. "Pick a gym
 within 15 minutes of home", not "Gym research". Write in plain words; the
 person reads these on a phone once a day.
 
+### A worked shape: Pay off student debt
+
+1. **Get the numbers** (phase): the loans information step, pointed at the
+   `loans` collection and pre-filled from servicer emails; a `claude` step
+   checking the drafts against the servicer's own figures once confirmed.
+2. **Choose the payoff order** (phase): the question "Avalanche or
+   snowball?" with lettered options; a `claude` step checking whether
+   refinancing, income-driven repayment or forgiveness applies to these
+   loans.
+3. **Build the schedule** (phase): a `claude` step for the month-by-month
+   schedule and payoff date, provisional on the order question.
+4. **Set up the payments** (phase): autopay on each loan (yours), with the
+   extra payment going to the first loan in the order.
+5. **Keep it on track** (phase): a monthly `rhythm` to log each balance, and a
+   quarterly `claude` review of progress against the schedule.
+
 ## Re-shaping after answers
 
 When questions under the goal have a `resolution`:
 
-- Write the steps each answer made clear. Proposed if the goal is not
-  approved, open if it is.
-- Drop your own proposals that an answer made pointless (`status = 'dropped'`).
+- Settle the provisional steps that hung on each answer. One the answer bears
+  out loses its `Provisional:` line and goes to `open` if the goal is approved
+  (it stays `proposed` if not). One the answer changes is rewritten to fit.
+  One the answer made pointless is dropped (`status = 'dropped'`).
+- Write any new steps the answer made clear, in the phase they belong to.
 - Update or clear the goal's `fog`.
 - Ask a new question only if an answer opened one. Never re-ask one the person
-  answered.
+  answered, or one they put aside.
+- A provisional step the person already approved (it is `open` with the
+  `Provisional:` line still there) is theirs now: rewrite it to fit the
+  answer and take the line off, but do not drop it; if the answer makes it
+  pointless, ask whether to drop it as a question.
 
 ## What you may change
 
@@ -140,9 +363,14 @@ may not change the person's own steps, or turn a proposal into a live step.
 Approving is the person's move, on the goal's page; it opens everything you
 proposed under the goal at once.
 
-**After it is approved:** add steps as `open`, split one into sub-steps, move a
-step under another step of the same goal, and reorder by `position`. Do these
+**After it is approved:** add steps as `open` (provisional ones as
+`proposed`), split one into sub-steps, move a step under another step of the
+same goal, reorder by `position`, and point a step at a collection. Do these
 without asking.
+
+**Collections, approved or not:** define one, add fields to one, serve one to
+the goal, and write draft records into one. Never confirm a record, and never
+archive one the person confirmed.
 
 **Never, approved or not:** add a goal except as a proposal; change a goal's
 `acceptance` (its done-when); close, drop or archive a goal; drop or archive a

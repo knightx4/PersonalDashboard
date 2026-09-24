@@ -151,6 +151,7 @@ describe('runs', () => {
     expect(text).toContain('user_id u-1');
     expect(text).toContain('goals.runs id r-1');
     expect(text).toContain('.claude/skills/goals/SKILL.md');
+    expect(text).toContain('map the whole path');
   });
 });
 

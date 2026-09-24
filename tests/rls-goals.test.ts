@@ -440,8 +440,9 @@ describe('approval once per goal (plan #932)', () => {
       values (${userA}, 'step', ${goal}, 'mine', 'Call one friend a week', 'proposed')
       returning id`);
     const [question] = await asClaude((tx) => tx<{ id: string }[]>`
-      insert into items (user_id, level, parent_id, kind, title)
-      values (${userA}, 'step', ${goal}, 'decision', 'Old friends or new ones first?')
+      insert into items (user_id, level, parent_id, kind, title, detail)
+      values (${userA}, 'step', ${goal}, 'decision', 'Old friends or new ones first?',
+              ${'A — Old friends.\nB — New ones.'})
       returning id`);
 
     await expect(
@@ -622,6 +623,56 @@ describe('questions put aside and answers changed (plan #956)', () => {
   });
 });
 
+describe('questions from Claude carry options (plan #962)', () => {
+  async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  it('counts lettered options the way the page draws them', async () => {
+    const counts = await admin<{ n: number }[]>`
+      select lettered_options(d) as n from unnest(${[
+        'A — Avalanche. Highest rate first.\nB — Snowball.\nRecommend A.',
+        '(a) One\n(b) Two\n(c) Three',
+        '  A. One\r\n  B: Two',
+        'A fired session\nB is prose',
+        'A -- One\nC -- Two',
+        'A) Only one',
+      ]}::text[]) as d`;
+    expect(counts.map((row) => row.n)).toEqual([2, 3, 2, 0, 0, 0]);
+  });
+
+  it('refuses a question from Claude with fewer than two options, and leaves yours alone', async () => {
+    await expect(
+      asClaude((tx) => tx`
+        insert into items (user_id, level, parent_id, kind, title)
+        values (${userA}, 'step', ${goalA}, 'decision', 'Avalanche or snowball?')`),
+    ).rejects.toThrow(/at least two options/);
+    await expect(
+      asClaude((tx) => tx`
+        insert into items (user_id, level, parent_id, kind, title, detail)
+        values (${userA}, 'step', ${goalA}, 'decision', 'Refinance?', ${'A — Refinance.'})`),
+    ).rejects.toThrow(/at least two options/);
+
+    const [question] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, detail)
+      values (${userA}, 'step', ${goalA}, 'decision', 'Avalanche or snowball?',
+              ${'A — Avalanche. Highest rate first.\nB — Snowball. Smallest balance first.'})
+      returning id`);
+    await expect(
+      asClaude((tx) => tx`update items set detail = 'Either works.' where id = ${question.id}`),
+    ).rejects.toThrow(/at least two options/);
+    await asClaude((tx) => tx`update items set position = 70 where id = ${question.id}`);
+
+    const [yours] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'decision', 'Call the servicer or write?') returning id`);
+    await asClaude((tx) => tx`update items set position = 80 where id = ${yours.id}`);
+  });
+});
+
 describe('one proposal at a time, and fog put aside (plan #960)', () => {
   async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
     return admin.begin(async (tx) => {
@@ -677,8 +728,9 @@ describe('one proposal at a time, and fog put aside (plan #960)', () => {
       values (${userA}, 'goal', ${areaA}, 'Learn to cook') returning id`);
     const step = await propose(goal.id, 'Take a knife skills class');
     const [question] = await asClaude((tx) => tx<{ id: string }[]>`
-      insert into items (user_id, level, parent_id, kind, title)
-      values (${userA}, 'step', ${step}, 'decision', 'Weekday or weekend?') returning id`);
+      insert into items (user_id, level, parent_id, kind, title, detail)
+      values (${userA}, 'step', ${step}, 'decision', 'Weekday or weekend?',
+              ${'A — Weekday.\nB — Weekend.'}) returning id`);
 
     const [{ settled }] = await asUser(userA, (tx) =>
       tx<{ settled: number }[]>`select settle_proposal(${step}, false) as settled`,
