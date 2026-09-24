@@ -63,3 +63,49 @@ export function storyParagraphs(text: string | undefined): string[] {
     .map((paragraph) => paragraph.replace(/\s+/g, ' ').trim())
     .filter(Boolean);
 }
+
+/** A passage as its words alone: lower case, no punctuation, single spaces. */
+function wordsOf(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+/**
+ * Whether the full story says anything the summary above it has not.
+ *
+ * Some newsletters are one short paragraph a story, and the summariser keeps
+ * it nearly as it is, so "Read the full story" opened onto the same words
+ * again (note 86b9c6d1). Compared by words, ignoring case and punctuation. A
+ * text no longer than the summary whose words are nearly all in it adds
+ * nothing either: in the live issues those differ by a word ("turn over" for
+ * "hand over", "its" for "the"), which is not a story worth opening.
+ */
+export function storyAddsToSummary(text: string | undefined, summary: string | undefined): boolean {
+  const full = wordsOf(storyParagraphs(text).join(' '));
+  if (!full) return false;
+  if (!summary) return true;
+  const shown = wordsOf(summary);
+  if (shown.includes(full)) return false;
+
+  const fullWords = full.split(' ');
+  const shownWords = shown.split(' ');
+  if (fullWords.length > shownWords.length * NEAR_LENGTH) return true;
+  const left = new Map<string, number>();
+  for (const word of shownWords) left.set(word, (left.get(word) ?? 0) + 1);
+  let shared = 0;
+  for (const word of fullWords) {
+    const count = left.get(word) ?? 0;
+    if (count === 0) continue;
+    shared += 1;
+    left.set(word, count - 1);
+  }
+  return shared < fullWords.length * NEAR_SHARED;
+}
+
+/** How much longer than the summary a text can be and still be the same story. */
+const NEAR_LENGTH = 1.2;
+
+/** The share of the text's words the summary must hold for the two to be the same. */
+const NEAR_SHARED = 0.85;

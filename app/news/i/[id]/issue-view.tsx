@@ -208,7 +208,7 @@ export function IssueView({
                         />
                       )}
                     </div>
-                    <StoryText text={story.text} />
+                    <StoryText text={story.text} summary={story.summary} />
                     <StoryActions story={story} issueId={issueId} saved={isSaved(story)} />
                   </li>
                 ))}
@@ -271,7 +271,7 @@ function LeadStory({
           {story.headline}
         </h2>
         <p className="mt-2 text-body leading-relaxed text-ink-muted">{story.summary}</p>
-        <StoryText text={story.text} />
+        <StoryText text={story.text} summary={story.summary} />
         <StoryActions story={story} issueId={issueId} saved={saved} />
       </div>
     </Card>
