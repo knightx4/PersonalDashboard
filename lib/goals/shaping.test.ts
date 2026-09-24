@@ -2,14 +2,17 @@ import { describe, expect, it } from 'vitest';
 import {
   approvalLine,
   awaitsAnswer,
+  changesLine,
   countAside,
   countOpenQuestions,
   countProposed,
   goalRunText,
   RUN_QUIET_MS,
   runInFlight,
+  runChanges,
   runLine,
   type GoalRun,
+  type RunHistoryRow,
 } from './shaping';
 import type { StepNode } from './steps';
 
@@ -107,6 +110,39 @@ describe('runs', () => {
     expect(runLine(run({ createdAt: '2026-09-24T08:00:00Z' }), NOW, when)).toBe(
       'A run started at 08:00 and never reported back.',
     );
+  });
+
+  it('counts what a run changed from its history rows', () => {
+    const row = (extra: Partial<RunHistoryRow>): RunHistoryRow => ({
+      table_name: 'items',
+      action: 'insert',
+      row_id: 'x',
+      old_values: null,
+      new_values: null,
+      ...extra,
+    });
+    const rows: RunHistoryRow[] = [
+      row({ new_values: { level: 'step', kind: 'claude', status: 'proposed' } }),
+      row({ new_values: { level: 'step', kind: 'mine', status: 'open' } }),
+      row({ new_values: { level: 'step', kind: 'decision', status: 'open' } }),
+      row({ new_values: { level: 'goal', kind: null, status: 'open' } }),
+      row({ action: 'update', old_values: { status: 'open' }, new_values: { status: 'done' } }),
+      row({ action: 'update', old_values: { title: 'a' }, new_values: { title: 'b' } }),
+      row({ table_name: 'records', row_id: 'r1', new_values: { data: {} } }),
+      row({ table_name: 'records', action: 'update', row_id: 'r1', old_values: {}, new_values: {} }),
+      row({ table_name: 'records', action: 'update', row_id: 'r2', old_values: {}, new_values: {} }),
+      row({ table_name: 'records', action: 'archive', row_id: 'r3', old_values: {}, new_values: {} }),
+    ];
+    const changes = runChanges(rows);
+    expect(changes).toEqual({ stepsAdded: 2, questionsAsked: 1, formsFilled: 2, stepsDone: 1 });
+    expect(changesLine(changes)).toBe(
+      'What it changed: 2 steps added, 1 question asked, 2 forms filled and 1 step done.',
+    );
+    expect(changesLine({ stepsAdded: 0, questionsAsked: 3, formsFilled: 0, stepsDone: 0 })).toBe(
+      'What it changed: 3 questions asked.',
+    );
+    expect(changesLine(runChanges([]))).toBe('It left the steps and forms as they were.');
+    expect(changesLine(null)).toBeNull();
   });
 
   it('briefs the routine with the goal, the account and the run row', () => {
