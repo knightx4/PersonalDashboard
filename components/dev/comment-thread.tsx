@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/ui/disclosure';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
 import { awaitingDash } from '@/lib/comments/awaiting';
-import { MENTION, mentionsDash } from '@/lib/comments/mention';
+import { MENTION, mentionsDash, withoutMention } from '@/lib/comments/mention';
 import { commentWhen, exactTime, shortWhen } from '@/lib/comments/when';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { useClockNow } from '@/lib/use-clock-now';
@@ -403,13 +403,23 @@ export function CommentThread({
                   // close under the tag before the tag ran.
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => {
-                    if (!tagged) {
+                    // A second press takes the tag back out (note 87a6e077).
+                    // A raise reaches Dash without one, so there it stays lit.
+                    if (mentionsDash(draft)) {
+                      setDraft((current) => withoutMention(current));
+                    } else if (!tagged) {
                       setDraft((current) => (current ? `${MENTION} ${current}` : `${MENTION} `));
                     }
                     box.current?.focus();
                   }}
                   aria-pressed={tagged}
-                  title={tagged ? 'Dash will read this' : `Tag ${MENTION}`}
+                  title={
+                    mentionsDash(draft)
+                      ? `Dash will read this. Press again to take ${MENTION} off.`
+                      : tagged
+                        ? 'Dash will read this'
+                        : `Tag ${MENTION}`
+                  }
                   className={
                     // ui-ok: hand-rolled-box -- the subtle circle is what note 66f5a513 asked for, to set Dash's head apart from the words beside it.
                     'press -ml-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border transition-colors duration-150 ' +

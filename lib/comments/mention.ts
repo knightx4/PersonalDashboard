@@ -71,3 +71,13 @@ export function questionFrom(body: string): string {
     .trim();
   return stripped || body.trim();
 }
+
+/**
+ * The draft with the tag taken back out, for a second press on Dash's head in
+ * the compose box. One space after each tag goes with it, so "@dash what
+ * next" becomes "what next" and "is this @dash right" becomes "is this right";
+ * everything else in the draft is left as written.
+ */
+export function withoutMention(body: string): string {
+  return body.replace(new RegExp(`${TAG.source}[^\\S\\n]?`, 'gi'), '$1');
+}
