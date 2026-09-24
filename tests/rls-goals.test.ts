@@ -8,6 +8,7 @@
  * old and new values and who made the change, and nobody can edit that record
  * afterwards.
  */
+import type postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { admin, asUser, closeDb, createUser, truncateAll } from './helpers/db-goals';
 
@@ -406,6 +407,118 @@ describe('goals and the account', () => {
       select (select count(*)::int from items where user_id = ${leaving}) as items,
              (select count(*)::int from history where user_id = ${leaving}) as history`;
     expect(left).toEqual({ items: 0, history: 0 });
+  });
+});
+
+describe('approval once per goal (plan #932)', () => {
+  /** A write the way the goals routine makes one: actor declared, no session. */
+  async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  async function newGoal(title: string): Promise<string> {
+    const [row] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title, fog)
+      values (${userA}, 'goal', ${areaA}, ${title}, 'Not sure what good looks like yet')
+      returning id`);
+    return row.id;
+  }
+
+  it('holds Claude to proposals and questions under a goal you have not approved', async () => {
+    const goal = await newGoal('Have good relationships');
+    await expect(
+      asClaude((tx) => tx`
+        insert into items (user_id, level, parent_id, kind, title)
+        values (${userA}, 'step', ${goal}, 'mine', 'Call one friend a week')`),
+    ).rejects.toThrow(/not approved yet/);
+
+    const [step] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, status)
+      values (${userA}, 'step', ${goal}, 'mine', 'Call one friend a week', 'proposed')
+      returning id`);
+    const [question] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goal}, 'decision', 'Old friends or new ones first?')
+      returning id`);
+
+    await expect(
+      asClaude((tx) => tx`update items set status = 'open' where id = ${step.id}`),
+    ).rejects.toThrow(/only you can turn a proposed step/);
+    await expect(
+      asClaude((tx) => tx`update items set resolution = 'New' where id = ${question.id}`),
+    ).rejects.toThrow(/may not answer a question/);
+    await expect(
+      asClaude((tx) => tx`update items set approved_at = now() where id = ${goal}`),
+    ).rejects.toThrow(/may not approve/);
+
+    const history = await historyOf(step.id);
+    expect(history[0].actor).toBe('claude');
+  });
+
+  it('opens the goal and every proposed step beneath it when you approve', async () => {
+    const goal = await newGoal('Get fit');
+    const [parent] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, status)
+      values (${userA}, 'step', ${goal}, 'mine', 'Pick a gym', 'proposed') returning id`);
+    await asClaude((tx) => tx`
+      insert into items (user_id, level, parent_id, kind, title, status)
+      values (${userA}, 'step', ${parent.id}, 'claude', 'Compare three gyms nearby', 'proposed')`);
+
+    const [{ opened }] = await asUser(userA, (tx) =>
+      tx<{ opened: number }[]>`select approve_goal(${goal}) as opened`,
+    );
+    expect(opened).toBe(2);
+
+    const rows = await admin<{ status: string; approved: boolean }[]>`
+      select status, approved_at is not null as approved from items
+      where id = ${goal} or parent_id = ${goal} or parent_id = ${parent.id} order by level`;
+    expect(rows).toEqual([
+      { status: 'open', approved: true },
+      { status: 'open', approved: false },
+      { status: 'open', approved: false },
+    ]);
+    // Somebody else's goal is out of reach.
+    const [{ none }] = await asUser(userB, (tx) =>
+      tx<{ none: number | null }[]>`select approve_goal(${goal}) as none`,
+    );
+    expect(none).toBeNull();
+  });
+
+  it('lets Claude add and reorder under an approved goal, but not touch the done-when or your steps', async () => {
+    const goal = await newGoal('Bench 200 lbs');
+    const [mine] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goal}, 'mine', 'Test a one-rep max') returning id`);
+    await asUser(userA, (tx) => tx`select approve_goal(${goal})`);
+
+    const [added] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, position)
+      values (${userA}, 'step', ${goal}, 'claude', 'Write a twelve-week programme', 5)
+      returning id`);
+    await asClaude((tx) => tx`update items set position = 50 where id = ${mine.id}`);
+    await asClaude((tx) => tx`update items set parent_id = ${added.id} where id = ${mine.id}`);
+
+    await expect(
+      asClaude((tx) => tx`update items set status = 'dropped' where id = ${mine.id}`),
+    ).rejects.toThrow(/drop or archive one of your steps/);
+    await expect(
+      asClaude((tx) => tx`update items set archived_at = now() where id = ${mine.id}`),
+    ).rejects.toThrow(/drop or archive one of your steps/);
+    await expect(
+      asClaude((tx) => tx`update items set acceptance = 'Bench 180' where id = ${goal}`),
+    ).rejects.toThrow(/done-when/);
+    await expect(
+      asClaude((tx) => tx`
+        insert into items (user_id, level, area_id, title)
+        values (${userA}, 'goal', ${areaA}, 'Run a marathon')`),
+    ).rejects.toThrow(/propose a goal but not add one/);
+    const [proposal] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title, status)
+      values (${userA}, 'goal', ${areaA}, 'Run a 10k', 'proposed') returning id`);
+    expect(proposal.id).toBeTruthy();
   });
 });
 

@@ -1,0 +1,39 @@
+# The goals routine
+
+The standing prompt for the Claude Code routine that **Work on this** on a
+goal's page fires (`app/goals/[goalId]/shaping-actions.ts`). The app appends a
+turn naming the goal, the account and the `goals.runs` row it wrote; the
+prompt below is what the routine carries when it starts.
+
+## Setting it up
+
+1. On claude.ai, create a routine on this repository with the **Supabase**
+   connector attached. It needs no schedule for Work on this; the daily and
+   weekly runs (plan #933 and #934) add schedules later.
+2. Paste the prompt below as its instructions.
+3. Copy the routine's id (`trig_…`) and create a token for it.
+4. In Vercel, on the project's Production environment, set
+   `CLAUDE_GOALS_ROUTINE_ID` to the id and `CLAUDE_GOALS_ROUTINE_TOKEN` to the
+   token, then redeploy. The token is scoped to this routine; the plan
+   routine's token answers 401.
+
+Until both are set, Work on this says so and starts nothing.
+
+## The prompt
+
+```
+You work the person's life goals in the goals schema of this repository's
+Supabase project (asjztutnqxbecruvyrbj), through the Supabase connector.
+
+Read .claude/skills/goals/SKILL.md first and follow it. It says how to read a
+goal, how to shape a new or vague one into proposed steps and one or two
+questions, what you may change before and after the person approves a goal,
+and how every write is labelled with goals.actor and goals.run_id.
+
+The turn after this one says which goal, which user_id and which goals.runs
+row this run is. If there is no such turn, write a goals.runs row yourself as
+the skill says and work every open goal that is new or has fog.
+
+You change rows, not code. Do not commit or push. Close the run row with a
+summary before you stop.
+```
