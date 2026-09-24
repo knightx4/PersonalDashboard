@@ -13,6 +13,7 @@ import { commentWhen, exactTime, shortWhen } from '@/lib/comments/when';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { useClockNow } from '@/lib/use-clock-now';
 import type { CommentAuthor, CommentTarget, DevComment } from '@/lib/comments/load';
+import type { PaidAction } from '@/lib/core/spend/paid-actions';
 import { PaidHint } from '@/components/ui/paid-hint';
 
 /**
@@ -28,8 +29,38 @@ import { PaidHint } from '@/components/ui/paid-hint';
  * wrote each one rather than by where it sits.
  */
 
-function DeleteComment({ id, target }: { id: string; target: CommentTarget }) {
-  const [state, action, pending] = useActionState(deleteComment, {} as CommentActionState);
+/** A server action the thread's forms post to. */
+type ThreadAction = (prev: CommentActionState, formData: FormData) => Promise<CommentActionState>;
+
+/**
+ * Where a thread's comments are kept, when it is not `dev_comments`.
+ *
+ * Goals keeps its threads in its own schema (plan #957), for every signed-in
+ * account rather than the owner alone, so its thread posts to its own
+ * actions. Everything else about the thread -- the tag, the waiting line, the
+ * optimistic comment -- is the same, which is why this is a prop and not a
+ * second component.
+ */
+export type CommentStore = {
+  add: ThreadAction;
+  remove: ThreadAction;
+  /** The action key the cost hint on a tagged comment prices. */
+  paid: PaidAction;
+};
+
+/** What a thread is on: a dev row, or a goal or step. */
+export type ThreadTarget = CommentTarget | 'goal';
+
+function DeleteComment({
+  id,
+  target,
+  remove,
+}: {
+  id: string;
+  target: ThreadTarget;
+  remove: ThreadAction;
+}) {
+  const [state, action, pending] = useActionState(remove, {} as CommentActionState);
 
   return (
     <form action={action} className="flex items-center gap-1">
@@ -86,11 +117,13 @@ function AuthorMark({ author }: { author: CommentAuthor }) {
 function Message({
   comment,
   target,
+  remove,
   grouped,
   titles,
 }: {
   comment: DevComment;
-  target: CommentTarget;
+  target: ThreadTarget;
+  remove: ThreadAction;
   /** Whether the message above is from the same author, so the header is up already. */
   grouped: boolean;
   /** What each step number in the body is called, for the hover text. */
@@ -144,7 +177,7 @@ function Message({
 
       {!unsent && (
         <div className="shrink-0 transition-opacity duration-150 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-          <DeleteComment id={comment.id} target={target} />
+          <DeleteComment id={comment.id} target={target} remove={remove} />
         </div>
       )}
     </li>
@@ -191,8 +224,9 @@ export function CommentThread({
   awaitingReply = false,
   composerOpen = false,
   titles,
+  store,
 }: {
-  target: CommentTarget;
+  target: ThreadTarget;
   /** The row being commented on, not the comment. */
   id: string;
   thread: readonly DevComment[];
@@ -220,11 +254,16 @@ export function CommentThread({
    * in the app.
    */
   composerOpen?: boolean;
+  /** Where the comments are kept, when not in `dev_comments`. */
+  store?: CommentStore;
 }) {
   // The write is not waited on: the comment is in the thread the moment it is
   // written, and a failure puts the words back in the box. Nothing on screen
   // is keyed to the request being in flight any more.
-  const [state, action] = useActionState(submit?.action ?? addComment, {} as CommentActionState);
+  const [state, action, sending] = useActionState(
+    submit?.action ?? store?.add ?? addComment,
+    {} as CommentActionState,
+  );
   const [writing, setWriting] = useState(composerOpen);
   const [draft, setDraft] = useState('');
   const box = useRef<HTMLTextAreaElement>(null);
@@ -299,6 +338,7 @@ export function CommentThread({
               key={comment.id}
               comment={comment}
               target={target}
+              remove={store?.remove ?? deleteComment}
               // Grouped on the same rule as any other turn. It used to be
               // forced apart so it could say "Sending…"; a comment that posts
               // straight into the thread has nothing to say that the one above
@@ -320,7 +360,16 @@ export function CommentThread({
               </div>
               <div className="min-w-0 flex-1 space-y-0.5">
                 <span className="text-small font-semibold text-ink-muted">Dash</span>
-                <p className="text-body text-ink-muted">Reading the row and replying…</p>
+                {/* Once the write has come back and the answer is still to
+                    come, what the action said about the wait -- that a
+                    session or the goals routine is on it -- replaces the
+                    plain line. While the write is out, the message is the
+                    last press's and says nothing about this one. */}
+                <p className="text-body text-ink-muted">
+                  {!sending && state.message && !state.error
+                    ? state.message
+                    : 'Reading the row and replying…'}
+                </p>
               </div>
             </li>
           )}
@@ -480,7 +529,7 @@ export function CommentThread({
               {/* Only a tagged comment is answered by Dash; the rest are free. */}
               {!submit && tagged && (
                 <PaidHint
-                  action="app/dev/comment-actions.ts#addComment"
+                  action={store?.paid ?? 'app/dev/comment-actions.ts#addComment'}
                   what="Cost of Dash's reply"
                   align="end"
                   className="self-center"

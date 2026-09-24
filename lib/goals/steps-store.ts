@@ -6,6 +6,8 @@ import {
   type Collection,
   type CollectionRecord,
 } from '@/lib/goals/collections-store';
+import type { DevComment } from '@/lib/comments/load';
+import { loadThreads } from '@/lib/goals/comments-store';
 import { dailyView, type DailyView } from '@/lib/goals/daily';
 import { GOALS_SCHEMA, type GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
@@ -120,6 +122,8 @@ export type GoalMap = {
   rhythms: Record<string, RhythmRecord>;
   /** The collections the information steps shown fill, with their records (plan #954). */
   information: Record<string, { collection: Collection; records: CollectionRecord[] }>;
+  /** The comments on the goal and on each step shown, keyed by item id (plan #957). */
+  threads: Record<string, DevComment[]>;
 };
 
 /** Whose rows, and which day it is for them, for bringing rhythm periods up to date. */
@@ -184,8 +188,10 @@ export async function loadGoalMap(
   const steps = byGoal.get(goalId) ?? [];
   const shown: string[] = [];
   const collectionIds: string[] = [];
+  const itemIds: string[] = [goalId];
   const collect = (list: StepNode[]) => {
     for (const node of list) {
+      itemIds.push(node.id);
       if (node.kind === 'rhythm') shown.push(node.id);
       if (node.collectionId) collectionIds.push(node.collectionId);
       collect(node.children);
@@ -193,9 +199,10 @@ export async function loadGoalMap(
   };
   collect(steps);
   collect(linked.map((entry) => entry.step));
-  const [records, information] = await Promise.all([
+  const [records, information, threads] = await Promise.all([
     syncRhythms(client, userId, liveRhythms(goals.map(toGoal), byGoal), today, shown),
     loadInformation(client, collectionIds),
+    loadThreads(client, itemIds),
   ]);
 
   return {
@@ -212,6 +219,7 @@ export async function loadGoalMap(
       }),
     ),
     information,
+    threads,
   };
 }
 

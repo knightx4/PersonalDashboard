@@ -24,6 +24,8 @@ import { loadGoalMap } from '@/lib/goals/steps-store';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { todayIn } from '@/lib/todo/tasks/model';
+import { Card } from '@/components/ui/card';
+import { GoalThread } from './goal-comments';
 import { GoalLinksSection } from './goal-links';
 import { GoalNumber } from './goal-number';
 import { GoalShaping } from './goal-shaping';
@@ -133,6 +135,15 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
           jobsOn={jobsOn}
         />
         <StepTree map={map} todoOn={moduleEnabled(account, 'todo')} />
+        {/* The goal's own thread (plan #957). Each step has its own, under its details. */}
+        <Card padding="dense">
+          <GoalThread
+            itemId={map.goal.id}
+            thread={map.threads[map.goal.id] ?? []}
+            label="Comment on this goal"
+            placeholder="A note on the goal. Tag @dash to ask about it, or to give it figures to file."
+          />
+        </Card>
       </div>
     </div>
   );

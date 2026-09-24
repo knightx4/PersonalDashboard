@@ -3,6 +3,7 @@
 import { createContext, useActionState, useContext, useId, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, CircleHelp, ListTree, Repeat, Sparkles, User } from 'lucide-react';
+import { CommentCount } from '@/components/dev/comment-count';
 import { AnswerBox, TheAnswered, TheOptions, useAnswerDraft } from '@/components/dev/question';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
@@ -45,6 +46,7 @@ import {
   unlinkStepAction,
   type StepActionState,
 } from './actions';
+import { GoalThread } from './goal-comments';
 import { InformationStep } from './information-step';
 import {
   answerQuestionAction,
@@ -91,6 +93,9 @@ const ShowAside = createContext(false);
 /** The collections the information steps fill, with their records (plan #954). */
 const Information = createContext<GoalMap['information']>({});
 
+/** The comments on each step, keyed by step id (plan #957). */
+const Threads = createContext<GoalMap['threads']>({});
+
 type Links = GoalMap['linksOf'];
 type OtherGoals = GoalMap['otherGoals'];
 
@@ -123,74 +128,76 @@ export function StepTree({ map, todoOn }: { map: GoalMap; todoOn: boolean }) {
       <TodoOn.Provider value={todoOn}>
         <Rhythms.Provider value={map.rhythms}>
           <Information.Provider value={map.information}>
-            <div className="space-y-6">
-              <section aria-label="Steps" className="space-y-2">
-                {total > 0 && (
-                  <p className="px-1 text-small text-ink-muted">
-                    {closed} of {total} {total === 1 ? 'step' : 'steps'} closed
-                  </p>
-                )}
-                {map.steps.length === 0 ? (
-                  <EmptyState
-                    icon={ListTree}
-                    title="No steps yet"
-                    description="Break the goal into the things that have to happen. Any step can hold sub-steps of its own."
-                  />
-                ) : (
-                  <Card>
-                    <StepList
-                      nodes={map.steps}
-                      depth={0}
-                      links={map.linksOf}
-                      otherGoals={map.otherGoals}
+            <Threads.Provider value={map.threads}>
+              <div className="space-y-6">
+                <section aria-label="Steps" className="space-y-2">
+                  {total > 0 && (
+                    <p className="px-1 text-small text-ink-muted">
+                      {closed} of {total} {total === 1 ? 'step' : 'steps'} closed
+                    </p>
+                  )}
+                  {map.steps.length === 0 ? (
+                    <EmptyState
+                      icon={ListTree}
+                      title="No steps yet"
+                      description="Break the goal into the things that have to happen. Any step can hold sub-steps of its own."
                     />
-                  </Card>
-                )}
-                {aside > 0 && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    aria-pressed={showAside}
-                    onClick={() => setShowAside(!showAside)}
-                  >
-                    {showAside
-                      ? 'Hide the questions put aside'
-                      : `Show ${aside === 1 ? 'the question' : `the ${aside} questions`} put aside`}
-                  </Button>
-                )}
-                <StepComposer parentId={map.goal.id} label="New step" />
-              </section>
-
-              {map.linked.length > 0 && (
-                <section aria-labelledby="linked-heading" className="space-y-2">
-                  <h2 id="linked-heading" className="px-1 text-ui font-semibold text-ink">
-                    Also counts towards this goal
-                  </h2>
-                  <Card>
-                    <ul className="divide-y divide-border">
-                      {map.linked.map((entry) => (
-                        <li key={entry.linkId}>
-                          <p className="px-3 pt-2 text-small text-ink-muted">
-                            From{' '}
-                            <Link href={`/goals/${entry.fromGoal.id}`} className="underline">
-                              {entry.fromGoal.title}
-                            </Link>
-                          </p>
-                          <StepList
-                            nodes={[entry.step]}
-                            depth={0}
-                            links={map.linksOf}
-                            otherGoals={map.otherGoals}
-                            unlinkId={entry.linkId}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  </Card>
+                  ) : (
+                    <Card>
+                      <StepList
+                        nodes={map.steps}
+                        depth={0}
+                        links={map.linksOf}
+                        otherGoals={map.otherGoals}
+                      />
+                    </Card>
+                  )}
+                  {aside > 0 && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      aria-pressed={showAside}
+                      onClick={() => setShowAside(!showAside)}
+                    >
+                      {showAside
+                        ? 'Hide the questions put aside'
+                        : `Show ${aside === 1 ? 'the question' : `the ${aside} questions`} put aside`}
+                    </Button>
+                  )}
+                  <StepComposer parentId={map.goal.id} label="New step" />
                 </section>
-              )}
-            </div>
+
+                {map.linked.length > 0 && (
+                  <section aria-labelledby="linked-heading" className="space-y-2">
+                    <h2 id="linked-heading" className="px-1 text-ui font-semibold text-ink">
+                      Also counts towards this goal
+                    </h2>
+                    <Card>
+                      <ul className="divide-y divide-border">
+                        {map.linked.map((entry) => (
+                          <li key={entry.linkId}>
+                            <p className="px-3 pt-2 text-small text-ink-muted">
+                              From{' '}
+                              <Link href={`/goals/${entry.fromGoal.id}`} className="underline">
+                                {entry.fromGoal.title}
+                              </Link>
+                            </p>
+                            <StepList
+                              nodes={[entry.step]}
+                              depth={0}
+                              links={map.linksOf}
+                              otherGoals={map.otherGoals}
+                              unlinkId={entry.linkId}
+                            />
+                          </li>
+                        ))}
+                      </ul>
+                    </Card>
+                  </section>
+                )}
+              </div>
+            </Threads.Provider>
           </Information.Provider>
         </Rhythms.Provider>
       </TodoOn.Provider>
@@ -259,6 +266,7 @@ function StepItem({
   const todoOn = useContext(TodoOn);
   const rhythms = useContext(Rhythms);
   const information = useContext(Information);
+  const thread = useContext(Threads)[node.id] ?? [];
   const filled = node.collectionId ? information[node.collectionId] : undefined;
   const rhythm: RhythmRecord | undefined = node.kind === 'rhythm' ? rhythms[node.id] : undefined;
   const current = node.status === 'open' ? (rhythm?.current ?? null) : null;
@@ -371,7 +379,7 @@ function StepItem({
     },
     {
       id: 'details',
-      label: details ? 'Hide details' : 'Details',
+      label: details ? 'Hide details and comments' : 'Details and comments',
       onSelect: () => setDetails(!details),
     },
     ...(unlinkId
@@ -473,6 +481,17 @@ function StepItem({
             {meta.map((line) => (
               <span key={line as string}>{line}</span>
             ))}
+            {/* How many comments the step carries, while they are out of
+                sight. Opens the details, where the thread is. */}
+            {!details && thread.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setDetails(true)}
+                className="press rounded-control hover:text-ink"
+              >
+                <CommentCount count={thread.length} />
+              </button>
+            )}
             {stepLinks.map((link) => (
               <Link key={link.linkId} href={`/goals/${link.goalId}`} className="underline">
                 Also {link.title}
@@ -492,6 +511,16 @@ function StepItem({
           {editState.error && <p className="px-1 text-small text-danger">{editState.error}</p>}
           {details && (
             <StepDetails node={node} links={stepLinks} otherGoals={otherGoals} edit={edit} />
+          )}
+          {details && (
+            <div className="px-1 pt-2">
+              <GoalThread
+                itemId={node.id}
+                thread={thread}
+                label="Comment"
+                placeholder="A note on this step. Tag @dash to ask about it, or to give it figures to file."
+              />
+            </div>
           )}
         </div>
         <ActionMenu label={`${node.title} actions`} items={items} />

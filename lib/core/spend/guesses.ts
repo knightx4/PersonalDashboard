@@ -171,4 +171,6 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // two thousand tokens as text and image together, and a statement runs to
   // a few pages.
   'read-into-form': run(HAIKU, 8_000, 800),
+  // A comment on a goal, with the goal's steps and collections written out.
+  'reply-to-goal-comment': run(HAIKU, 6_000, 400),
 };
