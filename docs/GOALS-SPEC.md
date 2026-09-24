@@ -372,6 +372,8 @@ A sketch for the migration, not the migration itself.
 - `goals.suggestions`: what Claude suggested, your reaction, and whether it
   happened.
 - `goals.runs`: one row per routine run, as `plan_runs` does for the dev plan.
+- `goals.comments`: the thread on a goal or a step, `me` or `claude` per
+  message (plan #957). A reply can file facts into a collection as drafts.
 - `archived_at` on areas and items, in place of deleting them.
 
 Its own schema, as `job_search` and `todo` have theirs, with row level security

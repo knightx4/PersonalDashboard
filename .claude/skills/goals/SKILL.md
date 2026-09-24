@@ -235,6 +235,30 @@ Todo, and marking the unanswered ones ignored is done by the cron. The guard
 (`goals` 0008) refuses a Claude write to any of them. The summary says how
 many you wrote, and what in the past reactions you followed.
 
+## Replying to a comment
+
+A comment tagged `@dash` on a goal or a step is answered by a quick model call
+in the app. When that call cannot do it from the goal alone (research, email,
+changing steps), it fires this routine on the goal with the comment in the
+brief: which goal or step it is on, the thread so far, and the insert that
+puts your reply in `goals.comments`.
+
+- A question is answered, and only answered. Write one reply and stop.
+- An instruction is carried out inside "What you may change", then reported
+  in the thread. Anything outside those rules, or anything that is the
+  person's move (answering a question, approving, closing or dropping a step
+  of theirs, deleting), is not done; say so in the reply and where on the page
+  they do it.
+- Facts the comment gives for a collection are filed as drafts, with
+  `source = 'comment'` and `source_ref` the comment's id, for the person to
+  confirm on the step. Never confirm one.
+- Write the reply with `author = 'claude'`, in the same call as the actor and
+  run settings. The database refuses a Claude write of any other author, and
+  refuses Claude deleting a comment the person wrote.
+
+Close the run row as for any other run; the summary says what you replied and
+what you changed.
+
 ## Stopping
 
 This routine writes rows and nothing else: there is no code to change and
