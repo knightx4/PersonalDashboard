@@ -120,6 +120,18 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'Saved when a goal\'s name or line loses focus after a change, and a reworded goal is placed again (place-aim). There is no button, only the field.',
   'app/shopping/review/actions.ts#readOrderFromEmail':
     'Nothing calls it. "Add from this email" on the review list opens the order form, whose page makes the same read as it renders, so the hint sits on that link under app/shopping/orders/new/page.tsx#NewOrderPage.',
+  'app/api/inbox/sync/continue/route.ts#POST':
+    'The sync calling itself to carry on past one invocation, authenticated by a token rather than a session. The press that started it is "Sync now", whose hint is under app/api/inbox/sync/route.ts#POST and prices each email.',
+  'app/api/review/reread-confirmations/route.ts#GET':
+    'A diagnostic opened by URL on the deployed site to count what the order reader gets from waiting confirmations (plan #830). Nothing links to it.',
+  'app/api/cron/map-sweep/route.ts#GET':
+    'Fired every five minutes by pg_cron to work the vault\'s map sweep; no press starts it.',
+  'app/api/cron/map-sweep/route.ts#POST':
+    'Fired every five minutes by pg_cron to work the vault\'s map sweep; no press starts it.',
+  'app/api/cron/youtube-library/route.ts#GET':
+    'Fired four times a day by pg_cron to fetch and embed the YouTube library\'s transcripts; no press starts it.',
+  'app/api/cron/youtube-library/route.ts#POST':
+    'Fired four times a day by pg_cron to fetch and embed the YouTube library\'s transcripts; no press starts it.',
 };
 
 /** Every paid press, in the order written. */

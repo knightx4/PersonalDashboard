@@ -243,7 +243,7 @@ export function operationsReachedBy(
   return result;
 }
 
-/** The exported functions of a server action file, by name. */
+/** The exported functions of a server action file or route handler, by name. */
 export function exportedFunctions(file: string): string[] {
   const parsed = parse(file);
   if (!parsed) return [];
@@ -263,6 +263,38 @@ export function exportedFunctions(file: string): string[] {
     }
   }
   return names;
+}
+
+const isUseServer = (statement: ts.Statement) =>
+  ts.isExpressionStatement(statement) &&
+  ts.isStringLiteral(statement.expression) &&
+  statement.expression.text === 'use server';
+
+/**
+ * Where a file declares server actions: `'file'` when it opens with
+ * `'use server'`, so every export is one; `'inline'` when a function inside
+ * it does, which the walk does not reach; null when it declares none.
+ */
+export function serverDirective(file: string): 'file' | 'inline' | null {
+  const parsed = parse(file);
+  if (!parsed) return null;
+  for (const statement of parsed.source.statements) {
+    if (isUseServer(statement)) return 'file';
+    if (!ts.isExpressionStatement(statement) || !ts.isStringLiteral(statement.expression)) break;
+  }
+  let inline = false;
+  const walk = (node: ts.Node): void => {
+    if (inline) return;
+    if (ts.isBlock(node) && node.statements.some(isUseServer)) inline = true;
+    else ts.forEachChild(node, walk);
+  };
+  walk(parsed.source);
+  return inline ? 'inline' : null;
+}
+
+/** A file's named imports from `@/…` and relative paths: local name to source. */
+export function namedImports(file: string): Map<string, { file: string; name: string }> {
+  return parse(file)?.imports ?? new Map();
 }
 
 export const REPO_ROOT = ROOT;
