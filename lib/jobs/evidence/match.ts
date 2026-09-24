@@ -15,6 +15,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { Requirement } from '../jd/requirements';
 import { parseMatchPayload, type MatchResult } from './match-payload';
 import type { ShortlistItem } from './shortlist';
@@ -76,6 +77,8 @@ export type MatchOptions = {
   apiKey: string;
   /** Overridable for tests. */
   client?: Anthropic;
+  /** What the call cost; record it as 'match-evidence'. */
+  onSpend?: SpendSink;
 };
 
 /** The bank, as it goes into the cached prefix. */
@@ -175,6 +178,7 @@ export async function matchRequirements(
     }
     return { ok: false, error: error instanceof Error ? error.message : 'Match failed.' };
   }
+  options.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
   const report = response.content.find(
     (block) => block.type === 'tool_use' && block.name === TOOL_NAME,

@@ -10,6 +10,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { z } from 'zod';
 
 /** Vision over a crowded shelf is the hard part; do not skimp on the model. */
@@ -58,6 +59,8 @@ export async function readGameShelfPhoto(input: {
   apiKey: string;
   mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
   base64Data: string;
+  /** What the call cost; record it as 'read-shelf-photo'. */
+  onSpend?: SpendSink;
 }): Promise<ShelfPhotoResult> {
   const client = new Anthropic({ apiKey: input.apiKey });
 
@@ -134,6 +137,7 @@ export async function readGameShelfPhoto(input: {
       error: error instanceof Error ? error.message : 'The photo read failed.',
     };
   }
+  input.onSpend?.({ model: SHELF_MODEL, usage: usageFrom(response.usage) });
 
   const toolUse = response.content.find(
     (block) => block.type === 'tool_use' && block.name === TOOL_NAME,

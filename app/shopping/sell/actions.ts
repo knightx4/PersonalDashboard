@@ -20,6 +20,11 @@ import {
 } from '@/lib/sell/price-lookup';
 import type { PriceEvidence } from '@/lib/sell/price-evidence';
 import { formatMoney, parseDollarsToCents } from '@/lib/money';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSessionSpend } from '@/lib/core/spend/session';
+import type { SpendOperation } from '@/lib/core/spend/operations';
+
+const ESTIMATE_SPEND: SpendOperation = { module: 'shopping', operation: 'estimate-resale-price' };
 
 export type SellActionState = {
   error?: string;
@@ -152,13 +157,16 @@ export async function priceSellItems(
   }
   const rescan = String(formData.get('rescan') ?? '') === '1';
 
+  const spend: SpendReport[] = [];
   const result = await runPriceLookups({
     supabase,
     userId: user.id,
     ids,
     // A named item is always re-fetched; a sweep of the whole list fills gaps.
     skipPriced: ids === undefined && !rescan,
+    onSpend: (report) => spend.push(report),
   });
+  await recordSessionSpend(user.id, ESTIMATE_SPEND, spend);
 
   if (result.source === 'none') {
     return { error: 'No price source configured.' };
@@ -225,7 +233,8 @@ export async function priceOneItem(
   };
   const source = expectedPriceSourceKind(keys);
   if (source === 'none') return { error: 'No price source configured.' };
-  const provider = await createExpectedPriceSource(keys);
+  const spend: SpendReport[] = [];
+  const provider = await createExpectedPriceSource({ ...keys, onSpend: (report) => spend.push(report) });
 
   let cents: number | null = null;
   try {
@@ -241,6 +250,8 @@ export async function priceOneItem(
   } catch (error) {
     console.error('price lookup failed', item.inventoryItemId, error);
     return { error: 'The price lookup failed. Try again in a moment.' };
+  } finally {
+    await recordSessionSpend(user.id, ESTIMATE_SPEND, spend);
   }
 
   revalidatePath('/shopping/sell');
@@ -302,7 +313,8 @@ export async function searchItemPrice(
   if (expectedPriceSourceKind(keys) === 'none') {
     return { error: 'No price source configured.' };
   }
-  const provider = await createExpectedPriceSource(keys);
+  const spend: SpendReport[] = [];
+  const provider = await createExpectedPriceSource({ ...keys, onSpend: (report) => spend.push(report) });
 
   const identity = await sellIdentityOf(supabase, item.id);
   const subject =
@@ -328,6 +340,8 @@ export async function searchItemPrice(
   } catch (error) {
     console.error('price search failed', item.id, error);
     return { error: 'The price search failed. Try again in a moment.' };
+  } finally {
+    await recordSessionSpend(user.id, ESTIMATE_SPEND, spend);
   }
 
   if (found.cents == null) {

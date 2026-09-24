@@ -17,6 +17,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { parseDraftPayload, type DraftResult } from './draft-payload';
 import type { ShortlistItem } from './shortlist';
 
@@ -81,6 +82,8 @@ export type DraftOptions = {
   apiKey: string;
   /** Overridable for tests. */
   client?: Anthropic;
+  /** What the call cost; record it as 'draft-answer'. */
+  onSpend?: SpendSink;
 };
 
 function renderBank(bank: readonly ShortlistItem[]): string {
@@ -168,6 +171,7 @@ export async function draftAnswer(
     }
     return { ok: false, error: error instanceof Error ? error.message : 'Draft failed.' };
   }
+  options.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
   const report = response.content.find(
     (block) => block.type === 'tool_use' && block.name === TOOL_NAME,

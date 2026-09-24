@@ -15,6 +15,8 @@ import {
 } from '@/lib/jobs/enrich/company';
 import { fetchSiteIcon } from '@/lib/jobs/enrich/site-icon';
 import { lookupCompanyOnline } from '@/lib/jobs/enrich/ai-company';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSessionSpend } from '@/lib/core/spend/session';
 import { statusRank, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
 
@@ -317,7 +319,12 @@ export async function proposeAiCompanyEnrichment(
       .filter((entry): entry is string => Boolean(entry))
       .join('; ') || null;
 
-  const result = await lookupCompanyOnline({ apiKey }, { name: company.name as string, hints });
+  const spend: SpendReport[] = [];
+  const result = await lookupCompanyOnline(
+    { apiKey, onSpend: (report) => spend.push(report) },
+    { name: company.name as string, hints },
+  );
+  await recordSessionSpend(user.id, { module: 'jobs', operation: 'enrich-company' }, spend);
   if (!result.ok) return { proposal: null, error: result.error };
 
   const changes: string[] = [];

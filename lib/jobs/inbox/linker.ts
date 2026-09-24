@@ -11,6 +11,8 @@ import {
 } from '@/lib/jobs/inbox/ingest-messages';
 import { loadCompanies, loadExcludedDomains, loadLinkCandidates } from '@/lib/jobs/inbox/link-candidates';
 import { normalizeTimeZone } from '@/lib/core/timezone';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSpendReports, type SpendClient } from '@/lib/core/spend/record';
 
 /**
  * The job search workspace, as something the shared sync can hand mail to.
@@ -22,7 +24,16 @@ import { normalizeTimeZone } from '@/lib/core/timezone';
  * was the price of admission. Sharing core's envelopes removes that price
  * entirely: the same fetch that finds order confirmations finds rejections.
  */
-export function jobLinker(supabase: AppSupabaseClient): DomainLinker {
+export function jobLinker(
+  supabase: AppSupabaseClient,
+  /** Where Tier B's spend is written: the core schema, service role. */
+  core?: SpendClient,
+): DomainLinker {
+  const record = async (userId: string, spend: SpendReport[]) => {
+    if (!core) return;
+    await recordSpendReports(core, userId, { module: 'jobs', operation: 'classify-job-email' }, spend);
+  };
+
   return {
     domain: 'jobs',
 
@@ -36,6 +47,7 @@ export function jobLinker(supabase: AppSupabaseClient): DomainLinker {
      * longer exists.
      */
     async sweep({ userId, accountId, accountEmail, accessToken, budgetMs }) {
+      const spend: SpendReport[] = [];
       const [companies, candidates, excludedDomains, profile] = await Promise.all([
         loadCompanies(supabase, userId),
         loadLinkCandidates(supabase, userId),
@@ -60,9 +72,11 @@ export function jobLinker(supabase: AppSupabaseClient): DomainLinker {
           excludedDomains,
           timezone: normalizeTimeZone(profile.data?.timezone as string | undefined),
           counters: emptyCounters(),
+          onSpend: (report) => spend.push(report),
         },
         { budgetMs },
       );
+      await record(userId, spend);
     },
 
     async link({ userId, accountId, accountEmail, accessToken, envelopes }) {
@@ -83,6 +97,7 @@ export function jobLinker(supabase: AppSupabaseClient): DomainLinker {
       ]);
 
       const ingest = emptyCounters();
+      const spend: SpendReport[] = [];
 
       const ctx = {
         userId,
@@ -102,9 +117,11 @@ export function jobLinker(supabase: AppSupabaseClient): DomainLinker {
         // put the interview five hours out.
         timezone: normalizeTimeZone(profile.data?.timezone as string | undefined),
         counters: ingest,
+        onSpend: (report: SpendReport) => spend.push(report),
       };
 
       if (envelopes.length > 0) await linkEnvelopes(supabase, ctx, envelopes);
+      await record(userId, spend);
 
       // Anything created just now changes what held mail can match against, so
       // messages that used up their retries before it existed get their budget
