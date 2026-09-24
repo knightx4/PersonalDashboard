@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { Field, Textarea } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
@@ -118,6 +119,10 @@ export function QuestionForm({
 
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <AnswerButton />
+              <PaidHint
+                action="app/learn/quiz/[id]/take/actions.ts#answerQuiz"
+                what="Cost of marking the answer"
+              />
               {state.error && <span className="text-ui text-danger">{state.error}</span>}
             </div>
           </form>

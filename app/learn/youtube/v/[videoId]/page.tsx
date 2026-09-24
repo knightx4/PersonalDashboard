@@ -130,6 +130,7 @@ export default async function VideoPage({
             {video.state !== 'queued' && (
               <Press
                 action={transcribeVideoAction}
+                cost="app/learn/youtube/actions.ts#transcribeVideoAction"
                 fields={{ videoId: video.videoId }}
                 label={video.state === 'none' ? 'Try again' : 'Get transcript'}
                 pendingLabel="Fetching…"

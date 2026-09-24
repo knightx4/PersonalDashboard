@@ -2,7 +2,9 @@
 
 import { useActionState } from 'react';
 import { Button, type ButtonProps } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { cn } from '@/lib/cn';
+import type { PaidAction } from '@/lib/core/spend/paid-actions';
 import type { PressState } from './actions';
 
 /**
@@ -11,6 +13,9 @@ import type { PressState } from './actions';
  * Transcribing a playlist or re-listing a channel can take a minute, and the
  * list it changes may look the same afterwards, so the line the action
  * returns is shown beside the button until the next press.
+ *
+ * `cost` names the press in lib/core/spend/paid-actions.ts when the action
+ * spends on a model, and puts its $ hint beside the button.
  */
 export function Press({
   action,
@@ -18,6 +23,7 @@ export function Press({
   label,
   pendingLabel,
   variant = 'secondary',
+  cost,
   className,
 }: {
   action: (state: PressState, formData: FormData) => Promise<PressState>;
@@ -25,6 +31,7 @@ export function Press({
   label: string;
   pendingLabel: string;
   variant?: ButtonProps['variant'];
+  cost?: PaidAction;
   className?: string;
 }) {
   const [state, run, pending] = useActionState(action, {});
@@ -37,6 +44,7 @@ export function Press({
       <Button type="submit" size="sm" variant={variant} pending={pending}>
         {pending ? pendingLabel : label}
       </Button>
+      {cost && <PaidHint action={cost} what="Cost of embedding what it fetches" className="-ml-2" />}
       {state.error ? (
         <span role="alert" className="text-small text-danger">
           {state.error}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useFormStatus } from 'react-dom';
+import { PaidHint } from '@/components/ui/paid-hint';
 import type { Concept } from '@/lib/learn/graph/model';
 import { readAboutConcept } from './actions';
 
@@ -36,10 +37,14 @@ export function ReadAbout({
   if (!anyState && concept.state !== 'shaky' && concept.state !== 'misconception') return null;
 
   return (
-    <form action={readAboutConcept}>
+    <form action={readAboutConcept} className="flex items-center gap-1">
       <input type="hidden" name="conceptId" value={concept.id} />
       <input type="hidden" name="subjectId" value={subjectId} />
       <Submit />
+      <PaidHint
+        action="app/learn/s/[id]/actions.ts#readAboutConcept"
+        what="Cost of the search"
+      />
     </form>
   );
 }

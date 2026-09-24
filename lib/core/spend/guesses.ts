@@ -108,7 +108,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
 
   // Learn: the catalogue. One search press embeds the claim and judges the
   // nearest segments, up to forty of them, so the judging is priced per press.
-  'embed-catalogue': background(run(VOYAGE_LITE, 500_000, 0)),
+  // The embedding is not background: the pull buttons on a track's page and
+  // the transcribe buttons on the YouTube page embed what they fetched in the
+  // same press (plan #917), and the sweep script records under the same name.
+  'embed-catalogue': run(VOYAGE_LITE, 500_000, 0),
   'embed-claim': run(VOYAGE_LITE, 100, 0),
   'judge-segment': run(HAIKU, 60_000, 3_000),
 

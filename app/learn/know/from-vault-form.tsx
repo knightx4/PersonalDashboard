@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { Field, Select } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import type { ProposedChain } from '@/lib/learn/graph/chain-payload';
@@ -114,8 +115,12 @@ export function FromVaultForm({
       {state.message && <p className="mt-2 text-ui text-ink-muted">{state.message}</p>}
       {state.error && <p className="mt-2 text-ui text-caution">{state.error}</p>}
 
-      <div className="mt-4">
+      <div className="mt-4 flex items-center gap-3">
         <ReadButton />
+        <PaidHint
+          action="app/learn/know/actions.ts#proposeFromNote"
+          what="Cost of reading the note"
+        />
       </div>
     </form>
   );

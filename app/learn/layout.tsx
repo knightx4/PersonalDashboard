@@ -11,6 +11,9 @@ import { loadLearnBrief } from '@/lib/shell/brief';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { countReadNow } from '@/lib/learn/tracks/load';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { estimatePaidActions, paidActionsUnder } from '@/lib/core/spend/paid-actions';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 
 /**
  * Shell for the learn workspace.
@@ -27,7 +30,11 @@ export default async function LearnLayout({ children }: { children: React.ReactN
   if (!user) redirect('/login');
 
   const supabase = await createClient();
-  const [{ data: profile }, settings, counts, activity, raised, mainCheck, owner] =
+  // Every paid button's $ hint in Learn, from one read of the spend ledger
+  // (plan #917). Here rather than on each page because the buttons sit in
+  // forms several components deep, and the figures change slowly enough that
+  // one read per visit to the module is plenty.
+  const [{ data: profile }, settings, counts, activity, raised, mainCheck, owner, costs] =
     await Promise.all([
       supabase.from('profiles').select('display_name').eq('id', user.id).single(),
       loadAccountSettings(user.id),
@@ -36,6 +43,9 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       loadRaisedNotifications(user.id),
       loadMainCheck(),
       isOwner({ user }),
+      createCoreClient()
+        .then((core) => estimatePaidActions(core, user.id, paidActionsUnder('app/learn/')))
+        .catch(() => ({})),
     ]);
 
   const brief = await loadLearnBrief();
@@ -140,7 +150,7 @@ export default async function LearnLayout({ children }: { children: React.ReactN
         mainCheck={mainCheck}
         brief={brief}
       >
-        {children}
+        <PaidCostsProvider costs={costs}>{children}</PaidCostsProvider>
       </AppShell>
     </div>
   );

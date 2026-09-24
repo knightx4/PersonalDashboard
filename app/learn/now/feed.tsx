@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import {
@@ -519,6 +520,10 @@ function DeckCard({
               <GraduationCap className="size-3.5" strokeWidth={2} aria-hidden />
               {testing ? 'Starting a track…' : 'Test me on this'}
             </Button>
+            <PaidHint
+              action="app/learn/now/actions.ts#testMeOnCard"
+              what="Cost of starting a track from this card"
+            />
             {/* Not interested and the two ratings stay on one line, the
                 ratings to its right, down to a 360px phone: that is why the
                 labels drop "Too" below sm. */}

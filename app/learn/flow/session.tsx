@@ -5,6 +5,7 @@ import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
 import { Sprout } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { ProbeOptions } from '@/components/learn/probe-options';
@@ -41,9 +42,12 @@ function AskButton({ label }: { label: string }) {
   // Usually the next question was written ahead and comes straight back. The
   // wait is only long when the queue ran dry and it is being written now.
   return (
-    <Button type="submit" disabled={pending}>
-      {pending ? 'Getting the next question…' : label}
-    </Button>
+    <span className="inline-flex items-center gap-1">
+      <Button type="submit" disabled={pending}>
+        {pending ? 'Getting the next question…' : label}
+      </Button>
+      <PaidHint action="app/learn/flow/actions.ts#flowStep:ask" what="Cost of the next question" />
+    </span>
   );
 }
 
@@ -187,7 +191,13 @@ function TrackOfferCard({
             <input type="hidden" name="intent" value="start-track" />
             <input type="hidden" name="themeId" value={offer.themeId} />
             <TrackField track={track} tracksOnly={tracksOnly} />
-            <StartButton />
+            <span className="inline-flex items-center gap-1">
+              <StartButton />
+              <PaidHint
+                action="app/learn/flow/actions.ts#flowStep:start-track"
+                what="Cost of starting the track"
+              />
+            </span>
           </form>
           {(['not_now', 'never'] as const).map((outcome) => (
             <form key={outcome} action={setAside}>
@@ -326,8 +336,17 @@ export function FlowSession({
         <ProbeOptions options={live.options} answered={live.answered ?? null} />
         {!live.answered && (
           <div className="flex flex-wrap items-center gap-4 pt-1">
-            <DontKnowButton />
-            <NotNowButton />
+            <span className="inline-flex items-center gap-1">
+              <DontKnowButton />
+              <PaidHint action="app/learn/flow/actions.ts#flowStep:answer" what="Cost of answering" />
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <NotNowButton />
+              <PaidHint
+                action="app/learn/flow/actions.ts#flowStep:ask"
+                what="Cost of the next question"
+              />
+            </span>
           </div>
         )}
       </form>
