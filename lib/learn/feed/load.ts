@@ -12,6 +12,7 @@ import {
   type FeedCard,
   type FeedCardRow,
 } from './card';
+import { ARTICLE_GAP, POOL_FACTOR, spreadDeck, type Spreadable } from './spread';
 
 /**
  * Reading and marking Learn now cards through the person's own session
@@ -20,7 +21,7 @@ import {
  */
 
 const CARD_SELECT =
-  'id, reason, status, idea_name, summary, why, takeaway, context, hook, example, check_question, check_answer, depth, difficulty, ' +
+  'id, reason, status, idea_name, theme_name, aim_name, field_id, summary, why, takeaway, context, hook, example, check_question, check_answer, depth, difficulty, ' +
   'item:catalogue_items!feed_cards_item_id_fkey(title, canonical_url, licence), ' +
   'segment:catalogue_segments!feed_cards_segment_id_fkey(heading, text, section_anchor)';
 
@@ -46,6 +47,12 @@ function returnCutoff(status: 'review' | 'skipped', now: number): string {
  * new cards always open by saying what they are about; a card coming back
  * after a skip or "work on this" is shown without one if it was written
  * before the paragraph existed.
+ *
+ * The page is dealt from a pool several times its size, so two cards from one
+ * article, such as two ideas from one section, are kept apart, and two cards
+ * for one theme are not back to back where another will do (spread.ts). The
+ * cards the page already holds are the last ids in `exclude`, in deck order,
+ * so a later page carries on the spacing.
  */
 export async function loadFeedPage(
   supabase: LearnSupabaseClient,
@@ -85,19 +92,48 @@ export async function loadFeedPage(
     return (data ?? []) as unknown as FeedCardRow[];
   };
 
+  const pool = limit * POOL_FACTOR;
   const rows: FeedCardRow[] = [];
   for (const status of ['review', 'ready', 'skipped'] as const) {
     rows.push(
       ...(await read(
         status,
-        limit - rows.length,
+        pool - rows.length,
         rows.map((row) => row.id),
       )),
     );
   }
-  return rows.flatMap((row) => {
+  const dealable = rows.flatMap((row) => {
     const card = toFeedCard(row);
-    return card ? [card] : [];
+    return card ? [{ card, article: card.article, target: targetOf(row) }] : [];
+  });
+  const recent = await recentInDeck(supabase, exclude.slice(-ARTICLE_GAP));
+  return spreadDeck(dealable, recent, limit).map((dealt) => dealt.card);
+}
+
+/** What a card was picked for, for keeping two on one theme apart. */
+function targetOf(row: FeedCardRow): string | null {
+  return row.theme_name ?? row.aim_name ?? row.field_id ?? null;
+}
+
+/** The article and target of the cards last dealt, oldest first. */
+async function recentInDeck(supabase: LearnSupabaseClient, ids: string[]): Promise<Spreadable[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase
+    .from('feed_cards')
+    .select('id, theme_name, aim_name, field_id, item:catalogue_items!feed_cards_item_id_fkey(title)')
+    .in('id', ids);
+  // Only spacing is lost without it, so a failed read deals the page as though fresh.
+  if (error) return [];
+  const byId = new Map(
+    ((data ?? []) as unknown as (Pick<FeedCardRow, 'theme_name' | 'aim_name' | 'field_id'> & {
+      id: string;
+      item: { title: string } | null;
+    })[]).map((row) => [row.id, { article: row.item?.title ?? '', target: targetOf(row as FeedCardRow) }]),
+  );
+  return ids.flatMap((id) => {
+    const found = byId.get(id);
+    return found ? [found] : [];
   });
 }
 

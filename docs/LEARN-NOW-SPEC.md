@@ -157,6 +157,11 @@ them.
 
 ## How cards are made
 
+[LEARN-LESSONS-SPEC](LEARN-LESSONS-SPEC.md) replaces this with lessons written
+for the concepts in your tracks, decided on 24 September 2026. Until it is
+built, cards are made as below; once it is, this is how exploratory cards are
+made.
+
 The catalogue is empty, so the feed has to fill it. A background pass keeps
 about twenty cards ready per person, and runs hourly and whenever the ready
 count drops to seven or fewer.
@@ -344,7 +349,23 @@ are not shown again.
 
 The deck asks for more cards while four are still ahead, so moving on never
 waits for the network. It serves returning "work on this" cards first, then
-ready cards newest first, then returning skipped ones.
+ready cards newest first, then returning skipped ones, spaced out as "The
+order of the deck" describes.
+
+### The order of the deck
+
+Decided by the owner on 24 September 2026, the day ideas went in, after three
+cards in a row from "Tell (archaeology)". A section's ideas are written at the
+same moment, so newest first served them back to back, and picks for one theme
+arrived together the same way (three geopolitics cards in a row).
+
+A page of the deck is dealt from a pool four times its size, in the order
+above. Each next card is the first in that order that shares no article with
+the last four cards dealt and, where possible, is not for the same theme or
+goal as the card before it. When every card left clashes, the one whose article
+was seen longest ago goes next. The page sends the ids it already holds in deck
+order, so the spacing carries on from one page to the next. Code:
+`lib/learn/feed/spread.ts`.
 
 ## One idea per card
 
