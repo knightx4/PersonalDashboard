@@ -2460,7 +2460,18 @@ export const SURFACES: readonly Surface[] = [
     label: 'News · Quick read story card',
     module: 'news',
     width: 'page',
-    render: () => <QuickReadView {...quickStory} />,
+    // The essay drawn behind it, so Next shows it at once (note 452a90d9).
+    render: () => (
+      <QuickReadView
+        {...quickStory}
+        upNext={{
+          card: quickEssay.card!,
+          arrived: '20 Sep, 09:02',
+          saved: false,
+          issueHref: '/news/i/issue-2',
+        }}
+      />
+    ),
   },
   {
     id: 'news-quick-essay',

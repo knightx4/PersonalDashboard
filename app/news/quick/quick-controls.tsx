@@ -1,6 +1,15 @@
 'use client';
 
-import { Fragment, startTransition, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  Fragment,
+  createContext,
+  startTransition,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useFormStatus } from 'react-dom';
 import { ArrowRight, EyeOff, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -30,13 +39,55 @@ export function QuickNextForm({ issueId, storyIndex }: { issueId: string; storyI
   );
 }
 
+/** What QuickDeck hands the Next button: move to the story already drawn behind this one. */
+const AdvanceContext = createContext<(() => void) | null>(null);
+
 function NextButton() {
   const { pending } = useFormStatus();
+  const advance = useContext(AdvanceContext);
+  // The pass is on its way the moment the form is pending, so the story
+  // behind this one can show now rather than when the page comes back.
+  useEffect(() => {
+    if (pending) advance?.();
+  }, [pending, advance]);
   return (
     <Button type="submit" size="lg" pending={pending}>
       {pending ? 'Loading…' : 'Next story'}
       {!pending && <ArrowRight className="size-4" strokeWidth={2} aria-hidden />}
     </Button>
+  );
+}
+
+/**
+ * The phone card with the one after it already drawn (note 452a90d9).
+ *
+ * The page renders both on the server; `next` stays out of the DOM until Next
+ * (or a swipe, which submits the same form) goes pending, and then shows at
+ * once while the pass is recorded. The page that comes back has that story as
+ * its current card, and the caller keys the deck on the current story, so the
+ * deck starts again from it with the following story behind it. The next
+ * story's picture is fetched ahead as well, so it does not arrive after the
+ * words. With no story behind this one, Next waits for the page as before.
+ */
+export function QuickDeck({
+  current,
+  next,
+  nextImage,
+}: {
+  current: ReactNode;
+  next: ReactNode | null;
+  nextImage: string | null;
+}) {
+  const [advanced, setAdvanced] = useState(false);
+  const advance = next ? () => setAdvanced(true) : null;
+  return (
+    <AdvanceContext.Provider value={advance}>
+      {advanced && next ? next : current}
+      {!advanced && nextImage && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={nextImage} alt="" referrerPolicy="no-referrer" hidden />
+      )}
+    </AdvanceContext.Provider>
   );
 }
 

@@ -13,6 +13,7 @@ import type { QuickCard } from '@/lib/news/quick/next';
 import {
   ArticleLink,
   HideTopicForm,
+  QuickDeck,
   QuickNextForm,
   QuickPageForm,
   QuickSwipe,
@@ -44,6 +45,12 @@ export type QuickReadViewProps = {
    * single card shows at every width, as it did before the grid.
    */
   page?: readonly QuickPageStory[];
+  /**
+   * The story Next shows after this one, drawn ahead so the phone card
+   * changes the moment Next is pressed (note 452a90d9). Left out, Next waits
+   * for the page to come back.
+   */
+  upNext?: QuickPageStory | null;
 };
 
 /** One story of the laptop page, with what the grid card needs beside the story. */
@@ -72,6 +79,7 @@ export function QuickReadView({
   seed,
   topics,
   page = [],
+  upNext = null,
 }: QuickReadViewProps) {
   const topic = topics.selected;
   const chips = <TopicChips {...topics} className="mb-4" />;
@@ -114,10 +122,7 @@ export function QuickReadView({
   }
 
   const story = card.kind === 'story' ? card.story : null;
-  const headline = story ? story.headline : (card.subject ?? 'No subject');
-  const summary = card.kind === 'story' ? card.story.summary : card.summary;
   const image = story?.image ?? null;
-  const left = card.remainingInIssue - 1;
   const grid = page.length > 0;
   // The pictures button shows where there is a picture to hide: on a phone
   // when the card has one, on a laptop when any story on the page has one.
@@ -161,66 +166,34 @@ export function QuickReadView({
 
       {/* One card below md and the grid from md up, chosen by CSS so the server never needs the screen size. */}
       <div className={grid ? 'md:hidden' : undefined}>
-        <QuickSwipe key={`${card.issueId}:${card.storyIndex}`}>
-          <Card padding="none" className="overflow-hidden">
-            <article>
-              {pictures && image && (
-                // A plain img for the reason given on the issue page: the address
-                // is the sender's, and next/image would need every sender's host.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={image}
-                  alt=""
-                  referrerPolicy="no-referrer"
-                  className="aspect-[16/9] w-full border-b border-border bg-sunken object-cover"
-                />
-              )}
-              <div className="card-pad">
-                <p className="truncate text-ui text-ink-muted">
-                  {card.from ?? 'Unknown sender'}
-                  {arrived && ` · ${arrived}`}
-                </p>
-                <h2 className="mt-1 break-words font-display text-title tracking-tight text-ink">
-                  {headline}
-                </h2>
-                <p className="mt-2 break-words text-body leading-relaxed text-ink">{summary}</p>
-                {story && <StoryText text={story.text} summary={summary} />}
-                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                  {story?.link && (
-                    <ArticleLink
-                      href={story.link}
-                      issueId={card.issueId}
-                      storyIndex={card.storyIndex}
-                    />
-                  )}
-                  {issueHref && (
-                    <Link href={issueHref} className="text-ui text-accent hover:underline">
-                      {card.kind === 'essay' ? 'Read the newsletter' : 'Open the whole newsletter'}
-                    </Link>
-                  )}
-                </div>
-              </div>
-              <div className="card-pad-x flex flex-wrap items-center justify-between gap-3 border-t border-border py-3">
-                <p className="text-ui text-ink-muted">
-                  {left === 0
-                    ? `The last ${topic ? `${topic} story` : 'story'} from this newsletter`
-                    : `${left} more ${topic ? `on ${topic} ` : ''}from this newsletter`}
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  {story && (
-                    <SaveStoryButton
-                      issueId={card.issueId}
-                      headline={story.headline}
-                      saved={saved}
-                    />
-                  )}
-                  {story?.topic && <HideTopicForm topic={story.topic} />}
-                  <QuickNextForm issueId={card.issueId} storyIndex={card.storyIndex} />
-                </div>
-              </div>
-            </article>
-          </Card>
-        </QuickSwipe>
+        <QuickDeck
+          key={`${card.issueId}:${card.storyIndex}`}
+          current={
+            <PhoneCard
+              card={card}
+              arrived={arrived}
+              saved={saved}
+              pictures={pictures}
+              issueHref={issueHref}
+              topic={topic}
+            />
+          }
+          next={
+            upNext && (
+              <PhoneCard
+                card={upNext.card}
+                arrived={upNext.arrived}
+                saved={upNext.saved}
+                pictures={pictures}
+                issueHref={upNext.issueHref}
+                topic={topic}
+              />
+            )
+          }
+          nextImage={
+            pictures && upNext?.card.kind === 'story' ? (upNext.card.story.image ?? null) : null
+          }
+        />
       </div>
 
       {grid && (
@@ -241,6 +214,90 @@ export function QuickReadView({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * One story as the phone card draws it: the current one, or the one drawn
+ * ahead of it for Next.
+ */
+function PhoneCard({
+  card,
+  arrived,
+  saved,
+  pictures,
+  issueHref,
+  topic,
+}: {
+  card: QuickCard;
+  arrived: string | null;
+  saved: boolean;
+  pictures: boolean;
+  issueHref: string | null;
+  topic: string | null;
+}) {
+  const story = card.kind === 'story' ? card.story : null;
+  const headline = story ? story.headline : (card.subject ?? 'No subject');
+  const summary = card.kind === 'story' ? card.story.summary : card.summary;
+  const image = story?.image ?? null;
+  const left = card.remainingInIssue - 1;
+  return (
+    <QuickSwipe key={`${card.issueId}:${card.storyIndex}`}>
+      <Card padding="none" className="overflow-hidden">
+        <article>
+          {pictures && image && (
+            // A plain img for the reason given on the issue page: the address
+            // is the sender's, and next/image would need every sender's host.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={image}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="aspect-[16/9] w-full border-b border-border bg-sunken object-cover"
+            />
+          )}
+          <div className="card-pad">
+            <p className="truncate text-ui text-ink-muted">
+              {card.from ?? 'Unknown sender'}
+              {arrived && ` · ${arrived}`}
+            </p>
+            <h2 className="mt-1 break-words font-display text-title tracking-tight text-ink">
+              {headline}
+            </h2>
+            <p className="mt-2 break-words text-body leading-relaxed text-ink">{summary}</p>
+            {story && <StoryText text={story.text} summary={summary} />}
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              {story?.link && (
+                <ArticleLink
+                  href={story.link}
+                  issueId={card.issueId}
+                  storyIndex={card.storyIndex}
+                />
+              )}
+              {issueHref && (
+                <Link href={issueHref} className="text-ui text-accent hover:underline">
+                  {card.kind === 'essay' ? 'Read the newsletter' : 'Open the whole newsletter'}
+                </Link>
+              )}
+            </div>
+          </div>
+          <div className="card-pad-x flex flex-wrap items-center justify-between gap-3 border-t border-border py-3">
+            <p className="text-ui text-ink-muted">
+              {left === 0
+                ? `The last ${topic ? `${topic} story` : 'story'} from this newsletter`
+                : `${left} more ${topic ? `on ${topic} ` : ''}from this newsletter`}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {story && (
+                <SaveStoryButton issueId={card.issueId} headline={story.headline} saved={saved} />
+              )}
+              {story?.topic && <HideTopicForm topic={story.topic} />}
+              <QuickNextForm issueId={card.issueId} storyIndex={card.storyIndex} />
+            </div>
+          </div>
+        </article>
+      </Card>
+    </QuickSwipe>
   );
 }
 
