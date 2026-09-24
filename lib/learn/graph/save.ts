@@ -131,10 +131,24 @@ export async function saveChain(
    * `theme` is the vault theme a track was started from, when it was. The
    * track then takes that theme's placement in the areas rather than asking
    * the model for one.
+   *
+   * `subjectId` writes into a track already known to be this person's,
+   * skipping the lookup by name and the placement. It is how a write through
+   * the service role stays scoped: the name lookup relies on RLS to see only
+   * the person's own tracks, and under the service role it would match a
+   * track of the same name belonging to anybody (lib/learn/lessons/lay-out-unit.ts).
    */
-  options: { goal?: boolean; origin?: ConceptOrigin; theme?: TrackTheme; unitId?: string | null } = {},
+  options: {
+    goal?: boolean;
+    origin?: ConceptOrigin;
+    theme?: TrackTheme;
+    unitId?: string | null;
+    subjectId?: string;
+  } = {},
 ): Promise<SavedChain> {
-  const { id: subjectId, placed } = await findOrCreateSubject(supabase, userId, chain.subject);
+  const { id: subjectId, placed } = options.subjectId
+    ? { id: options.subjectId, placed: true }
+    : await findOrCreateSubject(supabase, userId, chain.subject);
 
   // Placed once the response has gone, and never allowed to fail the write: a
   // track with no field is still a track, and the next chain written into it
