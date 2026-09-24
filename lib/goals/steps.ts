@@ -68,6 +68,8 @@ export type Step = {
   position: number;
   rhythmCount: number | null;
   rhythmPeriod: RhythmPeriod | null;
+  /** Whether you pressed Show on Todo on it (plan #927). */
+  onTodo: boolean;
 };
 
 export type StepNode = Step & { children: StepNode[] };

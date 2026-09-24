@@ -33,6 +33,7 @@ function step(id: string, parentId: string, extra: Partial<Step> = {}): Step {
     position: 10,
     rhythmCount: null,
     rhythmPeriod: null,
+    onTodo: false,
     ...extra,
   };
 }

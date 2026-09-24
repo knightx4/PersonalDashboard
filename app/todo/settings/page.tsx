@@ -32,7 +32,9 @@ export default async function TodoSettingsPage() {
   // all of them.
   const groups = MODULES.flatMap((module) => {
     const sources = allSources()
-      .filter((source) => source.module === module.id)
+      // An always-on source has no switch: each of its items was asked for
+      // one at a time, where it lives.
+      .filter((source) => source.module === module.id && !source.alwaysOn)
       .map((source) => ({
         id: source.id,
         label: source.label,

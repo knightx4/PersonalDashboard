@@ -10,10 +10,12 @@ import {
   linkStep,
   moveStep,
   setStepArchived,
+  setStepOnTodo,
   setStepStatus,
   unlinkStep,
   updateStep,
 } from '@/lib/goals/steps-store';
+import { undismissGoalStep } from '@/lib/todo/agenda/sources/goal-steps';
 
 /**
  * The writes on a goal's full tree (plan #925): add a step or sub-step, edit
@@ -88,6 +90,34 @@ export async function setStepStatusAction(form: FormData): Promise<StepActionSta
   } catch {
     return { error: 'The step could not be updated. Try again.' };
   }
+  return saved();
+}
+
+/**
+ * Show on Todo, or take it off (plan #927). The step is not copied anywhere:
+ * the flag is what the Todo agenda reads. Showing it again lifts any "Later"
+ * or "Not this one" left on Todo from before, since pressing it is asking to
+ * see it.
+ */
+// latency: pending
+export async function setStepOnTodoAction(form: FormData): Promise<StepActionState> {
+  const user = await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which step that was.' };
+  const on = form.get('on') === 'true';
+  try {
+    const changed = await setStepOnTodo(await createGoalsClient(), id.data, on);
+    if (!changed) return { error: 'That step has already changed. Reload to see it.' };
+    if (on) await undismissGoalStep(user.id, id.data);
+  } catch {
+    return {
+      error: on
+        ? 'The step could not be put on Todo. Try again.'
+        : 'The step could not be taken off Todo. Try again.',
+    };
+  }
+  revalidatePath('/todo', 'layout');
+  revalidatePath('/home');
   return saved();
 }
 

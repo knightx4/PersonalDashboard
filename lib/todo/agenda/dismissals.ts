@@ -18,7 +18,7 @@ import { createTodoClient } from '@/lib/todo/auth/server';
 export type Dismissals = Map<string, { until: string | null }>;
 
 /** Which foreign_source enum value a source's dismissals are stored under. */
-export type DismissalSource = 'return_deadline';
+export type DismissalSource = 'return_deadline' | 'goal_step';
 
 export async function loadDismissals(userId: string): Promise<Dismissals> {
   const supabase = await createTodoClient();
