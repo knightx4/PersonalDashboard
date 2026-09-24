@@ -28,7 +28,9 @@ import { createDrawer, wantsGap, wantsGoal, type DrawInput, type FeedGoal, type 
  * The Level 3 goal skips the naming call (plan #910): its picks come from its
  * list through `drawFromList`, one card per article, and are written as goal
  * cards under its aim like any other goal's, so they share the one card in
- * three and their swipes set its depth.
+ * three and their swipes set its depth. A claimed Level 3 article due back
+ * (plan #912) comes through the same port at a new section, and its pick
+ * carries the model that named that section.
  */
 
 /** Targets drawn per person per call. At two or three picks each, about ten picks. */
@@ -75,9 +77,14 @@ export type FeedPickPorts = {
   name(target: FeedTarget, avoid: string[], depth: DepthContext): Promise<NameResult>;
   /**
    * Picks for a goal with a list (the Level 3 goal), in place of `name`:
-   * articles from the list, none of them in `avoid`, each read from its lead.
+   * untouched articles from the list, none of them in `avoid`, each read from
+   * its lead, mixed with claimed articles due back (plan #912), none of them
+   * in `pickedNow`, each at a section no earlier card had, named at `depth`.
    */
-  drawFromList(goal: FeedGoal & { list: 'level3' }, avoid: string[]): Promise<NameResult>;
+  drawFromList(
+    goal: FeedGoal & { list: 'level3' },
+    request: { avoid: string[]; pickedNow: string[]; depth: DepthContext },
+  ): Promise<NameResult>;
   fetchArticle(title: string): Promise<WikipediaResult>;
   storeArticle(article: WikipediaArticle): Promise<{ itemId: string; segments: { id: string; ordinal: number }[] }>;
   /** Insert one row; 'duplicate' when this person already has the section. */
@@ -228,6 +235,9 @@ export async function runFeedPicksFor(
   const counts = { ...person.picked };
   const window = { ...(person.goalWindow ?? { goal: 0, total: 0 }) };
   const avoid = [...person.articlesHeld];
+  // Titles picked in this call. A Level 3 article coming back is already held,
+  // so returns are kept apart from this call's picks by this list, not `avoid`.
+  const pickedNow: string[] = [];
   const summary: FeedPickSummary = {
     userId,
     targets: [],
@@ -246,17 +256,21 @@ export async function runFeedPicksFor(
 
     const depth = contextFor(person.progress ?? NO_PROGRESS, depthTarget(target));
     const listGoal = target.reason === 'goal' && target.goal.list ? { ...target.goal, list: target.goal.list } : null;
-    const named = listGoal ? await ports.drawFromList(listGoal, avoid) : await ports.name(target, avoid, depth);
+    const named = listGoal
+      ? await ports.drawFromList(listGoal, { avoid, pickedNow, depth })
+      : await ports.name(target, avoid, depth);
     const model = listGoal ? LEVEL3_LIST_PICKER : options.model;
     if (!named.ok) {
       summary.failed.push(`${targetName(target)}: ${named.detail}`);
       continue;
     }
+    summary.failed.push(...(named.skipped ?? []));
 
     for (const pick of named.named) {
       avoid.unshift(pick.article);
+      pickedNow.push(pick.article);
       try {
-        if (await pickOne(ports, userId, target, pick, model, depth.depth, summary)) {
+        if (await pickOne(ports, userId, target, pick, pick.model ?? model, depth.depth, summary)) {
           counts[target.reason] += 1;
           summary.picked[target.reason] += 1;
           window.total += 1;

@@ -12,7 +12,15 @@ import { storeArticleOverRest } from '@/lib/learn/catalogue/store-rest';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { cardTitle, isCardDifficulty } from '@/lib/learn/feed/card';
 import { progressFrom } from '@/lib/learn/feed/depth';
-import { LEVEL3_PICKS_PER_DRAW, untouchedPicks, type Level3Article } from '@/lib/learn/feed/level3';
+import {
+  dueReturns,
+  LEVEL3_PICKS_PER_DRAW,
+  level3Picks,
+  resolveLevel3Picks,
+  untouchedPicks,
+  type Level3Article,
+  type Level3Claimed,
+} from '@/lib/learn/feed/level3';
 import { NAME_MATERIAL_MODEL, nameMaterial } from '@/lib/learn/feed/name-material';
 import {
   runFeedPicksFor,
@@ -21,6 +29,7 @@ import {
   type PersonInputs,
 } from '@/lib/learn/feed/pass';
 import { preferencesFrom } from '@/lib/learn/feed/preference';
+import { nameReturnAngle } from '@/lib/learn/feed/return-angle';
 import {
   RECENT_GOAL_DAYS,
   RECENT_TARGET_DAYS,
@@ -30,7 +39,7 @@ import {
   type FieldTests,
 } from '@/lib/learn/feed/targets';
 import type { LearnOperation } from '@/lib/learn/spend';
-import { fetchWikipediaArticle } from '@/lib/learn/providers/wikipedia';
+import { fetchWikipediaArticle, type WikipediaResult } from '@/lib/learn/providers/wikipedia';
 
 /**
  * One call of the Learn now picking pass (plan #806).
@@ -303,6 +312,29 @@ export function createFeedPicker(context: {
 }): (userId: string, options: { targets?: number; deadline: number }) => Promise<FeedPickSummary> {
   const { learn, core, apiKey, fields } = context;
   return (userId, options) => {
+    // Awaited by every caller, so the row lands before the function is frozen.
+    const record = async (spend: SpendReport[]): Promise<void> => {
+      for (const report of spend) {
+        await recordSpend(core, userId, {
+          module: 'learn',
+          operation: OPERATION,
+          model: report.model,
+          usage: report.usage,
+        });
+      }
+    };
+    // A Level 3 return is fetched to see its sections before it is named, and
+    // the pass fetches it again to store it; this keeps that to one request.
+    const fetched = new Map<string, Promise<WikipediaResult>>();
+    const fetchArticle = (title: string): Promise<WikipediaResult> => {
+      let result = fetched.get(title);
+      if (!result) {
+        result = fetchWikipediaArticle(title);
+        fetched.set(title, result);
+      }
+      return result;
+    };
+
     const ports: FeedPickPorts = {
       loadPerson: (id) => loadPerson(learn, fields, id),
       name: async (target, avoid, depth) => {
@@ -314,29 +346,67 @@ export function createFeedPicker(context: {
           anthropicApiKey: apiKey,
           onSpend: (report) => spend.push(report),
         });
-        // Awaited, so the row lands before the function is frozen.
-        for (const report of spend) {
-          await recordSpend(core, userId, {
-            module: 'learn',
-            operation: OPERATION,
-            model: report.model,
-            usage: report.usage,
-          });
-        }
+        await record(spend);
         return result;
       },
-      drawFromList: async (_goal, avoid) => {
-        // The Level 3 list is the only list. Untouched articles only for now;
-        // claimed ones due back join these picks in #912.
-        const { data, error } = await learn.rpc('level3_untouched_articles', {
-          p_user_id: userId,
-          p_count: LEVEL3_PICKS_PER_DRAW,
-          p_exclude: avoid,
+      drawFromList: async (_goal, { avoid, pickedNow, depth }) => {
+        // The Level 3 list is the only list: untouched articles, mixed with
+        // claimed ones due back (plan #912).
+        const [untouched, claimed] = await Promise.all([
+          learn.rpc('level3_untouched_articles', {
+            p_user_id: userId,
+            p_count: LEVEL3_PICKS_PER_DRAW,
+            p_exclude: avoid,
+          }),
+          learn.rpc('level3_claimed_articles', { p_user_id: userId, p_exclude: pickedNow }),
+        ]);
+        if (untouched.error) return { ok: false, detail: `Reading the Level 3 list failed: ${untouched.error.message}` };
+        if (claimed.error) {
+          return { ok: false, detail: `Reading the Level 3 articles you claimed failed: ${claimed.error.message}` };
+        }
+
+        type ClaimedRow = {
+          title: string;
+          section: string;
+          claimed_at: string;
+          last_seen_at: string;
+          returns: number;
+          earlier: (string | null)[] | null;
+        };
+        const due = dueReturns(
+          ((claimed.data ?? []) as ClaimedRow[]).map(
+            (row): Level3Claimed => ({
+              title: row.title,
+              section: row.section,
+              claimedAt: row.claimed_at,
+              lastSeenAt: row.last_seen_at,
+              returns: row.returns,
+              earlier: row.earlier ?? [],
+            }),
+          ),
+          Date.now(),
+        );
+        const picks = level3Picks({
+          untouched: untouchedPicks((untouched.data ?? []) as Level3Article[], avoid),
+          due,
+          avoid: pickedNow,
         });
-        if (error) return { ok: false, detail: `Reading the Level 3 list failed: ${error.message}` };
-        return { ok: true, named: untouchedPicks((data ?? []) as Level3Article[], avoid) };
+
+        const spend: SpendReport[] = [];
+        const { named, failed } = await resolveLevel3Picks(picks, {
+          depth,
+          sections: async (title) => {
+            const article = await fetchArticle(title);
+            return article.ok ? article.sections : null;
+          },
+          nameAngle: (request) =>
+            nameReturnAngle({ request, anthropicApiKey: apiKey, onSpend: (report) => spend.push(report) }),
+        });
+        await record(spend);
+        if (named.length === 0 && failed.length > 0) return { ok: false, detail: failed.join('; ') };
+        return { ok: true, named, skipped: failed };
       },
-      fetchArticle: fetchWikipediaArticle,
+      fetchArticle,
       storeArticle: (article) => storeArticleOverRest(learn, article),
       insertCard: async (row) => {
         const { data, error } = await learn
