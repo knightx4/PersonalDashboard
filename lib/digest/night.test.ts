@@ -17,6 +17,7 @@ import {
   nightFrom,
   nightLine,
   nightRows,
+  onNow,
 } from '@/lib/digest/night';
 import type { PlanItem } from '@/lib/plan/load';
 import {
@@ -438,5 +439,29 @@ describe('featureProgress', () => {
     const lone = step({ id: 'p6' });
     expect(featureProgress([lone], `#${lone.number}`)).toBeNull();
     expect(featureProgress([lone], '#99999')).toBeNull();
+  });
+});
+
+describe('onNow (note 39576272)', () => {
+  it('names every row a run is on, newest first, once each', () => {
+    const a = step({ id: 'a', title: 'Feature A', status: 'in_progress' });
+    const b = step({ id: 'b', title: 'Feature B', status: 'in_progress' });
+    const on = onNow(
+      [
+        { planItemId: 'a', at: '2026-03-02T01:00:00Z' },
+        { planItemId: 'b', at: '2026-03-02T02:00:00Z' },
+        { planItemId: 'a', at: '2026-03-02T00:30:00Z' },
+        { planItemId: 'gone', at: '2026-03-02T03:00:00Z' },
+      ],
+      [a, b],
+    );
+    expect(on.map((row) => [row.ref, row.title, row.at])).toEqual([
+      [`#${b.number}`, 'Feature B', '2026-03-02T02:00:00Z'],
+      [`#${a.number}`, 'Feature A', '2026-03-02T01:00:00Z'],
+    ]);
+  });
+
+  it('is empty with no run going', () => {
+    expect(onNow([], [])).toEqual([]);
   });
 });

@@ -135,6 +135,14 @@ export const AIM_DEPTH_LABELS: Record<AimDepth, { label: string; means: string }
 /** The ready-made goal the Goals page offers in one press. */
 export const LEVEL3_AIM_NAME = 'Every Level 3 vital article';
 
+/**
+ * How much of the Level 3 list you have shown you know (plan #906), read by
+ * learn.level3_evidence_counts() from the evidence view #904 added. Claimed
+ * is articles with any evidence, tested those with a right answer, total the
+ * size of the list.
+ */
+export type Level3Counts = { claimed: number; tested: number; total: number };
+
 export const AIM_NAME_MAX = 200;
 export const AIM_ABOUT_MAX = 1000;
 

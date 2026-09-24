@@ -17,6 +17,7 @@ import {
   LEVEL3_AIM_NAME,
   type Aim,
   type AimPlace,
+  type Level3Counts,
 } from '@/lib/learn/aims';
 import {
   addGoal,
@@ -51,10 +52,13 @@ const PLACING_POLL_MS = 8000;
 export function GoalsView({
   aims,
   places,
+  level3Counts,
 }: {
   aims: Aim[];
   /** Where each goal sits in the area grid, by id (#898). */
   places: Record<string, AimPlace>;
+  /** The Level 3 goal's counts (#906); null when there is none or the read failed. */
+  level3Counts: Level3Counts | null;
 }) {
   const router = useRouter();
   const hasLevel3 = aims.some((aim) => aim.listSource === 'level3');
@@ -80,7 +84,12 @@ export function GoalsView({
         <Card>
           <ul className="divide-y divide-border">
             {aims.map((aim) => (
-              <GoalRow key={aim.id} aim={aim} place={places[aim.id]} />
+              <GoalRow
+                key={aim.id}
+                aim={aim}
+                place={places[aim.id]}
+                level3Counts={level3Counts}
+              />
             ))}
           </ul>
         </Card>
@@ -95,7 +104,15 @@ export function GoalsView({
 }
 
 /** One goal, edited in place. Each control is its own form, so one save is one field. */
-function GoalRow({ aim, place }: { aim: Aim; place: AimPlace | undefined }) {
+function GoalRow({
+  aim,
+  place,
+  level3Counts,
+}: {
+  aim: Aim;
+  place: AimPlace | undefined;
+  level3Counts: Level3Counts | null;
+}) {
   const [editState, edit, editing] = useActionState(editGoal, initial);
   const [archiveState, archive, archiving] = useActionState(archiveGoal, initial);
   const error = editState.error ?? archiveState.error;
@@ -157,12 +174,15 @@ function GoalRow({ aim, place }: { aim: Aim; place: AimPlace | undefined }) {
             className="w-full text-ui text-ink-muted"
           />
         </form>
-        {/* Where a goal says what it covers. The Level 3 goal's claimed and
-            tested counts go here (#906). */}
+        {/* Where a goal says what it covers, and for the Level 3 goal how
+            much of the list you have shown you know (#906). */}
         {aim.listSource === 'level3' && (
-          <p className="px-1.5 text-small text-ink-muted">
-            Every article on Wikipedia&rsquo;s Level 3 vital list.
-          </p>
+          <>
+            <p className="px-1.5 text-small text-ink-muted">
+              Every article on Wikipedia&rsquo;s Level 3 vital list.
+            </p>
+            <Level3CountsLine counts={level3Counts} />
+          </>
         )}
         {place && <PlaceLine place={place} />}
         {error && <p className="px-1.5 text-small text-danger">{error}</p>}
@@ -322,5 +342,26 @@ function Level3Offer() {
       </Button>
       {state.error && <span className="text-small text-danger">{state.error}</span>}
     </form>
+  );
+}
+
+/** A count with thousands separators: 1,001. */
+const count = (n: number) => n.toLocaleString('en-GB');
+
+/**
+ * Claimed and tested side by side (decision #905): claimed is articles with
+ * any evidence, tested those with a right answer, both out of the whole list.
+ */
+function Level3CountsLine({ counts }: { counts: Level3Counts | null }) {
+  if (!counts) {
+    return (
+      <p className="px-1.5 text-small text-ink-muted">Your Level 3 counts could not be read.</p>
+    );
+  }
+  return (
+    <p className="px-1.5 text-small tabular-nums text-ink-muted">
+      {count(counts.claimed)} claimed, {count(counts.tested)} tested,
+      of {count(counts.total)}
+    </p>
   );
 }
