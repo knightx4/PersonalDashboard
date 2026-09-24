@@ -38,8 +38,9 @@ export default async function NewOrderPage({
 
   const defaultDate = todayInTimezone(profile?.timezone ?? 'UTC');
 
-  // Reached from a waiting order confirmation: read the email again and open
-  // the form with what it holds. Nothing is saved until the form is.
+  // Reached from a waiting confirmation, shipping or delivery email: read it
+  // again and open the form with what it holds. Nothing is saved until the
+  // form is.
   let prefill: OrderFormPrefill | null = null;
   let sourceMessageId: string | null = null;
   let readError: string | null = null;

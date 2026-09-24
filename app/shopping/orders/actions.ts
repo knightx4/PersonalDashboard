@@ -8,6 +8,7 @@ import { domainFromAddress } from '@/lib/email/extract/classify';
 import { parseDollarsToCents } from '@/lib/money';
 import { buildManualOrder } from '@/lib/orders/create-manual-order';
 import { ensureItemTags, linkOrderItemTags } from '@/lib/tags/ensure';
+import { canReadAsOrder } from '@/lib/review/read-order';
 
 export interface ActionState {
   error?: string;
@@ -57,7 +58,7 @@ const createOrderSchema = z.object({
   shipping: moneyField('Shipping', true),
   discount: moneyField('Discount', true),
   lines: z.array(lineSchema).min(1, 'Add at least one line item.'),
-  // Set when the form was opened from a waiting order confirmation.
+  // Set when the form was opened from a waiting email (see canReadAsOrder).
   sourceMessageId: z
     .string()
     .uuid()
@@ -133,8 +134,8 @@ export async function createManualOrder(
       .eq('user_id', user.id)
       .maybeSingle();
     if (error) return { error: error.message };
-    if (!message || message.classification !== 'order_confirmation') {
-      return { error: 'That email is not an order confirmation.' };
+    if (!message || !canReadAsOrder(message.classification as string | null)) {
+      return { error: 'That email is not an order confirmation, shipping or delivery email.' };
     }
     if (message.parse_status !== 'needs_review') {
       return { error: 'That email has already left the review queue.' };
