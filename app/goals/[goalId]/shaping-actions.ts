@@ -12,6 +12,7 @@ import {
   approveGoal,
   loadShaping,
   markReviewed,
+  setQuestionAside,
   startGoalRun,
 } from '@/lib/goals/shaping-store';
 
@@ -121,9 +122,32 @@ export async function answerQuestionAction(
   if (answer.length > ANSWER_MAX) return { error: 'That answer is too long.' };
   try {
     const answered = await answerQuestion(await createGoalsClient(), id.data, answer);
-    if (!answered) return { error: 'That question has already been answered or is gone.' };
+    if (!answered) return { error: 'That question was withdrawn or is gone.' };
   } catch {
     return { error: 'The answer could not be saved. Try again.' };
+  }
+  return saved();
+}
+
+/**
+ * Not now on a question, or Bring back (plan #956). The question stays open
+ * and unanswered; aside, it is out of the tree and off the home's waiting
+ * list until it is brought back.
+ */
+// latency: pending
+export async function setQuestionAsideAction(
+  _prev: ShapingActionState,
+  form: FormData,
+): Promise<ShapingActionState> {
+  await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which question that was.' };
+  const aside = form.get('aside') !== '0';
+  try {
+    const changed = await setQuestionAside(await createGoalsClient(), id.data, aside);
+    if (!changed) return { error: 'That question has been answered or is gone.' };
+  } catch {
+    return { error: 'Could not put the question aside. Try again.' };
   }
   return saved();
 }

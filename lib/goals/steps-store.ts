@@ -50,6 +50,7 @@ type ItemRow = {
   acceptance: string | null;
   fog: string | null;
   resolution: string | null;
+  dismissed_at: string | null;
   due_on: string | null;
   position: number;
   rhythm_count: number | null;
@@ -68,7 +69,7 @@ type LinkRow = { id: string; item_id: string; goal_id: string };
 
 const ITEM_COLUMNS =
   'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, resolution, ' +
-  'due_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
+  'dismissed_at, due_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
   'unit, target, collection_id, asks_for';
 
 const toStep = (row: ItemRow): Step => ({
@@ -80,6 +81,7 @@ const toStep = (row: ItemRow): Step => ({
   detail: row.detail,
   acceptance: row.acceptance,
   resolution: row.resolution,
+  dismissedAt: row.dismissed_at,
   dueOn: row.due_on,
   position: row.position,
   rhythmCount: row.rhythm_count,
