@@ -52,6 +52,9 @@ import { CommentThread } from '@/components/dev/comment-thread';
 import type { DevComment } from '@/lib/comments/load';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { Button } from '@/components/ui/button';
+import { CostHint } from '@/components/ui/cost-hint';
+import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import { IssueView, type IssueViewProps } from '@/app/news/i/[id]/issue-view';
 import { QuickReadView, type QuickReadViewProps } from '@/app/news/quick/quick-view';
 import { SavedView, type SavedViewProps } from '@/app/news/saved/saved-view';
@@ -1771,6 +1774,58 @@ const deckCards: FeedCard[] = [
   },
 ];
 
+const measuredDraft: CostEstimate = {
+  lowMicros: 300_000,
+  medianMicros: 400_000,
+  highMicros: 760_000,
+  runs: 12,
+  basis: 'measured',
+  per: 'run',
+};
+
+const guessedSummary: CostEstimate = {
+  lowMicros: 30_000,
+  medianMicros: 50_000,
+  highMicros: 90_000,
+  runs: 2,
+  basis: 'guess',
+  per: 'run',
+};
+
+const perReading: CostEstimate = {
+  lowMicros: 12_000,
+  medianMicros: 18_000,
+  highMicros: 31_000,
+  runs: 40,
+  basis: 'measured',
+  per: 'unit',
+};
+
+function CostHintRows() {
+  return (
+    <div className="space-y-16 pb-16">
+      <div className="flex items-center gap-1">
+        <Button>Draft cover letter</Button>
+        <CostHint estimate={measuredDraft} what="Cost of drafting" defaultOpen />
+      </div>
+      <div className="flex items-center gap-1">
+        <Button variant="secondary">Summarise thread</Button>
+        <CostHint estimate={guessedSummary} what="Cost of summarising" defaultOpen />
+      </div>
+      <div className="flex items-center justify-end gap-1">
+        <Button variant="secondary">Grade 12 readings</Button>
+        <CostHint
+          estimate={perReading}
+          count={12}
+          what="Cost of grading"
+          align="end"
+          defaultOpen
+        />
+      </div>
+    </div>
+  );
+}
+
 export const SURFACES: readonly Surface[] = [
   {
     id: 'jobs-role-timeline',
@@ -2270,6 +2325,19 @@ export const SURFACES: readonly Surface[] = [
     module: 'news',
     width: 'page',
     render: () => <SavedView stories={[]} />,
+  },
+
+  {
+    /* The $ hint beside three paid buttons: one with enough runs to give a
+     * range, one that is a guess, and one priced per item and multiplied by
+     * the batch. Each starts open so the shot shows the figure as well as the
+     * mark; in the app it opens on hover, focus or a press. The rows are
+     * spaced for the popup that hangs below each. */
+    id: 'core-cost-hint',
+    label: 'Spend · The $ hint beside a paid button',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CostHintRows />,
   },
 
   /* The page anatomies, framed at two widths by the anatomy section on
