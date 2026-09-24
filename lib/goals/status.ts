@@ -230,6 +230,30 @@ export function questionsBeneath(node: StepNode): number {
   return flatten(node.children).filter(awaitsAnswer).length;
 }
 
+/** How many open sub-steps the Needs line names before counting the rest. */
+const NEEDS_NAMED = 3;
+
+/**
+ * What a step is held up by, in one line, for the Needs block of an opened
+ * step (plan #959). A goal step has no block of its own, so this is what the
+ * plan's Needs line would say: the open steps under it, named, or your
+ * approval on a proposal. Null when nothing holds it up, which includes a
+ * question waiting on you, since its answer box already says so.
+ */
+export function stepNeeds(node: StepNode): string | null {
+  const health = stepHealth(node);
+  if (health === 'proposed') return 'Your approval. Nothing happens to it until then.';
+  if (health !== 'waiting') return null;
+  const open = node.children.filter(holdsOpen);
+  const named = open.slice(0, NEEDS_NAMED).map((step) => {
+    const move = stepMove(step);
+    return move === 'settled' ? step.title : `${step.title} (${PROGRESS_BAND_WORD[move]})`;
+  });
+  const rest = open.length - named.length;
+  if (rest > 0) named.push(plural(rest, 'more', 'more'));
+  return `${named.join(', ')} to close first.`;
+}
+
 /** The bands a goal's bar is drawn in, left to right, as the plan orders them. */
 export const PROGRESS_BANDS = ['on_you', 'waiting', 'with_claude', 'done'] as const;
 export type ProgressBand = (typeof PROGRESS_BANDS)[number];

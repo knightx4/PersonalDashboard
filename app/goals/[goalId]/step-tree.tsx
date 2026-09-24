@@ -31,7 +31,7 @@ import {
 } from '@/lib/goals/steps';
 import { awaitsReview } from '@/lib/goals/daily';
 import { countAside } from '@/lib/goals/shaping';
-import { goalProgress, questionsBeneath, stepState } from '@/lib/goals/status';
+import { goalProgress, questionsBeneath, stepNeeds, stepState } from '@/lib/goals/status';
 import { canShowOnTodo } from '@/lib/goals/todo';
 import { progressLine, type RhythmRecord } from '@/lib/goals/rhythms';
 import {
@@ -510,7 +510,7 @@ function StepItem({
           )}
           {editState.error && <p className="px-1 text-small text-danger">{editState.error}</p>}
           {details && (
-            <StepDetails node={node} links={stepLinks} otherGoals={otherGoals} edit={edit} />
+            <StepDetails node={node} links={stepLinks} otherGoals={otherGoals} />
           )}
           {details && (
             <div className="px-1 pt-2">
@@ -724,81 +724,151 @@ function formatDate(isoDate: string): string {
 }
 
 /**
- * The rest of a step: what it involves, its done-when, its due date, its kind,
- * and the other goals it counts towards. Each field saves on its own when it
- * loses focus or changes.
+ * The rest of a step, opened from its menu or its comment count (plan #959).
+ *
+ * It reads as text first, as an opened step on the plan does: what it
+ * involves, when it is done, and what it needs. Edit swaps the text for the
+ * form, and saving puts the text back. Which other goals it counts towards is
+ * on the row already, so it is changed in the form rather than repeated here.
  */
 function StepDetails({
   node,
   links,
   otherGoals,
-  edit,
 }: {
   node: StepNode;
   links: { linkId: string; goalId: string; title: string }[];
   otherGoals: OtherGoals;
-  edit: (form: FormData) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const needs = stepNeeds(node);
+  const readResult =
+    node.kind === 'claude' && !awaitsReview(node) && (node.result || node.resultUrl);
+
+  if (editing) {
+    return (
+      <StepEditForm
+        node={node}
+        links={links}
+        otherGoals={otherGoals}
+        onDone={() => setEditing(false)}
+      />
+    );
+  }
+
+  return (
+    <div className="mt-2 space-y-2 rounded-control bg-sunken px-3 py-2">
+      {node.detail && (
+        <p className="whitespace-pre-wrap text-ui text-ink-muted">{node.detail}</p>
+      )}
+      {node.acceptance && (
+        <div>
+          <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">
+            Done when
+          </p>
+          <p className="whitespace-pre-wrap text-ui text-ink">{node.acceptance}</p>
+        </div>
+      )}
+      {needs && (
+        <div>
+          <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Needs</p>
+          <p className="whitespace-pre-wrap text-ui text-ink">{needs}</p>
+        </div>
+      )}
+      {!node.detail && !node.acceptance && (
+        <p className="text-small text-ink-muted">
+          Nothing written yet on what it involves or when it is done.
+        </p>
+      )}
+      {readResult && <ClaudeResult node={node} />}
+      <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(true)}>
+        Edit
+      </Button>
+    </div>
+  );
+}
+
+/** Drop the fields a save would leave as they were, so an edit sends only what changed. */
+function onlyChanged(form: FormData, node: StepNode): FormData {
+  const before: Record<string, string> = {
+    detail: node.detail ?? '',
+    acceptance: node.acceptance ?? '',
+    dueOn: node.dueOn ?? '',
+  };
+  for (const [key, value] of Object.entries(before)) {
+    if (String(form.get(key) ?? '').trim() === value) form.delete(key);
+  }
+  if (form.get('kind') === node.kind) {
+    form.delete('kind');
+    if (
+      String(form.get('rhythmCount') ?? '') === String(node.rhythmCount ?? '') &&
+      form.get('rhythmPeriod') === node.rhythmPeriod
+    ) {
+      form.delete('rhythmCount');
+      form.delete('rhythmPeriod');
+    }
+  }
+  return form;
+}
+
+/** The step's fields as one form. Save puts the text view back; Cancel leaves it as it was. */
+function StepEditForm({
+  node,
+  links,
+  otherGoals,
+  onDone,
+}: {
+  node: StepNode;
+  links: { linkId: string; goalId: string; title: string }[];
+  otherGoals: OtherGoals;
+  onDone: () => void;
 }) {
   const menuAction = useMenuAction();
   const linkable = otherGoals.filter((goal) => !links.some((link) => link.goalId === goal.id));
   const [kind, setKind] = useState<StepKind>(node.kind);
+  const [state, save, saving] = useActionState(
+    async (prev: StepActionState, form: FormData) => {
+      const result = await editStep(prev, onlyChanged(form, node));
+      if (!result.error) onDone();
+      return result;
+    },
+    initial,
+  );
 
   return (
     <div className="mt-2 space-y-2 rounded-control bg-sunken px-2 py-2">
-      <form action={edit}>
+      <form action={save} className="space-y-2">
         <input type="hidden" name="id" value={node.id} />
-        {/* ui-ok: edits this step's own detail, shown only once Details is chosen */}
+        {/* ui-ok: composer-always-open -- this form only renders once Edit is pressed */}
         <Textarea
           name="detail"
-          rows={2}
+          rows={3}
           maxLength={STEP_DETAIL_MAX}
           defaultValue={node.detail ?? ''}
-          key={`detail-${node.detail ?? ''}`}
           placeholder="What it involves"
           aria-label={`What ${node.title} involves`}
-          onBlur={commitOnBlur(node.detail ?? '')}
+          autoFocus
         />
-      </form>
-      <form action={edit}>
-        <input type="hidden" name="id" value={node.id} />
         <InlineInput
           name="acceptance"
           maxLength={STEP_ACCEPTANCE_MAX}
           defaultValue={node.acceptance ?? ''}
-          key={`acceptance-${node.acceptance ?? ''}`}
           placeholder="Done when…"
           aria-label={`When ${node.title} is done`}
-          onBlur={commitOnBlur(node.acceptance ?? '')}
         />
-      </form>
-      {node.kind === 'claude' && !awaitsReview(node) && (node.result || node.resultUrl) && (
-        <ClaudeResult node={node} />
-      )}
-      <div className="flex flex-wrap items-center gap-2">
-        <form action={edit}>
-          <input type="hidden" name="id" value={node.id} />
+        <div className="flex flex-wrap items-center gap-2">
           <Input
             type="date"
             name="dueOn"
             defaultValue={node.dueOn ?? ''}
-            key={`due-${node.dueOn ?? ''}`}
             aria-label={`When ${node.title} is due`}
-            onChange={(event) => event.target.form?.requestSubmit()}
             className="w-auto"
           />
-        </form>
-        <form action={edit} className="flex flex-wrap items-center gap-2">
-          <input type="hidden" name="id" value={node.id} />
           <Select
             name="kind"
             value={kind}
             aria-label={`What kind of step ${node.title} is`}
-            onChange={(event) => {
-              const next = event.target.value as StepKind;
-              setKind(next);
-              // A rhythm needs to say how often before it can be saved.
-              if (next !== 'rhythm') event.target.form?.requestSubmit();
-            }}
+            onChange={(event) => setKind(event.target.value as StepKind)}
             className="w-auto"
           >
             {STEP_KINDS.map((option) => (
@@ -808,14 +878,19 @@ function StepDetails({
             ))}
           </Select>
           {kind === 'rhythm' && (
-            <RhythmFields
-              count={node.rhythmCount}
-              period={node.rhythmPeriod}
-              submitLabel={node.kind === 'rhythm' ? 'Save' : 'Make it a rhythm'}
-            />
+            <RhythmFields count={node.rhythmCount} period={node.rhythmPeriod} />
           )}
-        </form>
-      </div>
+        </div>
+        {state.error && <p className="px-1 text-small text-danger">{state.error}</p>}
+        <div className="flex items-center gap-2">
+          <Button type="submit" size="sm" pending={saving}>
+            Save
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={onDone}>
+            Cancel
+          </Button>
+        </div>
+      </form>
       {(links.length > 0 || linkable.length > 0) && (
         <div className="space-y-1 px-1 text-small">
           {links.map((link) => (
