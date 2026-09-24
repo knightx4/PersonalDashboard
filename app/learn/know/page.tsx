@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { Network } from 'lucide-react';
+import { Network, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
+import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SectionFold } from '@/components/ui/disclosure';
 import { cardVariants } from '@/components/ui/card';
@@ -58,7 +59,7 @@ function settledLine(counts: ReturnType<typeof countStates>): string {
 export default async function KnowPage({
   searchParams,
 }: {
-  searchParams: Promise<{ field?: string; domain?: string; unplaced?: string }>;
+  searchParams: Promise<{ field?: string; domain?: string; unplaced?: string; make?: string }>;
 }) {
   const params = await searchParams;
   const user = await requireUser();
@@ -112,18 +113,33 @@ export default async function KnowPage({
     opened = { place, themes, groups: destinationsFor(grid) };
   }
 
+  // Making a track is one button at the top, and the box only opens once it
+  // is pressed (note c6e981e0, law 14). A link rather than a toggle, so the
+  // press works before JavaScript does and the open box survives a refresh.
+  const making = params.make === 'track';
+
   return (
     <>
       <PageHeader
         title="Tracks"
         description="One graph per track, and it grows every time you use it."
+        actions={
+          making ? undefined : (
+            <Link href="/learn/know?make=track" className={buttonVariants({ variant: 'primary' })}>
+              <Plus className="size-4" strokeWidth={2} aria-hidden />
+              Make a track
+            </Link>
+          )
+        }
       />
+
+      {making && <CustomTrackForm />}
 
       {rows.length === 0 ? (
         <EmptyState
           icon={Network}
           title="No tracks yet"
-          description="A track is the container: Economics, not the Phillips curve. Make one below and it gets a fixed curriculum, or ask one question and the track forms around it."
+          description="A track is the container: Economics, not the Phillips curve. Make one from the button above and it gets a fixed curriculum, or ask one question and the track forms around it."
         />
       ) : (
         <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
@@ -176,10 +192,6 @@ export default async function KnowPage({
           </span>
         </Link>
       )}
-
-      {/* Making a track by name comes first: a track you create gets its
-          fixed curriculum at once, and its units are opened from there. */}
-      <CustomTrackForm />
 
       {/* Naming a goal is the other way a track comes into being: the chain
           for one question first, and the curriculum around it. */}
