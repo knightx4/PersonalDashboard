@@ -20,6 +20,9 @@ import {
  * and which track each of those ideas is in. Nothing is written, and a page
  * being opened counts for nothing; the rows read here are written when a
  * question is shown, when it is answered, and when Not now is pressed.
+ *
+ * The lesson chooser runs with the service role, which RLS does not narrow, so
+ * it passes `userId` and every read here then names the person.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -55,24 +58,28 @@ const blank = (): TrackActivity => ({ answered: 0, skipped: 0, pushedAside: 0, a
 export async function loadTrackInterest(
   supabase: LearnSupabaseClient,
   now: Date = new Date(),
+  userId?: string,
 ): Promise<TrackInterest> {
   const windowStart = now.getTime() - INTEREST_WINDOW_DAYS * DAY_MS;
   const from = new Date(windowStart - BEFORE_DAYS * DAY_MS).toISOString();
   const since = new Date(windowStart).toISOString();
 
-  const [probes, asides] = await Promise.all([
-    supabase
-      .from('probes')
-      .select('concept_id, answered_at, shown_at, picked_state')
-      .or(`answered_at.gte.${from},shown_at.gte.${from}`)
-      .is('discarded_at', null),
-    supabase
-      .from('next_outcomes')
-      .select('concept_id')
-      .eq('outcome', 'not_now')
-      .not('concept_id', 'is', null)
-      .gte('happened_at', since),
-  ]);
+  let probeQuery = supabase
+    .from('probes')
+    .select('concept_id, answered_at, shown_at, picked_state')
+    .or(`answered_at.gte.${from},shown_at.gte.${from}`)
+    .is('discarded_at', null);
+  let asideQuery = supabase
+    .from('next_outcomes')
+    .select('concept_id')
+    .eq('outcome', 'not_now')
+    .not('concept_id', 'is', null)
+    .gte('happened_at', since);
+  if (userId) {
+    probeQuery = probeQuery.eq('user_id', userId);
+    asideQuery = asideQuery.eq('user_id', userId);
+  }
+  const [probes, asides] = await Promise.all([probeQuery, asideQuery]);
 
   assertSchemaExposed(probes.error, LEARN_SCHEMA);
   if (probes.error) throw fail('Reading the questions you were asked', probes.error);
@@ -89,9 +96,11 @@ export async function loadTrackInterest(
   const conceptIds = [...new Set([...rows.map((row) => row.concept_id), ...pushed])];
   const subjectOf = new Map<string, string>();
   if (conceptIds.length > 0) {
+    let conceptQuery = supabase.from('concepts').select('id, subject_id').in('id', conceptIds);
+    if (userId) conceptQuery = conceptQuery.eq('user_id', userId);
     const [{ data, error }, surveyed] = await Promise.all([
-      supabase.from('concepts').select('id, subject_id').in('id', conceptIds),
-      loadSurveySubjectIds(supabase),
+      conceptQuery,
+      loadSurveySubjectIds(supabase, userId),
     ]);
     assertSchemaExposed(error, LEARN_SCHEMA);
     if (error) throw fail('Reading which track those ideas are in', error);
