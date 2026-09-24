@@ -390,6 +390,57 @@ describe('news.saved_stories', () => {
   });
 });
 
+describe('news.recommendations', () => {
+  const picks = [
+    {
+      name: 'The Tram Letter',
+      publisher: 'Rail Weekly',
+      topic: 'Technology',
+      reason: 'You read two transport newsletters already.',
+      link: 'https://example.com/tram-letter',
+    },
+  ];
+
+  it('keeps one list per user, and a reload replaces it', async () => {
+    await asUser(userA, (tx) => tx`
+      insert into recommendations (user_id, picks) values (${userA}, ${tx.json(picks)})`);
+    await asUser(userA, (tx) => tx`
+      insert into recommendations (user_id, picks) values (${userA}, ${tx.json([])})
+      on conflict (user_id) do update set picks = excluded.picks, made_at = excluded.made_at`);
+
+    const mine = await asUser(userA, (tx) => tx<{ picks: unknown[] }[]>`
+      select picks from recommendations`);
+    expect(mine.map((r) => r.picks)).toEqual([[]]);
+
+    await admin`update recommendations set picks = ${admin.json(picks)} where user_id = ${userA}`;
+  });
+
+  it('does not let another account read, change or remove the list', async () => {
+    await asUser(userB, async (tx) => {
+      const read = await tx`select 1 from recommendations`;
+      const changed = await tx`update recommendations set picks = '[]'::jsonb`;
+      const removed = await tx`delete from recommendations`;
+      expect(read).toHaveLength(0);
+      expect(changed.count).toBe(0);
+      expect(removed.count).toBe(0);
+    });
+
+    const [row] = await admin<{ picks: unknown[] }[]>`
+      select picks from recommendations where user_id = ${userA}`;
+    expect(row.picks).toEqual(picks);
+  });
+
+  it('refuses a list written under another account\'s id, or one that is not an array', async () => {
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into recommendations (user_id, picks) values (${userA}, '[]'::jsonb)`),
+    ).rejects.toThrow(/row-level security/);
+    await expect(
+      admin`insert into recommendations (user_id, picks) values (${userB}, '{}'::jsonb)`,
+    ).rejects.toThrow(/recommendations_picks_ck/);
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`
@@ -413,6 +464,7 @@ describe('RLS coverage', () => {
       'hidden_topics',
       'issues',
       'preferences',
+      'recommendations',
       'saved_stories',
       'senders',
       'story_groups',
