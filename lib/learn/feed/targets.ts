@@ -24,9 +24,10 @@ import { NO_PREFERENCES, fieldWeight, goalWeight, themeWeight, type FeedPreferen
  * lean changes how often something comes up and never which kind of gap comes
  * first.
  *
- * Goals (plan #900) are a third source. One card in three is drawn for an
- * open-subject goal on the Goals page, by the same count-based rule, and the
- * other two keep the three-to-one split between themes and gaps. The goal
+ * Goals (plan #900) are a third source. One card in three is drawn for a
+ * goal on the Goals page, the Level 3 goal included (plan #910), by the same
+ * count-based rule, and the other two keep the three-to-one split between
+ * themes and gaps. The goal
  * count starts when the oldest goal still active was set (`wantsGoal`), so
  * adding a first goal after months of cards gives it its share from then on
  * rather than a run of nothing but goal cards to catch up. Saves and
@@ -55,12 +56,16 @@ export type FeedField = {
 export type FieldTests = { tracks: number; answered: number };
 
 /**
- * An open-subject goal, as the draw needs it. The Level 3 goal is not one:
- * its cards come from its list of articles (plan #910), not from this draw.
+ * A goal, as the draw needs it. The Level 3 goal is drawn here like the
+ * open-subject ones and shares their one card in three, but its `list` is set,
+ * and the pass takes its articles from that list instead of the naming call
+ * (plan #910, `level3.ts`).
  */
 export type FeedGoal = {
   id: string;
   name: string;
+  /** 'level3' for the Level 3 goal, whose cards come from its list. Left out for an open subject. */
+  list?: 'level3';
   /** What the person means by it, when they said. */
   about: string | null;
   /** The card depth the goal starts at, from its depth (`cardDepthForAim`). */

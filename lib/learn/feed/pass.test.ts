@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { WikipediaArticle, WikipediaResult, WikipediaSection } from '@/lib/learn/providers/wikipedia';
 import { matchSection, runFeedPicksFor, type FeedCardInsert, type FeedPickPorts, type PersonInputs } from './pass';
+import { LEVEL3_LIST_PICKER, untouchedPicks, type Level3Article } from './level3';
 import type { NameResult } from './name-material';
 import type { FeedTarget } from './targets';
 
@@ -82,8 +83,16 @@ function person(overrides: Partial<PersonInputs> = {}): PersonInputs {
   };
 }
 
-function ports(options: { missing?: Set<string>; loaded?: PersonInputs } = {}) {
+/**
+ * The Level 3 list and the evidence against it, standing in for
+ * learn.level3_untouched_articles: an article with evidence, or already
+ * picked, is never offered.
+ */
+type ListStub = { articles: Level3Article[]; evidence: Set<string> };
+
+function ports(options: { missing?: Set<string>; loaded?: PersonInputs; list?: ListStub } = {}) {
   const cards: FeedCardInsert[] = [];
+  const listed: string[][] = [];
   const stored: string[] = [];
   const named: { target: FeedTarget; avoid: string[] }[] = [];
   let articleNo = 0;
@@ -100,6 +109,14 @@ function ports(options: { missing?: Set<string>; loaded?: PersonInputs } = {}) {
           return { article: `Article ${articleNo}`, section: 'Causes', basis: 'Fits.' };
         }),
       };
+    },
+    drawFromList: async (_goal, avoid) => {
+      listed.push([...avoid]);
+      const list = options.list ?? { articles: [], evidence: new Set<string>() };
+      const untouched = list.articles.filter(
+        (a) => !list.evidence.has(a.title) && !avoid.some((title) => title.toLowerCase() === a.title.toLowerCase()),
+      );
+      return { ok: true, named: untouchedPicks(untouched, avoid) };
     },
     fetchArticle: async (title): Promise<WikipediaResult> =>
       options.missing?.has(title)
@@ -120,7 +137,7 @@ function ports(options: { missing?: Set<string>; loaded?: PersonInputs } = {}) {
     now: () => (clock += 1),
     random: () => 0.5,
   };
-  return { ports: value, cards, stored, named };
+  return { ports: value, cards, stored, named, listed };
 }
 
 describe('running the pass once', () => {
@@ -278,5 +295,79 @@ describe('running the pass once', () => {
     const run = ports();
     await runFeedPicksFor(run.ports, { userId: 'u1', targets: 6, deadline: Number.MAX_SAFE_INTEGER, model: 'm' });
     expect(run.cards.some((card) => card.reason === 'goal')).toBe(false);
+  });
+
+  it('draws the Level 3 goal from untouched articles on its list, never naming it', async () => {
+    const level3 = {
+      id: 'l3',
+      name: 'Every Level 3 vital article',
+      about: null,
+      depth: 'working' as const,
+      field: null,
+      domain: null,
+      list: 'level3' as const,
+    };
+    const articles = ['Metallurgy', 'Photosynthesis', 'Inflation', 'Tide', 'Opera', 'Glacier', 'Vaccine', 'Sonnet'].map(
+      (title) => ({ title, section: 'Science > Things' }),
+    );
+    // A Got it on Photosynthesis and a save on Opera are evidence.
+    const evidence = new Set(['Photosynthesis', 'Opera']);
+    const run = ports({
+      loaded: person({ goals: [level3], goalWindow: { goal: 0, total: 0 }, articlesHeld: ['Tide'] }),
+      list: { articles, evidence },
+    });
+    const summary = await runFeedPicksFor(run.ports, {
+      userId: 'u1',
+      targets: 9,
+      deadline: Number.MAX_SAFE_INTEGER,
+      model: 'm',
+    });
+
+    // The naming call never sees the Level 3 goal.
+    expect(run.named.some((entry) => entry.target.reason === 'goal')).toBe(false);
+    expect(run.listed.length).toBeGreaterThan(0);
+
+    const goalCards = run.cards.filter((card) => card.reason === 'goal');
+    expect(goalCards.length).toBeGreaterThan(0);
+    expect(summary.picked.goal).toBe(goalCards.length);
+    const titles = goalCards.map((card) => card.named_article);
+    // Each card is on a different article, none with evidence and none already held.
+    expect(new Set(titles).size).toBe(titles.length);
+    for (const title of titles) {
+      expect(evidence.has(title)).toBe(false);
+      expect(title).not.toBe('Tide');
+    }
+    for (const card of goalCards) {
+      expect(card).toMatchObject({
+        aim_id: 'l3',
+        aim_name: 'Every Level 3 vital article',
+        field_id: null,
+        theme_id: null,
+        named_section: null,
+        pick_model: LEVEL3_LIST_PICKER,
+        depth: 'working',
+      });
+      // Each card is from the article's lead.
+      expect(card.segment_id).toBe(`seg:${card.named_article}:0`);
+    }
+  });
+
+  it('stops offering an untouched article once it has a Got it', async () => {
+    const level3 = {
+      id: 'l3',
+      name: 'Every Level 3 vital article',
+      about: null,
+      depth: 'working' as const,
+      field: null,
+      domain: null,
+      list: 'level3' as const,
+    };
+    const articles = [{ title: 'Metallurgy', section: 'Technology' }, { title: 'Glacier', section: 'Earth' }];
+    const run = ports({
+      loaded: person({ goals: [level3], goalWindow: { goal: 0, total: 0 } }),
+      list: { articles, evidence: new Set(['Metallurgy']) },
+    });
+    await runFeedPicksFor(run.ports, { userId: 'u1', targets: 3, deadline: Number.MAX_SAFE_INTEGER, model: 'm' });
+    expect(run.cards.filter((card) => card.reason === 'goal').map((card) => card.named_article)).toEqual(['Glacier']);
   });
 });
