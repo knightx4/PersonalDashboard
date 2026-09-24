@@ -28,7 +28,7 @@ believe the number.
 
 ## Read these first
 
-- `app/dev/ui/laws.ts` — the fifteen laws, and the four that matter here (9
+- `app/dev/ui/laws.ts` — the sixteen laws, and the four that matter here (9
   density, 10 folding, 11 borders, 12 editing in place).
 - `scripts/check-ui.ts` — what the gate can and cannot see. What it cannot see
   is most of your job.

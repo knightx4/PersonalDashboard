@@ -561,6 +561,7 @@ export const CHECKLIST: readonly string[] = [
   'A borrowed row from another workspace names its owner and is reachable from it. Nothing is copied.',
   'Any new animation is in the reduced-motion block in the same commit. Any flourish is chrome, under a second, and can be switched off.',
   'Icons are Lucide at 1.75 in currentColor. No emoji. No gradient blends two hues.',
+  'A button that calls a paid model has its cost hint beside it, and a guessed figure says uncertain.',
   'Every non-obvious decision carries a comment saying why.',
 ];
 
