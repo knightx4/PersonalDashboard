@@ -1735,6 +1735,7 @@ const deckCards: FeedCard[] = [
     answer:
       'It damps or disappears. The cycle comes from planting on last year’s price; if farmers plant on an accurate forecast instead, output matches what the market will clear at, so the overshoot never starts.',
     depth: 'working',
+    difficulty: null,
     returning: null,
     shown: [
       'The cobweb model or cobweb theory is an economic model that explains why prices might be subject to periodic fluctuations in certain types of markets.',
@@ -1759,6 +1760,7 @@ const deckCards: FeedCard[] = [
     question: null,
     answer: null,
     depth: 'advanced',
+    difficulty: null,
     returning: 'review',
     shown: ['Tax incidence is the analysis of the effect of a particular tax on the distribution of economic welfare.'],
     rest: [],

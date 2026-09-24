@@ -116,6 +116,14 @@ describe('turning a row into a card', () => {
     expect(toFeedCard(row({ why: null }))).toBeNull();
     expect(toFeedCard(row({ segment: null }))).toBeNull();
   });
+
+  it('carries a too hard or too easy rating, and null for anything else', () => {
+    expect(toFeedCard(row({ difficulty: 'too_hard' }))!.difficulty).toBe('too_hard');
+    expect(toFeedCard(row({ difficulty: 'too_easy' }))!.difficulty).toBe('too_easy');
+    expect(toFeedCard(row({ difficulty: null }))!.difficulty).toBeNull();
+    expect(toFeedCard(row({ difficulty: 'meh' }))!.difficulty).toBeNull();
+    expect(toFeedCard(row())!.difficulty).toBeNull();
+  });
 });
 
 describe('what each action may move', () => {
