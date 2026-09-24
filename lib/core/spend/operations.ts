@@ -69,6 +69,12 @@ export const SPEND_OPERATIONS = {
     // Filing a sentence from the capture box against open goals and steps
     // (plan #929). Haiku, one call per sentence.
     'file-capture',
+    // Reading pasted text or a document into an information step's form
+    // (plan #955). Haiku, one call per paste or file.
+    'read-into-form',
+    // Dash replying to a comment tagged @dash on a goal or a step, and filing
+    // any facts it gives into a collection (plan #957). Haiku.
+    'reply-to-goal-comment',
   ],
 } as const;
 

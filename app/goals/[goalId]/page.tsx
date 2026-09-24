@@ -11,11 +11,13 @@ import { loadAimChoices, loadGoalLinks } from '@/lib/goals/links-store';
 import { loadReadings } from '@/lib/goals/readings-store';
 import {
   approvalLine,
+  changesLine,
   countOpenQuestions,
   countProposed,
   runInFlight,
   runLine,
   type GoalRun,
+  type RunChanges,
 } from '@/lib/goals/shaping';
 import type { StepNode } from '@/lib/goals/steps';
 import type { GoalStatus } from '@/lib/goals/tree';
@@ -24,9 +26,11 @@ import { loadGoalMap } from '@/lib/goals/steps-store';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { todayIn } from '@/lib/todo/tasks/model';
+import { Card } from '@/components/ui/card';
+import { GoalThread } from './goal-comments';
 import { GoalLinksSection } from './goal-links';
 import { GoalNumber } from './goal-number';
-import { GoalShaping } from './goal-shaping';
+import { GoalFog, GoalShaping } from './goal-shaping';
 import { StepTree } from './step-tree';
 
 export const metadata = { title: 'Goal' };
@@ -45,7 +49,7 @@ export const dynamic = 'force-dynamic';
 function shapingLines(
   goalStatus: GoalStatus,
   steps: StepNode[],
-  shaping: { approvedAt: string | null; lastRun: GoalRun | null },
+  shaping: { approvedAt: string | null; lastRun: GoalRun | null; changes: RunChanges | null },
   timeZone: string,
 ) {
   const now = Date.now();
@@ -56,6 +60,7 @@ function shapingLines(
     hour: 'numeric',
     minute: '2-digit',
   });
+  const running = runInFlight(shaping.lastRun, now);
   return {
     approval: approvalLine({
       goalStatus,
@@ -64,7 +69,9 @@ function shapingLines(
       questions: countOpenQuestions(steps),
     }),
     runLine: runLine(shaping.lastRun, now, (iso) => `on ${stamp.format(new Date(iso))}`),
-    running: runInFlight(shaping.lastRun, now),
+    runFailed: shaping.lastRun?.status === 'failed',
+    changes: changesLine(shaping.changes),
+    runningSince: running && shaping.lastRun ? shaping.lastRun.createdAt : null,
   };
 }
 
@@ -109,8 +116,15 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
       </Link>
       <PageHeader
         title={map.goal.title}
-        description={map.goal.acceptance ?? map.goal.fog ?? undefined}
+        description={map.goal.acceptance ?? undefined}
       />
+      {map.goal.fog && (
+        <GoalFog
+          goalId={map.goal.id}
+          fog={map.goal.fog}
+          aside={Boolean(map.goal.fogDismissedAt)}
+        />
+      )}
       <div className="space-y-6">
         {shapeable && (
           <GoalShaping
@@ -133,6 +147,15 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
           jobsOn={jobsOn}
         />
         <StepTree map={map} todoOn={moduleEnabled(account, 'todo')} />
+        {/* The goal's own thread (plan #957). Each step has its own, under its details. */}
+        <Card padding="dense">
+          <GoalThread
+            itemId={map.goal.id}
+            thread={map.threads[map.goal.id] ?? []}
+            label="Comment on this goal"
+            placeholder="A note on the goal. Tag @dash to ask about it, or to give it figures to file."
+          />
+        </Card>
       </div>
     </div>
   );

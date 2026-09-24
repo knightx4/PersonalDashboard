@@ -3,12 +3,15 @@
 import { createContext, useActionState, useContext, useId, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, CircleHelp, ListTree, Repeat, Sparkles, User } from 'lucide-react';
+import { CommentCount } from '@/components/dev/comment-count';
+import { AnswerBox, TheAnswered, TheOptions, useAnswerDraft } from '@/components/dev/question';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ComposeTitle, InlineInput, Input, Select, Textarea } from '@/components/ui/field';
+import { StateLabel, TONE_TEXT } from '@/components/dev/state-label';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
@@ -20,8 +23,6 @@ import {
   STEP_DETAIL_MAX,
   STEP_KINDS,
   STEP_KIND_LABELS,
-  STEP_STATUS_GLYPHS,
-  STEP_STATUS_LABELS,
   STEP_TITLE_MAX,
   countSteps,
   describeRhythm,
@@ -29,6 +30,8 @@ import {
   type StepNode,
 } from '@/lib/goals/steps';
 import { awaitsReview } from '@/lib/goals/daily';
+import { countAside, countProposed } from '@/lib/goals/shaping';
+import { goalProgress, questionsBeneath, stepNeeds, stepState } from '@/lib/goals/status';
 import { canShowOnTodo } from '@/lib/goals/todo';
 import { progressLine, type RhythmRecord } from '@/lib/goals/rhythms';
 import {
@@ -43,10 +46,14 @@ import {
   unlinkStepAction,
   type StepActionState,
 } from './actions';
+import { GoalProgress, QuestionMark } from '../goal-progress';
+import { GoalThread } from './goal-comments';
 import { InformationStep } from './information-step';
 import {
   answerQuestionAction,
   reviewResultAction,
+  setQuestionAsideAction,
+  settleProposalAction,
   type ShapingActionState,
 } from './shaping-actions';
 
@@ -79,8 +86,17 @@ const TodoOn = createContext(false);
 /** Each rhythm step's current period and recent past ones (plan #928). */
 const Rhythms = createContext<GoalMap['rhythms']>({});
 
+/**
+ * Whether questions put aside with Not now are shown (plan #956). Off, they
+ * are left out of the tree until you ask to see them.
+ */
+const ShowAside = createContext(false);
+
 /** The collections the information steps fill, with their records (plan #954). */
 const Information = createContext<GoalMap['information']>({});
+
+/** The comments on each step, keyed by step id (plan #957). */
+const Threads = createContext<GoalMap['threads']>({});
 
 type Links = GoalMap['linksOf'];
 type OtherGoals = GoalMap['otherGoals'];
@@ -106,69 +122,84 @@ function commitOnBlur(before: string, { required = false }: { required?: boolean
 }
 
 export function StepTree({ map, todoOn }: { map: GoalMap; todoOn: boolean }) {
-  const { total, closed } = countSteps(map.steps);
+  const progress = goalProgress(map.steps);
+  const [showAside, setShowAside] = useState(false);
+  const aside = countAside(map.steps);
   return (
-    <TodoOn.Provider value={todoOn}>
-      <Rhythms.Provider value={map.rhythms}>
-        <Information.Provider value={map.information}>
-          <div className="space-y-6">
-            <section aria-label="Steps" className="space-y-2">
-              {total > 0 && (
-                <p className="px-1 text-small text-ink-muted">
-                  {closed} of {total} {total === 1 ? 'step' : 'steps'} closed
-                </p>
-              )}
-              {map.steps.length === 0 ? (
-                <EmptyState
-                  icon={ListTree}
-                  title="No steps yet"
-                  description="Break the goal into the things that have to happen. Any step can hold sub-steps of its own."
-                />
-              ) : (
-                <Card>
-                  <StepList
-                    nodes={map.steps}
-                    depth={0}
-                    links={map.linksOf}
-                    otherGoals={map.otherGoals}
-                  />
-                </Card>
-              )}
-              <StepComposer parentId={map.goal.id} label="New step" />
-            </section>
+    <ShowAside.Provider value={showAside}>
+      <TodoOn.Provider value={todoOn}>
+        <Rhythms.Provider value={map.rhythms}>
+          <Information.Provider value={map.information}>
+            <Threads.Provider value={map.threads}>
+              <div className="space-y-6">
+                <section aria-label="Steps" className="space-y-2">
+                  <GoalProgress progress={progress} label={map.goal.title} className="px-1" />
+                  {map.steps.length === 0 ? (
+                    <EmptyState
+                      icon={ListTree}
+                      title="No steps yet"
+                      description="Break the goal into the things that have to happen. Any step can hold sub-steps of its own."
+                    />
+                  ) : (
+                    <Card>
+                      <StepList
+                        nodes={map.steps}
+                        depth={0}
+                        links={map.linksOf}
+                        otherGoals={map.otherGoals}
+                      />
+                    </Card>
+                  )}
+                  {aside > 0 && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      aria-pressed={showAside}
+                      onClick={() => setShowAside(!showAside)}
+                    >
+                      {showAside
+                        ? 'Hide the questions put aside'
+                        : `Show ${aside === 1 ? 'the question' : `the ${aside} questions`} put aside`}
+                    </Button>
+                  )}
+                  <StepComposer parentId={map.goal.id} label="New step" />
+                </section>
 
-            {map.linked.length > 0 && (
-              <section aria-labelledby="linked-heading" className="space-y-2">
-                <h2 id="linked-heading" className="px-1 text-ui font-semibold text-ink">
-                  Also counts towards this goal
-                </h2>
-                <Card>
-                  <ul className="divide-y divide-border">
-                    {map.linked.map((entry) => (
-                      <li key={entry.linkId}>
-                        <p className="px-3 pt-2 text-small text-ink-muted">
-                          From{' '}
-                          <Link href={`/goals/${entry.fromGoal.id}`} className="underline">
-                            {entry.fromGoal.title}
-                          </Link>
-                        </p>
-                        <StepList
-                          nodes={[entry.step]}
-                          depth={0}
-                          links={map.linksOf}
-                          otherGoals={map.otherGoals}
-                          unlinkId={entry.linkId}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
-              </section>
-            )}
-          </div>
-        </Information.Provider>
-      </Rhythms.Provider>
-    </TodoOn.Provider>
+                {map.linked.length > 0 && (
+                  <section aria-labelledby="linked-heading" className="space-y-2">
+                    <h2 id="linked-heading" className="px-1 text-ui font-semibold text-ink">
+                      Also counts towards this goal
+                    </h2>
+                    <Card>
+                      <ul className="divide-y divide-border">
+                        {map.linked.map((entry) => (
+                          <li key={entry.linkId}>
+                            <p className="px-3 pt-2 text-small text-ink-muted">
+                              From{' '}
+                              <Link href={`/goals/${entry.fromGoal.id}`} className="underline">
+                                {entry.fromGoal.title}
+                              </Link>
+                            </p>
+                            <StepList
+                              nodes={[entry.step]}
+                              depth={0}
+                              links={map.linksOf}
+                              otherGoals={map.otherGoals}
+                              unlinkId={entry.linkId}
+                            />
+                          </li>
+                        ))}
+                      </ul>
+                    </Card>
+                  </section>
+                )}
+              </div>
+            </Threads.Provider>
+          </Information.Provider>
+        </Rhythms.Provider>
+      </TodoOn.Provider>
+    </ShowAside.Provider>
   );
 }
 
@@ -186,15 +217,17 @@ function StepList({
   /** Set on a step shown here through a link, so its menu can remove the link. */
   unlinkId?: string;
 }) {
+  const showAside = useContext(ShowAside);
+  const shown = showAside ? nodes : nodes.filter((node) => !node.dismissedAt);
   return (
     <ul className={cn(depth > 0 && 'ml-4 border-l border-border pl-1')}>
-      {nodes.map((node, index) => (
+      {shown.map((node, index) => (
         <StepItem
           key={node.id}
           node={node}
           depth={depth}
           index={index}
-          count={nodes.length}
+          count={shown.length}
           links={links}
           otherGoals={otherGoals}
           unlinkId={unlinkId}
@@ -231,6 +264,7 @@ function StepItem({
   const todoOn = useContext(TodoOn);
   const rhythms = useContext(Rhythms);
   const information = useContext(Information);
+  const thread = useContext(Threads)[node.id] ?? [];
   const filled = node.collectionId ? information[node.collectionId] : undefined;
   const rhythm: RhythmRecord | undefined = node.kind === 'rhythm' ? rhythms[node.id] : undefined;
   const current = node.status === 'open' ? (rhythm?.current ?? null) : null;
@@ -239,6 +273,7 @@ function StepItem({
   const hasChildren = node.children.length > 0;
   const stepLinks = links[node.id] ?? [];
   const KindIcon = KIND_ICONS[node.kind];
+  const state = stepState(node);
 
   async function archive(form: FormData) {
     const result = await archiveStepAction(form);
@@ -307,23 +342,48 @@ function StepItem({
       ]
     : [];
   const move = menuAction(moveStepAction);
+  // A proposal's moves are to approve it or turn it down (plan #960), each
+  // taking the proposed steps beneath it along. Mark done and Drop are not
+  // offered on one: done is not a thing a proposal can be, and turning it
+  // down is the drop.
+  const proposed = node.status === 'proposed';
+  const beneath = proposed ? countProposed(node.children) : 0;
+  const settle = menuAction((form) => settleProposalAction({}, form));
+  const statusItems: ActionMenuItem[] = proposed
+    ? [
+        {
+          id: 'approve',
+          label: beneath > 0 ? `Approve, with ${beneath} beneath` : 'Approve',
+          formAction: settle,
+          formFields: { id: node.id, approve: '1' },
+        },
+        {
+          id: 'reject',
+          label: beneath > 0 ? `Turn down, with ${beneath} beneath` : 'Turn down',
+          formAction: settle,
+          formFields: { id: node.id, approve: '0' },
+        },
+      ]
+    : [
+        closed
+          ? {
+              id: 'reopen',
+              label: 'Reopen',
+              formAction: status,
+              formFields: { id: node.id, status: 'open' },
+            }
+          : {
+              id: 'done',
+              label: 'Mark done',
+              formAction: status,
+              formFields: { id: node.id, status: 'done' },
+            },
+      ];
   const items: ActionMenuItem[] = [
     ...rhythmItems,
-    closed
-      ? {
-          id: 'reopen',
-          label: 'Reopen',
-          formAction: status,
-          formFields: { id: node.id, status: 'open' },
-        }
-      : {
-          id: 'done',
-          label: 'Mark done',
-          formAction: status,
-          formFields: { id: node.id, status: 'done' },
-        },
+    ...statusItems,
     ...todoItem,
-    ...(closed
+    ...(closed || proposed
       ? []
       : [
           {
@@ -343,7 +403,7 @@ function StepItem({
     },
     {
       id: 'details',
-      label: details ? 'Hide details' : 'Details',
+      label: details ? 'Hide details and comments' : 'Details and comments',
       onSelect: () => setDetails(!details),
     },
     ...(unlinkId
@@ -417,11 +477,9 @@ function StepItem({
         ) : (
           <span className="size-6 shrink-0" aria-hidden />
         )}
-        <StatusGlyph
-          glyph={STEP_STATUS_GLYPHS[node.status]}
-          label={STEP_STATUS_LABELS[node.status]}
-          className={cn('mt-2', closed ? 'text-ink-muted' : 'text-ink')}
-        />
+        <span className={cn('mt-2', TONE_TEXT[state.tone])} title={state.title}>
+          <StatusGlyph glyph={state.glyph} label={state.word} />
+        </span>
         <div className="min-w-0 flex-1">
           <form action={edit}>
             <input type="hidden" name="id" value={node.id} />
@@ -438,6 +496,10 @@ function StepItem({
             />
           </form>
           <p className="flex flex-wrap items-center gap-x-2 px-1 text-small text-ink-muted">
+            <StateLabel glyph={null} word={state.word} tone={state.tone} title={state.title} />
+            {/* Questions waiting on you under a folded step, where they
+                cannot be seen. Unfolded, they are on their own rows. */}
+            {!open && <QuestionMark count={questionsBeneath(node)} />}
             <span className="inline-flex items-center gap-1">
               <KindIcon className="size-3" strokeWidth={1.75} aria-hidden />
               {STEP_KIND_LABELS[node.kind]}
@@ -445,6 +507,17 @@ function StepItem({
             {meta.map((line) => (
               <span key={line as string}>{line}</span>
             ))}
+            {/* How many comments the step carries, while they are out of
+                sight. Opens the details, where the thread is. */}
+            {!details && thread.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setDetails(true)}
+                className="press rounded-control hover:text-ink"
+              >
+                <CommentCount count={thread.length} />
+              </button>
+            )}
             {stepLinks.map((link) => (
               <Link key={link.linkId} href={`/goals/${link.goalId}`} className="underline">
                 Also {link.title}
@@ -454,16 +527,26 @@ function StepItem({
           {rhythm && rhythm.past.length > 0 && node.rhythmPeriod && (
             <PastPeriods past={rhythm.past} period={node.rhythmPeriod} />
           )}
-          {node.kind === 'decision' && node.status === 'open' && node.resolution === null && (
-            <AnswerForm id={node.id} title={node.title} />
-          )}
+          {node.kind === 'decision' &&
+            node.status !== 'dropped' &&
+            (node.status === 'open' || node.resolution !== null) && <Question node={node} />}
           {awaitsReview(node) && <ClaudeResult node={node} />}
           {filled && (
             <InformationStep node={node} collection={filled.collection} records={filled.records} />
           )}
           {editState.error && <p className="px-1 text-small text-danger">{editState.error}</p>}
           {details && (
-            <StepDetails node={node} links={stepLinks} otherGoals={otherGoals} edit={edit} />
+            <StepDetails node={node} links={stepLinks} otherGoals={otherGoals} />
+          )}
+          {details && (
+            <div className="px-1 pt-2">
+              <GoalThread
+                itemId={node.id}
+                thread={thread}
+                label="Comment"
+                placeholder="A note on this step. Tag @dash to ask about it, or to give it figures to file."
+              />
+            </div>
           )}
         </div>
         <ActionMenu label={`${node.title} actions`} items={items} />
@@ -498,29 +581,89 @@ function StepItem({
 const answerInitial: ShapingActionState = {};
 
 /**
- * Answer a question Claude asked (plan #932). The answer is kept on the step
- * and the step closes; the next run on this goal reads it.
+ * A question Claude asked (plan #932), answered with its options (plan #956).
+ *
+ * The lettered options in its detail are buttons, with the one Claude
+ * recommends marked; pressing one writes it into the box, where it can be
+ * sent as it is or said differently. Answering closes the step and the next
+ * run reads the answer. Not now puts an unanswered question out of sight
+ * until it is brought back. An answered question shows its answer and can be
+ * given a new one, which is kept in the goal's history with the one it
+ * replaced. The pieces are the dev plan's, from components/dev/question.tsx.
  */
-function AnswerForm({ id, title }: { id: string; title: string }) {
-  const [state, answer, answering] = useActionState(answerQuestionAction, answerInitial);
+function Question({ node }: { node: StepNode }) {
+  const [state, answerAction, answering] = useActionState(answerQuestionAction, answerInitial);
+  const [asideState, asideAction, putting] = useActionState(setQuestionAsideAction, answerInitial);
+  // The box is open when it was opened since the last answer was saved, so a
+  // save closes it without an effect.
+  const [openedAt, setOpenedAt] = useState<number | null>(null);
+  const saved = state.done ?? 0;
+  const { answer, setAnswer, choose } = useAnswerDraft(() => setOpenedAt(saved));
+  const unanswered = node.resolution === null;
+  const aside = Boolean(node.dismissedAt);
+  const changing = openedAt === saved;
+  const answerable = unanswered || changing;
+
   return (
-    <form action={answer} className="mt-1 space-y-1 px-1">
-      <input type="hidden" name="id" value={id} />
-      {/* ui-ok: the answer to this question, shown only while it is unanswered */}
-      <Textarea
-        name="answer"
-        rows={2}
-        required
-        placeholder="Your answer"
-        aria-label={`Your answer to ${title}`}
-      />
-      <div className="flex items-center gap-2">
-        <Button type="submit" size="sm" variant="secondary" pending={answering}>
-          Answer
+    <div className="mt-1 space-y-2 px-1">
+      {node.resolution !== null && <TheAnswered resolution={node.resolution} />}
+      {answerable && <TheOptions detail={node.detail} onChoose={choose} />}
+      {answerable ? (
+        <AnswerBox
+          id={node.id}
+          detail={node.detail}
+          resolution={node.resolution}
+          action={answerAction}
+          pending={answering}
+          answer={answer}
+          onAnswer={setAnswer}
+          autoFocus={!unanswered}
+          onCancel={
+            unanswered
+              ? undefined
+              : () => {
+                  setAnswer('');
+                  setOpenedAt(null);
+                }
+          }
+          error={state.error ?? asideState.error}
+          extra={
+            unanswered && !aside ? (
+              <Button
+                type="submit"
+                size="sm"
+                variant="ghost"
+                formAction={asideAction}
+                pending={putting}
+              >
+                Not now
+              </Button>
+            ) : undefined
+          }
+        />
+      ) : (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            setAnswer('');
+            setOpenedAt(saved);
+          }}
+        >
+          Change the answer
         </Button>
-        {state.error && <span className="text-small text-danger">{state.error}</span>}
-      </div>
-    </form>
+      )}
+      {unanswered && aside && (
+        <form action={asideAction}>
+          <input type="hidden" name="id" value={node.id} />
+          <input type="hidden" name="aside" value="0" />
+          <Button type="submit" size="sm" variant="secondary" pending={putting}>
+            Bring back
+          </Button>
+        </form>
+      )}
+    </div>
   );
 }
 
@@ -607,87 +750,178 @@ function formatDate(isoDate: string): string {
 }
 
 /**
- * The rest of a step: what it involves, its done-when, its due date, its kind,
- * and the other goals it counts towards. Each field saves on its own when it
- * loses focus or changes.
+ * The rest of a step, opened from its menu or its comment count (plan #959).
+ *
+ * It reads as text first, as an opened step on the plan does: what it
+ * involves, when it is done, and what it needs. Edit swaps the text for the
+ * form, and saving puts the text back. Which other goals it counts towards is
+ * on the row already, so it is changed in the form rather than repeated here.
  */
 function StepDetails({
   node,
   links,
   otherGoals,
-  edit,
 }: {
   node: StepNode;
   links: { linkId: string; goalId: string; title: string }[];
   otherGoals: OtherGoals;
-  edit: (form: FormData) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const needs = stepNeeds(node);
+  const readResult =
+    node.kind === 'claude' && !awaitsReview(node) && (node.result || node.resultUrl);
+
+  if (editing) {
+    return (
+      <StepEditForm
+        node={node}
+        links={links}
+        otherGoals={otherGoals}
+        onDone={() => setEditing(false)}
+      />
+    );
+  }
+
+  return (
+    <div className="mt-2 space-y-2 rounded-control bg-sunken px-3 py-2">
+      {node.detail && (
+        <p className="whitespace-pre-wrap text-ui text-ink-muted">{node.detail}</p>
+      )}
+      {node.acceptance && (
+        <div>
+          <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">
+            Done when
+          </p>
+          <p className="whitespace-pre-wrap text-ui text-ink">{node.acceptance}</p>
+        </div>
+      )}
+      {needs && (
+        <div>
+          <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Needs</p>
+          <p className="whitespace-pre-wrap text-ui text-ink">{needs}</p>
+          {node.status === 'proposed' && <ProposalButtons node={node} />}
+        </div>
+      )}
+      {!node.detail && !node.acceptance && (
+        <p className="text-small text-ink-muted">
+          Nothing written yet on what it involves or when it is done.
+        </p>
+      )}
+      {readResult && <ClaudeResult node={node} />}
+      <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(true)}>
+        Edit
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Approve and Turn down beside a proposal's Needs line (plan #960), the same
+ * two moves its menu offers.
+ */
+function ProposalButtons({ node }: { node: StepNode }) {
+  const [state, settle, settling] = useActionState(settleProposalAction, answerInitial);
+  const beneath = countProposed(node.children);
+  const with_ = beneath > 0 ? `, with ${beneath} beneath` : '';
+  return (
+    <form action={settle} className="mt-1.5 flex flex-wrap items-center gap-2">
+      <input type="hidden" name="id" value={node.id} />
+      <Button type="submit" size="sm" name="approve" value="1" pending={settling}>
+        Approve{with_}
+      </Button>
+      <Button type="submit" size="sm" variant="ghost" name="approve" value="0" disabled={settling}>
+        Turn down{with_}
+      </Button>
+      {state.error && (
+        <p role="alert" className="text-small text-danger">
+          {state.error}
+        </p>
+      )}
+    </form>
+  );
+}
+
+/** Drop the fields a save would leave as they were, so an edit sends only what changed. */
+function onlyChanged(form: FormData, node: StepNode): FormData {
+  const before: Record<string, string> = {
+    detail: node.detail ?? '',
+    acceptance: node.acceptance ?? '',
+    dueOn: node.dueOn ?? '',
+  };
+  for (const [key, value] of Object.entries(before)) {
+    if (String(form.get(key) ?? '').trim() === value) form.delete(key);
+  }
+  if (form.get('kind') === node.kind) {
+    form.delete('kind');
+    if (
+      String(form.get('rhythmCount') ?? '') === String(node.rhythmCount ?? '') &&
+      form.get('rhythmPeriod') === node.rhythmPeriod
+    ) {
+      form.delete('rhythmCount');
+      form.delete('rhythmPeriod');
+    }
+  }
+  return form;
+}
+
+/** The step's fields as one form. Save puts the text view back; Cancel leaves it as it was. */
+function StepEditForm({
+  node,
+  links,
+  otherGoals,
+  onDone,
+}: {
+  node: StepNode;
+  links: { linkId: string; goalId: string; title: string }[];
+  otherGoals: OtherGoals;
+  onDone: () => void;
 }) {
   const menuAction = useMenuAction();
   const linkable = otherGoals.filter((goal) => !links.some((link) => link.goalId === goal.id));
   const [kind, setKind] = useState<StepKind>(node.kind);
+  const [state, save, saving] = useActionState(
+    async (prev: StepActionState, form: FormData) => {
+      const result = await editStep(prev, onlyChanged(form, node));
+      if (!result.error) onDone();
+      return result;
+    },
+    initial,
+  );
 
   return (
     <div className="mt-2 space-y-2 rounded-control bg-sunken px-2 py-2">
-      <form action={edit}>
+      <form action={save} className="space-y-2">
         <input type="hidden" name="id" value={node.id} />
-        {/* ui-ok: edits this step's own detail, shown only once Details is chosen */}
+        {/* ui-ok: composer-always-open -- this form only renders once Edit is pressed */}
         <Textarea
           name="detail"
-          rows={2}
+          rows={3}
           maxLength={STEP_DETAIL_MAX}
           defaultValue={node.detail ?? ''}
-          key={`detail-${node.detail ?? ''}`}
           placeholder="What it involves"
           aria-label={`What ${node.title} involves`}
-          onBlur={commitOnBlur(node.detail ?? '')}
+          autoFocus
         />
-      </form>
-      <form action={edit}>
-        <input type="hidden" name="id" value={node.id} />
         <InlineInput
           name="acceptance"
           maxLength={STEP_ACCEPTANCE_MAX}
           defaultValue={node.acceptance ?? ''}
-          key={`acceptance-${node.acceptance ?? ''}`}
           placeholder="Done when…"
           aria-label={`When ${node.title} is done`}
-          onBlur={commitOnBlur(node.acceptance ?? '')}
         />
-      </form>
-      {node.resolution && (
-        <p className="px-1 text-small text-ink">
-          <span className="text-ink-muted">Answer: </span>
-          {node.resolution}
-        </p>
-      )}
-      {node.kind === 'claude' && !awaitsReview(node) && (node.result || node.resultUrl) && (
-        <ClaudeResult node={node} />
-      )}
-      <div className="flex flex-wrap items-center gap-2">
-        <form action={edit}>
-          <input type="hidden" name="id" value={node.id} />
+        <div className="flex flex-wrap items-center gap-2">
           <Input
             type="date"
             name="dueOn"
             defaultValue={node.dueOn ?? ''}
-            key={`due-${node.dueOn ?? ''}`}
             aria-label={`When ${node.title} is due`}
-            onChange={(event) => event.target.form?.requestSubmit()}
             className="w-auto"
           />
-        </form>
-        <form action={edit} className="flex flex-wrap items-center gap-2">
-          <input type="hidden" name="id" value={node.id} />
           <Select
             name="kind"
             value={kind}
             aria-label={`What kind of step ${node.title} is`}
-            onChange={(event) => {
-              const next = event.target.value as StepKind;
-              setKind(next);
-              // A rhythm needs to say how often before it can be saved.
-              if (next !== 'rhythm') event.target.form?.requestSubmit();
-            }}
+            onChange={(event) => setKind(event.target.value as StepKind)}
             className="w-auto"
           >
             {STEP_KINDS.map((option) => (
@@ -697,14 +931,19 @@ function StepDetails({
             ))}
           </Select>
           {kind === 'rhythm' && (
-            <RhythmFields
-              count={node.rhythmCount}
-              period={node.rhythmPeriod}
-              submitLabel={node.kind === 'rhythm' ? 'Save' : 'Make it a rhythm'}
-            />
+            <RhythmFields count={node.rhythmCount} period={node.rhythmPeriod} />
           )}
-        </form>
-      </div>
+        </div>
+        {state.error && <p className="px-1 text-small text-danger">{state.error}</p>}
+        <div className="flex items-center gap-2">
+          <Button type="submit" size="sm" pending={saving}>
+            Save
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={onDone}>
+            Cancel
+          </Button>
+        </div>
+      </form>
       {(links.length > 0 || linkable.length > 0) && (
         <div className="space-y-1 px-1 text-small">
           {links.map((link) => (

@@ -3,9 +3,10 @@
  * "Fog and refining a goal" and "Approval"; plan #932).
  *
  * "Work on this" on a goal fires the goals routine for that goal. The session
- * follows .claude/skills/goals: on a new or foggy goal it proposes steps and
- * asks one or two questions; once you approve the goal it may add, split and
- * reorder steps beneath it without asking. The database holds it to that
+ * follows .claude/skills/goals: it maps the whole path for the goal (phases,
+ * Claude steps, information steps pre-filled from Gmail, provisional steps,
+ * questions with lettered options), proposed until you approve the goal;
+ * after that it may add, split and reorder steps beneath it without asking. The database holds it to that
  * (supabase/migrations-goals/0006).
  *
  * The rules that need no database live here: what a run looks like on the
@@ -50,12 +51,35 @@ export function countProposed(nodes: StepNode[]): number {
   return count;
 }
 
-/** Open questions with no answer yet, anywhere in the tree. */
+/**
+ * Whether a question is waiting on you: open, unanswered and not put aside
+ * with Not now (plan #956).
+ */
+export function awaitsAnswer(node: StepNode): boolean {
+  return (
+    node.kind === 'decision' &&
+    node.status === 'open' &&
+    node.resolution === null &&
+    !node.dismissedAt
+  );
+}
+
+/** Open questions with no answer yet and not put aside, anywhere in the tree. */
 export function countOpenQuestions(nodes: StepNode[]): number {
   let count = 0;
   for (const node of nodes) {
-    if (node.kind === 'decision' && node.status === 'open' && node.resolution === null) count += 1;
+    if (awaitsAnswer(node)) count += 1;
     count += countOpenQuestions(node.children);
+  }
+  return count;
+}
+
+/** Questions put aside with Not now and not answered since, anywhere in the tree. */
+export function countAside(nodes: StepNode[]): number {
+  let count = 0;
+  for (const node of nodes) {
+    if (node.kind === 'decision' && node.resolution === null && node.dismissedAt) count += 1;
+    count += countAside(node.children);
   }
   return count;
 }
@@ -87,6 +111,77 @@ export function runLine(
   return `A run started ${when(run.createdAt)} and never reported back.`;
 }
 
+/** One goals.history row written under a run, as runChanges reads it. */
+export type RunHistoryRow = {
+  table_name: string;
+  action: string;
+  row_id: string;
+  old_values: Record<string, unknown> | null;
+  new_values: Record<string, unknown> | null;
+};
+
+/** What a run changed, counted from the history rows that carry its id. */
+export type RunChanges = {
+  stepsAdded: number;
+  questionsAsked: number;
+  formsFilled: number;
+  stepsDone: number;
+};
+
+/**
+ * Count what a run did (plan #961). A step or question is one inserted item
+ * row; a form filled is each record the run added or changed, counted once
+ * however many times it was written; a step done is an item whose status
+ * moved to done. History keeps the whole row on an insert and only the
+ * changed columns on an update, which is why the update is read from
+ * old_values and new_values together.
+ */
+export function runChanges(rows: readonly RunHistoryRow[]): RunChanges {
+  const changes: RunChanges = { stepsAdded: 0, questionsAsked: 0, formsFilled: 0, stepsDone: 0 };
+  const records = new Set<string>();
+  for (const row of rows) {
+    if (row.table_name === 'items') {
+      if (row.action === 'insert' && row.new_values?.level === 'step') {
+        if (row.new_values.kind === 'decision') changes.questionsAsked += 1;
+        else changes.stepsAdded += 1;
+        if (row.new_values.status === 'done') changes.stepsDone += 1;
+      } else if (
+        row.action === 'update' &&
+        row.new_values?.status === 'done' &&
+        row.old_values?.status !== 'done'
+      ) {
+        changes.stepsDone += 1;
+      }
+    } else if (row.table_name === 'records' && (row.action === 'insert' || row.action === 'update')) {
+      records.add(row.row_id);
+    }
+  }
+  changes.formsFilled = records.size;
+  return changes;
+}
+
+function counted(count: number, one: string, many: string): string | null {
+  if (count === 0) return null;
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+/**
+ * The counts as one sentence, or a sentence saying there were none. Null
+ * when there is no history to count, so nothing is claimed either way.
+ */
+export function changesLine(changes: RunChanges | null): string | null {
+  if (!changes) return null;
+  const parts = [
+    counted(changes.stepsAdded, 'step added', 'steps added'),
+    counted(changes.questionsAsked, 'question asked', 'questions asked'),
+    counted(changes.formsFilled, 'form filled', 'forms filled'),
+    counted(changes.stepsDone, 'step done', 'steps done'),
+  ].filter((part): part is string => part !== null);
+  if (parts.length === 0) return 'It left the steps and forms as they were.';
+  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`;
+  return `What it changed: ${list}.`;
+}
+
 /**
  * The turn appended to the goals routine's standing prompt when "Work on
  * this" is pressed. It names the goal, the account and the run row the app
@@ -102,9 +197,10 @@ export function goalRunText(input: {
   return [
     `Work on one goal: "${input.goalTitle}" (goals.items id ${input.goalId}).`,
     '',
-    'Follow .claude/skills/goals/SKILL.md. Read it first: it says how to shape a new or',
-    'foggy goal, what you may change before and after the goal is approved, and how every',
-    'write is labelled.',
+    'Follow .claude/skills/goals/SKILL.md. Read it first: it says how to map the whole path',
+    'for a goal (phases, Claude steps, information steps pre-filled from Gmail, provisional',
+    'steps, questions with lettered options), what you may change before and after the goal',
+    'is approved, and how every write is labelled.',
     '',
     `The goals belong to user_id ${input.userId}. This run is goals.runs id ${input.runId},`,
     'already written as started. Set goals.run_id to it on every write, and close that row',

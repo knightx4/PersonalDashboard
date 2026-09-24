@@ -167,4 +167,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // Goals: one sentence filed against open goals and steps, which are
   // listed in the prompt. Grows with the size of the tree.
   'file-capture': run(HAIKU, 4_000, 300),
+  // A pasted page or a statement read into a form. A PDF page costs about
+  // two thousand tokens as text and image together, and a statement runs to
+  // a few pages.
+  'read-into-form': run(HAIKU, 8_000, 800),
+  // A comment on a goal, with the goal's steps and collections written out.
+  'reply-to-goal-comment': run(HAIKU, 6_000, 400),
 };

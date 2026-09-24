@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
   approvalLine,
+  awaitsAnswer,
+  changesLine,
+  countAside,
   countOpenQuestions,
   countProposed,
   goalRunText,
   RUN_QUIET_MS,
   runInFlight,
+  runChanges,
   runLine,
   type GoalRun,
+  type RunHistoryRow,
 } from './shaping';
 import type { StepNode } from './steps';
 
@@ -70,6 +75,21 @@ describe('counting what waits on you', () => {
   });
 });
 
+describe('questions put aside (plan #956)', () => {
+  it('leaves a question put aside out of what waits on you, and counts it as aside', () => {
+    const aside = node('q1', { kind: 'decision', dismissedAt: '2026-09-24T10:00:00Z' });
+    const live = node('q2', { kind: 'decision' });
+    const answered = node('q3', { kind: 'decision', status: 'done', resolution: 'A — Avalanche' });
+    const tree = [node('s', { children: [aside, live] }), answered];
+
+    expect(awaitsAnswer(aside)).toBe(false);
+    expect(awaitsAnswer(live)).toBe(true);
+    expect(awaitsAnswer(answered)).toBe(false);
+    expect(countOpenQuestions(tree)).toBe(1);
+    expect(countAside(tree)).toBe(1);
+  });
+});
+
 describe('runs', () => {
   it('takes a started run to be going for two hours, then not', () => {
     expect(runInFlight(null, NOW)).toBe(false);
@@ -92,12 +112,46 @@ describe('runs', () => {
     );
   });
 
+  it('counts what a run changed from its history rows', () => {
+    const row = (extra: Partial<RunHistoryRow>): RunHistoryRow => ({
+      table_name: 'items',
+      action: 'insert',
+      row_id: 'x',
+      old_values: null,
+      new_values: null,
+      ...extra,
+    });
+    const rows: RunHistoryRow[] = [
+      row({ new_values: { level: 'step', kind: 'claude', status: 'proposed' } }),
+      row({ new_values: { level: 'step', kind: 'mine', status: 'open' } }),
+      row({ new_values: { level: 'step', kind: 'decision', status: 'open' } }),
+      row({ new_values: { level: 'goal', kind: null, status: 'open' } }),
+      row({ action: 'update', old_values: { status: 'open' }, new_values: { status: 'done' } }),
+      row({ action: 'update', old_values: { title: 'a' }, new_values: { title: 'b' } }),
+      row({ table_name: 'records', row_id: 'r1', new_values: { data: {} } }),
+      row({ table_name: 'records', action: 'update', row_id: 'r1', old_values: {}, new_values: {} }),
+      row({ table_name: 'records', action: 'update', row_id: 'r2', old_values: {}, new_values: {} }),
+      row({ table_name: 'records', action: 'archive', row_id: 'r3', old_values: {}, new_values: {} }),
+    ];
+    const changes = runChanges(rows);
+    expect(changes).toEqual({ stepsAdded: 2, questionsAsked: 1, formsFilled: 2, stepsDone: 1 });
+    expect(changesLine(changes)).toBe(
+      'What it changed: 2 steps added, 1 question asked, 2 forms filled and 1 step done.',
+    );
+    expect(changesLine({ stepsAdded: 0, questionsAsked: 3, formsFilled: 0, stepsDone: 0 })).toBe(
+      'What it changed: 3 questions asked.',
+    );
+    expect(changesLine(runChanges([]))).toBe('It left the steps and forms as they were.');
+    expect(changesLine(null)).toBeNull();
+  });
+
   it('briefs the routine with the goal, the account and the run row', () => {
     const text = goalRunText({ goalId: 'g-1', goalTitle: 'Get fit', userId: 'u-1', runId: 'r-1' });
     expect(text).toContain('"Get fit" (goals.items id g-1)');
     expect(text).toContain('user_id u-1');
     expect(text).toContain('goals.runs id r-1');
     expect(text).toContain('.claude/skills/goals/SKILL.md');
+    expect(text).toContain('map the whole path');
   });
 });
 

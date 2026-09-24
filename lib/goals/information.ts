@@ -126,12 +126,26 @@ export const SOURCE_LABELS: Record<RecordSource, string> = {
   capture: 'From the capture box',
 };
 
-/** A link to where a draft came from, when there is one to open. */
+/** A stored document's name as you gave it, from its path (lib/goals/extract.ts, documentPath). */
+export function documentName(path: string): string {
+  const last = path.slice(path.lastIndexOf('/') + 1);
+  return last.replace(/^[0-9a-f-]{36}-/, '') || 'a document';
+}
+
+/** Where a record came from, naming the file when it came from one. */
+export function sourceLabel(source: RecordSource, ref: string | null): string {
+  if (source === 'document' && ref) return `From ${documentName(ref)}`;
+  return SOURCE_LABELS[source];
+}
+
+/** A link to where a record came from, when there is one to open. */
 export function sourceHref(source: RecordSource, ref: string | null): string | null {
   if (!ref) return null;
   if (source === 'gmail' && /^[A-Za-z0-9_-]{1,200}$/.test(ref)) {
     return `https://mail.google.com/mail/u/0/#all/${ref}`;
   }
+  // A document is kept in the private bucket; this route signs a link to it.
+  if (source === 'document') return `/goals/document?path=${encodeURIComponent(ref)}`;
   if (/^https?:\/\/\S+$/.test(ref)) return ref;
   return null;
 }
@@ -174,7 +188,10 @@ export function displayValue(field: CollectionField, value: FieldValue | undefin
 /** A stored value as its form input starts out. */
 export function inputValue(field: CollectionField, value: FieldValue | undefined): string {
   if (value === null || value === undefined) return '';
-  if (field.type === 'yes_no') return value === true ? 'yes' : value === false ? 'no' : '';
+  if (field.type === 'yes_no') {
+    // A string is already an input's value, as a filled-in preview holds it.
+    return value === true ? 'yes' : value === false ? 'no' : typeof value === 'string' ? value : '';
+  }
   return String(value);
 }
 

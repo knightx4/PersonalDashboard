@@ -11,7 +11,6 @@
  * rows, what a valid step is, and what a step looks like at a glance. The
  * reads and writes are in lib/goals/steps-store.ts.
  */
-import type { StatusGlyph } from '@/lib/status-glyphs';
 import type { GoalStatus } from '@/lib/goals/tree';
 
 /** The limits the table's checks set (supabase/migrations-goals/0001). */
@@ -34,17 +33,6 @@ export const STEP_KIND_LABELS: Record<StepKind, string> = {
   rhythm: 'Rhythm',
 };
 
-/**
- * One shape per status. A proposed step is dashed like a proposed plan step;
- * an open one is the empty hexagon; done is ticked and dropped is struck.
- */
-export const STEP_STATUS_GLYPHS: Record<GoalStatus, StatusGlyph> = {
-  proposed: 'dashed',
-  open: 'empty',
-  done: 'check',
-  dropped: 'slash',
-};
-
 export const STEP_STATUS_LABELS: Record<GoalStatus, string> = {
   proposed: 'Proposed',
   open: 'Open',
@@ -63,6 +51,8 @@ export type Step = {
   acceptance: string | null;
   /** A question's answer, once there is one. */
   resolution: string | null;
+  /** When you put an unanswered question aside with Not now (plan #956). */
+  dismissedAt?: string | null;
   /** YYYY-MM-DD. */
   dueOn: string | null;
   position: number;

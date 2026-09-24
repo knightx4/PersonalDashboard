@@ -440,8 +440,9 @@ describe('approval once per goal (plan #932)', () => {
       values (${userA}, 'step', ${goal}, 'mine', 'Call one friend a week', 'proposed')
       returning id`);
     const [question] = await asClaude((tx) => tx<{ id: string }[]>`
-      insert into items (user_id, level, parent_id, kind, title)
-      values (${userA}, 'step', ${goal}, 'decision', 'Old friends or new ones first?')
+      insert into items (user_id, level, parent_id, kind, title, detail)
+      values (${userA}, 'step', ${goal}, 'decision', 'Old friends or new ones first?',
+              ${'A — Old friends.\nB — New ones.'})
       returning id`);
 
     await expect(
@@ -569,6 +570,201 @@ describe('Claude results on steps (plan #933)', () => {
     await expect(
       admin`update items set reviewed_at = now() where id = ${claude.id}`,
     ).rejects.toThrow(/items_reviewed_at_ck/);
+  });
+});
+
+describe('questions put aside and answers changed (plan #956)', () => {
+  async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  it('lets only you put an unanswered question aside', async () => {
+    const [question] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, detail)
+      values (${userA}, 'step', ${goalA}, 'decision', 'Avalanche or snowball?',
+              ${'A — Avalanche. Highest rate first.\nB — Snowball. Smallest balance first.'})
+      returning id`);
+    const [step] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Set up autopay') returning id`);
+
+    await expect(
+      asClaude((tx) => tx`update items set dismissed_at = now() where id = ${question.id}`),
+    ).rejects.toThrow(/may not put a question aside/);
+    await expect(
+      asUser(userA, (tx) => tx`update items set dismissed_at = now() where id = ${step.id}`),
+    ).rejects.toThrow(/items_dismissed_question_ck/);
+
+    await asUser(userA, (tx) => tx`update items set dismissed_at = now() where id = ${question.id}`);
+    await expect(
+      asUser(userA, (tx) => tx`update items set resolution = 'A' where id = ${question.id}`),
+    ).rejects.toThrow(/items_dismissed_question_ck/);
+    await asUser(userA, (tx) => tx`
+      update items set resolution = 'A', status = 'done', dismissed_at = null
+      where id = ${question.id}`);
+  });
+
+  it('keeps the answer a change replaced in history', async () => {
+    const [question] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, resolution, status)
+      values (${userA}, 'step', ${goalA}, 'decision', 'Refinance?', 'A — Refinance', 'done')
+      returning id`);
+    await asUser(userA, (tx) => tx`
+      update items set resolution = 'B — Keep the federal loans' where id = ${question.id}`);
+
+    const history = await historyOf(question.id);
+    const change = history.at(-1);
+    expect(change?.action).toBe('update');
+    expect(change?.old_values).toMatchObject({ resolution: 'A — Refinance' });
+    expect(change?.new_values).toMatchObject({ resolution: 'B — Keep the federal loans' });
+  });
+});
+
+describe('questions from Claude carry options (plan #962)', () => {
+  async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  it('counts lettered options the way the page draws them', async () => {
+    const counts = await admin<{ n: number }[]>`
+      select lettered_options(d) as n from unnest(${[
+        'A — Avalanche. Highest rate first.\nB — Snowball.\nRecommend A.',
+        '(a) One\n(b) Two\n(c) Three',
+        '  A. One\r\n  B: Two',
+        'A fired session\nB is prose',
+        'A -- One\nC -- Two',
+        'A) Only one',
+      ]}::text[]) as d`;
+    expect(counts.map((row) => row.n)).toEqual([2, 3, 2, 0, 0, 0]);
+  });
+
+  it('refuses a question from Claude with fewer than two options, and leaves yours alone', async () => {
+    await expect(
+      asClaude((tx) => tx`
+        insert into items (user_id, level, parent_id, kind, title)
+        values (${userA}, 'step', ${goalA}, 'decision', 'Avalanche or snowball?')`),
+    ).rejects.toThrow(/at least two options/);
+    await expect(
+      asClaude((tx) => tx`
+        insert into items (user_id, level, parent_id, kind, title, detail)
+        values (${userA}, 'step', ${goalA}, 'decision', 'Refinance?', ${'A — Refinance.'})`),
+    ).rejects.toThrow(/at least two options/);
+
+    const [question] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, detail)
+      values (${userA}, 'step', ${goalA}, 'decision', 'Avalanche or snowball?',
+              ${'A — Avalanche. Highest rate first.\nB — Snowball. Smallest balance first.'})
+      returning id`);
+    await expect(
+      asClaude((tx) => tx`update items set detail = 'Either works.' where id = ${question.id}`),
+    ).rejects.toThrow(/at least two options/);
+    await asClaude((tx) => tx`update items set position = 70 where id = ${question.id}`);
+
+    const [yours] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'decision', 'Call the servicer or write?') returning id`);
+    await asClaude((tx) => tx`update items set position = 80 where id = ${yours.id}`);
+  });
+});
+
+describe('one proposal at a time, and fog put aside (plan #960)', () => {
+  async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  async function propose(parent: string, title: string, kind = 'mine'): Promise<string> {
+    const [row] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, status)
+      values (${userA}, 'step', ${parent}, ${kind}, ${title}, 'proposed') returning id`);
+    return row.id;
+  }
+
+  it('approves one proposal with those beneath it and leaves the goal unapproved', async () => {
+    const [goal] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title)
+      values (${userA}, 'goal', ${areaA}, 'Run a half marathon') returning id`);
+    const parent = await propose(goal.id, 'Pick a plan');
+    const child = await propose(parent, 'Compare three plans', 'claude');
+    const other = await propose(goal.id, 'Buy shoes');
+
+    const [{ settled }] = await asUser(userA, (tx) =>
+      tx<{ settled: number }[]>`select settle_proposal(${parent}, true) as settled`,
+    );
+    expect(settled).toBe(2);
+    const rows = await admin<{ id: string; status: string; approved_at: string | null }[]>`
+      select id, status, approved_at from items where id in (${goal.id}, ${parent}, ${child}, ${other})`;
+    const byId = Object.fromEntries(rows.map((row) => [row.id, row]));
+    expect(byId[parent].status).toBe('open');
+    expect(byId[child].status).toBe('open');
+    expect(byId[other].status).toBe('proposed');
+    expect(byId[goal.id].approved_at).toBeNull();
+
+    // Not a proposal any more, somebody else's, or asked by Claude.
+    const [{ none }] = await asUser(userA, (tx) =>
+      tx<{ none: number | null }[]>`select settle_proposal(${parent}, true) as none`,
+    );
+    expect(none).toBeNull();
+    const [{ theirs }] = await asUser(userB, (tx) =>
+      tx<{ theirs: number | null }[]>`select settle_proposal(${other}, true) as theirs`,
+    );
+    expect(theirs).toBeNull();
+    await expect(
+      asClaude((tx) => tx`select goals.settle_proposal(${other}, true)`),
+    ).rejects.toThrow(/only you can turn a proposed step/);
+  });
+
+  it('drops a turned-down proposal, the proposals and open questions beneath it, with history', async () => {
+    const [goal] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title)
+      values (${userA}, 'goal', ${areaA}, 'Learn to cook') returning id`);
+    const step = await propose(goal.id, 'Take a knife skills class');
+    const [question] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, detail)
+      values (${userA}, 'step', ${step}, 'decision', 'Weekday or weekend?',
+              ${'A — Weekday.\nB — Weekend.'}) returning id`);
+
+    const [{ settled }] = await asUser(userA, (tx) =>
+      tx<{ settled: number }[]>`select settle_proposal(${step}, false) as settled`,
+    );
+    expect(settled).toBe(2);
+    const rows = await admin<{ status: string }[]>`
+      select status from items where id in (${step}, ${question.id})`;
+    expect(rows.map((row) => row.status)).toEqual(['dropped', 'dropped']);
+    const history = await historyOf(step);
+    expect(history.at(-1)).toMatchObject({
+      action: 'update',
+      actor: 'me',
+      old_values: { status: 'proposed' },
+      new_values: { status: 'dropped' },
+    });
+  });
+
+  it('lets only you put fog aside, and brings it back when the fog is rewritten', async () => {
+    const [goal] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title, fog)
+      values (${userA}, 'goal', ${areaA}, 'Get fit', 'Strength or endurance?') returning id`);
+
+    await expect(
+      asClaude((tx) => tx`update items set fog_dismissed_at = now() where id = ${goal.id}`),
+    ).rejects.toThrow(/may not put fog aside/);
+    await expect(
+      asUser(userA, (tx) => tx`update items set fog_dismissed_at = now() where id = ${goalA}`),
+    ).rejects.toThrow(/items_fog_dismissed_ck/);
+
+    await asUser(userA, (tx) => tx`update items set fog_dismissed_at = now() where id = ${goal.id}`);
+    await asClaude((tx) => tx`update items set fog = 'Where are you starting from?' where id = ${goal.id}`);
+    const [row] = await admin<{ fog_dismissed_at: string | null }[]>`
+      select fog_dismissed_at from items where id = ${goal.id}`;
+    expect(row.fog_dismissed_at).toBeNull();
   });
 });
 
@@ -795,6 +991,65 @@ describe('collections and records (plan #953)', () => {
   });
 });
 
+describe('comments on goals and steps (plan #957)', () => {
+  async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  it('keeps a thread on a goal to its account, with history', async () => {
+    const [comment] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into comments (user_id, item_id, author, body)
+      values (${userA}, ${goalA}, 'me', '@dash which loan first?') returning id`);
+    const history = await historyOf(comment.id);
+    expect(history[0]).toMatchObject({ table_name: 'comments', action: 'insert', actor: 'me' });
+
+    const seen = await asUser(userB, (tx) => tx`select id from comments where id = ${comment.id}`);
+    expect(seen).toHaveLength(0);
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into comments (user_id, item_id, author, body)
+        values (${userB}, ${goalA}, 'me', 'not mine')`),
+    ).rejects.toThrow();
+  });
+
+  it('lets Claude add its own replies and nothing else', async () => {
+    const [mine] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into comments (user_id, item_id, author, body)
+      values (${userA}, ${goalA}, 'me', 'A note') returning id`);
+
+    await expect(
+      asClaude((tx) => tx`
+        insert into comments (user_id, item_id, author, body)
+        values (${userA}, ${goalA}, 'me', 'Pretending to be you')`),
+    ).rejects.toThrow(/only write its own replies/);
+    await expect(
+      asClaude((tx) => tx`delete from comments where id = ${mine.id}`),
+    ).rejects.toThrow(/may not delete a comment you wrote/);
+
+    const [reply] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into comments (user_id, item_id, author, body)
+      values (${userA}, ${goalA}, 'claude', 'Avalanche first.') returning id`);
+    const history = await historyOf(reply.id);
+    expect(history[0]).toMatchObject({ table_name: 'comments', actor: 'claude' });
+
+    await asUser(userA, (tx) => tx`delete from comments where id = ${reply.id}`);
+  });
+
+  it('refuses an empty comment and one by nobody', async () => {
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into comments (user_id, item_id, author, body) values (${userA}, ${goalA}, 'me', '  ')`),
+    ).rejects.toThrow(/comments_body_ck/);
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into comments (user_id, item_id, author, body) values (${userA}, ${goalA}, 'dash', 'hi')`),
+    ).rejects.toThrow(/comments_author_ck/);
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`
@@ -827,6 +1082,7 @@ describe('RLS coverage', () => {
       'captures',
       'collection_goals',
       'collections',
+      'comments',
       'item_goals',
       'items',
       'links',

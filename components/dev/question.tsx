@@ -210,6 +210,7 @@ export function AnswerBox({
   onCancel,
   hint = false,
   error,
+  extra,
 }: {
   id: string;
   detail: string | null;
@@ -222,6 +223,12 @@ export function AnswerBox({
   onCancel?: () => void;
   hint?: boolean;
   error?: string;
+  /**
+   * More buttons for the same row, such as Not now on a goal's question. A
+   * button here submits this form with its own `formAction`, so it gets the
+   * question's id from the hidden field above.
+   */
+  extra?: React.ReactNode;
 }) {
   const field = `answer-${id}`;
   const options = planOptions(detail);
@@ -254,6 +261,7 @@ export function AnswerBox({
             Cancel
           </Button>
         )}
+        {extra}
         <FieldError>{error}</FieldError>
       </div>
     </form>

@@ -6,6 +6,8 @@ import {
   type Collection,
   type CollectionRecord,
 } from '@/lib/goals/collections-store';
+import type { DevComment } from '@/lib/comments/load';
+import { loadThreads } from '@/lib/goals/comments-store';
 import { dailyView, type DailyView } from '@/lib/goals/daily';
 import { GOALS_SCHEMA, type GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
@@ -25,6 +27,7 @@ import {
   type RhythmRecord,
 } from '@/lib/goals/rhythms';
 import { syncRhythms } from '@/lib/goals/rhythms-store';
+import { goalProgress, type GoalProgress } from '@/lib/goals/status';
 import { todoSteps, type TodoStep } from '@/lib/goals/todo';
 import { nextPosition, reorder, type Goal, type GoalStatus } from '@/lib/goals/tree';
 
@@ -49,7 +52,9 @@ type ItemRow = {
   detail: string | null;
   acceptance: string | null;
   fog: string | null;
+  fog_dismissed_at: string | null;
   resolution: string | null;
+  dismissed_at: string | null;
   due_on: string | null;
   position: number;
   rhythm_count: number | null;
@@ -67,8 +72,9 @@ type ItemRow = {
 type LinkRow = { id: string; item_id: string; goal_id: string };
 
 const ITEM_COLUMNS =
-  'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, resolution, ' +
-  'due_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
+  'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, fog_dismissed_at, ' +
+  'resolution, ' +
+  'dismissed_at, due_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
   'unit, target, collection_id, asks_for';
 
 const toStep = (row: ItemRow): Step => ({
@@ -80,6 +86,7 @@ const toStep = (row: ItemRow): Step => ({
   detail: row.detail,
   acceptance: row.acceptance,
   resolution: row.resolution,
+  dismissedAt: row.dismissed_at,
   dueOn: row.due_on,
   position: row.position,
   rhythmCount: row.rhythm_count,
@@ -98,6 +105,7 @@ const toGoal = (row: ItemRow): Goal => ({
   title: row.title,
   acceptance: row.acceptance,
   fog: row.fog,
+  fogDismissedAt: row.fog_dismissed_at,
   status: row.status,
   position: row.position,
   unit: row.unit,
@@ -118,6 +126,8 @@ export type GoalMap = {
   rhythms: Record<string, RhythmRecord>;
   /** The collections the information steps shown fill, with their records (plan #954). */
   information: Record<string, { collection: Collection; records: CollectionRecord[] }>;
+  /** The comments on the goal and on each step shown, keyed by item id (plan #957). */
+  threads: Record<string, DevComment[]>;
 };
 
 /** Whose rows, and which day it is for them, for bringing rhythm periods up to date. */
@@ -182,8 +192,10 @@ export async function loadGoalMap(
   const steps = byGoal.get(goalId) ?? [];
   const shown: string[] = [];
   const collectionIds: string[] = [];
+  const itemIds: string[] = [goalId];
   const collect = (list: StepNode[]) => {
     for (const node of list) {
+      itemIds.push(node.id);
       if (node.kind === 'rhythm') shown.push(node.id);
       if (node.collectionId) collectionIds.push(node.collectionId);
       collect(node.children);
@@ -191,9 +203,10 @@ export async function loadGoalMap(
   };
   collect(steps);
   collect(linked.map((entry) => entry.step));
-  const [records, information] = await Promise.all([
+  const [records, information, threads] = await Promise.all([
     syncRhythms(client, userId, liveRhythms(goals.map(toGoal), byGoal), today, shown),
     loadInformation(client, collectionIds),
+    loadThreads(client, itemIds),
   ]);
 
   return {
@@ -210,36 +223,30 @@ export async function loadGoalMap(
       }),
     ),
     information,
+    threads,
   };
 }
 
-/** Live step and goal counts per goal, for the home page's link to each map. */
-export async function loadStepCounts(
+/**
+ * Each goal's progress and whose move it is (plan #958), keyed by goal id, for
+ * the All goals list. A goal with no live steps is absent.
+ */
+export async function loadGoalProgress(
   client: GoalsSupabaseClient,
-): Promise<Record<string, { total: number; open: number }>> {
-  const { data, error } = await client
-    .from('items')
-    .select('id, level, parent_id, status')
-    .is('archived_at', null);
+): Promise<Record<string, GoalProgress>> {
+  const { data, error } = await client.from('items').select(ITEM_COLUMNS).is('archived_at', null);
   if (error) throw new Error(`Could not read steps: ${error.message}`);
-  const rows = (data ?? []) as Pick<ItemRow, 'id' | 'level' | 'parent_id' | 'status'>[];
+  const rows = (data ?? []) as unknown as ItemRow[];
   const goalIds = rows.filter((r) => r.level === 'goal').map((r) => r.id);
-  const { goalOf } = buildForest(
+  const { byGoal } = buildForest(
     goalIds,
-    rows
-      .filter((r) => r.level === 'step')
-      .map((r) => ({ id: r.id, parentId: r.parent_id as string, status: r.status }) as Step),
+    rows.filter((r) => r.level === 'step').map(toStep),
   );
-  const counts: Record<string, { total: number; open: number }> = {};
-  const statusOf = new Map(rows.map((r) => [r.id, r.status]));
-  for (const [stepId, goalId] of goalOf) {
-    const entry = counts[goalId] ?? { total: 0, open: 0 };
-    entry.total += 1;
-    const status = statusOf.get(stepId);
-    if (status === 'open' || status === 'proposed') entry.open += 1;
-    counts[goalId] = entry;
+  const out: Record<string, GoalProgress> = {};
+  for (const [goalId, steps] of byGoal) {
+    if (steps.length > 0) out[goalId] = goalProgress(steps);
   }
-  return counts;
+  return out;
 }
 
 /**
@@ -485,7 +492,15 @@ export async function loadDailyView(
     byGoal,
   );
   const records = await syncRhythms(client, userId, live, today);
-  return { ...dailyView(goals, byGoal, today), rhythms: homeRhythms(live, records, today) };
+  const view = dailyView(goals, byGoal, today);
+  return {
+    ...view,
+    goals: view.goals.map((daily) => ({
+      ...daily,
+      progress: goalProgress(byGoal.get(daily.goal.id) ?? []),
+    })),
+    rhythms: homeRhythms(live, records, today),
+  };
 }
 
 /** A live rhythm whose current period is not yet met, for Todo (plan #928). */

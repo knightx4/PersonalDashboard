@@ -59,6 +59,7 @@ import {
   Select,
   Textarea,
 } from '@/components/ui/field';
+import { FogNote } from '@/components/dev/fog-note';
 import { StateLabel, TONE_TEXT, type DevTone } from '@/components/dev/state-label';
 import { DEV_STATE_WORD, PLAN_MOVE_WORD } from '@/lib/dev/words';
 import { MODULES, type ModuleId } from '@/lib/modules';
@@ -2600,27 +2601,17 @@ function PlanRow({
           so the fold is a control everywhere it is a state. */}
       {foldableFog && showChildren && (
           <li style={inset} className="pb-1.5 pr-3">
-            <div className="border-l-2 border-dashed border-border-strong pl-2.5">
-              <p className="text-micro font-semibold uppercase tracking-wide text-ink-ghost">
-                Not yet specified
-              </p>
-              <p className="whitespace-pre-wrap text-small text-ink-muted">{node.fog}</p>
-              {/* Putting the patch aside stops it being raised: off the page,
-                  out of the Not specified view, out of every turn, and no
-                  longer holding the step open when you close it. */}
-              <form action={fogAction} className="mt-1">
-                <input type="hidden" name="id" value={node.id} />
-                <input
-                  type="hidden"
-                  name="dismissed"
-                  value={node.fogDismissedAt === null ? '1' : '0'}
-                />
-                <Button type="submit" size="sm" variant="ghost" pending={fogPending}>
-                  {node.fogDismissedAt === null ? 'Not now' : 'Bring back'}
-                </Button>
-              </form>
-              <FieldError>{fogState.error}</FieldError>
-            </div>
+            {/* Putting the patch aside stops it being raised: off the page,
+                out of the Not specified view, out of every turn, and no
+                longer holding the step open when you close it. */}
+            <FogNote
+              id={node.id}
+              fog={node.fog ?? ''}
+              aside={node.fogDismissedAt !== null}
+              action={fogAction}
+              pending={fogPending}
+              error={fogState.error}
+            />
           </li>
         )}
 

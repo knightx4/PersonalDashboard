@@ -2,7 +2,13 @@ import 'server-only';
 
 import { fireFeatureRoutine, resolveRoutineId, type RoutineTarget } from '@/lib/feedback/routine';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
-import { goalRunText, type GoalRun } from '@/lib/goals/shaping';
+import {
+  goalRunText,
+  runChanges,
+  type GoalRun,
+  type RunChanges,
+  type RunHistoryRow,
+} from '@/lib/goals/shaping';
 
 /**
  * Reads and writes for Claude shaping a goal (plan #932): the latest run on a
@@ -22,11 +28,16 @@ type RunRow = {
 
 const ERROR_LIMIT = 4000;
 
-/** When the goal was approved (null if not yet) and the latest run on it. */
+/**
+ * When the goal was approved (null if not yet), the latest run on it, and,
+ * once that run has ended, what it changed (plan #961). The changes are
+ * counted from the history rows the run labelled with its id; null while the
+ * run is going, or when there is no history to read.
+ */
 export async function loadShaping(
   client: GoalsSupabaseClient,
   goalId: string,
-): Promise<{ approvedAt: string | null; lastRun: GoalRun | null }> {
+): Promise<{ approvedAt: string | null; lastRun: GoalRun | null; changes: RunChanges | null }> {
   const [goal, runs] = await Promise.all([
     client.from('items').select('approved_at').eq('id', goalId).eq('level', 'goal').maybeSingle(),
     client
@@ -41,6 +52,7 @@ export async function loadShaping(
   const row = (runs.data?.[0] ?? null) as RunRow | null;
   return {
     approvedAt: (goal.data?.approved_at as string | null) ?? null,
+    changes: row && row.status !== 'started' ? await loadRunChanges(client, row.id) : null,
     lastRun: row && {
       id: row.id,
       status: row.status,
@@ -50,6 +62,27 @@ export async function loadShaping(
       error: row.error,
     },
   };
+}
+
+/** Longest a run's history is read for counting; far past any one run. */
+const HISTORY_LIMIT = 2000;
+
+/**
+ * Count what one run changed from its history. A failed read is no count
+ * rather than a broken goal page: the run line still says how it ended.
+ */
+async function loadRunChanges(client: GoalsSupabaseClient, runId: string): Promise<RunChanges | null> {
+  const { data, error } = await client
+    .from('history')
+    .select('table_name, action, row_id, old_values, new_values')
+    .eq('run_id', runId)
+    .in('table_name', ['items', 'records'])
+    .limit(HISTORY_LIMIT);
+  if (error) {
+    console.error(`goals.history read failed for run ${runId}: ${error.message}`);
+    return null;
+  }
+  return runChanges((data ?? []) as RunHistoryRow[]);
 }
 
 /**
@@ -146,8 +179,11 @@ export async function approveGoal(client: GoalsSupabaseClient, goalId: string): 
 }
 
 /**
- * Answer a question step: the answer goes in its resolution and the step
- * closes. False when it is not a live, unanswered question.
+ * Answer a question step, or change the answer it already has (plan #956):
+ * the answer goes in its resolution, the step closes, and a question put
+ * aside comes back into view. A change is an update like any other, so the
+ * history trigger keeps the answer it replaced. False when it is not a live
+ * question, or it was withdrawn.
  */
 export async function answerQuestion(
   client: GoalsSupabaseClient,
@@ -156,7 +192,30 @@ export async function answerQuestion(
 ): Promise<boolean> {
   const { data, error } = await client
     .from('items')
-    .update({ resolution: answer, status: 'done' })
+    .update({ resolution: answer, status: 'done', dismissed_at: null })
+    .eq('id', id)
+    .eq('level', 'step')
+    .eq('kind', 'decision')
+    .neq('status', 'dropped')
+    .is('archived_at', null)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Put an unanswered question aside with Not now, or bring it back (plan
+ * #956). It stays open and unanswered either way. False when it is not a
+ * live, unanswered question.
+ */
+export async function setQuestionAside(
+  client: GoalsSupabaseClient,
+  id: string,
+  aside: boolean,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('items')
+    .update({ dismissed_at: aside ? new Date().toISOString() : null })
     .eq('id', id)
     .eq('level', 'step')
     .eq('kind', 'decision')
@@ -179,6 +238,44 @@ export async function markReviewed(client: GoalsSupabaseClient, id: string): Pro
     .eq('kind', 'claude')
     .is('reviewed_at', null)
     .or('result.not.is.null,result_url.not.is.null')
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Approve or turn down one proposed step (plan #960), with the proposed
+ * steps beneath it; turning one down also drops any unanswered question
+ * beneath it. The goal's other proposals keep waiting. Null when it is not a
+ * live proposed step of yours, otherwise how many rows it changed.
+ */
+export async function settleProposal(
+  client: GoalsSupabaseClient,
+  id: string,
+  approve: boolean,
+): Promise<number | null> {
+  const { data, error } = await client.rpc('settle_proposal', { step: id, approve });
+  if (error) throw new Error(error.message);
+  return data === null ? null : Number(data);
+}
+
+/**
+ * Put a goal's fog aside with Not now, or bring it back (plan #960). The fog
+ * itself is untouched, and rewriting it brings it back on its own. False when
+ * it is not a live goal of yours with fog on it.
+ */
+export async function setFogAside(
+  client: GoalsSupabaseClient,
+  goalId: string,
+  aside: boolean,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('items')
+    .update({ fog_dismissed_at: aside ? new Date().toISOString() : null })
+    .eq('id', goalId)
+    .eq('level', 'goal')
+    .not('fog', 'is', null)
+    .is('archived_at', null)
     .select('id');
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;

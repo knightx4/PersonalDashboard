@@ -4,21 +4,20 @@ import { useActionState, useId, useState } from 'react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
-import { Field, Input, Select, Textarea } from '@/components/ui/field';
+import { Field } from '@/components/ui/field';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
 import { liveFields, type CollectionField, type FieldValue } from '@/lib/goals/collections';
 import type { Collection, CollectionRecord } from '@/lib/goals/collections-store';
 import {
   SOURCE_LABELS,
-  VALUE_PREFIX,
   askedFields,
   displayValue,
   informationProgress,
-  inputValue,
   missingFields,
   progressLine,
   sourceHref,
+  sourceLabel,
   unfinishedReason,
 } from '@/lib/goals/information';
 import type { StepNode } from '@/lib/goals/steps';
@@ -29,13 +28,16 @@ import {
   saveRecordAction,
   type InformationActionState,
 } from './information-actions';
+import { FieldInput } from './field-input';
+import { FillFromDocument } from './fill-from-document';
 
 /**
  * The form or table on an information step (plan #954; docs/GOALS-SPEC.md,
  * "Information steps and collections"). A one-record collection is a form;
  * a list is a table with a row per item, which the table primitive stacks
  * into label and value pairs on a phone. Rows found for you are drafts,
- * marked with where they came from, until one tap confirms them.
+ * marked with where they came from, until one tap confirms them. Pasted
+ * text or a document fills the form in as a preview first (plan #955).
  */
 
 const initial: InformationActionState = {};
@@ -83,9 +85,27 @@ function OneRecord({
   record: CollectionRecord | null;
   asked: CollectionField[];
 }) {
+  const [filling, setFilling] = useState(false);
+  if (filling) {
+    return (
+      <FillFromDocument
+        stepId={node.id}
+        collection={collection}
+        current={record}
+        onClose={() => setFilling(false)}
+      />
+    );
+  }
   return (
     <div className="space-y-2">
-      {record?.draft && <DraftNote stepId={node.id} record={record} />}
+      {record?.draft ? (
+        <DraftNote stepId={node.id} record={record} />
+      ) : (
+        record && <SourceNote record={record} />
+      )}
+      {node.status === 'open' && (
+        <AddTrigger label="Fill in from text or a document" onClick={() => setFilling(true)} />
+      )}
       <RecordForm
         stepId={node.id}
         collection={collection}
@@ -111,6 +131,7 @@ function RecordTable({
   canFinish: boolean;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
+  const [filling, setFilling] = useState(false);
   const [finishState, finish, finishing] = useActionState(
     async (_prev: InformationActionState, form: FormData) => finishListAction(form),
     initial,
@@ -186,6 +207,7 @@ function RecordTable({
                   ))}
                   <TD className="max-md:justify-end">
                     <div className="flex items-center justify-end gap-1">
+                      {!record.draft && <SourceLink record={record} />}
                       {record.draft && <ConfirmButton stepId={node.id} record={record} compact />}
                       <ActionMenu label={`Row ${rowName(fields, record)} actions`} items={menu} />
                     </div>
@@ -197,7 +219,14 @@ function RecordTable({
         </Table>
       )}
 
-      {editingRecord ? (
+      {filling ? (
+        <FillFromDocument
+          stepId={node.id}
+          collection={collection}
+          current={null}
+          onClose={() => setFilling(false)}
+        />
+      ) : editingRecord ? (
         <div className="space-y-2 rounded-control bg-sunken p-3">
           {editingRecord.draft && <DraftNote stepId={node.id} record={editingRecord} />}
           <RecordForm
@@ -224,6 +253,7 @@ function RecordTable({
       ) : (
         <div className="flex flex-wrap items-center gap-3">
           <AddTrigger label="Add a row" onClick={() => setEditing('new')} />
+          <AddTrigger label="Fill in from text or a document" onClick={() => setFilling(true)} />
           {canFinish && (
             <form action={finish}>
               <input type="hidden" name="stepId" value={node.id} />
@@ -272,15 +302,44 @@ function DraftNote({ stepId, record }: { stepId: string; record: CollectionRecor
         Draft.{' '}
         {href ? (
           <a href={href} target="_blank" rel="noreferrer" className="underline">
-            {SOURCE_LABELS[record.source]}
+            {sourceLabel(record.source, record.sourceRef)}
           </a>
         ) : (
-          SOURCE_LABELS[record.source]
+          sourceLabel(record.source, record.sourceRef)
         )}
         . Check it, then confirm.
       </span>
       <ConfirmButton stepId={stepId} record={record} />
     </div>
+  );
+}
+
+/** Where a confirmed record's values came from, when it was not typed. */
+function SourceNote({ record }: { record: CollectionRecord }) {
+  if (record.source === 'typed') return null;
+  return (
+    <p className="text-small text-ink-muted">
+      <SourceLink record={record} />
+    </p>
+  );
+}
+
+/** A record's source, linked to the email or stored file when there is one. */
+function SourceLink({ record }: { record: CollectionRecord }) {
+  if (record.source === 'typed') return null;
+  const label = sourceLabel(record.source, record.sourceRef);
+  const href = sourceHref(record.source, record.sourceRef);
+  if (!href) return <span className="text-small text-ink-muted">{label}</span>;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-block max-w-40 truncate align-middle text-small text-ink-muted underline"
+      title={label}
+    >
+      {label}
+    </a>
   );
 }
 
@@ -399,72 +458,4 @@ function RecordForm({
       </div>
     </form>
   );
-}
-
-function FieldInput({
-  id,
-  field,
-  value,
-}: {
-  id: string;
-  field: CollectionField;
-  value: FieldValue | undefined;
-}) {
-  const name = `${VALUE_PREFIX}${field.key}`;
-  const defaultValue = inputValue(field, value);
-  switch (field.type) {
-    case 'long_text':
-      return <Textarea id={id} name={name} rows={2} defaultValue={defaultValue} />;
-    case 'number':
-    case 'money':
-    case 'percent':
-      return (
-        <Input
-          id={id}
-          name={name}
-          inputMode="decimal"
-          autoComplete="off"
-          defaultValue={defaultValue}
-        />
-      );
-    case 'day_of_month':
-      return (
-        <Input
-          id={id}
-          name={name}
-          inputMode="numeric"
-          autoComplete="off"
-          defaultValue={defaultValue}
-        />
-      );
-    case 'date':
-      return <Input id={id} name={name} type="date" defaultValue={defaultValue} />;
-    case 'link':
-      return <Input id={id} name={name} type="url" inputMode="url" defaultValue={defaultValue} />;
-    case 'yes_no':
-      return (
-        <Select id={id} name={name} defaultValue={defaultValue}>
-          <option value="">Not said</option>
-          <option value="yes">Yes</option>
-          <option value="no">No</option>
-        </Select>
-      );
-    case 'choice': {
-      const options = field.options ?? [];
-      // A value kept from before an option was taken off stays choosable.
-      const kept = defaultValue && !options.includes(defaultValue) ? [defaultValue] : [];
-      return (
-        <Select id={id} name={name} defaultValue={defaultValue}>
-          <option value="">Not chosen</option>
-          {[...kept, ...options].map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </Select>
-      );
-    }
-    default:
-      return <Input id={id} name={name} autoComplete="off" defaultValue={defaultValue} />;
-  }
 }
