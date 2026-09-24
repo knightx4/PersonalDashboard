@@ -157,6 +157,11 @@ them.
 
 ## How cards are made
 
+[LEARN-LESSONS-SPEC](LEARN-LESSONS-SPEC.md) replaces this with lessons written
+for the concepts in your tracks, decided on 24 September 2026. Until it is
+built, cards are made as below; once it is, this is how exploratory cards are
+made.
+
 The catalogue is empty, so the feed has to fill it. A background pass keeps
 about twenty cards ready per person, and runs hourly and whenever the ready
 count drops to seven or fewer.
