@@ -395,6 +395,79 @@ async function getJson(url: string): Promise<{ ok: true; text: string } | YouTub
   return { ok: true, text: fetched.text };
 }
 
+function youTubeKey(): string | YouTubeFailure {
+  const key = process.env.YOUTUBE_API_KEY?.trim();
+  return key ? key : fail('no-key', 'YOUTUBE_API_KEY is not set');
+}
+
+export type PlaylistOrderOptions = {
+  /**
+   * Stop at the first id in this set, without including it. For an uploads
+   * playlist, which lists newest first, this is every video already stored,
+   * so a re-list reads only what is new and usually costs one quota unit.
+   */
+  stopAt?: Set<string>;
+  /** The runaway guard, in pages of fifty. */
+  maxPages?: number;
+};
+
+/**
+ * The video ids of a playlist, in its own order, one quota unit per fifty.
+ */
+export async function fetchPlaylistVideoIds(
+  playlistId: string,
+  options: PlaylistOrderOptions = {},
+): Promise<({ ok: true; videoIds: string[]; complete: boolean }) | YouTubeFailure> {
+  const key = youTubeKey();
+  if (typeof key !== 'string') return key;
+
+  const orderedIds: string[] = [];
+  const seen = new Set<string>();
+  let pageToken: string | undefined;
+  const maxPages = options.maxPages ?? MAX_PAGES;
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const body = await getJson(playlistItemsRequestUrl(playlistId, key, pageToken));
+    if (!body.ok) return body;
+    const parsed = parsePlaylistItemsPage(body.text);
+    if (!parsed.ok) return parsed;
+
+    for (const id of parsed.videoIds) {
+      if (options.stopAt?.has(id)) return { ok: true, videoIds: orderedIds, complete: true };
+      if (seen.has(id)) continue;
+      seen.add(id);
+      orderedIds.push(id);
+    }
+    if (!parsed.nextPageToken) return { ok: true, videoIds: orderedIds, complete: true };
+    pageToken = parsed.nextPageToken;
+  }
+
+  return { ok: true, videoIds: orderedIds, complete: false };
+}
+
+/**
+ * Title, description, duration and date for a list of ids, in batches of
+ * fifty at one quota unit each. Private and deleted videos do not come back;
+ * the order of the answer is not the order asked for.
+ */
+export async function fetchVideosByIds(
+  videoIds: string[],
+): Promise<({ ok: true; videos: YouTubeVideo[] }) | YouTubeFailure> {
+  const key = youTubeKey();
+  if (typeof key !== 'string') return key;
+
+  const videos: YouTubeVideo[] = [];
+  for (let from = 0; from < videoIds.length; from += PAGE_SIZE) {
+    const batch = videoIds.slice(from, from + PAGE_SIZE);
+    const body = await getJson(videosRequestUrl(batch, key));
+    if (!body.ok) return body;
+    const parsed = parseVideosResponse(body.text);
+    if (!parsed.ok) return parsed;
+    videos.push(...parsed.videos);
+  }
+  return { ok: true, videos };
+}
+
 /**
  * Walk one playlist into a course.
  *
@@ -407,44 +480,23 @@ export async function fetchYouTubePlaylist(playlistId: string): Promise<YouTubeP
   const wanted = playlistId.trim();
   if (!wanted) return fail('error', 'no playlist named');
 
-  const key = process.env.YOUTUBE_API_KEY?.trim();
-  if (!key) return fail('no-key', 'YOUTUBE_API_KEY is not set');
+  const key = youTubeKey();
+  if (typeof key !== 'string') return key;
 
   const headBody = await getJson(playlistRequestUrl(wanted, key));
   if (!headBody.ok) return headBody;
   const head = parsePlaylistResponse(headBody.text);
   if (!head.ok) return head;
 
-  const orderedIds: string[] = [];
-  const seen = new Set<string>();
-  let pageToken: string | undefined;
-
-  for (let page = 0; page < MAX_PAGES; page += 1) {
-    const body = await getJson(playlistItemsRequestUrl(wanted, key, pageToken));
-    if (!body.ok) return body;
-    const parsed = parsePlaylistItemsPage(body.text);
-    if (!parsed.ok) return parsed;
-
-    for (const id of parsed.videoIds) {
-      if (seen.has(id)) continue;
-      seen.add(id);
-      orderedIds.push(id);
-    }
-    if (!parsed.nextPageToken) break;
-    pageToken = parsed.nextPageToken;
-  }
+  const order = await fetchPlaylistVideoIds(wanted);
+  if (!order.ok) return order;
+  const orderedIds = order.videoIds;
 
   if (orderedIds.length === 0) return fail('not-found', `${head.title} has no videos in it`);
 
-  const byId = new Map<string, YouTubeVideo>();
-  for (let from = 0; from < orderedIds.length; from += PAGE_SIZE) {
-    const batch = orderedIds.slice(from, from + PAGE_SIZE);
-    const body = await getJson(videosRequestUrl(batch, key));
-    if (!body.ok) return body;
-    const parsed = parseVideosResponse(body.text);
-    if (!parsed.ok) return parsed;
-    for (const video of parsed.videos) byId.set(video.videoId, video);
-  }
+  const found = await fetchVideosByIds(orderedIds);
+  if (!found.ok) return found;
+  const byId = new Map(found.videos.map((video) => [video.videoId, video]));
 
   const videos = orderedIds
     .map((id) => byId.get(id))
@@ -462,4 +514,209 @@ export async function fetchYouTubePlaylist(playlistId: string): Promise<YouTubeP
     channelTitle: head.channelTitle,
     videos,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Channels.
+//
+// A channel you follow is listed in full and for free: `channels.list` for its
+// uploads playlist, `playlistItems.list` over that for every video, and
+// `playlists.list` for how the channel itself groups them. Each is one quota
+// unit per call, so a channel of two thousand videos costs about eighty units
+// the first time and one or two on each re-list after.
+// ---------------------------------------------------------------------------
+
+export type ChannelInput =
+  | { ok: true; handle: string }
+  | { ok: true; channelId: string }
+  | { ok: false; error: string };
+
+const HANDLE = /^@[A-Za-z0-9._-]{1,100}$/;
+const CHANNEL_ID = /^UC[A-Za-z0-9_-]{22}$/;
+
+/**
+ * A channel as somebody would paste it: `@MITOCW`, a link to the channel
+ * page, or a `UC...` channel id.
+ */
+export function parseChannelInput(raw: string): ChannelInput {
+  const trimmed = raw.trim();
+  if (!trimmed) return { ok: false, error: 'Paste a channel handle like @MITOCW, or a link to the channel.' };
+
+  if (HANDLE.test(trimmed)) return { ok: true, handle: trimmed };
+  if (CHANNEL_ID.test(trimmed)) return { ok: true, channelId: trimmed };
+  if (/^[A-Za-z0-9._-]{3,100}$/.test(trimmed) && !trimmed.startsWith('UC')) {
+    return { ok: true, handle: `@${trimmed}` };
+  }
+
+  let url: URL | null = null;
+  try {
+    url = new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`);
+  } catch {
+    url = null;
+  }
+  if (url && /(^|\.)youtube\.com$/i.test(url.hostname)) {
+    const [first, second] = url.pathname.split('/').filter(Boolean);
+    if (first && HANDLE.test(decodeURIComponent(first))) return { ok: true, handle: decodeURIComponent(first) };
+    if (first === 'channel' && second && CHANNEL_ID.test(second)) return { ok: true, channelId: second };
+    if ((first === 'c' || first === 'user') && second) {
+      return { ok: false, error: 'That is an old-style channel link. Open the channel and copy its @handle instead.' };
+    }
+  }
+
+  return { ok: false, error: `${trimmed} does not look like a YouTube channel.` };
+}
+
+export function channelsRequestUrl(input: { handle: string } | { channelId: string }, key: string): string {
+  const url = new URL('channels', API_BASE);
+  url.searchParams.set('part', 'snippet,contentDetails');
+  if ('handle' in input) url.searchParams.set('forHandle', input.handle);
+  else url.searchParams.set('id', input.channelId);
+  url.searchParams.set('key', key);
+  return url.toString();
+}
+
+export function channelPlaylistsRequestUrl(channelId: string, key: string, pageToken?: string): string {
+  const url = new URL('playlists', API_BASE);
+  url.searchParams.set('part', 'snippet,contentDetails');
+  url.searchParams.set('channelId', channelId);
+  url.searchParams.set('maxResults', String(PAGE_SIZE));
+  if (pageToken) url.searchParams.set('pageToken', pageToken);
+  url.searchParams.set('key', key);
+  return url.toString();
+}
+
+export type YouTubeChannel = {
+  channelId: string;
+  title: string;
+  /** `@MITOCW`. Null for the rare channel that has none. */
+  handle: string | null;
+  uploadsPlaylistId: string;
+  canonicalUrl: string;
+};
+
+const ChannelsResponse = z.object({
+  error: z.object({ message: z.string() }).optional(),
+  items: z
+    .array(
+      z.object({
+        id: z.string(),
+        snippet: z.object({ title: z.string(), customUrl: z.string().optional() }).optional(),
+        contentDetails: z
+          .object({ relatedPlaylists: z.object({ uploads: z.string().optional() }).optional() })
+          .optional(),
+      }),
+    )
+    .optional(),
+});
+
+export function parseChannelsResponse(body: string): ({ ok: true } & YouTubeChannel) | YouTubeFailure {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    return fail('error', 'the API answered with something that is not JSON');
+  }
+
+  const parsed = ChannelsResponse.safeParse(payload);
+  if (!parsed.success) return fail('error', 'the API answered in an unexpected shape');
+  if (parsed.data.error) return fail('error', parsed.data.error.message);
+
+  const item = parsed.data.items?.[0];
+  if (!item?.snippet) return fail('not-found', 'no channel by that name');
+  const uploads = item.contentDetails?.relatedPlaylists?.uploads;
+  if (!uploads) return fail('not-found', `${item.snippet.title} has no uploads playlist`);
+
+  const custom = item.snippet.customUrl?.trim();
+  const handle = custom ? (custom.startsWith('@') ? custom : `@${custom}`) : null;
+
+  return {
+    ok: true,
+    channelId: item.id,
+    title: item.snippet.title,
+    handle: handle && HANDLE.test(handle) ? handle : null,
+    uploadsPlaylistId: uploads,
+    canonicalUrl: handle ? `https://www.youtube.com/${handle}` : `https://www.youtube.com/channel/${item.id}`,
+  };
+}
+
+export type YouTubeChannelPlaylist = {
+  playlistId: string;
+  title: string;
+  description: string;
+  itemCount: number | null;
+};
+
+const ChannelPlaylistsResponse = z.object({
+  error: z.object({ message: z.string() }).optional(),
+  nextPageToken: z.string().optional(),
+  items: z
+    .array(
+      z.object({
+        id: z.string(),
+        snippet: z.object({ title: z.string(), description: z.string().optional() }).optional(),
+        contentDetails: z.object({ itemCount: z.number().optional() }).optional(),
+      }),
+    )
+    .optional(),
+});
+
+export function parseChannelPlaylistsPage(
+  body: string,
+): ({ ok: true; playlists: YouTubeChannelPlaylist[]; nextPageToken: string | null }) | YouTubeFailure {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    return fail('error', 'the API answered with something that is not JSON');
+  }
+
+  const parsed = ChannelPlaylistsResponse.safeParse(payload);
+  if (!parsed.success) return fail('error', 'the API answered in an unexpected shape');
+  if (parsed.data.error) return fail('error', parsed.data.error.message);
+
+  const playlists: YouTubeChannelPlaylist[] = [];
+  for (const item of parsed.data.items ?? []) {
+    if (!item.snippet) continue;
+    playlists.push({
+      playlistId: item.id,
+      title: item.snippet.title,
+      description: item.snippet.description ?? '',
+      itemCount: item.contentDetails?.itemCount ?? null,
+    });
+  }
+
+  return { ok: true, playlists, nextPageToken: parsed.data.nextPageToken ?? null };
+}
+
+/** Resolve a handle or id to the channel and its uploads playlist. One unit. */
+export async function fetchYouTubeChannel(
+  input: { handle: string } | { channelId: string },
+): Promise<({ ok: true } & YouTubeChannel) | YouTubeFailure> {
+  const key = youTubeKey();
+  if (typeof key !== 'string') return key;
+
+  const body = await getJson(channelsRequestUrl(input, key));
+  if (!body.ok) return body;
+  return parseChannelsResponse(body.text);
+}
+
+/** Every playlist a channel publishes. One unit per fifty. */
+export async function fetchChannelPlaylists(
+  channelId: string,
+): Promise<({ ok: true; playlists: YouTubeChannelPlaylist[] }) | YouTubeFailure> {
+  const key = youTubeKey();
+  if (typeof key !== 'string') return key;
+
+  const playlists: YouTubeChannelPlaylist[] = [];
+  let pageToken: string | undefined;
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const body = await getJson(channelPlaylistsRequestUrl(channelId, key, pageToken));
+    if (!body.ok) return body;
+    const parsed = parseChannelPlaylistsPage(body.text);
+    if (!parsed.ok) return parsed;
+    playlists.push(...parsed.playlists);
+    if (!parsed.nextPageToken) break;
+    pageToken = parsed.nextPageToken;
+  }
+  return { ok: true, playlists };
 }

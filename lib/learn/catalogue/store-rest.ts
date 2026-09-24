@@ -1,6 +1,6 @@
 import { WIKIPEDIA_PROVIDER_SLUG, type WikipediaArticle } from '@/lib/learn/providers/wikipedia';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import type { StoredArticle } from './store';
+import type { CatalogueSegmentInput, StoredArticle } from './store';
 
 /**
  * Writing a fetched article into the catalogue through the service-role
@@ -69,23 +69,56 @@ export async function storeArticleOverRest(
   if (item.error) throw new Error(`Storing ${article.title} failed: ${item.error.message}`);
   const itemId = (item.data as { id: string }).id;
 
+  const rows = article.sections.map((section) => ({
+    ordinal: section.ordinal,
+    tStartSeconds: null,
+    tEndSeconds: null,
+    sectionAnchor: section.anchor,
+    heading: section.heading,
+    text: section.text,
+  }));
+  const { removed, segments } = await writeSegmentsOverRest(learn, itemId, rows, article.title);
+
+  return {
+    itemId,
+    written: article.sections.length,
+    removed,
+    segments,
+  };
+}
+
+/**
+ * Replace one item's segments with these, keeping the embedding of every
+ * segment whose text did not change.
+ *
+ * The article writer above and the transcript runner in lib/learn/youtube
+ * both come through here. Segments are upserted on `(item_id, ordinal)`, the
+ * ones past the new count are deleted, and a segment whose text changed loses
+ * its vector so the embedding pass picks it up again.
+ */
+export async function writeSegmentsOverRest(
+  learn: LearnSupabaseClient,
+  itemId: string,
+  input: CatalogueSegmentInput[],
+  label: string,
+): Promise<{ removed: number; segments: { id: string; ordinal: number }[] }> {
   const existing = await learn
     .from('catalogue_segments')
     .select('ordinal, text')
     .eq('item_id', itemId);
-  if (existing.error) throw new Error(`Reading ${article.title}'s sections failed: ${existing.error.message}`);
+  if (existing.error) throw new Error(`Reading ${label}'s segments failed: ${existing.error.message}`);
   const storedText = new Map(
     ((existing.data ?? []) as { ordinal: number; text: string }[]).map((row) => [row.ordinal, row.text]),
   );
 
-  const rows = article.sections.map((section) => ({
+  const rows = input.map((segment) => ({
     item_id: itemId,
-    ordinal: section.ordinal,
-    t_start_seconds: null,
-    t_end_seconds: null,
-    section_anchor: section.anchor,
-    heading: section.heading,
-    text: section.text,
+    ordinal: segment.ordinal,
+    t_start_seconds: segment.tStartSeconds,
+    t_end_seconds: segment.tEndSeconds,
+    section_anchor: segment.sectionAnchor,
+    heading: segment.heading,
+    text: segment.text,
   }));
   const changed = rows
     .filter((row) => storedText.get(row.ordinal) !== row.text)
@@ -97,27 +130,25 @@ export async function storeArticleOverRest(
     const { error } = await learn
       .from('catalogue_segments')
       .upsert(batch, { onConflict: 'item_id,ordinal' });
-    if (error) throw new Error(`Storing ${article.title}'s sections failed: ${error.message}`);
+    if (error) throw new Error(`Storing ${label}'s segments failed: ${error.message}`);
   }
 
   const removed = await learn
     .from('catalogue_segments')
     .delete()
     .eq('item_id', itemId)
-    .gte('ordinal', article.sections.length)
+    .gte('ordinal', input.length)
     .select('id');
-  if (removed.error) throw new Error(`Trimming ${article.title}'s sections failed: ${removed.error.message}`);
+  if (removed.error) throw new Error(`Trimming ${label}'s segments failed: ${removed.error.message}`);
 
   const segments = await learn
     .from('catalogue_segments')
     .select('id, ordinal')
     .eq('item_id', itemId)
     .order('ordinal');
-  if (segments.error) throw new Error(`Reading ${article.title}'s sections failed: ${segments.error.message}`);
+  if (segments.error) throw new Error(`Reading ${label}'s segments failed: ${segments.error.message}`);
 
   return {
-    itemId,
-    written: article.sections.length,
     removed: (removed.data ?? []).length,
     segments: (segments.data ?? []) as { id: string; ordinal: number }[],
   };

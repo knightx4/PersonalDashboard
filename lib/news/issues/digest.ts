@@ -39,8 +39,9 @@ import { FALLBACK_TOPIC, NEWS_TOPICS, readTopic } from '@/lib/news/issues/topics
  * keeps the summary it had and only moves `digested_at`, since the row cannot
  * hold a summary and an error at once and the old summary is still worth
  * reading. A redo that succeeds deletes the issue's rows in `story_passes`
- * (plan #849, 0007_story_passes.sql): a pass names a story by its position in
- * the array, and the new array puts different stories at those positions.
+ * (plan #849, 0007_story_passes.sql) and `story_groups` (plan #864,
+ * 0010_story_groups.sql): both name a story by its position in the array, and
+ * the new array puts different stories at those positions.
  *
  * Pictures and the story's own text. Each picture in the HTML is replaced by
  * an `[image N]` marker the same way links are, and the model gives the
@@ -543,17 +544,19 @@ export async function digestIssue(input: {
 
   if (saved.error) throw new Error(`news: saving the summary failed (${saved.error.message})`);
 
-  // A new summary over an old one rewrites the stories array, and a pass names
-  // a story by its position in it, so the old passes would now skip the wrong
-  // stories. A first summary has none to clear.
+  // A new summary over an old one rewrites the stories array, and a pass or a
+  // story's group names a story by its position in it, so the old rows would
+  // now name the wrong stories. A first summary has none to clear.
   if (outcome.status === 'digested' && data.summary) {
-    const cleared = await input.news
-      .from('story_passes')
-      .delete()
-      .eq('issue_id', input.issueId)
-      .eq('user_id', input.userId);
-    if (cleared.error) {
-      throw new Error(`news: clearing the stories passed failed (${cleared.error.message})`);
+    for (const table of ['story_passes', 'story_groups'] as const) {
+      const cleared = await input.news
+        .from(table)
+        .delete()
+        .eq('issue_id', input.issueId)
+        .eq('user_id', input.userId);
+      if (cleared.error) {
+        throw new Error(`news: clearing ${table} failed (${cleared.error.message})`);
+      }
     }
   }
   return outcome;

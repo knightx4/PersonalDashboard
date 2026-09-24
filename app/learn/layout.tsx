@@ -100,6 +100,19 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       exact: true,
       alsoMatches: ['/learn/quiz/'],
     },
+    // The owner's alone, because every transcript it fetches spends the
+    // owner's TranscriptAPI credits.
+    ...(owner
+      ? [
+          {
+            href: '/learn/youtube',
+            label: 'YouTube',
+            icon: 'videos' as const,
+            exact: true,
+            alsoMatches: ['/learn/youtube/'],
+          },
+        ]
+      : []),
   ];
 
   return (

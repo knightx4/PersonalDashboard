@@ -286,20 +286,19 @@ describe('digesting a newsletter', () => {
     expect(news.deletes).toEqual([]);
   });
 
-  it('clears the stories passed when a redo rewrites them', async () => {
+  it('clears the stories passed and their groups when a redo rewrites them', async () => {
     const { news } = await run(
       reported({ summary: 'New.', stories: [{ headline: 'First', summary: 'One. Two.' }] }),
       { ...ISSUE, summary: 'Old.' },
     );
 
+    const filters = [
+      ['issue_id', 'issue-1'],
+      ['user_id', 'user-1'],
+    ];
     expect(news.deletes).toEqual([
-      {
-        table: 'story_passes',
-        filters: [
-          ['issue_id', 'issue-1'],
-          ['user_id', 'user-1'],
-        ],
-      },
+      { table: 'story_passes', filters },
+      { table: 'story_groups', filters },
     ]);
   });
 
@@ -320,7 +319,7 @@ describe('digesting a newsletter', () => {
         anthropicApiKey: 'test',
         client: model(reported({ summary: 'Fine.', stories: [] })).client,
       }),
-    ).rejects.toThrow('clearing the stories passed failed (permission denied)');
+    ).rejects.toThrow('clearing story_passes failed (permission denied)');
     // The new summary was saved first; the passes are what failed.
     expect(news.updates).toHaveLength(1);
   });
