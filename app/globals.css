@@ -84,6 +84,8 @@
   --c-w-learn-tint: #e4f4f1;
   --c-w-news: #806500;
   --c-w-news-tint: #f6f1e2;
+  --c-w-goals: #4a6f0c;
+  --c-w-goals-tint: #eef5e1;
   --c-w-dev: #4b5768;
   --c-w-dev-tint: #eef1f5;
 
@@ -237,6 +239,7 @@
   --c-w-vault-lit: var(--c-w-vault);
   --c-w-learn-lit: var(--c-w-learn);
   --c-w-news-lit: var(--c-w-news);
+  --c-w-goals-lit: var(--c-w-goals);
   --c-w-dev-lit: var(--c-w-dev);
 
   /* The sheet palette, captured here on :root -- where --c-ink and friends
@@ -314,6 +317,8 @@
   --c-w-learn-tint: #0a2420;
   --c-w-news: #d8b23d;
   --c-w-news-tint: #281e03;
+  --c-w-goals: #a3d65a;
+  --c-w-goals-tint: #1a2408;
   --c-w-dev: #a9b6c8;
   --c-w-dev-tint: #1a1f27;
 
@@ -504,6 +509,7 @@
   --c-w-vault-lit: #eda6f6;
   --c-w-learn-lit: #6fdcd2;
   --c-w-news-lit: #debf69;
+  --c-w-goals-lit: #b0dc6e;
   --c-w-dev-lit: #bcc7d6;
 
   /* ---- The sheets ----
@@ -610,6 +616,8 @@
   --c-w-learn-tint: #d8ebe7;
   --c-w-news: #6e5600;
   --c-w-news-tint: #ece4cf;
+  --c-w-goals: #41610a;
+  --c-w-goals-tint: #e3ecd2;
   --c-w-dev: #434e5f;
   --c-w-dev-tint: #e6eaf0;
 
@@ -704,6 +712,8 @@
   --c-w-learn-tint: #102c29;
   --c-w-news: #dcb956;
   --c-w-news-tint: #2c2205;
+  --c-w-goals: #b2dd70;
+  --c-w-goals-tint: #1d2a0b;
   --c-w-dev: #b3bfcf;
   --c-w-dev-tint: #212832;
 
@@ -805,6 +815,7 @@
   --c-w-vault-lit: #eda6f6;
   --c-w-learn-lit: #6fdcd2;
   --c-w-news-lit: #debf69;
+  --c-w-goals-lit: #b0dc6e;
   --c-w-dev-lit: #bcc7d6;
 
   /* ---- The sheets: smoked glass ----
@@ -870,6 +881,8 @@
   --c-w-learn-tint: #0f2b2e;
   --c-w-news: #debf69;
   --c-w-news-tint: #2a2410;
+  --c-w-goals: #b0dc6e;
+  --c-w-goals-tint: #1f2a10;
   --c-w-dev: #bcc7d6;
   --c-w-dev-tint: #1f2836;
 
@@ -948,6 +961,8 @@
     --c-w-learn-tint: #0a2420;
     --c-w-news: #d8b23d;
     --c-w-news-tint: #281e03;
+    --c-w-goals: #a3d65a;
+    --c-w-goals-tint: #1a2408;
     --c-w-dev: #a9b6c8;
     --c-w-dev-tint: #1a1f27;
 
@@ -1021,6 +1036,11 @@
   --c-sheet-accent: var(--c-w-news);
   --c-page-accent: var(--c-w-news-lit);
   --c-accent-tint: var(--c-w-news-tint);
+}
+[data-workspace='goals'] {
+  --c-sheet-accent: var(--c-w-goals);
+  --c-page-accent: var(--c-w-goals-lit);
+  --c-accent-tint: var(--c-w-goals-tint);
 }
 [data-workspace='dev'] {
   --c-sheet-accent: var(--c-w-dev);
@@ -1187,6 +1207,8 @@ body,
   --color-w-learn-tint: var(--c-w-learn-tint);
   --color-w-news: var(--c-w-news);
   --color-w-news-tint: var(--c-w-news-tint);
+  --color-w-goals: var(--c-w-goals);
+  --color-w-goals-tint: var(--c-w-goals-tint);
   --color-w-dev: var(--c-w-dev);
   --color-w-dev-tint: var(--c-w-dev-tint);
 

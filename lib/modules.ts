@@ -12,7 +12,15 @@
  * module is never invisible while waiting for someone to write the query.
  */
 
-export type ModuleId = 'shopping' | 'jobs' | 'vault' | 'todo' | 'learn' | 'news' | 'dev';
+export type ModuleId =
+  | 'shopping'
+  | 'jobs'
+  | 'vault'
+  | 'todo'
+  | 'learn'
+  | 'news'
+  | 'goals'
+  | 'dev';
 
 export type AppModule = {
   id: ModuleId;
@@ -99,6 +107,7 @@ export type MarkShape =
   | 'lock'
   | 'book'
   | 'envelope'
+  | 'flag'
   | 'terminal';
 
 export interface MarkKey {
@@ -191,6 +200,20 @@ export const MODULES: readonly AppModule[] = [
     // from the warning colour in all four themes than rose sits from the
     // delete red, which is the distance this set already accepts.
     key: { shape: 'envelope', from: '#e8c760', to: '#846905' },
+  },
+  {
+    id: 'goals',
+    prefix: '/goals',
+    // The daily view: the next few things per goal (docs/GOALS-SPEC.md).
+    home: '/goals',
+    label: 'Goals',
+    description: 'What you are working towards, and the next step on each',
+    accent: '--color-w-goals',
+    // Lime, the yellow-green between news's gold and learn's emerald. Kept
+    // off the blue-green of the positive colour, which means money came back,
+    // so a goal's accent is never read as a refund. A flag rather than a
+    // target, because Learn's own Goals tab already draws the target.
+    key: { shape: 'flag', from: '#a3e635', to: '#4d7c0f' },
   },
   {
     id: 'dev',
