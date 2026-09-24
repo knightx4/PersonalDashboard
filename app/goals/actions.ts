@@ -31,10 +31,10 @@ export type GoalsActionState = { error?: string; done?: number };
 const Id = z.string().uuid();
 const Direction = z.enum(['up', 'down']);
 
-const GOALS_PATH = '/goals';
-
 function saved(): GoalsActionState {
-  revalidatePath(GOALS_PATH);
+  // The layout, so the daily view on the home and the All goals list both
+  // redraw after a change made on either.
+  revalidatePath('/goals', 'layout');
   // A new number each time, so a form can tell one save from the next.
   return { done: Date.now() };
 }

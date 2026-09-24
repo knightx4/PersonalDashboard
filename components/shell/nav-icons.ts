@@ -128,6 +128,9 @@ export const NAV_ICONS = {
   // Goals. A flag, the same object the workspace's own mark draws, as News
   // does with its envelope. Not Target, which is Learn's Goals tab.
   goalsHome: Flag,
+  // Every area and goal, for adding and arranging them; the home is the short
+  // daily list, so this is the long one.
+  goalsAll: List,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
 } as const;

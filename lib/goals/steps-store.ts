@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
+import { dailyView, type DailyView } from '@/lib/goals/daily';
 import { GOALS_SCHEMA, type GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
   buildForest,
@@ -357,4 +358,51 @@ export async function unlinkStep(client: GoalsSupabaseClient, linkId: string): P
     .select('id');
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;
+}
+
+/**
+ * Everything the daily view on the home needs (plan #926): every live goal in
+ * page order, area by area, with its area's name and its step tree. The
+ * selection itself is dailyView in lib/goals/daily.ts.
+ */
+export async function loadDailyView(client: GoalsSupabaseClient): Promise<DailyView> {
+  const [items, areas] = await Promise.all([
+    client
+      .from('items')
+      .select(ITEM_COLUMNS)
+      .is('archived_at', null)
+      .order('position')
+      .order('created_at'),
+    client
+      .from('areas')
+      .select('id, name')
+      .is('archived_at', null)
+      .order('position')
+      .order('created_at'),
+  ]);
+  assertSchemaExposed(items.error, GOALS_SCHEMA);
+  if (items.error) throw new Error(`Could not read steps: ${items.error.message}`);
+  if (areas.error) throw new Error(`Could not read areas: ${areas.error.message}`);
+
+  const rows = (items.data ?? []) as unknown as ItemRow[];
+  const goalsByArea = new Map<string, ItemRow[]>();
+  for (const row of rows) {
+    if (row.level !== 'goal') continue;
+    const list = goalsByArea.get(row.area_id as string) ?? [];
+    list.push(row);
+    goalsByArea.set(row.area_id as string, list);
+  }
+  // A goal in an archived area is out of view with it.
+  const goals = (areas.data ?? []).flatMap((area) =>
+    (goalsByArea.get(area.id as string) ?? []).map((row) => ({
+      goal: toGoal(row),
+      areaName: area.name as string,
+    })),
+  );
+
+  const { byGoal } = buildForest(
+    goals.map((g) => g.goal.id),
+    rows.filter((r) => r.level === 'step').map(toStep),
+  );
+  return dailyView(goals, byGoal);
 }
