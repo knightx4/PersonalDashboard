@@ -445,3 +445,32 @@ export function featureProgress(
     total: steps.length,
   };
 }
+
+/** A row a session is on now, as the plan page's "On" line names it. */
+export type OnNow = DigestNightRef & { at: string; step: DigestNightRef | null };
+
+/**
+ * Every row a session is on right now, newest first, one line per row
+ * (note 39576272).
+ *
+ * The control used to name only `lastFire`, so with sessions running in
+ * parallel the card said one of them was on and was silent about the rest.
+ * Read from the runs still `started` rather than from the night's fires, so a
+ * session fired by hand beside the night's own is named too. A row that two
+ * runs are on is one line, under the newer of them.
+ */
+export function onNow(
+  runs: readonly { planItemId: string; at: string }[],
+  items: readonly PlanItem[],
+): OnNow[] {
+  const itemById = new Map(items.map((item) => [item.id, item]));
+  const seen = new Set<string>();
+  return [...runs]
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .flatMap((run) => {
+      const item = itemById.get(run.planItemId);
+      if (!item || seen.has(item.id)) return [];
+      seen.add(item.id);
+      return [{ ...refOf(item), at: run.at, step: claimedStep(item.id, items) }];
+    });
+}

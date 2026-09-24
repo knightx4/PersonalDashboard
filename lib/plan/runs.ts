@@ -706,3 +706,33 @@ export async function loadFeatureFires(supabase: Db, userId: string): Promise<Fe
     (row) => ({ planItemId: row.plan_item_id, at: row.created_at }),
   );
 }
+
+/** A run still going, as the plan page's "On" lines read it. */
+export type StartedRun = { planItemId: string; at: string };
+
+/**
+ * Every run still going that was sent at a row, newest first (note 39576272).
+ *
+ * Read on the plan page after `endQuietRuns` has written back the ones that
+ * are over, so `started` here means going now. Any job, not only feature
+ * fires: a re-shape or a step run fired by hand beside the night's session is
+ * a session running in parallel all the same.
+ */
+export async function loadStartedRuns(supabase: Db, userId: string): Promise<StartedRun[]> {
+  const { data, error } = await supabase
+    .from('plan_runs')
+    .select('plan_item_id, created_at')
+    .eq('user_id', userId)
+    .eq('status', 'started')
+    .not('plan_item_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(FIRE_LIMIT);
+  if (error) {
+    console.error(`plan_runs could not be read for the runs going now: ${error.message}`);
+    return [];
+  }
+  return ((data ?? []) as Array<{ plan_item_id: string; created_at: string }>).map((row) => ({
+    planItemId: row.plan_item_id,
+    at: row.created_at,
+  }));
+}

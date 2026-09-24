@@ -179,6 +179,31 @@ describe('the Overnight card while a night is running', () => {
     expect(draw()).toContain('stops in 5h 10m');
   });
 
+  // Note 39576272: sessions running in parallel each get an On line.
+  it('names every row a session is on when several are running', () => {
+    const html = draw({
+      on: [
+        { ref: '#723', title: 'Newest session', at: '2026-09-17T04:20:00Z', step: null },
+        {
+          ref: '#494',
+          title: 'The dev pages say what is actually happening',
+          at: '2026-09-17T04:04:00Z',
+          step: null,
+        },
+      ],
+    });
+
+    expect((html.match(/On <span/g) ?? []).length).toBe(2);
+    expect(html.indexOf('#723')).toBeLessThan(html.indexOf('#494'));
+    expect(html).toContain('Newest session');
+  });
+
+  it('falls back to the last fire when no run is going', () => {
+    const html = draw({ on: [] });
+    expect((html.match(/On <span/g) ?? []).length).toBe(1);
+    expect(html).toContain('#494');
+  });
+
   // Note 84482e92: the claimed step hangs under the feature it belongs to.
   it('names the step being worked under the feature it is on', () => {
     const html = draw({
