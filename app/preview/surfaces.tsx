@@ -1780,6 +1780,43 @@ const gridStories: GridStory[] = [
 ];
 
 /**
+ * A full laptop page of Quick read (note a5a59857): five stories, every one
+ * with a picture, the case that has to fit a laptop screen without scrolling.
+ */
+const quickFullPage: QuickReadViewProps = {
+  ...quickStory,
+  page: gridStories.slice(0, 5).map((story, index) => {
+    const from = story.from ?? 'Infra Weekly';
+    return {
+      card: {
+        kind: 'story' as const,
+        story: {
+          headline: story.headline,
+          summary: story.summary,
+          image: previewPicture(
+            ['1e3a8a', '7c2d12', '14532d', '4c1d95', '713f12'][index],
+            '93c5fd',
+          ),
+          link: 'https://example.com/story',
+          text: index === 0 ? issueBase.digest!.stories[0].text : undefined,
+          topic: 'Business' as const,
+        },
+        issueId: `issue-${index + 1}`,
+        storyIndex: 0,
+        subject: issueBase.subject,
+        receivedAt: '2026-09-22T07:14:00Z',
+        sender: { id: `sender-${index + 1}`, email: 'hello@example.com', name: from, muted: false },
+        from,
+        remainingInIssue: 1,
+      },
+      arrived: '22 Sep, 07:14',
+      saved: false,
+      issueHref: `/news/i/issue-${index + 1}`,
+    };
+  }),
+};
+
+/**
  * The Saved tab (plan #870): three stories, newest saved first. The first has
  * its picture, full text and link; the second's newsletter has been deleted,
  * so its sender is not a link; the third has no link or text of its own.
@@ -1851,6 +1888,8 @@ const deckCards: FeedCard[] = [
     article: 'Cobweb model',
     section: 'Mechanism',
     why: 'You write about economic system design (Economics).',
+    takeaway:
+      'When farmers plant based on last year’s price, prices can swing up and down for years instead of settling.',
     context:
       'The cobweb model is a way economists explain boom-and-bust cycles in farm markets. It was worked out in the 1930s by Nicholas Kaldor and others, looking at crops and livestock where output has to be planned a season before it is sold. The name comes from the spiral the price and quantity trace on a supply and demand chart.',
     hook: 'US hog prices swung in a four-year cycle for decades because farmers set next year’s herd from this year’s price.',
@@ -1883,6 +1922,7 @@ const deckCards: FeedCard[] = [
     article: 'Tax incidence',
     section: 'Elasticity',
     why: 'A field you write about but have never been tested in: Public economics.',
+    takeaway: null,
     context: null,
     hook: 'Who legally pays a tax has no effect on who bears it; the less elastic side of the market ends up carrying most of it.',
     summary:
@@ -2486,6 +2526,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'news',
     width: 'page',
     render: () => <QuickReadView {...quickPageView} />,
+  },
+  {
+    id: 'news-quick-page-full',
+    label: 'News · A full Quick read page, every story with a picture',
+    module: 'news',
+    width: 'page',
+    render: () => <QuickReadView {...quickFullPage} />,
   },
   {
     id: 'news-quick-caught-up',

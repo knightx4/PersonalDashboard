@@ -32,6 +32,14 @@ export type StoryGridProps = {
   stories: readonly GridStory[];
   /** Whether pictures load: off when the reader turned them off. */
   pictures: boolean;
+  /**
+   * Quick read's laptop page, which should fit a laptop screen without
+   * scrolling (note a5a59857): the lead keeps to one row with its picture
+   * beside its text, and the other cards take a shorter picture, smaller type
+   * and a summary cut to three lines. The newsletter page leaves it off, since
+   * it shows every story in the issue and is read by scrolling.
+   */
+  compact?: boolean;
   className?: string;
 };
 
@@ -44,6 +52,11 @@ const LG_SPAN = { 1: 'lg:col-span-1', 2: 'lg:col-span-2', 3: 'lg:col-span-3' } a
 /** A picture keeps to a strip as its card widens, so a wide card is not mostly picture. */
 const MD_ASPECT = { 1: '', 2: 'md:aspect-[2/1]' } as const;
 const LG_ASPECT = { 1: 'lg:aspect-[16/9]', 2: 'lg:aspect-[2/1]', 3: 'lg:aspect-[3/1]' } as const;
+const LG_ASPECT_COMPACT = {
+  1: 'lg:aspect-[3/1]',
+  2: 'lg:aspect-[4/1]',
+  3: 'lg:aspect-[5/1]',
+} as const;
 
 /**
  * Stories side by side like a magazine page (plan #940): a lead across two
@@ -52,8 +65,10 @@ const LG_ASPECT = { 1: 'lg:aspect-[16/9]', 2: 'lg:aspect-[2/1]', 3: 'lg:aspect-[
  * meet it, with the foot pinned to the bottom, so cards of different lengths
  * line up without fixed tiles. Below md it is one column.
  */
-export function StoryGrid({ stories, pictures, className }: StoryGridProps) {
-  const spans = gridSpans(stories.length, { tallLead: pictures && Boolean(stories[0]?.image) });
+export function StoryGrid({ stories, pictures, compact = false, className }: StoryGridProps) {
+  const spans = gridSpans(stories.length, {
+    tallLead: !compact && pictures && Boolean(stories[0]?.image),
+  });
   return (
     <div className={cn('grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3', className)}>
       {stories.map((story, index) => {
@@ -64,6 +79,7 @@ export function StoryGrid({ stories, pictures, className }: StoryGridProps) {
             story={story}
             lead={index === 0}
             pictures={pictures}
+            compact={compact}
             span={span}
             className={cn(MD_SPAN[span.md], LG_SPAN[span.lg], span.tall && 'lg:row-span-2')}
           />
@@ -77,20 +93,26 @@ function StoryGridCard({
   story,
   lead,
   pictures,
+  compact,
   span,
   className,
 }: {
   story: GridStory;
   lead: boolean;
   pictures: boolean;
+  compact: boolean;
   span: GridSpan;
   className?: string;
 }) {
   const image = pictures ? story.image : null;
   const Heading = lead ? 'h2' : 'h3';
+  // A compact lead sets its picture beside its text on a laptop, so it takes
+  // the height of its words rather than a picture's.
+  const beside = compact && lead && span.lg > 1;
+  const small = compact && !lead;
   return (
     <Card padding="none" className={cn('flex flex-col overflow-hidden', className)}>
-      <article className="flex flex-1 flex-col">
+      <article className={cn('flex flex-1 flex-col', beside && 'lg:flex-row')}>
         {image && (
           // A plain img for the reason given on the issue page: the address is
           // the sender's, and next/image would need every sender's host listed.
@@ -103,24 +125,29 @@ function StoryGridCard({
             className={cn(
               'aspect-[16/9] w-full border-b border-border bg-sunken object-cover',
               MD_ASPECT[span.md],
-              LG_ASPECT[span.lg],
+              beside
+                ? 'lg:aspect-auto lg:h-auto lg:w-2/5 lg:border-r lg:border-b-0'
+                : (compact ? LG_ASPECT_COMPACT : LG_ASPECT)[span.lg],
             )}
           />
         )}
-        <div className="card-pad flex flex-1 flex-col">
+        <div className={cn('flex min-w-0 flex-1 flex-col', small ? 'card-pad-dense' : 'card-pad')}>
           {story.from && <p className="truncate text-ui text-ink-muted">{story.from}</p>}
           <Heading
             className={cn(
               'break-words text-ink',
               story.from && 'mt-1',
-              lead ? 'font-display text-title tracking-tight' : 'text-body font-semibold',
+              lead
+                ? 'font-display text-title tracking-tight'
+                : cn('font-semibold', small ? 'text-ui' : 'text-body'),
             )}
           >
             {story.headline}
           </Heading>
           <p
             className={cn(
-              'mt-1.5 break-words text-body leading-relaxed',
+              'mt-1.5 break-words',
+              small ? 'line-clamp-3 text-ui' : 'text-body leading-relaxed',
               lead ? 'text-ink' : 'text-ink-muted',
             )}
           >
@@ -128,7 +155,12 @@ function StoryGridCard({
           </p>
           {story.body}
           {(story.link || story.actions) && (
-            <div className="mt-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 pt-3">
+            <div
+              className={cn(
+                'mt-auto flex flex-wrap items-center justify-between gap-y-1.5',
+                small ? 'gap-x-1 pt-2' : 'gap-x-4 pt-3',
+              )}
+            >
               {story.link ? (
                 <a
                   href={story.link}
@@ -143,7 +175,14 @@ function StoryGridCard({
                 <span aria-hidden />
               )}
               {story.actions && (
-                <div className="flex flex-wrap items-center gap-2">{story.actions}</div>
+                <div
+                  className={cn(
+                    'flex flex-wrap items-center',
+                    small ? '[&_button]:px-1.5' : 'gap-2',
+                  )}
+                >
+                  {story.actions}
+                </div>
               )}
             </div>
           )}

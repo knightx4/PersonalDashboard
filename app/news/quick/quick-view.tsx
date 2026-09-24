@@ -198,7 +198,7 @@ export function QuickReadView({
 
       {grid && (
         <div className="hidden md:block">
-          <StoryGrid stories={page.map(gridStory)} pictures={pictures} />
+          <StoryGrid stories={page.map(gridStory)} pictures={pictures} compact />
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-ui text-ink-muted">
               Next page marks {page.length === 1 ? 'this story' : `all ${page.length} stories`} as

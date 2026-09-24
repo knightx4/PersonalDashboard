@@ -91,7 +91,7 @@ function fake(options: {
       if (outcome !== 'failed') state.picked = state.picked.filter((row) => row.id !== written.id);
       if (outcome === 'ready') {
         state.ready += 1;
-        return { outcome, context: 'C.', hook: 'H.', summary: 'S.', example: 'E.', question: null, answer: null, why: 'W.' };
+        return { outcome, takeaway: 'T.', context: 'C.', hook: 'H.', summary: 'S.', example: 'E.', question: null, answer: null, why: 'W.' };
       }
       return outcome === 'dropped' ? { outcome, reason: 'Off topic.' } : { outcome, detail: 'Down.' };
     },
