@@ -43,6 +43,7 @@ import {
   unlinkStepAction,
   type StepActionState,
 } from './actions';
+import { InformationStep } from './information-step';
 import {
   answerQuestionAction,
   reviewResultAction,
@@ -78,6 +79,9 @@ const TodoOn = createContext(false);
 /** Each rhythm step's current period and recent past ones (plan #928). */
 const Rhythms = createContext<GoalMap['rhythms']>({});
 
+/** The collections the information steps fill, with their records (plan #954). */
+const Information = createContext<GoalMap['information']>({});
+
 type Links = GoalMap['linksOf'];
 type OtherGoals = GoalMap['otherGoals'];
 
@@ -106,61 +110,63 @@ export function StepTree({ map, todoOn }: { map: GoalMap; todoOn: boolean }) {
   return (
     <TodoOn.Provider value={todoOn}>
       <Rhythms.Provider value={map.rhythms}>
-        <div className="space-y-6">
-          <section aria-label="Steps" className="space-y-2">
-            {total > 0 && (
-              <p className="px-1 text-small text-ink-muted">
-                {closed} of {total} {total === 1 ? 'step' : 'steps'} closed
-              </p>
-            )}
-            {map.steps.length === 0 ? (
-              <EmptyState
-                icon={ListTree}
-                title="No steps yet"
-                description="Break the goal into the things that have to happen. Any step can hold sub-steps of its own."
-              />
-            ) : (
-              <Card>
-                <StepList
-                  nodes={map.steps}
-                  depth={0}
-                  links={map.linksOf}
-                  otherGoals={map.otherGoals}
+        <Information.Provider value={map.information}>
+          <div className="space-y-6">
+            <section aria-label="Steps" className="space-y-2">
+              {total > 0 && (
+                <p className="px-1 text-small text-ink-muted">
+                  {closed} of {total} {total === 1 ? 'step' : 'steps'} closed
+                </p>
+              )}
+              {map.steps.length === 0 ? (
+                <EmptyState
+                  icon={ListTree}
+                  title="No steps yet"
+                  description="Break the goal into the things that have to happen. Any step can hold sub-steps of its own."
                 />
-              </Card>
-            )}
-            <StepComposer parentId={map.goal.id} label="New step" />
-          </section>
-
-          {map.linked.length > 0 && (
-            <section aria-labelledby="linked-heading" className="space-y-2">
-              <h2 id="linked-heading" className="px-1 text-ui font-semibold text-ink">
-                Also counts towards this goal
-              </h2>
-              <Card>
-                <ul className="divide-y divide-border">
-                  {map.linked.map((entry) => (
-                    <li key={entry.linkId}>
-                      <p className="px-3 pt-2 text-small text-ink-muted">
-                        From{' '}
-                        <Link href={`/goals/${entry.fromGoal.id}`} className="underline">
-                          {entry.fromGoal.title}
-                        </Link>
-                      </p>
-                      <StepList
-                        nodes={[entry.step]}
-                        depth={0}
-                        links={map.linksOf}
-                        otherGoals={map.otherGoals}
-                        unlinkId={entry.linkId}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              </Card>
+              ) : (
+                <Card>
+                  <StepList
+                    nodes={map.steps}
+                    depth={0}
+                    links={map.linksOf}
+                    otherGoals={map.otherGoals}
+                  />
+                </Card>
+              )}
+              <StepComposer parentId={map.goal.id} label="New step" />
             </section>
-          )}
-        </div>
+
+            {map.linked.length > 0 && (
+              <section aria-labelledby="linked-heading" className="space-y-2">
+                <h2 id="linked-heading" className="px-1 text-ui font-semibold text-ink">
+                  Also counts towards this goal
+                </h2>
+                <Card>
+                  <ul className="divide-y divide-border">
+                    {map.linked.map((entry) => (
+                      <li key={entry.linkId}>
+                        <p className="px-3 pt-2 text-small text-ink-muted">
+                          From{' '}
+                          <Link href={`/goals/${entry.fromGoal.id}`} className="underline">
+                            {entry.fromGoal.title}
+                          </Link>
+                        </p>
+                        <StepList
+                          nodes={[entry.step]}
+                          depth={0}
+                          links={map.linksOf}
+                          otherGoals={map.otherGoals}
+                          unlinkId={entry.linkId}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              </section>
+            )}
+          </div>
+        </Information.Provider>
       </Rhythms.Provider>
     </TodoOn.Provider>
   );
@@ -224,6 +230,8 @@ function StepItem({
   const childrenId = useId();
   const todoOn = useContext(TodoOn);
   const rhythms = useContext(Rhythms);
+  const information = useContext(Information);
+  const filled = node.collectionId ? information[node.collectionId] : undefined;
   const rhythm: RhythmRecord | undefined = node.kind === 'rhythm' ? rhythms[node.id] : undefined;
   const current = node.status === 'open' ? (rhythm?.current ?? null) : null;
 
@@ -450,6 +458,9 @@ function StepItem({
             <AnswerForm id={node.id} title={node.title} />
           )}
           {awaitsReview(node) && <ClaudeResult node={node} />}
+          {filled && (
+            <InformationStep node={node} collection={filled.collection} records={filled.records} />
+          )}
           {editState.error && <p className="px-1 text-small text-danger">{editState.error}</p>}
           {details && (
             <StepDetails node={node} links={stepLinks} otherGoals={otherGoals} edit={edit} />
@@ -523,7 +534,9 @@ function ClaudeResult({ node }: { node: StepNode }) {
   const unread = node.reviewedAt === null;
   return (
     <div className="mt-1 space-y-1 px-1">
-      <p className="text-small text-ink-muted">{unread ? 'Claude’s result, to read' : 'Claude’s result'}</p>
+      <p className="text-small text-ink-muted">
+        {unread ? 'Claude’s result, to read' : 'Claude’s result'}
+      </p>
       {node.result && (
         <p className="text-small break-words whitespace-pre-wrap text-ink">{node.result}</p>
       )}

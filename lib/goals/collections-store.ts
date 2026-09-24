@@ -39,6 +39,8 @@ export type CollectionRecord = {
   position: number;
   source: RecordSource;
   sourceRef: string | null;
+  /** Found for you and not yet confirmed (plan #954). */
+  draft: boolean;
   updatedAt: string;
 };
 
@@ -62,11 +64,12 @@ type RecordRow = {
   position: number;
   source: RecordSource;
   source_ref: string | null;
+  draft: boolean;
   updated_at: string;
 };
 
 const COLLECTION_COLUMNS = 'id, name, shape, fields, version, collection_goals(goal_id, archived_at)';
-const RECORD_COLUMNS = 'id, collection_id, data, version, position, source, source_ref, updated_at';
+const RECORD_COLUMNS = 'id, collection_id, data, version, position, source, source_ref, draft, updated_at';
 
 const toCollection = (row: CollectionRow): Collection => ({
   id: row.id,
@@ -85,6 +88,7 @@ const toRecord = (row: RecordRow): CollectionRecord => ({
   position: row.position,
   source: row.source,
   sourceRef: row.source_ref,
+  draft: row.draft,
   updatedAt: row.updated_at,
 });
 
@@ -145,6 +149,40 @@ export async function loadRecords(
     .order('created_at');
   if (error) throw new Error(`Could not read the records: ${error.message}`);
   return ((data ?? []) as RecordRow[]).map(toRecord);
+}
+
+/**
+ * Live collections by id, each with its live records, for the information
+ * steps on a page (plan #954). A collection that is gone is left out.
+ */
+export async function loadInformation(
+  client: GoalsSupabaseClient,
+  collectionIds: string[],
+): Promise<Record<string, { collection: Collection; records: CollectionRecord[] }>> {
+  const ids = [...new Set(collectionIds)];
+  if (ids.length === 0) return {};
+  const [collections, records] = await Promise.all([
+    client.from('collections').select(COLLECTION_COLUMNS).in('id', ids).is('archived_at', null),
+    client
+      .from('records')
+      .select(RECORD_COLUMNS)
+      .in('collection_id', ids)
+      .is('archived_at', null)
+      .order('position')
+      .order('created_at'),
+  ]);
+  if (collections.error) {
+    throw new Error(`Could not read the collections: ${collections.error.message}`);
+  }
+  if (records.error) throw new Error(`Could not read the records: ${records.error.message}`);
+  const out: Record<string, { collection: Collection; records: CollectionRecord[] }> = {};
+  for (const row of (collections.data ?? []) as CollectionRow[]) {
+    out[row.id] = { collection: toCollection(row), records: [] };
+  }
+  for (const row of (records.data ?? []) as RecordRow[]) {
+    out[row.collection_id]?.records.push(toRecord(row));
+  }
+  return out;
 }
 
 /** Define a collection and link it to the goals it serves. */
@@ -222,7 +260,7 @@ export async function addRecord(
   userId: string,
   collectionId: string,
   values: Record<string, unknown>,
-  source: { kind: RecordSource; ref?: string | null } = { kind: 'typed' },
+  source: { kind: RecordSource; ref?: string | null; draft?: boolean } = { kind: 'typed' },
   position = 0,
 ): Promise<WriteResult<string>> {
   const collection = await loadCollection(client, collectionId);
@@ -238,6 +276,7 @@ export async function addRecord(
       data: checked.data,
       source: source.kind,
       source_ref: source.ref ?? null,
+      draft: source.draft ?? false,
       position,
     })
     .select('id')
@@ -252,13 +291,15 @@ export async function addRecord(
 
 /**
  * Change some of a record's values. Values the write does not mention are
- * kept, so a removed field's old value stays in the record.
+ * kept, so a removed field's old value stays in the record. `confirm` also
+ * takes a draft out of draft, as saving your correction of one does.
  */
 export async function updateRecord(
   client: GoalsSupabaseClient,
   recordId: string,
   values: Record<string, unknown>,
   source?: { kind: RecordSource; ref?: string | null },
+  { confirm = false }: { confirm?: boolean } = {},
 ): Promise<WriteResult<CollectionRecord>> {
   const { data: row, error: readError } = await client
     .from('records')
@@ -280,6 +321,7 @@ export async function updateRecord(
     patch.source = source.kind;
     patch.source_ref = source.ref ?? null;
   }
+  if (confirm) patch.draft = false;
   const { data, error } = await client
     .from('records')
     .update(patch)
@@ -301,6 +343,34 @@ export async function archiveRecord(client: GoalsSupabaseClient, recordId: strin
     .update({ archived_at: new Date().toISOString() })
     .eq('id', recordId)
     .is('archived_at', null)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Confirm a draft as it stands: it keeps its values and where they came from,
+ * and stops being a draft. False when it was not a live draft.
+ */
+export async function confirmRecord(client: GoalsSupabaseClient, recordId: string): Promise<boolean> {
+  const { data, error } = await client
+    .from('records')
+    .update({ draft: false })
+    .eq('id', recordId)
+    .eq('draft', true)
+    .is('archived_at', null)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/** Bring back an archived record, for Undo. False when it was not archived. */
+export async function restoreRecord(client: GoalsSupabaseClient, recordId: string): Promise<boolean> {
+  const { data, error } = await client
+    .from('records')
+    .update({ archived_at: null })
+    .eq('id', recordId)
+    .not('archived_at', 'is', null)
     .select('id');
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;
