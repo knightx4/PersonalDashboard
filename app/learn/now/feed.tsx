@@ -519,46 +519,61 @@ function DeckCard({
               <GraduationCap className="size-3.5" strokeWidth={2} aria-hidden />
               {testing ? 'Starting a track…' : 'Test me on this'}
             </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={onDismiss} disabled={testing}>
-              <X className="size-3.5" strokeWidth={2} aria-hidden />
-              Not interested
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => rate('too_hard')}
-              aria-pressed={difficulty === 'too_hard'}
-              className={cn(
-                'text-danger hover:bg-danger-tint hover:text-danger',
-                difficulty === 'too_hard' && 'bg-danger-tint',
-              )}
-            >
-              {difficulty === 'too_hard' ? (
-                <Check className="size-3.5" strokeWidth={2} aria-hidden />
-              ) : (
-                <Weight className="size-3.5" strokeWidth={2} aria-hidden />
-              )}
-              Too hard
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => rate('too_easy')}
-              aria-pressed={difficulty === 'too_easy'}
-              className={cn(
-                'text-positive hover:bg-positive-tint hover:text-positive',
-                difficulty === 'too_easy' && 'bg-positive-tint',
-              )}
-            >
-              {difficulty === 'too_easy' ? (
-                <Check className="size-3.5" strokeWidth={2} aria-hidden />
-              ) : (
-                <Feather className="size-3.5" strokeWidth={2} aria-hidden />
-              )}
-              Too easy
-            </Button>
+            {/* Not interested and the two ratings stay on one line, the
+                ratings to its right, down to a 360px phone: that is why the
+                labels drop "Too" below sm. */}
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onDismiss}
+                disabled={testing}
+              >
+                <X className="size-3.5" strokeWidth={2} aria-hidden />
+                Not interested
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => rate('too_hard')}
+                aria-label="Too hard"
+                aria-pressed={difficulty === 'too_hard'}
+                className={cn(
+                  'text-danger hover:bg-danger-tint hover:text-danger',
+                  difficulty === 'too_hard' && 'bg-danger-tint',
+                )}
+              >
+                {difficulty === 'too_hard' ? (
+                  <Check className="size-3.5" strokeWidth={2} aria-hidden />
+                ) : (
+                  <Weight className="size-3.5" strokeWidth={2} aria-hidden />
+                )}
+                <span className="sm:hidden">Hard</span>
+                <span className="max-sm:hidden">Too hard</span>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => rate('too_easy')}
+                aria-label="Too easy"
+                aria-pressed={difficulty === 'too_easy'}
+                className={cn(
+                  'text-positive hover:bg-positive-tint hover:text-positive',
+                  difficulty === 'too_easy' && 'bg-positive-tint',
+                )}
+              >
+                {difficulty === 'too_easy' ? (
+                  <Check className="size-3.5" strokeWidth={2} aria-hidden />
+                ) : (
+                  <Feather className="size-3.5" strokeWidth={2} aria-hidden />
+                )}
+                <span className="sm:hidden">Easy</span>
+                <span className="max-sm:hidden">Too easy</span>
+              </Button>
+            </div>
           </div>
 
           {testing && (
