@@ -4,6 +4,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
 import { digestIssue, type DigestOutcome } from './digest';
+import { groupStories } from './groups';
 
 /**
  * When a newsletter is summarised (plan #787). #784 settled it: on arrival, so
@@ -29,6 +30,12 @@ import { digestIssue, type DigestOutcome } from './digest';
  * the issue out of the set. An issue with no stories, one essay, has nothing to
  * tag and is never picked. A redo that fails keeps the old stories, so that
  * issue is tried again on a later run, after every other pending issue.
+ *
+ * Grouping (plan #864). After each issue is summarised, both ways in run
+ * groupStories (lib/news/issues/groups.ts), which records which of its stories
+ * repeat one from another newsletter in the last two days. It never makes a
+ * summary fail: a grouping that cannot embed or save is logged and the issue
+ * is left ungrouped.
  */
 
 /**
@@ -55,6 +62,31 @@ type Clients = {
   client?: Pick<Anthropic, 'messages'>;
 };
 
+/**
+ * Group a newly summarised issue's stories. Never throws, and does nothing
+ * unless the digest wrote a summary.
+ */
+async function groupAfterDigest(
+  input: Clients & { userId: string; issueId: string },
+  outcome: DigestOutcome,
+): Promise<void> {
+  if (outcome.status !== 'digested') return;
+  try {
+    const grouped = await groupStories({
+      news: input.news,
+      spend: input.spend,
+      userId: input.userId,
+      issueId: input.issueId,
+    });
+    if (grouped.status === 'not-embedded') {
+      console.warn(`news: stories of issue ${input.issueId} not grouped (${grouped.reason})`);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`news: grouping the stories of issue ${input.issueId} stopped (${message})`);
+  }
+}
+
 export type ArrivalDigest = DigestOutcome['status'] | 'no-key' | 'error';
 
 /**
@@ -76,6 +108,7 @@ export async function digestOnArrival(
     if (outcome.status === 'failed') {
       console.warn(`news: summarising issue ${input.issueId} failed (${outcome.error})`);
     }
+    await groupAfterDigest(input, outcome);
     return outcome.status;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -140,6 +173,7 @@ export async function digestPending(
       userId: row.user_id as string,
       issueId,
     });
+    await groupAfterDigest({ ...input, userId: row.user_id as string, issueId }, outcome);
     tally[outcome.status] += 1;
     input.onIssue?.(issueId, outcome);
   }

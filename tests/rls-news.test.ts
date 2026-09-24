@@ -239,6 +239,36 @@ describe('news.story_passes', () => {
   });
 });
 
+describe('news.story_groups', () => {
+  const vector = `[${new Array(1024).fill(0).map((_, i) => (i === 0 ? 1 : 0)).join(',')}]`;
+
+  function group(tx: postgres.TransactionSql, userId: string, index: number) {
+    return tx`
+      insert into story_groups (user_id, issue_id, story_index, group_id, embedding, embedding_model)
+      values (${userId}, ${issueA}, ${index}, gen_random_uuid(), ${vector}, 'voyage-4-lite')`;
+  }
+
+  it('shows a user only their own stories\' groups', async () => {
+    await asUser(userA, (tx) => group(tx, userA, 0));
+
+    const mine = await asUser(userA, (tx) => tx<{ story_index: number }[]>`
+      select story_index from story_groups`);
+    expect(mine.map((r) => r.story_index)).toEqual([0]);
+
+    const theirs = await asUser(userB, (tx) => tx`select 1 from story_groups`);
+    expect(theirs).toHaveLength(0);
+  });
+
+  it('refuses a group row on another account\'s newsletter, even under their id', async () => {
+    await expect(asUser(userB, (tx) => group(tx, userB, 1))).rejects.toThrow(
+      /story_groups_issue_fk/,
+    );
+    await expect(asUser(userB, (tx) => group(tx, userA, 1))).rejects.toThrow(
+      /row-level security/,
+    );
+  });
+});
+
 describe('news.hidden_topics', () => {
   it('shows a user only the topics they have hidden, once each', async () => {
     await asUser(userA, (tx) => tx`
@@ -356,6 +386,7 @@ describe('RLS coverage', () => {
       'issues',
       'saved_stories',
       'senders',
+      'story_groups',
       'story_passes',
     ]);
   });

@@ -15,6 +15,18 @@ vi.mock('./digest', () => ({
 }));
 const reply = (value: unknown) => replies.push(async () => value);
 
+// Grouping is stubbed too (its own tests are in groups.test.ts): these check
+// that it runs after a summary and that its failure never fails one.
+const grouped: string[] = [];
+let groupFailure: Error | null = null;
+vi.mock('./groups', () => ({
+  groupStories: async (input: { issueId: string }) => {
+    if (groupFailure) throw groupFailure;
+    grouped.push(input.issueId);
+    return { status: 'grouped', stories: 0, matched: 0 };
+  },
+}));
+
 const { digestOnArrival, digestPending, LINE_SINCE, PENDING_FILTER } = await import('./summarise');
 
 /**
@@ -43,6 +55,8 @@ function pendingClient(rows: { id: string; user_id: string }[]) {
 beforeEach(() => {
   replies.length = 0;
   called.length = 0;
+  grouped.length = 0;
+  groupFailure = null;
 });
 
 describe('digestOnArrival', () => {
@@ -54,6 +68,22 @@ describe('digestOnArrival', () => {
     expect(called).toEqual([
       expect.objectContaining({ userId: 'user-1', issueId: 'issue-1', anthropicApiKey: 'key' }),
     ]);
+  });
+
+  it('groups the stories of a summarised issue, and not of a failed one', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    reply({ status: 'digested', summary: 'S', stories: [] });
+    await digestOnArrival({ ...base, anthropicApiKey: 'key' });
+    reply({ status: 'failed', error: 'overloaded' });
+    await digestOnArrival({ ...base, issueId: 'issue-2', anthropicApiKey: 'key' });
+    expect(grouped).toEqual(['issue-1']);
+  });
+
+  it('keeps the summary when grouping fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    groupFailure = new Error('news: saving story groups failed (down)');
+    reply({ status: 'digested', summary: 'S', stories: [] });
+    expect(await digestOnArrival({ ...base, anthropicApiKey: 'key' })).toBe('digested');
   });
 
   it('leaves the issue for the catch-up when there is no key', async () => {
@@ -111,6 +141,7 @@ describe('digestPending', () => {
     ]);
     expect(tally).toEqual({ digested: 2, failed: 1, missing: 0, left: 0 });
     expect(seen).toEqual(['a:digested', 'b:failed', 'c:digested']);
+    expect(grouped).toEqual(['a', 'c']);
   });
 
   it('redoes issues summarised without a line before it existed, or without topics', () => {
