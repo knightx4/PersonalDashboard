@@ -22,7 +22,10 @@ export type NextItem = {
   id: string;
   title: string;
   kind: Extract<StepKind, 'mine' | 'claude'>;
-  /** YYYY-MM-DD. */
+  /**
+   * YYYY-MM-DD, or null when undated or already past: an overdue step comes
+   * back as an ordinary next item with no date on it (plan #935).
+   */
   dueOn: string | null;
   /** The step it sits under, when that is a step rather than the goal. */
   under: string | null;
@@ -74,8 +77,17 @@ const WAITING_ORDER: Record<WaitingItem['kind'], number> = { question: 0, breakd
  * takes its branch with it. A step is next when it is yours or Claude's and
  * has no open step beneath it: a step with open sub-steps waits on them, and
  * it is they that are next.
+ *
+ * After time away nothing piles up (docs/GOALS-SPEC.md, "Coming back after
+ * time away"): a due date before `today` is ranked as though it were today
+ * and not shown, so a step missed a fortnight ago sits among what is due now
+ * rather than leading the page with a debt.
  */
-export function dailyView(goals: GoalWithArea[], stepsByGoal: Map<string, StepNode[]>): DailyView {
+export function dailyView(
+  goals: GoalWithArea[],
+  stepsByGoal: Map<string, StepNode[]>,
+  today: string,
+): DailyView {
   const daily: DailyGoal[] = [];
   const waiting: WaitingItem[] = [];
   // Where each row came in the walk, which is page order then tree order.
@@ -103,6 +115,8 @@ export function dailyView(goals: GoalWithArea[], stepsByGoal: Map<string, StepNo
 
     const roots = stepsByGoal.get(goal.id) ?? [];
     const candidates: NextItem[] = [];
+    // Steps whose date has passed: ranked as due today, shown undated.
+    const overdue = new Set<string>();
     let proposed = 0;
 
     const walk = (nodes: StepNode[], under: string | null) => {
@@ -129,12 +143,13 @@ export function dailyView(goals: GoalWithArea[], stepsByGoal: Map<string, StepNo
           (node.kind === 'mine' || node.kind === 'claude') &&
           !node.children.some((child) => child.status === 'open')
         ) {
+          if (node.dueOn !== null && node.dueOn < today) overdue.add(node.id);
           candidates.push(
             place({
               id: node.id,
               title: node.title,
               kind: node.kind,
-              dueOn: node.dueOn,
+              dueOn: node.dueOn !== null && node.dueOn < today ? today : node.dueOn,
               under,
             }),
           );
@@ -161,7 +176,9 @@ export function dailyView(goals: GoalWithArea[], stepsByGoal: Map<string, StepNo
     daily.push({
       goal,
       areaName,
-      next: next.slice(0, NEXT_PER_GOAL),
+      next: next
+        .slice(0, NEXT_PER_GOAL)
+        .map((item) => (overdue.has(item.id) ? { ...item, dueOn: null } : item)),
       more: Math.max(0, next.length - NEXT_PER_GOAL),
       hasSteps: roots.length > 0,
     });

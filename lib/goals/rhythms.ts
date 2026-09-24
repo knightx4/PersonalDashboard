@@ -209,8 +209,12 @@ export function progressLine(period: RhythmPeriod, row: Pick<PeriodRow, 'target'
   return `${row.count} of ${row.target} ${periodLabel(period)}`;
 }
 
-/** A rhythm's current period and the closed ones before it, oldest first. */
-export type RhythmRecord = { current: PeriodRow | null; past: PeriodRow[] };
+/**
+ * A rhythm's current period and the closed ones before it, oldest first.
+ * `missed` is how many periods in a row were missed up to the current one,
+ * counted over every stored row rather than only the PAST_SHOWN kept here.
+ */
+export type RhythmRecord = { current: PeriodRow | null; past: PeriodRow[]; missed: number };
 
 /** Group stored rows into a record per rhythm, keeping the last PAST_SHOWN. */
 export function recordsOf(rows: PeriodRow[], today: string): Map<string, RhythmRecord> {
@@ -219,7 +223,7 @@ export function recordsOf(rows: PeriodRow[], today: string): Map<string, RhythmR
     a.startsOn < b.startsOn ? -1 : a.startsOn > b.startsOn ? 1 : 0,
   );
   for (const row of sorted) {
-    const record = out.get(row.itemId) ?? { current: null, past: [] };
+    const record = out.get(row.itemId) ?? { current: null, past: [], missed: 0 };
     if (row.closedAt === null && row.startsOn <= today && today < row.endsOn) {
       record.current = row;
     } else if (row.closedAt !== null) {
@@ -227,23 +231,67 @@ export function recordsOf(rows: PeriodRow[], today: string): Map<string, RhythmR
     }
     out.set(row.itemId, record);
   }
-  for (const record of out.values()) record.past = record.past.slice(-PAST_SHOWN);
+  for (const record of out.values()) {
+    record.missed = missedRun(record.past);
+    record.past = record.past.slice(-PAST_SHOWN);
+  }
   return out;
+}
+
+/** Closed periods missed in a row at the end of `past`, which is oldest first. */
+function missedRun(past: PeriodRow[]): number {
+  let run = 0;
+  for (let i = past.length - 1; i >= 0 && past[i].kept === false; i--) run++;
+  return run;
 }
 
 export type AtRiskRhythm = LiveRhythm & { count: number; daysLeft: number };
 
-/** The live rhythms at risk this period, in the order they came. */
-export function atRiskRhythms(
+/**
+ * A rhythm as the home shows it after time away (docs/GOALS-SPEC.md, "Coming
+ * back after time away"; plan #935): this period's progress, and the missed
+ * periods before it folded into one count rather than listed one by one.
+ */
+export type HomeRhythm = AtRiskRhythm & { atRisk: boolean; missed: number };
+
+/**
+ * The live rhythms the home shows, one each, in the order they came: those
+ * at risk this period, and those with missed periods behind them whose
+ * current period is not yet met. Once this period is met the misses stop
+ * being shown; they stay in the stored periods and the history either way.
+ */
+export function homeRhythms(
   rhythms: LiveRhythm[],
   records: Map<string, RhythmRecord>,
   today: string,
-): AtRiskRhythm[] {
-  const out: AtRiskRhythm[] = [];
+): HomeRhythm[] {
+  const out: HomeRhythm[] = [];
   for (const rhythm of rhythms) {
-    const current = records.get(rhythm.id)?.current;
-    if (!current || !isAtRisk(rhythm.period, current, today)) continue;
-    out.push({ ...rhythm, count: current.count, daysLeft: daysLeft(current, today) });
+    const record = records.get(rhythm.id);
+    const current = record?.current;
+    if (!current) continue;
+    const atRisk = isAtRisk(rhythm.period, current, today);
+    const missed = current.count < current.target ? (record?.missed ?? 0) : 0;
+    if (!atRisk && missed === 0) continue;
+    out.push({
+      ...rhythm,
+      count: current.count,
+      daysLeft: daysLeft(current, today),
+      atRisk,
+      missed,
+    });
   }
   return out;
+}
+
+const PERIOD_NOUNS: Record<RhythmPeriod, [string, string]> = {
+  day: ['day', 'days'],
+  week: ['week', 'weeks'],
+  month: ['month', 'months'],
+};
+
+/** "3 weeks missed", "1 day missed". */
+export function missedLine(period: RhythmPeriod, missed: number): string {
+  const [one, many] = PERIOD_NOUNS[period];
+  return `${missed} ${missed === 1 ? one : many} missed`;
 }
