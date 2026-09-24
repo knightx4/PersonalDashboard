@@ -21,15 +21,21 @@ export type StoredUnit = {
   outcome: string;
 };
 
+/**
+ * `userId` names the person on the read, for a caller running with the
+ * service role (the lesson chooser); the session client leaves it out.
+ */
 export async function loadCurriculum(
   supabase: LearnSupabaseClient,
   subjectId: string,
+  userId?: string,
 ): Promise<StoredUnit[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from('curriculum_units')
     .select('id, ordinal, title, covers, outcome')
-    .eq('subject_id', subjectId)
-    .order('ordinal');
+    .eq('subject_id', subjectId);
+  if (userId) query = query.eq('user_id', userId);
+  const { data, error } = await query.order('ordinal');
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw new Error(`Reading the curriculum failed: ${error.message}`);
   return (data ?? []) as StoredUnit[];
