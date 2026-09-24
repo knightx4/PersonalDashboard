@@ -5,9 +5,14 @@ import { PageHeader } from '@/components/shell/page-header';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { createGoalsClient } from '@/lib/goals/auth/server';
+import { weekInstants, type GoalLinks } from '@/lib/goals/links';
+import { loadAimChoices, loadGoalLinks } from '@/lib/goals/links-store';
 import { loadReadings } from '@/lib/goals/readings-store';
 import { loadGoalMap } from '@/lib/goals/steps-store';
+import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
+import { createLearnClient } from '@/lib/learn/auth/server';
 import { todayIn } from '@/lib/todo/tasks/model';
+import { GoalLinksSection } from './goal-links';
 import { GoalNumber } from './goal-number';
 import { StepTree } from './step-tree';
 
@@ -28,11 +33,25 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
   const account = await loadAccountSettings(user.id);
   const today = todayIn(account.timezone);
   const client = await createGoalsClient();
-  const [map, readings] = await Promise.all([
+  const learnOn = moduleEnabled(account, 'learn');
+  const jobsOn = moduleEnabled(account, 'jobs');
+  const learn = learnOn ? await createLearnClient() : null;
+  const jobs = jobsOn ? await createJobsClient() : null;
+  const [map, readings, links, aims] = await Promise.all([
     loadGoalMap(client, goalId, { userId: user.id, today }),
     loadReadings(client, goalId),
+    // Read live from Learn and the job search (plan #931). A failed read is a
+    // line where the links would be, not a broken goal page.
+    loadGoalLinks(
+      { goals: client, learn, jobs },
+      goalId,
+      weekInstants(today, account.timezone),
+    ).catch((): GoalLinks | null => null),
+    learn ? loadAimChoices(learn).catch(() => null) : null,
   ]);
   if (!map) notFound();
+  const linkedAims = new Set(links?.aims.map((aim) => aim.aimId));
+  const aimChoices = aims?.filter((aim) => !linkedAims.has(aim.id)) ?? null;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -53,6 +72,12 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
           target={map.goal.target}
           readings={readings}
           today={today}
+        />
+        <GoalLinksSection
+          goalId={map.goal.id}
+          links={links}
+          aimChoices={aimChoices}
+          jobsOn={jobsOn}
         />
         <StepTree map={map} todoOn={moduleEnabled(account, 'todo')} />
       </div>
