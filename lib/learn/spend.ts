@@ -146,6 +146,10 @@ export const LEARN_OPERATIONS = [
   // Writing the multiple-choice question about that idea (plan #841). The same
   // call as 'write-probe', kept apart for the same reason as the idea.
   'write-survey-question',
+  // Writing the lesson for one concept in a track (LEARN-LESSONS-SPEC, "A
+  // lesson"; plan #976). One Sonnet call per lesson, dropped or not. The claim
+  // embedded to find its closest catalogue section goes under 'embed-claim'.
+  'write-lesson',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

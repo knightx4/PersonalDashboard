@@ -25,7 +25,10 @@ import {
  * Reading a subject's graph.
  *
  * Every query goes through the session client, so RLS decides what comes back
- * and nothing here filters by user id. Four plain reads rather than embedded
+ * and nothing here filters by user id unless asked to. The lesson chooser
+ * (`lib/learn/lessons/choose-load.ts`) runs under the service role, which RLS
+ * does not narrow, so the reads it shares take an optional `userId` and then
+ * name the person on every query. Four plain reads rather than embedded
  * ones, joined in memory: the links in this schema are composite, carrying
  * user_id so that a row from another account cannot be reached through a
  * foreign key, and that is not a thing to make PostgREST's relationship
@@ -56,14 +59,18 @@ function fail(action: string, error: { message: string }): Error {
   return new Error(`${action} failed: ${error.message}`);
 }
 
-export async function loadSubjects(supabase: LearnSupabaseClient): Promise<Subject[]> {
-  const { data, error } = await supabase
+export async function loadSubjects(
+  supabase: LearnSupabaseClient,
+  userId?: string,
+): Promise<Subject[]> {
+  let query = supabase
     .from('subjects')
     .select('id, name, note, created_at')
     // A survey subject holds questions about a theme you have no track for
     // (plan #838). It is not one of your tracks, so no list of them shows it.
-    .eq('survey', false)
-    .order('name');
+    .eq('survey', false);
+  if (userId) query = query.eq('user_id', userId);
+  const { data, error } = await query.order('name');
 
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw fail('Reading your tracks', error);
@@ -226,29 +233,34 @@ export async function loadConcept(
 export async function loadGraph(
   supabase: LearnSupabaseClient,
   subjectId: string,
+  userId?: string,
 ): Promise<Graph> {
+  let conceptQuery = supabase
+    .from('concepts')
+    .select(
+      'id, name, claim, claim_original, claim_rewritten_at, basis, kind, mastery, ' +
+        'catalogue_searched_at',
+    )
+    .eq('subject_id', subjectId);
+  let edgeQuery = supabase
+    .from('concept_edges')
+    .select('prerequisite_id, dependent_id')
+    .eq('subject_id', subjectId);
+  let mentionQuery = supabase
+    .from('concept_mentions')
+    .select('source_id, target_id, basis')
+    .eq('subject_id', subjectId);
+  if (userId) {
+    conceptQuery = conceptQuery.eq('user_id', userId);
+    edgeQuery = edgeQuery.eq('user_id', userId);
+    mentionQuery = mentionQuery.eq('user_id', userId);
+  }
+
   const [
     { data: conceptRows, error: conceptError },
     { data: edgeRows, error: edgeError },
     { data: mentionRows, error: mentionError },
-  ] = await Promise.all([
-    supabase
-      .from('concepts')
-      .select(
-        'id, name, claim, claim_original, claim_rewritten_at, basis, kind, mastery, ' +
-          'catalogue_searched_at',
-      )
-      .eq('subject_id', subjectId)
-      .order('name'),
-    supabase
-      .from('concept_edges')
-      .select('prerequisite_id, dependent_id')
-      .eq('subject_id', subjectId),
-    supabase
-      .from('concept_mentions')
-      .select('source_id, target_id, basis')
-      .eq('subject_id', subjectId),
-  ]);
+  ] = await Promise.all([conceptQuery.order('name'), edgeQuery, mentionQuery]);
 
   assertSchemaExposed(conceptError ?? edgeError ?? mentionError, LEARN_SCHEMA);
   if (conceptError) throw fail('Reading the concepts', conceptError);
@@ -265,10 +277,12 @@ export async function loadGraph(
   const ids = concepts.map((concept) => concept.id);
   let states: StateRow[] = [];
   if (ids.length > 0) {
-    const { data, error } = await supabase
+    let stateQuery = supabase
       .from('concept_state')
       .select('concept_id, state, established, misconception, tested_at, declared_at')
       .in('concept_id', ids);
+    if (userId) stateQuery = stateQuery.eq('user_id', userId);
+    const { data, error } = await stateQuery;
 
     assertSchemaExposed(error, LEARN_SCHEMA);
     if (error) throw fail('Reading what you know', error);
@@ -297,12 +311,14 @@ export async function loadGraph(
 export async function loadGoals(
   supabase: LearnSupabaseClient,
   subjectId: string,
+  userId?: string,
 ): Promise<Goal[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from('goals')
     .select('id, asked, concept_id, status, unit_id')
-    .eq('subject_id', subjectId)
-    .order('created_at', { ascending: false });
+    .eq('subject_id', subjectId);
+  if (userId) query = query.eq('user_id', userId);
+  const { data, error } = await query.order('created_at', { ascending: false });
 
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw fail('Reading your goals', error);

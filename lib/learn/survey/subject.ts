@@ -86,8 +86,13 @@ export async function surveySubjectForTheme(
 }
 
 /** Every survey subject's id, for the readers that count per track. */
-export async function loadSurveySubjectIds(supabase: LearnSupabaseClient): Promise<Set<string>> {
-  const { data, error } = await supabase.from('subjects').select('id').eq('survey', true);
+export async function loadSurveySubjectIds(
+  supabase: LearnSupabaseClient,
+  userId?: string,
+): Promise<Set<string>> {
+  let query = supabase.from('subjects').select('id').eq('survey', true);
+  if (userId) query = query.eq('user_id', userId);
+  const { data, error } = await query;
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw fail('Reading the survey subjects', error);
   return new Set(((data ?? []) as { id: string }[]).map((row) => row.id));
