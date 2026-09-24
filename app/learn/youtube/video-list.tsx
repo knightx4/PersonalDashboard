@@ -59,6 +59,7 @@ export function VideoList({ videos, numbered = false }: { videos: VideoRow[]; nu
             {video.state !== 'fetched' && video.state !== 'queued' && (
               <Press
                 action={transcribeVideoAction}
+                cost="app/learn/youtube/actions.ts#transcribeVideoAction"
                 fields={{ videoId: video.videoId }}
                 label={video.state === 'none' ? 'Try again' : 'Get transcript'}
                 pendingLabel="Fetching…"

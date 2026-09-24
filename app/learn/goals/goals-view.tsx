@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Gauge, ListChecks, MapPin, Target } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ChipSelect, ComposeBody, ComposeTitle, InlineInput } from '@/components/ui/field';
@@ -297,6 +298,11 @@ function GoalComposer() {
             <Button type="submit" size="sm" disabled={adding}>
               {adding ? 'Adding…' : 'Add goal'}
             </Button>
+            <PaidHint
+              action="app/learn/goals/actions.ts#addGoal"
+              what="Cost of placing the goal"
+              align="end"
+            />
           </span>
         </div>
       </form>

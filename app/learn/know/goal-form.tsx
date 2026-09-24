@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { Field, Input, Select } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
@@ -128,6 +129,7 @@ function Proposal({
 
       <div className="mt-4 flex items-center gap-3">
         <ApproveButton />
+        <PaidHint action="app/learn/know/actions.ts#approveChain" what="Cost of saving the track" />
         {state.error && <span className="text-ui text-danger">{state.error}</span>}
       </div>
     </form>
@@ -210,6 +212,7 @@ export function GoalForm({
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <AskButton />
+        <PaidHint action="app/learn/know/actions.ts#proposeGoal" what="Cost of laying it out" />
         {state.error && <span className="text-ui text-danger">{state.error}</span>}
       </div>
 

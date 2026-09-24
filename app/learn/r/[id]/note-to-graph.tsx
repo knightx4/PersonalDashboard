@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { Select } from '@/components/ui/field';
 import { approveNoteConcepts, readNoteIntoGraph, type NoteGraphState } from './actions';
 
@@ -73,6 +74,10 @@ export function NoteToGraph({
         {added.length > 0 && (
           <div className="mt-3 flex items-center gap-3">
             <SubmitButton idle="Add these to the graph" busy="Adding…" />
+            <PaidHint
+              action="app/learn/r/[id]/actions.ts#approveNoteConcepts"
+              what="Cost of adding them"
+            />
             {saved.error && <span className="text-ui text-danger">{saved.error}</span>}
           </div>
         )}
@@ -98,6 +103,10 @@ export function NoteToGraph({
       </div>
 
       <SubmitButton idle="Read the note" busy="Reading…" />
+      <PaidHint
+        action="app/learn/r/[id]/actions.ts#readNoteIntoGraph"
+        what="Cost of reading the note"
+      />
       {state.message && <span className="text-ui text-ink-muted">{state.message}</span>}
       {state.error && <span className="text-ui text-danger">{state.error}</span>}
     </form>

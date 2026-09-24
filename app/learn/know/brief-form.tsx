@@ -4,6 +4,7 @@ import { useActionState, useMemo, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { Field, Select, Textarea } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
@@ -172,6 +173,7 @@ export function Proposal({ chain, onDiscard }: { chain: ProposedChain; onDiscard
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <ImportButton count={adding} />
+        <PaidHint action="app/learn/know/actions.ts#approveBrief" what="Cost of saving them" />
         {/* Writes nothing and asks nothing again: the proposal is thrown away
             and the paste box comes back. */}
         <Button type="button" variant="ghost" onClick={onDiscard}>
@@ -240,6 +242,10 @@ export function BriefForm({
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <ReadButton />
+        <PaidHint
+          action="app/learn/know/actions.ts#proposeBrief"
+          what="Cost of reading the briefing"
+        />
         {state.error && <span className="text-ui text-danger">{state.error}</span>}
         {/* Not an error: a briefing that argues nothing is a normal thing to
             paste, and the sentence that comes back says what would work. */}

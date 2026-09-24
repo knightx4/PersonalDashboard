@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { writeQuestions, type WriteQuestionsState } from './actions';
 
 /**
@@ -33,6 +34,10 @@ export function WriteQuestions({ quizId, count }: { quizId: string; count: numbe
 
       <div className="flex flex-wrap items-center gap-3">
         <WriteButton count={count} />
+        <PaidHint
+          action="app/learn/quiz/[id]/actions.ts#writeQuestions"
+          what="Cost of writing the questions"
+        />
         {state.error && <span className="text-ui text-danger">{state.error}</span>}
         {/* Not an error: material with nothing answerable in it is a normal
             thing to have picked, and the sentence says which piece it was. */}

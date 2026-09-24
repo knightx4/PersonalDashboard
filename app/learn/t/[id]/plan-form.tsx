@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { formatMoney } from '@/lib/money';
@@ -245,6 +246,10 @@ export function PlanForm({ trackId }: { trackId: string }) {
 
       <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
         <PlanButton />
+        <PaidHint
+          action="app/learn/t/[id]/actions.ts#planTrack"
+          what="Cost of planning the track"
+        />
         {planState.error && <span className="text-ui text-danger">{planState.error}</span>}
       </div>
 

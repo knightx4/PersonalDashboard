@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { formatMoney } from '@/lib/money';
 import type { ResolvedSource } from '@/lib/learn/import/resolve-payload';
 import {
@@ -213,6 +214,7 @@ export function FindSources({ readingId }: { readingId: string }) {
       {findState.rooting && <Rooting note={findState.rooting} />}
       <div className="flex flex-wrap items-center gap-3">
         <SearchButton />
+        <PaidHint action="app/learn/r/[id]/actions.ts#findSources" what="Cost of the search" />
         {findState.error && <span className="text-ui text-danger">{findState.error}</span>}
       </div>
       <p className="mt-2 text-small text-ink-muted">

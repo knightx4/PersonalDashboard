@@ -65,6 +65,7 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
         <Press
           className="mb-4"
           action={transcribePlaylistAction}
+          cost="app/learn/youtube/actions.ts#transcribePlaylistAction"
           fields={{ courseItemId: playlist.itemId }}
           label={`Get ${missing === 1 ? 'the missing transcript' : `all ${missing} missing transcripts`} · up to ${missing} ${missing === 1 ? 'credit' : 'credits'}`}
           pendingLabel="Fetching transcripts…"

@@ -5,6 +5,7 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Plus } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { cardVariants } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
 import { Field, Input, Textarea } from '@/components/ui/field';
@@ -74,6 +75,10 @@ export function CustomTrackForm() {
 
       <div className="flex flex-wrap items-center gap-3">
         <MakeButton />
+        <PaidHint
+          action="app/learn/know/actions.ts#createCustomTrack"
+          what="Cost of making the track"
+        />
         <Link href="/learn/know" className={buttonVariants({ variant: 'ghost' })}>
           Cancel
         </Link>

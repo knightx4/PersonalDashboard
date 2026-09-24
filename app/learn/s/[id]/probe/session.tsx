@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { KindBadge } from '@/components/learn/kind-badge';
@@ -59,9 +60,15 @@ function Bar({ percent }: { percent: number }) {
 function AskButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" disabled={pending}>
-      {pending ? 'Writing a question…' : label}
-    </Button>
+    <span className="inline-flex items-center gap-1">
+      <Button type="submit" variant="secondary" disabled={pending}>
+        {pending ? 'Writing a question…' : label}
+      </Button>
+      <PaidHint
+        action="app/learn/s/[id]/probe/actions.ts#askQuestion"
+        what="Cost of writing a question"
+      />
+    </span>
   );
 }
 
@@ -134,6 +141,10 @@ function Floor({ subjectId, conceptId }: { subjectId: string; conceptId: string 
           <Button type="submit" variant="secondary">
             Add these underneath
           </Button>
+          <PaidHint
+            action="app/learn/s/[id]/probe/actions.ts#approveFloor"
+            what="Cost of adding them"
+          />
           {saved.error && <span className="text-ui text-danger">{saved.error}</span>}
         </div>
       </form>
@@ -152,6 +163,10 @@ function Floor({ subjectId, conceptId }: { subjectId: string; conceptId: string 
         <Button type="submit" variant="ghost">
           Work out what it rests on
         </Button>
+        <PaidHint
+          action="app/learn/s/[id]/probe/actions.ts#findFloor"
+          what="Cost of working it out"
+        />
         {state.message && <span className="text-ui text-ink-muted">{state.message}</span>}
         {state.error && <span className="text-ui text-danger">{state.error}</span>}
       </div>
@@ -205,11 +220,32 @@ export function ProbeSession({
               <input type="hidden" name="subjectId" value={subjectId} />
 
               {live.options ? (
-                <ProbeOptions options={live.options} answered={live.answered ?? null} />
+                <>
+                  <ProbeOptions options={live.options} answered={live.answered ?? null} />
+                  {!live.answered && (
+                    <div className="flex justify-end">
+                      <PaidHint
+                        action="app/learn/s/[id]/probe/actions.ts#answerQuestion"
+                        what="Cost of answering"
+                        align="end"
+                      />
+                    </div>
+                  )}
+                </>
               ) : (
                 <WrittenAnswer
                   response={live.answered?.response ?? null}
-                  beside={live.answered ? undefined : <KnownButton declare={declare} />}
+                  beside={
+                    live.answered ? undefined : (
+                      <>
+                        <PaidHint
+                          action="app/learn/s/[id]/probe/actions.ts#answerQuestion"
+                          what="Cost of marking the answer"
+                        />
+                        <KnownButton declare={declare} />
+                      </>
+                    )
+                  }
                 />
               )}
             </form>

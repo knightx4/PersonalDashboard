@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState, useTransition } from 'reac
 import { useFormStatus } from 'react-dom';
 import { Pencil, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { cardVariants } from '@/components/ui/card';
 import { FieldError, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
@@ -128,6 +129,7 @@ function Proposal({
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <ApproveButton />
+        <PaidHint action="app/learn/c/[id]/actions.ts#approveBranch" what="Cost of saving it" />
         <Button type="button" variant="ghost" size="sm" onClick={onDiscard}>
           Discard
         </Button>
@@ -306,6 +308,14 @@ export function BranchFromClaim({
               ) : (
                 <>
                   <AskButton pending={asking} />
+                  {/* Kept off the mousedown for the same reason as the button:
+                      pinning the figure must not collapse the selection. */}
+                  <span onMouseDown={(event) => event.preventDefault()}>
+                    <PaidHint
+                      action="app/learn/c/[id]/actions.ts#proposeBranch"
+                      what="Cost of laying it out"
+                    />
+                  </span>
                   <span className="text-small text-ink-muted">
                     Lays out what “{selection}” rests on, in this track. Nothing is saved
                     until you have read it.

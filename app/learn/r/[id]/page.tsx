@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, BadgeCheck, AlertTriangle, ExternalLink, GitBranch } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadOtherReadingsOfSource, loadReading } from '@/lib/learn/tracks/load';
 import { formatMoney } from '@/lib/money';
@@ -131,14 +132,18 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
 
         <div className="mt-4 pl-6">
           {url ? (
-            <form action={openReading}>
+            <form action={openReading} className="flex flex-wrap items-center gap-1">
               <input type="hidden" name="readingId" value={reading.id} />
               <Button type="submit" variant="primary" size="md">
                 <ExternalLink className="size-4" strokeWidth={2} aria-hidden />
                 Open
               </Button>
+              <PaidHint
+                action="app/learn/r/[id]/actions.ts#openReading"
+                what="Cost of finding the passage"
+              />
               {!verified && (
-                <span className="ml-3 text-small text-ink-muted">
+                <span className="ml-2 text-small text-ink-muted">
                   Finds the passage on the way, the first time.
                 </span>
               )}
