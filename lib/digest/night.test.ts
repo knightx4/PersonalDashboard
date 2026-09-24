@@ -444,8 +444,8 @@ describe('featureProgress', () => {
 
 describe('onNow (note 39576272)', () => {
   it('names every row a run is on, newest first, once each', () => {
-    const a = step({ id: 'a', title: 'Feature A', status: 'in_progress', kind: 'feature' });
-    const b = step({ id: 'b', title: 'Feature B', status: 'in_progress', kind: 'feature' });
+    const a = step({ id: 'a', title: 'Feature A', status: 'in_progress' });
+    const b = step({ id: 'b', title: 'Feature B', status: 'in_progress' });
     const on = onNow(
       [
         { planItemId: 'a', at: '2026-03-02T01:00:00Z' },
