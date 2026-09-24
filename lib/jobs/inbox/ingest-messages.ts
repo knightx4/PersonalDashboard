@@ -24,6 +24,7 @@ import { gmailProvider } from '@/lib/email/providers/gmail';
 import { isTerminal, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
 import { extractWithModel, reconcileClassification } from '@/lib/jobs/inbox/tier-b';
+import type { SpendSink } from '@/lib/core/spend/pricing';
 import {
   inboundMayMove,
   inferredApplicationNeedsReview,
@@ -1025,6 +1026,8 @@ export interface IngestContext {
   /** The user's own additions to the ignored-sender list; see excluded_senders. */
   excludedDomains: string[];
   counters: IngestCounters;
+  /** What each Tier B call cost; the linker records it as 'classify-job-email'. */
+  onSpend?: SpendSink;
 }
 
 /**
@@ -1183,6 +1186,7 @@ async function handleMessage(
         replyToAddress: message.replyToAddress,
         body: message.text,
         tierA,
+        onSpend: ctx.onSpend,
       })
     : { extracted: null, parserVersion: PARSER_VERSION };
 

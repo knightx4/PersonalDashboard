@@ -125,6 +125,14 @@ write about most, weighted by theme strength. About one in four comes from a
 **gap**: a field you write about but have never been tested in first, then a
 field with nothing in it at all. Every card says which it is.
 
+Once you set an open-subject goal on the Goals page, one card in three is drawn
+for a goal instead, and the other two keep the three-to-one split (plan #900).
+The share is counted from when the oldest active goal was set, so a first goal
+added after months of cards is not flooded to catch up. A goal card's why line
+names the goal, and it starts at the depth set on the goal: familiar, solid and
+deep pick at working, advanced and specialist. The Level 3 goal is drawn from
+its own list instead (plan #910).
+
 Your own queued readings are served before either, in the order you queued
 them.
 
@@ -136,7 +144,10 @@ count drops to seven or fewer.
 
 1. **Pick a target.** Three in four draws take a strong theme, weighted by
    strength; one in four takes a gap field. The draw skips anything with a
-   card made in the last few weeks.
+   card made in the last few weeks. With goals, one draw in three takes a
+   goal, weighted by what you saved and turned down on its cards. A goal with
+   a card in the last three days is passed over only for another goal, so a
+   single goal still gets its share.
 2. **Name the material.** One model call names two or three Wikipedia
    articles, and the section in each, that someone interested in the target
    should read next. The code checks each title exists before anything else

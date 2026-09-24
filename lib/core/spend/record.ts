@@ -1,7 +1,8 @@
 import 'server-only';
 
 import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
-import { costMicrosFor, usageFrom, type TokenUsage } from '@/lib/core/spend/pricing';
+import type { SpendOperation } from '@/lib/core/spend/operations';
+import { costMicrosFor, usageFrom, type SpendReport, type TokenUsage } from '@/lib/core/spend/pricing';
 
 /**
  * Writing down what a call cost.
@@ -39,7 +40,7 @@ export type SpendRecord = {
  * client pointed at another schema still cannot be passed and a test can hand
  * in a stub without standing up a database.
  */
-type SpendClient = Pick<CoreSupabaseClient, 'from'>;
+export type SpendClient = Pick<CoreSupabaseClient, 'from'>;
 
 /**
  * Record one call. Never throws, never rejects.
@@ -98,4 +99,28 @@ export async function recordSpendFromResponse(
     model: input.model,
     usage: usageFrom(input.usage),
   });
+}
+
+/**
+ * Record every report a call collected under one operation. Never throws.
+ *
+ * The shape most callers hold: a library function reported through its
+ * `onSpend` sink, the caller kept the reports, and writes them once the work
+ * is done. For a caller that has a core client already, whether its own
+ * session's or the service role's in a background job.
+ */
+export async function recordSpendReports(
+  supabase: SpendClient,
+  userId: string,
+  target: SpendOperation,
+  reports: SpendReport[],
+): Promise<void> {
+  for (const report of reports) {
+    await recordSpend(supabase, userId, {
+      module: target.module,
+      operation: target.operation,
+      model: report.model,
+      usage: report.usage,
+    });
+  }
 }

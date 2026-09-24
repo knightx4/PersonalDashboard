@@ -38,6 +38,8 @@ import {
 import { TARGET_COLUMN, threadFrom, type CommentTarget, type DevComment } from './load';
 import { readSpec, specBySlug } from '@/lib/specs/registry';
 import { splitSections } from '@/lib/specs/sections';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSessionSpend } from '@/lib/core/spend/session';
 import { replyToComment } from './reply';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -299,7 +301,9 @@ async function produceReply(input: AskInput): Promise<AskOutcome> {
     return { ok: false, error: why };
   }
 
-  const reply = await replyToComment({ apiKey: key }, message);
+  const spend: SpendReport[] = [];
+  const reply = await replyToComment({ apiKey: key, onSpend: (report) => spend.push(report) }, message);
+  await recordSessionSpend(input.userId, { module: 'core', operation: 'reply-to-comment' }, spend);
 
   if (reply.kind === 'answer') {
     await say(input, reply.body);

@@ -188,7 +188,12 @@ async function continueFetch(
  * the sync: that is the whole point of the fan-out.
  */
 function buildLinkers(): DomainLinker[] {
-  return [commerceLinker(createServiceSupabase()), jobLinker(createJobServiceSupabase())];
+  // The core client is where each linker writes what its model calls cost.
+  const core = createCoreServiceSupabase();
+  return [
+    commerceLinker(createServiceSupabase(), core),
+    jobLinker(createJobServiceSupabase(), core),
+  ];
 }
 
 /**

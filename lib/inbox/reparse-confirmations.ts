@@ -3,6 +3,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { classifyMessage, type MerchantDomainHit } from '@/lib/email/extract/classify';
 import { extractOrderFromEmail } from '@/lib/email/extract/extract-order';
+import type { SpendSink } from '@/lib/core/spend/pricing';
 import { displayNameFromAddress } from '@/lib/email/extract/heuristic';
 import { PARSER_VERSION } from '@/lib/email/extract/schema';
 import { gmailProvider } from '@/lib/email/providers/gmail';
@@ -81,6 +82,8 @@ export async function reparseInboxConfirmations(
     onlyOutdated?: boolean;
     limit?: number;
     counters?: ReparseCounters;
+    /** What each extraction cost; record it as 'extract-email-order'. */
+    onSpend?: SpendSink;
   },
 ): Promise<ReparseCounters> {
   const counters = opts.counters ?? {
@@ -164,6 +167,7 @@ export async function reparseInboxConfirmations(
         fromAddress: message.fromAddress,
         receivedAt: message.internalDate,
         categoryOptions: opts.categoryOptions,
+        onSpend: opts.onSpend,
       });
 
       if (!extraction.result.ok) {

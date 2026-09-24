@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { recordSpend, recordSpendFromResponse } from './record';
+import { recordSpend, recordSpendFromResponse, recordSpendReports } from './record';
 import { EMPTY_USAGE } from './pricing';
 
 /**
@@ -121,5 +121,37 @@ describe('recording straight off a response', () => {
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({ input_tokens: 0, output_tokens: 0, cost_micros: 0 }),
     );
+  });
+});
+
+describe('recordSpendReports', () => {
+  it('writes one row per report under the named operation', async () => {
+    const { client, insert } = clientRecording();
+    await recordSpendReports(client, 'user-1', { module: 'jobs', operation: 'draft-answer' }, [
+      { model: 'claude-opus-5', usage: { ...EMPTY_USAGE, inputTokens: 1000, outputTokens: 100 } },
+      { model: 'claude-opus-5', usage: EMPTY_USAGE },
+    ]);
+
+    expect(insert).toHaveBeenCalledTimes(2);
+    expect(insert.mock.calls[0][0]).toMatchObject({
+      user_id: 'user-1',
+      module: 'jobs',
+      operation: 'draft-answer',
+      model: 'claude-opus-5',
+      cost_micros: 1000 * 5 + 100 * 25,
+    });
+  });
+
+  it('writes nothing for no reports, and never throws on a failed write', async () => {
+    const { client, insert } = clientRecording();
+    await recordSpendReports(client, 'user-1', { module: 'core', operation: 'reply-to-comment' }, []);
+    expect(insert).not.toHaveBeenCalled();
+
+    const failing = clientThatFails('throws');
+    await expect(
+      recordSpendReports(failing.client, 'user-1', { module: 'core', operation: 'reply-to-comment' }, [
+        { model: 'claude-haiku-4-5', usage: EMPTY_USAGE },
+      ]),
+    ).resolves.toBeUndefined();
   });
 });

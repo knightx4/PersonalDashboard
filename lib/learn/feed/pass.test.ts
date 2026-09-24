@@ -76,7 +76,7 @@ function person(overrides: Partial<PersonInputs> = {}): PersonInputs {
     tests: new Map(),
     recentThemeIds: new Set(),
     recentFieldIds: new Set(),
-    picked: { interest: 0, gap: 0 },
+    picked: { interest: 0, gap: 0, goal: 0 },
     articlesHeld: [],
     ...overrides,
   };
@@ -143,7 +143,7 @@ describe('running the pass once', () => {
     const gap = run.cards.filter((card) => card.reason === 'gap').length;
     expect(gap / run.cards.length).toBeGreaterThanOrEqual(0.2);
     expect(gap / run.cards.length).toBeLessThanOrEqual(0.3);
-    expect(summary.picked).toEqual({ interest: 24 - gap, gap });
+    expect(summary.picked).toEqual({ interest: 24 - gap, gap, goal: 0 });
 
     const interestCard = run.cards.find((card) => card.reason === 'interest')!;
     expect(interestCard.theme_name).toMatch(/^Theme /);
@@ -199,7 +199,7 @@ describe('running the pass once', () => {
   });
 
   it('starts with a gap when the person\'s earlier cards are short of them', async () => {
-    const run = ports({ loaded: person({ picked: { interest: 9, gap: 0 } }) });
+    const run = ports({ loaded: person({ picked: { interest: 9, gap: 0, goal: 0 } }) });
     await runFeedPicksFor(run.ports, { userId: 'u1', targets: 1, deadline: Number.MAX_SAFE_INTEGER, model: 'm' });
     expect(run.named[0].target.reason).toBe('gap');
   });
@@ -209,5 +209,51 @@ describe('running the pass once', () => {
     const summary = await runFeedPicksFor(run.ports, { userId: 'u1', targets: 8, deadline: 0, model: 'm' });
     expect(summary.targets).toEqual([]);
     expect(run.cards).toEqual([]);
+  });
+
+  it('draws about one card in three for an active goal, each naming it at the depth set on it', async () => {
+    const econ = person().fields[0];
+    const goals = [
+      { id: 'g1', name: 'City design and urbanism', about: null, depth: 'advanced' as const, field: econ, domain: null },
+      { id: 'g2', name: 'Startup finance', about: 'FP&A', depth: 'specialist' as const, field: null, domain: null },
+    ];
+    const run = ports({ loaded: person({ goals, goalWindow: { goal: 0, total: 0 } }) });
+    const depths: { reason: string; depth: string }[] = [];
+    const name = run.ports.name;
+    run.ports.name = async (target, avoid, depth) => {
+      depths.push({ reason: target.reason, depth: depth.depth });
+      return name(target, avoid, depth);
+    };
+    const summary = await runFeedPicksFor(run.ports, {
+      userId: 'u1',
+      targets: 9,
+      deadline: Number.MAX_SAFE_INTEGER,
+      model: 'm',
+    });
+
+    const goalCards = run.cards.filter((card) => card.reason === 'goal');
+    expect(goalCards.length / run.cards.length).toBeGreaterThanOrEqual(0.3);
+    expect(goalCards.length / run.cards.length).toBeLessThanOrEqual(0.4);
+    expect(summary.picked.goal).toBe(goalCards.length);
+    // The first target is a goal: none has been drawn since goals began.
+    expect(run.named[0].target.reason).toBe('goal');
+
+    const urbanism = goalCards.find((card) => card.aim_id === 'g1')!;
+    expect(urbanism).toMatchObject({ aim_name: 'City design and urbanism', field_id: 'econ', theme_id: null, depth: 'advanced' });
+    const finance = goalCards.find((card) => card.aim_id === 'g2')!;
+    expect(finance).toMatchObject({ aim_name: 'Startup finance', field_id: null, depth: 'specialist' });
+    for (const entry of depths.filter((d) => d.reason === 'goal')) {
+      expect(['advanced', 'specialist']).toContain(entry.depth);
+    }
+    for (const card of run.cards.filter((c) => c.reason !== 'goal')) {
+      expect(card.aim_id).toBeNull();
+      expect(card.aim_name).toBeNull();
+    }
+  });
+
+  it('draws no goal cards for a person with no goals', async () => {
+    const run = ports();
+    await runFeedPicksFor(run.ports, { userId: 'u1', targets: 6, deadline: Number.MAX_SAFE_INTEGER, model: 'm' });
+    expect(run.cards.some((card) => card.reason === 'goal')).toBe(false);
   });
 });
