@@ -209,3 +209,41 @@ export async function markReviewed(client: GoalsSupabaseClient, id: string): Pro
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;
 }
+
+/**
+ * Approve or turn down one proposed step (plan #960), with the proposed
+ * steps beneath it; turning one down also drops any unanswered question
+ * beneath it. The goal's other proposals keep waiting. Null when it is not a
+ * live proposed step of yours, otherwise how many rows it changed.
+ */
+export async function settleProposal(
+  client: GoalsSupabaseClient,
+  id: string,
+  approve: boolean,
+): Promise<number | null> {
+  const { data, error } = await client.rpc('settle_proposal', { step: id, approve });
+  if (error) throw new Error(error.message);
+  return data === null ? null : Number(data);
+}
+
+/**
+ * Put a goal's fog aside with Not now, or bring it back (plan #960). The fog
+ * itself is untouched, and rewriting it brings it back on its own. False when
+ * it is not a live goal of yours with fog on it.
+ */
+export async function setFogAside(
+  client: GoalsSupabaseClient,
+  goalId: string,
+  aside: boolean,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('items')
+    .update({ fog_dismissed_at: aside ? new Date().toISOString() : null })
+    .eq('id', goalId)
+    .eq('level', 'goal')
+    .not('fog', 'is', null)
+    .is('archived_at', null)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
