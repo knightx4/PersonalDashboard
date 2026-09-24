@@ -15,8 +15,8 @@ import {
  * The embedding pass over HTTPS, for video segments.
  *
  * `embedCatalogueSegments` runs over a `postgres` connection, which the
- * deployed app does not have, so on Vercel nothing in the catalogue has ever
- * been embedded. This is the same loop (`runEmbedSweep`) over the service-role
+ * deployed app could not open until lib/env.ts fell back to POSTGRES_URL, so
+ * nothing in the live catalogue had ever been embedded. This is the same loop (`runEmbedSweep`) over the service-role
  * client, limited to segments of `video` items: the transcripts the YouTube
  * library fetches. The Wikipedia sections Learn now picks are left alone,
  * because Learn now reads them without vectors and embedding them is a spend

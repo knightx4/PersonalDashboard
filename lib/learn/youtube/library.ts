@@ -30,8 +30,8 @@ import { queueTranscripts } from './transcripts';
  * Learn that searches the catalogue reads segments, so a listed video is
  * invisible to it until then.
  *
- * Written through the service-role client over HTTPS, because Vercel has no
- * DATABASE_URL (lib/learn/catalogue/store-rest.ts says the same).
+ * Written through the service-role client over HTTPS, like the Learn now pass,
+ * so it needs no direct database connection.
  */
 
 /** Uploads read on a channel's first listing: 5,000 videos, 100 quota units. */

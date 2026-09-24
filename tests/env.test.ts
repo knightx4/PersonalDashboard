@@ -86,3 +86,32 @@ describe('publicEnv()', () => {
     expect(() => publicEnv()).toThrowError(/NEXT_PUBLIC_SUPABASE_URL/);
   });
 });
+
+describe('databaseUrl', () => {
+  // The Vercel project has POSTGRES_URL from the Supabase integration and no
+  // DATABASE_URL, so the direct connection falls back to it.
+  it('prefers DATABASE_URL as written', async () => {
+    const { databaseUrl } = await import('@/lib/env');
+    expect(
+      databaseUrl({
+        DATABASE_URL: 'postgresql://u:p@db.example.supabase.co:5432/postgres?application_name=scripts',
+        POSTGRES_URL: 'postgres://other',
+      }),
+    ).toBe('postgresql://u:p@db.example.supabase.co:5432/postgres?application_name=scripts');
+  });
+
+  it("falls back to the integration's POSTGRES_URL without the parameters Postgres would refuse", async () => {
+    const { databaseUrl } = await import('@/lib/env');
+    expect(
+      databaseUrl({
+        POSTGRES_URL:
+          'postgres://postgres.ref:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&supa=base-pooler.x',
+      }),
+    ).toBe('postgres://postgres.ref:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require');
+  });
+
+  it('is undefined when neither is set, so serverEnv names DATABASE_URL as missing', async () => {
+    const { databaseUrl } = await import('@/lib/env');
+    expect(databaseUrl({ DATABASE_URL: '  ' })).toBeUndefined();
+  });
+});

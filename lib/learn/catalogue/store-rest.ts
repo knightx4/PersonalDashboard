@@ -6,10 +6,11 @@ import type { CatalogueSegmentInput, StoredArticle } from './store';
  * Writing a fetched article into the catalogue through the service-role
  * Supabase client.
  *
- * `store.ts` does the same over a `postgres` connection, which the scripts
- * have and the deployed app does not: Vercel has no DATABASE_URL, and the
- * background passes reach Supabase over HTTPS with the service-role key. The
- * Learn now pass (plan #806) runs there, so it writes through this.
+ * `store.ts` does the same over a `postgres` connection. The background passes
+ * reach Supabase over HTTPS with the service-role key instead, which was the
+ * only way until the deployed app could open that connection (it falls back to
+ * the Supabase integration's POSTGRES_URL; see `databaseUrl` in lib/env.ts).
+ * The Learn now pass (plan #806) writes through this.
  *
  * The rules are the ones `store.ts` keeps. The item is upserted on
  * `(provider_id, external_id)` and each section on `(item_id, ordinal)`, so a
