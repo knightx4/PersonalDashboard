@@ -37,6 +37,7 @@ import { config as loadEnvFile } from 'dotenv';
 import { createCoreServiceSupabase } from '../inngest/core/supabase-admin';
 import type { SpendReport } from '../lib/core/spend/pricing';
 import { recordSpend } from '../lib/core/spend/record';
+import type { NewsOperation } from '../lib/core/spend/operations';
 import { createNewsServiceClient } from '../lib/news/auth/service';
 import { embedTexts, type EmbedOutcome } from '../lib/learn/embed/embed';
 import {
@@ -49,7 +50,7 @@ import {
 } from '../lib/news/issues/repeats';
 import { readStories } from '../lib/news/issues/stories';
 
-const OPERATION = 'measure-repeats';
+const OPERATION: NewsOperation = 'measure-repeats';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function loadEnvironment(): void {

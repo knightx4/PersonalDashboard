@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
+import type { NewsOperation } from '@/lib/core/spend/operations';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { embedTexts } from '@/lib/learn/embed/embed';
 import { vectorLiteral } from '@/lib/learn/catalogue/embed-sweep';
@@ -35,7 +36,7 @@ import { readStories } from './stories';
 export const STORY_MATCH_CUTOFF = 0.8;
 
 /** The name this call has in core.model_spend. Stable: renaming it splits the history. */
-export const GROUP_OPERATION = 'group-stories';
+export const GROUP_OPERATION: NewsOperation = 'group-stories';
 
 /** A stored story from another newsletter, as the comparison needs it. */
 export type GroupCandidate = { groupId: string; vector: number[] };
