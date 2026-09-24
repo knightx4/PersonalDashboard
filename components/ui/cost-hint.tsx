@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { CircleDollarSign } from 'lucide-react';
 import { Popover } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
@@ -68,6 +68,23 @@ export function CostHint({
   }
 
   usePopover({ open: mode === 'pinned', onClose: unpin, panelRef, triggerRef });
+
+  // Kept on screen. The popup hangs from the $, and a $ halfway across a
+  // phone leaves less room to its right than the sentence needs, so the
+  // measured sentence ran off the edge and widened the page. It is moved
+  // back in by what it overhangs, keeping the 16px gutter. `translate`
+  // rather than `transform`, which the rise-in animation owns.
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (mode === 'closed' || !panel) return;
+    panel.style.translate = '';
+    const gutter = 16;
+    const rect = panel.getBoundingClientRect();
+    const room = document.documentElement.clientWidth;
+    let shift = Math.min(0, room - gutter - rect.right);
+    if (rect.left + shift < gutter) shift = gutter - rect.left;
+    if (shift !== 0) panel.style.translate = `${shift}px 0`;
+  }, [mode]);
 
   const text = costHintText(estimate, count);
   const label = what ? `${what}: ${text}` : `Expected cost: ${text}`;
