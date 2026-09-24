@@ -11,7 +11,8 @@ import type { CardToWrite, WriteResult } from './write-card';
  *
  * Two callers. The hourly tick tops up anyone below the target. After a
  * response on the feed page, the top-up runs only once fewer than `READY_LOW`
- * are ready, so reading a card does not set off a model call every time.
+ * are ready, so reading a card does not set off a model call every time, and
+ * then writes `READY_BATCH` at once.
  *
  * Everything outside is a port, so the arithmetic is tested without a
  * database, a model or Wikipedia; `inngest/learn/feed-top-up.ts` supplies the
@@ -21,8 +22,15 @@ import type { CardToWrite, WriteResult } from './write-card';
 /** Ready cards kept per person. */
 export const READY_TARGET = 20;
 
-/** Below this many ready cards, a response on the feed page starts a top-up. */
-export const READY_LOW = 10;
+/**
+ * Below this many ready cards, a response on the feed page starts a top-up:
+ * seven or fewer ready is what note 832dd774 asked for, where ten had left
+ * too long a stretch with nothing new.
+ */
+export const READY_LOW = 8;
+
+/** Cards a top-up after a response writes, on top of those still ready (note 832dd774). */
+export const READY_BATCH = 15;
 
 /**
  * Picks one target yields, for working out how many targets to draw. The
