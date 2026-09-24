@@ -1,7 +1,8 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { CloudFog, Flag } from 'lucide-react';
+import Link from 'next/link';
+import { CloudFog, Flag, ListTree } from 'lucide-react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,9 @@ import {
  */
 
 const initial: GoalsActionState = {};
+
+/** Live steps under each goal, keyed by goal id; a goal with none is absent. */
+type StepCounts = Record<string, { total: number; open: number }>;
 
 /** Save on blur when the words changed. A required field cleared to nothing is put back. */
 function commitOnBlur(before: string, { required = false }: { required?: boolean } = {}) {
@@ -95,7 +99,13 @@ function moveItems(
   ];
 }
 
-export function GoalsView({ areas }: { areas: AreaWithGoals[] }) {
+export function GoalsView({
+  areas,
+  stepCounts,
+}: {
+  areas: AreaWithGoals[];
+  stepCounts: StepCounts;
+}) {
   return (
     <div className="space-y-6">
       {areas.length === 0 ? (
@@ -106,7 +116,13 @@ export function GoalsView({ areas }: { areas: AreaWithGoals[] }) {
         />
       ) : (
         areas.map((area, index) => (
-          <AreaSection key={area.id} area={area} index={index} count={areas.length} />
+          <AreaSection
+            key={area.id}
+            area={area}
+            index={index}
+            count={areas.length}
+            stepCounts={stepCounts}
+          />
         ))
       )}
       <AreaComposer />
@@ -118,10 +134,12 @@ function AreaSection({
   area,
   index,
   count,
+  stepCounts,
 }: {
   area: AreaWithGoals;
   index: number;
   count: number;
+  stepCounts: StepCounts;
 }) {
   const [renameState, rename, renaming] = useActionState(renameAreaAction, initial);
   const menuAction = useMenuAction();
@@ -187,7 +205,13 @@ function AreaSection({
         <Card>
           <ul className="divide-y divide-border">
             {area.goals.map((goal, i) => (
-              <GoalRow key={goal.id} goal={goal} index={i} count={goalCount} />
+              <GoalRow
+                key={goal.id}
+                goal={goal}
+                index={i}
+                count={goalCount}
+                steps={stepCounts[goal.id]}
+              />
             ))}
           </ul>
         </Card>
@@ -197,7 +221,17 @@ function AreaSection({
   );
 }
 
-function GoalRow({ goal, index, count }: { goal: Goal; index: number; count: number }) {
+function GoalRow({
+  goal,
+  index,
+  count,
+  steps,
+}: {
+  goal: Goal;
+  index: number;
+  count: number;
+  steps: { total: number; open: number } | undefined;
+}) {
   const [editState, edit, editing] = useActionState(editGoal, initial);
   // Fog is shown when the goal has some, or once you choose to add it.
   const [addingFog, setAddingFog] = useState(false);
@@ -296,6 +330,15 @@ function GoalRow({ goal, index, count }: { goal: Goal; index: number; count: num
             />
           </form>
         )}
+        <Link
+          href={`/goals/${goal.id}`}
+          className="ml-1 inline-flex items-center gap-1 text-small text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+        >
+          <ListTree className="size-3" strokeWidth={1.75} aria-hidden />
+          {steps
+            ? `${steps.open} open of ${steps.total} ${steps.total === 1 ? 'step' : 'steps'}`
+            : 'Break into steps'}
+        </Link>
         {editState.error && <p className="px-1 text-small text-danger">{editState.error}</p>}
       </div>
       <ActionMenu label={`${goal.title} actions`} items={items} />
