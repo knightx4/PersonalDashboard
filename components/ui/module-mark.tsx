@@ -116,6 +116,7 @@ function Solid({ shape }: { shape: MarkShape }) {
     case 'lock':
     case 'book':
     case 'envelope':
+    case 'flag':
     case 'terminal':
     case 'dash':
     default:
@@ -123,7 +124,7 @@ function Solid({ shape }: { shape: MarkShape }) {
   }
 }
 
-/** The other six, split out only to keep either switch readable. */
+/** The other seven, split out only to keep either switch readable. */
 function SolidRest({ shape }: { shape: MarkShape }) {
   switch (shape) {
     case 'list':
@@ -164,6 +165,17 @@ function SolidRest({ shape }: { shape: MarkShape }) {
       // that is not flat on top.
       return (
         <path d="M12 2.5a1.7 1.7 0 0 1 1.02.34l8.14 6.1A2.1 2.1 0 0 1 22 10.62v7.78a3.4 3.4 0 0 1-3.4 3.4H5.4A3.4 3.4 0 0 1 2 18.4v-7.78a2.1 2.1 0 0 1 .84-1.68l8.14-6.1A1.7 1.7 0 0 1 12 2.5Z" />
+      );
+
+    case 'flag':
+      // A pole with a swallowtail flag. The notch is what makes it a flag
+      // rather than a sign on a post, and it is the only shape here with a
+      // point cut into its edge.
+      return (
+        <>
+          <rect x="3.4" y="2.4" width="2.8" height="19.4" rx="1.4" />
+          <path d="M5 3.6h14.6a1.3 1.3 0 0 1 1.06 2.05L17.6 10l3.06 4.35A1.3 1.3 0 0 1 19.6 16.4H5Z" />
+        </>
       );
 
     case 'terminal':
@@ -261,6 +273,11 @@ function Detail({ shape }: { shape: MarkShape }) {
           <rect x="12.4" y="14.6" width="6" height="2.1" rx="1.05" />
         </>
       );
+
+    case 'flag':
+      // The gap between pole and cloth. Without it the two merge into one
+      // block at 18px and the pole stops reading as something you plant.
+      return <rect x="6.2" y="3" width="1.5" height="14" rx="0.75" />;
 
     case 'envelope':
       // The fold the letter goes behind, drawn as one wide V. It runs the full

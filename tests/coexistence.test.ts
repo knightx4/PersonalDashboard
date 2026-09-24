@@ -117,7 +117,8 @@ describe('coexistence with the commerce app in public', () => {
     // you wrote something on it. `learn` likewise: a reading queue exists
     // because you pasted something into it. `news` has updated_at on the
     // address and the senders, and its issues are delivered rather than
-    // created on sign-up.
+    // created on sign-up. `goals` likewise: an area exists because you wrote
+    // one down.
     //
     // `core` appears for touch_updated_at because account_settings has an
     // updated_at, and its sign-up function is deliberately NOT called
@@ -127,7 +128,7 @@ describe('coexistence with the commerce app in public', () => {
     const owners: Record<string, string[]> = {
       handle_new_user: [APP_SCHEMA, 'public'],
       handle_new_user_settings: ['core'],
-      touch_updated_at: ['core', APP_SCHEMA, 'learn', 'news', 'obsidian', 'public', 'todo'],
+      touch_updated_at: ['core', 'goals', APP_SCHEMA, 'learn', 'news', 'obsidian', 'public', 'todo'],
     };
 
     for (const [fn, expected] of Object.entries(owners)) {

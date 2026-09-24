@@ -16,7 +16,7 @@
 export type WhereToDoIt = { href: string; label: string; external: boolean };
 
 /** The app's own top-level routes, so `supabase/migrations-news` is not read as one. */
-const APP_ROOTS = ['account', 'dev', 'home', 'jobs', 'learn', 'news', 'shopping', 'todo', 'vault'];
+const APP_ROOTS = ['account', 'dev', 'goals', 'home', 'jobs', 'learn', 'news', 'shopping', 'todo', 'vault'];
 
 const URL = /https?:\/\/[^\s)<>"'`]+/;
 
