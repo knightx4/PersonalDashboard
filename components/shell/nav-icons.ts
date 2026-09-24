@@ -9,6 +9,7 @@ import {
   Bug,
   Building2,
   FileText,
+  Flag,
   GalleryHorizontalEnd,
   CalendarClock,
   CalendarDays,
@@ -124,6 +125,9 @@ export const NAV_ICONS = {
   // Quick read deals the stories out one card at a time, so it gets the
   // stack of cards.
   quickRead: GalleryHorizontalEnd,
+  // Goals. A flag, the same object the workspace's own mark draws, as News
+  // does with its envelope. Not Target, which is Learn's Goals tab.
+  goalsHome: Flag,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
 } as const;

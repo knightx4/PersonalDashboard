@@ -36,6 +36,7 @@ describe('assertSchemaExposed', () => {
     // that proved the point: it shipped with nobody ticking the box.
     expect(message).toContain('learn');
     expect(message).toContain('news');
+    expect(message).toContain('goals');
   });
 
   it('ignores every other error, which callers still handle themselves', () => {

@@ -1,8 +1,8 @@
 /**
  * Turning a missing Exposed-schemas entry into a sentence.
  *
- * Seven schemas back this app -- `public`, `job_search`, `core`, `obsidian`
- * (the vault workspace), `todo`, `learn` and `news` -- but PostgREST only
+ * Eight schemas back this app -- `public`, `job_search`, `core`, `obsidian`
+ * (the vault workspace), `todo`, `learn`, `news` and `goals` -- but PostgREST only
  * serves the ones it has been told to serve, under Settings -> API -> Exposed
  * schemas in the Supabase dashboard. It reads the same list out of the
  * database, which is where `migrations-news/0002` now writes it, so the fix is
@@ -41,6 +41,7 @@ const EXPOSED_SCHEMAS = [
   'todo',
   'learn',
   'news',
+  'goals',
 ] as const;
 
 type PostgrestErrorish = { code?: string | null; message?: string | null } | null;

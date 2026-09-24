@@ -14,6 +14,7 @@
 #   supabase/migrations-todo        -> todo,       the todo module
 #   supabase/migrations-learn       -> learn,      the learn module
 #   supabase/migrations-news        -> news,       the newsletter module
+#   supabase/migrations-goals       -> goals,      the goals module
 #
 # They are separate directories rather than one because the sets were numbered
 # independently and each starts at 0001 -- and the job_search versions are
@@ -92,11 +93,16 @@ echo "==> migrations-learn (learn)"
 for f in "$ROOT/supabase/migrations-learn"/*.sql; do apply_file "$f"; done
 
 # news depends on nothing but auth.users, so it could go anywhere before todo.
-# It sits here because todo must stay last.
+# It sits here because todo must come after it.
 echo "==> migrations-news (news)"
 for f in "$ROOT/supabase/migrations-news"/*.sql; do apply_file "$f"; done
 
 echo "==> migrations-todo (todo)"
 for f in "$ROOT/supabase/migrations-todo"/*.sql; do apply_file "$f"; done
+
+# goals after everything: its 0002 writes core.account_settings, and the links
+# it will hold point into learn and job_search, while nothing points back.
+echo "==> migrations-goals (goals)"
+for f in "$ROOT/supabase/migrations-goals"/*.sql; do apply_file "$f"; done
 
 echo "==> done"
