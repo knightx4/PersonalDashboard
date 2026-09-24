@@ -413,8 +413,9 @@ describe('the catalogue, which belongs to nobody', () => {
 });
 
 describe('learning goals, stored as aims', () => {
-  // 0044_aims.sql. Added, edited and archived by their owner through their own
-  // session; the table is `aims` because `goals` already holds track concepts.
+  // 0044_aims.sql and 0045_aim_placement.sql. Added, edited and archived by
+  // their owner through their own session; the table is `aims` because `goals`
+  // already holds track concepts.
   let aimA = '';
   let physics = '';
   let domain = '';
@@ -457,10 +458,30 @@ describe('learning goals, stored as aims', () => {
       select archived_at, depth from aims where id = ${aimA}`;
     expect(before).toEqual({ archived_at: null, depth: 'solid' });
 
-    await asUser(userA, (tx) => tx`update aims set field_id = ${physics} where id = ${aimA}`);
+    // A placement is written whole (0045_aim_placement.sql, plan #898).
+    await asUser(
+      userA,
+      (tx) => tx`
+        update aims
+        set field_id = ${physics}, placement_confidence = 'clear',
+            placement_basis = 'Placed for the test.', placed_at = now()
+        where id = ${aimA}`,
+    );
     const [placed] = await admin<{ field_id: string | null }[]>`
       select field_id from aims where id = ${aimA}`;
     expect(placed.field_id).toBe(physics);
+  });
+
+  it('refuses a field with no placement, and a placement with no basis', async () => {
+    const [row] = await admin<{ id: string }[]>`
+      insert into aims (user_id, name) values (${userB}, 'Half placed') returning id`;
+    await expect(
+      admin`update aims set field_id = ${physics} where id = ${row.id}`,
+    ).rejects.toThrow(/aims_placement_complete_ck/);
+    await expect(
+      admin`update aims set placed_at = now(), placement_confidence = 'clear' where id = ${row.id}`,
+    ).rejects.toThrow(/aims_placement_complete_ck/);
+    await admin`delete from aims where id = ${row.id}`;
   });
 
   it('refuses an unknown depth, a field and a domain at once, and a placed list', async () => {

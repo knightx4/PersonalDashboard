@@ -98,6 +98,11 @@ export const LEARN_OPERATIONS = [
   // show which fields you have been tested in. One call per track; a track
   // started from a theme copies the theme's placement and spends nothing.
   'place-track',
+  // Placing learning goals into the areas when one is saved or reworded (plan
+  // #898). One call carries every open goal not placed yet, so a failed call
+  // is retried by the next save; kept apart from 'place-track' so the cost of
+  // goals can be read on its own.
+  'place-aim',
   // Naming the Wikipedia sections a Learn now card is made from (plan #806).
   // One Sonnet call per target, recorded through the service role from the
   // picking pass against the account the target belongs to.

@@ -1,7 +1,8 @@
 'use client';
 
-import { useActionState, useState } from 'react';
-import { Gauge, ListChecks, Target } from 'lucide-react';
+import { useActionState, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Gauge, ListChecks, MapPin, Target } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -14,6 +15,7 @@ import {
   AIM_NAME_MAX,
   LEVEL3_AIM_NAME,
   type Aim,
+  type AimPlace,
 } from '@/lib/learn/aims';
 import {
   addGoal,
@@ -42,8 +44,28 @@ function DepthOptions() {
   ));
 }
 
-export function GoalsView({ aims }: { aims: Aim[] }) {
+/** How often the page checks back while a goal is being placed. */
+const PLACING_POLL_MS = 8000;
+
+export function GoalsView({
+  aims,
+  places,
+}: {
+  aims: Aim[];
+  /** Where each goal sits in the area grid, by id (#898). */
+  places: Record<string, AimPlace>;
+}) {
+  const router = useRouter();
   const hasLevel3 = aims.some((aim) => aim.listSource === 'level3');
+  const placing = Object.values(places).some((place) => place.kind === 'pending');
+
+  // Placement runs after the save's response, so check back until it lands.
+  // The server stops calling a goal pending two minutes after its save.
+  useEffect(() => {
+    if (!placing) return;
+    const timer = setInterval(() => router.refresh(), PLACING_POLL_MS);
+    return () => clearInterval(timer);
+  }, [placing, router]);
 
   return (
     <div className="space-y-4">
@@ -57,7 +79,7 @@ export function GoalsView({ aims }: { aims: Aim[] }) {
         <Card>
           <ul className="divide-y divide-border">
             {aims.map((aim) => (
-              <GoalRow key={aim.id} aim={aim} />
+              <GoalRow key={aim.id} aim={aim} place={places[aim.id]} />
             ))}
           </ul>
         </Card>
@@ -72,7 +94,7 @@ export function GoalsView({ aims }: { aims: Aim[] }) {
 }
 
 /** One goal, edited in place. Each control is its own form, so one save is one field. */
-function GoalRow({ aim }: { aim: Aim }) {
+function GoalRow({ aim, place }: { aim: Aim; place: AimPlace | undefined }) {
   const [editState, edit, editing] = useActionState(editGoal, initial);
   const [archiveState, archive, archiving] = useActionState(archiveGoal, initial);
   const error = editState.error ?? archiveState.error;
@@ -135,12 +157,13 @@ function GoalRow({ aim }: { aim: Aim }) {
           />
         </form>
         {/* Where a goal says what it covers. The Level 3 goal's claimed and
-            tested counts go here (#906), and an open goal's field (#898). */}
+            tested counts go here (#906). */}
         {aim.listSource === 'level3' && (
           <p className="px-1.5 text-small text-ink-muted">
             Every article on Wikipedia&rsquo;s Level 3 vital list.
           </p>
         )}
+        {place && <PlaceLine place={place} />}
         {error && <p className="px-1.5 text-small text-danger">{error}</p>}
       </div>
 
@@ -168,6 +191,36 @@ function GoalRow({ aim }: { aim: Aim }) {
         </form>
       </div>
     </li>
+  );
+}
+
+/** The field or domain an open goal was placed in, so a wrong one can be seen. */
+function PlaceLine({ place }: { place: AimPlace }) {
+  let text: string;
+  switch (place.kind) {
+    case 'list':
+      return null;
+    case 'field':
+      text = `In ${place.name}`;
+      break;
+    case 'domain':
+      text = `Across ${place.name}`;
+      break;
+    case 'spans':
+      text = 'Spans several domains, so it sits in no one field';
+      break;
+    case 'pending':
+      text = 'Finding its field…';
+      break;
+    case 'unplaced':
+      text = 'Not in a field yet. Saving a goal, or rewording this one, tries again.';
+      break;
+  }
+  return (
+    <p className="flex items-center gap-1 px-1.5 text-small text-ink-muted">
+      <MapPin className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+      {text}
+    </p>
   );
 }
 

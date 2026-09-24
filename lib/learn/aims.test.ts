@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cardDepthForAim, parseAimFields, toAim } from './aims';
+import { aimPlace, cardDepthForAim, parseAimFields, toAim } from './aims';
 
 describe('cardDepthForAim', () => {
   it('maps familiar, solid and deep to the card depths', () => {
@@ -18,8 +18,10 @@ describe('toAim', () => {
     list_source: 'level3',
     field_id: null,
     domain_id: null,
+    placed_at: null,
     archived_at: null,
     created_at: '2026-09-24T00:00:00Z',
+    updated_at: '2026-09-24T00:00:00Z',
   };
 
   it('reads a list aim', () => {
@@ -30,6 +32,45 @@ describe('toAim', () => {
     expect(toAim({ ...row, depth: 'expert', list_source: 'other' })).toMatchObject({
       depth: 'familiar',
       listSource: null,
+    });
+  });
+});
+
+describe('aimPlace', () => {
+  const now = Date.parse('2026-09-24T12:00:00Z');
+  const open = {
+    listSource: null,
+    fieldId: null,
+    domainId: null,
+    placedAt: null,
+    updatedAt: '2026-09-24T11:59:30Z',
+  };
+  const names = new Map([
+    ['field-urban', 'Urban planning'],
+    ['domain-society', 'Society'],
+  ]);
+
+  it('never places the Level 3 goal', () => {
+    expect(aimPlace({ ...open, listSource: 'level3' }, names, now)).toEqual({ kind: 'list' });
+  });
+
+  it('names the field or domain a goal was placed in', () => {
+    const placedAt = '2026-09-24T11:59:40Z';
+    expect(aimPlace({ ...open, placedAt, fieldId: 'field-urban' }, names, now)).toEqual({
+      kind: 'field',
+      name: 'Urban planning',
+    });
+    expect(aimPlace({ ...open, placedAt, domainId: 'domain-society' }, names, now)).toEqual({
+      kind: 'domain',
+      name: 'Society',
+    });
+    expect(aimPlace({ ...open, placedAt }, names, now)).toEqual({ kind: 'spans' });
+  });
+
+  it('reads an unplaced goal as pending for two minutes after its save, then unplaced', () => {
+    expect(aimPlace(open, names, now)).toEqual({ kind: 'pending' });
+    expect(aimPlace({ ...open, updatedAt: '2026-09-24T11:57:00Z' }, names, now)).toEqual({
+      kind: 'unplaced',
     });
   });
 });
