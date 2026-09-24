@@ -65,16 +65,23 @@ export const SPEND_OPERATIONS = {
     // with a web search for each topic. Opus, one run per press of Reload.
     'recommend-newsletters',
   ],
+  goals: [
+    // Filing a sentence from the capture box against open goals and steps
+    // (plan #929). Haiku, one call per sentence.
+    'file-capture',
+  ],
 } as const;
 
 export type JobsOperation = (typeof SPEND_OPERATIONS.jobs)[number];
 export type ShoppingOperation = (typeof SPEND_OPERATIONS.shopping)[number];
 export type CoreOperation = (typeof SPEND_OPERATIONS.core)[number];
 export type NewsOperation = (typeof SPEND_OPERATIONS.news)[number];
+export type GoalsOperation = (typeof SPEND_OPERATIONS.goals)[number];
 
 /** A module and one of its operations, as a pair that cannot be mismatched. */
 export type SpendOperation =
   | { module: 'jobs'; operation: JobsOperation }
   | { module: 'shopping'; operation: ShoppingOperation }
   | { module: 'core'; operation: CoreOperation }
-  | { module: 'news'; operation: NewsOperation };
+  | { module: 'news'; operation: NewsOperation }
+  | { module: 'goals'; operation: GoalsOperation };

@@ -107,6 +107,9 @@ export const PAID_ACTIONS = {
   // Dev: Dash's reply to a comment that tags it
   'app/dev/comment-actions.ts#addComment': ['reply-to-comment'],
   'app/dev/raised/actions.ts#decideRaise': ['reply-to-comment'],
+
+  // Goals: filing a sentence from the capture box, on every page
+  'app/goals/capture-actions.ts#fileGoalCapture': ['file-capture'],
 } as const satisfies Record<string, readonly OperationName[]>;
 
 export type PaidAction = keyof typeof PAID_ACTIONS;

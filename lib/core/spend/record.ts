@@ -21,7 +21,15 @@ import { costMicrosFor, usageFrom, type SpendReport, type TokenUsage } from '@/l
  */
 
 /** Which workspace spent it. Matches the module ids used everywhere else. */
-export type SpendModule = 'learn' | 'jobs' | 'shopping' | 'vault' | 'todo' | 'news' | 'core';
+export type SpendModule =
+  | 'learn'
+  | 'jobs'
+  | 'shopping'
+  | 'vault'
+  | 'todo'
+  | 'news'
+  | 'goals'
+  | 'core';
 
 export type SpendRecord = {
   module: SpendModule;
