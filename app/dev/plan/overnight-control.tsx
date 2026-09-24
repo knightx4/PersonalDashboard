@@ -23,6 +23,7 @@ import {
   nightRows,
   type DigestNight,
   type FeatureProgress,
+  type OnNow,
 } from '@/lib/digest/night';
 import { elapsedSince, remainingUntil } from '@/lib/plan/elapsed';
 import { commitSubject, type StoredPush } from '@/lib/plan/liveness';
@@ -331,6 +332,7 @@ export function OvernightControl({
   showBlocked = true,
   progress = null,
   refreshReadings = false,
+  on = [],
 }: {
   run: OvernightRun | null;
   canSend: boolean;
@@ -375,6 +377,13 @@ export function OvernightControl({
    * themselves and leaves it out.
    */
   progress?: FeatureProgress | null;
+  /**
+   * Every row a session is on right now, as `onNow` reads the runs still
+   * going (note 39576272). With sessions running in parallel each gets its own
+   * "On" line; with none, the card falls back to the night's last fire. Dash
+   * leaves it out and keeps the one line.
+   */
+  on?: readonly OnNow[];
   /**
    * Ask GitHub for fresh push readings once the page has drawn, while a night
    * is live, and redraw with them. The plan page does its own asking for every
@@ -578,7 +587,16 @@ export function OvernightControl({
           leaving the block empty and reading like one that is working. */}
       {live && run && night && (
         <div className="space-y-0.5">
-          {night.lastFire ? (
+          {on.length > 0 ? (
+            on.map((fire) => (
+              <OnFeature
+                key={fire.ref}
+                fire={fire}
+                now={now}
+                progress={fire.ref === night.lastFire?.ref ? progress : null}
+              />
+            ))
+          ) : night.lastFire ? (
             <OnFeature fire={night.lastFire} now={now} progress={progress} />
           ) : (
             <p className="text-small text-ink-muted">{overnightLine(run, now)}</p>

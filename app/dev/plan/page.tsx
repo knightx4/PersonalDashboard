@@ -2,13 +2,19 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadPlan } from '@/lib/plan/load';
 import { syncPlanFromSeed } from '@/lib/plan/sync';
-import { endQuietRuns, loadFeatureFires, loadLastRuns, loadRunRaises } from '@/lib/plan/runs';
+import {
+  endQuietRuns,
+  loadFeatureFires,
+  loadLastRuns,
+  loadRunRaises,
+  loadStartedRuns,
+} from '@/lib/plan/runs';
 import { loadCommitChecks, refreshCommitChecks } from '@/lib/plan/ci';
 import { loadOvernightRun, overnightStanding } from '@/lib/plan/overnight';
 import { readyFeatureCount } from '@/lib/plan/overnight-choice';
 import { keyRefusal } from '@/lib/plan/work';
 import { lastStoredPush } from '@/lib/plan/liveness';
-import { nightFrom } from '@/lib/digest/night';
+import { nightFrom, onNow } from '@/lib/digest/night';
 import type { LastRun } from '@/lib/plan/run-end';
 import { planRoutine } from '@/lib/feedback/routine';
 import {
@@ -117,7 +123,7 @@ export default async function DevPlanPage({
   // request only after something new has been closed.
   const checks = await refreshCommitChecks({ supabase, userId: user.id });
 
-  const [data, lastRuns, runRaises, commitChecks, overnight, fires] = await Promise.all([
+  const [data, lastRuns, runRaises, commitChecks, overnight, fires, started] = await Promise.all([
     loadPlan(supabase, user.id),
     loadLastRuns(supabase, user.id),
     // What sessions have raised against a step, so an opened step can say what
@@ -134,6 +140,9 @@ export default async function DevPlanPage({
     // one indexed read of a table this page is already reading, and holding it
     // back would cost every load a round trip to save this one.
     loadFeatureFires(supabase, user.id),
+    // Every run still going, after the sweep above, so the card can name each
+    // session running in parallel rather than only the last fire (note 39576272).
+    loadStartedRuns(supabase, user.id),
   ]);
 
   const standing = overnightStanding(overnight);
@@ -222,6 +231,7 @@ export default async function DevPlanPage({
         run={overnight}
         canSend={Boolean(planRoutine().token)}
         night={night}
+        on={onNow(started, data.items)}
         push={nightPush}
         ready={readyFeatureCount(sections)}
       />
