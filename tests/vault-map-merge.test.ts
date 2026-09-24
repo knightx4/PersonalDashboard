@@ -100,6 +100,19 @@ async function snapshot() {
   return row.s;
 }
 
+/** A snapshot with the themes' and positions' embedding columns left out. */
+function withoutVectors(s: Record<string, unknown[]>): Record<string, unknown[]> {
+  const strip = (rows: unknown[] | null) =>
+    rows?.map((row) =>
+      Object.fromEntries(
+        Object.entries(row as object).filter(
+          ([k]) => !['embedding', 'embedding_model', 'embedded_at'].includes(k),
+        ),
+      ),
+    ) ?? null;
+  return { ...s, themes: strip(s.themes) as unknown[], positions: strip(s.positions) as unknown[] };
+}
+
 /** How many rows anywhere still name `id`. */
 async function referencesTo(id: string): Promise<number> {
   const [row] = await admin<{ n: number }[]>`
@@ -204,7 +217,8 @@ describe('merge_themes and undo', () => {
     await placement(absorbed, true);
     await feedCard(absorbed, 'City planning');
     await trackOffer(absorbed, 'City planning');
-    // Both embedded, so undo has to give the renamed survivor its vector back.
+    // Both embedded. The record keeps no vectors, so undo leaves both
+    // unembedded for the map sweep to embed again.
     await admin`update themes
                 set embedding = array_fill(0.1::real, array[1024])::extensions.vector,
                     embedding_model = 'voyage-4-lite', embedded_at = now()
@@ -257,9 +271,19 @@ describe('merge_themes and undo', () => {
       select embedding is not null as embedded from themes where id = ${survivor}`;
     expect(cleared.embedded).toBe(false);
 
+    // The record keeps ids for the rows it repointed and no vectors.
+    const [record] = await admin<{ moved: Record<string, unknown[]>; absorbed: object }[]>`
+      select moved, absorbed from map_merges where id = ${merged.mergeId}`;
+    expect(Object.keys(record.moved.theme_positions[0] as object)).toEqual(['id']);
+    expect(Object.keys(record.moved.theme_notes[0] as object).sort()).toEqual(['id', 'note_id']);
+    expect(record.absorbed).not.toHaveProperty('embedding');
+
     const undone = await undo(userA, merged.mergeId);
     expect(undone.undoneAt).not.toBeNull();
-    expect(await snapshot()).toEqual(before);
+    expect(withoutVectors(await snapshot())).toEqual(withoutVectors(before));
+    const unembedded = await admin<{ id: string }[]>`
+      select id from themes where id in (${survivor}, ${absorbed}) and embedding is null`;
+    expect(unembedded).toHaveLength(2);
 
     await expect(undo(userA, merged.mergeId)).rejects.toThrow(/already been undone/);
   });
