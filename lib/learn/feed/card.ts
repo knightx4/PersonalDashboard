@@ -21,6 +21,7 @@ export type FeedCardRow = {
   check_question?: string | null;
   check_answer?: string | null;
   depth?: string | null;
+  difficulty?: string | null;
   item: { title: string; canonical_url: string; licence: string | null } | null;
   segment: { heading: string | null; text: string; section_anchor: string | null } | null;
 };
@@ -45,6 +46,8 @@ export type FeedCard = {
   answer: string | null;
   /** How deep the pick was pitched, said on the card. */
   depth: 'working' | 'advanced' | 'specialist' | null;
+  /** Whether the person said this card was too hard or too easy. Null when unrated. */
+  difficulty: CardDifficulty | null;
   /** Set when the card is back after a skip or a "work on this" swipe. */
   returning: 'review' | 'skipped' | null;
   /** The paragraphs shown before "Read the rest". */
@@ -193,6 +196,7 @@ export function toFeedCard(row: FeedCardRow): FeedCard | null {
       row.depth === 'working' || row.depth === 'advanced' || row.depth === 'specialist'
         ? row.depth
         : null,
+    difficulty: isCardDifficulty(row.difficulty) ? row.difficulty : null,
     returning: row.status === 'review' || row.status === 'skipped' ? row.status : null,
     shown,
     rest,
@@ -201,6 +205,18 @@ export function toFeedCard(row: FeedCardRow): FeedCard | null {
     site: siteName(row.item.canonical_url),
     licence: licenceFor(row.item.licence, row.item.canonical_url),
   };
+}
+
+/**
+ * The person's rating of a card (plan #890). Kept apart from its status, so a
+ * rated card can still be swiped, saved or tested, and null means unrated.
+ */
+export type CardDifficulty = 'too_hard' | 'too_easy';
+
+export const CARD_DIFFICULTIES: readonly CardDifficulty[] = ['too_hard', 'too_easy'];
+
+export function isCardDifficulty(value: unknown): value is CardDifficulty {
+  return value === 'too_hard' || value === 'too_easy';
 }
 
 /** The deliberate actions a card records (LEARN-NOW-SPEC "What is recorded"). */

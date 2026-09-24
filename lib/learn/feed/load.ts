@@ -7,6 +7,7 @@ import {
   FEED_PAGE,
   RETURN_AFTER_DAYS,
   toFeedCard,
+  type CardDifficulty,
   type FeedAction,
   type FeedCard,
   type FeedCardRow,
@@ -19,7 +20,7 @@ import {
  */
 
 const CARD_SELECT =
-  'id, reason, status, summary, why, context, hook, example, check_question, check_answer, depth, ' +
+  'id, reason, status, summary, why, context, hook, example, check_question, check_answer, depth, difficulty, ' +
   'item:catalogue_items!feed_cards_item_id_fkey(title, canonical_url, licence), ' +
   'segment:catalogue_segments!feed_cards_segment_id_fkey(heading, text, section_anchor)';
 
@@ -148,6 +149,27 @@ export async function recordFeedAction(
     .update({ status: action, acted_at: new Date().toISOString(), ...made })
     .eq('id', id)
     .in('status', [...ACTION_FROM[action]])
+    .select('id');
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw new Error(`Recording that failed: ${error.message}`);
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Set, change or clear the person's too hard or too easy rating on a card
+ * (plan #890). Any status will do: the rating does not decide the card.
+ * Returns whether a row was written; RLS hides another account's card, so
+ * that returns false and nothing changes.
+ */
+export async function setCardDifficulty(
+  supabase: LearnSupabaseClient,
+  id: string,
+  difficulty: CardDifficulty | null,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('feed_cards')
+    .update({ difficulty })
+    .eq('id', id)
     .select('id');
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw new Error(`Recording that failed: ${error.message}`);

@@ -6,8 +6,23 @@ import { z } from 'zod';
 import { topUpFeedAfterResponse } from '@/inngest/learn/feed-top-up';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { ACTION_FROM, cardTitle, sectionLink, SWIPES, type FeedCard, type SwipeAction } from '@/lib/learn/feed/card';
-import { countReadyCards, loadFeedCardRow, loadFeedPage, recordFeedAction } from '@/lib/learn/feed/load';
+import {
+  ACTION_FROM,
+  cardTitle,
+  isCardDifficulty,
+  sectionLink,
+  SWIPES,
+  type CardDifficulty,
+  type FeedCard,
+  type SwipeAction,
+} from '@/lib/learn/feed/card';
+import {
+  countReadyCards,
+  loadFeedCardRow,
+  loadFeedPage,
+  recordFeedAction,
+  setCardDifficulty,
+} from '@/lib/learn/feed/load';
 import { startTrackFromCard } from '@/lib/learn/feed/test-me';
 import { SAVED_FROM_FEED, saveFeedSection } from '@/lib/learn/tracks/save';
 
@@ -69,6 +84,32 @@ export async function dismissCard(id: string): Promise<CardActionResult> {
     return { error: error instanceof Error ? error.message : 'Could not record that.' };
   }
   after(() => topUpFeedAfterResponse(user.id));
+  return {};
+}
+
+/**
+ * Too hard or too easy on a card (plan #890), or null to take the rating
+ * back. The card stays where it is: rating it does not move the deck on, and
+ * it asks for no top-up because no card leaves the ready pool.
+ */
+// latency: optimistic
+export async function rateCard(
+  id: string,
+  difficulty: CardDifficulty | null,
+): Promise<CardActionResult> {
+  await requireUser();
+  const card = CardId.safeParse(id);
+  if (!card.success) return { error: 'Could not tell which card that was.' };
+  if (difficulty !== null && !isCardDifficulty(difficulty)) {
+    return { error: 'Could not tell which rating that was.' };
+  }
+  const supabase = await createLearnClient();
+  try {
+    const written = await setCardDifficulty(supabase, card.data, difficulty);
+    if (!written) return { error: 'That card is no longer there.' };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not record that.' };
+  }
   return {};
 }
 
