@@ -101,6 +101,7 @@ describe('RLS coverage', () => {
       where n.nspname = 'learn' and c.relkind = 'r'
       order by 1`;
     expect(rows.map((r) => r.tablename)).toEqual([
+      'aims',
       'area_check_articles',
       'area_domains',
       'area_fields',
@@ -408,6 +409,81 @@ describe('the catalogue, which belongs to nobody', () => {
                            'x', now())`,
       ),
     ).rejects.toThrow();
+  });
+});
+
+describe('learning goals, stored as aims', () => {
+  // 0044_aims.sql. Added, edited and archived by their owner through their own
+  // session; the table is `aims` because `goals` already holds track concepts.
+  let aimA = '';
+  let physics = '';
+  let domain = '';
+
+  beforeAll(async () => {
+    const [field] = await admin<{ id: string; domain_id: string }[]>`
+      select id, domain_id from area_fields where slug = 'physics'`;
+    physics = field.id;
+    domain = field.domain_id;
+    const [row] = await asUser(
+      userA,
+      (tx) => tx<{ id: string }[]>`
+        insert into aims (user_id, name, about, depth)
+        values (${userA}, 'City design and urbanism', 'How cities are laid out and why.', 'solid')
+        returning id`,
+    );
+    aimA = row.id;
+  });
+
+  it('shows the owner their aims and another user none of them', async () => {
+    const own = await asUser(userA, (tx) => tx`select id from aims`);
+    const other = await asUser(userB, (tx) => tx`select id from aims`);
+    expect(own.map((r) => r.id)).toEqual([aimA]);
+    expect(other).toHaveLength(0);
+  });
+
+  it('does not let a user file an aim under another account', async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into aims (user_id, name) values (${userA}, 'Planted')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('lets the owner edit and archive an aim and nobody else', async () => {
+    await asUser(userB, (tx) => tx`update aims set archived_at = now(), depth = 'deep'`);
+    await asUser(userB, (tx) => tx`delete from aims`);
+    const [before] = await admin<{ archived_at: string | null; depth: string }[]>`
+      select archived_at, depth from aims where id = ${aimA}`;
+    expect(before).toEqual({ archived_at: null, depth: 'solid' });
+
+    await asUser(userA, (tx) => tx`update aims set field_id = ${physics} where id = ${aimA}`);
+    const [placed] = await admin<{ field_id: string | null }[]>`
+      select field_id from aims where id = ${aimA}`;
+    expect(placed.field_id).toBe(physics);
+  });
+
+  it('refuses an unknown depth, a field and a domain at once, and a placed list', async () => {
+    await expect(
+      admin`insert into aims (user_id, name, depth) values (${userA}, 'Too deep', 'expert')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`update aims set domain_id = ${domain} where id = ${aimA}`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into aims (user_id, name, list_source, field_id)
+            values (${userA}, 'Level 3', 'level3', ${physics})`,
+    ).rejects.toThrow();
+  });
+
+  it('keeps one active Level 3 aim per person', async () => {
+    await admin`insert into aims (user_id, name, list_source) values (${userA}, 'Level 3', 'level3')`;
+    await expect(
+      admin`insert into aims (user_id, name, list_source) values (${userA}, 'Level 3 again', 'level3')`,
+    ).rejects.toThrow();
+    await admin`update aims set archived_at = now() where user_id = ${userA} and list_source = 'level3'`;
+    await admin`insert into aims (user_id, name, list_source) values (${userA}, 'Level 3 again', 'level3')`;
+    await admin`insert into aims (user_id, name, list_source) values (${userB}, 'Level 3', 'level3')`;
   });
 });
 
