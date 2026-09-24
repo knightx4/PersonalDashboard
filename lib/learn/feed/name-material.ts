@@ -112,6 +112,10 @@ export function describeProgress(context: DepthContext): string {
     lines.push('', 'Cards on this they said they need to work on; make these ideas concrete from another angle:');
     lines.push(...context.review.map((title) => `- ${title}`));
   }
+  if (context.tooHard.length > 0) {
+    lines.push('', 'Cards on this they rated too hard; come at these ideas from a simpler angle and pitch the next ones easier than these:');
+    lines.push(...context.tooHard.map((title) => `- ${title}`));
+  }
   return lines.join('\n');
 }
 
