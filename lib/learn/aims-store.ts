@@ -6,6 +6,7 @@ import {
   LEVEL3_AIM_NAME,
   toAim,
   type Aim,
+  type Level3Counts,
   type AimFields,
   type AimRow,
 } from '@/lib/learn/aims';
@@ -129,4 +130,16 @@ export async function loadAimAreaNames(
   if (domains.error) throw new Error(`Could not read the domains: ${domains.error.message}`);
   const rows = [...(fields.data ?? []), ...(domains.data ?? [])] as { id: string; name: string }[];
   return new Map(rows.map((row) => [row.id, row.name]));
+}
+
+/**
+ * Your claimed and tested counts on the Level 3 list, and its size (#906).
+ * Grouped by article in the database, so every kind of evidence the view
+ * gains counts without this changing.
+ */
+export async function loadLevel3Counts(supabase: LearnSupabaseClient): Promise<Level3Counts> {
+  const { data, error } = await supabase.rpc('level3_evidence_counts').single();
+  if (error) throw new Error(`Could not count your Level 3 articles: ${error.message}`);
+  const row = data as { claimed: number | string; tested: number | string; total: number | string };
+  return { claimed: Number(row.claimed), tested: Number(row.tested), total: Number(row.total) };
 }
