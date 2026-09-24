@@ -15,6 +15,7 @@ import type { DailyGoal, DailyView as Daily, NextItem, WaitingItem } from '@/lib
 import { missedLine, progressLine, type HomeRhythm } from '@/lib/goals/rhythms';
 import { STEP_KIND_LABELS } from '@/lib/goals/steps';
 import type { Suggestion } from '@/lib/goals/suggestions';
+import { GoalProgress } from './goal-progress';
 import { SuggestionsList } from './suggestions-list';
 
 /**
@@ -186,7 +187,7 @@ function WaitingRow({ item }: { item: WaitingItem }) {
 }
 
 function GoalCard({ daily }: { daily: DailyGoal }) {
-  const { goal, areaName, next, more, hasSteps } = daily;
+  const { goal, areaName, next, more, hasSteps, progress } = daily;
   const tree = `/goals/${goal.id}`;
   const headingId = `goal-${goal.id}`;
 
@@ -199,6 +200,7 @@ function GoalCard({ daily }: { daily: DailyGoal }) {
           </Link>
         </h2>
         <p className="text-small text-ink-muted">{areaName}</p>
+        {progress && <GoalProgress progress={progress} label={goal.title} className="pt-1" />}
       </div>
       <Card>
         {next.length > 0 ? (

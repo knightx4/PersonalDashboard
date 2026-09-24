@@ -27,6 +27,7 @@ import {
   type RhythmRecord,
 } from '@/lib/goals/rhythms';
 import { syncRhythms } from '@/lib/goals/rhythms-store';
+import { goalProgress, type GoalProgress } from '@/lib/goals/status';
 import { todoSteps, type TodoStep } from '@/lib/goals/todo';
 import { nextPosition, reorder, type Goal, type GoalStatus } from '@/lib/goals/tree';
 
@@ -223,33 +224,26 @@ export async function loadGoalMap(
   };
 }
 
-/** Live step and goal counts per goal, for the home page's link to each map. */
-export async function loadStepCounts(
+/**
+ * Each goal's progress and whose move it is (plan #958), keyed by goal id, for
+ * the All goals list. A goal with no live steps is absent.
+ */
+export async function loadGoalProgress(
   client: GoalsSupabaseClient,
-): Promise<Record<string, { total: number; open: number }>> {
-  const { data, error } = await client
-    .from('items')
-    .select('id, level, parent_id, status')
-    .is('archived_at', null);
+): Promise<Record<string, GoalProgress>> {
+  const { data, error } = await client.from('items').select(ITEM_COLUMNS).is('archived_at', null);
   if (error) throw new Error(`Could not read steps: ${error.message}`);
-  const rows = (data ?? []) as Pick<ItemRow, 'id' | 'level' | 'parent_id' | 'status'>[];
+  const rows = (data ?? []) as unknown as ItemRow[];
   const goalIds = rows.filter((r) => r.level === 'goal').map((r) => r.id);
-  const { goalOf } = buildForest(
+  const { byGoal } = buildForest(
     goalIds,
-    rows
-      .filter((r) => r.level === 'step')
-      .map((r) => ({ id: r.id, parentId: r.parent_id as string, status: r.status }) as Step),
+    rows.filter((r) => r.level === 'step').map(toStep),
   );
-  const counts: Record<string, { total: number; open: number }> = {};
-  const statusOf = new Map(rows.map((r) => [r.id, r.status]));
-  for (const [stepId, goalId] of goalOf) {
-    const entry = counts[goalId] ?? { total: 0, open: 0 };
-    entry.total += 1;
-    const status = statusOf.get(stepId);
-    if (status === 'open' || status === 'proposed') entry.open += 1;
-    counts[goalId] = entry;
+  const out: Record<string, GoalProgress> = {};
+  for (const [goalId, steps] of byGoal) {
+    if (steps.length > 0) out[goalId] = goalProgress(steps);
   }
-  return counts;
+  return out;
 }
 
 /**
@@ -495,7 +489,15 @@ export async function loadDailyView(
     byGoal,
   );
   const records = await syncRhythms(client, userId, live, today);
-  return { ...dailyView(goals, byGoal, today), rhythms: homeRhythms(live, records, today) };
+  const view = dailyView(goals, byGoal, today);
+  return {
+    ...view,
+    goals: view.goals.map((daily) => ({
+      ...daily,
+      progress: goalProgress(byGoal.get(daily.goal.id) ?? []),
+    })),
+    rhythms: homeRhythms(live, records, today),
+  };
 }
 
 /** A live rhythm whose current period is not yet met, for Todo (plan #928). */
