@@ -82,7 +82,7 @@ export function TheOptions({
 }) {
   if (!detail) return null;
   const options = planOptions(detail);
-  // The letter the prose recommends wears a green ring, so the choice a
+  // The letter the prose recommends wears a soft green ring, so the choice a
   // session would make shows before its paragraph is read (note 3a57b12f).
   const recommended = recommendedLetter(detail, options);
 
@@ -108,7 +108,7 @@ export function TheOptions({
                 className={
                   'flex size-5 shrink-0 items-center justify-center rounded-control text-micro font-semibold uppercase ' +
                   (isRecommended
-                    ? 'bg-positive-tint text-positive ring-1 ring-positive shadow-[0_0_6px_var(--color-positive)]'
+                    ? 'bg-positive-tint text-positive ring-2 ring-positive/50'
                     : 'bg-surface text-ink')
                 }
               >
