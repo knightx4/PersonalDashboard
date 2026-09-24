@@ -61,6 +61,9 @@ export const SPEND_OPERATIONS = {
     'group-stories',
     // The one-off measurement script behind #872, run by hand. Voyage.
     'measure-repeats',
+    // Making the list of free newsletters recommended on the Newsletters tab,
+    // with a web search for each topic. Opus, one run per press of Reload.
+    'recommend-newsletters',
   ],
 } as const;
 
