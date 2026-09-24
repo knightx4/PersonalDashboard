@@ -166,6 +166,16 @@ A failed call leaves `placed_at` null, and the next chain written into that
 track tries again. A track started from a vault theme through the Practice
 Flow offer takes that theme's row from `theme_fields` and makes no call.
 
+**Goals.** A learning goal (`learn.aims`, plan #895) is placed the same way
+and with the same call, once the response to saving it has gone
+(`lib/learn/areas/place-aim.ts`). Its columns are in `0045_aim_placement.sql`
+and read as a track's do, without a runner-up. Each call carries every open
+goal that has no `placed_at` yet, so a failed call is tried again when any
+goal is next saved or reworded. Rewording a goal clears its placement. The
+Level 3 goal covers every field and is never placed. The Goals page shows the
+field under each goal, and while one is still being placed it checks back
+every few seconds for two minutes after the save.
+
 **Themes.** Learn never writes to the vault map, so a theme's placement lives in
 Learn: a `learn.theme_fields` table holding the account, the theme, the field
 or domain, and a basis (`0031_theme_fields.sql`). It points at `obsidian.themes` with a

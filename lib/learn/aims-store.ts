@@ -61,7 +61,25 @@ export async function insertLevel3Aim(
   throw new Error(`Could not save the goal: ${error.message}`);
 }
 
-/** Change what an edit sent. False when no active goal of theirs matched. */
+/** What a reworded goal's placement goes back to, so it is placed again (#898). */
+const UNPLACED = {
+  field_id: null,
+  domain_id: null,
+  placement_confidence: null,
+  placement_basis: null,
+  placement_model: null,
+  placed_at: null,
+} as const;
+
+/** True when an edit changes what placement reads: the name or the line. */
+export function rewordsAim(fields: Partial<AimFields>): boolean {
+  return 'name' in fields || 'about' in fields;
+}
+
+/**
+ * Change what an edit sent. False when no active goal of theirs matched.
+ * A new name or line clears the placement, for the caller to place again.
+ */
 export async function updateAim(
   supabase: LearnSupabaseClient,
   id: string,
@@ -69,7 +87,7 @@ export async function updateAim(
 ): Promise<boolean> {
   const { data, error } = await supabase
     .from('aims')
-    .update(fields)
+    .update(rewordsAim(fields) ? { ...fields, ...UNPLACED } : fields)
     .eq('id', id)
     .is('archived_at', null)
     .select('id');
@@ -87,4 +105,28 @@ export async function archiveAim(supabase: LearnSupabaseClient, id: string): Pro
     .select('id');
   if (error) throw new Error(`Could not archive the goal: ${error.message}`);
   return (data ?? []).length > 0;
+}
+
+/**
+ * The names of the fields and domains the goals are placed in, by id, for
+ * the line under each goal. Empty when nothing is placed.
+ */
+export async function loadAimAreaNames(
+  supabase: LearnSupabaseClient,
+  aims: Aim[],
+): Promise<Map<string, string>> {
+  const fieldIds = [...new Set(aims.flatMap((aim) => (aim.fieldId ? [aim.fieldId] : [])))];
+  const domainIds = [...new Set(aims.flatMap((aim) => (aim.domainId ? [aim.domainId] : [])))];
+  const [fields, domains] = await Promise.all([
+    fieldIds.length > 0
+      ? supabase.from('area_fields').select('id, name').in('id', fieldIds)
+      : { data: [], error: null },
+    domainIds.length > 0
+      ? supabase.from('area_domains').select('id, name').in('id', domainIds)
+      : { data: [], error: null },
+  ]);
+  if (fields.error) throw new Error(`Could not read the fields: ${fields.error.message}`);
+  if (domains.error) throw new Error(`Could not read the domains: ${domains.error.message}`);
+  const rows = [...(fields.data ?? []), ...(domains.data ?? [])] as { id: string; name: string }[];
+  return new Map(rows.map((row) => [row.id, row.name]));
 }
