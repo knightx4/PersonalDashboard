@@ -15,6 +15,10 @@ export type FeedCardRow = {
   status: string;
   /** The idea's short name. Null on cards written before one idea per card. */
   idea_name?: string | null;
+  /** What the card was picked for, read for the deck's order. */
+  theme_name?: string | null;
+  aim_name?: string | null;
+  field_id?: string | null;
   summary: string | null;
   why: string | null;
   takeaway?: string | null;
