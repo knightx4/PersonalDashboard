@@ -13,6 +13,7 @@ function swipe(overrides: Partial<CardSwipe>): CardSwipe {
     status: 'known',
     theme_id: 't1',
     field_id: 'econ',
+    aim_id: null,
     reason: 'interest',
     title: 'A: B',
     difficulty: null,
@@ -158,5 +159,65 @@ describe('the Too hard and Too easy ratings', () => {
 
   it('ignores a rating on a card with no title', () => {
     expect(on([swipe({ status: 'ready', difficulty: 'too_hard', title: null })], theme).tooHard).toEqual([]);
+  });
+});
+
+describe('a goal', () => {
+  // cardDepthForAim in lib/learn/aims.ts maps familiar, solid and deep to
+  // working, advanced and specialist; these are those starts.
+  const familiar = { reason: 'goal', aimId: 'g1', start: 'working' } as const;
+  const solid = { reason: 'goal', aimId: 'g1', start: 'advanced' } as const;
+  const goalCard = (overrides: Partial<CardSwipe>) =>
+    swipe({ reason: 'goal', theme_id: null, field_id: null, aim_id: 'g1', ...overrides });
+  const on = (cards: CardSwipe[], target: Parameters<typeof contextFor>[1]) =>
+    contextFor(progressFrom(cards), target);
+
+  it('starts at the depth set on it', () => {
+    expect(on([], familiar)).toEqual({ depth: 'working', known: [], review: [], tooHard: [] });
+    expect(on([], solid)).toEqual({ depth: 'advanced', known: [], review: [], tooHard: [] });
+  });
+
+  it('moves a familiar goal from working to advanced after two cards swiped known', () => {
+    const cards = [goalCard({ title: 'Runway: Burn multiple' }), goalCard({ title: 'SaaS metrics: Net retention' })];
+    expect(on(cards.slice(0, 1), familiar).depth).toBe('working');
+    expect(on(cards, familiar)).toMatchObject({
+      depth: 'advanced',
+      known: ['Runway: Burn multiple', 'SaaS metrics: Net retention'],
+    });
+  });
+
+  it('goes on from advanced for a solid goal, and Too hard brings it back', () => {
+    const known = ['A', 'B', 'C'].map((title) => goalCard({ title }));
+    expect(on(known, solid).depth).toBe('specialist');
+    expect(on([goalCard({ status: 'ready', difficulty: 'too_hard', title: 'Hard' })], solid)).toMatchObject({
+      depth: 'working',
+      tooHard: ['Hard'],
+    });
+  });
+
+  it('passes the cards swiped as needing work as titles to come at differently, without going deeper', () => {
+    const cards = [
+      goalCard({ status: 'review', title: 'Cap table: Pro rata' }),
+      goalCard({ status: 'review', title: 'Venture debt: Warrants' }),
+    ];
+    expect(on(cards, familiar)).toEqual({
+      depth: 'working',
+      known: [],
+      review: ['Cap table: Pro rata', 'Venture debt: Warrants'],
+      tooHard: [],
+    });
+  });
+
+  it('counts only its own cards, and its cards move no theme, field or other goal', () => {
+    const cards = [
+      goalCard({ title: 'A', field_id: 'econ', theme_id: 't1' }),
+      goalCard({ title: 'B', field_id: 'econ', theme_id: 't1' }),
+      swipe({ title: 'C' }),
+      swipe({ title: 'D' }),
+    ];
+    expect(on(cards, familiar).known).toEqual(['A', 'B']);
+    expect(on(cards, { reason: 'goal', aimId: 'g2', start: 'working' }).depth).toBe('working');
+    expect(on(cards, { reason: 'interest', themeId: 't1' }).known).toEqual(['C', 'D']);
+    expect(on(cards, { reason: 'gap', fieldId: 'econ' }).known).toEqual([]);
   });
 });

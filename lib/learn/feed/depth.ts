@@ -21,6 +21,12 @@
  * card swiped known and rated too easy counts twice. The naming call is given
  * the titles rated too hard and told to go easier than them.
  *
+ * A goal (plan #909) is counted the same way, keyed by the goal, but starts
+ * at the depth the person set on it rather than at working: a goal set to
+ * solid starts at advanced, as though two of its cards had already been
+ * swiped known. Its swipes and ratings then move it from there, so Too hard
+ * can still take a solid goal back to working.
+ *
  * Pure, so the rules are tested directly.
  */
 
@@ -46,9 +52,11 @@ const NOTHING_SWIPED: Swiped = { known: [], review: [], tooHard: [], tooEasy: []
 export type DepthProgress = {
   themes: ReadonlyMap<string, Swiped>;
   fields: ReadonlyMap<string, Swiped>;
+  /** Keyed by the goal's id (learn.aims). */
+  aims: ReadonlyMap<string, Swiped>;
 };
 
-export const NO_PROGRESS: DepthProgress = { themes: new Map(), fields: new Map() };
+export const NO_PROGRESS: DepthProgress = { themes: new Map(), fields: new Map(), aims: new Map() };
 
 /** What the naming and writing calls are told about one target. */
 export type DepthContext = {
@@ -72,6 +80,8 @@ export type CardSwipe = {
   status: string;
   theme_id: string | null;
   field_id: string | null;
+  /** The goal a goal card was drawn for. */
+  aim_id: string | null;
   reason: string;
   /** "Article: Section", as the card showed it. */
   title: string | null;
@@ -85,21 +95,37 @@ function push(map: Map<string, Swiped>, id: string, kinds: readonly (keyof Swipe
   map.set(id, swiped);
 }
 
-/** The level from one target's swipes and ratings. */
-export function levelFrom(swiped: Swiped): Depth {
-  return depthFor(Math.max(0, swiped.known.length + swiped.tooEasy.length - swiped.tooHard.length));
+/** The known count a level starts from: what a goal set at that depth begins with. */
+export function knownCountFor(depth: Depth): number {
+  switch (depth) {
+    case 'working':
+      return 0;
+    case 'advanced':
+      return KNOWN_FOR_ADVANCED;
+    case 'specialist':
+      return KNOWN_FOR_SPECIALIST;
+  }
+}
+
+/** The level from one target's swipes and ratings, counted up from `start`. */
+export function levelFrom(swiped: Swiped, start: Depth = 'working'): Depth {
+  return depthFor(
+    Math.max(0, knownCountFor(start) + swiped.known.length + swiped.tooEasy.length - swiped.tooHard.length),
+  );
 }
 
 /**
  * The swipes and ratings per theme and per field. Cards are expected newest
  * first, and the lists keep that order. An interest card counts towards its
  * theme only, so a field with many themes in it does not jump a level from
- * swipes on one of them; a gap card counts towards its field. A card rated
+ * swipes on one of them; a gap card counts towards its field, and a goal card
+ * towards its goal only, never the field it is placed in. A card rated
  * but not swiped still counts for its rating.
  */
 export function progressFrom(cards: readonly CardSwipe[]): DepthProgress {
   const themes = new Map<string, Swiped>();
   const fields = new Map<string, Swiped>();
+  const aims = new Map<string, Swiped>();
   for (const card of cards) {
     const kinds: (keyof Swiped)[] = [];
     if (card.status === 'known') kinds.push('known');
@@ -109,17 +135,14 @@ export function progressFrom(cards: readonly CardSwipe[]): DepthProgress {
     if (kinds.length === 0 || !card.title) continue;
     if (card.reason === 'interest' && card.theme_id) push(themes, card.theme_id, kinds, card.title);
     else if (card.reason === 'gap' && card.field_id) push(fields, card.field_id, kinds, card.title);
+    else if (card.reason === 'goal' && card.aim_id) push(aims, card.aim_id, kinds, card.title);
   }
-  return { themes, fields };
+  return { themes, fields, aims };
 }
 
 /**
- * The context for one target: a theme for interest, a field for a gap.
- *
- * A goal (plan #900) starts at the depth the person set on it and carries no
- * swiped titles yet: its cards are not counted by goal, so a goal card swiped
- * known does not move it. Plan #909 keys the swipes by goal with this depth as
- * the starting level.
+ * The context for one target: a theme for interest, a field for a gap, the
+ * goal itself for a goal, which counts up from the depth set on it.
  */
 export function contextFor(
   progress: DepthProgress,
@@ -128,12 +151,13 @@ export function contextFor(
     | { reason: 'gap'; fieldId: string }
     | { reason: 'goal'; aimId: string; start: Depth },
 ): DepthContext {
-  if (target.reason === 'goal') return { depth: target.start, known: [], review: [], tooHard: [] };
   const swiped = (target.reason === 'interest'
     ? progress.themes.get(target.themeId)
-    : progress.fields.get(target.fieldId)) ?? NOTHING_SWIPED;
+    : target.reason === 'gap'
+      ? progress.fields.get(target.fieldId)
+      : progress.aims.get(target.aimId)) ?? NOTHING_SWIPED;
   return {
-    depth: levelFrom(swiped),
+    depth: levelFrom(swiped, target.reason === 'goal' ? target.start : 'working'),
     known: swiped.known.slice(0, MAX_TITLES),
     review: swiped.review.slice(0, MAX_TITLES),
     tooHard: swiped.tooHard.slice(0, MAX_TITLES),
