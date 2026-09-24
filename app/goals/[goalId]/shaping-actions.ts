@@ -12,7 +12,9 @@ import {
   approveGoal,
   loadShaping,
   markReviewed,
+  setFogAside,
   setQuestionAside,
+  settleProposal,
   startGoalRun,
 } from '@/lib/goals/shaping-store';
 
@@ -166,6 +168,52 @@ export async function reviewResultAction(
     if (!marked) return { error: 'That result has already been marked read or is gone.' };
   } catch {
     return { error: 'Could not mark it read. Try again.' };
+  }
+  return saved();
+}
+
+/**
+ * Approve or turn down one proposed step from its menu (plan #960). The
+ * goal-level Approve above still opens everything at once.
+ */
+// latency: pending
+export async function settleProposalAction(
+  _prev: ShapingActionState,
+  form: FormData,
+): Promise<ShapingActionState> {
+  await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which step that was.' };
+  const approve = form.get('approve') === '1';
+  let settled: number | null;
+  try {
+    settled = await settleProposal(await createGoalsClient(), id.data, approve);
+  } catch {
+    return {
+      error: approve ? 'The approval could not be saved. Try again.' : 'Could not turn it down. Try again.',
+    };
+  }
+  if (settled === null) return { error: 'That step is no longer a proposal. Reload to see it.' };
+  const beneath = settled - 1;
+  const more = beneath > 0 ? `, with ${beneath} beneath it` : '';
+  return saved(approve ? `Approved${more}.` : `Turned down${more}.`);
+}
+
+/** Not now on a goal's fog, or Bring back (plan #960). */
+// latency: pending
+export async function setFogAsideAction(
+  _prev: ShapingActionState,
+  form: FormData,
+): Promise<ShapingActionState> {
+  await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which goal that was.' };
+  const aside = form.get('dismissed') !== '0';
+  try {
+    const changed = await setFogAside(await createGoalsClient(), id.data, aside);
+    if (!changed) return { error: 'That goal no longer says what is not known.' };
+  } catch {
+    return { error: aside ? 'Could not put it aside. Try again.' : 'Could not bring it back. Try again.' };
   }
   return saved();
 }

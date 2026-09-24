@@ -30,7 +30,7 @@ import {
   type StepNode,
 } from '@/lib/goals/steps';
 import { awaitsReview } from '@/lib/goals/daily';
-import { countAside } from '@/lib/goals/shaping';
+import { countAside, countProposed } from '@/lib/goals/shaping';
 import { goalProgress, questionsBeneath, stepNeeds, stepState } from '@/lib/goals/status';
 import { canShowOnTodo } from '@/lib/goals/todo';
 import { progressLine, type RhythmRecord } from '@/lib/goals/rhythms';
@@ -53,6 +53,7 @@ import {
   answerQuestionAction,
   reviewResultAction,
   setQuestionAsideAction,
+  settleProposalAction,
   type ShapingActionState,
 } from './shaping-actions';
 
@@ -341,23 +342,48 @@ function StepItem({
       ]
     : [];
   const move = menuAction(moveStepAction);
+  // A proposal's moves are to approve it or turn it down (plan #960), each
+  // taking the proposed steps beneath it along. Mark done and Drop are not
+  // offered on one: done is not a thing a proposal can be, and turning it
+  // down is the drop.
+  const proposed = node.status === 'proposed';
+  const beneath = proposed ? countProposed(node.children) : 0;
+  const settle = menuAction((form) => settleProposalAction({}, form));
+  const statusItems: ActionMenuItem[] = proposed
+    ? [
+        {
+          id: 'approve',
+          label: beneath > 0 ? `Approve, with ${beneath} beneath` : 'Approve',
+          formAction: settle,
+          formFields: { id: node.id, approve: '1' },
+        },
+        {
+          id: 'reject',
+          label: beneath > 0 ? `Turn down, with ${beneath} beneath` : 'Turn down',
+          formAction: settle,
+          formFields: { id: node.id, approve: '0' },
+        },
+      ]
+    : [
+        closed
+          ? {
+              id: 'reopen',
+              label: 'Reopen',
+              formAction: status,
+              formFields: { id: node.id, status: 'open' },
+            }
+          : {
+              id: 'done',
+              label: 'Mark done',
+              formAction: status,
+              formFields: { id: node.id, status: 'done' },
+            },
+      ];
   const items: ActionMenuItem[] = [
     ...rhythmItems,
-    closed
-      ? {
-          id: 'reopen',
-          label: 'Reopen',
-          formAction: status,
-          formFields: { id: node.id, status: 'open' },
-        }
-      : {
-          id: 'done',
-          label: 'Mark done',
-          formAction: status,
-          formFields: { id: node.id, status: 'done' },
-        },
+    ...statusItems,
     ...todoItem,
-    ...(closed
+    ...(closed || proposed
       ? []
       : [
           {
@@ -773,6 +799,7 @@ function StepDetails({
         <div>
           <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Needs</p>
           <p className="whitespace-pre-wrap text-ui text-ink">{needs}</p>
+          {node.status === 'proposed' && <ProposalButtons node={node} />}
         </div>
       )}
       {!node.detail && !node.acceptance && (
@@ -785,6 +812,32 @@ function StepDetails({
         Edit
       </Button>
     </div>
+  );
+}
+
+/**
+ * Approve and Turn down beside a proposal's Needs line (plan #960), the same
+ * two moves its menu offers.
+ */
+function ProposalButtons({ node }: { node: StepNode }) {
+  const [state, settle, settling] = useActionState(settleProposalAction, answerInitial);
+  const beneath = countProposed(node.children);
+  const with_ = beneath > 0 ? `, with ${beneath} beneath` : '';
+  return (
+    <form action={settle} className="mt-1.5 flex flex-wrap items-center gap-2">
+      <input type="hidden" name="id" value={node.id} />
+      <Button type="submit" size="sm" name="approve" value="1" pending={settling}>
+        Approve{with_}
+      </Button>
+      <Button type="submit" size="sm" variant="ghost" name="approve" value="0" disabled={settling}>
+        Turn down{with_}
+      </Button>
+      {state.error && (
+        <p role="alert" className="text-small text-danger">
+          {state.error}
+        </p>
+      )}
+    </form>
   );
 }
 

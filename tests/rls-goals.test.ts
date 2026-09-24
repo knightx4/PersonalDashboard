@@ -622,6 +622,100 @@ describe('questions put aside and answers changed (plan #956)', () => {
   });
 });
 
+describe('one proposal at a time, and fog put aside (plan #960)', () => {
+  async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  async function propose(parent: string, title: string, kind = 'mine'): Promise<string> {
+    const [row] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, status)
+      values (${userA}, 'step', ${parent}, ${kind}, ${title}, 'proposed') returning id`);
+    return row.id;
+  }
+
+  it('approves one proposal with those beneath it and leaves the goal unapproved', async () => {
+    const [goal] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title)
+      values (${userA}, 'goal', ${areaA}, 'Run a half marathon') returning id`);
+    const parent = await propose(goal.id, 'Pick a plan');
+    const child = await propose(parent, 'Compare three plans', 'claude');
+    const other = await propose(goal.id, 'Buy shoes');
+
+    const [{ settled }] = await asUser(userA, (tx) =>
+      tx<{ settled: number }[]>`select settle_proposal(${parent}, true) as settled`,
+    );
+    expect(settled).toBe(2);
+    const rows = await admin<{ id: string; status: string; approved_at: string | null }[]>`
+      select id, status, approved_at from items where id in (${goal.id}, ${parent}, ${child}, ${other})`;
+    const byId = Object.fromEntries(rows.map((row) => [row.id, row]));
+    expect(byId[parent].status).toBe('open');
+    expect(byId[child].status).toBe('open');
+    expect(byId[other].status).toBe('proposed');
+    expect(byId[goal.id].approved_at).toBeNull();
+
+    // Not a proposal any more, somebody else's, or asked by Claude.
+    const [{ none }] = await asUser(userA, (tx) =>
+      tx<{ none: number | null }[]>`select settle_proposal(${parent}, true) as none`,
+    );
+    expect(none).toBeNull();
+    const [{ theirs }] = await asUser(userB, (tx) =>
+      tx<{ theirs: number | null }[]>`select settle_proposal(${other}, true) as theirs`,
+    );
+    expect(theirs).toBeNull();
+    await expect(
+      asClaude((tx) => tx`select goals.settle_proposal(${other}, true)`),
+    ).rejects.toThrow(/only you can turn a proposed step/);
+  });
+
+  it('drops a turned-down proposal, the proposals and open questions beneath it, with history', async () => {
+    const [goal] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title)
+      values (${userA}, 'goal', ${areaA}, 'Learn to cook') returning id`);
+    const step = await propose(goal.id, 'Take a knife skills class');
+    const [question] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${step}, 'decision', 'Weekday or weekend?') returning id`);
+
+    const [{ settled }] = await asUser(userA, (tx) =>
+      tx<{ settled: number }[]>`select settle_proposal(${step}, false) as settled`,
+    );
+    expect(settled).toBe(2);
+    const rows = await admin<{ status: string }[]>`
+      select status from items where id in (${step}, ${question.id})`;
+    expect(rows.map((row) => row.status)).toEqual(['dropped', 'dropped']);
+    const history = await historyOf(step);
+    expect(history.at(-1)).toMatchObject({
+      action: 'update',
+      actor: 'me',
+      old_values: { status: 'proposed' },
+      new_values: { status: 'dropped' },
+    });
+  });
+
+  it('lets only you put fog aside, and brings it back when the fog is rewritten', async () => {
+    const [goal] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title, fog)
+      values (${userA}, 'goal', ${areaA}, 'Get fit', 'Strength or endurance?') returning id`);
+
+    await expect(
+      asClaude((tx) => tx`update items set fog_dismissed_at = now() where id = ${goal.id}`),
+    ).rejects.toThrow(/may not put fog aside/);
+    await expect(
+      asUser(userA, (tx) => tx`update items set fog_dismissed_at = now() where id = ${goalA}`),
+    ).rejects.toThrow(/items_fog_dismissed_ck/);
+
+    await asUser(userA, (tx) => tx`update items set fog_dismissed_at = now() where id = ${goal.id}`);
+    await asClaude((tx) => tx`update items set fog = 'Where are you starting from?' where id = ${goal.id}`);
+    const [row] = await admin<{ fog_dismissed_at: string | null }[]>`
+      select fog_dismissed_at from items where id = ${goal.id}`;
+    expect(row.fog_dismissed_at).toBeNull();
+  });
+});
+
 describe('weekly suggestions (plan #934)', () => {
   async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
     return admin.begin(async (tx) => {

@@ -29,6 +29,8 @@ export type Goal = {
   acceptance: string | null;
   /** What is not known yet about a vague goal. Null once it is clear. */
   fog: string | null;
+  /** When its fog was put aside with Not now (plan #960); null while it shows. Read on the goal page only. */
+  fogDismissedAt?: string | null;
   status: GoalStatus;
   position: number;
   /** What the goal is measured in, such as "$" or "lb"; null when it is not (plan #930). */

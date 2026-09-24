@@ -52,6 +52,7 @@ type ItemRow = {
   detail: string | null;
   acceptance: string | null;
   fog: string | null;
+  fog_dismissed_at: string | null;
   resolution: string | null;
   dismissed_at: string | null;
   due_on: string | null;
@@ -71,7 +72,8 @@ type ItemRow = {
 type LinkRow = { id: string; item_id: string; goal_id: string };
 
 const ITEM_COLUMNS =
-  'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, resolution, ' +
+  'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, fog_dismissed_at, ' +
+  'resolution, ' +
   'dismissed_at, due_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
   'unit, target, collection_id, asks_for';
 
@@ -103,6 +105,7 @@ const toGoal = (row: ItemRow): Goal => ({
   title: row.title,
   acceptance: row.acceptance,
   fog: row.fog,
+  fogDismissedAt: row.fog_dismissed_at,
   status: row.status,
   position: row.position,
   unit: row.unit,

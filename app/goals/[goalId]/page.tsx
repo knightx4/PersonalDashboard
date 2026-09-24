@@ -28,7 +28,7 @@ import { Card } from '@/components/ui/card';
 import { GoalThread } from './goal-comments';
 import { GoalLinksSection } from './goal-links';
 import { GoalNumber } from './goal-number';
-import { GoalShaping } from './goal-shaping';
+import { GoalFog, GoalShaping } from './goal-shaping';
 import { StepTree } from './step-tree';
 
 export const metadata = { title: 'Goal' };
@@ -111,8 +111,15 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
       </Link>
       <PageHeader
         title={map.goal.title}
-        description={map.goal.acceptance ?? map.goal.fog ?? undefined}
+        description={map.goal.acceptance ?? undefined}
       />
+      {map.goal.fog && (
+        <GoalFog
+          goalId={map.goal.id}
+          fog={map.goal.fog}
+          aside={Boolean(map.goal.fogDismissedAt)}
+        />
+      )}
       <div className="space-y-6">
         {shapeable && (
           <GoalShaping
