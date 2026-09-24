@@ -21,7 +21,7 @@ about something that happened. You are given their open goals, each with a ref
 like g1, and the open steps under each goal, each with a ref like s4, then the
 sentence.
 
-Decide what the sentence means for those goals, using only these four moves:
+Decide what the sentence means for those goals, using only these five moves:
 
 - close: a step is finished. "step" is its ref. Only for steps marked mine or
   claude, never a rhythm.
@@ -30,6 +30,9 @@ Decide what the sentence means for those goals, using only these four moves:
   for steps marked rhythm with a period open.
 - note: progress towards a goal that no step captures, in a short phrase in
   the person's own terms. "goal" is its ref and "text" is the note.
+- reading: the sentence gives the current value of a goal's number, such as a
+  balance or a weight. "goal" is its ref and "value" is the number alone, in
+  the goal's unit. Only for goals marked "measured in".
 - add: a follow-up step the sentence implies. "parent" is the ref of the goal
   or step it goes under, "title" says what will be done in a few plain words,
   and "kind" is mine when the person does it or claude when it is research or
@@ -79,13 +82,14 @@ export async function askCaptureModel(
                 items: {
                   type: 'object',
                   properties: {
-                    type: { type: 'string', enum: ['close', 'count', 'note', 'add'] },
+                    type: { type: 'string', enum: ['close', 'count', 'note', 'reading', 'add'] },
                     step: { type: ['string', 'null'] },
                     goal: { type: ['string', 'null'] },
                     parent: { type: ['string', 'null'] },
                     title: { type: ['string', 'null'] },
                     kind: { type: ['string', 'null'], enum: ['mine', 'claude', null] },
                     text: { type: ['string', 'null'] },
+                    value: { type: ['number', 'null'] },
                   },
                   required: ['type'],
                 },

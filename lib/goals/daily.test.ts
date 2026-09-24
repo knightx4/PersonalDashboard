@@ -13,6 +13,8 @@ function goal(id: string, extra: Partial<Goal> = {}): { goal: Goal; areaName: st
       fog: null,
       status: 'open',
       position: 10,
+      unit: null,
+      target: null,
       ...extra,
     },
     areaName: 'Money',

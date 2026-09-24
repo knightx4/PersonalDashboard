@@ -12,6 +12,8 @@ function goal(id: string, extra: Partial<Goal> = {}): Goal {
     fog: null,
     status: 'open',
     position: 10,
+    unit: null,
+    target: null,
     ...extra,
   };
 }

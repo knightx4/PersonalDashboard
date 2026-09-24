@@ -28,6 +28,8 @@ function goal(id: string, extra: Partial<Goal> = {}): { goal: Goal; areaName: st
       fog: null,
       status: 'open',
       position: 10,
+      unit: null,
+      target: null,
       ...extra,
     },
     areaName: 'The city',
@@ -254,6 +256,8 @@ function stubs(input: unknown, overrides: Partial<FilingDeps> = {}) {
           return { kind: 'note', goal_id: action.goal.id, goal_title: action.goal.title, text: action.text, undone_at: null };
         case 'add':
           return { kind: 'add', step_id: 'new-step', title: action.title, step_kind: action.stepKind, goal_title: action.goal.title, undone_at: null };
+        case 'reading':
+          return { kind: 'reading', reading_id: 'new-reading', goal_id: action.goal.id, goal_title: action.goal.title, value: action.value, unit: action.goal.unit, undone_at: null };
       }
     },
     save: async (_id, filed) => {
@@ -368,5 +372,52 @@ describe('undo', () => {
   it('reads a stored list back, skipping anything that is not an entry', () => {
     expect(readFiled([...filed, { kind: 'other' }, 'x', null])).toEqual(filed);
     expect(readFiled('nope')).toEqual([]);
+  });
+});
+
+describe('readings from capture (plan #930)', () => {
+  const measured = contextOf(
+    [goal('debt', { unit: '$', target: 0 }), goal('city')],
+    [step('talk', 'city')],
+  );
+
+  it('tells the model what a goal is measured in', () => {
+    const message = captureMessage(measured, 'card balance is 4,200 now', '2026-09-24');
+    expect(message).toContain('g1: Goal debt (area: The city; measured in $, target $0)');
+    expect(message).toContain('g2: Goal city (area: The city)');
+  });
+
+  it('records a number against a goal with a unit, and refuses one without', () => {
+    const planned = parseFiling(
+      {
+        actions: [
+          { type: 'reading', goal: 'g1', value: 4200 },
+          { type: 'reading', goal: 'g2', value: 3 },
+          { type: 'reading', goal: 'g1', value: 'lots' },
+        ],
+      },
+      measured,
+    );
+    expect(planned).toEqual([{ kind: 'reading', goal: measured.goals[0], value: 4200 }]);
+  });
+
+  it('reads a number the model sent as text', () => {
+    const planned = parseFiling({ actions: [{ type: 'reading', goal: 'g1', value: '$4,200.50' }] }, measured);
+    expect(planned).toEqual([{ kind: 'reading', goal: measured.goals[0], value: 4200.5 }]);
+  });
+
+  it('describes the line and undoes it by deleting the reading', () => {
+    const entry: FiledEntry = {
+      kind: 'reading',
+      reading_id: 'r1',
+      goal_id: 'debt',
+      goal_title: 'Pay off the debts',
+      value: 4200,
+      unit: '$',
+      undone_at: null,
+    };
+    expect(describeFiled(entry)).toBe('Recorded $4,200 for Pay off the debts');
+    expect(undoMove(entry)).toEqual({ move: 'delete-reading', readingId: 'r1' });
+    expect(readFiled([entry])).toEqual([entry]);
   });
 });

@@ -31,6 +31,10 @@ export type Goal = {
   fog: string | null;
   status: GoalStatus;
   position: number;
+  /** What the goal is measured in, such as "$" or "lb"; null when it is not (plan #930). */
+  unit: string | null;
+  /** The value it is aiming for, when it has a unit and one is set. */
+  target: number | null;
 };
 
 export type AreaWithGoals = Area & { goals: Goal[] };

@@ -5,8 +5,10 @@ import { PageHeader } from '@/components/shell/page-header';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { createGoalsClient } from '@/lib/goals/auth/server';
+import { loadReadings } from '@/lib/goals/readings-store';
 import { loadGoalMap } from '@/lib/goals/steps-store';
 import { todayIn } from '@/lib/todo/tasks/model';
+import { GoalNumber } from './goal-number';
 import { StepTree } from './step-tree';
 
 export const metadata = { title: 'Goal' };
@@ -25,7 +27,11 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
   const user = await requireUser();
   const account = await loadAccountSettings(user.id);
   const today = todayIn(account.timezone);
-  const map = await loadGoalMap(await createGoalsClient(), goalId, { userId: user.id, today });
+  const client = await createGoalsClient();
+  const [map, readings] = await Promise.all([
+    loadGoalMap(client, goalId, { userId: user.id, today }),
+    loadReadings(client, goalId),
+  ]);
   if (!map) notFound();
 
   return (
@@ -40,7 +46,16 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
         title={map.goal.title}
         description={map.goal.acceptance ?? map.goal.fog ?? undefined}
       />
-      <StepTree map={map} todoOn={moduleEnabled(account, 'todo')} />
+      <div className="space-y-6">
+        <GoalNumber
+          goalId={map.goal.id}
+          unit={map.goal.unit}
+          target={map.goal.target}
+          readings={readings}
+          today={today}
+        />
+        <StepTree map={map} todoOn={moduleEnabled(account, 'todo')} />
+      </div>
     </div>
   );
 }

@@ -17,6 +17,8 @@ const goal = (id: string, areaId: string): Goal => ({
   fog: null,
   status: 'open',
   position: 0,
+  unit: null,
+  target: null,
 });
 
 const form = (values: Record<string, string>) => (key: string) => values[key] ?? null;
