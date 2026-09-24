@@ -26,6 +26,9 @@ function node(id: string, extra: Partial<StepNode> = {}): StepNode {
     rhythmCount: null,
     rhythmPeriod: null,
     onTodo: false,
+    result: null,
+    resultUrl: null,
+    reviewedAt: null,
     children: [],
     ...extra,
   };

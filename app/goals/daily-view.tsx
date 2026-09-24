@@ -41,6 +41,7 @@ const WAITING_ICONS: Record<WaitingItem['kind'], typeof User> = {
   question: CircleHelp,
   breakdown: ListChecks,
   goal: Flag,
+  review: Sparkles,
 };
 
 function formatDate(isoDate: string): string {
@@ -75,6 +76,8 @@ function waitingLine(item: WaitingItem): string {
       return `${item.count} proposed ${item.count === 1 ? 'step' : 'steps'} to approve`;
     case 'goal':
       return 'Goal Claude proposed';
+    case 'review':
+      return `Claude’s result to read · ${item.goalTitle}`;
   }
 }
 
@@ -156,7 +159,7 @@ function WaitingRow({ item }: { item: WaitingItem }) {
   return (
     <li>
       <Link
-        href={`/goals/${item.goalId}`}
+        href={item.kind === 'review' ? `/goals/${item.goalId}#step-${item.id}` : `/goals/${item.goalId}`}
         className="row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
       >
         <Icon className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />

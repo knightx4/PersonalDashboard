@@ -6,6 +6,7 @@ import { runJdBackfill } from '@/inngest/jobs/cron/jd-backfill';
 import { runVaultSyncForAll } from '@/inngest/vault/sync';
 import { runClaimSweep } from '@/inngest/dev/claims';
 import { runDevDigest } from '@/inngest/dev/digest';
+import { runGoalsDaily } from '@/inngest/goals/daily';
 
 // Long enough for the pump it starts: PUMP_BUDGET_MS is what that work is
 // allowed to take, and a route that ends first takes the hand-off with it.
@@ -25,6 +26,10 @@ export const maxDuration = 300;
  * quietly stops telling the truth. The vault comes after both: it is the
  * newest stage, and nothing reads it yet, so its freshness buys nothing today
  * and it must never be what delays a stage that does matter.
+ *
+ * The morning goals run (plan #933) only fires the goals routine and returns,
+ * so it costs a few reads and one request. It comes before the dev stages
+ * because its results are what the person opens the app for.
  *
  * The claim sweep and the digest are both about the dev pages, and they are in
  * that order because the sweep corrects rows the digest then reports: a step
@@ -51,6 +56,7 @@ export async function GET(request: NextRequest) {
     { name: 'jobs-sweep', run: () => runJobSweep() },
     { name: 'jd-backfill', run: () => runJdBackfill() },
     { name: 'vault', run: () => runVaultSyncForAll() },
+    { name: 'goals-daily', run: () => runGoalsDaily() },
     { name: 'plan-claims', run: () => runClaimSweep() },
     { name: 'dev-digest', run: () => runDevDigest() },
   ];

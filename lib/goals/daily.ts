@@ -7,7 +7,8 @@
  * - For each active goal, the next one to three things to do, yours before
  *   Claude's.
  * - What is waiting on you: a question to answer, a breakdown to approve, a
- *   goal Claude proposed.
+ *   goal Claude proposed, and a result Claude produced for you to read
+ *   (plan #933).
  *
  * Pure, so the ordering and the cap are tested without a database, in the
  * way lib/plan/waiting.ts is for the dev plan's Dash section.
@@ -51,7 +52,8 @@ export type WaitingItem =
       goalTitle: string;
       count: number;
     }
-  | { kind: 'goal'; id: string; title: string; goalId: string; goalTitle: string };
+  | { kind: 'goal'; id: string; title: string; goalId: string; goalTitle: string }
+  | { kind: 'review'; id: string; title: string; goalId: string; goalTitle: string };
 
 export type DailyView = { goals: DailyGoal[]; waiting: WaitingItem[] };
 
@@ -59,10 +61,16 @@ type GoalWithArea = { goal: Goal; areaName: string };
 
 /**
  * Most pressing first. A question holds up whatever sits above it in the
- * tree; a breakdown holds up a goal that has none yet; a proposed goal holds
+ * tree; a breakdown holds up a goal that has none yet. A result to read holds
+ * nothing up, but it is what the morning run was for; a proposed goal holds
  * up nothing until you want it.
  */
-const WAITING_ORDER: Record<WaitingItem['kind'], number> = { question: 0, breakdown: 1, goal: 2 };
+const WAITING_ORDER: Record<WaitingItem['kind'], number> = {
+  question: 0,
+  breakdown: 1,
+  review: 2,
+  goal: 3,
+};
 
 /**
  * The daily view for `goals`, which arrive in page order (area, then goal),
@@ -74,7 +82,8 @@ const WAITING_ORDER: Record<WaitingItem['kind'], number> = { question: 0, breakd
  *
  * Within an open goal the walk goes only through open steps. A proposed step
  * and everything under it is the breakdown to approve; a done or dropped step
- * takes its branch with it. A step is next when it is yours or Claude's and
+ * takes its branch with it, although a Claude step with a result you have
+ * not read is still listed as waiting. A step is next when it is yours or Claude's and
  * has no open step beneath it: a step with open sub-steps waits on them, and
  * it is they that are next.
  *
@@ -124,6 +133,17 @@ export function dailyView(
         if (node.status === 'proposed') {
           proposed += 1 + countProposed(node.children);
           continue;
+        }
+        if (awaitsReview(node)) {
+          waiting.push(
+            place({
+              kind: 'review',
+              id: node.id,
+              title: node.title,
+              goalId: goal.id,
+              goalTitle: goal.title,
+            }),
+          );
         }
         if (node.status !== 'open') continue;
 
@@ -200,6 +220,20 @@ function compareNext(a: NextItem, b: NextItem): number {
     return a.dueOn < b.dueOn ? -1 : 1;
   }
   return 0;
+}
+
+/**
+ * A Claude step whose result you have not marked read. It is usually done,
+ * since a Claude step closes once its result is stored; a dropped one is not
+ * worth reading.
+ */
+export function awaitsReview(node: StepNode): boolean {
+  return (
+    node.kind === 'claude' &&
+    node.status !== 'dropped' &&
+    node.reviewedAt === null &&
+    (node.result !== null || node.resultUrl !== null)
+  );
 }
 
 function countProposed(nodes: StepNode[]): number {
