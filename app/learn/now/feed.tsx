@@ -16,6 +16,7 @@ import {
   Weight,
   X,
 } from 'lucide-react';
+import { ClipPlayer } from '@/components/learn/clip-player';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { Card } from '@/components/ui/card';
@@ -565,6 +566,23 @@ function DeckCard({
             <section className="mt-4 rounded-control bg-accent-tint px-3 py-2.5">
               <h3 className="text-small font-semibold text-accent">In practice</h3>
               <p className="mt-1 text-body text-ink">{card.example}</p>
+            </section>
+          )}
+
+          {/* A lecture clip close to this idea, when the YouTube library has
+              one. It loads only when pressed: the deck preloads the cards
+              behind this one, and a player each would load for nothing. */}
+          {card.video && (
+            <section className="mt-4">
+              <h3 className="text-small font-semibold text-ink-muted">Watch it explained</h3>
+              <ClipPlayer
+                videoId={card.video.videoId}
+                title={card.video.title}
+                start={card.video.start}
+                end={card.video.end}
+                deferred
+                className="mt-1.5"
+              />
             </section>
           )}
 

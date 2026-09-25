@@ -37,3 +37,37 @@ export function watchAt(videoId: string, start: number): string {
   if (start > 0) url.searchParams.set('t', `${Math.floor(start)}s`);
   return url.toString();
 }
+
+/** An 11-character YouTube video id: letters, digits, `-` and `_`. */
+const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
+
+/**
+ * The video id in a YouTube link, or null for anything that is not one.
+ *
+ * Reads the shapes the catalogue and the readings hold: `youtube.com/watch?v=`,
+ * `youtu.be/`, and the `/embed/`, `/shorts/` and `/live/` paths, on the
+ * mobile, music and no-cookie hosts too. A link to a channel or a playlist has
+ * no single video and gets null.
+ */
+export function youtubeVideoId(url: string | null | undefined): string | null {
+  if (!url) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  const host = parsed.hostname.replace(/^(www|m|music)\./, '');
+  let id: string | null = null;
+  if (host === 'youtu.be') {
+    id = parsed.pathname.split('/')[1] ?? null;
+  } else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+    if (parsed.pathname === '/watch') {
+      id = parsed.searchParams.get('v');
+    } else {
+      const [, kind, rest] = parsed.pathname.split('/');
+      if (kind === 'embed' || kind === 'shorts' || kind === 'live' || kind === 'v') id = rest ?? null;
+    }
+  }
+  return id && VIDEO_ID.test(id) ? id : null;
+}

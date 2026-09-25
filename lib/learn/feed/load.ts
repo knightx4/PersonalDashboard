@@ -11,7 +11,9 @@ import {
   type FeedAction,
   type FeedCard,
   type FeedCardRow,
+  type FeedVideo,
 } from './card';
+import { youtubeVideoId } from '@/lib/learn/youtube/format';
 import { ARTICLE_GAP, POOL_FACTOR, spreadDeck, type Spreadable } from './spread';
 
 /**
@@ -21,7 +23,7 @@ import { ARTICLE_GAP, POOL_FACTOR, spreadDeck, type Spreadable } from './spread'
  */
 
 const CARD_SELECT =
-  'id, reason, status, idea_name, theme_name, aim_name, field_id, summary, why, takeaway, context, hook, example, check_question, check_answer, depth, difficulty, ' +
+  'id, reason, status, idea_name, concept_id, theme_name, aim_name, field_id, summary, why, takeaway, context, hook, example, check_question, check_answer, depth, difficulty, ' +
   'track_name, unit_title, subject_id, ' +
   'item:catalogue_items!feed_cards_item_id_fkey(title, canonical_url, licence), ' +
   'segment:catalogue_segments!feed_cards_segment_id_fkey(heading, text, section_anchor), ' +
@@ -114,8 +116,69 @@ export async function loadFeedPage(
     return card ? [{ card, ...spreadOf(row, card.article) }] : [];
   });
   const recent = await recentInDeck(supabase, exclude.slice(-ARTICLE_GAP));
-  return spreadDeck(dealable, recent, limit).map((dealt) => dealt.card);
+  const dealt = spreadDeck(dealable, recent, limit).map((entry) => entry.card);
+  const conceptOf = new Map(rows.map((row) => [row.id, row.concept_id ?? null]));
+  return withVideos(supabase, dealt, conceptOf);
 }
+
+/**
+ * How close a clip has to be to go on a card. Measured on the live catalogue
+ * (learn migration 0058): related pairs met at 0.49 to 0.56, unrelated ones
+ * topped out at 0.45.
+ */
+export const VIDEO_MIN_SIMILARITY = 0.5;
+
+/**
+ * Each card with the YouTube clip nearest its idea, where one clears the floor.
+ *
+ * Read at deal time rather than stored, so a lecture added to the library
+ * reaches the cards already written. A card whose idea was never saved as a
+ * concept, or has no embedding, gets none. A failed read leaves every card
+ * without a video: the card stands on its own.
+ */
+async function withVideos(
+  supabase: LearnSupabaseClient,
+  cards: FeedCard[],
+  conceptOf: Map<string, string | null>,
+): Promise<FeedCard[]> {
+  const conceptIds = [...new Set(cards.flatMap((card) => conceptOf.get(card.id) ?? []))];
+  if (conceptIds.length === 0) return cards;
+
+  const { data, error } = await supabase.rpc('video_clips_for_concepts', {
+    concept_ids: conceptIds,
+    min_similarity: VIDEO_MIN_SIMILARITY,
+  });
+  if (error) {
+    console.error('[learn now] videos for cards', error.message);
+    return cards;
+  }
+
+  const byConcept = new Map<string, FeedVideo>();
+  for (const row of (data ?? []) as VideoClipRow[]) {
+    const videoId = youtubeVideoId(row.item_canonical_url);
+    if (!videoId) continue;
+    byConcept.set(row.concept_id, {
+      videoId,
+      title: row.item_title,
+      start: row.t_start_seconds,
+      end: row.t_end_seconds,
+    });
+  }
+
+  return cards.map((card) => {
+    const concept = conceptOf.get(card.id);
+    const video = concept ? byConcept.get(concept) : undefined;
+    return video ? { ...card, video } : card;
+  });
+}
+
+type VideoClipRow = {
+  concept_id: string;
+  item_title: string;
+  item_canonical_url: string;
+  t_start_seconds: number | null;
+  t_end_seconds: number | null;
+};
 
 function isReadyCheck(row: FeedCardRow): boolean {
   return row.reason === 'unit_check' && row.status === 'ready';

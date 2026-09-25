@@ -1153,6 +1153,8 @@ const readingRow = (
   textAnchor: null,
   pageFrom: null,
   pageTo: null,
+  tStartSeconds: null,
+  tEndSeconds: null,
   finishedAt: null,
   readNowAt: null,
   conceptId: null,

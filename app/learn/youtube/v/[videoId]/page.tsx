@@ -5,7 +5,8 @@ import { PageHeader } from '@/components/shell/page-header';
 import { readTranscript } from '@/inngest/learn/youtube-library';
 import { isOwner } from '@/lib/dev/owner';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { clockTime, durationLabel, embedUrl } from '@/lib/learn/youtube/format';
+import { ClipPlayer } from '@/components/learn/clip-player';
+import { clockTime, durationLabel } from '@/lib/learn/youtube/format';
 import { loadVideoPage } from '@/lib/learn/youtube/load';
 import { paragraphsFromCues } from '@/lib/learn/youtube/paragraphs';
 import { transcribeVideoAction } from '../../actions';
@@ -76,17 +77,7 @@ export default async function VideoPage({
         }
       />
 
-      <div className="aspect-video w-full overflow-hidden rounded-card bg-sunken">
-        <iframe
-          key={`${start}-${stop ?? ''}`}
-          src={embedUrl(video.videoId, start, stop)}
-          title={video.title}
-          className="size-full"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          referrerPolicy="strict-origin-when-cross-origin"
-        />
-      </div>
+      <ClipPlayer videoId={video.videoId} title={video.title} start={start} end={stop} />
 
       {timed.length > 0 && (
         <p className="mt-3 text-small text-ink-muted">

@@ -15,6 +15,8 @@ export type FeedCardRow = {
   status: string;
   /** The idea's short name. Null on cards written before one idea per card. */
   idea_name?: string | null;
+  /** The concept the card's idea was saved as, whose embedding finds its video. */
+  concept_id?: string | null;
   /** What the card was picked for, read for the deck's order. */
   theme_name?: string | null;
   aim_name?: string | null;
@@ -97,6 +99,20 @@ export type FeedCard = {
   /** Where the link goes, named: "Wikipedia", or the host for anything else. */
   site: string | null;
   licence: string | null;
+  /**
+   * A YouTube clip close to the card's idea, when the library has one
+   * (`video_clips_for_concepts`). Attached after the deck is dealt, so it is
+   * absent on a card built straight from its row.
+   */
+  video?: FeedVideo | null;
+};
+
+/** A clip shown on a card: the video, and the span of it that matched. */
+export type FeedVideo = {
+  videoId: string;
+  title: string;
+  start: number | null;
+  end: number | null;
 };
 
 /** Characters shown before the fold: about a phone screen of text. */

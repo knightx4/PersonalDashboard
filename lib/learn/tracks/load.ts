@@ -74,6 +74,9 @@ export type ReadingRow = {
   textAnchor: string | null;
   pageFrom: number | null;
   pageTo: number | null;
+  /** The clip's offsets in seconds, on a reading queued from a timed segment. */
+  tStartSeconds: number | null;
+  tEndSeconds: number | null;
   finishedAt: string | null;
   /** When it was put on the Read now shelf. Null means it is not on it. */
   readNowAt: string | null;
@@ -143,6 +146,8 @@ type ReadingRecord = {
   text_anchor: string | null;
   page_from: number | null;
   page_to: number | null;
+  t_start_seconds: number | null;
+  t_end_seconds: number | null;
   finished_at: string | null;
   read_now_at: string | null;
   concept_id: string | null;
@@ -182,6 +187,8 @@ function toReading(row: ReadingRecord): ReadingRow {
     textAnchor: row.text_anchor,
     pageFrom: row.page_from,
     pageTo: row.page_to,
+    tStartSeconds: row.t_start_seconds,
+    tEndSeconds: row.t_end_seconds,
     finishedAt: row.finished_at,
     readNowAt: row.read_now_at,
     conceptId: row.concept_id,
@@ -205,7 +212,7 @@ const TRACK_COLUMNS = 'id, title, question, status, created_at, branched_from';
 
 const READING_COLUMNS =
   'id, position, status, title, why, note, locator_kind, locator_label, locator_basis, ' +
-  'locator_confidence, open_url, text_anchor, page_from, page_to, finished_at, read_now_at, ' +
+  'locator_confidence, open_url, text_anchor, page_from, page_to, t_start_seconds, t_end_seconds, finished_at, read_now_at, ' +
   'concept_id, ' +
   'sources!readings_source_fk ( id, title, author, kind, year, canonical_url, access, price_cents, page_count )';
 

@@ -1,4 +1,5 @@
 import { AlertTriangle, BadgeCheck } from 'lucide-react';
+import { ClipPlayer } from '@/components/learn/clip-player';
 import { Button } from '@/components/ui/button';
 import { CardSection } from '@/components/ui/card';
 import {
@@ -7,6 +8,7 @@ import {
   type ClaimMaterialView,
   type MaterialAbsence,
 } from '@/lib/learn/catalogue/material';
+import { youtubeVideoId } from '@/lib/learn/youtube/format';
 import { queueMaterial } from './actions';
 
 /**
@@ -52,6 +54,8 @@ function Confidence({ row }: { row: ClaimMaterial }) {
 }
 
 function Material({ row, conceptId }: { row: ClaimMaterial; conceptId: string }) {
+  const videoId = youtubeVideoId(row.item.canonicalUrl);
+
   return (
     <li className="row-pad first:pt-0 last:pb-0">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -71,6 +75,18 @@ function Material({ row, conceptId }: { row: ClaimMaterial; conceptId: string })
       </div>
 
       <p className="mt-1 text-ui text-ink">{row.basis}</p>
+
+      {/* A video plays its clip here, before you decide whether to queue it. */}
+      {videoId && (
+        <ClipPlayer
+          videoId={videoId}
+          title={row.item.title}
+          start={row.tStartSeconds}
+          end={row.tEndSeconds}
+          deferred
+          className="mt-2"
+        />
+      )}
 
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
         {/* A plain form, so the press works before JavaScript does. Nothing

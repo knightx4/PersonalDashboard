@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, BadgeCheck, AlertTriangle, ExternalLink, GitBranch } from 'lucide-react';
+import { ClipPlayer } from '@/components/learn/clip-player';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadOtherReadingsOfSource, loadReading } from '@/lib/learn/tracks/load';
+import { youtubeVideoId } from '@/lib/learn/youtube/format';
 import { formatMoney } from '@/lib/money';
 import { goDeeper, openReading } from './actions';
 import { FindSources } from './find-sources';
@@ -56,6 +58,9 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
   const where = [reading.locatorLabel, pages].filter(Boolean).join(', ');
   const url = reading.openUrl ?? reading.source?.canonicalUrl ?? null;
   const hasSource = reading.source !== null;
+  // A YouTube reading plays here, cut to its clip when it was queued from one.
+  // The Open button below stays, for the video on YouTube itself.
+  const videoId = youtubeVideoId(url) ?? youtubeVideoId(reading.source?.canonicalUrl);
 
   return (
     <>
@@ -79,6 +84,16 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
       />
 
       {reading.why && <p className="mb-5 text-body text-ink">{reading.why}</p>}
+
+      {videoId && (
+        <ClipPlayer
+          videoId={videoId}
+          title={reading.subject}
+          start={reading.tStartSeconds}
+          end={reading.tEndSeconds}
+          className="mb-5"
+        />
+      )}
 
       {!hasSource ? (
         // Something you wrote down. There is nothing to open, and saying so is
