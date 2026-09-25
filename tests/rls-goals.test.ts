@@ -1316,6 +1316,113 @@ describe('context from the other modules (0032)', () => {
   });
 });
 
+describe('worked-out answers on an information step (plan #989)', () => {
+  async function loansStep(): Promise<{ step: string; collection: string; loans: string[] }> {
+    const [col] = await admin<{ id: string }[]>`
+      insert into collections (user_id, name, shape, fields)
+      values (${userA}, ${`answer loans ${Math.random()}`}, 'list',
+              '[{"key": "name", "label": "Loan", "type": "text"},
+                {"key": "balance", "label": "Balance", "type": "money"},
+                {"key": "minimum", "label": "Minimum", "type": "money"}]'::jsonb)
+      returning id`;
+    const [step] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, collection_id)
+      values (${userA}, 'step', ${goalA}, 'mine', 'List the loans', ${col.id}) returning id`;
+    const loans = await admin<{ id: string }[]>`
+      insert into records (user_id, collection_id, data, as_of)
+      values (${userA}, ${col.id}, '{"name": "A", "balance": 1000, "minimum": 100}'::jsonb, '2026-09-02'),
+             (${userA}, ${col.id}, '{"name": "B", "balance": 2000, "minimum": 200}'::jsonb, '2026-09-02')
+      returning id`;
+    return { step: step.id, collection: col.id, loans: loans.map((l) => l.id) };
+  }
+
+  function sourcesOf(ids: string[]): string {
+    return JSON.stringify(ids.map((id) => ({ record_id: id, as_of: '2026-09-02' })));
+  }
+
+  async function answer(step: string, key: string, sources: string): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into answers (user_id, item_id, key, question, answer, sources)
+      values (${userA}, ${step}, ${key}, 'What is the monthly total?', 'About $300 a month.',
+              (${sources}::text)::jsonb)
+      returning id`;
+    return row.id;
+  }
+
+  async function outOfDate(id: string): Promise<boolean> {
+    const [row] = await admin<{ out_of_date_at: Date | null }[]>`
+      select out_of_date_at from answers where id = ${id}`;
+    return row.out_of_date_at !== null;
+  }
+
+  it('goes out of date when a row it read changes, and back when rewritten', async () => {
+    const { step, loans } = await loansStep();
+    const total = await answer(step, 'monthly_total', sourcesOf(loans));
+    const firstOnly = await answer(step, 'first_loan', sourcesOf([loans[0]]));
+    expect(await outOfDate(total)).toBe(false);
+
+    await asUser(userA, (tx) => tx`
+      update records set data = data || '{"balance": 1900}'::jsonb where id = ${loans[1]}`);
+    expect(await outOfDate(total)).toBe(true);
+    expect(await outOfDate(firstOnly)).toBe(false);
+
+    // A write that changes nothing an answer reads leaves it as it is.
+    await admin`update records set position = 99 where id = ${loans[0]}`;
+    expect(await outOfDate(firstOnly)).toBe(false);
+
+    await admin`update answers set answer = 'About $290 a month.' where id = ${total}`;
+    expect(await outOfDate(total)).toBe(false);
+  });
+
+  it('goes out of date when a confirmed row arrives, not a draft', async () => {
+    const { step, collection, loans } = await loansStep();
+    const total = await answer(step, 'monthly_total', sourcesOf(loans));
+
+    const [draft] = await admin<{ id: string }[]>`
+      insert into records (user_id, collection_id, data, draft, source)
+      values (${userA}, ${collection}, '{"name": "C"}'::jsonb, true, 'gmail') returning id`;
+    expect(await outOfDate(total)).toBe(false);
+
+    await asUser(userA, (tx) => tx`update records set draft = false where id = ${draft.id}`);
+    expect(await outOfDate(total)).toBe(true);
+  });
+
+  it('comes back into date when a check leaves the answer as it was', async () => {
+    const { step, loans } = await loansStep();
+    const total = await answer(step, 'monthly_total', sourcesOf(loans));
+    const [before] = await admin<{ worked_at: Date }[]>`
+      select worked_at from answers where id = ${total}`;
+    await admin`update records set as_of = '2026-10-02' where id = ${loans[0]}`;
+    expect(await outOfDate(total)).toBe(true);
+
+    await admin`update answers set out_of_date_at = null where id = ${total}`;
+    const [after] = await admin<{ worked_at: Date; out_of_date_at: Date | null }[]>`
+      select worked_at, out_of_date_at from answers where id = ${total}`;
+    expect(after.out_of_date_at).toBeNull();
+    expect(after.worked_at.getTime()).toBeGreaterThanOrEqual(before.worked_at.getTime());
+  });
+
+  it('belongs on an information step, reads rows of yours, and only its owner sees it', async () => {
+    const { step, loans } = await loansStep();
+    const [plain] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Call the servicer') returning id`;
+    await expect(answer(plain.id, 'x', '[]')).rejects.toThrow(/information step/);
+    await expect(answer(step, 'bad_source', '[{"record_id": "nope"}]')).rejects.toThrow(
+      /Each source/,
+    );
+    await expect(
+      answer(step, 'not_mine', sourcesOf(['00000000-0000-0000-0000-000000000000'])),
+    ).rejects.toThrow(/not one of your records/);
+
+    await answer(step, 'monthly_total', sourcesOf(loans));
+    expect(
+      await asUser(userA, (tx) => tx`select id from answers where item_id = ${step}`),
+    ).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from answers`)).toHaveLength(0);
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`
@@ -1346,6 +1453,7 @@ describe('RLS coverage', () => {
       order by 1`;
     expect(recorded.map((r) => r.tablename)).toEqual(tables.map((r) => r.tablename));
     expect(tables.map((r) => r.tablename)).toEqual([
+      'answers',
       'areas',
       'captures',
       'collection_goals',

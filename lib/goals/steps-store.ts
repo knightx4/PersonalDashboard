@@ -6,6 +6,8 @@ import {
   type Collection,
   type CollectionRecord,
 } from '@/lib/goals/collections-store';
+import type { StepAnswer } from '@/lib/goals/answers';
+import { loadAnswers } from '@/lib/goals/answers-store';
 import type { DevComment } from '@/lib/comments/load';
 import { loadThreads } from '@/lib/goals/comments-store';
 import { dailyView, type DailyView } from '@/lib/goals/daily';
@@ -162,6 +164,8 @@ export type GoalMap = {
   rhythms: Record<string, RhythmRecord>;
   /** The collections the information steps shown fill, with their records (plan #954). */
   information: Record<string, { collection: Collection; records: CollectionRecord[] }>;
+  /** The worked-out answers on each information step shown, keyed by step id (plan #989). */
+  answers: Record<string, StepAnswer[]>;
   /** The comments on the goal and on each step shown, keyed by item id (plan #957). */
   threads: Record<string, DevComment[]>;
 };
@@ -230,20 +234,25 @@ export async function loadGoalMap(
   const steps = byGoal.get(goalId) ?? [];
   const shown: string[] = [];
   const collectionIds: string[] = [];
+  const informationIds: string[] = [];
   const itemIds: string[] = [goalId];
   const collect = (list: StepNode[]) => {
     for (const node of list) {
       itemIds.push(node.id);
       if (node.kind === 'rhythm') shown.push(node.id);
-      if (node.collectionId) collectionIds.push(node.collectionId);
+      if (node.collectionId) {
+        collectionIds.push(node.collectionId);
+        informationIds.push(node.id);
+      }
       collect(node.children);
     }
   };
   collect(steps);
   collect(linked.map((entry) => entry.step));
-  const [records, information, threads] = await Promise.all([
+  const [records, information, answers, threads] = await Promise.all([
     syncRhythms(client, userId, liveRhythms(goals.map(toGoal), byGoal), today, shown),
     loadInformation(client, collectionIds),
+    loadAnswers(client, informationIds),
     loadThreads(client, itemIds),
   ]);
 
@@ -261,6 +270,7 @@ export async function loadGoalMap(
       }),
     ),
     information,
+    answers,
     threads,
   };
 }

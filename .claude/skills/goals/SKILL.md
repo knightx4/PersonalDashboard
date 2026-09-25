@@ -444,6 +444,52 @@ values ('<user>', '<collection id>',
 Draft inserts count as forms filled on the goal's page, so write them in a
 call that sets `goals.run_id`.
 
+### Answers on an information step
+
+An information step exists to answer something the later steps need: when
+the first payment falls due, what the payments come to a month. The fields
+are how you get there. Once the step's records hold enough to answer, work
+each answer out and store it in `goals.answers`, one row per question. The
+step shows them above its figures. The person never types an answer; they
+are yours to write and keep current.
+
+- `key` names the question on its step (`first_payment`, `monthly_total`),
+  lower case, digits and `_`. One row per key; rewrite a row rather than
+  adding a second.
+- `question` is the question as the step shows it; `answer` is one sentence
+  a person can act on ("18 Dec 2026, for both Grad PLUS loans; the
+  Unsubsidized loans follow on 19 Dec."). Say "about" where an amount rests
+  on an estimate.
+- `sources` lists every record you read, with the date of its figures:
+  `[{"record_id": "<uuid>", "as_of": "YYYY-MM-DD"}]`. The date is the
+  record's `as_of`, or the date the document gives in its values, or the
+  day the values were typed (`updated_at`). The database refuses a source
+  that is not one of the person's records.
+- Read the figures the way the step's notes explain them, not by the field
+  name alone: a Grad PLUS "repayment begin date" is its last disbursement,
+  and the first payment is the next due date.
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+insert into goals.answers (user_id, item_id, key, question, answer, sources, position, run_id)
+values ('<user>', '<step id>', 'monthly_total', 'What is the monthly total?',
+        'About $2,450 a month: $988 and $966 on the Grad PLUS loans, and about $250 on each Unsubsidized loan once it is scheduled.',
+        '[{"record_id": "<loan 1>", "as_of": "2026-09-02"}, {"record_id": "<loan 2>", "as_of": "2026-09-02"}]'::jsonb,
+        20, '<the run id>')
+on conflict (item_id, key) do update
+  set question = excluded.question, answer = excluded.answer,
+      sources = excluded.sources, run_id = excluded.run_id;
+```
+
+When a record an answer read changes, or a new record is confirmed in the
+collection, a trigger sets `out_of_date_at` and the page shows the answer as
+out of date. The morning run's brief lists those steps with their questions.
+Work each one again from the records as they are now and write it back the
+same way: a changed `answer` or `sources` dates it again and clears
+`out_of_date_at`. If the answer and its sources come out the same, clear it
+yourself with `update goals.answers set out_of_date_at = null where id = …`.
+
 ### Questions
 
 Ask only where the answer changes the path, and ask each one once. A question
@@ -761,7 +807,8 @@ plain dependency row is almost always the better way to say that.
 
 ## The morning run
 
-The daily cron fires the routine each morning when a `claude` step is ready
+The daily cron fires the routine each morning when a `claude` step is ready,
+or when an information step has an answer out of date
 (`inngest/goals/daily.ts`), with a brief listing those steps and the
 `goals.runs` row it wrote with `job` `daily`. Work only the steps it names.
 Before each one, report it on the run row with `now_on` the step's title
@@ -797,6 +844,11 @@ steps"). One whose facts are not findable stays open with no result. Say why
 in the run summary either way, and where a choice would unblock it, add it as
 a question step under the same goal. The summary names each step worked and
 each one left.
+
+An information step the brief lists under "answers out of date" is not a
+`claude` step and gets no `result`. Work its listed answers again as in
+"Answers on an information step", leave its status alone, and name each
+answer rewritten or confirmed in the summary.
 
 ## A step or phase sent from its row
 

@@ -221,6 +221,7 @@ const map: GoalMap = {
       ],
     },
   },
+  answers: {},
   threads: {
     call: [
       {

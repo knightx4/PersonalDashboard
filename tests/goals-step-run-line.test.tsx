@@ -73,6 +73,7 @@ const map: GoalMap = {
   linksOf: {},
   rhythms: {},
   information: {},
+  answers: {},
   threads: {},
 };
 
