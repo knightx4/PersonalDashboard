@@ -2,13 +2,14 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { requireUser } from '@/lib/auth/server';
+import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { isOwner } from '@/lib/dev/owner';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { noLinks, weekInstants, type GoalLinks } from '@/lib/goals/links';
 import { loadAimChoices, loadGoalLinks } from '@/lib/goals/links-store';
 import { loadCollectionsForGoal } from '@/lib/goals/collections-store';
+import { loadGoalFlags } from '@/lib/goals/flags-store';
 import { loadNumberFrom, loadReadings } from '@/lib/goals/readings-store';
 import { goalRunRows, type RunListing } from '@/lib/goals/runs';
 import { loadGoalRuns } from '@/lib/goals/runs-store';
@@ -28,6 +29,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { Card } from '@/components/ui/card';
 import { GoalAddRow } from './goal-add-row';
+import { GoalFlags } from './goal-flags';
 import { GoalThread } from './goal-comments';
 import { GoalHelp } from './goal-help';
 import { GoalLinksSection } from './goal-links';
@@ -83,7 +85,7 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
   const jobsOn = moduleEnabled(account, 'jobs');
   const learn = learnOn ? await createLearnClient() : null;
   const jobs = jobsOn ? await createJobsClient() : null;
-  const [map, readings, numberFrom, sources, links, aims, shaping, history, owner] = await Promise.all([
+  const [map, readings, numberFrom, sources, links, aims, shaping, history, owner, flags] = await Promise.all([
     loadGoalMap(client, goalId, { userId: user.id, today }),
     loadReadings(client, goalId),
     // Where the number is worked out from, and what it could be (plan #1024).
@@ -100,6 +102,8 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
     loadShaping(client, goalId),
     loadGoalRuns(client, goalId),
     isOwner({ user }),
+    // What a run flagged on the goal (plan #1015), from public.raised_items.
+    createClient().then((supabase) => loadGoalFlags(supabase, { userId: user.id, goalId })),
   ]);
   if (!map) notFound();
   const shapeable = map.goal.status === 'open' || map.goal.status === 'proposed';
@@ -144,6 +148,7 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
         />
       )}
       <div className="space-y-6">
+        {flags.length > 0 && <GoalFlags flags={flags} />}
         {shapeable && (
           <GoalShaping
             goalId={map.goal.id}

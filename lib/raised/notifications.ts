@@ -25,7 +25,7 @@ export async function loadRaisedNotifications(userId: string): Promise<Notificat
     const supabase = await createClient();
     const { data } = await supabase
       .from('raised_items')
-      .select('id, title, detail, created_at')
+      .select('id, title, detail, created_at, goal_id')
       .eq('user_id', userId)
       .eq('status', 'open')
       .order('created_at', { ascending: false });
@@ -34,7 +34,8 @@ export async function loadRaisedNotifications(userId: string): Promise<Notificat
       id: row.id as string,
       headline: row.title as string,
       detail: (row.detail as string | null) ?? null,
-      href: '/dev/raised',
+      // A flag on a goal (plan #1015) is answered on the goal's page.
+      href: row.goal_id ? `/goals/${row.goal_id as string}#flag-${row.id as string}` : '/dev/raised',
       at: row.created_at as string,
     }));
   } catch {

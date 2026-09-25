@@ -6,7 +6,8 @@
  * to questions on a goal (`reshape`, plan #1017), or one step or phase sent
  * from its row (`step`, `phase`, plan #1000), or one step of yours Claude was
  * asked to prepare (`prepare`, plan #1001), or Plan this area on an area
- * (`area`). The page
+ * (`area`), or your answer to something Claude flagged on a goal (`raise`,
+ * plan #1015). The page
  * reads them newest first and says, for each, what started it, what it was
  * on, how it ended, how long it took, and its summary or its error.
  *
@@ -16,7 +17,16 @@
 import { formatInstant } from './dates';
 import { runIsQuiet, runProgress, type GoalRunStatus } from '@/lib/goals/shaping';
 
-export type RunJob = 'goal' | 'daily' | 'weekly' | 'reshape' | 'step' | 'phase' | 'prepare' | 'area';
+export type RunJob =
+  | 'goal'
+  | 'daily'
+  | 'weekly'
+  | 'reshape'
+  | 'step'
+  | 'phase'
+  | 'prepare'
+  | 'area'
+  | 'raise';
 
 /** One goals.runs row with the item it was on, as the Runs page reads it. */
 export type RunListing = {
@@ -47,6 +57,7 @@ export const JOB_LABELS: Record<RunJob, string> = {
   phase: 'Sent a phase',
   prepare: 'Prepared a step',
   area: 'Planned an area',
+  raise: 'Your answer to a flag',
 };
 
 /**
@@ -114,7 +125,8 @@ function isJob(value: string): value is RunJob {
     value === 'step' ||
     value === 'phase' ||
     value === 'prepare' ||
-    value === 'area'
+    value === 'area' ||
+    value === 'raise'
   );
 }
 

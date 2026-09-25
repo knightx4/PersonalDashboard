@@ -1,8 +1,11 @@
 import { PageHeader } from '@/components/shell/page-header';
-import { requireUser } from '@/lib/auth/server';
+import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { catchUp, catchUpSince } from '@/lib/goals/catch-up';
 import { createGoalsClient } from '@/lib/goals/auth/server';
+import { withWaiting } from '@/lib/goals/daily';
+import { flagsWaiting } from '@/lib/goals/flags';
+import { loadGoalFlags, loadGoalTitles } from '@/lib/goals/flags-store';
 import { loadRunsEndedSince } from '@/lib/goals/runs-store';
 import { loadSinceVisit } from '@/lib/goals/since-visit-store';
 import { loadDailyView } from '@/lib/goals/steps-store';
@@ -25,7 +28,8 @@ export const dynamic = 'force-dynamic';
  * Each visit is recorded (plan #1019). On the day you come back after five or
  * more days away, the page leads with a catch-up from the day you left.
  * Otherwise it leads with what Claude did since your last sitting (plan
- * #1010), which the next sitting clears.
+ * #1010), which the next sitting clears. What a run flagged on a goal
+ * (plan #1015) is listed under Waiting on you with the rest.
  *
  * The loader checks that the schema is exposed, so a deployment where `goals`
  * is not exposed to PostgREST says so here instead of showing an empty page
@@ -36,11 +40,18 @@ export default async function GoalsPage() {
   const account = await loadAccountSettings(user.id);
   const client = await createGoalsClient();
   const today = todayIn(account.timezone);
-  const [view, suggestions, visit] = await Promise.all([
+  const [daily, suggestions, visit, flags] = await Promise.all([
     loadDailyView(client, { userId: user.id, today }),
     loadRecentSuggestions(client),
     recordVisit(client, { userId: user.id, today }),
+    createClient().then((supabase) => loadGoalFlags(supabase, { userId: user.id })),
   ]);
+  // What runs flagged on a goal (plan #1015) lives in public.raised_items, so
+  // it joins the waiting list here rather than in the step trees.
+  const titles = await loadGoalTitles(client, flags.map((flag) => flag.goalId)).catch(
+    () => new Map<string, string>(),
+  );
+  const view = { ...daily, waiting: withWaiting(daily.waiting, flagsWaiting(flags, titles)) };
   const since = catchUpSince(visit, today);
   const away = since ? catchUp(since, await loadRunsEndedSince(client, since), view) : null;
   // The catch-up already lists the runs from the time away.

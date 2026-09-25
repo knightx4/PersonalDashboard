@@ -100,4 +100,19 @@ describe('picking a raise up', () => {
     expect(picked).toEqual({ ok: false, said: null });
     expect(vi.mocked(startRoutineRun)).not.toHaveBeenCalled();
   });
+
+  it('sends a flag on a goal back to the goal page rather than the plan routine', async () => {
+    vi.mocked(startRoutineRun).mockClear();
+    const picked = await pickUpRaise({
+      supabase: db(row({ status: 'open', module: 'goals', goal_id: '33333333-3333-3333-3333-333333333333' })),
+      userId: USER,
+      id: '22222222-2222-2222-2222-222222222222',
+      commentId: 'c3',
+      answer: 'move it',
+    });
+
+    expect(picked.ok).toBe(false);
+    expect(picked).toMatchObject({ said: expect.stringContaining('/goals/33333333') });
+    expect(vi.mocked(startRoutineRun)).not.toHaveBeenCalled();
+  });
 });
