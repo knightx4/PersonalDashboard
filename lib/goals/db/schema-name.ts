@@ -32,15 +32,23 @@ export type GoalsSupabaseClient = import('@supabase/supabase-js').SupabaseClient
  */
 export type GoalsActor = 'me' | 'claude' | 'capture';
 
-/** The request headers the history trigger reads. */
+/**
+ * The request headers the history trigger reads. `undoes` names the history
+ * row a write takes back, and `undoesField` the one collection field it takes
+ * back, for Undo on a run's page (plan #1013).
+ */
 export function historyHeaders(options: {
   actor?: GoalsActor;
   captureId?: string;
   runId?: string;
+  undoes?: number;
+  undoesField?: string;
 }): Record<string, string> {
   const headers: Record<string, string> = {};
   if (options.actor) headers['x-goals-actor'] = options.actor;
   if (options.captureId) headers['x-goals-capture'] = options.captureId;
   if (options.runId) headers['x-goals-run'] = options.runId;
+  if (options.undoes !== undefined) headers['x-goals-undo'] = String(options.undoes);
+  if (options.undoesField) headers['x-goals-undo-field'] = options.undoesField;
   return headers;
 }

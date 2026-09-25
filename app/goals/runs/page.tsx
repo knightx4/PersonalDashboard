@@ -6,14 +6,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createGoalsClient } from '@/lib/goals/auth/server';
-import {
-  JOB_LABELS,
-  OUTCOME_LABELS,
-  runDuration,
-  runOutcome,
-  type RunListing,
-  type RunOutcome,
-} from '@/lib/goals/runs';
+import { JOB_LABELS, runMeta, type RunListing, type RunOutcome } from '@/lib/goals/runs';
 import { loadRuns } from '@/lib/goals/runs-store';
 
 export const metadata = { title: 'Runs' };
@@ -22,7 +15,8 @@ export const dynamic = 'force-dynamic';
 /**
  * Every goal run, newest first (plan #1012): what started it, the goal or
  * step it was on, how it ended, how long it took, and its summary or error.
- * Read from goals.runs; a failed run shows the reason it recorded.
+ * Read from goals.runs; a failed run shows the reason it recorded. Each
+ * run opens to what it changed (plan #1013).
  */
 
 type RunView = {
@@ -37,26 +31,7 @@ type RunView = {
  */
 function runViews(runs: RunListing[], timeZone: string): RunView[] {
   const now = Date.now();
-  const stamp = new Intl.DateTimeFormat(undefined, {
-    timeZone,
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-  return runs.map((run) => {
-    const outcome = runOutcome(run, now);
-    const took = runDuration(run);
-    const meta = [
-      OUTCOME_LABELS[outcome],
-      stamp.format(new Date(run.createdAt)),
-      took ? `took ${took}` : null,
-    ]
-      .filter(Boolean)
-      .join(' · ');
-    return { run, outcome, meta };
-  });
+  return runs.map((run) => ({ run, ...runMeta(run, now, timeZone) }));
 }
 
 export default async function GoalRunsPage() {
@@ -96,7 +71,9 @@ function RunRow({ view: { run, outcome, meta } }: { view: RunView }) {
   return (
     <li className="row-pad space-y-1">
       <p className="text-ui break-words text-ink">
-        <span className="font-semibold">{JOB_LABELS[run.job]}</span>
+        <Link href={`/goals/runs/${run.id}`} className="font-semibold underline-offset-2 hover:underline">
+          {JOB_LABELS[run.job]}
+        </Link>
         {run.item && (
           <>
             {' on '}

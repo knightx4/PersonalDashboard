@@ -19,7 +19,7 @@ import {
  * about who made it (see historyHeaders).
  */
 export async function createGoalsClient(
-  history: { actor?: GoalsActor; captureId?: string } = {},
+  history: { actor?: GoalsActor; captureId?: string; undoes?: number; undoesField?: string } = {},
 ): Promise<GoalsSupabaseClient> {
   const cookieStore = await cookies();
 

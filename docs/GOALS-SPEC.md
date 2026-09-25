@@ -391,7 +391,9 @@ A sketch for the migration, not the migration itself.
 - `goals.links`: a goal or step to a Learn aim, a job application, a role.
 - `goals.history`: one row per change to any goals table, written by
   trigger: table, row id, action, old and new values, actor (`me`, `claude`,
-  `capture`), capture id where there is one, and time. Append-only.
+  `capture`), capture id where there is one, and time. An Undo on a run's
+  page (/goals/runs/<id>) is recorded as yours with the change it took back
+  (`undoes`, and `undoes_field` for one field of a collection). Append-only.
 - `goals.captures`: each capture sentence as typed, what was filed from it,
   and when any of it was undone.
 - `goals.readings`: dated numeric readings against a goal (a balance, a

@@ -1202,3 +1202,39 @@ describe('RLS coverage', () => {
     expect(rows.map((r) => r.grantee)).toEqual([]);
   });
 });
+
+describe('goals history of an undo', () => {
+  it('records which change an undo took back, and only a change of your own', async () => {
+    // Claude adds a step, as a routine's SQL does.
+    const [step] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'claude', 'Added by a run') returning id`;
+    const [added] = await admin<{ id: string }[]>`
+      select id::text from history where row_id = ${step.id} and action = 'insert'`;
+
+    // Undo on the run's page archives it on your session, naming the change.
+    await asUser(userA, async (tx) => {
+      await tx.unsafe(`set local goals.undoes = '${added.id}'`);
+      await tx`update items set archived_at = now() where id = ${step.id}`;
+    });
+    const [undo] = await admin<{ action: string; actor: string; undoes: string | null; undoes_field: string | null }[]>`
+      select action, actor, undoes::text, undoes_field from history
+      where row_id = ${step.id} and action = 'archive'`;
+    expect(undo).toEqual({ action: 'archive', actor: 'me', undoes: added.id, undoes_field: null });
+
+    // A history id of another account is dropped rather than recorded.
+    const [theirs] = await admin<{ id: string }[]>`
+      insert into areas (user_id, name) values (${userB}, 'Theirs') returning id`;
+    const [theirRow] = await admin<{ id: string }[]>`
+      select id::text from history where row_id = ${theirs.id}`;
+    await asUser(userA, async (tx) => {
+      await tx.unsafe(`set local goals.undoes = '${theirRow.id}'`);
+      await tx.unsafe(`set local goals.undoes_field = 'balance'`);
+      await tx`update items set archived_at = null where id = ${step.id}`;
+    });
+    const [restore] = await admin<{ undoes: string | null; undoes_field: string | null }[]>`
+      select undoes::text, undoes_field from history
+      where row_id = ${step.id} and action = 'unarchive'`;
+    expect(restore).toEqual({ undoes: null, undoes_field: null });
+  });
+});
