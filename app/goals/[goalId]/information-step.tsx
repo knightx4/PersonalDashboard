@@ -4,10 +4,12 @@ import { useActionState, useId, useState } from 'react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { Disclosure, Group } from '@/components/ui/disclosure';
 import { Field } from '@/components/ui/field';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
-import { liveFields, type CollectionField, type FieldValue } from '@/lib/goals/collections';
+import { ValueList, ValueRow } from '@/components/ui/value-row';
+import { idField, liveFields, type CollectionField } from '@/lib/goals/collections';
 import type { Collection, CollectionRecord } from '@/lib/goals/collections-store';
 import {
   SOURCE_LABELS,
@@ -30,14 +32,19 @@ import {
 } from './information-actions';
 import { FieldInput } from './field-input';
 import { FillFromDocument } from './fill-from-document';
+import { RecordValue } from './record-value';
 
 /**
- * The form or table on an information step (plan #954; docs/GOALS-SPEC.md,
- * "Information steps and collections"). A one-record collection is a form;
- * a list is a table with a row per item, which the table primitive stacks
- * into label and value pairs on a phone. Rows found for you are drafts,
- * marked with where they came from, until one tap confirms them. Pasted
- * text or a document fills the form in as a preview first (plan #955).
+ * The record or table on an information step (plan #954; docs/GOALS-SPEC.md,
+ * "Information steps and collections"). A one-record collection is a list of
+ * its values; a list is a table with a row per item, which the table
+ * primitive stacks into label and value pairs on a phone. Either way the
+ * values are text, and each one is changed where it is read (plan #1040).
+ * Only the fields the step asks for are out: a one-record step folds the
+ * rest, and a list shows them for one row at a time. Rows found for you are
+ * drafts, marked with where they came from, until one tap confirms them.
+ * Pasted text or a document fills the form in as a preview first (plan
+ * #955), and the full form is kept for adding a record.
  */
 
 const initial: InformationActionState = {};
@@ -86,6 +93,7 @@ function OneRecord({
   asked: CollectionField[];
 }) {
   const [filling, setFilling] = useState(false);
+  const [adding, setAdding] = useState(false);
   if (filling) {
     return (
       <FillFromDocument
@@ -95,6 +103,19 @@ function OneRecord({
       />
     );
   }
+  if (adding && !record) {
+    return (
+      <AddRecordForm
+        stepId={node.id}
+        collection={collection}
+        asked={asked}
+        onDone={() => setAdding(false)}
+        onCancel={() => setAdding(false)}
+      />
+    );
+  }
+  const askedKeys = new Set(asked.map((f) => f.key));
+  const rest = liveFields(collection.fields).filter((f) => !askedKeys.has(f.key));
   return (
     <div className="space-y-2">
       {record?.draft ? (
@@ -102,17 +123,65 @@ function OneRecord({
       ) : (
         record && <SourceNote record={record} />
       )}
-      {node.status === 'open' && (
-        <AddTrigger label="Fill in from text or a document" onClick={() => setFilling(true)} />
+      {record && (
+        <>
+          <RecordValues stepId={node.id} record={record} fields={asked} asked={asked} />
+          {rest.length > 0 && (
+            <Disclosure title="Other fields" meta={filledCount(rest, record)}>
+              <RecordValues stepId={node.id} record={record} fields={rest} asked={asked} />
+            </Disclosure>
+          )}
+        </>
       )}
-      <RecordForm
-        stepId={node.id}
-        collection={collection}
-        record={record}
-        asked={asked}
-        key={record ? `${record.id}-${record.updatedAt}` : 'new'}
-      />
+      {(!record || node.status === 'open') && (
+        <div className="flex flex-wrap items-center gap-3">
+          {!record && <AddTrigger label="Fill in by hand" onClick={() => setAdding(true)} />}
+          {node.status === 'open' && (
+            <AddTrigger label="Fill in from text or a document" onClick={() => setFilling(true)} />
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+/** How many of these fields a record has a value for, as a fold's meta. */
+function filledCount(fields: CollectionField[], record: CollectionRecord): string {
+  const filled = fields.filter((f) => displayValue(f, record.data[f.key]) !== '').length;
+  return `${filled} of ${fields.length} filled`;
+}
+
+/** A record's values as labelled text, each changed where it is read. */
+function RecordValues({
+  stepId,
+  record,
+  fields,
+  asked,
+}: {
+  stepId: string;
+  record: CollectionRecord;
+  fields: CollectionField[];
+  asked: CollectionField[];
+}) {
+  const missing = new Set(missingFields(asked, record.data).map((f) => f.key));
+  return (
+    <ValueList>
+      {fields.map((f) => (
+        <ValueRow
+          key={f.key}
+          label={f.label}
+          value={
+            <RecordValue
+              stepId={stepId}
+              recordId={record.id}
+              field={f}
+              value={record.data[f.key]}
+              needed={missing.has(f.key)}
+            />
+          }
+        />
+      ))}
+    </ValueList>
   );
 }
 
@@ -129,16 +198,24 @@ function RecordTable({
   asked: CollectionField[];
   canFinish: boolean;
 }) {
-  const [editing, setEditing] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [opened, setOpened] = useState<string | null>(null);
   const [filling, setFilling] = useState(false);
   const [finishState, finish, finishing] = useActionState(
     async (_prev: InformationActionState, form: FormData) => finishListAction(form),
     initial,
   );
   const toast = useToast();
-  const fields = liveFields(collection.fields);
   const askedKeys = new Set(asked.map((f) => f.key));
-  const editingRecord = records.find((r) => r.id === editing) ?? null;
+  const id = idField(collection.fields);
+  // The columns are what the step asks for, with the ID field that tells rows
+  // apart. The rest are shown for one row at a time.
+  const columns = liveFields(collection.fields).filter(
+    (f) => askedKeys.has(f.key) || f.key === id?.key,
+  );
+  const columnKeys = new Set(columns.map((f) => f.key));
+  const rest = liveFields(collection.fields).filter((f) => !columnKeys.has(f.key));
+  const openedRecord = records.find((r) => r.id === opened) ?? null;
 
   async function archive(record: CollectionRecord) {
     const form = new FormData();
@@ -148,7 +225,7 @@ function RecordTable({
       toast({ text: result.error });
       return;
     }
-    if (editing === record.id) setEditing(null);
+    if (opened === record.id) setOpened(null);
     toast({
       text: 'Row archived.',
       undo: async () => {
@@ -167,7 +244,7 @@ function RecordTable({
         <Table aria-label={collection.name}>
           <THead>
             <tr>
-              {fields.map((f) => (
+              {columns.map((f) => (
                 <TH key={f.key} num={isNumeric(f)}>
                   {f.label}
                 </TH>
@@ -181,11 +258,15 @@ function RecordTable({
             {records.map((record) => {
               const missing = new Set(missingFields(asked, record.data).map((f) => f.key));
               const menu: ActionMenuItem[] = [
-                {
-                  id: 'edit',
-                  label: record.draft ? 'Correct' : 'Edit',
-                  onSelect: () => setEditing(record.id),
-                },
+                ...(rest.length > 0
+                  ? [
+                      {
+                        id: 'fields',
+                        label: opened === record.id ? 'Hide other fields' : 'Show other fields',
+                        onSelect: () => setOpened(opened === record.id ? null : record.id),
+                      },
+                    ]
+                  : []),
                 {
                   id: 'archive',
                   label: 'Archive row',
@@ -195,12 +276,15 @@ function RecordTable({
               ];
               return (
                 <TR key={record.id}>
-                  {fields.map((f, i) => (
+                  {columns.map((f, i) => (
                     <TD key={f.key} label={f.label} primary={i === 0} num={isNumeric(f)}>
-                      <Value
+                      <RecordValue
+                        stepId={node.id}
+                        recordId={record.id}
                         field={f}
                         value={record.data[f.key]}
-                        needed={askedKeys.has(f.key) && missing.has(f.key)}
+                        needed={missing.has(f.key)}
+                        align={isNumeric(f) ? 'right' : 'left'}
                       />
                     </TD>
                   ))}
@@ -208,7 +292,7 @@ function RecordTable({
                     <div className="flex items-center justify-end gap-1">
                       {!record.draft && <SourceLink record={record} />}
                       {record.draft && <ConfirmButton stepId={node.id} record={record} compact />}
-                      <ActionMenu label={`Row ${rowName(fields, record)} actions`} items={menu} />
+                      <ActionMenu label={`Row ${rowName(columns, record)} actions`} items={menu} />
                     </div>
                   </TD>
                 </TR>
@@ -218,39 +302,39 @@ function RecordTable({
         </Table>
       )}
 
+      {openedRecord && rest.length > 0 && (
+        <Group
+          title={rowName(columns, openedRecord)}
+          action={
+            <Button type="button" size="sm" variant="ghost" onClick={() => setOpened(null)}>
+              Hide
+            </Button>
+          }
+          className="rounded-control bg-sunken p-3"
+        >
+          <RecordValues stepId={node.id} record={openedRecord} fields={rest} asked={asked} />
+        </Group>
+      )}
+
       {filling ? (
         <FillFromDocument
           stepId={node.id}
           collection={collection}
           onClose={() => setFilling(false)}
         />
-      ) : editingRecord ? (
-        <div className="space-y-2 rounded-control bg-sunken p-3">
-          {editingRecord.draft && <DraftNote stepId={node.id} record={editingRecord} />}
-          <RecordForm
-            stepId={node.id}
-            collection={collection}
-            record={editingRecord}
-            asked={asked}
-            onDone={() => setEditing(null)}
-            onCancel={() => setEditing(null)}
-            key={`${editingRecord.id}-${editingRecord.updatedAt}`}
-          />
-        </div>
-      ) : editing === 'new' ? (
+      ) : adding ? (
         <div className="rounded-control bg-sunken p-3">
-          <RecordForm
+          <AddRecordForm
             stepId={node.id}
             collection={collection}
-            record={null}
-            asked={asked}
-            onDone={() => setEditing(null)}
-            onCancel={() => setEditing(null)}
+                asked={asked}
+            onDone={() => setAdding(false)}
+            onCancel={() => setAdding(false)}
           />
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-3">
-          <AddTrigger label="Add a row" onClick={() => setEditing('new')} />
+          <AddTrigger label="Add a row" onClick={() => setAdding(true)} />
           <AddTrigger label="Fill in from text or a document" onClick={() => setFilling(true)} />
           {canFinish && (
             <form action={finish}>
@@ -275,20 +359,6 @@ function rowName(fields: CollectionField[], record: CollectionRecord): string {
   const first = fields[0];
   const value = first ? displayValue(first, record.data[first.key]) : '';
   return value || 'without a name';
-}
-
-function Value({
-  field,
-  value,
-  needed,
-}: {
-  field: CollectionField;
-  value: FieldValue | undefined;
-  needed: boolean;
-}) {
-  const shown = displayValue(field, value);
-  if (shown) return <span className="break-words">{shown}</span>;
-  return <span className="text-ink-muted">{needed ? 'Needed' : ''}</span>;
 }
 
 /** What a draft is and where it came from, with the one tap that confirms it. */
@@ -381,21 +451,23 @@ function ConfirmButton({
   );
 }
 
-/** The fields of one record, drawn from the definition. */
-function RecordForm({
+/**
+ * Every field of a new record, drawn from the definition: the one place the
+ * whole form stays, since the values of a record arrive together when it is
+ * added (law 12). Escape or Cancel closes it.
+ */
+function AddRecordForm({
   stepId,
   collection,
-  record,
   asked,
   onDone,
   onCancel,
 }: {
   stepId: string;
   collection: Collection;
-  record: CollectionRecord | null;
   asked: CollectionField[];
-  onDone?: () => void;
-  onCancel?: () => void;
+  onDone: () => void;
+  onCancel: () => void;
 }) {
   const toast = useToast();
   const [state, save, saving] = useActionState(
@@ -403,7 +475,7 @@ function RecordForm({
       const result = await saveRecordAction(prev, form);
       if (!result.error) {
         if (result.closed) toast({ text: 'Saved. The step has what it asked for and is closed.' });
-        onDone?.();
+        onDone();
       }
       return result;
     },
@@ -414,9 +486,14 @@ function RecordForm({
   const formId = useId();
 
   return (
-    <form action={save} className="space-y-3">
+    <form
+      action={save}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') onCancel();
+      }}
+      className="space-y-3"
+    >
       <input type="hidden" name="stepId" value={stepId} />
-      {record && <input type="hidden" name="recordId" value={record.id} />}
       <div className="grid gap-3 sm:grid-cols-2">
         {fields.map((field) => (
           <Field
@@ -430,23 +507,17 @@ function RecordForm({
             error={state.field === field.key ? state.error : undefined}
             className={field.type === 'long_text' ? 'sm:col-span-2' : undefined}
           >
-            <FieldInput
-              id={`${formId}-${field.key}`}
-              field={field}
-              value={record?.data[field.key]}
-            />
+            <FieldInput id={`${formId}-${field.key}`} field={field} value={undefined} />
           </Field>
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" size="sm" pending={saving}>
-          {record?.draft ? 'Save and confirm' : record ? 'Save' : 'Add'}
+          Add
         </Button>
-        {onCancel && (
-          <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
-        )}
+        <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
         {state.error && !state.field && (
           <span className="text-small text-danger">{state.error}</span>
         )}
