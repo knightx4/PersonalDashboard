@@ -150,8 +150,16 @@ it may keep it outright. A dismissal is final for Claude: the database
 refuses a change to a dismissed row and a second row for the same thing
 (`migrations-goals/0032`).
 
-Reading the vault this way is another model pass over vault content, which
-[VAULT-SPEC.md](VAULT-SPEC.md) says the privacy policy has not caught up with.
+**Search wide, read narrow.** Finding notes costs a query; reading them
+costs the run's time and allowance. The vault is about 1,300 notes, far more
+than one run can read, so a run searches by theme and full text for names
+and highlighted lines, reads in full only the handful that bear on the goal,
+and on later runs starts from the kept context and looks only at what
+changed since. The weekly run does the same for everything written that
+week.
+
+Claude reading vault content is settled: the app has one user, who has said
+the vault is open to it.
 
 ## Todo
 
