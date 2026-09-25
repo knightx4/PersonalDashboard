@@ -2,6 +2,7 @@ import { trackToAsk, type TrackShare, type TrackWeight } from '@/lib/learn/flow/
 import { curriculumRows, type UnitGoal } from '@/lib/learn/graph/curriculum-view';
 import { pruneForGoal, type Concept, type Graph } from '@/lib/learn/graph/model';
 import { rankReady, readyInSubject } from '@/lib/learn/graph/ready';
+import { unitCheckDue, type UnitCheckDue } from './unit-check';
 
 /**
  * Which concept in which track each Learn now lesson slot teaches
@@ -60,6 +61,8 @@ export type ChooseLessonsInput = {
    * already well represented.
    */
   dealt?: ReadonlyMap<string, number>;
+  /** Units that already have a check card, answered, skipped or waiting. */
+  checked?: ReadonlySet<string>;
   slots: number;
 };
 
@@ -117,6 +120,11 @@ export type LessonChoice = {
    * those is known.
    */
   waiting: string[];
+  /**
+   * Tracks whose latest done unit has not been offered its check (plan #971),
+   * one each. Dormant tracks are left out, as they are for lessons.
+   */
+  checks: UnitCheckDue[];
 };
 
 /**
@@ -202,6 +210,7 @@ export function chooseLessons(input: ChooseLessonsInput): LessonChoice {
   const dormant: string[] = [];
   const needs: TrackNeed[] = [];
   const waiting: string[] = [];
+  const checks: UnitCheckDue[] = [];
   const queues = new Map<string, LessonPick[]>();
 
   for (const track of input.tracks) {
@@ -209,6 +218,8 @@ export function chooseLessons(input: ChooseLessonsInput): LessonChoice {
       dormant.push(track.subjectId);
       continue;
     }
+    const check = unitCheckDue(track, input.checked ?? new Set());
+    if (check) checks.push(check);
     const plan = planTrack(track, input.carded, input.tooHard);
     if (plan.need) needs.push(plan.need);
     if (plan.kind === 'waiting') waiting.push(track.subjectId);
@@ -230,5 +241,5 @@ export function chooseLessons(input: ChooseLessonsInput): LessonChoice {
     shares.find((share) => share.subjectId === subjectId)!.asked += 1;
   }
 
-  return { picks, needs, dormant, waiting };
+  return { picks, needs, dormant, waiting, checks };
 }

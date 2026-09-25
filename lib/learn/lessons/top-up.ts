@@ -2,6 +2,7 @@ import type { AddedFloor, FloorDue } from './add-floor';
 import type { AddedUnit } from './add-unit';
 import type { LaidOutUnit } from './lay-out-unit';
 import type { LessonPick, TrackNeed } from './choose';
+import type { UnitCheckDue } from './unit-check';
 
 /**
  * Filling Learn now with lessons (LEARN-LESSONS-SPEC, build step 1; plan #978).
@@ -33,6 +34,9 @@ export const MAX_UNITS_ADDED_PER_RUN = 2;
  */
 export const MAX_FLOORS_PER_RUN = 2;
 
+/** Unit checks written in one run, at most. Each is one short Haiku call. */
+export const MAX_CHECKS_PER_RUN = 2;
+
 /**
  * Laying out is not started with less than this left before the deadline:
  * the chain call takes about a minute, and the lessons after it need time too.
@@ -58,7 +62,10 @@ export type LessonOutcome = 'ready' | 'dropped' | 'failed';
 
 export type LessonTopUpPorts = {
   /** The chooser, with held tracks' needs already left out. */
-  choose(userId: string, slots: number): Promise<{ picks: LessonPick[]; needs: TrackNeed[] }>;
+  choose(
+    userId: string,
+    slots: number,
+  ): Promise<{ picks: LessonPick[]; needs: TrackNeed[]; checks?: UnitCheckDue[] }>;
   layOut(userId: string, subjectId: string): Promise<LaidOutUnit>;
   /** Write the unit after `lastUnitId`, the track's last when the need was read. */
   addUnit(userId: string, subjectId: string, lastUnitId: string | null): Promise<AddedUnit>;
@@ -68,6 +75,8 @@ export type LessonTopUpPorts = {
   floorsDue(userId: string, limit: number): Promise<FloorDue[]>;
   /** Add what a lesson rated too hard rests on, under its concept. */
   addFloor(userId: string, due: FloorDue): Promise<AddedFloor>;
+  /** Write the check for a done unit and store its row (plan #971). */
+  writeCheck(userId: string, due: UnitCheckDue): Promise<{ outcome: LessonOutcome; detail?: string }>;
   /** Write one lesson and store its row. */
   write(userId: string, pick: LessonPick): Promise<{ outcome: LessonOutcome; detail?: string }>;
   now(): number;
@@ -81,6 +90,8 @@ export type LessonTopUpSummary = {
   failed: string[];
   /** Concepts rated too hard that had a prerequisite added under them. */
   floors: string[];
+  /** Tracks whose done unit had its check written. */
+  checks: string[];
   /** Tracks a unit was written for, after their last. */
   added: string[];
   /** Tracks a unit was laid out for. */
@@ -105,6 +116,10 @@ export type LessonTopUpSummary = {
  * anything, so new concepts can take slots in the same run.
  *
  * A track whose unit could not be written or laid out is held for a day.
+ *
+ * A track whose latest done unit has not had its check gets one written
+ * first (plan #971): one question for the unit, which the deck shows as the
+ * next card from that track. It takes no lesson slot.
  */
 export async function writeLessonsFor(
   ports: LessonTopUpPorts,
@@ -118,6 +133,7 @@ export async function writeLessonsFor(
     dropped: [],
     failed: [],
     floors: [],
+    checks: [],
     added: [],
     laidOut: [],
     held: [],
@@ -145,6 +161,24 @@ export async function writeLessonsFor(
   }
 
   let choice = await ports.choose(userId, wanted);
+
+  // A done unit's check is the next card from its track, so it is written
+  // before anything else the track gets this run.
+  const toCheck = (choice.checks ?? []).slice(0, MAX_CHECKS_PER_RUN);
+  const checked = await Promise.all(
+    toCheck.map((due) =>
+      ports.writeCheck(userId, due).catch((error: unknown) => ({
+        outcome: 'failed' as const,
+        detail: error instanceof Error ? error.message : 'failed',
+      })),
+    ),
+  );
+  for (const [index, result] of checked.entries()) {
+    const due = toCheck[index]!;
+    if (result.outcome === 'ready') summary.checks.push(due.subjectName);
+    else if (result.outcome === 'dropped') summary.dropped.push(`${due.subjectName} check: ${result.detail ?? 'dropped'}`);
+    else summary.failed.push(`${due.subjectName} check: ${result.detail ?? 'failed'}`);
+  }
 
   const toAdd = choice.needs.filter((need) => need.because !== 'no-chain').slice(0, MAX_UNITS_ADDED_PER_RUN);
   if (toAdd.length > 0 && deadline - ports.now() >= LAYOUT_RESERVE_MS) {
