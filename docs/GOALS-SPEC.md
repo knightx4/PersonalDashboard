@@ -186,6 +186,11 @@ single line ("3 weeks missed"), and the page leads with what matters now. The
 point is that opening the app after a busy fortnight should not feel like a
 debt.
 
+After five or more days since the last visit, the home opens with a catch-up
+for the rest of that day: the runs Claude finished while you were away, what
+is waiting on you, and one next step per goal, with everything else folded
+under it. The last visit is kept in `goals.visits`.
+
 ## Your examples, broken down
 
 These are the first goals to enter once it exists, and a check on whether the

@@ -11,11 +11,14 @@ import {
 } from 'lucide-react';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { Card } from '@/components/ui/card';
+import { SectionFold } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
+import type { CatchUp } from '@/lib/goals/catch-up';
 import type { DailyGoal, DailyView as Daily, NextItem, WaitingItem } from '@/lib/goals/daily';
-import { formatDay } from '@/lib/goals/dates';
+import { formatDay, formatInstant } from '@/lib/goals/dates';
 import { VERDICT_LABELS, type GoalReview, type Verdict } from '@/lib/goals/reviews';
 import { missedLine, progressLine, type HomeRhythm } from '@/lib/goals/rhythms';
+import { JOB_LABELS, type RunListing } from '@/lib/goals/runs';
 import { STEP_KIND_LABELS } from '@/lib/goals/steps';
 import type { Suggestion } from '@/lib/goals/suggestions';
 import { GoalProgress } from './goal-progress';
@@ -41,9 +44,14 @@ import { SuggestionsList } from './suggestions-list';
  * The weekly run's suggestions (plan #934) come after the waiting list, with
  * their own going and not for me buttons: the one part of the home that
  * writes, because a reaction is quicker here than a trip into the tree.
+ *
+ * On the day you come back from five or more days away (plan #1019) the page
+ * leads with a catch-up instead: the runs Claude finished while you were
+ * gone, what is waiting on you, and one next step per goal. Everything else
+ * is folded under it, closed.
  */
 
-type View = Daily & { rhythms: HomeRhythm[]; suggestions: Suggestion[] };
+type View = Daily & { rhythms: HomeRhythm[]; suggestions: Suggestion[]; catchUp?: CatchUp | null };
 
 const KIND_ICONS: Record<NextItem['kind'], typeof User> = { mine: User, claude: Sparkles };
 
@@ -109,24 +117,26 @@ export function DailyView({
     );
   }
 
-  return (
-    <div className="space-y-6">
-      {view.waiting.length > 0 && (
-        <section aria-labelledby="waiting-heading" className="space-y-2">
-          <h2 id="waiting-heading" className="px-1 text-ui font-semibold text-ink">
-            Waiting on you
-          </h2>
-          <Card>
-            <ul className="divide-y divide-border">
-              {view.waiting.map((item) => (
-                <WaitingRow key={`${item.kind}-${item.id}`} item={item} />
-              ))}
-            </ul>
-          </Card>
-        </section>
-      )}
+  const waiting = view.waiting.length > 0 && (
+    <section aria-labelledby="waiting-heading" className="space-y-2">
+      <h2 id="waiting-heading" className="px-1 text-ui font-semibold text-ink">
+        Waiting on you
+      </h2>
+      <Card>
+        <ul className="divide-y divide-border">
+          {view.waiting.map((item) => (
+            <WaitingRow key={`${item.kind}-${item.id}`} item={item} />
+          ))}
+        </ul>
+      </Card>
+    </section>
+  );
 
-      {view.suggestions.length > 0 && <SuggestionsList suggestions={view.suggestions} timeZone={timeZone} />}
+  const rest = (
+    <>
+      {view.suggestions.length > 0 && (
+        <SuggestionsList suggestions={view.suggestions} timeZone={timeZone} />
+      )}
 
       {view.rhythms.length > 0 && (
         <section aria-labelledby="risk-heading" className="space-y-2">
@@ -168,7 +178,142 @@ export function DailyView({
       {view.goals.map((daily) => (
         <GoalCard key={daily.goal.id} daily={daily} />
       ))}
+    </>
+  );
+
+  if (view.catchUp) {
+    const folded = [
+      view.goals.length > 0 ? plural(view.goals.length, 'goal') : null,
+      view.suggestions.length > 0 ? plural(view.suggestions.length, 'suggestion') : null,
+      view.rhythms.length > 0 ? plural(view.rhythms.length, 'rhythm') : null,
+    ].filter(Boolean);
+    return (
+      <div className="space-y-6">
+        <CatchUpView catchUp={view.catchUp} timeZone={timeZone} waiting={waiting} />
+        {folded.length > 0 && (
+          <SectionFold title="Everything else" hint={folded.join(', ')} defaultOpen={false}>
+            <div className="space-y-6">{rest}</div>
+          </SectionFold>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {waiting}
+      {rest}
     </div>
+  );
+}
+
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+/**
+ * The catch-up after time away (plan #1019): what Claude finished, what is
+ * waiting on you (the same list the ordinary home leads with), and the first
+ * next step of each goal.
+ */
+function CatchUpView({
+  catchUp,
+  timeZone,
+  waiting,
+}: {
+  catchUp: CatchUp;
+  timeZone: string;
+  waiting: React.ReactNode;
+}) {
+  return (
+    <>
+      <section aria-labelledby="away-heading" className="space-y-2">
+        <div className="px-1">
+          <h2 id="away-heading" className="text-ui font-semibold text-ink">
+            While you were away
+          </h2>
+          <p className="text-small text-ink-muted">
+            Since {formatInstant(catchUp.since, timeZone)}
+          </p>
+        </div>
+        {catchUp.runs.length > 0 ? (
+          <Card>
+            <ul className="divide-y divide-border">
+              {catchUp.runs.map((run) => (
+                <RunRow key={run.id} run={run} timeZone={timeZone} />
+              ))}
+            </ul>
+            {catchUp.moreRuns > 0 && (
+              <Link
+                href="/goals/runs"
+                className="card-pad-x row-pad flex items-center gap-1.5 border-t border-border text-small text-ink-muted transition-colors duration-150 hover:text-ink"
+              >
+                {catchUp.moreRuns} more on the Runs page
+              </Link>
+            )}
+          </Card>
+        ) : (
+          <p className="px-1 text-small text-ink-muted">
+            Claude finished no runs while you were away.
+          </p>
+        )}
+      </section>
+
+      {waiting}
+
+      {catchUp.next.length > 0 && (
+        <section aria-labelledby="next-heading" className="space-y-2">
+          <h2 id="next-heading" className="px-1 text-ui font-semibold text-ink">
+            Next for each goal
+          </h2>
+          <Card>
+            <ul className="divide-y divide-border">
+              {catchUp.next.map(({ goalId, goalTitle, item }) => (
+                <NextRow
+                  key={item.id}
+                  item={{ ...item, under: item.under ?? goalTitle }}
+                  href={`/goals/${goalId}`}
+                />
+              ))}
+            </ul>
+          </Card>
+        </section>
+      )}
+    </>
+  );
+}
+
+function RunRow({ run, timeZone }: { run: RunListing; timeZone: string }) {
+  const meta = [
+    run.item?.title ?? null,
+    run.endedAt ? formatInstant(run.endedAt, timeZone, { weekday: false }) : null,
+  ].filter((line): line is string => line !== null);
+  return (
+    <li>
+      <Link
+        href={`/goals/runs/${run.id}`}
+        className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
+      >
+        <Sparkles
+          className="mt-0.5 size-4 shrink-0 text-ink-muted"
+          strokeWidth={1.75}
+          aria-hidden
+        />
+        <span className="min-w-0 flex-1">
+          <span className="line-clamp-2 block text-ui break-words text-ink">
+            {run.summary ?? JOB_LABELS[run.job]}
+          </span>
+          <span className="block text-small break-words text-ink-muted">
+            {[JOB_LABELS[run.job], ...meta].join(' · ')}
+          </span>
+        </span>
+        <ChevronRight
+          className="mt-0.5 size-4 shrink-0 text-ink-muted"
+          strokeWidth={1.75}
+          aria-hidden
+        />
+      </Link>
+    </li>
   );
 }
 
