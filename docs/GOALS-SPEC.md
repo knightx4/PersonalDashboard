@@ -272,7 +272,14 @@ migration.
   must be a percent and a balance must be money; a value that fails is
   refused with the field named.
 - **Tracked fields** also write a dated reading to `goals.readings` whenever
-  they change, so a balance becomes a series and a chart.
+  they change, so a balance becomes a series and a chart. A record read from
+  a document carries the date the document gives its figures as of
+  (`records.as_of`), and its readings take that date rather than the day of
+  the upload. Typed values carry none and are read on the day they are saved.
+- **An ID field.** One text or number field of a list can be marked
+  `"id": true`, such as a loan's ID. Reading a newer statement then updates
+  the row with the same ID instead of adding a copy, and the preview shows
+  the saved value beside each one it would change.
 - **Changing a definition** raises its version. Existing records keep their
   values; a new field shows empty; a removed field is hidden but its values
   stay in the record.

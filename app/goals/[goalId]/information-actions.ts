@@ -15,7 +15,7 @@ import {
 } from '@/lib/goals/collections-store';
 import { checkRecord } from '@/lib/goals/collections';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
-import { ownsDocumentPath, previewRowPrefix } from '@/lib/goals/extract';
+import { matchRows, ownsDocumentPath, parseDate, previewRowPrefix } from '@/lib/goals/extract';
 import {
   askedFields,
   closesOnSave,
@@ -116,7 +116,11 @@ export async function saveRecordAction(
  * Save the rows read from pasted text or a document (plan #955), once you
  * have checked them. Every row is checked before any is written, so a
  * refusal leaves nothing half-saved. For a one-record collection the row
- * becomes the record, replacing the values of one already there.
+ * becomes the record, replacing the values of one already there. In a list
+ * whose collection has an ID field, a row with the ID of a saved record
+ * updates that record instead of adding a copy (plan #985). Every record
+ * written is dated by the document's as-of date, which dates the readings of
+ * its tracked fields.
  */
 // latency: pending
 export async function savePreviewAction(
@@ -131,6 +135,11 @@ export async function savePreviewAction(
   const ref = typeof rawRef === 'string' && rawRef ? rawRef : null;
   if (source === 'document' && (!ref || !ownsDocumentPath(user.id, ref))) {
     return { error: 'Could not tell which file those came from.' };
+  }
+  const rawAsOf = form.get('asOf');
+  const asOf = typeof rawAsOf === 'string' && rawAsOf ? parseDate(rawAsOf) : null;
+  if (typeof rawAsOf === 'string' && rawAsOf && !asOf) {
+    return { error: 'The date the figures are as of must be a real date.', field: 'asOf' };
   }
   const rows = String(form.get('rows') ?? '')
     .split(',')
@@ -152,33 +161,32 @@ export async function savePreviewAction(
     const values = rows.map((row) =>
       formValues(collection.fields, (name) => form.get(`${previewRowPrefix(row)}${name}`)),
     );
-    const current = collection.shape === 'one' ? (existing[0] ?? null) : null;
+    // The record each row updates: a one-record form's record, or in a list
+    // the saved record with the same ID. Null adds a record.
+    const targets =
+      collection.shape === 'one'
+        ? values.map(() => existing[0]?.id ?? null)
+        : matchRows(collection.fields, values, existing);
+    const byId = new Map(existing.map((r) => [r.id, r]));
     for (const [i, row] of values.entries()) {
-      const checked = checkRecord(collection.fields, row, current?.data ?? null);
+      const target = targets[i] ? byId.get(targets[i]) : undefined;
+      const checked = checkRecord(collection.fields, row, target?.data ?? null);
       if (!checked.ok) return { error: checked.error, field: checked.field, row: rows[i] };
     }
 
-    const from = { kind: source, ref } as const;
-    if (current) {
-      const result = await updateRecord(client, current.id, values[0], from, { confirm: true });
-      if (!result.ok) return { error: result.error, field: result.field, row: rows[0] };
-    } else {
-      for (const [i, row] of values.entries()) {
-        const result = await addRecord(
-          client,
-          user.id,
-          step.collectionId,
-          row,
-          from,
-          existing.length + i,
-        );
-        if (!result.ok) {
-          return {
-            error: i === 0 ? result.error : `${result.error} The rows above it were saved.`,
-            field: result.field,
-            row: rows[i],
-          };
-        }
+    const from = { kind: source, ref, asOf } as const;
+    let added = 0;
+    for (const [i, row] of values.entries()) {
+      const target = targets[i];
+      const result = target
+        ? await updateRecord(client, target, row, from, { confirm: true })
+        : await addRecord(client, user.id, step.collectionId, row, from, existing.length + added++);
+      if (!result.ok) {
+        return {
+          error: i === 0 ? result.error : `${result.error} The rows above it were saved.`,
+          field: result.field,
+          row: rows[i],
+        };
       }
     }
     return saved(await settle(client, stepId.data));

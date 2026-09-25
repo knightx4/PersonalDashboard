@@ -11,11 +11,13 @@
  */
 
 import {
+  idField,
   liveFields,
   parseFieldValue,
   type CollectionField,
   type CollectionShape,
   type FieldValue,
+  type RecordValues,
 } from '@/lib/goals/collections';
 import { inputValue } from '@/lib/goals/information';
 
@@ -152,12 +154,17 @@ export function extractionTool(fields: CollectionField[]): {
     input_schema: {
       type: 'object',
       properties: {
+        as_of: {
+          type: ['string', 'null'],
+          description:
+            'The date the figures are current as of, as YYYY-MM-DD: the statement date, or the date the export or page was produced. Null when it gives none.',
+        },
         records: {
           type: 'array',
           items: { type: 'object', properties, required: Object.keys(properties) },
         },
       },
-      required: ['records'],
+      required: ['as_of', 'records'],
     },
   };
 }
@@ -178,7 +185,8 @@ Rules:
 - Dates are YYYY-MM-DD. A day of the month is the day alone, 1 to 31.
 - A choice field takes one of its listed options exactly, or null.
 - When the document shows the same item more than once, such as a summary and a detail page for one loan, return it once.
-- If nothing in it fits the form, return an empty list.`;
+- If nothing in it fits the form, return an empty list.
+- as_of is the date the document says its figures are current as of: a statement date, or the date an export or report was requested or produced. Not today's date, and not a due date. Null when it states none.`;
 }
 
 /** What the form starts from: each row's values as their inputs show them. */
@@ -223,6 +231,61 @@ function previewValue(field: CollectionField, raw: unknown): string {
   const parsed = parseFieldValue(field, raw);
   if (parsed.ok) return inputValue(field, parsed.value as FieldValue);
   return String(raw).trim();
+}
+
+/**
+ * The date the model read the figures as of, or null when it gave none or
+ * gave something that is not a real YYYY-MM-DD date.
+ */
+export function readAsOf(input: unknown): string | null {
+  const raw =
+    input && typeof input === 'object' ? (input as { as_of?: unknown }).as_of : undefined;
+  return typeof raw === 'string' ? parseDate(raw.trim()) : null;
+}
+
+/** A YYYY-MM-DD string that names a real day, or null. */
+export function parseDate(raw: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+  const day = new Date(`${raw}T00:00:00Z`);
+  if (Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== raw) return null;
+  return raw < '1900-01-01' ? null : raw;
+}
+
+/**
+ * The value a row is matched on: the ID field's value in one form, so
+ * " ab-12 " typed and "AB-12" stored are the same loan. Null when the value
+ * is empty or not valid for the field.
+ */
+export function idKey(field: CollectionField, raw: unknown): string | null {
+  if (raw === null || raw === undefined || raw === '') return null;
+  const parsed = parseFieldValue(field, raw);
+  if (!parsed.ok || parsed.value === null) return null;
+  return String(parsed.value).trim().replace(/\s+/g, ' ').toLowerCase() || null;
+}
+
+/**
+ * Which live record each read row updates (plan #985): the one whose ID
+ * field holds the same value, or null for a row that adds a record. A
+ * collection with no ID field matches nothing. Rows are values as the form
+ * shows them or as stored; records are in position order, and the first
+ * with a value wins.
+ */
+export function matchRows(
+  fields: CollectionField[],
+  rows: Record<string, unknown>[],
+  records: { id: string; data: RecordValues }[],
+): (string | null)[] {
+  const field = idField(fields);
+  if (!field) return rows.map(() => null);
+  const byKey = new Map<string, string>();
+  for (const record of records) {
+    const key = idKey(field, record.data[field.key]);
+    if (key !== null && !byKey.has(key)) byKey.set(key, record.id);
+  }
+  return rows.map((row) => {
+    const key = idKey(field, row[field.key]);
+    return key === null ? null : (byKey.get(key) ?? null);
+  });
 }
 
 /**

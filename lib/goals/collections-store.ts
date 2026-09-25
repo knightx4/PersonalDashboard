@@ -41,8 +41,16 @@ export type CollectionRecord = {
   sourceRef: string | null;
   /** Found for you and not yet confirmed (plan #954). */
   draft: boolean;
+  /** The date the values were current, as the document they were read from gives it (plan #985). */
+  asOf: string | null;
   updatedAt: string;
 };
+
+/**
+ * Where a write's values came from. `asOf` is the date the document gives
+ * its figures as of; the readings a tracked field writes are dated by it.
+ */
+export type RecordFrom = { kind: RecordSource; ref?: string | null; asOf?: string | null };
 
 /** A refused write: the field is the key of the value at fault, or null for the record as a whole. */
 export type WriteResult<T> = { ok: true; value: T } | { ok: false; field: string | null; error: string };
@@ -65,11 +73,12 @@ type RecordRow = {
   source: RecordSource;
   source_ref: string | null;
   draft: boolean;
+  as_of: string | null;
   updated_at: string;
 };
 
 const COLLECTION_COLUMNS = 'id, name, shape, fields, version, collection_goals(goal_id, archived_at)';
-const RECORD_COLUMNS = 'id, collection_id, data, version, position, source, source_ref, draft, updated_at';
+const RECORD_COLUMNS = 'id, collection_id, data, version, position, source, source_ref, draft, as_of, updated_at';
 
 const toCollection = (row: CollectionRow): Collection => ({
   id: row.id,
@@ -89,6 +98,7 @@ const toRecord = (row: RecordRow): CollectionRecord => ({
   source: row.source,
   sourceRef: row.source_ref,
   draft: row.draft,
+  asOf: row.as_of,
   updatedAt: row.updated_at,
 });
 
@@ -260,7 +270,7 @@ export async function addRecord(
   userId: string,
   collectionId: string,
   values: Record<string, unknown>,
-  source: { kind: RecordSource; ref?: string | null; draft?: boolean } = { kind: 'typed' },
+  source: RecordFrom & { draft?: boolean } = { kind: 'typed' },
   position = 0,
 ): Promise<WriteResult<string>> {
   const collection = await loadCollection(client, collectionId);
@@ -277,6 +287,7 @@ export async function addRecord(
       source: source.kind,
       source_ref: source.ref ?? null,
       draft: source.draft ?? false,
+      as_of: source.asOf ?? null,
       position,
     })
     .select('id')
@@ -293,12 +304,16 @@ export async function addRecord(
  * Change some of a record's values. Values the write does not mention are
  * kept, so a removed field's old value stays in the record. `confirm` also
  * takes a draft out of draft, as saving your correction of one does.
+ *
+ * A write that changes a value re-dates the record: to the source's `asOf`
+ * when it gives one, and otherwise to none, since values typed in are current
+ * on the day they are saved. A write that changes nothing keeps the date.
  */
 export async function updateRecord(
   client: GoalsSupabaseClient,
   recordId: string,
   values: Record<string, unknown>,
-  source?: { kind: RecordSource; ref?: string | null },
+  source?: RecordFrom,
   { confirm = false }: { confirm?: boolean } = {},
 ): Promise<WriteResult<CollectionRecord>> {
   const { data: row, error: readError } = await client
@@ -317,6 +332,10 @@ export async function updateRecord(
   if (!checked.ok) return checked;
 
   const patch: Record<string, unknown> = { data: checked.data };
+  const asOf = source?.asOf ?? null;
+  if (asOf !== record.asOf && (asOf !== null || !sameValues(record.data, checked.data))) {
+    patch.as_of = asOf;
+  }
   if (source) {
     patch.source = source.kind;
     patch.source_ref = source.ref ?? null;
@@ -334,6 +353,12 @@ export async function updateRecord(
     throw new Error(error.message);
   }
   return { ok: true, value: toRecord(data as RecordRow) };
+}
+
+function sameValues(a: RecordValues, b: RecordValues): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const key of keys) if ((a[key] ?? null) !== (b[key] ?? null)) return false;
+  return true;
 }
 
 /** Archive a record. It leaves the form and stays in the history. False when it was already gone. */

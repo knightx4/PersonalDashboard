@@ -6,8 +6,14 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { serverEnv } from '@/lib/env';
 import { createGoalsClient } from '@/lib/goals/auth/server';
-import { loadCollection } from '@/lib/goals/collections-store';
-import { DOCUMENT_BUCKET, ownsDocumentPath, type PreviewRow } from '@/lib/goals/extract';
+import type { RecordValues } from '@/lib/goals/collections';
+import { loadCollection, loadRecords } from '@/lib/goals/collections-store';
+import {
+  DOCUMENT_BUCKET,
+  matchRows,
+  ownsDocumentPath,
+  type PreviewRow,
+} from '@/lib/goals/extract';
 import { askExtractModel } from '@/lib/goals/extract-model';
 import { readIntoForm, type ReadInput } from '@/lib/goals/extract-read';
 import { loadInformationStep } from '@/lib/goals/steps-store';
@@ -30,6 +36,14 @@ export type ReadFormState = {
   source?: 'pasted' | 'document';
   /** The stored file's path, for a document. */
   ref?: string | null;
+  /** The date the document gives its figures as of (plan #985). */
+  asOf?: string | null;
+  /**
+   * For each row, the values of the saved record it will update: the one
+   * with the same ID, or a one-record form's record. Null for a row that
+   * adds a record.
+   */
+  before?: (RecordValues | null)[];
 };
 
 const Input = z.union([
@@ -82,7 +96,21 @@ export async function readIntoFormAction(
     );
     await recordSessionSpend(user.id, { module: 'goals', operation: 'read-into-form' }, spend);
     if (!result.ok) return { error: result.error };
-    return { rows: result.rows, source: ref ? 'document' : 'pasted', ref };
+    const records = await loadRecords(client, step.collectionId);
+    const byId = new Map(records.map((r) => [r.id, r.data]));
+    const before =
+      collection.shape === 'one'
+        ? result.rows.map(() => records[0]?.data ?? null)
+        : matchRows(collection.fields, result.rows, records).map((id) =>
+            id ? (byId.get(id) ?? null) : null,
+          );
+    return {
+      rows: result.rows,
+      source: ref ? 'document' : 'pasted',
+      ref,
+      asOf: result.asOf,
+      before,
+    };
   } catch {
     await recordSessionSpend(user.id, { module: 'goals', operation: 'read-into-form' }, spend);
     return { error: 'That could not be read. Try again.' };
