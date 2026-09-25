@@ -69,6 +69,7 @@ import { SavedView, type SavedViewProps } from '@/app/news/saved/saved-view';
 import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
 import { PlanOpenedSurface, PlanTreeSurface } from './plan-surfaces';
+import { GoalOpenedSurface, GoalTreeSurface } from './goal-surfaces';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -2220,6 +2221,24 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PlanOpenedSurface />,
+  },
+  {
+    /* A goal's steps, drawn with the plan's shared row (plan #982), beside
+     * the plan's own shots so the two can be compared. */
+    id: 'goals-steps-tree',
+    label: 'Goal · the steps',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalTreeSurface />,
+  },
+  {
+    /* The same goal with every step opened: detail, Needs, questions, what
+     * it waits on, the goal's own slots and the thread. */
+    id: 'goals-steps-opened',
+    label: 'Goal · steps opened',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalOpenedSurface />,
   },
   {
     /* The design language, held to itself. It is the one surface where being

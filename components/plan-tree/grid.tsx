@@ -22,7 +22,11 @@ export const ROW_GRID =
 /** The width of one level of the tree, in the name cell. */
 export const LEVEL = 'w-5';
 
-export function ColumnHeader() {
+/**
+ * The labels over the columns. `priority` names the fourth column, which a
+ * page other than the plan may fill with something of its own.
+ */
+export function ColumnHeader({ priority = 'Priority' }: { priority?: string } = {}) {
   return (
     <li
       aria-hidden
@@ -34,7 +38,7 @@ export function ColumnHeader() {
       <span>Step</span>
       <span>Health</span>
       <span className="hidden sm:block">Status</span>
-      <span className="hidden sm:block">Priority</span>
+      <span className="hidden sm:block">{priority}</span>
       <span className="hidden sm:block">Steps</span>
       <span />
     </li>
