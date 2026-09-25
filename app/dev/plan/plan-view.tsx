@@ -60,8 +60,7 @@ import {
   Textarea,
 } from '@/components/ui/field';
 import { FogNote } from '@/components/dev/fog-note';
-import { StateLabel, TONE_TEXT, type DevTone } from '@/components/dev/state-label';
-import { DEV_STATE_WORD, PLAN_MOVE_WORD } from '@/lib/dev/words';
+import { StateLabel, TONE_TEXT } from '@/components/dev/state-label';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import {
   PLAN_ASSIGNEES,
@@ -91,7 +90,6 @@ import {
   searchTerms,
   type MoveContext,
   type PlanBand,
-  type PlanHealth,
   type PlanLiveness,
   type PlanMove,
   type PlanNode,
@@ -101,7 +99,15 @@ import {
   type PlanTally,
   type PlanView as View,
 } from '@/lib/plan/tree';
-import { PLAN_HEALTH_GLYPHS, type StatusGlyph as GlyphName } from '@/lib/status-glyphs';
+import { PLAN_HEALTH_GLYPHS } from '@/lib/status-glyphs';
+import {
+  HEALTH,
+  TONE_DOT,
+  healthOf as healthWordsOf,
+  moveFor as moveWordsFor,
+  type HealthFacts,
+  type HealthWord,
+} from '@/lib/plan/health-words';
 import { reshapeOrigin } from '@/lib/plan/origin';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { quietSendAsk } from '@/lib/plan/liveness';
@@ -1383,197 +1389,24 @@ function SendToClaude({
 }
 
 
-/**
- * What the health column says about a step.
- *
- * The stored status is what you set; health is what it means right now. A
- * step not yet started is either ready, waiting on something, or simply not
- * reached -- three different answers the one word "not started" was hiding.
- * The other statuses say what they are. Done and dropped are the quiet ones:
- * finished work is consulted, not read.
- */
-type Health = {
-  word: string;
-  /**
-   * The six the dev pages share. `info` is the app's blue and deliberately not
-   * `accent`: the accent is whichever hue the workspace you are standing in
-   * owns, so an accent-toned state is a different colour on every page and
-   * slate on this one.
-   */
-  tone: DevTone;
-  title?: string;
-};
-
-/**
- * How each state is worded.
- *
- * Which state a step is in is decided in lib/plan/tree.ts, so the counts
- * beside a module heading and the health column under it cannot disagree.
- * Which shape it draws is in lib/status-glyphs.ts, beside the pipeline's and
- * the todo list's, so a state here looks like the same state there. What is
- * left is the word, the tone and the fixed part of the tooltip.
- *
- * Seven of the fourteen are states the other dev queues have too, and those
- * words come from lib/dev/words.ts so a dropped step and a declined note read
- * alike. The other seven are the plan's own refinements -- a question, a
- * question answered, a proposal, a step waiting on another step, a step nobody
- * has reached, a claim whose run stopped, and a setup job that is yours to do
- * -- and no other queue has anything for them to disagree with. Why there are
- * fourteen rather than fewer is written where the set is, in
- * lib/plan/tree.ts.
- *
- * Fourteen words, three colours (note 42aa1fa4): anything that cannot be
- * taken yet, for whatever reason, is amber; ready or underway is blue; done is
- * green. Dropped is the one outside the three, because it is none of them.
- */
-const HEALTH: Record<PlanHealth, Health> = {
-  unanswered: {
-    word: 'Unanswered',
-    tone: 'caution',
-    title: 'A question waiting on you. It closes on an answer, not a commit.',
-  },
-  answered: { word: 'Answered', tone: 'positive' },
-  proposed: {
-    word: 'Proposed',
-    tone: 'caution',
-    title: 'Written by a session. Approve it, edit it, or drop it -- nothing happens until you do.',
-  },
-  in_progress: { word: DEV_STATE_WORD.working, tone: 'info' },
-  // The three readings of a claim. `in_progress` above is the fourth and says
-  // the least: the row is claimed and nothing has looked into what the session
-  // is doing.
-  working: {
-    word: DEV_STATE_WORD.working,
-    tone: 'info',
-    title: 'A session has this and has pushed something recently.',
-  },
-  quiet: {
-    word: 'Quiet',
-    tone: 'info',
-    title:
-      'A session has this and has pushed nothing for a while. It may still be reading or waiting on a build.',
-  },
-  abandoned: {
-    word: 'Stopped',
-    tone: 'caution',
-    title:
-      'A session claimed this and stopped without closing it. Put it back or send it again -- nothing is working it.',
-  },
-  // "Waiting on you" rather than "Blocked", which said a step was stuck and not
-  // who could unstick it. The notes queue says the same thing about a note
-  // blocked on an answer, and now says it in the same words.
-  blocked: {
-    word: DEV_STATE_WORD.waiting,
-    tone: 'caution',
-    title: 'Stopped on something only you can settle. The note says what.',
-  },
-  // A job that was yours from the day it was written -- an account, a key, a
-  // switch. "Waiting on you" is what a blocked step says, and it says it about
-  // a build that ran into a wall; this one never was a build.
-  setup: {
-    word: 'Setup',
-    tone: 'caution',
-    title: 'Something only you can set up. Open it for what to do, and say so when you have.',
-  },
-  // A step waiting on another step, which clears itself. Nothing else to say
-  // "on you" about, and the plan is the only queue that has it.
-  waiting: { word: 'Waiting', tone: 'caution' },
-  // Blue, not green. Ready and done were both `positive`, so the one state
-  // that is an invitation to start read at a glance as the state that needs
-  // nothing.
-  //
-  // `info` and not `accent`, which is what it used to be and which was not
-  // blue anywhere it was read: the accent is the workspace's hue, and this
-  // page lives in the dev workspace, whose hue is slate. "Blue" was written
-  // in this comment and rendered as grey on the only page that shows it.
-  // `info` is the app's own blue, themed in all five palettes, and it does
-  // not move when the workspace does.
-  ready: { word: DEV_STATE_WORD.ready, tone: 'info' },
-  not_started: { word: 'Not started', tone: 'caution' },
-  done: { word: DEV_STATE_WORD.done, tone: 'positive' },
-  dropped: { word: DEV_STATE_WORD.dropped, tone: 'ghost' },
-};
-
-function healthOf(
-  node: PlanNode,
-  liveness?: PlanLiveness,
-): Health & { glyph: GlyphName; name: PlanHealth } {
-  const health = planHealthOf(node, liveness);
-  const base = { ...HEALTH[health], glyph: PLAN_HEALTH_GLYPHS[health], name: health };
-
-  // A row closed over open work reports what is open beneath it, so the word
-  // is about a step further down and the fixed tooltip would be describing the
-  // wrong row. Naming the rows is the whole answer to "why does this say that".
-  if (isClosed(node.status) && health !== 'done' && health !== 'dropped' && health !== 'answered') {
-    const open = flatten(node.children).filter((child) => !isClosed(child.status));
-    return {
-      ...base,
-      title: `Closed, but still open beneath it: ${open
-        .slice(0, 3)
-        .map((child) => `#${child.number} ${child.title}`)
-        .join(', ')}${open.length > 3 ? `, and ${open.length - 3} more` : ''}`,
-    };
-  }
-
-  // The three tooltips that can only be written with the step in hand.
-  if (health === 'answered') return { ...base, title: node.resolution ?? undefined };
-  if (health === 'blocked') return { ...base, title: node.blockAsk ?? node.comment ?? undefined };
-  if (health === 'waiting') {
-    return {
-      ...base,
-      title: `Waits on ${node.waitingOn.map((ref) => `#${ref.number} ${ref.title}`).join(', ')}`,
-    };
-  }
-  return base;
+/** The facts a health tooltip needs, read off a plan row. */
+function healthFactsOf(node: PlanNode): HealthFacts {
+  return {
+    closed: isClosed(node.status),
+    openBeneath: flatten(node.children).filter((child) => !isClosed(child.status)),
+    resolution: node.resolution,
+    blockAsk: node.blockAsk,
+    comment: node.comment,
+    waitingOn: node.waitingOn,
+  };
 }
 
-/**
- * The Status column, worded and toned.
- *
- * The same three colours as the health column (note 42aa1fa4). What is being
- * worked right now -- "With Dash", or a re-shape resolving answers -- is blue.
- * Everything still to do that nobody is working is amber: a step on you, one
- * you kept, one another step is holding up. A step waiting its turn has no
- * word to tone, and nor does one that is settled.
- *
- * The tooltip is where the rollup is explained. A feature reporting "With Dash"
- * because its third step is with a session would otherwise be a word with no
- * visible cause, which is the complaint the whole column exists to answer.
- */
-const MOVE_TONE: Record<PlanMove, Health['tone']> = {
-  resolving: 'info',
-  on_you: 'caution',
-  with_dash: 'info',
-  waiting: 'caution',
-  yours: 'caution',
-  none: 'ghost',
-  settled: 'ghost',
-};
+function healthOf(node: PlanNode, liveness?: PlanLiveness) {
+  return healthWordsOf(planHealthOf(node, liveness), healthFactsOf(node));
+}
 
-const MOVE_TITLE: Record<PlanMove, string> = {
-  resolving:
-    'Re-reading this feature against the answers you just gave. What it proposes will be here when it is done; sending it anywhere until then would send a plan that is mid-edit.',
-  on_you: 'Stopped on you: a question to answer, a proposal to approve, or something only you can supply.',
-  with_dash: 'A session is working on this now.',
-  waiting: 'Held up by another step that has not closed.',
-  yours: 'You kept this one, so the runner will not take it.',
-  none: 'Approved and waiting its turn. Nothing is on it and nothing is needed from you.',
-  settled: 'Nothing left to do on this one.',
-};
-
-function moveFor(
-  node: PlanNode,
-  context?: MoveContext,
-): { word: string; tone: Health['tone']; title?: string } {
-  const move = planMoveOf(node, context);
-  const own = ownMoveWord(node, context);
-  return {
-    word: PLAN_MOVE_WORD[move],
-    tone: MOVE_TONE[move],
-    // Said only where it is not obvious from the row itself: a leaf reporting
-    // its own move needs no explanation of where the word came from.
-    title: own === move ? MOVE_TITLE[move] : `${MOVE_TITLE[move]} (from a step beneath this one.)`,
-  };
+function moveFor(node: PlanNode, context?: MoveContext) {
+  return moveWordsFor(planMoveOf(node, context), ownMoveWord(node, context));
 }
 
 /** What this row alone would say, to tell a rollup from a row's own state. */
@@ -1655,14 +1488,6 @@ function SectionTally({ tally, label }: { tally: PlanTally; label: string }) {
   );
 }
 
-const TONE_DOT: Record<Health['tone'], string> = {
-  quiet: 'bg-ink-ghost',
-  ghost: 'bg-ink-ghost',
-  accent: 'bg-accent',
-  info: 'bg-status-submitted',
-  positive: 'bg-positive',
-  caution: 'bg-caution',
-};
 
 /**
  * The columns every row shares.
@@ -1750,7 +1575,7 @@ function Breakdown({ node }: { node: PlanNode }) {
   const { done, inProgress, ready, live } = node.rollup;
   if (live === 0) return <span className="text-small text-ink-ghost">—</span>;
 
-  const counts: Array<{ key: string; word: string; tone: Health['tone']; n: number }> = [
+  const counts: Array<{ key: string; word: string; tone: HealthWord['tone']; n: number }> = [
     { key: 'not-ready', word: 'not ready', tone: 'caution', n: live - done - inProgress - ready },
     { key: 'ready', word: 'ready or underway', tone: 'info', n: ready + inProgress },
     { key: 'done', word: 'done', tone: 'positive', n: done },
