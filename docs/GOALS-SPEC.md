@@ -163,9 +163,11 @@ the same allowance. So Goals runs on a schedule rather than on every change:
   to ten of them (`DAILY_STEP_LIMIT` in `lib/goals/daily-run.ts`) and the
   rest wait for the next morning. You open the app about once a day, so this
   is when the work has to be ready. The morning run does not map new or
-  foggy goals; the night run is to take that on (plan #1009).
+  foggy goals; the night run does that.
 - **Overnight.** While the overnight runner on `/dev/plan` is started, it
-  works ready `claude` steps one at a time between features. See "Claude's
+  maps each open goal that has no map yet or whose fog you changed, at most
+  once a night, and then works ready `claude` steps one at a time between
+  features. See "Claude's
   own work" below.
 - **Weekly.** A verdict on each open goal against its done-when: on track,
   stalled or waiting on you, with one sentence on why and the next move,
