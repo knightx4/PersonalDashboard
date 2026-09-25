@@ -1806,3 +1806,46 @@ describe('a goal’s number from its collection (plan #1024)', () => {
     expect(readings.slice(-2).map((r) => r.value)).toEqual(['1', '79980.21']);
   });
 });
+
+describe('help kinds Claude proposes when mapping (plan #1029)', () => {
+  async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  it('lets Claude propose help kinds but leaves choosing them to you', async () => {
+    const [goal] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title)
+      values (${userA}, 'goal', ${areaA}, 'Get plugged into the city') returning id`);
+    const proposal = [{ kind: 'events', note: 'Brooklyn, weeknights' }];
+
+    await asClaude((tx) => tx`
+      update items set proposed_help_kinds = ${tx.json(proposal)} where id = ${goal.id}`);
+    await expect(
+      asClaude((tx) => tx`
+        update items set help_kinds = ${tx.json(proposal)} where id = ${goal.id}`),
+    ).rejects.toThrow(/may not choose a goal's weekly help/);
+    await expect(
+      asClaude((tx) => tx`
+        update items set proposed_help_kinds = '[{"kind": "films"}]' where id = ${goal.id}`),
+    ).rejects.toThrow(/items_proposed_help_kinds_ck/);
+
+    // You approve it: the kinds move across and the goal's help is settled.
+    await asUser(userA, (tx) => tx`
+      update items set help_kinds = proposed_help_kinds, proposed_help_kinds = '[]',
+        help_kinds_settled_at = now() where id = ${goal.id}`);
+    const [row] = await admin<{ help_kinds: unknown; proposed_help_kinds: unknown }[]>`
+      select help_kinds, proposed_help_kinds from items where id = ${goal.id}`;
+    expect(row.help_kinds).toEqual(proposal);
+    expect(row.proposed_help_kinds).toEqual([]);
+
+    // Once settled, a later mapping run proposes nothing.
+    await expect(
+      asClaude((tx) => tx`
+        update items set proposed_help_kinds = '[{"kind": "reading", "note": null}]'
+        where id = ${goal.id}`),
+    ).rejects.toThrow(/already settled this goal's weekly help/);
+  });
+});
