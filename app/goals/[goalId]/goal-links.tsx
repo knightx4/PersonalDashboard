@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { useActionState, useState } from 'react';
+import { GraduationCap } from 'lucide-react';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Select } from '@/components/ui/field';
+import { ChipSelect } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { aimProgressLine, jobWeekLine, noLinks, type GoalLinks } from '@/lib/goals/links';
 import {
@@ -77,43 +78,48 @@ export function GoalLinksSection({
         Linked
       </h2>
       <Card>
-        <ul aria-label="Linked from other modules" className="divide-y divide-border">
-          {links.aims.map((aim) => (
-            <LinkRow
-              key={aim.linkId}
-              linkId={aim.linkId}
-              title={aim.name ?? 'A Learn goal'}
-              href={aim.name ? '/learn/goals' : null}
-              line={aimProgressLine(aim)}
-              what="Learn goal"
-            />
-          ))}
-          {links.jobSearch && (
-            <LinkRow
-              linkId={links.jobSearch.linkId}
-              title="Job search"
-              href="/jobs/today"
-              line={links.jobSearch.week ? jobWeekLine(links.jobSearch.week) : ''}
-              what="job search"
-            />
-          )}
-          {links.jobs.map((job) => (
-            <LinkRow
-              key={job.linkId}
-              linkId={job.linkId}
-              title={
-                job.title
-                  ? `${job.title}${job.company ? ` at ${job.company}` : ''}`
-                  : job.kind === 'role'
-                    ? 'A role'
-                    : 'An application'
-              }
-              href={job.roleId ? `/jobs/roles/${job.roleId}` : null}
-              line={job.title ? (job.status ?? 'Role') : 'No longer in the job search'}
-              what={job.kind}
-            />
-          ))}
-        </ul>
+        {/* Left out while linking the first one: an empty list is still the
+            card's first child, so the picker's first:border-t-0 never applied
+            and a hairline ran across the top of the card. */}
+        {!empty && (
+          <ul aria-label="Linked from other modules" className="divide-y divide-border">
+            {links.aims.map((aim) => (
+              <LinkRow
+                key={aim.linkId}
+                linkId={aim.linkId}
+                title={aim.name ?? 'A Learn goal'}
+                href={aim.name ? '/learn/goals' : null}
+                line={aimProgressLine(aim)}
+                what="Learn goal"
+              />
+            ))}
+            {links.jobSearch && (
+              <LinkRow
+                linkId={links.jobSearch.linkId}
+                title="Job search"
+                href="/jobs/today"
+                line={links.jobSearch.week ? jobWeekLine(links.jobSearch.week) : ''}
+                what="job search"
+              />
+            )}
+            {links.jobs.map((job) => (
+              <LinkRow
+                key={job.linkId}
+                linkId={job.linkId}
+                title={
+                  job.title
+                    ? `${job.title}${job.company ? ` at ${job.company}` : ''}`
+                    : job.kind === 'role'
+                      ? 'A role'
+                      : 'An application'
+                }
+                href={job.roleId ? `/jobs/roles/${job.roleId}` : null}
+                line={job.title ? (job.status ?? 'Role') : 'No longer in the job search'}
+                what={job.kind}
+              />
+            ))}
+          </ul>
+        )}
         {(canLinkAim || canLinkSearch) &&
           (adding ? (
             <AddLinks
@@ -221,7 +227,14 @@ function AddLinks({
       {aimChoices.length > 0 && (
         <form action={linkAim} className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="goalId" value={goalId} />
-          <Select name="aimId" required defaultValue="" aria-label="A Learn goal to link" className="w-56">
+          <ChipSelect
+            name="aimId"
+            required
+            defaultValue=""
+            placeholderValue=""
+            aria-label="A Learn goal to link"
+            icon={<GraduationCap className="size-3.5" strokeWidth={2} />}
+          >
             <option value="" disabled>
               A Learn goal…
             </option>
@@ -230,7 +243,7 @@ function AddLinks({
                 {aim.name}
               </option>
             ))}
-          </Select>
+          </ChipSelect>
           <Button type="submit" size="sm" variant="secondary" disabled={linking}>
             {linking ? 'Linking…' : 'Link'}
           </Button>

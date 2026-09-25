@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import { CalendarDays, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { formatInstant, formatWeekday } from '@/lib/goals/dates';
 import { HELP_KIND_LABELS } from '@/lib/goals/help-kinds';
 import { REACTION_LABELS, type Suggestion } from '@/lib/goals/suggestions';
 import { reactToSuggestionAction, type SuggestionActionState } from './suggestion-actions';
@@ -18,27 +19,21 @@ import { reactToSuggestionAction, type SuggestionActionState } from './suggestio
 
 const initial: SuggestionActionState = {};
 
-function whenLine(s: Suggestion): string | null {
-  if (s.startsAt) {
-    return new Date(s.startsAt).toLocaleString(undefined, {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  }
-  if (s.happensOn) {
-    return new Date(`${s.happensOn}T00:00:00`).toLocaleDateString(undefined, {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-    });
-  }
+/** When it is, in the account's zone rather than the zone of whichever machine renders. */
+function whenLine(s: Suggestion, timeZone: string): string | null {
+  if (s.startsAt) return formatInstant(s.startsAt, timeZone);
+  if (s.happensOn) return formatWeekday(s.happensOn);
   return null;
 }
 
-export function SuggestionsList({ suggestions }: { suggestions: Suggestion[] }) {
+export function SuggestionsList({
+  suggestions,
+  timeZone,
+}: {
+  suggestions: Suggestion[];
+  /** The account's zone, which an event's start time is printed in. */
+  timeZone: string;
+}) {
   return (
     <section aria-labelledby="suggestions-heading" className="space-y-2">
       <h2 id="suggestions-heading" className="px-1 text-ui font-semibold text-ink">
@@ -47,7 +42,7 @@ export function SuggestionsList({ suggestions }: { suggestions: Suggestion[] }) 
       <Card>
         <ul className="divide-y divide-border">
           {suggestions.map((s) => (
-            <SuggestionRow key={s.id} suggestion={s} />
+            <SuggestionRow key={s.id} suggestion={s} timeZone={timeZone} />
           ))}
         </ul>
       </Card>
@@ -55,9 +50,9 @@ export function SuggestionsList({ suggestions }: { suggestions: Suggestion[] }) 
   );
 }
 
-function SuggestionRow({ suggestion: s }: { suggestion: Suggestion }) {
+function SuggestionRow({ suggestion: s, timeZone }: { suggestion: Suggestion; timeZone: string }) {
   const [state, react, pending] = useActionState(reactToSuggestionAction, initial);
-  const meta = [HELP_KIND_LABELS[s.kind], whenLine(s), s.place, s.source].filter(Boolean).join(' · ');
+  const meta = [HELP_KIND_LABELS[s.kind], whenLine(s, timeZone), s.place, s.source].filter(Boolean).join(' · ');
   const going = s.reaction === 'going';
 
   return (

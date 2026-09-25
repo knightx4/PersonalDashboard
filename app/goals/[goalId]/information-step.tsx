@@ -49,14 +49,25 @@ import { RecordValue } from './record-value';
 
 const initial: InformationActionState = {};
 
+/**
+ * A list step's state on arrival, for the gallery: a row's other fields
+ * showing, and one value's editor open. Nothing in the app passes it.
+ */
+export type InformationSeam = {
+  openRow?: string;
+  editing?: { recordId: string; key: string };
+};
+
 export function InformationStep({
   node,
   collection,
   records,
+  seam,
 }: {
   node: StepNode;
   collection: Collection;
   records: CollectionRecord[];
+  seam?: InformationSeam;
 }) {
   const asked = askedFields(collection.fields, node.asksFor ?? null);
   const progress = informationProgress(collection.shape, asked, records);
@@ -75,6 +86,7 @@ export function InformationStep({
           records={records}
           asked={asked}
           canFinish={open && unfinishedReason(progress) === null}
+          seam={seam}
         />
       )}
     </div>
@@ -128,7 +140,7 @@ function OneRecord({
           <RecordValues stepId={node.id} record={record} fields={asked} asked={asked} />
           {rest.length > 0 && (
             <Disclosure title="Other fields" meta={filledCount(rest, record)}>
-              <RecordValues stepId={node.id} record={record} fields={rest} asked={asked} />
+              <OtherValues stepId={node.id} record={record} fields={rest} asked={asked} />
             </Disclosure>
           )}
         </>
@@ -185,21 +197,59 @@ function RecordValues({
   );
 }
 
+/**
+ * The fields a step does not ask for, those with a value first. Four or more
+ * with none fold under one line: a loan's paperwork has a dozen fields, and a
+ * dozen rows of "Not set" was most of what Show other fields drew (plan
+ * #1043). Fewer than four stay out, since a fold costs a line of its own.
+ */
+const FOLD_UNSET_FROM = 4;
+
+function OtherValues({
+  stepId,
+  record,
+  fields,
+  asked,
+}: {
+  stepId: string;
+  record: CollectionRecord;
+  fields: CollectionField[];
+  asked: CollectionField[];
+}) {
+  const unset = fields.filter((f) => displayValue(f, record.data[f.key]) === '');
+  if (unset.length < FOLD_UNSET_FROM) {
+    return <RecordValues stepId={stepId} record={record} fields={fields} asked={asked} />;
+  }
+  const set = fields.filter((f) => !unset.includes(f));
+  return (
+    <div className="space-y-2">
+      {set.length > 0 && (
+        <RecordValues stepId={stepId} record={record} fields={set} asked={asked} />
+      )}
+      <Disclosure title="Not set" meta={`${unset.length} fields`}>
+        <RecordValues stepId={stepId} record={record} fields={unset} asked={asked} />
+      </Disclosure>
+    </div>
+  );
+}
+
 function RecordTable({
   node,
   collection,
   records,
   asked,
   canFinish,
+  seam,
 }: {
   node: StepNode;
   collection: Collection;
   records: CollectionRecord[];
   asked: CollectionField[];
   canFinish: boolean;
+  seam?: InformationSeam;
 }) {
   const [adding, setAdding] = useState(false);
-  const [opened, setOpened] = useState<string | null>(null);
+  const [opened, setOpened] = useState<string | null>(seam?.openRow ?? null);
   const [filling, setFilling] = useState(false);
   const [finishState, finish, finishing] = useActionState(
     async (_prev: InformationActionState, form: FormData) => finishListAction(form),
@@ -241,7 +291,7 @@ function RecordTable({
   return (
     <div className="space-y-2">
       {records.length > 0 && (
-        <Table aria-label={collection.name}>
+        <Table aria-label={collection.name} flush>
           <THead>
             <tr>
               {columns.map((f) => (
@@ -285,12 +335,16 @@ function RecordTable({
                         value={record.data[f.key]}
                         needed={missing.has(f.key)}
                         align={isNumeric(f) ? 'right' : 'left'}
+                        inTable
+                        startEditing={
+                          seam?.editing?.recordId === record.id && seam.editing.key === f.key
+                        }
                       />
                     </TD>
                   ))}
                   <TD className="max-md:justify-end">
                     <div className="flex items-center justify-end gap-1">
-                      {!record.draft && <SourceLink record={record} />}
+                      {!record.draft && <SourceLink record={record} truncate />}
                       {record.draft && <ConfirmButton stepId={node.id} record={record} compact />}
                       <ActionMenu label={`Row ${rowName(columns, record)} actions`} items={menu} />
                     </div>
@@ -312,7 +366,7 @@ function RecordTable({
           }
           className="rounded-control bg-sunken p-3"
         >
-          <RecordValues stepId={node.id} record={openedRecord} fields={rest} asked={asked} />
+          <OtherValues stepId={node.id} record={openedRecord} fields={rest} asked={asked} />
         </Group>
       )}
 
@@ -352,7 +406,14 @@ function RecordTable({
 }
 
 function isNumeric(field: CollectionField): boolean {
-  return field.type === 'money' || field.type === 'number' || field.type === 'percent';
+  // A day of the month is a number too ("1st", "15th"), and set left beside a
+  // right-set payment it read as part of the column before it.
+  return (
+    field.type === 'money' ||
+    field.type === 'number' ||
+    field.type === 'percent' ||
+    field.type === 'day_of_month'
+  );
 }
 
 function rowName(fields: CollectionField[], record: CollectionRecord): string {
@@ -392,8 +453,12 @@ function SourceNote({ record }: { record: CollectionRecord }) {
   );
 }
 
-/** A record's source, linked to the email or stored file when there is one. */
-function SourceLink({ record }: { record: CollectionRecord }) {
+/**
+ * A record's source, linked to the email or stored file when there is one.
+ * Cut short in a table's action cell, where it shares the width with the
+ * row's buttons; whole on a line of its own.
+ */
+function SourceLink({ record, truncate = false }: { record: CollectionRecord; truncate?: boolean }) {
   if (record.source === 'typed') return null;
   const label = sourceLabel(record.source, record.sourceRef);
   const href = sourceHref(record.source, record.sourceRef);
@@ -403,7 +468,11 @@ function SourceLink({ record }: { record: CollectionRecord }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="inline-block max-w-40 truncate align-middle text-small text-ink-muted underline"
+      className={
+        truncate
+          ? 'inline-block max-w-40 truncate align-middle text-small text-ink-muted underline'
+          : 'text-small [overflow-wrap:anywhere] text-ink-muted underline'
+      }
       title={label}
     >
       {label}

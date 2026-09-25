@@ -332,14 +332,18 @@ function GoalRow({
             />
           </form>
         )}
-        <Link
-          href={`/goals/${goal.id}`}
-          className="ml-1 inline-flex items-center gap-1 text-small text-ink-muted underline-offset-2 hover:text-ink hover:underline"
-        >
-          <ListTree className="size-3" strokeWidth={1.75} aria-hidden />
-          {steps ? 'Full tree' : 'Break into steps'}
-        </Link>
-        {steps && <GoalProgress progress={steps} label={goal.title} className="px-1 pt-1" />}
+        {/* The bar first and the way into the tree after it, on one line
+            that wraps, rather than a line for each. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 pt-0.5">
+          {steps && <GoalProgress progress={steps} label={goal.title} />}
+          <Link
+            href={`/goals/${goal.id}`}
+            className="inline-flex items-center gap-1 text-small text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+          >
+            <ListTree className="size-3" strokeWidth={1.75} aria-hidden />
+            {steps ? 'Full tree' : 'Break into steps'}
+          </Link>
+        </div>
         {editState.error && <p className="px-1 text-small text-danger">{editState.error}</p>}
       </div>
       <ActionMenu label={`${goal.title} actions`} items={items} />

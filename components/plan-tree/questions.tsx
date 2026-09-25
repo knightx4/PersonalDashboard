@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import { Check } from 'lucide-react';
+import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { ComposeTitle, FieldError } from '@/components/ui/field';
 import { CommentThread } from '@/components/dev/comment-thread';
@@ -309,14 +310,12 @@ export function Questions({
         <AskQuestion node={node} ask={actions.ask} onDone={() => setAsking(false)} />
       ) : (
         !isClosed(node.status) && (
-          <button
-            type="button"
+          // The same add line as "Wait on a step" below it, so the two offers
+          // in an opened row share one glyph, one height and one indent.
+          <AddTrigger
+            label={questions.length === 0 ? 'Ask a question' : 'Ask another'}
             onClick={() => setAsking(true)}
-            className="press -ml-1.5 inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-ui text-ink-ghost hover:bg-sunken hover:text-ink-muted"
-          >
-            <span aria-hidden>+</span>
-            {questions.length === 0 ? 'Ask a question' : 'Ask another'}
-          </button>
+          />
         )
       )}
     </div>

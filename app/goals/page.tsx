@@ -35,7 +35,10 @@ export default async function GoalsPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Goals" />
-      <DailyView view={{ ...view, suggestions: homeSuggestions(suggestions, today) }} />
+      <DailyView
+        view={{ ...view, suggestions: homeSuggestions(suggestions, today) }}
+        timeZone={account.timezone}
+      />
     </div>
   );
 }

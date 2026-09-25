@@ -32,7 +32,7 @@ import {
   setGoalStepStatus,
 } from './block-actions';
 import { GOALS_STORE } from './goal-comments';
-import { InformationStep } from './information-step';
+import { InformationStep, type InformationSeam } from './information-step';
 import {
   prepareStepAction,
   sendStepAction,
@@ -92,6 +92,8 @@ export type GoalRowContext = {
   unfolded: boolean;
   /** Start with every panel open. A seam for the gallery; nothing in the app passes it. */
   opened: boolean;
+  /** An information step's list as the gallery wants it. Nothing in the app passes it. */
+  informationSeam?: InformationSeam;
 };
 
 /**
@@ -471,7 +473,12 @@ export function GoalRow({
             <PastPeriods past={rhythm.past} period={step.rhythmPeriod} />
           )}
           {filled && (
-            <InformationStep node={step} collection={filled.collection} records={filled.records} />
+            <InformationStep
+              node={step}
+              collection={filled.collection}
+              records={filled.records}
+              seam={context.informationSeam}
+            />
           )}
         </>
       }

@@ -6,6 +6,7 @@ import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { isOwner } from '@/lib/dev/owner';
 import { createGoalsClient } from '@/lib/goals/auth/server';
+import { formatInstant } from '@/lib/goals/dates';
 import { noLinks, weekInstants, type GoalLinks } from '@/lib/goals/links';
 import { loadAimChoices, loadGoalLinks } from '@/lib/goals/links-store';
 import { loadReadings } from '@/lib/goals/readings-store';
@@ -55,13 +56,6 @@ function shapingLines(
   timeZone: string,
 ) {
   const now = Date.now();
-  const stamp = new Intl.DateTimeFormat(undefined, {
-    timeZone,
-    day: 'numeric',
-    month: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
   const running = runInFlight(shaping.lastRun, now);
   return {
     approval: approvalLine({
@@ -70,7 +64,7 @@ function shapingLines(
       proposed: countProposed(steps),
       questions: countOpenQuestions(steps),
     }),
-    runLine: runLine(shaping.lastRun, now, (iso) => `on ${stamp.format(new Date(iso))}`),
+    runLine: runLine(shaping.lastRun, now, (iso) => `on ${formatInstant(iso, timeZone, { weekday: false })}`),
     runFailed: shaping.lastRun?.status === 'failed',
     changes: changesLine(shaping.changes),
     runningSince: running && shaping.lastRun ? shaping.lastRun.createdAt : null,

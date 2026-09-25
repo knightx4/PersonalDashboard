@@ -12,6 +12,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { DailyGoal, DailyView as Daily, NextItem, WaitingItem } from '@/lib/goals/daily';
+import { formatDay } from '@/lib/goals/dates';
 import { missedLine, progressLine, type HomeRhythm } from '@/lib/goals/rhythms';
 import { STEP_KIND_LABELS } from '@/lib/goals/steps';
 import type { Suggestion } from '@/lib/goals/suggestions';
@@ -51,13 +52,6 @@ const WAITING_ICONS: Record<WaitingItem['kind'], typeof User> = {
   review: Sparkles,
 };
 
-function formatDate(isoDate: string): string {
-  return new Date(`${isoDate}T00:00:00`).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-  });
-}
-
 function rhythmLine(rhythm: HomeRhythm): string {
   const left =
     !rhythm.atRisk || rhythm.period === 'day'
@@ -88,7 +82,14 @@ function waitingLine(item: WaitingItem): string {
   }
 }
 
-export function DailyView({ view }: { view: View }) {
+export function DailyView({
+  view,
+  timeZone,
+}: {
+  view: View;
+  /** The account's zone, for the times on the week's suggestions. */
+  timeZone: string;
+}) {
   if (view.goals.length === 0 && view.waiting.length === 0) {
     return (
       <EmptyState
@@ -117,7 +118,7 @@ export function DailyView({ view }: { view: View }) {
         </section>
       )}
 
-      {view.suggestions.length > 0 && <SuggestionsList suggestions={view.suggestions} />}
+      {view.suggestions.length > 0 && <SuggestionsList suggestions={view.suggestions} timeZone={timeZone} />}
 
       {view.rhythms.length > 0 && (
         <section aria-labelledby="risk-heading" className="space-y-2">
@@ -206,8 +207,12 @@ function GoalCard({ daily }: { daily: DailyGoal }) {
             {goal.title}
           </Link>
         </h2>
-        <p className="text-small text-ink-muted">{areaName}</p>
-        {progress && <GoalProgress progress={progress} label={goal.title} className="pt-1" />}
+        {/* The area leads the progress line rather than taking a line of its
+            own, so a goal's heading is two lines, not three. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
+          <span className="text-small text-ink-muted">{areaName}</span>
+          {progress && <GoalProgress progress={progress} label={goal.title} />}
+        </div>
         {next.length === 0 && (
           <Link
             href={tree}
@@ -240,9 +245,11 @@ function GoalCard({ daily }: { daily: DailyGoal }) {
 
 function NextRow({ item, href }: { item: NextItem; href: string }) {
   const Icon = KIND_ICONS[item.kind];
+  // Whose step it is is the glyph's to say; the word is for a screen reader.
+  // Printed as well, it was a second line under every row that repeated the
+  // glyph beside it, and the only line under an undated step.
   const meta = [
-    STEP_KIND_LABELS[item.kind],
-    item.dueOn ? `Due ${formatDate(item.dueOn)}` : null,
+    item.dueOn ? `Due ${formatDay(item.dueOn)}` : null,
     item.under ? `Under ${item.under}` : null,
   ].filter((line): line is string => line !== null);
 
@@ -254,8 +261,13 @@ function NextRow({ item, href }: { item: NextItem; href: string }) {
       >
         <Icon className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
         <span className="min-w-0 flex-1">
-          <span className="block text-ui break-words text-ink">{item.title}</span>
-          <span className="block text-small break-words text-ink-muted">{meta.join(' · ')}</span>
+          <span className="block text-ui break-words text-ink">
+            <span className="sr-only">{STEP_KIND_LABELS[item.kind]}: </span>
+            {item.title}
+          </span>
+          {meta.length > 0 && (
+            <span className="block text-small break-words text-ink-muted">{meta.join(' · ')}</span>
+          )}
         </span>
       </Link>
     </li>

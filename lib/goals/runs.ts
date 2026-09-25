@@ -12,6 +12,7 @@
  * Pure: the store in runs-store.ts reads the rows, this file says what they
  * mean.
  */
+import { formatInstant } from './dates';
 import { RUN_QUIET_MS, type GoalRunStatus } from '@/lib/goals/shaping';
 
 export type RunJob = 'goal' | 'daily' | 'weekly' | 'reshape' | 'step' | 'phase' | 'prepare';
@@ -134,17 +135,9 @@ export function toRunListings(rows: readonly RunRowWithItem[]): RunListing[] {
  * it took. Shared by the Runs page and a run's own page (plan #1013).
  */
 export function runMeta(run: RunListing, now: number, timeZone: string): { outcome: RunOutcome; meta: string } {
-  const stamp = new Intl.DateTimeFormat(undefined, {
-    timeZone,
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
   const outcome = runOutcome(run, now);
   const took = runDuration(run);
-  const meta = [OUTCOME_LABELS[outcome], stamp.format(new Date(run.createdAt)), took ? `took ${took}` : null]
+  const meta = [OUTCOME_LABELS[outcome], formatInstant(run.createdAt, timeZone), took ? `took ${took}` : null]
     .filter(Boolean)
     .join(' · ');
   return { outcome, meta };

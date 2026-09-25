@@ -112,7 +112,9 @@ export function GoalShaping({
     return (
       <div className="space-y-1 px-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <div className="min-w-0 flex-1 space-y-0.5">
+          {/* A basis, so on a phone the button drops under the lines instead
+              of squeezing them into a column beside it. */}
+          <div className="min-w-0 flex-[1_1_18rem] space-y-0.5">
             {approval.text && <p className="text-ui text-ink">{approval.text}</p>}
             {status}
           </div>

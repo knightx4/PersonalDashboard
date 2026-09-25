@@ -13,6 +13,7 @@ import { countAside } from '@/lib/goals/shaping';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import { GoalRow, type GoalRowContext } from './goal-row';
 import { StepComposer } from './step-parts';
+import type { InformationSeam } from './information-step';
 
 /**
  * A goal's full tree (plan #925), drawn as the dev plan draws a module
@@ -29,6 +30,7 @@ export function StepTree({
   todoOn,
   unfolded = true,
   opened = false,
+  informationSeam,
 }: {
   map: GoalMap;
   todoOn: boolean;
@@ -36,6 +38,8 @@ export function StepTree({
   unfolded?: boolean;
   /** Start with every step opened. A seam for the gallery; nothing in the app passes it. */
   opened?: boolean;
+  /** An information step's list as the gallery wants it. Nothing in the app passes it. */
+  informationSeam?: InformationSeam;
 }) {
   const [showAside, setShowAside] = useState(false);
   const aside = countAside(map.steps);
@@ -53,6 +57,7 @@ export function StepTree({
       catalog: goalCatalog(map.steps, numbers),
       unfolded,
       opened,
+      informationSeam,
     };
     return {
       own: goalRows(map.steps, options),
@@ -62,7 +67,7 @@ export function StepTree({
       })),
       context,
     };
-  }, [map, todoOn, showAside, unfolded, opened]);
+  }, [map, todoOn, showAside, unfolded, opened, informationSeam]);
 
   const substeps = own.rows.filter((row) => row.kind !== 'decision');
 
@@ -98,8 +103,9 @@ export function StepTree({
               ))}
             </ul>
             {/* Inside the card, under a rule, as the plan's "Add a step" sits
-                at the foot of a module (plan #983). */}
-            <div className="border-t border-border px-3 py-2">
+                at the foot of a module (plan #983), on the same py-1.5 line as
+                every other add line on the page. */}
+            <div className="border-t border-border px-3 py-1.5">
               <StepComposer parentId={map.goal.id} label="Add a step" bare />
             </div>
           </div>
