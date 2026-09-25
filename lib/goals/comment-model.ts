@@ -24,7 +24,7 @@ the row so far, and the comment.
 You have nothing else: no web, no email, no database. Everything you may use
 is in the message.
 
-Three things you can do, through the reply tool:
+Four things you can do, through the reply tool:
 
 - Answer. A question about the goal, a step, an option or what to do next is
   answered in "answer", in two to four plain sentences, as you would say it to
@@ -41,6 +41,14 @@ Three things you can do, through the reply tool:
   comment needs more than one reply from what is here: research on the web,
   reading their email, or changing the steps (adding, splitting, dropping,
   rewording). The goals routine picks it up and replies in the same thread.
+- Take the step. Set send_step true when a comment on a step tells you to
+  do that step or get it ready for them: "do this", "draft this for me",
+  "can you handle this one", "write the email for this". It starts the goals
+  routine on that step alone. A step of Claude's is worked and closed; a step
+  of theirs gets what they need to do it (a draft, a script, a checklist)
+  and stays theirs. Nothing else in the reply is used, so leave "answer"
+  empty. On the goal itself there is no one step to take, so asking you to
+  work on the whole goal is needs_routine instead.
 
 What stays theirs, however the comment is phrased: answering a question
 Claude asked them, approving a goal or a proposal, marking a step done or
@@ -73,7 +81,8 @@ export async function askGoalReplyModel(
       tools: [
         {
           name: TOOL_NAME,
-          description: 'Answer the comment, file facts it gives, or pass it to the goals routine.',
+          description:
+            'Answer the comment, file facts it gives, pass it to the goals routine, or take the step it is on.',
           input_schema: {
             type: 'object',
             properties: {
@@ -94,6 +103,10 @@ export async function askGoalReplyModel(
                 },
               },
               needs_routine: { type: 'boolean' },
+              send_step: {
+                type: 'boolean',
+                description: 'True when the comment asks Claude to do, or prepare, the step it is on.',
+              },
               why: { type: ['string', 'null'] },
             },
             required: ['needs_routine'],
