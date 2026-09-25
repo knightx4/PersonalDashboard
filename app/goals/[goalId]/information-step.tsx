@@ -91,7 +91,6 @@ function OneRecord({
       <FillFromDocument
         stepId={node.id}
         collection={collection}
-        current={record}
         onClose={() => setFilling(false)}
       />
     );
@@ -223,7 +222,6 @@ function RecordTable({
         <FillFromDocument
           stepId={node.id}
           collection={collection}
-          current={null}
           onClose={() => setFilling(false)}
         />
       ) : editingRecord ? (

@@ -8,7 +8,10 @@ import {
   documentKind,
   documentPath,
   extractionTool,
+  matchRows,
   ownsDocumentPath,
+  parseDate,
+  readAsOf,
   readExtraction,
 } from '@/lib/goals/extract';
 import { askExtractModel, type ExtractSource } from '@/lib/goals/extract-model';
@@ -93,7 +96,17 @@ describe('readIntoForm, with the model stubbed', () => {
         { name: 'Loan 1-01', servicer: 'Nelnet', balance: '12450.37', rate: '6.8', minimum: '145', due_day: '15' },
         { name: 'Loan 1-02', servicer: 'Nelnet', balance: '3100', rate: '4.53', minimum: '', due_day: '' },
       ],
+      asOf: null,
     });
+  });
+
+  it('hands back the date the document gives its figures as of (plan #985)', async () => {
+    const ask = async () => ({
+      ok: true as const,
+      input: { as_of: '2026-09-02', records: [{ name: 'Loan', balance: 10 }] },
+    });
+    const result = await readIntoForm(collection, { text: 'NSLDS file' }, ask);
+    expect(result).toMatchObject({ ok: true, asOf: '2026-09-02' });
   });
 
   it('sends a statement PDF and a screenshot to the model as themselves', async () => {
@@ -174,12 +187,51 @@ describe('readExtraction', () => {
   });
 });
 
+describe('readAsOf', () => {
+  it('takes a real date and nothing else', () => {
+    expect(readAsOf({ as_of: ' 2026-09-02 ', records: [] })).toBe('2026-09-02');
+    expect(readAsOf({ as_of: '2026-02-30' })).toBeNull();
+    expect(readAsOf({ as_of: '2 Sep 2026' })).toBeNull();
+    expect(readAsOf({ as_of: null })).toBeNull();
+    expect(readAsOf(null)).toBeNull();
+    expect(parseDate('1899-12-31')).toBeNull();
+  });
+});
+
+describe('matchRows (plan #985)', () => {
+  const withId: CollectionField[] = [
+    { key: 'name', label: 'Name', type: 'text' },
+    { key: 'loan_id', label: 'Loan ID', type: 'text', id: true },
+    { key: 'balance', label: 'Balance', type: 'money', tracked: true },
+  ];
+  const saved = [
+    { id: 'rec-a', data: { name: 'Grad PLUS', loan_id: '*****8042P25G01426001', balance: 80080.21 } },
+    { id: 'rec-b', data: { name: 'Unsub', loan_id: '*****8042U25G01426001', balance: 23549.6 } },
+    { id: 'rec-c', data: { name: 'No ID', loan_id: null, balance: 5 } },
+  ];
+
+  it('updates the saved row with the same ID, and adds the rest', () => {
+    const rows = [
+      { name: 'Grad PLUS', loan_id: ' *****8042p25g01426001 ', balance: '80500' },
+      { name: 'New loan', loan_id: '*****8042U26G01426001', balance: '100' },
+      { name: 'Unsub', loan_id: '*****8042U25G01426001', balance: '23549.60' },
+      { name: 'Blank', loan_id: '', balance: '1' },
+    ];
+    expect(matchRows(withId, rows, saved)).toEqual(['rec-a', null, 'rec-b', null]);
+  });
+
+  it('matches nothing when the collection has no ID field', () => {
+    expect(matchRows(loans, [{ name: 'Grad PLUS' }], saved)).toEqual([null]);
+  });
+});
+
 describe('extractionTool', () => {
   it('asks for every shown field, typed, and none removed', () => {
     const tool = extractionTool(loans);
     const items = (tool.input_schema.properties as { records: { items: { properties: object; required: string[] } } })
       .records.items;
     expect(items.required).toEqual(['name', 'servicer', 'balance', 'rate', 'minimum', 'due_day']);
+    expect(tool.input_schema.required).toEqual(['as_of', 'records']);
     expect(items.properties).toMatchObject({
       balance: { type: ['number', 'null'] },
       due_day: { type: ['integer', 'null'] },

@@ -51,6 +51,9 @@ export const FIELD_TYPE_LABELS: Record<FieldType, string> = {
 /** The types whose changes can be kept as a series of readings. */
 export const TRACKABLE_TYPES: ReadonlySet<FieldType> = new Set(['number', 'money', 'percent']);
 
+/** The types a field must have to be a collection's ID. */
+export const ID_TYPES: ReadonlySet<FieldType> = new Set(['text', 'number']);
+
 export type CollectionField = {
   /** What the value is stored under in records.data. Never changes. */
   key: string;
@@ -62,6 +65,12 @@ export type CollectionField = {
   options?: string[];
   /** Hidden from the form; values already kept stay in the record. */
   removed?: boolean;
+  /**
+   * The value names the record, so a read row with the same value updates it
+   * rather than adding a copy (plan #985). Text and number only, and at most
+   * one live field per collection.
+   */
+  id?: boolean;
 };
 
 export type CollectionShape = 'one' | 'list';
@@ -103,6 +112,7 @@ export function fieldsError(fields: unknown): string | null {
   if (!Array.isArray(fields)) return 'The fields must be a list.';
   if (fields.length > FIELDS_MAX) return `A collection holds at most ${FIELDS_MAX} fields.`;
   const seen = new Set<string>();
+  let idFields = 0;
   for (const field of fields as Partial<CollectionField>[]) {
     if (!field || typeof field !== 'object') return 'Each field must be an object.';
     const key = field.key;
@@ -125,6 +135,15 @@ export function fieldsError(fields: unknown): string | null {
     }
     if (field.removed !== undefined && typeof field.removed !== 'boolean') {
       return `The field ${key}: removed must be true or false.`;
+    }
+    if (field.id !== undefined && typeof field.id !== 'boolean') {
+      return `The field ${key}: id must be true or false.`;
+    }
+    if (field.id) {
+      if (!ID_TYPES.has(field.type as FieldType)) {
+        return `The field ${key}: only a text or number field can be the ID.`;
+      }
+      if (!field.removed && ++idFields > 1) return 'A collection has at most one ID field.';
     }
     if (field.type === 'choice') {
       const options = field.options;
@@ -162,6 +181,11 @@ export function revisionError(current: CollectionField[], next: CollectionField[
     }
   }
   return null;
+}
+
+/** The live field marked as the collection's ID, or null when it has none. */
+export function idField(fields: CollectionField[]): CollectionField | null {
+  return fields.find((f) => f.id && !f.removed) ?? null;
 }
 
 /** The fields a form shows: the ones not removed, in order. */

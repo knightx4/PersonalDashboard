@@ -215,6 +215,7 @@ const map: GoalMap = {
           source: 'gmail',
           sourceRef: null,
           draft: true,
+          asOf: null,
           updatedAt: '2026-09-20T09:00:00Z',
         },
       ],

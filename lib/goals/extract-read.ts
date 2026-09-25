@@ -13,6 +13,7 @@ import {
   DOCUMENT_MAX_BYTES,
   PASTE_MAX,
   documentKind,
+  readAsOf,
   readExtraction,
   type PreviewRow,
 } from '@/lib/goals/extract';
@@ -20,7 +21,10 @@ import type { ExtractResult, ExtractSource } from '@/lib/goals/extract-model';
 
 export type ReadInput = { text: string } | { name: string; bytes: Uint8Array };
 
-export type ReadResult = { ok: true; rows: PreviewRow[] } | { ok: false; error: string };
+/** asOf is the date the document gives its figures as of, or null when it gives none. */
+export type ReadResult =
+  | { ok: true; rows: PreviewRow[]; asOf: string | null }
+  | { ok: false; error: string };
 
 export async function readIntoForm(
   collection: { name: string; shape: CollectionShape; fields: CollectionField[] },
@@ -35,7 +39,7 @@ export async function readIntoForm(
   if (rows.length === 0) {
     return { ok: false, error: `Nothing in that fits the ${collection.name} form.` };
   }
-  return { ok: true, rows };
+  return { ok: true, rows, asOf: readAsOf(answer.input) };
 }
 
 function toSource(input: ReadInput): { ok: true; source: ExtractSource } | { ok: false; error: string } {

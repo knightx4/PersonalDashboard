@@ -3,6 +3,7 @@ import {
   FIELD_TYPES,
   checkRecord,
   fieldsError,
+  idField,
   liveFields,
   parseCollectionName,
   parseFieldValue,
@@ -202,6 +203,21 @@ describe('definitions', () => {
   it('tracks only numbers, money and percents', () => {
     expect(fieldsError([{ key: 'n', label: 'N', type: 'text', tracked: true }])).toMatch(/can be tracked/);
     expect(fieldsError([{ key: 'n', label: 'N', type: 'percent', tracked: true }])).toBeNull();
+  });
+
+  it('lets one live text or number field be the ID (plan #985)', () => {
+    const id = { key: 'loan_id', label: 'Loan ID', type: 'text', id: true } as const;
+    expect(fieldsError([id])).toBeNull();
+    expect(fieldsError([{ ...id, type: 'money' }])).toMatch(/only a text or number field can be the ID/);
+    expect(fieldsError([id, { key: 'n', label: 'N', type: 'number', id: true }])).toMatch(/at most one ID/);
+    // A removed ID field does not count, so the ID can move to another field.
+    const moved: CollectionField[] = [
+      { ...id, removed: true },
+      { key: 'n', label: 'N', type: 'number', id: true },
+    ];
+    expect(fieldsError(moved)).toBeNull();
+    expect(idField(moved)?.key).toBe('n');
+    expect(idField(loans)).toBeNull();
   });
 
   it('gives options to choice fields only, and requires them there', () => {
