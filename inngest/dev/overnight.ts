@@ -3,6 +3,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { releaseStaleClaims } from '@/inngest/dev/claims';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
+import { goalsNightNote, runGoalsNight, type GoalsNightTick } from '@/inngest/goals/overnight';
 import { listPushes, refreshMainCheck } from '@/lib/plan/ci';
 import { handFeatureToClaude } from '@/lib/plan/handover';
 import type { CheckConclusion } from '@/lib/plan/checks';
@@ -829,6 +830,8 @@ export type OvernightTickSummary = {
   fired: number;
   /** What happened to each, by user id, so the response says why nothing did. */
   results: Record<string, OvernightTick>;
+  /** What the goals half did for each, by user id (plan #1008). */
+  goals: Record<string, GoalsNightTick>;
   /**
    * What CI said about main's newest commit, read on this tick whether or not
    * anything was running. In the response so that a tick can be poked by hand
@@ -872,6 +875,8 @@ export async function runOvernightTick(
     now?: number;
     supabase?: Db;
     fetch?: typeof globalThis.fetch;
+    /** The goals half for one account; `runGoalsNight` unless a test hands one in. */
+    goalsNight?: (userId: string) => Promise<GoalsNightTick>;
   } = {},
 ): Promise<OvernightTickSummary> {
   const supabase = input.supabase ?? createServiceSupabase();
@@ -904,14 +909,24 @@ export async function runOvernightTick(
 
   const users = (data ?? []).map((row) => (row as { user_id: string }).user_id);
   const results: Record<string, OvernightTick> = {};
+  const goals: Record<string, GoalsNightTick> = {};
   let fired = 0;
+  const goalsNight =
+    input.goalsNight ??
+    ((userId: string) => runGoalsNight({ supabase, userId, now, fetch: input.fetch }));
 
   for (const userId of users) {
     try {
       const tick = await overnightTick(portsFor({ supabase, userId, now, fetch: input.fetch }));
       results[userId] = tick;
       if (tick.act === 'fired') fired += 1;
-      await recordTick(supabase, userId, now, tickNote(tick));
+      // After the features, so it reads the budget they left. It reads the
+      // row again and holds to the same verdict, and a failure in it is
+      // reported beside the feature half rather than costing it.
+      const goal = await goalsHalf(goalsNight, userId);
+      goals[userId] = goal;
+      const note = [tickNote(tick), goalsNightNote(goal)].filter(Boolean).join(' ');
+      await recordTick(supabase, userId, now, note === '' ? null : note);
       // A tick that fires says so; a tick that waits used to say nothing at
       // all, and the run that waited two hours for a session which had already
       // merged looked exactly like a quiet night. The reason is the whole
@@ -933,7 +948,21 @@ export async function runOvernightTick(
     }
   }
 
-  return { accounts: users.length, fired, results, main };
+  return { accounts: users.length, fired, results, goals, main };
+}
+
+/** The goals half of one account's tick, with a failure turned into a result. */
+async function goalsHalf(
+  goalsNight: (userId: string) => Promise<GoalsNightTick>,
+  userId: string,
+): Promise<GoalsNightTick> {
+  try {
+    return await goalsNight(userId);
+  } catch (err) {
+    const error = err instanceof Error ? err.message : 'failed';
+    console.error(`overnight: the goals half could not finish: ${error}`);
+    return { act: 'failed', error };
+  }
 }
 
 /**

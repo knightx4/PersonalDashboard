@@ -503,6 +503,33 @@ export async function recordOvernightFire(input: {
 }
 
 /**
+ * Write down that a goal step was just started from the night (plan #1008).
+ *
+ * The goal runs share the night's budget with the features (decision #1006),
+ * so each one takes one off it. `last_fired_at` is left alone: it is the
+ * feature fire the tick checks for a plan run row, and a goal run has none, so
+ * moving it would read as a feature fire that left no record and hold every
+ * feature slot until the stop time.
+ */
+export async function recordOvernightGoalFire(input: {
+  supabase: Db;
+  userId: string;
+  /** What the row said was left before this fire, or null for no cap. */
+  featuresLeft: number | null;
+}): Promise<OvernightWrite> {
+  if (input.featuresLeft === null) return { run: null, error: null };
+  const result = await input.supabase
+    .from('plan_overnight_runs')
+    .update({ features_left: Math.max(0, input.featuresLeft - 1) })
+    .eq('user_id', input.userId)
+    .eq('running', true)
+    .select(OVERNIGHT_COLUMNS)
+    .maybeSingle();
+
+  return wrote(result);
+}
+
+/**
  * What Dash is doing, for the status line at the bottom of every page.
  *
  * The bar was ingestion and nothing else, so on a night the runner was working
