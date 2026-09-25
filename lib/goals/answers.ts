@@ -43,7 +43,21 @@ export type StepAnswer = {
    * answer was written.
    */
   closed: ClosedAnswer | null;
+  /**
+   * Set when a rewrite changed the answer and reopened its closed step (plan
+   * #997), until the step closes again: when, and the row behind the change.
+   */
+  changed: AnswerChanged | null;
 };
+
+/** A change standing on an answer: when it came, and the row it came from. */
+export type AnswerChanged = { at: string; recordId: string | null };
+
+/** The stored changed_at and changed_record_id as the app reads them. */
+export function readChanged(at: unknown, recordId: unknown): AnswerChanged | null {
+  if (typeof at !== 'string') return null;
+  return { at, recordId: typeof recordId === 'string' && UUID.test(recordId) ? recordId : null };
+}
 
 /**
  * What an answer states, stored beside its wording (plan #1035): a day, a
@@ -231,7 +245,7 @@ export type OutOfDateStep = {
  * The steps whose answers are out of date, in page order, for the morning
  * run. Only a step under an open goal, and not one that was dropped: a step
  * that is done still has its answers kept current, since what it answered can
- * move (plan #997 decides what happens to the step when it does).
+ * move, and a rewrite that changes one reopens the step (plan #997).
  */
 export function outOfDateSteps(
   goals: Goal[],

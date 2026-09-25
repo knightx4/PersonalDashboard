@@ -15,11 +15,15 @@
  * closed (#1047), so small monthly rises add up. Before a step has closed,
  * it is measured from the answer as stored.
  *
- * Plan #997 calls `answerChange` before reopening a step, instead of
- * comparing the wording.
+ * Plan #997 reopens a closed step on this rule. The database applies it on
+ * every rewrite (goals.answer_moved, migrations-goals 0037), since the goals
+ * routine writes answers through SQL; the two must agree. The page reads this
+ * one to say what moved on a reopened step (`standingChange`).
  */
 
 import type { AnswerValue, StepAnswer } from '@/lib/goals/answers';
+import type { RecordSource } from '@/lib/goals/collections';
+import { sourceHref, sourceLabel } from '@/lib/goals/information';
 
 /** An amount has to move by more than this percentage to count (#1033). */
 export const AMOUNT_MARGIN_PERCENT = 5;
@@ -118,5 +122,41 @@ export function answerChange(
     changed,
     from: base.answer,
     reason: changed ? 'The wording changed and the routine gave no verdict on its meaning.' : 'The answer is unchanged.',
+  };
+}
+
+/** What a reopened step shows beside a changed answer (plan #997). */
+export type StandingChange = {
+  /** The answer as it stood when the step last closed. */
+  from: string;
+  /** One line saying what moved. */
+  reason: string;
+  /** Where the row behind the change came from, when that row is still there. */
+  document: { label: string; href: string | null } | null;
+};
+
+/** A row as far as naming where it came from goes. */
+export type ChangeRecord = { id: string; source: RecordSource; sourceRef: string | null };
+
+/**
+ * The change standing on an answer since a rewrite reopened its step, or
+ * null when there is none. The database marked the change; this says what
+ * it was, measured from the closing answer, and names the document of the
+ * row the database recorded as behind it.
+ */
+export function standingChange(
+  answer: Pick<StepAnswer, 'answer' | 'value' | 'closed' | 'changed'>,
+  records: ChangeRecord[],
+): StandingChange | null {
+  if (!answer.changed) return null;
+  const { from, reason } = answerChange(answer, { answer: answer.answer, value: answer.value });
+  const recordId = answer.changed.recordId;
+  const record = recordId ? records.find((r) => r.id === recordId) : undefined;
+  return {
+    from,
+    reason,
+    document: record
+      ? { label: sourceLabel(record.source, record.sourceRef), href: sourceHref(record.source, record.sourceRef) }
+      : null,
   };
 }

@@ -16,6 +16,7 @@ import {
   type StepAnswer,
   type StepQuestion,
 } from '@/lib/goals/answers';
+import { standingChange } from '@/lib/goals/answer-change';
 import { idField, liveFields, type CollectionField } from '@/lib/goals/collections';
 import type { Collection, CollectionRecord } from '@/lib/goals/collections-store';
 import {
@@ -116,8 +117,10 @@ export function InformationStep({
  * #991): each question with the answer the goals routine worked out, and a
  * line naming the rows it read and the date of their figures, or that it is
  * not answered yet. An answer whose rows have changed since says so until the
- * morning run works it again. An answer to a question the step no longer
- * lists is still shown, after the rest. The questions are edited here.
+ * morning run works it again. An answer that changed after the step closed,
+ * which reopened it (plan #997), shows what it said before, what moved and
+ * the document behind it. An answer to a question the step no longer lists
+ * is still shown, after the rest. The questions are edited here.
  */
 function Questions({
   stepId,
@@ -162,6 +165,7 @@ function Questions({
                     <p className="text-small text-ink-muted">
                       {sourcesLine(answer.sources, fields, records)}
                     </p>
+                    <ChangeLines answer={answer} records={records} />
                     {answer.outOfDateAt && (
                       <p className="text-small text-caution">
                         Out of date: a row it used has changed. The morning run works it out again.
@@ -180,6 +184,29 @@ function Questions({
         label={questions.length > 0 ? 'Edit the questions' : 'Add the questions it answers'}
         onClick={() => setEditing(true)}
       />
+    </div>
+  );
+}
+
+/** A changed answer's lines: before, what moved, and the document behind it. */
+function ChangeLines({ answer, records }: { answer: StepAnswer; records: CollectionRecord[] }) {
+  const change = standingChange(answer, records);
+  if (!change) return null;
+  return (
+    <div className="text-small">
+      <p className="text-caution">Changed since the step closed. {change.reason}</p>
+      <p className="text-ink-muted">Before: {change.from}</p>
+      {change.document && (
+        <p className="text-ink-muted">
+          {change.document.href ? (
+            <a href={change.document.href} target="_blank" rel="noreferrer" className="underline">
+              {change.document.label}
+            </a>
+          ) : (
+            change.document.label
+          )}
+        </p>
+      )}
     </div>
   );
 }

@@ -567,6 +567,16 @@ answers through SQL. A step with no questions never closes itself; the
 person closes it. Later steps and runs read the collection and the answers
 instead of asking again.
 
+A closed step comes back when a new document changes one of its answers
+(plan #997). A date that moves at all, or an amount that moves by more than
+5% of the answer the step closed on, reopens it; a written answer reopens it
+when its wording changes, until the routine judges meaning (plan #1036). The
+answer is marked changed, and the step shows what it said before, what moved
+and the document behind it. A statement that confirms the answer re-dates it
+and leaves the step closed. A reopened step does not close itself when its
+answers are current again; what closes it is decision #1048's, and until
+then the person does.
+
 ### Four ways to fill a form
 
 1. **Type it** into the form or table.
@@ -695,6 +705,9 @@ A sketch for the migration, not the migration itself.
   `value_date` or `value_amount` holds what the answer states, and
   `closed_answer`, `closed_date` and `closed_amount` hold it as it stood when
   the step last closed, written by a trigger on the step (plan #1035).
+  `changed_at` and `changed_record_id` mark a rewrite that changed the answer
+  and reopened its step, and the row behind it, until the step closes again
+  (plan #997).
 - `goals.comments`: the thread on a goal or a step, `me` or `claude` per
   message (plan #957). A reply can file facts into a collection as drafts.
 - `archived_at` on areas and items, in place of deleting them.
