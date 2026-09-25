@@ -6,7 +6,7 @@ import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
-import { InlineInput, Input } from '@/components/ui/field';
+import { InlineInput, Input, Select } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
@@ -15,13 +15,18 @@ import {
   UNIT_MAX,
   formatReading,
   movementLine,
+  numberFromChoices,
+  numberFromValue,
   readingChart,
+  type NumberFrom,
+  type NumberSource,
   type Reading,
 } from '@/lib/goals/readings';
 import {
   addReadingAction,
   deleteReadingAction,
   setMeasureAction,
+  setNumberFromAction,
   type ReadingActionState,
 } from './reading-actions';
 
@@ -34,6 +39,11 @@ const initial: ReadingActionState = {};
  * its row of add lines and mounts this with `startEditing` from (plan #1038).
  * That first unit is the one place a form is used; after it the unit and the
  * target are edited in the line beside the heading.
+ *
+ * A goal served by a collection can have its number worked out from it
+ * instead, such as the total of every loan's balance (plan #1024). The
+ * database then writes a reading whenever those records change, and the
+ * line for adding one by hand goes.
  */
 export function GoalNumber({
   goalId,
@@ -41,6 +51,8 @@ export function GoalNumber({
   target,
   readings,
   today,
+  numberFrom = null,
+  sources = [],
   startEditing = false,
   onClose,
 }: {
@@ -50,6 +62,10 @@ export function GoalNumber({
   /** Oldest first. */
   readings: Reading[];
   today: string;
+  /** Where the number is worked out from, or null when it is typed in. */
+  numberFrom?: NumberFrom | null;
+  /** The collections serving the goal, which the number can be worked out from. */
+  sources?: NumberSource[];
   /** Open with the form for choosing a unit showing. */
   startEditing?: boolean;
   /** Called when that form closes on a goal still not measured. */
@@ -61,6 +77,7 @@ export function GoalNumber({
     return editing ? (
       <MeasureForm
         goalId={goalId}
+        sources={sources}
         onClose={() => {
           setEditing(false);
           onClose?.();
@@ -84,6 +101,9 @@ export function GoalNumber({
         </h2>
         <MeasureLine goalId={goalId} unit={unit} target={target} />
       </div>
+      {(numberFrom || sources.length > 0) && (
+        <NumberFromLine goalId={goalId} numberFrom={numberFrom} sources={sources} />
+      )}
       <Card>
         {readings.length > 0 && (
           <div className="space-y-2 px-3 pt-3">
@@ -91,7 +111,7 @@ export function GoalNumber({
             <ReadingLine readings={readings} unit={unit} target={target} />
           </div>
         )}
-        {unit && <AddReading goalId={goalId} today={today} />}
+        {unit && !numberFrom && <AddReading goalId={goalId} today={today} />}
         {readings.length > 0 && <ReadingList readings={readings} unit={unit} />}
       </Card>
     </section>
@@ -196,8 +216,77 @@ function MeasureLine({
   );
 }
 
+/**
+ * Where the number comes from: typed in, or worked out from one of the
+ * collections serving the goal (plan #1024). Saves on choosing, like the unit
+ * beside the heading. A source whose collection or field has gone stays
+ * listed so the picker still shows what is set.
+ */
+function NumberFromLine({
+  goalId,
+  numberFrom,
+  sources,
+  onSaved,
+}: {
+  goalId: string;
+  numberFrom: NumberFrom | null;
+  sources: NumberSource[];
+  onSaved?: () => void;
+}) {
+  const [state, save, saving] = useActionState(async (prev: ReadingActionState, form: FormData) => {
+    const next = await setNumberFromAction(prev, form);
+    if (next.done) onSaved?.();
+    return next;
+  }, initial);
+  const formRef = useRef<HTMLFormElement>(null);
+  const choices = numberFromChoices(sources);
+  const current = numberFrom ? numberFromValue(numberFrom) : '';
+  const missing = current !== '' && !choices.some((c) => c.value === current);
+  return (
+    <form
+      ref={formRef}
+      action={save}
+      key={current}
+      className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-small text-ink-muted"
+    >
+      <input type="hidden" name="goalId" value={goalId} />
+      <label htmlFor={`number-from-${goalId}`}>Number</label>
+      <Select
+        id={`number-from-${goalId}`}
+        name="from"
+        defaultValue={current}
+        disabled={saving}
+        onChange={() => formRef.current?.requestSubmit()}
+        className="w-auto min-w-40"
+      >
+        <option value="">Typed in by hand</option>
+        {missing && (
+          <option value={current} disabled>
+            From a collection no longer serving this goal
+          </option>
+        )}
+        {choices.map((choice) => (
+          <option key={choice.value} value={choice.value}>
+            {choice.label}
+          </option>
+        ))}
+      </Select>
+      {numberFrom && !missing && <span>kept up to date as the records change</span>}
+      {state.error && <span className="w-full text-small text-danger">{state.error}</span>}
+    </form>
+  );
+}
+
 /** The first unit and target, for a goal not measured yet. */
-function MeasureForm({ goalId, onClose }: { goalId: string; onClose: () => void }) {
+function MeasureForm({
+  goalId,
+  sources,
+  onClose,
+}: {
+  goalId: string;
+  sources: NumberSource[];
+  onClose: () => void;
+}) {
   const [state, save, saving] = useActionState(async (prev: ReadingActionState, form: FormData) => {
     const next = await setMeasureAction(prev, form);
     if (next.done) onClose();
@@ -238,6 +327,11 @@ function MeasureForm({ goalId, onClose }: { goalId: string; onClose: () => void 
           </Button>
         </span>
       </form>
+      {sources.length > 0 && (
+        <div className="border-t border-border px-2 py-2">
+          <NumberFromLine goalId={goalId} numberFrom={null} sources={sources} onSaved={onClose} />
+        </div>
+      )}
     </Card>
   );
 }

@@ -9,6 +9,8 @@
  * reads and writes are in lib/goals/readings-store.ts.
  */
 
+import type { CollectionField, FieldType } from '@/lib/goals/collections';
+
 /** The limits the table's checks set (supabase/migrations-goals/0004 and 0001). */
 export const UNIT_MAX = 40;
 export const READING_NOTE_MAX = 2000;
@@ -147,6 +149,97 @@ export function movementLine(
     );
   }
   return parts.join(', ');
+}
+
+// ---------------------------------------------------------------------------
+// The number worked out from a collection (plan #1024)
+// ---------------------------------------------------------------------------
+
+/**
+ * How a goal's number is worked out from a collection
+ * (goals.items.number_from_how): the total of one field over every record,
+ * the value on the record whose figures are newest, or how many records there
+ * are. The database writes the readings (supabase/migrations-goals/0028).
+ */
+export const NUMBER_FROM_HOWS = ['sum', 'latest', 'count'] as const;
+export type NumberFromHow = (typeof NUMBER_FROM_HOWS)[number];
+
+export type NumberFrom = {
+  collectionId: string;
+  /** Null only for a count of every record. */
+  field: string | null;
+  how: NumberFromHow;
+};
+
+/** A collection serving the goal, as far as working out its number needs. */
+export type NumberSource = { id: string; name: string; fields: CollectionField[] };
+
+export type NumberFromChoice = {
+  /** What the picker sends: how, collection and field joined by "|". */
+  value: string;
+  label: string;
+  from: NumberFrom;
+  /** The unit a goal with none takes when this is chosen. */
+  unit: string;
+};
+
+const NUMBER_TYPES: ReadonlySet<FieldType> = new Set(['number', 'money', 'percent']);
+
+export function numberFromValue(from: NumberFrom): string {
+  return `${from.how}|${from.collectionId}|${from.field ?? ''}`;
+}
+
+function unitFor(field: CollectionField): string {
+  if (field.type === 'money') return '$';
+  if (field.type === 'percent') return '%';
+  return field.label.toLowerCase().slice(0, UNIT_MAX);
+}
+
+/**
+ * Every way the goal's number could be worked out from the collections
+ * serving it: for each number, money or percent field, its total and its
+ * latest value, and for each collection the count of its records.
+ */
+export function numberFromChoices(sources: NumberSource[]): NumberFromChoice[] {
+  const choices: NumberFromChoice[] = [];
+  for (const source of sources) {
+    for (const field of source.fields) {
+      if (field.removed || !NUMBER_TYPES.has(field.type)) continue;
+      const label = field.label.toLowerCase();
+      for (const how of ['sum', 'latest'] as const) {
+        const from = { collectionId: source.id, field: field.key, how };
+        choices.push({
+          value: numberFromValue(from),
+          label: `${how === 'sum' ? 'Total' : 'Latest'} ${label} of ${source.name}`,
+          from,
+          unit: unitFor(field),
+        });
+      }
+    }
+    const count = { collectionId: source.id, field: null, how: 'count' as const };
+    choices.push({
+      value: numberFromValue(count),
+      label: `Number of ${source.name}`,
+      from: count,
+      unit: source.name.toLowerCase().slice(0, UNIT_MAX),
+    });
+  }
+  return choices;
+}
+
+/**
+ * The picker's value: one of the choices, or empty for a number typed in by
+ * hand. Anything else is refused rather than guessed at.
+ */
+export function parseNumberFrom(
+  raw: unknown,
+  choices: NumberFromChoice[],
+): Parsed<NumberFromChoice | null> {
+  const value = clean(raw);
+  if (!value) return { ok: true, value: null };
+  const choice = choices.find((c) => c.value === value);
+  if (!choice) return { ok: false, error: 'That collection or field is no longer there.' };
+  return { ok: true, value: choice };
 }
 
 // ---------------------------------------------------------------------------

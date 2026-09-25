@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   formatReading,
   movementLine,
+  numberFromChoices,
   parseMeasureFields,
   parseNumber,
+  parseNumberFrom,
   parseReadingFields,
   readingChart,
   sortReadings,
@@ -175,5 +177,37 @@ describe('readingChart', () => {
 
   it('draws nothing with no readings', () => {
     expect(readingChart([], 5, size)).toBeNull();
+  });
+});
+
+describe('a number worked out from a collection (plan #1024)', () => {
+  const loans = {
+    id: 'c1',
+    name: 'loans',
+    fields: [
+      { key: 'name', label: 'Loan', type: 'text' as const },
+      { key: 'balance', label: 'Balance', type: 'money' as const, tracked: true },
+      { key: 'rate', label: 'Interest rate', type: 'percent' as const },
+      { key: 'old', label: 'Old', type: 'number' as const, removed: true },
+    ],
+  };
+
+  it('offers the total and latest of each number field, and a count', () => {
+    const choices = numberFromChoices([loans]);
+    expect(choices.map((c) => [c.value, c.label, c.unit])).toEqual([
+      ['sum|c1|balance', 'Total balance of loans', '$'],
+      ['latest|c1|balance', 'Latest balance of loans', '$'],
+      ['sum|c1|rate', 'Total interest rate of loans', '%'],
+      ['latest|c1|rate', 'Latest interest rate of loans', '%'],
+      ['count|c1|', 'Number of loans', 'loans'],
+    ]);
+  });
+
+  it('takes only a choice on offer, and empty for typing it in', () => {
+    const choices = numberFromChoices([loans]);
+    expect(parseNumberFrom('sum|c1|balance', choices)).toEqual({ ok: true, value: choices[0] });
+    expect(parseNumberFrom('', choices)).toEqual({ ok: true, value: null });
+    expect(parseNumberFrom('sum|c1|name', choices).ok).toBe(false);
+    expect(parseNumberFrom('sum|c2|balance', choices).ok).toBe(false);
   });
 });

@@ -1,7 +1,7 @@
 import 'server-only';
 
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
-import type { Reading } from '@/lib/goals/readings';
+import type { NumberFrom, NumberFromHow, Reading } from '@/lib/goals/readings';
 
 /**
  * Reads and writes for a goal's number and its readings (plan #930). The
@@ -102,4 +102,66 @@ export async function deleteReading(client: GoalsSupabaseClient, id: string): Pr
   const { data, error } = await client.from('readings').delete().eq('id', id).select('id');
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;
+}
+
+/**
+ * Where a goal's number is worked out from (plan #1024), or null when it is
+ * typed in by hand.
+ */
+export async function loadNumberFrom(
+  client: GoalsSupabaseClient,
+  goalId: string,
+): Promise<NumberFrom | null> {
+  const { data, error } = await client
+    .from('items')
+    .select('number_from_collection_id, number_from_field, number_from_how')
+    .eq('id', goalId)
+    .maybeSingle();
+  if (error) throw new Error(`Could not read where the number comes from: ${error.message}`);
+  const row = data as {
+    number_from_collection_id: string | null;
+    number_from_field: string | null;
+    number_from_how: NumberFromHow | null;
+  } | null;
+  if (!row?.number_from_collection_id || !row.number_from_how) return null;
+  return {
+    collectionId: row.number_from_collection_id,
+    field: row.number_from_field,
+    how: row.number_from_how,
+  };
+}
+
+/**
+ * Work a live goal's number out from a collection, or go back to typing it
+ * (null). The database checks the field and writes the first reading. A goal
+ * with no unit takes `unit`, so it reads as measured from then on. False when
+ * there is no such goal.
+ */
+export async function setNumberFrom(
+  client: GoalsSupabaseClient,
+  goalId: string,
+  from: NumberFrom | null,
+  unit: string | null,
+): Promise<boolean> {
+  const { data: goal, error: goalError } = await client
+    .from('items')
+    .select('unit')
+    .eq('id', goalId)
+    .eq('level', 'goal')
+    .is('archived_at', null)
+    .maybeSingle();
+  if (goalError) throw new Error(goalError.message);
+  if (!goal) return false;
+
+  const { error } = await client
+    .from('items')
+    .update({
+      number_from_collection_id: from?.collectionId ?? null,
+      number_from_field: from?.field ?? null,
+      number_from_how: from?.how ?? null,
+      ...(from && !(goal as { unit: string | null }).unit && unit ? { unit } : {}),
+    })
+    .eq('id', goalId);
+  if (error) throw new Error(error.message);
+  return true;
 }
