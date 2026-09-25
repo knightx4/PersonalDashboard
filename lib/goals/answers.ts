@@ -48,7 +48,22 @@ export type StepAnswer = {
    * #997), until the step closes again: when, and the row behind the change.
    */
   changed: AnswerChanged | null;
+  /**
+   * The goals routine's verdict on its latest rewrite of a written answer:
+   * whether the meaning changed, and one line on why (plan #1036). Null when
+   * it gave none.
+   */
+  meaning: MeaningVerdict | null;
 };
+
+/** The routine's judgement on a rewritten written answer (#1034). */
+export type MeaningVerdict = { changed: boolean; reason: string };
+
+/** The stored meaning_changed and meaning_reason as the app reads them. */
+export function readMeaning(changed: unknown, reason: unknown): MeaningVerdict | null {
+  if (typeof changed !== 'boolean' || typeof reason !== 'string' || reason.trim() === '') return null;
+  return { changed, reason };
+}
 
 /** A change standing on an answer: when it came, and the row it came from. */
 export type AnswerChanged = { at: string; recordId: string | null };

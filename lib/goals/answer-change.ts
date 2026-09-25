@@ -9,27 +9,27 @@
  * - a date differs when it moves at all (#998);
  * - an amount differs when it moves by more than 5% (#1033);
  * - a written answer differs when its meaning changes, which the goals
- *   routine judges with a one-line reason (#1034; plan #1036 stores it).
+ *   routine judges with a one-line reason (#1034), stored on the answer
+ *   (plan #1036).
  *
  * The change is measured from the answer as it stood when its step last
  * closed (#1047), so small monthly rises add up. Before a step has closed,
  * it is measured from the answer as stored.
  *
  * Plan #997 reopens a closed step on this rule. The database applies it on
- * every rewrite (goals.answer_moved, migrations-goals 0037), since the goals
+ * every rewrite (goals.answer_moved, migrations-goals 0037 and 0038), since the goals
  * routine writes answers through SQL; the two must agree. The page reads this
  * one to say what moved on a reopened step (`standingChange`).
  */
 
-import type { AnswerValue, StepAnswer } from '@/lib/goals/answers';
+import type { AnswerValue, MeaningVerdict, StepAnswer } from '@/lib/goals/answers';
 import type { RecordSource } from '@/lib/goals/collections';
 import { sourceHref, sourceLabel } from '@/lib/goals/information';
 
 /** An amount has to move by more than this percentage to count (#1033). */
 export const AMOUNT_MARGIN_PERCENT = 5;
 
-/** The routine's judgement on a rewritten written answer (#1034). */
-export type MeaningVerdict = { changed: boolean; reason: string };
+export type { MeaningVerdict };
 
 /** The answer as the routine has just worked it out. */
 export type RewrittenAnswer = {
@@ -142,14 +142,19 @@ export type ChangeRecord = { id: string; source: RecordSource; sourceRef: string
  * The change standing on an answer since a rewrite reopened its step, or
  * null when there is none. The database marked the change; this says what
  * it was, measured from the closing answer, and names the document of the
- * row the database recorded as behind it.
+ * row the database recorded as behind it. For a written answer the line is
+ * the routine's own reason, stored with its verdict.
  */
 export function standingChange(
-  answer: Pick<StepAnswer, 'answer' | 'value' | 'closed' | 'changed'>,
+  answer: Pick<StepAnswer, 'answer' | 'value' | 'closed' | 'changed' | 'meaning'>,
   records: ChangeRecord[],
 ): StandingChange | null {
   if (!answer.changed) return null;
-  const { from, reason } = answerChange(answer, { answer: answer.answer, value: answer.value });
+  const { from, reason } = answerChange(answer, {
+    answer: answer.answer,
+    value: answer.value,
+    meaning: answer.meaning ?? undefined,
+  });
   const recordId = answer.changed.recordId;
   const record = recordId ? records.find((r) => r.id === recordId) : undefined;
   return {

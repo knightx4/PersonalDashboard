@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { answerChange, standingChange } from '@/lib/goals/answer-change';
-import { readChanged, readClosed, readValue } from '@/lib/goals/answers';
+import { readChanged, readClosed, readMeaning, readValue } from '@/lib/goals/answers';
 
 // The loans step as it stands on the live site (plan #1035's done-when).
 const firstPayment = {
   answer: '18 Dec 2026, on both Grad PLUS loans.',
   value: { kind: 'date', date: '2026-12-18' } as const,
   closed: null,
+  meaning: null,
 };
 const monthlyTotal = {
   answer: 'About $2,450 a month.',
@@ -83,6 +84,14 @@ describe('answerChange (plan #1035)', () => {
   });
 });
 
+describe('reading the stored verdict (plan #1036)', () => {
+  it('reads a verdict with its reason, and nothing without one', () => {
+    expect(readMeaning(false, 'The same servicer.')).toEqual({ changed: false, reason: 'The same servicer.' });
+    expect(readMeaning(null, null)).toBeNull();
+    expect(readMeaning(true, '  ')).toBeNull();
+  });
+});
+
 describe('reading the stored value', () => {
   it('reads a date, an amount from text or number, and falls back to text', () => {
     expect(readValue('date', '2026-12-18', null)).toEqual({ kind: 'date', date: '2026-12-18' });
@@ -116,6 +125,7 @@ describe('standingChange (plan #997)', () => {
         value: { kind: 'date', date: '2027-01-18' },
         closed: { answer: firstPayment.answer, value: firstPayment.value },
         changed: { at: '2026-09-25T08:00:00Z', recordId: loan },
+        meaning: null,
       },
       records,
     );
@@ -127,6 +137,21 @@ describe('standingChange (plan #997)', () => {
         href: `/goals/document?path=${encodeURIComponent(records[0].sourceRef)}`,
       },
     });
+  });
+
+  it('gives the routine’s reason for a changed servicer (plan #1036)', () => {
+    const change = standingChange(
+      {
+        answer: 'MOHELA',
+        value: { kind: 'text' },
+        closed: { answer: 'Nelnet', value: { kind: 'text' } },
+        changed: { at: '2026-09-25T08:00:00Z', recordId: loan },
+        meaning: { changed: true, reason: 'The loans moved from Nelnet to MOHELA.' },
+      },
+      records,
+    );
+    expect(change?.from).toBe('Nelnet');
+    expect(change?.reason).toBe('The loans moved from Nelnet to MOHELA.');
   });
 
   it('is null without a change, and names no document for a row since gone', () => {
