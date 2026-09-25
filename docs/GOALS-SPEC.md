@@ -290,9 +290,8 @@ runs after the feature half:
   step the hand-over refuses is passed over for the next one, and a fire that
   fails ends the tick.
 
-Not built yet: mapping new and foggy goals at night (plan #1009), and a list
-on the Goals home of what the night did (plan #1010). Until then the Runs
-page is where the night's work shows. The budget field on `/dev/plan` still
+What the night did is listed at the top of the Goals home the next morning
+(see "Since your last visit" below). The budget field on `/dev/plan` still
 says "features" although goal runs spend it too.
 
 ## The daily view
@@ -320,6 +319,24 @@ After five or more days since the last visit, the home opens with a catch-up
 for the rest of that day: the runs Claude finished while you were away, what
 is waiting on you, and one next step per goal, with everything else folded
 under it. The last visit is kept in `goals.visits`.
+
+### Since your last visit
+
+On any other day, the home opens with the runs that ended since your last
+sitting, newest first (plan #1010): the step each worked, the goal it
+mapped with the steps and questions it proposed, the facts it filed, or that
+it failed and why. Each line links to the goal it was on, at the step when it
+was on one; a morning or weekly run links to its own page. Most of these are
+the night run's, but a run carries no mark of who started it, so a run you
+started before leaving is listed too.
+
+A sitting is page loads less than thirty minutes apart (`SITTING_MINUTES`
+in `lib/goals/catch-up.ts`), and the list reads from the last visit before
+this sitting (`goals.visits.previous_visit_at`). Reloading the home, or a
+press on it, keeps the list; the next sitting clears it. What each run did is
+counted from its `goals.history` rows by `run_id`
+(`lib/goals/since-visit.ts`). On a day back from time away the catch-up
+lists the runs instead.
 
 ## Your examples, broken down
 
@@ -611,4 +628,4 @@ Third round, plan features #999 and #1005:
 26. Progress reports and the 45-minute cutoff (#1002).
 27. Taking a step from an `@dash` comment (#1003).
 28. Goal steps in the overnight runner (#1007, #1008), with mapping at night
-    (#1009) and the morning list of what the night did (#1010) still to come.
+    (#1009) and the list of what the night did on the Goals home (#1010).
