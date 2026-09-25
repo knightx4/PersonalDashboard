@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { readChanged, readClosed, readSources, readValue, type StepAnswer } from '@/lib/goals/answers';
+import { readChanged, readClosed, readMeaning, readSources, readValue, type StepAnswer } from '@/lib/goals/answers';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 
 /**
@@ -27,10 +27,12 @@ type AnswerRow = {
   closed_amount: number | string | null;
   changed_at: string | null;
   changed_record_id: string | null;
+  meaning_changed: boolean | null;
+  meaning_reason: string | null;
 };
 
 const COLUMNS =
-  'id, item_id, key, question, answer, sources, position, worked_at, out_of_date_at, kind, value_date, value_amount, closed_answer, closed_date, closed_amount, changed_at, changed_record_id';
+  'id, item_id, key, question, answer, sources, position, worked_at, out_of_date_at, kind, value_date, value_amount, closed_answer, closed_date, closed_amount, changed_at, changed_record_id, meaning_changed, meaning_reason';
 
 const toAnswer = (row: AnswerRow): StepAnswer => ({
   id: row.id,
@@ -45,6 +47,7 @@ const toAnswer = (row: AnswerRow): StepAnswer => ({
   value: readValue(row.kind, row.value_date, row.value_amount),
   closed: readClosed(row.closed_answer, row.closed_date, row.closed_amount),
   changed: readChanged(row.changed_at, row.changed_record_id),
+  meaning: readMeaning(row.meaning_changed, row.meaning_reason),
 });
 
 /** The answers on these steps, keyed by step id, each step's in order. */

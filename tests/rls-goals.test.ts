@@ -1576,6 +1576,55 @@ describe('worked-out answers on an information step (plan #989)', () => {
       await admin`update answers set value_amount = 2575 where id = ${total}`;
       expect(await statusOf(step)).toBe('open');
     });
+
+    async function verdictOf(id: string) {
+      const [row] = await admin<{ meaning_changed: boolean | null; meaning_reason: string | null }[]>`
+        select meaning_changed, meaning_reason from answers where id = ${id}`;
+      return row;
+    }
+
+    it('judges a written answer by the routine’s verdict on its meaning (plan #1036)', async () => {
+      const { step, loans } = await closedLoans();
+      const servicer = await answer(step, 'servicer', sourcesOf(loans));
+      await admin`update answers set answer = 'Nelnet' where id = ${servicer}`;
+      await admin`update items set status = 'done' where id = ${step}`;
+
+      // Reworded, same servicer: the routine says so and the step stays closed.
+      await admin`update answers set answer = 'Nelnet Servicing', meaning_changed = false,
+                  meaning_reason = 'The same servicer, named in full.' where id = ${servicer}`;
+      expect(await statusOf(step)).toBe('done');
+      expect(await changeOf(servicer)).toEqual({ changed: false, changed_record_id: null });
+
+      // Another servicer: the step reopens and keeps the routine's reason.
+      await admin`update answers set answer = 'MOHELA', meaning_changed = true,
+                  meaning_reason = 'The loans moved from Nelnet to MOHELA.' where id = ${servicer}`;
+      expect(await statusOf(step)).toBe('open');
+      expect((await changeOf(servicer)).changed).toBe(true);
+      expect(await verdictOf(servicer)).toEqual({
+        meaning_changed: true,
+        meaning_reason: 'The loans moved from Nelnet to MOHELA.',
+      });
+    });
+
+    it('drops a verdict the rewrite did not renew, and falls back to the wording', async () => {
+      const { step, loans } = await closedLoans();
+      const servicer = await answer(step, 'servicer', sourcesOf(loans));
+      await admin`update answers set answer = 'Nelnet' where id = ${servicer}`;
+      await admin`update items set status = 'done' where id = ${step}`;
+      await admin`update answers set answer = 'Nelnet Servicing', meaning_changed = false,
+                  meaning_reason = 'The same servicer, named in full.' where id = ${servicer}`;
+      expect(await statusOf(step)).toBe('done');
+
+      // A rewrite with no verdict of its own: the old one judged another answer.
+      await admin`update answers set answer = 'MOHELA' where id = ${servicer}`;
+      expect(await verdictOf(servicer)).toEqual({ meaning_changed: null, meaning_reason: null });
+      expect(await statusOf(step)).toBe('open');
+
+      // A verdict without its reason is refused.
+      await expect(
+        admin`update answers set meaning_changed = true where id = ${servicer}`,
+      ).rejects.toThrow(/answers_meaning_verdict/);
+    });
   });
 });
 
