@@ -3,6 +3,7 @@ import type { NewsSender } from '@/lib/news/issues/list';
 import { cardPasses, nextCard, quickPage, quickTopics, type QuickIssue } from './next';
 import {
   COVERAGE_CAP,
+  FRESH_HALF_LIFE_HOURS,
   INTEREST_CAP,
   interestModel,
   rankReason,
@@ -16,9 +17,10 @@ const hoursAgo = (h: number) => new Date(NOW - h * 3_600_000).toISOString();
 describe('storyScore', () => {
   const base = { newsletters: 1, lead: false, topicLean: 0, senderLean: 0 };
 
-  it('halves a story each day', () => {
+  it('halves a story every half-life', () => {
     expect(storyScore({ ...base, receivedAt: hoursAgo(0) }, NOW)).toBeCloseTo(1);
-    expect(storyScore({ ...base, receivedAt: hoursAgo(24) }, NOW)).toBeCloseTo(0.5);
+    const half = hoursAgo(FRESH_HALF_LIFE_HOURS);
+    expect(storyScore({ ...base, receivedAt: half }, NOW)).toBeCloseTo(0.5);
   });
 
   it('puts an event five newsletters ran from yesterday above a lone story from now', () => {
@@ -200,5 +202,62 @@ describe('nextCard with signals', () => {
       },
     );
     expect(card?.repeats).toEqual([{ issueId: 'od', storyIndex: 1 }]);
+  });
+});
+
+describe('importance', () => {
+  const plain = { newsletters: 1, lead: false, topicLean: 0, senderLean: 0 };
+
+  it('lifts an unseen 5 from yesterday over a 4 from now, and sinks a 1', () => {
+    const major = storyScore({ ...plain, receivedAt: hoursAgo(24), importance: 5 }, NOW);
+    const lead = storyScore({ ...plain, receivedAt: hoursAgo(0), importance: 4 }, NOW);
+    const filler = storyScore({ ...plain, receivedAt: hoursAgo(0), importance: 1 }, NOW);
+    const ordinary = storyScore({ ...plain, receivedAt: hoursAgo(24), importance: 3 }, NOW);
+    expect(major).toBeGreaterThan(lead);
+    expect(filler).toBeLessThan(ordinary);
+  });
+
+  it('lets the rating, not the position, speak once a story is rated', () => {
+    const at = hoursAgo(2);
+    expect(storyScore({ ...plain, receivedAt: at, lead: true, importance: 3 }, NOW)).toBeCloseTo(
+      storyScore({ ...plain, receivedAt: at, importance: 3 }, NOW),
+    );
+  });
+
+  it('orders one newsletter by its ratings and mixes in other newsletters', () => {
+    const brief = issue('b', 'axios', 1, [
+      s('Lead fluff', { importance: 2 }),
+      s('Filler', { importance: 1 }),
+      s('Ruling', { importance: 5 }),
+    ]);
+    const other = issue('o', 'npr', 6, [s('Solid news', { importance: 3 })]);
+    const page = quickPage([brief, other], senders, [], {}, 10, { now: NOW });
+    expect(page.map((c) => (c.kind === 'story' ? c.story.headline : ''))).toEqual([
+      'Ruling',
+      'Solid news',
+      'Lead fluff',
+      'Filler',
+    ]);
+    expect(page[0].reason).toBe('A major story');
+  });
+
+  it('rates an event by its highest telling', () => {
+    const low = issue('l', 'axios', 1, [s('Passes back', { importance: 2, link: 'https://l' })]);
+    const high = issue('h', 'npr', 1, [s('Judge restores passes', { importance: 5 })]);
+    const rival = issue('r', 'brew', 1, [s('Other', { importance: 4 })]);
+    const card = nextCard(
+      [low, high, rival],
+      senders,
+      [],
+      {},
+      {
+        groups: [
+          { issueId: 'l', storyIndex: 0, groupId: 'g' },
+          { issueId: 'h', storyIndex: 0, groupId: 'g' },
+        ],
+        now: NOW,
+      },
+    );
+    expect(card).toMatchObject({ issueId: 'l', reason: 'A major story' });
   });
 });

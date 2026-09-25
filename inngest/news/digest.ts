@@ -2,6 +2,7 @@ import 'server-only';
 
 import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { createNewsServiceClient } from '@/lib/news/auth/service';
+import { scorePending, type ScoreTally } from '@/lib/news/issues/importance';
 import { digestPending, type PendingTally } from '@/lib/news/issues/summarise';
 
 /**
@@ -15,6 +16,11 @@ import { digestPending, type PendingTally } from '@/lib/news/issues/summarise';
  * they get one (plan #859). Called by pg_cron
  * through `/api/cron/news-digest`
  * (supabase/migrations/0100_news_digest_tick_cron.sql).
+ *
+ * With time left it rates the stories of newsletters summarised before
+ * stories were rated (lib/news/issues/importance.ts), newest first, so Quick
+ * read can rank them by importance. Once every stored newsletter is rated this
+ * is one query and no model call.
  */
 
 /** Most issues one run takes on. One Haiku call each, of up to about forty seconds. */
@@ -23,14 +29,28 @@ export const NEWS_DIGEST_PER_RUN = 10;
 /** Time after which a run starts no new issue. The route's limit is 300 seconds. */
 export const NEWS_DIGEST_BUDGET_MS = 200_000;
 
-export async function runNewsDigestTick(): Promise<PendingTally> {
+/** Most newsletters one run rates. One short Haiku call each, a few seconds long. */
+export const NEWS_SCORE_PER_RUN = 40;
+
+export async function runNewsDigestTick(): Promise<PendingTally & { rated: ScoreTally }> {
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicApiKey) throw new Error('ANTHROPIC_API_KEY is not set');
-  return digestPending({
-    news: createNewsServiceClient(),
-    spend: createCoreServiceSupabase(),
+  const news = createNewsServiceClient();
+  const spend = createCoreServiceSupabase();
+  const deadline = Date.now() + NEWS_DIGEST_BUDGET_MS;
+  const digested = await digestPending({
+    news,
+    spend,
     anthropicApiKey,
     limit: NEWS_DIGEST_PER_RUN,
-    deadline: Date.now() + NEWS_DIGEST_BUDGET_MS,
+    deadline,
   });
+  const rated = await scorePending({
+    news,
+    spend,
+    anthropicApiKey,
+    limit: NEWS_SCORE_PER_RUN,
+    deadline,
+  });
+  return { ...digested, rated };
 }

@@ -6,11 +6,19 @@ describe('readStories', () => {
   it('keeps each story with its headline, summary and link', () => {
     expect(
       readStories([
-        { headline: 'Rates held', summary: 'The bank kept rates. It meets again in May.', link: 'https://example.com/a' },
+        {
+          headline: 'Rates held',
+          summary: 'The bank kept rates. It meets again in May.',
+          link: 'https://example.com/a',
+        },
         { headline: 'No link', summary: 'Two sentences. Both here.' },
       ]),
     ).toEqual([
-      { headline: 'Rates held', summary: 'The bank kept rates. It meets again in May.', link: 'https://example.com/a' },
+      {
+        headline: 'Rates held',
+        summary: 'The bank kept rates. It meets again in May.',
+        link: 'https://example.com/a',
+      },
       { headline: 'No link', summary: 'Two sentences. Both here.' },
     ]);
   });
@@ -92,8 +100,15 @@ describe('storyParagraphs', () => {
 
 describe('storyAddsToSummary (note 86b9c6d1)', () => {
   it('is false when the text is the summary word for word', () => {
-    expect(storyAddsToSummary('The Fed held rates.\n\nMarkets rose!', 'The Fed held rates. Markets rose.')).toBe(false);
-    expect(storyAddsToSummary('the fed held rates', 'The Fed held rates, markets rose.')).toBe(false);
+    expect(
+      storyAddsToSummary(
+        'The Fed held rates.\n\nMarkets rose!',
+        'The Fed held rates. Markets rose.',
+      ),
+    ).toBe(false);
+    expect(storyAddsToSummary('the fed held rates', 'The Fed held rates, markets rose.')).toBe(
+      false,
+    );
   });
 
   it('is false when the text differs from the summary by a word or two', () => {
@@ -106,13 +121,28 @@ describe('storyAddsToSummary (note 86b9c6d1)', () => {
   });
 
   it('is true when the text says more', () => {
-    expect(storyAddsToSummary('The Fed held rates. Powell said more cuts may come.', 'The Fed held rates.')).toBe(
-      true,
-    );
+    expect(
+      storyAddsToSummary(
+        'The Fed held rates. Powell said more cuts may come.',
+        'The Fed held rates.',
+      ),
+    ).toBe(true);
     expect(storyAddsToSummary('Anything at all.', undefined)).toBe(true);
   });
 
   it('is false with no text', () => {
     expect(storyAddsToSummary(undefined, 'A summary.')).toBe(false);
+  });
+});
+
+describe('readStories importance', () => {
+  it('keeps a whole-number rating from 1 to 5 and drops anything else', () => {
+    const stories = readStories([
+      { headline: 'A', summary: 'a', importance: 5 },
+      { headline: 'B', summary: 'b', importance: '2' },
+      { headline: 'C', summary: 'c', importance: 0 },
+      { headline: 'D', summary: 'd', importance: 3.5 },
+    ]);
+    expect(stories.map((story) => story.importance)).toEqual([5, 2, undefined, undefined]);
   });
 });

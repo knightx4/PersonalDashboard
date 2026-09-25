@@ -10,6 +10,7 @@ import { forceTool } from '@/lib/learn/graph/tool-call';
 import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
 import { readStories, type NewsStory } from '@/lib/news/issues/stories';
 import { FALLBACK_TOPIC, NEWS_TOPICS, readTopic } from '@/lib/news/issues/topics';
+import { IMPORTANCE_RUBRIC } from './importance-rubric';
 
 /**
  * A newsletter's summary and stories, written by Haiku from the body already
@@ -55,6 +56,11 @@ import { FALLBACK_TOPIC, NEWS_TOPICS, readTopic } from '@/lib/news/issues/topics
  * kept on the story in the same jsonb. A story it gives no topic, or one not
  * on the list, is stored as Other, so every story digested from here on has
  * one.
+ *
+ * Importance. The model also rates each story from 1 to 5 by
+ * IMPORTANCE_RUBRIC (importance-rubric.ts), kept on the story as `importance`,
+ * which Quick read ranks by. A rating that is not a whole number from 1 to 5
+ * is dropped and the story kept without one.
  */
 
 export const DIGEST_MODEL = 'claude-haiku-4-5';
@@ -134,6 +140,8 @@ place, such as its city government, mayor, transit, schools, neighbourhoods or
 events there, is Local, even where another topic would also fit. When no local
 area is named, never pick Local.
 
+${IMPORTANCE_RUBRIC}
+
 ONE ESSAY. When the issue is a single article or essay rather than a set of
 items, the summary covers it and the story list is empty. Do not cut one essay
 into stories by its sections.`;
@@ -176,8 +184,13 @@ const TOOL = {
               enum: [...NEWS_TOPICS],
               description: 'The one topic from the list that fits this story best.',
             },
+            importance: {
+              type: 'integer',
+              enum: [1, 2, 3, 4, 5],
+              description: 'How much a well-informed reader needs to know this story, 1 to 5.',
+            },
           },
-          required: ['headline', 'summary', 'topic'],
+          required: ['headline', 'summary', 'topic', 'importance'],
         },
       },
     },
@@ -475,7 +488,9 @@ export async function writeDigest(
     (part) => part.type === 'tool_use' && part.name === TOOL_NAME,
   );
   if (!block || block.type !== 'tool_use') {
-    throw new Error(`The model did not report a digest (stopped: ${response.stop_reason ?? 'unknown'}).`);
+    throw new Error(
+      `The model did not report a digest (stopped: ${response.stop_reason ?? 'unknown'}).`,
+    );
   }
   const digest = readDigest(block.input, links, images);
   if (typeof digest === 'string') throw new Error(digest);

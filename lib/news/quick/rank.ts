@@ -1,3 +1,4 @@
+import type { Importance } from '@/lib/news/issues/stories';
 import { readTopic, type NewsTopic } from '@/lib/news/issues/topics';
 
 /**
@@ -7,13 +8,19 @@ import { readTopic, type NewsTopic } from '@/lib/news/issues/topics';
  * email's order (#846). With a dozen newsletters a day that put whatever
  * arrived last ahead of the event half of them led with, and showed that event
  * again from each newsletter that covered it. This ranks every story left
- * across them instead, from four things:
+ * across them instead, from five things:
  *
+ * - How much it matters: the 1 to 5 rating Haiku gives each story
+ *   (importance-rubric.ts). Each point above or below 3 is IMPORTANCE_STEP,
+ *   so a 5 from yesterday you have not seen still comes before a 4 from this
+ *   morning, and a 1 sinks below yesterday's ordinary news. This is what makes the order a front page
+ *   rather than a pile of newsletters.
  * - How new it is. A story halves in weight every FRESH_HALF_LIFE_HOURS.
  * - How many of your newsletters ran it. Each one past the first adds
  *   COVERAGE_STEP, up to COVERAGE_CAP: an event five of them led with is
  *   worth reading a day later.
- * - Whether it led its newsletter. The editor put it first for a reason.
+ * - Whether it led its newsletter, for a story not yet rated. The editor put
+ *   it first for a reason; once a story is rated, the rating says it better.
  * - What you read. Opening a story's article or saving it counts for its
  *   topic and its newsletter; moving past one without opening counts
  *   slightly against. `interestModel` turns those tallies into a lean of at
@@ -23,9 +30,10 @@ import { readTopic, type NewsTopic } from '@/lib/news/issues/topics';
  * Everything here is pure, so the order can be tested without a database.
  */
 
-export const FRESH_HALF_LIFE_HOURS = 24;
-export const COVERAGE_STEP = 0.6;
-export const COVERAGE_CAP = 1.8;
+export const FRESH_HALF_LIFE_HOURS = 36;
+export const IMPORTANCE_STEP = 0.4;
+export const COVERAGE_STEP = 0.4;
+export const COVERAGE_CAP = 1.2;
 export const LEAD_BONUS = 0.2;
 export const INTEREST_CAP = 0.4;
 export const MIN_ENGAGED = 3;
@@ -113,6 +121,8 @@ export type RankInput = {
   newsletters: number;
   /** Whether it was the first story of a newsletter with more than one. */
   lead: boolean;
+  /** Its rating, or undefined while it has none. */
+  importance?: Importance;
   topicLean: number;
   senderLean: number;
 };
@@ -123,22 +133,30 @@ export function storyScore(input: RankInput, now: number): number {
   const hours = Number.isFinite(arrived) ? Math.max(0, (now - arrived) / 3_600_000) : Infinity;
   const fresh = Number.isFinite(hours) ? 0.5 ** (hours / FRESH_HALF_LIFE_HOURS) : 0;
   const coverage = Math.min(COVERAGE_CAP, COVERAGE_STEP * Math.max(0, input.newsletters - 1));
-  return fresh + coverage + (input.lead ? LEAD_BONUS : 0) + input.topicLean + input.senderLean;
+  const weight =
+    input.importance === undefined
+      ? input.lead
+        ? LEAD_BONUS
+        : 0
+      : IMPORTANCE_STEP * (input.importance - 3);
+  return fresh + coverage + weight + input.topicLean + input.senderLean;
 }
 
 /**
  * The one line a card gives for why it is near the top, or null when nothing
  * stands out. Coverage by three or more newsletters says it first. Two is
- * already said by the card's "Also in" line.
+ * already said by the card's "Also in" line. Then a story rated 5.
  */
 export function rankReason(input: {
   newsletters: number;
+  importance?: Importance;
   topic: NewsTopic | undefined;
   topicLean: number;
   from: string | null;
   senderLean: number;
 }): string | null {
   if (input.newsletters >= 3) return `Ran in ${input.newsletters} of your newsletters`;
+  if (input.importance === 5) return 'A major story';
   if (input.topic && input.topic !== 'Other' && input.topicLean >= REASON_LEAN) {
     return `You often open ${input.topic} stories`;
   }

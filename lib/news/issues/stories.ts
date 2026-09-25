@@ -14,6 +14,12 @@ import { readTopic, type NewsTopic } from './topics';
  * in the same call that writes the summary (plan #859). It is absent on a
  * story summarised before topics existed, and on a stored topic that is no
  * longer on the list.
+ *
+ * `importance` is how much a well-informed reader needs to know the story,
+ * from 1 (filler) to 5 (front-page news), rated by Haiku when the newsletter
+ * is summarised or, for a story stored before ratings existed, by
+ * scoreImportance in lib/news/issues/importance.ts. Quick read ranks by it.
+ * It is absent until the story has been rated.
  */
 export type NewsStory = {
   headline: string;
@@ -22,7 +28,19 @@ export type NewsStory = {
   image?: string;
   text?: string;
   topic?: NewsTopic;
+  importance?: Importance;
 };
+
+/** A story's importance rating, 1 to 5. */
+export type Importance = 1 | 2 | 3 | 4 | 5;
+
+/** A value as an importance rating, or undefined when it is not a whole number from 1 to 5. */
+export function readImportance(value: unknown): Importance | undefined {
+  const n = typeof value === 'string' && /^\d$/.test(value.trim()) ? Number(value) : value;
+  return typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 5
+    ? (n as Importance)
+    : undefined;
+}
 
 const WEB_ADDRESS = /^https?:\/\//i;
 
@@ -33,7 +51,8 @@ const WEB_ADDRESS = /^https?:\/\//i;
  * entry without a headline or summary is dropped here rather than shown as a
  * blank story, and a link or image that is not http(s) is dropped from its
  * story so the page never renders a `javascript:` or `data:` address. A topic
- * not on the list is dropped from its story the same way.
+ * not on the list is dropped from its story the same way, as is an importance
+ * that is not a whole number from 1 to 5.
  * Anything that is not an array reads as no stories.
  */
 export function readStories(value: unknown): NewsStory[] {
@@ -41,7 +60,10 @@ export function readStories(value: unknown): NewsStory[] {
   const stories: NewsStory[] = [];
   for (const entry of value) {
     if (!entry || typeof entry !== 'object') continue;
-    const { headline, summary, link, image, text, topic } = entry as Record<string, unknown>;
+    const { headline, summary, link, image, text, topic, importance } = entry as Record<
+      string,
+      unknown
+    >;
     if (typeof headline !== 'string' || !headline.trim()) continue;
     if (typeof summary !== 'string' || !summary.trim()) continue;
     const story: NewsStory = { headline: headline.trim(), summary: summary.trim() };
@@ -50,6 +72,8 @@ export function readStories(value: unknown): NewsStory[] {
     if (typeof text === 'string' && text.trim()) story.text = text.trim();
     const listed = readTopic(topic);
     if (listed) story.topic = listed;
+    const rated = readImportance(importance);
+    if (rated) story.importance = rated;
     stories.push(story);
   }
   return stories;

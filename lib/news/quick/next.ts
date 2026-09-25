@@ -1,5 +1,5 @@
 import { senderLabel, type NewsSender } from '@/lib/news/issues/list';
-import { readStories, type NewsStory } from '@/lib/news/issues/stories';
+import { readStories, type Importance, type NewsStory } from '@/lib/news/issues/stories';
 import { NEWS_TOPICS, type NewsTopic } from '@/lib/news/issues/topics';
 import { interestModel, rankReason, storyScore, type InterestRow } from './rank';
 
@@ -200,6 +200,19 @@ function fullness(c: Candidate): number {
 }
 
 /**
+ * The highest rating any telling of an event got, or undefined when none is
+ * rated: one newsletter underplaying a story does not sink it.
+ */
+function ratingOf(tellings: readonly Candidate[]): Importance | undefined {
+  let best: Importance | undefined;
+  for (const c of tellings) {
+    const rated = c.slot.body.kind === 'story' ? c.slot.body.story.importance : undefined;
+    if (rated && (!best || rated > best)) best = rated;
+  }
+  return best;
+}
+
+/**
  * The cards left, best first.
  *
  * Without `signals` this is #846's order and nothing is folded. With them,
@@ -265,6 +278,7 @@ function rankedCards(
       .map((m) => ({ issueId: m.issue.id, storyIndex: m.slot.storyIndex }));
 
     const newsletters = 1 + alsoIn.length;
+    const importance = ratingOf([c, ...(c.groupId ? (members.get(c.groupId) ?? []) : [])]);
     const topic = topicOf(c.slot);
     const topicLean = interest?.topic(topic) ?? 0;
     const senderLean = interest?.sender(c.issue.senderId) ?? 0;
@@ -274,6 +288,7 @@ function rankedCards(
             receivedAt: c.issue.receivedAt,
             newsletters,
             lead: c.slot.readIndex === 0 && slots(c.issue).length > 1,
+            importance,
             topicLean,
             senderLean,
           },
@@ -292,7 +307,9 @@ function rankedCards(
       remainingInIssue: remaining.get(c.issue.id) ?? 1,
       alsoIn,
       repeats,
-      reason: interest ? rankReason({ newsletters, topic, topicLean, from, senderLean }) : null,
+      reason: interest
+        ? rankReason({ newsletters, importance, topic, topicLean, from, senderLean })
+        : null,
     };
     return { card, score, order: c.order };
   });

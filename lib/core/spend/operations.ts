@@ -59,6 +59,9 @@ export const SPEND_OPERATIONS = {
     // Embedding a new issue's stories to find the same event in other
     // newsletters. Voyage; background, beside the digest.
     'group-stories',
+    // Rating the importance of stories stored before the digest rated them.
+    // Haiku, one short call per newsletter; background, from the digest cron.
+    'score-importance',
     // The one-off measurement script behind #872, run by hand. Voyage.
     'measure-repeats',
     // Making the list of free newsletters recommended on the Newsletters tab,
