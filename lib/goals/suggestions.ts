@@ -2,18 +2,22 @@
  * The weekly run and what it suggests (docs/GOALS-SPEC.md, "What Claude does,
  * and when"; plan #934).
  *
- * Once a week the daily cron fires the goals routine to research city
- * events, talks and volunteer openings for the live rhythm goals. The routine
- * writes each find to goals.suggestions with its date and link. You press
- * going or not for me on the Goals home; going puts it on Todo on its date,
- * and ticking it there records that you went. A suggestion nobody reacted to
- * within the week is marked ignored. The next week's brief lists every
- * reaction from the last few weeks, so the research follows what you picked.
+ * Once a week the daily cron fires the goals routine to research the help
+ * each open goal asks for (its help_kinds: events, volunteer openings,
+ * reading, courses, job leads; plan #1027 and #1028). The routine writes each
+ * find to goals.suggestions with its kind and a link, and a date when it has
+ * one. You press going or not for me on the Goals home; going puts it on
+ * Todo on its date, and ticking it there records that you went. A suggestion
+ * nobody reacted to within the week is marked ignored. The next week's brief
+ * lists every reaction from the last few weeks under its kind, so the
+ * research for each kind follows what you picked of that kind.
  *
  * The rules that need no database live here. The reads and writes are in
  * lib/goals/suggestions-store.ts, and the cron stage is inngest/goals/weekly.ts.
  */
+import { HELP_KINDS, isHelpKind, type HelpKind, type HelpKindChoice } from '@/lib/goals/help-kinds';
 import type { LiveRhythm } from '@/lib/goals/rhythms';
+import type { Goal } from '@/lib/goals/tree';
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -55,6 +59,8 @@ export const REACTION_LABELS: Record<Reaction, string> = {
 export type Suggestion = {
   id: string;
   itemId: string | null;
+  /** The kind of help it is. Rows from before plan #1028 were all events. */
+  kind: HelpKind;
   title: string;
   detail: string | null;
   url: string | null;
@@ -71,6 +77,7 @@ export type Suggestion = {
 export type SuggestionRow = {
   id: string;
   item_id: string | null;
+  kind: string;
   title: string;
   detail: string | null;
   url: string | null;
@@ -84,12 +91,13 @@ export type SuggestionRow = {
 };
 
 export const SUGGESTION_COLUMNS =
-  'id, item_id, title, detail, url, place, source, happens_on, starts_at, reaction, attended, created_at';
+  'id, item_id, kind, title, detail, url, place, source, happens_on, starts_at, reaction, attended, created_at';
 
 export function toSuggestion(row: SuggestionRow): Suggestion {
   return {
     id: row.id,
     itemId: row.item_id,
+    kind: isHelpKind(row.kind) ? row.kind : 'events',
     title: row.title,
     detail: row.detail,
     url: row.url,
@@ -172,37 +180,83 @@ export function pastLine(s: Suggestion): string {
   return `- ${reaction}${went}: "${s.title}"${facts ? ` (${facts})` : ''}`;
 }
 
+/** A goal the weekly run researches for: open, and asking for at least one kind of help. */
+export type HelpGoal = {
+  id: string;
+  title: string;
+  helpKinds: HelpKindChoice[];
+  /** Its live rhythms, which an event or a volunteer opening can count towards. */
+  rhythms: LiveRhythm[];
+};
+
+/**
+ * The goals the weekly run researches for, in tree order. A goal that asks
+ * for nothing is left out, rhythms or not: the kinds on the goal are what
+ * decide the research (plan #1026).
+ */
+export function helpGoals(goals: Goal[], rhythms: LiveRhythm[]): HelpGoal[] {
+  return goals
+    .filter((g) => g.status === 'open' && (g.helpKinds ?? []).length > 0)
+    .map((g) => ({
+      id: g.id,
+      title: g.title,
+      helpKinds: g.helpKinds ?? [],
+      rhythms: rhythms.filter((r) => r.goalId === g.id),
+    }));
+}
+
+/** The kinds any of these goals ask for, in the fixed order of HELP_KINDS. */
+export function kindsAskedFor(goals: HelpGoal[]): HelpKind[] {
+  const asked = new Set(goals.flatMap((g) => g.helpKinds.map((h) => h.kind)));
+  return HELP_KINDS.filter((kind) => asked.has(kind));
+}
+
 /**
  * The turn appended to the goals routine's standing prompt for the weekly
- * run. It names the account, the run row already written, the rhythm goals
- * to research for and every reaction from the last few weeks.
+ * run. It names the account and the run row already written, then each goal
+ * with the kinds of help it asks for, and under each kind asked for, every
+ * reaction to that kind from the last few weeks.
  */
 export function weeklyRunText(input: {
   userId: string;
   runId: string;
-  rhythms: LiveRhythm[];
+  goals: HelpGoal[];
   past: Suggestion[];
 }): string {
-  const rhythms = input.rhythms.map(
-    (r) => `- "${r.title}" (goals.items id ${r.id}), ${r.target} a ${r.period}, under the goal "${r.goalTitle}"`,
-  );
-  const past =
-    input.past.length > 0
-      ? input.past.map(pastLine)
-      : ['- Nothing yet: this is the first week. Suggest a spread, so the reactions teach something.'];
+  const goals = input.goals.flatMap((g) => [
+    `Goal "${g.title}" (goals.items id ${g.id}) asks for:`,
+    ...g.helpKinds.map(({ kind, note }) => `- ${kind}${note ? `: ${note}` : ''}`),
+    ...(g.rhythms.length > 0
+      ? [
+          'Its live rhythms:',
+          ...g.rhythms.map((r) => `- "${r.title}" (goals.items id ${r.id}), ${r.target} a ${r.period}`),
+        ]
+      : []),
+    '',
+  ]);
+  const past = kindsAskedFor(input.goals).flatMap((kind) => {
+    const lines = input.past.filter((s) => s.kind === kind).map(pastLine);
+    return [
+      `${kind}:`,
+      ...(lines.length > 0
+        ? lines
+        : ['- Nothing yet for this kind. Suggest a spread, so the reactions teach something.']),
+      '',
+    ];
+  });
   return [
-    'The weekly run: research what is on in New York City for these rhythm goals.',
+    'The weekly run: find the help each goal below asks for, one kind at a time.',
     '',
-    ...rhythms,
-    '',
-    'What you suggested before, and what the person did with it (newest first):',
+    ...goals,
+    'What you suggested before of each kind, and what the person did with it (newest first):',
     '',
     ...past,
-    '',
-    'Follow .claude/skills/goals/SKILL.md, the section "The weekly run". Write each find to',
-    'goals.suggestions with its date and a link, and item_id set to the rhythm it serves.',
-    'Lean towards the kinds marked going and away from the kinds marked not for me or left',
-    'without an answer. Never write a reaction or attended: those are the person\'s.',
+    'Follow .claude/skills/goals/SKILL.md, the section "The weekly run", and its part for each',
+    'kind. Write each find to goals.suggestions with kind set to the kind it answers, a link,',
+    'and item_id set to the goal it is for, or to the rhythm it counts towards when it is an',
+    'event or a volunteer opening for a goal with one. Within each kind, lean towards what was',
+    'marked going and away from what was marked not for me or left without an answer. Never',
+    "write a reaction or attended: those are the person's.",
     '',
     `The goals belong to user_id ${input.userId}. This run is goals.runs id ${input.runId},`,
     'already written as started. Set goals.run_id to it and run_id on every suggestion, and',

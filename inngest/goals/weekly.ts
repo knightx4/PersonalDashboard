@@ -6,7 +6,7 @@ import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { liveRhythms } from '@/lib/goals/rhythms';
 import { recordAndFire } from '@/lib/goals/shaping-store';
 import { loadLiveTree } from '@/lib/goals/steps-store';
-import { ignoredBefore, pastSince, ranThisWeek, weeklyRunText } from '@/lib/goals/suggestions';
+import { helpGoals, ignoredBefore, pastSince, ranThisWeek, weeklyRunText } from '@/lib/goals/suggestions';
 import { ignoreUnanswered, loadPastSuggestions } from '@/lib/goals/suggestions-store';
 import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
 
@@ -18,17 +18,17 @@ import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
  *
  * Every day it closes the week for suggestions nobody reacted to, marking
  * them ignored. Then, once a week, it fires the goals routine for the owner
- * with the run row written first and a brief naming the live rhythms and
- * every reaction from the last few weeks. It fires nothing when the routine
- * is not set, when a weekly run started in the last week, or when there is
- * no live rhythm to research for, because each run spends the owner's
- * routine allowance. A fire that fails throws, so the cron reports the stage
+ * with the run row written first and a brief naming each open goal with the
+ * kinds of help it asks for (plan #1028), and every reaction from the last
+ * few weeks under its kind. It fires nothing when the routine is not set,
+ * when a weekly run started in the last week, or when no open goal asks for
+ * any help, because each run spends the owner's routine allowance. A fire that fails throws, so the cron reports the stage
  * as failed.
  */
 
 export type GoalsWeeklyResult =
   | { skipped: string; ignored?: number }
-  | { started: true; runId: string; rhythms: number; past: number; ignored: number };
+  | { started: true; runId: string; goals: number; past: number; ignored: number };
 
 export type GoalsWeeklyDeps = {
   client: GoalsSupabaseClient;
@@ -64,11 +64,9 @@ export async function runGoalsWeekly(deps?: Partial<GoalsWeeklyDeps>): Promise<G
   if (ranThisWeek(lastAt, now)) return { skipped: 'a weekly run already started this week', ignored };
 
   const { goals, byGoal } = await loadLiveTree(client, { userId });
-  const rhythms = liveRhythms(
-    goals.map((g) => g.goal),
-    byGoal,
-  );
-  if (rhythms.length === 0) return { skipped: 'no live rhythms to research for', ignored };
+  const open = goals.map((g) => g.goal);
+  const asking = helpGoals(open, liveRhythms(open, byGoal));
+  if (asking.length === 0) return { skipped: 'no open goal asks for weekly help', ignored };
 
   const past = await loadPastSuggestions(client, userId, pastSince(now));
 
@@ -78,11 +76,11 @@ export async function runGoalsWeekly(deps?: Partial<GoalsWeeklyDeps>): Promise<G
     job: 'weekly',
     itemId: null,
     routine,
-    text: (runId) => weeklyRunText({ userId, runId, rhythms, past }),
+    text: (runId) => weeklyRunText({ userId, runId, goals: asking, past }),
     fetch: deps?.fetch,
   });
   if (!result.ok) {
     throw new Error(`The weekly goals run did not start (run ${result.runId ?? 'not recorded'}): ${result.error}`);
   }
-  return { started: true, runId: result.runId, rhythms: rhythms.length, past: past.length, ignored };
+  return { started: true, runId: result.runId, goals: asking.length, past: past.length, ignored };
 }
