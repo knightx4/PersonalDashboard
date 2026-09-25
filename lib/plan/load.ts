@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { isModuleId, type ModuleId } from '@/lib/modules';
+import { readAll } from '@/lib/learn/db/read-all';
 
 /**
  * The plan: what is being built, as a tree.
@@ -275,36 +276,50 @@ export const ITEM_COLUMNS =
   'created_at, updated_at, dismissed_at, fog_dismissed_at';
 
 /**
- * Every row of the account's plan, in one read. The whole tree is what the
- * page shows and what a "what next" has to consider, and it is short enough —
- * tens of steps, a hundred at the outside — that reading it whole is cheaper
- * than any query that tries to be clever about which part is wanted.
+ * Every row of the account's plan. The whole tree is what the page shows and
+ * what a "what next" has to consider, so it is read whole rather than by any
+ * query that tries to be clever about which part is wanted.
+ *
+ * A page at a time, because PostgREST stops at a thousand rows and the plan
+ * passed that. The rows past the cap were the last by position, which were
+ * the newest features, so their steps arrived without them and drew as loose
+ * rows at the top of the module. `id` breaks ties in position, so no row
+ * lands on two pages or on none.
  */
 export async function loadPlan(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any, 'public'>,
   userId: string,
 ): Promise<PlanData> {
-  const [{ data: rows }, { data: deps }] = await Promise.all([
-    supabase
-      .from('plan_items')
-      // The thread is read with the row rather than as a second query, the
-      // same as on a raise. It is not in ITEM_COLUMNS because an embedded
-      // select is PostgREST's and the CLI reads these columns over a direct
-      // connection.
-      .select(`${ITEM_COLUMNS}, thread:dev_comments(${COMMENT_COLUMNS})`)
-      .eq('user_id', userId)
-      .order('position', { ascending: true })
-      .order('created_at', { ascending: true }),
-    supabase
-      .from('plan_dependencies')
-      .select('id, item_id, depends_on_id')
-      .eq('user_id', userId),
+  const [rows, deps] = await Promise.all([
+    readAll<Record<string, unknown>>((from, to) =>
+      supabase
+        .from('plan_items')
+        // The thread is read with the row rather than as a second query, the
+        // same as on a raise. It is not in ITEM_COLUMNS because an embedded
+        // select is PostgREST's and the CLI reads these columns over a direct
+        // connection.
+        .select(`${ITEM_COLUMNS}, thread:dev_comments(${COMMENT_COLUMNS})`)
+        .eq('user_id', userId)
+        .order('position', { ascending: true })
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to),
+    ),
+    // Paged for the same reason: 683 links today, and climbing.
+    readAll<Record<string, unknown>>((from, to) =>
+      supabase
+        .from('plan_dependencies')
+        .select('id, item_id, depends_on_id')
+        .eq('user_id', userId)
+        .order('id', { ascending: true })
+        .range(from, to),
+    ),
   ]);
 
   return {
-    items: ((rows ?? []) as unknown as Array<Record<string, unknown>>).map(planItemFromRow),
-    dependencies: ((deps ?? []) as Array<Record<string, unknown>>).map((row) => ({
+    items: rows.map(planItemFromRow),
+    dependencies: deps.map((row) => ({
       id: row.id as string,
       itemId: row.item_id as string,
       dependsOnId: row.depends_on_id as string,
