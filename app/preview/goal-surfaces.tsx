@@ -2,6 +2,7 @@ import { StepTree } from '@/app/goals/[goalId]/step-tree';
 import { attachDependencies, type DependencyRow } from '@/lib/goals/dependencies';
 import { buildForest, type Step } from '@/lib/goals/steps';
 import type { GoalMap } from '@/lib/goals/steps-store';
+import type { Collection } from '@/lib/goals/collections-store';
 
 /**
  * A goal's page of steps, drawn from fixtures for the gallery (plan #982).
@@ -9,10 +10,12 @@ import type { GoalMap } from '@/lib/goals/steps-store';
  * Beside the dev plan's surfaces in plan-surfaces.tsx, so the two can be
  * photographed together: the goal page draws its steps with the plan's
  * shared row. The tree holds a step of each kind -- yours, Claude's, a
- * question and a rhythm -- and the states a goal step can be in: blocked on
- * you, waiting on another step, a proposal, a Claude result to read, done
- * and dropped. No clock anywhere in it, so two shots only differ when the
- * page does.
+ * question, a rhythm and an information step with a form -- and the states a
+ * goal step can be in: blocked on you, waiting on another step, a proposal, a
+ * Claude result to read, done and dropped. A step from another goal is linked
+ * in, and one step waits on a step in a goal that is not on the page (plan
+ * #983). No clock anywhere in it, so two shots only differ when the page
+ * does.
  */
 
 function step(id: string, parentId: string, extra: Partial<Step> & { title: string }): Step {
@@ -91,6 +94,12 @@ const steps: Step[] = [
     status: 'proposed',
     position: 50,
   }),
+  step('income', GOAL, {
+    title: 'Write down what comes in each month',
+    detail: 'Pay and anything else that arrives regularly.',
+    collectionId: 'col-income',
+    position: 55,
+  }),
   step('overdraft', GOAL, {
     title: 'Close the overdraft',
     status: 'dropped',
@@ -98,10 +107,40 @@ const steps: Step[] = [
   }),
 ];
 
-const dependencies: DependencyRow[] = [{ id: 'dep-1', itemId: 'transfer', dependsOnId: 'rates' }];
+/** Another goal: one step linked into this one, one this goal waits on. */
+const OTHER = 'goal-savings';
 
-const forest = buildForest([GOAL], steps);
+const otherSteps: Step[] = [
+  step('fund', OTHER, {
+    title: 'Keep a month of spending in savings',
+    acceptance: 'The savings account holds one month of spending.',
+    position: 10,
+  }),
+  step('payday', OTHER, {
+    title: 'Move payday to the first of the month',
+    position: 20,
+  }),
+];
+
+const dependencies: DependencyRow[] = [
+  { id: 'dep-1', itemId: 'transfer', dependsOnId: 'rates' },
+  { id: 'dep-2', itemId: 'review', dependsOnId: 'payday' },
+];
+
+const forest = buildForest([GOAL, OTHER], [...steps, ...otherSteps]);
 attachDependencies(forest.byGoal, forest.nodes, dependencies);
+
+const income: Collection = {
+  id: 'col-income',
+  name: 'Income',
+  shape: 'one',
+  version: 1,
+  goalIds: [GOAL],
+  fields: [
+    { key: 'pay', label: 'Monthly pay', type: 'money' },
+    { key: 'other', label: 'Other income', type: 'text' },
+  ],
+};
 
 const map: GoalMap = {
   goal: {
@@ -117,9 +156,15 @@ const map: GoalMap = {
   },
   areaName: 'Money',
   steps: forest.byGoal.get(GOAL) ?? [],
-  linked: [],
-  otherGoals: [],
-  linksOf: {},
+  linked: [
+    {
+      linkId: 'link-1',
+      fromGoal: { id: OTHER, title: 'Build an emergency fund' },
+      step: forest.nodes.get('fund')!,
+    },
+  ],
+  otherGoals: [{ id: OTHER, title: 'Build an emergency fund' }],
+  linksOf: { fund: [{ linkId: 'link-1', goalId: GOAL, title: 'Pay off the credit cards' }] },
   rhythms: {
     review: {
       current: {
@@ -157,7 +202,24 @@ const map: GoalMap = {
       missed: 1,
     },
   },
-  information: {},
+  information: {
+    'col-income': {
+      collection: income,
+      records: [
+        {
+          id: 'rec-1',
+          collectionId: 'col-income',
+          data: { pay: 2400, other: null },
+          version: 1,
+          position: 10,
+          source: 'gmail',
+          sourceRef: null,
+          draft: true,
+          updatedAt: '2026-09-20T09:00:00Z',
+        },
+      ],
+    },
+  },
   threads: {
     call: [
       {

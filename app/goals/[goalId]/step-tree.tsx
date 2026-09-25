@@ -97,6 +97,11 @@ export function StepTree({
                 />
               ))}
             </ul>
+            {/* Inside the card, under a rule, as the plan's "Add a step" sits
+                at the foot of a module (plan #983). */}
+            <div className="border-t border-border px-3 py-2">
+              <StepComposer parentId={map.goal.id} label="Add a step" />
+            </div>
           </div>
         )}
         {aside > 0 && (
@@ -112,7 +117,7 @@ export function StepTree({
               : `Show ${aside === 1 ? 'the question' : `the ${aside} questions`} put aside`}
           </Button>
         )}
-        <StepComposer parentId={map.goal.id} label="New step" />
+        {map.steps.length === 0 && <StepComposer parentId={map.goal.id} label="Add a step" />}
       </section>
 
       {linked.length > 0 && (
