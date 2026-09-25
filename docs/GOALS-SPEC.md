@@ -4,10 +4,6 @@ A workspace for the things you are working towards in your own life, run the
 way `/dev/plan` runs the app: a tree of what has to happen, with Claude doing
 the parts it can and your parts showing up as a short list of things to do.
 
-> **Not built.** Worked out in conversation on 24 September 2026. Nothing here
-> has a migration or a plan step yet; the build order at the end is the
-> proposal for both.
-
 ## What changes from the dev plan
 
 On `/dev/plan` most steps are Claude's. A session picks one up, builds it and
@@ -145,9 +141,14 @@ Every automated job is a routine run. Runs count against the Claude plan's
 usage and daily routine limits, and the dev plan and overnight runner draw on
 the same allowance. So Goals runs on a schedule rather than on every change:
 
-- **Daily, early morning.** Work ready `claude` steps, shape newly added or
-  foggy goals, and write the day's view. You open the app about once a day, so
-  this is when the work has to be ready.
+- **Daily, early morning.** When a `claude` step is ready, one run works up
+  to ten of them (`DAILY_STEP_LIMIT` in `lib/goals/daily-run.ts`) and the
+  rest wait for the next morning. You open the app about once a day, so this
+  is when the work has to be ready. The morning run does not map new or
+  foggy goals; the night run is to take that on (plan #1009).
+- **Overnight.** While the overnight runner on `/dev/plan` is started, it
+  works ready `claude` steps one at a time between features. See "Claude's
+  own work" below.
 - **Weekly.** A verdict on each open goal against its done-when: on track,
   stalled or waiting on you, with one sentence on why and the next move,
   shown on the goal's card on the Goals home. A goal with nothing done in
@@ -160,10 +161,120 @@ the same allowance. So Goals runs on a schedule rather than on every change:
   Meetup and org newsletters vary in how reachable and current they are, so
   the first few weeks will be uneven and should improve with the feedback.
 - **On request.** A **Work on this** button on a goal fires one run for it.
+  One step or phase can be sent on its own, and one of your steps can be
+  prepared, as described in "Claude's own work" below.
 - **After an answer.** Answering a question on a goal fires one run for that
   goal once ten minutes pass with no further answer, so several answers in
   one sitting cost one run. It settles the provisional steps the answers
   held up and proposes anything new (plan #1017).
+
+## Claude's own work
+
+Besides the scheduled runs, you can hand Claude one part of a goal, and the
+overnight runner works Claude steps while you sleep. Every way in goes
+through one hand-over, `sendGoalStep` in `lib/goals/handover-store.ts`, so
+each refuses the same things and writes the same run row and brief.
+
+### Sending a step or a phase
+
+A Claude step with nothing under it has **Send to Claude** on its row. A step
+with sub-steps is a phase, whoever's it is, and has **Send this phase to
+Claude**. Pressing either writes a `goals.runs` row with job `step` or
+`phase` and `item_id` on the step, then fires the goals routine with a brief
+that names the step first, followed by its goal, where it sits, the steps
+beside it, a phase's own steps and the collections the goal fills.
+
+A sent step is worked as the morning run works one: Claude produces what it
+asks for, stores it in the step's `result` and closes it, touching no other
+step. A sent phase has its open Claude steps worked in order. Your own steps
+and questions in it are left alone, and the run stops at the first step that
+needs you.
+
+The rules are `sendRefusal` in `lib/goals/handover.ts`. A send is refused,
+with the reason shown on the row, when:
+
+- the step is a question;
+- the goal is not approved, or is done or dropped;
+- the step, or a step above it, is still a proposal;
+- the step is done or dropped already;
+- the step or a step above it is blocked;
+- a single step waits on another step that is still open;
+- a phase has nothing open under it;
+- Claude is already on the step, on the whole goal, on a phase the step is
+  part of, or on a step inside the phase.
+
+### Preparing one of your steps
+
+One of your steps with no sub-steps, such as calling a servicer or sending an
+application, has **Ask Claude to prepare this**, and **Prepare it again** once
+it has a result. A rhythm is yours too, but it repeats, so it is not offered.
+The run has job `prepare`. Claude writes what you need to do the step: a
+draft email, a call script or numbered instructions, naming the real
+servicer, account and amounts from the goal's collections and your email. It
+is stored in the step's `result`, which goals migration 0023 lets a `mine`
+step hold. The step stays yours and open, ticking it is still yours, and
+preparing it again replaces the text.
+
+The refusals are the same as for a send, except that a step may be prepared
+before the steps it waits on have closed.
+
+### From a comment
+
+The quick `@dash` reply on a step (`lib/goals/comment-model.ts`) has four
+outcomes: answer, file facts as drafts, pass the comment to the goals
+routine, or take the step. When it takes the step, `commentMode` picks the
+job: a step of yours with no sub-steps is prepared, and anything else is
+sent (`lib/goals/ask.ts`). The comment goes into the brief under "What they
+wrote", and the run treats what it says about the result, such as shorter or
+addressed to someone, as part of the step's done-when.
+
+The reply in the thread says what happened, including a refusal ("I did not
+start it: …" with the reason). On the goal itself there is no single step to
+take, so a comment asking Claude to work on the goal fires the whole-goal run
+(job `goal`), as **Work on this** does.
+
+### Progress while a run goes
+
+The goals skill reports at each step it starts by writing `last_seen_at` and
+a short `now_on` line to the run row (goals migration 0024). A run in
+progress then reads "on Draft the letter, 3 minutes ago". A run on the whole
+goal shows this in the goal page's Claude panel, and the Runs page
+(`/goals/runs`) shows it for every run, including a sent or prepared step.
+A step's row says it was sent when you press the button and shows the result
+once the run closes the step, but it does not show the run itself after the
+page reloads.
+
+A run with no report for 45 minutes (`RUN_QUIET_MS` in
+`lib/goals/shaping.ts`) is taken to have died. The sweep in
+`inngest/goals/quiet-runs.ts` closes each one as failed, with the step it was
+last on in the error. It runs on the overnight clock, which pg_cron calls
+every four minutes all day, and in the daily cron, so a dead run is closed
+within the hour and **Work on this** and **Send** work again. This replaced a
+flat two hours in which any started run held its goal.
+
+### The night run
+
+Decision #1006 put goal steps into the dev plan's overnight runner rather
+than a runner of their own. The start, pause, stop, budget and stop time on
+`/dev/plan` hold goal runs as they hold features, and each goal run takes one
+off the same budget. The goals half of each tick (`inngest/goals/overnight.ts`)
+runs after the feature half:
+
+- It starts nothing while any goals run is going, so goal steps are worked
+  one at a time.
+- `chooseNightSteps` in `lib/goals/overnight-choice.ts` orders the ready
+  Claude steps: soonest due first, then the goal that has gone longest
+  without progress, then page order. It takes one step per goal, and skips a
+  goal that already has a run going and a step whose last two runs failed or
+  never reported back.
+- The first step is sent through `sendGoalStep`, as Send would send it. A
+  step the hand-over refuses is passed over for the next one, and a fire that
+  fails ends the tick.
+
+Not built yet: mapping new and foggy goals at night (plan #1009), and a list
+on the Goals home of what the night did (plan #1010). Until then the Runs
+page is where the night's work shows. The budget field on `/dev/plan` still
+says "features" although goal runs spend it too.
 
 ## The daily view
 
@@ -425,6 +536,9 @@ A sketch for the migration, not the migration itself.
 - `goals.reviews`: the weekly verdict on each open goal, with why, the next
   move, the step proposed for a stalled one, and the run that wrote it.
 - `goals.runs`: one row per routine run, as `plan_runs` does for the dev plan.
+  `job` says what fired it (`daily`, `weekly`, `goal`, `reshape`, `step`,
+  `phase` or `prepare`), `item_id` the goal or step it is on, and
+  `last_seen_at` with `now_on` its last progress report.
 - `goals.dependencies`: one row per step that cannot start until another
   step closes, with the loop and same-account checks `plan_dependencies` has
   (plan #981). `goals.items` carries `block_ask` and `block_kind` for a
@@ -470,3 +584,12 @@ Second round, filed as its own feature:
 21. Approving or rejecting one proposal, and fog on the page.
 22. Run status on a goal.
 23. The skill: full maps, information steps, Gmail pre-fill, options required.
+
+Third round, plan features #999 and #1005:
+
+24. Send a Claude step or a phase from its row (#1000).
+25. Prepare one of your steps (#1001).
+26. Progress reports and the 45-minute cutoff (#1002).
+27. Taking a step from an `@dash` comment (#1003).
+28. Goal steps in the overnight runner (#1007, #1008), with mapping at night
+    (#1009) and the morning list of what the night did (#1010) still to come.
