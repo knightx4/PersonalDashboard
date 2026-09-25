@@ -7,7 +7,7 @@ import { isOwner } from '@/lib/dev/owner';
 import { goalsRoutine } from '@/lib/feedback/routine';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { runInFlight } from '@/lib/goals/shaping';
-import { loadAreaRuns, startAreaRun } from '@/lib/goals/shaping-store';
+import { approveGoal, loadAreaRuns, startAreaRun } from '@/lib/goals/shaping-store';
 import {
   archiveArea,
   insertArea,
@@ -163,6 +163,40 @@ export async function planAreaAction(
     return { error: result.error };
   }
   return saved();
+}
+
+/**
+ * Approve every goal Claude proposed in one area, as Approve on each goal's
+ * page would: each opens with the steps proposed under it.
+ */
+// latency: pending
+export async function approveAreaAction(
+  _prev: GoalsActionState,
+  form: FormData,
+): Promise<GoalsActionState> {
+  await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which area that was.' };
+  const client = await createGoalsClient();
+  const { data, error } = await client
+    .from('items')
+    .select('id')
+    .eq('area_id', id.data)
+    .eq('level', 'goal')
+    .eq('status', 'proposed')
+    .is('archived_at', null);
+  if (error) return { error: 'Could not read the proposed goals. Try again.' };
+  let approved = 0;
+  for (const row of (data ?? []) as { id: string }[]) {
+    try {
+      if ((await approveGoal(client, row.id)) !== null) approved += 1;
+    } catch {
+      saved();
+      return { error: `Approved ${approved}, then one could not be saved. Try again for the rest.` };
+    }
+  }
+  if (approved === 0) return { error: 'There is nothing proposed in that area now.' };
+  return { ...saved(), message: approved === 1 ? 'Approved 1 goal.' : `Approved ${approved} goals.` };
 }
 
 // latency: pending

@@ -370,12 +370,25 @@ start one, the answer is kept and the flag stays open. Flags are left off
 
 ## The daily view
 
-The Goals home page is for a once-a-day visit. It shows:
+The Goals home page is for a once-a-day visit, and it is sorted by whose
+move each thing is, so nothing Claude will do reads as yours and nothing
+waiting on your approval looks under way:
 
-- For each active goal, the next one to three things, with yours first.
-- Anything waiting on you: an unanswered decision, a proposed breakdown to
-  approve, a finished draft to review.
-- Rhythms at risk this period.
+- **Your move**, grouped by what it asks of you. *Decide*: questions, and
+  what a run flagged. *Approve*: goals Claude proposed, one row per area
+  (the All goals page has Approve and Turn down on each, and Approve all for
+  an area), and proposed steps on an approved goal. *Read*: a result Claude
+  produced, and the context and drafts it found for a goal. *Do*: your own
+  next steps across every goal, with the rhythms running out of days.
+- **Dash is on it**: the runs going now, the Claude steps the next morning
+  run will work, and the Claude steps held until you approve the goal or the
+  proposal they sit under.
+- **Your goals**: each goal's bar, its weekly verdict and the way into its
+  tree.
+
+A phase closes itself once every step under it is closed
+(`migrations-goals/0040`), so a finished stage never sits under Do waiting
+for a tick.
 
 The full tree for a goal is one tap away and is for when you want to look at
 the map, usually on a laptop. It is not the default because a tree of eighty

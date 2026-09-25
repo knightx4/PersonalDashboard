@@ -1,9 +1,12 @@
 import Link from 'next/link';
 import {
+  BookOpenText,
   ChevronRight,
   CircleAlert,
   CircleHelp,
+  FilePen,
   Flag,
+  Hourglass,
   ListChecks,
   Megaphone,
   ListTree,
@@ -16,7 +19,15 @@ import { Card } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { CatchUp } from '@/lib/goals/catch-up';
-import type { DailyGoal, DailyView as Daily, NextItem, WaitingItem } from '@/lib/goals/daily';
+import {
+  WAITING_GROUP,
+  type DailyGoal,
+  type DailyView as Daily,
+  type DashQueue,
+  type NextItem,
+  type WaitingGroup,
+  type WaitingItem,
+} from '@/lib/goals/daily';
 import { formatDay, formatInstant } from '@/lib/goals/dates';
 import { VERDICT_LABELS, type GoalReview, type Verdict } from '@/lib/goals/reviews';
 import { missedLine, progressLine, type HomeRhythm } from '@/lib/goals/rhythms';
@@ -28,33 +39,39 @@ import { GoalProgress } from './goal-progress';
 import { DidYouGoList, SuggestionsList } from './suggestions-list';
 
 /**
- * The daily view on the Goals home (plan #926).
+ * The daily view on the Goals home (plan #926), sorted by whose move it is.
  *
- * What is waiting on you comes first, because each of those holds something
- * else up. It includes what a run flagged on a goal (plan #1015), which opens
- * to the flag on the goal's page. Then one card per active goal with its next one to three things,
- * yours first. Every row is a link into the goal's full tree, where the step
- * can be done, edited or broken down; the home itself only reads.
+ * Your move comes first, because each thing in it holds something else up.
+ * It is grouped by what it asks of you: decide (a question, or something a
+ * run flagged, plan #1015), approve (goals Claude proposed, one row per area,
+ * and proposed steps), read (a result Claude produced, and the context and
+ * drafts it found for a goal) and do (the next steps of yours across every
+ * goal, with the rhythms running out of days, plan #928). Every row opens
+ * where the thing can be done; the home itself only reads.
  *
- * Rhythms at risk this period (plan #928) sit between the two: they are
- * running out of days, which makes them more pressing than a goal's next step
- * and less than a question holding a branch up.
+ * Dash is on it comes second: the runs going now, the Claude steps the next
+ * run will work, and the ones held until you approve what they sit under. So
+ * nothing Claude will do is listed as yours, and nothing waiting on your
+ * approval looks like it is under way.
+ *
+ * Then the goals themselves, each with its bar and the weekly verdict
+ * (plan #1018) and a way into its tree.
  *
  * After time away (plan #935) nothing is shown as overdue. A rhythm with
  * missed periods behind it gets one line saying how many, beside this
  * period's progress, and a step whose date has passed is listed as a plain
  * next item.
  *
- * The weekly run's suggestions (plan #934) come after the waiting list, with
- * their own going and not for me buttons: the one part of the home that
- * writes, because a reaction is quicker here than a trip into the tree. Above
- * them, from the day after an event you said you were going to, the home asks
+ * The weekly run's suggestions (plan #934) come after Dash, with their own
+ * going and not for me buttons: the one part of the home that writes,
+ * because a reaction is quicker here than a trip into the tree. Above them,
+ * from the day after an event you said you were going to, the home asks
  * whether you went (plan #1020).
  *
  * On the day you come back from five or more days away (plan #1019) the page
  * leads with a catch-up instead: the runs Claude finished while you were
- * gone, what is waiting on you, and one next step per goal. Everything else
- * is folded under it, closed.
+ * gone, your move, and one next step per goal. Everything else is folded
+ * under it, closed.
  *
  * On any other day, when runs ended since your last sitting (plan #1010), the
  * page opens with them: what each did, or why it failed, each a link to the
@@ -75,10 +92,22 @@ const KIND_ICONS: Record<NextItem['kind'], typeof User> = { mine: User, claude: 
 const WAITING_ICONS: Record<WaitingItem['kind'], typeof User> = {
   question: CircleHelp,
   breakdown: ListChecks,
-  goal: Flag,
+  plan: Flag,
   review: Sparkles,
   flag: Megaphone,
+  context: BookOpenText,
+  drafts: FilePen,
 };
+
+const GROUP_LABELS: Record<WaitingGroup | 'do', string> = {
+  decide: 'Decide',
+  approve: 'Approve',
+  read: 'Read',
+  do: 'Do',
+};
+
+/** The most of your own next steps the home lists; the rest are in each goal's tree. */
+const DO_SHOWN = 8;
 
 const VERDICT_TONES: Record<Verdict, DevTone> = {
   on_track: 'positive',
@@ -109,12 +138,33 @@ function waitingLine(item: WaitingItem): string {
       return `Question to answer · ${item.goalTitle}`;
     case 'breakdown':
       return `${item.count} proposed ${item.count === 1 ? 'step' : 'steps'} to approve`;
-    case 'goal':
-      return 'Goal Claude proposed';
+    case 'plan':
+      return item.count === 1
+        ? `Goal Claude proposed · ${item.goalTitle}`
+        : `${item.count} goals Claude proposed: ${item.goals.map((g) => g.title).join(', ')}`;
     case 'review':
       return `Claude’s result to read · ${item.goalTitle}`;
     case 'flag':
       return `Claude flagged this · ${item.goalTitle}`;
+    case 'context':
+      return `${plural(item.count, 'thing')} Claude found in your other modules`;
+    case 'drafts':
+      return `${plural(item.count, 'draft')} Claude filled in, to confirm`;
+  }
+}
+
+function waitingHref(item: WaitingItem): string {
+  switch (item.kind) {
+    case 'review':
+      return `/goals/${item.goalId}#step-${item.id}`;
+    case 'flag':
+      return `/goals/${item.goalId}#flag-${item.id}`;
+    case 'plan':
+      return item.count === 1 ? `/goals/${item.goalId}` : `/goals/all#area-${item.id}`;
+    case 'context':
+      return `/goals/${item.goalId}#context-heading`;
+    default:
+      return `/goals/${item.goalId}`;
   }
 }
 
@@ -130,7 +180,9 @@ export function DailyView({
     <SinceVisitView sinceVisit={view.sinceVisit} timeZone={timeZone} />
   );
 
-  if (view.goals.length === 0 && view.waiting.length === 0 && !lately) {
+  const hasDash =
+    view.dash.ready.length + view.dash.held.length + (view.dash.running?.length ?? 0) > 0;
+  if (view.goals.length === 0 && view.waiting.length === 0 && !lately && !hasDash) {
     return (
       <EmptyState
         icon={Flag}
@@ -141,83 +193,53 @@ export function DailyView({
     );
   }
 
-  const waiting = view.waiting.length > 0 && (
-    <section aria-labelledby="waiting-heading" className="space-y-2">
-      <h2 id="waiting-heading" className="px-1 text-ui font-semibold text-ink">
-        Waiting on you
-      </h2>
-      <Card>
-        <ul className="divide-y divide-border">
-          {view.waiting.map((item) => (
-            <WaitingRow key={`${item.kind}-${item.id}`} item={item} />
-          ))}
-        </ul>
-      </Card>
-    </section>
+  // The catch-up lists one next step per goal itself, so its Your move leaves Do out.
+  const yourMove = (
+    <YourMove
+      waiting={view.waiting}
+      goals={view.catchUp ? [] : view.goals}
+      rhythms={view.catchUp ? [] : view.rhythms}
+    />
   );
 
   const didYouGo = view.didYouGo ?? [];
   const rest = (
     <>
+      <DashSection dash={view.dash} />
+
       {didYouGo.length > 0 && <DidYouGoList suggestions={didYouGo} timeZone={timeZone} />}
 
       {view.suggestions.length > 0 && (
         <SuggestionsList suggestions={view.suggestions} timeZone={timeZone} />
       )}
 
-      {view.rhythms.length > 0 && (
-        <section aria-labelledby="risk-heading" className="space-y-2">
-          <h2 id="risk-heading" className="px-1 text-ui font-semibold text-ink">
-            Rhythms to keep up
+      {view.goals.length > 0 && (
+        <section aria-labelledby="goals-heading" className="space-y-2">
+          <h2 id="goals-heading" className="px-1 text-ui font-semibold text-ink">
+            Your goals
           </h2>
           <Card>
             <ul className="divide-y divide-border">
-              {view.rhythms.map((rhythm) => (
-                <li key={rhythm.id}>
-                  <Link
-                    href={`/goals/${rhythm.goalId}`}
-                    className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
-                  >
-                    <Repeat
-                      className="mt-0.5 size-4 shrink-0 text-ink-muted"
-                      strokeWidth={1.75}
-                      aria-hidden
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-ui break-words text-ink">{rhythm.title}</span>
-                      <span className="block text-small break-words text-ink-muted">
-                        {rhythmLine(rhythm)}
-                      </span>
-                    </span>
-                    <ChevronRight
-                      className="mt-0.5 size-4 shrink-0 text-ink-muted"
-                      strokeWidth={1.75}
-                      aria-hidden
-                    />
-                  </Link>
-                </li>
+              {view.goals.map((daily) => (
+                <GoalRow key={daily.goal.id} daily={daily} />
               ))}
             </ul>
           </Card>
         </section>
       )}
-
-      {view.goals.map((daily) => (
-        <GoalCard key={daily.goal.id} daily={daily} />
-      ))}
     </>
   );
 
   if (view.catchUp) {
     const folded = [
+      hasDash ? 'what Dash has in hand' : null,
       view.goals.length > 0 ? plural(view.goals.length, 'goal') : null,
       didYouGo.length > 0 ? plural(didYouGo.length, 'past event') : null,
       view.suggestions.length > 0 ? plural(view.suggestions.length, 'suggestion') : null,
-      view.rhythms.length > 0 ? plural(view.rhythms.length, 'rhythm') : null,
     ].filter(Boolean);
     return (
       <div className="space-y-6">
-        <CatchUpView catchUp={view.catchUp} timeZone={timeZone} waiting={waiting} />
+        <CatchUpView catchUp={view.catchUp} timeZone={timeZone} waiting={yourMove} />
         {folded.length > 0 && (
           <SectionFold title="Everything else" hint={folded.join(', ')} defaultOpen={false}>
             <div className="space-y-6">{rest}</div>
@@ -230,9 +252,192 @@ export function DailyView({
   return (
     <div className="space-y-6">
       {lately}
-      {waiting}
+      {yourMove}
       {rest}
     </div>
+  );
+}
+
+/**
+ * Everything that is yours to move, grouped by what it asks: decide,
+ * approve, read, do. Do is your own next steps across every goal, earliest
+ * due first, then the rhythms running out of days.
+ */
+function YourMove({
+  waiting,
+  goals,
+  rhythms,
+}: {
+  waiting: WaitingItem[];
+  goals: DailyGoal[];
+  rhythms: HomeRhythm[];
+}) {
+  const groups: Record<WaitingGroup, WaitingItem[]> = { decide: [], approve: [], read: [] };
+  for (const item of waiting) groups[WAITING_GROUP[item.kind]].push(item);
+  const steps = goals.flatMap((daily) =>
+    daily.next.map((item) => ({ item, goalId: daily.goal.id, goalTitle: daily.goal.title })),
+  );
+  const shown = steps.slice(0, DO_SHOWN);
+  const empty = waiting.length === 0 && steps.length === 0 && rhythms.length === 0;
+
+  return (
+    <section aria-labelledby="move-heading" className="space-y-2">
+      <h2 id="move-heading" className="px-1 text-ui font-semibold text-ink">
+        Your move
+      </h2>
+      {empty ? (
+        <p className="px-1 text-small text-ink-muted">Nothing is waiting on you.</p>
+      ) : (
+        <div className="space-y-4">
+          {(['decide', 'approve', 'read'] as const).map(
+            (group) =>
+              groups[group].length > 0 && (
+                <MoveGroup key={group} group={group}>
+                  {groups[group].map((item) => (
+                    <WaitingRow key={`${item.kind}-${item.id}`} item={item} />
+                  ))}
+                </MoveGroup>
+              ),
+          )}
+          {(steps.length > 0 || rhythms.length > 0) && (
+            <MoveGroup group="do">
+              {shown.map(({ item, goalId, goalTitle }) => (
+                <NextRow
+                  key={item.id}
+                  item={{ ...item, under: item.under ? `${goalTitle} · ${item.under}` : goalTitle }}
+                  href={`/goals/${goalId}`}
+                />
+              ))}
+              {rhythms.map((rhythm) => (
+                <RhythmRow key={rhythm.id} rhythm={rhythm} />
+              ))}
+              {steps.length > shown.length && (
+                <li className="card-pad-x row-pad text-small text-ink-muted">
+                  {plural(steps.length - shown.length, 'more step')} in your goals’ trees
+                </li>
+              )}
+            </MoveGroup>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function MoveGroup({ group, children }: { group: WaitingGroup | 'do'; children: React.ReactNode }) {
+  const id = `move-${group}`;
+  return (
+    <div className="space-y-1">
+      <h3 id={id} className="px-1 text-small font-semibold text-ink-muted">
+        {GROUP_LABELS[group]}
+      </h3>
+      <Card>
+        <ul aria-labelledby={id} className="divide-y divide-border">
+          {children}
+        </ul>
+      </Card>
+    </div>
+  );
+}
+
+function RhythmRow({ rhythm }: { rhythm: HomeRhythm }) {
+  return (
+    <li>
+      <Link
+        href={`/goals/${rhythm.goalId}`}
+        className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
+      >
+        <Repeat className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block text-ui break-words text-ink">{rhythm.title}</span>
+          <span className="block text-small break-words text-ink-muted">{rhythmLine(rhythm)}</span>
+        </span>
+        <ChevronRight className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+      </Link>
+    </li>
+  );
+}
+
+/**
+ * What Dash has in hand: the runs going now, the Claude steps the next run
+ * will work, and the ones held until you approve what they sit under.
+ */
+function DashSection({ dash }: { dash: DashQueue }) {
+  const running = dash.running ?? [];
+  const empty = running.length + dash.ready.length + dash.held.length === 0;
+  return (
+    <section aria-labelledby="dash-heading" className="space-y-2">
+      <h2 id="dash-heading" className="px-1 text-ui font-semibold text-ink">
+        Dash is on it
+      </h2>
+      {empty ? (
+        <p className="px-1 text-small text-ink-muted">
+          Nothing queued. Work on this on a goal gives Dash something to do.
+        </p>
+      ) : (
+        <Card>
+          <ul className="divide-y divide-border">
+            {running.map((run) => (
+              <li key={run.id}>
+                <Link
+                  href={`/goals/runs/${run.id}`}
+                  className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
+                >
+                  <span className="mt-1.5 size-2 shrink-0 animate-pulse rounded-full bg-accent" aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-ui break-words text-ink">
+                      {run.on ? `${run.label} · ${run.on}` : run.label}
+                    </span>
+                    <span className="block text-small break-words text-accent">
+                      Working now{run.progress ? ` · ${run.progress}` : ''}
+                    </span>
+                  </span>
+                  <ChevronRight className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+                </Link>
+              </li>
+            ))}
+            {dash.ready.map((step) => (
+              <li key={step.id}>
+                <Link
+                  href={`/goals/${step.goalId}#step-${step.id}`}
+                  className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
+                >
+                  <Sparkles className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-ui break-words text-ink">{step.title}</span>
+                    <span className="block text-small break-words text-ink-muted">
+                      Next morning run · {step.goalTitle}
+                    </span>
+                  </span>
+                  <ChevronRight className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+                </Link>
+              </li>
+            ))}
+            {dash.held.map((held) => (
+              <li key={`${held.on}-${held.goalId}`}>
+                <Link
+                  href={`/goals/${held.goalId}`}
+                  className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
+                >
+                  <Hourglass className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-ui break-words text-ink">
+                      {plural(held.count, 'step')} on {held.goalTitle}
+                    </span>
+                    <span className="block text-small break-words text-ink-muted">
+                      {held.on === 'goal'
+                        ? 'Starts once you approve the goal'
+                        : 'Starts once you approve the proposed steps'}
+                    </span>
+                  </span>
+                  <ChevronRight className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+    </section>
   );
 }
 
@@ -418,13 +623,7 @@ function WaitingRow({ item }: { item: WaitingItem }) {
   return (
     <li>
       <Link
-        href={
-          item.kind === 'review'
-            ? `/goals/${item.goalId}#step-${item.id}`
-            : item.kind === 'flag'
-              ? `/goals/${item.goalId}#flag-${item.id}`
-              : `/goals/${item.goalId}`
-        }
+        href={waitingHref(item)}
         className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
       >
         <Icon className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
@@ -442,67 +641,44 @@ function WaitingRow({ item }: { item: WaitingItem }) {
   );
 }
 
-function GoalCard({ daily }: { daily: DailyGoal }) {
-  const { goal, areaName, next, more, hasSteps, progress, review } = daily;
+/** One goal: its bar, the weekly verdict and the way into its tree. */
+function GoalRow({ daily }: { daily: DailyGoal }) {
+  const { goal, areaName, more, next, hasSteps, progress, review } = daily;
   const tree = `/goals/${goal.id}`;
-  const headingId = `goal-${goal.id}`;
+  const steps = next.length + more;
   const treeLabel = !hasSteps
     ? 'Break into steps'
-    : more > 0
-      ? `${more} more in the full tree`
+    : steps > 0
+      ? `${plural(steps, 'step')} of yours · Full tree`
       : 'Full tree';
-
-  // A goal with nothing next gets no card, since the card would only say there
-  // is nothing to show (law 1). The link to the tree moves under the heading.
   return (
-    <section aria-labelledby={headingId} className="space-y-2">
-      <div className="px-1">
-        <h2 id={headingId} className="text-ui font-semibold break-words text-ink">
-          <Link href={tree} className="underline-offset-2 hover:underline">
-            {goal.title}
-          </Link>
-        </h2>
-        {/* The area leads the progress line rather than taking a line of its
-            own, so a goal's heading is two lines, not three. */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
-          <span className="text-small text-ink-muted">{areaName}</span>
-          {progress && <GoalProgress progress={progress} label={goal.title} />}
-        </div>
-        {review && <ReviewLine review={review} />}
-        {next.length === 0 && (
-          <Link
-            href={tree}
-            className="mt-1 inline-flex items-center gap-1.5 text-small text-ink-muted transition-colors duration-150 hover:text-ink"
-          >
-            <ListTree className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
-            {treeLabel}
-          </Link>
-        )}
+    <li className="card-pad-x row-pad space-y-0.5">
+      <p className="text-ui font-semibold break-words text-ink">
+        <Link href={tree} className="underline-offset-2 hover:underline">
+          {goal.title}
+        </Link>
+      </p>
+      {/* The area leads the progress line rather than taking a line of its own. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="text-small text-ink-muted">{areaName}</span>
+        {progress && <GoalProgress progress={progress} label={goal.title} />}
       </div>
-      {next.length > 0 && (
-        <Card>
-          <ul className="divide-y divide-border">
-            {next.map((item) => (
-              <NextRow key={item.id} item={item} href={tree} />
-            ))}
-          </ul>
-          <Link
-            href={tree}
-            className="card-pad-x row-pad flex items-center gap-1.5 border-t border-border text-small text-ink-muted transition-colors duration-150 hover:text-ink"
-          >
-            <ListTree className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
-            {treeLabel}
-          </Link>
-        </Card>
-      )}
-    </section>
+      {review && <ReviewLine review={review} />}
+      <Link
+        href={tree}
+        className="inline-flex items-center gap-1.5 text-small text-ink-muted transition-colors duration-150 hover:text-ink"
+      >
+        <ListTree className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+        {treeLabel}
+      </Link>
+    </li>
   );
 }
 
 /**
  * The weekly run's newest verdict on the goal (plan #1018): the verdict and
  * why on one line, the next move on the next. A stalled goal's next move is
- * also a proposed step, which the waiting list above offers to approve.
+ * also a proposed step, which Your move above offers to approve.
  */
 function ReviewLine({ review }: { review: GoalReview }) {
   const checked = formatDay(review.createdAt.slice(0, 10));

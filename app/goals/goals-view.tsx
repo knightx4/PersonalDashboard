@@ -21,9 +21,11 @@ import {
   type AreaWithGoals,
   type Goal,
 } from '@/lib/goals/tree';
+import { approveGoalAction } from './[goalId]/shaping-actions';
 import {
   addArea,
   addGoal,
+  approveAreaAction,
   archiveAreaAction,
   archiveGoalAction,
   editGoal,
@@ -200,8 +202,10 @@ function AreaSection({
     },
   ];
 
+  const proposedCount = area.goals.filter((goal) => goal.status === 'proposed').length;
+
   return (
-    <section aria-label={area.name} className="space-y-2">
+    <section id={`area-${area.id}`} aria-label={area.name} className="scroll-mt-16 space-y-2">
       <div className="flex items-center gap-2">
         <form action={rename} className="min-w-0 flex-1">
           <input type="hidden" name="id" value={area.id} />
@@ -238,6 +242,7 @@ function AreaSection({
       </form>
       {noteState.error && <p className="px-1 text-small text-danger">{noteState.error}</p>}
 
+      {proposedCount > 1 && <ApproveArea areaId={area.id} count={proposedCount} />}
       {goalCount > 0 && (
         <Card>
           <ul className="divide-y divide-border">
@@ -377,13 +382,63 @@ function GoalRow({
             className="inline-flex items-center gap-1 text-small text-ink-muted underline-offset-2 hover:text-ink hover:underline"
           >
             <ListTree className="size-3" strokeWidth={1.75} aria-hidden />
-            {goal.status === 'proposed' ? 'Proposed by Claude: review' : steps ? 'Full tree' : 'Break into steps'}
+            {goal.status === 'proposed' ? 'See what Claude proposed' : steps ? 'Full tree' : 'Break into steps'}
           </Link>
         </div>
+        {goal.status === 'proposed' && <SettleProposedGoal goalId={goal.id} onTurnDown={archive} />}
         {editState.error && <p className="px-1 text-small text-danger">{editState.error}</p>}
       </div>
       <ActionMenu label={`${goal.title} actions`} items={items} />
     </li>
+  );
+}
+
+/**
+ * Approve or turn down a goal Claude proposed, where it stands. Approving
+ * opens it with the steps proposed under it; turning it down archives it,
+ * with an undo, and Claude does not propose it again.
+ */
+function SettleProposedGoal({
+  goalId,
+  onTurnDown,
+}: {
+  goalId: string;
+  onTurnDown: (form: FormData) => Promise<void>;
+}) {
+  const [state, approve, approving] = useActionState(approveGoalAction, {});
+  return (
+    <div className="flex flex-wrap items-center gap-2 px-1 pt-1">
+      <form action={approve}>
+        <input type="hidden" name="goalId" value={goalId} />
+        <Button type="submit" size="sm" variant="secondary" pending={approving}>
+          Approve
+        </Button>
+      </form>
+      <form action={onTurnDown}>
+        <input type="hidden" name="id" value={goalId} />
+        <Button type="submit" size="sm" variant="ghost" disabled={approving}>
+          Turn down
+        </Button>
+      </form>
+      {state.error && <span className="text-small text-danger">{state.error}</span>}
+    </div>
+  );
+}
+
+/** Approve every goal Claude proposed in the area at once. */
+function ApproveArea({ areaId, count }: { areaId: string; count: number }) {
+  const [state, approve, approving] = useActionState(approveAreaAction, initial);
+  return (
+    <form action={approve} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
+      <input type="hidden" name="id" value={areaId} />
+      <p className="min-w-0 flex-1 text-small text-ink-muted">
+        Claude proposed {count} goals here. Approve the ones you want, or all of them.
+      </p>
+      <Button type="submit" size="sm" variant="secondary" pending={approving}>
+        Approve all {count}
+      </Button>
+      {state.error && <span className="w-full text-small text-danger">{state.error}</span>}
+    </form>
   );
 }
 

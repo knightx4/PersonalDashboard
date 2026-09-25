@@ -99,7 +99,34 @@ const home: ComponentProps<typeof DailyView>['view'] = {
       goalId: cards.id,
       goalTitle: cards.title,
     },
+    {
+      kind: 'context',
+      id: job.id,
+      title: job.title,
+      goalId: job.id,
+      goalTitle: job.title,
+      count: 3,
+    },
+    {
+      kind: 'plan',
+      id: 'a-health',
+      title: 'Health',
+      goalId: 'g-sleep',
+      goalTitle: 'Sleep before midnight',
+      count: 2,
+      goals: [
+        { id: 'g-sleep', title: 'Sleep before midnight' },
+        { id: 'g-strength', title: 'Lift three times a week' },
+      ],
+    },
   ],
+  dash: {
+    running: [
+      { id: 'run-1', label: 'Work on this', on: job.title, progress: 'on Reading the vault for job notes, 2 minutes ago' },
+    ],
+    ready: [{ id: 'cmp', title: 'Compare the two cards’ rates', goalId: cards.id, goalTitle: cards.title }],
+    held: [{ goalId: 'g-sleep', goalTitle: 'Sleep before midnight', count: 2, on: 'goal' }],
+  },
   suggestions: [
     {
       id: 'sug-1',

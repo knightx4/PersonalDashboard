@@ -2,9 +2,9 @@
  * The Goals home after time away (plan #1019).
  *
  * With a catch-up, the page opens on what Claude did while you were away,
- * then what is waiting on you, then one next step per goal, and folds the
- * goal cards and the rest under "Everything else", closed. Without one it is
- * the ordinary daily view, leading with what is waiting on you.
+ * then your move, then one next step per goal, and folds the goals and the
+ * rest under "Everything else", closed. Without one it is the ordinary daily
+ * view, leading with your move.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -46,7 +46,13 @@ const waiting: WaitingItem[] = [
   },
 ];
 
-const base = { goals: [goal], waiting, rhythms: [], suggestions: [] };
+const base = {
+  goals: [goal],
+  waiting,
+  rhythms: [],
+  suggestions: [],
+  dash: { ready: [], held: [] },
+};
 
 function render(withCatchUp: boolean): string {
   const away = withCatchUp
@@ -78,7 +84,7 @@ describe('the Goals home after time away', () => {
     const order = [
       'While you were away',
       'Drafted the payoff order',
-      'Waiting on you',
+      'Your move',
       'Next for each goal',
       'Everything else',
     ];
@@ -86,10 +92,10 @@ describe('the Goals home after time away', () => {
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
     expect(html).toContain('href="/goals/runs/r1"');
-    // Only the first next step is in the catch-up; the second is in the folded card.
+    // Only the first next step is in the catch-up; the second waits in the goal's tree.
     const fold = html.indexOf('Everything else');
     expect(html.indexOf('List every balance')).toBeLessThan(fold);
-    expect(html.indexOf('Call the card company')).toBeGreaterThan(fold);
+    expect(html).not.toContain('Call the card company');
     expect(html).toMatch(/<details(?![^>]*open)[^>]*>/);
   });
 
@@ -97,6 +103,8 @@ describe('the Goals home after time away', () => {
     const html = render(false);
     expect(html).not.toContain('While you were away');
     expect(html).not.toContain('Everything else');
-    expect(html.indexOf('Waiting on you')).toBeLessThan(html.indexOf('List every balance'));
+    expect(html.indexOf('Your move')).toBeLessThan(html.indexOf('List every balance'));
+    expect(html).toContain('Call the card company');
+    expect(html.indexOf('List every balance')).toBeLessThan(html.indexOf('Dash is on it'));
   });
 });

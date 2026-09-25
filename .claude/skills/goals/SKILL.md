@@ -315,7 +315,8 @@ and reuse a step that already says what you were about to write.
    numbers, choose the order, build the schedule, set up the payments, keep it
    on track. A phase has `kind = 'mine'`, an `acceptance` saying what is true
    when the stage is over, and sub-steps. It reads Waiting while its sub-steps
-   are open, and comes up for the person to tick off once they are done.
+   are open, and closes itself once they are all done or dropped (a trigger,
+   `migrations-goals/0040`); never close a phase yourself.
 2. **Sub-steps under each phase.** Two to five, each one sitting of work, each
    with its own `acceptance`. A sub-step bigger than one sitting gets
    sub-steps of its own.

@@ -1628,6 +1628,47 @@ describe('worked-out answers on an information step (plan #989)', () => {
   });
 });
 
+describe('phases close themselves (0040)', () => {
+  async function tree(): Promise<{ goal: string; phase: string; a: string; b: string }> {
+    const [g] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title, approved_at)
+      values (${userA}, 'goal', ${areaA}, 'Get the numbers straight', now()) returning id`;
+    const [phase] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${g.id}, 'mine', 'Get the numbers') returning id`;
+    const [a] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${phase.id}, 'mine', 'List the loans') returning id`;
+    const [b] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${phase.id}, 'claude', 'Check the figures') returning id`;
+    return { goal: g.id, phase: phase.id, a: a.id, b: b.id };
+  }
+
+  async function status(id: string): Promise<string> {
+    const [row] = await admin<{ status: string }[]>`select status from items where id = ${id}`;
+    return row.status;
+  }
+
+  it('closes a phase when its last open step closes, and never the goal', async () => {
+    const t = await tree();
+    await asUser(userA, (tx) => tx`update items set status = 'done' where id = ${t.a}`);
+    expect(await status(t.phase)).toBe('open');
+    await asUser(userA, (tx) => tx`update items set status = 'dropped' where id = ${t.b}`);
+    expect(await status(t.phase)).toBe('done');
+    expect(await status(t.goal)).toBe('open');
+  });
+
+  it('keeps a phase open while a step under it is still proposed', async () => {
+    const t = await tree();
+    await admin`
+      insert into items (user_id, level, parent_id, kind, title, status)
+      values (${userA}, 'step', ${t.phase}, 'mine', 'Maybe later', 'proposed')`;
+    await asUser(userA, (tx) => tx`update items set status = 'done' where id in (${t.a}, ${t.b})`);
+    expect(await status(t.phase)).toBe('open');
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`

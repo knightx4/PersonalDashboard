@@ -3,9 +3,10 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { catchUp, catchUpSince } from '@/lib/goals/catch-up';
 import { createGoalsClient } from '@/lib/goals/auth/server';
-import { withWaiting } from '@/lib/goals/daily';
+import { withWaiting, type DailyView as Daily } from '@/lib/goals/daily';
 import { flagsWaiting } from '@/lib/goals/flags';
 import { loadGoalFlags, loadGoalTitles } from '@/lib/goals/flags-store';
+import { loadHomeExtras } from '@/lib/goals/home-store';
 import { loadRunsEndedSince } from '@/lib/goals/runs-store';
 import { loadSinceVisit } from '@/lib/goals/since-visit-store';
 import { loadDailyView } from '@/lib/goals/steps-store';
@@ -19,10 +20,24 @@ export const metadata = { title: 'Goals' };
 export const dynamic = 'force-dynamic';
 
 /**
+ * Every goal on the home by id, open or proposed, so the context and drafts
+ * waiting on either can be named. Outside the component, with the clock read
+ * here, because reading the clock during render is unstable.
+ */
+function homeExtras(client: Awaited<ReturnType<typeof createGoalsClient>>, daily: Daily) {
+  const titles = new Map<string, string>(daily.goals.map((d) => [d.goal.id, d.goal.title]));
+  for (const item of daily.waiting) {
+    if (item.kind === 'plan') for (const goal of item.goals) titles.set(goal.id, goal.title);
+  }
+  return loadHomeExtras(client, titles, Date.now()).catch(() => ({ waiting: [], running: [] }));
+}
+
+/**
  * The Goals home, for a once-a-day visit (docs/GOALS-SPEC.md, "The daily
- * view"; plan #926): what is waiting on you, then the next few things for
- * each active goal. Adding and arranging goals is on the All goals tab, and
- * each goal's full tree is one tap from here. The weekly run's suggestions
+ * view"; plan #926), sorted by whose move it is: what is on you (decide,
+ * approve, read, do), then what Dash has in hand, then the goals
+ * themselves. Adding and arranging goals is on the All goals tab, and each
+ * goal's full tree is one tap from here. The weekly run's suggestions
  * (plan #934) sit after what is waiting on you, below "Did you go?" for the
  * events you said you were going to whose day has passed (plan #1020).
  *
@@ -30,7 +45,7 @@ export const dynamic = 'force-dynamic';
  * more days away, the page leads with a catch-up from the day you left.
  * Otherwise it leads with what Claude did since your last sitting (plan
  * #1010), which the next sitting clears. What a run flagged on a goal
- * (plan #1015) is listed under Waiting on you with the rest.
+ * (plan #1015) is listed under Your move with the rest.
  *
  * The loader checks that the schema is exposed, so a deployment where `goals`
  * is not exposed to PostgREST says so here instead of showing an empty page
@@ -50,10 +65,16 @@ export default async function GoalsPage() {
   ]);
   // What runs flagged on a goal (plan #1015) lives in public.raised_items, so
   // it joins the waiting list here rather than in the step trees.
-  const titles = await loadGoalTitles(client, flags.map((flag) => flag.goalId)).catch(
-    () => new Map<string, string>(),
-  );
-  const view = { ...daily, waiting: withWaiting(daily.waiting, flagsWaiting(flags, titles)) };
+  const [titles, extras] = await Promise.all([
+    loadGoalTitles(client, flags.map((flag) => flag.goalId)).catch(() => new Map<string, string>()),
+    // The context and drafts waiting to be read, and the runs going now.
+    homeExtras(client, daily),
+  ]);
+  const view = {
+    ...daily,
+    waiting: withWaiting(daily.waiting, [...flagsWaiting(flags, titles), ...extras.waiting]),
+    dash: { ...daily.dash, running: extras.running },
+  };
   const since = catchUpSince(visit, today);
   const away = since ? catchUp(since, await loadRunsEndedSince(client, since), view) : null;
   // The catch-up already lists the runs from the time away.

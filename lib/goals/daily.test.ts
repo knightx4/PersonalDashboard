@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dailyView, NEXT_PER_GOAL } from './daily';
+import { dailyView, NEXT_PER_GOAL, readWaiting, WAITING_GROUP } from './daily';
 import { buildForest, type Step } from './steps';
 import type { Goal } from './tree';
 
@@ -57,12 +57,13 @@ const nextIds = (result: ReturnType<typeof view>, goalId: string) =>
   result.goals.find((g) => g.goal.id === goalId)?.next.map((n) => n.id);
 
 describe('dailyView next items', () => {
-  it('puts yours before Claude’s, whatever the tree order', () => {
+  it('lists only yours as next, and puts a ready Claude step on Dash’s list', () => {
     const result = view(
       [goal('g')],
       [step('c1', 'g', { kind: 'claude' }), step('m1', 'g'), step('m2', 'g')],
     );
-    expect(nextIds(result, 'g')).toEqual(['m1', 'm2', 'c1']);
+    expect(nextIds(result, 'g')).toEqual(['m1', 'm2']);
+    expect(result.dash.ready).toEqual([{ id: 'c1', title: 'c1', goalId: 'g', goalTitle: 'Goal g' }]);
   });
 
   it('orders by due date within each kind, undated after dated', () => {
@@ -87,12 +88,13 @@ describe('dailyView next items', () => {
     expect(daily.more).toBe(2);
   });
 
-  it('keeps yours inside the cap when Claude has more', () => {
+  it('leaves Claude’s steps out of the cap on yours', () => {
     const result = view(
       [goal('g')],
       [...['c1', 'c2', 'c3'].map((id) => step(id, 'g', { kind: 'claude' })), step('m1', 'g')],
     );
-    expect(nextIds(result, 'g')).toEqual(['m1', 'c1', 'c2']);
+    expect(nextIds(result, 'g')).toEqual(['m1']);
+    expect(result.dash.ready.map((r) => r.id)).toEqual(['c1', 'c2', 'c3']);
   });
 
   it('shows the open sub-steps of a step rather than the step itself', () => {
@@ -178,13 +180,62 @@ describe('dailyView waiting on you', () => {
     ]);
   });
 
-  it('lists a proposed goal once and none of its steps', () => {
+  it('lists a proposed goal once, none of its steps, and its Claude steps as held', () => {
     const result = view(
       [goal('p', { status: 'proposed' })],
-      [step('q', 'p', { kind: 'decision' }), step('s', 'p', { status: 'proposed' })],
+      [
+        step('q', 'p', { kind: 'decision' }),
+        step('s', 'p', { status: 'proposed' }),
+        step('c', 's', { status: 'proposed', kind: 'claude' }),
+      ],
     );
     expect(result.goals).toEqual([]);
-    expect(result.waiting.map((w) => [w.kind, w.id])).toEqual([['goal', 'p']]);
+    expect(result.waiting.map((w) => [w.kind, w.id])).toEqual([['plan', 'area']]);
+    expect(result.dash.held).toEqual([{ goalId: 'p', goalTitle: 'Goal p', count: 1, on: 'goal' }]);
+  });
+
+  it('groups the goals Claude proposed in one area into one row', () => {
+    const result = view(
+      [
+        goal('a', { status: 'proposed' }),
+        goal('b', { status: 'proposed' }),
+        goal('c', { status: 'proposed', areaId: 'other' }),
+      ],
+      [],
+    );
+    expect(result.waiting).toEqual([
+      {
+        kind: 'plan',
+        id: 'area',
+        title: 'Money',
+        goalId: 'a',
+        goalTitle: 'Goal a',
+        count: 2,
+        goals: [
+          { id: 'a', title: 'Goal a' },
+          { id: 'b', title: 'Goal b' },
+        ],
+      },
+      {
+        kind: 'plan',
+        id: 'other',
+        title: 'Money',
+        goalId: 'c',
+        goalTitle: 'Goal c',
+        count: 1,
+        goals: [{ id: 'c', title: 'Goal c' }],
+      },
+    ]);
+    expect(result.waiting.map((w) => WAITING_GROUP[w.kind])).toEqual(['approve', 'approve']);
+  });
+
+  it('holds a Claude step inside a proposal on an approved goal', () => {
+    const result = view(
+      [goal('g')],
+      [step('p', 'g', { status: 'proposed' }), step('c', 'p', { status: 'proposed', kind: 'claude' })],
+    );
+    expect(result.dash.held).toEqual([{ goalId: 'g', goalTitle: 'Goal g', count: 1, on: 'steps' }]);
+    expect(result.dash.ready).toEqual([]);
   });
 
   it('orders questions, then breakdowns, then proposed goals, each in page order', () => {
@@ -200,7 +251,7 @@ describe('dailyView waiting on you', () => {
       ['question', 'b-ask'],
       ['question', 'c-ask'],
       ['breakdown', 'b'],
-      ['goal', 'a'],
+      ['plan', 'area'],
     ]);
   });
 
@@ -225,10 +276,11 @@ describe('dailyView waiting on you', () => {
       ['breakdown', 'b'],
       ['review', 'draft'],
       ['review', 'linked'],
-      ['goal', 'a'],
+      ['plan', 'area'],
     ]);
-    // The unworked Claude step is still a next item, and a closed one is not.
-    expect(nextIds(result, 'b')).toEqual(['pending']);
+    // The unworked Claude step is Dash's next, and a closed one is nobody's.
+    expect(nextIds(result, 'b')).toEqual([]);
+    expect(result.dash.ready.map((r) => r.id)).toEqual(['pending']);
   });
 });
 
@@ -260,5 +312,28 @@ describe('dailyView after time away', () => {
     const next = result.goals[0].next;
     expect(next.map((n) => n.id)).toEqual(['today', 'late', 'soon']);
     expect(next.map((n) => n.dueOn)).toEqual([TODAY, null, '2026-09-26']);
+  });
+});
+
+describe('what else waits to be read', () => {
+  it('names the context and drafts found for each goal, and skips a goal with none', () => {
+    const rows = readWaiting(
+      new Map([['g1', 3]]),
+      new Map([
+        ['g1', 1],
+        ['g2', 2],
+        ['gone', 5],
+      ]),
+      new Map([
+        ['g1', 'Know what job you are aiming for'],
+        ['g2', 'Pay off student debt'],
+      ]),
+    );
+    expect(rows.map((r) => [r.kind, r.goalId, 'count' in r ? r.count : null])).toEqual([
+      ['context', 'g1', 3],
+      ['drafts', 'g1', 1],
+      ['drafts', 'g2', 2],
+    ]);
+    expect(rows.every((r) => WAITING_GROUP[r.kind] === 'read')).toBe(true);
   });
 });

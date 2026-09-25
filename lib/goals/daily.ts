@@ -1,14 +1,17 @@
 /**
  * What the Goals home shows on the daily visit (docs/GOALS-SPEC.md, "The
- * daily view"; plan #926).
+ * daily view"; plan #926), sorted by whose move it is.
  *
- * Two lists, both read out of the step trees already built by buildForest:
+ * Three lists, all read out of the step trees already built by buildForest:
  *
- * - For each active goal, the next one to three things to do, yours before
- *   Claude's.
- * - What is waiting on you: a question to answer, a breakdown to approve, a
- *   goal Claude proposed, and a result Claude produced for you to read
- *   (plan #933).
+ * - For each active goal, the next one to three things for you to do.
+ * - What else is waiting on you, each in one of three groups: decide (a
+ *   question, a flag), approve (goals Claude proposed, grouped by area, and a
+ *   breakdown), and read (a result Claude produced, and the context and
+ *   drafts it found, which the loader adds).
+ * - What Dash has in hand: Claude steps ready for the next run, and Claude
+ *   steps held until you approve what they sit under. The loader adds the
+ *   runs going now.
  *
  * Pure, so the ordering and the cap are tested without a database, in the
  * way lib/plan/waiting.ts is for the dev plan's Dash section.
@@ -59,12 +62,75 @@ export type WaitingItem =
       goalTitle: string;
       count: number;
     }
-  | { kind: 'goal'; id: string; title: string; goalId: string; goalTitle: string }
+  /**
+   * Goals Claude proposed in one area, as one row: `id` is the area, `title`
+   * its name, and `goalId` the first goal, which a single proposal opens to.
+   */
+  | {
+      kind: 'plan';
+      id: string;
+      title: string;
+      goalId: string;
+      goalTitle: string;
+      count: number;
+      goals: { id: string; title: string }[];
+    }
   | { kind: 'review'; id: string; title: string; goalId: string; goalTitle: string }
   /** Something a run flagged on the goal (plan #1015); `id` is the raised_items row. */
-  | { kind: 'flag'; id: string; title: string; goalId: string; goalTitle: string };
+  | { kind: 'flag'; id: string; title: string; goalId: string; goalTitle: string }
+  /** Context Claude found in the other modules, waiting on Keep or Not relevant; `id` is the goal. */
+  | { kind: 'context'; id: string; title: string; goalId: string; goalTitle: string; count: number }
+  /** Records Claude filled as drafts, waiting to be confirmed; `id` is the goal. */
+  | { kind: 'drafts'; id: string; title: string; goalId: string; goalTitle: string; count: number };
 
-export type DailyView = { goals: DailyGoal[]; waiting: WaitingItem[] };
+/** What each waiting item asks of you, which is how the home groups them. */
+export type WaitingGroup = 'decide' | 'approve' | 'read';
+
+export const WAITING_GROUP: Record<WaitingItem['kind'], WaitingGroup> = {
+  question: 'decide',
+  flag: 'decide',
+  plan: 'approve',
+  breakdown: 'approve',
+  review: 'read',
+  context: 'read',
+  drafts: 'read',
+};
+
+/** A Claude step with nothing in its way, which the next scheduled run works. */
+export type DashReady = { id: string; title: string; goalId: string; goalTitle: string };
+
+/**
+ * Claude steps that wait on your approval: under a goal Claude proposed
+ * (`goal`), or proposed themselves under a goal you approved (`steps`).
+ */
+export type DashHeld = { goalId: string; goalTitle: string; count: number; on: 'goal' | 'steps' };
+
+/** A run going now, as the home names it; added by the loader, which reads goals.runs. */
+export type DashRunning = { id: string; label: string; on: string | null; progress: string | null };
+
+export type DashQueue = { ready: DashReady[]; held: DashHeld[]; running?: DashRunning[] };
+
+/**
+ * The context and drafts waiting on each goal, as rows for the read group.
+ * `counts` are keyed by goal id; goals with none, or not in `titles`, are
+ * left out.
+ */
+export function readWaiting(
+  context: ReadonlyMap<string, number>,
+  drafts: ReadonlyMap<string, number>,
+  titles: ReadonlyMap<string, string>,
+): WaitingItem[] {
+  const rows: WaitingItem[] = [];
+  for (const [goalId, goalTitle] of titles) {
+    const found = context.get(goalId) ?? 0;
+    if (found > 0) rows.push({ kind: 'context', id: goalId, title: goalTitle, goalId, goalTitle, count: found });
+    const filled = drafts.get(goalId) ?? 0;
+    if (filled > 0) rows.push({ kind: 'drafts', id: goalId, title: goalTitle, goalId, goalTitle, count: filled });
+  }
+  return rows;
+}
+
+export type DailyView = { goals: DailyGoal[]; waiting: WaitingItem[]; dash: DashQueue };
 
 type GoalWithArea = { goal: Goal; areaName: string };
 
@@ -80,7 +146,9 @@ const WAITING_ORDER: Record<WaitingItem['kind'], number> = {
   flag: 1,
   breakdown: 2,
   review: 3,
-  goal: 4,
+  context: 4,
+  drafts: 5,
+  plan: 6,
 };
 
 /**
@@ -107,9 +175,11 @@ export function withWaiting(
  * Within an open goal the walk goes only through open steps. A proposed step
  * and everything under it is the breakdown to approve; a done or dropped step
  * takes its branch with it, although a Claude step with a result you have
- * not read is still listed as waiting. A step is next when it is yours or Claude's and
- * has no open step beneath it: a step with open sub-steps waits on them, and
- * it is they that are next.
+ * not read is still listed as waiting. A step of yours is next when it has no
+ * open step beneath it: a step with open sub-steps waits on them, and it is
+ * they that are next. A Claude step in the same place is ready for Dash's
+ * next run instead, and a Claude step inside a proposal, or under a goal
+ * Claude proposed, is held until you approve it.
  *
  * After time away nothing piles up (docs/GOALS-SPEC.md, "Coming back after
  * time away"): a due date before `today` is ranked as though it were today
@@ -123,6 +193,9 @@ export function dailyView(
 ): DailyView {
   const daily: DailyGoal[] = [];
   const waiting: WaitingItem[] = [];
+  const ready: DashReady[] = [];
+  const held: DashHeld[] = [];
+  const plans = new Map<string, Extract<WaitingItem, { kind: 'plan' }>>();
   // Where each row came in the walk, which is page order then tree order.
   const seen = new Map<object, number>();
   const order = (row: object) => seen.get(row) ?? 0;
@@ -133,15 +206,25 @@ export function dailyView(
 
   for (const { goal, areaName } of goals) {
     if (goal.status === 'proposed') {
-      waiting.push(
-        place({
-          kind: 'goal',
-          id: goal.id,
-          title: goal.title,
+      const plan = plans.get(goal.areaId);
+      if (plan) {
+        plan.count += 1;
+        plan.goals.push({ id: goal.id, title: goal.title });
+      } else {
+        const row = place({
+          kind: 'plan' as const,
+          id: goal.areaId,
+          title: areaName,
           goalId: goal.id,
           goalTitle: goal.title,
-        }),
-      );
+          count: 1,
+          goals: [{ id: goal.id, title: goal.title }],
+        });
+        plans.set(goal.areaId, row);
+        waiting.push(row);
+      }
+      const claude = countClaude(stepsByGoal.get(goal.id) ?? []);
+      if (claude > 0) held.push({ goalId: goal.id, goalTitle: goal.title, count: claude, on: 'goal' });
       continue;
     }
     if (goal.status !== 'open') continue;
@@ -151,11 +234,13 @@ export function dailyView(
     // Steps whose date has passed: ranked as due today, shown undated.
     const overdue = new Set<string>();
     let proposed = 0;
+    let heldClaude = 0;
 
     const walk = (nodes: StepNode[], under: string | null) => {
       for (const node of nodes) {
         if (node.status === 'proposed') {
           proposed += 1 + countProposed(node.children);
+          heldClaude += countClaude([node]);
           continue;
         }
         if (awaitsReview(node)) {
@@ -183,10 +268,10 @@ export function dailyView(
               }),
             );
           }
-        } else if (
-          (node.kind === 'mine' || node.kind === 'claude') &&
-          waitsOnNothing(node)
-        ) {
+        } else if (node.kind === 'claude' && waitsOnNothing(node)) {
+          // Claude's own: it goes on Dash's list, not yours.
+          ready.push(place({ id: node.id, title: node.title, goalId: goal.id, goalTitle: goal.title }));
+        } else if (node.kind === 'mine' && waitsOnNothing(node)) {
           if (node.dueOn !== null && node.dueOn < today) overdue.add(node.id);
           candidates.push(
             place({
@@ -203,6 +288,9 @@ export function dailyView(
     };
     walk(roots, null);
 
+    if (heldClaude > 0) {
+      held.push({ goalId: goal.id, goalTitle: goal.title, count: heldClaude, on: 'steps' });
+    }
     if (proposed > 0) {
       waiting.push(
         place({
@@ -229,15 +317,11 @@ export function dailyView(
   }
 
   waiting.sort((a, b) => WAITING_ORDER[a.kind] - WAITING_ORDER[b.kind] || order(a) - order(b));
-  return { goals: daily, waiting };
+  return { goals: daily, waiting, dash: { ready, held } };
 }
 
-/**
- * Yours before Claude's, then the earliest due date, undated after dated. A
- * tie is left to the order of the tree.
- */
+/** The earliest due date first, undated after dated. A tie is left to the order of the tree. */
 function compareNext(a: NextItem, b: NextItem): number {
-  if (a.kind !== b.kind) return a.kind === 'mine' ? -1 : 1;
   if (a.dueOn !== b.dueOn) {
     if (a.dueOn === null) return 1;
     if (b.dueOn === null) return -1;
@@ -264,6 +348,16 @@ function countProposed(nodes: StepNode[]): number {
   let count = 0;
   for (const node of nodes) {
     if (node.status === 'proposed') count += 1 + countProposed(node.children);
+  }
+  return count;
+}
+
+/** Claude steps anywhere in these branches that are not closed. */
+function countClaude(nodes: StepNode[]): number {
+  let count = 0;
+  for (const node of nodes) {
+    if (node.kind === 'claude' && node.status !== 'done' && node.status !== 'dropped') count += 1;
+    count += countClaude(node.children);
   }
   return count;
 }
