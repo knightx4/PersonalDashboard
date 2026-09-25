@@ -184,6 +184,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
   dependencies,
   comments = PLAN_COMMENTS,
   titles,
+  threadPlaceholder = 'A note on this step. Tag @dash to ask something, or to tell it to reword the step, file an idea or build it.',
   renderChild,
 }: {
   node: TreeRowNode;
@@ -224,6 +225,8 @@ export function TreeRow<E extends TreeCatalogEntry>({
   comments?: TreeComments;
   /** What each step number in a comment is called, for the hover text. */
   titles?: PlanRefTitles;
+  /** What the empty comment box says. The dev plan's, naming what Dash can do there, by default. */
+  threadPlaceholder?: string;
   /** Draws one sub-step, one level further in. */
   renderChild: (child: TreeRowNode, trail: readonly boolean[]) => ReactNode;
 }) {
@@ -596,7 +599,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                 id={node.id}
                 thread={node.thread}
                 titles={titles}
-                placeholder="A note on this step. Tag @dash to ask something, or to tell it to reword the step, file an idea or build it."
+                placeholder={threadPlaceholder}
               />
 
               {meta}
