@@ -1,10 +1,11 @@
 # The goals routine
 
 The standing prompt for the Claude Code routine that **Work on this** on a
-goal's page fires (`app/goals/[goalId]/shaping-actions.ts`), that the
+goal's page fires (`app/goals/[goalId]/shaping-actions.ts`), that **Plan
+this area** on the All goals page fires (`app/goals/actions.ts`), that the
 daily cron fires each morning when a Claude step is ready
 (`inngest/goals/daily.ts`), and that the re-shape tick fires once questions
-on a goal are answered (`inngest/goals/reshape.ts`). The app appends a turn naming the goal or the
+on a goal are answered (`inngest/goals/reshape.ts`). The app appends a turn naming the area, the goal or the
 steps, the account and the `goals.runs` row it wrote; the prompt below is what
 the routine carries when it starts. The prompt and the connectors are stored
 on claude.ai, not read from here, so a change to either takes effect only
@@ -40,8 +41,8 @@ steps pre-filled from Gmail, provisional steps, questions with lettered
 options), what you may change before and after the person approves a goal,
 and how every write is labelled with goals.actor and goals.run_id.
 
-The turn after this one says what to work (one goal, or the morning's Claude
-steps), which user_id and which goals.runs row this run is. If there is no such turn, write a goals.runs row yourself as
+The turn after this one says what to work (one area, one goal, or the
+morning's Claude steps), which user_id and which goals.runs row this run is. If there is no such turn, write a goals.runs row yourself as
 the skill says and work every open goal that is new or has fog.
 
 You change rows, not code. Do not commit or push. Close the run row with a

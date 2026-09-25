@@ -3,7 +3,7 @@ import 'server-only';
 import { fireFeatureRoutine, resolveRoutineId, type RoutineTarget } from '@/lib/feedback/routine';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import type { RunJob } from '@/lib/goals/runs';
-import { goalRunText, type GoalRun } from '@/lib/goals/shaping';
+import { areaRunText, goalRunText, type GoalRun } from '@/lib/goals/shaping';
 
 /**
  * Reads and writes for Claude shaping a goal (plan #932): the latest run on a
@@ -74,7 +74,7 @@ export async function startGoalRun(input: {
   goal: { id: string; title: string };
   routine: RoutineTarget;
   fetch?: typeof globalThis.fetch;
-}): Promise<{ ok: true; detail: string } | { ok: false; error: string }> {
+}): Promise<{ ok: true; detail: string; runId: string } | { ok: false; error: string }> {
   const { goal, userId } = input;
   const result = await recordAndFire({
     ...input,
@@ -82,13 +82,70 @@ export async function startGoalRun(input: {
     itemId: goal.id,
     text: (runId) => goalRunText({ goalId: goal.id, goalTitle: goal.title, userId, runId }),
   });
+  return result.ok
+    ? { ok: true, detail: result.detail, runId: result.runId }
+    : { ok: false, error: result.error };
+}
+
+/**
+ * The latest run on each area, keyed by area id, for the Plan this area
+ * button and the line beside it. An area with no run is absent.
+ */
+export async function loadAreaRuns(client: GoalsSupabaseClient): Promise<Record<string, GoalRun>> {
+  const { data, error } = await client
+    .from('runs')
+    .select('id, area_id, status, created_at, ended_at, summary, error, last_seen_at, now_on')
+    .eq('job', 'area')
+    .not('area_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (error) throw new Error(`Could not read area runs: ${error.message}`);
+  const latest: Record<string, GoalRun> = {};
+  for (const row of (data ?? []) as (RunRow & { area_id: string })[]) {
+    if (latest[row.area_id]) continue;
+    latest[row.area_id] = {
+      id: row.id,
+      status: row.status,
+      createdAt: row.created_at,
+      endedAt: row.ended_at,
+      summary: row.summary,
+      error: row.error,
+      lastSeenAt: row.last_seen_at,
+      nowOn: row.now_on,
+    };
+  }
+  return latest;
+}
+
+/**
+ * Plan this area: the run row on the area, then the fire with a brief naming
+ * the area, its note and the goals already under it.
+ */
+export async function startAreaRun(input: {
+  client: GoalsSupabaseClient;
+  userId: string;
+  area: { id: string; name: string; note: string | null };
+  goals: { title: string; status: string }[];
+  routine: RoutineTarget;
+  fetch?: typeof globalThis.fetch;
+}): Promise<{ ok: true; detail: string } | { ok: false; error: string }> {
+  const { area, goals, userId } = input;
+  const result = await recordAndFire({
+    ...input,
+    job: 'area',
+    itemId: null,
+    areaId: area.id,
+    text: (runId) =>
+      areaRunText({ areaId: area.id, areaName: area.name, note: area.note, goals, userId, runId }),
+  });
   return result.ok ? { ok: true, detail: result.detail } : { ok: false, error: result.error };
 }
 
 /**
  * The run row and the fire, for any job: "Work on this" on one goal, the
  * morning run (plan #933), the weekly run, a re-shape after answers
- * (plan #1017), or one step or phase sent from its row (plan #1000). `text` is the brief, given the new run's id. The
+ * (plan #1017), one step or phase sent from its row (plan #1000), or an
+ * area (Plan this area). `text` is the brief, given the new run's id. The
  * run id comes back either way, null only when the row itself could not be
  * written and nothing was started.
  */
@@ -97,6 +154,8 @@ export async function recordAndFire(input: {
   userId: string;
   job: RunJob;
   itemId: string | null;
+  /** The area an area run is on; every other job leaves it out. */
+  areaId?: string | null;
   routine: RoutineTarget;
   text: (runId: string) => string;
   fetch?: typeof globalThis.fetch;
@@ -110,6 +169,7 @@ export async function recordAndFire(input: {
       user_id: userId,
       job: input.job,
       item_id: input.itemId,
+      area_id: input.areaId ?? null,
       status: 'started',
       routine_id: resolveRoutineId(routine.id),
     })

@@ -92,6 +92,8 @@ export async function sendGoalStep(input: {
   stepId: string;
   routine: RoutineTarget;
   mode?: SendMode;
+  /** The @dash comment that asked for it (plan #1003), passed into the brief. */
+  asked?: string;
   now?: number;
   fetch?: typeof globalThis.fetch;
 }): Promise<SendResult> {
@@ -120,7 +122,7 @@ export async function sendGoalStep(input: {
     itemId: target.step.id,
     routine: input.routine,
     fetch: input.fetch,
-    text: (runId) => sendRunText({ target, job, collections, userId, runId }),
+    text: (runId) => sendRunText({ target, job, collections, userId, runId, asked: input.asked }),
   });
   if (!fired.ok) return { ok: false, error: fired.error };
   return { ok: true, job, title: target.step.title, runId: fired.runId };

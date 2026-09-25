@@ -22,7 +22,7 @@ import {
  * `archive`, and every read filters archived rows out.
  */
 
-type AreaRow = { id: string; name: string; position: number };
+type AreaRow = { id: string; name: string; note: string | null; position: number };
 type GoalRow = {
   id: string;
   area_id: string;
@@ -35,7 +35,12 @@ type GoalRow = {
   target: number | string | null;
 };
 
-const toArea = (row: AreaRow): Area => ({ id: row.id, name: row.name, position: row.position });
+const toArea = (row: AreaRow): Area => ({
+  id: row.id,
+  name: row.name,
+  note: row.note ?? null,
+  position: row.position,
+});
 
 const toGoal = (row: GoalRow): Goal => ({
   id: row.id,
@@ -52,7 +57,7 @@ const toGoal = (row: GoalRow): Goal => ({
 export async function loadAreas(client: GoalsSupabaseClient): Promise<Area[]> {
   const { data, error } = await client
     .from('areas')
-    .select('id, name, position')
+    .select('id, name, note, position')
     .is('archived_at', null)
     .order('position')
     .order('created_at');
@@ -112,6 +117,22 @@ export async function renameArea(
   const { data, error } = await client
     .from('areas')
     .update({ name })
+    .eq('id', id)
+    .is('archived_at', null)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/** Write or clear what you want from an area. False when no live area has that id. */
+export async function setAreaNote(
+  client: GoalsSupabaseClient,
+  id: string,
+  note: string | null,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('areas')
+    .update({ note })
     .eq('id', id)
     .is('archived_at', null)
     .select('id');

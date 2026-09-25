@@ -1,6 +1,6 @@
 ---
 name: goals
-description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, provisional steps for what hangs on a question, and questions with lettered options. Re-shaping - read the answers to those questions and settle the provisional steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - give each open goal a verdict (on track, stalled or waiting on you) with the next move, proposing that move as a step for a stalled goal, then research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind. Use when the goals routine is fired from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "shape my goal …", "break down <goal>", "work on my goals".
+description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, provisional steps for what hangs on a question, and questions with lettered options. Re-shaping - read the answers to those questions and settle the provisional steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - give each open goal a verdict (on track, stalled or waiting on you) with the next move, proposing that move as a step for a stalled goal, then research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
 ---
 
 # Working a goal
@@ -44,7 +44,8 @@ or `fog_dismissed_at`, and never set a record's `draft` to false.
 
 Every run has a `goals.runs` row.
 
-- Fired from **Work on this**, by the **morning run**, by the weekly run,
+- Fired from **Plan this area** (job `area`, with `area_id` on the area and
+  no `item_id`), from **Work on this**, by the **morning run**, by the weekly run,
   after the person answered questions on a goal (job `reshape`), or by
   **Send** on one step or phase (job `step` or `phase`), or by **Prepare** on
   one step of the person's (job `prepare`): the app has written the row as
@@ -367,6 +368,135 @@ person reads these on a phone once a day.
 5. **Keep it on track** (phase): a monthly `rhythm` to log each balance, and a
    quarterly `claude` review of progress against the schedule.
 
+## Planning an area
+
+The person pressed **Plan this area** on an area, or **Plan what is missing**
+on one that already has goals. They know the direction ("get plugged into
+the city") and not the goals that would get them there. Your job is those
+goals: a short set of proposals they can approve or turn down one by one, each
+concrete enough that **Work on this** can map it afterwards.
+
+The brief names the area, what the person wrote they want from it (the
+area's `note`, which may be empty), the goals already under it, and the run
+row, whose `job` is `area` and whose `area_id` is the area. Report progress on
+it as for any run.
+
+### Reading the area
+
+```sql
+select id, name, note from goals.areas
+where id = '<area id>' and user_id = '<user>';
+
+-- every goal the area has had, including the ones turned down
+select id, title, acceptance, fog, detail, status, archived_at
+from goals.items
+where area_id = '<area id>' and user_id = '<user>' and level = 'goal';
+
+-- the other areas' goals, so nothing is proposed twice
+select a.name, i.title, i.status
+from goals.items i join goals.areas a on a.id = i.area_id
+where i.user_id = '<user>' and i.level = 'goal' and i.archived_at is null
+  and i.area_id <> '<area id>';
+
+-- what the person did with past suggestions, which says what they go to
+select kind, title, reaction, attended from goals.suggestions
+where user_id = '<user>' order by created_at desc limit 100;
+```
+
+A goal with `archived_at` set or `status = 'dropped'` was turned down. Do not
+propose it again, in the same words or others. A goal of theirs that already
+covers a direction means you leave that direction alone.
+
+### What to propose
+
+1. **Three to six goals**, fewer when the area already has some. Together
+   they should cover the main ways into the area, so the person can see the
+   whole shape of it and pick. For a scene or a community that usually means
+   some mix of: knowing the subject, showing up, knowing people, joining
+   something, and contributing something of their own. For money or health it
+   means the separate outcomes (the debt, the fund, the habit).
+2. **Each one a goal, not a step.** It takes weeks or months and has several
+   steps under it. "Go to a community board meeting" is a step; "Be a regular
+   at your community board" is a goal.
+3. **A title that says what will be true**, in under about eight words, and
+   an `acceptance` that can be checked: a count, a date, a thing that exists.
+   "Know ten people working on housing or transit by name" rather than "build
+   a network". Where a goal is a practice rather than something that ends,
+   say so in the done-when ("kept for eight of the last ten weeks") and make
+   its first step a `rhythm`.
+4. **A `detail` of one or two sentences**: why this goal serves the area, and
+   what it assumes about the person. That sentence is what they decide on.
+5. **One first move under each**, as a proposed step with its own
+   `acceptance`: the smallest thing that would start the goal this week. Only
+   one. The full map comes from **Work on this** once they approve the goal,
+   so do not map it here.
+6. **`position` in the order to start them**, in tens after the area's
+   existing goals. Put the goal that is easiest to start, and that makes the
+   others easier, first.
+
+Use the person's note as the brief. Where it is empty, or the area could mean
+quite different things (a career in urbanism, or a civic life in the city),
+propose goals covering the likely readings and say in each `detail` which
+reading it serves. Turning down the ones that do not fit is how the person
+answers. A question that changes one goal's shape goes under that goal as a
+`decision` step with lettered options, as in "Questions". Where you cannot
+write a goal's done-when even provisionally, write it with `fog` instead.
+
+Use web search where current facts make a goal concrete: the organisations,
+groups, meetings and publications that exist in the person's city for this
+area. Name them in the `detail` or the first move ("Join Open Plans' volunteer
+list"), not in the title.
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+with g as (
+  insert into goals.items (user_id, level, area_id, title, acceptance, detail, status, position)
+  values ('<user>', 'goal', '<area id>',
+          'Be a regular at your community board',
+          'You have attended six full board or committee meetings and spoken at one.',
+          'Community boards are where land use and street changes are argued first, and the same people come every month. Assumes you live in one board''s district.',
+          'proposed', 10)
+  returning id
+)
+insert into goals.items (user_id, level, parent_id, kind, title, acceptance, status, position)
+select '<user>', 'step', id, 'mine',
+       'Go to this month''s land use committee meeting',
+       'You attended and wrote down two things that were argued.',
+       'proposed', 10
+from g
+returning id;
+```
+
+### A worked shape: Get plugged into the city / urbanism scene
+
+1. **Know how the city's planning fights work**: done when you can explain
+   ULURP, the zoning text amendments of the last two years and one open fight
+   in your borough. First move: a `claude` step for a two-page primer with
+   the reading list, and a link to Learn where a course fits better.
+2. **Go to one urbanism event a week**: a practice, kept for eight of ten
+   weeks. First move: a `rhythm` of one event a week, which the weekly run
+   feeds with events.
+3. **Be a regular at your community board**: as in the example above.
+4. **Volunteer steadily with one advocacy group**: done when you have put in
+   ten sessions with one of Open Plans, Transportation Alternatives, Open New
+   York or the like. First move: a `claude` step comparing three groups'
+   volunteer asks.
+5. **Know ten people in the scene by name**: done when ten people working on
+   housing, transit or planning would recognise you. First move: yours, write
+   down the three you already know.
+6. **Put something of your own into the conversation**: a testimony, an
+   op-ed, a map or a talk, published or given. Written with `fog` if the
+   person has not said what they would want to make.
+
+### Afterwards
+
+Change nothing on the area itself: its name and note are the person's. Do not
+edit, drop or archive a goal of theirs. The summary lists each goal proposed
+with its first move, any question asked, and which directions you left alone
+because an existing goal covers them. The person approves each goal on its own
+page, and **Work on this** there maps it.
+
 ## Re-shaping after answers
 
 When questions under the goal have a `resolution`:
@@ -521,6 +651,13 @@ the goal fills, and the run row has `job` `step` or `phase` with `item_id` on
 the step. The app has already refused a question, a proposal, a step on a goal
 that is not approved, and a step Claude is already on, so what you are sent is
 yours to work.
+
+The same run starts when the person writes `@dash` on a step asking Claude to
+take it ("do this", "draft this for me"; `lib/goals/ask.ts`). Then the brief
+also carries what they wrote, under "What they wrote". Treat anything in it
+about what to produce or how (shorter, more formal, addressed to someone) as
+part of the step's done-when. The quick reply has already said in the thread
+that the run started, so there is nothing more to write there.
 
 - **A step** (`job` `step`): work that one Claude step as in "The morning
   run", and touch no other step. If it turns out to need something only the

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { chooseNightSteps, type NightRun, type NightStep } from '@/lib/goals/overnight-choice';
+import {
+  chooseNightMaps,
+  chooseNightSteps,
+  type NightGoal,
+  type NightRun,
+  type NightStep,
+} from '@/lib/goals/overnight-choice';
 import { RUN_QUIET_MS } from '@/lib/goals/shaping';
 
 const NOW = Date.parse('2026-09-25T03:00:00.000Z');
@@ -97,5 +103,75 @@ describe('chooseNightSteps', () => {
       chosen: [],
       skipped: [],
     });
+  });
+});
+
+describe('chooseNightMaps (plan #1009)', () => {
+  const at = (hoursAgo: number) => new Date(NOW - hoursAgo * HOUR).toISOString();
+  const NIGHT = at(5);
+
+  function goal(id: string, over: Partial<NightGoal> = {}): NightGoal {
+    return {
+      id,
+      title: `Goal ${id}`,
+      status: 'open',
+      approvedAt: null,
+      createdAt: at(4),
+      fogChangedAt: null,
+      ...over,
+    };
+  }
+
+  function mapRun(goalId: string, status: NightRun['status'], hoursAgo: number): NightRun {
+    return { ...run(goalId, null, status, hoursAgo), job: 'goal' };
+  }
+
+  const choose = (goals: NightGoal[], runs: NightRun[] = []) =>
+    chooseNightMaps({ goals, runs, nightStartedAt: NIGHT, now: NOW });
+  const chosen = (goals: NightGoal[], runs: NightRun[] = []) =>
+    choose(goals, runs).chosen.map((one) => [one.goal.id, one.reason]);
+
+  it('maps a goal never mapped, oldest first, and leaves proposed and closed goals alone', () => {
+    expect(
+      chosen([
+        goal('later', { createdAt: at(2) }),
+        goal('earlier', { createdAt: at(30) }),
+        goal('proposed', { status: 'proposed' }),
+        goal('done', { status: 'done' }),
+      ]),
+    ).toEqual([
+      ['earlier', 'new'],
+      ['later', 'new'],
+    ]);
+  });
+
+  it('leaves a mapped goal alone until its fog changes after the map', () => {
+    const mapped = [mapRun('g', 'done', 30)];
+    expect(chosen([goal('g', { createdAt: at(40) })], mapped)).toEqual([]);
+    expect(chosen([goal('g', { createdAt: at(40), fogChangedAt: at(35) })], mapped)).toEqual([]);
+    expect(chosen([goal('g', { createdAt: at(40), fogChangedAt: at(10) })], mapped)).toEqual([
+      ['g', 'fog'],
+    ]);
+  });
+
+  it('maps an approved goal only when its fog changed since you approved it', () => {
+    expect(chosen([goal('g', { approvedAt: at(20) })])).toEqual([]);
+    expect(chosen([goal('g', { approvedAt: at(20), fogChangedAt: at(25) })])).toEqual([]);
+    expect(chosen([goal('g', { approvedAt: at(20), fogChangedAt: at(10) })])).toEqual([
+      ['g', 'fog'],
+    ]);
+  });
+
+  it('tries a goal again the next night when its mapping run failed, but not the same night', () => {
+    expect(chosen([goal('g')], [mapRun('g', 'failed', 30)])).toEqual([['g', 'new']]);
+    const tonight = choose([goal('g')], [mapRun('g', 'failed', 2)]);
+    expect(tonight.chosen).toEqual([]);
+    expect(tonight.skipped.map((one) => one.reason)).toEqual(['mapped_tonight']);
+  });
+
+  it('holds a goal with another run going on it, and does not count a step run as a map', () => {
+    const busy = choose([goal('g')], [run('g', 's', 'started', 0.1)]);
+    expect(busy.skipped.map((one) => one.reason)).toEqual(['goal_running']);
+    expect(chosen([goal('g')], [run('g', 's', 'done', 30)])).toEqual([['g', 'new']]);
   });
 });

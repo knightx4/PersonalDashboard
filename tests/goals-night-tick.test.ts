@@ -5,7 +5,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import { goalsNightNote, goalsNightTick, type GoalsNightPorts } from '@/inngest/goals/overnight';
-import type { NightRun, NightStep } from '@/lib/goals/overnight-choice';
+import type { NightGoal, NightRun, NightStep } from '@/lib/goals/overnight-choice';
 import { overnightVerdict, type OvernightRun } from '@/lib/plan/overnight';
 
 const START = Date.parse('2026-09-25T22:00:00.000Z');
@@ -35,19 +35,34 @@ function step(id: string, goalId: string): NightStep {
   return { id, title: `Step ${id}`, goalId, goalTitle: `Goal ${goalId}`, dueOn: null };
 }
 
-/** An account in memory: the row, the ready steps, and the runs the fires write. */
-function account(run: OvernightRun, steps: NightStep[]) {
+function goal(id: string, over: Partial<NightGoal> = {}): NightGoal {
+  return {
+    id,
+    title: `Goal ${id}`,
+    status: 'open',
+    approvedAt: null,
+    createdAt: new Date(START).toISOString(),
+    fogChangedAt: null,
+    ...over,
+  };
+}
+
+/** An account in memory: the row, the goals, the ready steps, and the runs the fires write. */
+function account(run: OvernightRun, steps: NightStep[], goals: NightGoal[] = []) {
   const state = {
     run,
+    goals: [...goals],
     steps: [...steps],
     runs: [] as NightRun[],
     progress: new Map<string, string | null>(),
     fired: [] as string[],
+    mapped: [] as string[],
   };
   const ports = (now: number): GoalsNightPorts => ({
     now,
     loadRun: async () => state.run,
     loadNight: async () => ({
+      goals: [...state.goals],
       steps: [...state.steps],
       runs: [...state.runs],
       lastProgressAt: new Map(state.progress),
@@ -62,6 +77,17 @@ function account(run: OvernightRun, steps: NightStep[]) {
       });
       return { ok: true, runId: `run-${one.id}` };
     },
+    fireMap: async (one) => {
+      state.mapped.push(one.id);
+      state.runs.push({
+        goalId: one.id,
+        stepId: null,
+        status: 'started',
+        createdAt: new Date(now).toISOString(),
+        job: 'goal',
+      });
+      return { ok: true, runId: `map-${one.id}` };
+    },
     recordFire: async (left) => {
       state.run = { ...state.run, featuresLeft: left === null ? null : Math.max(0, left - 1) };
     },
@@ -73,7 +99,13 @@ function account(run: OvernightRun, steps: NightStep[]) {
     state.steps = state.steps.filter((one) => one.id !== stepId);
     if (done) state.progress.set(done.goalId, new Date(now).toISOString());
   };
-  return { state, ports, finish };
+  /** The mapping session on this goal finished: its run is done. */
+  const finishMap = (goalId: string) => {
+    for (const one of state.runs) {
+      if (one.job === 'goal' && one.goalId === goalId) one.status = 'done';
+    }
+  };
+  return { state, ports, finish, finishMap };
 }
 
 describe('goalsNightTick', () => {
@@ -178,6 +210,61 @@ describe('goalsNightTick', () => {
   });
 });
 
+describe('goalsNightTick mapping (plan #1009)', () => {
+  it('maps a goal added at 10pm before 7am, once, ahead of the ready steps', async () => {
+    const added = goal('new', { createdAt: '2026-09-25T22:00:00.000Z' });
+    const { state, ports, finishMap, finish } = account(
+      night({ featuresBudget: 5, featuresLeft: 5 }),
+      [step('b1', 'B')],
+      [added, goal('B', { approvedAt: '2026-09-20T12:00:00.000Z' })],
+    );
+
+    let now = START;
+    expect(await goalsNightTick(ports(now))).toMatchObject({
+      act: 'mapped',
+      goalId: 'new',
+      reason: 'new',
+      runId: 'map-new',
+      featuresLeft: 4,
+    });
+
+    // The map is still being made: nothing else starts.
+    now += TICK;
+    expect(await goalsNightTick(ports(now))).toEqual({ act: 'waiting' });
+
+    // Mapped; the rest of the night goes to steps and never maps it again.
+    finishMap('new');
+    const seven = Date.parse('2026-09-26T07:00:00.000Z');
+    while (now < seven) {
+      now += TICK;
+      const tick = await goalsNightTick(ports(now));
+      if (tick.act === 'fired') finish(tick.stepId, now);
+    }
+    expect(state.mapped).toEqual(['new']);
+    expect(state.fired).toEqual(['b1']);
+    expect(state.run.featuresLeft).toBe(3);
+  });
+
+  it('does not map the same goal twice in a night, even when the first run failed', async () => {
+    const { state, ports } = account(night(), [], [goal('G')]);
+    expect(await goalsNightTick(ports(START))).toMatchObject({ act: 'mapped', goalId: 'G' });
+    state.runs[0].status = 'failed';
+    expect(await goalsNightTick(ports(START + TICK))).toEqual({ act: 'nothing-ready' });
+    expect(state.mapped).toEqual(['G']);
+  });
+
+  it('stops at a mapping run that could not be started, and spends nothing on it', async () => {
+    const { ports } = account(night(), [step('b1', 'B')], [goal('G')]);
+    const broken = ports(START);
+    broken.fireMap = vi.fn(async () => ({ ok: false as const, error: 'routine down' }));
+    const fire = vi.spyOn(broken, 'fire');
+    const recordFire = vi.spyOn(broken, 'recordFire');
+    expect(await goalsNightTick(broken)).toEqual({ act: 'failed', error: 'routine down' });
+    expect(fire).not.toHaveBeenCalled();
+    expect(recordFire).not.toHaveBeenCalled();
+  });
+});
+
 describe('goalsNightNote', () => {
   it('names the step it started, and is silent otherwise', () => {
     expect(
@@ -191,6 +278,16 @@ describe('goalsNightNote', () => {
         refused: [],
       }),
     ).toBe('Started the goal step "Draft the cover letter" on "Change jobs".');
+    expect(
+      goalsNightNote({
+        act: 'mapped',
+        goalId: 'g',
+        goalTitle: 'Change jobs',
+        reason: 'fog',
+        runId: 'r',
+        featuresLeft: 1,
+      }),
+    ).toBe('Started mapping the goal "Change jobs" again, since its fog changed.');
     expect(goalsNightNote({ act: 'waiting' })).toBeNull();
   });
 });

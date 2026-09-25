@@ -7,7 +7,7 @@ import { GOAL_RUNS_SHOWN, toRunListings, type RunListing, type RunRowWithItem } 
  * Every run in goals.runs with the goal or step it was on (plan #1012),
  * newest first. Row level security keeps it to your own runs. The item comes
  * through runs_item_fk, which is (item_id, user_id), so PostgREST can embed it
- * directly.
+ * directly. An area run's area comes the same way, through runs_area_fk.
  *
  * The cap is far past what a year of morning runs and presses writes, and
  * stops a runaway loop from making the page unreadable.
@@ -15,7 +15,7 @@ import { GOAL_RUNS_SHOWN, toRunListings, type RunListing, type RunRowWithItem } 
 const RUNS_LIMIT = 2000;
 
 const RUN_SELECT =
-  'id, job, status, created_at, ended_at, summary, error, last_seen_at, now_on, item:items!runs_item_fk(id, title, level)';
+  'id, job, status, created_at, ended_at, summary, error, last_seen_at, now_on, item:items!runs_item_fk(id, title, level), area:areas!runs_area_fk(id, name)';
 
 export async function loadRuns(client: GoalsSupabaseClient): Promise<RunListing[]> {
   const { data, error } = await client

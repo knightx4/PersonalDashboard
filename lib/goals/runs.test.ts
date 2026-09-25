@@ -43,6 +43,14 @@ describe('toRunListings', () => {
     expect(listings[1]).toMatchObject({ job: 'daily', item: null });
   });
 
+  it('keeps the area an area run was on', () => {
+    const [listing] = toRunListings([
+      row({ job: 'area', item: null, area: { id: 'a1', name: 'The city' } }),
+    ]);
+    expect(listing).toMatchObject({ job: 'area', item: null, area: { id: 'a1', name: 'The city' } });
+    expect(toRunListings([row({})])[0].area).toBeNull();
+  });
+
   it('reads anything that is not a goal as a step', () => {
     const [listing] = toRunListings([row({ item: { id: 's1', title: 'Buy shoes', level: 'step' } })]);
     expect(listing.item).toEqual({ id: 's1', title: 'Buy shoes', level: 'step' });
