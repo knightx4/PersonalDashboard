@@ -131,6 +131,9 @@ export const NAV_ICONS = {
   // Every area and goal, for adding and arranging them; the home is the short
   // daily list, so this is the long one.
   goalsAll: List,
+  // Every run Claude made on your goals, newest first: a record of what was
+  // done, so the same clock-and-arrow the changelog uses.
+  goalsRuns: History,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
 } as const;
