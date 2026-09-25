@@ -14,7 +14,7 @@ export const AREA_NAME_MAX = 200;
 export const GOAL_TITLE_MAX = 500;
 export const GOAL_ACCEPTANCE_MAX = 4000;
 export const GOAL_FOG_MAX = 4000;
-/** supabase/migrations-goals/0028. */
+/** supabase/migrations-goals/0029. */
 export const AREA_NOTE_MAX = 4000;
 
 export type GoalStatus = 'proposed' | 'open' | 'done' | 'dropped';
