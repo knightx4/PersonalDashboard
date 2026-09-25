@@ -44,6 +44,9 @@ import { unitCheckDue, type UnitCheckDue } from './unit-check';
  *   track has anything to teach, and the goals' third goes to the other
  *   tracks when no goal track has. A goal's track is never dormant while the
  *   goal is active: the person set it on purpose, as they start a track.
+ * - A track picked up from its resting offer in Learn now (plan #1045) is not
+ *   dormant for four weeks after the press, so its next lesson comes from the
+ *   following top-up (`resting.ts`).
  */
 
 /** One track as the chooser needs it. */
@@ -75,6 +78,11 @@ export type ChooseLessonsInput = {
   checked?: ReadonlySet<string>;
   /** The tracks of the person's active learning goals (plan #972). */
   goalTracks?: ReadonlySet<string>;
+  /**
+   * Tracks picked up again in Learn now in the last four weeks (plan #1045,
+   * `pickedUpSince`). Not dormant, however long since they were used.
+   */
+  pickedUp?: ReadonlySet<string>;
   slots: number;
 };
 
@@ -226,8 +234,13 @@ export function chooseLessons(input: ChooseLessonsInput): LessonChoice {
   const queues = new Map<string, LessonPick[]>();
 
   const goalTracks = input.goalTracks ?? new Set<string>();
+  const pickedUp = input.pickedUp ?? new Set<string>();
   for (const track of input.tracks) {
-    if (input.weights.get(track.subjectId)?.stopped && !goalTracks.has(track.subjectId)) {
+    if (
+      input.weights.get(track.subjectId)?.stopped &&
+      !goalTracks.has(track.subjectId) &&
+      !pickedUp.has(track.subjectId)
+    ) {
       dormant.push(track.subjectId);
       continue;
     }
