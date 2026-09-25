@@ -50,6 +50,12 @@ export const PAID_ACTIONS = {
   'app/learn/s/[id]/actions.ts#pullLectureCourse': ['embed-catalogue'],
   'app/learn/goals/actions.ts#addGoal': ['place-aim'],
   'app/learn/now/actions.ts#testMeOnCard': ['generate-chain', 'place-track'],
+  'app/learn/now/actions.ts#startTrackOffer': [
+    'generate-track-from-theme',
+    'place-track',
+    'write-curriculum',
+  ],
+  'app/learn/now/actions.ts#makeTrackOfCard': ['place-track', 'write-curriculum'],
 
   // Learn: questions
   'app/learn/s/[id]/probe/actions.ts#askQuestion': ['write-probe', 'write-applied-case'],

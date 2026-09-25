@@ -25,7 +25,9 @@ import {
 } from '@/lib/learn/feed/load';
 import { settleIdeaFromSwipe } from '@/lib/learn/feed/ideas-store';
 import { startTrackFromCard } from '@/lib/learn/feed/test-me';
+import { makeTrackFromCard, startTrackFromOffer } from '@/lib/learn/lessons/new-track';
 import { SAVED_FROM_FEED, saveFeedSection } from '@/lib/learn/tracks/save';
+import { createVaultClient } from '@/lib/vault/auth/server';
 
 /**
  * The Learn now feed's actions (plan #808).
@@ -218,4 +220,71 @@ export async function testMeOnCard(id: string): Promise<CardActionResult> {
   );
   after(() => topUpFeedAfterResponse(user.id));
   redirect(`/learn/flow?track=${started.subjectId}`);
+}
+
+export type NewTrackResult = { error?: string; track?: { id: string; name: string; units: number } };
+
+/**
+ * Start, on the track offer in Learn now (plan #968). The track is written
+ * with its chain and its curriculum while you wait, and its lessons come into
+ * the feed from the top-up afterwards. Not now and Never are Practice Flow's
+ * own `answerTrackOffer`, so both are honoured the same way in either place.
+ */
+// latency: pending
+export async function startTrackOffer(themeId: string): Promise<NewTrackResult> {
+  const user = await requireUser();
+  const theme = CardId.safeParse(themeId);
+  if (!theme.success) return { error: 'Could not tell which theme that was.' };
+
+  const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
+  const started = await startTrackFromOffer(supabase, vault, user.id, theme.data).catch(
+    (error: unknown) => ({
+      ok: false as const,
+      detail: error instanceof Error ? error.message : 'Could not start that track.',
+    }),
+  );
+  if (!started.ok) return { error: started.detail };
+
+  after(() => topUpFeedAfterResponse(user.id));
+  return { track: { id: started.subjectId, name: started.name, units: started.units } };
+}
+
+/**
+ * Make this a track, on an exploratory card (plan #968). The card's article
+ * becomes a track with a curriculum, and the card is marked tested with the
+ * track on it, as Test me on this marks it: both turn the card into a track,
+ * and nothing moves a card out of `tested`. Pressed again, it names the track
+ * already made rather than paying for another curriculum.
+ */
+// latency: pending
+export async function makeTrackOfCard(id: string): Promise<NewTrackResult> {
+  const user = await requireUser();
+  const card = CardId.safeParse(id);
+  if (!card.success) return { error: 'Could not tell which card that was.' };
+  const supabase = await createLearnClient();
+
+  const row = await loadFeedCardRow(supabase, card.data).catch(() => null);
+  if (!row?.item || !row.segment || row.reason === 'lesson') {
+    return { error: 'That card is no longer there.' };
+  }
+  if (row.status === 'tested' && row.subject_id) {
+    return { track: { id: row.subject_id, name: row.item.title, units: 0 } };
+  }
+
+  const made = await makeTrackFromCard(supabase, user.id, {
+    article: row.item.title,
+    idea: row.idea_name?.trim() || cardTitle(row.item.title, row.segment.heading),
+  }).catch((error: unknown) => ({
+    ok: false as const,
+    detail: error instanceof Error ? error.message : 'Could not make that track.',
+  }));
+  if (!made.ok) return { error: made.detail };
+
+  if (ACTION_FROM.tested.includes(row.status)) {
+    await recordFeedAction(supabase, card.data, 'tested', { subject_id: made.subjectId }).catch(
+      () => false,
+    );
+  }
+  after(() => topUpFeedAfterResponse(user.id));
+  return { track: { id: made.subjectId, name: made.name, units: made.units } };
 }

@@ -290,43 +290,55 @@ export async function loadTrackOffer(
   try {
     const rows = await loadReadyAndSettled(supabase, LOW_WATER, null);
     if (!runningLow(rows.ready.length)) return null;
-
-    const [themes, subjects, record, interest, field] = await Promise.all([
-      loadThemes(vault),
-      loadSubjects(supabase),
-      loadOfferRecord(supabase),
-      loadTrackInterest(supabase, now).catch((error: unknown) => {
-        console.error('[learn flow] track weights', error instanceof Error ? error.message : error);
-        return null;
-      }),
-      // A field that could not be read leaves today's choice, the same as no
-      // field qualifying.
-      loadUntestedField(supabase, vault).catch((error: unknown) => {
-        console.error(
-          '[learn flow] untested field',
-          error instanceof Error ? error.message : error,
-        );
-        return null;
-      }),
-    ]);
-    const anchors = interest
-      ? await loadAnchors(vault, subjects, record, interest.weights).catch(() => [])
-      : [];
-    return trackToOffer({
-      themes,
-      trackNames: subjects.map((subject) => subject.name),
-      record,
-      now,
-      lean: offerLean(
-        themes.map((theme) => ({ id: theme.id, notes: new Set(theme.noteIds ?? []) })),
-        anchors,
-      ),
-      field,
-    });
+    return await chooseTrackOffer(supabase, vault, now);
   } catch (error) {
     console.error('[learn flow] track offer', error instanceof Error ? error.message : error);
     return null;
   }
+}
+
+/**
+ * The theme to offer as a new track, whether or not anything is running low,
+ * or null when there is none left to offer.
+ *
+ * What Practice Flow offers once it runs low, and what Learn now offers on
+ * every visit (LEARN-LESSONS-SPEC, "What the feed deals"; plan #968). Throws
+ * when a read fails; each caller decides what a failed offer costs.
+ */
+export async function chooseTrackOffer(
+  supabase: LearnSupabaseClient,
+  vault: VaultSupabaseClient,
+  now: Date = new Date(),
+): Promise<TrackOffer | null> {
+  const [themes, subjects, record, interest, field] = await Promise.all([
+    loadThemes(vault),
+    loadSubjects(supabase),
+    loadOfferRecord(supabase),
+    loadTrackInterest(supabase, now).catch((error: unknown) => {
+      console.error('[learn flow] track weights', error instanceof Error ? error.message : error);
+      return null;
+    }),
+    // A field that could not be read leaves today's choice, the same as no
+    // field qualifying.
+    loadUntestedField(supabase, vault).catch((error: unknown) => {
+      console.error('[learn flow] untested field', error instanceof Error ? error.message : error);
+      return null;
+    }),
+  ]);
+  const anchors = interest
+    ? await loadAnchors(vault, subjects, record, interest.weights).catch(() => [])
+    : [];
+  return trackToOffer({
+    themes,
+    trackNames: subjects.map((subject) => subject.name),
+    record,
+    now,
+    lean: offerLean(
+      themes.map((theme) => ({ id: theme.id, notes: new Set(theme.noteIds ?? []) })),
+      anchors,
+    ),
+    field,
+  });
 }
 
 type ThemeRow = {
@@ -514,7 +526,18 @@ export async function recordTrackOffer(
 }
 
 export type StartedTrack =
-  | { ok: true; subjectId: string; name: string }
+  | {
+      ok: true;
+      subjectId: string;
+      name: string;
+      /**
+       * The goal the chain was filed as, so a caller that writes the track's
+       * curriculum can file it under its unit. Unset when no goal was written.
+       */
+      goalId?: string | null;
+      /** What the track was started for, as a curriculum call is told. */
+      asked?: string;
+    }
   | { ok: false; detail: string };
 
 /**
@@ -562,6 +585,7 @@ export async function startTrackFromTheme(
   if (!result.ok) return { ok: false, detail: result.detail };
 
   let subjectId: string;
+  let goalId: string | null;
   try {
     const saved = await saveChain(
       supabase,
@@ -571,6 +595,7 @@ export async function startTrackFromTheme(
       { origin: 'generated', theme: { id: themeId, about: map.theme.about } },
     );
     subjectId = saved.subjectId;
+    goalId = saved.goalId;
   } catch (error) {
     return {
       ok: false,
@@ -585,7 +610,13 @@ export async function startTrackFromTheme(
     outcome: 'started',
     subjectId,
   });
-  return { ok: true, subjectId, name: map.theme.name };
+  return {
+    ok: true,
+    subjectId,
+    name: map.theme.name,
+    goalId,
+    asked: map.theme.about ? `${map.theme.name}: ${map.theme.about}` : map.theme.name,
+  };
 }
 
 const STANCE_ORDER: Record<string, number> = { held: 0, encountered: 1, generated: 2 };

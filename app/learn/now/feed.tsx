@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Feather,
   GraduationCap,
+  Sprout,
   Weight,
   X,
 } from 'lucide-react';
@@ -20,20 +21,27 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import {
   appendCards,
+  canMakeTrack,
   feedEnd,
+  offerDue,
   type CardDifficulty,
   PRELOAD_AHEAD,
   type FeedCard,
   type SwipeAction,
 } from '@/lib/learn/feed/card';
+import type { TrackOffer } from '@/lib/learn/flow/offer';
+import { answerTrackOffer } from '../flow/actions';
 import {
   dismissCard,
   loadMoreCards,
+  makeTrackOfCard,
   openCardSource,
   rateCard,
   saveCard,
+  startTrackOffer,
   swipeCard,
   testMeOnCard,
+  type NewTrackResult,
 } from './actions';
 
 /**
@@ -53,6 +61,10 @@ import {
  * The next cards are already loaded behind the one on screen, and more are
  * asked for while four are still ahead, so moving on never waits for the
  * network. Recording a swipe happens after the card has gone.
+ *
+ * A visit may also carry one track offer (plan #968), shown in place of the
+ * next card once a couple are passed. It has no swipes: it stays until Start,
+ * Not now or Never is pressed, as the offer in Practice Flow does.
  */
 
 const SWIPE_X = 90;
@@ -67,16 +79,23 @@ const SWIPE_LABEL: Record<SwipeAction, string> = {
   skipped: 'Not now',
 };
 
+type MadeTrack = NonNullable<NewTrackResult['track']>;
+
 export function LearnNowFeed({
   first,
   ready: firstReady,
   low,
+  offer: firstOffer = null,
 }: {
   first: FeedCard[];
   ready: number;
   /** Below this many ready cards, loading more starts a top-up. */
   low: number;
+  /** A theme from your notes to offer as a new track this visit, or null. */
+  offer?: TrackOffer | null;
 }) {
+  const [offer, setOffer] = useState(firstOffer);
+  const [started, setStarted] = useState<MadeTrack | null>(null);
   const [deck, setDeck] = useState(first);
   const [ready, setReady] = useState(firstReady);
   const [ended, setEnded] = useState(first.length === 0);
@@ -113,6 +132,12 @@ export function LearnNowFeed({
   }, [deck.length, ended, loadMore]);
 
   const current = deck[0] ?? null;
+  const offerShown = offer !== null && offerDue(passed, deck.length);
+
+  const offerDone = useCallback((track: MadeTrack | null) => {
+    setOffer(null);
+    if (track) setStarted(track);
+  }, []);
 
   /** Take the card off the top of the deck, and bring the next into view. */
   const advance = useCallback((id: string) => {
@@ -166,13 +191,14 @@ export function LearnNowFeed({
             : event.key === 'ArrowLeft'
               ? 'skipped'
               : null;
-      if (!swipeAs || !current) return;
+      // The offer has no swipes; its buttons are the only way past it.
+      if (!swipeAs || !current || offerShown) return;
       event.preventDefault();
       swipe(swipeAs);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [current, swipe]);
+  }, [current, offerShown, swipe]);
 
   const end = feedEnd(ready, low);
   const ahead = Math.max(0, deck.length - 1);
@@ -184,8 +210,11 @@ export function LearnNowFeed({
           {error}
         </p>
       )}
+      {started && <MadeTrackLine track={started} className="mb-2" />}
 
-      {current ? (
+      {offer && offerShown ? (
+        <FeedOfferCard key={offer.themeId} offer={offer} onDone={offerDone} />
+      ) : current ? (
         <>
           <p
             className="mb-2 flex items-baseline justify-between gap-3 text-small text-ink-muted"
@@ -283,6 +312,8 @@ function DeckCard({
   const [error, setError] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
   const [testing, startTest] = useTransition();
+  const [making, startMake] = useTransition();
+  const [made, setMade] = useState<MadeTrack | null>(null);
   const [difficulty, setDifficulty] = useState<CardDifficulty | null>(card.difficulty);
   const rating = useRef(0);
   const surface = useRef<HTMLDivElement>(null);
@@ -363,6 +394,17 @@ function DeckCard({
       // Redirects to Practice Flow on success, so only a failure comes back.
       const result = await testMeOnCard(card.id);
       if (result?.error) setError(result.error);
+    });
+
+  const makeTrack = () =>
+    startMake(async () => {
+      setError(null);
+      const result = await makeTrackOfCard(card.id).catch(() => ({
+        error: 'Could not make that track. Check your connection.',
+        track: undefined,
+      }));
+      if (result.track) setMade(result.track);
+      else setError(result.error ?? 'Could not make that track.');
     });
 
   // Too hard and Too easy (plan #893). The card stays on screen (#891), so
@@ -554,6 +596,31 @@ function DeckCard({
                 what="Cost of starting a track from this card"
               />
             )}
+            {canMakeTrack(card) && (
+              <span className="inline-flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={makeTrack}
+                  pending={making}
+                  disabled={made !== null || testing}
+                >
+                  {made ? (
+                    <Check className="size-3.5" strokeWidth={2} aria-hidden />
+                  ) : (
+                    <Sprout className="size-3.5" strokeWidth={2} aria-hidden />
+                  )}
+                  {made ? 'Track made' : making ? 'Making a track…' : 'Make this a track'}
+                </Button>
+                {!made && (
+                  <PaidHint
+                    action="app/learn/now/actions.ts#makeTrackOfCard"
+                    what="Cost of making a track from this card"
+                  />
+                )}
+              </span>
+            )}
             {/* Not interested and the two ratings stay on one line, the
                 ratings to its right, down to a 360px phone: that is why the
                 labels drop "Too" below sm. */}
@@ -617,6 +684,12 @@ function DeckCard({
               opens on them.
             </p>
           )}
+          {making && (
+            <p className="mt-2 text-small text-ink-muted" aria-live="polite">
+              Writing the track&apos;s units. This takes about half a minute.
+            </p>
+          )}
+          {made && <MadeTrackLine track={made} className="mt-2" />}
           {saved && (
             <p className="mt-2 text-small text-ink-muted">
               On{' '}
@@ -662,5 +735,109 @@ function DeckCard({
         </div>
       </Card>
     </div>
+  );
+}
+
+/** The line a new track leaves: its name, linked, and where its lessons will come. */
+function MadeTrackLine({ track, className }: { track: MadeTrack; className?: string }) {
+  return (
+    <p className={cn('text-small text-ink-muted', className)} aria-live="polite">
+      Started{' '}
+      <Link href={`/learn/s/${track.id}`} className="text-ink underline underline-offset-2">
+        {track.name}
+      </Link>
+      {track.units > 0
+        ? `, ${track.units} units. Its lessons come into Learn now as they are written.`
+        : '. Its units could not be written yet; its page can write them.'}
+    </p>
+  );
+}
+
+/**
+ * A theme from your notes offered as a new track (LEARN-LESSONS-SPEC, "What
+ * the feed deals"; plan #968). Start writes the track with its units and the
+ * deck carries on; Not now and Never go through Practice Flow's own action,
+ * so a theme set aside here is set aside there too.
+ */
+function FeedOfferCard({
+  offer,
+  onDone,
+}: {
+  offer: TrackOffer;
+  onDone: (track: MadeTrack | null) => void;
+}) {
+  const [starting, startStart] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const start = () =>
+    startStart(async () => {
+      setError(null);
+      const result: NewTrackResult = await startTrackOffer(offer.themeId).catch(() => ({
+        error: 'Could not start that track. Check your connection.',
+      }));
+      if (result.track) onDone(result.track);
+      else setError(result.error ?? 'Could not start that track.');
+    });
+
+  const setAside = (outcome: 'not_now' | 'never') => {
+    onDone(null);
+    const form = new FormData();
+    form.set('themeId', offer.themeId);
+    form.set('outcome', outcome);
+    // As in Practice Flow: the card has gone, and a press that was not kept
+    // only means the theme may be offered again.
+    void answerTrackOffer(form).catch(() => undefined);
+  };
+
+  return (
+    <Card padding="standard">
+      <p className="flex items-center gap-1.5 text-small text-ink-muted">
+        <Sprout className="size-3.5" strokeWidth={2} aria-hidden />
+        A new track
+      </p>
+      <h2 className="mt-1 font-display text-title tracking-tight break-words text-ink">
+        {offer.name}
+      </h2>
+      <p className="mt-2 text-body text-ink">
+        You write a lot about this, in {offer.notes} of your {offer.notes === 1 ? 'note' : 'notes'}.
+        Want a curriculum for it?
+      </p>
+      {offer.about && <p className="mt-2 text-ui text-ink-muted">{offer.about}</p>}
+      {offer.field && (
+        <p className="mt-1 text-ui text-ink-muted">
+          It sits in {offer.field}, which you write about most and have never been tested in.
+        </p>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center gap-1">
+          <Button type="button" variant="primary" onClick={start} pending={starting}>
+            {starting ? 'Writing the track…' : 'Start'}
+          </Button>
+          <PaidHint
+            action="app/learn/now/actions.ts#startTrackOffer"
+            what="Cost of starting the track"
+          />
+        </span>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => setAside('not_now')}
+          disabled={starting}
+        >
+          Not now
+        </Button>
+        <Button type="button" variant="ghost" onClick={() => setAside('never')} disabled={starting}>
+          Never
+        </Button>
+      </div>
+
+      {starting && (
+        <p className="mt-2 text-small text-ink-muted" aria-live="polite">
+          Writing the track&apos;s first ideas and its units. This takes about a minute.
+        </p>
+      )}
+      {error && <p className="mt-2 text-small text-danger">{error}</p>}
+    </Card>
   );
 }
