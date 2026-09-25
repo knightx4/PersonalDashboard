@@ -163,6 +163,10 @@ export const LEARN_OPERATIONS = [
   // which writes a new track's first units on a press, so what growing tracks
   // costs can be read on its own.
   'write-next-unit',
+  // Adding what a lesson rated too hard rests on, under its concept (plan
+  // #970), from the background top-up. The same call as 'propose-floor',
+  // which a press on the probe page records.
+  'add-lesson-floor',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

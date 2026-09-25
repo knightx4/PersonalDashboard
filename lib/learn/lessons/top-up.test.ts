@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { Concept } from '@/lib/learn/graph/model';
 import type { LessonPick, TrackNeed } from './choose';
+import type { AddedFloor, FloorDue } from './add-floor';
 import type { AddedUnit } from './add-unit';
 import type { LaidOutUnit } from './lay-out-unit';
 import {
   LAYOUT_RESERVE_MS,
   LESSON_HOLD_MS,
+  MAX_FLOORS_PER_RUN,
   MAX_LAYOUTS_PER_RUN,
   MAX_UNITS_ADDED_PER_RUN,
   lessonWhy,
@@ -40,6 +42,8 @@ function ports(options: {
   choices: { picks: LessonPick[]; needs: TrackNeed[] }[];
   layOut?: (subjectId: string) => LaidOutUnit;
   addUnit?: (subjectId: string) => AddedUnit;
+  floorsDue?: FloorDue[];
+  addFloor?: (due: FloorDue) => AddedFloor;
   write?: (pick: LessonPick) => LessonOutcome;
   now?: () => number;
 }) {
@@ -47,9 +51,15 @@ function ports(options: {
     choose: 0,
     layOut: [] as string[],
     addUnit: [] as { subjectId: string; lastUnitId: string | null }[],
-    hold: [] as { subjectId: string; until: Date }[], write: [] as string[] };
+    hold: [] as { subjectId: string; until: Date }[],
+    floorsDue: [] as number[],
+    addFloor: [] as string[],
+    write: [] as string[],
+    order: [] as string[],
+  };
   const port: LessonTopUpPorts = {
     choose: async () => {
+      calls.order.push('choose');
       const choice = options.choices[Math.min(calls.choose, options.choices.length - 1)]!;
       calls.choose += 1;
       return choice;
@@ -64,6 +74,15 @@ function ports(options: {
     },
     hold: async (_userId, subjectId, until) => {
       calls.hold.push({ subjectId, until });
+    },
+    floorsDue: async (_userId, limit) => {
+      calls.floorsDue.push(limit);
+      return (options.floorsDue ?? []).slice(0, limit);
+    },
+    addFloor: async (_userId, due) => {
+      calls.addFloor.push(due.cardId);
+      calls.order.push(`floor ${due.cardId}`);
+      return options.addFloor?.(due) ?? { outcome: 'added', conceptIds: [`${due.conceptId}-floor`] };
     },
     write: async (_userId, chosen) => {
       calls.write.push(chosen.concept.id);
@@ -226,6 +245,43 @@ describe('writing the next unit', () => {
     expect(summary.added).toEqual([]);
     // Nothing was added, so the first choice stands.
     expect(calls.choose).toBe(1);
+  });
+});
+
+describe('lessons rated too hard', () => {
+  const due = (id: string): FloorDue => ({ cardId: id, subjectId: 'track', conceptId: `${id}-c`, name: `Concept ${id}` });
+
+  it('adds what each rests on before the lessons are chosen', async () => {
+    const { port, calls } = ports({ choices: [{ picks: [pick('a')], needs: [] }], floorsDue: [due('hard')] });
+    const summary = await writeLessonsFor(port, { userId: 'u', wanted: 4, deadline: FAR });
+    expect(calls.order).toEqual(['floor hard', 'choose']);
+    expect(summary.floors).toEqual(['Concept hard']);
+  });
+
+  it('takes at most two a run, and none when too little time is left', async () => {
+    const many = ports({ choices: [{ picks: [], needs: [] }], floorsDue: [due('a'), due('b'), due('c')] });
+    await writeLessonsFor(many.port, { userId: 'u', wanted: 4, deadline: FAR });
+    expect(many.calls.addFloor).toHaveLength(MAX_FLOORS_PER_RUN);
+
+    const late = ports({ choices: [{ picks: [], needs: [] }], floorsDue: [due('a')] });
+    await writeLessonsFor(late.port, { userId: 'u', wanted: 4, deadline: LAYOUT_RESERVE_MS - 1 });
+    expect(late.calls.floorsDue).toEqual([]);
+    expect(late.calls.addFloor).toEqual([]);
+  });
+
+  it('reports a failed call and still writes lessons', async () => {
+    const { port, calls } = ports({
+      choices: [{ picks: [pick('a')], needs: [] }],
+      floorsDue: [due('broken'), due('fine')],
+      addFloor: (one) =>
+        one.cardId === 'broken'
+          ? { outcome: 'failed', detail: 'The model said no.' }
+          : { outcome: 'nothing-missing', detail: 'Nothing missing.' },
+    });
+    const summary = await writeLessonsFor(port, { userId: 'u', wanted: 4, deadline: FAR });
+    expect(summary.failed).toEqual(['Concept broken: adding what it rests on failed: The model said no.']);
+    expect(summary.floors).toEqual([]);
+    expect(calls.write).toEqual(['a']);
   });
 });
 
