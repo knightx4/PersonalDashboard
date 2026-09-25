@@ -2,7 +2,12 @@ import 'server-only';
 
 import { OAuth2Client } from 'google-auth-library';
 import { gmailOAuthEnv } from '@/lib/email/gmail-env';
-import { formatGmailApiError } from '@/lib/email/providers/gmail-api-error';
+import {
+  formatGmailApiError,
+  GMAIL_RATE_LIMIT_RETRIES,
+  gmailRetryDelayMs,
+  isGmailRateLimit,
+} from '@/lib/email/providers/gmail-api-error';
 import { emailFromIdToken } from '@/lib/email/id-token';
 import {
   gmailPayloadToCalendar,
@@ -62,18 +67,29 @@ async function gmailJson<T>(
   path: string,
   opts?: { historyNotFound?: boolean },
 ): Promise<T> {
-  const res = await fetch(`https://gmail.googleapis.com/gmail/v1/${path}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok) {
+  for (let attempt = 0; ; attempt += 1) {
+    const res = await fetch(`https://gmail.googleapis.com/gmail/v1/${path}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (res.ok) return res.json() as Promise<T>;
+
     const body = await res.text().catch(() => '');
+    // A large import reads faster than Gmail's per-user quota allows. The
+    // refusal clears within the minute, so wait it out rather than fail the
+    // message: a failed envelope is skipped and the backfill moves past it.
+    if (attempt < GMAIL_RATE_LIMIT_RETRIES && isGmailRateLimit(res.status, body)) {
+      const waitMs = gmailRetryDelayMs(attempt, res.headers.get('retry-after'));
+      console.warn('gmail rate limited, retrying', { path, attempt, waitMs });
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      continue;
+    }
+
     console.error('gmail api error', { path, status: res.status, body: body.slice(0, 500) });
     if (opts?.historyNotFound && res.status === 404) {
       throw new GmailHistoryExpiredError();
     }
     throw new Error(formatGmailApiError(res.status, body));
   }
-  return res.json() as Promise<T>;
 }
 
 export const gmailProvider: GmailOAuthProvider = {
