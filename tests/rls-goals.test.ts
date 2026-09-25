@@ -553,12 +553,21 @@ describe('Claude results on steps (plan #933)', () => {
     expect(history.map((h) => h.actor)).toEqual(['me', 'claude', 'me']);
   });
 
-  it('keeps results to Claude steps, with a link that is a web address', async () => {
+  it('keeps results to Claude steps and prepared steps of yours, with a link that is a web address', async () => {
+    // A step of yours takes what Claude prepared for it (plan #1001), and stays open.
     const [mine] = await admin<{ id: string }[]>`
       insert into items (user_id, level, parent_id, kind, title)
       values (${userA}, 'step', ${goalA}, 'mine', 'Call the bank') returning id`;
+    await admin`update items set result = '1. Call 1-800-555-0100.' where id = ${mine.id}`;
+    const [prepared] = await admin<{ kind: string; status: string }[]>`
+      select kind, status from items where id = ${mine.id}`;
+    expect(prepared).toEqual({ kind: 'mine', status: 'open' });
+
+    const [question] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'decision', 'Which bank?') returning id`;
     await expect(
-      admin`update items set result = 'Done' where id = ${mine.id}`,
+      admin`update items set result = 'Done' where id = ${question.id}`,
     ).rejects.toThrow(/items_result_kind_ck/);
 
     const [claude] = await admin<{ id: string }[]>`

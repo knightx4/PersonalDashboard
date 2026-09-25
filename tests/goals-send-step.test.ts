@@ -191,6 +191,27 @@ describe('sendGoalStep', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('fires a prepare run on a step of yours (plan #1001)', async () => {
+    const { client, calls } = fakeClient({ items: ITEMS, approvedAt: APPROVED });
+    const fetch = okFetch();
+    const result = await sendGoalStep({ client, userId: USER, stepId: 'm', routine, mode: 'prepare', now: NOW, fetch });
+    expect(result).toEqual({ ok: true, job: 'prepare', title: 'Log in to Edfinancial', runId: 'run-1' });
+    expect(calls.find((c) => c.op === 'insert')?.values).toMatchObject({ job: 'prepare', item_id: 'm' });
+    // The step itself is not written: it stays yours and open until the run stores what it prepared.
+    expect(calls.some((c) => c.op === 'update' && c.table === 'items')).toBe(false);
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    const text = (JSON.parse(init.body as string) as { text: string }).text;
+    expect(text).toContain('The step: "Log in to Edfinancial" (goals.items id m)');
+  });
+
+  it('refuses to prepare a Claude step', async () => {
+    const { client } = fakeClient({ items: ITEMS, approvedAt: APPROVED });
+    const fetch = okFetch();
+    const result = await sendGoalStep({ client, userId: USER, stepId: 's', routine, mode: 'prepare', now: NOW, fetch });
+    expect(result).toEqual({ ok: false, error: 'Only a step of yours with no sub-steps can be prepared.' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('says so when the step is not on any live goal', async () => {
     const { result } = await send('gone');
     expect(result).toEqual({ ok: false, error: 'That step is no longer on the page.' });

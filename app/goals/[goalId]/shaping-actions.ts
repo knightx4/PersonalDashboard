@@ -6,6 +6,7 @@ import { requireUser } from '@/lib/auth/server';
 import { isOwner } from '@/lib/dev/owner';
 import { goalsRoutine } from '@/lib/feedback/routine';
 import { createGoalsClient } from '@/lib/goals/auth/server';
+import type { SendMode } from '@/lib/goals/handover';
 import { sendGoalStep } from '@/lib/goals/handover-store';
 import { runInFlight } from '@/lib/goals/shaping';
 import {
@@ -101,6 +102,24 @@ export async function sendStepAction(
   _prev: ShapingActionState,
   form: FormData,
 ): Promise<ShapingActionState> {
+  return handOver(form, 'send');
+}
+
+/**
+ * Ask Claude to prepare one of your steps from its row (plan #1001): a run
+ * that writes a draft email, a call script or a checklist into the step's
+ * result and leaves the step yours and open. The rules are sendRefusal's,
+ * in lib/goals/handover.ts, with mode `prepare`.
+ */
+// latency: pending
+export async function prepareStepAction(
+  _prev: ShapingActionState,
+  form: FormData,
+): Promise<ShapingActionState> {
+  return handOver(form, 'prepare');
+}
+
+async function handOver(form: FormData, mode: SendMode): Promise<ShapingActionState> {
   const user = await requireUser();
   const id = Id.safeParse(form.get('id'));
   if (!id.success) return { error: 'Could not tell which step that was.' };
@@ -124,14 +143,20 @@ export async function sendStepAction(
       userId: user.id,
       stepId: id.data,
       routine,
+      mode,
     });
   } catch {
-    return { error: 'The step could not be sent. Try again.' };
+    return {
+      error: mode === 'prepare' ? 'Claude could not be asked. Try again.' : 'The step could not be sent. Try again.',
+    };
   }
   if (!sent.ok) {
     // A fire that failed still wrote a failed run row, which the Runs page lists.
     revalidatePath('/goals', 'layout');
     return { error: sent.error };
+  }
+  if (sent.job === 'prepare') {
+    return saved(`Asked Claude to prepare "${sent.title}". What it writes will show on the step, which stays yours.`);
   }
   return saved(
     sent.job === 'phase'

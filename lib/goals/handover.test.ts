@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { locateStep, offersSend, sendJob, sendRefusal, type SendGoal } from './handover';
+import {
+  locateStep,
+  offersPrepare,
+  offersSend,
+  prepareJob,
+  sendJob,
+  sendRefusal,
+  sendRunText,
+  type SendGoal,
+} from './handover';
 import { RUN_QUIET_MS } from './shaping';
 import type { StepNode } from './steps';
 
@@ -98,5 +107,55 @@ describe('sendRefusal', () => {
 
   it('lets a run that went quiet be sent over', () => {
     expect(refusal([phase], 's', [{ itemId: 's', job: 'step', ago: RUN_QUIET_MS + 1 }])).toBeNull();
+  });
+});
+
+describe('prepare (plan #1001)', () => {
+  function prepareRefusal(steps: StepNode[], id: string, runs: { itemId: string; job: string; ago: number }[] = []) {
+    const target = locateStep(GOAL, steps, id);
+    if (!target) throw new Error(`no step ${id}`);
+    return sendRefusal(
+      target,
+      runs.map((r) => ({ itemId: r.itemId, job: r.job, createdAt: new Date(NOW - r.ago).toISOString() })),
+      NOW,
+      'prepare',
+    );
+  }
+
+  it('offers it on an open step of yours with no sub-steps, and on nothing else', () => {
+    expect(prepareJob(node('m', { kind: 'mine' }))).toBe('prepare');
+    expect(prepareJob(node('m', { kind: 'mine', children: [node('q', { kind: 'decision' })] }))).toBe('prepare');
+    expect(prepareJob(node('p', { kind: 'mine', children: [node('a')] }))).toBeNull();
+    expect(prepareJob(node('a'))).toBeNull();
+    expect(prepareJob(node('r', { kind: 'rhythm' }))).toBeNull();
+    expect(offersPrepare(node('m', { kind: 'mine' }))).toBe(true);
+    expect(offersPrepare(node('m', { kind: 'mine', status: 'done' }))).toBe(false);
+  });
+
+  it('lets a step of yours go, even one waiting on another', () => {
+    expect(prepareRefusal([node('m', { kind: 'mine' })], 'm')).toBeNull();
+    expect(
+      prepareRefusal([node('w', { kind: 'mine', waitingOn: [{ id: 'o', title: 'Other', status: 'open' }] })], 'w'),
+    ).toBeNull();
+  });
+
+  it("refuses Claude's step, a blocked one of yours and one Claude is already preparing", () => {
+    expect(prepareRefusal([node('a')], 'a')).toBe('Only a step of yours with no sub-steps can be prepared.');
+    expect(prepareRefusal([node('b', { kind: 'mine', status: 'blocked', blockAsk: 'Your login.' })], 'b')).toBe(
+      'That step is blocked: Your login.',
+    );
+    expect(prepareRefusal([node('m', { kind: 'mine' })], 'm', [{ itemId: 'm', job: 'prepare', ago: 60_000 }])).toBe(
+      'Claude is already preparing this step. What it writes will show here when it is done.',
+    );
+  });
+
+  it('briefs the run to write into the result and leave the step yours and open', () => {
+    const target = locateStep(GOAL, [node('m', { kind: 'mine', title: 'Turn on autopay' })], 'm');
+    if (!target) throw new Error('no step');
+    const text = sendRunText({ target, job: 'prepare', collections: [], userId: 'u', runId: 'r' });
+    expect(text).toContain("Prepare one of the person's own steps");
+    expect(text).toContain('The step: "Turn on autopay"');
+    expect(text).toContain('A step of yours to prepare');
+    expect(text).toContain('Leave its kind, status and everything else as they are');
   });
 });

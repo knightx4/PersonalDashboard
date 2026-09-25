@@ -9,6 +9,10 @@
  * rather than in the button, so a later way in (an @dash comment, the night
  * run) refuses the same things.
  *
+ * Prepare (plan #1001) goes the same way for a step of yours: a run with job
+ * `prepare` writes what you need to do it (a draft email, a call script, a
+ * checklist) into the step's result, and leaves the step yours and open.
+ *
  * Pure, so the row can ask whether to offer Send and the tests can read the
  * rules. The reads and the fire are in lib/goals/handover-store.ts.
  */
@@ -17,7 +21,10 @@ import { RUN_QUIET_MS } from '@/lib/goals/shaping';
 import { STEP_KIND_LABELS, STEP_STATUS_LABELS, type StepNode } from '@/lib/goals/steps';
 import type { GoalStatus } from '@/lib/goals/tree';
 
-export type SendJob = 'step' | 'phase';
+export type SendJob = 'step' | 'phase' | 'prepare';
+
+/** Send hands Claude's own work over; prepare asks Claude to ready one of yours. */
+export type SendMode = 'send' | 'prepare';
 
 /** What a send reads about the goal the step sits under. */
 export type SendGoal = {
@@ -50,7 +57,7 @@ function substeps(step: StepNode): StepNode[] {
  * Which run a step would get, or null when it is not Claude's to take. A step
  * with sub-steps is a phase, whoever's it is: the run works the Claude steps
  * in it. A Claude step with none is a step. A step of yours with none is not
- * sent here; preparing one is its own job (plan #1001).
+ * sent here; preparing one is its own job (prepareJob, plan #1001).
  */
 export function sendJob(step: Pick<StepNode, 'kind' | 'children'>): SendJob | null {
   if (step.kind === 'decision') return null;
@@ -61,6 +68,26 @@ export function sendJob(step: Pick<StepNode, 'kind' | 'children'>): SendJob | nu
 /** Whether the row offers Send at all. What is refused once pressed is sendRefusal's. */
 export function offersSend(step: StepNode): boolean {
   return sendJob(step) !== null && step.status !== 'done' && step.status !== 'dropped';
+}
+
+/**
+ * Whether Claude can prepare a step (plan #1001): one of yours with no
+ * sub-steps, such as calling the servicer or sending an application. A rhythm
+ * is yours too, but it repeats, so there is no one thing to prepare.
+ */
+export function prepareJob(step: Pick<StepNode, 'kind' | 'children'>): 'prepare' | null {
+  if (step.kind !== 'mine') return null;
+  return step.children.some((child) => child.kind !== 'decision') ? null : 'prepare';
+}
+
+/** Whether the row offers Prepare. What is refused once pressed is sendRefusal's. */
+export function offersPrepare(step: StepNode): boolean {
+  return prepareJob(step) !== null && step.status !== 'done' && step.status !== 'dropped';
+}
+
+/** The job a send or a prepare would start on a step, or null when it has none. */
+export function jobFor(step: Pick<StepNode, 'kind' | 'children'>, mode: SendMode): SendJob | null {
+  return mode === 'prepare' ? prepareJob(step) : sendJob(step);
 }
 
 const isOpen = (node: StepNode) => node.status === 'open' || node.status === 'blocked';
@@ -77,9 +104,15 @@ function idsUnder(step: StepNode, into: Set<string> = new Set()): Set<string> {
  * go. In the order the person would want to hear them: a question is theirs
  * to answer; an unapproved goal and a proposal are waiting on their yes; a
  * closed or blocked step has nothing for Claude to do; and a step Claude is
- * already on takes one run, not two.
+ * already on takes one run, not two. `mode` is `prepare` for Prepare on a
+ * step of yours (plan #1001), which may go ahead of the steps it waits on.
  */
-export function sendRefusal(target: SendTarget, running: readonly LiveRun[], now: number): string | null {
+export function sendRefusal(
+  target: SendTarget,
+  running: readonly LiveRun[],
+  now: number,
+  mode: SendMode = 'send',
+): string | null {
   const { goal, step, above } = target;
 
   if (step.kind === 'decision') {
@@ -101,9 +134,11 @@ export function sendRefusal(target: SendTarget, running: readonly LiveRun[], now
     return `That step is ${STEP_STATUS_LABELS[step.status].toLowerCase()} already.`;
   }
 
-  const job = sendJob(step);
+  const job = jobFor(step, mode);
   if (!job) {
-    return 'That step is yours. Only Claude\'s steps, and phases with steps in them, can be sent.';
+    return mode === 'prepare'
+      ? 'Only a step of yours with no sub-steps can be prepared.'
+      : 'That step is yours. Only Claude\'s steps, and phases with steps in them, can be sent.';
   }
   if (isStepBlocked(step)) {
     return step.blockAsk ? `That step is blocked: ${step.blockAsk}` : 'That step is blocked.';
@@ -115,7 +150,7 @@ export function sendRefusal(target: SendTarget, running: readonly LiveRun[], now
     if (waiting.length > 0) {
       return `That step waits on "${waiting[0].title}" first.`;
     }
-  } else if (!substeps(step).some(isOpen)) {
+  } else if (job === 'phase' && !substeps(step).some(isOpen)) {
     return 'Nothing under that phase is open, so there is nothing to send.';
   }
 
@@ -124,7 +159,9 @@ export function sendRefusal(target: SendTarget, running: readonly LiveRun[], now
   for (const run of live) {
     if (!run.itemId) continue;
     if (run.itemId === step.id) {
-      return `Claude is already working on this ${job}. What it produces will show here when it is done.`;
+      return job === 'prepare'
+        ? 'Claude is already preparing this step. What it writes will show here when it is done.'
+        : `Claude is already working on this ${job}. What it produces will show here when it is done.`;
     }
     if (run.itemId === goal.id && (run.job === 'goal' || run.job === 'reshape')) {
       return 'Claude is already working on the whole goal. Send this once that run has finished.';
@@ -202,6 +239,15 @@ export function sendRunText(input: {
           "person's own steps and questions as they are. Stop at a step that needs something",
           'only the person has, and say so in the summary.',
         ]
+      : job === 'prepare'
+      ? [
+          "This step is the person's own: they will do it, not you. Prepare it for them, as in",
+          'the section "A step of yours to prepare": write what they need to do it, such as a',
+          'draft email, a call script or a step-by-step checklist, made specific with what the',
+          "goal's steps, collections and their email say (names, account numbers, phone numbers,",
+          "sites). Store it in the step's result (and result_url when it lives somewhere with a",
+          'link). Leave its kind, status and everything else as they are, and touch no other step.',
+        ]
       : [
           'Work this one step, as in the section "The morning run": produce what its title',
           'and done-when ask for, store it in the step\'s result (and result_url when it lives',
@@ -209,7 +255,9 @@ export function sendRunText(input: {
         ];
 
   return [
-    `Work on one ${noun} of a goal, sent from its row on the goal page.`,
+    job === 'prepare'
+      ? "Prepare one of the person's own steps on a goal, asked for from its row on the goal page."
+      : `Work on one ${noun} of a goal, sent from its row on the goal page.`,
     '',
     ...about,
     '',

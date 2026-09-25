@@ -46,8 +46,9 @@ Every run has a `goals.runs` row.
 
 - Fired from **Work on this**, by the **morning run**, by the weekly run,
   after the person answered questions on a goal (job `reshape`), or by
-  **Send** on one step or phase (job `step` or `phase`): the app has written
-  the row as `started`, and its id is in your brief. Use it.
+  **Send** on one step or phase (job `step` or `phase`), or by **Prepare** on
+  one step of the person's (job `prepare`): the app has written the row as
+  `started`, and its id is in your brief. Use it.
 - Started any other way: write one first, with `job` `goal` and `item_id` for
   one goal, or `daily` / `weekly` for a scheduled run, and use its id.
 
@@ -466,7 +467,9 @@ For each one:
    you used any. Use web search where the step needs current facts.
 3. Store it on the step and close the step in one write. `result` is the text
    itself (up to 100,000 characters). `result_url` is optional, for when it
-   also lives at a link. Only a `claude` step takes either.
+   also lives at a link. Only a `claude` step takes either here; a step of
+   the person's takes them only when it is prepared ("A step of yours to
+   prepare").
 
    ```sql
    set local goals.actor = 'claude';
@@ -507,6 +510,37 @@ yours to work.
   person.
 
 The summary names each step worked and each one left, with the reason.
+
+## A step of yours to prepare
+
+The person pressed **Prepare** on one of their own steps (`kind` `mine`), such
+as calling a servicer or sending an application. The run row has `job`
+`prepare` and `item_id` on the step, and the brief names it the way a sent
+step's brief does. They will do the step; you write what they need to do it.
+
+1. Read the step, its done-when, the steps around it, the goal's collections
+   and records, and their email where it bears on it, so what you write names
+   the real servicer, account, phone number, site and amounts rather than
+   placeholders. Where a fact is not findable, say so in the text and leave a
+   clearly marked blank.
+2. Write the one form that fits: a draft email ready to send, a call script
+   with what to say and what to ask, or numbered step-by-step instructions
+   for a site or a form. Keep it to what doing the step needs.
+3. Store it in one write, as `claude`:
+
+   ```sql
+   set local goals.actor = 'claude';
+   set local goals.run_id = '<the run id>';
+   update goals.items
+   set result = '<what you prepared>', result_url = null
+   where id = '<step id>' and user_id = '<user>' and kind = 'mine';
+   ```
+
+   `result_url` is for when it also lives somewhere with a link. Change
+   nothing else: the step stays `mine` and `open`, and ticking it is theirs.
+   Preparing it again replaces the earlier text.
+4. Close the run row with a summary that says what you prepared and anything
+   you could not find.
 
 ## The weekly run
 

@@ -144,14 +144,19 @@ export function Question({ node }: { node: StepNode }) {
  * What the morning run produced for a Claude step (plan #933): the note or
  * draft, its link when it has one, and while it is unread a button to mark it
  * read, which takes it off the home. Once read it moves into the details.
+ *
+ * On a step of yours it is what Claude prepared for you to do it (plan
+ * #1001). That waits on the step itself, which is still yours to tick, so it
+ * has no Mark read.
  */
 export function ClaudeResult({ node }: { node: StepNode }) {
   const [state, review, reviewing] = useActionState(reviewResultAction, answerInitial);
-  const unread = node.reviewedAt === null;
+  const prepared = node.kind !== 'claude';
+  const unread = !prepared && node.reviewedAt === null;
   return (
     <div className="mt-1 space-y-1 px-1">
       <p className="text-small text-ink-muted">
-        {unread ? 'Claude’s result, to read' : 'Claude’s result'}
+        {prepared ? 'What Claude prepared for this' : unread ? 'Claude’s result, to read' : 'Claude’s result'}
       </p>
       {node.result && (
         <p className="text-small break-words whitespace-pre-wrap text-ink">{node.result}</p>
