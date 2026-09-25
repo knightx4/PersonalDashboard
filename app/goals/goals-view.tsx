@@ -10,9 +10,11 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ComposeBody, ComposeTitle, InlineInput } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
+import type { AreaRunView } from '@/lib/goals/shaping';
 import type { GoalProgress as GoalProgressData } from '@/lib/goals/status';
 import {
   AREA_NAME_MAX,
+  AREA_NOTE_MAX,
   GOAL_ACCEPTANCE_MAX,
   GOAL_FOG_MAX,
   GOAL_TITLE_MAX,
@@ -28,14 +30,18 @@ import {
   moveAreaAction,
   moveGoalAction,
   renameAreaAction,
+  setAreaNoteAction,
   type GoalsActionState,
 } from './actions';
+import { AreaPlanner } from './area-planner';
 import { GoalProgress } from './goal-progress';
 
 /**
  * Areas and the goals under them (plan #924).
  *
- * Each area is a heading with its goals in a card beneath. Everything is
+ * Each area is a heading, a line saying what you want from it, and its goals
+ * in a card beneath, with Plan this area asking Claude to propose the goals
+ * it needs. Everything is
  * edited where it stands (law 12): a name, a title, a done-when or a note of
  * fog is an inline input saved on blur. Reordering and archiving sit in each
  * row's menu, which works the same with a thumb as with a mouse. Archiving
@@ -104,9 +110,15 @@ function moveItems(
 export function GoalsView({
   areas,
   progress,
+  areaRuns,
+  canRun,
 }: {
   areas: AreaWithGoals[];
   progress: Progress;
+  /** Each area's latest Plan this area run, keyed by area id. */
+  areaRuns: Record<string, AreaRunView>;
+  /** Whether this account can start a Claude run (the owner's only). */
+  canRun: boolean;
 }) {
   return (
     <div className="space-y-6">
@@ -124,6 +136,8 @@ export function GoalsView({
             index={index}
             count={areas.length}
             progress={progress}
+            run={areaRuns[area.id] ?? null}
+            canRun={canRun}
           />
         ))
       )}
@@ -137,13 +151,18 @@ function AreaSection({
   index,
   count,
   progress,
+  run,
+  canRun,
 }: {
   area: AreaWithGoals;
   index: number;
   count: number;
   progress: Progress;
+  run: AreaRunView | null;
+  canRun: boolean;
 }) {
   const [renameState, rename, renaming] = useActionState(renameAreaAction, initial);
+  const [noteState, saveNote, savingNote] = useActionState(setAreaNoteAction, initial);
   const menuAction = useMenuAction();
   const toast = useToast();
 
@@ -202,6 +221,22 @@ function AreaSection({
         <ActionMenu label={`${area.name} actions`} items={items} />
       </div>
       {renameState.error && <p className="px-1 text-small text-danger">{renameState.error}</p>}
+      <form action={saveNote}>
+        <input type="hidden" name="id" value={area.id} />
+        <InlineInput
+          name="note"
+          maxLength={AREA_NOTE_MAX}
+          defaultValue={area.note ?? ''}
+          key={`note-${area.note ?? ''}`}
+          placeholder="What you want from this, in a sentence"
+          aria-label={`What you want from ${area.name}`}
+          disabled={savingNote}
+          onBlur={commitOnBlur(area.note ?? '')}
+          onKeyDown={revertOnEscape(area.note ?? '')}
+          className="text-ink-muted"
+        />
+      </form>
+      {noteState.error && <p className="px-1 text-small text-danger">{noteState.error}</p>}
 
       {goalCount > 0 && (
         <Card>
@@ -218,6 +253,7 @@ function AreaSection({
           </ul>
         </Card>
       )}
+      <AreaPlanner areaId={area.id} hasGoals={goalCount > 0} run={run} canRun={canRun} />
       <GoalComposer areaId={area.id} areaName={area.name} />
     </section>
   );
@@ -341,7 +377,7 @@ function GoalRow({
             className="inline-flex items-center gap-1 text-small text-ink-muted underline-offset-2 hover:text-ink hover:underline"
           >
             <ListTree className="size-3" strokeWidth={1.75} aria-hidden />
-            {steps ? 'Full tree' : 'Break into steps'}
+            {goal.status === 'proposed' ? 'Proposed by Claude: review' : steps ? 'Full tree' : 'Break into steps'}
           </Link>
         </div>
         {editState.error && <p className="px-1 text-small text-danger">{editState.error}</p>}

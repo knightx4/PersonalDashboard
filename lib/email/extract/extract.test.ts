@@ -58,6 +58,30 @@ describe('classifyMessage', () => {
     expect(result.merchant).toBeNull();
   });
 
+  it.each([
+    "Order Confirmed! We'll Take It From Here",
+    'Your order is confirmed',
+    'Thank you for your order',
+    'Thank you for your purchase!',
+    'Purchase confirmation',
+  ])('marks "%s" from an unknown sender as order_confirmation', (subject) => {
+    const result = classifyMessage({
+      fromAddress: 'James Avery Artisan Jewelry <order-info@email.jamesavery.com>',
+      subject,
+      merchants: [],
+    });
+    expect(result.classification).toBe('order_confirmation');
+  });
+
+  it('still reads "Order Shipped!" as shipping', () => {
+    const result = classifyMessage({
+      fromAddress: 'order-info@email.jamesavery.com',
+      subject: 'Order Shipped!',
+      merchants: [],
+    });
+    expect(result.classification).toBe('shipping');
+  });
+
   it('marks Amazon review prompts as not_relevant', () => {
     const result = classifyMessage({
       fromAddress: 'no-reply@amazon.com',

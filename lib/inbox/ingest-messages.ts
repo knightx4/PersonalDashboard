@@ -558,7 +558,17 @@ export async function linkEnvelopes(
         item.existing.parse_status === 'needs_review') &&
       item.existing.error !== EXCLUDED_SENDER_ERROR;
 
-    if (item.existing && !retryLifecycle) {
+    // A message judged not relevant is judged again whenever its subject comes
+    // back through, which a backfill arranges by re-reading scrubbed envelopes.
+    // Classifying is free, so a widened classifier can recover a confirmation
+    // it once turned away; only a changed verdict costs a body fetch.
+    const retryNotRelevant =
+      item.existing?.classification === 'not_relevant' &&
+      item.existing.parse_status === 'skipped' &&
+      item.existing.error == null &&
+      Boolean(item.envelope.subject);
+
+    if (item.existing && !retryLifecycle && !retryNotRelevant) {
       counters.skipped += 1;
       continue;
     }
@@ -569,6 +579,11 @@ export async function linkEnvelopes(
       merchants,
     });
     counters.messagesClassified += 1;
+
+    if (retryNotRelevant && classified.classification === 'not_relevant') {
+      counters.skipped += 1;
+      continue;
+    }
 
     // Every message gets a verdict recorded, including the ones this workspace
     // wants nothing to do with. Saying "not mine" out loud is what lets core

@@ -173,6 +173,70 @@ export function goalRunText(input: {
 }
 
 /**
+ * The turn appended to the goals routine's standing prompt when "Plan this
+ * area" is pressed: the area, what you wrote you want from it, the goals
+ * already under it, and the run row. The session proposes the goals the area
+ * needs (.claude/skills/goals, "Planning an area"), each as a proposal you
+ * approve or turn down on its own.
+ */
+export function areaRunText(input: {
+  areaId: string;
+  areaName: string;
+  note: string | null;
+  goals: { title: string; status: string }[];
+  userId: string;
+  runId: string;
+}): string {
+  const note = input.note?.trim();
+  const goals =
+    input.goals.length === 0
+      ? ['It has no goals yet.']
+      : ['The goals already under it:', ...input.goals.map((g) => `- ${g.title} (${g.status})`)];
+  return [
+    `Plan one area: "${input.areaName}" (goals.areas id ${input.areaId}).`,
+    '',
+    note ? `What the person wants from it, in their words:\n${note}` : 'The person has not written what they want from it.',
+    '',
+    ...goals,
+    '',
+    'Follow .claude/skills/goals/SKILL.md, "Planning an area". Read it first: it says how to',
+    'propose the goals the area needs, each with a done-when and a first move, and how every',
+    'write is labelled.',
+    '',
+    `The goals belong to user_id ${input.userId}. This run is goals.runs id ${input.runId},`,
+    'already written as started. Set goals.run_id to it on every write, and close that row',
+    'with a summary (or as failed, with the reason) before you stop.',
+  ].join('\n');
+}
+
+/** An area's latest run, as the line beside Plan this area shows it. */
+export type AreaRunView = {
+  runId: string;
+  /** Where a run still going has got to, or null when none is going. */
+  running: string | null;
+  /** Why the latest run failed, or null when it did not. */
+  error: string | null;
+  /** The first line of the latest finished run's summary, or null. */
+  summary: string | null;
+};
+
+/**
+ * The line for an area's latest run. A started run gone quiet reads as
+ * failed, with the reason the sweep will close it with, so the button comes
+ * back without waiting for the sweep.
+ */
+export function areaRunView(run: GoalRun, now: number): AreaRunView {
+  if (run.status === 'started' && !runIsQuiet(run, now)) {
+    return { runId: run.id, running: runProgress(run, now), error: null, summary: null };
+  }
+  if (run.status === 'failed' || run.status === 'started') {
+    const error = run.status === 'failed' ? (run.error ?? 'No reason was recorded.') : quietRunError(run);
+    return { runId: run.id, running: null, error: firstLine(error), summary: null };
+  }
+  return { runId: run.id, running: null, error: null, summary: run.summary ? firstLine(run.summary) : null };
+}
+
+/**
  * What the goal page says about approval, and what its button is called, or
  * null for no button. Approving opens the goal if Claude proposed it and every
  * proposed step under it, and from then on Claude may add, split and reorder

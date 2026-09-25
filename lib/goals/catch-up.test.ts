@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AWAY_DAYS,
   CATCH_UP_RUNS_SHOWN,
+  SITTING_MINUTES,
   catchUp,
   catchUpSince,
   nextVisit,
@@ -19,6 +20,7 @@ describe('nextVisit and catchUpSince', () => {
       lastVisitAt: '2026-09-25T09:00:00.000Z',
       awayFrom: null,
       backOn: null,
+      previousVisitAt: null,
     });
     expect(catchUpSince(record, '2026-09-25')).toBeNull();
   });
@@ -28,6 +30,7 @@ describe('nextVisit and catchUpSince', () => {
       lastVisitAt: '2026-09-18T08:00:00.000Z',
       awayFrom: null,
       backOn: null,
+      previousVisitAt: null,
     };
     const back = nextVisit(before, at('2026-09-25T09:00:00Z'), '2026-09-25');
     expect(catchUpSince(back, '2026-09-25')).toBe('2026-09-18T08:00:00.000Z');
@@ -45,10 +48,35 @@ describe('nextVisit and catchUpSince', () => {
       lastVisitAt: '2026-09-20T09:00:01.000Z',
       awayFrom: null,
       backOn: null,
+      previousVisitAt: null,
     };
     const record = nextVisit(before, at(`2026-09-25T09:00:00Z`), '2026-09-25');
     expect(AWAY_DAYS).toBe(5);
     expect(catchUpSince(record, '2026-09-25')).toBeNull();
+  });
+});
+
+describe('nextVisit sittings (plan #1010)', () => {
+  const evening: VisitRecord = {
+    lastVisitAt: '2026-09-24T21:00:00.000Z',
+    awayFrom: null,
+    backOn: null,
+    previousVisitAt: '2026-09-24T08:00:00.000Z',
+  };
+
+  it('starts a sitting in the morning from the evening visit, and keeps it through reloads', () => {
+    const morning = nextVisit(evening, at('2026-09-25T07:00:00Z'), '2026-09-25');
+    expect(morning.previousVisitAt).toBe('2026-09-24T21:00:00.000Z');
+
+    // A press on the home reloads it ten minutes later: still the same sitting.
+    const reload = nextVisit(morning, at('2026-09-25T07:10:00Z'), '2026-09-25');
+    expect(reload.previousVisitAt).toBe('2026-09-24T21:00:00.000Z');
+  });
+
+  it('clears the list at the next sitting', () => {
+    const morning = nextVisit(evening, at('2026-09-25T07:00:00Z'), '2026-09-25');
+    const later = nextVisit(morning, at(`2026-09-25T07:${SITTING_MINUTES}:00Z`), '2026-09-25');
+    expect(later.previousVisitAt).toBe('2026-09-25T07:00:00.000Z');
   });
 });
 

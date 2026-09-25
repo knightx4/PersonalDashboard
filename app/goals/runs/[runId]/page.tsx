@@ -57,6 +57,14 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
               ) : (
                 <>{`On the step ${run.item.title} · `}</>
               )
+            ) : run.area ? (
+              <>
+                {'On '}
+                <Link href="/goals/all" className="underline-offset-2 hover:underline">
+                  {run.area.name}
+                </Link>
+                {' · '}
+              </>
             ) : null}
             {meta}
           </>

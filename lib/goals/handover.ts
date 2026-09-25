@@ -85,6 +85,15 @@ export function offersPrepare(step: StepNode): boolean {
   return prepareJob(step) !== null && step.status !== 'done' && step.status !== 'dropped';
 }
 
+/**
+ * Which hand-over an @dash comment asking Claude to take a step starts
+ * (plan #1003): a step of yours is prepared and stays yours, and anything
+ * else is sent. A step that fits neither is refused by sendRefusal as a send.
+ */
+export function commentMode(step: Pick<StepNode, 'kind' | 'children'>): SendMode {
+  return prepareJob(step) ? 'prepare' : 'send';
+}
+
 /** The job a send or a prepare would start on a step, or null when it has none. */
 export function jobFor(step: Pick<StepNode, 'kind' | 'children'>, mode: SendMode): SendJob | null {
   return mode === 'prepare' ? prepareJob(step) : sendJob(step);
@@ -203,8 +212,11 @@ export function sendRunText(input: {
   collections: readonly SendCollection[];
   userId: string;
   runId: string;
+  /** The @dash comment that asked for it (plan #1003), when it came from the thread. */
+  asked?: string;
 }): string {
   const { target, job, collections } = input;
+  const from = input.asked ? 'a comment on its row' : 'its row on the goal page';
   const { goal, step, above, siblings } = target;
   const noun = job === 'phase' ? 'phase' : 'step';
 
@@ -256,10 +268,17 @@ export function sendRunText(input: {
 
   return [
     job === 'prepare'
-      ? "Prepare one of the person's own steps on a goal, asked for from its row on the goal page."
-      : `Work on one ${noun} of a goal, sent from its row on the goal page.`,
+      ? `Prepare one of the person's own steps on a goal, asked for from ${from}.`
+      : `Work on one ${noun} of a goal, sent from ${from}.`,
     '',
     ...about,
+    ...(input.asked
+      ? [
+          '',
+          'What they wrote, which may say what to produce or how:',
+          input.asked,
+        ]
+      : []),
     '',
     `The goal: "${goal.title}" (goals.items id ${goal.id}).`,
     goal.acceptance ? `The goal is done when: ${goal.acceptance}` : 'The goal has no done-when yet.',

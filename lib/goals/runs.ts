@@ -5,7 +5,8 @@
  * `goal`), the morning run (`daily`), the weekly run (`weekly`), or answers
  * to questions on a goal (`reshape`, plan #1017), or one step or phase sent
  * from its row (`step`, `phase`, plan #1000), or one step of yours Claude was
- * asked to prepare (`prepare`, plan #1001). The page
+ * asked to prepare (`prepare`, plan #1001), or Plan this area on an area
+ * (`area`). The page
  * reads them newest first and says, for each, what started it, what it was
  * on, how it ended, how long it took, and its summary or its error.
  *
@@ -15,7 +16,7 @@
 import { formatInstant } from './dates';
 import { runIsQuiet, runProgress, type GoalRunStatus } from '@/lib/goals/shaping';
 
-export type RunJob = 'goal' | 'daily' | 'weekly' | 'reshape' | 'step' | 'phase' | 'prepare';
+export type RunJob = 'goal' | 'daily' | 'weekly' | 'reshape' | 'step' | 'phase' | 'prepare' | 'area';
 
 /** One goals.runs row with the item it was on, as the Runs page reads it. */
 export type RunListing = {
@@ -32,6 +33,8 @@ export type RunListing = {
   nowOn: string | null;
   /** The goal or step it was on; null for a morning or weekly run, or when that item was deleted. */
   item: { id: string; title: string; level: 'goal' | 'step' } | null;
+  /** The area an area run was on; null for every other run, or when the area was deleted. */
+  area?: { id: string; name: string } | null;
 };
 
 /** What started each kind of run, as the page names it. */
@@ -43,6 +46,7 @@ export const JOB_LABELS: Record<RunJob, string> = {
   step: 'Sent a step',
   phase: 'Sent a phase',
   prepare: 'Prepared a step',
+  area: 'Planned an area',
 };
 
 /**
@@ -98,6 +102,7 @@ export type RunRowWithItem = {
   last_seen_at?: string | null;
   now_on?: string | null;
   item: { id: string; title: string; level: string } | null;
+  area?: { id: string; name: string } | null;
 };
 
 function isJob(value: string): value is RunJob {
@@ -108,7 +113,8 @@ function isJob(value: string): value is RunJob {
     value === 'reshape' ||
     value === 'step' ||
     value === 'phase' ||
-    value === 'prepare'
+    value === 'prepare' ||
+    value === 'area'
   );
 }
 
@@ -136,6 +142,7 @@ export function toRunListings(rows: readonly RunRowWithItem[]): RunListing[] {
       item: row.item
         ? { id: row.item.id, title: row.item.title, level: row.item.level === 'goal' ? 'goal' : 'step' }
         : null,
+      area: row.area ? { id: row.area.id, name: row.area.name } : null,
     }))
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
