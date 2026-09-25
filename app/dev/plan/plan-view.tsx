@@ -1,9 +1,8 @@
 'use client';
 
-import { useActionState, useEffect, useMemo, useRef, useState } from 'react';
+import { useActionState, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  Check,
   Circle,
   CircleUser,
   Flag,
@@ -14,7 +13,6 @@ import {
   Play,
   Scale,
   Wrench,
-  X,
 } from 'lucide-react';
 import {
   addPlanDependency,
@@ -46,8 +44,6 @@ import { AddTrigger } from '@/components/ui/add-trigger';
 import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Banner } from '@/components/ui/banner';
-import { Bands } from '@/components/ui/meter';
-import { StatusGlyph } from '@/components/ui/status-glyph';
 import {
   ChipSelect,
   ComposeBody,
@@ -68,6 +64,7 @@ import {
   PLAN_PRIORITY_LABEL,
   PLAN_SIZES,
   PLAN_STATUSES,
+  PLAN_STATUS_LABEL,
   isClosed,
   isDismissed,
   type PlanAssignee,
@@ -76,7 +73,6 @@ import {
   type PlanStatus,
 } from '@/lib/plan/load';
 import {
-  PLAN_HEALTHS,
   PLAN_VIEW_CHIPS,
   PLAN_VIEW_LABEL,
   PLAN_VIEW_MENU,
@@ -89,27 +85,19 @@ import {
   searchSections,
   searchTerms,
   type MoveContext,
-  type PlanBand,
   type PlanLiveness,
   type PlanMove,
   type PlanNode,
-  type PlanProgress,
   type PlanSection,
   type PlanSummary,
-  type PlanTally,
   type PlanView as View,
 } from '@/lib/plan/tree';
-import { PLAN_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import {
-  HEALTH,
-  TONE_DOT,
   healthOf as healthWordsOf,
   moveFor as moveWordsFor,
   type HealthFacts,
-  type HealthWord,
 } from '@/lib/plan/health-words';
 import { reshapeOrigin } from '@/lib/plan/origin';
-import type { PlanRefTitles } from '@/lib/comments/refs';
 import { quietSendAsk } from '@/lib/plan/liveness';
 import {
   isResolvingAnswers,
@@ -138,6 +126,12 @@ import {
 } from './plan-run-status';
 import { catalogLabel, subtreeOf, type PlanCatalogEntry } from './plan-catalog';
 import { cn } from '@/lib/cn';
+import { ColumnHeader, LEVEL, ROW_GRID, TreeGuides } from '@/components/plan-tree/grid';
+import { Breakdown, Progress, SectionTally } from '@/components/plan-tree/counts';
+import { Questions } from '@/components/plan-tree/questions';
+import { Dependencies } from '@/components/plan-tree/dependencies';
+import { useSettled } from '@/components/plan-tree/use-settled';
+import type { TreeActions } from '@/components/plan-tree/types';
 
 /**
  * A step as the pickers know it: enough to name it and to place it.
@@ -147,13 +141,16 @@ import { cn } from '@/lib/cn';
  * is often not in it, while the catalog is every step in the plan.
  */
 
-const STATUS_LABEL: Record<PlanStatus, string> = {
-  proposed: 'Proposed',
-  not_started: 'Not started',
-  in_progress: 'In progress',
-  blocked: 'Blocked',
-  done: 'Done',
-  dropped: 'Dropped',
+const STATUS_LABEL = PLAN_STATUS_LABEL;
+
+/** The plan's own writes, for the shared tree components. */
+const PLAN_TREE_ACTIONS: TreeActions = {
+  answer: answerPlanDecision,
+  setStatus: setPlanItemStatus,
+  dismissQuestion: dismissPlanDecision,
+  ask: addPlanItem,
+  addDependency: addPlanDependency,
+  removeDependency: removePlanDependency,
 };
 
 const SIZE_LABEL: Record<PlanSize, string> = { s: 'Small', m: 'Medium', l: 'Large' };
@@ -256,60 +253,6 @@ function StatusChip({ defaultValue }: { defaultValue: PlanStatus }) {
     >
       <StatusOptions />
     </ChipSelect>
-  );
-}
-
-/**
- * How far through, as a bar and as the numbers behind it.
- *
- * The numbers are there because a bar alone is a shape rather than a fact:
- * "8 of 12" survives being read at a glance in a way that four fifths of a
- * rectangle does not.
- *
- * The bar is banded rather than a single green length. All green said one
- * thing -- the done fraction -- and left everything not done as blank track,
- * so a module held up by four unanswered questions and a module nobody has
- * got to yet drew the same picture. Each state now owns its share of the
- * length in the tone the health column beneath it already gives it: amber for
- * everything not yet takeable, blue for ready and underway, green for done. The tally beside it was already saying this in numbers; the
- * bar was the one thing on the row still claiming the module was simply
- * eight twelfths of the way there.
- */
-function Progress({
-  label,
-  progress,
-  bands,
-}: {
-  label: string;
-  progress: PlanProgress;
-  bands: readonly PlanBand[];
-}) {
-  if (progress.fraction === null) return null;
-
-  return (
-    <span className="flex items-center gap-2">
-      {/* `sunken`, not `canvas`. The track is what the bands are drawn on --
-          but `--c-page` is defined as `var(--c-canvas)`, so a canvas track on
-          a page is the page colour and there is no track at all. It shows
-          through wherever a state is missing entirely, which on a module with
-          no ready steps and no blocks is most of the bar's own rounding.
-          Same reason the avatar tiles are sunken. */}
-      <Bands
-        bands={bands.map((band) => ({
-          key: band.health,
-          value: band.count,
-          fill: TONE_DOT[HEALTH[band.health].tone],
-          label: `${band.count} ${HEALTH[band.health].word.toLowerCase()}`,
-        }))}
-        track="sunken"
-        className="w-24"
-        label={label}
-      />
-      <span className="tabular text-small text-ink-muted">
-        {progress.done} of {progress.live}
-        {progress.inProgress > 0 && ` · ${progress.inProgress} underway`}
-      </span>
-    </span>
   );
 }
 
@@ -453,24 +396,6 @@ function SummaryStrip({
       </nav>
     </div>
   );
-}
-
-/**
- * Closes a form once its action has landed.
- *
- * Compared by identity rather than by the text of the message, so two
- * consecutive saves are distinguishable. In an effect rather than during
- * render, because what closes is usually the parent's state -- "stop editing",
- * "stop adding" -- and a child may not set its parent's state while rendering.
- */
-function useSettled(state: PlanActionState, onSettle: () => void) {
-  const seen = useRef<PlanActionState | null>(null);
-  useEffect(() => {
-    if (state.message && state !== seen.current) {
-      seen.current = state;
-      onSettle();
-    }
-  }, [state, onSettle]);
 }
 
 /** The steps in the catalog beneath one, itself included: what it cannot move under or wait on. */
@@ -853,372 +778,6 @@ function SetupJob({
 }
 
 /**
- * Raise a question against a step, from the step.
- *
- * One field, because a question is one sentence. It becomes a decision beneath
- * the step -- the same row kind the shaping sessions write -- so a question
- * asked here and a question proposed by a session are the same object, answered
- * the same way and carried into the same briefs. The options, if there turn out
- * to be options worth writing down, go in through Edit like any other detail.
- */
-function AskQuestion({ node, onDone }: { node: PlanNode; onDone: () => void }) {
-  const [state, action, pending] = useActionState(addPlanItem, {} as PlanActionState);
-  useSettled(state, onDone);
-
-  return (
-    <form action={action} className="space-y-2 rounded-lg bg-surface px-3 py-2.5">
-      <input type="hidden" name="module" value={node.module ?? ''} />
-      <input type="hidden" name="parent" value={node.id} />
-      <input type="hidden" name="kind" value="decision" />
-      <ComposeTitle
-        name="title"
-        autoFocus
-        aria-label="The question"
-        placeholder="What has to be decided before this can be built?"
-      />
-      <div className="flex flex-wrap items-center gap-2">
-        <FieldError>{state.error}</FieldError>
-        <div className="ml-auto flex items-center gap-1">
-          <Button type="button" size="sm" variant="ghost" onClick={onDone}>
-            Cancel
-          </Button>
-          <Button type="submit" size="sm" pending={pending}>
-            {pending ? 'Asking…' : 'Ask'}
-          </Button>
-        </div>
-      </div>
-    </form>
-  );
-}
-
-/**
- * One question in a step's questions section.
- *
- * Open, it is the question with a box to close it in. Answered, it is the
- * question with the answer under it, and changing your mind is a fresh answer
- * rather than an edit -- the same rule `AnswerDecision` keeps, for the same
- * reason: the record should show that a decision changed.
- *
- * Withdrawn is the other way out, and it is the "or close them" half of the
- * ask. A question that stopped mattering is dropped rather than answered with
- * something untrue, because a decision carrying an invented answer would be
- * repeated to every session that reads the feature from then on.
- */
-function QuestionRow({ node, titles }: { node: PlanNode; titles?: PlanRefTitles }) {
-  const [answerState, answerAction, answerPending] = useActionState(
-    answerPlanDecision,
-    {} as PlanActionState,
-  );
-  const [dropState, dropAction, dropPending] = useActionState(
-    setPlanItemStatus,
-    {} as PlanActionState,
-  );
-  const [dismissState, dismissAction, dismissPending] = useActionState(
-    dismissPlanDecision,
-    {} as PlanActionState,
-  );
-  const [answering, setAnswering] = useState(false);
-  useSettled(answerState, () => setAnswering(false));
-
-  const settled = isClosed(node.status);
-  // Only ever rendered under the Dismissed view: everywhere else the row is
-  // pruned before it gets here.
-  const aside = isDismissed(node);
-  /**
-   * Pressing an option opens the box with that option in it.
-   *
-   * The options were only clickable once you had already pressed Answer, so
-   * from the outside they were three things that looked like buttons and did
-   * nothing. `useAnswerDraft` writes the option into the box rather than
-   * recording it; the callback is what opens the box, which does not exist yet
-   * at the moment the option is pressed.
-   */
-  const { answer, setAnswer, choose } = useAnswerDraft(() => setAnswering(true));
-
-  return (
-    <li
-      className={cn(
-        'rounded-lg px-3 py-2.5',
-        node.status === 'dropped'
-          ? 'bg-sunken'
-          : settled
-            ? 'bg-positive-tint/40'
-            : 'bg-caution-tint/40',
-      )}
-    >
-      <div className="flex items-start gap-2">
-        <span
-          aria-hidden
-          className={cn(
-            'mt-0.5 shrink-0 text-small font-semibold',
-            node.status === 'dropped'
-              ? 'text-ink-ghost'
-              : settled
-                ? 'text-positive'
-                : 'text-caution',
-          )}
-        >
-          {settled && node.status !== 'dropped' ? <Check className="size-3.5" strokeWidth={2} /> : '?'}
-        </span>
-        <div className="min-w-0 flex-1 space-y-2">
-          {/* Withdrawn, it is a record rather than a question: struck through,
-              and none of the apparatus for answering it applies. */}
-          {node.status === 'dropped' ? (
-            <p className="text-ui text-ink-muted line-through">
-              <span className="tabular mr-1.5 text-small text-ink-ghost">#{node.outline}</span>
-              {node.title}
-            </p>
-          ) : (
-            <>
-              <TheQuestion outline={node.outline} title={node.title} />
-              <TheOptions detail={node.detail} onChoose={settled ? undefined : choose} />
-            </>
-          )}
-
-          {node.resolution && <TheAnswered resolution={node.resolution} />}
-
-          {answering ? (
-            <AnswerBox
-              id={node.id}
-              detail={node.detail}
-              resolution={node.resolution}
-              action={answerAction}
-              pending={answerPending}
-              answer={answer}
-              onAnswer={setAnswer}
-              autoFocus
-              onCancel={() => {
-                setAnswer('');
-                setAnswering(false);
-              }}
-            />
-          ) : (
-            <div className="flex flex-wrap items-center gap-1">
-              <Button type="button" size="sm" variant="ghost" onClick={() => setAnswering(true)}>
-                {node.resolution ? 'Change the answer' : 'Answer'}
-              </Button>
-              {!settled && (
-                <form action={dropAction}>
-                  <input type="hidden" name="id" value={node.id} />
-                  <input type="hidden" name="status" value="dropped" />
-                  <Button type="submit" size="sm" variant="ghost" pending={dropPending}>
-                    Withdraw
-                  </Button>
-                </form>
-              )}
-              {/* The third way out, and the one that says nothing about the
-                  question: it is still open, still unanswered, and out of
-                  sight until you come and get it. */}
-              {!settled && (
-                <form action={dismissAction}>
-                  <input type="hidden" name="id" value={node.id} />
-                  <input type="hidden" name="dismissed" value={aside ? '0' : '1'} />
-                  <Button
-                    type="submit"
-                    size="sm"
-                    variant={aside ? 'secondary' : 'ghost'}
-                    pending={dismissPending}
-                  >
-                    {aside ? 'Bring back' : 'Not now'}
-                  </Button>
-                </form>
-              )}
-            </div>
-          )}
-
-          {/* A question is commented on where it is read, which is here: a
-              decision beneath a step is deliberately not a row of its own in
-              the tree, so this is the only place to say anything about it. */}
-          {node.status !== 'dropped' && (
-            <CommentThread
-              target="step"
-              id={node.id}
-              thread={node.thread}
-              label="Comment"
-              titles={titles}
-              placeholder="What is unclear about the question, or what you are weighing. Tag @dash to ask; either way it does not answer it."
-            />
-          )}
-
-          <FieldError>{answerState.error ?? dropState.error ?? dismissState.error}</FieldError>
-        </div>
-      </div>
-    </li>
-  );
-}
-
-/**
- * The questions hanging off a step.
- *
- * A question raised while a feature was being shaped used to end up as a
- * sentence inside the detail paragraph, where it could be read and nothing
- * else: there was no way to answer it, nothing recorded that it had been
- * settled, and the next session read the same open question as though it were
- * part of the description of the work. Decisions already are the app's answer
- * to that -- a question closed by an answer rather than a commit -- but they
- * could only be reached as rows of their own, several levels into the tree,
- * which is not where you are standing when you read the step they are about.
- *
- * So this is that list, gathered on the step that raised them, with the box
- * that closes each one. Answered questions stay, because "we already decided
- * this" is the most useful thing a step can tell you; withdrawn ones stay too,
- * quietly, so a question does not simply vanish.
- */
-function Questions({ node, titles }: { node: PlanNode; titles?: PlanRefTitles }) {
-  const [asking, setAsking] = useState(false);
-  const questions = node.children.filter((child) => child.kind === 'decision');
-  const unanswered = questions.filter(
-    (question) => !isClosed(question.status) && !isDismissed(question),
-  ).length;
-
-  if (questions.length === 0 && isClosed(node.status)) return null;
-
-  return (
-    <div className="space-y-2">
-      <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">
-        Questions
-        {unanswered > 0 && (
-          <span className="ml-1.5 font-normal normal-case tracking-normal text-caution">
-            {unanswered} unanswered
-          </span>
-        )}
-      </p>
-
-      {questions.length > 0 && (
-        <ul className="space-y-1.5">
-          {questions.map((question) => (
-            <QuestionRow key={question.id} node={question} titles={titles} />
-          ))}
-        </ul>
-      )}
-
-      {asking ? (
-        <AskQuestion node={node} onDone={() => setAsking(false)} />
-      ) : (
-        !isClosed(node.status) && (
-          <button
-            type="button"
-            onClick={() => setAsking(true)}
-            className="press -ml-1.5 inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-ui text-ink-ghost hover:bg-sunken hover:text-ink-muted"
-          >
-            <span aria-hidden>+</span>
-            {questions.length === 0 ? 'Ask a question' : 'Ask another'}
-          </button>
-        )
-      )}
-    </div>
-  );
-}
-
-function Dependencies({
-  node,
-  catalog,
-}: {
-  node: PlanNode;
-  catalog: readonly PlanCatalogEntry[];
-}) {
-  const [addState, addAction, addPending] = useActionState(addPlanDependency, {} as PlanActionState);
-  const [removeState, removeAction, removePending] = useActionState(
-    removePlanDependency,
-    {} as PlanActionState,
-  );
-
-  const own = new Set(node.dependsOn.map((link) => link.item.id));
-  const inherited = node.waitingOn.filter((ref) => !own.has(ref.id));
-  const excluded = subtreeOf(catalog, node.id);
-  const candidates = catalog.filter(
-    (entry) => !excluded.has(entry.id) && !own.has(entry.id) && !entry.closed,
-  );
-  const byModule = new Map<string, PlanCatalogEntry[]>();
-  for (const entry of candidates) {
-    const key = scopeLabel(entry.module);
-    byModule.set(key, [...(byModule.get(key) ?? []), entry]);
-  }
-
-  return (
-    <div className="space-y-2">
-      {(node.dependsOn.length > 0 || inherited.length > 0) && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-small text-ink-muted">Waits on</span>
-          {node.dependsOn.map((link) => (
-            <form key={link.dependencyId} action={removeAction} className="contents">
-              <input type="hidden" name="id" value={link.dependencyId} />
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-full py-0.5 pl-2 pr-1 text-small',
-                  isClosed(link.item.status)
-                    ? 'bg-positive-tint text-positive'
-                    : 'bg-caution-tint text-caution',
-                )}
-              >
-                #{link.item.number} {link.item.title}
-                {isClosed(link.item.status) && ` (${STATUS_LABEL[link.item.status].toLowerCase()})`}
-                <button
-                  type="submit"
-                  disabled={removePending}
-                  aria-label={`Stop waiting on #${link.item.number}`}
-                  className="press rounded-full p-0.5 hover:bg-surface/60"
-                >
-                  <X className="size-3" strokeWidth={2} aria-hidden />
-                </button>
-              </span>
-            </form>
-          ))}
-          {inherited.map((ref) => (
-            <span
-              key={ref.id}
-              title="Through a step above this one"
-              className="inline-flex items-center rounded-full bg-caution-tint px-2 py-0.5 text-small text-caution opacity-80"
-            >
-              #{ref.number} {ref.title} · above
-            </span>
-          ))}
-        </div>
-      )}
-
-      {node.blocks.length > 0 && (
-        <p className="text-small text-ink-muted">
-          Unblocks {node.blocks.map((ref) => `#${ref.number} ${ref.title}`).join(', ')}
-        </p>
-      )}
-
-      {candidates.length > 0 && (
-        <form action={addAction} className="flex flex-wrap items-center gap-2">
-          <input type="hidden" name="item" value={node.id} />
-          {/* Width only. This carried `h-8 py-0 text-small`, which overrode
-              three things the primitive is for: the dial's height, so it was
-              32px on a phone where every control beside it is 36; and
-              `text-base sm:text-ui`, which is the 16px that stops iOS zooming
-              the whole page when the select is tapped. Twelve-pixel type on a
-              native picker bought nothing and cost that. */}
-          <Select
-            name="depends_on"
-            defaultValue=""
-            className="w-auto max-w-xs"
-            aria-label="A step this one has to wait for"
-          >
-            <option value="">Wait on a step…</option>
-            {[...byModule.entries()].map(([label, entries]) => (
-              <optgroup key={label} label={label}>
-                {entries.map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {catalogLabel(entry)}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </Select>
-          <Button type="submit" variant="ghost" pending={addPending}>
-            {addPending ? 'Adding…' : 'Add'}
-          </Button>
-          <FieldError>{addState.error ?? removeState.error}</FieldError>
-        </form>
-      )}
-    </div>
-  );
-}
-
-/**
  * What pressing Send actually sends, said before it is pressed.
  *
  * The brief carries the step's whole subtree under "## Steps", so Send on a
@@ -1435,169 +994,6 @@ function useResolving(lastRuns: Readonly<Record<string, LastRun>>, now: number):
   );
 }
 
-/**
- * A module's steps, counted by state, beside its heading.
- *
- * The progress bar next to this answers "how far through", which is one
- * number and hides the shape of what is left: eleven not-started steps and
- * eleven unanswered questions are the same bar and are not the same module.
- * A count per state says which, without the section being opened -- and it
- * survives the fold, which is the point (law 10).
- *
- * Each count is marked with the state's hexagon rather than a round dot, so
- * "four blocked, two ready" is readable without telling the tones apart. Same
- * shape as the health column under it and the same size, because the two are
- * on screen together and a state that changed shape between them would read
- * as two states.
- *
- * Only states that are actually present are counted. A row of zeroes is noise,
- * and a "0 blocked" is a fact nobody needed (law 1). The count is the label:
- * the word is on the tooltip and in the accessible name, because eight
- * spelled-out states would be a paragraph where a glance was asked for.
- *
- * Answered is left out. Every other dot is either work outstanding or work
- * that shipped; an answered question is neither -- it is a decision recorded
- * and carried into the briefs beneath it, and it never becomes work again.
- * Counting them said nothing about the shape of what is left in a module,
- * which is the one thing these dots are for, and it was a dot on every
- * heading.
- */
-const TALLY_HEALTHS = PLAN_HEALTHS.filter((health) => health !== 'answered');
-
-function SectionTally({ tally, label }: { tally: PlanTally; label: string }) {
-  const present = TALLY_HEALTHS.filter((health) => tally[health] > 0);
-  if (present.length === 0) return null;
-
-  return (
-    <span className="flex items-center gap-2.5" aria-label={`${label} by state`}>
-      {present.map((health) => (
-        <span
-          key={health}
-          className="flex items-center gap-1"
-          title={`${tally[health]} ${HEALTH[health].word.toLowerCase()}`}
-        >
-          <StatusGlyph
-            glyph={PLAN_HEALTH_GLYPHS[health]}
-            className={TONE_TEXT[HEALTH[health].tone]}
-          />
-          <span className="tabular text-small text-ink-muted">{tally[health]}</span>
-          <span className="sr-only">{HEALTH[health].word}</span>
-        </span>
-      ))}
-    </span>
-  );
-}
-
-
-/**
- * The columns every row shares.
- *
- * One template, used by the header and by every row at every depth, is what
- * makes the page scan: the health of a sub-sub-step sits under the health of
- * the feature above it, because the indent lives inside the name cell rather
- * than around the row. On a phone the three middle columns go and the name,
- * the health and the menu stay.
- */
-// The last column holds the row's quick actions as well as its menu, so it is
-// wide enough for them from sm up -- reserved rather than grown on hover,
-// because a column that widens under the pointer moves every row beside it.
-// Status sits directly after Health, because the two are read together -- "how
-// far along, and who has it" is one question asked twice -- and a column
-// between them would make that a comparison across the row.
-const ROW_GRID =
-  'grid grid-cols-[minmax(0,1fr)_7.25rem_2rem] items-center gap-x-2 ' +
-  'sm:grid-cols-[minmax(0,1fr)_7.25rem_6rem_5.5rem_6rem_8rem]';
-
-/** The width of one level of the tree, in the name cell. */
-const LEVEL = 'w-5';
-
-function ColumnHeader() {
-  return (
-    <li
-      aria-hidden
-      className={cn(
-        ROW_GRID,
-        'px-3 py-1.5 text-micro font-semibold uppercase tracking-wide text-ink-ghost',
-      )}
-    >
-      <span>Step</span>
-      <span>Health</span>
-      <span className="hidden sm:block">Status</span>
-      <span className="hidden sm:block">Priority</span>
-      <span className="hidden sm:block">Steps</span>
-      <span />
-    </li>
-  );
-}
-
-/**
- * The lines that draw the tree.
- *
- * One slot per level above this row. An outer slot carries the line down
- * from an ancestor that still has siblings after it; the innermost slot is
- * the elbow into this row, continuing below when a sibling follows. It is
- * what lets a step three deep be read as three deep at a glance, without the
- * indent alone having to say so.
- */
-function TreeGuides({ trail }: { trail: readonly boolean[] }) {
-  return (
-    <>
-      {trail.map((continues, level) => {
-        const last = level === trail.length - 1;
-        return (
-          <span key={level} className={cn(LEVEL, 'relative shrink-0 self-stretch')} aria-hidden>
-            {(continues || last) && (
-              <span
-                className={cn(
-                  'absolute left-2 top-0 w-px bg-border-strong',
-                  continues ? 'bottom-0' : 'h-1/2',
-                )}
-              />
-            )}
-            {last && <span className="absolute left-2 top-1/2 h-px w-2.5 bg-border-strong" />}
-          </span>
-        );
-      })}
-    </>
-  );
-}
-
-/**
- * Ready, not ready, underway, done: the leaf steps beneath a feature, as dots.
- * Read from the roll-up rather than from the children on the page, so a
- * narrowed view that has folded the done steps away still counts them.
- *
- * Amber, blue, green, in that order (note 42aa1fa4): everything that cannot
- * be taken yet, blocked and waiting alike, then what is ready or underway, then
- * what is done. The same three colours the health column gives each state.
- */
-function Breakdown({ node }: { node: PlanNode }) {
-  const { done, inProgress, ready, live } = node.rollup;
-  if (live === 0) return <span className="text-small text-ink-ghost">—</span>;
-
-  const counts: Array<{ key: string; word: string; tone: HealthWord['tone']; n: number }> = [
-    { key: 'not-ready', word: 'not ready', tone: 'caution', n: live - done - inProgress - ready },
-    { key: 'ready', word: 'ready or underway', tone: 'info', n: ready + inProgress },
-    { key: 'done', word: 'done', tone: 'positive', n: done },
-  ];
-  const shown = counts.filter((c) => c.n > 0);
-  const title = shown.map((c) => `${c.n} ${c.word}`).join(', ');
-
-  return (
-    <span
-      className="tabular flex flex-wrap items-center gap-x-2 gap-y-0.5 text-small text-ink-muted"
-      title={`${title} of ${live}`}
-      aria-label={`${title} of ${live} steps`}
-    >
-      {shown.map((c) => (
-        <span key={c.key} className="inline-flex items-center gap-1">
-          <span className={cn('size-1.5 rounded-full', TONE_DOT[c.tone])} aria-hidden />
-          {c.n}
-        </span>
-      ))}
-    </span>
-  );
-}
 
 /**
  * One step: what it is, where it stands, and what is beneath it.
@@ -2289,7 +1685,7 @@ function PlanRow({
             you kept; the rest is on the open step, in the summary's "Claude's"
             view, and in the menu that changes it. */}
         <span className="hidden sm:block">
-          <Breakdown node={node} />
+          <Breakdown rollup={node.rollup} />
         </span>
 
         {/* The three things done to a step without reading it first, then the
@@ -2506,9 +1902,14 @@ function PlanRow({
               />
             )}
 
-            <Questions node={node} titles={refTitles} />
+            <Questions node={node} titles={refTitles} actions={PLAN_TREE_ACTIONS} />
 
-            <Dependencies node={node} catalog={catalog} />
+            <Dependencies
+              node={node}
+              catalog={catalog}
+              groupOf={(entry) => scopeLabel(entry.module)}
+              actions={PLAN_TREE_ACTIONS}
+            />
 
             <CommentThread
               target="step"
