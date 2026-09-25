@@ -11,7 +11,11 @@ import {
   HELP_NOTE_MAX,
   type HelpKindChoice,
 } from '@/lib/goals/help-kinds';
-import { setHelpKindsAction, type HelpKindsActionState } from './help-actions';
+import {
+  setHelpKindsAction,
+  turnDownHelpAction,
+  type HelpKindsActionState,
+} from './help-actions';
 
 const initial: HelpKindsActionState = {};
 
@@ -20,23 +24,33 @@ const initial: HelpKindsActionState = {};
  * with its note, and a form to tick kinds and say what to look for. A goal
  * with none shows only the way to choose some, which the page draws in its row
  * of add lines and mounts this with `startEditing` from (plan #1038).
+ *
+ * Kinds Claude proposed when it mapped the goal (plan #1029) show in place of
+ * the chosen ones, to approve as they stand, change or turn down. Claude only
+ * proposes for a goal whose help has never been saved, so the two lists do not
+ * meet.
  */
 export function GoalHelp({
   goalId,
   helpKinds,
+  proposedHelpKinds = [],
   startEditing = false,
   onClose,
 }: {
   goalId: string;
   helpKinds: HelpKindChoice[];
+  /** Kinds Claude proposed, waiting for you. */
+  proposedHelpKinds?: HelpKindChoice[];
   /** Open with the form showing. */
   startEditing?: boolean;
   /** Called when the form closes. */
   onClose?: () => void;
 }) {
   const [editing, setEditing] = useState(startEditing);
+  const proposed = helpKinds.length === 0 && proposedHelpKinds.length > 0;
+  const shown = proposed ? proposedHelpKinds : helpKinds;
 
-  if (helpKinds.length === 0 && !editing) {
+  if (shown.length === 0 && !editing) {
     return (
       <AddTrigger
         label="Choose the help the weekly run finds, such as events or reading"
@@ -51,7 +65,10 @@ export function GoalHelp({
         <h2 id="help-heading" className="text-ui font-semibold text-ink">
           Weekly help
         </h2>
-        {!editing && (
+        {proposed && !editing && (
+          <span className="text-small text-ink-muted">Proposed by Claude</span>
+        )}
+        {!editing && !proposed && (
           <Button
             type="button"
             size="sm"
@@ -66,7 +83,7 @@ export function GoalHelp({
       {editing ? (
         <HelpForm
           goalId={goalId}
-          helpKinds={helpKinds}
+          helpKinds={shown}
           onClose={() => {
             setEditing(false);
             onClose?.();
@@ -75,13 +92,20 @@ export function GoalHelp({
       ) : (
         <Card>
           <ul className="divide-y divide-border">
-            {helpKinds.map(({ kind, note }) => (
+            {shown.map(({ kind, note }) => (
               <li key={kind} className="flex flex-wrap items-baseline gap-x-3 px-3 py-2">
                 <span className="text-body text-ink">{HELP_KIND_LABELS[kind]}</span>
                 {note && <span className="text-small text-ink-muted">{note}</span>}
               </li>
             ))}
           </ul>
+          {proposed && (
+            <ProposalButtons
+              goalId={goalId}
+              proposal={proposedHelpKinds}
+              onChange={() => setEditing(true)}
+            />
+          )}
         </Card>
       )}
     </section>
@@ -162,5 +186,55 @@ function HelpForm({
         </div>
       </form>
     </Card>
+  );
+}
+
+/**
+ * Approve, Change and Turn down under a proposal (plan #1029). Approve saves
+ * the proposed kinds and notes through the same action as the form, so it
+ * settles the goal's help the same way.
+ */
+function ProposalButtons({
+  goalId,
+  proposal,
+  onChange,
+}: {
+  goalId: string;
+  proposal: HelpKindChoice[];
+  onChange: () => void;
+}) {
+  const [approved, approve, approving] = useActionState(setHelpKindsAction, initial);
+  const [turned, turnDown, turning] = useActionState(turnDownHelpAction, initial);
+  const busy = approving || turning;
+  const error = approved.error ?? turned.error;
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2">
+      <form action={approve}>
+        <input type="hidden" name="goalId" value={goalId} />
+        {proposal.map(({ kind, note }) => (
+          <span key={kind}>
+            <input type="hidden" name="kind" value={kind} />
+            <input type="hidden" name={`note:${kind}`} value={note ?? ''} />
+          </span>
+        ))}
+        <Button type="submit" size="sm" pending={approving} disabled={busy}>
+          Approve
+        </Button>
+      </form>
+      <Button type="button" size="sm" variant="ghost" onClick={onChange} disabled={busy}>
+        Change
+      </Button>
+      <form action={turnDown}>
+        <input type="hidden" name="goalId" value={goalId} />
+        <Button type="submit" size="sm" variant="ghost" pending={turning} disabled={busy}>
+          Turn down
+        </Button>
+      </form>
+      {error && (
+        <p role="alert" className="text-small text-danger">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

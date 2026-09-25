@@ -81,6 +81,7 @@ type ItemRow = {
   block_ask: string | null;
   block_kind: StepBlockKind | null;
   help_kinds: unknown;
+  proposed_help_kinds: unknown;
 };
 
 type LinkRow = { id: string; item_id: string; goal_id: string };
@@ -109,7 +110,7 @@ const ITEM_COLUMNS =
   'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, fog_dismissed_at, ' +
   'resolution, ' +
   'dismissed_at, due_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
-  'unit, target, collection_id, asks_for, questions, block_ask, block_kind, help_kinds';
+  'unit, target, collection_id, asks_for, questions, block_ask, block_kind, help_kinds, proposed_help_kinds';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -150,6 +151,7 @@ const toGoal = (row: ItemRow): Goal => ({
   target: row.target === null ? null : Number(row.target),
   dueOn: row.due_on,
   helpKinds: readHelpKinds(row.help_kinds),
+  proposedHelpKinds: readHelpKinds(row.proposed_help_kinds),
 });
 
 export type GoalMap = {

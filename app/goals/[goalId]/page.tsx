@@ -155,10 +155,14 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
     numberFrom,
     sources,
   };
-  const help = { goalId: map.goal.id, helpKinds: map.goal.helpKinds ?? [] };
+  const help = {
+    goalId: map.goal.id,
+    helpKinds: map.goal.helpKinds ?? [],
+    proposedHelpKinds: map.goal.proposedHelpKinds ?? [],
+  };
   const linked = { goalId: map.goal.id, links, aimChoices, jobsOn };
   const numberEmpty = !number.unit && readings.length === 0;
-  const helpEmpty = help.helpKinds.length === 0;
+  const helpEmpty = help.helpKinds.length === 0 && help.proposedHelpKinds.length === 0;
   const linksEmpty = links !== null && noLinks(links);
   const canLink = (aimChoices?.length ?? 0) > 0 || jobsOn;
 
