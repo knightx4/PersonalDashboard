@@ -7,12 +7,7 @@ import { FieldError, Select } from '@/components/ui/field';
 import { catalogLabel, subtreeOf } from '@/lib/plan/catalog';
 import { PLAN_STATUS_LABEL, isClosed } from '@/lib/plan/load';
 import { cn } from '@/lib/cn';
-import type {
-  TreeActionState,
-  TreeActions,
-  TreeCatalogEntry,
-  TreeDependencyNode,
-} from './types';
+import type { TreeActionState, TreeActions, TreeCatalogEntry, TreeDependencyNode } from './types';
 
 /**
  * What a step waits on, what waits on it, and the picker that adds an edge.
@@ -71,7 +66,8 @@ export function Dependencies<E extends TreeCatalogEntry>({
                 )}
               >
                 #{link.item.number} {link.item.title}
-                {isClosed(link.item.status) && ` (${PLAN_STATUS_LABEL[link.item.status].toLowerCase()})`}
+                {isClosed(link.item.status) &&
+                  ` (${PLAN_STATUS_LABEL[link.item.status].toLowerCase()})`}
                 <button
                   type="submit"
                   disabled={removePending}

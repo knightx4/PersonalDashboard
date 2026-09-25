@@ -66,8 +66,7 @@ const items: PlanItem[] = [
   item({
     id: 'goal-tree',
     title: 'Make the goal page use the dev plan’s tree',
-    detail:
-      'Goals looks and works like the dev plan because it is drawn by the same components.',
+    detail: 'Goals looks and works like the dev plan because it is drawn by the same components.',
     acceptance: 'A goal page and /dev/plan read the same at phone and laptop width.',
     priority: 1,
     size: 'l',

@@ -199,7 +199,8 @@ export const MOVE_TONE: Record<PlanMove, DevTone> = {
 export const MOVE_TITLE: Record<PlanMove, string> = {
   resolving:
     'Re-reading this feature against the answers you just gave. What it proposes will be here when it is done; sending it anywhere until then would send a plan that is mid-edit.',
-  on_you: 'Stopped on you: a question to answer, a proposal to approve, or something only you can supply.',
+  on_you:
+    'Stopped on you: a question to answer, a proposal to approve, or something only you can supply.',
   with_dash: 'A session is working on this now.',
   waiting: 'Held up by another step that has not closed.',
   yours: 'You kept this one, so the runner will not take it.',

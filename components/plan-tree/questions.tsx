@@ -150,7 +150,11 @@ export function QuestionRow({
                 : 'text-caution',
           )}
         >
-          {settled && node.status !== 'dropped' ? <Check className="size-3.5" strokeWidth={2} /> : '?'}
+          {settled && node.status !== 'dropped' ? (
+            <Check className="size-3.5" strokeWidth={2} />
+          ) : (
+            '?'
+          )}
         </span>
         <div className="min-w-0 flex-1 space-y-2">
           {/* Withdrawn, it is a record rather than a question: struck through,
