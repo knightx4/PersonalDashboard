@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  commentMode,
   locateStep,
   offersPrepare,
   offersSend,
@@ -157,5 +158,31 @@ describe('prepare (plan #1001)', () => {
     expect(text).toContain('The step: "Turn on autopay"');
     expect(text).toContain('A step of yours to prepare');
     expect(text).toContain('Leave its kind, status and everything else as they are');
+  });
+});
+
+describe('from an @dash comment (plan #1003)', () => {
+  it("prepares a step of yours and sends anything else", () => {
+    expect(commentMode(node('m', { kind: 'mine' }))).toBe('prepare');
+    expect(commentMode(node('a'))).toBe('send');
+    expect(commentMode(node('p', { kind: 'mine', children: [node('c')] }))).toBe('send');
+  });
+
+  it('puts what they wrote in the brief', () => {
+    const target = locateStep(GOAL, [node('m', { kind: 'mine', title: 'Email the servicer' })], 'm');
+    if (!target) throw new Error('no step');
+    const text = sendRunText({
+      target,
+      job: 'prepare',
+      collections: [],
+      userId: 'u',
+      runId: 'r',
+      asked: 'draft this for me, keep it short',
+    });
+    expect(text).toContain('asked for from a comment on its row');
+    expect(text).toContain('draft this for me, keep it short');
+    const plain = sendRunText({ target, job: 'prepare', collections: [], userId: 'u', runId: 'r' });
+    expect(plain).toContain('asked for from its row on the goal page');
+    expect(plain).not.toContain('What they wrote');
   });
 });

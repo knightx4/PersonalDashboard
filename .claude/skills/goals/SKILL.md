@@ -522,6 +522,13 @@ the step. The app has already refused a question, a proposal, a step on a goal
 that is not approved, and a step Claude is already on, so what you are sent is
 yours to work.
 
+The same run starts when the person writes `@dash` on a step asking Claude to
+take it ("do this", "draft this for me"; `lib/goals/ask.ts`). Then the brief
+also carries what they wrote, under "What they wrote". Treat anything in it
+about what to produce or how (shorter, more formal, addressed to someone) as
+part of the step's done-when. The quick reply has already said in the thread
+that the run started, so there is nothing more to write there.
+
 - **A step** (`job` `step`): work that one Claude step as in "The morning
   run", and touch no other step. If it turns out to need something only the
   person has, block it with `block_ask` rather than guessing.

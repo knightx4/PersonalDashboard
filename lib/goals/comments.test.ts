@@ -121,6 +121,15 @@ describe('the goal written out for a reply', () => {
 describe('reading the reply', () => {
   const { refs } = goalContext(context());
 
+  it('takes the step when asked to, over anything else in the answer (plan #1003)', () => {
+    expect(
+      parseGoalReply({ answer: 'Sure.', needs_routine: true, send_step: true }, refs),
+    ).toEqual({ kind: 'send' });
+    expect(parseGoalReply({ answer: 'Sure.', needs_routine: false, send_step: false }, refs).kind).toBe(
+      'answer',
+    );
+  });
+
   it('reads an answer', () => {
     expect(parseGoalReply({ answer: ' Avalanche saves more. ', needs_routine: false }, refs)).toEqual({
       kind: 'answer',
