@@ -8,7 +8,8 @@ import { isOwner } from '@/lib/dev/owner';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { noLinks, weekInstants, type GoalLinks } from '@/lib/goals/links';
 import { loadAimChoices, loadGoalLinks } from '@/lib/goals/links-store';
-import { loadReadings } from '@/lib/goals/readings-store';
+import { loadCollectionsForGoal } from '@/lib/goals/collections-store';
+import { loadNumberFrom, loadReadings } from '@/lib/goals/readings-store';
 import { goalRunRows, type RunListing } from '@/lib/goals/runs';
 import { loadGoalRuns } from '@/lib/goals/runs-store';
 import {
@@ -82,9 +83,12 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
   const jobsOn = moduleEnabled(account, 'jobs');
   const learn = learnOn ? await createLearnClient() : null;
   const jobs = jobsOn ? await createJobsClient() : null;
-  const [map, readings, links, aims, shaping, history, owner] = await Promise.all([
+  const [map, readings, numberFrom, sources, links, aims, shaping, history, owner] = await Promise.all([
     loadGoalMap(client, goalId, { userId: user.id, today }),
     loadReadings(client, goalId),
+    // Where the number is worked out from, and what it could be (plan #1024).
+    loadNumberFrom(client, goalId),
+    loadCollectionsForGoal(client, goalId),
     // Read live from Learn and the job search (plan #931). A failed read is a
     // line where the links would be, not a broken goal page.
     loadGoalLinks(
@@ -110,6 +114,8 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
     target: map.goal.target,
     readings,
     today,
+    numberFrom,
+    sources,
   };
   const help = { goalId: map.goal.id, helpKinds: map.goal.helpKinds ?? [] };
   const linked = { goalId: map.goal.id, links, aimChoices, jobsOn };

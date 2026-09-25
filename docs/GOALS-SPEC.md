@@ -310,6 +310,15 @@ migration.
   a document carries the date the document gives its figures as of
   (`records.as_of`), and its readings take that date rather than the day of
   the upload. Typed values carry none and are read on the day they are saved.
+- **A goal's number from a collection.** A goal served by a collection can
+  have its number worked out from it rather than typed: the total of a
+  field over every record, the latest value, or how many records there are
+  (`items.number_from_collection_id`, `number_from_field`,
+  `number_from_how`). Drafts and archived records are left out. Whenever
+  the collection's records change and the number moves, the database adds a
+  reading to the goal, dated by the changed records' `as_of` or today; one
+  statement changing several records adds one reading. Setting the source
+  adds the first reading, dated today.
 - **An ID field.** One text or number field of a list can be marked
   `"id": true`, such as a loan's ID. Reading a newer statement then updates
   the row with the same ID instead of adding a copy, and the preview shows
