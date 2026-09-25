@@ -521,6 +521,13 @@ migration.
   reading to the goal, dated by the changed records' `as_of` or today; one
   statement changing several records adds one reading. Setting the source
   adds the first reading, dated today.
+- **When the target will be reached.** With a target and at least three
+  readings, the number shows the date the target is reached at the pace of
+  the latest six readings (a least-squares slope carried on from the latest
+  one). A goal with a due date (`items.due_on`, set beside the target) is
+  told whether that date is ahead of it or behind it, and by how much. A
+  pace that is flat or moving away from the target says so instead of
+  giving a date.
 - **An ID field.** One text or number field of a list can be marked
   `"id": true`, such as a loan's ID. Reading a newer statement then updates
   the row with the same ID instead of adding a copy, and the preview shows

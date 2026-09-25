@@ -43,6 +43,8 @@ export type Goal = {
   unit: string | null;
   /** The value it is aiming for, when it has a unit and one is set. */
   target: number | null;
+  /** When the goal is due, YYYY-MM-DD, or null (plan #1025). Read on the goal page only. */
+  dueOn?: string | null;
   /** The kinds of weekly help it asks for (plan #1027). Read on the goal page only. */
   helpKinds?: HelpKindChoice[];
 };

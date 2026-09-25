@@ -46,11 +46,16 @@ export async function loadReadings(client: GoalsSupabaseClient, goalId: string):
 export async function setGoalMeasure(
   client: GoalsSupabaseClient,
   goalId: string,
-  measure: { unit: string | null; target: number | null },
+  measure: { unit: string | null; target: number | null; dueOn?: string | null },
 ): Promise<boolean> {
   const { data, error } = await client
     .from('items')
-    .update({ unit: measure.unit, target: measure.unit ? measure.target : null })
+    .update({
+      unit: measure.unit,
+      target: measure.unit ? measure.target : null,
+      // Left alone unless the form sent it (plan #1025).
+      ...(measure.dueOn !== undefined ? { due_on: measure.dueOn } : {}),
+    })
     .eq('id', goalId)
     .eq('level', 'goal')
     .is('archived_at', null)

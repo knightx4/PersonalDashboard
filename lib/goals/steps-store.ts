@@ -144,6 +144,7 @@ const toGoal = (row: ItemRow): Goal => ({
   position: row.position,
   unit: row.unit,
   target: row.target === null ? null : Number(row.target),
+  dueOn: row.due_on,
   helpKinds: readHelpKinds(row.help_kinds),
 });
 
