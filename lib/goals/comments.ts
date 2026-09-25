@@ -195,6 +195,8 @@ export type GoalReply =
   | { kind: 'answer'; body: string; filings: Filing[] }
   /** Needs the goals routine: research, several steps changed, anything beyond one reply. */
   | { kind: 'routine'; why: string }
+  /** Hand the step the comment is on to Claude, to work or to prepare (plan #1003). */
+  | { kind: 'send' }
   | { kind: 'error'; error: string };
 
 function asText(value: unknown): string {
@@ -202,13 +204,17 @@ function asText(value: unknown): string {
 }
 
 /**
- * The model's answer as one of the three outcomes. `needs_routine` wins, as
- * `needs_repo` does for a dev reply: an answer given beside it is a guess.
- * A filing that names no known collection, or fills nothing, is dropped.
+ * The model's answer as one of the four outcomes. `send_step` wins, since the
+ * person told Claude to take the step and the run it starts does the rest.
+ * Then `needs_routine`, as `needs_repo` does for a dev reply: an answer given
+ * beside it is a guess. A filing that names no known collection, or fills
+ * nothing, is dropped.
  */
 export function parseGoalReply(raw: unknown, refs: ReplyRefs): GoalReply {
   if (!raw || typeof raw !== 'object') return { kind: 'error', error: 'Nothing usable came back.' };
   const input = raw as Record<string, unknown>;
+
+  if (input.send_step === true) return { kind: 'send' };
 
   if (input.needs_routine === true) {
     return {
