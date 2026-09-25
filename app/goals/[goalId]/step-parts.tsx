@@ -1,11 +1,12 @@
 'use client';
 
 import { useActionState, useState } from 'react';
+import { CircleUser, Repeat, Target } from 'lucide-react';
 import { AnswerBox, TheAnswered, TheOptions, useAnswerDraft } from '@/components/dev/question';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ComposeTitle, InlineInput, Input, Select, Textarea } from '@/components/ui/field';
+import { ChipInput, ChipSelect, ComposeTitle, InlineInput, Textarea } from '@/components/ui/field';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
@@ -333,26 +334,17 @@ export function StepEditForm({
           aria-label={`When ${node.title} is done`}
         />
         <div className="flex flex-wrap items-center gap-2">
-          <Input
+          <ChipInput
             type="date"
             name="dueOn"
             defaultValue={node.dueOn ?? ''}
             aria-label={`When ${node.title} is due`}
-            className="w-auto"
           />
-          <Select
-            name="kind"
+          <KindChip
             value={kind}
-            aria-label={`What kind of step ${node.title} is`}
-            onChange={(event) => setKind(event.target.value as StepKind)}
-            className="w-auto"
-          >
-            {STEP_KINDS.map((option) => (
-              <option key={option} value={option}>
-                {STEP_KIND_LABELS[option]}
-              </option>
-            ))}
-          </Select>
+            onChange={setKind}
+            label={`What kind of step ${node.title} is`}
+          />
           {kind === 'rhythm' && (
             <RhythmFields count={node.rhythmCount} period={node.rhythmPeriod} />
           )}
@@ -386,17 +378,17 @@ export function StepEditForm({
           {linkable.length > 0 && (
             <form action={menuAction(linkStepAction)} className="flex flex-wrap items-center gap-2">
               <input type="hidden" name="id" value={node.id} />
-              <Select
+              <ChipSelect
                 name="goalId"
                 aria-label="Another goal this counts towards"
-                className="w-auto"
+                icon={<Target className="size-3.5" strokeWidth={2} />}
               >
                 {linkable.map((goal) => (
                   <option key={goal.id} value={goal.id}>
                     {goal.title}
                   </option>
                 ))}
-              </Select>
+              </ChipSelect>
               <Button type="submit" size="sm" variant="ghost">
                 Count towards it too
               </Button>
@@ -408,6 +400,38 @@ export function StepEditForm({
   );
 }
 
+/**
+ * What kind of step it is, as a chip carrying its own value, the way the dev
+ * plan's composer sets priority and assignee (app/dev/plan/step-forms.tsx).
+ * It was a boxed select, the one bordered control in a row of words.
+ */
+function KindChip({
+  value,
+  onChange,
+  label,
+}: {
+  value: StepKind;
+  onChange: (kind: StepKind) => void;
+  label: string;
+}) {
+  return (
+    <ChipSelect
+      name="kind"
+      value={value}
+      onChange={(event) => onChange(event.target.value as StepKind)}
+      aria-label={label}
+      icon={<CircleUser className="size-3.5" strokeWidth={2} />}
+    >
+      {STEP_KINDS.map((option) => (
+        <option key={option} value={option}>
+          {STEP_KIND_LABELS[option]}
+        </option>
+      ))}
+    </ChipSelect>
+  );
+}
+
+/** How often a rhythm comes round, read as the sentence it is: "3 a week". */
 function RhythmFields({
   count,
   period,
@@ -418,8 +442,8 @@ function RhythmFields({
   submitLabel?: string;
 }) {
   return (
-    <span className="inline-flex flex-wrap items-center gap-2">
-      <Input
+    <span className="inline-flex flex-wrap items-center gap-0.5">
+      <ChipInput
         type="number"
         name="rhythmCount"
         min={1}
@@ -427,21 +451,16 @@ function RhythmFields({
         required
         defaultValue={count ?? 1}
         aria-label="How many times"
-        className="w-16"
+        icon={<Repeat className="size-3.5" strokeWidth={2} />}
       />
-      <span className="text-small text-ink-muted">a</span>
-      <Select
-        name="rhythmPeriod"
-        defaultValue={period ?? 'week'}
-        aria-label="Per"
-        className="w-auto"
-      >
+      <span className="text-ui text-ink-muted">a</span>
+      <ChipSelect name="rhythmPeriod" defaultValue={period ?? 'week'} aria-label="Per">
         {RHYTHM_PERIODS.map((option) => (
           <option key={option} value={option}>
             {option}
           </option>
         ))}
-      </Select>
+      </ChipSelect>
       {submitLabel && (
         <Button type="submit" size="sm" variant="ghost">
           {submitLabel}
@@ -514,19 +533,7 @@ export function StepComposer({
           !bare && 'border-t border-border px-3 py-2',
         )}
       >
-        <Select
-          name="kind"
-          value={kind}
-          onChange={(event) => setKind(event.target.value as StepKind)}
-          aria-label="What kind of step"
-          className="w-auto"
-        >
-          {STEP_KINDS.map((option) => (
-            <option key={option} value={option}>
-              {STEP_KIND_LABELS[option]}
-            </option>
-          ))}
-        </Select>
+        <KindChip value={kind} onChange={setKind} label="What kind of step" />
         {kind === 'rhythm' && <RhythmFields count={null} period={null} />}
         {state.error && <span className="text-small text-danger">{state.error}</span>}
         <span className="ml-auto flex items-center gap-1">

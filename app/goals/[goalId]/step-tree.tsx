@@ -98,8 +98,9 @@ export function StepTree({
               ))}
             </ul>
             {/* Inside the card, under a rule, as the plan's "Add a step" sits
-                at the foot of a module (plan #983). */}
-            <div className="border-t border-border px-3 py-2">
+                at the foot of a module (plan #983), on the same py-1.5 line as
+                every other add line on the page. */}
+            <div className="border-t border-border px-3 py-1.5">
               <StepComposer parentId={map.goal.id} label="Add a step" bare />
             </div>
           </div>

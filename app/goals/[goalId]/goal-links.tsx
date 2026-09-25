@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { useActionState, useState } from 'react';
+import { GraduationCap } from 'lucide-react';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Select } from '@/components/ui/field';
+import { ChipSelect } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { aimProgressLine, jobWeekLine, noLinks, type GoalLinks } from '@/lib/goals/links';
 import {
@@ -221,7 +222,14 @@ function AddLinks({
       {aimChoices.length > 0 && (
         <form action={linkAim} className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="goalId" value={goalId} />
-          <Select name="aimId" required defaultValue="" aria-label="A Learn goal to link" className="w-56">
+          <ChipSelect
+            name="aimId"
+            required
+            defaultValue=""
+            placeholderValue=""
+            aria-label="A Learn goal to link"
+            icon={<GraduationCap className="size-3.5" strokeWidth={2} />}
+          >
             <option value="" disabled>
               A Learn goal…
             </option>
@@ -230,7 +238,7 @@ function AddLinks({
                 {aim.name}
               </option>
             ))}
-          </Select>
+          </ChipSelect>
           <Button type="submit" size="sm" variant="secondary" disabled={linking}>
             {linking ? 'Linking…' : 'Link'}
           </Button>
