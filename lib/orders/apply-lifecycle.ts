@@ -54,6 +54,38 @@ async function upsertShipment(
       return { ok: true };
     }
 
+    // A shipment an earlier email opened without a number is this one: the
+    // number arrived later. Filling it in keeps the order to one parcel.
+    const { data: unnumbered } = await supabase
+      .from('shipments')
+      .select('id, status, shipped_at, delivered_at, carrier, tracking_url')
+      .eq('order_id', orderId)
+      .is('tracking_number', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (unnumbered) {
+      const nextStatus =
+        unnumbered.status === 'delivered' ? 'delivered' : extraction.shipmentStatus;
+      const { error } = await supabase
+        .from('shipments')
+        .update({
+          tracking_number: tracking,
+          status: nextStatus,
+          carrier: extraction.carrier ?? unnumbered.carrier,
+          tracking_url: extraction.trackingUrl ?? unnumbered.tracking_url,
+          shipped_at: extraction.shippedAt ?? unnumbered.shipped_at,
+          delivered_at:
+            nextStatus === 'delivered'
+              ? (extraction.deliveredAt ?? unnumbered.delivered_at ?? extraction.shippedAt)
+              : unnumbered.delivered_at,
+        })
+        .eq('id', unnumbered.id);
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    }
+
     const { error } = await supabase.from('shipments').insert({
       order_id: orderId,
       carrier: extraction.carrier,

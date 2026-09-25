@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { classifyMessage } from './classify';
-import { extractLifecycleFromEmail } from './lifecycle';
+import { carrierTrackingUrl, extractLifecycleFromEmail } from './lifecycle';
 
 const amazon = {
   id: 'm1',
@@ -101,5 +101,47 @@ describe('extractLifecycleFromEmail', () => {
     expect(extracted?.externalOrderNumber).toBe('123-4567890-1234567');
     expect(extracted?.refundAmountCents).toBe(37584);
     expect(extracted?.itemNameHints.some((h) => /Sony/i.test(h))).toBe(true);
+  });
+});
+
+describe('tracking from store shipping mail', () => {
+  it('does not take a heading word for the tracking number', () => {
+    const extracted = extractLifecycleFromEmail({
+      classification: 'shipping',
+      subject: 'Order Shipped!',
+      text: 'Tracking Information\nShipped via UPS\nTracking Number: 1Z999AA10123456784',
+    });
+    expect(extracted?.trackingNumber).toBe('1Z999AA10123456784');
+    expect(extracted?.trackingNumber).not.toBe('Information');
+  });
+
+  it('leaves the number empty when the mail only has the heading', () => {
+    const extracted = extractLifecycleFromEmail({
+      classification: 'shipping',
+      subject: 'Order Shipped!',
+      text: 'Tracking Information\nYour order is on its way via UPS.',
+    });
+    expect(extracted?.trackingNumber).toBeNull();
+  });
+
+  it('follows a Track button whose link goes through a click tracker', () => {
+    const extracted = extractLifecycleFromEmail({
+      classification: 'shipping',
+      subject: 'Order Shipped!',
+      text: '',
+      html: '<a href="https://click.email.example.com/?qs=abc&amp;r=1"><span>Track Package</span></a>',
+    });
+    expect(extracted?.trackingUrl).toBe('https://click.email.example.com/?qs=abc&r=1');
+  });
+
+  it('builds the carrier page when the mail gives a number but no link', () => {
+    const extracted = extractLifecycleFromEmail({
+      classification: 'shipping',
+      subject: 'Order Shipped!',
+      text: 'Shipped via UPS 1Z999AA10123456784',
+    });
+    expect(extracted?.trackingUrl).toBe('https://www.ups.com/track?tracknum=1Z999AA10123456784');
+    expect(carrierTrackingUrl('USPS', '9400100000000000000000')).toMatch(/usps\.com.*9400100000000000000000/);
+    expect(carrierTrackingUrl(null, '12345678901')).toBeNull();
   });
 });

@@ -18,9 +18,11 @@ export type LifecycleExtraction = {
   confidence: number;
 };
 
+// Every carrier's tracking number carries digits. Without that requirement a
+// heading such as "Tracking Information" reads as tracking number "Information".
 const TRACKING_PATTERNS: RegExp[] = [
-  /\btracking\s*(?:number|#|no\.?)?[:\s]+([A-Z0-9]{10,})\b/i,
-  /\b(?:UPS|FedEx|USPS)\s*(?:tracking)?[:\s#]*([A-Z0-9]{10,})\b/i,
+  /\btracking\s*(?:number|#|no\.?)?[:\s]+((?=[A-Z]*\d)[A-Z0-9]{10,})\b/i,
+  /\b(?:UPS|FedEx|USPS)\s*(?:tracking)?[:\s#]*((?=[A-Z]*\d)[A-Z0-9]{10,})\b/i,
   /\b(1Z[A-Z0-9]{16})\b/i,
   /\b(TBA\d{10,})\b/i,
 ];
@@ -45,11 +47,45 @@ function extractTrackingNumber(blob: string): string | null {
   return null;
 }
 
+/**
+ * The link a person would press to follow the parcel.
+ *
+ * Store mail usually routes every link through a click tracker, so the URL
+ * itself rarely says "track". The button text does, which is why an anchor
+ * reading "Track package" is preferred over a URL that merely looks like one.
+ */
 function extractTrackingUrl(blob: string): string | null {
+  for (const anchor of blob.matchAll(/<a\b[^>]*?href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    const href = anchor[1]!.replace(/&amp;/g, '&').trim();
+    const label = anchor[2]!.replace(/<[^>]+>/g, ' ');
+    if (/^https?:\/\//i.test(href) && /\btrack/i.test(label)) return href;
+  }
   const match = blob.match(
     /https?:\/\/[^\s"'<>]*(?:track|tracking|shipment|parcel)[^\s"'<>]*/i,
   );
-  return match?.[0]?.replace(/[.,);]+$/, '') ?? null;
+  return match?.[0]?.replace(/&amp;/g, '&').replace(/[.,);]+$/, '') ?? null;
+}
+
+/** The carrier's own tracking page, for mail that gives a number but no link. */
+export function carrierTrackingUrl(
+  carrier: string | null,
+  trackingNumber: string | null,
+): string | null {
+  if (!trackingNumber) return null;
+  const n = encodeURIComponent(trackingNumber);
+  const which = /^1Z/i.test(trackingNumber) ? 'UPS' : carrier;
+  switch (which) {
+    case 'UPS':
+      return `https://www.ups.com/track?tracknum=${n}`;
+    case 'FedEx':
+      return `https://www.fedex.com/fedextrack/?trknbr=${n}`;
+    case 'USPS':
+      return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${n}`;
+    case 'DHL':
+      return `https://www.dhl.com/us-en/home/tracking/tracking-express.html?tracking-id=${n}`;
+    default:
+      return null;
+  }
 }
 
 function extractCarrier(blob: string): string | null {
@@ -119,8 +155,9 @@ export function extractLifecycleFromEmail(input: {
   const blob = `${input.subject}\n${input.text}\n${input.html ?? ''}`;
   const orderNumber = extractOrderNumber(blob);
   const trackingNumber = extractTrackingNumber(blob);
-  const trackingUrl = extractTrackingUrl(blob);
   const carrier = extractCarrier(blob);
+  const trackingUrl =
+    extractTrackingUrl(blob) ?? carrierTrackingUrl(carrier, trackingNumber);
   const status = shipmentStatusFor(input.classification, blob);
   const shippedAt =
     input.classification === 'shipping' || input.classification === 'delivery'
