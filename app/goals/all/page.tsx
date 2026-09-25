@@ -27,10 +27,7 @@ export default async function AllGoalsPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader
-        title="All goals"
-        description="What you are working towards, grouped by the areas of your life they belong to."
-      />
+      <PageHeader title="All goals" />
       <GoalsView areas={groupGoals(areas, goals)} progress={progress} />
     </div>
   );

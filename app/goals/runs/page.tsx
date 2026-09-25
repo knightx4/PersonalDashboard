@@ -42,10 +42,7 @@ export default async function GoalRunsPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader
-        title="Runs"
-        description="Every time Claude worked on your goals, newest first, with how each one ended."
-      />
+      <PageHeader title="Runs" />
       {views.length === 0 ? (
         <EmptyState
           icon={History}
