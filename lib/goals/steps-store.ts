@@ -10,6 +10,7 @@ import type { DevComment } from '@/lib/comments/load';
 import { loadThreads } from '@/lib/goals/comments-store';
 import { dailyView, type DailyView } from '@/lib/goals/daily';
 import { GOALS_SCHEMA, type GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
+import { readHelpKinds } from '@/lib/goals/help-kinds';
 import {
   attachDependencies,
   type DependencyRow,
@@ -75,6 +76,7 @@ type ItemRow = {
   asks_for: string[] | null;
   block_ask: string | null;
   block_kind: StepBlockKind | null;
+  help_kinds: unknown;
 };
 
 type LinkRow = { id: string; item_id: string; goal_id: string };
@@ -103,7 +105,7 @@ const ITEM_COLUMNS =
   'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, fog_dismissed_at, ' +
   'resolution, ' +
   'dismissed_at, due_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
-  'unit, target, collection_id, asks_for, block_ask, block_kind';
+  'unit, target, collection_id, asks_for, block_ask, block_kind, help_kinds';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -141,6 +143,7 @@ const toGoal = (row: ItemRow): Goal => ({
   position: row.position,
   unit: row.unit,
   target: row.target === null ? null : Number(row.target),
+  helpKinds: readHelpKinds(row.help_kinds),
 });
 
 export type GoalMap = {
