@@ -52,9 +52,7 @@ export const SOURCE_SCHEMAS: readonly string[] = [
  * that will create it. The gate lets these be missing from the database; once
  * the file lands, the entry here is stale and can go.
  */
-export const AWAITING_MIGRATION: Readonly<Record<string, string>> = {
-  'job_search.thoughts': 'supabase/migrations-job-search/0026_thoughts.sql',
-};
+export const AWAITING_MIGRATION: Readonly<Record<string, string>> = {};
 
 export const SOURCES: readonly Source[] = MODULES.flatMap((m) => m.sources);
 export const NOT_SOURCES: readonly NotASource[] = MODULES.flatMap((m) => m.notSources);
