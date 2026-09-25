@@ -63,6 +63,15 @@ against its four failure modes before committing one. The most common offenders
 in this repository have been slogans used as section summaries, em dashes
 manufacturing rhythm, and inflated contrast of the "not X, it's Y" form.
 
+## New tables go in the catalogue
+
+Every table the migrations create is either a source Goals may read or listed
+as not one, in its module's `sources.ts` ([lib/sources/types.ts](lib/sources/types.ts)).
+A new table in neither list fails the gate (`tests/sources-catalogue.test.ts`).
+When you add one, decide which it is: a table that holds what the person
+wrote, wants, did or has is a source; settings, join rows and bookkeeping are
+not. Then run `npm run sources:write` so the goals routine reads the new list.
+
 ## Secrets are the exception
 
 A value only the person has — an API token, a deployment secret — cannot be

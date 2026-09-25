@@ -85,8 +85,11 @@ export type CollectionDefinition = {
 export type FieldValue = string | number | boolean | null;
 export type RecordValues = Record<string, FieldValue>;
 
-/** Where a record's values came from (goals.records.source). */
-export const RECORD_SOURCES = ['typed', 'pasted', 'document', 'gmail', 'comment', 'capture'] as const;
+/**
+ * Where a record's values came from (goals.records.source). `app` is another
+ * module of this app, with `schema.table:ref` as its source_ref (0032).
+ */
+export const RECORD_SOURCES = ['typed', 'pasted', 'document', 'gmail', 'comment', 'capture', 'app'] as const;
 export type RecordSource = (typeof RECORD_SOURCES)[number];
 
 /** The limits the database sets (0009_collections.sql). */

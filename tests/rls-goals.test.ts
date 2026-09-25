@@ -1242,6 +1242,80 @@ describe('blocked steps and dependencies (plan #981)', () => {
   });
 });
 
+describe('context from the other modules (0032)', () => {
+  async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  async function newGoal(title: string, approved: boolean): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title, approved_at)
+      values (${userA}, 'goal', ${areaA}, ${title}, ${approved ? new Date() : null})
+      returning id`;
+    return row.id;
+  }
+
+  function propose(goal: string, ref: string, status = 'proposed') {
+    return asClaude((tx) => tx<{ id: string; decided_at: Date | null }[]>`
+      insert into context (user_id, item_id, source, ref, title, why, status)
+      values (${userA}, ${goal}, 'obsidian.notes', ${ref}, 'What I want next',
+              'Says what you want from the next role.', ${status})
+      returning id, decided_at`);
+  }
+
+  it('lets Claude propose, and keep only on an approved goal', async () => {
+    const draft = await newGoal('Find a planning job', false);
+    const [row] = await propose(draft, 'Career/What I want.md');
+    expect(row.decided_at).toBeNull();
+    await expect(propose(draft, 'Career/Other.md', 'kept')).rejects.toThrow(/not approved/);
+    await expect(
+      asClaude((tx) => tx`update context set status = 'kept' where id = ${row.id}`),
+    ).rejects.toThrow(/only the person can keep/);
+
+    const approved = await newGoal('Find a planning job, approved', true);
+    const [kept] = await propose(approved, 'Career/What I want.md', 'kept');
+    expect(kept.decided_at).not.toBeNull();
+  });
+
+  it('leaves dismissing to the person, and a dismissal stays', async () => {
+    const goal = await newGoal('Change careers', false);
+    const [row] = await propose(goal, 'Career/Dismissed.md');
+    await expect(
+      asClaude((tx) => tx`update context set status = 'dismissed' where id = ${row.id}`),
+    ).rejects.toThrow(/dismissing is the person/);
+
+    await asUser(userA, (tx) => tx`update context set status = 'dismissed' where id = ${row.id}`);
+    await expect(
+      asClaude((tx) => tx`update context set why = 'Try again' where id = ${row.id}`),
+    ).rejects.toThrow(/dismissed this context/);
+    await expect(
+      asClaude((tx) => tx`delete from context where id = ${row.id}`),
+    ).rejects.toThrow(/withdraw only its own proposals/);
+    // The same note cannot come back as a second row.
+    await expect(propose(goal, 'Career/Dismissed.md')).rejects.toThrow(/context_ref_key/);
+  });
+
+  it('belongs on a goal, and only to its owner', async () => {
+    const goal = await newGoal('Get plugged into the city', false);
+    const [step] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goal}, 'mine', 'Go to a board meeting') returning id`;
+    await expect(propose(step.id, 'City/Boards.md')).rejects.toThrow(/belongs on a goal/);
+
+    await propose(goal, 'City/Boards.md');
+    const theirs = await asUser(userB, (tx) => tx`select id from context`);
+    expect(theirs).toHaveLength(0);
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into context (user_id, item_id, source, ref, title, why)
+        values (${userB}, ${goal}, 'obsidian.notes', 'x.md', 'x', 'x')`),
+    ).rejects.toThrow();
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`
@@ -1277,6 +1351,7 @@ describe('RLS coverage', () => {
       'collection_goals',
       'collections',
       'comments',
+      'context',
       'dependencies',
       'item_goals',
       'items',

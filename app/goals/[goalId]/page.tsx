@@ -9,6 +9,8 @@ import { createGoalsClient } from '@/lib/goals/auth/server';
 import { noLinks, weekInstants, type GoalLinks } from '@/lib/goals/links';
 import { loadAimChoices, loadGoalLinks } from '@/lib/goals/links-store';
 import { loadCollectionsForGoal } from '@/lib/goals/collections-store';
+import { shownContext, type ContextItem } from '@/lib/goals/context';
+import { loadContext } from '@/lib/goals/context-store';
 import { loadGoalFlags } from '@/lib/goals/flags-store';
 import { loadNumberFrom, loadReadings } from '@/lib/goals/readings-store';
 import { goalRunRows, type RunListing } from '@/lib/goals/runs';
@@ -29,6 +31,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { Card } from '@/components/ui/card';
 import { GoalAddRow } from './goal-add-row';
+import { GoalContext } from './goal-context';
 import { GoalFlags } from './goal-flags';
 import { GoalThread } from './goal-comments';
 import { GoalHelp } from './goal-help';
@@ -85,7 +88,7 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
   const jobsOn = moduleEnabled(account, 'jobs');
   const learn = learnOn ? await createLearnClient() : null;
   const jobs = jobsOn ? await createJobsClient() : null;
-  const [map, readings, numberFrom, sources, links, aims, shaping, history, owner, flags] = await Promise.all([
+  const [map, readings, numberFrom, sources, links, aims, shaping, history, owner, flags, context] = await Promise.all([
     loadGoalMap(client, goalId, { userId: user.id, today }),
     loadReadings(client, goalId),
     // Where the number is worked out from, and what it could be (plan #1024).
@@ -104,6 +107,9 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
     isOwner({ user }),
     // What a run flagged on the goal (plan #1015), from public.raised_items.
     createClient().then((supabase) => loadGoalFlags(supabase, { userId: user.id, goalId })),
+    // What Claude found in the other modules for this goal. A failed read
+    // leaves the section out rather than the page.
+    loadContext(client, goalId).catch((): ContextItem[] => []),
   ]);
   if (!map) notFound();
   const shapeable = map.goal.status === 'open' || map.goal.status === 'proposed';
@@ -156,6 +162,7 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
             canRun={owner}
           />
         )}
+        <GoalContext items={shownContext(context)} />
         {!numberEmpty && <GoalNumber {...number} />}
         {!helpEmpty && <GoalHelp {...help} />}
         {!linksEmpty && <GoalLinksSection {...linked} />}

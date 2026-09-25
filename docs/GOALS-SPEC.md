@@ -109,6 +109,50 @@ One action can serve several goals. A volunteering shift counts towards the
 city goal and the friends goal, so a step or a logged event can be linked to
 more than one goal, and each goal's view shows it.
 
+## Pulling in from the other modules
+
+Much of what a goal needs is already written somewhere else in the app: what
+you want from the next job in the job search's thoughts, a vault note on it,
+a Learn aim for the skills, the applications themselves. Goals reads those
+rather than asking again. Two kinds of thing come across, and they are
+handled differently:
+
+- **Progress another module owns** (applications sent, articles read) is
+  linked and read live, as above. Nothing is copied.
+- **What you have said or thought** (a thoughts entry, a note) is found by
+  search, and what bears on a goal is kept on it as **context**: a row in
+  `goals.context` naming the table and row, one sentence on why it matters
+  here, and the words that do. The goal page shows it under "From your other
+  modules", each linking back to where it lives. Facts from it fill the
+  goal's collections as drafts, with `source = 'app'`.
+
+**Where to look is a catalogue, not a rule per goal.** Each module declares
+its tables in a `sources.ts` beside its own code (`lib/jobs/sources.ts`,
+`lib/vault/sources.ts`, …): what a table holds, which columns to search, how
+to name and link a row, and whether it says what you want (`intent`), what
+you did (`record`) or only mentions things (`incidental`). Tables that are no
+use to Goals are listed as not a source, with the reason. `lib/sources`
+gathers them, and `npm run sources:write` writes the list the goals routine
+reads (`.claude/skills/goals/reference/sources.md`). Claude chooses sources
+from what they hold, so a career goal finds a vault note on work without
+anything saying "career means the vault".
+
+**The catalogue cannot fall behind.** `tests/sources-catalogue.test.ts`
+reads every table the migrations create and fails the gate on one that is in
+neither list, naming the file to change. A session that adds a table has to
+decide whether Goals should read it before it can merge. The routine also
+reads table comments, and names in its run summary anything useful it found
+outside the catalogue, which catches a new column on an old table.
+
+**You decide what stays.** Context Claude finds on a goal you have not
+approved is proposed, with Keep and Not relevant on each row; after approval
+it may keep it outright. A dismissal is final for Claude: the database
+refuses a change to a dismissed row and a second row for the same thing
+(`migrations-goals/0032`).
+
+Reading the vault this way is another model pass over vault content, which
+[VAULT-SPEC.md](VAULT-SPEC.md) says the privacy policy has not caught up with.
+
 ## Todo
 
 This follows the rule in [TODO-SPEC.md](TODO-SPEC.md): an obligation is shown

@@ -20,6 +20,7 @@
  * not confirmed. It counts for nothing until you do.
  */
 
+import { sourceHref as catalogueHref, sourceModule } from '@/lib/sources/catalogue';
 import {
   liveFields,
   type CollectionField,
@@ -124,7 +125,14 @@ export const SOURCE_LABELS: Record<RecordSource, string> = {
   gmail: 'From Gmail',
   comment: 'From a comment',
   capture: 'From the capture box',
+  app: 'From another module',
 };
+
+/** An `app` record's source_ref split into its table and row, or null when it is not one. */
+export function appSource(ref: string | null): { table: string; ref: string } | null {
+  const match = ref ? /^([a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*):(.+)$/.exec(ref) : null;
+  return match ? { table: match[1], ref: match[2] } : null;
+}
 
 /** A stored document's name as you gave it, from its path (lib/goals/extract.ts, documentPath). */
 export function documentName(path: string): string {
@@ -135,6 +143,8 @@ export function documentName(path: string): string {
 /** Where a record came from, naming the file when it came from one. */
 export function sourceLabel(source: RecordSource, ref: string | null): string {
   if (source === 'document' && ref) return `From ${documentName(ref)}`;
+  const app = source === 'app' ? appSource(ref) : null;
+  if (app) return `From ${sourceModule(app.table)}`;
   return SOURCE_LABELS[source];
 }
 
@@ -146,6 +156,10 @@ export function sourceHref(source: RecordSource, ref: string | null): string | n
   }
   // A document is kept in the private bucket; this route signs a link to it.
   if (source === 'document') return `/goals/document?path=${encodeURIComponent(ref)}`;
+  if (source === 'app') {
+    const app = appSource(ref);
+    return app ? catalogueHref(app.table, app.ref) : null;
+  }
   if (/^https?:\/\/\S+$/.test(ref)) return ref;
   return null;
 }

@@ -1,6 +1,6 @@
 ---
 name: goals
-description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, provisional steps for what hangs on a question, and questions with lettered options. Re-shaping - read the answers to those questions and settle the provisional steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - give each open goal a verdict (on track, stalled or waiting on you) with the next move, proposing that move as a step for a stalled goal, then research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
+description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, provisional steps for what hangs on a question, and questions with lettered options. Re-shaping - read the answers to those questions and settle the provisional steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - give each open goal a verdict (on track, stalled or waiting on you) with the next move, proposing that move as a step for a stalled goal, then research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
 ---
 
 # Working a goal
@@ -144,6 +144,140 @@ Two things the person has put aside stay put aside:
   point again as fog or as a question. Rewriting the goal's fog to say
   something new brings it back, which is allowed when there is something new
   to say. Never write `fog_dismissed_at`.
+
+## Pulling in from the other modules
+
+The person keeps more of their life in the app than in Goals: what they want
+from the next job in the job search's thoughts, notes in their vault, aims in
+Learn, applications, tasks. A map that ignores those asks them questions
+they have already answered in writing. So before you map a goal or plan an
+area, look for what the other modules already hold about it.
+
+### Where to look
+
+[reference/sources.md](reference/sources.md) is the catalogue: every table
+that can bear on a goal, what it holds, which columns to search, how to name
+and link a row, and where it opens. It is written from each module's own
+`sources.ts` and the gate keeps it complete, so a table that is not in it is
+either new since this checkout or not about the person's life.
+
+Choose the sources by what they hold and what the goal is about, not by the
+module's name. A career goal reads the job search, but also vault notes on
+work, Learn aims on the skills it needs, and a money goal's savings target
+if the move means a pay cut. A goal about the city might read vault notes,
+saved news stories and calendar events. Read in the catalogue's order:
+
+1. **What they said they want** (`intent`). Read all of it that bears on the
+   goal. These are the person's own words about what they want; quote them
+   rather than paraphrase, and let a newer entry win over an older one.
+2. **What they did or have** (`record`). Read for progress and for facts to
+   fill the goal's collections.
+3. **Mentions** (`incidental`). Leads only, never evidence of what they want.
+
+### How to search
+
+Every read is scoped to the person: `user_id = '<user>'` unless the catalogue
+names another way. Search the columns it lists with the goal's words and
+their near neighbours ("job", "career", "role", "work", the field's name):
+
+```sql
+select id, left(body, 400) as body, created_at
+from job_search.thoughts
+where user_id = '<user>'
+order by created_at desc;
+
+select id, title from job_search.roles
+where user_id = '<user>'
+  and (title ilike '%planner%' or jd_text ilike '%urban%');
+```
+
+The vault is the largest source, so search it two ways:
+
+```sql
+-- by meaning: read the theme list whole and pick the themes that bear on the goal
+select id, name, about from obsidian.themes where user_id = '<user>' order by name;
+
+select n.path, n.title, left(n.body, 1500) as body
+from obsidian.theme_notes tn
+join obsidian.notes n on n.id = tn.note_id and n.deleted_at is null
+where tn.theme_id = any('{<theme ids>}'::uuid[]) and tn.user_id = '<user>';
+
+-- by words: full text over every note
+select path, title, ts_headline('english', body, q) as hit
+from obsidian.notes, websearch_to_tsquery('english', 'job OR career OR "looking for"') q
+where user_id = '<user>' and deleted_at is null and search_tsv @@ q
+order by ts_rank(search_tsv, q) desc limit 20;
+```
+
+Read a note in full before you rely on it. Report progress on the run row
+while you search ("Reading the vault for job notes").
+
+### What is already on the goal
+
+```sql
+select source, ref, title, status from goals.context
+where item_id = '<goal id>' and user_id = '<user>';
+```
+
+**Kept** rows are where to start: read them again first, since they may have
+changed. **Dismissed** rows were turned down: never propose the same
+`source` and `ref` again. **Proposed** rows wait on the person; leave them.
+
+### Writing what you found
+
+Write a `goals.context` row for each thing that changes the map, the
+done-when or the questions, and only those: a handful, rarely more than
+eight. A note that only mentions the subject is not context.
+
+- `source` is the table as the catalogue names it, `ref` the row by the
+  column the catalogue says to link it by (a vault note's `path`).
+- `title` is the row's name as the catalogue says to take it.
+- `why` is one sentence on how it bears on this goal: "Says you want a
+  planning role with fieldwork, not a desk job."
+- `excerpt` is the words that matter, quoted exactly, a few sentences at
+  most. Never copy a whole note.
+- `status` is `proposed` on a goal that is not approved; on an approved one
+  you may write it `kept`.
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+insert into goals.context (user_id, item_id, source, ref, title, why, excerpt, status, run_id)
+values ('<user>', '<goal id>', 'obsidian.notes', 'Career/What I want next.md',
+        'What I want next',
+        'Lists what you want from the next role: fieldwork, a public-sector employer, under an hour''s commute.',
+        'I want to be out in neighbourhoods at least two days a week. Public sector over consulting.',
+        'proposed', '<the run id>')
+on conflict (item_id, source, ref) do nothing;
+```
+
+The database refuses a dismissed row from you, a change to one the person
+dismissed, and keeping a proposal on a goal that is not approved.
+
+### Using it
+
+What you found should show in the map, or it was not worth writing:
+
+- **Steps and done-whens follow it.** A step that says "Shortlist roles with
+  fieldwork and a public-sector employer" rather than "Shortlist roles".
+- **Do not ask what is already written.** If a thought or a note answers a
+  question you would have asked, build on the answer and cite it in the
+  step's `detail` instead. Ask only when sources disagree or are silent.
+- **Facts fill collections as drafts**, the way Gmail does: `source = 'app'`
+  and `source_ref` the row as `schema.table:ref`
+  (`job_search.thoughts:<id>`). The page links the draft back to it.
+- **Progress is read, not copied.** Where a goal is measured by something a
+  module counts (applications, readings), link it with `goals.links` where
+  the kind exists, and say how it is counted rather than logging a number.
+
+### Something the catalogue does not list
+
+If a table outside the catalogue plainly holds something about the goal
+(read table and column comments with `obj_description` and
+`col_description` to find out what a table is for), you may use it, and the
+run summary must name it: "Found your career notes in
+`job_search.profiles.summary`, which is not in the catalogue." That line is
+how the catalogue gets fixed.
 
 ## Mapping a goal
 
@@ -383,6 +517,13 @@ row, whose `job` is `area` and whose `area_id` is the area. Report progress on
 it as for any run.
 
 ### Reading the area
+
+Before proposing, look in the other modules as "Pulling in from the other
+modules" says, for what the person has written about the area as a whole:
+their vault notes on it, their job search thoughts for a career area. Goals
+they have already described in their own words come first among your
+proposals, in their words. Write what you found as context on the goals you
+propose it for.
 
 ```sql
 select id, name, note from goals.areas
@@ -708,6 +849,12 @@ Once a week the daily cron fires the routine with the `goals.runs` row it
 wrote with `job` `weekly` (`inngest/goals/weekly.ts`). The run does two
 things, in this order: it reviews every open goal, then it researches the
 help the goals ask for.
+
+While reviewing, look for what is new since the last weekly run in the
+sources each goal draws on: the tables its kept context comes from, and the
+`intent` sources in the catalogue. A new thoughts entry or a vault note
+written this week can change a goal's next move. Write what matters as
+context, proposed, and say so in the verdict's reason.
 
 ### Reviewing each goal
 
