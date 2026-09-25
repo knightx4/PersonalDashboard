@@ -74,7 +74,7 @@ export async function startGoalRun(input: {
   goal: { id: string; title: string };
   routine: RoutineTarget;
   fetch?: typeof globalThis.fetch;
-}): Promise<{ ok: true; detail: string } | { ok: false; error: string }> {
+}): Promise<{ ok: true; detail: string; runId: string } | { ok: false; error: string }> {
   const { goal, userId } = input;
   const result = await recordAndFire({
     ...input,
@@ -82,7 +82,9 @@ export async function startGoalRun(input: {
     itemId: goal.id,
     text: (runId) => goalRunText({ goalId: goal.id, goalTitle: goal.title, userId, runId }),
   });
-  return result.ok ? { ok: true, detail: result.detail } : { ok: false, error: result.error };
+  return result.ok
+    ? { ok: true, detail: result.detail, runId: result.runId }
+    : { ok: false, error: result.error };
 }
 
 /**
