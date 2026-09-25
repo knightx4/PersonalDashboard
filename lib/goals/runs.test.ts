@@ -1,0 +1,72 @@
+import { describe, expect, it } from 'vitest';
+import { RUN_QUIET_MS } from '@/lib/goals/shaping';
+import { runDuration, runOutcome, toRunListings, type RunRowWithItem } from '@/lib/goals/runs';
+
+function row(overrides: Partial<RunRowWithItem>): RunRowWithItem {
+  return {
+    id: 'r1',
+    job: 'goal',
+    status: 'done',
+    created_at: '2026-09-20T10:00:00Z',
+    ended_at: '2026-09-20T10:12:00Z',
+    summary: 'Mapped the goal.',
+    error: null,
+    item: { id: 'g1', title: 'Run a marathon', level: 'goal' },
+    ...overrides,
+  };
+}
+
+describe('toRunListings', () => {
+  it('keeps every run, failed ones with their reason, newest first', () => {
+    const listings = toRunListings([
+      row({ id: 'old' }),
+      row({
+        id: 'failed',
+        status: 'failed',
+        created_at: '2026-09-22T08:00:00Z',
+        ended_at: '2026-09-22T08:00:01Z',
+        summary: null,
+        error: 'Routine token rejected',
+      }),
+      row({ id: 'daily', job: 'daily', item: null, created_at: '2026-09-21T07:00:00Z' }),
+    ]);
+    expect(listings.map((r) => r.id)).toEqual(['failed', 'daily', 'old']);
+    expect(listings[0]).toMatchObject({ status: 'failed', error: 'Routine token rejected' });
+    expect(listings[1]).toMatchObject({ job: 'daily', item: null });
+  });
+
+  it('reads anything that is not a goal as a step', () => {
+    const [listing] = toRunListings([row({ item: { id: 's1', title: 'Buy shoes', level: 'step' } })]);
+    expect(listing.item).toEqual({ id: 's1', title: 'Buy shoes', level: 'step' });
+  });
+});
+
+describe('runOutcome', () => {
+  const created = '2026-09-20T10:00:00Z';
+  const start = Date.parse(created);
+
+  it('says a started run is running inside the quiet window and silent past it', () => {
+    expect(runOutcome({ status: 'started', createdAt: created }, start + 1000)).toBe('running');
+    expect(runOutcome({ status: 'started', createdAt: created }, start + RUN_QUIET_MS + 1)).toBe('silent');
+  });
+
+  it('passes done and failed through', () => {
+    expect(runOutcome({ status: 'done', createdAt: created }, start)).toBe('done');
+    expect(runOutcome({ status: 'failed', createdAt: created }, start)).toBe('failed');
+  });
+});
+
+describe('runDuration', () => {
+  const createdAt = '2026-09-20T10:00:00Z';
+
+  it('is null until the run ends', () => {
+    expect(runDuration({ createdAt, endedAt: null })).toBeNull();
+  });
+
+  it('reads seconds, minutes, then hours and minutes', () => {
+    expect(runDuration({ createdAt, endedAt: '2026-09-20T10:00:42Z' })).toBe('42s');
+    expect(runDuration({ createdAt, endedAt: '2026-09-20T10:12:00Z' })).toBe('12 min');
+    expect(runDuration({ createdAt, endedAt: '2026-09-20T11:05:00Z' })).toBe('1 h 5 min');
+    expect(runDuration({ createdAt, endedAt: '2026-09-20T12:00:00Z' })).toBe('2 h');
+  });
+});
