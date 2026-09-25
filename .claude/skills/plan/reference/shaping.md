@@ -61,9 +61,19 @@ nothing else.
    > known, and what would have to be found out>"`. It graduates into steps
    > once somebody can see far enough to write them, and is cleared then.
 
-   The second test is *not* whether you can answer the question. A question
-   you could answer yourself is still a decision if it is the person's to
-   make; a question nobody can answer yet is still a decision if it is sharp.
+   Before either test, check the question is worth asking at all. The person
+   takes the recommended option almost every time, so most choices are not
+   decisions: settle them in the step's `--detail` ("Sorted newest first;
+   nothing on the page suggests another order") and the approval covers them.
+   Write a decision only when the answer is hard to undo, when the person
+   could reasonably want it the other way and nothing already settles it, or
+   when it changes what the feature includes. The full bar is under **When
+   you reach something you should not decide** in `building.md`. Most
+   features need no decisions, and two is a lot.
+
+   Past that bar, the second test is *not* whether you can answer the
+   question. A question nobody can answer yet is still a decision if it is
+   sharp.
 
    **One patch of fog per feature.** `fog` is one column, so a second one
    replaces the first rather than joining it. A feature that seems to need two

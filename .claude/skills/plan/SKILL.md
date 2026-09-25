@@ -79,6 +79,10 @@ If `DATABASE_URL` is missing, read `reference/offline.md` rather than guessing.
   decision** — not by running `answer`, not by writing the resolution into the
   row, and not by building as though it had been settled. A routine that can
   answer its own questions has no questions, only guesses with a paper trail.
+  The other half of that rule is to write few of them. A choice you would
+  recommend and the person would very likely accept is settled by you and
+  noted, not asked; the bar is in `reference/building.md` under **When you
+  reach something you should not decide**.
 - A **setup step** is never yours either. It is something only the person can
   supply — a key, an account, a value set somewhere a session cannot reach —
   and it closes when they say they have done it, on the page or in the Dash

@@ -78,6 +78,38 @@ export const FOG_RULE =
   'that seems to need two has one of them wrong.';
 
 /**
+ * Which questions are worth the person's time, said in the instruction itself.
+ *
+ * Sessions were writing a decision for every choice with two defensible
+ * answers: a label, a default, a sort order, which of two equivalent ways to
+ * store something. The person's report was that they take the recommended
+ * option nearly every time, so each of those questions cost them a visit to
+ * the page and bought nothing but a delay on the step waiting behind it.
+ *
+ * So the bar moves from "could reasonably go either way" to "the person would
+ * plausibly pick differently, and it would matter if they did". Everything
+ * under it is decided by the session and written down where the person will
+ * see it, which keeps it vetoable without making it a question. Carried by
+ * shaping, re-shaping and building, the three jobs that write decisions.
+ */
+export const QUESTION_RULE =
+  'Ask the person only what is worth their time. They take the recommended ' +
+  'option almost every time, so a question whose answer you would recommend ' +
+  'and they would very likely accept is not a question: decide it yourself. ' +
+  'Write a decision only when at least one of these holds: it is hard to undo ' +
+  '(deleting or rewriting their data, a stored shape that will fill with data, ' +
+  'anything sent outside the app, money); it changes what they see or do in a ' +
+  'way they could reasonably want the other way and nothing already settles ' +
+  '(the design laws, the code, an earlier answer, the idea itself); or it ' +
+  'changes the scope, meaning whether to build something at all or build ' +
+  'noticeably more or less than was asked. Names, wording, layout within the ' +
+  'design laws, defaults, thresholds, ordering, which of two equivalent ' +
+  'implementations: decide those and keep going. Say what you chose and why in ' +
+  'one line where the person reads it (the detail of a proposed row, or the ' +
+  'note you close a step with), so they can still overrule it. Most features ' +
+  'need no questions; two is a lot.';
+
+/**
  * What "not right now" means to a session, said in the instruction itself.
  *
  * Dismissing is the way out of a question you do not want to settle and a fog

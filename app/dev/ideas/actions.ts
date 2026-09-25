@@ -8,7 +8,7 @@ import { threadText } from '@/lib/comments/context';
 import { codeMatches } from '@/lib/feedback/code';
 import { planRoutine } from '@/lib/feedback/routine';
 import { IDEA_COLUMNS, ideaRowFrom } from '@/lib/ideas/load';
-import { FOG_RULE, PLAIN_ENGLISH_RULE } from '@/lib/plan/brief';
+import { FOG_RULE, PLAIN_ENGLISH_RULE, QUESTION_RULE } from '@/lib/plan/brief';
 import { MODULE_IDS, MODULES } from '@/lib/modules';
 import { startRoutineRun } from '@/lib/plan/runs';
 
@@ -243,7 +243,7 @@ export async function shapeIdea(
     'how every row is worded. Write a proposal only: a feature with its steps, ' +
     'each with a done-when and a size, all in the proposed status and linked back to the idea. ' +
     'Do not build anything and do not approve anything.\n\n' +
-    `${PLAIN_ENGLISH_RULE}\n\n${FOG_RULE}\n\n` +
+    `${PLAIN_ENGLISH_RULE}\n\n${FOG_RULE}\n\n${QUESTION_RULE}\n\n` +
     `Idea ${idea.id} (about ${label}):\n\n${idea.body}\n` +
     (said ? `\n${said}` : '');
 

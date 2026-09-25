@@ -42,7 +42,11 @@ against everything now known and write down what has changed — as
    may drop, and must always say why. If you are not sure the step is dead,
    it is not: say so in the report and leave it alone.
 4. **Write the new questions.** An answer usually surfaces the next question.
-   If it can be phrased sharply, it is a decision: `add "…?" --parent <n>
+   Most of them are yours to settle: if you would recommend an answer and the
+   person would very likely take it, write the choice into the step it
+   affects and move on. The bar for asking is under **When you reach
+   something you should not decide** in `building.md`. A question that clears
+   it and can be phrased sharply is a decision: `add "…?" --parent <n>
    --kind decision --from <the decision it came out of> --detail "<the real
    options, lettered from A, one per line, each with its cost; then your
    recommendation>"`. If it cannot, it is fog on the feature — but only if the
