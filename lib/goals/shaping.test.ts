@@ -181,4 +181,12 @@ describe('approvalLine', () => {
       'Approve it',
     );
   });
+
+  it('says nothing about approval once approved with nothing waiting but the questions', () => {
+    const approvedAt = '2026-09-20T00:00:00Z';
+    expect(approvalLine({ ...base, approvedAt }).text).toBe('');
+    expect(approvalLine({ ...base, approvedAt, questions: 2 }).text).toBe(
+      '2 questions for you are in the steps below.',
+    );
+  });
 });

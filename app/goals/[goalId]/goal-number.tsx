@@ -36,7 +36,8 @@ function formatDay(isoDate: string, withYear = false): string {
 /**
  * A goal's number (plan #930): what it is measured in, every reading with
  * its date, and a line of them against the target. A goal with no unit shows
- * only the way to give it one.
+ * only the way to give it one, which the page draws in its row of add lines
+ * and mounts this with `startEditing` from (plan #1038).
  */
 export function GoalNumber({
   goalId,
@@ -44,6 +45,8 @@ export function GoalNumber({
   target,
   readings,
   today,
+  startEditing = false,
+  onClose,
 }: {
   goalId: string;
   unit: string | null;
@@ -51,12 +54,24 @@ export function GoalNumber({
   /** Oldest first. */
   readings: Reading[];
   today: string;
+  /** Open with the form for choosing a unit showing. */
+  startEditing?: boolean;
+  /** Called when that form closes on a goal still not measured. */
+  onClose?: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing);
 
   if (!unit && readings.length === 0) {
     return editing ? (
-      <MeasureForm goalId={goalId} unit={null} target={null} onClose={() => setEditing(false)} />
+      <MeasureForm
+        goalId={goalId}
+        unit={null}
+        target={null}
+        onClose={() => {
+          setEditing(false);
+          onClose?.();
+        }}
+      />
     ) : (
       <AddTrigger label="Track a number, such as a balance or a weight" onClick={() => setEditing(true)} />
     );

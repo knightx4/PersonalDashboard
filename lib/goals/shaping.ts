@@ -213,6 +213,10 @@ export function goalRunText(input: {
  * null for no button. Approving opens the goal if Claude proposed it and every
  * proposed step under it, and from then on Claude may add, split and reorder
  * steps beneath it without asking.
+ *
+ * An approved goal with nothing proposed says only what questions are waiting,
+ * or nothing: what approval allows was said when it was asked for, and saying
+ * it on every visit after is furniture (ui finding 133242ff, plan #1038).
  */
 export function approvalLine(input: {
   goalStatus: 'proposed' | 'open' | 'done' | 'dropped';
@@ -248,8 +252,5 @@ export function approvalLine(input: {
       approve: input.proposed === 1 ? 'Approve it' : 'Approve them',
     };
   }
-  return {
-    text: `Approved. Claude adds and reorders steps here without asking, and asks before changing the done-when or dropping your steps.${asks}`,
-    approve: null,
-  };
+  return { text: asks.trim(), approve: null };
 }
