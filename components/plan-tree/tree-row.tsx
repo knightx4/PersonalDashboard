@@ -172,6 +172,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
   actions,
   anchorId,
   origin = null,
+  source,
   marks,
   priority,
   quickActions,
@@ -202,6 +203,8 @@ export function TreeRow<E extends TreeCatalogEntry>({
   anchorId?: string;
   /** The answer that produced this row, when a re-shape wrote it. */
   origin?: { number: number; gist: string } | null;
+  /** Where the step lives when the page shows it away from home: a line under the title, in text only. */
+  source?: string;
   /** Marks after the title and the comment count. */
   marks?: ReactNode;
   /** The priority column, from sm up. Empty when not given. */
@@ -379,11 +382,14 @@ export function TreeRow<E extends TreeCatalogEntry>({
               {/* Truncated closed, whole open. A row is a line and a long title
                * has to give way to keep it one; but opening the step is the
                * gesture that means "show me this one", and a name still cut
-               * off after it leaves no way to read it at all. */}
+               * off after it leaves no way to read it at all. On a phone it
+               * wraps closed as well: the name cell there is what is left
+               * after the health word and the menu, which cut titles to two
+               * words (plan #1041). */}
               <span
                 className={cn(
                   'min-w-0',
-                  open ? 'break-words' : 'truncate',
+                  open ? 'break-words' : 'break-words sm:truncate',
                   node.status === 'dropped' && 'text-ink-muted line-through',
                 )}
               >
@@ -417,6 +423,9 @@ export function TreeRow<E extends TreeCatalogEntry>({
               <span className="block truncate text-small text-ink-ghost">
                 From #{origin.number}&apos;s answer: {origin.gist}
               </span>
+            )}
+            {source && (
+              <span className="block truncate text-small text-ink-ghost">{source}</span>
             )}
             {gloss && !open && (
               <span className="block truncate text-small text-ink-muted">
@@ -590,6 +599,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   catalog={dependencies.catalog}
                   groupOf={dependencies.groupOf}
                   actions={actions}
+                  closed={closed}
                 />
               )}
 
