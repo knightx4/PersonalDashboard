@@ -69,6 +69,24 @@ answered, proposes concrete goals beneath it, such as *bench 200 lbs by March*.
 This is the shape and re-shape flow from `.claude/skills/plan`, pointed at a
 goal instead of an idea.
 
+### Planning an area
+
+Sometimes the direction is clear and the goals are not. "Get plugged into the
+city" says where you want to go without saying what would get you there. An
+area takes a sentence saying what you want from it (`areas.note`), and **Plan
+this area** fires one run that proposes the goals the area needs: three to
+six, covering the main ways in (knowing the subject, showing up, knowing
+people, joining something, making something), each with a done-when, a
+sentence on why it serves the area, and one first move beneath it.
+
+The goals arrive as proposals. You approve the ones that fit on each goal's
+page and archive the rest, and turning one down is how you tell Claude which
+reading of the area you meant. **Work on this** on an approved goal then maps
+it in full. Once the area has goals, the button reads **Plan what is
+missing** and proposes only what the existing goals leave out, never
+something you turned down. The rules for the run are in
+`.claude/skills/goals`, "Planning an area".
+
 ## Approval
 
 Claude proposes; you approve. On the dev plan every proposed step waits for
@@ -159,7 +177,8 @@ the same allowance. So Goals runs on a schedule rather than on every change:
   that kind. Sources such as Eventbrite,
   Meetup and org newsletters vary in how reachable and current they are, so
   the first few weeks will be uneven and should improve with the feedback.
-- **On request.** A **Work on this** button on a goal fires one run for it.
+- **On request.** A **Work on this** button on a goal fires one run for it,
+  and **Plan this area** on an area fires one run proposing its goals.
 - **After an answer.** Answering a question on a goal fires one run for that
   goal once ten minutes pass with no further answer, so several answers in
   one sitting cost one run. It settles the provisional steps the answers
@@ -388,7 +407,7 @@ Priority, filters and search stay on the dev plan for now.
 
 A sketch for the migration, not the migration itself.
 
-- `goals.areas`: id, user_id, name, position.
+- `goals.areas`: id, user_id, name, note, position.
 - `goals.items`: the tree. One table for goals and steps, as `plan_items` is
   one table for features and steps. `area_id` on top-level rows, `parent_id`
   below them, `level` (`goal` or `step`), `kind`, `status`, `title`, `detail`,

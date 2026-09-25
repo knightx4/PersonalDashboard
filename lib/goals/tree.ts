@@ -14,12 +14,16 @@ export const AREA_NAME_MAX = 200;
 export const GOAL_TITLE_MAX = 500;
 export const GOAL_ACCEPTANCE_MAX = 4000;
 export const GOAL_FOG_MAX = 4000;
+/** supabase/migrations-goals/0028. */
+export const AREA_NOTE_MAX = 4000;
 
 export type GoalStatus = 'proposed' | 'open' | 'done' | 'dropped';
 
 export type Area = {
   id: string;
   name: string;
+  /** What you want from the area, in your own words; the brief for Plan this area. Null when unwritten. */
+  note: string | null;
   position: number;
 };
 
@@ -72,6 +76,15 @@ export function parseAreaName(raw: unknown): Parsed<string> {
     return { ok: false, error: `Keep the name under ${AREA_NAME_MAX} characters.` };
   }
   return { ok: true, value: name };
+}
+
+/** An area's note: trimmed, and null when cleared, which is allowed. */
+export function parseAreaNote(raw: unknown): Parsed<string | null> {
+  const note = clean(raw);
+  if (note && note.length > AREA_NOTE_MAX) {
+    return { ok: false, error: `Keep the note under ${AREA_NOTE_MAX} characters.` };
+  }
+  return { ok: true, value: note };
 }
 
 export type GoalFields = {

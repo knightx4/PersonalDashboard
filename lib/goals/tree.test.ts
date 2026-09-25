@@ -4,6 +4,7 @@ import {
   groupGoals,
   nextPosition,
   parseAreaName,
+  parseAreaNote,
   parseGoalFields,
   reorder,
   type Goal,
@@ -22,6 +23,14 @@ const goal = (id: string, areaId: string): Goal => ({
 });
 
 const form = (values: Record<string, string>) => (key: string) => values[key] ?? null;
+
+describe('parseAreaNote', () => {
+  it('trims a note and clears an empty one', () => {
+    expect(parseAreaNote('  Meet people in transit ')).toEqual({ ok: true, value: 'Meet people in transit' });
+    expect(parseAreaNote('   ')).toEqual({ ok: true, value: null });
+    expect(parseAreaNote('x'.repeat(4001)).ok).toBe(false);
+  });
+});
 
 describe('parseAreaName', () => {
   it('trims a name and refuses an empty one', () => {
@@ -87,8 +96,8 @@ describe('groupGoals', () => {
   it('keeps the areas in order and leaves out goals of unlisted areas', () => {
     const grouped = groupGoals(
       [
-        { id: 'money', name: 'Money', position: 10 },
-        { id: 'city', name: 'The city', position: 20 },
+        { id: 'money', name: 'Money', note: null, position: 10 },
+        { id: 'city', name: 'The city', note: null, position: 20 },
       ],
       [goal('debts', 'money'), goal('events', 'city'), goal('stray', 'gone')],
     );

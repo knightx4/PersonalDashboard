@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   approvalLine,
+  areaRunText,
+  areaRunView,
   awaitsAnswer,
   countAside,
   countOpenQuestions,
@@ -131,6 +133,50 @@ describe('runs', () => {
     expect(text).toContain('goals.runs id r-1');
     expect(text).toContain('.claude/skills/goals/SKILL.md');
     expect(text).toContain('map the whole path');
+  });
+});
+
+describe('planning an area', () => {
+  it('briefs the routine with the area, its note, its goals and the run row', () => {
+    const text = areaRunText({
+      areaId: 'a-1',
+      areaName: 'The city',
+      note: 'Meet the people working on transit.',
+      goals: [{ title: 'Go to a community board meeting', status: 'open' }],
+      userId: 'u-1',
+      runId: 'r-1',
+    });
+    expect(text).toContain('"The city" (goals.areas id a-1)');
+    expect(text).toContain('Meet the people working on transit.');
+    expect(text).toContain('- Go to a community board meeting (open)');
+    expect(text).toContain('"Planning an area"');
+    expect(text).toContain('goals.runs id r-1');
+    expect(text).toContain('user_id u-1');
+  });
+
+  it('says so when the area has no note and no goals', () => {
+    const text = areaRunText({ areaId: 'a', areaName: 'Health', note: '  ', goals: [], userId: 'u', runId: 'r' });
+    expect(text).toContain('has not written what they want from it');
+    expect(text).toContain('It has no goals yet.');
+  });
+
+  it('reads the latest run as going, failed, gone quiet or finished', () => {
+    expect(areaRunView(run({ lastSeenAt: '2026-09-24T11:57:00Z', nowOn: 'Reading the note' }), NOW)).toMatchObject({
+      running: 'on Reading the note, 3 minutes ago',
+      error: null,
+    });
+    expect(areaRunView(run({ status: 'failed', error: 'Token rejected' }), NOW)).toMatchObject({
+      running: null,
+      error: 'Token rejected',
+    });
+    expect(
+      areaRunView(run({ createdAt: new Date(NOW - RUN_QUIET_MS).toISOString() }), NOW).error,
+    ).toContain('never reported progress');
+    expect(areaRunView(run({ status: 'done', summary: 'Proposed four goals.\nMore.' }), NOW)).toMatchObject({
+      running: null,
+      error: null,
+      summary: 'Proposed four goals.',
+    });
   });
 });
 
