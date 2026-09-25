@@ -62,6 +62,34 @@ describe('a track’s weight', () => {
   });
 });
 
+describe('lessons in Learn now', () => {
+  it('count Got it and Work on this as answers, and Not now as moving past', () => {
+    expect(trackWeight(activity({ lessonsTaken: 3 }), false).weight).toBe(4);
+    expect(trackWeight(activity({ answered: 1, lessonsPassed: 3 }), false).weight).toBe(0.5);
+  });
+
+  it('keep a track from reading as stopped', () => {
+    expect(trackWeight(activity({ answeredBefore: 4, lessonsTaken: 1 }), true).stopped).toBe(false);
+  });
+
+  it('count as using a track when another is weighed', () => {
+    const weights = trackWeights(
+      new Map([
+        ['lessons', activity({ lessonsTaken: 2 })],
+        ['old', activity({ answeredBefore: 3 })],
+      ]),
+    );
+    expect(weights.get('old')).toEqual({ weight: STOPPED_WEIGHT, stopped: true });
+  });
+
+  it('are named on the track’s page', () => {
+    const row = activity({ answered: 1, lessonsTaken: 2, lessonsPassed: 1 });
+    expect(weightReason(row, trackWeight(row, false))).toBe(
+      'Practice Flow asks about this track about 2 times as often as a new one, because in the last four weeks you answered 1 of its questions, skipped none, took 2 lessons in Learn now and passed on 1 lesson.',
+    );
+  });
+});
+
 describe('the line on the track’s page', () => {
   it('names the counts behind a heavy track', () => {
     const row = activity({ answered: 12, skipped: 1 });

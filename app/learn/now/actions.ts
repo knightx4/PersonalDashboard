@@ -149,7 +149,11 @@ export async function saveCard(id: string): Promise<SaveCardResult> {
 
   try {
     const row = await loadFeedCardRow(supabase, card.data);
-    if (!row?.item || !row.segment || !row.why) return { error: 'That card is no longer there.' };
+    // A lesson saves the section it cites, and has nothing to save without one.
+    const item = row?.item ?? row?.source_item ?? null;
+    const segment = row?.item ? row.segment : (row?.source_segment ?? null);
+    const itemId = row?.item_id ?? row?.source_item_id ?? null;
+    if (!row || !item || !segment || !itemId || !row.why) return { error: 'That card is no longer there.' };
     // Checked before the reading is written, so a second press, or a card
     // already dismissed in another tab, does not put a row on the list.
     if (!ACTION_FROM.saved.includes(row.status)) {
@@ -157,12 +161,12 @@ export async function saveCard(id: string): Promise<SaveCardResult> {
     }
 
     const saved = await saveFeedSection(supabase, user.id, {
-      article: row.item.title,
-      section: row.segment.heading,
-      articleUrl: row.item.canonical_url.split('#')[0]!,
-      link: sectionLink(row.item.canonical_url, row.segment.section_anchor),
+      article: item.title,
+      section: segment.heading,
+      articleUrl: item.canonical_url.split('#')[0]!,
+      link: sectionLink(item.canonical_url, segment.section_anchor),
       why: row.why,
-      catalogueItemId: row.item_id,
+      catalogueItemId: itemId,
     });
     await recordFeedAction(supabase, card.data, 'saved', { saved_reading_id: saved.readingId });
     after(() => topUpFeedAfterResponse(user.id));
@@ -175,7 +179,8 @@ export async function saveCard(id: string): Promise<SaveCardResult> {
 /**
  * Test me on this: start a track from the card and go to Practice Flow,
  * focused on it. The card is marked tested only once the track exists, so a
- * failed start leaves it ready and says why on the card.
+ * failed start leaves it ready and says why on the card. A lesson is already
+ * in a track, so it goes straight to that track's Practice Flow.
  */
 // latency: pending
 export async function testMeOnCard(id: string): Promise<CardActionResult> {
@@ -185,6 +190,14 @@ export async function testMeOnCard(id: string): Promise<CardActionResult> {
   const supabase = await createLearnClient();
 
   const row = await loadFeedCardRow(supabase, card.data).catch(() => null);
+  if (row?.reason === 'lesson') {
+    if (!row.subject_id) return { error: 'The track this lesson was from is no longer there.' };
+    if (ACTION_FROM.tested.includes(row.status)) {
+      await recordFeedAction(supabase, card.data, 'tested').catch(() => false);
+      after(() => topUpFeedAfterResponse(user.id));
+    }
+    redirect(`/learn/flow?track=${row.subject_id}`);
+  }
   if (!row?.item || !row.segment) return { error: 'That card is no longer there.' };
   // Pressed again after the track was started: go back to it rather than
   // paying for a second chain.
