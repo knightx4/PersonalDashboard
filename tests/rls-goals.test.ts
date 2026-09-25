@@ -778,16 +778,16 @@ describe('weekly suggestions (plan #934)', () => {
 
   async function suggest(title: string): Promise<string> {
     const [row] = await asClaude((tx) => tx<{ id: string }[]>`
-      insert into suggestions (user_id, title, url, happens_on)
-      values (${userA}, ${title}, 'https://example.test/e', '2026-10-01') returning id`);
+      insert into suggestions (user_id, kind, title, url, happens_on)
+      values (${userA}, 'events', ${title}, 'https://example.test/e', '2026-10-01') returning id`);
     return row.id;
   }
 
   it('lets Claude suggest and mark an unanswered one ignored, and nothing more', async () => {
     await expect(
       asClaude((tx) => tx`
-        insert into suggestions (user_id, title, reaction, reacted_at)
-        values (${userA}, 'A talk', 'going', now())`),
+        insert into suggestions (user_id, kind, title, reaction, reacted_at)
+        values (${userA}, 'events', 'A talk', 'going', now())`),
     ).rejects.toThrow(/may suggest but not react/);
 
     const talk = await suggest('A talk at the library');
@@ -804,6 +804,20 @@ describe('weekly suggestions (plan #934)', () => {
 
     const history = await historyOf(talk);
     expect(history.map((h) => h.actor)).toEqual(['claude', 'claude']);
+  });
+
+  it('refuses a suggestion with no kind or a kind outside the set (plan #1028)', async () => {
+    await expect(
+      asClaude((tx) => tx`insert into suggestions (user_id, title) values (${userA}, 'A book')`),
+    ).rejects.toThrow(/"kind"/);
+    await expect(
+      asClaude((tx) => tx`
+        insert into suggestions (user_id, kind, title) values (${userA}, 'gigs', 'A gig')`),
+    ).rejects.toThrow(/suggestions_kind_ck/);
+    const [row] = await asClaude((tx) => tx<{ kind: string }[]>`
+      insert into suggestions (user_id, kind, title) values (${userA}, 'reading', 'A book')
+      returning kind`);
+    expect(row.kind).toBe('reading');
   });
 
   it('records your going, not for me and whether you went on the row', async () => {

@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import { CalendarDays, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { HELP_KIND_LABELS } from '@/lib/goals/help-kinds';
 import { REACTION_LABELS, type Suggestion } from '@/lib/goals/suggestions';
 import { reactToSuggestionAction, type SuggestionActionState } from './suggestion-actions';
 
@@ -56,7 +57,7 @@ export function SuggestionsList({ suggestions }: { suggestions: Suggestion[] }) 
 
 function SuggestionRow({ suggestion: s }: { suggestion: Suggestion }) {
   const [state, react, pending] = useActionState(reactToSuggestionAction, initial);
-  const meta = [whenLine(s), s.place, s.source].filter(Boolean).join(' · ');
+  const meta = [HELP_KIND_LABELS[s.kind], whenLine(s), s.place, s.source].filter(Boolean).join(' · ');
   const going = s.reaction === 'going';
 
   return (

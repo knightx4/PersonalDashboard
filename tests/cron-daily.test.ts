@@ -120,7 +120,7 @@ vi.mock('@/inngest/goals/daily', () => ({
   runGoalsDaily: vi.fn(async () => ({ skipped: 'no Claude steps are ready' })),
 }));
 vi.mock('@/inngest/goals/weekly', () => ({
-  runGoalsWeekly: vi.fn(async () => ({ started: true, runId: 'run-1', rhythms: 1, past: 0, ignored: 2 })),
+  runGoalsWeekly: vi.fn(async () => ({ started: true, runId: 'run-1', goals: 1, past: 0, ignored: 2 })),
 }));
 vi.mock('@/inngest/dev/claims', () => ({
   runClaimSweep: vi.fn(async () => ({ released: 2, steps: [42, 43] })),

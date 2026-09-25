@@ -1,6 +1,6 @@
 ---
 name: goals
-description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, provisional steps for what hangs on a question, and questions with lettered options. Re-shaping - read the answers to those questions and settle the provisional steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - research NYC city events for rhythm goals and write them as suggestions, following past reactions. Use when the goals routine is fired from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "shape my goal …", "break down <goal>", "work on my goals".
+description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, provisional steps for what hangs on a question, and questions with lettered options. Re-shaping - read the answers to those questions and settle the provisional steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind. Use when the goals routine is fired from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "shape my goal …", "break down <goal>", "work on my goals".
 ---
 
 # Working a goal
@@ -488,51 +488,89 @@ each one left.
 
 ## The weekly run
 
-Once a week the daily cron fires the routine to research what is on in New
-York City for the person's rhythm goals (`inngest/goals/weekly.ts`), with the
-`goals.runs` row it wrote with `job` `weekly`. The brief names each live
-rhythm and lists every suggestion from the last eight weeks with what the
-person did with it: `going`, `not_for_me`, `ignored` (no answer within the
-week), and whether they then went. Read those lines before searching. They
-are the only feedback there is, and the research should visibly follow them:
-more of the kinds marked going or attended, fewer of the kinds turned down or
-left unanswered. You can read further back yourself:
+Once a week the daily cron fires the routine with the `goals.runs` row it
+wrote with `job` `weekly` (`inngest/goals/weekly.ts`). The brief lists each
+open goal that asks for weekly help, with the kinds it asks for from
+`goals.items.help_kinds` and the note on each ("Brooklyn, weeknights"), and
+the goal's live rhythms. A goal that asks for nothing gets nothing, whatever
+rhythms it has.
+
+Under that, the brief lists every suggestion from the last eight weeks,
+grouped by kind, with what the person did with it: `going`, `not_for_me`,
+`ignored` (no answer within the week), and whether they then went. Read
+those lines before searching. They are the only feedback there is, and each
+kind's research should visibly follow its own lines: more like what was
+marked going or attended, less like what was turned down or left
+unanswered. A reaction to a talk says nothing about what to read, so do not
+carry one kind's reactions over to another. You can read further back
+yourself:
 
 ```sql
-select title, source, place, happens_on, reaction, attended, created_at
+select kind, title, source, place, happens_on, reaction, attended, created_at
 from goals.suggestions
 where user_id = '<user>'
 order by created_at desc limit 200;
 ```
 
-1. Search for talks, events and volunteer openings in the coming seven to
-   ten days that serve the rhythms in the brief. Eventbrite, Meetup, museum
-   and library calendars, NYC Parks and org newsletters are the usual
-   sources; check each find is current and has a page you can link.
-2. Write five to eight suggestions, one row each. Every one needs a date
-   (`happens_on`, and `starts_at` when the time is known, in New York time
-   with its offset) and a link (`url`, the event's own page). A volunteer
-   opening with no single date takes the first date it can be done. `item_id`
-   is the rhythm it serves, `run_id` this run.
+Work one kind at a time, for every goal that asks for it, using the note as
+the brief for what to look for. Each kind has its own sources and its own
+rule for dates:
+
+- **events**: talks, meetups, performances and classes in New York City in
+  the coming seven to ten days. Eventbrite, Meetup, museum and library
+  calendars (NYPL, Brooklyn Public Library, Queens Public Library), NYC Parks
+  and org newsletters. Every one needs `happens_on`, and `starts_at` when
+  the time is known, in New York time with its offset.
+- **volunteering**: openings in New York City the person could sign up for
+  now. NYC Service, VolunteerMatch, Idealist, New York Cares and the
+  organisations' own pages. An opening with no single date takes the first
+  date it can be done as `happens_on`.
+- **reading**: books, long articles and papers that fit the goal and the
+  note. Publishers' pages, library catalogues, the authors' own sites and
+  reviews in the major papers. Link the thing itself, or its library or
+  publisher page. No date: leave `happens_on` null. When the person's Learn
+  module is the better home for it, say so in `detail`.
+- **courses**: courses and workshops open for enrolment, in person in New
+  York City or online. University extension schools, the libraries' free
+  classes, Coursera, edX and the organisers' pages. `happens_on` is the
+  start date, or null for one taken at your own pace.
+- **job_leads**: open roles that fit the goal and the note. Company career
+  pages and the job boards the note names. `happens_on` is the closing date
+  when there is one, else null. The Jobs module tracks applications, so a
+  lead is a pointer to a role, not an application.
+
+Then write the finds:
+
+1. Two to five suggestions per kind asked for, and no more than twelve in
+   the run. Check each find is current and has a page of its own you can
+   link as `url`.
+2. One row each, with `kind` set to the kind it answers. `item_id` is the
+   goal it is for, or the rhythm it counts towards when it is an event or a
+   volunteer opening for a goal with a live rhythm. `run_id` is this run. The
+   database refuses a row with no kind or a kind outside the five.
 
    ```sql
    set local goals.actor = 'claude';
    set local goals.run_id = '<the run id>';
    insert into goals.suggestions
-     (user_id, item_id, run_id, title, detail, url, place, source, happens_on, starts_at)
-   values ('<user>', '<rhythm id>', '<the run id>', 'Talk: …', 'One or two plain sentences on why it fits.',
-           'https://…', 'Brooklyn Public Library, Central', 'BPL events', '2026-10-01',
-           '2026-10-01T18:30:00-04:00');
+     (user_id, item_id, run_id, kind, title, detail, url, place, source, happens_on, starts_at)
+   values
+     ('<user>', '<rhythm id>', '<the run id>', 'events', 'Talk: …',
+      'One or two plain sentences on why it fits.', 'https://…',
+      'Brooklyn Public Library, Central', 'BPL events', '2026-10-01', '2026-10-01T18:30:00-04:00'),
+     ('<user>', '<goal id>', '<the run id>', 'reading', 'The Power Broker, Robert Caro',
+      'Why it fits the note.', 'https://…', null, 'Penguin Random House', null, null);
    ```
 
 3. Do not repeat a suggestion already in the table, and do not suggest
-   something that has already happened.
+   something that has already happened or closed.
 
 Never write `reaction`, `reacted_at` or `attended`. Going and not for me are
 the person's buttons on the Goals home, whether they went is their tick on
 Todo, and marking the unanswered ones ignored is done by the cron. The guard
 (`goals` 0008) refuses a Claude write to any of them. The summary says how
-many you wrote, and what in the past reactions you followed.
+many you wrote of each kind, and what in each kind's past reactions you
+followed.
 
 ## Replying to a comment
 

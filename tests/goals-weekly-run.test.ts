@@ -1,7 +1,8 @@
 /**
  * The weekly goals run, as the daily cron calls it (plan #934): it marks last
  * week's unanswered suggestions ignored every day, and once a week fires the
- * goals routine with the live rhythms and the past reactions in its brief.
+ * goals routine with each goal's kinds of help and the past reactions to each
+ * kind in its brief (plan #1028).
  *
  * The client is a stand-in that answers each table's query from a fixture and
  * records every insert and update, as in goals-daily-run.test.ts.
@@ -97,7 +98,22 @@ function item(row: Record<string, unknown>) {
   };
 }
 
-const GOAL = item({ id: 'g', level: 'goal', area_id: 'area', title: 'Get plugged into city life' });
+const GOAL = item({
+  id: 'g',
+  level: 'goal',
+  area_id: 'area',
+  title: 'Get plugged into city life',
+  help_kinds: [{ kind: 'events', note: 'Brooklyn, weeknights' }],
+});
+const LEARNING = item({
+  id: 'l',
+  level: 'goal',
+  area_id: 'area',
+  position: 20,
+  title: 'Learn how cities are planned',
+  help_kinds: [{ kind: 'reading', note: null }],
+});
+const QUIET = item({ id: 'q', level: 'goal', area_id: 'area', position: 30, title: 'Sleep by eleven' });
 const RHYTHM = item({
   id: 'r1',
   level: 'step',
@@ -110,6 +126,7 @@ const RHYTHM = item({
 const PAST = {
   id: 'p1',
   item_id: 'r1',
+  kind: 'events',
   title: 'Jazz in Bryant Park',
   detail: null,
   url: 'https://example.test/jazz',
@@ -139,11 +156,11 @@ describe('runGoalsWeekly', () => {
   });
 
   it('marks last week’s unanswered suggestions ignored, then fires with the past reactions', async () => {
-    const { client, writes } = fakeClient({ items: [GOAL, RHYTHM], past: [PAST] });
+    const { client, writes } = fakeClient({ items: [GOAL, RHYTHM, LEARNING, QUIET], past: [PAST] });
     const fetch = okFetch();
     const result = await runGoalsWeekly({ client, routine, now: NOW, fetch });
 
-    expect(result).toEqual({ started: true, runId: 'run-1', rhythms: 1, past: 1, ignored: 2 });
+    expect(result).toEqual({ started: true, runId: 'run-1', goals: 2, past: 1, ignored: 2 });
 
     expect(writes[0]).toMatchObject({ table: 'suggestions', op: 'update', values: { reaction: 'ignored' } });
     expect(writes[0].filters).toContainEqual(['eq', 'user_id', USER]);
@@ -160,8 +177,12 @@ describe('runGoalsWeekly', () => {
     expect(url).toContain('/routines/trig_goals/fire');
     const text = (JSON.parse(init.body as string) as { text: string }).text;
     expect(text).toContain('goals.runs id run-1');
+    expect(text).toContain('Goal "Get plugged into city life" (goals.items id g) asks for:\n- events: Brooklyn, weeknights');
     expect(text).toContain('"Go to one city event" (goals.items id r1)');
-    expect(text).toContain('- going, and went: "Jazz in Bryant Park"');
+    expect(text).toContain('Goal "Learn how cities are planned" (goals.items id l) asks for:\n- reading');
+    expect(text).not.toContain('Sleep by eleven');
+    expect(text).toContain('events:\n- going, and went: "Jazz in Bryant Park"');
+    expect(text).toContain('reading:\n- Nothing yet for this kind.');
   });
 
   it('closes the week every day but fires only once a week', async () => {
@@ -173,11 +194,11 @@ describe('runGoalsWeekly', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('spends no run when there is no live rhythm to research for', async () => {
-    const { client, writes } = fakeClient({ items: [GOAL] });
+  it('spends no run when no open goal asks for help, even one with a live rhythm', async () => {
+    const { client, writes } = fakeClient({ items: [QUIET, { ...RHYTHM, parent_id: 'q' }] });
     const fetch = okFetch();
     const result = await runGoalsWeekly({ client, routine, now: NOW, fetch });
-    expect(result).toEqual({ skipped: 'no live rhythms to research for', ignored: 2 });
+    expect(result).toEqual({ skipped: 'no open goal asks for weekly help', ignored: 2 });
     expect(writes.map((w) => w.table)).toEqual(['suggestions']);
     expect(fetch).not.toHaveBeenCalled();
   });

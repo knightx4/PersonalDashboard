@@ -148,9 +148,11 @@ the same allowance. So Goals runs on a schedule rather than on every change:
 - **Daily, early morning.** Work ready `claude` steps, shape newly added or
   foggy goals, and write the day's view. You open the app about once a day, so
   this is when the work has to be ready.
-- **Weekly.** Research for rhythm goals: the NYC city events list, volunteer
-  openings, talks. Each item has quick **going / not for me** buttons, and that
-  feedback is what the next week's research reads. Sources such as Eventbrite,
+- **Weekly.** Research for each goal of the kinds of help it asks for:
+  events, volunteer openings, reading, courses or job leads (plan #1028).
+  Each suggestion carries its kind and has quick **going / not for me**
+  buttons, and the next week's research for a kind reads the reactions to
+  that kind. Sources such as Eventbrite,
   Meetup and org newsletters vary in how reachable and current they are, so
   the first few weeks will be uneven and should improve with the feedback.
 - **On request.** A **Work on this** button on a goal fires one run for it.
@@ -400,8 +402,8 @@ A sketch for the migration, not the migration itself.
   weight, a count), never overwritten.
 - `goals.periods`: one row per rhythm per period, with target, count and
   whether it was kept.
-- `goals.suggestions`: what Claude suggested, your reaction, and whether it
-  happened.
+- `goals.suggestions`: what Claude suggested, the kind of help it is, your
+  reaction, and whether it happened.
 - `goals.runs`: one row per routine run, as `plan_runs` does for the dev plan.
 - `goals.dependencies`: one row per step that cannot start until another
   step closes, with the loop and same-account checks `plan_dependencies` has
