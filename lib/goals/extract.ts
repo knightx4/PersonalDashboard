@@ -11,6 +11,11 @@
  */
 
 import {
+  FIELD_KEY_PATTERN,
+  FIELD_TYPES,
+  ID_TYPES,
+  LABEL_MAX,
+  OPTIONS_MAX,
   idField,
   liveFields,
   parseFieldValue,
@@ -32,6 +37,13 @@ export const PASTE_MAX = 100_000;
 
 /** The most rows one read fills in. */
 export const ROWS_MAX = 50;
+
+/** The most fields one read suggests adding, and the most cautions it hands back (plan #986). */
+export const SUGGESTIONS_MAX = 20;
+export const CAUTIONS_MAX = 10;
+
+/** The longest reason or caution note kept from the model. */
+export const NOTE_MAX = 300;
 
 export type DocumentKind =
   | { kind: 'pdf' }
@@ -163,8 +175,55 @@ export function extractionTool(fields: CollectionField[]): {
           type: 'array',
           items: { type: 'object', properties, required: Object.keys(properties) },
         },
+        extra: {
+          type: 'array',
+          description:
+            'Facts the document gives about its items that no field in the form holds, one entry per fact. Empty when there are none.',
+          items: {
+            type: 'object',
+            properties: {
+              label: { type: 'string', description: 'A short name for the field, as a form would label it.' },
+              type: { type: 'string', enum: [...FIELD_TYPES] },
+              options: {
+                type: ['array', 'null'],
+                items: { type: 'string' },
+                description: 'For a choice field, the values it can take. Null for any other type.',
+              },
+              identifies: {
+                type: 'boolean',
+                description: 'True when the value names the item, such as a loan or account number.',
+              },
+              values: {
+                type: 'array',
+                items: { type: ['string', 'number', 'boolean', 'null'] },
+                description:
+                  'One value for each entry in records, in the same order, written as that field type is in records. Null where the item has none.',
+              },
+              why: { type: 'string', description: 'One line on what someone tracking this could use it for.' },
+            },
+            required: ['label', 'type', 'options', 'identifies', 'values', 'why'],
+          },
+        },
+        caution: {
+          type: 'array',
+          description:
+            'Labels in the document that do not mean what their name says. Empty when there are none.',
+          items: {
+            type: 'object',
+            properties: {
+              label: { type: 'string', description: 'The label exactly as the document writes it.' },
+              field: {
+                type: ['string', 'null'],
+                enum: [...Object.keys(properties), null],
+                description: 'The key of the form field that label would seem to fill, or null when it fills none.',
+              },
+              note: { type: 'string', description: 'One line on what the value really is, and for which items.' },
+            },
+            required: ['label', 'field', 'note'],
+          },
+        },
       },
-      required: ['as_of', 'records'],
+      required: ['as_of', 'records', 'extra', 'caution'],
     },
   };
 }
@@ -186,7 +245,17 @@ Rules:
 - A choice field takes one of its listed options exactly, or null.
 - When the document shows the same item more than once, such as a summary and a detail page for one loan, return it once.
 - If nothing in it fits the form, return an empty list.
-- as_of is the date the document says its figures are current as of: a statement date, or the date an export or report was requested or produced. Not today's date, and not a due date. Null when it states none.`;
+- as_of is the date the document says its figures are current as of: a statement date, or the date an export or report was requested or produced. Not today's date, and not a due date. Null when it states none.
+
+The form may not have a place for everything useful in the document. In extra, list each other fact the document gives about its items that someone tracking them could use, such as a status and the date it began, a next due date, the principal and interest a balance is made of, or a number that identifies each item:
+
+- Give it a short label and the type that fits: text, long_text, number, money, percent, date, day_of_month, yes_no, choice (with its options) or link.
+- values holds one value for each entry in records, in the same order, null where that item has none.
+- Mark identifies for a number or code that names each item, such as a loan or account number.
+- why is one line on what a goal might use it for.
+- Leave out anything a form field already holds, totals across items, contact details, addresses, and the document's own headings and page furniture.
+
+In caution, list any label whose value does not mean what its name says, for all items or for some. Check each date against the item's type, status and other dates before trusting its label: a field called a start date that, for some kinds of item, holds when the money was paid out rather than when payments begin is one to list. Name the label as the document writes it, the form field it would seem to fill (null when none does), and one line on what the value really is and which items it applies to.`;
 }
 
 /** What the form starts from: each row's values as their inputs show them. */
@@ -203,13 +272,20 @@ export function readExtraction(
   shape: CollectionShape,
   input: unknown,
 ): PreviewRow[] {
-  const records =
-    input && typeof input === 'object' && Array.isArray((input as { records?: unknown }).records)
-      ? ((input as { records: unknown[] }).records as unknown[])
-      : [];
+  return extractRows(fields, shape, input).rows;
+}
+
+/** The rows, and for each the index of the record in the answer it came from. */
+function extractRows(
+  fields: CollectionField[],
+  shape: CollectionShape,
+  input: unknown,
+): { rows: PreviewRow[]; from: number[] } {
+  const records = listOf(input, 'records');
   const live = liveFields(fields);
   const rows: PreviewRow[] = [];
-  for (const record of records) {
+  const from: number[] = [];
+  for (const [index, record] of records.entries()) {
     if (!record || typeof record !== 'object' || Array.isArray(record)) continue;
     const row: PreviewRow = {};
     let filled = false;
@@ -219,10 +295,160 @@ export function readExtraction(
       row[field.key] = shown;
       if (shown !== '') filled = true;
     }
-    if (filled) rows.push(row);
+    if (filled) {
+      rows.push(row);
+      from.push(index);
+    }
     if (rows.length >= (shape === 'one' ? 1 : ROWS_MAX)) break;
   }
-  return rows;
+  return { rows, from };
+}
+
+function listOf(input: unknown, key: string): unknown[] {
+  if (!input || typeof input !== 'object') return [];
+  const list = (input as Record<string, unknown>)[key];
+  return Array.isArray(list) ? list : [];
+}
+
+/**
+ * A field the document has and the form lacks (plan #986): the field as it
+ * would be added, its value for each preview row as the input would show
+ * it, and why a goal might use it.
+ */
+export type SuggestedField = {
+  field: CollectionField;
+  values: string[];
+  why: string;
+};
+
+/**
+ * A label in the document that does not mean what its name says (plan
+ * #986). `field` is the key of the form field it would seem to fill, or
+ * null when it fills none.
+ */
+export type Caution = { label: string; field: string | null; note: string };
+
+/** Everything one read hands back: the rows, their date, and what the form has no place for. */
+export type ReadAnswer = {
+  rows: PreviewRow[];
+  asOf: string | null;
+  suggestions: SuggestedField[];
+  cautions: Caution[];
+};
+
+export function readAnswer(
+  fields: CollectionField[],
+  shape: CollectionShape,
+  input: unknown,
+): ReadAnswer {
+  const { rows, from } = extractRows(fields, shape, input);
+  return {
+    rows,
+    asOf: readAsOf(input),
+    suggestions: readSuggestions(fields, input, from),
+    cautions: readCautions(fields, input),
+  };
+}
+
+/**
+ * The fields the model found that the form lacks, each with a fresh key and
+ * a value per row. `from` is, for each preview row, the index of the record
+ * it came from, so a value lines up with its row when empty records were
+ * dropped. A suggestion is left out when its label is one the form already
+ * shows, when it repeats an earlier one, or when no row has a value for it.
+ * A suggestion the model marks as identifying becomes the ID only when the
+ * form has none and its type can be one.
+ */
+export function readSuggestions(
+  fields: CollectionField[],
+  input: unknown,
+  from: number[],
+): SuggestedField[] {
+  const live = liveFields(fields);
+  const shown = new Set(live.flatMap((f) => [sameLabel(f.label), sameLabel(f.key)]));
+  const taken = new Set(fields.map((f) => f.key));
+  let hasId = idField(fields) !== null;
+  const out: SuggestedField[] = [];
+  for (const entry of listOf(input, 'extra')) {
+    if (out.length >= SUGGESTIONS_MAX) break;
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    const e = entry as Record<string, unknown>;
+    const label = typeof e.label === 'string' ? e.label.trim().slice(0, LABEL_MAX) : '';
+    if (!label || shown.has(sameLabel(label))) continue;
+    let type = FIELD_TYPES.find((t) => t === e.type);
+    if (!type) continue;
+    const options = type === 'choice' ? choiceOptions(e.options) : null;
+    if (type === 'choice' && !options) type = 'text';
+
+    const key = suggestedKey(label, taken);
+    const field: CollectionField = { key, label, type };
+    if (options) field.options = options;
+    if (e.identifies === true && !hasId && ID_TYPES.has(type)) field.id = true;
+
+    const raw = Array.isArray(e.values) ? e.values : [];
+    const values = from.map((index) => previewValue(field, raw[index]));
+    if (values.every((v) => v === '')) continue;
+
+    shown.add(sameLabel(label));
+    taken.add(key);
+    if (field.id) hasId = true;
+    const why = typeof e.why === 'string' ? e.why.trim().slice(0, NOTE_MAX) : '';
+    out.push({ field, values, why });
+  }
+  return out;
+}
+
+/** The labels in the document the model warned about, naming a form field only when it is one the form shows. */
+export function readCautions(fields: CollectionField[], input: unknown): Caution[] {
+  const keys = new Set(liveFields(fields).map((f) => f.key));
+  const out: Caution[] = [];
+  for (const entry of listOf(input, 'caution')) {
+    if (out.length >= CAUTIONS_MAX) break;
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    const e = entry as Record<string, unknown>;
+    const label = typeof e.label === 'string' ? e.label.trim().slice(0, LABEL_MAX) : '';
+    const note = typeof e.note === 'string' ? e.note.trim().slice(0, NOTE_MAX) : '';
+    if (!label || !note) continue;
+    const field = typeof e.field === 'string' && keys.has(e.field) ? e.field : null;
+    out.push({ label, field, note });
+  }
+  return out;
+}
+
+function sameLabel(label: string): string {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function choiceOptions(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  const options = [
+    ...new Set(
+      raw
+        .filter((o): o is string => typeof o === 'string')
+        .map((o) => o.trim().slice(0, LABEL_MAX))
+        .filter(Boolean),
+    ),
+  ].slice(0, OPTIONS_MAX);
+  return options.length > 0 ? options : null;
+}
+
+/**
+ * A key for a new field, drawn from its label and not one the collection
+ * has used, removed fields included: "Next payment due" is next_payment_due,
+ * and a second one next_payment_due_2.
+ */
+export function suggestedKey(label: string, taken: ReadonlySet<string>): string {
+  let base = label
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 36)
+    .replace(/_+$/, '');
+  if (!/^[a-z]/.test(base)) base = `field_${base}`.replace(/_+$/, '').slice(0, 36);
+  let key = base;
+  for (let n = 2; taken.has(key) || !FIELD_KEY_PATTERN.test(key); n++) key = `${base}_${n}`;
+  return key;
 }
 
 function previewValue(field: CollectionField, raw: unknown): string {

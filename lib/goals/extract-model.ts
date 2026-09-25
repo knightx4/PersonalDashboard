@@ -57,7 +57,7 @@ export async function askExtractModel(
   try {
     response = await client.messages.create({
       model: EXTRACT_MODEL,
-      max_tokens: 4096,
+      max_tokens: 8192,
       system: extractionPrompt(collection.name, collection.shape),
       tools: [tool as Anthropic.Tool],
       tool_choice: { type: 'tool', name: EXTRACT_TOOL },

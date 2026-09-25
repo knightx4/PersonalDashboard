@@ -12,7 +12,10 @@ import {
   ownsDocumentPath,
   parseDate,
   readAsOf,
+  readCautions,
   readExtraction,
+  readSuggestions,
+  suggestedKey,
 } from '@/lib/goals/extract';
 import { askExtractModel, type ExtractSource } from '@/lib/goals/extract-model';
 import { readIntoForm } from '@/lib/goals/extract-read';
@@ -97,6 +100,8 @@ describe('readIntoForm, with the model stubbed', () => {
         { name: 'Loan 1-02', servicer: 'Nelnet', balance: '3100', rate: '4.53', minimum: '', due_day: '' },
       ],
       asOf: null,
+      suggestions: [],
+      cautions: [],
     });
   });
 
@@ -187,6 +192,115 @@ describe('readExtraction', () => {
   });
 });
 
+describe('suggested fields and cautions (plan #986)', () => {
+  it('suggests what an NSLDS export has and the loans form lacks, and passes on its warning', async () => {
+    const ask = async () => ({
+      ok: true as const,
+      input: {
+        as_of: '2026-09-02',
+        records: [
+          { name: 'Direct Unsubsidized', balance: 20500 },
+          { name: null, balance: null },
+          { name: 'Grad PLUS', balance: 31000 },
+        ],
+        extra: [
+          {
+            label: 'Loan ID', type: 'text', options: null, identifies: true,
+            values: ['DU-1', null, 'GP-1'], why: 'Matches next month’s export to these loans.',
+          },
+          {
+            label: 'Status', type: 'choice', options: ['In school', 'Repayment'], identifies: false,
+            values: ['In school', null, 'Repayment'], why: 'Says whether payments are due yet.',
+          },
+          {
+            label: 'Next payment due', type: 'date', options: null, identifies: false,
+            values: [null, null, '2026-12-18'], why: 'When the first payment falls.',
+          },
+          {
+            label: 'Principal', type: 'money', options: null, identifies: false,
+            values: [20000, null, 30000], why: 'What interest accrues on.',
+          },
+          {
+            label: 'Interest', type: 'money', options: null, identifies: false,
+            values: [500, null, 1000], why: 'Unpaid interest that may capitalise.',
+          },
+          { label: 'Balance', type: 'money', options: null, identifies: false, values: [1, null, 2], why: '' },
+          { label: 'Servicer phone', type: 'text', options: null, identifies: false, values: [null, null, null], why: '' },
+        ],
+        caution: [
+          {
+            label: 'Repayment Begin Date', field: null,
+            note: 'For the Grad PLUS loan this is the last disbursement date, not when payments start.',
+          },
+        ],
+      },
+    });
+    const result = await readIntoForm(collection, { text: 'NSLDS file' }, ask);
+    if (!result.ok) throw new Error(result.error);
+    expect(result.rows.map((r) => r.name)).toEqual(['Direct Unsubsidized', 'Grad PLUS']);
+    expect(result.suggestions.map((s) => [s.field.key, s.field.type, s.values])).toEqual([
+      ['loan_id', 'text', ['DU-1', 'GP-1']],
+      ['status', 'choice', ['In school', 'Repayment']],
+      ['next_payment_due', 'date', ['', '2026-12-18']],
+      ['principal', 'money', ['20000', '30000']],
+      ['interest', 'money', ['500', '1000']],
+    ]);
+    expect(result.suggestions[0].field.id).toBe(true);
+    expect(result.suggestions[1].field.options).toEqual(['In school', 'Repayment']);
+    expect(result.cautions).toEqual([
+      {
+        label: 'Repayment Begin Date',
+        field: null,
+        note: 'For the Grad PLUS loan this is the last disbursement date, not when payments start.',
+      },
+    ]);
+  });
+
+  it('takes a fresh key, never marks a second ID, and makes a choice with no options text', () => {
+    const withId: CollectionField[] = [
+      ...loans,
+      { key: 'loan_id', label: 'Loan number', type: 'text', id: true },
+    ];
+    const input = {
+      extra: [
+        { label: 'Old', type: 'text', identifies: true, values: ['x'], why: '' },
+        { label: 'Account', type: 'text', identifies: true, values: ['A-1'], why: '' },
+        { label: 'Kind', type: 'choice', options: [], values: ['Federal'], why: '' },
+        { label: 'Kind', type: 'text', values: ['again'], why: '' },
+        { label: 'Weird', type: 'colour', values: ['red'], why: '' },
+      ],
+    };
+    const suggested = readSuggestions(withId, input, [0]);
+    expect(suggested.map((s) => s.field)).toEqual([
+      { key: 'old_2', label: 'Old', type: 'text' },
+      { key: 'account', label: 'Account', type: 'text' },
+      { key: 'kind', label: 'Kind', type: 'text' },
+    ]);
+  });
+
+  it('keys a label as lower case words joined by _', () => {
+    expect(suggestedKey('Next Payment Due', new Set())).toBe('next_payment_due');
+    expect(suggestedKey('Next Payment Due', new Set(['next_payment_due']))).toBe('next_payment_due_2');
+    expect(suggestedKey('2nd rate (%)', new Set())).toBe('field_2nd_rate');
+    expect(suggestedKey('', new Set())).toBe('field');
+  });
+
+  it('names a form field in a caution only when the form shows it', () => {
+    expect(
+      readCautions(loans, {
+        caution: [
+          { label: 'Due', field: 'due_day', note: 'The day after the cut-off.' },
+          { label: 'Old', field: 'old', note: 'Not what it says.' },
+          { label: 'Empty', field: null, note: '' },
+        ],
+      }),
+    ).toEqual([
+      { label: 'Due', field: 'due_day', note: 'The day after the cut-off.' },
+      { label: 'Old', field: null, note: 'Not what it says.' },
+    ]);
+  });
+});
+
 describe('readAsOf', () => {
   it('takes a real date and nothing else', () => {
     expect(readAsOf({ as_of: ' 2026-09-02 ', records: [] })).toBe('2026-09-02');
@@ -231,7 +345,10 @@ describe('extractionTool', () => {
     const items = (tool.input_schema.properties as { records: { items: { properties: object; required: string[] } } })
       .records.items;
     expect(items.required).toEqual(['name', 'servicer', 'balance', 'rate', 'minimum', 'due_day']);
-    expect(tool.input_schema.required).toEqual(['as_of', 'records']);
+    expect(tool.input_schema.required).toEqual(['as_of', 'records', 'extra', 'caution']);
+    const caution = (tool.input_schema.properties as { caution: { items: { properties: { field: { enum: unknown[] } } } } })
+      .caution.items.properties.field;
+    expect(caution.enum).toEqual(['name', 'servicer', 'balance', 'rate', 'minimum', 'due_day', null]);
     expect(items.properties).toMatchObject({
       balance: { type: ['number', 'null'] },
       due_day: { type: ['integer', 'null'] },
