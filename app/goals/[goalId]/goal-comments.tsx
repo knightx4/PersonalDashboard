@@ -10,7 +10,7 @@ import { addGoalComment, deleteGoalComment } from './comment-actions';
  * the goal written out, and facts it gives can be filed into a collection as
  * drafts.
  */
-const GOALS_STORE: CommentStore = {
+export const GOALS_STORE: CommentStore = {
   add: addGoalComment,
   remove: deleteGoalComment,
   paid: 'app/goals/[goalId]/comment-actions.ts#addGoalComment',
