@@ -117,6 +117,45 @@ export async function loadAreaRuns(client: GoalsSupabaseClient): Promise<Record<
   return latest;
 }
 
+/** The jobs a run on one step has: sent, sent as a phase, or asked to prepare it. */
+const STEP_RUN_JOBS = ['step', 'phase', 'prepare'] as const;
+
+/**
+ * The latest run on each of these steps, keyed by step id (plan #1044), for
+ * the line on a sent step's row. Only the runs started on the step itself,
+ * from its row, an @dash comment or Prepare; a goal's morning run is on the
+ * goal and shows in the Claude panel. A step with no run is absent.
+ */
+export async function loadStepRuns(
+  client: GoalsSupabaseClient,
+  stepIds: readonly string[],
+): Promise<Record<string, GoalRun>> {
+  if (stepIds.length === 0) return {};
+  const { data, error } = await client
+    .from('runs')
+    .select('id, item_id, status, created_at, ended_at, summary, error, last_seen_at, now_on')
+    .in('job', [...STEP_RUN_JOBS])
+    .in('item_id', [...stepIds])
+    .order('created_at', { ascending: false })
+    .limit(500);
+  if (error) throw new Error(`Could not read the steps' runs: ${error.message}`);
+  const latest: Record<string, GoalRun> = {};
+  for (const row of (data ?? []) as (RunRow & { item_id: string })[]) {
+    if (latest[row.item_id]) continue;
+    latest[row.item_id] = {
+      id: row.id,
+      status: row.status,
+      createdAt: row.created_at,
+      endedAt: row.ended_at,
+      summary: row.summary,
+      error: row.error,
+      lastSeenAt: row.last_seen_at,
+      nowOn: row.now_on,
+    };
+  }
+  return latest;
+}
+
 /**
  * Plan this area: the run row on the area, then the fire with a brief naming
  * the area, its note and the goals already under it.

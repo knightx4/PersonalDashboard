@@ -242,6 +242,18 @@ export function areaRunView(run: GoalRun, now: number): AreaRunView {
 }
 
 /**
+ * A sent or prepared step's latest run, as its row on the goal page shows it
+ * (plan #1044): where it has got to while going, then its summary or why it
+ * failed. The same three lines as an area's.
+ */
+export type StepRunView = AreaRunView;
+
+/** Each step's run line, keyed by step id. `now` is read once, outside render. */
+export function stepRunViews(runs: Record<string, GoalRun>, now: number): Record<string, StepRunView> {
+  return Object.fromEntries(Object.entries(runs).map(([id, run]) => [id, areaRunView(run, now)]));
+}
+
+/**
  * What the goal page says about approval, and what its button is called, or
  * null for no button. Approving opens the goal if Claude proposed it and every
  * proposed step under it, and from then on Claude may add, split and reorder

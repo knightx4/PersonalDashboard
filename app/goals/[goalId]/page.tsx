@@ -21,11 +21,13 @@ import {
   countProposed,
   runInFlight,
   runProgress,
+  stepRunViews,
+  type GoalRun,
 } from '@/lib/goals/shaping';
 import type { StepNode } from '@/lib/goals/steps';
 import type { GoalStatus } from '@/lib/goals/tree';
-import { loadShaping } from '@/lib/goals/shaping-store';
-import { loadGoalMap } from '@/lib/goals/steps-store';
+import { loadShaping, loadStepRuns } from '@/lib/goals/shaping-store';
+import { loadGoalMap, type GoalMap } from '@/lib/goals/steps-store';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { todayIn } from '@/lib/todo/tasks/model';
@@ -76,6 +78,25 @@ function shapingLines(
   };
 }
 
+/** Every step on the page, its own and those linked in, at any depth. */
+function stepIdsOn(map: GoalMap): string[] {
+  const ids: string[] = [];
+  const walk = (nodes: StepNode[]) => {
+    for (const node of nodes) {
+      ids.push(node.id);
+      walk(node.children);
+    }
+  };
+  walk(map.steps);
+  walk(map.linked.map((entry) => entry.step));
+  return ids;
+}
+
+/** Each sent step's run line (plan #1044). Outside the component because it reads the clock. */
+function stepRunLines(runs: Record<string, GoalRun>) {
+  return stepRunViews(runs, Date.now());
+}
+
 export default async function GoalMapPage({ params }: { params: Promise<{ goalId: string }> }) {
   const { goalId } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(goalId)) notFound();
@@ -112,6 +133,12 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
     loadContext(client, goalId).catch((): ContextItem[] => []),
   ]);
   if (!map) notFound();
+  // The latest run on each step sent, prepared or asked about from its row
+  // (plan #1044), so a reload shows it going. A failed read leaves the lines
+  // out rather than the page.
+  const stepRuns = await loadStepRuns(client, stepIdsOn(map)).catch(
+    (): Record<string, GoalRun> => ({}),
+  );
   const shapeable = map.goal.status === 'open' || map.goal.status === 'proposed';
   const linkedAims = new Set(links?.aims.map((aim) => aim.aimId));
   const aimChoices = aims?.filter((aim) => !linkedAims.has(aim.id)) ?? null;
@@ -171,7 +198,11 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
           help={helpEmpty ? help : null}
           links={linksEmpty && canLink ? linked : null}
         />
-        <StepTree map={map} todoOn={moduleEnabled(account, 'todo')} />
+        <StepTree
+          map={map}
+          todoOn={moduleEnabled(account, 'todo')}
+          runs={stepRunLines(stepRuns)}
+        />
         {/* The goal's own thread (plan #957). Each step has its own, under its details. */}
         <Card padding="dense">
           <GoalThread
