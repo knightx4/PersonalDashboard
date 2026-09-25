@@ -4,11 +4,13 @@ import type { RoutineTarget } from '@/lib/feedback/routine';
 import { loadCollectionsForGoal } from '@/lib/goals/collections-store';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
+  jobFor,
   locateStep,
-  sendJob,
   sendRefusal,
   sendRunText,
   type LiveRun,
+  type SendJob,
+  type SendMode,
   type SendTarget,
 } from '@/lib/goals/handover';
 import { RUN_QUIET_MS } from '@/lib/goals/shaping';
@@ -27,7 +29,7 @@ import { loadLiveTree } from '@/lib/goals/steps-store';
  */
 
 export type SendResult =
-  | { ok: true; job: 'step' | 'phase'; title: string; runId: string }
+  | { ok: true; job: SendJob; title: string; runId: string }
   | { ok: false; error: string };
 
 /** The step, its goal, and whether that goal is approved; null when it is not a live step. */
@@ -73,14 +75,16 @@ async function loadLiveRuns(client: GoalsSupabaseClient, userId: string, now: nu
 }
 
 /**
- * Send one step or phase to Claude: refuse it with the reason, or write the
- * run row and fire the goals routine with the step's brief.
+ * Send one step or phase to Claude, or with `mode` `prepare` ask Claude to
+ * prepare one of your steps (plan #1001): refuse it with the reason, or write
+ * the run row and fire the goals routine with the step's brief.
  */
 export async function sendGoalStep(input: {
   client: GoalsSupabaseClient;
   userId: string;
   stepId: string;
   routine: RoutineTarget;
+  mode?: SendMode;
   now?: number;
   fetch?: typeof globalThis.fetch;
 }): Promise<SendResult> {
@@ -90,10 +94,11 @@ export async function sendGoalStep(input: {
   const target = await loadTarget(client, userId, stepId);
   if (!target) return { ok: false, error: 'That step is no longer on the page.' };
 
-  const refused = sendRefusal(target, await loadLiveRuns(client, userId, now), now);
+  const mode = input.mode ?? 'send';
+  const refused = sendRefusal(target, await loadLiveRuns(client, userId, now), now, mode);
   if (refused) return { ok: false, error: refused };
   // sendRefusal has already turned away a step with no job.
-  const job = sendJob(target.step) as 'step' | 'phase';
+  const job = jobFor(target.step, mode) as SendJob;
 
   const collections = (await loadCollectionsForGoal(client, target.goal.id)).map((c) => ({
     id: c.id,

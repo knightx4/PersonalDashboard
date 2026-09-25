@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import Link from 'next/link';
-import { Play, Repeat, Sparkles } from 'lucide-react';
+import { ClipboardList, Play, Repeat, Sparkles } from 'lucide-react';
 import { RowIconButton } from '@/app/dev/plan/plan-run-status';
 import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
 import type { TreeActionState, TreeActions, TreeCatalogEntry } from '@/components/plan-tree/types';
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { FieldError, InlineInput } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { awaitsReview } from '@/lib/goals/daily';
-import { offersSend, sendJob } from '@/lib/goals/handover';
+import { offersPrepare, offersSend, sendJob } from '@/lib/goals/handover';
 import type { GoalRowNode } from '@/lib/goals/plan-rows';
 import { progressLine } from '@/lib/goals/rhythms';
 import { countProposed } from '@/lib/goals/shaping';
@@ -34,6 +34,7 @@ import {
 import { GOALS_STORE } from './goal-comments';
 import { InformationStep } from './information-step';
 import {
+  prepareStepAction,
   sendStepAction,
   setFogAsideAction,
   settleProposalAction,
@@ -182,6 +183,12 @@ export function GoalRow({
     sendStepAction,
     {} as ShapingActionState,
   );
+  // Prepare (plan #1001): Claude writes what you need to do one of your own
+  // steps into its result. Its answer is said on the row the same way.
+  const [prepareState, prepareAction, preparePending] = useActionState(
+    prepareStepAction,
+    {} as ShapingActionState,
+  );
   const toast = useToast();
   const menuAction = useMenuAction();
   const tree = (action: (prev: TreeActionState, form: FormData) => Promise<TreeActionState>) =>
@@ -315,9 +322,16 @@ export function GoalRow({
   const sendItems: ActionMenuItem[] = sendable
     ? [{ id: 'send', label: sendLabel, formAction: sendAction, formFields: { id: step.id } }]
     : [];
+  const preparable = offersPrepare(step);
+  const prepareLabel = step.result || step.resultUrl ? 'Prepare it again' : 'Ask Claude to prepare this';
+  const prepareItems: ActionMenuItem[] = preparable
+    ? [{ id: 'prepare', label: prepareLabel, formAction: prepareAction, formFields: { id: step.id } }]
+    : [];
+  const handedOver = (sendState.error ?? sendState.message) ? sendState : prepareState;
   const move = menuAction(moveStepAction);
   const menu: ActionMenuItem[] = [
     ...sendItems,
+    ...prepareItems,
     ...rhythmItems,
     ...todoItems,
     { id: 'add-child', label: 'Add a sub-step', onSelect: row.addChild },
@@ -400,13 +414,22 @@ export function GoalRow({
         ) : null
       }
       quickActions={
-        sendable && (
+        sendable ? (
           <form action={sendAction}>
             <input type="hidden" name="id" value={step.id} />
             <RowIconButton type="submit" label={sendLabel} pending={sendPending}>
               <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
             </RowIconButton>
           </form>
+        ) : (
+          preparable && (
+            <form action={prepareAction}>
+              <input type="hidden" name="id" value={step.id} />
+              <RowIconButton type="submit" label={prepareLabel} pending={preparePending}>
+                <ClipboardList className="size-3.5" strokeWidth={1.75} aria-hidden />
+              </RowIconButton>
+            </form>
+          )
         )
       }
       notices={
@@ -414,11 +437,11 @@ export function GoalRow({
           {blocking && (
             <BlockForm node={node} inset={rowInset(trail)} onDone={() => setBlocking(false)} />
           )}
-          {/* What the last send did, or why it was refused, wherever it was pressed. */}
-          {(sendState.error ?? sendState.message) && (
+          {/* What the last send or prepare did, or why it was refused, wherever it was pressed. */}
+          {(handedOver.error ?? handedOver.message) && (
             <li style={rowInset(trail)} className="pb-1.5 pr-3 text-small">
-              <FieldError>{sendState.error}</FieldError>
-              {!sendState.error && <span className="text-ink-muted">{sendState.message}</span>}
+              <FieldError>{handedOver.error}</FieldError>
+              {!handedOver.error && <span className="text-ink-muted">{handedOver.message}</span>}
             </li>
           )}
         </>
@@ -439,6 +462,7 @@ export function GoalRow({
           {step.kind === 'claude' && (awaitsReview(step) || step.result || step.resultUrl) && (
             <ClaudeResult node={step} />
           )}
+          {step.kind === 'mine' && (step.result || step.resultUrl) && <ClaudeResult node={step} />}
           {rhythm && rhythm.past.length > 0 && step.rhythmPeriod && (
             <PastPeriods past={rhythm.past} period={step.rhythmPeriod} />
           )}
@@ -474,6 +498,15 @@ export function GoalRow({
               <Button type="submit" size="sm" variant="secondary" pending={sendPending}>
                 <Play className="size-3.5" aria-hidden />
                 {sendPending ? 'Sending…' : sendLabel}
+              </Button>
+            </form>
+          )}
+          {preparable && (
+            <form action={prepareAction}>
+              <input type="hidden" name="id" value={step.id} />
+              <Button type="submit" size="sm" variant="secondary" pending={preparePending}>
+                <ClipboardList className="size-3.5" aria-hidden />
+                {preparePending ? 'Asking…' : 'Prepare'}
               </Button>
             </form>
           )}
