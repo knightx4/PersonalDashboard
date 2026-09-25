@@ -3,10 +3,16 @@ import 'server-only';
 import { z } from 'zod';
 import { createLearnServiceSupabase } from '@/inngest/learn/supabase-admin';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import { embedVideoSegmentsOverRest } from '@/lib/learn/catalogue/embed-rest';
+import { embedVideoSegmentsOverRest, restLedger } from '@/lib/learn/catalogue/embed-rest';
 import type { EmbedSweepResult } from '@/lib/learn/catalogue/embed-sweep';
 import { scheduledRunAllowance } from '@/lib/learn/youtube/budget';
 import { addChannel, listChannel, loadChannels, type ListChannelResult } from '@/lib/learn/youtube/library';
+import {
+  embedVideoMetadata,
+  queueMatchingVideos,
+  type MatchQueueResult,
+  type MetadataEmbedResult,
+} from '@/lib/learn/youtube/match';
 import {
   loadCreditState,
   loadTranscript,
@@ -34,6 +40,8 @@ const PRESS_EMBED_MS = 240_000;
 
 /** The scheduled run's budget, out of the route's 300 seconds. */
 const TICK_LIST_MS = 90_000;
+/** Titles and descriptions are embedded until here, then the queue is topped up. */
+const TICK_METADATA_MS = 120_000;
 const TICK_TRANSCRIBE_MS = 210_000;
 const TICK_EMBED_MS = 270_000;
 
@@ -56,11 +64,16 @@ export type TickReport = {
   transcripts: TranscribeResult | null;
   allowance: number;
   embedding: EmbedSweepResult | null;
+  /** Titles and descriptions embedded for matching (learn migration 0059). */
+  metadata?: MetadataEmbedResult | null;
+  /** Transcripts queued because the video matched one of your ideas. */
+  matched?: MatchQueueResult | null;
 };
 
 /**
- * The scheduled run: re-list every channel, then work through the queue
- * within this run's share of the month's credits, then embed what is new.
+ * The scheduled run: re-list every channel, queue the videos that best match
+ * your ideas, then work through the queue within this run's share of the
+ * month's credits, then embed what is new.
  */
 export async function runYouTubeLibraryTick(): Promise<TickReport> {
   const started = Date.now();
@@ -76,6 +89,23 @@ export async function runYouTubeLibraryTick(): Promise<TickReport> {
       console.error(`[youtube-library] listing ${channel.name}`, error instanceof Error ? error.message : error);
     }
   }
+
+  // Spend the month's credits on what you study: embed the titles and
+  // descriptions of newly listed videos, then queue the best untranscribed
+  // matches for your ideas. A failure here leaves the queue as it was.
+  const owner = await ownerId(learn);
+  const ledger = owner ? restLedger(learn, owner) : null;
+  const spendRows: Promise<void>[] = [];
+  try {
+    report.metadata = await embedVideoMetadata(learn, {
+      deadline: started + TICK_METADATA_MS,
+      onSpend: ledger ? (spend) => void spendRows.push(ledger(spend)) : undefined,
+    });
+    if (owner) report.matched = await queueMatchingVideos(learn, owner);
+  } catch (error) {
+    console.error('[youtube-library] matching videos', error instanceof Error ? error.message : error);
+  }
+  await Promise.all(spendRows);
 
   const now = new Date();
   const credits = await loadCreditState(learn, now);

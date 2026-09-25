@@ -64,7 +64,7 @@ export function restVideoSegmentStore(learn: LearnSupabaseClient): SegmentStore 
 }
 
 /** One spend row per call, under the owner, as `catalogueLedger` does. */
-function restLedger(learn: LearnSupabaseClient, userId: string): (report: SpendReport) => Promise<void> {
+export function restLedger(learn: LearnSupabaseClient, userId: string): (report: SpendReport) => Promise<void> {
   return async (report) => {
     const { error } = await learn
       .schema('core')
