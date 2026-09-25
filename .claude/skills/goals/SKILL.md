@@ -504,6 +504,7 @@ on conflict (item_id, key) do update
   set question = excluded.question, answer = excluded.answer,
       kind = excluded.kind, value_date = excluded.value_date,
       value_amount = excluded.value_amount,
+      meaning_changed = excluded.meaning_changed, meaning_reason = excluded.meaning_reason,
       sources = excluded.sources, run_id = excluded.run_id;
 ```
 
@@ -514,6 +515,37 @@ Work each one again from the records as they are now and write it back the
 same way: a changed `answer` or `sources` dates it again and clears
 `out_of_date_at`. If the answer and its sources come out the same, clear it
 yourself with `update goals.answers set out_of_date_at = null where id = …`.
+
+A closed step keeps its answers current too, and the database decides
+whether a rewrite brings it back (migrations-goals 0037, plan #997). It
+compares the new answer with the one the step closed on: a date that moves
+at all, or an amount that moves by more than 5%, reopens the step and marks
+the answer changed, and the step shows the old answer beside the new one
+with the document behind it. The same value reworded leaves the step
+closed. Write the answer as it now stands, with the right `value_date` or
+`value_amount`, and do not reopen or close the step yourself. A reopened
+step does not close itself when its answers are current again.
+
+A written answer (`kind` `text`), or one whose kind you change, is judged by
+its meaning, and you are the judge (plan #1036). Each time you rewrite one,
+compare the new answer with `closed_answer` (or the answer as stored, when
+`closed_answer` is null) and write your verdict in the same statement:
+`meaning_changed` true or false, and `meaning_reason`, one line the person
+reads beside the old and new answer. "Nelnet" rewritten as "Nelnet
+Servicing" names the same servicer: `meaning_changed = false`, reason "The
+same servicer, named in full." "MOHELA" names another: `meaning_changed =
+true`, reason "The loans moved from Nelnet to MOHELA." Only a change in
+meaning reopens the step. A verdict belongs to the rewrite it came with, so
+write a fresh one every time; a rewrite that leaves the old verdict in place
+drops it, and the database then compares the wording (case and spacing
+aside), which reopens the step on any rewording.
+
+```sql
+update goals.answers
+   set answer = 'Nelnet Servicing', sources = '<the records read>'::jsonb,
+       meaning_changed = false, meaning_reason = 'The same servicer, named in full.'
+ where item_id = '<step id>' and key = 'servicer' and user_id = '<user>';
+```
 
 ### Questions
 

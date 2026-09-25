@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { answerChange } from '@/lib/goals/answer-change';
-import { readClosed, readValue } from '@/lib/goals/answers';
+import { answerChange, standingChange } from '@/lib/goals/answer-change';
+import { readChanged, readClosed, readMeaning, readValue } from '@/lib/goals/answers';
 
 // The loans step as it stands on the live site (plan #1035's done-when).
 const firstPayment = {
   answer: '18 Dec 2026, on both Grad PLUS loans.',
   value: { kind: 'date', date: '2026-12-18' } as const,
   closed: null,
+  meaning: null,
 };
 const monthlyTotal = {
   answer: 'About $2,450 a month.',
@@ -83,6 +84,14 @@ describe('answerChange (plan #1035)', () => {
   });
 });
 
+describe('reading the stored verdict (plan #1036)', () => {
+  it('reads a verdict with its reason, and nothing without one', () => {
+    expect(readMeaning(false, 'The same servicer.')).toEqual({ changed: false, reason: 'The same servicer.' });
+    expect(readMeaning(null, null)).toBeNull();
+    expect(readMeaning(true, '  ')).toBeNull();
+  });
+});
+
 describe('reading the stored value', () => {
   it('reads a date, an amount from text or number, and falls back to text', () => {
     expect(readValue('date', '2026-12-18', null)).toEqual({ kind: 'date', date: '2026-12-18' });
@@ -100,5 +109,63 @@ describe('reading the stored value', () => {
     });
     expect(readClosed('$2,450', null, '2450.00')?.value).toEqual({ kind: 'amount', amount: 2450 });
     expect(readClosed('Nelnet', null, null)?.value).toEqual({ kind: 'text' });
+  });
+});
+
+describe('standingChange (plan #997)', () => {
+  const loan = '00000000-0000-4000-8000-000000000001';
+  const records = [
+    { id: loan, source: 'document' as const, sourceRef: 'user/11111111-2222-3333-4444-555555555555-nslds.txt' },
+  ];
+
+  it('shows the closing answer, what moved and the document behind it', () => {
+    const change = standingChange(
+      {
+        answer: '18 Jan 2027, on both Grad PLUS loans.',
+        value: { kind: 'date', date: '2027-01-18' },
+        closed: { answer: firstPayment.answer, value: firstPayment.value },
+        changed: { at: '2026-09-25T08:00:00Z', recordId: loan },
+        meaning: null,
+      },
+      records,
+    );
+    expect(change).toEqual({
+      from: firstPayment.answer,
+      reason: 'The date moved from 18 Dec 2026 to 18 Jan 2027.',
+      document: {
+        label: 'From nslds.txt',
+        href: `/goals/document?path=${encodeURIComponent(records[0].sourceRef)}`,
+      },
+    });
+  });
+
+  it('gives the routine’s reason for a changed servicer (plan #1036)', () => {
+    const change = standingChange(
+      {
+        answer: 'MOHELA',
+        value: { kind: 'text' },
+        closed: { answer: 'Nelnet', value: { kind: 'text' } },
+        changed: { at: '2026-09-25T08:00:00Z', recordId: loan },
+        meaning: { changed: true, reason: 'The loans moved from Nelnet to MOHELA.' },
+      },
+      records,
+    );
+    expect(change?.from).toBe('Nelnet');
+    expect(change?.reason).toBe('The loans moved from Nelnet to MOHELA.');
+  });
+
+  it('is null without a change, and names no document for a row since gone', () => {
+    expect(standingChange({ ...firstPayment, changed: null }, records)).toBeNull();
+    const gone = standingChange(
+      { ...firstPayment, changed: { at: '2026-09-25T08:00:00Z', recordId: null } },
+      records,
+    );
+    expect(gone?.document).toBeNull();
+  });
+
+  it('reads the stored columns', () => {
+    expect(readChanged(null, loan)).toBeNull();
+    expect(readChanged('2026-09-25T08:00:00Z', loan)).toEqual({ at: '2026-09-25T08:00:00Z', recordId: loan });
+    expect(readChanged('2026-09-25T08:00:00Z', 'nope')).toEqual({ at: '2026-09-25T08:00:00Z', recordId: null });
   });
 });

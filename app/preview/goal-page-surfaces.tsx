@@ -542,6 +542,8 @@ const loanAnswers: StepAnswer[] = [
     outOfDateAt: '2026-09-12T09:30:00Z',
     value: { kind: 'amount', amount: 496 },
     closed: null,
+    changed: null,
+    meaning: null,
   },
   {
     id: 'answer-car-ends',
@@ -554,7 +556,10 @@ const loanAnswers: StepAnswer[] = [
     workedAt: '2026-09-10T08:00:00Z',
     outOfDateAt: null,
     value: { kind: 'date', date: '2028-02-01' },
-    closed: null,
+    // Moved by the latest statement, so the step shows what it said before (plan #997).
+    closed: { answer: '1 Mar 2028.', value: { kind: 'date', date: '2028-03-01' } },
+    changed: { at: '2026-09-10T08:00:00Z', recordId: 'loan-car' },
+    meaning: null,
   },
 ];
 

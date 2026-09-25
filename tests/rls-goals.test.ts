@@ -1517,6 +1517,115 @@ describe('worked-out answers on an information step (plan #989)', () => {
     await admin`update answers set value_date = '2026-12-19', answer = '19 Dec 2026.' where id = ${first}`;
     expect(await closedOf()).toEqual({ closed_answer: 'About $300 a month.', closed_date: '2026-12-18' });
   });
+
+  describe('reopening a closed step when an answer changes (plan #997)', () => {
+    async function closedLoans() {
+      const { step, loans } = await loansStep();
+      const first = await answer(step, 'first_payment', sourcesOf(loans));
+      await admin`update answers set kind = 'date', value_date = '2026-12-18',
+                  answer = '18 Dec 2026.' where id = ${first}`;
+      const total = await answer(step, 'monthly_total', sourcesOf(loans));
+      await admin`update answers set kind = 'amount', value_amount = 2450 where id = ${total}`;
+      await asUser(userA, (tx) => tx`
+        update items set questions = (${QUESTIONS}::text)::jsonb where id = ${step}`);
+      expect(await statusOf(step)).toBe('done');
+      return { step, loans, first, total };
+    }
+
+    async function changeOf(id: string) {
+      const [row] = await admin<{ changed: boolean; changed_record_id: string | null }[]>`
+        select changed_at is not null as changed, changed_record_id from answers where id = ${id}`;
+      return row;
+    }
+
+    it('leaves the step closed when the rewrite says the same', async () => {
+      const { step, loans, first, total } = await closedLoans();
+      // The same export read again: the rows change, the answers go out of date.
+      await admin`update records set data = data || '{"balance": 1001}'::jsonb where id = ${loans[0]}`;
+      expect(await outOfDate(first)).toBe(true);
+      // Reworded, same day; and an amount within 5%.
+      await admin`update answers set answer = '18 December 2026.' where id = ${first}`;
+      await admin`update answers set value_amount = 2560, answer = 'About $2,560.' where id = ${total}`;
+      expect(await statusOf(step)).toBe('done');
+      expect(await changeOf(first)).toEqual({ changed: false, changed_record_id: null });
+      expect(await outOfDate(first)).toBe(false);
+    });
+
+    it('reopens it when a date moves, names the row, and does not close it again on its own', async () => {
+      const { step, loans, first, total } = await closedLoans();
+      await admin`update records set data = data || '{"minimum": 150}'::jsonb where id = ${loans[1]}`;
+      await admin`update answers set value_date = '2027-01-18', answer = '18 Jan 2027.' where id = ${first}`;
+      expect(await statusOf(step)).toBe('open');
+      expect(await changeOf(first)).toEqual({ changed: true, changed_record_id: loans[1] });
+
+      // Every question is current, but the change stands until the step is closed.
+      await admin`update answers set out_of_date_at = null where id = ${total}`;
+      expect(await statusOf(step)).toBe('open');
+
+      await admin`update items set status = 'done' where id = ${step}`;
+      expect(await changeOf(first)).toEqual({ changed: false, changed_record_id: null });
+      const [row] = await admin<{ closed_date: string }[]>`
+        select closed_date::text from answers where id = ${first}`;
+      expect(row.closed_date).toBe('2027-01-18');
+    });
+
+    it('reopens it when an amount moves by more than 5% of its closing value', async () => {
+      const { step, total } = await closedLoans();
+      await admin`update answers set value_amount = 2572 where id = ${total}`;
+      expect(await statusOf(step)).toBe('done');
+      await admin`update answers set value_amount = 2575 where id = ${total}`;
+      expect(await statusOf(step)).toBe('open');
+    });
+
+    async function verdictOf(id: string) {
+      const [row] = await admin<{ meaning_changed: boolean | null; meaning_reason: string | null }[]>`
+        select meaning_changed, meaning_reason from answers where id = ${id}`;
+      return row;
+    }
+
+    it('judges a written answer by the routine’s verdict on its meaning (plan #1036)', async () => {
+      const { step, loans } = await closedLoans();
+      const servicer = await answer(step, 'servicer', sourcesOf(loans));
+      await admin`update answers set answer = 'Nelnet' where id = ${servicer}`;
+      await admin`update items set status = 'done' where id = ${step}`;
+
+      // Reworded, same servicer: the routine says so and the step stays closed.
+      await admin`update answers set answer = 'Nelnet Servicing', meaning_changed = false,
+                  meaning_reason = 'The same servicer, named in full.' where id = ${servicer}`;
+      expect(await statusOf(step)).toBe('done');
+      expect(await changeOf(servicer)).toEqual({ changed: false, changed_record_id: null });
+
+      // Another servicer: the step reopens and keeps the routine's reason.
+      await admin`update answers set answer = 'MOHELA', meaning_changed = true,
+                  meaning_reason = 'The loans moved from Nelnet to MOHELA.' where id = ${servicer}`;
+      expect(await statusOf(step)).toBe('open');
+      expect((await changeOf(servicer)).changed).toBe(true);
+      expect(await verdictOf(servicer)).toEqual({
+        meaning_changed: true,
+        meaning_reason: 'The loans moved from Nelnet to MOHELA.',
+      });
+    });
+
+    it('drops a verdict the rewrite did not renew, and falls back to the wording', async () => {
+      const { step, loans } = await closedLoans();
+      const servicer = await answer(step, 'servicer', sourcesOf(loans));
+      await admin`update answers set answer = 'Nelnet' where id = ${servicer}`;
+      await admin`update items set status = 'done' where id = ${step}`;
+      await admin`update answers set answer = 'Nelnet Servicing', meaning_changed = false,
+                  meaning_reason = 'The same servicer, named in full.' where id = ${servicer}`;
+      expect(await statusOf(step)).toBe('done');
+
+      // A rewrite with no verdict of its own: the old one judged another answer.
+      await admin`update answers set answer = 'MOHELA' where id = ${servicer}`;
+      expect(await verdictOf(servicer)).toEqual({ meaning_changed: null, meaning_reason: null });
+      expect(await statusOf(step)).toBe('open');
+
+      // A verdict without its reason is refused.
+      await expect(
+        admin`update answers set meaning_changed = true where id = ${servicer}`,
+      ).rejects.toThrow(/answers_meaning_verdict/);
+    });
+  });
 });
 
 describe('RLS coverage', () => {
