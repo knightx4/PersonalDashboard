@@ -11,7 +11,7 @@
 
 export type FeedCardRow = {
   id: string;
-  reason: 'interest' | 'gap' | 'goal' | 'queued' | 'lesson';
+  reason: 'interest' | 'gap' | 'goal' | 'queued' | 'lesson' | 'unit_check';
   status: string;
   /** The idea's short name. Null on cards written before one idea per card. */
   idea_name?: string | null;
@@ -45,12 +45,13 @@ type CatalogueSegment = { heading: string | null; text: string; section_anchor: 
 
 export type FeedCard = {
   id: string;
-  reason: 'interest' | 'gap' | 'goal' | 'lesson';
+  reason: 'interest' | 'gap' | 'goal' | 'lesson' | 'unit_check';
   /**
-   * A section card, made from a Wikipedia section, or a lesson written for a
-   * concept in one of your tracks (LEARN-LESSONS-SPEC; plan #978).
+   * A section card, made from a Wikipedia section, a lesson written for a
+   * concept in one of your tracks (LEARN-LESSONS-SPEC; plan #978), or the
+   * optional check on a unit you have finished (plan #971).
    */
-  kind: 'section' | 'lesson';
+  kind: 'section' | 'lesson' | 'check';
   /**
    * The idea's name, or "Article: Section" on a card written before ideas. A
    * lesson's is its concept's name.
@@ -213,6 +214,7 @@ function sentenceCut(paragraph: string, limit: number): number {
 export function toFeedCard(row: FeedCardRow): FeedCard | null {
   if (row.reason === 'queued') return null;
   if (row.reason === 'lesson') return toLessonCard(row);
+  if (row.reason === 'unit_check') return toCheckCard(row);
   if (!row.item || !row.segment || !row.summary || !row.why) return null;
   const { shown, rest, restMinutes } = splitForReading(row.segment.text);
   return {
@@ -293,6 +295,46 @@ function toLessonCard(row: FeedCardRow): FeedCard | null {
     link: item ? sectionLink(item.canonical_url, segment?.section_anchor ?? null) : null,
     site: item ? siteName(item.canonical_url) : null,
     licence: item ? licenceFor(item.licence, item.canonical_url) : null,
+  };
+}
+
+/**
+ * A unit check (plan #971): titled by the unit, with its track under it, the
+ * unit's outcome as its context and the question as its hook. The expected
+ * answer stays on the server until the check is answered, so the card carries
+ * none.
+ */
+function toCheckCard(row: FeedCardRow): FeedCard | null {
+  const unit = row.unit_title?.trim();
+  const track = row.track_name?.trim();
+  const question = row.check_question?.trim();
+  if (!unit || !track || !question || !row.why) return null;
+  return {
+    id: row.id,
+    reason: 'unit_check',
+    kind: 'check',
+    title: unit,
+    source: track,
+    track: row.subject_id ? { id: row.subject_id, name: track } : null,
+    article: '',
+    section: null,
+    why: row.why,
+    takeaway: null,
+    context: row.context?.trim() || null,
+    hook: null,
+    summary: row.summary ?? '',
+    example: null,
+    question,
+    answer: null,
+    depth: null,
+    difficulty: null,
+    returning: null,
+    shown: [],
+    rest: [],
+    restMinutes: 0,
+    link: null,
+    site: null,
+    licence: null,
   };
 }
 

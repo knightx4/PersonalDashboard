@@ -199,6 +199,7 @@ async function topUpWith(
         dropped: [],
         failed: [error instanceof Error ? error.message : 'Writing lessons failed.'],
         floors: [],
+        checks: [],
         added: [],
         laidOut: [],
         held: [],

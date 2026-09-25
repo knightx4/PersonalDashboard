@@ -9,6 +9,9 @@ import { findLessonSource, type LessonSource } from '@/lib/learn/lessons/closest
 import { addLessonFloor, loadFloorsDue } from '@/lib/learn/lessons/add-floor';
 import { addNextUnit } from '@/lib/learn/lessons/add-unit';
 import { layOutNextUnit } from '@/lib/learn/lessons/lay-out-unit';
+import { unitCheckWhy, type UnitCheckDue } from '@/lib/learn/lessons/unit-check';
+import { loadUnitForCheck } from '@/lib/learn/lessons/unit-check-store';
+import { UNIT_CHECK_MODEL, writeUnitCheck } from '@/lib/learn/lessons/write-unit-check';
 import { lessonWhy, type LessonOutcome, type LessonTopUpPorts } from '@/lib/learn/lessons/top-up';
 import { WRITE_LESSON_MODEL, writeLesson } from '@/lib/learn/lessons/write-lesson';
 import type { LearnOperation } from '@/lib/learn/spend';
@@ -21,6 +24,7 @@ import type { LearnOperation } from '@/lib/learn/spend';
 
 const WRITE_OPERATION: LearnOperation = 'write-lesson';
 const EMBED_OPERATION: LearnOperation = 'embed-lesson-claim';
+const CHECK_OPERATION: LearnOperation = 'write-unit-check';
 
 /** Postgres's unique violation: another run stored a lesson for this concept first. */
 const UNIQUE_VIOLATION = '23505';
@@ -139,6 +143,57 @@ export function createLessonPorts(context: {
     return result.outcome === 'ready' ? { outcome: 'ready' } : { outcome: 'dropped', detail: result.reason };
   };
 
+  /**
+   * The check for a done unit (plan #971). A check the model would not write
+   * is stored as dropped, so the unit is not offered one again every hour; a
+   * call that failed stores nothing, and a later run tries again.
+   */
+  const writeCheck = async (userId: string, due: UnitCheckDue): Promise<{ outcome: LessonOutcome; detail?: string }> => {
+    const unit = await loadUnitForCheck(learn, userId, {
+      unitId: due.unitId,
+      trackName: due.subjectName,
+      conceptIds: due.conceptIds,
+    });
+    if (!unit) return { outcome: 'failed', detail: 'The unit is no longer there.' };
+
+    const spend: SpendReport[] = [];
+    const result = await writeUnitCheck({ unit, anthropicApiKey: apiKey, onSpend: (report) => spend.push(report) });
+    for (const report of spend) {
+      await recordSpend(core, userId, { module: 'learn', operation: CHECK_OPERATION, model: report.model, usage: report.usage });
+    }
+    if (result.outcome === 'failed') return { outcome: 'failed', detail: result.detail };
+
+    const { error } = await learn.from('feed_cards').insert({
+      user_id: userId,
+      reason: 'unit_check',
+      subject_id: due.subjectId,
+      track_name: due.subjectName,
+      unit_id: due.unitId,
+      unit_title: unit.title,
+      check_concept_ids: due.conceptIds,
+      write_model: UNIT_CHECK_MODEL,
+      written_at: new Date().toISOString(),
+      ...(result.outcome === 'ready'
+        ? {
+            status: 'ready',
+            why: unitCheckWhy(due.subjectName),
+            // The deck reads a card as ready only with a context and a hook,
+            // so the check carries its outcome and its question in both.
+            context: unit.outcome?.trim() || unit.title,
+            summary: unit.outcome?.trim() || unit.title,
+            hook: result.question,
+            check_question: result.question,
+            check_answer: result.expected,
+          }
+        : { status: 'dropped', drop_reason: result.reason }),
+    });
+    if (error) {
+      if (error.code === UNIQUE_VIOLATION) return { outcome: 'failed', detail: 'Written by another run first.' };
+      return { outcome: 'failed', detail: `Saving the check failed: ${error.message}` };
+    }
+    return result.outcome === 'ready' ? { outcome: 'ready' } : { outcome: 'dropped', detail: result.reason };
+  };
+
   return {
     choose: (userId, slots) => chooseLessonsFor(learn, userId, slots),
     layOut: (userId, subjectId) => layOutNextUnit(learn, core, userId, subjectId, apiKey),
@@ -153,6 +208,7 @@ export function createLessonPorts(context: {
     },
     floorsDue: (userId, limit) => loadFloorsDue(learn, userId, limit),
     addFloor: (userId, due) => addLessonFloor(learn, core, userId, due, apiKey),
+    writeCheck,
     write,
     now: Date.now,
   };

@@ -167,6 +167,12 @@ export const LEARN_OPERATIONS = [
   // #970), from the background top-up. The same call as 'propose-floor',
   // which a press on the probe page records.
   'add-lesson-floor',
+  // Writing the one question that checks a done unit (plan #971), from the
+  // background top-up. One Haiku call per unit.
+  'write-unit-check',
+  // Marking an answer to a unit check against the unit's outcome (plan #971),
+  // from the press on the card. One Haiku call per answer.
+  'mark-unit-check',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

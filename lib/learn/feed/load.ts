@@ -106,12 +106,19 @@ export async function loadFeedPage(
       )),
     );
   }
+  // A unit check is the next card from its track (plan #971), so a ready one
+  // is dealt ahead of the rest of the pool; the spacing still applies.
+  rows.sort((a, b) => Number(isReadyCheck(b)) - Number(isReadyCheck(a)));
   const dealable = rows.flatMap((row) => {
     const card = toFeedCard(row);
     return card ? [{ card, ...spreadOf(row, card.article) }] : [];
   });
   const recent = await recentInDeck(supabase, exclude.slice(-ARTICLE_GAP));
   return spreadDeck(dealable, recent, limit).map((dealt) => dealt.card);
+}
+
+function isReadyCheck(row: FeedCardRow): boolean {
+  return row.reason === 'unit_check' && row.status === 'ready';
 }
 
 /** What a card was picked for, for keeping two on one theme apart. */
@@ -122,13 +129,14 @@ function targetOf(row: FeedCardRow): string | null {
 /**
  * What the deck keeps apart for one card. A lesson counts its track as its
  * article, so two lessons from one track are spaced as two cards from one
- * article are, and its track's id as its target.
+ * article are, and its track's id as its target. A unit check counts the
+ * same way.
  */
 function spreadOf(
   row: Pick<FeedCardRow, 'reason' | 'track_name' | 'subject_id' | 'theme_name' | 'aim_name' | 'field_id'>,
   article: string,
 ): Spreadable {
-  if (row.reason === 'lesson') {
+  if (row.reason === 'lesson' || row.reason === 'unit_check') {
     return { article: `track:${row.track_name ?? ''}`, target: row.subject_id ?? row.track_name ?? null };
   }
   return { article, target: targetOf(row as FeedCardRow) };

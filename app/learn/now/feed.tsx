@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { Card } from '@/components/ui/card';
+import { Field, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import {
   appendCards,
@@ -32,6 +33,7 @@ import {
 import type { TrackOffer } from '@/lib/learn/flow/offer';
 import { answerTrackOffer } from '../flow/actions';
 import {
+  answerUnitCheck,
   dismissCard,
   loadMoreCards,
   makeTrackOfCard,
@@ -42,6 +44,7 @@ import {
   swipeCard,
   testMeOnCard,
   type NewTrackResult,
+  type UnitCheckResult,
 } from './actions';
 
 /**
@@ -65,6 +68,8 @@ import {
  * A visit may also carry one track offer (plan #968), shown in place of the
  * next card once a couple are passed. It has no swipes: it stays until Start,
  * Not now or Never is pressed, as the offer in Practice Flow does.
+ *
+ * A unit check (plan #971) has no swipes either: it is answered or skipped.
  */
 
 const SWIPE_X = 90;
@@ -177,6 +182,19 @@ export function LearnNowFeed({
       .catch(() => setError('Not interested was not recorded. Check your connection.'));
   }, [advance, current]);
 
+  /** Skip on a unit check: it goes as Not interested does, and the unit stays done. */
+  const skipCheck = useCallback(() => {
+    if (!current) return;
+    const id = current.id;
+    setError(null);
+    advance(id);
+    void dismissCard(id)
+      .then((result) => {
+        if (result.error) setError(`Skipping that check was not recorded: ${result.error}`);
+      })
+      .catch(() => setError('Skipping that check was not recorded. Check your connection.'));
+  }, [advance, current]);
+
   // The arrow keys, away from anything you are typing in.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -191,8 +209,8 @@ export function LearnNowFeed({
             : event.key === 'ArrowLeft'
               ? 'skipped'
               : null;
-      // The offer has no swipes; its buttons are the only way past it.
-      if (!swipeAs || !current || offerShown) return;
+      // The offer and a unit check have no swipes; their buttons are the only way past.
+      if (!swipeAs || !current || offerShown || current.kind === 'check') return;
       event.preventDefault();
       swipe(swipeAs);
     };
@@ -229,13 +247,22 @@ export function LearnNowFeed({
               {ahead > 0 ? `${ahead} more loaded` : loading ? 'Loading more…' : ''}
             </span>
           </p>
-          <DeckCard
-            key={current.id}
-            card={current}
-            leaving={leaving?.id === current.id ? leaving.swipe : null}
-            onSwipe={swipe}
-            onDismiss={dismiss}
-          />
+          {current.kind === 'check' ? (
+            <UnitCheckCard
+              key={current.id}
+              card={current}
+              onSkip={skipCheck}
+              onNext={() => advance(current.id)}
+            />
+          ) : (
+            <DeckCard
+              key={current.id}
+              card={current}
+              leaving={leaving?.id === current.id ? leaving.swipe : null}
+              onSwipe={swipe}
+              onDismiss={dismiss}
+            />
+          )}
         </>
       ) : (
         <Card padding="standard" className="text-center">
@@ -838,6 +865,109 @@ function FeedOfferCard({
         </p>
       )}
       {error && <p className="mt-2 text-small text-danger">{error}</p>}
+    </Card>
+  );
+}
+
+type Marked = NonNullable<UnitCheckResult['marked']>;
+
+/**
+ * The optional check on a unit you have finished (LEARN-LESSONS-SPEC, "The
+ * unit check"; plan #971): one question needing the unit's ideas together,
+ * answered in a sentence or two. Check my answer has it marked and shows the
+ * mark with the answer expected; Skip moves on. Either way the unit stays
+ * done, and only a right answer marks its ideas tested.
+ */
+function UnitCheckCard({
+  card,
+  onSkip,
+  onNext,
+}: {
+  card: FeedCard;
+  onSkip: () => void;
+  onNext: () => void;
+}) {
+  const [response, setResponse] = useState('');
+  const [marking, startMarking] = useTransition();
+  const [marked, setMarked] = useState<Marked | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const check = () =>
+    startMarking(async () => {
+      setError(null);
+      const result: UnitCheckResult = await answerUnitCheck(card.id, response).catch(() => ({
+        error: 'Could not mark that. Check your connection.',
+      }));
+      if (result.marked) setMarked(result.marked);
+      else setError(result.error ?? 'Could not mark that.');
+    });
+
+  return (
+    <Card padding="standard">
+      <p className="flex items-center gap-1.5 text-small text-ink-muted">
+        <GraduationCap className="size-3.5" strokeWidth={2} aria-hidden />
+        {card.why}
+      </p>
+      <h2 className="mt-1 font-display text-title tracking-tight break-words text-ink">{card.title}</h2>
+      {card.source && <p className="text-small text-ink-muted">{card.source}</p>}
+      {card.context && <p className="mt-2 text-ui text-ink-muted">{card.context}</p>}
+      <p className="mt-3 text-body text-ink">{card.question}</p>
+
+      {!marked ? (
+        <>
+          <Field label="Your answer" id={`check-${card.id}`} hint="A sentence or two, from memory.">
+            <Textarea
+              id={`check-${card.id}`}
+              rows={3}
+              maxLength={2000}
+              value={response}
+              onChange={(event) => setResponse(event.target.value)}
+              disabled={marking}
+            />
+          </Field>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1">
+              <Button
+                type="button"
+                variant="primary"
+                onClick={check}
+                pending={marking}
+                disabled={response.trim() === ''}
+              >
+                {marking ? 'Marking…' : 'Check my answer'}
+              </Button>
+              <PaidHint action="app/learn/now/actions.ts#answerUnitCheck" what="Cost of marking the answer" />
+            </span>
+            <Button type="button" variant="secondary" onClick={onSkip} disabled={marking}>
+              Skip
+            </Button>
+          </div>
+          {error && <p className="mt-2 text-small text-danger">{error}</p>}
+        </>
+      ) : (
+        <div className="mt-3 space-y-2" aria-live="polite">
+          <p className={cn('flex items-center gap-1.5 text-ui font-medium', marked.correct ? 'text-ink' : 'text-ink-muted')}>
+            {marked.correct ? (
+              <Check className="size-4" strokeWidth={2} aria-hidden />
+            ) : (
+              <X className="size-4" strokeWidth={2} aria-hidden />
+            )}
+            {marked.correct ? 'Right.' : 'Not quite.'}
+          </p>
+          {marked.why && <p className="text-ui text-ink">{marked.why}</p>}
+          <p className="text-ui text-ink-muted">Expected: {marked.expected}</p>
+          <p className="text-small text-ink-muted">
+            {marked.correct
+              ? marked.tested === 1
+                ? 'One idea in this unit is now marked tested.'
+                : `${marked.tested} ideas in this unit are now marked tested.`
+              : 'The unit stays done. Its ideas keep the state they had.'}
+          </p>
+          <Button type="button" variant="primary" onClick={onNext}>
+            Next
+          </Button>
+        </div>
+      )}
     </Card>
   );
 }
