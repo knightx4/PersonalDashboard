@@ -11,6 +11,7 @@
  * a run already happened today, and the brief the routine is fired with. The
  * reads and writes are in inngest/goals/daily.ts.
  */
+import type { OutOfDateStep } from '@/lib/goals/answers';
 import { isStaleStepBlock, waitsOnNothing } from '@/lib/goals/dependencies';
 import type { StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
@@ -65,23 +66,52 @@ export function ranRecently(lastDailyRunAt: string | null, now: number): boolean
 
 /**
  * The turn appended to the goals routine's standing prompt for the morning
- * run. It names the account, the run row already written and the steps to
- * work, so the session does not have to decide which steps are ready.
+ * run. It names the account, the run row already written, the steps to work
+ * and the information steps whose answers are out of date (plan #989), so
+ * the session does not have to decide what is ready.
  */
-export function dailyRunText(input: { userId: string; runId: string; steps: ReadyStep[] }): string {
+export function dailyRunText(input: {
+  userId: string;
+  runId: string;
+  steps: ReadyStep[];
+  answers?: OutOfDateStep[];
+}): string {
+  const answers = input.answers ?? [];
   const lines = input.steps.map(
     (step) => `- "${step.title}" (goals.items id ${step.id}), under the goal "${step.goalTitle}"`,
   );
+  const stale = answers.map(
+    (step) =>
+      `- "${step.title}" (goals.items id ${step.id}), under the goal "${step.goalTitle}": ` +
+      step.questions.map((q) => `"${q}"`).join(', '),
+  );
   return [
-    'The morning run: work the Claude steps that are ready.',
+    input.steps.length > 0
+      ? 'The morning run: work the Claude steps that are ready.'
+      : 'The morning run: no Claude step is ready, but some answers are out of date.',
     '',
-    ...lines,
-    '',
-    'Follow .claude/skills/goals/SKILL.md, the section "The morning run". For each step,',
-    'produce what its title and done-when ask for, store it in the step\'s result (and',
-    'result_url when it lives somewhere with a link), and close the step as done. A step',
-    'you cannot finish stays open, with the reason in the run summary.',
-    '',
+    ...(input.steps.length > 0
+      ? [
+          ...lines,
+          '',
+          'Follow .claude/skills/goals/SKILL.md, the section "The morning run". For each step,',
+          'produce what its title and done-when ask for, store it in the step\'s result (and',
+          'result_url when it lives somewhere with a link), and close the step as done. A step',
+          'you cannot finish stays open, with the reason in the run summary.',
+          '',
+        ]
+      : []),
+    ...(answers.length > 0
+      ? [
+          'These information steps have answers out of date, since a row they read has changed:',
+          '',
+          ...stale,
+          '',
+          'Work each one again from the step\'s records, as in the section "Answers on an',
+          'information step", and write it back with its sources.',
+          '',
+        ]
+      : []),
     `The goals belong to user_id ${input.userId}. This run is goals.runs id ${input.runId},`,
     'already written as started. Set goals.run_id to it on every write, and close that row',
     'with a summary (or as failed, with the reason) before you stop.',

@@ -8,6 +8,7 @@ import { GoalNumber } from '@/app/goals/[goalId]/goal-number';
 import { GoalFog, GoalShaping } from '@/app/goals/[goalId]/goal-shaping';
 import { StepTree } from '@/app/goals/[goalId]/step-tree';
 import type { InformationSeam } from '@/app/goals/[goalId]/information-step';
+import type { StepAnswer } from '@/lib/goals/answers';
 import type { CollectionField } from '@/lib/goals/collections';
 import type { Collection, CollectionRecord } from '@/lib/goals/collections-store';
 import type { GoalLinks } from '@/lib/goals/links';
@@ -517,6 +518,36 @@ const loansStep = step('loans', {
   position: 20,
 });
 
+/** The loans step's worked-out answers: one standing, one out of date (plan #989). */
+const loanAnswers: StepAnswer[] = [
+  {
+    id: 'answer-total',
+    itemId: loansStep.id,
+    key: 'monthly_total',
+    question: 'What is the monthly total?',
+    answer: 'About $496 a month across the three loans.',
+    sources: [
+      { recordId: 'loan-car', asOf: '2026-09-02' },
+      { recordId: 'loan-student', asOf: '2026-09-02' },
+      { recordId: 'loan-personal', asOf: '2026-09-02' },
+    ],
+    position: 10,
+    workedAt: '2026-09-10T08:00:00Z',
+    outOfDateAt: '2026-09-12T09:30:00Z',
+  },
+  {
+    id: 'answer-car-ends',
+    itemId: loansStep.id,
+    key: 'car_paid_off',
+    question: 'When is the car paid off?',
+    answer: '1 Feb 2028, with the balloon payment optional.',
+    sources: [{ recordId: 'loan-car', asOf: '2026-08-28' }],
+    position: 20,
+    workedAt: '2026-09-10T08:00:00Z',
+    outOfDateAt: null,
+  },
+];
+
 function infoMap(only: Step): GoalMap {
   const forest = buildForest([cards.id], [only]);
   return {
@@ -531,6 +562,7 @@ function infoMap(only: Step): GoalMap {
       [income.id]: { collection: income, records: [incomeRecord] },
       [loans.id]: { collection: loans, records: loanRecords },
     },
+    answers: { [loansStep.id]: loanAnswers },
     threads: {},
   };
 }

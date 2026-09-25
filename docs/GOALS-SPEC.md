@@ -536,6 +536,17 @@ migration.
   values; a new field shows empty; a removed field is hidden but its values
   stay in the record.
 
+- **Worked-out answers.** A step exists to answer something, such as when
+  the loan payments start or what they come to a month, and the fields are
+  the means (#988). The goals routine works each answer out from the step's
+  records and stores it in `goals.answers`: the question, the answer in one
+  sentence, and the rows it read with the date of each row's figures. The
+  step shows the answers above its figures, each with a line naming those
+  rows and that date. Nobody types an answer. When a row an answer read
+  changes, or a new row is confirmed in the collection, a trigger marks the
+  answer out of date; the step says so, and the next morning run works it
+  again (plan #989).
+
 An information step closes when its collection has what the step asked for.
 Later steps and runs read the collection instead of asking again.
 
@@ -660,6 +671,10 @@ A sketch for the migration, not the migration itself.
   step closes, with the loop and same-account checks `plan_dependencies` has
   (plan #981). `goals.items` carries `block_ask` and `block_kind` for a
   blocked step.
+- `goals.answers`: the answers the routine worked out on an information
+  step, one per question (`key`), with `sources` naming the records read and
+  each one's `as_of`, `worked_at`, and `out_of_date_at` once a record it read
+  has changed (plan #989).
 - `goals.comments`: the thread on a goal or a step, `me` or `claude` per
   message (plan #957). A reply can file facts into a collection as drafts.
 - `archived_at` on areas and items, in place of deleting them.

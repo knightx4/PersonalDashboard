@@ -29,5 +29,6 @@ export const goalsSources: ModuleSources = {
     'goals.runs',
     'goals.history',
     'goals.visits',
+    'goals.answers',
   ].map((table) => ({ table, reason: OWN })),
 };

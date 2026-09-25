@@ -9,6 +9,7 @@ import { Field } from '@/components/ui/field';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
+import { sourcesLine, type StepAnswer } from '@/lib/goals/answers';
 import { idField, liveFields, type CollectionField } from '@/lib/goals/collections';
 import type { Collection, CollectionRecord } from '@/lib/goals/collections-store';
 import {
@@ -62,11 +63,14 @@ export function InformationStep({
   node,
   collection,
   records,
+  answers,
   seam,
 }: {
   node: StepNode;
   collection: Collection;
   records: CollectionRecord[];
+  /** What the goals routine worked out from these records (plan #989). */
+  answers: StepAnswer[];
   seam?: InformationSeam;
 }) {
   const asked = askedFields(collection.fields, node.asksFor ?? null);
@@ -76,6 +80,9 @@ export function InformationStep({
 
   return (
     <div className="mt-2 space-y-2 px-1">
+      {answers.length > 0 && (
+        <Answers answers={answers} fields={collection.fields} records={records} />
+      )}
       {line && <p className="text-small text-ink-muted">{line}</p>}
       {collection.shape === 'one' ? (
         <OneRecord node={node} collection={collection} record={records[0] ?? null} asked={asked} />
@@ -90,6 +97,44 @@ export function InformationStep({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * What the step's figures answer, above the figures themselves: each question
+ * with the answer the goals routine worked out, and a line naming the rows it
+ * read and the date of their figures. An answer whose rows have changed since
+ * says so until the morning run works it again.
+ */
+function Answers({
+  answers,
+  fields,
+  records,
+}: {
+  answers: StepAnswer[];
+  fields: CollectionField[];
+  records: CollectionRecord[];
+}) {
+  return (
+    <ValueList>
+      {answers.map((a) => (
+        <ValueRow
+          key={a.id}
+          label={a.question}
+          value={
+            <div className="space-y-0.5">
+              <p>{a.answer}</p>
+              <p className="text-small text-ink-muted">{sourcesLine(a.sources, fields, records)}</p>
+              {a.outOfDateAt && (
+                <p className="text-small text-caution">
+                  Out of date: a row it used has changed. The morning run works it out again.
+                </p>
+              )}
+            </div>
+          }
+        />
+      ))}
+    </ValueList>
   );
 }
 

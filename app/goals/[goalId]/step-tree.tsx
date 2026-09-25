@@ -70,6 +70,7 @@ export function StepTree({
       todoOn,
       rhythms: map.rhythms,
       information: map.information,
+      answers: map.answers,
       linksOf: map.linksOf,
       otherGoals: map.otherGoals,
       catalog: goalCatalog(map.steps, numbers),

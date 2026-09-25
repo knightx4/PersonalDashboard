@@ -85,6 +85,7 @@ export type GoalRowContext = {
   todoOn: boolean;
   rhythms: GoalMap['rhythms'];
   information: GoalMap['information'];
+  answers: GoalMap['answers'];
   linksOf: GoalMap['linksOf'];
   otherGoals: GoalMap['otherGoals'];
   catalog: readonly TreeCatalogEntry[];
@@ -529,6 +530,7 @@ export function GoalRow({
               node={step}
               collection={filled.collection}
               records={filled.records}
+              answers={context.answers[step.id] ?? []}
               seam={context.informationSeam}
             />
           )}
