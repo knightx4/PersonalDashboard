@@ -68,6 +68,7 @@ import { QuickReadView, type QuickReadViewProps } from '@/app/news/quick/quick-v
 import { SavedView, type SavedViewProps } from '@/app/news/saved/saved-view';
 import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
+import { PlanOpenedSurface, PlanTreeSurface } from './plan-surfaces';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -2200,6 +2201,25 @@ export const SURFACES: readonly Surface[] = [
         />
       </div>
     ),
+  },
+  {
+    /* The dev plan as a list, every feature unfolded (plan #993). What a
+     * change to the plan's rows is checked against: shot before and after,
+     * the two should not differ. */
+    id: 'dev-plan-tree',
+    label: 'Plan · the tree, unfolded',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanTreeSurface />,
+  },
+  {
+    /* The same plan with its rows opened, for the panel behind a row: the
+     * detail, the questions, what it waits on and the thread. */
+    id: 'dev-plan-opened',
+    label: 'Plan · rows opened',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanOpenedSurface />,
   },
   {
     /* The design language, held to itself. It is the one surface where being

@@ -120,6 +120,16 @@ export function isPlanPriority(value: number): value is PlanPriority {
   return (PLAN_PRIORITIES as readonly number[]).includes(value);
 }
 
+/** What each status is called, wherever one is shown or picked. */
+export const PLAN_STATUS_LABEL: Record<PlanStatus, string> = {
+  proposed: 'Proposed',
+  not_started: 'Not started',
+  in_progress: 'In progress',
+  blocked: 'Blocked',
+  done: 'Done',
+  dropped: 'Dropped',
+};
+
 /** What each of the three is called, wherever one is shown or set. */
 export const PLAN_PRIORITY_LABEL: Record<PlanPriority, string> = {
   1: 'Next',

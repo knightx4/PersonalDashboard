@@ -23,23 +23,6 @@ export type PlanCatalogEntry = {
   closed: boolean;
 };
 
-/** Every step under this one, by id, including the one named. */
-export function subtreeOf(catalog: readonly PlanCatalogEntry[], id: string): Set<string> {
-  const ids = new Set([id]);
-  let grew = true;
-  while (grew) {
-    grew = false;
-    for (const entry of catalog) {
-      if (entry.parentId && ids.has(entry.parentId) && !ids.has(entry.id)) {
-        ids.add(entry.id);
-        grew = true;
-      }
-    }
-  }
-  return ids;
-}
-
-/** How a step reads in a picker: its depth, its number and its title. */
-export function catalogLabel(entry: PlanCatalogEntry): string {
-  return `${'· '.repeat(entry.depth)}#${entry.number} ${entry.title}`;
-}
+// The two helpers that read it live in lib/plan/catalog.ts, typed on the
+// fields they read, so the shared tree components can use them too.
+export { catalogLabel, subtreeOf } from '@/lib/plan/catalog';
