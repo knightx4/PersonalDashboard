@@ -154,6 +154,10 @@ the same allowance. So Goals runs on a schedule rather than on every change:
   Meetup and org newsletters vary in how reachable and current they are, so
   the first few weeks will be uneven and should improve with the feedback.
 - **On request.** A **Work on this** button on a goal fires one run for it.
+- **After an answer.** Answering a question on a goal fires one run for that
+  goal once ten minutes pass with no further answer, so several answers in
+  one sitting cost one run. It settles the provisional steps the answers
+  held up and proposes anything new (plan #1017).
 
 ## The daily view
 

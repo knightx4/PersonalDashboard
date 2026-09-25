@@ -1,9 +1,10 @@
 # The goals routine
 
 The standing prompt for the Claude Code routine that **Work on this** on a
-goal's page fires (`app/goals/[goalId]/shaping-actions.ts`), and that the
+goal's page fires (`app/goals/[goalId]/shaping-actions.ts`), that the
 daily cron fires each morning when a Claude step is ready
-(`inngest/goals/daily.ts`). The app appends a turn naming the goal or the
+(`inngest/goals/daily.ts`), and that the re-shape tick fires once questions
+on a goal are answered (`inngest/goals/reshape.ts`). The app appends a turn naming the goal or the
 steps, the account and the `goals.runs` row it wrote; the prompt below is what
 the routine carries when it starts. The prompt and the connectors are stored
 on claude.ai, not read from here, so a change to either takes effect only
