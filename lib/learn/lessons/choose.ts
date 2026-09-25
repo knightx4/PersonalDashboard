@@ -27,6 +27,9 @@ import { rankReady, readyInSubject } from '@/lib/learn/graph/ready';
  *   (`pruneForGoal`) that `readyToLearn` allows: not known or sharp, with
  *   every prerequisite known or sharp. `rankReady` orders them, which puts the
  *   concept nearest the unit's outcome first, as the spec asks.
+ * - A concept under a lesson rated too hard comes before the rest of its
+ *   unit (plan #970): the top-up has added what that lesson rests on, and the
+ *   spec asks for its lesson first.
  * - Slots go to tracks by `trackToAsk`, the rule Practice Flow shares its
  *   questions by, so over a run of slots each track gets lessons in
  *   proportion to its weight.
@@ -49,6 +52,8 @@ export type ChooseLessonsInput = {
   weights: ReadonlyMap<string, TrackWeight>;
   /** Concepts that already have a card the person has seen or will see. */
   carded: ReadonlySet<string>;
+  /** Concepts whose lesson was rated too hard. What sits under them is taught first. */
+  tooHard?: ReadonlySet<string>;
   /**
    * Cards per track already waiting in the deck. They count as slots the
    * track has had, so a top-up does not pile more onto a track that is
@@ -123,8 +128,24 @@ type TrackPlan =
   | { kind: 'need'; need: TrackNeed }
   | { kind: 'waiting'; need?: TrackNeed };
 
+/**
+ * The concepts under a lesson rated too hard: everything on the path to a
+ * too-hard concept that is not settled, other than the concept itself.
+ */
+function underTooHard(graph: Graph, tooHard: ReadonlySet<string>): Set<string> {
+  const under = new Set<string>();
+  for (const id of tooHard) {
+    for (const below of pruneForGoal(graph, id)) if (below !== id) under.add(below);
+  }
+  return under;
+}
+
 /** What one track can teach next, before any slot is given out. */
-export function planTrack(track: LessonTrack, carded: ReadonlySet<string>): TrackPlan {
+export function planTrack(
+  track: LessonTrack,
+  carded: ReadonlySet<string>,
+  tooHard: ReadonlySet<string> = new Set(),
+): TrackPlan {
   const need = (because: TrackNeed['because'], unitId: string | null): TrackPlan => ({
     kind: 'need',
     need: { subjectId: track.subjectId, subjectName: track.name, because, unitId },
@@ -152,10 +173,13 @@ export function planTrack(track: LessonTrack, carded: ReadonlySet<string>): Trac
   ).filter((row) => onPath.has(row.concept.id) && !carded.has(row.concept.id));
 
   if (ready.length === 0) return { kind: 'waiting', ...short };
+  const under = underTooHard(track.graph, tooHard);
+  const ranked = rankReady(ready, ready.length);
+  const first = ranked.filter((row) => under.has(row.concept.id));
   return {
     kind: 'teach',
     ...short,
-    candidates: rankReady(ready, ready.length).map((row) => ({
+    candidates: [...first, ...ranked.filter((row) => !under.has(row.concept.id))].map((row) => ({
       subjectId: track.subjectId,
       subjectName: track.name,
       unitId: current.unit.id,
@@ -185,7 +209,7 @@ export function chooseLessons(input: ChooseLessonsInput): LessonChoice {
       dormant.push(track.subjectId);
       continue;
     }
-    const plan = planTrack(track, input.carded);
+    const plan = planTrack(track, input.carded, input.tooHard);
     if (plan.need) needs.push(plan.need);
     if (plan.kind === 'waiting') waiting.push(track.subjectId);
     else if (plan.kind === 'teach') queues.set(track.subjectId, plan.candidates);

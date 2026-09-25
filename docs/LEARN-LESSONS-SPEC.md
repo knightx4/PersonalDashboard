@@ -237,7 +237,7 @@ word, and Not now leaves it, through the same step idea cards use
 cards do. The swipes also move the track's weight (`loadTrackInterest`): Got it
 and Work on this count as answering one of its questions, and Not now as moving
 past one. Only a lesson's latest swipe counts. The track's page names the
-lessons behind its weight. Too hard is still only a rating until step 4.
+lessons behind its weight. Too hard adds a prerequisite from step 4 on.
 
 **Section cards.** The section picker leaves lesson rows out of what it reads,
 so lessons do not use up a theme's, field's or goal's turn and do not set how
@@ -267,6 +267,33 @@ A unit written for a track with every unit done has no chain yet, so the
 chooser then asks for it to be laid out, which can happen in the same run. A
 unit written ahead of a short last unit waits until that unit is done.
 
+## Step 4 as built
+
+Plan #970, on 25 September 2026. Rating a lesson Too hard only records the
+rating, as before. The Learn now top-up (`writeLessonsFor` in
+`lib/learn/lessons/top-up.ts`) then starts each run by taking up to two lessons
+rated too hard that have had nothing added under them, before it chooses any
+lesson. For each, `addLessonFloor` (`lib/learn/lessons/add-floor.ts`) makes the
+call a probe makes for a missing floor (`proposeFloor`), given the concept and
+the names of the rest of its track, and saves what comes back under the
+concept with `saveChainInto` and no goal. The prerequisite may be a new
+concept or one the track already holds; either way it has an edge to the
+concept. There is no approval screen, as with a unit the top-up lays out. The
+spend is recorded as `add-lesson-floor`.
+
+The card records when this was done in `feed_cards.floor_at`, set before the
+call, so a lesson gets a prerequisite once: two runs at once do not both add
+one, and taking the rating back and giving it again adds nothing. A call that
+fails sets it back, so a later run tries again. A call that finds nothing
+missing, or a concept known by then, leaves it set.
+
+The concept now has a prerequisite that is not known, so it is no longer
+ready. The chooser (`planTrack`) reads which concepts have a lesson rated too
+hard and puts the ready concepts under any of them that is not yet known ahead
+of the rest of the unit, whatever their distance from the outcome. So the next
+lesson written for that track teaches the prerequisite. Lessons already in the
+deck from that track are not moved.
+
 ## Build order
 
 Each step ships on its own.
@@ -281,7 +308,8 @@ Each step ships on its own.
    track with a curriculum, and the top-up lays out its first unit.
 3. **Units written as you go.** Built (plan #969). New tracks start with three
    or four units, and a unit is added when a track runs short.
-4. **Too hard adds a prerequisite.**
+4. **Too hard adds a prerequisite.** Built (plan #970). The top-up adds what
+   a lesson rated too hard rests on, and teaches it next in that track.
 5. **The unit check.**
 6. **Goals as tracks.** A goal on the Goals page gets a track.
 

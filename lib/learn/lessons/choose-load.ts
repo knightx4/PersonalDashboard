@@ -31,7 +31,7 @@ const UNSEEN_STATUS = 'dropped';
 /** Card statuses still in the deck, waiting to be written or shown. */
 const IN_DECK = new Set(['picked', 'ready']);
 
-type CardRow = { concept_id: string; status: string };
+type CardRow = { concept_id: string; status: string; reason: string; difficulty: string | null };
 
 /**
  * One person's tracks whose units are not to be laid out before a time: the
@@ -48,7 +48,10 @@ async function loadHeld(supabase: LearnSupabaseClient, userId: string, now: Date
   return new Set(((data ?? []) as { id: string }[]).map((row) => row.id));
 }
 
-/** Every track, weighed, with its units, goals and graph, and the concepts on cards. */
+/**
+ * Every track, weighed, with its units, goals and graph, the concepts on
+ * cards, and the concepts whose lesson was rated too hard.
+ */
 export async function loadLessonInput(
   supabase: LearnSupabaseClient,
   userId: string,
@@ -60,7 +63,7 @@ export async function loadLessonInput(
     readAll<CardRow>((from, to) =>
       supabase
         .from('feed_cards')
-        .select('concept_id, status')
+        .select('concept_id, status, reason, difficulty')
         .eq('user_id', userId)
         .not('concept_id', 'is', null)
         .or(`status.neq.${UNSEEN_STATUS},reason.eq.lesson`)
@@ -97,6 +100,9 @@ export async function loadLessonInput(
     tracks,
     weights: interest.weights,
     carded: new Set(cards.map((card) => card.concept_id)),
+    tooHard: new Set(
+      cards.filter((card) => card.reason === 'lesson' && card.difficulty === 'too_hard').map((card) => card.concept_id),
+    ),
     dealt,
   };
 }
