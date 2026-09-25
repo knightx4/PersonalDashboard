@@ -10,7 +10,7 @@
  * The rules that need no database live here: which goals are due, and the
  * brief. The reads and writes are in inngest/goals/reshape.ts.
  */
-import { RUN_QUIET_MS } from '@/lib/goals/shaping';
+import { runIsQuiet } from '@/lib/goals/shaping';
 import type { StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
 
@@ -34,7 +34,7 @@ export const RESHAPE_GOAL_LIMIT = 3;
 export type Answer = { questionId: string; answeredAt: string };
 
 /** One goals.runs row on a goal, as the tick reads it. */
-export type GoalRunStamp = { itemId: string; status: string; createdAt: string };
+export type GoalRunStamp = { itemId: string; status: string; createdAt: string; lastSeenAt?: string | null };
 
 export type AnsweredQuestion = { id: string; title: string; resolution: string };
 
@@ -101,7 +101,7 @@ export function goalsToReshape(input: {
     const at = Date.parse(run.createdAt);
     if (!Number.isFinite(at)) continue;
     lastRun.set(run.itemId, Math.max(at, lastRun.get(run.itemId) ?? 0));
-    if (run.status === 'started' && input.now - at < RUN_QUIET_MS) busy.add(run.itemId);
+    if (run.status === 'started' && !runIsQuiet(run, input.now)) busy.add(run.itemId);
   }
 
   const due: ReshapeGoal[] = [];

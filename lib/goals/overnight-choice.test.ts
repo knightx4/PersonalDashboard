@@ -33,7 +33,7 @@ describe('chooseNightSteps', () => {
       step('second', 'g-stale'),
     ];
     const runs = [
-      run('g-busy', null, 'started', 1),
+      run('g-busy', null, 'started', 0.25),
       run('g-flaky', 'flaky', 'failed', 30),
       run('g-flaky', 'flaky', 'failed', 5),
     ];

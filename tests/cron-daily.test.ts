@@ -119,6 +119,9 @@ vi.mock('@/inngest/vault/sync', () => ({
 vi.mock('@/inngest/goals/daily', () => ({
   runGoalsDaily: vi.fn(async () => ({ skipped: 'no Claude steps are ready' })),
 }));
+vi.mock('@/inngest/goals/quiet-runs', () => ({
+  runGoalsQuietSweep: vi.fn(async () => ({ closed: ['run-0'] })),
+}));
 vi.mock('@/inngest/goals/weekly', () => ({
   runGoalsWeekly: vi.fn(async () => ({ started: true, runId: 'run-1', goals: 1, past: 0, ignored: 2 })),
 }));
@@ -136,6 +139,7 @@ const { runVaultSyncForAll } = await import('@/inngest/vault/sync');
 const { runClaimSweep } = await import('@/inngest/dev/claims');
 const { runGoalsDaily } = await import('@/inngest/goals/daily');
 const { runGoalsWeekly } = await import('@/inngest/goals/weekly');
+const { runGoalsQuietSweep } = await import('@/inngest/goals/quiet-runs');
 const { runDevDigest } = await import('@/inngest/dev/digest');
 
 function cronRequest(token: string | null) {
@@ -194,6 +198,11 @@ describe('the daily cron route', () => {
     expect(runGoalsDaily).toHaveBeenCalled();
     expect(runGoalsWeekly).toHaveBeenCalled();
     expect(body.results['goals-weekly']).toMatchObject({ started: true, ignored: 2 });
+
+    // Goal runs that stopped reporting are closed before the morning run
+    // reads what is still going (plan #1002).
+    expect(runGoalsQuietSweep).toHaveBeenCalled();
+    expect(body.results['goals-quiet-runs']).toEqual({ closed: ['run-0'] });
 
     // The claim sweep runs before the digest, so the summary reports the rows
     // it has already corrected rather than the ones it is about to.

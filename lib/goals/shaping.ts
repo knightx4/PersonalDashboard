@@ -26,19 +26,75 @@ export type GoalRun = {
   endedAt: string | null;
   summary: string | null;
   error: string | null;
+  /** When the session last reported, or null before its first report (plan #1002). */
+  lastSeenAt?: string | null;
+  /** What the session said it was on at that report, usually a step title. */
+  nowOn?: string | null;
 };
 
 /**
- * How long a started run is taken to still be working. A session that dies
- * never writes its row back, so past this the page stops saying Claude is on
- * it and lets you press again. The same two hours the dev plan uses.
+ * How long a started run may go without reporting before it is taken to have
+ * died (plan #1002). The goals skill writes last_seen_at at each step it
+ * starts, so a live session is rarely quiet for more than a few minutes. The
+ * sweep in the daily and overnight ticks (lib/goals/run-sweep.ts) closes a run
+ * quiet this long as failed, and the pages read the same window so they agree
+ * with the sweep in the few minutes between ticks.
  */
-export const RUN_QUIET_MS = 2 * 60 * 60 * 1000;
+export const RUN_QUIET_MS = 45 * 60 * 1000;
+
+/** When a run was last heard from: its last report, or its start before the first. */
+export function lastHeardAt(run: { createdAt: string; lastSeenAt?: string | null }): number {
+  const created = Date.parse(run.createdAt);
+  const seen = run.lastSeenAt ? Date.parse(run.lastSeenAt) : Number.NaN;
+  return Number.isFinite(seen) ? Math.max(seen, created) : created;
+}
+
+/** Whether a started run has gone quiet for longer than RUN_QUIET_MS. */
+export function runIsQuiet(run: { createdAt: string; lastSeenAt?: string | null }, now: number): boolean {
+  return now - lastHeardAt(run) >= RUN_QUIET_MS;
+}
 
 /** Whether a run is still taken to be going, so a second press is refused. */
 export function runInFlight(run: GoalRun | null, now: number): boolean {
   if (!run || run.status !== 'started') return false;
-  return now - Date.parse(run.createdAt) < RUN_QUIET_MS;
+  return !runIsQuiet(run, now);
+}
+
+/** "3 minutes ago", "1 hour ago" or "just now", for a run's last report. */
+export function minutesAgo(iso: string, now: number): string {
+  const minutes = Math.max(0, Math.floor((now - Date.parse(iso)) / 60_000));
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+  const hours = Math.floor(minutes / 60);
+  return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+}
+
+/**
+ * Where a started run has got to: "on Draft the letter, 3 minutes ago" once
+ * the session has reported, "started 3 minutes ago" before it has. Null for a
+ * run that has ended.
+ */
+export function runProgress(
+  run: { status: GoalRunStatus; createdAt: string; lastSeenAt?: string | null; nowOn?: string | null },
+  now: number,
+): string | null {
+  if (run.status !== 'started') return null;
+  const onWhat = run.nowOn?.trim();
+  if (run.lastSeenAt && onWhat) return `on ${firstLine(onWhat)}, ${minutesAgo(run.lastSeenAt, now)}`;
+  if (run.lastSeenAt) return `last reported ${minutesAgo(run.lastSeenAt, now)}`;
+  return `started ${minutesAgo(run.createdAt, now)}`;
+}
+
+/**
+ * The error a quiet run is closed with. Names what it was last on, so the
+ * run's page says where it stopped.
+ */
+export function quietRunError(run: { nowOn?: string | null }): string {
+  const minutes = Math.round(RUN_QUIET_MS / 60_000);
+  const onWhat = run.nowOn?.trim();
+  return onWhat
+    ? `The session stopped reporting while on ${firstLine(onWhat)}, and nothing was heard for ${minutes} minutes.`
+    : `The session never reported progress, and nothing was heard for ${minutes} minutes.`;
 }
 
 /** Every proposed step anywhere in the tree, which approving opens. */

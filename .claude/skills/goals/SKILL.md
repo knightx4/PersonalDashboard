@@ -68,6 +68,27 @@ update goals.runs set status = 'failed', error = '<why>', ended_at = now()
 where id = '<run id>' and user_id = '<user>';
 ```
 
+### Reporting progress
+
+While the run is going, report at each step you start: which one, and that
+you are still there. The goal page and the Runs page show it as "on Draft the
+letter, 3 minutes ago".
+
+```sql
+update goals.runs set last_seen_at = now(), now_on = '<the step title, or what you are doing>'
+where id = '<run id>' and user_id = '<user>' and status = 'started';
+```
+
+Report when you start mapping a goal, at each step of a morning run, at each
+step of a phase, and at least every 15 minutes during anything long, such as
+reading a long Gmail thread or researching one step. `now_on` is a short
+line, up to 300 characters; the step's title is usually right.
+
+A run with no report for 45 minutes is taken to have died. A sweep every few
+minutes closes it as failed, and the person can press **Work on this** or
+**Send** again. If you find your run row already closed as failed, stop
+working: say so in your last message and do not write to it again.
+
 ## Reading the goal
 
 ```sql
@@ -457,7 +478,8 @@ plain dependency row is almost always the better way to say that.
 The daily cron fires the routine each morning when a `claude` step is ready
 (`inngest/goals/daily.ts`), with a brief listing those steps and the
 `goals.runs` row it wrote with `job` `daily`. Work only the steps it names.
-For each one:
+Before each one, report it on the run row with `now_on` the step's title
+("Reporting progress"). For each one:
 
 1. Read the step, its goal and the steps around it, as in "Reading the goal".
    The title and `acceptance` say what to produce; the goal says what it is

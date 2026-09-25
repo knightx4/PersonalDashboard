@@ -17,7 +17,7 @@
  * rules. The reads and the fire are in lib/goals/handover-store.ts.
  */
 import { isStepBlocked } from '@/lib/goals/dependencies';
-import { RUN_QUIET_MS } from '@/lib/goals/shaping';
+import { runIsQuiet } from '@/lib/goals/shaping';
 import { STEP_KIND_LABELS, STEP_STATUS_LABELS, type StepNode } from '@/lib/goals/steps';
 import type { GoalStatus } from '@/lib/goals/tree';
 
@@ -46,7 +46,7 @@ export type SendTarget = {
 };
 
 /** A started goals.runs row that might already cover the target. */
-export type LiveRun = { itemId: string | null; job: string; createdAt: string };
+export type LiveRun = { itemId: string | null; job: string; createdAt: string; lastSeenAt?: string | null };
 
 /** The sub-steps that make a step a phase. A question beneath does not. */
 function substeps(step: StepNode): StepNode[] {
@@ -154,7 +154,7 @@ export function sendRefusal(
     return 'Nothing under that phase is open, so there is nothing to send.';
   }
 
-  const live = running.filter((run) => now - Date.parse(run.createdAt) < RUN_QUIET_MS);
+  const live = running.filter((run) => !runIsQuiet(run, now));
   const under = idsUnder(step);
   for (const run of live) {
     if (!run.itemId) continue;

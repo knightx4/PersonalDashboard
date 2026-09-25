@@ -28,8 +28,13 @@ vi.mock('@/inngest/dev/overnight', () => ({
   runOvernightTick: vi.fn(async () => ({ accounts: 0, fired: 0, results: {} })),
 }));
 
+vi.mock('@/inngest/goals/quiet-runs', () => ({
+  runGoalsQuietSweep: vi.fn(async () => ({ closed: [] })),
+}));
+
 const { GET, POST } = await import('@/app/api/cron/overnight/route');
 const { runOvernightTick } = await import('@/inngest/dev/overnight');
+const { runGoalsQuietSweep } = await import('@/inngest/goals/quiet-runs');
 
 function tickRequest(token: string | null) {
   const headers = new Headers({ host: 'example.test', 'x-forwarded-proto': 'https' });
@@ -44,12 +49,14 @@ describe('the overnight tick route', () => {
   beforeEach(() => {
     process.env.CRON_SECRET = 'secret-token';
     vi.mocked(runOvernightTick).mockClear();
+    vi.mocked(runGoalsQuietSweep).mockClear();
   });
 
   it('refuses a request without the shared secret, on both verbs', async () => {
     expect((await GET(tickRequest(null))).status).toBe(401);
     expect((await POST(tickRequest(null))).status).toBe(401);
     expect(runOvernightTick).not.toHaveBeenCalled();
+    expect(runGoalsQuietSweep).not.toHaveBeenCalled();
   });
 
   it('refuses a wrong secret', async () => {
@@ -62,7 +69,22 @@ describe('the overnight tick route', () => {
   it('ticks for the secret the cron job carries', async () => {
     const response = await POST(tickRequest('secret-token'));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, accounts: 0, fired: 0, results: {} });
+    expect(await response.json()).toEqual({
+      ok: true,
+      accounts: 0,
+      fired: 0,
+      results: {},
+      goalsQuiet: { closed: [] },
+    });
+    expect(runOvernightTick).toHaveBeenCalled();
+  });
+
+  it('closes quiet goal runs on every tick, and still ticks when that fails (plan #1002)', async () => {
+    vi.mocked(runGoalsQuietSweep).mockRejectedValueOnce(new Error('goals read failed'));
+    const response = await POST(tickRequest('secret-token'));
+    expect(response.status).toBe(200);
+    expect((await response.json()).goalsQuiet).toEqual({ error: 'goals read failed' });
+    expect(runGoalsQuietSweep).toHaveBeenCalled();
     expect(runOvernightTick).toHaveBeenCalled();
   });
 });

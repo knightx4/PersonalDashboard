@@ -279,7 +279,7 @@ export function GoalTopSurface() {
           )}
           runFailed={false}
           changes={changesLine({ stepsAdded: 1, questionsAsked: 1, formsFilled: 0, stepsDone: 0 })}
-          runningSince={null}
+          running={null}
           canRun
         />
         <GoalNumber goalId={cards.id} unit="$" target={0} readings={readings} today={TODAY} />
@@ -307,7 +307,7 @@ export function GoalBareSurface() {
           runLine={null}
           runFailed={false}
           changes={null}
-          runningSince={null}
+          running={null}
           canRun
         />
         <GoalAddRow

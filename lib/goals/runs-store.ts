@@ -14,7 +14,8 @@ import { toRunListings, type RunListing, type RunRowWithItem } from '@/lib/goals
  */
 const RUNS_LIMIT = 2000;
 
-const RUN_SELECT = 'id, job, status, created_at, ended_at, summary, error, item:items!runs_item_fk(id, title, level)';
+const RUN_SELECT =
+  'id, job, status, created_at, ended_at, summary, error, last_seen_at, now_on, item:items!runs_item_fk(id, title, level)';
 
 export async function loadRuns(client: GoalsSupabaseClient): Promise<RunListing[]> {
   const { data, error } = await client

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RUN_QUIET_MS } from '@/lib/goals/shaping';
-import { runDuration, runOutcome, toRunListings, type RunRowWithItem } from '@/lib/goals/runs';
+import { runDuration, runMeta, runOutcome, toRunListings, type RunRowWithItem } from '@/lib/goals/runs';
 
 function row(overrides: Partial<RunRowWithItem>): RunRowWithItem {
   return {
@@ -50,6 +50,15 @@ describe('runOutcome', () => {
     expect(runOutcome({ status: 'started', createdAt: created }, start + RUN_QUIET_MS + 1)).toBe('silent');
   });
 
+  it('counts the quiet window from the last report', () => {
+    const seen = new Date(start + 2 * 60 * 60 * 1000).toISOString();
+    const later = Date.parse(seen) + 10 * 60 * 1000;
+    expect(runOutcome({ status: 'started', createdAt: created, lastSeenAt: seen }, later)).toBe('running');
+    expect(runOutcome({ status: 'started', createdAt: created, lastSeenAt: seen }, later + RUN_QUIET_MS)).toBe(
+      'silent',
+    );
+  });
+
   it('passes done and failed through', () => {
     expect(runOutcome({ status: 'done', createdAt: created }, start)).toBe('done');
     expect(runOutcome({ status: 'failed', createdAt: created }, start)).toBe('failed');
@@ -68,5 +77,22 @@ describe('runDuration', () => {
     expect(runDuration({ createdAt, endedAt: '2026-09-20T10:12:00Z' })).toBe('12 min');
     expect(runDuration({ createdAt, endedAt: '2026-09-20T11:05:00Z' })).toBe('1 h 5 min');
     expect(runDuration({ createdAt, endedAt: '2026-09-20T12:00:00Z' })).toBe('2 h');
+  });
+});
+
+describe('runMeta', () => {
+  it('says where a running run has got to (plan #1002)', () => {
+    const [running] = toRunListings([
+      row({
+        status: 'started',
+        ended_at: null,
+        summary: null,
+        last_seen_at: '2026-09-20T10:17:00Z',
+        now_on: 'Find three running clubs',
+      }),
+    ]);
+    const { outcome, meta } = runMeta(running, Date.parse('2026-09-20T10:20:00Z'), 'UTC');
+    expect(outcome).toBe('running');
+    expect(meta.startsWith('Still running · on Find three running clubs, 3 minutes ago · ')).toBe(true);
   });
 });

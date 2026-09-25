@@ -80,7 +80,7 @@ export async function runGoalsReshape(deps?: Partial<GoalsReshapeDeps>): Promise
 
   const runs = await client
     .from('runs')
-    .select('item_id, status, created_at')
+    .select('item_id, status, created_at, last_seen_at')
     .eq('user_id', userId)
     .in('job', ['goal', 'reshape'])
     .not('item_id', 'is', null)
@@ -90,6 +90,7 @@ export async function runGoalsReshape(deps?: Partial<GoalsReshapeDeps>): Promise
     itemId: row.item_id as string,
     status: row.status as string,
     createdAt: row.created_at as string,
+    lastSeenAt: row.last_seen_at as string | null,
   }));
 
   const { goals, byGoal } = await loadLiveTree(client, { userId });

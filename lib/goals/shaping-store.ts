@@ -25,6 +25,8 @@ type RunRow = {
   ended_at: string | null;
   summary: string | null;
   error: string | null;
+  last_seen_at: string | null;
+  now_on: string | null;
 };
 
 const ERROR_LIMIT = 4000;
@@ -43,7 +45,7 @@ export async function loadShaping(
     client.from('items').select('approved_at').eq('id', goalId).eq('level', 'goal').maybeSingle(),
     client
       .from('runs')
-      .select('id, status, created_at, ended_at, summary, error')
+      .select('id, status, created_at, ended_at, summary, error, last_seen_at, now_on')
       .eq('item_id', goalId)
       .order('created_at', { ascending: false })
       .limit(1),
@@ -61,6 +63,8 @@ export async function loadShaping(
       endedAt: row.ended_at,
       summary: row.summary,
       error: row.error,
+      lastSeenAt: row.last_seen_at,
+      nowOn: row.now_on,
     },
   };
 }
