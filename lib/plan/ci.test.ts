@@ -114,6 +114,8 @@ type Chain = {
   select: () => Chain;
   eq: () => Chain;
   not: () => Chain;
+  order: () => Chain;
+  range: () => Chain;
   upsert: (...args: unknown[]) => Promise<{ error: null }>;
   then: (resolve: (value: unknown) => unknown) => Promise<unknown>;
 };
@@ -137,6 +139,8 @@ function db(
       select: () => node,
       eq: () => node,
       not: () => node,
+      order: () => node,
+      range: () => node,
       upsert,
       then: (resolve) => Promise.resolve(result).then(resolve),
     };

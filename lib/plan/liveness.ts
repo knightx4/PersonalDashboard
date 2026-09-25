@@ -85,6 +85,12 @@ export const FEATURE_IDLE_AFTER_MINUTES = 20;
 export type FeatureTrail = {
   /** Whether any step beneath the feature is claimed right now. */
   claimed: boolean;
+  /**
+   * Whether the row the run was sent at is itself done or dropped. A session
+   * closes its feature, or its one step, as the last thing it does, so there
+   * is nothing left to wait out.
+   */
+  closed?: boolean;
   /** The newest change to the feature or any row beneath it. */
   touchedAt: string | null;
 };
@@ -94,9 +100,15 @@ export type FeatureTrail = {
  * nothing changed since the run started or since its last change, for
  * `FEATURE_IDLE_AFTER_MINUTES`. False at `now === 0`, like every clock rule
  * here.
+ *
+ * A run whose own row is closed is idle at once. The twenty minutes are for
+ * the gap between one step and the next, and a closed row has no next. On 25
+ * September the runner fired steps one at a time and waited the full twenty
+ * minutes after each had closed, which was two thirds of every step's time.
  */
 export function featureRunIdle(startedAt: string, trail: FeatureTrail, now: number): boolean {
   if (now === 0 || trail.claimed) return false;
+  if (trail.closed) return true;
   const fired = new Date(startedAt).getTime();
   const touched = trail.touchedAt ? new Date(trail.touchedAt).getTime() : 0;
   const last = Math.max(fired, Number.isFinite(touched) ? touched : 0);

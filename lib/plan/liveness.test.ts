@@ -714,6 +714,13 @@ describe('featureRunIdle', () => {
     expect(featureRunIdle(started, quiet, at('2026-09-23T03:00:00Z'))).toBe(false);
     expect(featureRunIdle(started, { claimed: false, touchedAt: null }, 0)).toBe(false);
   });
+
+  it('ends a run whose own row is closed without waiting out the twenty minutes', () => {
+    // #1012 closed at 04:07:39 on 25 September and the next step was fired at
+    // 04:28, twenty minutes later, with nothing left for the run to do.
+    const trail = { claimed: false, closed: true, touchedAt: '2026-09-22T22:15:00Z' };
+    expect(featureRunIdle(started, trail, at('2026-09-22T22:15:30Z'))).toBe(true);
+  });
 });
 
 describe('featureBetweenSteps', () => {

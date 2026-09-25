@@ -25,6 +25,8 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { readAll } from '@/lib/learn/db/read-all';
+
 import { ask, commitOnMain, readToken, REPO, REPO_KEY, refusalFor } from './github';
 import { pushesFrom, type ActivityRow, type Push } from './liveness';
 import { deployStateFrom, type DeployState } from './deploy';
@@ -486,18 +488,28 @@ export async function refreshCommitChecks(input: {
     return { checked: 0, error: 'No GITHUB_READ_TOKEN is set, so CI results cannot be read.' };
   }
 
-  const { data: steps, error: stepsError } = await input.supabase
-    .from('plan_items')
-    .select('commit_sha, completed_at')
-    .eq('user_id', input.userId)
-    .eq('status', 'done')
-    .not('commit_sha', 'is', null);
-  if (stepsError) return { checked: 0, error: stepsError.message };
+  // Paged: closed steps with a commit are most of the plan, and the plan is
+  // past PostgREST's thousand-row cap.
+  let steps: Array<{ commit_sha: string; completed_at?: string | null }>;
+  try {
+    steps = await readAll((from, to) =>
+      input.supabase
+        .from('plan_items')
+        .select('commit_sha, completed_at')
+        .eq('user_id', input.userId)
+        .eq('status', 'done')
+        .not('commit_sha', 'is', null)
+        .order('id', { ascending: true })
+        .range(from, to),
+    );
+  } catch (err) {
+    return { checked: 0, error: err instanceof Error ? err.message : 'failed' };
+  }
 
   // When each commit's step closed, the latest where two steps share one, so
   // a `none` read a day after that stops being asked about.
   const closedAt = new Map<string, string | null>();
-  for (const step of (steps ?? []) as Array<{ commit_sha: string; completed_at?: string | null }>) {
+  for (const step of steps) {
     const at = step.completed_at ?? null;
     const before = closedAt.get(step.commit_sha);
     if (before === undefined || (at && (!before || at > before))) closedAt.set(step.commit_sha, at);

@@ -16,6 +16,8 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { readAll } from '@/lib/learn/db/read-all';
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, 'public'>;
 
@@ -66,29 +68,33 @@ export async function subtreeBlockedAt(supabase: Db, root: string): Promise<stri
  * subtree last changed. Read for `featureRunIdle`.
  *
  * The account's rows are read and walked here rather than through a database
- * function: it is three narrow columns, and one account's plan is a few
- * hundred rows. Null when the rows cannot be read, so the caller falls back
- * to the push readings rather than ending a run on a failed lookup.
+ * function: it is four narrow columns. They are read a page at a time, since
+ * the plan passed PostgREST's thousand-row cap on 25 September and the rows
+ * past it were the newest features. Null when the rows cannot be read, so the
+ * caller falls back to the push readings rather than ending a run on a failed
+ * lookup.
  */
 export async function subtreeTrail(
   supabase: Db,
   userId: string,
   root: string,
-): Promise<{ claimed: boolean; touchedAt: string | null } | null> {
-  const { data, error } = await supabase
-    .from('plan_items')
-    .select('id, parent_id, status, updated_at')
-    .eq('user_id', userId);
-  if (error) {
-    console.error(`plan_items could not be read for the feature trail: ${error.message}`);
+): Promise<{ claimed: boolean; closed: boolean; touchedAt: string | null } | null> {
+  type Row = { id: string; parent_id: string | null; status: string; updated_at: string };
+  let rows: Row[];
+  try {
+    rows = await readAll<Row>((from, to) =>
+      supabase
+        .from('plan_items')
+        .select('id, parent_id, status, updated_at')
+        .eq('user_id', userId)
+        .order('id', { ascending: true })
+        .range(from, to),
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'failed';
+    console.error(`plan_items could not be read for the feature trail: ${message}`);
     return null;
   }
-  const rows = (data ?? []) as Array<{
-    id: string;
-    parent_id: string | null;
-    status: string;
-    updated_at: string;
-  }>;
   const children = new Map<string, typeof rows>();
   for (const row of rows) {
     if (!row.parent_id) continue;
@@ -96,7 +102,9 @@ export async function subtreeTrail(
   }
 
   let claimed = false;
-  let touchedAt: string | null = rows.find((row) => row.id === root)?.updated_at ?? null;
+  const own = rows.find((row) => row.id === root);
+  const closed = own?.status === 'done' || own?.status === 'dropped';
+  let touchedAt: string | null = own?.updated_at ?? null;
   const seen = new Set<string>([root]);
   const queue = [root];
   while (queue.length > 0) {
@@ -110,5 +118,5 @@ export async function subtreeTrail(
       }
     }
   }
-  return { claimed, touchedAt };
+  return { claimed, closed, touchedAt };
 }
