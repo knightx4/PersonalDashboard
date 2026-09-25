@@ -48,6 +48,11 @@ export type RaisedRow = {
   answeredAt: string | null;
   /** The thread, oldest first. Empty until somebody says something. */
   thread: DevComment[];
+  /**
+   * The goal a flag from a goals run is about (plan #1015), or null for a
+   * raise from the dev plan. Left out by fixtures that predate the column.
+   */
+  goalId?: string | null;
 };
 
 export interface RaisedQueue {
@@ -79,7 +84,7 @@ export function needsFollowThrough(row: RaisedRow): boolean {
 /** Every column the app reads off a raise, and the thread under it. */
 export const RAISED_COLUMNS =
   'id, title, detail, ask, consequence, outcome, module, source, status, created_at, ' +
-  'answered_at, ' +
+  'answered_at, goal_id, ' +
   `thread:dev_comments(${COMMENT_COLUMNS})`;
 
 /** A row as the app reads it. One shape leaves here, whoever selected it. */
@@ -106,6 +111,7 @@ export function raisedRowFrom(row: Record<string, unknown>): RaisedRow {
     createdAt: row.created_at as string,
     answeredAt: (row.answered_at as string | null) ?? null,
     thread: threadFrom(row.thread),
+    goalId: (row.goal_id as string | null | undefined) ?? null,
   };
 }
 
@@ -142,6 +148,10 @@ export function raisedQueueFrom(rows: readonly RaisedRow[]): RaisedQueue {
 /**
  * Takes a client rather than building one, like everything else in lib/. The
  * page reads as you and the sidebar reads as you, so both go through RLS.
+ *
+ * A flag a goals run raised on a goal (plan #1015) is left out: it is shown
+ * and answered on the Goals pages, and an answer given here would start the
+ * plan routine rather than a goal run.
  */
 export async function loadRaised(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -152,6 +162,7 @@ export async function loadRaised(
     .from('raised_items')
     .select(RAISED_COLUMNS)
     .eq('user_id', userId)
+    .is('goal_id', null)
     .order('created_at', { ascending: false })
     .limit(200);
 

@@ -1,6 +1,6 @@
 ---
 name: goals
-description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, provisional steps for what hangs on a question, and questions with lettered options. Re-shaping - read the answers to those questions and settle the provisional steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - give each open goal a verdict (on track, stalled or waiting on you) with the next move, proposing that move as a step for a stalled goal, then research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
+description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, provisional steps for what hangs on a question, and questions with lettered options. Re-shaping - read the answers to those questions and settle the provisional steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - give each open goal a verdict (on track, stalled or waiting on you) with the next move, proposing that move as a step for a stalled goal, then research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
 ---
 
 # Working a goal
@@ -48,7 +48,8 @@ Every run has a `goals.runs` row.
   no `item_id`), from **Work on this**, by the **morning run**, by the weekly run,
   after the person answered questions on a goal (job `reshape`), or by
   **Send** on one step or phase (job `step` or `phase`), or by **Prepare** on
-  one step of the person's (job `prepare`): the app has written the row as
+  one step of the person's (job `prepare`), or by the person answering
+  something you flagged on a goal (job `raise`): the app has written the row as
   `started`, and its id is in your brief. Use it.
 - Started any other way: write one first, with `job` `goal` and `item_id` for
   one goal, or `daily` / `weekly` for a scheduled run, and use its id.
@@ -848,6 +849,44 @@ Todo, and marking the unanswered ones ignored is done by the cron. The guard
 many verdicts of each kind you wrote and which goals are stalled, how many
 suggestions you wrote of each kind, and what in each kind's past reactions
 you followed.
+
+## Flagging something on a goal
+
+Sometimes a run finds a thing the person should know that is neither a step
+nor a question with options: the servicer moved the due date, a statement
+shows a missed payment, a deadline in an email is sooner than the step says.
+Do not bury it in the run summary, which is only read by opening the run.
+Flag it. A flag shows on the Goals home under Waiting on you and on the
+goal's page, where the person answers it or puts it aside.
+
+A flag is a row in `public.raised_items`, not in the goals schema, with the
+goal's id and module `goals`. The goal must be a goal, not a step: use the
+id of the goal the step is under, and name the step in the detail. There is
+no history trigger here, so no actor or run settings are needed.
+
+```sql
+insert into public.raised_items (user_id, module, goal_id, title, detail, ask, source)
+values ('<user>', 'goals', '<goal id>',
+        '<what happened, in one line: Nelnet moved your due date to the 28th>',
+        '<where you saw it and what it changes: the September statement; autopay still runs on the 15th>',
+        '<what you want from them, if anything: Move autopay to the 28th?>',
+        'goals run <run id>')
+returning id;
+```
+
+`title` is up to 200 characters, `detail` up to 4,000, `ask` up to 500 and
+may be left null when there is nothing to decide. Flag each thing once:
+read the goal's open flags first (`status in ('open', 'answered')` with the
+same `goal_id`) and skip one already there. Keep flags for things that
+happened; what the person has to do is a step, and a choice between paths is
+a question step.
+
+When the person answers, the app fires this routine with job `raise`. The
+brief names the flag, what has been said on it and their answer. Do what the
+answer says, within "What you may change", then write your reply into the
+flag's thread and close it with what came of it. The brief spells out both
+writes. Leave it open, and say so in the reply, if what the answer asked for
+is still outstanding.
 
 ## Replying to a comment
 

@@ -60,7 +60,9 @@ export type WaitingItem =
       count: number;
     }
   | { kind: 'goal'; id: string; title: string; goalId: string; goalTitle: string }
-  | { kind: 'review'; id: string; title: string; goalId: string; goalTitle: string };
+  | { kind: 'review'; id: string; title: string; goalId: string; goalTitle: string }
+  /** Something a run flagged on the goal (plan #1015); `id` is the raised_items row. */
+  | { kind: 'flag'; id: string; title: string; goalId: string; goalTitle: string };
 
 export type DailyView = { goals: DailyGoal[]; waiting: WaitingItem[] };
 
@@ -68,16 +70,31 @@ type GoalWithArea = { goal: Goal; areaName: string };
 
 /**
  * Most pressing first. A question holds up whatever sits above it in the
- * tree; a breakdown holds up a goal that has none yet. A result to read holds
- * nothing up, but it is what the morning run was for; a proposed goal holds
- * up nothing until you want it.
+ * tree. A flag is a thing that already happened out in the world, such as a
+ * moved due date, and it can cost money while it waits. A breakdown holds up a
+ * goal that has none yet. A result to read holds nothing up, but it is what
+ * the morning run was for; a proposed goal holds up nothing until you want it.
  */
 const WAITING_ORDER: Record<WaitingItem['kind'], number> = {
   question: 0,
-  breakdown: 1,
-  review: 2,
-  goal: 3,
+  flag: 1,
+  breakdown: 2,
+  review: 3,
+  goal: 4,
 };
+
+/**
+ * Rows read from outside the step trees, merged into the waiting list in its
+ * order. The flags on a goal (plan #1015) live in public.raised_items, so
+ * dailyView never sees them. The sort is stable, so rows of one kind keep the
+ * order they came in.
+ */
+export function withWaiting(
+  waiting: readonly WaitingItem[],
+  more: readonly WaitingItem[],
+): WaitingItem[] {
+  return [...waiting, ...more].sort((a, b) => WAITING_ORDER[a.kind] - WAITING_ORDER[b.kind]);
+}
 
 /**
  * The daily view for `goals`, which arrive in page order (area, then goal),
