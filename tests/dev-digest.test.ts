@@ -26,6 +26,7 @@ function stubClient(tables: Record<string, Row[]>) {
       select: () => self,
       eq: () => self,
       order: () => self,
+      range: () => self,
       limit: () => self,
       maybeSingle: async () => ({ data: rows()[0] ?? null, error: null }),
       insert: async (row: Row) => {
