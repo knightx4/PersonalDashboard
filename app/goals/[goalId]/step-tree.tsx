@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
 import { ListTree } from 'lucide-react';
 import { Progress, SectionTally } from '@/components/plan-tree/counts';
 import { ColumnHeader } from '@/components/plan-tree/grid';
@@ -22,7 +21,8 @@ import { StepComposer } from './step-parts';
  * One card: a heading with the plan's count of steps by state and its banded
  * bar, the column header, and a row per step from the plan's shared tree.
  * Steps from other goals that count towards this one follow in a second card,
- * each under the goal it comes from.
+ * which has no column header of its own since its columns line up with the
+ * first, and each row names the goal it comes from under its title.
  */
 export function StepTree({
   map,
@@ -100,7 +100,7 @@ export function StepTree({
             {/* Inside the card, under a rule, as the plan's "Add a step" sits
                 at the foot of a module (plan #983). */}
             <div className="border-t border-border px-3 py-2">
-              <StepComposer parentId={map.goal.id} label="Add a step" />
+              <StepComposer parentId={map.goal.id} label="Add a step" bare />
             </div>
           </div>
         )}
@@ -132,26 +132,21 @@ export function StepTree({
             Also counts towards this goal
           </h2>
           <ul className="divide-y divide-border">
-            <ColumnHeader priority="When" />
-            {linked.map(({ entry, row }) => [
-              <li key={`from-${entry.linkId}`} className="px-3 pt-2 text-small text-ink-muted">
-                From{' '}
-                <Link href={`/goals/${entry.fromGoal.id}`} className="underline">
-                  {entry.fromGoal.title}
-                </Link>
-              </li>,
-              row && (
-                <GoalRow
-                  key={entry.linkId}
-                  node={row}
-                  trail={[]}
-                  context={context}
-                  index={0}
-                  count={1}
-                  unlinkId={entry.linkId}
-                />
-              ),
-            ])}
+            {linked.map(
+              ({ entry, row }) =>
+                row && (
+                  <GoalRow
+                    key={entry.linkId}
+                    node={row}
+                    trail={[]}
+                    context={context}
+                    index={0}
+                    count={1}
+                    unlinkId={entry.linkId}
+                    fromGoal={entry.fromGoal}
+                  />
+                ),
+            )}
           </ul>
         </section>
       )}

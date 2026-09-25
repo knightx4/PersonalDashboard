@@ -1,7 +1,8 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { X } from 'lucide-react';
+import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { FieldError, Select } from '@/components/ui/field';
 import { catalogLabel, subtreeOf } from '@/lib/plan/catalog';
@@ -24,21 +25,33 @@ function stepName(ref: { number: number; title: string }): string {
  * An edge through a step above this one is drawn but cannot be removed here,
  * since it belongs to that step. The picker leaves out this step, everything
  * beneath it, what it already waits on and anything closed.
+ *
+ * The picker sits behind a "Wait on a step" line, as asking a question does,
+ * and a closed step does not offer it at all: nothing waits once it is done
+ * or dropped (plan #1041).
  */
 export function Dependencies<E extends TreeCatalogEntry>({
   node,
   catalog,
   groupOf,
   actions,
+  closed = false,
 }: {
   node: TreeDependencyNode;
   catalog: readonly E[];
   /** The heading a candidate is listed under in the picker. */
   groupOf: (entry: E) => string;
   actions: Pick<TreeActions, 'addDependency' | 'removeDependency'>;
+  /** Whether the step is done or dropped, which takes away the picker. */
+  closed?: boolean;
 }) {
+  const [picking, setPicking] = useState(false);
   const [addState, addAction, addPending] = useActionState(
-    actions.addDependency,
+    async (prev: TreeActionState, form: FormData) => {
+      const next = await actions.addDependency(prev, form);
+      if (!next.error) setPicking(false);
+      return next;
+    },
     {} as TreeActionState,
   );
   const [removeState, removeAction, removePending] = useActionState(
@@ -57,6 +70,10 @@ export function Dependencies<E extends TreeCatalogEntry>({
     const key = groupOf(entry);
     byModule.set(key, [...(byModule.get(key) ?? []), entry]);
   }
+
+  const offer = !closed && candidates.length > 0;
+  if (node.dependsOn.length === 0 && inherited.length === 0 && node.blocks.length === 0 && !offer)
+    return null;
 
   return (
     <div className="space-y-2">
@@ -108,19 +125,29 @@ export function Dependencies<E extends TreeCatalogEntry>({
         </p>
       )}
 
-      {candidates.length > 0 && (
-        <form action={addAction} className="flex flex-wrap items-center gap-2">
+      {offer && picking ? (
+        <form
+          action={addAction}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') setPicking(false);
+          }}
+          className="flex flex-wrap items-center gap-2"
+        >
           <input type="hidden" name="item" value={node.id} />
           {/* Width only. This carried `h-8 py-0 text-small`, which overrode
               three things the primitive is for: the dial's height, so it was
               32px on a phone where every control beside it is 36; and
               `text-base sm:text-ui`, which is the 16px that stops iOS zooming
               the whole page when the select is tapped. Twelve-pixel type on a
-              native picker bought nothing and cost that. */}
+              native picker bought nothing and cost that. `max-w-full` keeps
+              a long step title inside the panel on a phone, where it pushed
+              the chevron out of sight. */}
           <Select
             name="depends_on"
             defaultValue=""
-            className="w-auto max-w-xs"
+            required
+            autoFocus
+            className="w-auto min-w-0 max-w-full sm:max-w-xs"
             aria-label="A step this one has to wait for"
           >
             <option value="">Wait on a step…</option>
@@ -134,11 +161,26 @@ export function Dependencies<E extends TreeCatalogEntry>({
               </optgroup>
             ))}
           </Select>
-          <Button type="submit" variant="ghost" pending={addPending}>
-            {addPending ? 'Adding…' : 'Add'}
-          </Button>
+          <span className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setPicking(false)}
+              disabled={addPending}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" variant="ghost" pending={addPending}>
+              {addPending ? 'Adding…' : 'Add'}
+            </Button>
+          </span>
           <FieldError>{addState.error ?? removeState.error}</FieldError>
         </form>
+      ) : (
+        <>
+          {offer && <AddTrigger label="Wait on a step" onClick={() => setPicking(true)} />}
+          <FieldError>{removeState.error}</FieldError>
+        </>
       )}
     </div>
   );

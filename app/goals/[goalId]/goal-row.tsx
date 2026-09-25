@@ -158,6 +158,7 @@ export function GoalRow({
   index,
   count,
   unlinkId,
+  fromGoal,
 }: {
   node: GoalRowNode;
   trail: readonly boolean[];
@@ -167,6 +168,8 @@ export function GoalRow({
   count: number;
   /** Set on a step shown here through a link, so its menu can remove the link. */
   unlinkId?: string;
+  /** The goal a linked step lives under, said on the row and linked in the opened panel. */
+  fromGoal?: { id: string; title: string };
 }) {
   const { step } = node;
   const row = useTreeRow(node, {
@@ -389,6 +392,7 @@ export function GoalRow({
       menu={menu}
       actions={GOAL_TREE_ACTIONS}
       anchorId={`step-${step.id}`}
+      source={fromGoal ? `From ${fromGoal.title}` : undefined}
       comments={GOAL_COMMENTS}
       threadPlaceholder="A note on this step. Tag @dash to ask about it, or to give it figures to file."
       dependencies={{ catalog: context.catalog, groupOf: () => context.goalTitle }}
@@ -474,6 +478,11 @@ export function GoalRow({
       meta={
         <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">
           <span>{STEP_KIND_LABELS[step.kind]}</span>
+          {fromGoal && (
+            <Link href={`/goals/${fromGoal.id}`} className="underline">
+              From {fromGoal.title}
+            </Link>
+          )}
           {step.kind === 'rhythm' && step.rhythmCount && step.rhythmPeriod && (
             <span>{describeRhythm(step.rhythmCount, step.rhythmPeriod)}</span>
           )}
@@ -516,6 +525,7 @@ export function GoalRow({
         <StepComposer
           parentId={step.id}
           label={`Sub-step of ${step.title}`}
+          bare
           startOpen
           onClose={() => row.setAddingChild(false)}
         />

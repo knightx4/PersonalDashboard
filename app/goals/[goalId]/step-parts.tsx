@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { ComposeTitle, InlineInput, Input, Select, Textarea } from '@/components/ui/field';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useToast } from '@/components/ui/toast';
+import { cn } from '@/lib/cn';
 import { countProposed } from '@/lib/goals/shaping';
 import {
   RHYTHM_COUNT_MAX,
@@ -450,16 +451,25 @@ function RhythmFields({
   );
 }
 
-/** A new step or sub-step: a title and its kind, with how often for a rhythm. */
+/**
+ * A new step or sub-step: a title and its kind, with how often for a rhythm.
+ *
+ * `bare` is for a composer opened inside the Steps card, at its foot or in a
+ * row's sub-step slot: the form sits on the card's ground under the rule
+ * already there instead of drawing a card inside the card (plan #1041). The
+ * framed one is for a goal with no steps, where there is no card around it.
+ */
 export function StepComposer({
   parentId,
   label,
   startOpen = false,
+  bare = false,
   onClose,
 }: {
   parentId: string;
   label: string;
   startOpen?: boolean;
+  bare?: boolean;
   onClose?: () => void;
 }) {
   const [open, setOpenState] = useState(startOpen);
@@ -479,57 +489,63 @@ export function StepComposer({
 
   if (!open) return <AddTrigger label={label} onClick={() => setOpen(true)} />;
 
-  return (
-    <Card>
-      <form
-        action={add}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') setOpen(false);
-        }}
+  const form = (
+    <form
+      action={add}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') setOpen(false);
+      }}
+      className={cn(bare && 'space-y-2')}
+    >
+      <input type="hidden" name="parentId" value={parentId} />
+      <div className={cn(!bare && 'px-3 py-3')}>
+        <ComposeTitle
+          name="title"
+          required
+          autoFocus
+          maxLength={STEP_TITLE_MAX}
+          placeholder="A step, such as list every balance"
+          aria-label={label}
+        />
+      </div>
+      <div
+        className={cn(
+          'flex flex-wrap items-center gap-2',
+          !bare && 'border-t border-border px-3 py-2',
+        )}
       >
-        <input type="hidden" name="parentId" value={parentId} />
-        <div className="px-3 py-3">
-          <ComposeTitle
-            name="title"
-            required
-            autoFocus
-            maxLength={STEP_TITLE_MAX}
-            placeholder="A step, such as list every balance"
-            aria-label={label}
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2">
-          <Select
-            name="kind"
-            value={kind}
-            onChange={(event) => setKind(event.target.value as StepKind)}
-            aria-label="What kind of step"
-            className="w-auto"
+        <Select
+          name="kind"
+          value={kind}
+          onChange={(event) => setKind(event.target.value as StepKind)}
+          aria-label="What kind of step"
+          className="w-auto"
+        >
+          {STEP_KINDS.map((option) => (
+            <option key={option} value={option}>
+              {STEP_KIND_LABELS[option]}
+            </option>
+          ))}
+        </Select>
+        {kind === 'rhythm' && <RhythmFields count={null} period={null} />}
+        {state.error && <span className="text-small text-danger">{state.error}</span>}
+        <span className="ml-auto flex items-center gap-1">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => setOpen(false)}
+            disabled={adding}
           >
-            {STEP_KINDS.map((option) => (
-              <option key={option} value={option}>
-                {STEP_KIND_LABELS[option]}
-              </option>
-            ))}
-          </Select>
-          {kind === 'rhythm' && <RhythmFields count={null} period={null} />}
-          {state.error && <span className="text-small text-danger">{state.error}</span>}
-          <span className="ml-auto flex items-center gap-1">
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => setOpen(false)}
-              disabled={adding}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" size="sm" disabled={adding}>
-              {adding ? 'Adding…' : 'Add step'}
-            </Button>
-          </span>
-        </div>
-      </form>
-    </Card>
+            Cancel
+          </Button>
+          <Button type="submit" size="sm" disabled={adding}>
+            {adding ? 'Adding…' : 'Add step'}
+          </Button>
+        </span>
+      </div>
+    </form>
   );
+
+  return bare ? form : <Card>{form}</Card>;
 }

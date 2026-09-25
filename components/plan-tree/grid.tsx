@@ -7,7 +7,9 @@ import { cn } from '@/lib/cn';
  * makes the page scan: the health of a sub-sub-step sits under the health of
  * the feature above it, because the indent lives inside the name cell rather
  * than around the row. On a phone the three middle columns go and the name,
- * the health and the menu stay.
+ * the health and the menu stay, and the name wraps rather than truncating
+ * (tree-row.tsx), because at 390 pixels what the health word and the menu
+ * leave is two words of a title.
  */
 // The last column holds the row's quick actions as well as its menu, so it is
 // wide enough for them from sm up -- reserved rather than grown on hover,
