@@ -32,7 +32,7 @@ const MAX_ATTEMPTS = 5;
 const NO_CAPTIONS_RETRY_MS = 30 * 86_400_000;
 
 export type TranscriptState = 'queued' | 'fetched' | 'none' | 'failed';
-export type RequestedBy = 'press' | 'auto' | 'course';
+export type RequestedBy = 'press' | 'auto' | 'course' | 'match';
 export type CallTrigger = 'press' | 'scheduled';
 
 export function storagePathFor(videoId: string): string {
