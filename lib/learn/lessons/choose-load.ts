@@ -21,13 +21,32 @@ import { chooseLessons, type ChooseLessonsInput, type LessonChoice } from './cho
  * does, and no model call.
  */
 
-/** Cards a lesson can no longer be for: the writer dropped them unseen. */
+/**
+ * Cards a lesson can still be written for: the writer dropped them unseen. A
+ * dropped lesson is the exception and still counts as carded, because the
+ * same concept would be dropped again for the same reason (plan #978).
+ */
 const UNSEEN_STATUS = 'dropped';
 
 /** Card statuses still in the deck, waiting to be written or shown. */
 const IN_DECK = new Set(['picked', 'ready']);
 
 type CardRow = { concept_id: string; status: string };
+
+/**
+ * One person's tracks whose units are not to be laid out before a time: the
+ * top-up tried and failed, or found no unit to open (plan #978). Read here
+ * rather than in `loadSubjects`, which the pages share.
+ */
+async function loadHeld(supabase: LearnSupabaseClient, userId: string, now: Date): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('subjects')
+    .select('id')
+    .eq('user_id', userId)
+    .gt('lessons_held_until', now.toISOString());
+  if (error) throw new Error(`Reading which tracks are held failed: ${error.message}`);
+  return new Set(((data ?? []) as { id: string }[]).map((row) => row.id));
+}
 
 /** Every track, weighed, with its units, goals and graph, and the concepts on cards. */
 export async function loadLessonInput(
@@ -44,7 +63,7 @@ export async function loadLessonInput(
         .select('concept_id, status')
         .eq('user_id', userId)
         .not('concept_id', 'is', null)
-        .neq('status', UNSEEN_STATUS)
+        .or(`status.neq.${UNSEEN_STATUS},reason.eq.lesson`)
         .order('id')
         .range(from, to),
     ).catch((error: unknown) => {
@@ -82,13 +101,21 @@ export async function loadLessonInput(
   };
 }
 
-/** The lessons for `slots` Learn now slots, read and chosen in one call. */
+/**
+ * The lessons for `slots` Learn now slots, read and chosen in one call.
+ *
+ * A track under a hold (`lessons_held_until` in the future) still has its
+ * ready concepts taught, since the hold is about laying out units; only its
+ * need is left out of `needs`, and its id is listed in `held`.
+ */
 export async function chooseLessonsFor(
   supabase: LearnSupabaseClient,
   userId: string,
   slots: number,
   now: Date = new Date(),
-): Promise<LessonChoice> {
-  const input = await loadLessonInput(supabase, userId, now);
-  return chooseLessons({ ...input, slots });
+): Promise<LessonChoice & { held: string[] }> {
+  const [input, heldIds] = await Promise.all([loadLessonInput(supabase, userId, now), loadHeld(supabase, userId, now)]);
+  const choice = chooseLessons({ ...input, slots });
+  const held = choice.needs.filter((need) => heldIds.has(need.subjectId)).map((need) => need.subjectId);
+  return { ...choice, needs: choice.needs.filter((need) => !heldIds.has(need.subjectId)), held };
 }

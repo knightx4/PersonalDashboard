@@ -1881,15 +1881,49 @@ const shellSections: NavSection[] = [
 ];
 
 /**
- * Two Learn now cards for the deck: one idea card in the form the writer now
- * produces, and one written before cards carried one idea each.
+ * Three Learn now cards for the deck: a lesson from a track that cites no
+ * section (plan #978), one idea card in the form the writer now produces, and
+ * one written before cards carried one idea each.
  */
 const deckCards: FeedCard[] = [
   {
+    id: '00000000-0000-4000-8000-000000000003',
+    reason: 'lesson',
+    kind: 'lesson',
+    title: 'Price ceilings cause shortages',
+    source: 'Economics · Markets and prices',
+    track: { id: '00000000-0000-4000-8000-0000000000aa', name: 'Economics' },
+    article: '',
+    section: null,
+    why: 'Next in your Economics track. It builds on Supply and demand curves.',
+    takeaway: 'A legal maximum price set below what the market would clear at leaves more people wanting the good than there is of it.',
+    context:
+      'A price ceiling is a law saying a good may not be sold above a set price. The market-clearing price is the one at which the amount people want to buy equals the amount sellers offer.',
+    hook: 'When New York froze many rents after 1943, the city’s vacancy rate for controlled flats stayed below 2% for decades.',
+    summary:
+      'At the capped price, buyers ask for more than at the market price and sellers offer less, because some of them can no longer cover their costs. The gap has to be closed some other way: queues, waiting lists, favouritism or a black market.',
+    example:
+      'In 1970s America, a cap on petrol prices during the oil shocks led to queues that ran around the block, and some states rationed fuel by the last digit of the number plate.',
+    question: 'A city caps taxi fares at half what riders pay today. What happens to the wait for a taxi at rush hour, and why?',
+    answer:
+      'It gets longer. Fewer drivers work at the lower fare while more riders want a cheap ride, so the shortage shows up as time spent waiting.',
+    depth: null,
+    difficulty: null,
+    returning: null,
+    shown: [],
+    rest: [],
+    restMinutes: 0,
+    link: null,
+    site: null,
+    licence: null,
+  },
+  {
     id: '00000000-0000-4000-8000-000000000001',
     reason: 'interest',
+    kind: 'section',
     title: 'Planting on last year’s price',
     source: 'Cobweb model: Mechanism',
+    track: null,
     article: 'Cobweb model',
     section: 'Mechanism',
     why: 'You write about economic system design (Economics).',
@@ -1923,8 +1957,10 @@ const deckCards: FeedCard[] = [
   {
     id: '00000000-0000-4000-8000-000000000002',
     reason: 'gap',
+    kind: 'section',
     title: 'Tax incidence: Elasticity',
     source: null,
+    track: null,
     article: 'Tax incidence',
     section: 'Elasticity',
     why: 'A field you write about but have never been tested in: Public economics.',

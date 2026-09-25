@@ -11,7 +11,7 @@
 
 export type FeedCardRow = {
   id: string;
-  reason: 'interest' | 'gap' | 'goal' | 'queued';
+  reason: 'interest' | 'gap' | 'goal' | 'queued' | 'lesson';
   status: string;
   /** The idea's short name. Null on cards written before one idea per card. */
   idea_name?: string | null;
@@ -29,17 +29,41 @@ export type FeedCardRow = {
   check_answer?: string | null;
   depth?: string | null;
   difficulty?: string | null;
-  item: { title: string; canonical_url: string; licence: string | null } | null;
-  segment: { heading: string | null; text: string; section_anchor: string | null } | null;
+  item: CatalogueItem | null;
+  segment: CatalogueSegment | null;
+  /** A lesson's track and unit, by name (plan #978). Null on section cards. */
+  track_name?: string | null;
+  unit_title?: string | null;
+  subject_id?: string | null;
+  /** The section a lesson cites, when one was close enough to its claim. */
+  source_item?: CatalogueItem | null;
+  source_segment?: CatalogueSegment | null;
 };
+
+type CatalogueItem = { title: string; canonical_url: string; licence: string | null };
+type CatalogueSegment = { heading: string | null; text: string; section_anchor: string | null };
 
 export type FeedCard = {
   id: string;
-  reason: 'interest' | 'gap' | 'goal';
-  /** The idea's name, or "Article: Section" on a card written before ideas. */
+  reason: 'interest' | 'gap' | 'goal' | 'lesson';
+  /**
+   * A section card, made from a Wikipedia section, or a lesson written for a
+   * concept in one of your tracks (LEARN-LESSONS-SPEC; plan #978).
+   */
+  kind: 'section' | 'lesson';
+  /**
+   * The idea's name, or "Article: Section" on a card written before ideas. A
+   * lesson's is its concept's name.
+   */
   title: string;
-  /** "Article: Section", named under an idea's title as its source. Null when the title already is. */
+  /**
+   * The line under the title. "Article: Section" on an idea card, as its
+   * source, and null when the title already is. "Track · Unit" on a lesson.
+   */
   source: string | null;
+  /** The lesson's track, for Test me on this. Null on a section card. */
+  track: { id: string; name: string } | null;
+  /** The article the link goes to. Empty on a lesson that cites none. */
   article: string;
   section: string | null;
   why: string;
@@ -67,10 +91,10 @@ export type FeedCard = {
   rest: string[];
   /** Minutes the rest takes to read, rounded up. Zero when there is no rest. */
   restMinutes: number;
-  /** The section on the source's own page. */
-  link: string;
+  /** The section on the source's own page. Null on a lesson that cites none. */
+  link: string | null;
   /** Where the link goes, named: "Wikipedia", or the host for anything else. */
-  site: string;
+  site: string | null;
   licence: string | null;
 };
 
@@ -188,13 +212,16 @@ function sentenceCut(paragraph: string, limit: number): number {
  */
 export function toFeedCard(row: FeedCardRow): FeedCard | null {
   if (row.reason === 'queued') return null;
+  if (row.reason === 'lesson') return toLessonCard(row);
   if (!row.item || !row.segment || !row.summary || !row.why) return null;
   const { shown, rest, restMinutes } = splitForReading(row.segment.text);
   return {
     id: row.id,
     reason: row.reason,
+    kind: 'section',
     title: row.idea_name?.trim() || cardTitle(row.item.title, row.segment.heading),
     source: row.idea_name?.trim() ? cardTitle(row.item.title, row.segment.heading) : null,
+    track: null,
     article: row.item.title,
     section: row.segment.heading,
     why: row.why,
@@ -217,6 +244,55 @@ export function toFeedCard(row: FeedCardRow): FeedCard | null {
     link: sectionLink(row.item.canonical_url, row.segment.section_anchor),
     site: siteName(row.item.canonical_url),
     licence: licenceFor(row.item.licence, row.item.canonical_url),
+  };
+}
+
+/** "Economics · Supply and demand", or the track alone when the unit is not known. */
+export function lessonSourceLine(track: string, unit: string | null | undefined): string {
+  const unitTitle = unit?.trim();
+  return unitTitle ? `${track.trim()} · ${unitTitle}` : track.trim();
+}
+
+/**
+ * A lesson (plan #978): titled by its concept, with the track and unit under
+ * it. The section it cites, when there is one, is folded in and linked as the
+ * section card's is; with none, the card has no link and nothing to fold.
+ */
+function toLessonCard(row: FeedCardRow): FeedCard | null {
+  const title = row.idea_name?.trim();
+  const track = row.track_name?.trim();
+  if (!title || !track || !row.summary || !row.why) return null;
+  const item = row.source_item ?? null;
+  const segment = item ? (row.source_segment ?? null) : null;
+  const { shown, rest, restMinutes } = segment
+    ? splitForReading(segment.text)
+    : { shown: [], rest: [], restMinutes: 0 };
+  return {
+    id: row.id,
+    reason: 'lesson',
+    kind: 'lesson',
+    title,
+    source: lessonSourceLine(track, row.unit_title),
+    track: row.subject_id ? { id: row.subject_id, name: track } : null,
+    article: item?.title ?? '',
+    section: segment?.heading ?? null,
+    why: row.why,
+    takeaway: row.takeaway?.trim() || null,
+    context: row.context?.trim() || null,
+    hook: row.hook?.trim() || null,
+    summary: row.summary,
+    example: row.example?.trim() || null,
+    question: row.check_question && row.check_answer ? row.check_question : null,
+    answer: row.check_question && row.check_answer ? row.check_answer : null,
+    depth: null,
+    difficulty: isCardDifficulty(row.difficulty) ? row.difficulty : null,
+    returning: row.status === 'review' || row.status === 'skipped' ? row.status : null,
+    shown,
+    rest,
+    restMinutes,
+    link: item ? sectionLink(item.canonical_url, segment?.section_anchor ?? null) : null,
+    site: item ? siteName(item.canonical_url) : null,
+    licence: item ? licenceFor(item.licence, item.canonical_url) : null,
   };
 }
 

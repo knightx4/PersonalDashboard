@@ -1,3 +1,4 @@
+import type { LessonTopUpSummary } from '@/lib/learn/lessons/top-up';
 import type { CardToWrite, WriteResult } from './write-card';
 
 /**
@@ -105,6 +106,8 @@ export type TopUpSummary = {
   picked: number;
   /** Why the run stopped short of the target, when it did. */
   stopped: 'deadline' | 'nothing-to-pick' | 'pick-rounds' | 'no-progress' | null;
+  /** The lessons written before the section cards (plan #978), when that ran. */
+  lessons?: LessonTopUpSummary;
 };
 
 export async function runTopUpFor(

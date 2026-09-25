@@ -4,7 +4,10 @@
  *
  * Every track gets a weight from what you did with it in the last four weeks:
  * questions answered push it up, and questions you moved past without
- * answering, or pushed aside with Not now, push it down. A track with no
+ * answering, or pushed aside with Not now, push it down. Its lessons in Learn
+ * now count the same way (LEARN-LESSONS-SPEC, "How slots are shared between
+ * tracks"): Got it and Work on this as an answer, Not now as a question moved
+ * past. A track with no
  * history weighs 1. The mixed flow then shares its questions between tracks in
  * proportion to their weights, except that about one question in five goes to
  * the track asked about least, so the picks do not narrow to one track.
@@ -44,8 +47,12 @@ export type TrackActivity = {
   skipped: number;
   /** Its ideas you pushed aside with Not now. */
   pushedAside: number;
-  /** Questions from it you answered before the window. */
+  /** Questions from it you answered, and its lessons you engaged with, before the window. */
   answeredBefore: number;
+  /** Its lessons in Learn now swiped Got it or Work on this. */
+  lessonsTaken?: number;
+  /** Its lessons in Learn now swiped Not now. */
+  lessonsPassed?: number;
 };
 
 export type TrackWeight = {
@@ -66,20 +73,27 @@ const clamp = (value: number) => Math.min(MOST_WEIGHT, Math.max(LEAST_WEIGHT, va
  * from Learn would read as having stopped every track at once.
  */
 export function trackWeight(activity: TrackActivity, answeredElsewhere: boolean): TrackWeight {
-  const stopped =
-    activity.answered === 0 &&
-    activity.answeredBefore > 0 &&
-    activity.skipped + activity.pushedAside === 0 &&
-    answeredElsewhere;
+  const engaged = engagedWith(activity);
+  const passed = passedOver(activity);
+  const stopped = engaged === 0 && activity.answeredBefore > 0 && passed === 0 && answeredElsewhere;
   if (stopped) return { weight: STOPPED_WEIGHT, stopped };
 
-  const passed = activity.skipped + activity.pushedAside;
-  return { weight: clamp((activity.answered + 1) / (passed + 1)), stopped };
+  return { weight: clamp((engaged + 1) / (passed + 1)), stopped };
+}
+
+/** Questions answered and lessons taken in the window. */
+function engagedWith(activity: TrackActivity): number {
+  return activity.answered + (activity.lessonsTaken ?? 0);
+}
+
+/** Questions and lessons moved past, and ideas pushed aside, in the window. */
+function passedOver(activity: TrackActivity): number {
+  return activity.skipped + activity.pushedAside + (activity.lessonsPassed ?? 0);
 }
 
 /** Every track's weight, from the activity of all of them. */
 export function trackWeights(activity: Map<string, TrackActivity>): Map<string, TrackWeight> {
-  const answering = [...activity].filter(([, row]) => row.answered > 0).map(([id]) => id);
+  const answering = [...activity].filter(([, row]) => engagedWith(row) > 0).map(([id]) => id);
   const weights = new Map<string, TrackWeight>();
   for (const [subjectId, row] of activity) {
     const elsewhere = answering.some((id) => id !== subjectId);
@@ -121,8 +135,9 @@ export function weightReason(
     return `${lead}, because in the last four weeks you answered questions from other tracks and none from this one.`;
   }
 
-  const passed = row.skipped + row.pushedAside;
-  if (row.answered === 0 && passed === 0) {
+  const taken = row.lessonsTaken ?? 0;
+  const passedLessons = row.lessonsPassed ?? 0;
+  if (engagedWith(row) === 0 && passedOver(row) === 0) {
     return `${lead}, because you have not answered or skipped any of its questions in the last four weeks.`;
   }
 
@@ -130,6 +145,8 @@ export function weightReason(
     `you answered ${row.answered === 0 ? 'none' : row.answered} of its questions`,
     `skipped ${row.skipped === 0 ? 'none' : row.skipped}`,
     ...(row.pushedAside > 0 ? [`pushed ${plural(row.pushedAside, 'idea', 'ideas')} aside with Not now`] : []),
+    ...(taken > 0 ? [`took ${plural(taken, 'lesson', 'lessons')} in Learn now`] : []),
+    ...(passedLessons > 0 ? [`passed on ${plural(passedLessons, 'lesson', 'lessons')}`] : []),
   ];
   const listed = `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
 

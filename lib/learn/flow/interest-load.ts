@@ -15,11 +15,15 @@ import {
  * Reading what you did with each track's questions, for `interest.ts`
  * (plan #780).
  *
- * Three reads through the session client: the questions shown or answered in
+ * Four reads through the session client: the questions shown or answered in
  * the last twelve weeks, the ideas pushed aside with Not now in the last four,
- * and which track each of those ideas is in. Nothing is written, and a page
- * being opened counts for nothing; the rows read here are written when a
- * question is shown, when it is answered, and when Not now is pressed.
+ * the lessons swiped in Learn now in the last twelve (plan #978), and which
+ * track each of those ideas is in. Nothing is written, and a page being opened
+ * counts for nothing; the rows read here are written when a question is shown,
+ * when it is answered, when Not now is pressed, and when a lesson is swiped.
+ *
+ * A lesson's row keeps only its latest swipe, so a lesson swiped Not now and
+ * then Got it when it came back counts once, as taken.
  *
  * The lesson chooser runs with the service role, which RLS does not narrow, so
  * it passes `userId` and every read here then names the person.
@@ -33,6 +37,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * started, without reading every answer ever given.
  */
 const BEFORE_DAYS = 56;
+
+/** Lesson swipes that count as engaging with the track, and the one that counts as moving past it. */
+const LESSON_TAKEN = new Set(['known', 'review']);
+const LESSON_PASSED = 'skipped';
+
+type LessonRow = { concept_id: string; status: string; acted_at: string };
 
 type ProbeRow = {
   concept_id: string;
@@ -75,16 +85,26 @@ export async function loadTrackInterest(
     .eq('outcome', 'not_now')
     .not('concept_id', 'is', null)
     .gte('happened_at', since);
+  let lessonQuery = supabase
+    .from('feed_cards')
+    .select('concept_id, status, acted_at')
+    .eq('reason', 'lesson')
+    .in('status', [...LESSON_TAKEN, LESSON_PASSED])
+    .not('concept_id', 'is', null)
+    .gte('acted_at', from);
   if (userId) {
     probeQuery = probeQuery.eq('user_id', userId);
     asideQuery = asideQuery.eq('user_id', userId);
+    lessonQuery = lessonQuery.eq('user_id', userId);
   }
-  const [probes, asides] = await Promise.all([probeQuery, asideQuery]);
+  const [probes, asides, lessonCards] = await Promise.all([probeQuery, asideQuery, lessonQuery]);
 
   assertSchemaExposed(probes.error, LEARN_SCHEMA);
   if (probes.error) throw fail('Reading the questions you were asked', probes.error);
   assertSchemaExposed(asides.error, LEARN_SCHEMA);
   if (asides.error) throw fail('Reading what you pushed aside', asides.error);
+  assertSchemaExposed(lessonCards.error, LEARN_SCHEMA);
+  if (lessonCards.error) throw fail('Reading the lessons you swiped', lessonCards.error);
 
   // A question written ahead and never shown is a row too, and says nothing
   // about what you did.
@@ -93,7 +113,11 @@ export async function loadTrackInterest(
   );
   const pushed = ((asides.data ?? []) as { concept_id: string }[]).map((row) => row.concept_id);
 
-  const conceptIds = [...new Set([...rows.map((row) => row.concept_id), ...pushed])];
+  const lessons = (lessonCards.data ?? []) as LessonRow[];
+
+  const conceptIds = [
+    ...new Set([...rows.map((row) => row.concept_id), ...pushed, ...lessons.map((row) => row.concept_id)]),
+  ];
   const subjectOf = new Map<string, string>();
   if (conceptIds.length > 0) {
     let conceptQuery = supabase.from('concepts').select('id, subject_id').in('id', conceptIds);
@@ -151,6 +175,20 @@ export async function loadTrackInterest(
   for (const conceptId of pushed) {
     const subjectId = subjectOf.get(conceptId);
     if (subjectId) of(subjectId).pushedAside += 1;
+  }
+
+  for (const lesson of lessons) {
+    const subjectId = subjectOf.get(lesson.concept_id);
+    if (!subjectId) continue;
+    const track = of(subjectId);
+    const taken = LESSON_TAKEN.has(lesson.status);
+    if (!inWindow(lesson.acted_at)) {
+      if (taken) track.answeredBefore += 1;
+    } else if (taken) {
+      track.lessonsTaken = (track.lessonsTaken ?? 0) + 1;
+    } else {
+      track.lessonsPassed = (track.lessonsPassed ?? 0) + 1;
+    }
   }
 
   return { activity, weights: trackWeights(activity), asked };
