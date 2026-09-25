@@ -16,6 +16,7 @@ import {
   countOpenQuestions,
   countProposed,
   runInFlight,
+  runProgress,
   runLine,
   type GoalRun,
   type RunChanges,
@@ -67,7 +68,7 @@ function shapingLines(
     runLine: runLine(shaping.lastRun, now, (iso) => `on ${formatInstant(iso, timeZone, { weekday: false })}`),
     runFailed: shaping.lastRun?.status === 'failed',
     changes: changesLine(shaping.changes),
-    runningSince: running && shaping.lastRun ? shaping.lastRun.createdAt : null,
+    running: running && shaping.lastRun ? runProgress(shaping.lastRun, now) : null,
   };
 }
 

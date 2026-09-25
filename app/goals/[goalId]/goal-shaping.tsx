@@ -2,7 +2,6 @@
 
 import { useActionState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { RunningFor } from '@/app/dev/plan/plan-run-status';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FogNote } from '@/components/dev/fog-note';
@@ -35,7 +34,7 @@ export function GoalShaping({
   runLine,
   runFailed,
   changes,
-  runningSince,
+  running: progress,
   canRun,
 }: {
   goalId: string;
@@ -46,13 +45,16 @@ export function GoalShaping({
   runFailed: boolean;
   /** What the ended run changed, counted from history (plan #961). */
   changes: string | null;
-  /** When the run still going started, or null when none is. */
-  runningSince: string | null;
+  /**
+   * Where the run still going has got to, as "on Draft the letter, 3 minutes
+   * ago" (plan #1002), or null when none is going.
+   */
+  running: string | null;
   /** Whether this account can start a run (the owner's only). */
   canRun: boolean;
 }) {
   const router = useRouter();
-  const running = runningSince !== null;
+  const running = progress !== null;
   useEffect(() => {
     if (!running) return;
     const timer = setInterval(() => router.refresh(), RUN_POLL_MS);
@@ -63,13 +65,10 @@ export function GoalShaping({
   const error = approveState.error ?? workState.error;
   const message = workState.message ?? approveState.message;
 
-  const status = runningSince ? (
+  const status = running ? (
     <p role="status" className="flex items-center gap-1.5 text-small text-accent">
       <span className="size-1.5 animate-pulse rounded-full bg-accent" aria-hidden />
-      <span>
-        Claude is working on this
-        <RunningFor startedAt={runningSince} claim={undefined} />
-      </span>
+      <span>Claude is working on this · {progress}</span>
     </p>
   ) : (
     runLine && (

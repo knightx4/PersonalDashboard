@@ -13,7 +13,7 @@
  * mean.
  */
 import { formatInstant } from './dates';
-import { RUN_QUIET_MS, type GoalRunStatus } from '@/lib/goals/shaping';
+import { runIsQuiet, runProgress, type GoalRunStatus } from '@/lib/goals/shaping';
 
 export type RunJob = 'goal' | 'daily' | 'weekly' | 'reshape' | 'step' | 'phase' | 'prepare';
 
@@ -27,6 +27,9 @@ export type RunListing = {
   endedAt: string | null;
   summary: string | null;
   error: string | null;
+  /** When the session last reported, and what it said it was on (plan #1002). */
+  lastSeenAt: string | null;
+  nowOn: string | null;
   /** The goal or step it was on; null for a morning or weekly run, or when that item was deleted. */
   item: { id: string; title: string; level: 'goal' | 'step' } | null;
 };
@@ -43,16 +46,19 @@ export const JOB_LABELS: Record<RunJob, string> = {
 };
 
 /**
- * How a run ended, in a word or two. A started run past the quiet window is
- * one whose session died without writing back, the same reading the goal
- * page gives its latest run.
+ * How a run ended, in a word or two. A started run quiet for longer than
+ * RUN_QUIET_MS is one whose session died without writing back; the sweep
+ * closes it as failed on the next tick, and until then it reads as silent.
  */
 export type RunOutcome = 'done' | 'failed' | 'running' | 'silent';
 
-export function runOutcome(run: Pick<RunListing, 'status' | 'createdAt'>, now: number): RunOutcome {
+export function runOutcome(
+  run: Pick<RunListing, 'status' | 'createdAt'> & { lastSeenAt?: string | null },
+  now: number,
+): RunOutcome {
   if (run.status === 'done') return 'done';
   if (run.status === 'failed') return 'failed';
-  return now - Date.parse(run.createdAt) < RUN_QUIET_MS ? 'running' : 'silent';
+  return runIsQuiet(run, now) ? 'silent' : 'running';
 }
 
 export const OUTCOME_LABELS: Record<RunOutcome, string> = {
@@ -89,6 +95,8 @@ export type RunRowWithItem = {
   ended_at: string | null;
   summary: string | null;
   error: string | null;
+  last_seen_at?: string | null;
+  now_on?: string | null;
   item: { id: string; title: string; level: string } | null;
 };
 
@@ -123,6 +131,8 @@ export function toRunListings(rows: readonly RunRowWithItem[]): RunListing[] {
       endedAt: row.ended_at,
       summary: row.summary,
       error: row.error,
+      lastSeenAt: row.last_seen_at ?? null,
+      nowOn: row.now_on ?? null,
       item: row.item
         ? { id: row.item.id, title: row.item.title, level: row.item.level === 'goal' ? 'goal' : 'step' }
         : null,
@@ -131,13 +141,20 @@ export function toRunListings(rows: readonly RunRowWithItem[]): RunListing[] {
 }
 
 /**
- * The line under a run's heading: how it ended, when it started, and how long
- * it took. Shared by the Runs page and a run's own page (plan #1013).
+ * The line under a run's heading: how it ended, where a running one has got
+ * to, when it started, and how long it took. Shared by the Runs page and a
+ * run's own page (plan #1013).
  */
 export function runMeta(run: RunListing, now: number, timeZone: string): { outcome: RunOutcome; meta: string } {
   const outcome = runOutcome(run, now);
   const took = runDuration(run);
-  const meta = [OUTCOME_LABELS[outcome], formatInstant(run.createdAt, timeZone), took ? `took ${took}` : null]
+  const progress = outcome === 'running' ? runProgress(run, now) : null;
+  const meta = [
+    OUTCOME_LABELS[outcome],
+    progress,
+    formatInstant(run.createdAt, timeZone),
+    took ? `took ${took}` : null,
+  ]
     .filter(Boolean)
     .join(' · ');
   return { outcome, meta };

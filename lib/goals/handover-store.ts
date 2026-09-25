@@ -13,7 +13,6 @@ import {
   type SendMode,
   type SendTarget,
 } from '@/lib/goals/handover';
-import { RUN_QUIET_MS } from '@/lib/goals/shaping';
 import { recordAndFire } from '@/lib/goals/shaping-store';
 import { loadLiveTree } from '@/lib/goals/steps-store';
 
@@ -58,19 +57,23 @@ async function loadTarget(
   return null;
 }
 
-/** Started runs young enough to still be going, on anything a send might overlap. */
-async function loadLiveRuns(client: GoalsSupabaseClient, userId: string, now: number): Promise<LiveRun[]> {
+/**
+ * Every started run, on anything a send might overlap. The sweep closes quiet
+ * ones (plan #1002), so these are few; sendRefusal drops any that went quiet
+ * since the last tick.
+ */
+async function loadLiveRuns(client: GoalsSupabaseClient, userId: string): Promise<LiveRun[]> {
   const { data, error } = await client
     .from('runs')
-    .select('item_id, job, created_at')
+    .select('item_id, job, created_at, last_seen_at')
     .eq('user_id', userId)
-    .eq('status', 'started')
-    .gte('created_at', new Date(now - RUN_QUIET_MS).toISOString());
+    .eq('status', 'started');
   if (error) throw new Error(`Could not read runs: ${error.message}`);
   return (data ?? []).map((row) => ({
     itemId: row.item_id as string | null,
     job: row.job as string,
     createdAt: row.created_at as string,
+    lastSeenAt: row.last_seen_at as string | null,
   }));
 }
 
@@ -95,7 +98,7 @@ export async function sendGoalStep(input: {
   if (!target) return { ok: false, error: 'That step is no longer on the page.' };
 
   const mode = input.mode ?? 'send';
-  const refused = sendRefusal(target, await loadLiveRuns(client, userId, now), now, mode);
+  const refused = sendRefusal(target, await loadLiveRuns(client, userId), now, mode);
   if (refused) return { ok: false, error: refused };
   // sendRefusal has already turned away a step with no job.
   const job = jobFor(target.step, mode) as SendJob;

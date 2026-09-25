@@ -7,8 +7,10 @@ import {
   countOpenQuestions,
   countProposed,
   goalRunText,
+  quietRunError,
   RUN_QUIET_MS,
   runInFlight,
+  runProgress,
   runChanges,
   runLine,
   type GoalRun,
@@ -45,7 +47,7 @@ function run(extra: Partial<GoalRun> = {}): GoalRun {
   return {
     id: 'run',
     status: 'started',
-    createdAt: '2026-09-24T11:00:00Z',
+    createdAt: '2026-09-24T11:30:00Z',
     endedAt: null,
     summary: null,
     error: null,
@@ -91,16 +93,46 @@ describe('questions put aside (plan #956)', () => {
 });
 
 describe('runs', () => {
-  it('takes a started run to be going for two hours, then not', () => {
+  it('takes a started run to be going until it has been quiet for 45 minutes', () => {
+    expect(RUN_QUIET_MS).toBe(45 * 60 * 1000);
     expect(runInFlight(null, NOW)).toBe(false);
     expect(runInFlight(run(), NOW)).toBe(true);
     expect(runInFlight(run({ createdAt: new Date(NOW - RUN_QUIET_MS).toISOString() }), NOW)).toBe(false);
     expect(runInFlight(run({ status: 'done' }), NOW)).toBe(false);
   });
 
+  it('measures quiet from the last report, so a long run that keeps reporting stays going', () => {
+    const long = run({ createdAt: '2026-09-24T09:00:00Z', lastSeenAt: '2026-09-24T11:50:00Z' });
+    expect(runInFlight(long, NOW)).toBe(true);
+    expect(runInFlight({ ...long, lastSeenAt: '2026-09-24T11:10:00Z' }, NOW)).toBe(false);
+  });
+
+  it('says which step a running run is on and when it last reported', () => {
+    const on = run({ lastSeenAt: '2026-09-24T11:57:00Z', nowOn: 'Draft the letter to Edfinancial' });
+    expect(runProgress(on, NOW)).toBe('on Draft the letter to Edfinancial, 3 minutes ago');
+    expect(runProgress({ ...on, lastSeenAt: '2026-09-24T11:59:30Z' }, NOW)).toBe(
+      'on Draft the letter to Edfinancial, just now',
+    );
+    expect(runProgress({ ...on, lastSeenAt: '2026-09-24T11:59:00Z' }, NOW)).toBe(
+      'on Draft the letter to Edfinancial, 1 minute ago',
+    );
+    expect(runProgress(run({ lastSeenAt: '2026-09-24T11:57:00Z' }), NOW)).toBe('last reported 3 minutes ago');
+    expect(runProgress(run(), NOW)).toBe('started 30 minutes ago');
+    expect(runProgress(run({ status: 'done' }), NOW)).toBeNull();
+  });
+
+  it('closes a quiet run with where it stopped', () => {
+    expect(quietRunError({ nowOn: 'Draft the letter' })).toBe(
+      'The session stopped reporting while on Draft the letter, and nothing was heard for 45 minutes.',
+    );
+    expect(quietRunError({ nowOn: null })).toBe(
+      'The session never reported progress, and nothing was heard for 45 minutes.',
+    );
+  });
+
   it('says what the last run did in one line', () => {
     expect(runLine(null, NOW, when)).toBeNull();
-    expect(runLine(run(), NOW, when)).toBe('Claude is working on this, started at 11:00.');
+    expect(runLine(run(), NOW, when)).toBe('Claude is working on this, started at 11:30.');
     expect(
       runLine(run({ status: 'done', endedAt: '2026-09-24T11:20:00Z', summary: 'Proposed 5 steps.\nMore.' }), NOW, when),
     ).toBe('Claude worked on this at 11:20: Proposed 5 steps.');
