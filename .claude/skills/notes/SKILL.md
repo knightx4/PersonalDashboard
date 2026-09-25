@@ -196,8 +196,8 @@ skipped, and this is where they are paid for:
     npm run gate
 
 It runs what CI runs on main: the test database, migrations, typecheck, lint,
-contrast, UI laws, the whole test suite including tests/, and the build, and
-stops at the first failure with the step's name. Run it after merging
+contrast, UI laws, the whole test suite including tests/, and the build, in
+three lanes side by side, and names every step that failed. Run it after merging
 `origin/main` into the batch branch, so it checks what main will be. The old
 gate was lint, `vitest run lib` and the build, and every failure that kept
 main red on 23 September 2026 came through what that left out.

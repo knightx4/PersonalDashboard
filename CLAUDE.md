@@ -44,7 +44,7 @@ Every session that pushes to main runs `npm run gate` first, after merging
 `origin/main` into its branch, and pushes only when it ends with `gate: all
 clear`. The gate ([scripts/gate.sh](scripts/gate.sh)) runs the same checks as
 CI's check and design jobs, starting the local test database the tests/ suite
-needs. It takes about six minutes.
+needs. It takes about three minutes.
 
 Several sessions merge to main at once, and nothing on GitHub stops a red
 merge. On 23 September 2026 main stayed red for fourteen hours through seven
