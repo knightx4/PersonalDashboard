@@ -11,6 +11,7 @@ import {
   DISMISSAL_RULE,
   FOG_RULE,
   PLAIN_ENGLISH_RULE,
+  QUESTION_RULE,
   dismissedUnder,
   planBrief,
 } from '@/lib/plan/brief';
@@ -1196,11 +1197,12 @@ async function startReshape(
     '- A step an answer has made pointless is dropped with the reason, naming the answer ' +
     'that did it. A re-shape may drop, and must say why.\n' +
     `- A question an answer surfaced is written as a fresh decision ${where}, ` +
-    'with its real options, what each costs, and your recommendation.\n\n' +
+    'with its real options, what each costs, and your recommendation -- but only if it clears ' +
+    'the bar for a question below; one that does not, you settle and write into the step.\n\n' +
     'Everything you add is proposed and stays proposed. Do not approve anything, do not ' +
     'answer a decision, do not start or build a step, and do not re-propose something the ' +
     'feature already holds. Report what you proposed, what you dropped and why, and what ' +
-    `fog you cleared.\n\n${PLAIN_ENGLISH_RULE}\n\n${FOG_RULE}\n\n${DISMISSAL_RULE}\n\nThe brief is below; it is the plan as the app holds it right ` +
+    `fog you cleared.\n\n${PLAIN_ENGLISH_RULE}\n\n${FOG_RULE}\n\n${QUESTION_RULE}\n\n${DISMISSAL_RULE}\n\nThe brief is below; it is the plan as the app holds it right ` +
     'now, and the plan is the source of truth. "Decided so far" is every answer settled ' +
     'beneath this feature.\n\n' +
     planBrief(sections, node, { thread: true }) +

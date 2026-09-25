@@ -226,7 +226,9 @@ Mark it `blocked` immediately and move to the next one — do not stall the
 batch. The note must say exactly what is needed, in a form the user can answer
 in one line:
 
-- Needs a decision → the options, and a recommendation.
+- Needs a decision → the options, and a recommendation. Only a real one: a
+  choice you would recommend and the user would very likely accept is yours
+  to make. Make it, and say what you chose in the note you close with.
 - Needs a credential or access → which one, and where it goes.
 - Needs information only the user has → the specific question.
 - Too large for a batch → what it really involves, and a proposed split.

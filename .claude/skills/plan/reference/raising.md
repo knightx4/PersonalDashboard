@@ -53,6 +53,11 @@ a reply written while nothing was awake, and that answer is what to build
 against from then on. `--from <n>` stamps the step you were on, which is what
 makes a raise legible a week later.
 
+Raise only what clears the same bar as a decision (`building.md`, **When you
+reach something you should not decide**). A risk worth fixing that you can
+describe is an idea, and a question of taste you would answer the way the
+person almost certainly would is not worth a raise.
+
 **`--ask` is required, and it is the row.** The title says what it is about and
 the detail is the evidence; the ask is the move you want back, in one sentence
 the person can answer in one line — a question with your recommendation, an

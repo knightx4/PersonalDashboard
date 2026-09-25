@@ -27,7 +27,7 @@ import {
   sendOverClaim,
   underwayRefusal,
 } from './liveness';
-import { planBrief } from './brief';
+import { QUESTION_RULE, planBrief } from './brief';
 import { endRunsOnStep, loadLastRuns, reshapeUnderway, startRoutineRun } from './runs';
 import { isClosed, loadPlan } from './load';
 import {
@@ -258,12 +258,14 @@ export async function handStepToClaude(input: {
       'app holds it right now, and the plan is the source of truth -- claim the step, build ' +
       'it, verify, commit with the step number in the subject, and close it with a note. ' +
       'Merge it to main when it is closed.\n\n' +
+      `${QUESTION_RULE}\n\n` +
       planBrief(sections, node, { thread: true, liveness })
     : `Build plan step #${node.number}, "${node.title}", and the steps beneath it, following ` +
       '.claude/skills/plan/SKILL.md -- the Building section, which has more than one step to ' +
       'build and so is orchestrated: send each step to its own subagent and keep your own ' +
       'context for the batch. The brief is below; it is the plan as the app holds it right ' +
       'now, and the plan is the source of truth.\n\n' +
+      `${QUESTION_RULE}\n\n` +
       planBrief(sections, node, { thread: true, liveness });
 
   const result = await startRoutineRun({

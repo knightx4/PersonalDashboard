@@ -165,12 +165,29 @@ short.
 
 ## When you reach something you should not decide
 
-A design choice with two real answers, a cost worth somebody's opinion, a thing
-the brief did not say — do not pick one and build on it. Guessing is cheap in
-the moment and expensive later, because a guess built on looks exactly like a
-decision from the outside.
+Most choices are yours. The person takes the recommended option almost every
+time, so a question you would answer with a recommendation they would very
+likely accept costs them a visit to the page and holds the step up for
+nothing. Decide it, build on it, and say what you chose and why in one line of
+the note you close the step with, so they can still overrule it.
 
-Write it down instead, and stop:
+Stop and ask only when at least one of these holds:
+
+- **It is hard to undo.** Deleting or rewriting their data, a stored shape
+  that will fill up with data, anything sent outside the app, anything that
+  costs money.
+- **They could reasonably want it the other way, and nothing settles it.** It
+  changes what they see or do, and neither the design laws, the code, an
+  earlier answer nor the brief already points one way.
+- **It changes the scope.** Whether to build something at all, or building
+  noticeably more or less than the step asked for.
+
+Names, wording, layout within the design laws, defaults, thresholds, ordering,
+and which of two equivalent implementations to use are not on that list.
+
+When one of them does hold, do not pick an answer and build on it. A guess
+built on looks exactly like a decision from the outside. Write it down
+instead, and stop:
 
 ```
 npx tsx scripts/plan.ts add "Which shape for the export?" --parent <the feature> \
