@@ -116,6 +116,23 @@ const home: ComponentProps<typeof DailyView>['view'] = {
       createdAt: '2026-09-21T06:00:00Z',
     },
   ],
+  didYouGo: [
+    {
+      id: 'sug-0',
+      itemId: null,
+      kind: 'events',
+      title: 'Open evening at the options desk',
+      detail: null,
+      url: null,
+      place: 'Canary Wharf',
+      source: 'Eventbrite',
+      happensOn: '2026-09-18',
+      startsAt: null,
+      reaction: 'going',
+      attended: null,
+      createdAt: '2026-09-14T06:00:00Z',
+    },
+  ],
   rhythms: [
     {
       id: 'review',

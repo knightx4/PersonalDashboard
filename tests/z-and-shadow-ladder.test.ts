@@ -68,9 +68,6 @@ function sources(directory: string): string[] {
       if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
       out.push(...sources(path));
     } else if (['.ts', '.tsx'].includes(extname(entry.name))) {
-      // tests/lint-boundaries.test.ts writes __design_probe.ts into app/ and
-      // components/ and deletes it again, so a `__` file here is another
-      // test's, may be gone by the time this reads it, and is not the app.
       if (entry.name.startsWith('__')) continue;
       out.push(path);
     }

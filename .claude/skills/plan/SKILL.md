@@ -141,8 +141,8 @@ thousand tokens, and gets to the end.
      conflicts.
    - `npm run gate`. It runs what CI runs on main: the test database,
      migrations, typecheck, lint, contrast, UI laws, the whole test suite
-     including tests/, and the build. It stops at the first failure and
-     names the step. The old gate here was lint, `vitest run lib` and the
+     including tests/, and the build, in three lanes side by side, and
+     names every step that failed. The old gate here was lint, `vitest run lib` and the
      build, and every failure that kept main red on 23 September 2026 came
      through what that left out.
    - Merge the working branch into `main` with `--no-ff`, subject `Merge plan
@@ -155,7 +155,7 @@ thousand tokens, and gets to the end.
    add a commit against that step's number, before the merge. That includes
    a failure another session merged: main is what you are about to push, so
    it is yours to get passing, and a step that merges onto red makes it
-   worse. Running the gate before every merge costs about six minutes a step
+   worse. Running the gate before every merge costs about three minutes a step
    (the first run in a session adds a minute to start the database). Decision #674
    chose that over the old arrangement, where a closed step sat on an unpushed
    branch until the batch ended.

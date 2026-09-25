@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  didYouGoSuggestions,
   helpGoals,
   homeSuggestions,
   ignoredBefore,
@@ -242,5 +243,45 @@ describe('toSuggestion', () => {
       created_at: '2026-09-24T00:00:00Z',
     });
     expect(s.reaction).toBeNull();
+  });
+});
+
+describe('did you go', () => {
+  const today = '2026-10-01';
+
+  it('asks from the day after an event you said you were going to, most recent first', () => {
+    const out = didYouGoSuggestions(
+      [
+        suggestion({ id: 'today', reaction: 'going', happensOn: '2026-10-01' }),
+        suggestion({ id: 'yesterday', reaction: 'going', happensOn: '2026-09-30' }),
+        suggestion({ id: 'last-week', reaction: 'going', happensOn: '2026-09-24' }),
+      ],
+      today,
+    );
+    expect(out.map((s) => s.id)).toEqual(['yesterday', 'last-week']);
+  });
+
+  it('does not ask once answered, when not going, when undated or when long past', () => {
+    const out = didYouGoSuggestions(
+      [
+        suggestion({ id: 'went', reaction: 'going', attended: true, happensOn: '2026-09-30' }),
+        suggestion({ id: 'did-not', reaction: 'going', attended: false, happensOn: '2026-09-30' }),
+        suggestion({ id: 'ignored', reaction: 'ignored', happensOn: '2026-09-30' }),
+        suggestion({ id: 'undated', reaction: 'going', happensOn: null }),
+        suggestion({ id: 'edge', reaction: 'going', happensOn: '2026-09-17' }),
+        suggestion({ id: 'old', reaction: 'going', happensOn: '2026-09-16' }),
+      ],
+      today,
+    );
+    expect(out.map((s) => s.id)).toEqual(['edge']);
+  });
+
+  it('reads a yes into the next brief as went, and a no as did not go', () => {
+    expect(pastLine(suggestion({ title: 'A talk', reaction: 'going', attended: true }))).toContain(
+      'going, and went: "A talk"',
+    );
+    expect(pastLine(suggestion({ title: 'A talk', reaction: 'going', attended: false }))).toContain(
+      'going, and did not go',
+    );
   });
 });

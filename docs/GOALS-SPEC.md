@@ -221,7 +221,9 @@ the same allowance. So Goals runs on a schedule rather than on every change:
   events, volunteer openings, reading, courses or job leads (plan #1028).
   Each suggestion carries its kind and has quick **going / not for me**
   buttons, and the next week's research for a kind reads the reactions to
-  that kind. Sources such as Eventbrite,
+  that kind. Going puts it on Todo on its date. From the day after, the home
+  asks "Did you go?" with yes and no, for up to two weeks, and a tick on Todo
+  counts as yes; the brief reads the answer beside the reaction (plan #1020). Sources such as Eventbrite,
   Meetup and org newsletters vary in how reachable and current they are, so
   the first few weeks will be uneven and should improve with the feedback.
 - **On request.** A **Work on this** button on a goal fires one run for it,

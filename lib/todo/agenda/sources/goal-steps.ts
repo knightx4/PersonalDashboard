@@ -3,11 +3,10 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { countTowards } from '@/lib/goals/rhythms-store';
-import { periodOf, progressLine } from '@/lib/goals/rhythms';
-import { RHYTHM_PERIODS, type RhythmPeriod } from '@/lib/goals/steps';
+import { progressLine } from '@/lib/goals/rhythms';
 import { loadTodoGoals, setStepStatus } from '@/lib/goals/steps-store';
 import { todoSuggestions } from '@/lib/goals/suggestions';
-import { loadGoingSuggestions, markAttended } from '@/lib/goals/suggestions-store';
+import { loadGoingSuggestions, recordAttended } from '@/lib/goals/suggestions-store';
 import { dismiss, undismiss } from '@/lib/todo/agenda/dismissals';
 import { SNOOZE_DAYS, todayIn } from '@/lib/todo/tasks/model';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
@@ -38,7 +37,8 @@ import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/
  * weekly run that you pressed going on shows on its date, linked to the
  * event's page. Ticking it records that you went and, when it was suggested
  * for a rhythm, counts one towards that rhythm's current period. One whose
- * date has passed leaves the list rather than piling up.
+ * date has passed leaves the list rather than piling up; from the day after,
+ * the Goals home asks whether you went instead (plan #1020).
  */
 
 const PREFIX = 'goal_steps:';
@@ -117,7 +117,7 @@ export const goalStepsSource: AgendaSource = {
     const rhythm = rhythmOf(key);
     if (rhythm) await countTowards(client, rhythm.itemId, rhythm.startsOn, 1);
     else if (key.startsWith(SUGGESTION_PREFIX)) {
-      await attendSuggestion(client, key.slice(SUGGESTION_PREFIX.length), todayIn(ctx.timezone, ctx.now));
+      await recordAttended(client, key.slice(SUGGESTION_PREFIX.length), true, todayIn(ctx.timezone, ctx.now));
     } else await setStepStatus(client, idOf(key), 'done');
     revalidatePath('/goals', 'layout');
   },
@@ -132,33 +132,6 @@ export const goalStepsSource: AgendaSource = {
     await dismiss(ctx.userId, 'goal_step', key, null);
   },
 };
-
-/**
- * You went: record it on the suggestion, and when it was suggested for a
- * rhythm, count one towards that rhythm's current period.
- */
-async function attendSuggestion(
-  client: Awaited<ReturnType<typeof createGoalsClient>>,
-  id: string,
-  today: string,
-): Promise<void> {
-  if (!(await markAttended(client, id))) return;
-  const { data: suggestion } = await client
-    .from('suggestions')
-    .select('item_id')
-    .eq('id', id)
-    .maybeSingle();
-  const itemId = (suggestion?.item_id as string | null | undefined) ?? null;
-  if (!itemId) return;
-  const { data: item } = await client
-    .from('items')
-    .select('kind, rhythm_period')
-    .eq('id', itemId)
-    .maybeSingle();
-  const period = item?.rhythm_period as RhythmPeriod | null | undefined;
-  if (item?.kind !== 'rhythm' || !period || !RHYTHM_PERIODS.includes(period)) return;
-  await countTowards(client, itemId, periodOf(period, today).startsOn, 1);
-}
 
 function idOf(key: string): string {
   return key.slice(PREFIX.length);

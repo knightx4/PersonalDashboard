@@ -9,8 +9,8 @@ import { loadGoalFlags, loadGoalTitles } from '@/lib/goals/flags-store';
 import { loadRunsEndedSince } from '@/lib/goals/runs-store';
 import { loadSinceVisit } from '@/lib/goals/since-visit-store';
 import { loadDailyView } from '@/lib/goals/steps-store';
-import { homeSuggestions } from '@/lib/goals/suggestions';
-import { loadRecentSuggestions } from '@/lib/goals/suggestions-store';
+import { didYouGoSuggestions, homeSuggestions } from '@/lib/goals/suggestions';
+import { loadGoingSuggestions, loadRecentSuggestions } from '@/lib/goals/suggestions-store';
 import { recordVisit } from '@/lib/goals/visits-store';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { DailyView } from './daily-view';
@@ -23,7 +23,8 @@ export const dynamic = 'force-dynamic';
  * view"; plan #926): what is waiting on you, then the next few things for
  * each active goal. Adding and arranging goals is on the All goals tab, and
  * each goal's full tree is one tap from here. The weekly run's suggestions
- * (plan #934) sit after what is waiting on you.
+ * (plan #934) sit after what is waiting on you, below "Did you go?" for the
+ * events you said you were going to whose day has passed (plan #1020).
  *
  * Each visit is recorded (plan #1019). On the day you come back after five or
  * more days away, the page leads with a catch-up from the day you left.
@@ -40,9 +41,10 @@ export default async function GoalsPage() {
   const account = await loadAccountSettings(user.id);
   const client = await createGoalsClient();
   const today = todayIn(account.timezone);
-  const [daily, suggestions, visit, flags] = await Promise.all([
+  const [daily, suggestions, going, visit, flags] = await Promise.all([
     loadDailyView(client, { userId: user.id, today }),
     loadRecentSuggestions(client),
+    loadGoingSuggestions(client),
     recordVisit(client, { userId: user.id, today }),
     createClient().then((supabase) => loadGoalFlags(supabase, { userId: user.id })),
   ]);
@@ -62,7 +64,13 @@ export default async function GoalsPage() {
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Goals" />
       <DailyView
-        view={{ ...view, suggestions: homeSuggestions(suggestions, today), catchUp: away, sinceVisit: lately }}
+        view={{
+          ...view,
+          suggestions: homeSuggestions(suggestions, today),
+          didYouGo: didYouGoSuggestions(going, today),
+          catchUp: away,
+          sinceVisit: lately,
+        }}
         timeZone={account.timezone}
       />
     </div>
