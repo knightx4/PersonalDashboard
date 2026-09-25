@@ -26,7 +26,8 @@ const RUN_POLL_MS = 15_000;
  * Claude on this goal (plan #932): whether you have approved it, what Claude
  * has proposed and asked, how its last run went, and the two presses. Work on
  * this fires the goals routine for this goal; Approve opens what it proposed
- * and lets it change the steps here without asking from then on.
+ * and lets it change the steps here without asking from then on. With nothing
+ * to approve it is one line rather than a card.
  */
 export function GoalShaping({
   goalId,
@@ -62,6 +63,66 @@ export function GoalShaping({
   const error = approveState.error ?? workState.error;
   const message = workState.message ?? approveState.message;
 
+  const status = runningSince ? (
+    <p role="status" className="flex items-center gap-1.5 text-small text-accent">
+      <span className="size-1.5 animate-pulse rounded-full bg-accent" aria-hidden />
+      <span>
+        Claude is working on this
+        <RunningFor startedAt={runningSince} claim={undefined} />
+      </span>
+    </p>
+  ) : (
+    runLine && (
+      <div className="space-y-0.5">
+        <p className={runFailed ? 'text-small text-danger' : 'text-small text-ink-muted'}>{runLine}</p>
+        {changes && <p className="text-small text-ink-muted">{changes}</p>}
+      </div>
+    )
+  );
+  const workButton = canRun && (
+    <form action={work}>
+      <input type="hidden" name="goalId" value={goalId} />
+      <Button
+        type="submit"
+        variant={approval.approve ? 'secondary' : 'primary'}
+        pending={starting}
+        disabled={running}
+      >
+        Work on this
+      </Button>
+    </form>
+  );
+  const feedback = error ? (
+    <p role="alert" className="text-small text-danger">
+      {error}
+    </p>
+  ) : (
+    message && (
+      <p role="status" className="text-small text-ink-muted">
+        {message}
+      </p>
+    )
+  );
+
+  // Nothing to approve: the run line and Work on this as one line, with no
+  // heading or card around them (ui finding 133242ff, plan #1038). The card
+  // comes back when Claude proposes something.
+  if (!approval.approve) {
+    if (!approval.text && !status && !workButton && !feedback) return null;
+    return (
+      <div className="space-y-1 px-1">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="min-w-0 flex-1 space-y-0.5">
+            {approval.text && <p className="text-ui text-ink">{approval.text}</p>}
+            {status}
+          </div>
+          {workButton}
+        </div>
+        {feedback}
+      </div>
+    );
+  }
+
   return (
     <section aria-labelledby="claude-heading" className="space-y-2">
       <h2 id="claude-heading" className="px-1 text-ui font-semibold text-ink">
@@ -69,57 +130,17 @@ export function GoalShaping({
       </h2>
       <Card className="space-y-2 p-3">
         <p className="text-ui text-ink">{approval.text}</p>
-        {runningSince ? (
-          <p role="status" className="flex items-center gap-1.5 text-small text-accent">
-            <span className="size-1.5 animate-pulse rounded-full bg-accent" aria-hidden />
-            <span>
-              Claude is working on this
-              <RunningFor startedAt={runningSince} claim={undefined} />
-            </span>
-          </p>
-        ) : (
-          runLine && (
-            <div className="space-y-0.5">
-              <p className={runFailed ? 'text-small text-danger' : 'text-small text-ink-muted'}>{runLine}</p>
-              {changes && <p className="text-small text-ink-muted">{changes}</p>}
-            </div>
-          )
-        )}
-        {(approval.approve || canRun) && (
-          <div className="flex flex-wrap items-center gap-2">
-            {approval.approve && (
-              <form action={approve}>
-                <input type="hidden" name="goalId" value={goalId} />
-                <Button type="submit" pending={approving}>
-                  {approval.approve}
-                </Button>
-              </form>
-            )}
-            {canRun && (
-              <form action={work}>
-                <input type="hidden" name="goalId" value={goalId} />
-                <Button
-                  type="submit"
-                  variant={approval.approve ? 'secondary' : 'primary'}
-                  pending={starting}
-                  disabled={running}
-                >
-                  Work on this
-                </Button>
-              </form>
-            )}
-          </div>
-        )}
-        {error && (
-          <p role="alert" className="text-small text-danger">
-            {error}
-          </p>
-        )}
-        {!error && message && (
-          <p role="status" className="text-small text-ink-muted">
-            {message}
-          </p>
-        )}
+        {status}
+        <div className="flex flex-wrap items-center gap-2">
+          <form action={approve}>
+            <input type="hidden" name="goalId" value={goalId} />
+            <Button type="submit" pending={approving}>
+              {approval.approve}
+            </Button>
+          </form>
+          {workButton}
+        </div>
+        {feedback}
       </Card>
     </section>
   );

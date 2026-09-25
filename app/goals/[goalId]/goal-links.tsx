@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Select } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
-import { aimProgressLine, jobWeekLine, type GoalLinks } from '@/lib/goals/links';
+import { aimProgressLine, jobWeekLine, noLinks, type GoalLinks } from '@/lib/goals/links';
 import {
   linkAimAction,
   linkJobSearchAction,
@@ -23,12 +23,18 @@ const initial: LinkActionState = {};
  * Learn goal with its progress, and the job search with this week's
  * applications and interviews. The counts are read from those modules when
  * the page loads; nothing here is logged twice.
+ *
+ * The way to link more is a line until it is pressed (plan #1038). A goal
+ * with no links is drawn by the page's row of add lines, which mounts this
+ * with `startAdding` and hears `onClose` when the person cancels.
  */
 export function GoalLinksSection({
   goalId,
   links,
   aimChoices,
   jobsOn,
+  startAdding = false,
+  onClose,
 }: {
   goalId: string;
   /** Null when the links could not be read. */
@@ -36,8 +42,12 @@ export function GoalLinksSection({
   /** Learn goals not yet linked; null when Learn is off or could not be read. */
   aimChoices: { id: string; name: string }[] | null;
   jobsOn: boolean;
+  /** Open with the controls for linking showing. */
+  startAdding?: boolean;
+  /** Called when the person closes those controls without linking anything. */
+  onClose?: () => void;
 }) {
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(startAdding);
 
   if (!links) {
     return (
@@ -49,7 +59,7 @@ export function GoalLinksSection({
 
   const canLinkSearch = jobsOn && !links.jobSearch;
   const canLinkAim = (aimChoices?.length ?? 0) > 0;
-  const empty = links.aims.length === 0 && !links.jobSearch && links.jobs.length === 0;
+  const empty = noLinks(links);
 
   if (empty && !adding) {
     if (!canLinkAim && !canLinkSearch) return null;
@@ -63,12 +73,9 @@ export function GoalLinksSection({
 
   return (
     <section aria-labelledby="links-heading" className="space-y-2">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-1">
-        <h2 id="links-heading" className="text-ui font-semibold text-ink">
-          Linked
-        </h2>
-        <span className="text-small text-ink-muted">Progress read from Learn and Jobs</span>
-      </div>
+      <h2 id="links-heading" className="px-1 text-ui font-semibold text-ink">
+        Linked
+      </h2>
       <Card>
         <ul aria-label="Linked from other modules" className="divide-y divide-border">
           {links.aims.map((aim) => (
@@ -107,13 +114,26 @@ export function GoalLinksSection({
             />
           ))}
         </ul>
-        {(canLinkAim || canLinkSearch) && (
-          <AddLinks
-            goalId={goalId}
-            aimChoices={canLinkAim ? (aimChoices ?? []) : []}
-            canLinkSearch={canLinkSearch}
-          />
-        )}
+        {(canLinkAim || canLinkSearch) &&
+          (adding ? (
+            <AddLinks
+              goalId={goalId}
+              aimChoices={canLinkAim ? (aimChoices ?? []) : []}
+              canLinkSearch={canLinkSearch}
+              onLinked={() => setAdding(false)}
+              onCancel={() => {
+                setAdding(false);
+                onClose?.();
+              }}
+            />
+          ) : (
+            <div className="border-t border-border px-3 py-1.5 first:border-t-0">
+              <AddTrigger
+                label={canLinkSearch ? 'Link a Learn goal or the job search' : 'Link a Learn goal'}
+                onClick={() => setAdding(true)}
+              />
+            </div>
+          ))}
       </Card>
     </section>
   );
@@ -168,21 +188,38 @@ function AddLinks({
   goalId,
   aimChoices,
   canLinkSearch,
+  onLinked,
+  onCancel,
 }: {
   goalId: string;
   aimChoices: { id: string; name: string }[];
   canLinkSearch: boolean;
+  onLinked: () => void;
+  onCancel: () => void;
 }) {
   const toast = useToast();
-  const [state, linkAim, linking] = useActionState(linkAimAction, initial);
+  const [state, linkAim, linking] = useActionState(
+    async (prev: LinkActionState, form: FormData) => {
+      const next = await linkAimAction(prev, form);
+      if (next.done) onLinked();
+      return next;
+    },
+    initial,
+  );
   const linkSearch = async (form: FormData) => {
     const result = await linkJobSearchAction(form);
     if (result.error) toast({ text: result.error });
+    else onLinked();
   };
   return (
-    <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2 first:border-t-0">
+    <div
+      className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2 first:border-t-0"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') onCancel();
+      }}
+    >
       {aimChoices.length > 0 && (
-        <form action={linkAim} key={state.done ?? 0} className="flex flex-wrap items-center gap-2">
+        <form action={linkAim} className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="goalId" value={goalId} />
           <Select name="aimId" required defaultValue="" aria-label="A Learn goal to link" className="w-56">
             <option value="" disabled>
@@ -200,13 +237,16 @@ function AddLinks({
         </form>
       )}
       {canLinkSearch && (
-        <form action={linkSearch} className="ml-auto">
+        <form action={linkSearch}>
           <input type="hidden" name="goalId" value={goalId} />
           <Button type="submit" size="sm" variant="ghost">
             Link the job search
           </Button>
         </form>
       )}
+      <Button type="button" size="sm" variant="ghost" className="ml-auto" onClick={onCancel}>
+        Cancel
+      </Button>
       {state.error && <p className="w-full text-small text-danger">{state.error}</p>}
     </div>
   );

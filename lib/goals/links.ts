@@ -79,6 +79,11 @@ export type GoalLinks = {
   jobs: LinkedJob[];
 };
 
+/** Whether a goal holds nothing from Learn or the job search. */
+export function noLinks(links: GoalLinks): boolean {
+  return links.aims.length === 0 && !links.jobSearch && links.jobs.length === 0;
+}
+
 /**
  * This week, Monday to Monday, as the two instants a timestamp is compared
  * against. The same week the rhythms and the Todo calendar use, in the

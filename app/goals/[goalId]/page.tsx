@@ -6,7 +6,7 @@ import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { isOwner } from '@/lib/dev/owner';
 import { createGoalsClient } from '@/lib/goals/auth/server';
-import { weekInstants, type GoalLinks } from '@/lib/goals/links';
+import { noLinks, weekInstants, type GoalLinks } from '@/lib/goals/links';
 import { loadAimChoices, loadGoalLinks } from '@/lib/goals/links-store';
 import { loadReadings } from '@/lib/goals/readings-store';
 import {
@@ -27,6 +27,7 @@ import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { Card } from '@/components/ui/card';
+import { GoalAddRow } from './goal-add-row';
 import { GoalThread } from './goal-comments';
 import { GoalHelp } from './goal-help';
 import { GoalLinksSection } from './goal-links';
@@ -107,6 +108,22 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
   const linkedAims = new Set(links?.aims.map((aim) => aim.aimId));
   const aimChoices = aims?.filter((aim) => !linkedAims.has(aim.id)) ?? null;
 
+  // Each section drawn above the steps only once it holds something; the empty
+  // ones share one row of add lines instead (plan #1038).
+  const number = {
+    goalId: map.goal.id,
+    unit: map.goal.unit,
+    target: map.goal.target,
+    readings,
+    today,
+  };
+  const help = { goalId: map.goal.id, helpKinds: map.goal.helpKinds ?? [] };
+  const linked = { goalId: map.goal.id, links, aimChoices, jobsOn };
+  const numberEmpty = !number.unit && readings.length === 0;
+  const helpEmpty = help.helpKinds.length === 0;
+  const linksEmpty = links !== null && noLinks(links);
+  const canLink = (aimChoices?.length ?? 0) > 0 || jobsOn;
+
   return (
     <div className="mx-auto max-w-3xl">
       <Link
@@ -134,19 +151,13 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
             canRun={owner}
           />
         )}
-        <GoalNumber
-          goalId={map.goal.id}
-          unit={map.goal.unit}
-          target={map.goal.target}
-          readings={readings}
-          today={today}
-        />
-        <GoalHelp goalId={map.goal.id} helpKinds={map.goal.helpKinds ?? []} />
-        <GoalLinksSection
-          goalId={map.goal.id}
-          links={links}
-          aimChoices={aimChoices}
-          jobsOn={jobsOn}
+        {!numberEmpty && <GoalNumber {...number} />}
+        {!helpEmpty && <GoalHelp {...help} />}
+        {!linksEmpty && <GoalLinksSection {...linked} />}
+        <GoalAddRow
+          number={numberEmpty ? number : null}
+          help={helpEmpty ? help : null}
+          links={linksEmpty && canLink ? linked : null}
         />
         <StepTree map={map} todoOn={moduleEnabled(account, 'todo')} />
         {/* The goal's own thread (plan #957). Each step has its own, under its details. */}

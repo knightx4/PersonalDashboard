@@ -18,10 +18,23 @@ const initial: HelpKindsActionState = {};
 /**
  * The kinds of weekly help a goal asks for (plan #1027): each chosen kind
  * with its note, and a form to tick kinds and say what to look for. A goal
- * with none shows only the way to choose some.
+ * with none shows only the way to choose some, which the page draws in its row
+ * of add lines and mounts this with `startEditing` from (plan #1038).
  */
-export function GoalHelp({ goalId, helpKinds }: { goalId: string; helpKinds: HelpKindChoice[] }) {
-  const [editing, setEditing] = useState(false);
+export function GoalHelp({
+  goalId,
+  helpKinds,
+  startEditing = false,
+  onClose,
+}: {
+  goalId: string;
+  helpKinds: HelpKindChoice[];
+  /** Open with the form showing. */
+  startEditing?: boolean;
+  /** Called when the form closes. */
+  onClose?: () => void;
+}) {
+  const [editing, setEditing] = useState(startEditing);
 
   if (helpKinds.length === 0 && !editing) {
     return (
@@ -51,7 +64,14 @@ export function GoalHelp({ goalId, helpKinds }: { goalId: string; helpKinds: Hel
         )}
       </div>
       {editing ? (
-        <HelpForm goalId={goalId} helpKinds={helpKinds} onClose={() => setEditing(false)} />
+        <HelpForm
+          goalId={goalId}
+          helpKinds={helpKinds}
+          onClose={() => {
+            setEditing(false);
+            onClose?.();
+          }}
+        />
       ) : (
         <Card>
           <ul className="divide-y divide-border">
