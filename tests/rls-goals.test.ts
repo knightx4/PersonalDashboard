@@ -197,6 +197,17 @@ describe('goals isolation', () => {
       asUser(userB, (tx) => tx`insert into areas (user_id, name) values (${userA}, 'Theirs')`),
     ).rejects.toThrow(/row-level security/);
   });
+
+  it('keeps the visit record to its owner (plan #1019)', async () => {
+    await asUser(userA, (tx) => tx`
+      insert into visits (user_id, last_visit_at) values (${userA}, now())
+      on conflict (user_id) do update set last_visit_at = excluded.last_visit_at`);
+    const theirs = await asUser(userB, (tx) => tx<{ user_id: string }[]>`select user_id from visits`);
+    expect(theirs).toEqual([]);
+    await expect(
+      asUser(userB, (tx) => tx`insert into visits (user_id) values (${userA})`),
+    ).rejects.toThrow(/row-level security/);
+  });
 });
 
 describe('goals shape', () => {
@@ -1242,12 +1253,14 @@ describe('RLS coverage', () => {
     expect(rows.map((r) => r.tablename)).toEqual([]);
   });
 
-  it('records history on every table but history itself', async () => {
+  // goals.visits (plan #1019) is the other exception: it changes on every
+  // load of the home and records nothing done to a goal (migrations-goals/0027).
+  it('records history on every table but history itself and visits', async () => {
     const tables = await admin<{ tablename: string }[]>`
       select c.relname as tablename
       from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = 'goals' and c.relkind = 'r' and c.relname <> 'history'
+      where n.nspname = 'goals' and c.relkind = 'r' and c.relname not in ('history', 'visits')
       order by 1`;
     const recorded = await admin<{ tablename: string }[]>`
       select distinct c.relname as tablename
