@@ -72,6 +72,9 @@ export async function findOrCreateSubject(
   const { data, error } = await supabase
     .from('subjects')
     .select('id, name, placed_at, survey')
+    // Named, because the service role (the Learn now top-up) is not narrowed
+    // by RLS and would otherwise find another person's track of the same name.
+    .eq('user_id', userId)
     .ilike('name', name)
     .maybeSingle();
 

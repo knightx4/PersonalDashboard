@@ -158,9 +158,11 @@ them.
 ## How cards are made
 
 [LEARN-LESSONS-SPEC](LEARN-LESSONS-SPEC.md) replaces this with lessons written
-for the concepts in your tracks, decided on 24 September 2026. Until it is
-built, cards are made as below; once it is, this is how exploratory cards are
-made.
+for the concepts in your tracks, decided on 24 September 2026. Since plan #978
+the top-up gives about four in five of the cards it is short to lessons (that
+spec, "Step 1 as built"). What follows is how the rest are made: the
+exploratory cards, and every card for someone with no track that has anything
+to teach.
 
 The catalogue is empty, so the feed has to fill it. A background pass keeps
 about twenty cards ready per person, and runs hourly and whenever the ready
@@ -364,8 +366,10 @@ above. Each next card is the first in that order that shares no article with
 the last four cards dealt and, where possible, is not for the same theme or
 goal as the card before it. When every card left clashes, the one whose article
 was seen longest ago goes next. The page sends the ids it already holds in deck
-order, so the spacing carries on from one page to the next. Code:
-`lib/learn/feed/spread.ts`.
+order, so the spacing carries on from one page to the next. A lesson counts
+its track as its article and the track as its target, so two lessons from one
+track are kept apart the same way. Code: `lib/learn/feed/spread.ts`, with the
+lesson rule in `spreadOf` in `lib/learn/feed/load.ts`.
 
 ## One idea per card
 

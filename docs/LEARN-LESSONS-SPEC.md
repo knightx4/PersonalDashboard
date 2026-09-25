@@ -1,7 +1,8 @@
 # Learn lessons: curriculum first
 
-Decided by the owner on 24 September 2026. Not built yet; the build order is at
-the end.
+Decided by the owner on 24 September 2026. Step 1 of the build order at the end
+is built (plan #978), and "Step 1 as built" says how it works. The other steps
+are not built yet.
 
 ## Why this changes
 
@@ -175,13 +176,80 @@ From the spend ledger, 24 September 2026:
 A lesson is written only for a concept that is about to be served, so nothing
 is thrown away after writing. About half of the sections picked today are.
 
+## Step 1 as built
+
+Plan #978, on 25 September 2026. Code: `lib/learn/lessons/top-up.ts` for the
+order of work, `inngest/learn/lesson-top-up.ts` for the reads and writes, and
+`inngest/learn/feed-top-up.ts`, which runs it before any section card.
+
+**How the top-up shares the slots.** The top-up counts the ready cards first.
+When fewer than its threshold are ready, it asks for lessons for four in five
+of the cards it is short, rounded, and then tops up to the target with section
+cards. Section cards also fill whatever the lessons fell short of, so someone
+with no track that has anything to teach gets a feed of section cards, as
+before. This runs in the hourly top-up and in the one after a response on the
+feed page.
+
+**Which concepts.** The chooser (`lib/learn/lessons/choose.ts`, plan #975)
+names the concept for each slot, as "The next lesson in a track" describes,
+sharing slots by track weight. Two details differ from the sections above. A
+track counts as dormant when its Practice Flow weight has stopped, which also
+needs other tracks used in the four weeks, and a track never used at all is
+not dormant, since nothing yet records a track being opened. And a concept
+counts as already carded once any lesson row exists for it, including one that
+was dropped, so a lesson the source contradicted is not paid for again every
+hour.
+
+**Laying out units.** When a track's first unit that is not done has no chain,
+the top-up lays one out with `layOutNextUnit` (plan #977) and then asks the
+chooser again, so the new concepts can be taught in the same run. At most two
+units are laid out in one run, side by side, and only with at least ninety
+seconds left before the deadline. When laying one out fails, or finds no unit
+to open, the track's `lessons_held_until` is set a day ahead and the top-up
+does not try again before then; its ready concepts are still taught. A track
+with every unit done, or with no curriculum, is left alone until step 3.
+
+**Writing a lesson.** For each concept the top-up searches the catalogue for
+the closest section (`findLessonSource`), writes the lesson (`writeLesson`,
+plan #976), and records the spend under `embed-claim` and `write-lesson`. The
+lessons are written four at a time. Each is stored as a row in
+`learn.feed_cards` with reason `lesson`: the track in `subject_id` and
+`track_name`, the unit in `unit_id` and `unit_title`, the concept in
+`concept_id` and `idea_name`, and the section it cites in `source_item_id` and
+`source_segment_id`. A lesson the model would not write, or whose source
+contradicts it, is stored as dropped with the reason. A call that failed stores
+nothing, and the concept is chosen again on a later run. One lesson row is kept
+per concept, so two top-ups running at once cannot both serve it.
+
+**The card.** A lesson is titled by its concept's name, with "Track · Unit"
+under it. The line above the title is built in code: "Next in your Economics
+track. It builds on Supply and Demand." When the lesson cites a section, the
+card folds the section's text under "Read the section" and links to it, and
+Save saves that section to a reading list; with no section there is neither,
+and no Save button. Test me on this opens the track's Practice Flow and marks
+the card tested. In the deck, a track counts as a lesson's article, so two
+lessons from one track are spaced as two cards from one article are.
+
+**What a swipe does.** Got it and Work on this set the concept's state on your
+word, and Not now leaves it, through the same step idea cards use
+(`settleIdeaFromSwipe`). A lesson comes back after two or three days as other
+cards do. The swipes also move the track's weight (`loadTrackInterest`): Got it
+and Work on this count as answering one of its questions, and Not now as moving
+past one. Only a lesson's latest swipe counts. The track's page names the
+lessons behind its weight. Too hard is still only a rating until step 4.
+
+**Section cards.** The section picker leaves lesson rows out of what it reads,
+so lessons do not use up a theme's, field's or goal's turn and do not set how
+deep the next pick goes. It does not yet steer clear of subjects a track
+already covers.
+
 ## Build order
 
 Each step ships on its own.
 
-1. **Lessons for track concepts.** The top-up writes lessons for the ready
-   concepts of tracks you already have, by track weight, with exploratory cards
-   at one in five. Swipes set the concept's state.
+1. **Lessons for track concepts.** Built (plan #978). The top-up writes lessons
+   for the ready concepts of tracks you already have, by track weight, with
+   exploratory cards at one in five. Swipes set the concept's state.
 2. **Track offers in the feed.** Themes with no track are offered as cards, and
    exploratory cards carry "Make this a track".
 3. **Units written as you go.** New tracks start with three or four units, and

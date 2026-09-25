@@ -28,6 +28,7 @@ import {
 
 const source: LessonSource = {
   segmentId: 'seg-1',
+  itemId: 'item-1',
   itemTitle: 'CHIPS and Science Act',
   heading: 'Manufacturing',
   url: 'https://en.wikipedia.org/wiki/CHIPS_and_Science_Act',

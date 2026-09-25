@@ -17,14 +17,20 @@ import type { Depth } from '@/lib/learn/feed/depth';
 import { nearbyIdeas, saveIdeas } from '@/lib/learn/feed/ideas-store';
 import { WRITE_CARD_MODEL, writeCard, type CardToWrite, type IdeaCard, type WriteResult } from '@/lib/learn/feed/write-card';
 import type { LearnOperation } from '@/lib/learn/spend';
+import type { LessonTopUpSummary } from '@/lib/learn/lessons/top-up';
+import { lessonsWanted, writeLessonsFor } from '@/lib/learn/lessons/top-up';
 import { createFeedPicker, loadFeedFields, peopleToPickFor } from './feed-picks';
+import { createLessonPorts } from './lesson-top-up';
 
 /**
  * The Learn now top-up (plan #807, LEARN-NOW-SPEC "How cards are made").
  *
- * Writes the picked rows in `learn.feed_cards` into cards until each person
- * has about twenty ready, picking more sections from Wikipedia first when the
- * picked rows run out. Called hourly by pg_cron through
+ * Tops each person up to about twenty ready cards. About four in five of the
+ * cards it is short go to lessons for the concepts in the person's tracks
+ * (plan #978, LEARN-LESSONS-SPEC; lesson-top-up.ts). The rest, and any the
+ * lessons fall short of, are section cards: the picked rows in
+ * `learn.feed_cards` written into cards, picking more sections from Wikipedia
+ * first when the picked rows run out. Called hourly by pg_cron through
  * `/api/cron/feed-top-up` for every account with placed themes, and by the
  * feed page after a response for one person (`topUpFeedAfterResponse`).
  *
@@ -175,6 +181,30 @@ async function topUpWith(
   const { learn, core, apiKey, pickFor } = context;
   let written: Set<string> | null = null;
 
+  const readyBefore = await countReady(learn, userId);
+  const target = options.target ?? READY_TARGET;
+  let lessons: LessonTopUpSummary | undefined;
+  if (readyBefore < options.threshold) {
+    lessons = await writeLessonsFor(createLessonPorts({ learn, core, apiKey }), {
+      userId,
+      wanted: lessonsWanted(target - readyBefore),
+      deadline: options.deadline,
+    }).catch((error: unknown): LessonTopUpSummary => {
+      // A failure here leaves the whole shortfall to section cards.
+      console.error('[learn feed top-up] lessons', error instanceof Error ? error.message : error);
+      return {
+        wanted: 0,
+        chosen: 0,
+        written: 0,
+        dropped: [],
+        failed: [error instanceof Error ? error.message : 'Writing lessons failed.'],
+        laidOut: [],
+        held: [],
+        stopped: null,
+      };
+    });
+  }
+
   const ports: TopUpPorts = {
     countReady: (id) => countReady(learn, id),
     loadPicked: async (id, limit) => {
@@ -279,12 +309,16 @@ async function topUpWith(
     now: Date.now,
   };
 
-  return runTopUpFor(ports, {
+  // The threshold was checked above, before the lessons; the section cards
+  // top up to the target whatever the lessons came to.
+  const sections = await runTopUpFor(ports, {
     userId,
-    threshold: options.threshold,
-    target: options.target ?? READY_TARGET,
+    threshold: lessons ? target : options.threshold,
+    target,
     deadline: options.deadline,
   });
+  if (!lessons) return sections;
+  return { ...sections, readyBefore, skipped: false, lessons };
 }
 
 export type FeedTopUpResult = { people: TopUpSummary[] };

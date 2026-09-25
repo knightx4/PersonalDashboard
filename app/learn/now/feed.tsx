@@ -443,8 +443,12 @@ function DeckCard({
             {card.title}
           </h2>
           {/* An idea card is titled by its idea, so the section it came from
-              is named under it. */}
-          {card.source && <p className="mt-0.5 text-small text-ink-muted">From {card.source}</p>}
+              is named under it. A lesson names its track and unit there. */}
+          {card.source && (
+            <p className="mt-0.5 text-small text-ink-muted">
+              {card.kind === 'lesson' ? card.source : `From ${card.source}`}
+            </p>
+          )}
 
           {/* The one thing to remember, first, for someone who reads no
               further (note 125f60f2). Older cards have none. */}
@@ -483,59 +487,73 @@ function DeckCard({
           )}
 
           {/* The source's own text, folded: the card above is what to read
-              first, and this is there for when you want the whole section. */}
-          <details className="group mt-4 border-t border-border pt-3">
-            <summary className="press inline-flex cursor-pointer list-none items-center gap-1.5 rounded-control text-ui font-medium text-accent [&::-webkit-details-marker]:hidden">
-              <span className="group-open:hidden">Read the section</span>
-              <span className="hidden group-open:inline">The section</span>
-              <span className="font-normal text-ink-muted">{readingMinutes(card)} min</span>
-            </summary>
-            <div className="mt-2 space-y-3 text-body break-words text-ink">
-              {[...card.shown, ...card.rest].map((paragraph, index) => (
-                <p key={index}>{paragraph}</p>
-              ))}
-            </div>
-          </details>
+              first, and this is there for when you want the whole section.
+              A lesson that cites no section has none. */}
+          {card.shown.length > 0 && (
+            <details className="group mt-4 border-t border-border pt-3">
+              <summary className="press inline-flex cursor-pointer list-none items-center gap-1.5 rounded-control text-ui font-medium text-accent [&::-webkit-details-marker]:hidden">
+                <span className="group-open:hidden">Read the section</span>
+                <span className="hidden group-open:inline">The section</span>
+                <span className="font-normal text-ink-muted">{readingMinutes(card)} min</span>
+              </summary>
+              <div className="mt-2 space-y-3 text-body break-words text-ink">
+                {[...card.shown, ...card.rest].map((paragraph, index) => (
+                  <p key={index}>{paragraph}</p>
+                ))}
+              </div>
+            </details>
+          )}
 
-          <p className="mt-3 text-small text-ink-muted">
-            <a
-              href={card.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => void openCardSource(card.id)}
-              className="inline-flex items-center gap-1 text-ink underline underline-offset-2 hover:text-accent"
-            >
-              {card.article}
-              <ExternalLink className="size-3" strokeWidth={2} aria-hidden />
-            </a>
-            {` · ${card.site}`}
-            {card.licence ? ` · ${card.licence}` : ''}
-          </p>
+          {card.link && (
+            <p className="mt-3 text-small text-ink-muted">
+              <a
+                href={card.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => void openCardSource(card.id)}
+                className="inline-flex items-center gap-1 text-ink underline underline-offset-2 hover:text-accent"
+              >
+                {card.article}
+                <ExternalLink className="size-3" strokeWidth={2} aria-hidden />
+              </a>
+              {` · ${card.site}`}
+              {card.licence ? ` · ${card.licence}` : ''}
+            </p>
+          )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={save}
-              pending={saving}
-              disabled={saved !== null}
-            >
-              {saved ? (
-                <Check className="size-3.5" strokeWidth={2} aria-hidden />
-              ) : (
-                <Bookmark className="size-3.5" strokeWidth={2} aria-hidden />
-              )}
-              {saved ? 'Saved' : saving ? 'Saving…' : 'Save'}
-            </Button>
+            {card.link && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={save}
+                pending={saving}
+                disabled={saved !== null}
+              >
+                {saved ? (
+                  <Check className="size-3.5" strokeWidth={2} aria-hidden />
+                ) : (
+                  <Bookmark className="size-3.5" strokeWidth={2} aria-hidden />
+                )}
+                {saved ? 'Saved' : saving ? 'Saving…' : 'Save'}
+              </Button>
+            )}
             <Button type="button" variant="ghost" size="sm" onClick={testMe} pending={testing}>
               <GraduationCap className="size-3.5" strokeWidth={2} aria-hidden />
-              {testing ? 'Starting a track…' : 'Test me on this'}
+              {testing
+                ? card.kind === 'lesson'
+                  ? 'Opening Practice Flow…'
+                  : 'Starting a track…'
+                : 'Test me on this'}
             </Button>
-            <PaidHint
-              action="app/learn/now/actions.ts#testMeOnCard"
-              what="Cost of starting a track from this card"
-            />
+            {/* A lesson's track already exists, so testing on it costs nothing. */}
+            {card.kind === 'section' && (
+              <PaidHint
+                action="app/learn/now/actions.ts#testMeOnCard"
+                what="Cost of starting a track from this card"
+              />
+            )}
             {/* Not interested and the two ratings stay on one line, the
                 ratings to its right, down to a 360px phone: that is why the
                 labels drop "Too" below sm. */}
