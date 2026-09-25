@@ -11,9 +11,11 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardBody, CardSection } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { AlsoInLine } from '@/components/news/also-in';
 import { SaveStoryButton } from '@/components/news/save-story-button';
 import { StoryGrid } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
+import type { AlsoIn } from '@/lib/news/quick/next';
 import type { NewsStory } from '@/lib/news/issues/stories';
 import { markIssueUnread } from './actions';
 import { IssueFrame } from './issue-frame';
@@ -45,6 +47,11 @@ export type IssueViewProps = {
   summaryHref: string;
   /** Headlines of this issue's stories on the Saved list, so each reads Save or Saved. */
   savedHeadlines?: readonly string[];
+  /**
+   * The other newsletters that ran each story's event (plan #865), by the
+   * story's position in `digest.stories`. A story with none is left out.
+   */
+  elsewhere?: Readonly<Record<number, readonly AlsoIn[]>>;
 };
 
 /**
@@ -70,6 +77,7 @@ export function IssueView({
   originalHref,
   summaryHref,
   savedHeadlines = [],
+  elsewhere = {},
 }: IssueViewProps) {
   const isSaved = (story: NewsStory) => savedHeadlines.includes(story.headline);
   // From md up a summarised issue's stories are a grid (plan #942), so the
@@ -186,7 +194,16 @@ export function IssueView({
                 summary: story.summary,
                 image: story.image ?? null,
                 link: story.link ?? null,
-                body: <StoryText text={story.text} summary={story.summary} />,
+                body: (
+                  <>
+                    <AlsoInLine
+                      alsoIn={elsewhere[index] ?? []}
+                      pictures={pictures}
+                      className="mt-1.5"
+                    />
+                    <StoryText text={story.text} summary={story.summary} />
+                  </>
+                ),
                 actions: (
                   <SaveStoryButton
                     issueId={issueId}
@@ -206,6 +223,7 @@ export function IssueView({
                 pictures={pictures}
                 issueId={issueId}
                 saved={isSaved(digest.stories[0])}
+                alsoIn={elsewhere[0] ?? []}
               />
             </div>
           )}
@@ -237,6 +255,11 @@ export function IssueView({
                         />
                       )}
                     </div>
+                    <AlsoInLine
+                      alsoIn={elsewhere[index + 1] ?? []}
+                      pictures={pictures}
+                      className="mt-1"
+                    />
                     <StoryText text={story.text} summary={story.summary} />
                     <StoryActions story={story} issueId={issueId} saved={isSaved(story)} />
                   </li>
@@ -277,11 +300,13 @@ function LeadStory({
   pictures,
   issueId,
   saved,
+  alsoIn,
 }: {
   story: NewsStory;
   pictures: boolean;
   issueId: string;
   saved: boolean;
+  alsoIn: readonly AlsoIn[];
 }) {
   return (
     <Card padding="none" className="overflow-hidden">
@@ -300,6 +325,7 @@ function LeadStory({
           {story.headline}
         </h2>
         <p className="mt-2 text-body leading-relaxed text-ink-muted">{story.summary}</p>
+        <AlsoInLine alsoIn={alsoIn} pictures={pictures} className="mt-1.5" />
         <StoryText text={story.text} summary={story.summary} />
         <StoryActions story={story} issueId={issueId} saved={saved} />
       </div>

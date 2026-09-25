@@ -27,16 +27,27 @@ export const QUICK_NEXT_FORM = 'quick-read-next';
 
 /**
  * The one button #847 settled on. It records the story whether or not you
- * read it, and the page comes back with the next card.
+ * read it, with the same event's stories in other newsletters (plan #865),
+ * and the page comes back with the next card. `stories` is cardPasses of the
+ * card: its own first, then its repeats.
  */
-export function QuickNextForm({ issueId, storyIndex }: { issueId: string; storyIndex: number }) {
+export function QuickNextForm({ stories }: { stories: readonly StoryPass[] }) {
   return (
     <form id={QUICK_NEXT_FORM} action={passQuickStory}>
-      <input type="hidden" name="issueId" value={issueId} />
-      <input type="hidden" name="storyIndex" value={storyIndex} />
+      <PassFields stories={stories} />
       <NextButton />
     </form>
   );
+}
+
+/** One issueId and storyIndex pair per story, in order, as readPairs in actions.ts reads them. */
+function PassFields({ stories }: { stories: readonly StoryPass[] }) {
+  return stories.map((story) => (
+    <Fragment key={`${story.issueId}:${story.storyIndex}`}>
+      <input type="hidden" name="issueId" value={story.issueId} />
+      <input type="hidden" name="storyIndex" value={story.storyIndex} />
+    </Fragment>
+  ));
 }
 
 /** What QuickDeck hands the Next button: move to the story already drawn behind this one. */
@@ -99,12 +110,7 @@ export function QuickDeck({
 export function QuickPageForm({ stories }: { stories: readonly StoryPass[] }) {
   return (
     <form action={passQuickPage}>
-      {stories.map((story) => (
-        <Fragment key={`${story.issueId}:${story.storyIndex}`}>
-          <input type="hidden" name="issueId" value={story.issueId} />
-          <input type="hidden" name="storyIndex" value={story.storyIndex} />
-        </Fragment>
-      ))}
+      <PassFields stories={stories} />
       <NextPageButton />
     </form>
   );
@@ -151,8 +157,9 @@ function HideTopicButton({ topic }: { topic: NewsTopic }) {
 }
 
 /**
- * The article, in a new tab. Opening it records the story as passed while the
- * tab opens, and the card stays so you can come back and press Next.
+ * The article, in a new tab. Opening it records the story as passed and
+ * opened while the tab opens, and the card stays so you can come back and
+ * press Next. The open is what Quick read's ranking learns from.
  */
 export function ArticleLink({
   href,

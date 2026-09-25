@@ -1655,6 +1655,12 @@ const quickStory: QuickReadViewProps = {
     },
     from: 'Infra Weekly',
     remainingInIssue: 4,
+    alsoIn: [
+      { issueId: 'issue-4', from: 'Morning Tape' },
+      { issueId: 'issue-5', from: 'Local Brief' },
+    ],
+    repeats: [],
+    reason: 'Ran in 3 of your newsletters',
   },
   arrived: '22 Sep, 07:14',
   nothingYet: false,
@@ -1688,6 +1694,9 @@ const quickEssay: QuickReadViewProps = {
     sender: { id: 'sender-2', email: 'letters@slow.example', name: 'Slow Letters', muted: false },
     from: 'Slow Letters',
     remainingInIssue: 1,
+    alsoIn: [],
+    repeats: [],
+    reason: null,
   },
   arrived: '20 Sep, 09:02',
   issueHref: '/news/i/issue-2',
@@ -1810,6 +1819,9 @@ const quickFullPage: QuickReadViewProps = {
         sender: { id: `sender-${index + 1}`, email: 'hello@example.com', name: from, muted: false },
         from,
         remainingInIssue: 1,
+        alsoIn: index === 0 ? [{ issueId: 'issue-9', from: 'Morning Tape' }] : [],
+        repeats: [],
+        reason: null,
       },
       arrived: '22 Sep, 07:14',
       saved: false,
@@ -1897,7 +1909,8 @@ const deckCards: FeedCard[] = [
     article: '',
     section: null,
     why: 'Next in your Economics track. It builds on Supply and demand curves.',
-    takeaway: 'A legal maximum price set below what the market would clear at leaves more people wanting the good than there is of it.',
+    takeaway:
+      'A legal maximum price set below what the market would clear at leaves more people wanting the good than there is of it.',
     context:
       'A price ceiling is a law saying a good may not be sold above a set price. The market-clearing price is the one at which the amount people want to buy equals the amount sellers offer.',
     hook: 'When New York froze many rents after 1943, the city’s vacancy rate for controlled flats stayed below 2% for decades.',
@@ -1905,7 +1918,8 @@ const deckCards: FeedCard[] = [
       'At the capped price, buyers ask for more than at the market price and sellers offer less, because some of them can no longer cover their costs. The gap has to be closed some other way: queues, waiting lists, favouritism or a black market.',
     example:
       'In 1970s America, a cap on petrol prices during the oil shocks led to queues that ran around the block, and some states rationed fuel by the last digit of the number plate.',
-    question: 'A city caps taxi fares at half what riders pay today. What happens to the wait for a taxi at rush hour, and why?',
+    question:
+      'A city caps taxi fares at half what riders pay today. What happens to the wait for a taxi at rush hour, and why?',
     answer:
       'It gets longer. Fewer drivers work at the lower fare while more riders want a cheap ride, so the shortage shows up as time spent waiting.',
     depth: null,

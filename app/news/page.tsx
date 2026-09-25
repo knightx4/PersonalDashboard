@@ -3,11 +3,18 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { loadSenders } from '@/lib/news/issues/load';
 import { formatArrival, issueHref } from '@/lib/news/issues/list';
-import { loadQuickRead } from '@/lib/news/issues/quick';
+import { loadQuickRead, loadQuickSignals } from '@/lib/news/issues/quick';
 import { readTopic } from '@/lib/news/issues/topics';
 import { loadHiddenTopics } from '@/lib/news/quick/hidden-topics';
 import { loadSavedHeadlines } from '@/lib/news/saved/stories';
-import { nextCard, quickHref, quickPage, quickTopics, type QuickCard } from '@/lib/news/quick/next';
+import {
+  cardPasses,
+  nextCard,
+  quickHref,
+  quickPage,
+  quickTopics,
+  type QuickCard,
+} from '@/lib/news/quick/next';
 import { topicHrefs } from '@/components/news/topic-chips';
 import { QuickReadView } from './quick/quick-view';
 
@@ -36,6 +43,11 @@ export const dynamic = 'force-dynamic';
  *
  * The story after the card is worked out too and drawn ahead, so Next on a
  * phone shows it at once while the pass is recorded (note 452a90d9).
+ *
+ * The order is ranked rather than newest first (lib/news/quick/rank.ts): an
+ * event several newsletters ran shows once, naming the others, and goes up
+ * the queue; so do lead stories and the topics and newsletters whose articles
+ * you open. What it ranks with comes from loadQuickSignals.
  */
 export default async function QuickReadPage({
   searchParams,
@@ -54,20 +66,19 @@ export default async function QuickReadPage({
     loadHiddenTopics(client),
   ]);
 
-  const card = nextCard(issues, senders, passes, { topic, hidden });
-  // The story Next brings up, worked out as though this card had been passed,
-  // so the phone can show it without waiting for the page (note 452a90d9).
+  const signals = await loadQuickSignals(client, issues);
+  const filter = { topic, hidden };
+
+  const card = nextCard(issues, senders, passes, filter, signals);
+  // The story Next brings up, worked out as though this card and its repeats
+  // had been passed, so the phone can show it without waiting for the page
+  // (note 452a90d9).
   const upNext = card
-    ? nextCard(
-        issues,
-        senders,
-        [...passes, { issueId: card.issueId, storyIndex: card.storyIndex }],
-        { topic, hidden },
-      )
+    ? nextCard(issues, senders, [...passes, ...cardPasses(card)], filter, signals)
     : null;
-  const page = quickPage(issues, senders, passes, { topic, hidden });
+  const page = quickPage(issues, senders, passes, filter, undefined, signals);
   const wanted = params.pictures !== '0';
-  const topics = quickTopics(issues, senders, passes, hidden);
+  const topics = quickTopics(issues, senders, passes, hidden, signals.groups);
 
   // The saved headlines of every newsletter on the page, read once each.
   const issueIds = [...new Set([card, upNext, ...page].flatMap((c) => (c ? [c.issueId] : [])))];

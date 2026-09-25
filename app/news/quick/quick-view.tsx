@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Image as ImageIcon, ImageOff, Mail } from 'lucide-react';
+import { AlsoInLine } from '@/components/news/also-in';
 import { SaveStoryButton } from '@/components/news/save-story-button';
 import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
@@ -9,7 +10,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
-import type { QuickCard } from '@/lib/news/quick/next';
+import { cardPasses, type QuickCard } from '@/lib/news/quick/next';
 import {
   ArticleLink,
   HideTopicForm,
@@ -61,7 +62,8 @@ export type QuickPageStory = {
   issueHref: string;
 };
 
-const DESCRIPTION = 'One story at a time from your newsletters, newest first.';
+const DESCRIPTION =
+  'One story at a time from your newsletters: the big and the new first, and what you tend to open.';
 
 /**
  * What Quick read draws, split from the page so the preview gallery can render
@@ -198,18 +200,17 @@ export function QuickReadView({
 
       {grid && (
         <div className="hidden md:block">
-          <StoryGrid stories={page.map(gridStory)} pictures={pictures} compact />
+          <StoryGrid
+            stories={page.map((story) => gridStory(story, pictures))}
+            pictures={pictures}
+            compact
+          />
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-ui text-ink-muted">
               Next page marks {page.length === 1 ? 'this story' : `all ${page.length} stories`} as
               seen.
             </p>
-            <QuickPageForm
-              stories={page.map(({ card: c }) => ({
-                issueId: c.issueId,
-                storyIndex: c.storyIndex,
-              }))}
-            />
+            <QuickPageForm stories={page.flatMap(({ card: c }) => cardPasses(c))} />
           </div>
         </div>
       )}
@@ -261,6 +262,7 @@ function PhoneCard({
               {card.from ?? 'Unknown sender'}
               {arrived && ` · ${arrived}`}
             </p>
+            <AlsoInLine reason={card.reason} alsoIn={card.alsoIn} pictures={pictures} />
             <h2 className="mt-1 break-words font-display text-title tracking-tight text-ink">
               {headline}
             </h2>
@@ -292,7 +294,7 @@ function PhoneCard({
                 <SaveStoryButton issueId={card.issueId} headline={story.headline} saved={saved} />
               )}
               {story?.topic && <HideTopicForm topic={story.topic} />}
-              <QuickNextForm issueId={card.issueId} storyIndex={card.storyIndex} />
+              <QuickNextForm stories={cardPasses(card)} />
             </div>
           </div>
         </article>
@@ -306,7 +308,10 @@ function PhoneCard({
  * recording ArticleLink rather than the grid's own, so opening one still
  * counts as seen, and an essay, which has no article, links to its newsletter.
  */
-function gridStory({ card, arrived, saved, issueHref }: QuickPageStory): GridStory {
+function gridStory(
+  { card, arrived, saved, issueHref }: QuickPageStory,
+  pictures: boolean,
+): GridStory {
   const from = [card.from ?? 'Unknown sender', arrived].filter(Boolean).join(' · ');
   if (card.kind === 'essay') {
     return {
@@ -328,7 +333,17 @@ function gridStory({ card, arrived, saved, issueHref }: QuickPageStory): GridSto
     summary: story.summary,
     image: story.image ?? null,
     from,
-    body: <StoryText text={story.text} summary={story.summary} />,
+    body: (
+      <>
+        <AlsoInLine
+          reason={card.reason}
+          alsoIn={card.alsoIn}
+          pictures={pictures}
+          className="mt-1.5"
+        />
+        <StoryText text={story.text} summary={story.summary} />
+      </>
+    ),
     actions: (
       <>
         {story.link && (

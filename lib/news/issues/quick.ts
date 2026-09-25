@@ -2,7 +2,14 @@ import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { NEWS_SCHEMA, type NewsSupabaseClient } from '@/lib/news/db/schema-name';
-import { issueFinished, type QuickIssue, type StoryPass } from '@/lib/news/quick/next';
+import {
+  issueFinished,
+  type QuickIssue,
+  type QuickSignals,
+  type StoryGroupRow,
+  type StoryPass,
+} from '@/lib/news/quick/next';
+import type { InterestRow } from '@/lib/news/quick/rank';
 import { markRead } from './read';
 
 /**
@@ -81,6 +88,66 @@ export async function loadQuickRead(
     throw new Error(`news: reading the stories you have passed failed (${passes.error.message})`);
   }
   return { issues, passes: toPasses(passes.data) };
+}
+
+/**
+ * Issues whose story groups are read in one request. PostgREST returns at
+ * most 1000 rows to a read, and forty newsletters at the five stories each
+ * they average is about 200, well clear of it even for a long one.
+ */
+const GROUP_CHUNK = 40;
+
+/**
+ * What Quick read ranks with (lib/news/quick/rank.ts): which of these
+ * newsletters' stories are the same event, from news.story_groups, and what
+ * you have opened and saved, from the news.story_interest view.
+ *
+ * Ranking is an improvement on the order, never a condition for it: when
+ * either read fails the page still works, with nothing folded or no lean, so
+ * failures here are swallowed rather than thrown.
+ */
+export async function loadQuickSignals(
+  client: NewsSupabaseClient,
+  issues: readonly QuickIssue[],
+): Promise<QuickSignals> {
+  const ids = issues.map((issue) => issue.id);
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += GROUP_CHUNK) chunks.push(ids.slice(i, i + GROUP_CHUNK));
+
+  const [groupReads, interest] = await Promise.all([
+    Promise.all(
+      chunks.map((chunk) =>
+        client.from('story_groups').select('issue_id, story_index, group_id').in('issue_id', chunk),
+      ),
+    ),
+    client.from('story_interest').select('sender_id, topic, seen, opened, saved'),
+  ]);
+
+  const groups: StoryGroupRow[] = groupReads.flatMap((read) =>
+    read.error
+      ? []
+      : ((read.data ?? []) as { issue_id: string; story_index: number; group_id: string }[]).map(
+          (row) => ({ issueId: row.issue_id, storyIndex: row.story_index, groupId: row.group_id }),
+        ),
+  );
+  const rows: InterestRow[] = interest.error
+    ? []
+    : (
+        (interest.data ?? []) as {
+          sender_id: string;
+          topic: string | null;
+          seen: number;
+          opened: number;
+          saved: number;
+        }[]
+      ).map((row) => ({
+        senderId: row.sender_id,
+        topic: row.topic,
+        seen: Number(row.seen) || 0,
+        opened: Number(row.opened) || 0,
+        saved: Number(row.saved) || 0,
+      }));
+  return { groups, interest: rows };
 }
 
 /**
@@ -163,4 +230,28 @@ async function finishIfDone(client: NewsSupabaseClient, issueId: string): Promis
   const finished = issueFinished(toQuickIssue(issue.data as QuickRow), toPasses(passes.data));
   if (finished) await markRead(client, issueId);
   return finished;
+}
+
+/**
+ * Record that you opened a story's article: a pass, as passStory writes it,
+ * with opened_at set, which Quick read's ranking reads as interest
+ * (supabase/migrations-news/0013_story_interest.sql). A story already passed
+ * keeps its first passed_at, and a second open keeps the first opened_at.
+ */
+export async function openStory(
+  client: NewsSupabaseClient,
+  { userId, issueId, storyIndex }: { userId: string; issueId: string; storyIndex: number },
+): Promise<{ finished: boolean }> {
+  const { finished } = await passStory(client, { userId, issueId, storyIndex });
+  const opened = await client
+    .from('story_passes')
+    .update({ opened_at: new Date().toISOString() })
+    .eq('issue_id', issueId)
+    .eq('story_index', storyIndex)
+    .is('opened_at', null);
+  assertSchemaExposed(opened.error, NEWS_SCHEMA);
+  if (opened.error) {
+    throw new Error(`news: recording that you opened that story failed (${opened.error.message})`);
+  }
+  return { finished };
 }
