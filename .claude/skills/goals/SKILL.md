@@ -515,6 +515,17 @@ same way: a changed `answer` or `sources` dates it again and clears
 `out_of_date_at`. If the answer and its sources come out the same, clear it
 yourself with `update goals.answers set out_of_date_at = null where id = …`.
 
+A closed step keeps its answers current too, and the database decides
+whether a rewrite brings it back (migrations-goals 0037, plan #997). It
+compares the new answer with the one the step closed on: a date that moves
+at all, or an amount that moves by more than 5%, reopens the step and marks
+the answer changed, and the step shows the old answer beside the new one
+with the document behind it. A written answer reopens it when its wording
+changes (case and spacing aside). The same value reworded leaves the step
+closed. Write the answer as it now stands, with the right `value_date` or
+`value_amount`, and do not reopen or close the step yourself. A reopened
+step does not close itself when its answers are current again.
+
 ### Questions
 
 Ask only where the answer changes the path, and ask each one once. A question
