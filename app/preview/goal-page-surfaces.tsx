@@ -12,7 +12,8 @@ import type { CollectionField } from '@/lib/goals/collections';
 import type { Collection, CollectionRecord } from '@/lib/goals/collections-store';
 import type { GoalLinks } from '@/lib/goals/links';
 import type { Reading } from '@/lib/goals/readings';
-import { approvalLine, changesLine, runLine } from '@/lib/goals/shaping';
+import { goalRunRows, type RunListing } from '@/lib/goals/runs';
+import { approvalLine } from '@/lib/goals/shaping';
 import type { GoalProgress } from '@/lib/goals/status';
 import { buildForest, type Step } from '@/lib/goals/steps';
 import type { GoalMap } from '@/lib/goals/steps-store';
@@ -235,16 +236,43 @@ const links: GoalLinks = {
 
 const aimChoices = [{ id: 'aim-2', name: 'Behavioural economics' }];
 
-/** The fixed instant the run lines are measured from, a day after the run. */
+/** The fixed instant the run lines are measured from, a day after the latest run. */
 const NOW = Date.parse('2026-09-25T09:00:00Z');
-const stamp = (iso: string) =>
-  `on ${new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/London',
-    day: 'numeric',
-    month: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(iso))}`;
+
+function run(id: string, createdAt: string, endedAt: string, extra: Partial<RunListing> = {}): RunListing {
+  return {
+    id,
+    job: 'goal',
+    status: 'done',
+    createdAt,
+    endedAt,
+    summary: null,
+    error: null,
+    lastSeenAt: null,
+    nowOn: null,
+    item: { id: cards.id, title: cards.title, level: 'goal' },
+    ...extra,
+  };
+}
+
+/** Three runs on the credit cards: an answer re-shape, one that failed, and the first mapping. */
+const cardRuns = goalRunRows(
+  [
+    run('run-3', '2026-09-24T07:40:00Z', '2026-09-24T07:52:00Z', {
+      job: 'reshape',
+      summary: 'Drafted the call script and asked which card to start with.',
+    }),
+    run('run-2', '2026-09-20T07:00:00Z', '2026-09-20T07:00:02Z', {
+      status: 'failed',
+      error: 'The routine token was rejected.',
+    }),
+    run('run-1', '2026-09-01T08:10:00Z', '2026-09-01T08:31:00Z', {
+      summary: 'Mapped the goal: list the cards, call about the rates, then pay the highest rate first.',
+    }),
+  ],
+  NOW,
+  'Europe/London',
+);
 
 /**
  * The top of a goal page that has something in each section: the Claude
@@ -265,20 +293,8 @@ export function GoalTopSurface() {
             proposed: 0,
             questions: 1,
           })}
-          runLine={runLine(
-            {
-              id: 'run-1',
-              status: 'done',
-              createdAt: '2026-09-24T07:40:00Z',
-              endedAt: '2026-09-24T07:52:00Z',
-              summary: 'Drafted the call script and asked which card to start with.',
-              error: null,
-            },
-            NOW,
-            stamp,
-          )}
-          runFailed={false}
-          changes={changesLine({ stepsAdded: 1, questionsAsked: 1, formsFilled: 0, stepsDone: 0 })}
+          runs={cardRuns}
+          moreRuns={false}
           running={null}
           canRun
         />
@@ -304,9 +320,8 @@ export function GoalBareSurface() {
         <GoalShaping
           goalId={marathon.id}
           approval={approvalLine({ goalStatus: 'open', approvedAt: null, proposed: 0, questions: 0 })}
-          runLine={null}
-          runFailed={false}
-          changes={null}
+          runs={[]}
+          moreRuns={false}
           running={null}
           canRun
         />

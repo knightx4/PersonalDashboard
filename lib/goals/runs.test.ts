@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { RUN_QUIET_MS } from '@/lib/goals/shaping';
-import { runDuration, runMeta, runOutcome, toRunListings, type RunRowWithItem } from '@/lib/goals/runs';
+import {
+  GOAL_RUNS_SHOWN,
+  goalRunRows,
+  runDuration,
+  runMeta,
+  runOutcome,
+  toRunListings,
+  type RunRowWithItem,
+} from '@/lib/goals/runs';
 
 function row(overrides: Partial<RunRowWithItem>): RunRowWithItem {
   return {
@@ -94,5 +102,46 @@ describe('runMeta', () => {
     const { outcome, meta } = runMeta(running, Date.parse('2026-09-20T10:20:00Z'), 'UTC');
     expect(outcome).toBe('running');
     expect(meta.startsWith('Still running · on Find three running clubs, 3 minutes ago · ')).toBe(true);
+  });
+});
+
+describe('goalRunRows', () => {
+  const now = Date.parse('2026-09-25T09:00:00Z');
+
+  it('lists a goal with three past runs as three rows with their summaries, newest first', () => {
+    const rows = goalRunRows(
+      toRunListings([
+        row({ id: 'first', created_at: '2026-09-01T08:00:00Z', ended_at: '2026-09-01T08:20:00Z', summary: 'Mapped it.' }),
+        row({ id: 'third', job: 'reshape', created_at: '2026-09-24T07:40:00Z', ended_at: '2026-09-24T07:52:00Z', summary: 'Asked which card.' }),
+        row({ id: 'second', created_at: '2026-09-10T08:00:00Z', ended_at: '2026-09-10T08:05:00Z', summary: 'Added two steps.' }),
+      ]),
+      now,
+      'UTC',
+    );
+    expect(rows.map((r) => [r.id, r.label, r.text])).toEqual([
+      ['third', 'After your answers', 'Asked which card.'],
+      ['second', 'Work on this', 'Added two steps.'],
+      ['first', 'Work on this', 'Mapped it.'],
+    ]);
+    expect(rows[0].meta).toContain('Finished');
+    expect(rows[0].meta).toContain('took 12 min');
+  });
+
+  it('shows a failed run with its error, and keeps only the latest ten', () => {
+    const [failed] = goalRunRows(
+      toRunListings([row({ status: 'failed', summary: null, error: 'Token rejected' })]),
+      now,
+      'UTC',
+    );
+    expect(failed).toMatchObject({ failed: true, text: 'Token rejected' });
+
+    const many = toRunListings(
+      Array.from({ length: 12 }, (_, i) =>
+        row({ id: `r${i}`, created_at: `2026-09-${String(i + 1).padStart(2, '0')}T08:00:00Z`, ended_at: null }),
+      ),
+    );
+    const rows = goalRunRows(many, now, 'UTC');
+    expect(rows).toHaveLength(GOAL_RUNS_SHOWN);
+    expect(rows[0].id).toBe('r11');
   });
 });
