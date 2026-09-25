@@ -3,9 +3,12 @@ import {
   ACTION_FROM,
   SWIPES,
   appendCards,
+  canMakeTrack,
   cardTitle,
   feedEnd,
   licenceFor,
+  OFFER_AFTER,
+  offerDue,
   sectionLink,
   siteName,
   splitForReading,
@@ -235,5 +238,23 @@ describe('the feed', () => {
   it('says more are being written only when the ready pool is low', () => {
     expect(feedEnd(3, 10)).toBe('writing');
     expect(feedEnd(14, 10)).toBe('passed');
+  });
+});
+
+describe('a track offer and Make this a track (plan #968)', () => {
+  it('holds the offer back until a couple of cards are passed', () => {
+    expect(offerDue(0, 5)).toBe(false);
+    expect(offerDue(OFFER_AFTER - 1, 5)).toBe(false);
+    expect(offerDue(OFFER_AFTER, 5)).toBe(true);
+  });
+
+  it('shows the offer at once when there is no card to show', () => {
+    expect(offerDue(0, 0)).toBe(true);
+  });
+
+  it('puts Make this a track on a section card only', () => {
+    expect(canMakeTrack({ kind: 'section', article: 'Telomere' })).toBe(true);
+    expect(canMakeTrack({ kind: 'lesson', article: 'Telomere' })).toBe(false);
+    expect(canMakeTrack({ kind: 'section', article: ' ' })).toBe(false);
   });
 });
