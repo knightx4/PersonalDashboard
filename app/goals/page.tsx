@@ -34,10 +34,7 @@ export default async function GoalsPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader
-        title="Goals"
-        description="The next few things for each goal you are working on."
-      />
+      <PageHeader title="Goals" />
       <DailyView view={{ ...view, suggestions: homeSuggestions(suggestions, today) }} />
     </div>
   );

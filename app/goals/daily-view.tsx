@@ -190,7 +190,14 @@ function GoalCard({ daily }: { daily: DailyGoal }) {
   const { goal, areaName, next, more, hasSteps, progress } = daily;
   const tree = `/goals/${goal.id}`;
   const headingId = `goal-${goal.id}`;
+  const treeLabel = !hasSteps
+    ? 'Break into steps'
+    : more > 0
+      ? `${more} more in the full tree`
+      : 'Full tree';
 
+  // A goal with nothing next gets no card, since the card would only say there
+  // is nothing to show (law 1). The link to the tree moves under the heading.
   return (
     <section aria-labelledby={headingId} className="space-y-2">
       <div className="px-1">
@@ -201,31 +208,32 @@ function GoalCard({ daily }: { daily: DailyGoal }) {
         </h2>
         <p className="text-small text-ink-muted">{areaName}</p>
         {progress && <GoalProgress progress={progress} label={goal.title} className="pt-1" />}
+        {next.length === 0 && (
+          <Link
+            href={tree}
+            className="mt-1 inline-flex items-center gap-1.5 text-small text-ink-muted transition-colors duration-150 hover:text-ink"
+          >
+            <ListTree className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+            {treeLabel}
+          </Link>
+        )}
       </div>
-      <Card>
-        {next.length > 0 ? (
+      {next.length > 0 && (
+        <Card>
           <ul className="divide-y divide-border">
             {next.map((item) => (
               <NextRow key={item.id} item={item} href={tree} />
             ))}
           </ul>
-        ) : (
-          <p className="row-pad text-small text-ink-muted">
-            {hasSteps ? 'Nothing to do next on this goal.' : 'No steps yet.'}
-          </p>
-        )}
-        <Link
-          href={tree}
-          className="row-pad flex items-center gap-1.5 border-t border-border text-small text-ink-muted transition-colors duration-150 hover:text-ink"
-        >
-          <ListTree className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
-          {!hasSteps
-            ? 'Break into steps'
-            : more > 0
-              ? `${more} more in the full tree`
-              : 'Full tree'}
-        </Link>
-      </Card>
+          <Link
+            href={tree}
+            className="row-pad flex items-center gap-1.5 border-t border-border text-small text-ink-muted transition-colors duration-150 hover:text-ink"
+          >
+            <ListTree className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+            {treeLabel}
+          </Link>
+        </Card>
+      )}
     </section>
   );
 }
