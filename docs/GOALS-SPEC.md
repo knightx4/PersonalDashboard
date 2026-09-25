@@ -545,7 +545,12 @@ migration.
   rows and that date. Nobody types an answer. When a row an answer read
   changes, or a new row is confirmed in the collection, a trigger marks the
   answer out of date; the step says so, and the next morning run works it
-  again (plan #989).
+  again (plan #989). Each answer also stores what it states: a date, an
+  amount, or neither (plan #1035). A rewritten answer counts as a change
+  when its date moves at all, its amount moves by more than 5%, or, for a
+  written answer, the routine judges that its meaning changed. The change is
+  measured from the answer as it stood when the step last closed
+  (`lib/goals/answer-change.ts`).
 
 - **Questions.** The step lists the questions it has to answer, in
   `goals.items.questions`, each with the key its answer carries ("When does
@@ -686,7 +691,10 @@ A sketch for the migration, not the migration itself.
 - `goals.answers`: the answers the routine worked out on an information
   step, one per question (`key`), with `sources` naming the records read and
   each one's `as_of`, `worked_at`, and `out_of_date_at` once a record it read
-  has changed (plan #989).
+  has changed (plan #989). `kind` (`date`, `amount` or `text`) with
+  `value_date` or `value_amount` holds what the answer states, and
+  `closed_answer`, `closed_date` and `closed_amount` hold it as it stood when
+  the step last closed, written by a trigger on the step (plan #1035).
 - `goals.comments`: the thread on a goal or a step, `me` or `claude` per
   message (plan #957). A reply can file facts into a collection as drafts.
 - `archived_at` on areas and items, in place of deleting them.

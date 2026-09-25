@@ -477,6 +477,15 @@ are yours to write and keep current.
   record's `as_of`, or the date the document gives in its values, or the
   day the values were typed (`updated_at`). The database refuses a source
   that is not one of the person's records.
+- `kind` says what the answer states, and its value goes beside the
+  wording: `date` with `value_date` (the day the answer gives, such as
+  `2026-12-18` for the first payment), `amount` with `value_amount` (the
+  dollar figure, such as `2450` for the monthly total), or `text` with
+  neither (which company services the loans). Give the value the sentence
+  states; where the sentence gives a range, give the figure it leads with.
+  The database refuses a date or amount without its value. The value is what
+  a later rewrite is compared on, so a reworded sentence with the same value
+  is not a change.
 - Read the figures the way the step's notes explain them, not by the field
   name alone: a Grad PLUS "repayment begin date" is its last disbursement,
   and the first payment is the next due date.
@@ -484,13 +493,17 @@ are yours to write and keep current.
 ```sql
 set local goals.actor = 'claude';
 set local goals.run_id = '<the run id>';
-insert into goals.answers (user_id, item_id, key, question, answer, sources, position, run_id)
+insert into goals.answers (user_id, item_id, key, question, answer, kind, value_amount,
+                           sources, position, run_id)
 values ('<user>', '<step id>', 'monthly_total', 'What is the monthly total?',
         'About $2,450 a month: $988 and $966 on the Grad PLUS loans, and about $250 on each Unsubsidized loan once it is scheduled.',
+        'amount', 2450,
         '[{"record_id": "<loan 1>", "as_of": "2026-09-02"}, {"record_id": "<loan 2>", "as_of": "2026-09-02"}]'::jsonb,
         20, '<the run id>')
 on conflict (item_id, key) do update
   set question = excluded.question, answer = excluded.answer,
+      kind = excluded.kind, value_date = excluded.value_date,
+      value_amount = excluded.value_amount,
       sources = excluded.sources, run_id = excluded.run_id;
 ```
 
