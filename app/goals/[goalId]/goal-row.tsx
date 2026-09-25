@@ -366,8 +366,14 @@ export function GoalRow({
         )
       }
       priority={
+        /* The shared cell truncates, which suits the plan's one word and
+           size. A rhythm's count runs to three or four words ("0 of 1 this
+           week"), so it wraps onto a second line the way the plan's "Next ·
+           L" does rather than being cut off (plan #983). */
         current && step.rhythmPeriod ? (
-          <span className="text-ink-muted">{progressLine(step.rhythmPeriod, current)}</span>
+          <span className="whitespace-normal text-ink-muted">
+            {progressLine(step.rhythmPeriod, current)}
+          </span>
         ) : step.dueOn ? (
           <span className="text-ink-muted">Due {formatDate(step.dueOn)}</span>
         ) : null

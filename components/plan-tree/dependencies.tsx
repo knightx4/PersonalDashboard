@@ -10,6 +10,15 @@ import { cn } from '@/lib/cn';
 import type { TreeActionState, TreeActions, TreeCatalogEntry, TreeDependencyNode } from './types';
 
 /**
+ * A step as it is named in a chip: its number and title. A goal step can
+ * wait on a step under another goal, which has no number on this page and
+ * comes through as 0, so that one is named by its title alone (plan #983).
+ */
+function stepName(ref: { number: number; title: string }): string {
+  return ref.number > 0 ? `#${ref.number} ${ref.title}` : ref.title;
+}
+
+/**
  * What a step waits on, what waits on it, and the picker that adds an edge.
  *
  * An edge through a step above this one is drawn but cannot be removed here,
@@ -65,13 +74,15 @@ export function Dependencies<E extends TreeCatalogEntry>({
                     : 'bg-caution-tint text-caution',
                 )}
               >
-                #{link.item.number} {link.item.title}
+                {stepName(link.item)}
                 {isClosed(link.item.status) &&
                   ` (${PLAN_STATUS_LABEL[link.item.status].toLowerCase()})`}
                 <button
                   type="submit"
                   disabled={removePending}
-                  aria-label={`Stop waiting on #${link.item.number}`}
+                  aria-label={`Stop waiting on ${
+                    link.item.number > 0 ? `#${link.item.number}` : link.item.title
+                  }`}
                   className="press rounded-full p-0.5 hover:bg-surface/60"
                 >
                   <X className="size-3" strokeWidth={2} aria-hidden />
@@ -85,7 +96,7 @@ export function Dependencies<E extends TreeCatalogEntry>({
               title="Through a step above this one"
               className="inline-flex items-center rounded-full bg-caution-tint px-2 py-0.5 text-small text-caution opacity-80"
             >
-              #{ref.number} {ref.title} · above
+              {stepName(ref)} · above
             </span>
           ))}
         </div>
@@ -93,7 +104,7 @@ export function Dependencies<E extends TreeCatalogEntry>({
 
       {node.blocks.length > 0 && (
         <p className="text-small text-ink-muted">
-          Unblocks {node.blocks.map((ref) => `#${ref.number} ${ref.title}`).join(', ')}
+          Unblocks {node.blocks.map(stepName).join(', ')}
         </p>
       )}
 
