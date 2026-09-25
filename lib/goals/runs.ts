@@ -3,7 +3,8 @@
  *
  * One goals.runs row per run: "Work on this" or a comment on a goal (job
  * `goal`), the morning run (`daily`), the weekly run (`weekly`), or answers
- * to questions on a goal (`reshape`, plan #1017). The page
+ * to questions on a goal (`reshape`, plan #1017), or one step or phase sent
+ * from its row (`step`, `phase`, plan #1000). The page
  * reads them newest first and says, for each, what started it, what it was
  * on, how it ended, how long it took, and its summary or its error.
  *
@@ -12,7 +13,7 @@
  */
 import { RUN_QUIET_MS, type GoalRunStatus } from '@/lib/goals/shaping';
 
-export type RunJob = 'goal' | 'daily' | 'weekly' | 'reshape';
+export type RunJob = 'goal' | 'daily' | 'weekly' | 'reshape' | 'step' | 'phase';
 
 /** One goals.runs row with the item it was on, as the Runs page reads it. */
 export type RunListing = {
@@ -34,6 +35,8 @@ export const JOB_LABELS: Record<RunJob, string> = {
   daily: 'Morning run',
   weekly: 'Weekly run',
   reshape: 'After your answers',
+  step: 'Sent a step',
+  phase: 'Sent a phase',
 };
 
 /**
@@ -87,7 +90,14 @@ export type RunRowWithItem = {
 };
 
 function isJob(value: string): value is RunJob {
-  return value === 'goal' || value === 'daily' || value === 'weekly' || value === 'reshape';
+  return (
+    value === 'goal' ||
+    value === 'daily' ||
+    value === 'weekly' ||
+    value === 'reshape' ||
+    value === 'step' ||
+    value === 'phase'
+  );
 }
 
 function isStatus(value: string): value is GoalRunStatus {

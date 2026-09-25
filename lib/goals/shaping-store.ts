@@ -2,6 +2,7 @@ import 'server-only';
 
 import { fireFeatureRoutine, resolveRoutineId, type RoutineTarget } from '@/lib/feedback/routine';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
+import type { RunJob } from '@/lib/goals/runs';
 import {
   goalRunText,
   runChanges,
@@ -111,15 +112,15 @@ export async function startGoalRun(input: {
 
 /**
  * The run row and the fire, for any job: "Work on this" on one goal, the
- * morning run (plan #933), the weekly run, or a re-shape after answers
- * (plan #1017). `text` is the brief, given the new run's id. The
+ * morning run (plan #933), the weekly run, a re-shape after answers
+ * (plan #1017), or one step or phase sent from its row (plan #1000). `text` is the brief, given the new run's id. The
  * run id comes back either way, null only when the row itself could not be
  * written and nothing was started.
  */
 export async function recordAndFire(input: {
   client: GoalsSupabaseClient;
   userId: string;
-  job: 'goal' | 'daily' | 'weekly' | 'reshape';
+  job: RunJob;
   itemId: string | null;
   routine: RoutineTarget;
   text: (runId: string) => string;
