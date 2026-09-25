@@ -8,16 +8,18 @@
  * On you, With Claude or Waiting. The words, shapes and tones are the plan's
  * own, so a question looks the same on /goals as on /dev/plan.
  *
- * Goals have no dependencies between steps. What a step waits on is the open
- * steps under it, which is the rule the daily view already uses to pick what
- * is next (lib/goals/daily.ts): a step with open sub-steps is not itself next,
- * they are.
+ * A step waits on the steps it is declared to wait on, as a plan step does
+ * (plan #981, lib/goals/dependencies.ts), and on the open steps under it,
+ * which is the rule the daily view already uses to pick what is next
+ * (lib/goals/daily.ts): a step with open sub-steps is not itself next, they
+ * are. A step blocked on you is on you, and its Needs line says what for.
  *
  * Pure, so the rules are tested without a database or a page.
  */
 import type { DevTone } from '@/components/dev/state-label';
 import { DEV_STATE_WORD } from '@/lib/dev/words';
 import { awaitsReview } from '@/lib/goals/daily';
+import { isStepBlocked } from '@/lib/goals/dependencies';
 import { awaitsAnswer } from '@/lib/goals/shaping';
 import type { StepNode } from '@/lib/goals/steps';
 import { PLAN_HEALTH_GLYPHS, type StatusGlyph } from '@/lib/status-glyphs';
@@ -28,9 +30,11 @@ import { PLAN_HEALTH_GLYPHS, type StatusGlyph } from '@/lib/status-glyphs';
  * - `proposed`: Claude wrote it and you have not approved it.
  * - `unanswered`: a question waiting on your answer.
  * - `review`: a Claude step with a result you have not read.
+ * - `blocked`: blocked on something only you can give it (plan #981).
  * - `yours`: an open step of yours (or a rhythm) with nothing open under it.
  * - `working`: an open Claude step with nothing produced yet.
- * - `waiting`: an open step with open steps under it.
+ * - `waiting`: an open step with open steps under it, or one waiting on
+ *   other steps to close.
  * - `aside`: a question put aside with Not now.
  * - `done`, `answered`, `dropped`: closed.
  */
@@ -38,6 +42,7 @@ export const STEP_HEALTHS = [
   'proposed',
   'unanswered',
   'review',
+  'blocked',
   'yours',
   'working',
   'waiting',
@@ -75,6 +80,7 @@ const MOVE_OF: Record<StepHealth, StepMove> = {
   proposed: 'on_you',
   unanswered: 'on_you',
   review: 'on_you',
+  blocked: 'on_you',
   yours: 'on_you',
   working: 'with_claude',
   waiting: 'waiting',
@@ -94,6 +100,7 @@ export const STEP_HEALTH_GLYPHS: Record<StepHealth, StatusGlyph> = {
   proposed: PLAN_HEALTH_GLYPHS.proposed,
   unanswered: PLAN_HEALTH_GLYPHS.unanswered,
   review: PLAN_HEALTH_GLYPHS.blocked,
+  blocked: PLAN_HEALTH_GLYPHS.blocked,
   yours: PLAN_HEALTH_GLYPHS.ready,
   working: PLAN_HEALTH_GLYPHS.working,
   waiting: PLAN_HEALTH_GLYPHS.waiting,
@@ -108,6 +115,7 @@ const HEALTH_TITLE: Record<StepHealth, string> = {
   proposed: 'Claude proposed this step. Nothing happens to it until you approve it.',
   unanswered: 'A question waiting on your answer.',
   review: 'Claude has finished this. Read what it produced and mark it read.',
+  blocked: 'Blocked until you give it what it needs.',
   yours: 'Yours to do.',
   working: 'Claude does this one. The morning run works it and leaves the result here.',
   waiting: 'Waits on the steps under it.',
@@ -128,7 +136,7 @@ function isAside(node: StepNode): boolean {
 
 /** Whether a sub-step still holds its parent open. A put-aside question does not. */
 function holdsOpen(node: StepNode): boolean {
-  return node.status === 'open' && !isAside(node);
+  return (node.status === 'open' || node.status === 'blocked') && !isAside(node);
 }
 
 export function stepHealth(node: StepNode): StepHealth {
@@ -138,6 +146,10 @@ export function stepHealth(node: StepNode): StepHealth {
   if (node.status === 'dropped') return 'dropped';
   if (node.status === 'done') return node.kind === 'decision' ? 'answered' : 'done';
   if (node.status === 'proposed') return 'proposed';
+  // A block on the steps it waits on is waiting; one on you is yours. A block
+  // whose steps have all closed no longer holds, and the step reads as open.
+  if (isStepBlocked(node)) return node.blockKind === 'steps' ? 'waiting' : 'blocked';
+  if ((node.waitingOn ?? []).length > 0) return 'waiting';
   if (node.kind === 'decision') {
     if (awaitsAnswer(node)) return 'unanswered';
     if (isAside(node)) return 'aside';
@@ -205,7 +217,12 @@ export function stepState(node: StepNode): StepState {
   let title = HEALTH_TITLE[health];
   // The tooltips that can only be written with the step in hand, as on the
   // plan: what a waiting step waits on, and what an answer said.
-  if (health === 'waiting') {
+  const waits = node.waitingOn ?? [];
+  if (health === 'waiting' && waits.length > 0) {
+    title = `Waits on ${waits.map((step) => step.title).join(', ')}.`;
+  } else if (health === 'blocked' && node.blockAsk) {
+    title = `Blocked. Needs: ${node.blockAsk}`;
+  } else if (health === 'waiting') {
     const open = node.children.filter(holdsOpen);
     const beneath = movesLine(countMoves(flatten(open).filter((step) => !isClosed(step))));
     title = `Waits on the ${plural(open.length, 'open step', 'open steps')} under it${beneath ? `: ${beneath}` : ''}.`;
@@ -235,21 +252,26 @@ const NEEDS_NAMED = 3;
 
 /**
  * What a step is held up by, in one line, for the Needs block of an opened
- * step (plan #959). A goal step has no block of its own, so this is what the
- * plan's Needs line would say: the open steps under it, named, or your
- * approval on a proposal. Null when nothing holds it up, which includes a
- * question waiting on you, since its answer box already says so.
+ * step (plan #959), as the plan's Needs line says it: what a blocked step
+ * said it needs (plan #981), the steps it waits on and the open steps under
+ * it, named, or your approval on a proposal. Null when nothing holds it up,
+ * which includes a question waiting on you, since its answer box already says
+ * so.
  */
 export function stepNeeds(node: StepNode): string | null {
   const health = stepHealth(node);
   if (health === 'proposed') return 'Your approval. Nothing happens to it until then.';
+  if (health === 'blocked') return node.blockAsk ?? 'Something from you. Nothing says what yet.';
   if (health !== 'waiting') return null;
-  const open = node.children.filter(holdsOpen);
-  const named = open.slice(0, NEEDS_NAMED).map((step) => {
+  if (isStepBlocked(node) && node.blockAsk) return node.blockAsk;
+  const waits = (node.waitingOn ?? []).map((step) => step.title);
+  const open = node.children.filter(holdsOpen).map((step) => {
     const move = stepMove(step);
     return move === 'settled' ? step.title : `${step.title} (${PROGRESS_BAND_WORD[move]})`;
   });
-  const rest = open.length - named.length;
+  const all = [...waits, ...open];
+  const named = all.slice(0, NEEDS_NAMED);
+  const rest = all.length - named.length;
   if (rest > 0) named.push(plural(rest, 'more', 'more'));
   return `${named.join(', ')} to close first.`;
 }

@@ -11,6 +11,7 @@
  * rows, what a valid step is, and what a step looks like at a glance. The
  * reads and writes are in lib/goals/steps-store.ts.
  */
+import type { StepBlockKind, StepLink, StepRef } from '@/lib/goals/dependencies';
 import type { GoalStatus } from '@/lib/goals/tree';
 
 /** The limits the table's checks set (supabase/migrations-goals/0001). */
@@ -33,9 +34,13 @@ export const STEP_KIND_LABELS: Record<StepKind, string> = {
   rhythm: 'Rhythm',
 };
 
-export const STEP_STATUS_LABELS: Record<GoalStatus, string> = {
+/** A step's status: a goal's four, and blocked, which only a step can be (plan #981). */
+export type StepStatus = GoalStatus | 'blocked';
+
+export const STEP_STATUS_LABELS: Record<StepStatus, string> = {
   proposed: 'Proposed',
   open: 'Open',
+  blocked: 'Blocked',
   done: 'Done',
   dropped: 'Dropped',
 };
@@ -44,7 +49,7 @@ export type Step = {
   id: string;
   parentId: string;
   kind: StepKind;
-  status: GoalStatus;
+  status: StepStatus;
   title: string;
   detail: string | null;
   /** The done-when. */
@@ -70,9 +75,26 @@ export type Step = {
   collectionId?: string | null;
   /** The field keys it needs filled; null for every field the form shows. */
   asksFor?: string[] | null;
+  /** What a blocked step needs, in one sentence: its Needs line (plan #981). */
+  blockAsk?: string | null;
+  /** Who clears the block: `steps` when the steps it waits on close, `outside` when you do. */
+  blockKind?: StepBlockKind | null;
 };
 
-export type StepNode = Step & { children: StepNode[] };
+/**
+ * A step in the tree. The dependency fields are filled by
+ * `attachDependencies` in lib/goals/dependencies.ts, and absent on a tree
+ * built without it, which reads as a step that waits on nothing.
+ */
+export type StepNode = Step & {
+  children: StepNode[];
+  /** The steps this one is declared to wait on, closed or not. */
+  dependsOn?: StepLink[];
+  /** The steps declared to wait on this one. */
+  blocks?: StepRef[];
+  /** What holds it up: its own unfinished dependencies and those of every step above it. */
+  waitingOn?: StepRef[];
+};
 
 /** A step from another goal's tree that also counts towards this one. */
 export type LinkedStep = {

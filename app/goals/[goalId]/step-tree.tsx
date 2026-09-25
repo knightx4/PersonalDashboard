@@ -365,6 +365,18 @@ function StepItem({
         },
       ]
     : [
+        // Blocked (plan #981): unblocking puts it back to open, and the
+        // database clears what it said it needed.
+        ...(node.status === 'blocked'
+          ? [
+              {
+                id: 'unblock',
+                label: 'Unblock',
+                formAction: status,
+                formFields: { id: node.id, status: 'open' },
+              },
+            ]
+          : []),
         closed
           ? {
               id: 'reopen',

@@ -11,6 +11,11 @@ import { loadThreads } from '@/lib/goals/comments-store';
 import { dailyView, type DailyView } from '@/lib/goals/daily';
 import { GOALS_SCHEMA, type GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
+  attachDependencies,
+  type DependencyRow,
+  type StepBlockKind,
+} from '@/lib/goals/dependencies';
+import {
   buildForest,
   type LinkedStep,
   type RhythmPeriod,
@@ -18,6 +23,7 @@ import {
   type StepFields,
   type StepKind,
   type StepNode,
+  type StepStatus,
 } from '@/lib/goals/steps';
 import {
   homeRhythms,
@@ -47,7 +53,7 @@ type ItemRow = {
   area_id: string | null;
   parent_id: string | null;
   kind: StepKind | null;
-  status: GoalStatus;
+  status: StepStatus;
   title: string;
   detail: string | null;
   acceptance: string | null;
@@ -67,15 +73,37 @@ type ItemRow = {
   target: number | string | null;
   collection_id: string | null;
   asks_for: string[] | null;
+  block_ask: string | null;
+  block_kind: StepBlockKind | null;
 };
 
 type LinkRow = { id: string; item_id: string; goal_id: string };
+type DependencyDbRow = { id: string; item_id: string; depends_on_id: string };
+
+/**
+ * Every "waits on" edge between steps (plan #981). `userId` narrows it for
+ * the service-role client, as in loadLiveTree.
+ */
+async function loadDependencies(
+  client: GoalsSupabaseClient,
+  userId?: string,
+): Promise<DependencyRow[]> {
+  let query = client.from('dependencies').select('id, item_id, depends_on_id');
+  if (userId) query = query.eq('user_id', userId);
+  const { data, error } = await query;
+  if (error) throw new Error(`Could not read what steps wait on: ${error.message}`);
+  return ((data ?? []) as DependencyDbRow[]).map((row) => ({
+    id: row.id,
+    itemId: row.item_id,
+    dependsOnId: row.depends_on_id,
+  }));
+}
 
 const ITEM_COLUMNS =
   'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, fog_dismissed_at, ' +
   'resolution, ' +
   'dismissed_at, due_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
-  'unit, target, collection_id, asks_for';
+  'unit, target, collection_id, asks_for, block_ask, block_kind';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -97,6 +125,8 @@ const toStep = (row: ItemRow): Step => ({
   reviewedAt: row.reviewed_at,
   collectionId: row.collection_id,
   asksFor: row.asks_for,
+  blockAsk: row.block_ask,
+  blockKind: row.block_kind,
 });
 
 const toGoal = (row: ItemRow): Goal => ({
@@ -106,7 +136,8 @@ const toGoal = (row: ItemRow): Goal => ({
   acceptance: row.acceptance,
   fog: row.fog,
   fogDismissedAt: row.fog_dismissed_at,
-  status: row.status,
+  // Only a step can be blocked; the database refuses it on a goal.
+  status: row.status as GoalStatus,
   position: row.position,
   unit: row.unit,
   target: row.target === null ? null : Number(row.target),
@@ -144,7 +175,7 @@ export async function loadGoalMap(
   goalId: string,
   { userId, today }: Today,
 ): Promise<GoalMap | null> {
-  const [items, links, areas] = await Promise.all([
+  const [items, links, areas, dependencies] = await Promise.all([
     client
       .from('items')
       .select(ITEM_COLUMNS)
@@ -153,6 +184,7 @@ export async function loadGoalMap(
       .order('created_at'),
     client.from('item_goals').select('id, item_id, goal_id').is('archived_at', null),
     client.from('areas').select('id, name').is('archived_at', null),
+    loadDependencies(client),
   ]);
   assertSchemaExposed(items.error, GOALS_SCHEMA);
   if (items.error) throw new Error(`Could not read steps: ${items.error.message}`);
@@ -170,6 +202,7 @@ export async function loadGoalMap(
     goals.map((g) => g.id),
     rows.filter((r) => r.level === 'step').map(toStep),
   );
+  attachDependencies(byGoal, nodes, dependencies);
   const titles = new Map(goals.map((g) => [g.id, g.title]));
 
   const linked: LinkedStep[] = [];
@@ -234,14 +267,18 @@ export async function loadGoalMap(
 export async function loadGoalProgress(
   client: GoalsSupabaseClient,
 ): Promise<Record<string, GoalProgress>> {
-  const { data, error } = await client.from('items').select(ITEM_COLUMNS).is('archived_at', null);
+  const [{ data, error }, dependencies] = await Promise.all([
+    client.from('items').select(ITEM_COLUMNS).is('archived_at', null),
+    loadDependencies(client),
+  ]);
   if (error) throw new Error(`Could not read steps: ${error.message}`);
   const rows = (data ?? []) as unknown as ItemRow[];
   const goalIds = rows.filter((r) => r.level === 'goal').map((r) => r.id);
-  const { byGoal } = buildForest(
+  const { byGoal, nodes } = buildForest(
     goalIds,
     rows.filter((r) => r.level === 'step').map(toStep),
   );
+  attachDependencies(byGoal, nodes, dependencies);
   const out: Record<string, GoalProgress> = {};
   for (const [goalId, steps] of byGoal) {
     if (steps.length > 0) out[goalId] = goalProgress(steps);
@@ -305,7 +342,8 @@ export async function updateStep(
 
 /**
  * Close a step as done or dropped, or reopen it. closed_at follows by
- * trigger. False when it is not a live step or already in that state.
+ * trigger. Setting a blocked step open unblocks it, and the database clears
+ * what it said it needed. False when it is not a live step or already in that state.
  */
 export async function setStepStatus(
   client: GoalsSupabaseClient,
@@ -320,6 +358,59 @@ export async function setStepStatus(
     .neq('status', status)
     .is('archived_at', null)
     .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Block a step with what it needs (plan #981). `outside` waits for you;
+ * `steps` clears itself once the steps it waits on close. Blocking again
+ * rewrites the sentence. False when it is not a live, unclosed step.
+ */
+export async function blockStep(
+  client: GoalsSupabaseClient,
+  id: string,
+  ask: string | null,
+  kind: StepBlockKind = 'outside',
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('items')
+    .update({ status: 'blocked', block_ask: ask, block_kind: kind })
+    .eq('id', id)
+    .eq('level', 'step')
+    .in('status', ['open', 'blocked'])
+    .is('archived_at', null)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/** Why a new dependency was refused, in the page's words; null when it was written. */
+export type DependencyRefusal = 'loop' | 'duplicate' | 'not_steps';
+
+/**
+ * "This step cannot start until that one is closed." The database refuses a
+ * loop, a pair already there, and an end that is not a step of yours.
+ */
+export async function insertDependency(
+  client: GoalsSupabaseClient,
+  userId: string,
+  itemId: string,
+  dependsOnId: string,
+): Promise<DependencyRefusal | null> {
+  const { error } = await client
+    .from('dependencies')
+    .insert({ user_id: userId, item_id: itemId, depends_on_id: dependsOnId });
+  if (!error) return null;
+  if (error.code === '23505') return 'duplicate';
+  if (error.code === '23514') return 'loop';
+  if (error.code === '23503') return 'not_steps';
+  throw new Error(error.message);
+}
+
+/** False when there was no such dependency. */
+export async function deleteDependency(client: GoalsSupabaseClient, id: string): Promise<boolean> {
+  const { data, error } = await client.from('dependencies').delete().eq('id', id).select('id');
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;
 }
@@ -448,9 +539,10 @@ export async function loadLiveTree(
     itemsQuery = itemsQuery.eq('user_id', userId);
     areasQuery = areasQuery.eq('user_id', userId);
   }
-  const [items, areas] = await Promise.all([
+  const [items, areas, dependencies] = await Promise.all([
     itemsQuery.order('position').order('created_at'),
     areasQuery.order('position').order('created_at'),
+    loadDependencies(client, userId),
   ]);
   assertSchemaExposed(items.error, GOALS_SCHEMA);
   if (items.error) throw new Error(`Could not read steps: ${items.error.message}`);
@@ -471,10 +563,11 @@ export async function loadLiveTree(
     })),
   );
 
-  const { byGoal } = buildForest(
+  const { byGoal, nodes } = buildForest(
     goals.map((g) => g.goal.id),
     rows.filter((r) => r.level === 'step').map(toStep),
   );
+  attachDependencies(byGoal, nodes, dependencies);
   return { goals, byGoal };
 }
 
@@ -581,7 +674,7 @@ export async function setStepCollection(
 export async function loadInformationStep(
   client: GoalsSupabaseClient,
   id: string,
-): Promise<{ collectionId: string; asksFor: string[] | null; status: GoalStatus } | null> {
+): Promise<{ collectionId: string; asksFor: string[] | null; status: StepStatus } | null> {
   const { data, error } = await client
     .from('items')
     .select('collection_id, asks_for, status')
@@ -594,6 +687,6 @@ export async function loadInformationStep(
   return {
     collectionId: data.collection_id as string,
     asksFor: (data.asks_for as string[] | null) ?? null,
-    status: data.status as GoalStatus,
+    status: data.status as StepStatus,
   };
 }
