@@ -1,10 +1,12 @@
 'use client';
 
 import { useActionState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FogNote } from '@/components/dev/fog-note';
+import type { GoalRunRow } from '@/lib/goals/runs';
 import {
   approveGoalAction,
   setFogAsideAction,
@@ -23,7 +25,7 @@ const RUN_POLL_MS = 15_000;
 
 /**
  * Claude on this goal (plan #932): whether you have approved it, what Claude
- * has proposed and asked, how its last run went, and the two presses. Work on
+ * has proposed and asked, its last ten runs (plan #1014), and the two presses. Work on
  * this fires the goals routine for this goal; Approve opens what it proposed
  * and lets it change the steps here without asking from then on. With nothing
  * to approve it is one line rather than a card.
@@ -31,20 +33,17 @@ const RUN_POLL_MS = 15_000;
 export function GoalShaping({
   goalId,
   approval,
-  runLine,
-  runFailed,
-  changes,
+  runs,
+  moreRuns,
   running: progress,
   canRun,
 }: {
   goalId: string;
   approval: { text: string; approve: string | null };
-  /** The latest run in a sentence, or null when there has not been one. */
-  runLine: string | null;
-  /** Whether that run failed, so its line reads as an error. */
-  runFailed: boolean;
-  /** What the ended run changed, counted from history (plan #961). */
-  changes: string | null;
+  /** The goal's latest runs, newest first, each opening to what it changed (plan #1014). */
+  runs: GoalRunRow[];
+  /** Whether it has older runs than these, which the Runs page lists. */
+  moreRuns: boolean;
   /**
    * Where the run still going has got to, as "on Draft the letter, 3 minutes
    * ago" (plan #1002), or null when none is going.
@@ -65,19 +64,13 @@ export function GoalShaping({
   const error = approveState.error ?? workState.error;
   const message = workState.message ?? approveState.message;
 
-  const status = running ? (
+  const status = running && (
     <p role="status" className="flex items-center gap-1.5 text-small text-accent">
       <span className="size-1.5 animate-pulse rounded-full bg-accent" aria-hidden />
       <span>Claude is working on this · {progress}</span>
     </p>
-  ) : (
-    runLine && (
-      <div className="space-y-0.5">
-        <p className={runFailed ? 'text-small text-danger' : 'text-small text-ink-muted'}>{runLine}</p>
-        {changes && <p className="text-small text-ink-muted">{changes}</p>}
-      </div>
-    )
   );
+  const history = runs.length > 0 && <RunHistory runs={runs} more={moreRuns} />;
   const workButton = canRun && (
     <form action={work}>
       <input type="hidden" name="goalId" value={goalId} />
@@ -107,7 +100,7 @@ export function GoalShaping({
   // heading or card around them (ui finding 133242ff, plan #1038). The card
   // comes back when Claude proposes something.
   if (!approval.approve) {
-    if (!approval.text && !status && !workButton && !feedback) return null;
+    if (!approval.text && !status && !history && !workButton && !feedback) return null;
     return (
       <div className="space-y-1 px-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -120,6 +113,7 @@ export function GoalShaping({
           {workButton}
         </div>
         {feedback}
+        {history}
       </div>
     );
   }
@@ -142,8 +136,49 @@ export function GoalShaping({
           {workButton}
         </div>
         {feedback}
+        {history}
       </Card>
     </section>
+  );
+}
+
+/**
+ * The goal's runs, newest first (plan #1014): what started each, how it
+ * ended and when, and its summary or its error. Each opens to its own page,
+ * which lists what it changed; the Runs page has the older ones.
+ */
+function RunHistory({ runs, more }: { runs: GoalRunRow[]; more: boolean }) {
+  return (
+    <div className="space-y-1 pt-1">
+      <h3 className="text-small font-semibold text-ink">Runs</h3>
+      <ul className="divide-y divide-border">
+        {runs.map((run) => (
+          <li key={run.id} className="space-y-0.5 py-1.5">
+            <p className="text-small break-words">
+              <Link
+                href={`/goals/runs/${run.id}`}
+                className="font-medium text-ink underline-offset-2 hover:underline"
+              >
+                {run.label}
+              </Link>
+              <span className={run.failed ? 'text-danger' : 'text-ink-muted'}> · {run.meta}</span>
+            </p>
+            {run.text && (
+              <p
+                className={`line-clamp-2 text-small break-words whitespace-pre-wrap ${run.failed ? 'text-danger' : 'text-ink'}`}
+              >
+                {run.text}
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
+      {more && (
+        <Link href="/goals/runs" className="text-small text-ink-muted underline-offset-2 hover:underline">
+          All runs
+        </Link>
+      )}
+    </div>
   );
 }
 

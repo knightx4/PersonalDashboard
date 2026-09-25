@@ -6,20 +6,17 @@ import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { isOwner } from '@/lib/dev/owner';
 import { createGoalsClient } from '@/lib/goals/auth/server';
-import { formatInstant } from '@/lib/goals/dates';
 import { noLinks, weekInstants, type GoalLinks } from '@/lib/goals/links';
 import { loadAimChoices, loadGoalLinks } from '@/lib/goals/links-store';
 import { loadReadings } from '@/lib/goals/readings-store';
+import { goalRunRows, type RunListing } from '@/lib/goals/runs';
+import { loadGoalRuns } from '@/lib/goals/runs-store';
 import {
   approvalLine,
-  changesLine,
   countOpenQuestions,
   countProposed,
   runInFlight,
   runProgress,
-  runLine,
-  type GoalRun,
-  type RunChanges,
 } from '@/lib/goals/shaping';
 import type { StepNode } from '@/lib/goals/steps';
 import type { GoalStatus } from '@/lib/goals/tree';
@@ -53,22 +50,23 @@ export const dynamic = 'force-dynamic';
 function shapingLines(
   goalStatus: GoalStatus,
   steps: StepNode[],
-  shaping: { approvedAt: string | null; lastRun: GoalRun | null; changes: RunChanges | null },
+  approvedAt: string | null,
+  history: { runs: RunListing[]; more: boolean },
   timeZone: string,
 ) {
   const now = Date.now();
-  const running = runInFlight(shaping.lastRun, now);
+  const lastRun = history.runs[0] ?? null;
+  const running = runInFlight(lastRun, now);
   return {
     approval: approvalLine({
       goalStatus,
-      approvedAt: shaping.approvedAt,
+      approvedAt,
       proposed: countProposed(steps),
       questions: countOpenQuestions(steps),
     }),
-    runLine: runLine(shaping.lastRun, now, (iso) => `on ${formatInstant(iso, timeZone, { weekday: false })}`),
-    runFailed: shaping.lastRun?.status === 'failed',
-    changes: changesLine(shaping.changes),
-    running: running && shaping.lastRun ? runProgress(shaping.lastRun, now) : null,
+    runs: goalRunRows(history.runs, now, timeZone),
+    moreRuns: history.more,
+    running: running && lastRun ? runProgress(lastRun, now) : null,
   };
 }
 
@@ -84,7 +82,7 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
   const jobsOn = moduleEnabled(account, 'jobs');
   const learn = learnOn ? await createLearnClient() : null;
   const jobs = jobsOn ? await createJobsClient() : null;
-  const [map, readings, links, aims, shaping, owner] = await Promise.all([
+  const [map, readings, links, aims, shaping, history, owner] = await Promise.all([
     loadGoalMap(client, goalId, { userId: user.id, today }),
     loadReadings(client, goalId),
     // Read live from Learn and the job search (plan #931). A failed read is a
@@ -96,6 +94,7 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
     ).catch((): GoalLinks | null => null),
     learn ? loadAimChoices(learn).catch(() => null) : null,
     loadShaping(client, goalId),
+    loadGoalRuns(client, goalId),
     isOwner({ user }),
   ]);
   if (!map) notFound();
@@ -142,7 +141,7 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
         {shapeable && (
           <GoalShaping
             goalId={map.goal.id}
-            {...shapingLines(map.goal.status, map.steps, shaping, account.timezone)}
+            {...shapingLines(map.goal.status, map.steps, shaping.approvedAt, history, account.timezone)}
             canRun={owner}
           />
         )}

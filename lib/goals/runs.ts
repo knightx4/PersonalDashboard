@@ -159,3 +159,35 @@ export function runMeta(run: RunListing, now: number, timeZone: string): { outco
     .join(' · ');
   return { outcome, meta };
 }
+
+/** How many runs a goal's page lists (plan #1014); the rest are on the Runs page. */
+export const GOAL_RUNS_SHOWN = 10;
+
+/** One run in a goal's history, as the goal page draws it. */
+export type GoalRunRow = {
+  id: string;
+  label: string;
+  meta: string;
+  failed: boolean;
+  /** The run's summary, or its error when it failed; null when it wrote neither. */
+  text: string | null;
+};
+
+/**
+ * A goal's latest runs for its page (plan #1014), newest first and at most
+ * GOAL_RUNS_SHOWN, each with the same line the Runs page gives it. `now`
+ * is passed in so the page reads the clock once, outside render.
+ */
+export function goalRunRows(runs: readonly RunListing[], now: number, timeZone: string): GoalRunRow[] {
+  return runs.slice(0, GOAL_RUNS_SHOWN).map((run) => {
+    const { outcome, meta } = runMeta(run, now, timeZone);
+    const failed = outcome === 'failed';
+    return {
+      id: run.id,
+      label: JOB_LABELS[run.job],
+      meta,
+      failed,
+      text: failed ? (run.error ?? 'No reason was recorded.') : run.summary,
+    };
+  });
+}
