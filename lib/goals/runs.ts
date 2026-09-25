@@ -115,3 +115,24 @@ export function toRunListings(rows: readonly RunRowWithItem[]): RunListing[] {
     }))
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
+
+/**
+ * The line under a run's heading: how it ended, when it started, and how long
+ * it took. Shared by the Runs page and a run's own page (plan #1013).
+ */
+export function runMeta(run: RunListing, now: number, timeZone: string): { outcome: RunOutcome; meta: string } {
+  const stamp = new Intl.DateTimeFormat(undefined, {
+    timeZone,
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  const outcome = runOutcome(run, now);
+  const took = runDuration(run);
+  const meta = [OUTCOME_LABELS[outcome], stamp.format(new Date(run.createdAt)), took ? `took ${took}` : null]
+    .filter(Boolean)
+    .join(' · ');
+  return { outcome, meta };
+}
