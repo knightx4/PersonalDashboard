@@ -4,6 +4,7 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { catchUp, catchUpSince } from '@/lib/goals/catch-up';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { loadRunsEndedSince } from '@/lib/goals/runs-store';
+import { loadSinceVisit } from '@/lib/goals/since-visit-store';
 import { loadDailyView } from '@/lib/goals/steps-store';
 import { homeSuggestions } from '@/lib/goals/suggestions';
 import { loadRecentSuggestions } from '@/lib/goals/suggestions-store';
@@ -23,6 +24,8 @@ export const dynamic = 'force-dynamic';
  *
  * Each visit is recorded (plan #1019). On the day you come back after five or
  * more days away, the page leads with a catch-up from the day you left.
+ * Otherwise it leads with what Claude did since your last sitting (plan
+ * #1010), which the next sitting clears.
  *
  * The loader checks that the schema is exposed, so a deployment where `goals`
  * is not exposed to PostgREST says so here instead of showing an empty page
@@ -40,12 +43,15 @@ export default async function GoalsPage() {
   ]);
   const since = catchUpSince(visit, today);
   const away = since ? catchUp(since, await loadRunsEndedSince(client, since), view) : null;
+  // The catch-up already lists the runs from the time away.
+  const lately =
+    !away && visit.previousVisitAt ? await loadSinceVisit(client, visit.previousVisitAt) : null;
 
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Goals" />
       <DailyView
-        view={{ ...view, suggestions: homeSuggestions(suggestions, today), catchUp: away }}
+        view={{ ...view, suggestions: homeSuggestions(suggestions, today), catchUp: away, sinceVisit: lately }}
         timeZone={account.timezone}
       />
     </div>

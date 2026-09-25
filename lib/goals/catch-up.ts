@@ -23,6 +23,14 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** This many days or more since the last visit counts as time away. */
 export const AWAY_DAYS = 5;
 
+/**
+ * Page loads closer together than this are one sitting (plan #1010). The list
+ * of what Claude did since your last visit reads from the visit before the
+ * sitting began, so reloading the home, or a press on it that reloads it,
+ * does not empty the list; the next sitting does.
+ */
+export const SITTING_MINUTES = 30;
+
 /** The most finished runs the catch-up lists; the rest are on the Runs page. */
 export const CATCH_UP_RUNS_SHOWN = 6;
 
@@ -33,6 +41,11 @@ export type VisitRecord = {
   awayFrom: string | null;
   /** YYYY-MM-DD you came back on, in the account's zone; null alongside awayFrom. */
   backOn: string | null;
+  /**
+   * ISO instant of the last visit before this sitting (plan #1010); null
+   * until there has been one. What Claude did since then leads the home.
+   */
+  previousVisitAt: string | null;
 };
 
 /**
@@ -40,15 +53,20 @@ export type VisitRecord = {
  * catch up on. A gap of AWAY_DAYS or more starts a catch-up for today; a
  * shorter one leaves the last catch-up's fields as they were, so a second
  * visit on the day you came back still shows it.
+ *
+ * A gap of SITTING_MINUTES or more starts a new sitting, whose previous visit
+ * is the last one; a shorter gap keeps the sitting's previous visit.
  */
 export function nextVisit(record: VisitRecord | null, now: Date, today: string): VisitRecord {
   const lastVisitAt = now.toISOString();
-  if (!record) return { lastVisitAt, awayFrom: null, backOn: null };
+  if (!record) return { lastVisitAt, awayFrom: null, backOn: null, previousVisitAt: null };
   const gap = now.getTime() - Date.parse(record.lastVisitAt);
+  const previousVisitAt =
+    gap >= SITTING_MINUTES * 60 * 1000 ? record.lastVisitAt : record.previousVisitAt;
   if (gap >= AWAY_DAYS * DAY_MS) {
-    return { lastVisitAt, awayFrom: record.lastVisitAt, backOn: today };
+    return { lastVisitAt, awayFrom: record.lastVisitAt, backOn: today, previousVisitAt };
   }
-  return { lastVisitAt, awayFrom: record.awayFrom, backOn: record.backOn };
+  return { lastVisitAt, awayFrom: record.awayFrom, backOn: record.backOn, previousVisitAt };
 }
 
 /** When the time away began, if today is the day you came back from it; otherwise null. */

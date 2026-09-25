@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import {
   ChevronRight,
+  CircleAlert,
   CircleHelp,
   Flag,
   ListChecks,
@@ -20,6 +21,7 @@ import { VERDICT_LABELS, type GoalReview, type Verdict } from '@/lib/goals/revie
 import { missedLine, progressLine, type HomeRhythm } from '@/lib/goals/rhythms';
 import { JOB_LABELS, type RunListing } from '@/lib/goals/runs';
 import { STEP_KIND_LABELS } from '@/lib/goals/steps';
+import type { SinceEntry, SinceVisit } from '@/lib/goals/since-visit';
 import type { Suggestion } from '@/lib/goals/suggestions';
 import { GoalProgress } from './goal-progress';
 import { SuggestionsList } from './suggestions-list';
@@ -49,9 +51,18 @@ import { SuggestionsList } from './suggestions-list';
  * leads with a catch-up instead: the runs Claude finished while you were
  * gone, what is waiting on you, and one next step per goal. Everything else
  * is folded under it, closed.
+ *
+ * On any other day, when runs ended since your last sitting (plan #1010), the
+ * page opens with them: what each did, or why it failed, each a link to the
+ * goal it was on. The next sitting clears the list.
  */
 
-type View = Daily & { rhythms: HomeRhythm[]; suggestions: Suggestion[]; catchUp?: CatchUp | null };
+type View = Daily & {
+  rhythms: HomeRhythm[];
+  suggestions: Suggestion[];
+  catchUp?: CatchUp | null;
+  sinceVisit?: SinceVisit | null;
+};
 
 const KIND_ICONS: Record<NextItem['kind'], typeof User> = { mine: User, claude: Sparkles };
 
@@ -106,7 +117,11 @@ export function DailyView({
   /** The account's zone, for the times on the week's suggestions. */
   timeZone: string;
 }) {
-  if (view.goals.length === 0 && view.waiting.length === 0) {
+  const lately = view.sinceVisit && view.sinceVisit.entries.length > 0 && (
+    <SinceVisitView sinceVisit={view.sinceVisit} timeZone={timeZone} />
+  );
+
+  if (view.goals.length === 0 && view.waiting.length === 0 && !lately) {
     return (
       <EmptyState
         icon={Flag}
@@ -201,9 +216,77 @@ export function DailyView({
 
   return (
     <div className="space-y-6">
+      {lately}
       {waiting}
       {rest}
     </div>
+  );
+}
+
+/** What Claude did since your last sitting (plan #1010), newest first. */
+function SinceVisitView({ sinceVisit, timeZone }: { sinceVisit: SinceVisit; timeZone: string }) {
+  return (
+    <section aria-labelledby="since-heading" className="space-y-2">
+      <div className="px-1">
+        <h2 id="since-heading" className="text-ui font-semibold text-ink">
+          Since your last visit
+        </h2>
+        <p className="text-small text-ink-muted">
+          Since {formatInstant(sinceVisit.since, timeZone)}
+        </p>
+      </div>
+      <Card>
+        <ul className="divide-y divide-border">
+          {sinceVisit.entries.map((entry) => (
+            <SinceRow key={entry.runId} entry={entry} />
+          ))}
+        </ul>
+        {sinceVisit.more > 0 && (
+          <Link
+            href="/goals/runs"
+            className="card-pad-x row-pad flex items-center gap-1.5 border-t border-border text-small text-ink-muted transition-colors duration-150 hover:text-ink"
+          >
+            {sinceVisit.more} more on the Runs page
+          </Link>
+        )}
+      </Card>
+    </section>
+  );
+}
+
+function SinceRow({ entry }: { entry: SinceEntry }) {
+  const Icon = entry.failed ? CircleAlert : Sparkles;
+  return (
+    <li>
+      <Link
+        href={entry.href}
+        className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
+      >
+        <Icon
+          className={`mt-0.5 size-4 shrink-0 ${entry.failed ? 'text-danger' : 'text-ink-muted'}`}
+          strokeWidth={1.75}
+          aria-hidden
+        />
+        <span className="min-w-0 flex-1">
+          <span className="block text-ui break-words text-ink">{entry.title}</span>
+          <span
+            className={`block text-small break-words ${entry.failed ? 'text-danger' : 'text-ink-muted'}`}
+          >
+            {entry.line}
+          </span>
+          {entry.error && (
+            <span className="line-clamp-2 block text-small break-words text-ink-muted">
+              {entry.error}
+            </span>
+          )}
+        </span>
+        <ChevronRight
+          className="mt-0.5 size-4 shrink-0 text-ink-muted"
+          strokeWidth={1.75}
+          aria-hidden
+        />
+      </Link>
+    </li>
   );
 }
 
