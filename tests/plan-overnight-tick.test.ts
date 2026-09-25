@@ -808,7 +808,13 @@ describe('featureRunLiveness', () => {
       { id: 'first', parent_id: 'feature', status: 'done', updated_at: closed },
       { id: 'next', parent_id: 'feature', status: nextStatus, updated_at: closed },
     ];
-    const chain = { select: () => chain, eq: async () => ({ data: rows, error: null }) };
+    const result = { data: rows, error: null };
+    const chain: Record<string, unknown> = {
+      select: () => chain,
+      eq: () => chain,
+      order: () => chain,
+      range: async () => result,
+    };
     return {
       rpc: async (fn: string) => ({
         data: fn === 'plan_subtree_closed_at' ? closed : null,
