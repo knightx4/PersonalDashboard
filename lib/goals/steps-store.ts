@@ -30,6 +30,8 @@ import {
 } from '@/lib/goals/steps';
 import {
   homeRhythms,
+  practices,
+  type Practice,
   liveRhythms,
   type HomeRhythm,
   type LiveRhythm,
@@ -597,7 +599,7 @@ export async function loadLiveTree(
 export async function loadDailyView(
   client: GoalsSupabaseClient,
   { userId, today }: Today,
-): Promise<DailyView & { rhythms: HomeRhythm[] }> {
+): Promise<DailyView & { rhythms: HomeRhythm[]; practices: Practice[] }> {
   const { goals, byGoal } = await loadLiveTree(client);
   const live = liveRhythms(
     goals.map((g) => g.goal),
@@ -616,6 +618,7 @@ export async function loadDailyView(
       review: reviews.get(daily.goal.id),
     })),
     rhythms: homeRhythms(live, records, today),
+    practices: practices(live, records),
   };
 }
 

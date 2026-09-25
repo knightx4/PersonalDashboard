@@ -308,9 +308,10 @@ which stays `proposed` (below). Before you add anything, read what is already
 there and build around it: keep the person's steps, fill in what is missing,
 and reuse a step that already says what you were about to write.
 
-### Phases and sub-steps
+### Stages and sub-steps
 
-1. **Phases at the top level.** Three to six steps under the goal, in the
+1. **Stages at the top level.** (Older runs, and the Send a phase job, call
+   them phases; they are the same thing.) Three to six steps under the goal, in the
    order they happen, each a stage of the path: for a debt goal, get the
    numbers, choose the order, build the schedule, set up the payments, keep it
    on track. A phase has `kind = 'mine'`, an `acceptance` saying what is true
@@ -708,6 +709,21 @@ covers a direction means you leave that direction alone.
 
 ### What to propose
 
+0. **Check the three levels first** (spec, "The three levels"). An area is
+   a direction; a goal is an outcome that ends; a practice is never a goal.
+   - **A practice goes inside a goal as a `rhythm` step**, never as a goal.
+     "Go to one event a week" is the way to "Know ten people in the scene by
+     name", so propose the second and put the first inside it. The database
+     refuses a goal from you whose title or done-when reads as a rate or a
+     streak (`goals.reads_as_practice`, migrations-goals/0041).
+   - **Parts that follow one another toward one done-when are stages of one
+     goal**, not several goals. Knowing the target, a résumé, a network,
+     applying, interviewing and negotiating all serve getting the job: that
+     is one goal, *Land your next role*, with six stages. Propose several
+     goals only for outcomes that stand on their own.
+   - **An area whose name is itself an outcome** ("Get a job") gets one goal
+     with stages, and the run summary says the area would read better named
+     as a direction ("Career"). The name is the person's to change.
 1. **Three to six goals**, fewer when the area already has some. Together
    they should cover the main ways into the area, so the person can see the
    whole shape of it and pick. For a scene or a community that usually means
@@ -720,9 +736,8 @@ covers a direction means you leave that direction alone.
 3. **A title that says what will be true**, in under about eight words, and
    an `acceptance` that can be checked: a count, a date, a thing that exists.
    "Know ten people working on housing or transit by name" rather than "build
-   a network". Where a goal is a practice rather than something that ends,
-   say so in the done-when ("kept for eight of the last ten weeks") and make
-   its first step a `rhythm`.
+   a network". Never a rate or a streak: that is a practice, and it goes
+   inside the goal as a `rhythm` step.
 4. **A `detail` of one or two sentences**: why this goal serves the area, and
    what it assumes about the person. That sentence is what they decide on.
 5. **One first move under each**, as a proposed step with its own
@@ -773,18 +788,17 @@ returning id;
    ULURP, the zoning text amendments of the last two years and one open fight
    in your borough. First move: a `claude` step for a two-page primer with
    the reading list, and a link to Learn where a course fits better.
-2. **Go to one urbanism event a week**: a practice, kept for eight of ten
-   weeks. First move: a `rhythm` of one event a week, which the weekly run
-   feeds with events.
+2. **Know ten people in the scene by name**: done when ten people working on
+   housing, transit or planning would recognise you. Inside it, a `rhythm`
+   of one urbanism event a week, which the weekly run feeds with events; the
+   events are the way there, not the goal. First move: yours, write down the
+   three you already know.
 3. **Be a regular at your community board**: as in the example above.
 4. **Volunteer steadily with one advocacy group**: done when you have put in
    ten sessions with one of Open Plans, Transportation Alternatives, Open New
    York or the like. First move: a `claude` step comparing three groups'
    volunteer asks.
-5. **Know ten people in the scene by name**: done when ten people working on
-   housing, transit or planning would recognise you. First move: yours, write
-   down the three you already know.
-6. **Put something of your own into the conversation**: a testimony, an
+5. **Put something of your own into the conversation**: a testimony, an
    op-ed, a map or a talk, published or given. Written with `fog` if the
    person has not said what they would want to make.
 

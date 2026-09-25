@@ -218,13 +218,24 @@ export function DailyView({
           <h2 id="goals-heading" className="px-1 text-ui font-semibold text-ink">
             Your goals
           </h2>
-          <Card>
-            <ul className="divide-y divide-border">
-              {view.goals.map((daily) => (
-                <GoalRow key={daily.goal.id} daily={daily} />
-              ))}
-            </ul>
-          </Card>
+          <div className="space-y-4">
+            {byArea(view.goals).map(({ areaId, areaName, goals }) => (
+              <div key={areaId} className="space-y-1">
+                <h3 className="px-1 text-small font-semibold text-ink-muted">
+                  <Link href={`/goals/area/${areaId}`} className="underline-offset-2 hover:text-ink hover:underline">
+                    {areaName}
+                  </Link>
+                </h3>
+                <Card>
+                  <ul className="divide-y divide-border">
+                    {goals.map((daily) => (
+                      <GoalRow key={daily.goal.id} daily={daily} />
+                    ))}
+                  </ul>
+                </Card>
+              </div>
+            ))}
+          </div>
         </section>
       )}
     </>
@@ -641,9 +652,27 @@ function WaitingRow({ item }: { item: WaitingItem }) {
   );
 }
 
-/** One goal: its bar, the weekly verdict and the way into its tree. */
-function GoalRow({ daily }: { daily: DailyGoal }) {
-  const { goal, areaName, more, next, hasSteps, progress, review } = daily;
+/** The goals in page order, gathered under their areas in the order the areas first come. */
+function byArea(goals: DailyGoal[]): { areaId: string; areaName: string; goals: DailyGoal[] }[] {
+  const groups = new Map<string, { areaId: string; areaName: string; goals: DailyGoal[] }>();
+  for (const daily of goals) {
+    const group = groups.get(daily.goal.areaId) ?? {
+      areaId: daily.goal.areaId,
+      areaName: daily.areaName,
+      goals: [],
+    };
+    group.goals.push(daily);
+    groups.set(daily.goal.areaId, group);
+  }
+  return [...groups.values()];
+}
+
+/**
+ * One goal: its bar, the weekly verdict and the way into its tree. Listed
+ * under its area, so the area is not repeated on the row.
+ */
+export function GoalRow({ daily }: { daily: DailyGoal }) {
+  const { goal, more, next, hasSteps, progress, review } = daily;
   const tree = `/goals/${goal.id}`;
   const steps = next.length + more;
   const treeLabel = !hasSteps
@@ -658,11 +687,7 @@ function GoalRow({ daily }: { daily: DailyGoal }) {
           {goal.title}
         </Link>
       </p>
-      {/* The area leads the progress line rather than taking a line of its own. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="text-small text-ink-muted">{areaName}</span>
-        {progress && <GoalProgress progress={progress} label={goal.title} />}
-      </div>
+      {progress && <GoalProgress progress={progress} label={goal.title} />}
       {review && <ReviewLine review={review} />}
       <Link
         href={tree}
