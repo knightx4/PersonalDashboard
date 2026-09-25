@@ -1,6 +1,9 @@
 import 'server-only';
 
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
+import { periodOf } from '@/lib/goals/rhythms';
+import { countTowards } from '@/lib/goals/rhythms-store';
+import { RHYTHM_PERIODS, type RhythmPeriod } from '@/lib/goals/steps';
 import {
   PAST_LIMIT,
   SHOWN_FOR_MS,
@@ -71,17 +74,41 @@ export async function reactToSuggestion(
   return (data ?? []).length > 0;
 }
 
-/** Record that you went, from the tick on Todo. False when nothing changed. */
-export async function markAttended(client: GoalsSupabaseClient, id: string): Promise<boolean> {
+/**
+ * Record whether you went: yes from the tick on Todo or the home's "Did you
+ * go?", no from the home (plan #1020). Only on a suggestion you said you are
+ * going to and have not answered for. A yes on one suggested for a rhythm
+ * counts one towards the rhythm's period holding the event's date (today's
+ * for an undated one), when that period is still open. False when nothing
+ * changed.
+ */
+export async function recordAttended(
+  client: GoalsSupabaseClient,
+  id: string,
+  went: boolean,
+  today: string,
+): Promise<boolean> {
   const { data, error } = await client
     .from('suggestions')
-    .update({ attended: true })
+    .update({ attended: went })
     .eq('id', id)
     .eq('reaction', 'going')
     .is('attended', null)
-    .select('id');
+    .select('item_id, happens_on');
   if (error) throw new Error(error.message);
-  return (data ?? []).length > 0;
+  const row = (data ?? [])[0] as { item_id: string | null; happens_on: string | null } | undefined;
+  if (!row) return false;
+  if (!went || !row.item_id) return true;
+
+  const { data: item } = await client
+    .from('items')
+    .select('kind, rhythm_period')
+    .eq('id', row.item_id)
+    .maybeSingle();
+  const period = item?.rhythm_period as RhythmPeriod | null | undefined;
+  if (item?.kind !== 'rhythm' || !period || !RHYTHM_PERIODS.includes(period)) return true;
+  await countTowards(client, row.item_id, periodOf(period, row.happens_on ?? today).startsOn, 1);
+  return true;
 }
 
 /**

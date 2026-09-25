@@ -3,10 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
+import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { parseYourReaction } from '@/lib/goals/suggestions';
-import { reactToSuggestion } from '@/lib/goals/suggestions-store';
+import { reactToSuggestion, recordAttended } from '@/lib/goals/suggestions-store';
 import { undismiss } from '@/lib/todo/agenda/dismissals';
+import { todayIn } from '@/lib/todo/tasks/model';
 
 /**
  * Going and not for me on a suggestion from the weekly run (plan #934). The
@@ -35,6 +37,39 @@ export async function reactToSuggestionAction(
     // Pressing going again is asking to see it, so a "Later" or "Not this
     // one" left on Todo from before is lifted.
     if (reaction === 'going') await undismiss(user.id, 'goal_step', `goal_suggestions:${id.data}`);
+  } catch {
+    return { error: 'Your answer could not be saved. Try again.' };
+  }
+  revalidatePath('/goals', 'layout');
+  revalidatePath('/todo', 'layout');
+  revalidatePath('/home');
+  return { done: Date.now() };
+}
+
+/**
+ * Yes or no to "Did you go?", asked on the home the day after an event you
+ * said you were going to (plan #1020). Written to the suggestion's attended,
+ * which the next weekly brief reads beside the reaction.
+ */
+// latency: pending
+export async function recordAttendedAction(
+  _prev: SuggestionActionState,
+  form: FormData,
+): Promise<SuggestionActionState> {
+  const user = await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which suggestion that was.' };
+  const went = form.get('went');
+  if (went !== 'yes' && went !== 'no') return { error: 'Choose yes or no.' };
+  try {
+    const account = await loadAccountSettings(user.id);
+    const changed = await recordAttended(
+      await createGoalsClient(),
+      id.data,
+      went === 'yes',
+      todayIn(account.timezone),
+    );
+    if (!changed) return { error: 'That was already answered. Reload to see the list.' };
   } catch {
     return { error: 'Your answer could not be saved. Try again.' };
   }

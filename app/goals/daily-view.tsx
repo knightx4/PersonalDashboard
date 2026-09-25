@@ -25,7 +25,7 @@ import { STEP_KIND_LABELS } from '@/lib/goals/steps';
 import type { SinceEntry, SinceVisit } from '@/lib/goals/since-visit';
 import type { Suggestion } from '@/lib/goals/suggestions';
 import { GoalProgress } from './goal-progress';
-import { SuggestionsList } from './suggestions-list';
+import { DidYouGoList, SuggestionsList } from './suggestions-list';
 
 /**
  * The daily view on the Goals home (plan #926).
@@ -47,7 +47,9 @@ import { SuggestionsList } from './suggestions-list';
  *
  * The weekly run's suggestions (plan #934) come after the waiting list, with
  * their own going and not for me buttons: the one part of the home that
- * writes, because a reaction is quicker here than a trip into the tree.
+ * writes, because a reaction is quicker here than a trip into the tree. Above
+ * them, from the day after an event you said you were going to, the home asks
+ * whether you went (plan #1020).
  *
  * On the day you come back from five or more days away (plan #1019) the page
  * leads with a catch-up instead: the runs Claude finished while you were
@@ -62,6 +64,8 @@ import { SuggestionsList } from './suggestions-list';
 type View = Daily & {
   rhythms: HomeRhythm[];
   suggestions: Suggestion[];
+  /** Events you said you were going to whose day has passed (plan #1020). */
+  didYouGo?: Suggestion[];
   catchUp?: CatchUp | null;
   sinceVisit?: SinceVisit | null;
 };
@@ -152,8 +156,11 @@ export function DailyView({
     </section>
   );
 
+  const didYouGo = view.didYouGo ?? [];
   const rest = (
     <>
+      {didYouGo.length > 0 && <DidYouGoList suggestions={didYouGo} timeZone={timeZone} />}
+
       {view.suggestions.length > 0 && (
         <SuggestionsList suggestions={view.suggestions} timeZone={timeZone} />
       )}
@@ -204,6 +211,7 @@ export function DailyView({
   if (view.catchUp) {
     const folded = [
       view.goals.length > 0 ? plural(view.goals.length, 'goal') : null,
+      didYouGo.length > 0 ? plural(didYouGo.length, 'past event') : null,
       view.suggestions.length > 0 ? plural(view.suggestions.length, 'suggestion') : null,
       view.rhythms.length > 0 ? plural(view.rhythms.length, 'rhythm') : null,
     ].filter(Boolean);
