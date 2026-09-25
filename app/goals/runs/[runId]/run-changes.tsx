@@ -36,7 +36,7 @@ function ChangeRow({ runId, line }: { runId: string; line: ChangeLine }) {
             : null;
 
   return (
-    <li className="row-pad flex flex-wrap items-center gap-x-3 gap-y-1">
+    <li className="card-pad-x row-pad flex flex-wrap items-center gap-x-3 gap-y-1">
       <span
         className={
           line.state === 'undone'

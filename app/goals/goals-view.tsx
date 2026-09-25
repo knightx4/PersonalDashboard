@@ -274,7 +274,7 @@ function GoalRow({
   ];
 
   return (
-    <li className="row-pad flex items-start gap-2">
+    <li className="card-pad-x row-pad flex items-start gap-2">
       <div className="min-w-0 flex-1">
         <form action={edit}>
           <input type="hidden" name="id" value={goal.id} />

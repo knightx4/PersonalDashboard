@@ -130,7 +130,7 @@ export function DailyView({ view }: { view: View }) {
                 <li key={rhythm.id}>
                   <Link
                     href={`/goals/${rhythm.goalId}`}
-                    className="row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
+                    className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
                   >
                     <Repeat
                       className="mt-0.5 size-4 shrink-0 text-ink-muted"
@@ -169,7 +169,7 @@ function WaitingRow({ item }: { item: WaitingItem }) {
     <li>
       <Link
         href={item.kind === 'review' ? `/goals/${item.goalId}#step-${item.id}` : `/goals/${item.goalId}`}
-        className="row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
+        className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
       >
         <Icon className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
         <span className="min-w-0 flex-1">
@@ -227,7 +227,7 @@ function GoalCard({ daily }: { daily: DailyGoal }) {
           </ul>
           <Link
             href={tree}
-            className="row-pad flex items-center gap-1.5 border-t border-border text-small text-ink-muted transition-colors duration-150 hover:text-ink"
+            className="card-pad-x row-pad flex items-center gap-1.5 border-t border-border text-small text-ink-muted transition-colors duration-150 hover:text-ink"
           >
             <ListTree className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
             {treeLabel}
@@ -250,7 +250,7 @@ function NextRow({ item, href }: { item: NextItem; href: string }) {
     <li>
       <Link
         href={href}
-        className="row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
+        className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
       >
         <Icon className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
         <span className="min-w-0 flex-1">

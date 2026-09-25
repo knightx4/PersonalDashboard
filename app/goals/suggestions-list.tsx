@@ -61,7 +61,7 @@ function SuggestionRow({ suggestion: s }: { suggestion: Suggestion }) {
   const going = s.reaction === 'going';
 
   return (
-    <li className="row-pad flex items-start gap-2">
+    <li className="card-pad-x row-pad flex items-start gap-2">
       <CalendarDays className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
       <div className="min-w-0 flex-1 space-y-1">
         {s.url ? (
