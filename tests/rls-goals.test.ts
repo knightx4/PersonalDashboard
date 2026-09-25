@@ -777,6 +777,64 @@ describe('one proposal at a time, and fog put aside (plan #960)', () => {
   });
 });
 
+describe('weekly goal reviews (plan #1018)', () => {
+  async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  it('takes a stalled verdict only with its proposed step, and records it as Claude’s', async () => {
+    await expect(
+      asClaude((tx) => tx`
+        insert into reviews (user_id, item_id, verdict, reason, next_move)
+        values (${userA}, ${goalA}, 'stalled', 'Nothing done since August.', 'Call the lender.')`),
+    ).rejects.toThrow(/reviews_stalled_step_ck/);
+
+    const [row] = await asClaude((tx) => tx<{ id: string }[]>`
+      with step as (
+        insert into items (user_id, level, parent_id, kind, title, status)
+        values (${userA}, 'step', ${goalA}, 'mine', 'Call the lender', 'proposed')
+        returning id
+      )
+      insert into reviews (user_id, item_id, verdict, reason, next_move, step_id)
+      select ${userA}, ${goalA}, 'stalled', 'Nothing done since August.', 'Call the lender.', id
+      from step
+      returning id`);
+
+    const history = await historyOf(row.id);
+    expect(history).toEqual([
+      expect.objectContaining({ table_name: 'reviews', action: 'insert', actor: 'claude' }),
+    ]);
+  });
+
+  it('refuses a verdict outside the three', async () => {
+    await expect(
+      asClaude((tx) => tx`
+        insert into reviews (user_id, item_id, verdict, reason, next_move)
+        values (${userA}, ${goalA}, 'done', 'It is done.', 'Close it.')`),
+    ).rejects.toThrow(/reviews_verdict_ck/);
+  });
+
+  it('lets you read your own verdicts and write none, and hides them from anyone else', async () => {
+    await asClaude((tx) => tx`
+      insert into reviews (user_id, item_id, verdict, reason, next_move)
+      values (${userA}, ${goalA}, 'on_track', 'Two steps closed this week.', 'Pay the Visa.')`);
+
+    const mine = await asUser(userA, (tx) => tx`select verdict from reviews where item_id = ${goalA}`);
+    expect(mine.length).toBeGreaterThan(0);
+    const theirs = await asUser(userB, (tx) => tx`select verdict from reviews`);
+    expect(theirs).toHaveLength(0);
+
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into reviews (user_id, item_id, verdict, reason, next_move)
+        values (${userA}, ${goalA}, 'on_track', 'Mine.', 'Mine.')`),
+    ).rejects.toThrow(/permission denied/);
+  });
+});
+
 describe('weekly suggestions (plan #934)', () => {
   async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
     return admin.begin(async (tx) => {
@@ -1213,6 +1271,7 @@ describe('RLS coverage', () => {
       'periods',
       'readings',
       'records',
+      'reviews',
       'runs',
       'suggestions',
     ]);

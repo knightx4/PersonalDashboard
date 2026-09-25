@@ -14,6 +14,7 @@
  * way lib/plan/waiting.ts is for the dev plan's Dash section.
  */
 import { isStaleStepBlock, waitsOnNothing } from '@/lib/goals/dependencies';
+import type { GoalReview } from '@/lib/goals/reviews';
 import type { GoalProgress } from '@/lib/goals/status';
 import type { StepKind, StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
@@ -44,6 +45,8 @@ export type DailyGoal = {
   hasSteps: boolean;
   /** Its bar and whose move it is (plan #958); added by the loader, not by dailyView. */
   progress?: GoalProgress;
+  /** The weekly run's newest verdict on the goal (plan #1018), when there is one. */
+  review?: GoalReview;
 };
 
 export type WaitingItem =

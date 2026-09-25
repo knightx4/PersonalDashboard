@@ -1,8 +1,8 @@
 /**
  * The weekly goals run, as the daily cron calls it (plan #934): it marks last
  * week's unanswered suggestions ignored every day, and once a week fires the
- * goals routine with each goal's kinds of help and the past reactions to each
- * kind in its brief (plan #1028).
+ * goals routine with every open goal to review (plan #1018), each goal's kinds
+ * of help and the past reactions to each kind in its brief (plan #1028).
  *
  * The client is a stand-in that answers each table's query from a fixture and
  * records every insert and update, as in goals-daily-run.test.ts.
@@ -18,6 +18,8 @@ type Fixture = {
   lastWeeklyRun?: string | null;
   items: Record<string, unknown>[];
   past?: Record<string, unknown>[];
+  readings?: Record<string, unknown>[];
+  reviews?: Record<string, unknown>[];
 };
 
 function fakeClient(fixture: Fixture) {
@@ -37,6 +39,8 @@ function fakeClient(fixture: Fixture) {
         };
       }
       if (table === 'suggestions') return { data: fixture.past ?? [], error: null };
+      if (table === 'readings') return { data: fixture.readings ?? [], error: null };
+      if (table === 'reviews') return { data: fixture.reviews ?? [], error: null };
       if (table === 'areas') return { data: [{ id: 'area', name: 'The city' }], error: null };
       return { data: fixture.items, error: null };
     };
@@ -113,7 +117,24 @@ const LEARNING = item({
   title: 'Learn how cities are planned',
   help_kinds: [{ kind: 'reading', note: null }],
 });
-const QUIET = item({ id: 'q', level: 'goal', area_id: 'area', position: 30, title: 'Sleep by eleven' });
+const QUIET = item({
+  id: 'q',
+  level: 'goal',
+  area_id: 'area',
+  position: 30,
+  title: 'Sleep by eleven',
+  acceptance: 'Asleep by eleven five nights a week for a month.',
+  approved_at: '2026-08-01T00:00:00Z',
+});
+const SLEPT = item({
+  id: 's1',
+  level: 'step',
+  parent_id: 'q',
+  kind: 'mine',
+  status: 'done',
+  title: 'Set a phone curfew',
+  closed_at: '2026-09-01T21:00:00Z',
+});
 const RHYTHM = item({
   id: 'r1',
   level: 'step',
@@ -160,7 +181,7 @@ describe('runGoalsWeekly', () => {
     const fetch = okFetch();
     const result = await runGoalsWeekly({ client, routine, now: NOW, fetch });
 
-    expect(result).toEqual({ started: true, runId: 'run-1', goals: 2, past: 1, ignored: 2 });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 3, goals: 2, past: 1, ignored: 2 });
 
     expect(writes[0]).toMatchObject({ table: 'suggestions', op: 'update', values: { reaction: 'ignored' } });
     expect(writes[0].filters).toContainEqual(['eq', 'user_id', USER]);
@@ -180,7 +201,7 @@ describe('runGoalsWeekly', () => {
     expect(text).toContain('Goal "Get plugged into city life" (goals.items id g) asks for:\n- events: Brooklyn, weeknights');
     expect(text).toContain('"Go to one city event" (goals.items id r1)');
     expect(text).toContain('Goal "Learn how cities are planned" (goals.items id l) asks for:\n- reading');
-    expect(text).not.toContain('Sleep by eleven');
+    expect(text).not.toContain('Goal "Sleep by eleven" (goals.items id q) asks for');
     expect(text).toContain('events:\n- going, and went: "Jazz in Bryant Park"');
     expect(text).toContain('reading:\n- Nothing yet for this kind.');
   });
@@ -194,11 +215,27 @@ describe('runGoalsWeekly', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('spends no run when no open goal asks for help, even one with a live rhythm', async () => {
-    const { client, writes } = fakeClient({ items: [QUIET, { ...RHYTHM, parent_id: 'q' }] });
+  it('reviews every open goal, and a goal quiet for three weeks reads stalled', async () => {
+    const { client } = fakeClient({ items: [QUIET, SLEPT, { ...RHYTHM, parent_id: 'q' }] });
     const fetch = okFetch();
     const result = await runGoalsWeekly({ client, routine, now: NOW, fetch });
-    expect(result).toEqual({ skipped: 'no open goal asks for weekly help', ignored: 2 });
+    expect(result).toMatchObject({ started: true, reviewed: 1, goals: 0 });
+
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    const text = (JSON.parse(init.body as string) as { text: string }).text;
+    expect(text).toContain(
+      'Goal "Sleep by eleven" (goals.items id q)\n- Done when: Asleep by eleven five nights a week for a month.\n' +
+        '- Last thing done: 2026-09-01, 29 days ago.\n' +
+        '- Nothing done in 21 days or more: the verdict is stalled, with a proposed next step.',
+    );
+    expect(text).toContain('nothing to research');
+  });
+
+  it('spends no run when there is no open goal', async () => {
+    const { client, writes } = fakeClient({ items: [{ ...QUIET, status: 'done' }] });
+    const fetch = okFetch();
+    const result = await runGoalsWeekly({ client, routine, now: NOW, fetch });
+    expect(result).toEqual({ skipped: 'no open goal to review', ignored: 2 });
     expect(writes.map((w) => w.table)).toEqual(['suggestions']);
     expect(fetch).not.toHaveBeenCalled();
   });

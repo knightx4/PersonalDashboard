@@ -33,6 +33,7 @@ import {
   type LiveRhythm,
   type RhythmRecord,
 } from '@/lib/goals/rhythms';
+import { loadLatestReviews } from '@/lib/goals/reviews-store';
 import { syncRhythms } from '@/lib/goals/rhythms-store';
 import { goalProgress, type GoalProgress } from '@/lib/goals/status';
 import { todoSteps, type TodoStep } from '@/lib/goals/todo';
@@ -587,13 +588,17 @@ export async function loadDailyView(
     goals.map((g) => g.goal),
     byGoal,
   );
-  const records = await syncRhythms(client, userId, live, today);
+  const [records, reviews] = await Promise.all([
+    syncRhythms(client, userId, live, today),
+    loadLatestReviews(client),
+  ]);
   const view = dailyView(goals, byGoal, today);
   return {
     ...view,
     goals: view.goals.map((daily) => ({
       ...daily,
       progress: goalProgress(byGoal.get(daily.goal.id) ?? []),
+      review: reviews.get(daily.goal.id),
     })),
     rhythms: homeRhythms(live, records, today),
   };

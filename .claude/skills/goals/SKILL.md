@@ -1,6 +1,6 @@
 ---
 name: goals
-description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, provisional steps for what hangs on a question, and questions with lettered options. Re-shaping - read the answers to those questions and settle the provisional steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind. Use when the goals routine is fired from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "shape my goal …", "break down <goal>", "work on my goals".
+description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, provisional steps for what hangs on a question, and questions with lettered options. Re-shaping - read the answers to those questions and settle the provisional steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - give each open goal a verdict (on track, stalled or waiting on you) with the next move, proposing that move as a step for a stalled goal, then research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind. Use when the goals routine is fired from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "shape my goal …", "break down <goal>", "work on my goals".
 ---
 
 # Working a goal
@@ -567,11 +567,72 @@ step's brief does. They will do the step; you write what they need to do it.
 ## The weekly run
 
 Once a week the daily cron fires the routine with the `goals.runs` row it
-wrote with `job` `weekly` (`inngest/goals/weekly.ts`). The brief lists each
-open goal that asks for weekly help, with the kinds it asks for from
-`goals.items.help_kinds` and the note on each ("Brooklyn, weeknights"), and
-the goal's live rhythms. A goal that asks for nothing gets nothing, whatever
-rhythms it has.
+wrote with `job` `weekly` (`inngest/goals/weekly.ts`). The run does two
+things, in this order: it reviews every open goal, then it researches the
+help the goals ask for.
+
+### Reviewing each goal
+
+The brief lists every open goal with its done-when, when anything was last
+done on it (a step closed as done, or a reading logged), and last week's
+verdict when there was one. Read each goal's tree before judging it: what is
+done, what is open, what waits on the person, and what waits on you.
+
+Give every open goal one verdict:
+
+- **on_track**: it is moving towards its done-when at a pace that gets there.
+- **stalled**: nothing is moving and nobody is on it. **A goal with nothing
+  done in three weeks is stalled**, and the brief says so on that goal's
+  line. That holds even when a question of theirs is what it waits on: say
+  so in the reason.
+- **waiting_on_you**: the next thing is the person's, such as a question to
+  answer, a breakdown to approve or a step of theirs, and something was done
+  in the last three weeks.
+
+Write one sentence on why and one on the next move. Both are read on the
+goal's card on the Goals home, so name the step or the question rather than
+describing the goal back to them.
+
+A stalled goal also gets its next move as a step under it, with status
+`proposed`, so it lands in the person's breakdown to approve. Make it the
+smallest thing that would get the goal moving, `mine` or `claude` as fits,
+with a done-when. Do not propose one when an open proposal under the goal
+already says the same thing: name that one instead. The database refuses a
+stalled review with no `step_id`.
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+with step as (
+  insert into goals.items (user_id, level, parent_id, kind, title, acceptance, status, position)
+  values ('<user>', 'step', '<goal id>', 'mine', 'Call the lender about the rate',
+          'The new rate is written on the goal.', 'proposed', 5)
+  returning id
+)
+insert into goals.reviews (user_id, item_id, run_id, verdict, reason, next_move, step_id)
+select '<user>', '<goal id>', '<the run id>', 'stalled',
+       'Nothing has been done since the balance was logged on 2 September.',
+       'Call the lender about the rate, proposed as a step.', id
+from step;
+
+-- on_track and waiting_on_you carry no step
+insert into goals.reviews (user_id, item_id, run_id, verdict, reason, next_move)
+values ('<user>', '<goal id>', '<the run id>', 'waiting_on_you',
+        'Two sub-steps closed this week and the next one is yours.',
+        'Answer "Which card first?" on the goal.');
+```
+
+One row per goal per run. Rows are never updated: next week's run adds a new
+one, and the card shows the newest. The summary gives the count of each
+verdict and names the stalled goals.
+
+### Researching the help each goal asks for
+
+The brief then lists each open goal that asks for weekly help, with the kinds
+it asks for from `goals.items.help_kinds` and the note on each ("Brooklyn,
+weeknights"), and the goal's live rhythms. A goal that asks for nothing gets
+nothing, whatever rhythms it has. A week when no goal asks for help is a
+review and nothing else.
 
 Under that, the brief lists every suggestion from the last eight weeks,
 grouped by kind, with what the person did with it: `going`, `not_for_me`,
@@ -647,8 +708,9 @@ Never write `reaction`, `reacted_at` or `attended`. Going and not for me are
 the person's buttons on the Goals home, whether they went is their tick on
 Todo, and marking the unanswered ones ignored is done by the cron. The guard
 (`goals` 0008) refuses a Claude write to any of them. The summary says how
-many you wrote of each kind, and what in each kind's past reactions you
-followed.
+many verdicts of each kind you wrote and which goals are stalled, how many
+suggestions you wrote of each kind, and what in each kind's past reactions
+you followed.
 
 ## Replying to a comment
 

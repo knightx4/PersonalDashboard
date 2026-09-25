@@ -9,10 +9,12 @@ import {
   Sparkles,
   User,
 } from 'lucide-react';
+import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { DailyGoal, DailyView as Daily, NextItem, WaitingItem } from '@/lib/goals/daily';
 import { formatDay } from '@/lib/goals/dates';
+import { VERDICT_LABELS, type GoalReview, type Verdict } from '@/lib/goals/reviews';
 import { missedLine, progressLine, type HomeRhythm } from '@/lib/goals/rhythms';
 import { STEP_KIND_LABELS } from '@/lib/goals/steps';
 import type { Suggestion } from '@/lib/goals/suggestions';
@@ -50,6 +52,12 @@ const WAITING_ICONS: Record<WaitingItem['kind'], typeof User> = {
   breakdown: ListChecks,
   goal: Flag,
   review: Sparkles,
+};
+
+const VERDICT_TONES: Record<Verdict, DevTone> = {
+  on_track: 'positive',
+  stalled: 'caution',
+  waiting_on_you: 'caution',
 };
 
 function rhythmLine(rhythm: HomeRhythm): string {
@@ -188,7 +196,7 @@ function WaitingRow({ item }: { item: WaitingItem }) {
 }
 
 function GoalCard({ daily }: { daily: DailyGoal }) {
-  const { goal, areaName, next, more, hasSteps, progress } = daily;
+  const { goal, areaName, next, more, hasSteps, progress, review } = daily;
   const tree = `/goals/${goal.id}`;
   const headingId = `goal-${goal.id}`;
   const treeLabel = !hasSteps
@@ -213,6 +221,7 @@ function GoalCard({ daily }: { daily: DailyGoal }) {
           <span className="text-small text-ink-muted">{areaName}</span>
           {progress && <GoalProgress progress={progress} label={goal.title} />}
         </div>
+        {review && <ReviewLine review={review} />}
         {next.length === 0 && (
           <Link
             href={tree}
@@ -240,6 +249,30 @@ function GoalCard({ daily }: { daily: DailyGoal }) {
         </Card>
       )}
     </section>
+  );
+}
+
+/**
+ * The weekly run's newest verdict on the goal (plan #1018): the verdict and
+ * why on one line, the next move on the next. A stalled goal's next move is
+ * also a proposed step, which the waiting list above offers to approve.
+ */
+function ReviewLine({ review }: { review: GoalReview }) {
+  const checked = formatDay(review.createdAt.slice(0, 10));
+  return (
+    <div className="space-y-0.5 pt-1 text-small break-words text-ink-muted">
+      <p>
+        <StateLabel
+          glyph={null}
+          word={VERDICT_LABELS[review.verdict]}
+          tone={VERDICT_TONES[review.verdict]}
+          title={`Weekly check, ${checked}`}
+          className="mr-1.5 font-semibold"
+        />
+        {review.reason}
+      </p>
+      <p>Next: {review.nextMove}</p>
+    </div>
   );
 }
 
