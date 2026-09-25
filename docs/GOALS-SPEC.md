@@ -296,6 +296,24 @@ What the night did is listed at the top of the Goals home the next morning
 (see "Since your last visit" below). The budget field on `/dev/plan` still
 says "features" although goal runs spend it too.
 
+### Flags
+
+A run sometimes finds something you should know that is neither a step nor a
+question, such as a servicer moving your due date or a statement showing a
+missed payment. It flags it: a row in `public.raised_items` with the goal's
+id in `goal_id` and module `goals` (goals migration 0031). An open flag is
+listed under Waiting on you on the home, after the questions, and opens to
+the flag on the goal's page. There it shows what was found, the thread under
+it, a box to answer it and **Put aside**.
+
+Answering writes your answer into the flag's thread and starts a goal run
+with job `raise`, whose brief carries the flag, the thread and your answer
+(`lib/goals/flags-store.ts`). The flag moves to answered, which takes it off
+Waiting on you, and the run replies in the thread and closes it. When no run
+can start, because a run is already going on the goal or the account cannot
+start one, the answer is kept and the flag stays open. Flags are left off
+`/dev/raised`, where an answer would start the plan routine instead.
+
 ## The daily view
 
 The Goals home page is for a once-a-day visit. It shows:

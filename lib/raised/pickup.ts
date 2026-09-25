@@ -106,6 +106,14 @@ export async function pickUpRaise(input: PickupInput): Promise<PickupOutcome> {
 
   const row = raisedRowFrom(data as unknown as Record<string, unknown>);
   if (row.status !== 'open' && row.status !== 'answered') return { ok: false, said: null };
+  // A flag on a goal is answered on the goal's page, which starts a goal run
+  // (lib/goals/flags-store.ts). The plan routine would not know the goals.
+  if (row.goalId) {
+    return {
+      ok: false,
+      said: `Your answer is saved, but no session started: this was raised on a goal, so answer it on /goals/${row.goalId}.`,
+    };
+  }
 
   const history = row.thread.filter((comment) => comment.id !== input.commentId);
   const started = await startRoutineRun({

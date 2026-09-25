@@ -101,6 +101,8 @@ function doneVerb(run: RunListing, tally: RunTally): string {
       return 'Settled after your answers';
     case 'area':
       return 'Planned this area';
+    case 'raise':
+      return 'Acted on your answer';
     case 'daily':
     case 'weekly':
       return 'Finished';

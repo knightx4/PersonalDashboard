@@ -5,6 +5,7 @@ import {
   CircleHelp,
   Flag,
   ListChecks,
+  Megaphone,
   ListTree,
   Repeat,
   Sparkles,
@@ -30,7 +31,8 @@ import { SuggestionsList } from './suggestions-list';
  * The daily view on the Goals home (plan #926).
  *
  * What is waiting on you comes first, because each of those holds something
- * else up. Then one card per active goal with its next one to three things,
+ * else up. It includes what a run flagged on a goal (plan #1015), which opens
+ * to the flag on the goal's page. Then one card per active goal with its next one to three things,
  * yours first. Every row is a link into the goal's full tree, where the step
  * can be done, edited or broken down; the home itself only reads.
  *
@@ -71,6 +73,7 @@ const WAITING_ICONS: Record<WaitingItem['kind'], typeof User> = {
   breakdown: ListChecks,
   goal: Flag,
   review: Sparkles,
+  flag: Megaphone,
 };
 
 const VERDICT_TONES: Record<Verdict, DevTone> = {
@@ -106,6 +109,8 @@ function waitingLine(item: WaitingItem): string {
       return 'Goal Claude proposed';
     case 'review':
       return `Claude’s result to read · ${item.goalTitle}`;
+    case 'flag':
+      return `Claude flagged this · ${item.goalTitle}`;
   }
 }
 
@@ -405,7 +410,13 @@ function WaitingRow({ item }: { item: WaitingItem }) {
   return (
     <li>
       <Link
-        href={item.kind === 'review' ? `/goals/${item.goalId}#step-${item.id}` : `/goals/${item.goalId}`}
+        href={
+          item.kind === 'review'
+            ? `/goals/${item.goalId}#step-${item.id}`
+            : item.kind === 'flag'
+              ? `/goals/${item.goalId}#flag-${item.id}`
+              : `/goals/${item.goalId}`
+        }
         className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
       >
         <Icon className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
