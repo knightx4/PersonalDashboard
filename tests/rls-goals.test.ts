@@ -1477,6 +1477,46 @@ describe('worked-out answers on an information step (plan #989)', () => {
       admin`update items set questions = '[{"key": "a", "question": "x"}]'::jsonb where id = ${plain.id}`,
     ).rejects.toThrow(/items_questions_ck/);
   });
+
+  it('stores a date or amount beside the wording, matching its kind (plan #1035)', async () => {
+    const { step, loans } = await loansStep();
+    const total = await answer(step, 'monthly_total', sourcesOf(loans));
+    await admin`update answers set kind = 'amount', value_amount = 300 where id = ${total}`;
+    await expect(
+      admin`update answers set kind = 'date' where id = ${total}`,
+    ).rejects.toThrow(/answers_value_ck/);
+    await expect(
+      admin`update answers set kind = 'text' where id = ${total}`,
+    ).rejects.toThrow(/answers_value_ck/);
+
+    // A new value alone counts as a rewrite and brings the answer back into date.
+    await admin`update records set data = data || '{"balance": 1900}'::jsonb where id = ${loans[0]}`;
+    expect(await outOfDate(total)).toBe(true);
+    await admin`update answers set value_amount = 290 where id = ${total}`;
+    expect(await outOfDate(total)).toBe(false);
+  });
+
+  it('keeps each answer as it stood when its step closed (plan #1047)', async () => {
+    const { step, loans } = await loansStep();
+    const first = await answer(step, 'first_payment', sourcesOf(loans));
+    await admin`update answers set kind = 'date', value_date = '2026-12-18' where id = ${first}`;
+    const closedOf = async () => {
+      const [row] = await admin<{ closed_answer: string | null; closed_date: string | null }[]>`
+        select closed_answer, closed_date::text from answers where id = ${first}`;
+      return row;
+    };
+    expect(await closedOf()).toEqual({ closed_answer: null, closed_date: null });
+
+    await asUser(userA, (tx) => tx`
+      update items set questions = '[{"key": "first_payment", "question": "When?"}]'::jsonb
+      where id = ${step}`);
+    expect(await statusOf(step)).toBe('done');
+    expect(await closedOf()).toEqual({ closed_answer: 'About $300 a month.', closed_date: '2026-12-18' });
+
+    // Rewriting the answer on a closed step leaves the closing state alone.
+    await admin`update answers set value_date = '2026-12-19', answer = '19 Dec 2026.' where id = ${first}`;
+    expect(await closedOf()).toEqual({ closed_answer: 'About $300 a month.', closed_date: '2026-12-18' });
+  });
 });
 
 describe('RLS coverage', () => {

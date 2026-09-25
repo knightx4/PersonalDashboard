@@ -540,6 +540,8 @@ const loanAnswers: StepAnswer[] = [
     position: 10,
     workedAt: '2026-09-10T08:00:00Z',
     outOfDateAt: '2026-09-12T09:30:00Z',
+    value: { kind: 'amount', amount: 496 },
+    closed: null,
   },
   {
     id: 'answer-car-ends',
@@ -551,6 +553,8 @@ const loanAnswers: StepAnswer[] = [
     position: 20,
     workedAt: '2026-09-10T08:00:00Z',
     outOfDateAt: null,
+    value: { kind: 'date', date: '2028-02-01' },
+    closed: null,
   },
 ];
 

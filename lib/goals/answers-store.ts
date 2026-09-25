@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { readSources, type StepAnswer } from '@/lib/goals/answers';
+import { readClosed, readSources, readValue, type StepAnswer } from '@/lib/goals/answers';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 
 /**
@@ -19,9 +19,16 @@ type AnswerRow = {
   position: number;
   worked_at: string;
   out_of_date_at: string | null;
+  kind: string;
+  value_date: string | null;
+  value_amount: number | string | null;
+  closed_answer: string | null;
+  closed_date: string | null;
+  closed_amount: number | string | null;
 };
 
-const COLUMNS = 'id, item_id, key, question, answer, sources, position, worked_at, out_of_date_at';
+const COLUMNS =
+  'id, item_id, key, question, answer, sources, position, worked_at, out_of_date_at, kind, value_date, value_amount, closed_answer, closed_date, closed_amount';
 
 const toAnswer = (row: AnswerRow): StepAnswer => ({
   id: row.id,
@@ -33,6 +40,8 @@ const toAnswer = (row: AnswerRow): StepAnswer => ({
   position: row.position,
   workedAt: row.worked_at,
   outOfDateAt: row.out_of_date_at,
+  value: readValue(row.kind, row.value_date, row.value_amount),
+  closed: readClosed(row.closed_answer, row.closed_date, row.closed_amount),
 });
 
 /** The answers on these steps, keyed by step id, each step's in order. */
