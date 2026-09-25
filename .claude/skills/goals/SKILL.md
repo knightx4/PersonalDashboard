@@ -83,8 +83,13 @@ with recursive tree as (
 )
 select id, parent_id, depth, kind, status, title, detail, acceptance, resolution,
        dismissed_at, collection_id, asks_for, position, due_on, rhythm_count,
-       rhythm_period
+       rhythm_period, block_ask, block_kind
 from tree order by depth, position;
+
+-- what the steps wait on: each row is "item cannot start until depends_on closes"
+select d.id, d.item_id, d.depends_on_id, p.title, p.status
+from goals.dependencies d join goals.items p on p.id = d.depends_on_id
+where d.user_id = '<user>';
 
 -- the collections this goal already has, and every live one on the account
 select c.id, c.name, c.shape, c.fields, c.version,
@@ -365,8 +370,9 @@ proposed under the goal at once.
 
 **After it is approved:** add steps as `open` (provisional ones as
 `proposed`), split one into sub-steps, move a step under another step of the
-same goal, reorder by `position`, and point a step at a collection. Do these
-without asking.
+same goal, reorder by `position`, point a step at a collection, make a step
+wait on another, and block a step on the person (see "Blocked and waiting
+steps"). Do these without asking.
 
 **Collections, approved or not:** define one, add fields to one, serve one to
 the goal, and write draft records into one. Never confirm a record, and never
@@ -380,6 +386,46 @@ as option A.
 
 Nothing is deleted. Archive with `archived_at = now()` where you are allowed
 to, and delete only a row you wrote by mistake in this same run.
+
+## Blocked and waiting steps
+
+A step that cannot start until another step closes **waits on it**: a row in
+`goals.dependencies`, not a status. It reads as Waiting on the goal page, stays
+out of the morning run and the home's next steps, and becomes ready by itself
+when the other step is done or dropped. Use it for order that matters: pay the
+card only once the statement is in. Both ends are steps of the same account;
+the database refuses a goal at either end, and a loop ("That would make the
+two steps wait on each other").
+
+```sql
+set local goals.actor = 'claude';
+insert into goals.dependencies (user_id, item_id, depends_on_id)
+values ('<user>', '<the step that waits>', '<the step it waits on>');
+
+-- taking it off again
+delete from goals.dependencies where id = '<dependency id>' and user_id = '<user>';
+```
+
+A step that needs something only the person can give (an account number, a
+login, a decision that is not worth a question step) is **blocked on them**:
+`status = 'blocked'` with `block_ask`, one sentence saying what it needs. That
+sentence is the step's Needs line on the page. `block_kind` is `outside`
+unless you leave it out, which means the same. Blocking again rewrites the
+sentence. Only a step can be blocked, never a goal.
+
+```sql
+set local goals.actor = 'claude';
+update goals.items
+set status = 'blocked', block_ask = 'The account number for the Chase card.'
+where id = '<step id>' and user_id = '<user>' and level = 'step'
+  and status in ('open', 'blocked');
+```
+
+Unblocking is setting it back to `open`; the database clears `block_ask` and
+`block_kind` itself. Unblock a step once what it asked for has arrived, in a
+comment, a record or an answer. `block_kind = 'steps'` is for a block that
+waits on the steps it depends on and clears itself once they all close; a
+plain dependency row is almost always the better way to say that.
 
 ## The morning run
 
@@ -410,10 +456,12 @@ The home then lists the step under "Waiting on you" until the person presses
 **Mark read**. Never write `reviewed_at`: reading it is theirs, and the guard
 refuses it.
 
-A step you cannot finish (it needs something only the person has, or the
-facts are not findable) stays open with no result. Say why in the run
-summary, and where a question would unblock it, add it as a question step
-under the same goal. The summary names each step worked and each one left.
+A step you cannot finish because it needs something only the person has is
+blocked on them, with `block_ask` saying what (see "Blocked and waiting
+steps"). One whose facts are not findable stays open with no result. Say why
+in the run summary either way, and where a choice would unblock it, add it as
+a question step under the same goal. The summary names each step worked and
+each one left.
 
 ## The weekly run
 

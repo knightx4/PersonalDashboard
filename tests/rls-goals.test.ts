@@ -1050,6 +1050,71 @@ describe('comments on goals and steps (plan #957)', () => {
   });
 });
 
+describe('blocked steps and dependencies (plan #981)', () => {
+  async function newStep(title: string, owner = userA, parent = goalA): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${owner}, 'step', ${parent}, 'mine', ${title}) returning id`;
+    return row.id;
+  }
+
+  it('blocks a step with what it needs, and clears both when it is unblocked', async () => {
+    const step = await newStep('Call the bank');
+    await asUser(userA, (tx) => tx`
+      update items set status = 'blocked', block_ask = 'The account number.' where id = ${step}`);
+    const [blocked] = await admin<{ status: string; block_ask: string; block_kind: string }[]>`
+      select status, block_ask, block_kind from items where id = ${step}`;
+    expect(blocked).toEqual({ status: 'blocked', block_ask: 'The account number.', block_kind: 'outside' });
+
+    await asUser(userA, (tx) => tx`update items set status = 'open' where id = ${step}`);
+    const [open] = await admin<{ block_ask: string | null; block_kind: string | null }[]>`
+      select block_ask, block_kind from items where id = ${step}`;
+    expect(open).toEqual({ block_ask: null, block_kind: null });
+  });
+
+  it('never blocks a goal', async () => {
+    await expect(
+      admin`update items set status = 'blocked' where id = ${goalA}`,
+    ).rejects.toThrow(/items_blocked_step_ck/);
+  });
+
+  it('records a dependency and refuses a loop, a goal and another account\'s step', async () => {
+    const first = await newStep('Get the statement');
+    const second = await newStep('Pay the card');
+    const third = await newStep('Close the card');
+
+    const [dep] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into dependencies (user_id, item_id, depends_on_id)
+      values (${userA}, ${second}, ${first}) returning id`);
+    const history = await historyOf(dep.id);
+    expect(history[0]).toMatchObject({ table_name: 'dependencies', action: 'insert', actor: 'me' });
+    await asUser(userA, (tx) => tx`
+      insert into dependencies (user_id, item_id, depends_on_id) values (${userA}, ${third}, ${second})`);
+
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into dependencies (user_id, item_id, depends_on_id) values (${userA}, ${first}, ${third})`),
+    ).rejects.toThrow(/wait on each other/);
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into dependencies (user_id, item_id, depends_on_id) values (${userA}, ${first}, ${goalA})`),
+    ).rejects.toThrow(/steps of your own/);
+
+    const [areaB] = await admin<{ id: string }[]>`
+      insert into areas (user_id, name) values (${userB}, 'Theirs') returning id`;
+    const [goalB] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title)
+      values (${userB}, 'goal', ${areaB.id}, 'Their goal') returning id`;
+    const theirs = await newStep('Their step', userB, goalB.id);
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into dependencies (user_id, item_id, depends_on_id) values (${userA}, ${first}, ${theirs})`),
+    ).rejects.toThrow();
+    const seen = await asUser(userB, (tx) => tx`select id from dependencies`);
+    expect(seen).toHaveLength(0);
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`
@@ -1083,6 +1148,7 @@ describe('RLS coverage', () => {
       'collection_goals',
       'collections',
       'comments',
+      'dependencies',
       'item_goals',
       'items',
       'links',

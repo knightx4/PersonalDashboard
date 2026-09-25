@@ -11,6 +11,7 @@
  * a run already happened today, and the brief the routine is fired with. The
  * reads and writes are in inngest/goals/daily.ts.
  */
+import { isStaleStepBlock, waitsOnNothing } from '@/lib/goals/dependencies';
 import type { StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
 
@@ -30,7 +31,8 @@ export type ReadyStep = { id: string; title: string; goalId: string; goalTitle: 
  * Every Claude step the morning run should work, in page order: an open
  * `claude` step under an open goal, reached through open steps only, with no
  * open step beneath it and nothing produced yet. A step with open sub-steps
- * waits on them, as on the home.
+ * waits on them, as on the home, and so does one waiting on other steps
+ * (plan #981). A blocked step and what is under it wait on you.
  */
 export function readyClaudeSteps(goals: Goal[], stepsByGoal: Map<string, StepNode[]>): ReadyStep[] {
   const ready: ReadyStep[] = [];
@@ -38,12 +40,12 @@ export function readyClaudeSteps(goals: Goal[], stepsByGoal: Map<string, StepNod
     if (goal.status !== 'open') continue;
     const walk = (nodes: StepNode[]) => {
       for (const node of nodes) {
-        if (node.status !== 'open') continue;
+        if (node.status !== 'open' && !isStaleStepBlock(node)) continue;
         if (
           node.kind === 'claude' &&
           node.result === null &&
           node.resultUrl === null &&
-          !node.children.some((child) => child.status === 'open')
+          waitsOnNothing(node)
         ) {
           ready.push({ id: node.id, title: node.title, goalId: goal.id, goalTitle: goal.title });
         }
