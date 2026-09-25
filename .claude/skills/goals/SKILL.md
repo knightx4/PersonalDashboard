@@ -44,9 +44,10 @@ or `fog_dismissed_at`, and never set a record's `draft` to false.
 
 Every run has a `goals.runs` row.
 
-- Fired from **Work on this**, by the **morning run**, by the weekly run or
-  after the person answered questions on a goal (job `reshape`): the app has
-  written the row as `started`, and its id is in your brief. Use it.
+- Fired from **Work on this**, by the **morning run**, by the weekly run,
+  after the person answered questions on a goal (job `reshape`), or by
+  **Send** on one step or phase (job `step` or `phase`): the app has written
+  the row as `started`, and its id is in your brief. Use it.
 - Started any other way: write one first, with `job` `goal` and `item_id` for
   one goal, or `daily` / `weekly` for a scheduled run, and use its id.
 
@@ -485,6 +486,27 @@ steps"). One whose facts are not findable stays open with no result. Say why
 in the run summary either way, and where a choice would unblock it, add it as
 a question step under the same goal. The summary names each step worked and
 each one left.
+
+## A step or phase sent from its row
+
+The person pressed **Send** on one step or one phase on the goal page
+(`lib/goals/handover.ts`). The brief names that step first, then its goal,
+where it sits, the steps beside it, a phase's own steps, and the collections
+the goal fills, and the run row has `job` `step` or `phase` with `item_id` on
+the step. The app has already refused a question, a proposal, a step on a goal
+that is not approved, and a step Claude is already on, so what you are sent is
+yours to work.
+
+- **A step** (`job` `step`): work that one Claude step as in "The morning
+  run", and touch no other step. If it turns out to need something only the
+  person has, block it with `block_ask` rather than guessing.
+- **A phase** (`job` `phase`): work the open Claude steps in it, in order, as
+  in "The morning run". Leave the person's own steps and the questions alone.
+  The goal is approved, so where the phase plainly needs a Claude step it does
+  not have, you may add one under it. Stop at the first step that needs the
+  person.
+
+The summary names each step worked and each one left, with the reason.
 
 ## The weekly run
 

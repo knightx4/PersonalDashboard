@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from 'react';
 import Link from 'next/link';
-import { Repeat, Sparkles } from 'lucide-react';
+import { Play, Repeat, Sparkles } from 'lucide-react';
+import { RowIconButton } from '@/app/dev/plan/plan-run-status';
 import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
 import type { TreeActionState, TreeActions, TreeCatalogEntry } from '@/components/plan-tree/types';
 import type { ActionMenuItem } from '@/components/ui/action-menu';
@@ -10,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { FieldError, InlineInput } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { awaitsReview } from '@/lib/goals/daily';
+import { offersSend, sendJob } from '@/lib/goals/handover';
 import type { GoalRowNode } from '@/lib/goals/plan-rows';
 import { progressLine } from '@/lib/goals/rhythms';
 import { countProposed } from '@/lib/goals/shaping';
@@ -31,7 +33,12 @@ import {
 } from './block-actions';
 import { GOALS_STORE } from './goal-comments';
 import { InformationStep } from './information-step';
-import { setFogAsideAction, settleProposalAction } from './shaping-actions';
+import {
+  sendStepAction,
+  setFogAsideAction,
+  settleProposalAction,
+  type ShapingActionState,
+} from './shaping-actions';
 import {
   ClaudeResult,
   PastPeriods,
@@ -167,6 +174,14 @@ export function GoalRow({
     opened: context.opened,
   });
   const [blocking, setBlocking] = useState(false);
+  // Send to Claude (plan #1000). Held by the row rather than by a button,
+  // because there are three ways to press it -- the quick icon, the button in
+  // the opened row and the menu -- and what came back is said once, on the
+  // row, as the dev plan does.
+  const [sendState, sendAction, sendPending] = useActionState(
+    sendStepAction,
+    {} as ShapingActionState,
+  );
   const toast = useToast();
   const menuAction = useMenuAction();
   const tree = (action: (prev: TreeActionState, form: FormData) => Promise<TreeActionState>) =>
@@ -295,8 +310,14 @@ export function GoalRow({
           : []),
       ]
     : [];
+  const sendable = offersSend(step);
+  const sendLabel = sendJob(step) === 'phase' ? 'Send this phase to Claude' : 'Send to Claude';
+  const sendItems: ActionMenuItem[] = sendable
+    ? [{ id: 'send', label: sendLabel, formAction: sendAction, formFields: { id: step.id } }]
+    : [];
   const move = menuAction(moveStepAction);
   const menu: ActionMenuItem[] = [
+    ...sendItems,
     ...rhythmItems,
     ...todoItems,
     { id: 'add-child', label: 'Add a sub-step', onSelect: row.addChild },
@@ -378,10 +399,29 @@ export function GoalRow({
           <span className="text-ink-muted">Due {formatDate(step.dueOn)}</span>
         ) : null
       }
-      notices={
-        blocking && (
-          <BlockForm node={node} inset={rowInset(trail)} onDone={() => setBlocking(false)} />
+      quickActions={
+        sendable && (
+          <form action={sendAction}>
+            <input type="hidden" name="id" value={step.id} />
+            <RowIconButton type="submit" label={sendLabel} pending={sendPending}>
+              <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
+            </RowIconButton>
+          </form>
         )
+      }
+      notices={
+        <>
+          {blocking && (
+            <BlockForm node={node} inset={rowInset(trail)} onDone={() => setBlocking(false)} />
+          )}
+          {/* What the last send did, or why it was refused, wherever it was pressed. */}
+          {(sendState.error ?? sendState.message) && (
+            <li style={rowInset(trail)} className="pb-1.5 pr-3 text-small">
+              <FieldError>{sendState.error}</FieldError>
+              {!sendState.error && <span className="text-ink-muted">{sendState.message}</span>}
+            </li>
+          )}
+        </>
       }
       edit={
         <StepEditForm
@@ -425,7 +465,20 @@ export function GoalRow({
           ))}
         </p>
       }
-      panelActions={proposed && <ProposalButtons node={step} />}
+      panelActions={
+        <>
+          {proposed && <ProposalButtons node={step} />}
+          {sendable && (
+            <form action={sendAction}>
+              <input type="hidden" name="id" value={step.id} />
+              <Button type="submit" size="sm" variant="secondary" pending={sendPending}>
+                <Play className="size-3.5" aria-hidden />
+                {sendPending ? 'Sending…' : sendLabel}
+              </Button>
+            </form>
+          )}
+        </>
+      }
       addChild={
         <StepComposer
           parentId={step.id}

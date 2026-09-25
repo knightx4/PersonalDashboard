@@ -6,6 +6,7 @@ import { requireUser } from '@/lib/auth/server';
 import { isOwner } from '@/lib/dev/owner';
 import { goalsRoutine } from '@/lib/feedback/routine';
 import { createGoalsClient } from '@/lib/goals/auth/server';
+import { sendGoalStep } from '@/lib/goals/handover-store';
 import { runInFlight } from '@/lib/goals/shaping';
 import {
   answerQuestion,
@@ -88,6 +89,55 @@ export async function workOnGoalAction(
   }
   // No message: the working line in the panel says it, with its clock (plan #961).
   return saved();
+}
+
+/**
+ * Send one Claude step, or one phase, to Claude from its row (plan #1000).
+ * Every rule about what may be sent is in lib/goals/handover.ts; a refusal
+ * comes back as the sentence the row shows.
+ */
+// latency: pending
+export async function sendStepAction(
+  _prev: ShapingActionState,
+  form: FormData,
+): Promise<ShapingActionState> {
+  const user = await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which step that was.' };
+  if (!(await isOwner({ user }))) {
+    return { error: 'Only the account that owns this app can start a Claude run.' };
+  }
+  const routine = goalsRoutine();
+  if (!routine.id) {
+    return {
+      error:
+        'No goals routine on this deployment, so nothing was started. Set ' +
+        'CLAUDE_GOALS_ROUTINE_ID to the routine that works goals, and ' +
+        'CLAUDE_GOALS_ROUTINE_TOKEN to its token.',
+    };
+  }
+
+  let sent;
+  try {
+    sent = await sendGoalStep({
+      client: await createGoalsClient(),
+      userId: user.id,
+      stepId: id.data,
+      routine,
+    });
+  } catch {
+    return { error: 'The step could not be sent. Try again.' };
+  }
+  if (!sent.ok) {
+    // A fire that failed still wrote a failed run row, which the Runs page lists.
+    revalidatePath('/goals', 'layout');
+    return { error: sent.error };
+  }
+  return saved(
+    sent.job === 'phase'
+      ? `Sent "${sent.title}" to Claude. It will work the Claude steps in it, in order.`
+      : `Sent "${sent.title}" to Claude. What it produces will show on the step.`,
+  );
 }
 
 // latency: pending
