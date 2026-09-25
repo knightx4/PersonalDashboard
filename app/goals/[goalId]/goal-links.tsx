@@ -78,43 +78,48 @@ export function GoalLinksSection({
         Linked
       </h2>
       <Card>
-        <ul aria-label="Linked from other modules" className="divide-y divide-border">
-          {links.aims.map((aim) => (
-            <LinkRow
-              key={aim.linkId}
-              linkId={aim.linkId}
-              title={aim.name ?? 'A Learn goal'}
-              href={aim.name ? '/learn/goals' : null}
-              line={aimProgressLine(aim)}
-              what="Learn goal"
-            />
-          ))}
-          {links.jobSearch && (
-            <LinkRow
-              linkId={links.jobSearch.linkId}
-              title="Job search"
-              href="/jobs/today"
-              line={links.jobSearch.week ? jobWeekLine(links.jobSearch.week) : ''}
-              what="job search"
-            />
-          )}
-          {links.jobs.map((job) => (
-            <LinkRow
-              key={job.linkId}
-              linkId={job.linkId}
-              title={
-                job.title
-                  ? `${job.title}${job.company ? ` at ${job.company}` : ''}`
-                  : job.kind === 'role'
-                    ? 'A role'
-                    : 'An application'
-              }
-              href={job.roleId ? `/jobs/roles/${job.roleId}` : null}
-              line={job.title ? (job.status ?? 'Role') : 'No longer in the job search'}
-              what={job.kind}
-            />
-          ))}
-        </ul>
+        {/* Left out while linking the first one: an empty list is still the
+            card's first child, so the picker's first:border-t-0 never applied
+            and a hairline ran across the top of the card. */}
+        {!empty && (
+          <ul aria-label="Linked from other modules" className="divide-y divide-border">
+            {links.aims.map((aim) => (
+              <LinkRow
+                key={aim.linkId}
+                linkId={aim.linkId}
+                title={aim.name ?? 'A Learn goal'}
+                href={aim.name ? '/learn/goals' : null}
+                line={aimProgressLine(aim)}
+                what="Learn goal"
+              />
+            ))}
+            {links.jobSearch && (
+              <LinkRow
+                linkId={links.jobSearch.linkId}
+                title="Job search"
+                href="/jobs/today"
+                line={links.jobSearch.week ? jobWeekLine(links.jobSearch.week) : ''}
+                what="job search"
+              />
+            )}
+            {links.jobs.map((job) => (
+              <LinkRow
+                key={job.linkId}
+                linkId={job.linkId}
+                title={
+                  job.title
+                    ? `${job.title}${job.company ? ` at ${job.company}` : ''}`
+                    : job.kind === 'role'
+                      ? 'A role'
+                      : 'An application'
+                }
+                href={job.roleId ? `/jobs/roles/${job.roleId}` : null}
+                line={job.title ? (job.status ?? 'Role') : 'No longer in the job search'}
+                what={job.kind}
+              />
+            ))}
+          </ul>
+        )}
         {(canLinkAim || canLinkSearch) &&
           (adding ? (
             <AddLinks

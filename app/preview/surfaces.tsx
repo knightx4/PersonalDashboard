@@ -70,6 +70,15 @@ import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
 import { PlanOpenedSurface, PlanTreeSurface } from './plan-surfaces';
 import { GoalOpenedSurface, GoalTreeSurface } from './goal-surfaces';
+import {
+  GoalBareSurface,
+  GoalLinkingSurface,
+  GoalTopSurface,
+  GoalsAllSurface,
+  GoalsHomeSurface,
+  InformationListSurface,
+  InformationOneSurface,
+} from './goal-page-surfaces';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -2253,6 +2262,80 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalOpenedSurface />,
+  },
+  {
+    /* The Goals home on an ordinary week (plan #1043): a question and a
+     * result waiting, a rhythm running late, a suggestion, two goals with
+     * next steps, one waiting on other people with nothing next, and one
+     * with no steps at all. */
+    id: 'goals-home',
+    label: 'Goals · home',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsHomeSurface />,
+  },
+  {
+    /* Three areas and their goals, edited where they stand. */
+    id: 'goals-all',
+    label: 'Goals · all goals',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSurface />,
+  },
+  {
+    /* The top of a goal page with every section holding something: the
+     * Claude line, the number and its readings, one Learn goal linked. */
+    id: 'goals-page-top',
+    label: 'Goal · the top of the page',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalTopSurface />,
+  },
+  {
+    /* A goal just added: the Claude line and the row of add lines. */
+    id: 'goals-page-bare',
+    label: 'Goal · a bare goal',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalBareSurface />,
+  },
+  {
+    /* The bare goal's link line pressed: the picker for a first link. */
+    id: 'goals-page-linking',
+    label: 'Goal · linking the first Learn goal',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalLinkingSurface />,
+  },
+  {
+    /* An information step holding one record: two asked values, the rest
+     * folded under Other fields. */
+    id: 'goals-info-one',
+    label: 'Goal · a one-record information step',
+    module: 'goals',
+    width: 'page',
+    render: () => <InformationOneSurface />,
+  },
+  {
+    /* A list step: three loans of nineteen fields, four of them asked. */
+    id: 'goals-info-list',
+    label: 'Goal · a list information step',
+    module: 'goals',
+    width: 'page',
+    render: () => <InformationListSurface />,
+  },
+  {
+    /* The same list with one row's other fields showing and a balance
+     * being changed in its cell. */
+    id: 'goals-info-list-open',
+    label: 'Goal · a list step, other fields and an editor open',
+    module: 'goals',
+    width: 'page',
+    render: () => (
+      <InformationListSurface
+        seam={{ openRow: 'loan-student', editing: { recordId: 'loan-car', key: 'balance' } }}
+      />
+    ),
   },
   {
     /* The design language, held to itself. It is the one surface where being

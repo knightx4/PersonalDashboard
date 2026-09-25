@@ -14,12 +14,17 @@ export function FieldInput({
   field,
   value,
   namePrefix = '',
+  fit = false,
+  className,
 }: {
   id: string;
   field: CollectionField;
   value: FieldValue | undefined;
   /** Put before the input's name when one form holds several records. */
   namePrefix?: string;
+  /** Take the width it is given rather than asking for its own (a table cell). */
+  fit?: boolean;
+  className?: string;
 }) {
   const name = `${namePrefix}${VALUE_PREFIX}${field.key}`;
   const defaultValue = inputValue(field, value);
@@ -33,6 +38,8 @@ export function FieldInput({
         <Input
           id={id}
           name={name}
+          size={fit ? 1 : undefined}
+          className={className}
           inputMode="decimal"
           autoComplete="off"
           defaultValue={defaultValue}
@@ -43,6 +50,8 @@ export function FieldInput({
         <Input
           id={id}
           name={name}
+          size={fit ? 1 : undefined}
+          className={className}
           inputMode="numeric"
           autoComplete="off"
           defaultValue={defaultValue}
@@ -76,6 +85,15 @@ export function FieldInput({
       );
     }
     default:
-      return <Input id={id} name={name} autoComplete="off" defaultValue={defaultValue} />;
+      return (
+        <Input
+          id={id}
+          name={name}
+          size={fit ? 1 : undefined}
+          className={className}
+          autoComplete="off"
+          defaultValue={defaultValue}
+        />
+      );
   }
 }

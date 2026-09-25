@@ -9,6 +9,7 @@ import { Disclosure } from '@/components/ui/disclosure';
 import { InlineInput, Input } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
+import { formatDay } from '@/lib/goals/dates';
 import {
   READING_NOTE_MAX,
   UNIT_MAX,
@@ -25,14 +26,6 @@ import {
 } from './reading-actions';
 
 const initial: ReadingActionState = {};
-
-function formatDay(isoDate: string, withYear = false): string {
-  return new Date(`${isoDate}T00:00:00`).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    ...(withYear ? { year: 'numeric' } : {}),
-  });
-}
 
 /**
  * A goal's number (plan #930): what it is measured in, a line of the readings
@@ -156,7 +149,9 @@ function MeasureLine({
 
   // Sized to what is typed, so the line reads as a sentence rather than a row
   // of boxes.
-  const fit = 'field-sizing-content w-auto min-w-8 max-w-48';
+  // The floor is for a field cleared to nothing, which its placeholder
+  // already keeps wide enough to press; min-w-8 left a gap after "$".
+  const fit = 'field-sizing-content w-auto min-w-4 max-w-48';
 
   return (
     <form

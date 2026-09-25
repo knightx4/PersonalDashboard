@@ -25,6 +25,8 @@ export function RecordValue({
   value,
   needed,
   align = 'left',
+  startEditing = false,
+  inTable = false,
 }: {
   stepId: string;
   recordId: string;
@@ -33,8 +35,16 @@ export function RecordValue({
   /** An asked field with no value, which reads as Needed rather than Not set. */
   needed: boolean;
   align?: 'left' | 'right';
+  /** Open with the input showing. A seam for the gallery; nothing in the app passes it. */
+  startEditing?: boolean;
+  /**
+   * In a table cell. The input then takes the cell's width instead of setting
+   * it: at its natural twenty characters it pushed a number column out by
+   * half again as it opened, and every column after it moved.
+   */
+  inTable?: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing);
   const toast = useToast();
   const [state, save, saving] = useActionState(
     async (prev: InformationActionState, form: FormData) => {
@@ -117,7 +127,9 @@ export function RecordValue({
           commit();
         }
       }}
-      className="min-w-32"
+      // In a table the column keeps the width its values gave it; elsewhere
+      // a floor stops a short value opening into a sliver of a box.
+      className={inTable ? 'w-full min-w-20' : 'min-w-32'}
     >
       <input type="hidden" name="stepId" value={stepId} />
       <input type="hidden" name="recordId" value={recordId} />
@@ -125,7 +137,13 @@ export function RecordValue({
       <label htmlFor={id} className="sr-only">
         {field.label}
       </label>
-      <FieldInput id={id} field={field} value={value} />
+      <FieldInput
+        id={id}
+        field={field}
+        value={value}
+        fit={inTable}
+        className={align === 'right' ? 'tabular text-right' : undefined}
+      />
       {state.error && <p className="mt-1 text-small text-danger">{state.error}</p>}
     </form>
   );

@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDay } from '@/lib/goals/dates';
 import { useActionState, useState } from 'react';
 import { CircleUser, Repeat, Target } from 'lucide-react';
 import { AnswerBox, TheAnswered, TheOptions, useAnswerDraft } from '@/components/dev/question';
@@ -221,15 +222,9 @@ export function PastPeriods({
   );
 }
 
-/**
- * "3 Oct". A fixed locale, as elsewhere in the app, so the server and the
- * browser print the same text and the page hydrates cleanly.
- */
+/** "3 Oct", as every Goals page prints a date (lib/goals/dates.ts). */
 export function formatDate(isoDate: string): string {
-  return new Date(`${isoDate}T00:00:00`).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-  });
+  return formatDay(isoDate);
 }
 /**
  * Approve and Turn down beside a proposal's Needs line (plan #960), the same
