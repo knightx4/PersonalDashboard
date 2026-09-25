@@ -1,3 +1,4 @@
+import { wantsGoal } from '@/lib/learn/feed/targets';
 import { trackToAsk, type TrackShare, type TrackWeight } from '@/lib/learn/flow/interest';
 import { curriculumRows, type UnitGoal } from '@/lib/learn/graph/curriculum-view';
 import { pruneForGoal, type Concept, type Graph } from '@/lib/learn/graph/model';
@@ -34,6 +35,15 @@ import { unitCheckDue, type UnitCheckDue } from './unit-check';
  * - Slots go to tracks by `trackToAsk`, the rule Practice Flow shares its
  *   questions by, so over a run of slots each track gets lessons in
  *   proportion to its weight.
+ * - The tracks of learning goals (plan #972) share one slot in three between
+ *   them, the share a goal had of the section cards (`wantsGoal`, decision
+ *   #899). The count is the cards waiting in the deck plus the slots filled
+ *   in this run, so a goal set today gets its share from the next top-up.
+ *   Within the goals' third, and among the other tracks for the rest, slots
+ *   still go by weight. A goal track takes the other slots too when no other
+ *   track has anything to teach, and the goals' third goes to the other
+ *   tracks when no goal track has. A goal's track is never dormant while the
+ *   goal is active: the person set it on purpose, as they start a track.
  */
 
 /** One track as the chooser needs it. */
@@ -63,6 +73,8 @@ export type ChooseLessonsInput = {
   dealt?: ReadonlyMap<string, number>;
   /** Units that already have a check card, answered, skipped or waiting. */
   checked?: ReadonlySet<string>;
+  /** The tracks of the person's active learning goals (plan #972). */
+  goalTracks?: ReadonlySet<string>;
   slots: number;
 };
 
@@ -213,8 +225,9 @@ export function chooseLessons(input: ChooseLessonsInput): LessonChoice {
   const checks: UnitCheckDue[] = [];
   const queues = new Map<string, LessonPick[]>();
 
+  const goalTracks = input.goalTracks ?? new Set<string>();
   for (const track of input.tracks) {
-    if (input.weights.get(track.subjectId)?.stopped) {
+    if (input.weights.get(track.subjectId)?.stopped && !goalTracks.has(track.subjectId)) {
       dormant.push(track.subjectId);
       continue;
     }
@@ -232,14 +245,40 @@ export function chooseLessons(input: ChooseLessonsInput): LessonChoice {
     asked: input.dealt?.get(subjectId) ?? 0,
   }));
 
+  // The goals' share counts every track's waiting cards, not only the tracks
+  // with something to teach now.
+  const goalCount = { goal: 0, total: 0 };
+  for (const [subjectId, count] of input.dealt ?? []) {
+    goalCount.total += count;
+    if (goalTracks.has(subjectId)) goalCount.goal += count;
+  }
+
   const picks: LessonPick[] = [];
   while (picks.length < input.slots) {
     const open = [...queues].filter(([, queue]) => queue.length > 0).map(([id]) => id);
-    const subjectId = trackToAsk(open, shares, false);
+    const subjectId = trackToAsk(goalTurn(open, goalTracks, goalCount), shares, false);
     if (subjectId === null) break;
     picks.push(queues.get(subjectId)!.shift()!);
     shares.find((share) => share.subjectId === subjectId)!.asked += 1;
+    goalCount.total += 1;
+    if (goalTracks.has(subjectId)) goalCount.goal += 1;
   }
 
   return { picks, needs, dormant, waiting, checks };
+}
+
+/**
+ * The tracks the next slot may go to: the goal tracks when the goals are at or
+ * behind their one in three, the others when they are ahead, and whichever
+ * side has something to teach when only one does.
+ */
+function goalTurn(
+  open: readonly string[],
+  goalTracks: ReadonlySet<string>,
+  share: { goal: number; total: number },
+): readonly string[] {
+  const goals = open.filter((id) => goalTracks.has(id));
+  const others = open.filter((id) => !goalTracks.has(id));
+  if (goals.length === 0 || others.length === 0) return open;
+  return wantsGoal(share) ? goals : others;
 }

@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
@@ -12,12 +13,16 @@ import {
   rewordsAim,
   updateAim,
 } from '@/lib/learn/aims-store';
-import { placeAimsAfterResponse } from '@/lib/learn/areas/place-aim';
+import { placeAims, placeAimsAfterResponse } from '@/lib/learn/areas/place-aim';
+import { giveAimsTracks } from '@/lib/learn/lessons/aim-tracks';
 
 /**
  * The Goals page's writes (plan #897): add a goal, add the Level 3 goal in one
  * press, change a goal's wording or depth, and archive one. Adding or
  * rewording an open goal places it in the area grid after the response (#898).
+ * Adding one also gives it a track with its first units, after the placement
+ * so the track can take it (#972, lib/learn/lessons/aim-tracks.ts). Archiving
+ * a goal leaves its track.
  *
  * Each returns a sentence to show rather than throwing, so a refused write
  * leaves the page standing with the reason beside the control.
@@ -39,7 +44,11 @@ export async function addGoal(_prev: GoalActionState, form: FormData): Promise<G
     const supabase = await createLearnClient();
     await insertAim(supabase, user.id, parsed.fields as AimFields);
     // Into a field once the response has gone (#898); the page checks back.
-    placeAimsAfterResponse(supabase, user.id);
+    // Then its track, placed as the goal is, with its first units (#972).
+    after(async () => {
+      await placeAims(supabase, user.id);
+      await giveAimsTracks(supabase, user.id);
+    });
   } catch {
     return { error: 'The goal could not be saved. Try again.' };
   }
