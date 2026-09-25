@@ -13,18 +13,19 @@ import {
   DOCUMENT_MAX_BYTES,
   PASTE_MAX,
   documentKind,
-  readAsOf,
-  readExtraction,
-  type PreviewRow,
+  readAnswer,
+  type ReadAnswer,
 } from '@/lib/goals/extract';
 import type { ExtractResult, ExtractSource } from '@/lib/goals/extract-model';
 
 export type ReadInput = { text: string } | { name: string; bytes: Uint8Array };
 
-/** asOf is the date the document gives its figures as of, or null when it gives none. */
-export type ReadResult =
-  | { ok: true; rows: PreviewRow[]; asOf: string | null }
-  | { ok: false; error: string };
+/**
+ * asOf is the date the document gives its figures as of, or null when it
+ * gives none. suggestions are the fields it has and the form lacks, and
+ * cautions the labels in it that do not mean what they say (plan #986).
+ */
+export type ReadResult = ({ ok: true } & ReadAnswer) | { ok: false; error: string };
 
 export async function readIntoForm(
   collection: { name: string; shape: CollectionShape; fields: CollectionField[] },
@@ -35,11 +36,11 @@ export async function readIntoForm(
   if (!source.ok) return source;
   const answer = await ask(source.source);
   if (!answer.ok) return answer;
-  const rows = readExtraction(collection.fields, collection.shape, answer.input);
-  if (rows.length === 0) {
+  const read = readAnswer(collection.fields, collection.shape, answer.input);
+  if (read.rows.length === 0) {
     return { ok: false, error: `Nothing in that fits the ${collection.name} form.` };
   }
-  return { ok: true, rows, asOf: readAsOf(answer.input) };
+  return { ok: true, ...read };
 }
 
 function toSource(input: ReadInput): { ok: true; source: ExtractSource } | { ok: false; error: string } {

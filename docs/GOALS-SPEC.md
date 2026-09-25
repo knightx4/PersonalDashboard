@@ -295,6 +295,16 @@ Later steps and runs read the collection instead of asking again.
    direct model call extracts values against the definition and shows them
    filled in for you to confirm or correct before anything is saved. The
    original file is kept in storage and the records point to it.
+
+   The same read lists what the document has and the form lacks, such as a
+   loan's status, next due date or ID, with a value for each row and a line
+   on why a goal might use it. Each has an Add field button beneath the
+   rows. Adding one revises the collection's fields, so the definition check
+   applies and the version goes up, and the new field is filled in on every
+   row of the preview. A suggestion becomes the ID field only when the list
+   has none. The read also warns about labels that do not mean what they
+   say, such as an NSLDS "Repayment Begin Date" that is the last
+   disbursement date for a Grad PLUS loan; those are listed above the rows.
 3. **Claude finds it first.** The goals routine has the Gmail connector. When
    it writes an information step it searches for what it can (loan
    statements, offer letters, receipts), fills in what it found as a draft,

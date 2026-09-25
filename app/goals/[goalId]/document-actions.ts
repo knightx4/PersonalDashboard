@@ -1,18 +1,27 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { serverEnv } from '@/lib/env';
 import { createGoalsClient } from '@/lib/goals/auth/server';
-import type { RecordValues } from '@/lib/goals/collections';
-import { loadCollection, loadRecords } from '@/lib/goals/collections-store';
+import {
+  FIELD_TYPES,
+  idField,
+  type CollectionField,
+  type RecordValues,
+} from '@/lib/goals/collections';
+import { loadCollection, loadRecords, reviseFields } from '@/lib/goals/collections-store';
 import {
   DOCUMENT_BUCKET,
   matchRows,
   ownsDocumentPath,
+  suggestedKey,
+  type Caution,
   type PreviewRow,
+  type SuggestedField,
 } from '@/lib/goals/extract';
 import { askExtractModel } from '@/lib/goals/extract-model';
 import { readIntoForm, type ReadInput } from '@/lib/goals/extract-read';
@@ -44,6 +53,10 @@ export type ReadFormState = {
    * adds a record.
    */
   before?: (RecordValues | null)[];
+  /** Fields the document has and the form lacks (plan #986). */
+  suggestions?: SuggestedField[];
+  /** Labels in the document that do not mean what they say. */
+  cautions?: Caution[];
 };
 
 const Input = z.union([
@@ -110,9 +123,67 @@ export async function readIntoFormAction(
       ref,
       asOf: result.asOf,
       before,
+      suggestions: result.suggestions,
+      cautions: result.cautions,
     };
   } catch {
     await recordSessionSpend(user.id, { module: 'goals', operation: 'read-into-form' }, spend);
     return { error: 'That could not be read. Try again.' };
+  }
+}
+
+const Suggested = z.object({
+  stepId: z.string().uuid(),
+  field: z.object({
+    key: z.string().min(1).max(40),
+    label: z.string().min(1).max(200),
+    type: z.enum(FIELD_TYPES),
+    options: z.array(z.string()).max(100).optional(),
+    id: z.boolean().optional(),
+  }),
+});
+
+export type AddFieldState = { error?: string; field?: CollectionField };
+
+/**
+ * Add a field the document suggested to the form behind a step (plan #986).
+ * It goes through reviseFields, so the definition check applies and the
+ * collection's version goes up. The key is taken afresh if the collection
+ * used it since the read, and the field is only the ID while the collection
+ * has none. It hands back the field as added, so the preview can fill it in
+ * for every row.
+ */
+// latency: pending
+export async function addSuggestedFieldAction(raw: {
+  stepId: string;
+  field: CollectionField;
+}): Promise<AddFieldState> {
+  await requireUser();
+  const parsed = Suggested.safeParse(raw);
+  if (!parsed.success) return { error: 'Could not tell which field to add.' };
+  const { stepId, field: asked } = parsed.data;
+
+  try {
+    const client = await createGoalsClient();
+    const step = await loadInformationStep(client, stepId);
+    if (!step) return { error: 'That step no longer has a form.' };
+    const collection = await loadCollection(client, step.collectionId);
+    if (!collection) return { error: 'The collection behind that step is gone.' };
+
+    const taken = new Set(collection.fields.map((f) => f.key));
+    const field: CollectionField = {
+      key: taken.has(asked.key) ? suggestedKey(asked.label, taken) : asked.key,
+      label: asked.label.trim(),
+      type: asked.type,
+    };
+    if (asked.type === 'choice' && asked.options) field.options = asked.options;
+    if (asked.id && !idField(collection.fields)) field.id = true;
+
+    const result = await reviseFields(client, collection.id, [...collection.fields, field]);
+    if (!result.ok) return { error: result.error };
+    revalidatePath('/goals', 'layout');
+    return { field };
+  } catch {
+    return { error: 'That field could not be added. Try again.' };
   }
 }

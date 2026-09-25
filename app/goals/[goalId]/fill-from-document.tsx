@@ -1,12 +1,18 @@
 'use client';
 
-import { useActionState, useId, useState } from 'react';
+import { useActionState, useId, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, Input, Textarea } from '@/components/ui/field';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { useToast } from '@/components/ui/toast';
 import { createClient } from '@/lib/auth/client';
-import { idField, liveFields, type RecordValues } from '@/lib/goals/collections';
+import {
+  FIELD_TYPE_LABELS,
+  idField,
+  liveFields,
+  type CollectionField,
+  type RecordValues,
+} from '@/lib/goals/collections';
 import type { Collection } from '@/lib/goals/collections-store';
 import {
   DOCUMENT_BUCKET,
@@ -14,10 +20,16 @@ import {
   documentContentType,
   documentPath,
   previewRowPrefix,
+  type Caution,
   type PreviewRow,
+  type SuggestedField,
 } from '@/lib/goals/extract';
 import { displayValue, documentName, inputValue } from '@/lib/goals/information';
-import { readIntoFormAction, type ReadFormState } from './document-actions';
+import {
+  addSuggestedFieldAction,
+  readIntoFormAction,
+  type ReadFormState,
+} from './document-actions';
 import { FieldInput } from './field-input';
 import { savePreviewAction, type InformationActionState } from './information-actions';
 
@@ -38,6 +50,11 @@ import { savePreviewAction, type InformationActionState } from './information-ac
  * the saved values wherever the read found nothing, and each value it would
  * change shows the saved one beside it. The date the document gives its
  * figures as of is shown and can be corrected; it dates the readings.
+ *
+ * What the document has and the form lacks is listed beneath the rows, each
+ * with an Add field button (plan #986). Adding one changes the collection
+ * straight away and fills the new field in on every row. Labels the reader
+ * warned do not mean what they say are listed above the rows.
  */
 
 const ACCEPT = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.docx,.txt,.csv,.html,.htm';
@@ -50,6 +67,8 @@ type Preview = {
   asOf: string | null;
   /** For each row, the saved values it updates, or null for a new record. */
   before: (RecordValues | null)[];
+  suggestions: SuggestedField[];
+  cautions: Caution[];
 };
 
 export function FillFromDocument({
@@ -105,6 +124,8 @@ function ReadForm({
         ref: result.ref ?? null,
         asOf: result.asOf ?? null,
         before: result.before ?? [],
+        suggestions: result.suggestions ?? [],
+        cautions: result.cautions ?? [],
       });
     }
     return result;
@@ -186,8 +207,18 @@ function PreviewForm({
 }) {
   const toast = useToast();
   const formId = useId();
-  const fields = liveFields(collection.fields);
+  const [added, setAdded] = useState<CollectionField[]>([]);
+  const [found, setFound] = useState(preview.rows);
+  const [suggestions, setSuggestions] = useState(preview.suggestions);
+  const shown = liveFields(collection.fields);
+  // Fields added here show at once, before the page's own copy of the collection catches up.
+  const fields = [...shown, ...added.filter((a) => !shown.some((f) => f.key === a.key))];
   const [kept, setKept] = useState(() => preview.rows.map((_, i) => i));
+  const addField = (suggestion: SuggestedField, field: CollectionField) => {
+    setAdded((list) => [...list, field]);
+    setFound((rows) => rows.map((row, i) => ({ ...row, [field.key]: suggestion.values[i] ?? '' })));
+    setSuggestions((list) => list.filter((s) => s !== suggestion));
+  };
   const [state, save, saving] = useActionState(
     async (prev: InformationActionState, form: FormData) => {
       const result = await savePreviewAction(prev, form);
@@ -208,9 +239,9 @@ function PreviewForm({
 
   // A row that updates a saved record keeps what it holds wherever the read found nothing.
   const startingValue = (index: number, key: string) => {
-    const found = preview.rows[index][key] ?? '';
+    const read = found[index][key] ?? '';
     const saved = preview.before[index];
-    if (found !== '' || !saved) return found;
+    if (read !== '' || !saved) return read;
     const field = fields.find((f) => f.key === key);
     return field ? inputValue(field, saved[key]) : '';
   };
@@ -264,6 +295,8 @@ function PreviewForm({
         <Input id={`${formId}-as-of`} name="asOf" type="date" defaultValue={preview.asOf ?? ''} />
       </Field>
 
+      {preview.cautions.length > 0 && <Cautions cautions={preview.cautions} fields={fields} />}
+
       {kept.map((index) => {
         const updates = collection.shape === 'list' && preview.before[index] !== null;
         return (
@@ -313,6 +346,15 @@ function PreviewForm({
         );
       })}
 
+      {suggestions.length > 0 && (
+        <Suggestions
+          stepId={stepId}
+          suggestions={suggestions}
+          rowCount={kept.length}
+          onAdded={addField}
+        />
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" size="sm" pending={saving} disabled={kept.length === 0}>
           {many && kept.length > 1 ? `Save ${kept.length} rows` : 'Save'}
@@ -330,5 +372,104 @@ function PreviewForm({
         <FieldError>{state.error}</FieldError>
       )}
     </form>
+  );
+}
+
+/** The labels the reader warned do not mean what their name says. */
+function Cautions({ cautions, fields }: { cautions: Caution[]; fields: CollectionField[] }) {
+  return (
+    <div className="space-y-1 rounded-control bg-caution-tint p-2">
+      <p className="text-small font-medium text-caution">Check these before saving</p>
+      <ul className="space-y-1">
+        {cautions.map((caution, i) => {
+          const field = caution.field ? fields.find((f) => f.key === caution.field) : undefined;
+          return (
+            <li key={i} className="text-small text-ink">
+              <span className="font-medium">&ldquo;{caution.label}&rdquo;</span>
+              {field && <span className="text-ink-muted"> (read into {field.label})</span>}:{' '}
+              {caution.note}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/** What the document has and the form lacks, each with a button that adds it. */
+function Suggestions({
+  stepId,
+  suggestions,
+  rowCount,
+  onAdded,
+}: {
+  stepId: string;
+  suggestions: SuggestedField[];
+  rowCount: number;
+  onAdded: (suggestion: SuggestedField, field: CollectionField) => void;
+}) {
+  return (
+    <section className="space-y-2" aria-label="Fields the form lacks">
+      <p className="text-ui font-medium text-ink">The document also has</p>
+      <p className="text-small text-ink-muted">
+        The form has no field for these. Adding one adds it to the form for good and fills it in on{' '}
+        {rowCount === 1 ? 'this row' : 'every row'}.
+      </p>
+      <ul className="space-y-2">
+        {suggestions.map((suggestion) => (
+          <SuggestionRow
+            key={suggestion.field.key}
+            stepId={stepId}
+            suggestion={suggestion}
+            onAdded={onAdded}
+          />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function SuggestionRow({
+  stepId,
+  suggestion,
+  onAdded,
+}: {
+  stepId: string;
+  suggestion: SuggestedField;
+  onAdded: (suggestion: SuggestedField, field: CollectionField) => void;
+}) {
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const { field, values, why } = suggestion;
+  const sample = values.filter((v) => v !== '').slice(0, 3);
+  const add = () =>
+    start(async () => {
+      const result = await addSuggestedFieldAction({ stepId, field });
+      if (result.field) onAdded(suggestion, result.field);
+      else setError(result.error ?? 'That field could not be added.');
+    });
+  return (
+    <li className="flex flex-wrap items-start justify-between gap-2">
+      <div className="min-w-0 flex-1">
+        <p className="text-body text-ink">
+          {field.label}{' '}
+          <span className="text-small text-ink-muted">
+            · {FIELD_TYPE_LABELS[field.type]}
+            {field.id ? ' · names each row' : ''}
+          </span>
+        </p>
+        {why && <p className="text-small text-ink-muted">{why}</p>}
+        {sample.length > 0 && (
+          <p className="text-small text-ink-muted">
+            Read: {sample.join(', ')}
+            {values.filter((v) => v !== '').length > sample.length ? ', …' : ''}
+          </p>
+        )}
+        <FieldError>{error}</FieldError>
+      </div>
+      <Button type="button" size="sm" variant="secondary" pending={pending} onClick={add}>
+        Add field
+      </Button>
+    </li>
   );
 }
