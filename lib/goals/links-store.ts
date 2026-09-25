@@ -103,7 +103,7 @@ async function readAims(learn: LearnSupabaseClient, links: Link[]): Promise<Link
   if (ids.length === 0) return [];
 
   const [aims, cards] = await Promise.all([
-    learn.from('aims').select('id, name, list_source, archived_at').in('id', ids),
+    learn.from('aims').select('id, name, list_source, archived_at, subject_id').in('id', ids),
     learn
       .from('feed_cards')
       .select('aim_id, status')
@@ -113,15 +113,40 @@ async function readAims(learn: LearnSupabaseClient, links: Link[]): Promise<Link
   if (aims.error) throw new Error(`Could not read the Learn goals: ${aims.error.message}`);
   if (cards.error) throw new Error(`Could not read the Learn cards: ${cards.error.message}`);
 
-  type AimRow = { id: string; name: string; list_source: string | null; archived_at: string | null };
+  type AimRow = {
+    id: string;
+    name: string;
+    list_source: string | null;
+    archived_at: string | null;
+    subject_id: string | null;
+  };
   const byId = new Map(((aims.data ?? []) as AimRow[]).map((row) => [row.id, row]));
+
+  // An open goal's cards are its track's lessons (plan #972), which carry the
+  // track rather than the goal.
+  const aimOfTrack = new Map<string, string>();
+  for (const row of byId.values()) if (row.subject_id) aimOfTrack.set(row.subject_id, row.id);
+  const lessons =
+    aimOfTrack.size === 0
+      ? { data: [], error: null }
+      : await learn
+          .from('feed_cards')
+          .select('subject_id, status')
+          .in('subject_id', [...aimOfTrack.keys()])
+          .in('reason', ['lesson', 'unit_check'])
+          .in('status', READ_CARD_STATUSES as unknown as string[]);
+  if (lessons.error) throw new Error(`Could not read the Learn lessons: ${lessons.error.message}`);
+  const trackCards = ((lessons.data ?? []) as { subject_id: string; status: string }[]).map((card) => ({
+    aim_id: aimOfTrack.get(card.subject_id)!,
+    status: card.status,
+  }));
   const level3 = [...byId.values()].some((row) => row.list_source === 'level3')
     ? await loadLevel3Counts(learn)
     : null;
 
   const read = new Map<string, number>();
   const saved = new Map<string, number>();
-  for (const card of (cards.data ?? []) as { aim_id: string; status: string }[]) {
+  for (const card of [...((cards.data ?? []) as { aim_id: string; status: string }[]), ...trackCards]) {
     read.set(card.aim_id, (read.get(card.aim_id) ?? 0) + 1);
     if (card.status === 'saved') saved.set(card.aim_id, (saved.get(card.aim_id) ?? 0) + 1);
   }

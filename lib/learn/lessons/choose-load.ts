@@ -5,6 +5,7 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { loadTrackInterest } from '@/lib/learn/flow/interest-load';
 import { loadCurriculum } from '@/lib/learn/graph/curriculum-store';
 import { loadGoals, loadGraph, loadSubjects } from '@/lib/learn/graph/load';
+import { loadGoalTracks } from './aim-tracks';
 import { chooseLessons, type ChooseLessonsInput, type LessonChoice } from './choose';
 
 /**
@@ -48,16 +49,35 @@ async function loadHeld(supabase: LearnSupabaseClient, userId: string, now: Date
   return new Set(((data ?? []) as { id: string }[]).map((row) => row.id));
 }
 
+/** Units that already have a check card, whatever became of it (plan #971). */
+async function loadChecked(supabase: LearnSupabaseClient, userId: string): Promise<Set<string>> {
+  const rows = await readAll<{ unit_id: string }>((from, to) =>
+    supabase
+      .from('feed_cards')
+      .select('unit_id')
+      .eq('user_id', userId)
+      .eq('reason', 'unit_check')
+      .not('unit_id', 'is', null)
+      .order('id')
+      .range(from, to),
+  ).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Reading which units have a check failed: ${message}`);
+  });
+  return new Set(rows.map((row) => row.unit_id));
+}
+
 /**
  * Every track, weighed, with its units, goals and graph, the concepts on
- * cards, and the concepts whose lesson was rated too hard.
+ * cards, the concepts whose lesson was rated too hard, the units that already
+ * have a check, and which tracks belong to learning goals (plan #972).
  */
 export async function loadLessonInput(
   supabase: LearnSupabaseClient,
   userId: string,
   now: Date = new Date(),
 ): Promise<Omit<ChooseLessonsInput, 'slots'>> {
-  const [subjects, interest, cards] = await Promise.all([
+  const [subjects, interest, cards, checked, goalTracks] = await Promise.all([
     loadSubjects(supabase, userId),
     loadTrackInterest(supabase, now, userId),
     readAll<CardRow>((from, to) =>
@@ -73,6 +93,8 @@ export async function loadLessonInput(
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(`Reading the concepts already on cards failed: ${message}`);
     }),
+    loadChecked(supabase, userId),
+    loadGoalTracks(supabase, userId),
   ]);
 
   const tracks = await Promise.all(
@@ -104,6 +126,8 @@ export async function loadLessonInput(
       cards.filter((card) => card.reason === 'lesson' && card.difficulty === 'too_hard').map((card) => card.concept_id),
     ),
     dealt,
+    checked,
+    goalTracks,
   };
 }
 

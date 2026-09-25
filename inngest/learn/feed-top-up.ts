@@ -19,6 +19,7 @@ import { WRITE_CARD_MODEL, writeCard, type CardToWrite, type IdeaCard, type Writ
 import type { LearnOperation } from '@/lib/learn/spend';
 import type { LessonTopUpSummary } from '@/lib/learn/lessons/top-up';
 import { lessonsWanted, writeLessonsFor } from '@/lib/learn/lessons/top-up';
+import { linkAimTracks } from '@/lib/learn/lessons/aim-tracks';
 import { createFeedPicker, loadFeedFields, peopleToPickFor } from './feed-picks';
 import { createLessonPorts } from './lesson-top-up';
 
@@ -185,6 +186,12 @@ async function topUpWith(
   const target = options.target ?? READY_TARGET;
   let lessons: LessonTopUpSummary | undefined;
   if (readyBefore < options.threshold) {
+    // A learning goal without a track gets one first, so its lessons can be
+    // chosen in this run (plan #972). No model call; the track's first unit
+    // is written by the lesson top-up, as for any track with no curriculum.
+    await linkAimTracks(learn, userId).catch((error: unknown) => {
+      console.error('[learn feed top-up] goal tracks', error instanceof Error ? error.message : error);
+    });
     lessons = await writeLessonsFor(createLessonPorts({ learn, core, apiKey }), {
       userId,
       wanted: lessonsWanted(target - readyBefore),
@@ -199,6 +206,7 @@ async function topUpWith(
         dropped: [],
         failed: [error instanceof Error ? error.message : 'Writing lessons failed.'],
         floors: [],
+        checks: [],
         added: [],
         laidOut: [],
         held: [],

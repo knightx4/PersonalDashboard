@@ -26,6 +26,9 @@ import {
 import { settleIdeaFromSwipe } from '@/lib/learn/feed/ideas-store';
 import { startTrackFromCard } from '@/lib/learn/feed/test-me';
 import { makeTrackFromCard, startTrackFromOffer } from '@/lib/learn/lessons/new-track';
+import { loadUnitForCheck, markUnitConceptsTested } from '@/lib/learn/lessons/unit-check-store';
+import { markUnitCheck } from '@/lib/learn/lessons/write-unit-check';
+import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { SAVED_FROM_FEED, saveFeedSection } from '@/lib/learn/tracks/save';
 import { createVaultClient } from '@/lib/vault/auth/server';
 
@@ -287,4 +290,115 @@ export async function makeTrackOfCard(id: string): Promise<NewTrackResult> {
   }
   after(() => topUpFeedAfterResponse(user.id));
   return { track: { id: made.subjectId, name: made.name, units: made.units } };
+}
+
+export type UnitCheckResult = {
+  error?: string;
+  marked?: {
+    correct: boolean;
+    /** The marker's one sentence on the answer. */
+    why: string;
+    /** The answer the check expected, shown once it is answered. */
+    expected: string;
+    /** Concepts marked tested by a right answer. */
+    tested: number;
+  };
+};
+
+const CheckResponse = z.string().trim().min(1).max(2000);
+
+type CheckRow = {
+  reason: string;
+  status: string;
+  track_name: string | null;
+  unit_id: string | null;
+  check_question: string | null;
+  check_answer: string | null;
+  check_concept_ids: string[] | null;
+  check_correct: boolean | null;
+  check_marked_why: string | null;
+};
+
+/**
+ * Check my answer, on a unit check (LEARN-LESSONS-SPEC, "The unit check";
+ * plan #971). Haiku marks what was written against the unit's outcome, the
+ * card is marked tested with the answer and the mark on it, and a right answer
+ * marks the unit's concepts tested. A wrong one changes nothing about them.
+ * Skip is Not interested (`dismissCard`): the unit stays done either way.
+ */
+// latency: pending
+export async function answerUnitCheck(id: string, response: string): Promise<UnitCheckResult> {
+  const user = await requireUser();
+  const card = CardId.safeParse(id);
+  if (!card.success) return { error: 'Could not tell which card that was.' };
+  const answer = CheckResponse.safeParse(response);
+  if (!answer.success) return { error: 'Write an answer first, in a sentence or two.' };
+  const supabase = await createLearnClient();
+
+  const { data, error } = await supabase
+    .from('feed_cards')
+    .select(
+      'reason, status, track_name, unit_id, check_question, check_answer, check_concept_ids, check_correct, check_marked_why',
+    )
+    .eq('id', card.data)
+    .maybeSingle();
+  if (error) return { error: `Reading that card failed: ${error.message}` };
+  const row = data as CheckRow | null;
+  if (!row || row.reason !== 'unit_check' || !row.check_question || !row.check_answer || !row.unit_id) {
+    return { error: 'That check is no longer there.' };
+  }
+  // Answered already, in another tab: show that mark rather than paying for another.
+  if (row.status === 'tested' && row.check_correct !== null) {
+    return {
+      marked: { correct: row.check_correct, why: row.check_marked_why ?? '', expected: row.check_answer, tested: 0 },
+    };
+  }
+  if (!ACTION_FROM.tested.includes(row.status)) return { error: 'That check has been dealt with.' };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'Marking an answer needs ANTHROPIC_API_KEY to be set.' };
+
+  const conceptIds = row.check_concept_ids ?? [];
+  try {
+    const unit = await loadUnitForCheck(supabase, user.id, {
+      unitId: row.unit_id,
+      trackName: row.track_name ?? '',
+      conceptIds,
+    });
+    if (!unit) return { error: 'The unit this check was for is no longer there.' };
+
+    const spend = collectSpend();
+    const grade = await markUnitCheck({
+      unit,
+      question: row.check_question,
+      expected: row.check_answer,
+      response: answer.data,
+      anthropicApiKey: apiKey,
+      onSpend: spend.sink,
+    });
+    await recordLearnSpend(user.id, 'mark-unit-check', spend.reports);
+    if (!grade.ok) return { error: `Marking failed: ${grade.detail}` };
+
+    const { data: moved, error: moveError } = await supabase
+      .from('feed_cards')
+      .update({
+        status: 'tested',
+        acted_at: new Date().toISOString(),
+        check_response: answer.data,
+        check_correct: grade.correct,
+        check_marked_why: grade.why,
+      })
+      .eq('id', card.data)
+      .in('status', [...ACTION_FROM.tested])
+      .select('id');
+    if (moveError) return { error: `Recording the answer failed: ${moveError.message}` };
+    // Another press got there first and recorded its own mark.
+    if ((moved ?? []).length === 0) return { error: 'That check has been dealt with.' };
+
+    const tested = grade.correct ? await markUnitConceptsTested(supabase, user.id, conceptIds) : 0;
+    after(() => topUpFeedAfterResponse(user.id));
+    return { marked: { correct: grade.correct, why: grade.why, expected: row.check_answer, tested } };
+  } catch (caught) {
+    return { error: caught instanceof Error ? caught.message : 'Could not mark that.' };
+  }
 }

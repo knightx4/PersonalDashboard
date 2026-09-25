@@ -4,9 +4,11 @@ import type { LessonPick, TrackNeed } from './choose';
 import type { AddedFloor, FloorDue } from './add-floor';
 import type { AddedUnit } from './add-unit';
 import type { LaidOutUnit } from './lay-out-unit';
+import type { UnitCheckDue } from './unit-check';
 import {
   LAYOUT_RESERVE_MS,
   LESSON_HOLD_MS,
+  MAX_CHECKS_PER_RUN,
   MAX_FLOORS_PER_RUN,
   MAX_LAYOUTS_PER_RUN,
   MAX_UNITS_ADDED_PER_RUN,
@@ -39,12 +41,13 @@ function need(subjectId: string, because: TrackNeed['because'] = 'no-chain'): Tr
 }
 
 function ports(options: {
-  choices: { picks: LessonPick[]; needs: TrackNeed[] }[];
+  choices: { picks: LessonPick[]; needs: TrackNeed[]; checks?: UnitCheckDue[] }[];
   layOut?: (subjectId: string) => LaidOutUnit;
   addUnit?: (subjectId: string) => AddedUnit;
   floorsDue?: FloorDue[];
   addFloor?: (due: FloorDue) => AddedFloor;
   write?: (pick: LessonPick) => LessonOutcome;
+  writeCheck?: (due: UnitCheckDue) => LessonOutcome;
   now?: () => number;
 }) {
   const calls = {
@@ -54,8 +57,11 @@ function ports(options: {
     hold: [] as { subjectId: string; until: Date }[],
     floorsDue: [] as number[],
     addFloor: [] as string[],
+    writeCheck: [] as string[],
     write: [] as string[],
     order: [] as string[],
+    /** Checks and lessons, in the order they were written. */
+    written: [] as string[],
   };
   const port: LessonTopUpPorts = {
     choose: async () => {
@@ -84,8 +90,14 @@ function ports(options: {
       calls.order.push(`floor ${due.cardId}`);
       return options.addFloor?.(due) ?? { outcome: 'added', conceptIds: [`${due.conceptId}-floor`] };
     },
+    writeCheck: async (_userId, due) => {
+      calls.writeCheck.push(due.unitId);
+      calls.written.push(`check ${due.unitId}`);
+      return { outcome: options.writeCheck?.(due) ?? 'ready' };
+    },
     write: async (_userId, chosen) => {
       calls.write.push(chosen.concept.id);
+      calls.written.push(`write ${chosen.concept.id}`);
       return { outcome: options.write?.(chosen) ?? 'ready' };
     },
     now: options.now ?? (() => 0),
@@ -298,5 +310,38 @@ describe('the why line', () => {
     expect(lessonWhy('Economics', ['Supply', 'Demand', 'Elasticity', 'Tax'])).toBe(
       'Next in your Economics track. It builds on Supply, Demand and 2 more.',
     );
+  });
+});
+
+function checkDue(subjectId: string): UnitCheckDue {
+  return { subjectId, subjectName: subjectId, unitId: `${subjectId}-done`, conceptIds: ['c1', 'c2'] };
+}
+
+describe('unit checks in the top-up', () => {
+  it('writes the check for a done unit before any lesson', async () => {
+    const { port, calls } = ports({ choices: [{ picks: [pick('a')], needs: [], checks: [checkDue('econ')] }] });
+    const summary = await writeLessonsFor(port, { userId: 'u', wanted: 1, deadline: FAR });
+    expect(calls.written).toEqual(['check econ-done', 'write a']);
+    expect(summary.checks).toEqual(['econ']);
+    expect(summary.written).toBe(1);
+  });
+
+  it('writes at most a few checks in one run', async () => {
+    const many = ['a', 'b', 'c', 'd'].map(checkDue);
+    const { port, calls } = ports({ choices: [{ picks: [], needs: [], checks: many }] });
+    await writeLessonsFor(port, { userId: 'u', wanted: 2, deadline: FAR });
+    expect(calls.writeCheck).toHaveLength(MAX_CHECKS_PER_RUN);
+  });
+
+  it('counts a check that was dropped or failed, and still writes the lessons', async () => {
+    const { port, calls } = ports({
+      choices: [{ picks: [pick('a')], needs: [], checks: [checkDue('x'), checkDue('y')] }],
+      writeCheck: (one) => (one.subjectId === 'x' ? 'dropped' : 'failed'),
+    });
+    const summary = await writeLessonsFor(port, { userId: 'u', wanted: 1, deadline: FAR });
+    expect(summary.checks).toEqual([]);
+    expect(summary.dropped).toEqual(['x check: dropped']);
+    expect(summary.failed).toEqual(['y check: failed']);
+    expect(calls.write).toEqual(['a']);
   });
 });

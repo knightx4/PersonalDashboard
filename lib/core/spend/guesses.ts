@@ -143,6 +143,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'write-next-unit': background(unit(SONNET, 2_000, 300)),
   // One concept and the names of the others in its track.
   'add-lesson-floor': background(unit(SONNET, 3_000, 800)),
+  // One unit's outcome and up to twelve of its ideas in, one question out.
+  'write-unit-check': background(unit(HAIKU, 1_500, 250)),
+  // The same unit, the question, the expected answer and what was written.
+  'mark-unit-check': run(HAIKU, 1_500, 120),
 
   // Jobs.
   'enrich-company': run(HAIKU, 10_000, 500),
