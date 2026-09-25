@@ -1,10 +1,11 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useRef, useState } from 'react';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Disclosure } from '@/components/ui/disclosure';
 import { InlineInput, Input } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
@@ -34,10 +35,12 @@ function formatDay(isoDate: string, withYear = false): string {
 }
 
 /**
- * A goal's number (plan #930): what it is measured in, every reading with
- * its date, and a line of them against the target. A goal with no unit shows
- * only the way to give it one, which the page draws in its row of add lines
- * and mounts this with `startEditing` from (plan #1038).
+ * A goal's number (plan #930): what it is measured in, a line of the readings
+ * against the target, and every reading with its date folded beneath it. A
+ * goal with no unit shows only the way to give it one, which the page draws in
+ * its row of add lines and mounts this with `startEditing` from (plan #1038).
+ * That first unit is the one place a form is used; after it the unit and the
+ * target are edited in the line beside the heading.
  */
 export function GoalNumber({
   goalId,
@@ -65,15 +68,16 @@ export function GoalNumber({
     return editing ? (
       <MeasureForm
         goalId={goalId}
-        unit={null}
-        target={null}
         onClose={() => {
           setEditing(false);
           onClose?.();
         }}
       />
     ) : (
-      <AddTrigger label="Track a number, such as a balance or a weight" onClick={() => setEditing(true)} />
+      <AddTrigger
+        label="Track a number, such as a balance or a weight"
+        onClick={() => setEditing(true)}
+      />
     );
   }
 
@@ -85,25 +89,8 @@ export function GoalNumber({
         <h2 id="number-heading" className="text-ui font-semibold text-ink">
           The number
         </h2>
-        <span className="text-small text-ink-muted">
-          {unit ? `In ${unit}` : 'No longer measured'}
-          {unit && target !== null && `, aiming for ${formatReading(target, unit)}`}
-        </span>
-        {!editing && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="ml-auto"
-            onClick={() => setEditing(true)}
-          >
-            {unit ? 'Change unit or target' : 'Measure it again'}
-          </Button>
-        )}
+        <MeasureLine goalId={goalId} unit={unit} target={target} />
       </div>
-      {editing && (
-        <MeasureForm goalId={goalId} unit={unit} target={target} onClose={() => setEditing(false)} />
-      )}
       <Card>
         {readings.length > 0 && (
           <div className="space-y-2 px-3 pt-3">
@@ -111,32 +98,116 @@ export function GoalNumber({
             <ReadingLine readings={readings} unit={unit} target={target} />
           </div>
         )}
-        {unit && <ReadingForm goalId={goalId} today={today} />}
+        {unit && <AddReading goalId={goalId} today={today} />}
         {readings.length > 0 && <ReadingList readings={readings} unit={unit} />}
       </Card>
     </section>
   );
 }
 
-function MeasureForm({
+/**
+ * The unit and the target, edited where they are read beside the heading
+ * (law 12). Both sit in one form, so changing either sends the other as it
+ * stands. Commit is on Enter or on leaving the line, and only when something
+ * changed; moving from the unit to the target does not save in between.
+ * Escape puts both back. Clearing the unit stops the measuring and
+ * keeps the readings, and typing one again starts it again.
+ */
+function MeasureLine({
   goalId,
   unit,
   target,
-  onClose,
 }: {
   goalId: string;
   unit: string | null;
   target: number | null;
-  onClose: () => void;
 }) {
-  const [state, save, saving] = useActionState(
-    async (prev: ReadingActionState, form: FormData) => {
-      const next = await setMeasureAction(prev, form);
-      if (next.done) onClose();
-      return next;
-    },
-    initial,
+  const [state, save, saving] = useActionState(setMeasureAction, initial);
+  const formRef = useRef<HTMLFormElement>(null);
+  const committed = { unit: unit ?? '', target: target === null ? '' : String(target) };
+
+  function commit() {
+    const form = formRef.current;
+    if (!form || saving) return;
+    const data = new FormData(form);
+    const changed =
+      String(data.get('unit') ?? '').trim() !== committed.unit ||
+      (data.has('target') && String(data.get('target') ?? '').trim() !== committed.target);
+    if (changed) form.requestSubmit();
+  }
+
+  function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Enter') {
+      // Two fields and no submit button, so the browser will not submit on
+      // Enter by itself.
+      event.preventDefault();
+      commit();
+      return;
+    }
+    if (event.key !== 'Escape') return;
+    const form = formRef.current;
+    if (!form) return;
+    for (const name of ['unit', 'target'] as const) {
+      const field = form.elements.namedItem(name);
+      if (field instanceof HTMLInputElement) field.value = committed[name];
+    }
+    event.currentTarget.blur();
+  }
+
+  // Sized to what is typed, so the line reads as a sentence rather than a row
+  // of boxes.
+  const fit = 'field-sizing-content w-auto min-w-8 max-w-48';
+
+  return (
+    <form
+      ref={formRef}
+      action={save}
+      // A fresh key after each save puts the saved values back as the defaults.
+      key={`${committed.unit}|${committed.target}`}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) commit();
+      }}
+      className="flex flex-wrap items-baseline gap-x-1 text-small text-ink-muted"
+    >
+      <input type="hidden" name="goalId" value={goalId} />
+      <span>{unit ? 'In' : 'No longer measured. Measure it again in'}</span>
+      <InlineInput
+        name="unit"
+        maxLength={UNIT_MAX}
+        defaultValue={committed.unit}
+        placeholder={unit ? 'no unit' : 'such as $ or lb'}
+        aria-label="What the number is measured in. Clear it to stop measuring; the readings are kept."
+        onKeyDown={onKeyDown}
+        disabled={saving}
+        className={fit}
+      />
+      {unit && (
+        <>
+          <span>aiming for</span>
+          <InlineInput
+            name="target"
+            inputMode="decimal"
+            defaultValue={committed.target}
+            placeholder="no target"
+            aria-label="The number you are aiming for"
+            onKeyDown={onKeyDown}
+            disabled={saving}
+            className={cn(fit, 'tabular')}
+          />
+        </>
+      )}
+      {state.error && <span className="w-full text-small text-danger">{state.error}</span>}
+    </form>
   );
+}
+
+/** The first unit and target, for a goal not measured yet. */
+function MeasureForm({ goalId, onClose }: { goalId: string; onClose: () => void }) {
+  const [state, save, saving] = useActionState(async (prev: ReadingActionState, form: FormData) => {
+    const next = await setMeasureAction(prev, form);
+    if (next.done) onClose();
+    return next;
+  }, initial);
   return (
     <Card>
       <form
@@ -151,7 +222,6 @@ function MeasureForm({
           name="unit"
           autoFocus
           maxLength={UNIT_MAX}
-          defaultValue={unit ?? ''}
           placeholder="Unit, such as $ or lb"
           aria-label="What the number is measured in"
           className="w-44"
@@ -159,7 +229,6 @@ function MeasureForm({
         <Input
           name="target"
           inputMode="decimal"
-          defaultValue={target ?? ''}
           placeholder="Target (optional)"
           aria-label="The number you are aiming for"
           className="w-40"
@@ -174,22 +243,42 @@ function MeasureForm({
           </Button>
         </span>
       </form>
-      {unit && (
-        <p className="border-t border-border px-3 py-2 text-small text-ink-muted">
-          Clear the unit to stop measuring. The readings so far are kept.
-        </p>
-      )}
     </Card>
   );
 }
 
-function ReadingForm({ goalId, today }: { goalId: string; today: string }) {
-  const [state, add, adding] = useActionState(addReadingAction, initial);
+/** Adding a reading, one line until it is wanted (law 14). */
+function AddReading({ goalId, today }: { goalId: string; today: string }) {
+  const [adding, setAdding] = useState(false);
+  return adding ? (
+    <ReadingForm goalId={goalId} today={today} onClose={() => setAdding(false)} />
+  ) : (
+    <div className="border-t border-border px-3 py-1.5 first:border-t-0">
+      <AddTrigger label="Add a reading" onClick={() => setAdding(true)} />
+    </div>
+  );
+}
+
+function ReadingForm({
+  goalId,
+  today,
+  onClose,
+}: {
+  goalId: string;
+  today: string;
+  onClose: () => void;
+}) {
+  const [state, add, adding] = useActionState(async (prev: ReadingActionState, form: FormData) => {
+    const next = await addReadingAction(prev, form);
+    if (next.done) onClose();
+    return next;
+  }, initial);
   return (
     <form
       action={add}
-      // A new key after each save empties the fields for the next reading.
-      key={state.done ?? 0}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') onClose();
+      }}
       className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2 first:border-t-0"
     >
       <input type="hidden" name="goalId" value={goalId} />
@@ -197,6 +286,7 @@ function ReadingForm({ goalId, today }: { goalId: string; today: string }) {
         name="value"
         inputMode="decimal"
         required
+        autoFocus
         placeholder="New reading"
         aria-label="The number today"
         className="w-36"
@@ -216,9 +306,14 @@ function ReadingForm({ goalId, today }: { goalId: string; today: string }) {
         aria-label="A note on this reading"
         className="min-w-32 flex-1"
       />
-      <Button type="submit" size="sm" disabled={adding}>
-        {adding ? 'Adding…' : 'Add reading'}
-      </Button>
+      <span className="flex items-center gap-1">
+        <Button type="button" size="sm" variant="ghost" onClick={onClose} disabled={adding}>
+          Cancel
+        </Button>
+        <Button type="submit" size="sm" disabled={adding}>
+          {adding ? 'Adding…' : 'Add reading'}
+        </Button>
+      </span>
       {state.error && <p className="w-full text-small text-danger">{state.error}</p>}
     </form>
   );
@@ -230,35 +325,46 @@ function ReadingList({ readings, unit }: { readings: Reading[]; unit: string | n
     const result = await deleteReadingAction(form);
     if (result.error) toast({ text: result.error });
   };
+  const latest = readings[readings.length - 1];
+  // Folded, because the chart above already draws every one of these (law
+  // 10). The closed line carries the count and the latest, so opening it is
+  // for correcting a reading rather than for reading them.
   return (
-    <ul aria-label="Every reading" className="divide-y divide-border border-t border-border">
-      {[...readings].reverse().map((reading) => (
-        <li key={reading.id} className="flex items-center gap-3 px-3 py-1.5">
-          <span className="tabular w-24 shrink-0 text-small text-ink-muted">
-            {formatDay(reading.readOn, true)}
-          </span>
-          <span className="tabular shrink-0 text-ui text-ink">
-            {formatReading(reading.value, unit)}
-          </span>
-          <span className="min-w-0 flex-1 truncate text-small text-ink-muted">
-            {reading.note ?? (reading.captureId ? 'From the capture box' : '')}
-          </span>
-          <ActionMenu
-            label={`Reading of ${formatDay(reading.readOn, true)} actions`}
-            items={[
-              {
-                id: 'delete',
-                label: 'Delete, entered by mistake',
-                destructive: true,
-                confirm: 'Delete this reading?',
-                formAction: remove,
-                formFields: { id: reading.id },
-              },
-            ]}
-          />
-        </li>
-      ))}
-    </ul>
+    <div className="border-t border-border px-3 py-1.5">
+      <Disclosure
+        title={`${readings.length} ${readings.length === 1 ? 'reading' : 'readings'}`}
+        meta={`latest ${formatReading(latest.value, unit)} on ${formatDay(latest.readOn)}`}
+      >
+        <ul aria-label="Every reading" className="divide-y divide-border">
+          {[...readings].reverse().map((reading) => (
+            <li key={reading.id} className="flex items-center gap-3 py-1.5">
+              <span className="tabular w-24 shrink-0 text-small text-ink-muted">
+                {formatDay(reading.readOn, true)}
+              </span>
+              <span className="tabular shrink-0 text-ui text-ink">
+                {formatReading(reading.value, unit)}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-small text-ink-muted">
+                {reading.note ?? (reading.captureId ? 'From the capture box' : '')}
+              </span>
+              <ActionMenu
+                label={`Reading of ${formatDay(reading.readOn, true)} actions`}
+                items={[
+                  {
+                    id: 'delete',
+                    label: 'Delete, entered by mistake',
+                    destructive: true,
+                    confirm: 'Delete this reading?',
+                    formAction: remove,
+                    formFields: { id: reading.id },
+                  },
+                ]}
+              />
+            </li>
+          ))}
+        </ul>
+      </Disclosure>
+    </div>
   );
 }
 
