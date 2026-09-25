@@ -10,6 +10,7 @@ const body = z
   .min(1, 'Write something first.')
   .max(20000, 'That is longer than one entry holds. Split it in two.');
 
+// latency: pending
 export async function addThought(input: string): Promise<{ error: string | null }> {
   const parsed = body.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -25,6 +26,7 @@ export async function addThought(input: string): Promise<{ error: string | null 
   return { error: null };
 }
 
+// latency: pending
 export async function updateThought(id: string, input: string): Promise<{ error: string | null }> {
   const parsed = body.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -42,6 +44,7 @@ export async function updateThought(id: string, input: string): Promise<{ error:
   return { error: null };
 }
 
+// latency: pending
 export async function deleteThought(id: string): Promise<{ error: string | null }> {
   const user = await requireUser();
   const supabase = await createClient();
