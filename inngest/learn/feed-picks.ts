@@ -78,7 +78,8 @@ async function readAll<T>(
 /**
  * Every account with at least one theme placed in a field, or an active goal
  * (plan #900; the Level 3 goal counts, plan #910), which is enough to draw
- * cards for.
+ * cards for. An open goal draws no section cards now, but its track's lessons
+ * are written by the same top-up (plan #972).
  */
 export async function peopleToPickFor(learn: LearnSupabaseClient): Promise<string[]> {
   const [themed, aiming] = await Promise.all([
@@ -102,10 +103,11 @@ export async function peopleToPickFor(learn: LearnSupabaseClient): Promise<strin
 }
 
 /**
- * This person's active goals, as the draw needs them, oldest first. The Level
- * 3 goal is among them, marked by `list`, and the pass takes its cards from
- * the list rather than naming them (plan #910). A goal not placed yet is drawn
- * from its wording, since nothing retries a placement that failed.
+ * This person's active goals that the draw still takes section cards for,
+ * oldest first: the Level 3 goal, marked by `list`, whose cards the pass takes
+ * from the list rather than naming them (plan #910). An open goal has a track
+ * of its own instead, and its cards are that track's lessons (plan #972,
+ * lib/learn/lessons/aim-tracks.ts), so it is not drawn here.
  */
 async function loadGoals(
   learn: LearnSupabaseClient,
@@ -117,6 +119,7 @@ async function loadGoals(
     .select(AIM_COLUMNS)
     .eq('user_id', userId)
     .is('archived_at', null)
+    .not('list_source', 'is', null)
     .order('created_at', { ascending: true });
   if (error) throw new Error(`Reading your goals failed: ${error.message}`);
   const aims = ((data ?? []) as AimRow[]).map(toAim);

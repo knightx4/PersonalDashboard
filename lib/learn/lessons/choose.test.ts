@@ -330,3 +330,75 @@ describe('chooseLessons', () => {
     expect(choice.waiting).toEqual(['full']);
   });
 });
+
+describe('the tracks of learning goals', () => {
+  const count = (picks: { subjectId: string }[], id: string) => picks.filter((pick) => pick.subjectId === id).length;
+
+  it('share one slot in three between them, whatever the weights', () => {
+    const choice = chooseLessons({
+      tracks: [wideTrack('goal', 10), wideTrack('a', 10), wideTrack('b', 10)],
+      weights: new Map([
+        ['goal', weight(0.25)],
+        ['a', weight(4)],
+        ['b', weight(4)],
+      ]),
+      carded: new Set(),
+      goalTracks: new Set(['goal']),
+      slots: 9,
+    });
+    expect(count(choice.picks, 'goal')).toBe(3);
+    expect(choice.picks[0].subjectId).toBe('goal');
+  });
+
+  it('split their third by weight, and count the cards already waiting', () => {
+    const choice = chooseLessons({
+      tracks: [wideTrack('g1', 10), wideTrack('g2', 10), wideTrack('other', 10)],
+      weights: new Map([
+        ['g1', weight(3)],
+        ['g2', weight(1)],
+      ]),
+      carded: new Set(),
+      dealt: new Map([['other', 4]]),
+      goalTracks: new Set(['g1', 'g2']),
+      slots: 8,
+    });
+    // Four waiting plus eight: four of the twelve go to the goals.
+    expect(count(choice.picks, 'g1') + count(choice.picks, 'g2')).toBe(4);
+    expect(count(choice.picks, 'g1')).toBe(3);
+  });
+
+  it('take every slot when no other track has anything to teach, and give theirs up when they have nothing', () => {
+    const alone = chooseLessons({
+      tracks: [wideTrack('goal', 5)],
+      weights: new Map(),
+      carded: new Set(),
+      goalTracks: new Set(['goal']),
+      slots: 3,
+    });
+    expect(count(alone.picks, 'goal')).toBe(3);
+
+    const empty = chooseLessons({
+      tracks: [wideTrack('goal', 2), wideTrack('other', 5)],
+      weights: new Map(),
+      carded: new Set(['goal-0', 'goal-1']),
+      goalTracks: new Set(['goal']),
+      slots: 3,
+    });
+    expect(count(empty.picks, 'other')).toBe(3);
+  });
+
+  it('are never dormant while the goal is active', () => {
+    const choice = chooseLessons({
+      tracks: [wideTrack('goal', 3), wideTrack('used', 3)],
+      weights: new Map([
+        ['goal', weight(0.5, true)],
+        ['used', weight(1)],
+      ]),
+      carded: new Set(),
+      goalTracks: new Set(['goal']),
+      slots: 3,
+    });
+    expect(choice.dormant).toEqual([]);
+    expect(count(choice.picks, 'goal')).toBe(1);
+  });
+});

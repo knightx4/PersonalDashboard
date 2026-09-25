@@ -31,7 +31,9 @@ import { NO_PREFERENCES, fieldWeight, goalWeight, themeWeight, type FeedPreferen
  * count starts when the oldest goal still active was set (`wantsGoal`), so
  * adding a first goal after months of cards gives it its share from then on
  * rather than a run of nothing but goal cards to catch up. Saves and
- * dismissals lean each goal as they lean a theme (`goalWeight`).
+ * dismissals lean each goal as they lean a theme (`goalWeight`). Since plan
+ * #972 only the Level 3 goal is given here: an open goal has a track, and its
+ * one in three is a share of the lessons (`chooseLessons`).
  */
 
 /** A theme placed in a field. Themes placed at a domain, or nowhere, are not drawn. */

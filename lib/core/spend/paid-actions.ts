@@ -48,7 +48,7 @@ export const PAID_ACTIONS = {
   'app/learn/s/[id]/actions.ts#readAboutConcept': ['embed-claim', 'judge-segment'],
   'app/learn/s/[id]/actions.ts#pullWikipediaArticles': ['embed-catalogue'],
   'app/learn/s/[id]/actions.ts#pullLectureCourse': ['embed-catalogue'],
-  'app/learn/goals/actions.ts#addGoal': ['place-aim'],
+  'app/learn/goals/actions.ts#addGoal': ['place-aim', 'write-curriculum'],
   'app/learn/now/actions.ts#testMeOnCard': ['generate-chain', 'place-track'],
   'app/learn/now/actions.ts#startTrackOffer': [
     'generate-track-from-theme',

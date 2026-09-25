@@ -325,6 +325,35 @@ its reason on the row, and shows the mark and the expected answer. A right
 answer sets `established` to tested on each of the unit's concepts still
 known or sharp. A wrong one changes nothing about them.
 
+## Step 6 as built
+
+Plan #972, on 25 September 2026. Code: `lib/learn/lessons/aim-tracks.ts`, and
+the goal share in `chooseLessons` (`lib/learn/lessons/choose.ts`).
+
+**The track.** Each open goal records its track in `aims.subject_id` (learn
+0056). Saving a goal places it, then gives it a track found or made by the
+goal's name, copies the goal's placement onto the track when the track has
+none, and writes the track's first units from the goal's line and depth
+("city design, as a learning goal: enough to use it and explain it"). The
+Learn now top-up gives a track to any active goal still without one before it
+chooses lessons, with no model call, and writes that track's first unit as it
+does for any track with no curriculum. Archiving a goal leaves its track as
+one of your tracks, without the goal's share. Rewording a goal leaves the
+track's name.
+
+**The share.** The tracks of active goals share one lesson slot in three
+between them, counted over the lessons waiting in the deck and the slots filled
+in the run, by the rule the section draw used for goals (`wantsGoal`). Within
+that third, and among the other tracks for the rest, slots go by weight as
+before. When only goal tracks have something to teach they take every slot,
+and when none of them has, their third goes to the other tracks. A goal's track
+is never dormant while the goal is active.
+
+**Section cards.** The section draw no longer takes open goals: only the
+Level 3 goal is drawn there, from its list, and it now has the goals' one
+section card in three to itself. A goal linked from a life goal counts its
+track's lessons and checks as its cards read.
+
 ## Build order
 
 Each step ships on its own.
@@ -344,7 +373,8 @@ Each step ships on its own.
 5. **The unit check.** Built (plan #971). A done unit's check is the next
    card from its track; skipping it leaves the unit done, and a right answer
    marks its concepts tested.
-6. **Goals as tracks.** A goal on the Goals page gets a track.
+6. **Goals as tracks.** Built (plan #972). An open goal on the Goals page
+   gets a track, and the goals' tracks share one lesson in three.
 
 ## Open questions
 
