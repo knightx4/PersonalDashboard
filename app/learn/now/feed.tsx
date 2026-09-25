@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Feather,
   GraduationCap,
+  Moon,
   Sprout,
   Weight,
   X,
@@ -31,8 +32,10 @@ import {
   type SwipeAction,
 } from '@/lib/learn/feed/card';
 import type { TrackOffer } from '@/lib/learn/flow/offer';
+import { weeksResting, type RestingOffer } from '@/lib/learn/lessons/resting';
 import { answerTrackOffer } from '../flow/actions';
 import {
+  answerRestingTrack,
   answerUnitCheck,
   dismissCard,
   loadMoreCards,
@@ -67,7 +70,9 @@ import {
  *
  * A visit may also carry one track offer (plan #968), shown in place of the
  * next card once a couple are passed. It has no swipes: it stays until Start,
- * Not now or Never is pressed, as the offer in Practice Flow does.
+ * Not now or Never is pressed, as the offer in Practice Flow does. A track you
+ * have left alone (plan #1045) takes the same place, with Pick it up, Not now
+ * and Let it rest, and a visit that carries one carries no theme offer.
  *
  * A unit check (plan #971) has no swipes either: it is answered or skipped.
  */
@@ -91,6 +96,7 @@ export function LearnNowFeed({
   ready: firstReady,
   low,
   offer: firstOffer = null,
+  resting: firstResting = null,
 }: {
   first: FeedCard[];
   ready: number;
@@ -98,8 +104,13 @@ export function LearnNowFeed({
   low: number;
   /** A theme from your notes to offer as a new track this visit, or null. */
   offer?: TrackOffer | null;
+  /** A dormant track to offer back this visit, or null. It goes before a theme. */
+  resting?: RestingOffer | null;
 }) {
-  const [offer, setOffer] = useState(firstOffer);
+  const [resting, setResting] = useState(firstResting);
+  // One offer a visit: a resting track and a theme are never both on it.
+  const [offer, setOffer] = useState(firstResting ? null : firstOffer);
+  const [pickedUp, setPickedUp] = useState<RestingOffer | null>(null);
   const [started, setStarted] = useState<MadeTrack | null>(null);
   const [deck, setDeck] = useState(first);
   const [ready, setReady] = useState(firstReady);
@@ -137,11 +148,16 @@ export function LearnNowFeed({
   }, [deck.length, ended, loadMore]);
 
   const current = deck[0] ?? null;
-  const offerShown = offer !== null && offerDue(passed, deck.length);
+  const offerShown = (offer !== null || resting !== null) && offerDue(passed, deck.length);
 
   const offerDone = useCallback((track: MadeTrack | null) => {
     setOffer(null);
     if (track) setStarted(track);
+  }, []);
+
+  const restingDone = useCallback((picked: RestingOffer | null) => {
+    setResting(null);
+    if (picked) setPickedUp(picked);
   }, []);
 
   /** Take the card off the top of the deck, and bring the next into view. */
@@ -229,8 +245,19 @@ export function LearnNowFeed({
         </p>
       )}
       {started && <MadeTrackLine track={started} className="mb-2" />}
+      {pickedUp && (
+        <p className="mb-2 text-small text-ink-muted" aria-live="polite">
+          Picked up{' '}
+          <Link href={`/learn/s/${pickedUp.subjectId}`} className="text-ink underline underline-offset-2">
+            {pickedUp.name}
+          </Link>
+          . Its lessons come back into Learn now from the next cards written.
+        </p>
+      )}
 
-      {offer && offerShown ? (
+      {resting && offerShown ? (
+        <RestingTrackCard key={resting.subjectId} track={resting} onDone={restingDone} onError={setError} />
+      ) : offer && offerShown ? (
         <FeedOfferCard key={offer.themeId} offer={offer} onDone={offerDone} />
       ) : current ? (
         <>
@@ -864,6 +891,82 @@ function FeedOfferCard({
           Writing the track&apos;s first ideas and its units. This takes about a minute.
         </p>
       )}
+      {error && <p className="mt-2 text-small text-danger">{error}</p>}
+    </Card>
+  );
+}
+
+/**
+ * A track you have left alone, offered back (LEARN-LESSONS-SPEC, "A resting
+ * track is offered back"; plan #1045). Pick it up waits for the press to be
+ * kept, since the track's lessons hang on it; Not now and Let it rest take the
+ * card away at once, and one that was not kept only means the track may be
+ * offered again.
+ */
+function RestingTrackCard({
+  track,
+  onDone,
+  onError,
+}: {
+  track: RestingOffer;
+  onDone: (picked: RestingOffer | null) => void;
+  onError: (message: string) => void;
+}) {
+  const [picking, startPicking] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const weeks = weeksResting(track.lastUsed, new Date());
+
+  const pickUp = () =>
+    startPicking(async () => {
+      setError(null);
+      const result = await answerRestingTrack(track.subjectId, 'picked_up').catch(() => ({
+        error: 'Could not pick that track up. Check your connection.',
+      }));
+      if (result.error) setError(result.error);
+      else onDone(track);
+    });
+
+  const setAside = (outcome: 'not_now' | 'rested') => {
+    onDone(null);
+    void answerRestingTrack(track.subjectId, outcome)
+      .then((result) => {
+        if (result.error) onError(`That was not kept: ${result.error}`);
+      })
+      .catch(() => onError('That was not kept. Check your connection.'));
+  };
+
+  return (
+    <Card padding="standard">
+      <p className="flex items-center gap-1.5 text-small text-ink-muted">
+        <Moon className="size-3.5" strokeWidth={2} aria-hidden />
+        A resting track
+      </p>
+      <h2 className="mt-1 font-display text-title tracking-tight break-words text-ink">
+        <Link href={`/learn/s/${track.subjectId}`} className="hover:underline underline-offset-2">
+          {track.name}
+        </Link>
+      </h2>
+      <p className="mt-2 text-body text-ink">
+        You have left this alone for {weeks} {weeks === 1 ? 'week' : 'weeks'}, so its lessons stopped
+        coming. Pick it up again?
+      </p>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Button type="button" variant="primary" onClick={pickUp} pending={picking}>
+          Pick it up
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => setAside('not_now')}
+          disabled={picking}
+        >
+          Not now
+        </Button>
+        <Button type="button" variant="ghost" onClick={() => setAside('rested')} disabled={picking}>
+          Let it rest
+        </Button>
+      </div>
       {error && <p className="mt-2 text-small text-danger">{error}</p>}
     </Card>
   );

@@ -309,6 +309,21 @@ describe('chooseLessons', () => {
     expect(choice.needs).toEqual([]);
   });
 
+  it('gives lessons to a dormant track picked up again (plan #1045)', () => {
+    const choice = chooseLessons({
+      tracks: [wideTrack('used', 3), wideTrack('stopped', 3)],
+      weights: new Map([
+        ['used', weight(1)],
+        ['stopped', weight(0.5, true)],
+      ]),
+      carded: new Set(),
+      pickedUp: new Set(['stopped']),
+      slots: 4,
+    });
+    expect(choice.dormant).toEqual([]);
+    expect(choice.picks.some((pick) => pick.subjectId === 'stopped')).toBe(true);
+  });
+
   it('reports needs and waiting tracks beside the picks', () => {
     const noChain: LessonTrack = {
       subjectId: 'fresh',

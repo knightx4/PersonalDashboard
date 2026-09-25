@@ -53,6 +53,12 @@ export type TrackActivity = {
   lessonsTaken?: number;
   /** Its lessons in Learn now swiped Not now. */
   lessonsPassed?: number;
+  /**
+   * When a question from it was last answered or a lesson from it last taken,
+   * as far back as the loader reads. Unset when nothing was. What says how long
+   * a dormant track has been resting (plan #1045).
+   */
+  lastUsed?: string;
 };
 
 export type TrackWeight = {

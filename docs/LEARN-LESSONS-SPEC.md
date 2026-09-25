@@ -69,7 +69,29 @@ quarter to four.
 
 A track with nothing done on it for four weeks, while other tracks were used,
 is **dormant**. It takes no share until you open it on the Tracks tab or start
-a lesson from it there. It is never deleted.
+a lesson from it there. It is never deleted, and two weeks after it goes
+dormant it is offered back (below).
+
+## A resting track is offered back
+
+Two weeks after a track goes dormant, so six weeks after it was last used, it
+comes back to Learn now as one card asking whether to pick it up again, with
+Pick it up, Not now and Let it rest. A goal's track is never offered, since it
+does not go dormant while the goal is active.
+
+The card takes the place of the theme offer: one offer a visit, shown after the
+second card, and a visit with a resting track to offer shows no theme. When
+several tracks are resting, the one dormant longest is offered.
+
+- **Pick it up** makes the track not dormant for four weeks, so its next lesson
+  comes from the following top-up. If it is still not used when the four weeks
+  run out, it is dormant again from then and offered two weeks later.
+- **Not now** holds the offer back for four weeks.
+- **Let it rest** stops the offers for that track until it is used again: a
+  question answered or a lesson taken after the press.
+
+Each press is a row in `learn.track_offers` with `kind = 'resting'` and the
+track's subject id (learn 0057). Nothing records that the card was shown.
 
 Lessons are written only for the ready cards, the same twenty kept ready today,
 and a unit's chain of concepts is written only when the unit is reached. So the
@@ -376,9 +398,11 @@ Each step ships on its own.
 6. **Goals as tracks.** Built (plan #972). An open goal on the Goals page
    gets a track, and the goals' tracks share one lesson in three.
 
-## Open questions
+## Settled questions
 
-- The Level 3 goal draws articles from a fixed list rather than a curriculum.
-  Whether it becomes a track of its own, or stays an exploratory source, is not
-  decided.
-- Whether a dormant track should be offered back after a while, as a card.
+- The Level 3 goal stays a source of section cards, drawn from its fixed list,
+  with no track and no units (decision #973). It has the goals' one section
+  card in three to itself.
+- A dormant track is offered back as a card two weeks after it goes dormant
+  (decision #974, built in plan #1045), as "A resting track is offered back"
+  describes.

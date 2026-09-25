@@ -7,6 +7,8 @@ import { loadCurriculum } from '@/lib/learn/graph/curriculum-store';
 import { loadGoals, loadGraph, loadSubjects } from '@/lib/learn/graph/load';
 import { loadGoalTracks } from './aim-tracks';
 import { chooseLessons, type ChooseLessonsInput, type LessonChoice } from './choose';
+import { pickedUpSince } from './resting';
+import { loadRestingRecord } from './resting-load';
 
 /**
  * Reading what `chooseLessons` needs (plan #975).
@@ -70,14 +72,15 @@ async function loadChecked(supabase: LearnSupabaseClient, userId: string): Promi
 /**
  * Every track, weighed, with its units, goals and graph, the concepts on
  * cards, the concepts whose lesson was rated too hard, the units that already
- * have a check, and which tracks belong to learning goals (plan #972).
+ * have a check, which tracks belong to learning goals (plan #972), and which
+ * were picked up from a resting offer in the last four weeks (plan #1045).
  */
 export async function loadLessonInput(
   supabase: LearnSupabaseClient,
   userId: string,
   now: Date = new Date(),
 ): Promise<Omit<ChooseLessonsInput, 'slots'>> {
-  const [subjects, interest, cards, checked, goalTracks] = await Promise.all([
+  const [subjects, interest, cards, checked, goalTracks, resting] = await Promise.all([
     loadSubjects(supabase, userId),
     loadTrackInterest(supabase, now, userId),
     readAll<CardRow>((from, to) =>
@@ -95,6 +98,7 @@ export async function loadLessonInput(
     }),
     loadChecked(supabase, userId),
     loadGoalTracks(supabase, userId),
+    loadRestingRecord(supabase, userId),
   ]);
 
   const tracks = await Promise.all(
@@ -128,6 +132,7 @@ export async function loadLessonInput(
     dealt,
     checked,
     goalTracks,
+    pickedUp: pickedUpSince(resting, now),
   };
 }
 
