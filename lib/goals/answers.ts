@@ -58,6 +58,61 @@ export function readSources(raw: unknown): AnswerSource[] {
   return out;
 }
 
+/**
+ * One question an information step has to answer (plan #991), as stored in
+ * goals.items.questions. `key` matches the answer's row in goals.answers.
+ */
+export type StepQuestion = { key: string; question: string };
+
+const KEY = /^[a-z][a-z0-9_]{0,39}$/;
+
+/** The most questions a step holds, as the database allows. */
+export const MAX_QUESTIONS = 20;
+/** The longest a question may be, as the database allows. */
+export const MAX_QUESTION_LENGTH = 300;
+/** A question's input name: `q:<key>` for one already on the step, `q:new` for one added. */
+export const QUESTION_PREFIX = 'q:';
+
+/**
+ * The stored questions, `[{"key", "question"}]`, as the app reads them. The
+ * database checks the shape on write; anything that still does not fit, or
+ * repeats a key, is left out.
+ */
+export function readQuestions(raw: unknown): StepQuestion[] {
+  if (!Array.isArray(raw)) return [];
+  const out: StepQuestion[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const { key, question } = item as Record<string, unknown>;
+    if (typeof key !== 'string' || !KEY.test(key) || seen.has(key)) continue;
+    if (typeof question !== 'string' || !question.trim()) continue;
+    seen.add(key);
+    out.push({ key, question });
+  }
+  return out;
+}
+
+/**
+ * A key for a question the person adds, made from its words
+ * ("What is the monthly total?" is `what_is_the_monthly_total`), and
+ * numbered when the step already has that key.
+ */
+export function questionKey(question: string, taken: Iterable<string>): string {
+  const used = new Set(taken);
+  const words = question
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^[^a-z]+|_+$/g, '');
+  const base = (words || 'question').slice(0, 36).replace(/_+$/, '');
+  if (!used.has(base)) return base;
+  for (let n = 2; ; n++) {
+    const key = `${base}_${n}`;
+    if (!used.has(key)) return key;
+  }
+}
+
 /** A row as a source line names it: its first field with a value. */
 export type SourceRecord = { id: string; data: RecordValues };
 

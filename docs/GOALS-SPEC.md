@@ -547,8 +547,20 @@ migration.
   answer out of date; the step says so, and the next morning run works it
   again (plan #989).
 
-An information step closes when its collection has what the step asked for.
-Later steps and runs read the collection instead of asking again.
+- **Questions.** The step lists the questions it has to answer, in
+  `goals.items.questions`, each with the key its answer carries ("When does
+  my first payment fall due?" is `first_payment`). The goals routine writes
+  them when it maps the goal, and the person edits them on the step. Editing
+  a question's wording keeps its key, so its answer stays with it.
+
+An information step closes when each of its questions has an answer that
+names the rows it read and is not out of date (plan #991). Filling every
+field does not close it, and a list has no "That is all of them" button. The
+database closes the step when the last answer lands or when the questions
+change so that every one is already answered, since the routine writes
+answers through SQL. A step with no questions never closes itself; the
+person closes it. Later steps and runs read the collection and the answers
+instead of asking again.
 
 ### Four ways to fill a form
 

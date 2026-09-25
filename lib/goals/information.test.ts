@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { CollectionField } from '@/lib/goals/collections';
 import {
   askedFields,
-  closesOnSave,
   displayValue,
   formValues,
   informationProgress,
@@ -49,49 +48,80 @@ describe('askedFields', () => {
 
 describe('informationProgress', () => {
   const asked = askedFields(loans, ['name', 'balance', 'rate', 'due_day']);
+  const questions = [
+    { key: 'first_payment', question: 'When does my first payment fall due?' },
+    { key: 'monthly_total', question: 'What is the monthly total?' },
+  ];
+  const source = [{ recordId: '00000000-0000-4000-8000-000000000001', asOf: '2026-09-02' }];
+  const answer = (key: string, over: Partial<{ sources: typeof source; outOfDateAt: string | null }> = {}) => ({
+    key,
+    sources: source,
+    outOfDateAt: null,
+    ...over,
+  });
+  const filled = [
+    { id: 'a', data: full, draft: false },
+    { id: 'b', data: { ...full, name: 'Nelnet 2' }, draft: false },
+  ];
 
-  it('completes a one-record collection on a confirmed, filled record', () => {
-    const progress = informationProgress('one', asked, [{ id: 'a', data: full, draft: false }]);
+  it('leaves the step open when every field is filled but a question has no answer', () => {
+    const progress = informationProgress(asked, filled, questions, [answer('first_payment')]);
+    expect(progress).toMatchObject({ unfilled: 0, drafts: 0, questions: 2, complete: false });
+    expect(progress.open.map((q) => q.key)).toEqual(['monthly_total']);
+    expect(unfinishedReason(progress)).toBe('Still to answer: \u201cWhat is the monthly total?\u201d');
+    expect(progressLine('list', progress)).toBe('2 rows, 1 of 2 questions answered');
+  });
+
+  it('is complete once every question has an answer with sources, whatever the fields', () => {
+    const progress = informationProgress(
+      asked,
+      [{ id: 'a', data: { name: 'x' }, draft: false }],
+      questions,
+      [answer('first_payment'), answer('monthly_total')],
+    );
     expect(progress.complete).toBe(true);
-    expect(closesOnSave('one', progress)).toBe(true);
-  });
-
-  it('does not count a draft', () => {
-    const progress = informationProgress('one', asked, [{ id: 'a', data: full, draft: true }]);
-    expect(progress).toMatchObject({ drafts: 1, complete: false });
-    expect(unfinishedReason(progress)).toBe('One row is a draft. Confirm or correct it first.');
-  });
-
-  it('does not count a record with an asked field empty', () => {
-    const progress = informationProgress('one', asked, [
-      { id: 'a', data: { ...full, rate: null }, draft: false },
-    ]);
-    expect(progress).toMatchObject({ unfilled: 1, complete: false });
-  });
-
-  it('never closes a list on a save, however full', () => {
-    const progress = informationProgress('list', asked, [
-      { id: 'a', data: full, draft: false },
-      { id: 'b', data: { ...full, name: 'Nelnet 2' }, draft: false },
-    ]);
-    expect(progress.complete).toBe(true);
-    expect(closesOnSave('list', progress)).toBe(false);
     expect(unfinishedReason(progress)).toBeNull();
   });
 
-  it('says an empty list cannot be whole yet', () => {
-    const progress = informationProgress('list', asked, []);
-    expect(unfinishedReason(progress)).toBe('Add at least one row first.');
-    expect(progressLine('list', progress)).toBe('0 rows');
+  it('does not count an answer without sources or one out of date', () => {
+    const progress = informationProgress(asked, filled, questions, [
+      answer('first_payment', { sources: [] }),
+      answer('monthly_total', { outOfDateAt: '2026-09-25T00:00:00Z' }),
+    ]);
+    expect(progress.open).toHaveLength(2);
+    expect(unfinishedReason(progress)).toBe(
+      'Still to answer: \u201cWhen does my first payment fall due?\u201d and \u201cWhat is the monthly total?\u201d',
+    );
+  });
+
+  it('ignores answers to questions the step does not list', () => {
+    const progress = informationProgress(asked, filled, questions.slice(0, 1), [
+      answer('first_payment'),
+      answer('daily_interest', { sources: [] }),
+    ]);
+    expect(progress.complete).toBe(true);
+  });
+
+  it('never completes a step with no questions', () => {
+    const progress = informationProgress(asked, filled, [], []);
+    expect(progress.complete).toBe(false);
+    expect(unfinishedReason(progress)).toMatch(/^No questions yet/);
+    expect(progressLine('list', progress)).toBe('2 rows');
   });
 
   it('counts drafts and gaps in the line', () => {
-    const progress = informationProgress('list', asked, [
-      { id: 'a', data: full, draft: true },
-      { id: 'b', data: { name: 'x' }, draft: false },
-      { id: 'c', data: { name: 'y' }, draft: false },
-    ]);
+    const progress = informationProgress(
+      asked,
+      [
+        { id: 'a', data: full, draft: true },
+        { id: 'b', data: { name: 'x' }, draft: false },
+        { id: 'c', data: { name: 'y' }, draft: false },
+      ],
+      [],
+      [],
+    );
     expect(progressLine('list', progress)).toBe('3 rows, 1 draft to confirm, 2 with gaps');
+    expect(progressLine('one', informationProgress(asked, [], [], []))).toBe('Not filled in');
   });
 });
 

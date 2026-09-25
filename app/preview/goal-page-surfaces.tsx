@@ -515,6 +515,12 @@ const loansStep = step('loans', {
   detail: 'The car, the student loan and anything else with a monthly payment.',
   collectionId: loans.id,
   asksFor: ['balance', 'rate', 'payment', 'due_day'],
+  // Three questions (plan #991): one answered, one out of date, one open.
+  questions: [
+    { key: 'monthly_total', question: 'What is the monthly total?' },
+    { key: 'car_paid_off', question: 'When is the car paid off?' },
+    { key: 'student_first_payment', question: 'When does the student loan start charging?' },
+  ],
   position: 20,
 });
 

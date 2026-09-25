@@ -224,11 +224,7 @@ function PreviewForm({
       const result = await savePreviewAction(prev, form);
       if (!result.error) {
         toast({
-          text: result.closed
-            ? 'Saved. The step has what it asked for and is closed.'
-            : kept.length === 1
-              ? 'Saved.'
-              : `Saved ${kept.length} rows.`,
+          text: kept.length === 1 ? 'Saved.' : `Saved ${kept.length} rows.`,
         });
         onClose();
       }

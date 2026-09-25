@@ -14,24 +14,25 @@ import {
   updateRecord,
 } from '@/lib/goals/collections-store';
 import { checkRecord } from '@/lib/goals/collections';
-import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { matchRows, ownsDocumentPath, parseDate, previewRowPrefix } from '@/lib/goals/extract';
 import {
-  askedFields,
-  closesOnSave,
-  formValues,
-  informationProgress,
-  unfinishedReason,
-} from '@/lib/goals/information';
-import { loadInformationStep, setStepStatus } from '@/lib/goals/steps-store';
+  MAX_QUESTIONS,
+  MAX_QUESTION_LENGTH,
+  QUESTION_PREFIX,
+  questionKey,
+  type StepQuestion,
+} from '@/lib/goals/answers';
+import { formValues } from '@/lib/goals/information';
+import { loadInformationStep, setStepQuestions } from '@/lib/goals/steps-store';
 
 /**
  * The writes on an information step's form or table (plan #954): add a row,
- * correct one, confirm a draft, archive a row and bring it back, and say a
- * list is whole. Every value goes through the collection's validator in
- * lib/goals/collections.ts, and a refusal comes back with the field it is
- * about so the form can show it there. A write that leaves a one-record
- * collection complete closes the step.
+ * correct one, confirm a draft, archive a row and bring it back, and edit
+ * the questions the step has to answer. Every value goes through the
+ * collection's validator in lib/goals/collections.ts, and a refusal comes
+ * back with the field it is about so the form can show it there. Filling
+ * the fields never closes the step: it closes once every question has an
+ * answer (plan #991), which the database checks when an answer is written.
  */
 
 export type InformationActionState = {
@@ -39,7 +40,7 @@ export type InformationActionState = {
   /** The key of the field the error is about, when it is about one. */
   field?: string | null;
   done?: number;
-  /** The step closed on this write. */
+  /** The step closed on this write: every question already had its answer. */
   closed?: boolean;
   /** For a filled-in preview: the index of the row the error is about. */
   row?: number;
@@ -50,22 +51,6 @@ const Id = z.string().uuid();
 function saved(closed = false): InformationActionState {
   revalidatePath('/goals', 'layout');
   return { done: Date.now(), closed };
-}
-
-/** Close the step when this write left a one-record collection complete. */
-async function settle(client: GoalsSupabaseClient, stepId: string): Promise<boolean> {
-  const step = await loadInformationStep(client, stepId);
-  if (!step || step.status !== 'open') return false;
-  const collection = await loadCollection(client, step.collectionId);
-  if (!collection) return false;
-  const records = await loadRecords(client, step.collectionId);
-  const progress = informationProgress(
-    collection.shape,
-    askedFields(collection.fields, step.asksFor),
-    records,
-  );
-  if (!closesOnSave(collection.shape, progress)) return false;
-  return setStepStatus(client, stepId, 'done');
 }
 
 /**
@@ -112,7 +97,7 @@ export async function saveRecordAction(
       );
       if (!result.ok) return { error: result.error, field: result.field };
     }
-    return saved(await settle(client, stepId.data));
+    return saved();
   } catch {
     return { error: 'That could not be saved. Try again.' };
   }
@@ -195,7 +180,7 @@ export async function savePreviewAction(
         };
       }
     }
-    return saved(await settle(client, stepId.data));
+    return saved();
   } catch {
     return { error: 'Those could not be saved. Try again.' };
   }
@@ -212,7 +197,7 @@ export async function confirmRecordAction(form: FormData): Promise<InformationAc
     const client = await createGoalsClient();
     const confirmed = await confirmRecord(client, recordId.data);
     if (!confirmed) return { error: 'That row is no longer a draft. Reload to see it.' };
-    return saved(await settle(client, stepId.data));
+    return saved();
   } catch {
     return { error: 'That could not be confirmed. Try again.' };
   }
@@ -239,9 +224,51 @@ export async function archiveRecordAction(form: FormData): Promise<InformationAc
   return saved();
 }
 
-/** Say a list is whole, which closes the step once every row is confirmed and filled. */
+/**
+ * The questions a submitted form carries, in the order the form lists them:
+ * each kept question with its wording as edited, a cleared one left out, and
+ * a new one given a key made from its words. An error names what is wrong.
+ */
+function formQuestions(
+  existing: StepQuestion[],
+  form: FormData,
+): { ok: true; questions: StepQuestion[] } | { ok: false; error: string } {
+  const known = new Set(existing.map((q) => q.key));
+  const out: StepQuestion[] = [];
+  const added: string[] = [];
+  for (const [name, raw] of form.entries()) {
+    if (!name.startsWith(QUESTION_PREFIX) || typeof raw !== 'string') continue;
+    const key = name.slice(QUESTION_PREFIX.length);
+    const question = raw.trim().replace(/\s+/g, ' ');
+    if (!question) continue;
+    if (question.length > MAX_QUESTION_LENGTH) {
+      return { ok: false, error: `A question can be at most ${MAX_QUESTION_LENGTH} characters.` };
+    }
+    if (key === 'new') added.push(question);
+    else if (known.has(key) && !out.some((q) => q.key === key)) out.push({ key, question });
+  }
+  const taken = new Set(existing.map((q) => q.key));
+  for (const question of added) {
+    const key = questionKey(question, taken);
+    taken.add(key);
+    out.push({ key, question });
+  }
+  if (out.length > MAX_QUESTIONS) {
+    return { ok: false, error: `A step can hold at most ${MAX_QUESTIONS} questions.` };
+  }
+  return { ok: true, questions: out };
+}
+
+/**
+ * Save the questions the step has to answer. A question keeps its key when
+ * its wording is edited, so the answer the goals routine wrote for it stays
+ * with it. Closes the step when every question already has its answer.
+ */
 // latency: pending
-export async function finishListAction(form: FormData): Promise<InformationActionState> {
+export async function saveQuestionsAction(
+  _prev: InformationActionState,
+  form: FormData,
+): Promise<InformationActionState> {
   await requireUser();
   const stepId = Id.safeParse(form.get('stepId'));
   if (!stepId.success) return { error: 'Could not tell which step that was.' };
@@ -249,21 +276,12 @@ export async function finishListAction(form: FormData): Promise<InformationActio
     const client = await createGoalsClient();
     const step = await loadInformationStep(client, stepId.data);
     if (!step) return { error: 'That step no longer has a form.' };
-    if (step.status !== 'open') return { error: 'That step is already closed.' };
-    const collection = await loadCollection(client, step.collectionId);
-    if (!collection) return { error: 'The collection behind that step is gone.' };
-    const records = await loadRecords(client, step.collectionId);
-    const progress = informationProgress(
-      collection.shape,
-      askedFields(collection.fields, step.asksFor),
-      records,
-    );
-    const reason = unfinishedReason(progress);
-    if (reason) return { error: reason };
-    const closed = await setStepStatus(client, stepId.data, 'done');
-    if (!closed) return { error: 'That step has already changed. Reload to see it.' };
-    return saved(true);
+    const read = formQuestions(step.questions, form);
+    if (!read.ok) return { error: read.error };
+    const status = await setStepQuestions(client, stepId.data, read.questions);
+    if (!status) return { error: 'That step no longer has a form.' };
+    return saved(step.status === 'open' && status === 'done');
   } catch {
-    return { error: 'The step could not be closed. Try again.' };
+    return { error: 'The questions could not be saved. Try again.' };
   }
 }

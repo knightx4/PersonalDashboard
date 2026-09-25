@@ -6,7 +6,7 @@ import {
   type Collection,
   type CollectionRecord,
 } from '@/lib/goals/collections-store';
-import type { StepAnswer } from '@/lib/goals/answers';
+import { readQuestions, type StepAnswer, type StepQuestion } from '@/lib/goals/answers';
 import { loadAnswers } from '@/lib/goals/answers-store';
 import type { DevComment } from '@/lib/comments/load';
 import { loadThreads } from '@/lib/goals/comments-store';
@@ -77,6 +77,7 @@ type ItemRow = {
   target: number | string | null;
   collection_id: string | null;
   asks_for: string[] | null;
+  questions: unknown;
   block_ask: string | null;
   block_kind: StepBlockKind | null;
   help_kinds: unknown;
@@ -108,7 +109,7 @@ const ITEM_COLUMNS =
   'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, fog_dismissed_at, ' +
   'resolution, ' +
   'dismissed_at, due_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
-  'unit, target, collection_id, asks_for, block_ask, block_kind, help_kinds';
+  'unit, target, collection_id, asks_for, questions, block_ask, block_kind, help_kinds';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -130,6 +131,7 @@ const toStep = (row: ItemRow): Step => ({
   reviewedAt: row.reviewed_at,
   collectionId: row.collection_id,
   asksFor: row.asks_for,
+  questions: readQuestions(row.questions),
   blockAsk: row.block_ask,
   blockKind: row.block_kind,
 });
@@ -680,7 +682,11 @@ export async function setStepCollection(
 ): Promise<boolean> {
   const { data, error } = await client
     .from('items')
-    .update({ collection_id: collectionId, asks_for: collectionId ? asksFor : null })
+    .update({
+      collection_id: collectionId,
+      asks_for: collectionId ? asksFor : null,
+      ...(collectionId ? {} : { questions: null }),
+    })
     .eq('id', id)
     .eq('level', 'step')
     .is('archived_at', null)
@@ -689,14 +695,19 @@ export async function setStepCollection(
   return (data ?? []).length > 0;
 }
 
-/** An information step as its form's writes need it: its collection, what it asks for, and its status. */
+/** An information step as its form's writes need it: its collection, what it asks for, its questions and its status. */
 export async function loadInformationStep(
   client: GoalsSupabaseClient,
   id: string,
-): Promise<{ collectionId: string; asksFor: string[] | null; status: StepStatus } | null> {
+): Promise<{
+  collectionId: string;
+  asksFor: string[] | null;
+  questions: StepQuestion[];
+  status: StepStatus;
+} | null> {
   const { data, error } = await client
     .from('items')
-    .select('collection_id, asks_for, status')
+    .select('collection_id, asks_for, questions, status')
     .eq('id', id)
     .eq('level', 'step')
     .is('archived_at', null)
@@ -706,6 +717,32 @@ export async function loadInformationStep(
   return {
     collectionId: data.collection_id as string,
     asksFor: (data.asks_for as string[] | null) ?? null,
+    questions: readQuestions(data.questions),
     status: data.status as StepStatus,
   };
+}
+
+/**
+ * Rewrite the questions an information step has to answer (plan #991); an
+ * empty list clears them. When every question already has a current answer,
+ * the database closes the step on this write (migrations-goals 0035). The
+ * step's status after the write, or null when no live information step has
+ * that id.
+ */
+export async function setStepQuestions(
+  client: GoalsSupabaseClient,
+  id: string,
+  questions: StepQuestion[],
+): Promise<StepStatus | null> {
+  const { data, error } = await client
+    .from('items')
+    .update({ questions: questions.length > 0 ? questions : null })
+    .eq('id', id)
+    .eq('level', 'step')
+    .not('collection_id', 'is', null)
+    .is('archived_at', null)
+    .select('status');
+  if (error) throw new Error(error.message);
+  const row = (data ?? [])[0] as { status: StepStatus } | undefined;
+  return row?.status ?? null;
 }
