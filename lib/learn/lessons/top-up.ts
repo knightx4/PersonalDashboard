@@ -1,3 +1,4 @@
+import type { AddedUnit } from './add-unit';
 import type { LaidOutUnit } from './lay-out-unit';
 import type { LessonPick, TrackNeed } from './choose';
 
@@ -21,6 +22,9 @@ export const LESSON_SHARE = 0.8;
 
 /** Units laid out in one run, at most. Each is a `generateChain` call of about a minute. */
 export const MAX_LAYOUTS_PER_RUN = 2;
+
+/** Units written after a track's last in one run, at most. Each is one short Sonnet call. */
+export const MAX_UNITS_ADDED_PER_RUN = 2;
 
 /**
  * Laying out is not started with less than this left before the deadline:
@@ -49,6 +53,8 @@ export type LessonTopUpPorts = {
   /** The chooser, with held tracks' needs already left out. */
   choose(userId: string, slots: number): Promise<{ picks: LessonPick[]; needs: TrackNeed[] }>;
   layOut(userId: string, subjectId: string): Promise<LaidOutUnit>;
+  /** Write the unit after `lastUnitId`, the track's last when the need was read. */
+  addUnit(userId: string, subjectId: string, lastUnitId: string | null): Promise<AddedUnit>;
   /** Leave the track's layout alone until `until`. */
   hold(userId: string, subjectId: string, until: Date): Promise<void>;
   /** Write one lesson and store its row. */
@@ -62,6 +68,8 @@ export type LessonTopUpSummary = {
   written: number;
   dropped: string[];
   failed: string[];
+  /** Tracks a unit was written for, after their last. */
+  added: string[];
   /** Tracks a unit was laid out for. */
   laidOut: string[];
   /** Tracks put on hold this run. */
@@ -72,11 +80,14 @@ export type LessonTopUpSummary = {
 /**
  * Write up to `wanted` lessons for one person, and return what came of it.
  *
- * Units are laid out only for a track whose next unit has no chain
- * (`no-chain`). A track with every unit done, or with no curriculum, needs a
- * unit written, which is a later step (plan #969), so nothing is called for
- * it. After a unit is laid out the chooser is asked once more, so the new
- * concepts can take slots in the same run.
+ * A track that has run out of units, or is on its last with fewer than
+ * three concepts left, or has no curriculum, first gets its next unit written
+ * (plan #969). Then units are laid out for tracks whose next unit has no chain
+ * (`no-chain`), which includes a unit just written for a track with every unit
+ * done. The chooser is asked again after each of the two when it changed
+ * anything, so new concepts can take slots in the same run.
+ *
+ * A track whose unit could not be written or laid out is held for a day.
  */
 export async function writeLessonsFor(
   ports: LessonTopUpPorts,
@@ -89,13 +100,37 @@ export async function writeLessonsFor(
     written: 0,
     dropped: [],
     failed: [],
+    added: [],
     laidOut: [],
     held: [],
     stopped: null,
   };
   if (wanted <= 0) return summary;
 
+  const hold = async (need: TrackNeed) => {
+    try {
+      await ports.hold(userId, need.subjectId, new Date(ports.now() + LESSON_HOLD_MS));
+      summary.held.push(need.subjectId);
+    } catch (error) {
+      summary.failed.push(`${need.subjectName}: holding it failed: ${error instanceof Error ? error.message : error}`);
+    }
+  };
+
   let choice = await ports.choose(userId, wanted);
+
+  const toAdd = choice.needs.filter((need) => need.because !== 'no-chain').slice(0, MAX_UNITS_ADDED_PER_RUN);
+  if (toAdd.length > 0 && deadline - ports.now() >= LAYOUT_RESERVE_MS) {
+    const results = await Promise.all(toAdd.map((need) => ports.addUnit(userId, need.subjectId, need.unitId)));
+    for (const [index, result] of results.entries()) {
+      const need = toAdd[index]!;
+      if (result.outcome === 'added') summary.added.push(need.subjectId);
+      else if (result.outcome === 'failed') {
+        summary.failed.push(`${need.subjectName}: ${result.detail}`);
+        await hold(need);
+      }
+    }
+    if (summary.added.length > 0) choice = await ports.choose(userId, wanted);
+  }
 
   const toLayOut = choice.needs.filter((need) => need.because === 'no-chain').slice(0, MAX_LAYOUTS_PER_RUN);
   if (toLayOut.length > 0 && deadline - ports.now() >= LAYOUT_RESERVE_MS) {
@@ -108,12 +143,7 @@ export async function writeLessonsFor(
         continue;
       }
       if (result.outcome === 'failed') summary.failed.push(`${need.subjectName}: ${result.detail}`);
-      try {
-        await ports.hold(userId, need.subjectId, new Date(ports.now() + LESSON_HOLD_MS));
-        summary.held.push(need.subjectId);
-      } catch (error) {
-        summary.failed.push(`${need.subjectName}: holding it failed: ${error instanceof Error ? error.message : error}`);
-      }
+      await hold(need);
     }
     if (summary.laidOut.length > 0) choice = await ports.choose(userId, wanted);
   }

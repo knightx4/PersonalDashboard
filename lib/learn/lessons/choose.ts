@@ -80,13 +80,25 @@ export type LessonPick = {
  *   the first unit is written. A track made before curricula existed can be
  *   in this state while its graph still holds concepts: they are not taught
  *   until a unit covers them, since a lesson always belongs to a unit.
+ * - `last-unit-short`: the track is on its last unit and fewer than
+ *   `SHORT_UNIT_LEFT` of that unit's concepts are left to learn. The track
+ *   still teaches what is left; `unitId` is the last unit, and the next unit
+ *   is written after it so it is ready when this one is done.
+ *
+ * Every kind but `no-chain` is met by writing a unit (plan #969,
+ * LEARN-LESSONS-SPEC "Units are written as you go"); `unitId` is then the
+ * track's last unit when the need was read, so a writer can tell that another
+ * run already added one.
  */
 export type TrackNeed = {
   subjectId: string;
   subjectName: string;
-  because: 'no-chain' | 'all-units-done' | 'no-curriculum';
+  because: 'no-chain' | 'all-units-done' | 'no-curriculum' | 'last-unit-short';
   unitId: string | null;
 };
+
+/** A last unit with fewer concepts left than this gets the next unit written after it. */
+export const SHORT_UNIT_LEFT = 3;
 
 export type LessonChoice = {
   /** At most `slots`, in the order the slots were filled. */
@@ -102,10 +114,14 @@ export type LessonChoice = {
   waiting: string[];
 };
 
+/**
+ * A track that can teach, or is waiting, may still carry a need: its last
+ * unit is running short, and the next unit is written while it is taught.
+ */
 type TrackPlan =
-  | { kind: 'teach'; candidates: LessonPick[] }
+  | { kind: 'teach'; candidates: LessonPick[]; need?: TrackNeed }
   | { kind: 'need'; need: TrackNeed }
-  | { kind: 'waiting' };
+  | { kind: 'waiting'; need?: TrackNeed };
 
 /** What one track can teach next, before any slot is given out. */
 export function planTrack(track: LessonTrack, carded: ReadonlySet<string>): TrackPlan {
@@ -121,6 +137,12 @@ export function planTrack(track: LessonTrack, carded: ReadonlySet<string>): Trac
   if (!current) return need('all-units-done', track.units[track.units.length - 1].id);
   if (current.state === 'not-opened') return need('no-chain', current.unit.id);
 
+  const last = track.units[track.units.length - 1];
+  const short =
+    current.unit.id === last.id && current.left < SHORT_UNIT_LEFT
+      ? { need: { subjectId: track.subjectId, subjectName: track.name, because: 'last-unit-short' as const, unitId: last.id } }
+      : {};
+
   const goalConceptIds = current.goals.map((goal) => goal.conceptId!);
   const onPath = new Set(goalConceptIds.flatMap((id) => pruneForGoal(track.graph, id)));
   const ready = readyInSubject(
@@ -129,9 +151,10 @@ export function planTrack(track: LessonTrack, carded: ReadonlySet<string>): Trac
     goalConceptIds,
   ).filter((row) => onPath.has(row.concept.id) && !carded.has(row.concept.id));
 
-  if (ready.length === 0) return { kind: 'waiting' };
+  if (ready.length === 0) return { kind: 'waiting', ...short };
   return {
     kind: 'teach',
+    ...short,
     candidates: rankReady(ready, ready.length).map((row) => ({
       subjectId: track.subjectId,
       subjectName: track.name,
@@ -163,9 +186,9 @@ export function chooseLessons(input: ChooseLessonsInput): LessonChoice {
       continue;
     }
     const plan = planTrack(track, input.carded);
-    if (plan.kind === 'need') needs.push(plan.need);
-    else if (plan.kind === 'waiting') waiting.push(track.subjectId);
-    else queues.set(track.subjectId, plan.candidates);
+    if (plan.need) needs.push(plan.need);
+    if (plan.kind === 'waiting') waiting.push(track.subjectId);
+    else if (plan.kind === 'teach') queues.set(track.subjectId, plan.candidates);
   }
 
   const shares: TrackShare[] = [...queues.keys()].map((subjectId) => ({

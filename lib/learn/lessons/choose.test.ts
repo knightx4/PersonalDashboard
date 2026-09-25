@@ -166,6 +166,32 @@ describe('planTrack', () => {
     });
   });
 
+  it('asks for the next unit while the last one has fewer than three concepts left, and still teaches', () => {
+    // a > b > top with a known: b and top are left in the last unit.
+    const plan = planTrack(chainTrack('s', { 's-a': 'known' }), new Set());
+    expect(plan).toMatchObject({
+      kind: 'teach',
+      need: { subjectId: 's', subjectName: 'S', because: 'last-unit-short', unitId: 's-u1' },
+    });
+    expect(plan.kind === 'teach' && plan.candidates.map((pick) => pick.concept.id)).toEqual(['s-b']);
+  });
+
+  it('asks for the next unit from a short last unit whose ready concepts are all on cards', () => {
+    expect(planTrack(chainTrack('s', { 's-a': 'known' }), new Set(['s-b']))).toEqual({
+      kind: 'waiting',
+      need: { subjectId: 's', subjectName: 'S', because: 'last-unit-short', unitId: 's-u1' },
+    });
+  });
+
+  it('does not ask while three concepts are left, or while a later unit is still to come', () => {
+    expect(planTrack(chainTrack('s'), new Set())).not.toHaveProperty('need');
+    const track: LessonTrack = {
+      ...chainTrack('s', { 's-a': 'known' }),
+      units: [{ id: 's-u1' }, { id: 's-u2' }],
+    };
+    expect(planTrack(track, new Set())).not.toHaveProperty('need');
+  });
+
   it('asks for a first unit when the track has no curriculum', () => {
     const track: LessonTrack = {
       subjectId: 's',
@@ -244,9 +270,9 @@ describe('chooseLessons', () => {
       graph: graphOf({}),
     };
     const choice = chooseLessons({
-      tracks: [chainTrack('a'), noChain, wideTrack('full', 1)],
+      tracks: [chainTrack('a'), noChain, wideTrack('full', 2)],
       weights: new Map(),
-      carded: new Set(['full-0']),
+      carded: new Set(['full-0', 'full-1']),
       slots: 2,
     });
     expect(choice.picks.map((pick) => pick.concept.id)).toEqual(['a-a']);

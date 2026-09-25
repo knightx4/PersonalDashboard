@@ -198,6 +198,7 @@ async function topUpWith(
         written: 0,
         dropped: [],
         failed: [error instanceof Error ? error.message : 'Writing lessons failed.'],
+        added: [],
         laidOut: [],
         held: [],
         stopped: null,

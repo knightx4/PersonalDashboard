@@ -22,8 +22,9 @@ import type { LearnOperation } from '@/lib/learn/spend';
  * theirs before anything is written into it. It writes with `saveChainInto`,
  * which takes the track's id and does no lookup by name and no placement.
  *
- * A track with every unit opened is left alone. Adding units as you go is a
- * later step (plan #969).
+ * A track with every unit opened is left alone here; its next unit is written
+ * by `addNextUnit` (lib/learn/lessons/add-unit.ts, plan #969) and laid out on
+ * a later call.
  */
 
 const OPERATION: LearnOperation = 'lay-out-lesson-unit';

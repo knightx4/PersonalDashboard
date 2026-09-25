@@ -207,7 +207,8 @@ units are laid out in one run, side by side, and only with at least ninety
 seconds left before the deadline. When laying one out fails, or finds no unit
 to open, the track's `lessons_held_until` is set a day ahead and the top-up
 does not try again before then; its ready concepts are still taught. A track
-with every unit done, or with no curriculum, is left alone until step 3.
+with every unit done, or with no curriculum, gets its next unit written first
+(see "Step 3 as built").
 
 **Writing a lesson.** For each concept the top-up searches the catalogue for
 the closest section (`findLessonSource`), writes the lesson (`writeLesson`,
@@ -243,6 +244,29 @@ so lessons do not use up a theme's, field's or goal's turn and do not set how
 deep the next pick goes. It does not yet steer clear of subjects a track
 already covers.
 
+## Step 3 as built
+
+Plan #969, on 25 September 2026. A new track's curriculum call
+(`writeCurriculum` in `lib/learn/graph/curriculum.ts`) asks for the first three
+or four units, and the reader keeps at most four and refuses fewer than three.
+Units a person writes for a custom track are all kept, up to twelve, as before.
+
+The chooser (`planTrack` in `lib/learn/lessons/choose.ts`) names three needs
+that a unit meets: every unit done, no curriculum, and `last-unit-short`, which
+is a track on its last unit with fewer than three of that unit's concepts left
+to learn. That track still teaches what is left. For each, up to two a run, the
+top-up calls `addNextUnit` (`lib/learn/lessons/add-unit.ts`) before it lays out
+any chain. It writes one unit with `writeNextUnit`, given the units so far, the
+concepts known or sharp, the concepts left shaky, and the lessons from the
+track rated too hard, and appends it at the next ordinal. The need carries the
+track's last unit when it was read, so a unit another run added meanwhile is
+not added twice. A call that fails holds the track for a day, as a failed
+layout does. The spend is recorded as `write-next-unit`.
+
+A unit written for a track with every unit done has no chain yet, so the
+chooser then asks for it to be laid out, which can happen in the same run. A
+unit written ahead of a short last unit waits until that unit is done.
+
 ## Build order
 
 Each step ships on its own.
@@ -255,8 +279,8 @@ Each step ships on its own.
    the track and its curriculum, and Not now and Never go through Practice
    Flow's own action. "Make this a track" on a section card makes the article a
    track with a curriculum, and the top-up lays out its first unit.
-3. **Units written as you go.** New tracks start with three or four units, and
-   a unit is added when a track runs short.
+3. **Units written as you go.** Built (plan #969). New tracks start with three
+   or four units, and a unit is added when a track runs short.
 4. **Too hard adds a prerequisite.**
 5. **The unit check.**
 6. **Goals as tracks.** A goal on the Goals page gets a track.

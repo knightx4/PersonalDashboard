@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_UNITS, parseOwnUnits, readCurriculum, unitGoal } from './curriculum-payload';
+import {
+  FIRST_UNITS_MAX,
+  parseOwnUnits,
+  readCurriculum,
+  readNextUnit,
+  unitGoal,
+} from './curriculum-payload';
 import { curriculumRows, type UnitGoal } from './curriculum-view';
 import type { Concept, Graph, KnowledgeState } from './model';
 
@@ -16,14 +22,25 @@ function unit(n: number) {
   };
 }
 
+describe('reading the next unit', () => {
+  it('cleans the unit it was sent', () => {
+    expect(
+      readNextUnit({ title: '  Tax  incidence ', covers: 'Who pays.', outcome: 'Say who bears a tax.' }, ['Supply']),
+    ).toEqual({ ok: true, unit: { title: 'Tax incidence', covers: 'Who pays.', outcome: 'Say who bears a tax.' } });
+  });
+
+  it('refuses a unit with a part missing, one the track already has, or a malformed one', () => {
+    expect(readNextUnit({ ...unit(5), outcome: ' ' }, [])).toMatchObject({ ok: false });
+    expect(readNextUnit(unit(2), ['Unit 1', 'unit 2'])).toMatchObject({ ok: false });
+    expect(readNextUnit({ units: [unit(5)] }, [])).toMatchObject({ ok: false });
+  });
+});
+
 describe('reading the curriculum', () => {
   it('keeps the units in order and maps the goal unit onto them', () => {
-    const result = readCurriculum({ units: [1, 2, 3, 4, 5, 6, 7].map(unit), goal_unit: 3 });
+    const result = readCurriculum({ units: [1, 2, 3, 4].map(unit), goal_unit: 3 });
     expect(result).toMatchObject({ ok: true, goalUnit: 2 });
-    if (result.ok)
-      expect(result.units.map((u) => u.title)).toEqual(
-        [1, 2, 3, 4, 5, 6, 7].map((n) => `Unit ${n}`),
-      );
+    if (result.ok) expect(result.units.map((u) => u.title)).toEqual([1, 2, 3, 4].map((n) => `Unit ${n}`));
   });
 
   it('leaves out incomplete and repeated units, and moves the goal unit with them', () => {
@@ -32,26 +49,28 @@ describe('reading the curriculum', () => {
       { ...unit(2), covers: ' ' },
       unit(3),
       { ...unit(3) },
-      ...[4, 5, 6, 7].map(unit),
+      unit(4),
     ];
     const result = readCurriculum({ units, goal_unit: 5 });
     // Unit 2 and the repeat of unit 3 are gone; the model's fifth is Unit 4, now third.
     expect(result).toMatchObject({ ok: true, goalUnit: 2 });
-    if (result.ok) expect(result.units).toHaveLength(6);
+    if (result.ok) expect(result.units).toHaveLength(3);
   });
 
   it('drops the goal unit when it pointed at a unit that was left out', () => {
-    const units = [unit(1), { ...unit(2), title: '' }, ...[3, 4, 5, 6, 7].map(unit)];
+    const units = [unit(1), { ...unit(2), title: '' }, ...[3, 4].map(unit)];
     expect(readCurriculum({ units, goal_unit: 2 })).toMatchObject({ ok: true, goalUnit: null });
   });
 
-  it('cuts a curriculum past the most units, and refuses one too short to be a course', () => {
+  it('keeps the first three or four units and refuses fewer', () => {
     const long = readCurriculum({
-      units: Array.from({ length: 20 }, (_, i) => unit(i + 1)),
-      goal_unit: null,
+      units: Array.from({ length: 12 }, (_, i) => unit(i + 1)),
+      goal_unit: 9,
     });
-    if (long.ok) expect(long.units).toHaveLength(MAX_UNITS);
-    expect(readCurriculum({ units: [1, 2, 3].map(unit), goal_unit: 1 })).toMatchObject({
+    expect(long).toMatchObject({ ok: true, goalUnit: null });
+    if (long.ok) expect(long.units).toHaveLength(FIRST_UNITS_MAX);
+    expect(readCurriculum({ units: [1, 2, 3].map(unit), goal_unit: 1 })).toMatchObject({ ok: true });
+    expect(readCurriculum({ units: [1, 2].map(unit), goal_unit: 1 })).toMatchObject({
       ok: false,
     });
     expect(readCurriculum({ units: 'many' })).toMatchObject({ ok: false });

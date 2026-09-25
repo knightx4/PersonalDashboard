@@ -5,7 +5,13 @@ import { z } from 'zod';
  * curriculum"). Pure, so the rules are tested without a model.
  */
 
-export const MIN_UNITS = 6;
+/**
+ * A new track's first units (LEARN-LESSONS-SPEC, "Units are written as you
+ * go"). The rest are written one at a time as these are finished.
+ */
+export const FIRST_UNITS_MIN = 3;
+export const FIRST_UNITS_MAX = 4;
+/** Units a person may write for a track of their own, which are kept whole. */
 export const MAX_UNITS = 12;
 
 const MAX_TITLE = 80;
@@ -32,10 +38,10 @@ function clean(value: string): string {
 }
 
 /**
- * The units, cleaned. A unit missing any of its three parts, or repeating a
- * title already used, is left out; past MAX_UNITS the rest are cut. Fewer than
- * MIN_UNITS left is a failure, since a curriculum that short is a chain, and
- * the track is better left to ask again than fixed in that shape.
+ * The first units, cleaned. A unit missing any of its three parts, or
+ * repeating a title already used, is left out; past FIRST_UNITS_MAX the rest
+ * are cut. Fewer than FIRST_UNITS_MIN left is a failure, and the track is
+ * better left to ask again than started on one or two units.
  *
  * `goal_unit` counts from 1 over what the model sent. It is mapped to the unit
  * kept at that place, and dropped when that unit was left out.
@@ -73,17 +79,42 @@ export function readCurriculum(input: unknown, fixed?: readonly string[]): Curri
     const covers = clean(raw.covers);
     const outcome = clean(raw.outcome);
     const key = title.toLowerCase();
-    if (!title || !covers || !outcome || seen.has(key) || units.length === MAX_UNITS) return;
+    if (!title || !covers || !outcome || seen.has(key) || units.length === FIRST_UNITS_MAX) return;
     if (title.length > MAX_TITLE || covers.length > MAX_TEXT || outcome.length > MAX_TEXT) return;
     seen.add(key);
     if (parsed.data.goal_unit === index + 1) goalUnit = units.length;
     units.push({ title, covers, outcome });
   });
 
-  if (units.length < MIN_UNITS) {
+  if (units.length < FIRST_UNITS_MIN) {
     return { ok: false, detail: `The curriculum came back with ${units.length} usable units.` };
   }
   return { ok: true, units, goalUnit };
+}
+
+export type NextUnitResult = { ok: true; unit: CurriculumUnit } | { ok: false; detail: string };
+
+const nextUnitSchema = z.object({ title: z.string(), covers: z.string(), outcome: z.string() });
+
+/**
+ * The one unit written after a track's last (LEARN-LESSONS-SPEC, "Units are
+ * written as you go"), cleaned by the same rules as the first units. A title
+ * the track already has is refused, since the unit would repeat one.
+ */
+export function readNextUnit(input: unknown, existingTitles: readonly string[]): NextUnitResult {
+  const parsed = nextUnitSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, detail: 'The unit did not match its schema.' };
+  const title = clean(parsed.data.title);
+  const covers = clean(parsed.data.covers);
+  const outcome = clean(parsed.data.outcome);
+  if (!title || !covers || !outcome) return { ok: false, detail: 'The unit came back with a part missing.' };
+  if (title.length > MAX_TITLE || covers.length > MAX_TEXT || outcome.length > MAX_TEXT) {
+    return { ok: false, detail: 'The unit came back too long.' };
+  }
+  if (existingTitles.some((existing) => existing.trim().toLowerCase() === title.toLowerCase())) {
+    return { ok: false, detail: `The unit repeats "${title}", which the track already has.` };
+  }
+  return { ok: true, unit: { title, covers, outcome } };
 }
 
 /**

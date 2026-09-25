@@ -75,12 +75,15 @@ Decided by the owner on 23 September 2026. A track used to be only the chains
 its goals laid out, so its shape was whatever had been asked about so far. A
 track you create now starts with a fixed curriculum.
 
-- **Written once.** When the first chain is approved into a new track, one
-  Sonnet call lays out 6 to 12 units in teaching order. Each has a title, one
-  or two sentences on what it covers, and one sentence on what you can do
-  once it is learned. The same call names the unit your first question falls
-  in, and that goal is filed under it.
-- **Fixed after that.** Nothing regenerates, reorders or edits the units. The
+- **Written as you go.** When the first chain is approved into a new track, one
+  Sonnet call lays out the first three or four units in teaching order. Each
+  has a title, one or two sentences on what it covers, and one sentence on
+  what you can do once it is learned. The same call names the unit your first
+  question falls in, and that goal is filed under it; a question past those
+  units is filed under none. Later units are written one at a time as you
+  finish these (LEARN-LESSONS-SPEC, "Units are written as you go"; plan #969).
+  Tracks made before that keep the six to twelve units they were given.
+- **Fixed once written.** Nothing regenerates, reorders or edits a unit. The
   table takes inserts and reads only, and the units go when the track is
   deleted.
 - **Detail comes per unit.** Opening a unit runs the ordinary goal form with
