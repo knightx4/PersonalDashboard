@@ -211,7 +211,7 @@ with every unit done, or with no curriculum, is left alone until step 3.
 
 **Writing a lesson.** For each concept the top-up searches the catalogue for
 the closest section (`findLessonSource`), writes the lesson (`writeLesson`,
-plan #976), and records the spend under `embed-claim` and `write-lesson`. The
+plan #976), and records the spend under `embed-lesson-claim` and `write-lesson`. The
 lessons are written four at a time. Each is stored as a row in
 `learn.feed_cards` with reason `lesson`: the track in `subject_id` and
 `track_name`, the unit in `unit_id` and `unit_title`, the concept in

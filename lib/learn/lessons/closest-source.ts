@@ -91,7 +91,7 @@ export function closestFrom(
  * failure and when nothing is close enough.
  *
  * The embedding spend goes to `onSpend`, for the caller to record under
- * 'embed-claim' with the rest of the lesson's spend.
+ * 'embed-lesson-claim' with the rest of the lesson's spend.
  */
 export async function findLessonSource(
   supabase: LearnSupabaseClient,

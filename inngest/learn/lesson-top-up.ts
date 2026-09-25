@@ -18,7 +18,7 @@ import type { LearnOperation } from '@/lib/learn/spend';
  */
 
 const WRITE_OPERATION: LearnOperation = 'write-lesson';
-const EMBED_OPERATION: LearnOperation = 'embed-claim';
+const EMBED_OPERATION: LearnOperation = 'embed-lesson-claim';
 
 /** Postgres's unique violation: another run stored a lesson for this concept first. */
 const UNIQUE_VIOLATION = '23505';
