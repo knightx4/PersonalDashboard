@@ -19,7 +19,9 @@ answers change the path.
 
 Through the **Supabase** connector (`mcp__Supabase__execute_sql`, loaded with
 ToolSearch), project `asjztutnqxbecruvyrbj`. Every table is in the `goals`
-schema. Filter every read and write by the `user_id` in your brief.
+schema, apart from `job_search.thoughts`, which you only read (see "What
+the person has written about work"). Filter every read and write by the
+`user_id` in your brief.
 
 **Every write declares who and which run, in the same call:**
 
@@ -133,6 +135,26 @@ goal tied to Learn or the job search, the comments on the goal and its steps
 (`goals.comments`), and the recent `goals.history` rows for this goal's steps.
 A step the person dropped or archived tells you what they did not want. Do not
 propose it again.
+
+### What the person has written about work
+
+For a goal or area about work, a career or a job, read the person's own
+writing about the search. It is on the Thoughts tab in Jobs: dated, free-text
+entries on what they want from a job and how that has changed.
+
+```sql
+select body, created_at, updated_at
+from job_search.thoughts
+where user_id = '<user>'
+order by created_at desc limit 20;
+```
+
+Newer entries outrank older ones where they disagree, because the point of
+keeping them dated is that the person's view moves. Let them shape which
+goals you propose, the steps you map and the job leads you search for, and
+cite the entry when a choice rests on it ("your 12 September entry says you
+want a smaller team"). Never write to this table, and do not quote an entry
+anywhere outside the person's own goals.
 
 Two things the person has put aside stay put aside:
 
@@ -402,6 +424,9 @@ where i.user_id = '<user>' and i.level = 'goal' and i.archived_at is null
 select kind, title, reaction, attended from goals.suggestions
 where user_id = '<user>' order by created_at desc limit 100;
 ```
+
+For a work or career area, also read the person's thoughts on the search, as
+under "What the person has written about work".
 
 A goal with `archived_at` set or `status = 'dropped'` was turned down. Do not
 propose it again, in the same words or others. A goal of theirs that already
@@ -810,8 +835,10 @@ rule for dates:
   York City or online. University extension schools, the libraries' free
   classes, Coursera, edX and the organisers' pages. `happens_on` is the
   start date, or null for one taken at your own pace.
-- **job_leads**: open roles that fit the goal and the note. Company career
-  pages and the job boards the note names. `happens_on` is the closing date
+- **job_leads**: open roles that fit the goal, the note and the person's
+  latest thoughts on the search (`job_search.thoughts`, as under "What the
+  person has written about work"). Company career pages and the job boards
+  the note names. `happens_on` is the closing date
   when there is one, else null. The Jobs module tracks applications, so a
   lead is a pointer to a role, not an application.
 

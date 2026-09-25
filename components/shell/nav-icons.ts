@@ -25,6 +25,7 @@ import {
   Mail,
   Map,
   Network,
+  NotebookPen,
   PencilLine,
   MessageCircleQuestion,
   MessageSquareText,
@@ -72,6 +73,9 @@ export const NAV_ICONS = {
   contacts: Users,
   interviews: CalendarClock,
   answers: MessageSquareText,
+  // Your own writing about the search, kept like a notebook. Not PencilLine,
+  // which is Learn's quiz.
+  thoughts: NotebookPen,
   analytics: BarChart3,
   activity: Activity,
   // Dev

@@ -332,7 +332,9 @@ for one number a month, the new balances. There is no bank connection.
 
 **Get a job** (Career). Sits over the Jobs module. Claude finds roles and
 drafts applications as `claude` steps; you apply and interview. Progress is
-counted from Jobs.
+counted from Jobs. What you write on the Thoughts tab in Jobs, about what you
+want from a job and how that has changed, is read when the goal is planned,
+mapped and reviewed, and when job leads are researched for it.
 
 **Get plugged into city life in NYC** (The city). A rhythm of one event a week,
 fed by the weekly research. Reading and courses go to Learn as linked aims.
