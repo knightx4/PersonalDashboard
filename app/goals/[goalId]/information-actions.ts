@@ -68,7 +68,12 @@ async function settle(client: GoalsSupabaseClient, stepId: string): Promise<bool
   return setStepStatus(client, stepId, 'done');
 }
 
-/** Add a row, or save a correction to one. Saving a draft you corrected confirms it. */
+/**
+ * Add a row, or save a correction to one. Saving a draft through the whole
+ * form confirms it. A single value changed where it is read sends `keepDraft`,
+ * so a draft stays a draft until its Confirm is pressed: one value checked is
+ * not the row checked.
+ */
 // latency: pending
 export async function saveRecordAction(
   _prev: InformationActionState,
@@ -80,6 +85,7 @@ export async function saveRecordAction(
   const rawRecord = form.get('recordId');
   const recordId = rawRecord ? Id.safeParse(rawRecord) : null;
   if (recordId && !recordId.success) return { error: 'Could not tell which row that was.' };
+  const keepDraft = form.get('keepDraft') === 'true';
 
   try {
     const client = await createGoalsClient();
@@ -91,7 +97,7 @@ export async function saveRecordAction(
 
     if (recordId) {
       const result = await updateRecord(client, recordId.data, values, undefined, {
-        confirm: true,
+        confirm: !keepDraft,
       });
       if (!result.ok) return { error: result.error, field: result.field };
     } else {
