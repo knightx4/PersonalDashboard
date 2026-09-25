@@ -144,6 +144,7 @@ const FIELD_WORDS: Record<string, string> = {
   rhythm_period: 'the rhythm',
   on_todo: 'Todo',
   help_kinds: 'the weekly help',
+  proposed_help_kinds: 'the proposed weekly help',
   approved_at: 'the approval',
   kind: 'the kind',
   unit: 'the unit',

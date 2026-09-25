@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { parseHelpKindFields } from '@/lib/goals/help-kinds';
-import { setGoalHelpKinds } from '@/lib/goals/help-kinds-store';
+import { setGoalHelpKinds, turnDownHelpProposal } from '@/lib/goals/help-kinds-store';
 
 /**
  * Save the kinds of weekly help a goal asks for (plan #1027): the ticked
@@ -34,6 +34,25 @@ export async function setHelpKindsAction(
     if (!changed) return { error: 'That goal is no longer on the page.' };
   } catch {
     return { error: 'The kinds of help could not be saved. Try again.' };
+  }
+  revalidatePath('/goals', 'layout');
+  return { done: Date.now() };
+}
+
+/** Turn down the kinds of help Claude proposed for a goal (plan #1029). */
+// latency: pending
+export async function turnDownHelpAction(
+  _prev: HelpKindsActionState,
+  form: FormData,
+): Promise<HelpKindsActionState> {
+  await requireUser();
+  const goalId = Id.safeParse(form.get('goalId'));
+  if (!goalId.success) return { error: 'Could not tell which goal that was.' };
+  try {
+    const changed = await turnDownHelpProposal(await createGoalsClient(), goalId.data);
+    if (!changed) return { error: 'That proposal is no longer waiting.' };
+  } catch {
+    return { error: 'The proposal could not be turned down. Try again.' };
   }
   revalidatePath('/goals', 'layout');
   return { done: Date.now() };

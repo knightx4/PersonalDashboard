@@ -688,7 +688,11 @@ A sketch for the migration, not the migration itself.
   `position`, and `rhythm_count` with `rhythm_period` for rhythms. A goal's
   `help_kinds` lists the weekly help it asks for, each an entry of `kind`
   (events, volunteering, reading, courses or job_leads) and a `note` on what
-  to look for (plan #1027).
+  to look for (plan #1027). When Claude maps a goal it proposes kinds in
+  `proposed_help_kinds`, the same shape, for the person to approve, change or
+  turn down on the goal page; `help_kinds_settled_at` records when the person
+  last saved the goal's help, and Claude proposes only while it is null (plan
+  #1029).
 - `goals.item_goals`: extra goals a step counts towards, beyond its own
   parent.
 - `goals.links`: a goal or step to a Learn aim, a job application, a role.

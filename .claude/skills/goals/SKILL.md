@@ -1,6 +1,6 @@
 ---
 name: goals
-description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, provisional steps for what hangs on a question, and questions with lettered options. Re-shaping - read the answers to those questions and settle the provisional steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - give each open goal a verdict (on track, stalled or waiting on you) with the next move, proposing that move as a step for a stalled goal, then research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
+description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, provisional steps for what hangs on a question, and questions with lettered options, and the kinds of weekly help that fit the goal as a proposal on its page. Re-shaping - read the answers to those questions and settle the provisional steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - give each open goal a verdict (on track, stalled or waiting on you) with the next move, proposing that move as a step for a stalled goal, then research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
 ---
 
 # Working a goal
@@ -591,6 +591,45 @@ where it belongs on the path, not under the question.
 This replaces leaving such steps out. Use the goal's `fog` only for what you
 cannot write even provisionally, in one or two plain sentences, and clear the
 fog once the map covers it.
+
+### Weekly help
+
+Each goal can ask the weekly run for help of up to five kinds: `events`,
+`volunteering` (volunteer openings), `reading`, `courses` and `job_leads`,
+each with a note on what to look for ("Brooklyn, weeknights"). The person's
+choice is `help_kinds`; yours is a proposal in `proposed_help_kinds`, which
+the goal page shows under Weekly help with Approve, Change and Turn down.
+
+Propose on every mapping run where the goal's `help_kinds_settled_at` is null
+and `proposed_help_kinds` is empty. Once it is set, the person has saved the
+goal's help (approved, changed, turned down or chosen their own), so propose
+nothing, even when you would have chosen differently.
+
+1. **Pick the kinds the goal would use.** Only those the weekly run could
+   find something for that moves the goal forward: events and volunteer
+   openings for a goal about a scene or a community, reading and courses for
+   a goal about learning something, job leads for a job search. A goal that
+   no kind helps, such as paying off a loan, gets no proposal; leave it
+   empty.
+2. **Write a note for each** that narrows the search the way the goal and its
+   context do: the neighbourhood, the evenings they are free, the topic, the
+   kind of role. Under 200 characters. Leave it null only when the goal says
+   nothing that narrows it.
+3. **Write the proposal on the goal row**, in the order HELP_KINDS lists them
+   (`lib/goals/help-kinds.ts`):
+
+   ```sql
+   set local goals.actor = 'claude';
+   set local goals.run_id = '<the run id>';
+   update goals.items
+   set proposed_help_kinds = '[{"kind": "events", "note": "Urbanism talks and meetups, Brooklyn, weeknights"},
+                               {"kind": "volunteering", "note": "Street safety and transit advocacy"}]'
+   where id = '<goal id>' and user_id = '<user>';
+   ```
+
+Never write `help_kinds` or `help_kinds_settled_at`. A guard refuses a write
+of yours to either, and refuses a proposal on a goal whose help is settled.
+Say in the run's summary which kinds you proposed and why.
 
 ### A goal that is several goals
 

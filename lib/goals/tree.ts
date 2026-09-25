@@ -47,6 +47,8 @@ export type Goal = {
   dueOn?: string | null;
   /** The kinds of weekly help it asks for (plan #1027). Read on the goal page only. */
   helpKinds?: HelpKindChoice[];
+  /** The kinds Claude proposed when it mapped the goal, waiting for you (plan #1029). Goal page only. */
+  proposedHelpKinds?: HelpKindChoice[];
 };
 
 export type AreaWithGoals = Area & { goals: Goal[] };
