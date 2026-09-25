@@ -148,8 +148,16 @@ export const LEARN_OPERATIONS = [
   'write-survey-question',
   // Writing the lesson for one concept in a track (LEARN-LESSONS-SPEC, "A
   // lesson"; plan #976). One Sonnet call per lesson, dropped or not. The claim
-  // embedded to find its closest catalogue section goes under 'embed-claim'.
+  // embedded to find its closest catalogue section goes under 'embed-lesson-claim'.
   'write-lesson',
+  // Embedding a concept's claim to find the catalogue section a Learn now
+  // lesson is checked against (plan #976). Kept apart from 'embed-claim',
+  // which a press records, because the background top-up records this one.
+  'embed-lesson-claim',
+  // Writing the chain for a track's next unit so its lessons keep coming
+  // (plan #977). The same call as 'generate-chain', recorded from the
+  // background top-up rather than a press.
+  'lay-out-lesson-unit',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

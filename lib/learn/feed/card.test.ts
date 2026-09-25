@@ -133,6 +133,67 @@ describe('turning a row into a card', () => {
   });
 });
 
+describe('a lesson', () => {
+  const lesson = (overrides: Partial<FeedCardRow> = {}) =>
+    row({
+      reason: 'lesson',
+      idea_name: 'Price ceilings cause shortages',
+      track_name: 'Economics',
+      unit_title: 'Markets and prices',
+      subject_id: 'track-1',
+      why: 'Next in your Economics track.',
+      item: null,
+      segment: null,
+      ...overrides,
+    });
+
+  it('is titled by its concept, with the track and unit under it', () => {
+    const card = toFeedCard(lesson())!;
+    expect(card.kind).toBe('lesson');
+    expect(card.title).toBe('Price ceilings cause shortages');
+    expect(card.source).toBe('Economics · Markets and prices');
+    expect(card.track).toEqual({ id: 'track-1', name: 'Economics' });
+  });
+
+  it('has no link and nothing to fold when it cites no section', () => {
+    const card = toFeedCard(lesson())!;
+    expect(card.link).toBeNull();
+    expect(card.site).toBeNull();
+    expect(card.shown).toEqual([]);
+    expect(card.article).toBe('');
+  });
+
+  it('links and folds the section it cites', () => {
+    const card = toFeedCard(
+      lesson({
+        source_item: { title: 'Price ceiling', canonical_url: 'https://en.wikipedia.org/wiki/Price_ceiling', licence: null },
+        source_segment: { heading: 'Rent control', text: 'Short text.', section_anchor: 'Rent_control' },
+      }),
+    )!;
+    expect(card.link).toBe('https://en.wikipedia.org/wiki/Price_ceiling#Rent_control');
+    expect(card.site).toBe('Wikipedia');
+    expect(card.article).toBe('Price ceiling');
+    expect(card.shown).toEqual(['Short text.']);
+    // The line under the title still names the track, not the article.
+    expect(card.source).toBe('Economics · Markets and prices');
+  });
+
+  it('names the track alone when the unit is not known', () => {
+    expect(toFeedCard(lesson({ unit_title: null }))!.source).toBe('Economics');
+  });
+
+  it('shows nothing without its concept name or track', () => {
+    expect(toFeedCard(lesson({ idea_name: null }))).toBeNull();
+    expect(toFeedCard(lesson({ track_name: ' ' }))).toBeNull();
+  });
+
+  it('leaves a section card marked as one', () => {
+    const card = toFeedCard(row())!;
+    expect(card.kind).toBe('section');
+    expect(card.track).toBeNull();
+  });
+});
+
 describe('what each action may move', () => {
   it('opens only a card nobody has decided on', () => {
     expect(ACTION_FROM.opened).toEqual(['ready']);

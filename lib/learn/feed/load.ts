@@ -22,8 +22,11 @@ import { ARTICLE_GAP, POOL_FACTOR, spreadDeck, type Spreadable } from './spread'
 
 const CARD_SELECT =
   'id, reason, status, idea_name, theme_name, aim_name, field_id, summary, why, takeaway, context, hook, example, check_question, check_answer, depth, difficulty, ' +
+  'track_name, unit_title, subject_id, ' +
   'item:catalogue_items!feed_cards_item_id_fkey(title, canonical_url, licence), ' +
-  'segment:catalogue_segments!feed_cards_segment_id_fkey(heading, text, section_anchor)';
+  'segment:catalogue_segments!feed_cards_segment_id_fkey(heading, text, section_anchor), ' +
+  'source_item:catalogue_items!feed_cards_source_item_id_fkey(title, canonical_url, licence), ' +
+  'source_segment:catalogue_segments!feed_cards_source_segment_id_fkey(heading, text, section_anchor)';
 
 /** The most card ids a request excludes. Past this, the oldest shown come back. */
 const MAX_EXCLUDED = 300;
@@ -105,7 +108,7 @@ export async function loadFeedPage(
   }
   const dealable = rows.flatMap((row) => {
     const card = toFeedCard(row);
-    return card ? [{ card, article: card.article, target: targetOf(row) }] : [];
+    return card ? [{ card, ...spreadOf(row, card.article) }] : [];
   });
   const recent = await recentInDeck(supabase, exclude.slice(-ARTICLE_GAP));
   return spreadDeck(dealable, recent, limit).map((dealt) => dealt.card);
@@ -116,20 +119,40 @@ function targetOf(row: FeedCardRow): string | null {
   return row.theme_name ?? row.aim_name ?? row.field_id ?? null;
 }
 
+/**
+ * What the deck keeps apart for one card. A lesson counts its track as its
+ * article, so two lessons from one track are spaced as two cards from one
+ * article are, and its track's id as its target.
+ */
+function spreadOf(
+  row: Pick<FeedCardRow, 'reason' | 'track_name' | 'subject_id' | 'theme_name' | 'aim_name' | 'field_id'>,
+  article: string,
+): Spreadable {
+  if (row.reason === 'lesson') {
+    return { article: `track:${row.track_name ?? ''}`, target: row.subject_id ?? row.track_name ?? null };
+  }
+  return { article, target: targetOf(row as FeedCardRow) };
+}
+
 /** The article and target of the cards last dealt, oldest first. */
 async function recentInDeck(supabase: LearnSupabaseClient, ids: string[]): Promise<Spreadable[]> {
   if (ids.length === 0) return [];
   const { data, error } = await supabase
     .from('feed_cards')
-    .select('id, theme_name, aim_name, field_id, item:catalogue_items!feed_cards_item_id_fkey(title)')
+    .select(
+      'id, reason, theme_name, aim_name, field_id, track_name, subject_id, item:catalogue_items!feed_cards_item_id_fkey(title)',
+    )
     .in('id', ids);
   // Only spacing is lost without it, so a failed read deals the page as though fresh.
   if (error) return [];
   const byId = new Map(
-    ((data ?? []) as unknown as (Pick<FeedCardRow, 'theme_name' | 'aim_name' | 'field_id'> & {
+    ((data ?? []) as unknown as (Pick<
+      FeedCardRow,
+      'reason' | 'theme_name' | 'aim_name' | 'field_id' | 'track_name' | 'subject_id'
+    > & {
       id: string;
       item: { title: string } | null;
-    })[]).map((row) => [row.id, { article: row.item?.title ?? '', target: targetOf(row as FeedCardRow) }]),
+    })[]).map((row) => [row.id, spreadOf(row, row.item?.title ?? '')]),
   );
   return ids.flatMap((id) => {
     const found = byId.get(id);
@@ -150,7 +173,11 @@ export async function countReadyCards(supabase: LearnSupabaseClient): Promise<nu
   return count ?? 0;
 }
 
-export type FeedCardDetail = FeedCardRow & { item_id: string; subject_id: string | null };
+export type FeedCardDetail = FeedCardRow & {
+  item_id: string | null;
+  subject_id: string | null;
+  source_item_id: string | null;
+};
 
 /** One card with its catalogue parts, or null when it is not yours or not shown. */
 export async function loadFeedCardRow(
@@ -159,7 +186,7 @@ export async function loadFeedCardRow(
 ): Promise<FeedCardDetail | null> {
   const { data, error } = await supabase
     .from('feed_cards')
-    .select(`${CARD_SELECT}, item_id, subject_id`)
+    .select(`${CARD_SELECT}, item_id, source_item_id`)
     .eq('id', id)
     .maybeSingle();
   assertSchemaExposed(error, LEARN_SCHEMA);

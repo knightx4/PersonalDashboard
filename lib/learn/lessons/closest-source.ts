@@ -45,6 +45,8 @@ export const LESSON_SOURCE_MIN_SIMILARITY = 0.55;
 /** The section a lesson was checked against, with what the lesson shows and cites. */
 export type LessonSource = {
   segmentId: string;
+  /** The catalogue item the segment is in, which the lesson's row points at. */
+  itemId: string;
   itemTitle: string;
   /** The section heading, or null for a lead or a timed segment. */
   heading: string | null;
@@ -57,6 +59,7 @@ export type LessonSource = {
 function toLessonSource(segment: NearbySegment): LessonSource {
   return {
     segmentId: segment.segmentId,
+    itemId: segment.itemId,
     itemTitle: segment.item.title,
     heading: segment.heading,
     url: segment.item.canonicalUrl,
@@ -88,7 +91,7 @@ export function closestFrom(
  * failure and when nothing is close enough.
  *
  * The embedding spend goes to `onSpend`, for the caller to record under
- * 'embed-claim' with the rest of the lesson's spend.
+ * 'embed-lesson-claim' with the rest of the lesson's spend.
  */
 export async function findLessonSource(
   supabase: LearnSupabaseClient,

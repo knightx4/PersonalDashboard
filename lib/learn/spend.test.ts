@@ -85,6 +85,8 @@ describe('the operation names', () => {
       'write-survey-idea',
       'write-survey-question',
       'write-lesson',
+      'embed-lesson-claim',
+      'lay-out-lesson-unit',
     ]);
   });
 });

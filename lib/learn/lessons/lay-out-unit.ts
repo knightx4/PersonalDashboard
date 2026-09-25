@@ -5,7 +5,7 @@ import { recordSpend, type SpendClient } from '@/lib/core/spend/record';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { unitGoal } from '@/lib/learn/graph/curriculum-payload';
 import { generateChain } from '@/lib/learn/graph/generate';
-import { existingConcepts, saveChain } from '@/lib/learn/graph/save';
+import { existingConcepts, saveChainInto } from '@/lib/learn/graph/save';
 import type { LearnOperation } from '@/lib/learn/spend';
 
 /**
@@ -14,20 +14,19 @@ import type { LearnOperation } from '@/lib/learn/spend';
  *
  * The same chain a person gets by opening a unit on the track page: one
  * `generateChain` call asked for the unit's title and outcome, saved with
- * `saveChain` and the unit's id. There is no approval screen, the same as
+ * `saveChainInto` and the unit's id. There is no approval screen, the same as
  * Test me on this (lib/learn/feed/test-me.ts), because nobody is looking.
  *
  * It runs from the background top-up with the service role, which bypasses
  * RLS, so every read here names the person and the track is checked to be
- * theirs before anything is written into it. `saveChain` is handed the track's
- * id rather than its name, because its lookup by name counts on RLS to see
- * only the person's own tracks.
+ * theirs before anything is written into it. It writes with `saveChainInto`,
+ * which takes the track's id and does no lookup by name and no placement.
  *
  * A track with every unit opened is left alone. Adding units as you go is a
  * later step (plan #969).
  */
 
-const OPERATION: LearnOperation = 'generate-chain';
+const OPERATION: LearnOperation = 'lay-out-lesson-unit';
 
 export type UnitToOpen = { id: string; ordinal: number; title: string; outcome: string };
 
@@ -156,10 +155,9 @@ export async function layOutNextUnit(
       return { outcome: 'failed', detail: `The unit "${unit.title}" was opened while its chain was being written.` };
     }
 
-    const saved = await saveChain(learn, userId, { ...result.chain, subject: name }, unitGoal(unit), {
+    const saved = await saveChainInto(learn, userId, subjectId, { ...result.chain, subject: name }, unitGoal(unit), {
       origin: 'generated',
       unitId: unit.id,
-      subjectId,
     });
     return { outcome: 'laid-out', unitId: unit.id, goalId: saved.goalId, conceptIds: saved.conceptIds };
   } catch (error) {

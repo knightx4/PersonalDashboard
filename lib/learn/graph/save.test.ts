@@ -36,15 +36,19 @@ function clientReturningIds(existingSubject: string | null = null, placed = true
   const client = {
     from(table: string) {
       return {
-        select: () => ({
-          ilike: () => ({
+        select: () => {
+          const found = {
             maybeSingle: async () =>
               existingSubject
                 ? { data: { id: existingSubject, placed_at: placed ? '2026-09-01T00:00:00Z' : null }, error: null }
                 : { data: null, error: null },
-          }),
-          eq: () => ({ order: async () => ({ data: [], error: null }) }),
-        }),
+          };
+          return {
+            ilike: () => found,
+            // The track lookup names the person before the name (plan #978).
+            eq: () => ({ order: async () => ({ data: [], error: null }), ilike: () => found }),
+          };
+        },
         upsert: (rows: unknown) => {
           inserts.push({ table, rows });
           return { then: (resolve: (v: { error: null }) => void) => resolve({ error: null }) } as never;
