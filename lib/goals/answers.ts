@@ -35,7 +35,60 @@ export type StepAnswer = {
   workedAt: string;
   /** When a row it read changed after it was worked out; null while it stands. */
   outOfDateAt: string | null;
+  /** The date or amount the answer states, beside its wording (plan #1035). */
+  value: AnswerValue;
+  /**
+   * The answer as it stood when its step last closed, which a change is
+   * measured from (plan #1047); null when the step has not closed since the
+   * answer was written.
+   */
+  closed: ClosedAnswer | null;
 };
+
+/**
+ * What an answer states, stored beside its wording (plan #1035): a day, a
+ * dollar amount, or neither. The goals routine writes it with the sentence,
+ * so a later statement is compared on the number rather than on the words.
+ */
+export type AnswerValue =
+  | { kind: 'date'; date: string }
+  | { kind: 'amount'; amount: number }
+  | { kind: 'text' };
+
+/** An answer's wording and value when its step last closed. */
+export type ClosedAnswer = { answer: string; value: AnswerValue };
+
+function toAmount(raw: unknown): number | null {
+  const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * The stored kind and typed columns (goals.answers kind, value_date,
+ * value_amount) as the app reads them. A date or amount whose value is
+ * missing or unreadable is read as text rather than shown wrong.
+ */
+export function readValue(kind: unknown, date: unknown, amount: unknown): AnswerValue {
+  if (kind === 'date' && typeof date === 'string' && DAY.test(date)) return { kind: 'date', date };
+  if (kind === 'amount') {
+    const n = toAmount(amount);
+    if (n !== null) return { kind: 'amount', amount: n };
+  }
+  return { kind: 'text' };
+}
+
+/**
+ * The closing state (closed_answer, closed_date, closed_amount), or null when
+ * the step has not closed since the answer was written. Its kind is whichever
+ * value is set.
+ */
+export function readClosed(answer: unknown, date: unknown, amount: unknown): ClosedAnswer | null {
+  if (typeof answer !== 'string') return null;
+  if (typeof date === 'string' && DAY.test(date)) return { answer, value: { kind: 'date', date } };
+  const n = amount === null || amount === undefined ? null : toAmount(amount);
+  if (n !== null) return { answer, value: { kind: 'amount', amount: n } };
+  return { answer, value: { kind: 'text' } };
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
