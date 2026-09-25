@@ -21,7 +21,7 @@
  * goal is the caller's to say, as `lastProgressAt`.
  */
 import type { ReadyStep } from '@/lib/goals/daily-run';
-import { runOutcome } from '@/lib/goals/runs';
+import { runOutcome, type RunJob } from '@/lib/goals/runs';
 import type { GoalRunStatus } from '@/lib/goals/shaping';
 
 /** A ready Claude step, with the due date the order reads. */
@@ -37,6 +37,8 @@ export type NightRun = {
   createdAt: string;
   /** The session's last report, which keeps a long run from reading as silent. */
   lastSeenAt?: string | null;
+  /** What started it; `goal` is a mapping run (plan #1009). Absent reads as not a mapping run. */
+  job?: RunJob;
 };
 
 export type NightSkipReason = 'goal_running' | 'goal_chosen' | 'failed_twice';
@@ -108,6 +110,105 @@ export function chooseNightSteps(input: {
       chosen.push(step);
       taken.add(step.goalId);
     }
+  }
+  return { chosen, skipped };
+}
+
+/**
+ * A live goal, as the night reads it to decide whether to map it (plan #1009).
+ */
+export type NightGoal = {
+  id: string;
+  title: string;
+  status: 'proposed' | 'open' | 'done' | 'dropped';
+  /** When you approved its map, or null before you have. */
+  approvedAt: string | null;
+  createdAt: string;
+  /** When its fog was last written or cleared by anyone but Claude, or null for never. */
+  fogChangedAt: string | null;
+};
+
+/** Why a goal is mapped tonight: it has never been mapped, or its fog changed since it was. */
+export type NightMapReason = 'new' | 'fog';
+
+export type NightMapSkipReason = 'goal_running' | 'mapped_tonight';
+
+export type NightMapChoice = {
+  /** The goals to map, oldest trigger first. */
+  chosen: { goal: NightGoal; reason: NightMapReason }[];
+  /** Goals that wanted a map but are not getting one on this tick, with why. */
+  skipped: { goal: NightGoal; reason: NightMapSkipReason }[];
+};
+
+const after = (a: string | null, b: string | null) =>
+  a !== null && (b === null || Date.parse(a) > Date.parse(b));
+
+/**
+ * Whether a goal wants a map, and why; null when it does not.
+ *
+ * Only an open goal: a goal Claude proposed waits for you to take it before
+ * anything is built under it. A goal with no finished mapping run wants one,
+ * unless you approved it anyway. After that only a change to its fog brings
+ * it back, and on an approved goal only a change made since you approved it.
+ * Claude writing its own fog is not a change: that is the map's output.
+ */
+function mapReason(goal: NightGoal, lastMappedAt: string | null): NightMapReason | null {
+  if (goal.status !== 'open') return null;
+  if (goal.approvedAt !== null) {
+    return after(goal.fogChangedAt, goal.approvedAt) && after(goal.fogChangedAt, lastMappedAt)
+      ? 'fog'
+      : null;
+  }
+  if (lastMappedAt === null) return 'new';
+  return after(goal.fogChangedAt, lastMappedAt) ? 'fog' : null;
+}
+
+/**
+ * Which goals a night tick maps (plan #1009): a goal never mapped, or one
+ * whose fog changed since it was, at most one mapping run per goal per night.
+ *
+ * A mapping run is a goals.runs row with job `goal`, the same run "Work on
+ * this" starts. Only a finished one counts as a map made, so a failed or
+ * silent one is tried again the next night; any one started since the night
+ * began counts against tonight, whatever became of it.
+ */
+export function chooseNightMaps(input: {
+  goals: readonly NightGoal[];
+  runs: readonly NightRun[];
+  /** When tonight's runner was started, as an ISO instant. */
+  nightStartedAt: string;
+  now: number;
+}): NightMapChoice {
+  const { goals, runs, nightStartedAt, now } = input;
+  const nightStart = Date.parse(nightStartedAt);
+
+  const running = new Set<string>();
+  const tonight = new Set<string>();
+  const lastMapped = new Map<string, string>();
+  for (const run of runs) {
+    if (runOutcome(run, now) === 'running') running.add(run.goalId);
+    if (run.job !== 'goal') continue;
+    if (Date.parse(run.createdAt) >= nightStart) tonight.add(run.goalId);
+    if (run.status !== 'done') continue;
+    const seen = lastMapped.get(run.goalId);
+    if (!seen || Date.parse(run.createdAt) > Date.parse(seen)) lastMapped.set(run.goalId, run.createdAt);
+  }
+
+  const wanted = goals
+    .map((goal) => ({ goal, reason: mapReason(goal, lastMapped.get(goal.id) ?? null) }))
+    .filter((one): one is { goal: NightGoal; reason: NightMapReason } => one.reason !== null)
+    .map((one) => ({
+      ...one,
+      since: Date.parse(one.reason === 'new' ? one.goal.createdAt : (one.goal.fogChangedAt as string)),
+    }))
+    .sort((a, b) => a.since - b.since);
+
+  const chosen: NightMapChoice['chosen'] = [];
+  const skipped: NightMapChoice['skipped'] = [];
+  for (const { goal, reason } of wanted) {
+    if (tonight.has(goal.id)) skipped.push({ goal, reason: 'mapped_tonight' });
+    else if (running.has(goal.id)) skipped.push({ goal, reason: 'goal_running' });
+    else chosen.push({ goal, reason });
   }
   return { chosen, skipped };
 }
