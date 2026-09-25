@@ -66,7 +66,7 @@ export default async function GoalRunsPage() {
 function RunRow({ view: { run, outcome, meta } }: { view: RunView }) {
   const failed = outcome === 'failed';
   return (
-    <li className="row-pad space-y-1">
+    <li className="card-pad-x row-pad space-y-1">
       <p className="text-ui break-words text-ink">
         <Link href={`/goals/runs/${run.id}`} className="font-semibold underline-offset-2 hover:underline">
           {JOB_LABELS[run.job]}
