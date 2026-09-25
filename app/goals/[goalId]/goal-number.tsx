@@ -17,6 +17,8 @@ import {
   movementLine,
   numberFromChoices,
   numberFromValue,
+  projectTarget,
+  projectionLine,
   readingChart,
   type NumberFrom,
   type NumberSource,
@@ -49,6 +51,7 @@ export function GoalNumber({
   goalId,
   unit,
   target,
+  dueOn = null,
   readings,
   today,
   numberFrom = null,
@@ -59,6 +62,8 @@ export function GoalNumber({
   goalId: string;
   unit: string | null;
   target: number | null;
+  /** The goal's due date, YYYY-MM-DD, which the projection is read against. */
+  dueOn?: string | null;
   /** Oldest first. */
   readings: Reading[];
   today: string;
@@ -92,6 +97,8 @@ export function GoalNumber({
   }
 
   const movement = movementLine(readings, { unit, target }, (day) => formatDay(day));
+  // When the target is reached at the recent pace (plan #1025).
+  const projection = projectTarget(readings, target, dueOn);
 
   return (
     <section aria-labelledby="number-heading" className="space-y-2">
@@ -99,7 +106,7 @@ export function GoalNumber({
         <h2 id="number-heading" className="text-ui font-semibold text-ink">
           The number
         </h2>
-        <MeasureLine goalId={goalId} unit={unit} target={target} />
+        <MeasureLine goalId={goalId} unit={unit} target={target} dueOn={dueOn} />
       </div>
       {(numberFrom || sources.length > 0) && (
         <NumberFromLine goalId={goalId} numberFrom={numberFrom} sources={sources} />
@@ -108,6 +115,18 @@ export function GoalNumber({
         {readings.length > 0 && (
           <div className="space-y-2 px-3 pt-3">
             {movement && <p className="text-small text-ink-muted">{movement}</p>}
+            {projection && (
+              <p
+                className={cn(
+                  'text-small',
+                  projection.kind === 'reaches' && projection.daysEarly !== null && projection.daysEarly < 0
+                    ? 'text-ink'
+                    : 'text-ink-muted',
+                )}
+              >
+                {projectionLine(projection, (day) => formatDay(day, true))}
+              </p>
+            )}
             <ReadingLine readings={readings} unit={unit} target={target} />
           </div>
         )}
@@ -119,8 +138,9 @@ export function GoalNumber({
 }
 
 /**
- * The unit and the target, edited where they are read beside the heading
- * (law 12). Both sit in one form, so changing either sends the other as it
+ * The unit, the target and the goal's due date, edited where they are read
+ * beside the heading (law 12). The date shows once there is a target, since
+ * it is what the projection is read against (plan #1025). Both sit in one form, so changing either sends the other as it
  * stands. Commit is on Enter or on leaving the line, and only when something
  * changed; moving from the unit to the target does not save in between.
  * Escape puts both back. Clearing the unit stops the measuring and
@@ -130,14 +150,20 @@ function MeasureLine({
   goalId,
   unit,
   target,
+  dueOn,
 }: {
   goalId: string;
   unit: string | null;
   target: number | null;
+  dueOn: string | null;
 }) {
   const [state, save, saving] = useActionState(setMeasureAction, initial);
   const formRef = useRef<HTMLFormElement>(null);
-  const committed = { unit: unit ?? '', target: target === null ? '' : String(target) };
+  const committed = {
+    unit: unit ?? '',
+    target: target === null ? '' : String(target),
+    dueOn: dueOn ?? '',
+  };
 
   function commit() {
     const form = formRef.current;
@@ -145,7 +171,8 @@ function MeasureLine({
     const data = new FormData(form);
     const changed =
       String(data.get('unit') ?? '').trim() !== committed.unit ||
-      (data.has('target') && String(data.get('target') ?? '').trim() !== committed.target);
+      (data.has('target') && String(data.get('target') ?? '').trim() !== committed.target) ||
+      (data.has('dueOn') && String(data.get('dueOn') ?? '') !== committed.dueOn);
     if (changed) form.requestSubmit();
   }
 
@@ -160,7 +187,7 @@ function MeasureLine({
     if (event.key !== 'Escape') return;
     const form = formRef.current;
     if (!form) return;
-    for (const name of ['unit', 'target'] as const) {
+    for (const name of ['unit', 'target', 'dueOn'] as const) {
       const field = form.elements.namedItem(name);
       if (field instanceof HTMLInputElement) field.value = committed[name];
     }
@@ -178,7 +205,7 @@ function MeasureLine({
       ref={formRef}
       action={save}
       // A fresh key after each save puts the saved values back as the defaults.
-      key={`${committed.unit}|${committed.target}`}
+      key={`${committed.unit}|${committed.target}|${committed.dueOn}`}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) commit();
       }}
@@ -208,6 +235,20 @@ function MeasureLine({
             onKeyDown={onKeyDown}
             disabled={saving}
             className={cn(fit, 'tabular')}
+          />
+        </>
+      )}
+      {unit && target !== null && (
+        <>
+          <span>by</span>
+          <InlineInput
+            type="date"
+            name="dueOn"
+            defaultValue={committed.dueOn}
+            aria-label="When the goal is due. Clear it to have none."
+            onKeyDown={onKeyDown}
+            disabled={saving}
+            className="tabular w-auto"
           />
         </>
       )}

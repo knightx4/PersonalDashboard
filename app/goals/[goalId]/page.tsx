@@ -149,6 +149,7 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
     goalId: map.goal.id,
     unit: map.goal.unit,
     target: map.goal.target,
+    dueOn: map.goal.dueOn ?? null,
     readings,
     today,
     numberFrom,

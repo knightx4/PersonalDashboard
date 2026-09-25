@@ -29,6 +29,8 @@ export type Reading = {
 
 export type Measure = { unit: string; target: number | null };
 
+const DAY_MS = 86_400_000;
+
 type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 
 function clean(raw: unknown): string | null {
@@ -58,17 +60,28 @@ export function parseNumber(raw: unknown): number | null {
  */
 export function parseMeasureFields(
   get: (key: string) => unknown,
-): Parsed<{ unit: string | null; target: number | null }> {
+): Parsed<{ unit: string | null; target: number | null; dueOn?: string | null }> {
   const unit = clean(get('unit'));
   if (!unit) return { ok: true, value: { unit: null, target: null } };
   if (unit.length > UNIT_MAX) {
     return { ok: false, error: `Keep the unit under ${UNIT_MAX} characters.` };
   }
+  // The goal's due date (plan #1025), sent only by the line beside the
+  // heading. Absent leaves it as it is; empty clears it.
+  const rawDue = get('dueOn');
+  let dueOn: string | null | undefined;
+  if (rawDue !== null && rawDue !== undefined) {
+    dueOn = clean(rawDue);
+    if (dueOn && (!/^\d{4}-\d{2}-\d{2}$/.test(dueOn) || Number.isNaN(Date.parse(dueOn)))) {
+      return { ok: false, error: 'The due date is not a date.' };
+    }
+  }
+  const withDue = dueOn === undefined ? {} : { dueOn };
   const rawTarget = clean(get('target'));
-  if (!rawTarget) return { ok: true, value: { unit, target: null } };
+  if (!rawTarget) return { ok: true, value: { unit, target: null, ...withDue } };
   const target = parseNumber(rawTarget);
   if (target === null) return { ok: false, error: 'The target has to be a number.' };
-  return { ok: true, value: { unit, target } };
+  return { ok: true, value: { unit, target, ...withDue } };
 }
 
 /** A new reading from the goal's form. The day defaults to today and cannot be later. */
@@ -149,6 +162,116 @@ export function movementLine(
     );
   }
   return parts.join(', ');
+}
+
+// ---------------------------------------------------------------------------
+// When the target will be reached (plan #1025)
+// ---------------------------------------------------------------------------
+
+/** Fewer readings than this and no projection is drawn. */
+export const PROJECTION_MIN_READINGS = 3;
+/** The pace is taken from this many of the latest readings. */
+export const PROJECTION_RECENT = 6;
+/** Further out than this is not a date worth printing. */
+const PROJECTION_MAX_DAYS = 100 * 365;
+
+export type Projection =
+  | {
+      kind: 'reaches';
+      /** YYYY-MM-DD the target is reached at the recent pace. */
+      reachOn: string;
+      /** The goal's due date, or null without one. */
+      dueOn: string | null;
+      /** Days before the due date (negative after it); null without one. */
+      daysEarly: number | null;
+    }
+  /** The recent readings are flat or moving away from the target. */
+  | { kind: 'not-closing' };
+
+function dayNumber(isoDate: string): number {
+  return Date.parse(`${isoDate}T00:00:00Z`) / DAY_MS;
+}
+
+function isoDay(day: number): string {
+  return new Date(day * DAY_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * When the number will reach its target at the pace of its recent readings:
+ * the least-squares slope through the latest few, carried on from the latest
+ * reading. Null when there is nothing to project: no target, fewer than three
+ * readings, the target already reached, or every recent reading on one day.
+ */
+export function projectTarget(
+  readings: Reading[],
+  target: number | null,
+  dueOn: string | null,
+): Projection | null {
+  if (target === null) return null;
+  const sorted = sortReadings(readings);
+  if (sorted.length < PROJECTION_MIN_READINGS) return null;
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  // Which way is progress, as movementLine reads it.
+  const aimingDown = first.value > target;
+  const left = aimingDown ? last.value - target : target - last.value;
+  if (left <= 0) return null;
+
+  const recent = sorted.slice(-PROJECTION_RECENT);
+  const xs = recent.map((r) => dayNumber(r.readOn));
+  const meanX = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const meanY = recent.reduce((a, r) => a + r.value, 0) / recent.length;
+  let sxx = 0;
+  let sxy = 0;
+  recent.forEach((r, i) => {
+    sxx += (xs[i] - meanX) ** 2;
+    sxy += (xs[i] - meanX) * (r.value - meanY);
+  });
+  if (sxx === 0) return null;
+  const perDay = sxy / sxx;
+  // Progress per day, positive when closing on the target.
+  const closing = aimingDown ? -perDay : perDay;
+  if (closing <= 0) return { kind: 'not-closing' };
+  const days = Math.ceil(left / closing);
+  if (days > PROJECTION_MAX_DAYS) return { kind: 'not-closing' };
+
+  const reachDay = dayNumber(last.readOn) + days;
+  return {
+    kind: 'reaches',
+    reachOn: isoDay(reachDay),
+    dueOn,
+    daysEarly: dueOn === null ? null : Math.round(dayNumber(dueOn) - reachDay),
+  };
+}
+
+/** "3 days", "5 weeks", "4 months", "2 years", rounded to the nearest. */
+export function spanWords(days: number): string {
+  const n = Math.abs(days);
+  const words = (count: number, unit: string) => `${count} ${unit}${count === 1 ? '' : 's'}`;
+  if (n < 14) return words(n, 'day');
+  if (n < 61) return words(Math.round(n / 7), 'week');
+  if (n < 730) return words(Math.round(n / 30.44), 'month');
+  return words(Math.round(n / 365.25), 'year');
+}
+
+/**
+ * The projection as one line: when the target is reached at this pace, and
+ * whether that is ahead of the goal's due date or behind it.
+ */
+export function projectionLine(
+  projection: Projection,
+  formatDay: (isoDate: string) => string,
+): string {
+  if (projection.kind === 'not-closing') {
+    return 'Not closing on the target at the recent pace';
+  }
+  const reach = `At this pace, target reached ${formatDay(projection.reachOn)}`;
+  if (projection.dueOn === null || projection.daysEarly === null) return reach;
+  const due = formatDay(projection.dueOn);
+  if (projection.daysEarly === 0) return `${reach}, on the due date`;
+  return projection.daysEarly > 0
+    ? `${reach}: ahead, ${spanWords(projection.daysEarly)} before the due date of ${due}`
+    : `${reach}: behind, ${spanWords(projection.daysEarly)} after the due date of ${due}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -262,8 +385,6 @@ export type ReadingChart = {
   /** The plot area inside the chart's padding. */
   plot: { left: number; right: number; top: number; bottom: number };
 };
-
-const DAY_MS = 86_400_000;
 
 /**
  * Where each reading goes on a chart of the given size. Time runs left to

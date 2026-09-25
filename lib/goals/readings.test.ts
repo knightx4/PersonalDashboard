@@ -7,7 +7,10 @@ import {
   parseNumber,
   parseNumberFrom,
   parseReadingFields,
+  projectTarget,
+  projectionLine,
   readingChart,
+  spanWords,
   sortReadings,
   type Reading,
 } from './readings';
@@ -209,5 +212,80 @@ describe('a number worked out from a collection (plan #1024)', () => {
     expect(parseNumberFrom('', choices)).toEqual({ ok: true, value: null });
     expect(parseNumberFrom('sum|c1|name', choices).ok).toBe(false);
     expect(parseNumberFrom('sum|c2|balance', choices).ok).toBe(false);
+  });
+});
+
+describe('when the target will be reached (plan #1025)', () => {
+  // Three falling readings, $1,000 a month off a $10,000 debt.
+  const falling = [
+    reading('a', '2026-07-01', 12000),
+    reading('b', '2026-07-31', 11000),
+    reading('c', '2026-08-30', 10000),
+  ];
+
+  it('projects a date from three falling readings and says it is ahead of the due date', () => {
+    const projection = projectTarget(falling, 0, '2027-12-31');
+    expect(projection).toEqual({
+      kind: 'reaches',
+      reachOn: '2027-06-26',
+      dueOn: '2027-12-31',
+      daysEarly: 188,
+    });
+    expect(projectionLine(projection!, day)).toBe(
+      'At this pace, target reached 2027-06-26: ahead, 6 months before the due date of 2027-12-31',
+    );
+  });
+
+  it('says it is behind when the pace misses the due date', () => {
+    const projection = projectTarget(falling, 0, '2027-01-01');
+    expect(projection).toMatchObject({ kind: 'reaches', daysEarly: -176 });
+    expect(projectionLine(projection!, day)).toBe(
+      'At this pace, target reached 2027-06-26: behind, 6 months after the due date of 2027-01-01',
+    );
+  });
+
+  it('gives the date alone without a due date, and works for a number counting up', () => {
+    const projection = projectTarget(falling, 0, null);
+    expect(projectionLine(projection!, day)).toBe('At this pace, target reached 2027-06-26');
+    const lifting = [
+      reading('a', '2026-09-01', 185),
+      reading('b', '2026-09-08', 190),
+      reading('c', '2026-09-15', 195),
+    ];
+    expect(projectTarget(lifting, 225, null)).toMatchObject({ reachOn: '2026-10-27' });
+  });
+
+  it('shows nothing with fewer than three readings, no target, or the target reached', () => {
+    expect(projectTarget(falling.slice(0, 2), 0, null)).toBeNull();
+    expect(projectTarget(falling, null, null)).toBeNull();
+    expect(projectTarget(falling, 10000, null)).toBeNull();
+  });
+
+  it('says the number is not closing when the recent pace is flat or the wrong way', () => {
+    const rising = [...falling, reading('d', '2026-09-29', 11000), reading('e', '2026-10-29', 12500)];
+    const projection = projectTarget(rising.slice(-3), 0, null);
+    expect(projection).toEqual({ kind: 'not-closing' });
+    expect(projectionLine(projection!, day)).toBe('Not closing on the target at the recent pace');
+  });
+
+  it('reads the due date from the measure line, and leaves it alone when not sent', () => {
+    expect(parseMeasureFields(form({ unit: '$', target: '0', dueOn: '2028-01-31' }))).toEqual({
+      ok: true,
+      value: { unit: '$', target: 0, dueOn: '2028-01-31' },
+    });
+    expect(parseMeasureFields(form({ unit: '$', target: '0', dueOn: '' }))).toEqual({
+      ok: true,
+      value: { unit: '$', target: 0, dueOn: null },
+    });
+    const untouched = parseMeasureFields(form({ unit: '$', target: '0' }));
+    expect(untouched.ok && 'dueOn' in untouched.value).toBe(false);
+    expect(parseMeasureFields(form({ unit: '$', target: '0', dueOn: 'soon' })).ok).toBe(false);
+  });
+
+  it('words a span of days', () => {
+    expect(spanWords(1)).toBe('1 day');
+    expect(spanWords(-21)).toBe('3 weeks');
+    expect(spanWords(188)).toBe('6 months');
+    expect(spanWords(800)).toBe('2 years');
   });
 });
