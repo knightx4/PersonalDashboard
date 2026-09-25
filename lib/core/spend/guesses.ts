@@ -139,6 +139,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'write-lesson': background(unit(SONNET, 3_500, 1_200)),
   'embed-lesson-claim': background(unit(VOYAGE_LITE, 100, 0)),
   'lay-out-lesson-unit': background(unit(SONNET, 4_000, 3_000)),
+  // One unit, given the units so far and up to forty concept names in each list.
+  'write-next-unit': background(unit(SONNET, 2_000, 300)),
 
   // Jobs.
   'enrich-company': run(HAIKU, 10_000, 500),

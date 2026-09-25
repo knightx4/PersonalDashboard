@@ -158,6 +158,11 @@ export const LEARN_OPERATIONS = [
   // (plan #977). The same call as 'generate-chain', recorded from the
   // background top-up rather than a press.
   'lay-out-lesson-unit',
+  // Writing a track's next unit when its last is done or nearly done (plan
+  // #969), from the background top-up. Kept apart from 'write-curriculum',
+  // which writes a new track's first units on a press, so what growing tracks
+  // costs can be read on its own.
+  'write-next-unit',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

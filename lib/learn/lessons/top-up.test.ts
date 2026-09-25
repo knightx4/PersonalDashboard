@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { Concept } from '@/lib/learn/graph/model';
 import type { LessonPick, TrackNeed } from './choose';
+import type { AddedUnit } from './add-unit';
 import type { LaidOutUnit } from './lay-out-unit';
 import {
   LAYOUT_RESERVE_MS,
   LESSON_HOLD_MS,
   MAX_LAYOUTS_PER_RUN,
+  MAX_UNITS_ADDED_PER_RUN,
   lessonWhy,
   lessonsWanted,
   writeLessonsFor,
@@ -37,10 +39,15 @@ function need(subjectId: string, because: TrackNeed['because'] = 'no-chain'): Tr
 function ports(options: {
   choices: { picks: LessonPick[]; needs: TrackNeed[] }[];
   layOut?: (subjectId: string) => LaidOutUnit;
+  addUnit?: (subjectId: string) => AddedUnit;
   write?: (pick: LessonPick) => LessonOutcome;
   now?: () => number;
 }) {
-  const calls = { choose: 0, layOut: [] as string[], hold: [] as { subjectId: string; until: Date }[], write: [] as string[] };
+  const calls = {
+    choose: 0,
+    layOut: [] as string[],
+    addUnit: [] as { subjectId: string; lastUnitId: string | null }[],
+    hold: [] as { subjectId: string; until: Date }[], write: [] as string[] };
   const port: LessonTopUpPorts = {
     choose: async () => {
       const choice = options.choices[Math.min(calls.choose, options.choices.length - 1)]!;
@@ -50,6 +57,10 @@ function ports(options: {
     layOut: async (_userId, subjectId) => {
       calls.layOut.push(subjectId);
       return options.layOut?.(subjectId) ?? { outcome: 'laid-out', unitId: 'u', goalId: 'g', conceptIds: ['c'] };
+    },
+    addUnit: async (_userId, subjectId, lastUnitId) => {
+      calls.addUnit.push({ subjectId, lastUnitId });
+      return options.addUnit?.(subjectId) ?? { outcome: 'added', unitId: `${subjectId}-new`, title: 'New' };
     },
     hold: async (_userId, subjectId, until) => {
       calls.hold.push({ subjectId, until });
@@ -134,14 +145,6 @@ describe('laying out units', () => {
     expect(calls.layOut).toHaveLength(MAX_LAYOUTS_PER_RUN);
   });
 
-  it('leaves tracks that need a unit written, or a curriculum, to a later step', async () => {
-    const { port, calls } = ports({
-      choices: [{ picks: [], needs: [need('done', 'all-units-done'), need('bare', 'no-curriculum')] }],
-    });
-    await writeLessonsFor(port, { userId: 'u', wanted: 4, deadline: FAR });
-    expect(calls.layOut).toEqual([]);
-    expect(calls.hold).toEqual([]);
-  });
 
   it('holds a track for a day when laying it out fails or finds no unit', async () => {
     const { port, calls } = ports({
@@ -164,6 +167,65 @@ describe('laying out units', () => {
     await writeLessonsFor(port, { userId: 'u', wanted: 4, deadline: LAYOUT_RESERVE_MS - 1 });
     expect(calls.layOut).toEqual([]);
     expect(calls.write).toEqual(['a']);
+  });
+});
+
+describe('writing the next unit', () => {
+  it('writes a unit for a track that ran out, then lays it out and teaches it in the same run', async () => {
+    const { port, calls } = ports({
+      choices: [
+        { picks: [], needs: [need('done', 'all-units-done')] },
+        { picks: [], needs: [need('done')] },
+        { picks: [pick('n', 'done')], needs: [] },
+      ],
+    });
+    const summary = await writeLessonsFor(port, { userId: 'u', wanted: 4, deadline: FAR });
+    expect(calls.addUnit).toEqual([{ subjectId: 'done', lastUnitId: 'done-u' }]);
+    expect(calls.layOut).toEqual(['done']);
+    expect(calls.choose).toBe(3);
+    expect(calls.write).toEqual(['n']);
+    expect(summary).toMatchObject({ added: ['done'], laidOut: ['done'] });
+  });
+
+  it('writes a unit for a short last unit and a track with no curriculum, and lays out neither', async () => {
+    const { port, calls } = ports({
+      choices: [
+        { picks: [pick('a', 'short')], needs: [need('short', 'last-unit-short'), need('bare', 'no-curriculum')] },
+        { picks: [pick('a', 'short')], needs: [] },
+      ],
+    });
+    await writeLessonsFor(port, { userId: 'u', wanted: 4, deadline: FAR });
+    expect(calls.addUnit).toEqual([
+      { subjectId: 'short', lastUnitId: 'short-u' },
+      { subjectId: 'bare', lastUnitId: null },
+    ]);
+    expect(calls.layOut).toEqual([]);
+    expect(calls.write).toEqual(['a']);
+  });
+
+  it('writes at most two units in a run and none when too little time is left', async () => {
+    const needs = [need('one', 'all-units-done'), need('two', 'all-units-done'), need('three', 'all-units-done')];
+    const many = ports({ choices: [{ picks: [], needs }] });
+    await writeLessonsFor(many.port, { userId: 'u', wanted: 4, deadline: FAR });
+    expect(many.calls.addUnit).toHaveLength(MAX_UNITS_ADDED_PER_RUN);
+
+    const late = ports({ choices: [{ picks: [], needs }] });
+    await writeLessonsFor(late.port, { userId: 'u', wanted: 4, deadline: LAYOUT_RESERVE_MS - 1 });
+    expect(late.calls.addUnit).toEqual([]);
+  });
+
+  it('holds a track whose unit could not be written, and leaves one another run already grew', async () => {
+    const { port, calls } = ports({
+      choices: [{ picks: [], needs: [need('broken', 'all-units-done'), need('raced', 'all-units-done')] }],
+      addUnit: (subjectId) =>
+        subjectId === 'broken' ? { outcome: 'failed', detail: 'The model said no.' } : { outcome: 'already-added' },
+    });
+    const summary = await writeLessonsFor(port, { userId: 'u', wanted: 4, deadline: FAR });
+    expect(calls.hold.map((held) => held.subjectId)).toEqual(['broken']);
+    expect(summary.failed).toEqual(['broken: The model said no.']);
+    expect(summary.added).toEqual([]);
+    // Nothing was added, so the first choice stands.
+    expect(calls.choose).toBe(1);
   });
 });
 

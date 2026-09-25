@@ -87,6 +87,7 @@ describe('the operation names', () => {
       'write-lesson',
       'embed-lesson-claim',
       'lay-out-lesson-unit',
+      'write-next-unit',
     ]);
   });
 });

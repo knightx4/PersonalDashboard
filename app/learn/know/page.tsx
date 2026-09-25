@@ -139,7 +139,7 @@ export default async function KnowPage({
         <EmptyState
           icon={Network}
           title="No tracks yet"
-          description="A track is the container: Economics, not the Phillips curve. Make one from the button above and it gets a fixed curriculum, or ask one question and the track forms around it."
+          description="A track is the container: Economics, not the Phillips curve. Make one from the button above and it gets its first units, with more added as you finish them, or ask one question and the track forms around it."
         />
       ) : (
         <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>

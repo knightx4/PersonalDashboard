@@ -6,6 +6,7 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { LessonPick } from '@/lib/learn/lessons/choose';
 import { chooseLessonsFor } from '@/lib/learn/lessons/choose-load';
 import { findLessonSource, type LessonSource } from '@/lib/learn/lessons/closest-source';
+import { addNextUnit } from '@/lib/learn/lessons/add-unit';
 import { layOutNextUnit } from '@/lib/learn/lessons/lay-out-unit';
 import { lessonWhy, type LessonOutcome, type LessonTopUpPorts } from '@/lib/learn/lessons/top-up';
 import { WRITE_LESSON_MODEL, writeLesson } from '@/lib/learn/lessons/write-lesson';
@@ -140,6 +141,7 @@ export function createLessonPorts(context: {
   return {
     choose: (userId, slots) => chooseLessonsFor(learn, userId, slots),
     layOut: (userId, subjectId) => layOutNextUnit(learn, core, userId, subjectId, apiKey),
+    addUnit: (userId, subjectId, lastUnitId) => addNextUnit(learn, core, userId, subjectId, lastUnitId, apiKey),
     hold: async (userId, subjectId, until) => {
       const { error } = await learn
         .from('subjects')
