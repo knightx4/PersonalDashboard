@@ -1333,3 +1333,88 @@ describe('goals history of an undo', () => {
     expect(restore).toEqual({ undoes: null, undoes_field: null });
   });
 });
+
+describe('a goal’s number from its collection (plan #1024)', () => {
+  const fields = [
+    { key: 'name', label: 'Loan', type: 'text' },
+    { key: 'balance', label: 'Balance', type: 'money', tracked: true },
+  ];
+  let goal = '';
+  let collection = '';
+  let first = '';
+  let second = '';
+
+  async function goalReadings() {
+    return admin<{ value: string; read_on: string; note: string | null }[]>`
+      select value::text, read_on::text, note from readings
+      where item_id = ${goal} order by created_at`;
+  }
+
+  beforeAll(async () => {
+    const [g] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title, unit)
+      values (${userA}, 'goal', ${areaA}, 'Clear the student loans', '$') returning id`;
+    goal = g.id;
+    const [c] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into collections (user_id, name, fields)
+      values (${userA}, 'Student loans', ${JSON.stringify(fields)}::text::jsonb) returning id`);
+    collection = c.id;
+    const rows = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into records (user_id, collection_id, data) values
+        (${userA}, ${collection}, '{"name": "A", "balance": 80080.21}'::jsonb),
+        (${userA}, ${collection}, '{"name": "B", "balance": 124304.41}'::jsonb)
+      returning id`);
+    [first, second] = rows.map((r) => r.id);
+  });
+
+  it('refuses a field the collection lacks, or a sum of text', async () => {
+    await expect(
+      asUser(userA, (tx) => tx`
+        update items set number_from_collection_id = ${collection}, number_from_field = 'rate',
+          number_from_how = 'sum' where id = ${goal}`),
+    ).rejects.toThrow(/has no field rate/);
+    await expect(
+      asUser(userA, (tx) => tx`
+        update items set number_from_collection_id = ${collection}, number_from_field = 'name',
+          number_from_how = 'sum' where id = ${goal}`),
+    ).rejects.toThrow(/Loan is not a number/);
+    await expect(
+      asUser(userA, (tx) => tx`
+        update items set number_from_collection_id = ${collection}, number_from_how = 'sum'
+        where id = ${goal}`),
+    ).rejects.toThrow(/items_number_from_ck/);
+  });
+
+  it('reads the total when set, and a new one when a balance changes', async () => {
+    await asUser(userA, (tx) => tx`
+      update items set number_from_collection_id = ${collection}, number_from_field = 'balance',
+        number_from_how = 'sum' where id = ${goal}`);
+    const [now] = await admin<{ n: string }[]>`select goals.goal_number(${goal})::text as n`;
+    expect(now.n).toBe('204384.62');
+
+    // One statement touching both loans writes one reading, dated by the statement.
+    await asUser(userA, (tx) => tx`
+      update records set data = data || jsonb_build_object('balance',
+        (data ->> 'balance')::numeric - 100), as_of = '2026-09-20'
+      where id in (${first}, ${second})`);
+    // An edit that leaves the total alone writes nothing.
+    await asUser(userA, (tx) => tx`
+      update records set data = data || '{"name": "A loan"}'::jsonb where id = ${first}`);
+    // Archiving a loan takes it out of the total.
+    await asUser(userA, (tx) => tx`update records set archived_at = now() where id = ${second}`);
+
+    const readings = await goalReadings();
+    expect(readings.map((r) => r.value)).toEqual(['204384.62', '204184.62', '79980.21']);
+    expect(readings[1].read_on).toBe('2026-09-20');
+    expect(readings[0].note).toBe('From Student loans: total balance');
+  });
+
+  it('counts records, and takes the newest value for latest', async () => {
+    await asUser(userA, (tx) => tx`
+      update items set number_from_how = 'count', number_from_field = null where id = ${goal}`);
+    await asUser(userA, (tx) => tx`
+      update items set number_from_how = 'latest', number_from_field = 'balance' where id = ${goal}`);
+    const readings = await goalReadings();
+    expect(readings.slice(-2).map((r) => r.value)).toEqual(['1', '79980.21']);
+  });
+});
