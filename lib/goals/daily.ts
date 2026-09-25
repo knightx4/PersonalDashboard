@@ -13,6 +13,7 @@
  * Pure, so the ordering and the cap are tested without a database, in the
  * way lib/plan/waiting.ts is for the dev plan's Dash section.
  */
+import { isStaleStepBlock, waitsOnNothing } from '@/lib/goals/dependencies';
 import type { GoalProgress } from '@/lib/goals/status';
 import type { StepKind, StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
@@ -148,7 +149,7 @@ export function dailyView(
             }),
           );
         }
-        if (node.status !== 'open') continue;
+        if (node.status !== 'open' && !isStaleStepBlock(node)) continue;
 
         if (node.kind === 'decision') {
           if (node.resolution === null && !node.dismissedAt) {
@@ -164,7 +165,7 @@ export function dailyView(
           }
         } else if (
           (node.kind === 'mine' || node.kind === 'claude') &&
-          !node.children.some((child) => child.status === 'open')
+          waitsOnNothing(node)
         ) {
           if (node.dueOn !== null && node.dueOn < today) overdue.add(node.id);
           candidates.push(

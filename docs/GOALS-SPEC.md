@@ -333,9 +333,14 @@ than rebuilding them:
    fog shown under it.
 6. **Run status**: Claude is working on this while a run is going, and what
    it changed once it ends.
+7. **Blocked and waiting steps** (plan #981): a step can be blocked with one
+   sentence saying what it needs, shown as its Needs line, and can wait on
+   other steps. A waiting step reads as Waiting and becomes ready by itself
+   once the steps it waits on close, by the rules `isReady` and
+   `isStaleBlock` apply on the plan. A step blocked on you is On you. Only a
+   step can be blocked, never a goal.
 
-Dependencies between steps, priority, filters and search stay on the dev
-plan for now.
+Priority, filters and search stay on the dev plan for now.
 
 ## Not in this version
 
@@ -372,6 +377,10 @@ A sketch for the migration, not the migration itself.
 - `goals.suggestions`: what Claude suggested, your reaction, and whether it
   happened.
 - `goals.runs`: one row per routine run, as `plan_runs` does for the dev plan.
+- `goals.dependencies`: one row per step that cannot start until another
+  step closes, with the loop and same-account checks `plan_dependencies` has
+  (plan #981). `goals.items` carries `block_ask` and `block_kind` for a
+  blocked step.
 - `goals.comments`: the thread on a goal or a step, `me` or `claude` per
   message (plan #957). A reply can file facts into a collection as drafts.
 - `archived_at` on areas and items, in place of deleting them.
