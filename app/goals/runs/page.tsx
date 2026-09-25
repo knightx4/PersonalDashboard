@@ -83,6 +83,14 @@ function RunRow({ view: { run, outcome, meta } }: { view: RunView }) {
             )}
           </>
         )}
+        {run.area && (
+          <>
+            {' on '}
+            <Link href="/goals/all" className="underline-offset-2 hover:underline">
+              {run.area.name}
+            </Link>
+          </>
+        )}
       </p>
       <p className={failed ? 'text-small text-danger' : 'text-small text-ink-muted'}>{meta}</p>
       {failed ? (

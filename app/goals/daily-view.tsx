@@ -285,7 +285,7 @@ function CatchUpView({
 
 function RunRow({ run, timeZone }: { run: RunListing; timeZone: string }) {
   const meta = [
-    run.item?.title ?? null,
+    run.item?.title ?? run.area?.name ?? null,
     run.endedAt ? formatInstant(run.endedAt, timeZone, { weekday: false }) : null,
   ].filter((line): line is string => line !== null);
   return (

@@ -183,13 +183,21 @@ export function GoalsHomeSurface() {
 /* ------------------------------------------------------------- all goals */
 
 const areas: AreaWithGoals[] = [
-  { id: 'a-money', name: 'Money', position: 10, goals: [cards, fund] },
-  { id: 'a-career', name: 'Career', position: 20, goals: [job] },
+  { id: 'a-money', name: 'Money', note: null, position: 10, goals: [cards, fund] },
+  { id: 'a-career', name: 'Career', note: null, position: 20, goals: [job] },
   {
     id: 'a-health',
     name: 'Health',
+    note: null,
     position: 30,
     goals: [marathon, goal('g-sleep', 'a-health', 'Sleep before midnight', { position: 20 })],
+  },
+  {
+    id: 'a-city',
+    name: 'The city',
+    note: 'Know the people working on housing and transit here, and be one of them.',
+    position: 40,
+    goals: [],
   },
 ];
 
@@ -204,6 +212,8 @@ export function GoalsAllSurface() {
           [fund.id]: home.goals[1].progress!,
           [job.id]: home.goals[2].progress!,
         }}
+        areaRuns={{}}
+        canRun
       />
     </div>
   );
