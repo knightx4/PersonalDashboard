@@ -176,7 +176,7 @@ describe('sendGoalStep', () => {
       ['s', { approvedAt: null }, 'This goal is not approved yet. Approve it, then send its steps.'],
     ] as const) {
       const { result, calls, fetch } = await send(stepId, fixture);
-      expect(result).toEqual({ ok: false, error: reason });
+      expect(result).toEqual({ ok: false, error: reason, refused: true });
       expect(calls.some((c) => c.op === 'insert')).toBe(false);
       expect(fetch).not.toHaveBeenCalled();
     }
@@ -208,12 +208,12 @@ describe('sendGoalStep', () => {
     const { client } = fakeClient({ items: ITEMS, approvedAt: APPROVED });
     const fetch = okFetch();
     const result = await sendGoalStep({ client, userId: USER, stepId: 's', routine, mode: 'prepare', now: NOW, fetch });
-    expect(result).toEqual({ ok: false, error: 'Only a step of yours with no sub-steps can be prepared.' });
+    expect(result).toEqual({ ok: false, error: 'Only a step of yours with no sub-steps can be prepared.', refused: true });
     expect(fetch).not.toHaveBeenCalled();
   });
 
   it('says so when the step is not on any live goal', async () => {
     const { result } = await send('gone');
-    expect(result).toEqual({ ok: false, error: 'That step is no longer on the page.' });
+    expect(result).toEqual({ ok: false, error: 'That step is no longer on the page.', refused: true });
   });
 });

@@ -29,7 +29,11 @@ import { loadLiveTree } from '@/lib/goals/steps-store';
 
 export type SendResult =
   | { ok: true; job: SendJob; title: string; runId: string }
-  | { ok: false; error: string };
+  /**
+   * `refused` is set when the step itself cannot be sent, as against the fire
+   * having failed; the night tick tries its next step on one and not the other.
+   */
+  | { ok: false; error: string; refused?: true };
 
 /** The step, its goal, and whether that goal is approved; null when it is not a live step. */
 async function loadTarget(
@@ -95,11 +99,11 @@ export async function sendGoalStep(input: {
   const now = input.now ?? Date.now();
 
   const target = await loadTarget(client, userId, stepId);
-  if (!target) return { ok: false, error: 'That step is no longer on the page.' };
+  if (!target) return { ok: false, error: 'That step is no longer on the page.', refused: true };
 
   const mode = input.mode ?? 'send';
   const refused = sendRefusal(target, await loadLiveRuns(client, userId), now, mode);
-  if (refused) return { ok: false, error: refused };
+  if (refused) return { ok: false, error: refused, refused: true };
   // sendRefusal has already turned away a step with no job.
   const job = jobFor(target.step, mode) as SendJob;
 

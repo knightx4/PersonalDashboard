@@ -35,6 +35,8 @@ export type NightRun = {
   stepId: string | null;
   status: GoalRunStatus;
   createdAt: string;
+  /** The session's last report, which keeps a long run from reading as silent. */
+  lastSeenAt?: string | null;
 };
 
 export type NightSkipReason = 'goal_running' | 'goal_chosen' | 'failed_twice';
