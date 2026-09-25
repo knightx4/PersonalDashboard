@@ -197,10 +197,12 @@ The vault is the largest source, so search it two ways:
 -- by meaning: read the theme list whole and pick the themes that bear on the goal
 select id, name, about from obsidian.themes where user_id = '<user>' order by name;
 
-select n.path, n.title, left(n.body, 1500) as body
+-- then the notes under them, by name only: a theme can hold hundreds
+select n.path, n.title, n.updated_at
 from obsidian.theme_notes tn
 join obsidian.notes n on n.id = tn.note_id and n.deleted_at is null
-where tn.theme_id = any('{<theme ids>}'::uuid[]) and tn.user_id = '<user>';
+where tn.theme_id = any('{<theme ids>}'::uuid[]) and tn.user_id = '<user>'
+order by n.updated_at desc;
 
 -- by words: full text over every note
 select path, title, ts_headline('english', body, q) as hit
@@ -209,7 +211,19 @@ where user_id = '<user>' and deleted_at is null and search_tsv @@ q
 order by ts_rank(search_tsv, q) desc limit 20;
 ```
 
-Read a note in full before you rely on it. Report progress on the run row
+Searching is cheap; reading is what costs. The vault is about 1,300 notes
+and well over a million words, far more than a run can read, so narrow
+first and read last:
+
+1. Search by name and by full text, which return paths, titles and a
+   highlighted line, not bodies.
+2. From those, choose the notes that plainly bear on the goal: usually five
+   to fifteen, never more than about twenty-five in a run.
+3. Read only those in full, and rely on nothing you have not read in full.
+
+A run with kept context on the goal starts from those rows and reads their
+notes again, and searches only for what has changed since
+(`updated_at > <the last run on the goal>`). Report progress on the run row
 while you search ("Reading the vault for job notes").
 
 ### What is already on the goal
@@ -850,8 +864,8 @@ wrote with `job` `weekly` (`inngest/goals/weekly.ts`). The run does two
 things, in this order: it reviews every open goal, then it researches the
 help the goals ask for.
 
-While reviewing, look for what is new since the last weekly run in the
-sources each goal draws on: the tables its kept context comes from, and the
+While reviewing, look for what is new since the last weekly run (rows with
+`created_at` or `updated_at` after it) in the sources each goal draws on: the tables its kept context comes from, and the
 `intent` sources in the catalogue. A new thoughts entry or a vault note
 written this week can change a goal's next move. Write what matters as
 context, proposed, and say so in the verdict's reason.
