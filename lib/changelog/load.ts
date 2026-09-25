@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { FEEDBACK_COLUMNS, feedbackRowFrom } from '@/lib/feedback/load';
 import { ITEM_COLUMNS, planItemFromRow } from '@/lib/plan/load';
+import { readAll } from '@/lib/learn/db/read-all';
 import { changelogEntries, type ChangelogEntry, type PlanParentRow } from './entries';
 
 /**
@@ -30,7 +31,7 @@ export async function loadChangelog(
   supabase: SupabaseClient<any, 'public'>,
   userId: string,
 ): Promise<ChangelogEntry[]> {
-  const [{ data: steps }, { data: notes }, { data: parents }] = await Promise.all([
+  const [{ data: steps }, { data: notes }, parents] = await Promise.all([
     supabase
       .from('plan_items')
       .select(ITEM_COLUMNS)
@@ -45,13 +46,22 @@ export async function loadChangelog(
       .eq('status', 'done')
       .order('completed_at', { ascending: false })
       .limit(LIMIT),
-    supabase.from('plan_items').select('id, number, title, parent_id').eq('user_id', userId),
+    // Every row, a page at a time: past a thousand, PostgREST drops the rest
+    // and a shipped step loses the feature it belongs to.
+    readAll<Record<string, unknown>>((from, to) =>
+      supabase
+        .from('plan_items')
+        .select('id, number, title, parent_id')
+        .eq('user_id', userId)
+        .order('id', { ascending: true })
+        .range(from, to),
+    ),
   ]);
 
   return changelogEntries({
     plan: ((steps ?? []) as unknown as Array<Record<string, unknown>>).map(planItemFromRow),
     notes: ((notes ?? []) as unknown as Array<Record<string, unknown>>).map(feedbackRowFrom),
-    planParents: ((parents ?? []) as unknown as Array<Record<string, unknown>>).map(
+    planParents: parents.map(
       (row): PlanParentRow => ({
         id: row.id as string,
         number: row.number as number,
