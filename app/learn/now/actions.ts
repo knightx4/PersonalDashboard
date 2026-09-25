@@ -26,6 +26,7 @@ import {
 import { settleIdeaFromSwipe } from '@/lib/learn/feed/ideas-store';
 import { startTrackFromCard } from '@/lib/learn/feed/test-me';
 import { makeTrackFromCard, startTrackFromOffer } from '@/lib/learn/lessons/new-track';
+import { recordRestingPress } from '@/lib/learn/lessons/resting-load';
 import { loadUnitForCheck, markUnitConceptsTested } from '@/lib/learn/lessons/unit-check-store';
 import { markUnitCheck } from '@/lib/learn/lessons/write-unit-check';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
@@ -401,4 +402,34 @@ export async function answerUnitCheck(id: string, response: string): Promise<Uni
   } catch (caught) {
     return { error: caught instanceof Error ? caught.message : 'Could not mark that.' };
   }
+}
+
+const RestingAnswer = z.enum(['picked_up', 'not_now', 'rested']);
+
+/**
+ * Pick it up, Not now or Let it rest, on a resting track offered back in
+ * Learn now (plan #1045). Each is kept in `learn.track_offers` as a `resting`
+ * row; what each one does is in `lib/learn/lessons/resting.ts`. Pick it up
+ * asks for a top-up once the response has gone, so the track's next lesson is
+ * written then rather than on the next hourly run.
+ */
+// latency: optimistic
+export async function answerRestingTrack(
+  subjectId: string,
+  outcome: string,
+): Promise<{ error?: string }> {
+  const user = await requireUser();
+  const track = CardId.safeParse(subjectId);
+  const answer = RestingAnswer.safeParse(outcome);
+  if (!track.success || !answer.success) return { error: 'Could not tell which track that was.' };
+
+  const supabase = await createLearnClient();
+  const kept = await recordRestingPress(supabase, user.id, track.data, answer.data).catch(
+    () => null,
+  );
+  if (kept === null) return { error: 'Could not keep that. Check your connection.' };
+  if (!kept) return { error: 'That track is no longer there.' };
+
+  if (answer.data === 'picked_up') after(() => topUpFeedAfterResponse(user.id));
+  return {};
 }

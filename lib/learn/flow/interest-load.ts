@@ -64,6 +64,11 @@ function fail(action: string, error: { message: string }): Error {
 
 const blank = (): TrackActivity => ({ answered: 0, skipped: 0, pushedAside: 0, answeredBefore: 0 });
 
+/** Move the track's last use up to `at` when `at` is later. */
+function used(track: TrackActivity, at: string) {
+  if (!track.lastUsed || new Date(at).getTime() > new Date(track.lastUsed).getTime()) track.lastUsed = at;
+}
+
 /** Every track's activity, weight and questions asked, as of `now`. */
 export async function loadTrackInterest(
   supabase: LearnSupabaseClient,
@@ -161,6 +166,7 @@ export async function loadTrackInterest(
     const track = of(subjectId);
 
     if (row.answered_at !== null) {
+      used(track, row.answered_at);
       if (inWindow(row.answered_at)) track.answered += 1;
       else track.answeredBefore += 1;
     } else if (inWindow(row.shown_at) && row.shown_at !== lastShown) {
@@ -182,6 +188,7 @@ export async function loadTrackInterest(
     if (!subjectId) continue;
     const track = of(subjectId);
     const taken = LESSON_TAKEN.has(lesson.status);
+    if (taken) used(track, lesson.acted_at);
     if (!inWindow(lesson.acted_at)) {
       if (taken) track.answeredBefore += 1;
     } else if (taken) {

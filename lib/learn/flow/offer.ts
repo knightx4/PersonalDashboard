@@ -252,6 +252,8 @@ export async function loadOfferRecord(supabase: LearnSupabaseClient): Promise<Of
   const { data, error } = await supabase
     .from('track_offers')
     .select('theme_id, theme_name, outcome, happened_at, subject_id')
+    // A resting track offered back (plan #1045) names no theme.
+    .eq('kind', 'theme')
     .order('happened_at', { ascending: false });
 
   assertSchemaExposed(error, LEARN_SCHEMA);
