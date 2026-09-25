@@ -59,3 +59,21 @@ export async function loadGoalRuns(
   const runs = toRunListings((data ?? []) as unknown as RunRowWithItem[]);
   return { runs: runs.slice(0, GOAL_RUNS_SHOWN), more: runs.length > GOAL_RUNS_SHOWN };
 }
+
+/**
+ * Runs that ended after `since`, for the catch-up on the Goals home after time
+ * away (plan #1019). The catch-up keeps the finished ones.
+ */
+export async function loadRunsEndedSince(
+  client: GoalsSupabaseClient,
+  since: string,
+): Promise<RunListing[]> {
+  const { data, error } = await client
+    .from('runs')
+    .select(RUN_SELECT)
+    .gt('ended_at', since)
+    .order('ended_at', { ascending: false })
+    .limit(RUNS_LIMIT);
+  if (error) throw new Error(`Could not read the runs since your last visit: ${error.message}`);
+  return toRunListings((data ?? []) as unknown as RunRowWithItem[]);
+}
