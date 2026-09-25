@@ -14,7 +14,7 @@ import { awaitsReview } from '@/lib/goals/daily';
 import { offersPrepare, offersSend, sendJob } from '@/lib/goals/handover';
 import type { GoalRowNode } from '@/lib/goals/plan-rows';
 import { progressLine } from '@/lib/goals/rhythms';
-import { countProposed } from '@/lib/goals/shaping';
+import { countProposed, type StepRunView } from '@/lib/goals/shaping';
 import { STEP_KIND_LABELS, countSteps, describeRhythm } from '@/lib/goals/steps';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import { canShowOnTodo } from '@/lib/goals/todo';
@@ -94,7 +94,52 @@ export type GoalRowContext = {
   opened: boolean;
   /** An information step's list as the gallery wants it. Nothing in the app passes it. */
   informationSeam?: InformationSeam;
+  /** The latest run on each step sent or prepared from its row, by step id (plan #1044). */
+  runs: Record<string, StepRunView>;
 };
+
+/**
+ * A sent or prepared step's latest run on its row (plan #1044): what it is on
+ * now while it goes, then why it failed or what it said it did, with the run's
+ * own page one press away. The wording follows an area's Plan this area line.
+ */
+function StepRunLine({ run, inset }: { run: StepRunView; inset: React.CSSProperties }) {
+  const details = (
+    <Link href={`/goals/runs/${run.runId}`} className="underline underline-offset-2">
+      Details
+    </Link>
+  );
+  if (run.running) {
+    return (
+      <li
+        style={inset}
+        role="status"
+        className="flex items-center gap-1.5 pb-1.5 pr-3 text-small text-accent"
+      >
+        <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-accent" aria-hidden />
+        <span>
+          Claude is on this · {run.running} · {details}
+        </span>
+      </li>
+    );
+  }
+  if (run.error) {
+    return (
+      <li style={inset} className="pb-1.5 pr-3 text-small text-danger">
+        The last run did not finish: {run.error} {details}
+      </li>
+    );
+  }
+  if (!run.summary) return null;
+  return (
+    <li style={inset} className="pb-1.5 pr-3 text-small text-ink-muted">
+      <Link href={`/goals/runs/${run.runId}`} className="underline-offset-2 hover:underline">
+        Last run
+      </Link>
+      : {run.summary}
+    </li>
+  );
+}
 
 /**
  * What a blocked step needs, asked for when Blocked is chosen from the health
@@ -333,6 +378,11 @@ export function GoalRow({
     ? [{ id: 'prepare', label: prepareLabel, formAction: prepareAction, formFields: { id: step.id } }]
     : [];
   const handedOver = (sendState.error ?? sendState.message) ? sendState : prepareState;
+  const run = context.runs[step.id];
+  // Once the page holds the run a press started, its line says what the
+  // press's message said and more, so the message gives way to it. A refusal
+  // is still said: it started nothing.
+  const pressNote = handedOver.error ?? (run?.running ? undefined : handedOver.message);
   const move = menuAction(moveStepAction);
   const menu: ActionMenuItem[] = [
     ...sendItems,
@@ -444,12 +494,14 @@ export function GoalRow({
             <BlockForm node={node} inset={rowInset(trail)} onDone={() => setBlocking(false)} />
           )}
           {/* What the last send or prepare did, or why it was refused, wherever it was pressed. */}
-          {(handedOver.error ?? handedOver.message) && (
+          {pressNote && (
             <li style={rowInset(trail)} className="pb-1.5 pr-3 text-small">
               <FieldError>{handedOver.error}</FieldError>
               {!handedOver.error && <span className="text-ink-muted">{handedOver.message}</span>}
             </li>
           )}
+          {/* The step's own latest run, read with the page (plan #1044). */}
+          {run && <StepRunLine run={run} inset={rowInset(trail)} />}
         </>
       }
       edit={

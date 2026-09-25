@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ListTree } from 'lucide-react';
 import { Progress, SectionTally } from '@/components/plan-tree/counts';
 import { ColumnHeader } from '@/components/plan-tree/grid';
@@ -9,11 +10,16 @@ import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
 import { goalCatalog, goalRows, numberSteps } from '@/lib/goals/plan-rows';
-import { countAside } from '@/lib/goals/shaping';
+import { countAside, type StepRunView } from '@/lib/goals/shaping';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import { GoalRow, type GoalRowContext } from './goal-row';
 import { StepComposer } from './step-parts';
 import type { InformationSeam } from './information-step';
+
+/** How often the page looks again while a step's run is going, as the Claude panel does. */
+const RUN_POLL_MS = 15_000;
+
+const NO_RUNS: Record<string, StepRunView> = {};
 
 /**
  * A goal's full tree (plan #925), drawn as the dev plan draws a module
@@ -31,9 +37,12 @@ export function StepTree({
   unfolded = true,
   opened = false,
   informationSeam,
+  runs = NO_RUNS,
 }: {
   map: GoalMap;
   todoOn: boolean;
+  /** The latest run on each step sent or prepared from its row, by step id (plan #1044). */
+  runs?: Record<string, StepRunView>;
   /** Start with every step's sub-steps showing. */
   unfolded?: boolean;
   /** Start with every step opened. A seam for the gallery; nothing in the app passes it. */
@@ -43,6 +52,15 @@ export function StepTree({
 }) {
   const [showAside, setShowAside] = useState(false);
   const aside = countAside(map.steps);
+  // While a step's run is going, read the page again now and then, so its
+  // row moves on to what the run is on now and then to how it ended.
+  const router = useRouter();
+  const anyRunning = Object.values(runs).some((run) => run.running !== null);
+  useEffect(() => {
+    if (!anyRunning) return;
+    const timer = setInterval(() => router.refresh(), RUN_POLL_MS);
+    return () => clearInterval(timer);
+  }, [anyRunning, router]);
 
   const { own, linked, context } = useMemo(() => {
     const numbers = numberSteps([map.steps, ...map.linked.map((entry) => [entry.step])]);
@@ -58,6 +76,7 @@ export function StepTree({
       unfolded,
       opened,
       informationSeam,
+      runs,
     };
     return {
       own: goalRows(map.steps, options),
@@ -67,7 +86,7 @@ export function StepTree({
       })),
       context,
     };
-  }, [map, todoOn, showAside, unfolded, opened, informationSeam]);
+  }, [map, todoOn, showAside, unfolded, opened, informationSeam, runs]);
 
   const substeps = own.rows.filter((row) => row.kind !== 'decision');
 
