@@ -892,6 +892,41 @@ describe('collections and records (plan #953)', () => {
     ]);
   });
 
+  it('dates a reading by the document the record was read from (plan #985)', async () => {
+    const [row] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into records (user_id, collection_id, data, as_of)
+      values (${userA}, ${collection}, '{"name": "Loan 3", "balance": 900}'::jsonb, '2026-09-02')
+      returning id`);
+    // A second read of the same statement changes nothing and writes nothing.
+    await asUser(userA, (tx) => tx`
+      update records set data = data || '{"balance": 900}'::jsonb, as_of = '2026-09-02' where id = ${row.id}`);
+    // Typed values carry no date and are read today.
+    await asUser(userA, (tx) => tx`
+      update records set data = data || '{"balance": 850}'::jsonb, as_of = null where id = ${row.id}`);
+    const readings = await admin<{ value: string; dated: boolean; today: boolean }[]>`
+      select value::text, read_on = date '2026-09-02' as dated, read_on = current_date as today
+      from readings where record_id = ${row.id} order by created_at`;
+    expect(readings).toEqual([
+      { value: '900', dated: true, today: false },
+      { value: '850', dated: false, today: true },
+    ]);
+  });
+
+  it('holds a collection to one ID field, of text or a number (plan #985)', async () => {
+    const fields = (extra: object) =>
+      JSON.stringify([{ key: 'loan_id', label: 'Loan ID', type: 'text', id: true }, extra]);
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into collections (user_id, name, fields)
+        values (${userA}, 'Two IDs', ${fields({ key: 'n', label: 'N', type: 'number', id: true })}::text::jsonb)`),
+    ).rejects.toThrow(/at most one ID field/);
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into collections (user_id, name, fields)
+        values (${userA}, 'Money ID', ${JSON.stringify([{ key: 'm', label: 'M', type: 'money', id: true }])}::text::jsonb)`),
+    ).rejects.toThrow(/only a text or number field can be the ID/);
+  });
+
   it('raises the version on a definition change and keeps old records intact', async () => {
     const loan = await addLoan({ name: 'Loan 2', kind: 'Federal' });
     const revised = [
