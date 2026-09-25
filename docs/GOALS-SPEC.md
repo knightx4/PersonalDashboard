@@ -148,7 +148,11 @@ the same allowance. So Goals runs on a schedule rather than on every change:
 - **Daily, early morning.** Work ready `claude` steps, shape newly added or
   foggy goals, and write the day's view. You open the app about once a day, so
   this is when the work has to be ready.
-- **Weekly.** Research for each goal of the kinds of help it asks for:
+- **Weekly.** A verdict on each open goal against its done-when: on track,
+  stalled or waiting on you, with one sentence on why and the next move,
+  shown on the goal's card on the Goals home. A goal with nothing done in
+  three weeks reads stalled, and its next move is proposed as a step
+  (plan #1018). Then research for each goal of the kinds of help it asks for:
   events, volunteer openings, reading, courses or job leads (plan #1028).
   Each suggestion carries its kind and has quick **going / not for me**
   buttons, and the next week's research for a kind reads the reactions to
@@ -404,6 +408,8 @@ A sketch for the migration, not the migration itself.
   whether it was kept.
 - `goals.suggestions`: what Claude suggested, the kind of help it is, your
   reaction, and whether it happened.
+- `goals.reviews`: the weekly verdict on each open goal, with why, the next
+  move, the step proposed for a stalled one, and the run that wrote it.
 - `goals.runs`: one row per routine run, as `plan_runs` does for the dev plan.
 - `goals.dependencies`: one row per step that cannot start until another
   step closes, with the loop and same-account checks `plan_dependencies` has

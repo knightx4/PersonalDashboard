@@ -107,7 +107,7 @@ describe('the brief', () => {
   };
 
   it('names each goal with its kinds and notes, its rhythms, and the run', () => {
-    const text = weeklyRunText({ userId: 'u1', runId: 'run-9', goals: [CITY, LEARNING], past: [] });
+    const text = weeklyRunText({ userId: 'u1', runId: 'run-9', review: [], goals: [CITY, LEARNING], past: [] });
     expect(text).toContain(
       'Goal "Get plugged into city life" (goals.items id g) asks for:\n- events: Brooklyn, weeknights\n- volunteering\n',
     );
@@ -122,6 +122,7 @@ describe('the brief', () => {
     const text = weeklyRunText({
       userId: 'u1',
       runId: 'run-9',
+      review: [],
       goals: [CITY, LEARNING],
       past: [
         suggestion({ title: 'Jazz at the park', reaction: 'going', attended: true, source: 'NYC Parks' }),
@@ -138,6 +139,32 @@ describe('the brief', () => {
     expect(text).not.toContain('Python course');
     expect(text.indexOf('\nevents:\n')).toBeLessThan(text.indexOf('\nvolunteering:\n'));
     expect(text.indexOf('\nvolunteering:\n')).toBeLessThan(text.indexOf('\nreading:\n'));
+  });
+
+  it('reviews every open goal first, and says so when there is nothing to research', () => {
+    const text = weeklyRunText({
+      userId: 'u1',
+      runId: 'run-9',
+      review: [
+        {
+          id: 'q',
+          title: 'Sleep by eleven',
+          acceptance: 'Asleep by eleven five nights a week for a month.',
+          lastDoneAt: null,
+          quietDays: 30,
+          stalled: true,
+          last: null,
+        },
+      ],
+      goals: [],
+      past: [],
+    });
+    expect(text).toContain('review every open goal below against its done-when');
+    expect(text).toContain('Goal "Sleep by eleven" (goals.items id q)\n- Done when: Asleep by eleven');
+    expect(text).toContain('the verdict is stalled, with a proposed next step');
+    expect(text).toContain('nothing to research');
+    expect(text).not.toContain('What you suggested before');
+    expect(text).toContain('run_id on every review and\nsuggestion');
   });
 
   it('reads a start time before a bare date', () => {

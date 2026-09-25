@@ -17,6 +17,7 @@
  */
 import { HELP_KINDS, isHelpKind, type HelpKind, type HelpKindChoice } from '@/lib/goals/help-kinds';
 import type { LiveRhythm } from '@/lib/goals/rhythms';
+import { reviewLines, type ReviewGoal } from '@/lib/goals/reviews';
 import type { Goal } from '@/lib/goals/tree';
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -213,16 +214,20 @@ export function kindsAskedFor(goals: HelpGoal[]): HelpKind[] {
 
 /**
  * The turn appended to the goals routine's standing prompt for the weekly
- * run. It names the account and the run row already written, then each goal
- * with the kinds of help it asks for, and under each kind asked for, every
- * reaction to that kind from the last few weeks.
+ * run. It names the account and the run row already written, then every open
+ * goal to review against its done-when (plan #1018), then each goal with the
+ * kinds of help it asks for, and under each kind asked for, every reaction to
+ * that kind from the last few weeks. A week when no goal asks for help is a
+ * review and nothing else.
  */
 export function weeklyRunText(input: {
   userId: string;
   runId: string;
+  review: ReviewGoal[];
   goals: HelpGoal[];
   past: Suggestion[];
 }): string {
+  const review = input.review.flatMap((g) => [...reviewLines(g), '']);
   const goals = input.goals.flatMap((g) => [
     `Goal "${g.title}" (goals.items id ${g.id}) asks for:`,
     ...g.helpKinds.map(({ kind, note }) => `- ${kind}${note ? `: ${note}` : ''}`),
@@ -244,22 +249,35 @@ export function weeklyRunText(input: {
       '',
     ];
   });
+  const research =
+    input.goals.length > 0
+      ? [
+          'Then find the help each goal below asks for, one kind at a time.',
+          '',
+          ...goals,
+          'What you suggested before of each kind, and what the person did with it (newest first):',
+          '',
+          ...past,
+          'Follow .claude/skills/goals/SKILL.md, the section "The weekly run", and its part for each',
+          'kind. Write each find to goals.suggestions with kind set to the kind it answers, a link,',
+          'and item_id set to the goal it is for, or to the rhythm it counts towards when it is an',
+          'event or a volunteer opening for a goal with one. Within each kind, lean towards what was',
+          'marked going and away from what was marked not for me or left without an answer. Never',
+          "write a reaction or attended: those are the person's.",
+          '',
+        ]
+      : ['No goal asks for weekly help this week, so there is nothing to research.', ''];
   return [
-    'The weekly run: find the help each goal below asks for, one kind at a time.',
+    'The weekly run. First, review every open goal below against its done-when: one row in',
+    'goals.reviews each, with a verdict of on_track, stalled or waiting_on_you, one sentence on',
+    'why and one on the next move. A stalled goal also gets that next move as a proposed step',
+    'under it, named in the review as step_id. Follow .claude/skills/goals/SKILL.md, "Reviewing',
+    'each goal".',
     '',
-    ...goals,
-    'What you suggested before of each kind, and what the person did with it (newest first):',
-    '',
-    ...past,
-    'Follow .claude/skills/goals/SKILL.md, the section "The weekly run", and its part for each',
-    'kind. Write each find to goals.suggestions with kind set to the kind it answers, a link,',
-    'and item_id set to the goal it is for, or to the rhythm it counts towards when it is an',
-    'event or a volunteer opening for a goal with one. Within each kind, lean towards what was',
-    'marked going and away from what was marked not for me or left without an answer. Never',
-    "write a reaction or attended: those are the person's.",
-    '',
+    ...review,
+    ...research,
     `The goals belong to user_id ${input.userId}. This run is goals.runs id ${input.runId},`,
-    'already written as started. Set goals.run_id to it and run_id on every suggestion, and',
-    'close that row with a summary (or as failed, with the reason) before you stop.',
+    'already written as started. Set goals.run_id to it, and run_id on every review and',
+    'suggestion, and close that row with a summary (or as failed, with the reason) before you stop.',
   ].join('\n');
 }
