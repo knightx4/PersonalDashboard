@@ -382,7 +382,10 @@ A sketch for the migration, not the migration itself.
   one table for features and steps. `area_id` on top-level rows, `parent_id`
   below them, `level` (`goal` or `step`), `kind`, `status`, `title`, `detail`,
   `acceptance`, `fog`, `resolution`, `due_on`, `on_todo`, `approved_at`,
-  `position`, and `rhythm_count` with `rhythm_period` for rhythms.
+  `position`, and `rhythm_count` with `rhythm_period` for rhythms. A goal's
+  `help_kinds` lists the weekly help it asks for, each an entry of `kind`
+  (events, volunteering, reading, courses or job_leads) and a `note` on what
+  to look for (plan #1027).
 - `goals.item_goals`: extra goals a step counts towards, beyond its own
   parent.
 - `goals.links`: a goal or step to a Learn aim, a job application, a role.

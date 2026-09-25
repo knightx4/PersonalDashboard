@@ -28,6 +28,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { Card } from '@/components/ui/card';
 import { GoalThread } from './goal-comments';
+import { GoalHelp } from './goal-help';
 import { GoalLinksSection } from './goal-links';
 import { GoalNumber } from './goal-number';
 import { GoalFog, GoalShaping } from './goal-shaping';
@@ -140,6 +141,7 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
           readings={readings}
           today={today}
         />
+        <GoalHelp goalId={map.goal.id} helpKinds={map.goal.helpKinds ?? []} />
         <GoalLinksSection
           goalId={map.goal.id}
           links={links}

@@ -7,6 +7,8 @@
  * are in lib/goals/store.ts.
  */
 
+import type { HelpKindChoice } from '@/lib/goals/help-kinds';
+
 /** The limits the table's checks set (supabase/migrations-goals/0001). */
 export const AREA_NAME_MAX = 200;
 export const GOAL_TITLE_MAX = 500;
@@ -37,6 +39,8 @@ export type Goal = {
   unit: string | null;
   /** The value it is aiming for, when it has a unit and one is set. */
   target: number | null;
+  /** The kinds of weekly help it asks for (plan #1027). Read on the goal page only. */
+  helpKinds?: HelpKindChoice[];
 };
 
 export type AreaWithGoals = Area & { goals: Goal[] };
