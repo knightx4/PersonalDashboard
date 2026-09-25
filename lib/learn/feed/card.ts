@@ -376,3 +376,27 @@ export const PRELOAD_AHEAD = 4;
 export function feedEnd(ready: number, low: number): 'writing' | 'passed' {
   return ready < low ? 'writing' : 'passed';
 }
+
+/**
+ * Cards passed before the track offer comes up (plan #968). Not first, so a
+ * visit opens on something to read, and early, so the offer is seen on a
+ * short visit too.
+ */
+export const OFFER_AFTER = 2;
+
+/**
+ * Whether the visit's track offer is on the screen instead of the next card:
+ * once `OFFER_AFTER` cards are passed, or sooner when there is no card to show.
+ * One offer a visit, and it stays until one of its three buttons is pressed.
+ */
+export function offerDue(passed: number, cardsLeft: number): boolean {
+  return passed >= OFFER_AFTER || cardsLeft === 0;
+}
+
+/**
+ * Whether a card carries "Make this a track": an exploratory card, made from a
+ * section, does. A lesson is already in a track.
+ */
+export function canMakeTrack(card: Pick<FeedCard, 'kind' | 'article'>): boolean {
+  return card.kind === 'section' && card.article.trim() !== '';
+}

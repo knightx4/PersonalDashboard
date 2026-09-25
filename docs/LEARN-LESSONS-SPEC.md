@@ -250,8 +250,11 @@ Each step ships on its own.
 1. **Lessons for track concepts.** Built (plan #978). The top-up writes lessons
    for the ready concepts of tracks you already have, by track weight, with
    exploratory cards at one in five. Swipes set the concept's state.
-2. **Track offers in the feed.** Themes with no track are offered as cards, and
-   exploratory cards carry "Make this a track".
+2. **Track offers in the feed.** Built (plan #968). One offer a visit, chosen
+   as Practice Flow chooses it and shown after the second card; Start writes
+   the track and its curriculum, and Not now and Never go through Practice
+   Flow's own action. "Make this a track" on a section card makes the article a
+   track with a curriculum, and the top-up lays out its first unit.
 3. **Units written as you go.** New tracks start with three or four units, and
    a unit is added when a track runs short.
 4. **Too hard adds a prerequisite.**
