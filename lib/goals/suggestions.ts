@@ -7,7 +7,8 @@
  * reading, courses, job leads; plan #1027 and #1028). The routine writes each
  * find to goals.suggestions with its kind and a link, and a date when it has
  * one. You press going or not for me on the Goals home; going puts it on
- * Todo on its date, and ticking it there records that you went. A suggestion
+ * Todo on its date, and ticking it there records that you went. From the day
+ * after, the home asks whether you went, and yes or no is recorded too. A suggestion
  * nobody reacted to within the week is marked ignored. The next week's brief
  * lists every reaction from the last few weeks under its kind, so the
  * research for each kind follows what you picked of that kind.
@@ -166,6 +167,33 @@ export function todoSuggestions(all: Suggestion[], today: string, to: string): S
       s.attended === null &&
       (s.happensOn === null || (s.happensOn >= today && s.happensOn <= to)),
   );
+}
+
+/** How many days after an event the home keeps asking whether you went. */
+export const ASK_WENT_DAYS = 14;
+
+/**
+ * What the home asks "Did you go?" about (plan #1020): each suggestion you
+ * said you are going to, not yet answered or ticked on Todo, whose date is
+ * before today and no more than ASK_WENT_DAYS back, most recent first. One
+ * with no date is never asked about, since there is no day after it; it stays
+ * on Todo until ticked. One older than that stops being asked about rather
+ * than piling up, and is left unanswered.
+ */
+export function didYouGoSuggestions(going: Suggestion[], today: string): Suggestion[] {
+  const oldest = new Date(Date.parse(`${today}T00:00:00Z`) - ASK_WENT_DAYS * DAY_MS)
+    .toISOString()
+    .slice(0, 10);
+  return going
+    .filter(
+      (s) =>
+        s.reaction === 'going' &&
+        s.attended === null &&
+        s.happensOn !== null &&
+        s.happensOn < today &&
+        s.happensOn >= oldest,
+    )
+    .sort((a, b) => (b.happensOn ?? '').localeCompare(a.happensOn ?? ''));
 }
 
 function when(s: Pick<Suggestion, 'happensOn' | 'startsAt'>): string | null {
