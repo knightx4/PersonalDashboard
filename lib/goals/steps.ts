@@ -11,6 +11,7 @@
  * rows, what a valid step is, and what a step looks like at a glance. The
  * reads and writes are in lib/goals/steps-store.ts.
  */
+import type { StepQuestion } from '@/lib/goals/answers';
 import type { StepBlockKind, StepLink, StepRef } from '@/lib/goals/dependencies';
 import type { GoalStatus } from '@/lib/goals/tree';
 
@@ -78,6 +79,8 @@ export type Step = {
   collectionId?: string | null;
   /** The field keys it needs filled; null for every field the form shows. */
   asksFor?: string[] | null;
+  /** The questions it has to answer; it closes once each has an answer (plan #991). */
+  questions?: StepQuestion[];
   /** What a blocked step needs, in one sentence: its Needs line (plan #981). */
   blockAsk?: string | null;
   /** Who clears the block: `steps` when the steps it waits on close, `outside` when you do. */

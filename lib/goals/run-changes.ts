@@ -135,6 +135,7 @@ const FIELD_WORDS: Record<string, string> = {
   acceptance: 'done when',
   due_on: 'the due date',
   asks_for: 'what it asks for',
+  questions: 'its questions',
   collection_id: 'the collection',
   block_ask: 'what it is waiting on',
   block_kind: 'what it is waiting on',

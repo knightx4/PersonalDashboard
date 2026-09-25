@@ -1421,6 +1421,62 @@ describe('worked-out answers on an information step (plan #989)', () => {
     ).toHaveLength(1);
     expect(await asUser(userB, (tx) => tx`select id from answers`)).toHaveLength(0);
   });
+
+  async function statusOf(step: string): Promise<string> {
+    const [row] = await admin<{ status: string }[]>`select status from items where id = ${step}`;
+    return row.status;
+  }
+
+  const QUESTIONS = JSON.stringify([
+    { key: 'first_payment', question: 'When does my first payment fall due?' },
+    { key: 'monthly_total', question: 'What is the monthly total?' },
+  ]);
+
+  it('closes the step once every question has a current answer with sources (plan #991)', async () => {
+    const { step, loans } = await loansStep();
+    await asUser(userA, (tx) => tx`
+      update items set questions = (${QUESTIONS}::text)::jsonb where id = ${step}`);
+    // Every field filled, one question answered, one answered without sources.
+    await answer(step, 'first_payment', sourcesOf(loans));
+    const total = await answer(step, 'monthly_total', '[]');
+    await answer(step, 'daily_interest', '[]');
+    expect(await statusOf(step)).toBe('open');
+
+    await admin`update records set data = data || '{"balance": 999}'::jsonb where id = ${loans[0]}`;
+    await admin`update answers set sources = (${sourcesOf(loans)}::text)::jsonb where id = ${total}`;
+    // first_payment went out of date with the change, so the step waits for it.
+    expect(await statusOf(step)).toBe('open');
+
+    await admin`update answers set out_of_date_at = null where item_id = ${step} and key = 'first_payment'`;
+    expect(await statusOf(step)).toBe('done');
+  });
+
+  it('closes on a question list every answer already covers, and never without questions', async () => {
+    const { step, loans } = await loansStep();
+    await answer(step, 'first_payment', sourcesOf(loans));
+    await answer(step, 'monthly_total', sourcesOf(loans));
+    expect(await statusOf(step)).toBe('open');
+
+    await asUser(userA, (tx) => tx`
+      update items set questions = (${QUESTIONS}::text)::jsonb where id = ${step}`);
+    expect(await statusOf(step)).toBe('done');
+  });
+
+  it('refuses a malformed question list, and questions on a step without a collection', async () => {
+    const { step } = await loansStep();
+    await expect(
+      admin`update items set questions = '[{"key": "Bad", "question": "x"}]'::jsonb where id = ${step}`,
+    ).rejects.toThrow(/items_questions_ck/);
+    await expect(
+      admin`update items set questions = '[{"key": "a", "question": "x"}, {"key": "a", "question": "y"}]'::jsonb where id = ${step}`,
+    ).rejects.toThrow(/items_questions_ck/);
+    const [plain] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Call the servicer') returning id`;
+    await expect(
+      admin`update items set questions = '[{"key": "a", "question": "x"}]'::jsonb where id = ${plain.id}`,
+    ).rejects.toThrow(/items_questions_ck/);
+  });
 });
 
 describe('RLS coverage', () => {

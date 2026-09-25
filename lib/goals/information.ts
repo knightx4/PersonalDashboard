@@ -5,16 +5,15 @@
  *
  * The step names its collection (goals.items.collection_id) and, optionally,
  * the fields it needs filled (asks_for; every shown field when it is null).
- * This file decides what the form shows and when the step has what it asked
- * for. The rule for closing:
+ * This file decides what the form shows and when the step is done.
  *
- *   - A one-record collection is complete when its record is confirmed and
- *     has every asked field filled. The save that completes it closes the
- *     step.
- *   - A list is never complete from its rows alone, since the app cannot know
- *     there is not another loan to come. When every row is confirmed and
- *     filled, the step offers "That is all of them", and pressing it closes
- *     the step.
+ * The rule for closing (plan #991, from #988's answer): a step closes when
+ * each of its questions (items.questions) has an answer with its sources,
+ * not when its fields are filled. The fields are how the goals routine
+ * reaches the answers. The database closes the step when the last answer
+ * lands (migrations-goals 0035), since the routine writes answers through
+ * SQL; this file counts the same thing for the page. A step with no
+ * questions never closes itself: the person closes it.
  *
  * A draft is a record found for you, in Gmail or a document, that you have
  * not confirmed. It counts for nothing until you do.
@@ -29,6 +28,7 @@ import {
   type RecordSource,
 } from '@/lib/goals/collections';
 import { formatMoney } from '@/lib/money';
+import type { StepAnswer, StepQuestion } from '@/lib/goals/answers';
 
 /** The fields the step needs filled: those it names, or every shown field. */
 export function askedFields(
@@ -51,6 +51,15 @@ export function missingFields(
   return asked.filter((f) => data[f.key] === null || data[f.key] === undefined);
 }
 
+/**
+ * Whether an answer settles its question: it names at least one row and no
+ * row it read has changed since. The same rule the database closes the step
+ * by (goals.close_answered_step, migrations-goals 0035).
+ */
+export function settles(answer: Pick<StepAnswer, 'sources' | 'outOfDateAt'> | undefined): boolean {
+  return !!answer && answer.sources.length > 0 && answer.outOfDateAt === null;
+}
+
 export type InformationRecord = { id: string; data: Record<string, FieldValue>; draft: boolean };
 
 export type InformationProgress = {
@@ -60,47 +69,52 @@ export type InformationProgress = {
   drafts: number;
   /** Records with an asked field still empty. */
   unfilled: number;
-  /** The collection has what the step asked for (a list also needs you to say it is whole). */
+  /** The questions the step has to answer. */
+  questions: number;
+  /** The questions still without a current answer with sources, in order. */
+  open: StepQuestion[];
+  /** Every question is answered: the step has what it is for. */
   complete: boolean;
 };
 
 export function informationProgress(
-  shape: CollectionShape,
   asked: CollectionField[],
   records: InformationRecord[],
+  questions: StepQuestion[],
+  answers: Pick<StepAnswer, 'key' | 'sources' | 'outOfDateAt'>[],
 ): InformationProgress {
   const drafts = records.filter((r) => r.draft).length;
   const unfilled = records.filter((r) => missingFields(asked, r.data).length > 0).length;
-  const count = records.length;
-  const complete = count > 0 && drafts === 0 && unfilled === 0 && (shape === 'list' || count === 1);
-  return { count, drafts, unfilled, complete };
+  const byKey = new Map(answers.map((a) => [a.key, a]));
+  const open = questions.filter((q) => !settles(byKey.get(q.key)));
+  return {
+    count: records.length,
+    drafts,
+    unfilled,
+    questions: questions.length,
+    open,
+    complete: questions.length > 0 && open.length === 0,
+  };
 }
 
 /**
- * Whether a write should close the step. Only a one-record collection closes
- * on its own; a list waits for "That is all of them".
+ * Why the step is still open, naming the questions without an answer, or
+ * null when every one has one.
  */
-export function closesOnSave(shape: CollectionShape, progress: InformationProgress): boolean {
-  return shape === 'one' && progress.complete;
-}
-
-/** Why a list cannot be called whole yet, or null when it can. */
 export function unfinishedReason(progress: InformationProgress): string | null {
-  if (progress.count === 0) return 'Add at least one row first.';
-  if (progress.drafts > 0) {
-    return progress.drafts === 1
-      ? 'One row is a draft. Confirm or correct it first.'
-      : `${progress.drafts} rows are drafts. Confirm or correct them first.`;
+  if (progress.questions === 0) {
+    return 'No questions yet. Add what this step has to answer, and it closes once each has an answer.';
   }
-  if (progress.unfilled > 0) {
-    return progress.unfilled === 1
-      ? 'One row still has an empty field the step needs.'
-      : `${progress.unfilled} rows still have empty fields the step needs.`;
-  }
-  return null;
+  if (progress.open.length === 0) return null;
+  const quoted = progress.open.map((q) => `“${q.question}”`);
+  const list =
+    quoted.length === 1
+      ? quoted[0]
+      : `${quoted.slice(0, -1).join(', ')} and ${quoted[quoted.length - 1]}`;
+  return `Still to answer: ${list}`;
 }
 
-/** One line on the step: how far the collection has got. */
+/** One line on the step: how far the collection and its questions have got. */
 export function progressLine(shape: CollectionShape, progress: InformationProgress): string {
   const parts: string[] = [];
   if (shape === 'list') {
@@ -114,6 +128,12 @@ export function progressLine(shape: CollectionShape, progress: InformationProgre
     );
   if (progress.unfilled > 0)
     parts.push(progress.unfilled === 1 ? '1 with gaps' : `${progress.unfilled} with gaps`);
+  if (progress.questions > 0) {
+    const answered = progress.questions - progress.open.length;
+    parts.push(
+      `${answered} of ${progress.questions} ${progress.questions === 1 ? 'question' : 'questions'} answered`,
+    );
+  }
   return parts.join(', ');
 }
 

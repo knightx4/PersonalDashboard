@@ -108,7 +108,7 @@ with recursive tree as (
   where c.archived_at is null
 )
 select id, parent_id, depth, kind, status, title, detail, acceptance, resolution,
-       dismissed_at, collection_id, asks_for, position, due_on, rhythm_count,
+       dismissed_at, collection_id, asks_for, questions, position, due_on, rhythm_count,
        rhythm_period, block_ask, block_kind
 from tree order by depth, position;
 
@@ -374,8 +374,13 @@ balances" with nowhere to list them is the gap these close.
    changes; add a new field instead. The database refuses a definition that
    breaks any of this and names the field.
 3. **Serve it to the goal and point the step at it.** `asks_for` lists the
-   field keys the step needs; leave it null when it needs every field. The
-   step closes itself once the collection holds what it asks for.
+   field keys the step needs; leave it null when it needs every field.
+   `questions` lists what the step has to answer, in order, as
+   `[{"key": "first_payment", "question": "When does my first payment fall
+   due?"}]`: keys are lower case, digits and `_`, unique on the step, and
+   they are the keys the answers carry (see "Answers on an information
+   step"). Write at least one. The step closes itself once every question
+   has a current answer with sources, not when the fields are filled.
 
 ```sql
 set local goals.actor = 'claude';
@@ -397,18 +402,22 @@ with c as (
   select '<user>', id, '<goal id>' from c
 )
 insert into goals.items (user_id, level, parent_id, kind, title, acceptance,
-                         collection_id, asks_for, status, position)
+                         collection_id, asks_for, questions, status, position)
 select '<user>', 'step', '<phase id>', 'mine',
        'Every loan listed with balance, rate and minimum',
        'Each loan has a confirmed row with its balance, rate and minimum payment.',
-       id, array['name', 'balance', 'rate', 'minimum'], 'open', 10
+       id, array['name', 'balance', 'rate', 'minimum'],
+       '[{"key": "first_payment", "question": "When does my first payment fall due?"},
+         {"key": "monthly_total", "question": "What is the monthly total?"}]'::jsonb,
+       'open', 10
 from c
 returning id, collection_id;
 ```
 
 An existing step that already asks for these facts (say "List your loan
 balances, rates and minimum payments") is pointed at the collection with an
-update of `collection_id` and `asks_for`, rather than written again.
+update of `collection_id`, `asks_for` and `questions`, rather than written
+again.
 
 ### Pre-filling from Gmail
 
@@ -454,8 +463,11 @@ step shows them above its figures. The person never types an answer; they
 are yours to write and keep current.
 
 - `key` names the question on its step (`first_payment`, `monthly_total`),
-  lower case, digits and `_`. One row per key; rewrite a row rather than
-  adding a second.
+  lower case, digits and `_`. Use the key the step's `questions` gives the
+  question; a question the person added has a key made from its words. One
+  row per key; rewrite a row rather than adding a second. When the last of
+  the step's questions gets a current answer with sources, the database
+  closes the step (migrations-goals 0035); do not close it yourself.
 - `question` is the question as the step shows it; `answer` is one sentence
   a person can act on ("18 Dec 2026, for both Grad PLUS loans; the
   Unsubsidized loans follow on 19 Dec."). Say "about" where an amount rests

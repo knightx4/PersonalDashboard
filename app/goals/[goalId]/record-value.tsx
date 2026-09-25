@@ -1,7 +1,6 @@
 'use client';
 
 import { useActionState, useEffect, useId, useRef, useState } from 'react';
-import { useToast } from '@/components/ui/toast';
 import type { CollectionField, FieldValue } from '@/lib/goals/collections';
 import { VALUE_PREFIX, displayValue, inputValue } from '@/lib/goals/information';
 import { cn } from '@/lib/cn';
@@ -45,14 +44,10 @@ export function RecordValue({
   inTable?: boolean;
 }) {
   const [editing, setEditing] = useState(startEditing);
-  const toast = useToast();
   const [state, save, saving] = useActionState(
     async (prev: InformationActionState, form: FormData) => {
       const result = await saveRecordAction(prev, form);
-      if (!result.error) {
-        if (result.closed) toast({ text: 'Saved. The step has what it asked for and is closed.' });
-        setEditing(false);
-      }
+      if (!result.error) setEditing(false);
       return result;
     },
     initial,

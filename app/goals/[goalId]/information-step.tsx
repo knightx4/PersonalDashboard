@@ -5,11 +5,17 @@ import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Disclosure, Group } from '@/components/ui/disclosure';
-import { Field } from '@/components/ui/field';
+import { Field, Input } from '@/components/ui/field';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
-import { sourcesLine, type StepAnswer } from '@/lib/goals/answers';
+import {
+  MAX_QUESTION_LENGTH,
+  QUESTION_PREFIX,
+  sourcesLine,
+  type StepAnswer,
+  type StepQuestion,
+} from '@/lib/goals/answers';
 import { idField, liveFields, type CollectionField } from '@/lib/goals/collections';
 import type { Collection, CollectionRecord } from '@/lib/goals/collections-store';
 import {
@@ -27,7 +33,7 @@ import type { StepNode } from '@/lib/goals/steps';
 import {
   archiveRecordAction,
   confirmRecordAction,
-  finishListAction,
+  saveQuestionsAction,
   saveRecordAction,
   type InformationActionState,
 } from './information-actions';
@@ -74,16 +80,22 @@ export function InformationStep({
   seam?: InformationSeam;
 }) {
   const asked = askedFields(collection.fields, node.asksFor ?? null);
-  const progress = informationProgress(collection.shape, asked, records);
+  const questions = node.questions ?? [];
+  const progress = informationProgress(asked, records, questions, answers);
   const line = progressLine(collection.shape, progress);
-  const open = node.status === 'open';
+  const reason = node.status === 'open' ? unfinishedReason(progress) : null;
 
   return (
     <div className="mt-2 space-y-2 px-1">
-      {answers.length > 0 && (
-        <Answers answers={answers} fields={collection.fields} records={records} />
-      )}
+      <Questions
+        stepId={node.id}
+        questions={questions}
+        answers={answers}
+        fields={collection.fields}
+        records={records}
+      />
       {line && <p className="text-small text-ink-muted">{line}</p>}
+      {reason && <p className="text-small text-ink-muted">{reason}</p>}
       {collection.shape === 'one' ? (
         <OneRecord node={node} collection={collection} record={records[0] ?? null} asked={asked} />
       ) : (
@@ -92,7 +104,6 @@ export function InformationStep({
           collection={collection}
           records={records}
           asked={asked}
-          canFinish={open && unfinishedReason(progress) === null}
           seam={seam}
         />
       )}
@@ -101,40 +112,153 @@ export function InformationStep({
 }
 
 /**
- * What the step's figures answer, above the figures themselves: each question
- * with the answer the goals routine worked out, and a line naming the rows it
- * read and the date of their figures. An answer whose rows have changed since
- * says so until the morning run works it again.
+ * What the step has to answer, above the figures that answer it (plans #989,
+ * #991): each question with the answer the goals routine worked out, and a
+ * line naming the rows it read and the date of their figures, or that it is
+ * not answered yet. An answer whose rows have changed since says so until the
+ * morning run works it again. An answer to a question the step no longer
+ * lists is still shown, after the rest. The questions are edited here.
  */
-function Answers({
+function Questions({
+  stepId,
+  questions,
   answers,
   fields,
   records,
 }: {
+  stepId: string;
+  questions: StepQuestion[];
   answers: StepAnswer[];
   fields: CollectionField[];
   records: CollectionRecord[];
 }) {
+  const [editing, setEditing] = useState(false);
+  const byKey = new Map(answers.map((a) => [a.key, a]));
+  const listed = new Set(questions.map((q) => q.key));
+  const rows = [
+    ...questions.map((q) => ({ key: q.key, question: q.question, answer: byKey.get(q.key) })),
+    ...answers
+      .filter((a) => !listed.has(a.key))
+      .map((a) => ({ key: a.key, question: a.question, answer: a })),
+  ];
+
+  if (editing) {
+    return (
+      <QuestionsForm stepId={stepId} questions={questions} onDone={() => setEditing(false)} />
+    );
+  }
   return (
-    <ValueList>
-      {answers.map((a) => (
-        <ValueRow
-          key={a.id}
-          label={a.question}
-          value={
-            <div className="space-y-0.5">
-              <p>{a.answer}</p>
-              <p className="text-small text-ink-muted">{sourcesLine(a.sources, fields, records)}</p>
-              {a.outOfDateAt && (
-                <p className="text-small text-caution">
-                  Out of date: a row it used has changed. The morning run works it out again.
-                </p>
-              )}
-            </div>
-          }
-        />
+    <div className="space-y-1">
+      {rows.length > 0 && (
+        <ValueList>
+          {rows.map(({ key, question, answer }) => (
+            <ValueRow
+              key={key}
+              label={question}
+              value={
+                answer ? (
+                  <div className="space-y-0.5">
+                    <p>{answer.answer}</p>
+                    <p className="text-small text-ink-muted">
+                      {sourcesLine(answer.sources, fields, records)}
+                    </p>
+                    {answer.outOfDateAt && (
+                      <p className="text-small text-caution">
+                        Out of date: a row it used has changed. The morning run works it out again.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-ink-muted">Not answered yet</p>
+                )
+              }
+            />
+          ))}
+        </ValueList>
+      )}
+      <AddTrigger
+        label={questions.length > 0 ? 'Edit the questions' : 'Add the questions it answers'}
+        onClick={() => setEditing(true)}
+      />
+    </div>
+  );
+}
+
+/**
+ * The step's questions as inputs, one per question and one blank for a new
+ * one. Clearing a question's text takes it off the step. Escape or Cancel
+ * closes it.
+ */
+function QuestionsForm({
+  stepId,
+  questions,
+  onDone,
+}: {
+  stepId: string;
+  questions: StepQuestion[];
+  onDone: () => void;
+}) {
+  const toast = useToast();
+  const formId = useId();
+  const [state, save, saving] = useActionState(
+    async (prev: InformationActionState, form: FormData) => {
+      const result = await saveQuestionsAction(prev, form);
+      if (!result.error) {
+        toast({
+          text: result.closed
+            ? 'Saved. Every question has its answer, so the step is closed.'
+            : 'Questions saved.',
+        });
+        onDone();
+      }
+      return result;
+    },
+    initial,
+  );
+  return (
+    <form
+      action={save}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') onDone();
+      }}
+      className="space-y-3 rounded-control bg-sunken p-3"
+    >
+      <input type="hidden" name="stepId" value={stepId} />
+      {questions.map((q, i) => (
+        <Field key={q.key} id={`${formId}-${q.key}`} label={`Question ${i + 1}`}>
+          <Input
+            id={`${formId}-${q.key}`}
+            name={`${QUESTION_PREFIX}${q.key}`}
+            defaultValue={q.question}
+            maxLength={MAX_QUESTION_LENGTH}
+          />
+        </Field>
       ))}
-    </ValueList>
+      <Field
+        id={`${formId}-new`}
+        label={questions.length > 0 ? 'Another question (optional)' : 'What does this step answer?'}
+      >
+        <Input
+          id={`${formId}-new`}
+          name={`${QUESTION_PREFIX}new`}
+          maxLength={MAX_QUESTION_LENGTH}
+          placeholder="When does my first payment fall due?"
+        />
+      </Field>
+      <p className="text-small text-ink-muted">
+        The step closes once each question has an answer with the rows it came from. Clear a
+        question to take it off.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="submit" size="sm" pending={saving}>
+          Save
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={onDone}>
+          Cancel
+        </Button>
+        {state.error && <span className="text-small text-danger">{state.error}</span>}
+      </div>
+    </form>
   );
 }
 
@@ -283,23 +407,17 @@ function RecordTable({
   collection,
   records,
   asked,
-  canFinish,
   seam,
 }: {
   node: StepNode;
   collection: Collection;
   records: CollectionRecord[];
   asked: CollectionField[];
-  canFinish: boolean;
   seam?: InformationSeam;
 }) {
   const [adding, setAdding] = useState(false);
   const [opened, setOpened] = useState<string | null>(seam?.openRow ?? null);
   const [filling, setFilling] = useState(false);
-  const [finishState, finish, finishing] = useActionState(
-    async (_prev: InformationActionState, form: FormData) => finishListAction(form),
-    initial,
-  );
   const toast = useToast();
   const askedKeys = new Set(asked.map((f) => f.key));
   const id = idField(collection.fields);
@@ -435,15 +553,6 @@ function RecordTable({
         <div className="flex flex-wrap items-center gap-3">
           <AddTrigger label="Add a row" onClick={() => setAdding(true)} />
           <AddTrigger label="Fill in from text or a document" onClick={() => setFilling(true)} />
-          {canFinish && (
-            <form action={finish}>
-              <input type="hidden" name="stepId" value={node.id} />
-              <Button type="submit" size="sm" variant="secondary" pending={finishing}>
-                That is all of them
-              </Button>
-            </form>
-          )}
-          {finishState.error && <span className="text-small text-danger">{finishState.error}</span>}
         </div>
       )}
     </div>
@@ -539,8 +648,6 @@ function ConfirmButton({
     async (_prev: InformationActionState, form: FormData) => {
       const result = await confirmRecordAction(form);
       if (result.error) toast({ text: result.error });
-      else if (result.closed)
-        toast({ text: 'Confirmed. The step has what it asked for and is closed.' });
       return result;
     },
     initial,
@@ -583,14 +690,10 @@ function AddRecordForm({
   onDone: () => void;
   onCancel: () => void;
 }) {
-  const toast = useToast();
   const [state, save, saving] = useActionState(
     async (prev: InformationActionState, form: FormData) => {
       const result = await saveRecordAction(prev, form);
-      if (!result.error) {
-        if (result.closed) toast({ text: 'Saved. The step has what it asked for and is closed.' });
-        onDone();
-      }
+      if (!result.error) onDone();
       return result;
     },
     initial,
