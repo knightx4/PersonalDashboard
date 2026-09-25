@@ -1,3 +1,4 @@
+import type { AddedFloor, FloorDue } from './add-floor';
 import type { AddedUnit } from './add-unit';
 import type { LaidOutUnit } from './lay-out-unit';
 import type { LessonPick, TrackNeed } from './choose';
@@ -25,6 +26,12 @@ export const MAX_LAYOUTS_PER_RUN = 2;
 
 /** Units written after a track's last in one run, at most. Each is one short Sonnet call. */
 export const MAX_UNITS_ADDED_PER_RUN = 2;
+
+/**
+ * Lessons rated too hard that get a prerequisite added under their concept in
+ * one run, at most. Each is one Sonnet call.
+ */
+export const MAX_FLOORS_PER_RUN = 2;
 
 /**
  * Laying out is not started with less than this left before the deadline:
@@ -57,6 +64,10 @@ export type LessonTopUpPorts = {
   addUnit(userId: string, subjectId: string, lastUnitId: string | null): Promise<AddedUnit>;
   /** Leave the track's layout alone until `until`. */
   hold(userId: string, subjectId: string, until: Date): Promise<void>;
+  /** Lessons rated too hard with nothing added under them yet, newest first. */
+  floorsDue(userId: string, limit: number): Promise<FloorDue[]>;
+  /** Add what a lesson rated too hard rests on, under its concept. */
+  addFloor(userId: string, due: FloorDue): Promise<AddedFloor>;
   /** Write one lesson and store its row. */
   write(userId: string, pick: LessonPick): Promise<{ outcome: LessonOutcome; detail?: string }>;
   now(): number;
@@ -68,6 +79,8 @@ export type LessonTopUpSummary = {
   written: number;
   dropped: string[];
   failed: string[];
+  /** Concepts rated too hard that had a prerequisite added under them. */
+  floors: string[];
   /** Tracks a unit was written for, after their last. */
   added: string[];
   /** Tracks a unit was laid out for. */
@@ -79,6 +92,10 @@ export type LessonTopUpSummary = {
 
 /**
  * Write up to `wanted` lessons for one person, and return what came of it.
+ *
+ * Lessons rated too hard come first: what each one's concept rests on is
+ * added under it (plan #970), before anything is chosen, so the chooser can
+ * give the new concept the track's next slot.
  *
  * A track that has run out of units, or is on its last with fewer than
  * three concepts left, or has no curriculum, first gets its next unit written
@@ -100,6 +117,7 @@ export async function writeLessonsFor(
     written: 0,
     dropped: [],
     failed: [],
+    floors: [],
     added: [],
     laidOut: [],
     held: [],
@@ -115,6 +133,16 @@ export async function writeLessonsFor(
       summary.failed.push(`${need.subjectName}: holding it failed: ${error instanceof Error ? error.message : error}`);
     }
   };
+
+  if (deadline - ports.now() >= LAYOUT_RESERVE_MS) {
+    const due = await ports.floorsDue(userId, MAX_FLOORS_PER_RUN);
+    const results = await Promise.all(due.map((one) => ports.addFloor(userId, one)));
+    for (const [index, result] of results.entries()) {
+      const one = due[index]!;
+      if (result.outcome === 'added') summary.floors.push(one.name);
+      else if (result.outcome === 'failed') summary.failed.push(`${one.name}: adding what it rests on failed: ${result.detail}`);
+    }
+  }
 
   let choice = await ports.choose(userId, wanted);
 

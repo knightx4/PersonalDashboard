@@ -207,6 +207,54 @@ describe('planTrack', () => {
   });
 });
 
+describe('a lesson rated too hard', () => {
+  /**
+   * One unit whose goal is `top`, resting on `near` and `hard`. The lesson for
+   * `hard` was rated too hard, and `floor` was added under it.
+   */
+  const track: LessonTrack = {
+    subjectId: 's',
+    name: 'S',
+    units: [{ id: 'u1' }],
+    goals: [goal('u1', 'top')],
+    graph: graphOf(
+      { near: 'unknown', hard: 'unknown', floor: 'unknown', top: 'unknown' },
+      ['near>top', 'hard>top', 'floor>hard'],
+    ),
+  };
+
+  it('puts the concept added under it before a ready concept nearer the outcome', () => {
+    const plain = planTrack(track, new Set(['hard']));
+    expect(plain.kind === 'teach' && plain.candidates.map((c) => c.concept.id)).toEqual(['near', 'floor']);
+
+    const rated = planTrack(track, new Set(['hard']), new Set(['hard']));
+    expect(rated.kind === 'teach' && rated.candidates.map((c) => c.concept.id)).toEqual(['floor', 'near']);
+  });
+
+  it('makes that concept the next lesson from the track', () => {
+    const choice = chooseLessons({
+      tracks: [track],
+      weights: new Map(),
+      carded: new Set(['hard']),
+      tooHard: new Set(['hard']),
+      slots: 1,
+    });
+    expect(choice.picks.map((pick) => pick.concept.id)).toEqual(['floor']);
+  });
+
+  it('stops putting it first once the too-hard concept is known', () => {
+    const known: LessonTrack = {
+      ...track,
+      graph: graphOf(
+        { near: 'unknown', hard: 'known', floor: 'unknown', other: 'unknown', top: 'unknown' },
+        ['near>top', 'hard>top', 'floor>hard', 'other>top'],
+      ),
+    };
+    const plan = planTrack(known, new Set(), new Set(['hard']));
+    expect(plan.kind === 'teach' && plan.candidates[0]!.concept.id).not.toBe('floor');
+  });
+});
+
 describe('chooseLessons', () => {
   it('spreads slots by weight', () => {
     const choice = chooseLessons({

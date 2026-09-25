@@ -6,6 +6,7 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { LessonPick } from '@/lib/learn/lessons/choose';
 import { chooseLessonsFor } from '@/lib/learn/lessons/choose-load';
 import { findLessonSource, type LessonSource } from '@/lib/learn/lessons/closest-source';
+import { addLessonFloor, loadFloorsDue } from '@/lib/learn/lessons/add-floor';
 import { addNextUnit } from '@/lib/learn/lessons/add-unit';
 import { layOutNextUnit } from '@/lib/learn/lessons/lay-out-unit';
 import { lessonWhy, type LessonOutcome, type LessonTopUpPorts } from '@/lib/learn/lessons/top-up';
@@ -150,6 +151,8 @@ export function createLessonPorts(context: {
         .eq('user_id', userId);
       if (error) throw new Error(error.message);
     },
+    floorsDue: (userId, limit) => loadFloorsDue(learn, userId, limit),
+    addFloor: (userId, due) => addLessonFloor(learn, core, userId, due, apiKey),
     write,
     now: Date.now,
   };
