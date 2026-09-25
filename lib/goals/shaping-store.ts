@@ -110,15 +110,16 @@ export async function startGoalRun(input: {
 }
 
 /**
- * The run row and the fire, for any job: "Work on this" on one goal, or the
- * morning run (plan #933). `text` is the brief, given the new run's id. The
+ * The run row and the fire, for any job: "Work on this" on one goal, the
+ * morning run (plan #933), the weekly run, or a re-shape after answers
+ * (plan #1017). `text` is the brief, given the new run's id. The
  * run id comes back either way, null only when the row itself could not be
  * written and nothing was started.
  */
 export async function recordAndFire(input: {
   client: GoalsSupabaseClient;
   userId: string;
-  job: 'goal' | 'daily' | 'weekly';
+  job: 'goal' | 'daily' | 'weekly' | 'reshape';
   itemId: string | null;
   routine: RoutineTarget;
   text: (runId: string) => string;

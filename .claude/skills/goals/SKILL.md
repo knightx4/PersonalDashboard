@@ -44,8 +44,9 @@ or `fog_dismissed_at`, and never set a record's `draft` to false.
 
 Every run has a `goals.runs` row.
 
-- Fired from **Work on this** or by the **morning run**: the app has written
-  the row as `started`, and its id is in your brief. Use it.
+- Fired from **Work on this**, by the **morning run**, by the weekly run or
+  after the person answered questions on a goal (job `reshape`): the app has
+  written the row as `started`, and its id is in your brief. Use it.
 - Started any other way: write one first, with `job` `goal` and `item_id` for
   one goal, or `daily` / `weekly` for a scheduled run, and use its id.
 
@@ -359,6 +360,28 @@ When questions under the goal have a `resolution`:
   `Provisional:` line still there) is theirs now: rewrite it to fit the
   answer and take the line off, but do not drop it; if the answer makes it
   pointless, ask whether to drop it as a question.
+
+### The re-shape run
+
+Answering a question fires a run by itself: a tick every ten minutes
+(`inngest/goals/reshape.ts`) finds goals whose questions were answered since
+their last run, waits until the latest answer is ten minutes old so answers
+given together start one run, and fires the routine with the `goals.runs` row
+it wrote with `job` `reshape`. The brief names the goal, each question
+answered and its answer, and the provisional steps whose `Provisional:` line
+names one of those questions.
+
+Do what "Re-shaping after answers" says for those answers, and nothing else:
+
+- Settle every provisional step that hangs on them, including any the brief
+  missed because its line names the question in other words.
+- Write anything new as a proposal (`proposed`), whether or not the goal is
+  approved, so the person approves it from the page.
+- Do not map the goal again, do not work `claude` steps (that is the morning
+  run), and do not search Gmail unless an answer asks for facts you now need.
+
+The summary names each provisional step and what happened to it: settled as
+it stood, rewritten, or dropped.
 
 ## What you may change
 
