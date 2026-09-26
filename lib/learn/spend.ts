@@ -132,6 +132,10 @@ export const LEARN_OPERATIONS = [
   // owner, from the vault sync and from the map sweep's tick, which is also
   // the backfill. A note is embedded again only when its text changes.
   'embed-notes',
+  // Embedding the text of a page -- a story, a card, a job, a goal -- to find
+  // the person's notes nearest it (plan #1112). Once per distinct text: the
+  // vector is kept in obsidian.text_embeddings by the text's hash.
+  'embed-note-match',
   // Asking Haiku which vault themes are one subject under two names (plan
   // #811), twenty pairs a call. Recorded through the service role from the map
   // sweep's cron tick, against the account whose themes were judged.
