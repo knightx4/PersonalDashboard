@@ -40,6 +40,8 @@ export function StateLabel({
   /** What sits between the glyph and the word: the bot on a row a session has. */
   children,
   className,
+  /** Classes for the word alone, such as hiding it at one width. */
+  wordClassName,
 }: {
   glyph: GlyphName | null;
   word: string;
@@ -47,6 +49,7 @@ export function StateLabel({
   title?: string;
   children?: React.ReactNode;
   className?: string;
+  wordClassName?: string;
 }) {
   return (
     <span
@@ -55,7 +58,7 @@ export function StateLabel({
     >
       {glyph && <StatusGlyph glyph={glyph} />}
       {children}
-      <span className="truncate">{word}</span>
+      <span className={cn('truncate', wordClassName)}>{word}</span>
     </span>
   );
 }

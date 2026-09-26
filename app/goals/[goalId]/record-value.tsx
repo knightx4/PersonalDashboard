@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useId, useRef, useState } from 'react';
+import { startTransition, useActionState, useEffect, useId, useRef, useState } from 'react';
 import type { CollectionField, FieldValue } from '@/lib/goals/collections';
 import { VALUE_PREFIX, displayValue, inputValue } from '@/lib/goals/information';
 import { cn } from '@/lib/cn';
@@ -47,7 +47,10 @@ export function RecordValue({
   const [state, save, saving] = useActionState(
     async (prev: InformationActionState, form: FormData) => {
       const result = await saveRecordAction(prev, form);
-      if (!result.error) setEditing(false);
+      // In a transition, so the editor closes in the same commit as the
+      // revalidated value. Set straight after the await, it was an urgent
+      // update that closed first and showed the old value for a moment.
+      if (!result.error) startTransition(() => setEditing(false));
       return result;
     },
     initial,

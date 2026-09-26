@@ -8,6 +8,7 @@ import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { FogNote } from '@/components/dev/fog-note';
 import { StateLabel, TONE_TEXT, type DevTone } from '@/components/dev/state-label';
+import { StatusGlyph } from '@/components/ui/status-glyph';
 import { planRowId, type PlanRefTitles } from '@/lib/comments/refs';
 import { isClosed, isDismissed } from '@/lib/plan/load';
 import type { PlanProgress } from '@/lib/plan/tree';
@@ -392,8 +393,8 @@ export function TreeRow<E extends TreeCatalogEntry>({
                * gesture that means "show me this one", and a name still cut
                * off after it leaves no way to read it at all. On a phone it
                * wraps closed as well: the name cell there is what is left
-               * after the health word and the menu, which cut titles to two
-               * words (plan #1041). */}
+               * after the health and the menu, which cut titles to two words
+               * (plan #1041). */}
               <span
                 className={cn(
                   'min-w-0',
@@ -481,7 +482,14 @@ export function TreeRow<E extends TreeCatalogEntry>({
               // beside the module heading keeps its slash too, because there
               // a bare number would say nothing at all.
               glyph={health.name === 'dropped' ? null : health.glyph}
-            />
+              // On a phone the glyph stands for the word, which stays for
+              // screen readers, so a dropped row gets its slash back there.
+              wordClassName="max-sm:sr-only"
+            >
+              {health.name === 'dropped' && (
+                <StatusGlyph glyph={health.glyph} className="sm:hidden" />
+              )}
+            </StateLabel>
           }
         />
 

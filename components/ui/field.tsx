@@ -97,6 +97,46 @@ export function InlineInput({ className, ref, ...props }: React.ComponentProps<'
   );
 }
 
+/**
+ * InlineInput for a value that can run past one line: a done-when, a note.
+ *
+ * The same rest, hover and focus look, but a textarea that grows with
+ * `field-sizing: content`, so a long value wraps where it is read instead of
+ * being cut mid-word at 390. Enter commits by blurring, as it would in an
+ * input; a line break has no meaning in these values, so none can be typed.
+ */
+export function InlineTextarea({
+  className,
+  ref,
+  onKeyDown,
+  ...props
+}: React.ComponentProps<'textarea'>) {
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      onKeyDown={(event) => {
+        onKeyDown?.(event);
+        if (event.defaultPrevented) return;
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }
+      }}
+      className={cn(
+        // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
+        'block w-full resize-none rounded-control border border-transparent bg-transparent px-1 py-0.5 text-base text-ink [field-sizing:content] sm:text-ui',
+        'hover:bg-sunken',
+        'focus:border-accent focus:bg-surface focus:outline-none focus:ring-1 focus:ring-accent/40',
+        'placeholder:text-ink-ghost aria-invalid:border-danger',
+        'disabled:cursor-not-allowed disabled:opacity-50',
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
 export function Select({
   className,
   children,

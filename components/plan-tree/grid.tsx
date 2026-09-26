@@ -8,8 +8,9 @@ import { cn } from '@/lib/cn';
  * the feature above it, because the indent lives inside the name cell rather
  * than around the row. On a phone the three middle columns go and the name,
  * the health and the menu stay, and the name wraps rather than truncating
- * (tree-row.tsx), because at 390 pixels what the health word and the menu
- * leave is two words of a title.
+ * (tree-row.tsx). The health there is its glyph alone, with the word kept for
+ * screen readers: at 390 pixels the word's column left a title three lines
+ * tall.
  */
 // The last column holds the row's quick actions as well as its menu, so it is
 // wide enough for them from sm up -- reserved rather than grown on hover,
@@ -18,7 +19,7 @@ import { cn } from '@/lib/cn';
 // far along, and who has it" is one question asked twice -- and a column
 // between them would make that a comparison across the row.
 export const ROW_GRID =
-  'grid grid-cols-[minmax(0,1fr)_7.25rem_2rem] items-center gap-x-2 ' +
+  'grid grid-cols-[minmax(0,1fr)_2rem_2rem] items-center gap-x-2 ' +
   'sm:grid-cols-[minmax(0,1fr)_7.25rem_6rem_5.5rem_6rem_8rem]';
 
 /** The width of one level of the tree, in the name cell. */
@@ -38,7 +39,8 @@ export function ColumnHeader({ priority = 'Priority' }: { priority?: string } = 
       )}
     >
       <span>Step</span>
-      <span>Health</span>
+      <span className="hidden sm:block">Health</span>
+      <span className="sm:hidden" />
       <span className="hidden sm:block">Status</span>
       <span className="hidden sm:block">{priority}</span>
       <span className="hidden sm:block">Steps</span>

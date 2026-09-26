@@ -4,6 +4,7 @@ import { useActionState, useOptimistic, useRef, useState } from 'react';
 import { ArrowUp, Bot, CircleUser, X } from 'lucide-react';
 import { addComment, deleteComment, type CommentActionState } from '@/app/dev/comment-actions';
 import { CommentBody } from '@/components/dev/comment-body';
+import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/ui/disclosure';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
@@ -377,8 +378,8 @@ export function CommentThread({
       )}
 
       {!writing || posted ? (
-        <button
-          type="button"
+        <AddTrigger
+          label={trigger}
           onClick={() => setWriting(true)}
           // Off for the moment the last comment is still going out. Opening
           // the box again in that window would hand back the box we have just
@@ -387,11 +388,7 @@ export function CommentThread({
           // write. A control that is visibly off for a second says that
           // better than one that swallows the press.
           disabled={posted}
-          className="press -ml-1.5 inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-ui text-ink-ghost hover:bg-sunken hover:text-ink-muted disabled:opacity-50"
-        >
-          <span aria-hidden>+</span>
-          {trigger}
-        </button>
+        />
       ) : (
         <form
           ref={form}
