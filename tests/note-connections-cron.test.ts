@@ -48,7 +48,7 @@ describe('the note connections route', () => {
 });
 
 const migration = readFileSync(
-  join(import.meta.dirname, '..', 'supabase/migrations/0106_note_connections_cron.sql'),
+  join(import.meta.dirname, '..', 'supabase/migrations/0107_note_connections_cron.sql'),
   'utf8',
 );
 

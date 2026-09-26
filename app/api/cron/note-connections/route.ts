@@ -9,7 +9,7 @@ export const maxDuration = 120;
  * The weekly connections between new and older vault notes (plan #1115).
  *
  * Called on Monday afternoons by a pg_cron job through pg_net
- * (supabase/migrations/0106_note_connections_cron.sql), because Vercel's free
+ * (supabase/migrations/0107_note_connections_cron.sql), because Vercel's free
  * plan allows one cron a day. GET and POST both; the body is ignored.
  *
  * Authorised like the other cron routes, with `Authorization: Bearer
