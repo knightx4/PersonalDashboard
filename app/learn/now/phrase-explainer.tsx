@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { MAX_SELECTION, normaliseSelection } from '@/lib/learn/graph/branch';
 import type { FeedCard } from '@/lib/learn/feed/card';
+import type { MarkedPart } from '@/lib/learn/feed/mentions';
 import { startTrack, type NewTrackState } from '../new/actions';
 import { explainPhrase, makePhraseCard, type ExplainedPhrase } from './actions';
 
@@ -306,5 +307,38 @@ function Explanation({
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * One paragraph of a card with the ideas it mentions underlined (plan #1056).
+ *
+ * Each term is a button, so a tap on it opens its explanation, keyboard
+ * users reach it with Tab, and the deck's swipe leaves it alone as it does
+ * every button. The text inside stays selectable, so a selection can still
+ * start or end on an underlined word.
+ */
+export function Mentioned({
+  parts,
+  onTap,
+}: {
+  parts: readonly MarkedPart[];
+  onTap: (phrase: string) => void;
+}) {
+  return parts.map((part, index) =>
+    part.mention ? (
+      <button
+        key={index}
+        type="button"
+        onClick={() => onTap(part.text)}
+        title={part.mention.why || undefined}
+        aria-label={`Explain ${part.text}`}
+        className="inline cursor-pointer select-text rounded-sm p-0 text-left font-[inherit] text-inherit underline decoration-accent decoration-dotted decoration-2 underline-offset-4 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        {part.text}
+      </button>
+    ) : (
+      part.text
+    ),
   );
 }

@@ -72,6 +72,7 @@ function ideaColumns(idea: IdeaCard, index: number, conceptId: string | null, wh
     example: idea.example,
     check_question: idea.question,
     check_answer: idea.answer,
+    mentions: idea.mentions ?? [],
     why,
     write_model: WRITE_CARD_MODEL,
     written_at,

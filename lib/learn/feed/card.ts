@@ -10,6 +10,7 @@
  */
 
 import type { CardNote } from '@/lib/learn/notes/notes';
+import { keepMentions, type CardMention } from './mentions';
 import type { TalkTurn } from '@/lib/talk/talk';
 
 export type FeedCardRow = {
@@ -32,6 +33,8 @@ export type FeedCardRow = {
   example?: string | null;
   check_question?: string | null;
   check_answer?: string | null;
+  /** The ideas the card mentions, as the writer stored them (plan #1056). */
+  mentions?: unknown;
   depth?: string | null;
   difficulty?: string | null;
   item: CatalogueItem | null;
@@ -85,6 +88,11 @@ export type FeedCard = {
   /** A question to try, and its answer behind a tap. Both or neither. */
   question: string | null;
   answer: string | null;
+  /**
+   * Other ideas the card leans on, underlined where they first appear
+   * (plan #1056). Empty on cards written before, lessons and checks.
+   */
+  mentions?: CardMention[];
   /** How deep the pick was pitched, said on the card. */
   depth: 'working' | 'advanced' | 'specialist' | null;
   /** Whether the person said this card was too hard or too easy. Null when unrated. */
@@ -265,6 +273,7 @@ export function toFeedCard(row: FeedCardRow): FeedCard | null {
     example: row.example?.trim() || null,
     question: row.check_question && row.check_answer ? row.check_question : null,
     answer: row.check_question && row.check_answer ? row.check_answer : null,
+    mentions: keepMentions(row.mentions),
     depth:
       row.depth === 'working' || row.depth === 'advanced' || row.depth === 'specialist'
         ? row.depth

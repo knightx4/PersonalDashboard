@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import {
   ArrowDown,
   ArrowLeft,
@@ -55,7 +55,8 @@ import {
   type NewTrackResult,
   type UnitCheckResult,
 } from './actions';
-import { PhraseExplainer, usePhraseExplainer } from './phrase-explainer';
+import { markMentions } from '@/lib/learn/feed/mentions';
+import { Mentioned, PhraseExplainer, usePhraseExplainer } from './phrase-explainer';
 
 /**
  * The Learn now deck (LEARN-NOW-SPEC, "Cards after the first week").
@@ -398,6 +399,16 @@ function DeckCard({
   const surface = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLElement>(null);
   const phrases = usePhraseExplainer(card.id, body);
+  // In the order the card shows them, so each term is underlined where it is
+  // first read.
+  const marked = useMemo(
+    () =>
+      markMentions(
+        [card.takeaway ?? '', card.context ?? '', card.hook ?? '', card.summary, card.example ?? ''],
+        card.mentions ?? [],
+      ),
+    [card.takeaway, card.context, card.hook, card.summary, card.example, card.mentions],
+  );
   const swipeRef = useRef(onSwipe);
   useEffect(() => {
     swipeRef.current = onSwipe;
@@ -585,20 +596,36 @@ function DeckCard({
           {card.takeaway && (
             <section className="mt-3 rounded-control border-l-2 border-accent bg-accent-tint px-3 py-2.5">
               <h3 className="text-small font-semibold text-accent">The takeaway</h3>
-              <p className="mt-1 text-body font-medium text-ink">{card.takeaway}</p>
+              <p className="mt-1 text-body font-medium text-ink">
+                <Mentioned parts={marked[0]} onTap={phrases.explain} />
+              </p>
             </section>
           )}
 
           {/* What this is about, before anything argues about it: the card
               has to stand on its own for someone who never saw the source. */}
-          {card.context && <p className="mt-3 text-body text-ink">{card.context}</p>}
-          {card.hook && <p className="mt-3 text-body font-semibold text-ink">{card.hook}</p>}
-          <p className="mt-2 text-body text-ink">{card.summary}</p>
+          {/* The ideas the card leans on are underlined where they first
+              appear, and a tap explains one (plan #1056). */}
+          {card.context && (
+            <p className="mt-3 text-body text-ink">
+              <Mentioned parts={marked[1]} onTap={phrases.explain} />
+            </p>
+          )}
+          {card.hook && (
+            <p className="mt-3 text-body font-semibold text-ink">
+              <Mentioned parts={marked[2]} onTap={phrases.explain} />
+            </p>
+          )}
+          <p className="mt-2 text-body text-ink">
+            <Mentioned parts={marked[3]} onTap={phrases.explain} />
+          </p>
 
           {card.example && (
             <section className="mt-4 rounded-control bg-accent-tint px-3 py-2.5">
               <h3 className="text-small font-semibold text-accent">In practice</h3>
-              <p className="mt-1 text-body text-ink">{card.example}</p>
+              <p className="mt-1 text-body text-ink">
+                <Mentioned parts={marked[4]} onTap={phrases.explain} />
+              </p>
             </section>
           )}
 
