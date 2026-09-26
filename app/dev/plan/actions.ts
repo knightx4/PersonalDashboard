@@ -907,7 +907,7 @@ export async function answerPlanDecision(
   );
   return {
     message: started.ok
-      ? `Answered, and re-shaping #${feature.number} against everything settled under it. What comes back is proposed.`
+      ? `Answered, and re-shaping #${feature.number} against everything settled under it.`
       : `Answered. The re-shape did not start: ${started.error}`,
   };
 }
@@ -1192,7 +1192,7 @@ async function startReshape(
         'feature that dispels it exists. If nothing has changed, say so and write nothing.\n\n'
       : '') +
     'Three moves, and nothing else:\n' +
-    `- Fog the answers have made specifiable becomes proposed steps ${where}, ` +
+    `- Fog the answers have made specifiable becomes steps ${where}, ` +
     'each with a done-when and a size, and the fog patch is cleared in the same breath ' +
     '(plan.ts fog <n> --clear).\n' +
     '- A step an answer has made pointless is dropped with the reason, naming the answer ' +
@@ -1200,9 +1200,15 @@ async function startReshape(
     `- A question an answer surfaced is written as a fresh decision ${where}, ` +
     'with its real options, what each costs, and your recommendation -- but only if it clears ' +
     'the bar for a question below; one that does not, you settle and write into the step.\n\n' +
-    'Everything you add is proposed and stays proposed. Do not approve anything, do not ' +
-    'answer a decision, do not start or build a step, and do not re-propose something the ' +
-    'feature already holds. Report what you proposed, what you dropped and why, and what ' +
+    (closed
+      ? 'The new feature goes in with --proposed, and everything under it is proposed with it. '
+      : 'The person approved this feature, so the steps you add beneath it go in ready to ' +
+        'build; plan.ts add does that and stamps them with your session. A step that acts ' +
+        'outside the repository (sending, buying, publishing, changing another service) ' +
+        'still goes in with --proposed. ') +
+    'Do not approve anything, do not ' +
+    'answer a decision, do not start or build a step, and do not add again something the ' +
+    'feature already holds. Report what you added and which of it is proposed, what you dropped and why, and what ' +
     `fog you cleared.\n\n${PLAIN_ENGLISH_RULE}\n\n${FOG_RULE}\n\n${QUESTION_RULE}\n\n${DISMISSAL_RULE}\n\nThe brief is below; it is the plan as the app holds it right ` +
     'now, and the plan is the source of truth. "Decided so far" is every answer settled ' +
     'beneath this feature.\n\n' +
@@ -1276,7 +1282,7 @@ export async function reshapePlanFeature(
     message:
       `Re-shaping #${node.number} against ` +
       `${answered === 0 ? 'no answers yet' : `${answered} ${answered === 1 ? 'answer' : 'answers'}`}` +
-      `${node.fog ? ' and its fog' : ''}. What comes back is proposed. ${result.detail}`,
+      `${node.fog ? ' and its fog' : ''}. ${result.detail}`,
   };
 }
 

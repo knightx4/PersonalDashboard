@@ -23,6 +23,9 @@ export function firstLine(body: string, max = 90): string {
   return `${line.slice(0, max - 1).trimEnd()}…`;
 }
 
+/** What a note's subtitle calls it. Keyed by the `feedback_kind` enum. */
+const NOTE_KIND_LABEL: Record<string, string> = { bug: 'Bug', feature: 'Request', like: 'Like' };
+
 export function planHref(number: number): string {
   return `/dev/plan?view=all&q=${encodeURIComponent(`#${number}`)}`;
 }
@@ -72,7 +75,7 @@ export function devHits(rows: DevRows): SearchHit[] {
       kind: 'feedback',
       id: row.id,
       title: firstLine(row.body),
-      subtitle: `${row.kind === 'bug' ? 'Bug' : 'Request'} · ${row.status.replace('_', ' ')}`,
+      subtitle: `${NOTE_KIND_LABEL[row.kind] ?? 'Request'} · ${row.status.replace('_', ' ')}`,
       match: row.body,
       href: `/dev/bugs#note-${row.id}`,
     });

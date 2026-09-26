@@ -44,6 +44,16 @@ describe('dev search hits', () => {
     expect(hits[2].subtitle).toBe('Bug · in progress');
   });
 
+  it('calls a like a like', () => {
+    const [hit] = devHits({
+      plan: [],
+      specs: [],
+      ideas: [],
+      notes: [{ id: 'n2', body: 'The plan page', kind: 'like', status: 'open' }],
+    });
+    expect(hit.subtitle).toBe('Like · open');
+  });
+
   it('shortens a long first line', () => {
     expect(firstLine('a'.repeat(200), 10)).toBe(`${'a'.repeat(9)}…`);
     expect(firstLine('   ')).toBe('Untitled');

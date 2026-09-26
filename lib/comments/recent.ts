@@ -147,7 +147,9 @@ function aboutFrom(target: CommentTarget, parent: Record<string, unknown> | null
 
   // A note has no title, so the sentence you filed is the name of it.
   if (target === 'note') {
-    return firstLine(parent.body) ?? (parent.kind === 'feature' ? 'A feature request' : 'A bug report');
+    const unnamed =
+      parent.kind === 'feature' ? 'A feature request' : parent.kind === 'like' ? 'A like' : 'A bug report';
+    return firstLine(parent.body) ?? unnamed;
   }
 
   return firstLine(parent.body) ?? UNNAMED.idea;

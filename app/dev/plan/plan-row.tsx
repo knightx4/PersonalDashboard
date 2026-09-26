@@ -357,7 +357,7 @@ function SendToClaude({
             disabled={resolving}
             title={
               held ??
-              'Re-read this feature against the questions answered beneath it. Whatever comes back is proposed, not started.'
+              'Re-read this feature against the questions answered beneath it. Steps it adds under an approved feature are ready to build, marked as added by Dash.'
             }
           >
             {reshapePending ? 'Re-shaping…' : 'Re-shape'}
