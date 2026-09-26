@@ -8,7 +8,7 @@ import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ComposeBody, ComposeTitle, InlineInput } from '@/components/ui/field';
+import { ComposeBody, ComposeTitle, InlineInput, InlineTextarea } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import type { AreaRunView } from '@/lib/goals/shaping';
 import type { GoalProgress as GoalProgressData } from '@/lib/goals/status';
@@ -57,7 +57,7 @@ type Progress = Record<string, GoalProgressData>;
 
 /** Save on blur when the words changed. A required field cleared to nothing is put back. */
 function commitOnBlur(before: string, { required = false }: { required?: boolean } = {}) {
-  return (event: React.FocusEvent<HTMLInputElement>) => {
+  return (event: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const value = event.target.value.trim();
     if (required && value === '') {
       event.target.value = before;
@@ -68,7 +68,7 @@ function commitOnBlur(before: string, { required = false }: { required?: boolean
 }
 
 function revertOnEscape(before: string) {
-  return (event: React.KeyboardEvent<HTMLInputElement>) => {
+  return (event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     if (event.key === 'Escape') {
       event.currentTarget.value = before;
       event.currentTarget.blur();
@@ -335,7 +335,7 @@ function GoalRow({
         </form>
         <form action={edit}>
           <input type="hidden" name="id" value={goal.id} />
-          <InlineInput
+          <InlineTextarea
             name="acceptance"
             maxLength={GOAL_ACCEPTANCE_MAX}
             defaultValue={goal.acceptance ?? ''}
@@ -356,7 +356,7 @@ function GoalRow({
               strokeWidth={1.75}
               aria-hidden
             />
-            <InlineInput
+            <InlineTextarea
               name="fog"
               maxLength={GOAL_FOG_MAX}
               defaultValue={goal.fog ?? ''}

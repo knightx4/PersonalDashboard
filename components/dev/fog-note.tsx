@@ -34,7 +34,9 @@ export function FogNote({
       <form action={action} className="mt-1">
         <input type="hidden" name="id" value={id} />
         <input type="hidden" name="dismissed" value={aside ? '0' : '1'} />
-        <Button type="submit" size="sm" variant="ghost" pending={pending}>
+        {/* Pulled left by its own padding, so the word lines up with the fog
+            text above it rather than the button's ground. */}
+        <Button type="submit" size="sm" variant="ghost" pending={pending} className="-ml-2.5">
           {aside ? 'Bring back' : 'Not now'}
         </Button>
       </form>
