@@ -3,6 +3,7 @@ import 'server-only';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { chaptersFromDescription, type YouTubeChapter } from '@/lib/learn/providers/youtube';
 import type { TranscriptState } from './transcripts';
+import { readStretches } from './video-cards';
 
 /**
  * What the Videos section reads: your list (learn.watch_list), not the
@@ -13,8 +14,8 @@ import type { TranscriptState } from './transcripts';
  * any signed-in account (0022, 0042).
  *
  * The list is one playlist's worth, a few hundred rows at most, so it is read
- * whole and narrowed here: `filterVideos` is the one place a search or, for
- * #1068, a verdict filter narrows it.
+ * whole and narrowed here: `filterVideos` is the one place a search or a
+ * verdict filter (#1068) narrows it.
  */
 
 export type Verdict = 'watch' | 'card' | 'skip';
@@ -28,9 +29,18 @@ export type ListVideo = {
   watchedAt: string | null;
   /** Set by the judge (#1066) or by moving it by hand (#1068). */
   verdict: Verdict | null;
+  /** Who filed it under `verdict`: the judge, or you on the Videos page. */
+  verdictBy: 'judge' | 'you' | null;
+  /** What the judge said, which is where a video you moved came from. */
+  judgeVerdict: Verdict | null;
+  /** The judge's reason. Kept after a move, as what you disagreed with. */
   why: string | null;
   bestStartSeconds: number | null;
   bestEndSeconds: number | null;
+  /** Set once the first pass has read it; with no verdict, it is waiting on its transcript. */
+  screenedAt: string | null;
+  /** Stretches the judge named: what a card-pile video's cards are written from (#1067). */
+  stretchCount: number;
 };
 
 type ProviderJoin = { name: string; youtube_channel_id: string | null } | { name: string; youtube_channel_id: string | null }[] | null;
@@ -50,9 +60,13 @@ type ListRow = {
   added_at: string;
   watched_at: string | null;
   verdict: Verdict | null;
+  verdict_by: 'judge' | 'you' | null;
+  judge_verdict: Verdict | null;
   why: string | null;
   best_start_seconds: number | null;
   best_end_seconds: number | null;
+  screened_at: string | null;
+  stretches: unknown;
   item: ItemJoin | ItemJoin[] | null;
 };
 
@@ -68,7 +82,7 @@ function channelOf(item: ItemJoin): string | null {
 }
 
 const LIST_COLUMNS =
-  'video_id, added_at, watched_at, verdict, why, best_start_seconds, best_end_seconds, item:catalogue_items!watch_list_item_id_fkey(id, title, author, description, duration_seconds, canonical_url, provider:catalogue_providers!catalogue_items_provider_id_fkey(name, youtube_channel_id))';
+  'video_id, added_at, watched_at, verdict, verdict_by, judge_verdict, why, best_start_seconds, best_end_seconds, screened_at, stretches, item:catalogue_items!watch_list_item_id_fkey(id, title, author, description, duration_seconds, canonical_url, provider:catalogue_providers!catalogue_items_provider_id_fkey(name, youtube_channel_id))';
 
 function toListVideo(row: ListRow): ListVideo | null {
   const item = one(row.item);
@@ -81,9 +95,13 @@ function toListVideo(row: ListRow): ListVideo | null {
     addedAt: row.added_at,
     watchedAt: row.watched_at,
     verdict: row.verdict,
+    verdictBy: row.verdict ? row.verdict_by : null,
+    judgeVerdict: row.judge_verdict,
     why: row.why,
     bestStartSeconds: row.best_start_seconds,
     bestEndSeconds: row.best_end_seconds,
+    screenedAt: row.screened_at,
+    stretchCount: readStretches(row.stretches).length,
   };
 }
 
@@ -102,15 +120,69 @@ export async function loadListVideos(learn: LearnSupabaseClient, userId: string)
 export type VideoFilter = {
   /** Words that must all appear in the title or the channel's name. */
   q?: string | null;
-  /** Only videos with this verdict (#1068). */
-  verdict?: Verdict | null;
+  /** Only videos in this pile (#1068), or the ones the judge has not settled. */
+  verdict?: Pile | null;
 };
 
-/** The list narrowed by a search and, later, a verdict. Order is kept. */
+/** A pile on the Videos page: a verdict, or not judged yet. */
+export type Pile = Verdict | 'unjudged';
+
+export function isPile(value: unknown): value is Pile {
+  return value === 'unjudged' || isVerdict(value);
+}
+
+export const VERDICTS: readonly Verdict[] = ['watch', 'card', 'skip'];
+
+export function isVerdict(value: unknown): value is Verdict {
+  return typeof value === 'string' && (VERDICTS as readonly string[]).includes(value);
+}
+
+/** How many videos are in each pile, and how many the judge has not settled. */
+export function pileCounts(videos: readonly ListVideo[]): Record<Pile, number> {
+  const counts = { watch: 0, card: 0, skip: 0, unjudged: 0 };
+  for (const video of videos) counts[video.verdict ?? 'unjudged'] += 1;
+  return counts;
+}
+
+export const PILE_LABEL: Record<Pile, string> = { watch: 'Watch', card: 'Card', skip: 'Skip', unjudged: 'Not judged' };
+
+/**
+ * Where a video opens: at its best minute for one in the Watch pile, so the
+ * player starts on the stretch the judge found worth your time.
+ */
+export function videoHref(video: Pick<ListVideo, 'videoId' | 'verdict' | 'bestStartSeconds'>): string {
+  const base = `/learn/videos/${video.videoId}`;
+  return video.verdict === 'watch' && video.bestStartSeconds !== null ? `${base}?t=${video.bestStartSeconds}` : base;
+}
+
+/**
+ * The line under a video saying why it is in its pile.
+ *
+ * The judge's reason as it stands; for a video you moved, whose reason was
+ * written for the pile it came from, that it was yours and what the judge
+ * had said. A video with no verdict says what it is waiting for.
+ */
+export function verdictReason(
+  video: Pick<ListVideo, 'verdict' | 'verdictBy' | 'judgeVerdict' | 'why' | 'screenedAt'>,
+): string {
+  if (!video.verdict) {
+    return video.screenedAt
+      ? `Not judged yet: it passed the first look and waits on its transcript.${video.why ? ` ${video.why}` : ''}`
+      : 'Not judged yet. The next library run reads it.';
+  }
+  if (video.verdictBy === 'you') {
+    if (!video.judgeVerdict) return 'Filed by you before the judge read it.';
+    if (video.judgeVerdict === video.verdict) return `Filed by you, where the judge put it too.${video.why ? ` ${video.why}` : ''}`;
+    return `You moved this from ${PILE_LABEL[video.judgeVerdict].toLowerCase()}. The judge had said: ${video.why ?? 'no reason given.'}`;
+  }
+  return video.why ?? 'The judge gave no reason.';
+}
+
+/** The list narrowed by a search and a verdict. Order is kept. */
 export function filterVideos(videos: readonly ListVideo[], filter: VideoFilter): ListVideo[] {
   const words = (filter.q ?? '').toLowerCase().split(/\s+/).filter(Boolean);
   return videos.filter((video) => {
-    if (filter.verdict && video.verdict !== filter.verdict) return false;
+    if (filter.verdict && (video.verdict ?? 'unjudged') !== filter.verdict) return false;
     if (words.length === 0) return true;
     const haystack = `${video.title} ${video.channel ?? ''}`.toLowerCase();
     return words.every((word) => haystack.includes(word));
@@ -187,6 +259,90 @@ export async function setWatched(
     .eq('user_id', userId)
     .eq('video_id', videoId);
   if (error) throw new Error(`Marking the video failed: ${error.message}`);
+}
+
+/**
+ * File a video under another pile yourself (#1068).
+ *
+ * Sets the verdict and marks it yours, which the judge never overwrites
+ * (judging.ts guards every write on verdict_by) and reads back as an example
+ * on its next run. The judge's reason, its best stretch and its stretches are
+ * left as they were: the page shows the reason as what you disagreed with, a
+ * video moved from watch to card keeps the stretches its cards are written
+ * from, and one moved back keeps its best minute.
+ */
+export async function fileVideo(
+  learn: LearnSupabaseClient,
+  userId: string,
+  videoId: string,
+  verdict: Verdict,
+  now: Date = new Date(),
+): Promise<void> {
+  const stamp = now.toISOString();
+  const { error } = await learn
+    .from('watch_list')
+    .update({ verdict, verdict_by: 'you', judged_at: stamp, updated_at: stamp })
+    .eq('user_id', userId)
+    .eq('video_id', videoId);
+  if (error) throw new Error(`Moving the video failed: ${error.message}`);
+}
+
+/** A Learn now card a video became (#1067), as the Videos section lists it. */
+export type VideoCard = {
+  id: string;
+  videoId: string;
+  startSeconds: number;
+  endSeconds: number | null;
+  /** The idea the card was written about, or the stretch's point before it is written. */
+  title: string;
+  conceptId: string | null;
+  status: string;
+};
+
+
+/**
+ * The cards your videos became, by video, in the order they play. Pass the
+ * ids to read one video's; leave them out for the whole list.
+ */
+export async function loadVideoCards(
+  learn: LearnSupabaseClient,
+  userId: string,
+  videoIds?: readonly string[],
+): Promise<Map<string, VideoCard[]>> {
+  let query = learn
+    .from('feed_cards')
+    .select('id, video_id, video_start_seconds, video_end_seconds, idea_name, pick_basis, concept_id, status')
+    .eq('user_id', userId)
+    .eq('reason', 'video')
+    // Cards that are out, or were: not ones still being written, nor set aside.
+    .not('status', 'in', '(picked,dropped)');
+  if (videoIds) query = query.in('video_id', [...videoIds]);
+  const { data, error } = await query.order('video_start_seconds');
+  if (error) throw new Error(`Reading the cards your videos became failed: ${error.message}`);
+  const out = new Map<string, VideoCard[]>();
+  type Row = {
+    id: string;
+    video_id: string;
+    video_start_seconds: number;
+    video_end_seconds: number | null;
+    idea_name: string | null;
+    pick_basis: string | null;
+    concept_id: string | null;
+    status: string;
+  };
+  for (const row of (data ?? []) as Row[]) {
+    const card: VideoCard = {
+      id: row.id,
+      videoId: row.video_id,
+      startSeconds: row.video_start_seconds,
+      endSeconds: row.video_end_seconds,
+      title: row.idea_name?.trim() || row.pick_basis?.trim() || 'A card from this video',
+      conceptId: row.concept_id,
+      status: row.status,
+    };
+    out.set(row.video_id, [...(out.get(row.video_id) ?? []), card]);
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
