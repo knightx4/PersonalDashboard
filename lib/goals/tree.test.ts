@@ -5,6 +5,7 @@ import {
   nextPosition,
   parseAreaName,
   parseAreaNote,
+  readsAsPractice,
   parseGoalFields,
   reorder,
   type Goal,
@@ -23,6 +24,46 @@ const goal = (id: string, areaId: string): Goal => ({
 });
 
 const form = (values: Record<string, string>) => (key: string) => values[key] ?? null;
+
+describe('a goal is an outcome, not a practice', () => {
+  it('reads rates and streaks as practices', () => {
+    for (const text of [
+      'Go to one urbanism event a week',
+      'Kept for eight of the last ten weeks',
+      'Apply to roles every week',
+      'Run three times a week',
+      'Weekly date night',
+      'Log the balance monthly',
+      'Send 5 applications per week',
+    ]) {
+      expect(readsAsPractice(text), text).toBe(true);
+    }
+  });
+
+  it('leaves outcomes alone, including ones with numbers and dates', () => {
+    for (const text of [
+      'Know ten people in the scene by name',
+      'Pay off student debt',
+      'You have attended six full board meetings and spoken at one.',
+      'Bench 200 lbs by March',
+      'Every card at a zero balance.',
+      'Land your next role',
+      'Find a gym within a week',
+      'Move in a month',
+    ]) {
+      expect(readsAsPractice(text), text).toBe(false);
+    }
+  });
+
+  it('refuses a practice as a goal title or done-when, with the way to fix it', () => {
+    const get = (fields: Record<string, string>) => (key: string) => fields[key] ?? null;
+    const title = parseGoalFields(get({ title: 'Go to one event a week' }));
+    expect(title.ok).toBe(false);
+    expect(!title.ok && title.error).toMatch(/rhythm step/);
+    expect(parseGoalFields(get({ acceptance: 'Kept for 8 of 10 weeks' })).ok).toBe(false);
+    expect(parseGoalFields(get({ fog: 'Maybe once a week, maybe more' })).ok).toBe(true);
+  });
+});
 
 describe('parseAreaNote', () => {
   it('trims a note and clears an empty one', () => {

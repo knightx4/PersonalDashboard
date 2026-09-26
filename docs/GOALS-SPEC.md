@@ -22,14 +22,38 @@ So the design is judged on two things:
 
 ## The three levels
 
-**Areas** are directions that never finish: money, career, the city,
-relationships, health. An area groups goals and has no done-when.
+Each level has one test, and a thing that fails it belongs at another level.
 
-**Goals** sit under an area and have a done-when, even when it starts out
-vague: pay off the debts, get a job, bench 200 lbs.
+**Areas** are directions that never finish, named as nouns: Money, Career,
+The city, Relationships, Health. An area has no done-when. It holds a
+sentence of what you want from it (its note), the goals that serve it, and
+its own page (`/goals/area/<id>`). A name that reads as an outcome, such as
+"Get a job", is a goal in the wrong place: it ends, so it goes under an area
+as a goal (Career, then *Land your next role*).
 
-**Steps** sit under a goal, and a step can have sub-steps to any depth. Each
-step is one of four kinds:
+**Goals** are outcomes that end. A goal sits under an area and has a
+done-when describing a state of the world that will be true: pay off the
+student debt, land your next role, know ten people in the scene by name,
+bench 200 lbs. It may start vague, with fog in place of the done-when.
+**A goal is never a practice.** "Go to one urbanism event a week" and "apply
+every week" are ways of getting somewhere, not somewhere to get; the goal is
+the outcome they serve, and they go inside it as rhythm steps. The app
+refuses a goal whose title or done-when reads as a rate or a streak ("a
+week", "every morning", "kept for eight of ten weeks") and says what to
+write instead, and the database refuses one from Claude
+(`migrations-goals/0041`).
+
+**Stages** are the top level of a goal's tree when it has one: three to six
+parts of the path, in order, each with a done-when of its own and steps
+beneath it. *Land your next role* runs from knowing the target to saying
+yes. The goal page draws each stage as its own card, "Stage 1 of 6", and a
+stage closes itself when every step under it is closed
+(`migrations-goals/0040`). A goal whose parts are independent outcomes is
+several goals instead; parts that follow one another toward one done-when
+are stages.
+
+**Steps** sit under a stage or directly under a goal, and a step can have
+sub-steps to any depth. Each step is one of four kinds:
 
 | Kind | Whose | Closes when |
 |---|---|---|
@@ -38,17 +62,19 @@ step is one of four kinds:
 | `decision` | yours | you answer the question on it |
 | `rhythm` | yours | never; it is kept or missed, week by week |
 
-Goals that are mostly yours, like making friends in New York, still get the
+Goals that are mostly yours, like knowing people in the scene, still get the
 full tree. The map of what has to happen is useful even when Claude can do
 none of it.
 
 ### Rhythms
 
-Some goals end and some are practices. "Get a job" ends. "Make friends in New
-York" and "get plugged into city life" are practices, and they are served by a
-rhythm such as *one city event a week* or *reach out to someone every few
-days*. A rhythm has a target count per period, and progress on it is whether
-the recent periods were kept. It never shows as done.
+A practice is a rhythm step inside the goal it serves: *attend one urbanism
+event a week* inside *Know ten people in the scene by name*, *send five
+applications a week* inside the applying stage of *Land your next role*,
+*log each balance monthly* inside *Pay off student debt*. A rhythm has a
+target count per period, and progress on it is whether the recent periods
+were kept. It never shows as done. An area's page lists the practices of all
+its goals together, with this period's progress.
 
 Todo has no repeating tasks today (`lib/todo/tasks/model.ts` has no
 recurrence), so the rhythm lives in Goals and shows on Todo through the agenda
@@ -438,7 +464,8 @@ for one number a month, the new balances. There is no bank connection.
 drafts applications as `claude` steps; you apply and interview. Progress is
 counted from Jobs.
 
-**Get plugged into city life in NYC** (The city). A rhythm of one event a week,
+**Get plugged into city life in NYC** (The city). Outcomes such as knowing
+ten people in the scene by name, with a rhythm of one event a week inside,
 fed by the weekly research. Reading and courses go to Learn as linked aims.
 After a few events, a `decision` step asks whether the next move is more
 education or joining an organization, based on what you marked as worth it.
