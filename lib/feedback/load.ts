@@ -26,6 +26,19 @@ export type FeedbackStatus =
 export const FEEDBACK_KINDS = ['bug', 'feature', 'like'] as const;
 export type FeedbackKind = (typeof FEEDBACK_KINDS)[number];
 
+/** What each kind is called where the person reads it: the tab, the label, the filter. */
+export const FEEDBACK_KIND_LABEL: Record<FeedbackKind, string> = {
+  bug: 'Bug',
+  feature: 'Feature',
+  like: 'Like',
+};
+
+/** A `?kind=` value read off the URL, or null for every kind. */
+export function parseFeedbackKind(value: unknown): FeedbackKind | null {
+  const first = Array.isArray(value) ? value[0] : value;
+  return (FEEDBACK_KINDS as readonly unknown[]).includes(first) ? (first as FeedbackKind) : null;
+}
+
 export type FeedbackRow = {
   id: string;
   kind: FeedbackKind;
@@ -76,6 +89,18 @@ export interface FeedbackQueue {
   outstanding: FeedbackRow[];
   closed: FeedbackRow[];
   blocked: FeedbackRow[];
+}
+
+/** The same queue narrowed to one kind, every list in it at once. Null keeps all of it. */
+export function queueOfKind(queue: FeedbackQueue, kind: FeedbackKind | null): FeedbackQueue {
+  if (!kind) return queue;
+  const of = (rows: FeedbackRow[]) => rows.filter((row) => row.kind === kind);
+  return {
+    rows: of(queue.rows),
+    outstanding: of(queue.outstanding),
+    closed: of(queue.closed),
+    blocked: of(queue.blocked),
+  };
 }
 
 /** Every column the app reads off a note. Shared with the changelog. */

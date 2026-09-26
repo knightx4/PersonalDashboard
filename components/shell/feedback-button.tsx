@@ -15,11 +15,12 @@ import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { FieldError, Input, Label, Select, Textarea } from '@/components/ui/field';
 import { Popover } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
+import { FEEDBACK_KIND_LABEL, type FeedbackKind } from '@/lib/feedback/load';
 import { MODULES, moduleForPath } from '@/lib/modules';
 import { usePopover } from '@/lib/use-popover';
 
 /**
- * Always-available capture for bugs, requests and ideas.
+ * Always-available capture for bugs, requests, likes and ideas.
  *
  * It lives in the header so the thought can be written down where it occurs,
  * and it records the page you were on — half of every bug report is "where
@@ -29,22 +30,24 @@ import { usePopover } from '@/lib/use-popover';
  * workspace's rendering of that queue you land on, so following the link does
  * not throw you out of the app you were using.
  *
- * Three tabs, two destinations. A bug and a request are the same row in the
- * notes queue and differ only by kind; an idea is a row in `ideas`, which is
+ * Four tabs, two destinations. A bug, a request and a like are the same row
+ * in the notes queue and differ only by kind; an idea is a row in `ideas`, which is
  * not worked and has no queue — it is a thing that might be worth doing one
  * day. They share a panel because they share the moment: the thought arrives
- * while you are looking at the thing, and which of the three it is, is not
+ * while you are looking at the thing, and which of them it is, is not
  * something anybody should have to decide by picking a page to navigate to.
+ * A like is the one that says what works: it sits beside Bug and Feature so
+ * saying so costs the same few seconds as reporting what does not.
  *
- * Three tabs for the owner. Two for everybody else, and no code box and
+ * Four tabs for the owner. Three for everybody else, and no code box and
  * nothing under the form: see `isOwner` below for what goes and why.
  */
-type Kind = 'bug' | 'feature' | 'idea';
+type Kind = FeedbackKind | 'idea';
 
 /**
  * What each tab is called and what it asks for.
  *
- * A table rather than three ternaries down the form. The tabs were two and
+ * A table rather than ternaries down the form. The tabs were two and
  * every difference between them was written inline; at three that reads as a
  * puzzle, and a fourth destination would have to be added in five places.
  */
@@ -56,15 +59,21 @@ const KINDS: ReadonlyArray<{
 }> = [
   {
     id: 'bug',
-    tab: 'Bug',
+    tab: FEEDBACK_KIND_LABEL.bug,
     prompt: 'What went wrong?',
     placeholder: 'What you did, what happened, what you expected.',
   },
   {
     id: 'feature',
-    tab: 'Feature',
+    tab: FEEDBACK_KIND_LABEL.feature,
     prompt: 'What should it do?',
     placeholder: 'The change, and what it would let you do.',
+  },
+  {
+    id: 'like',
+    tab: FEEDBACK_KIND_LABEL.like,
+    prompt: 'What do you like?',
+    placeholder: 'What works, and what it would be a shame to lose.',
   },
   {
     id: 'idea',
@@ -162,7 +171,7 @@ export function FeedbackButton({
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        title="Report a bug, request a feature, or note an idea"
+        title="Report a bug, request a feature, say what you like, or note an idea"
         className={cn(
           'press flex size-8 items-center justify-center rounded-full transition-colors',
           open
@@ -171,7 +180,7 @@ export function FeedbackButton({
         )}
       >
         <MessageSquarePlus className="size-4" aria-hidden />
-        <span className="sr-only">Report a bug, request a feature, or note an idea</span>
+        <span className="sr-only">Report a bug, request a feature, say what you like, or note an idea</span>
       </button>
 
       {open && (

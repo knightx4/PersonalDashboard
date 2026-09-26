@@ -6,7 +6,7 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { isOwner, requireOwner } from '@/lib/dev/owner';
 import { codeMatches } from '@/lib/feedback/code';
 import { notesRoutine } from '@/lib/feedback/routine';
-import { OUTSTANDING_STATUSES } from '@/lib/feedback/load';
+import { FEEDBACK_KINDS, OUTSTANDING_STATUSES, type FeedbackKind } from '@/lib/feedback/load';
 import { startRoutineRun } from '@/lib/plan/runs';
 
 /** One queue, one page. The old per-workspace pages redirect to it. */
@@ -20,13 +20,13 @@ export type FeedbackActionState = {
 };
 
 const submitSchema = z.object({
-  kind: z.enum(['bug', 'feature']),
+  kind: z.enum(FEEDBACK_KINDS),
   body: z.string().trim().min(3).max(4000),
   pagePath: z.string().max(300).nullable(),
 });
 
 /**
- * File a note -- a bug or a request -- from the header panel.
+ * File a note -- a bug, a request or a like -- from the header panel.
  *
  * The one action in this file that is open to every signed-in account, and the
  * one exception #417 makes. The button that posts it is in the header on every
@@ -81,11 +81,14 @@ export async function submitFeedback(
   if (error) return { error: error.message };
 
   revalidateFeedback();
-  return {
-    message:
-      parsed.data.kind === 'bug' ? 'Bug report saved.' : 'Feature request saved.',
-  };
+  return { message: SAVED[parsed.data.kind] };
 }
+
+const SAVED: Record<FeedbackKind, string> = {
+  bug: 'Bug report saved.',
+  feature: 'Feature request saved.',
+  like: 'Like saved.',
+};
 
 const statusSchema = z.enum([
   'open',
@@ -128,7 +131,7 @@ export async function updateFeedbackStatus(
 
 const editSchema = z.object({
   id: z.string().uuid(),
-  kind: z.enum(['bug', 'feature']),
+  kind: z.enum(FEEDBACK_KINDS),
   body: z.string().trim().min(3, 'Write a sentence or two describing it.').max(4000),
 });
 
