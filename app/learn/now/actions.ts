@@ -12,6 +12,7 @@ import {
   isCardDifficulty,
   sectionLink,
   SWIPES,
+  toFeedCard,
   type CardDifficulty,
   type FeedCard,
   type SwipeAction,
@@ -39,6 +40,9 @@ import { cardMaterial, CARD_REPLY_GUIDANCE } from '@/lib/learn/feed/ask';
 import { turnBody, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
 import { appendTurns, loadConversation } from '@/lib/talk/store';
 import { replyAbout } from '@/lib/talk/reply';
+import { makeAskedCard } from '@/inngest/learn/asked-card';
+import { checkedPhrase, EXPLAIN_MODEL, explainPhraseOnCard, phraseOnCard } from '@/lib/learn/feed/explain-phrase';
+import { loadExplanation, saveExplanation, setMadeCard, type StoredExplanation } from '@/lib/learn/feed/phrases-store';
 
 /**
  * The Learn now feed's actions (plan #808).
@@ -394,6 +398,160 @@ export async function askAboutCard(id: string, question: string): Promise<AskRes
       error: error instanceof Error ? error.message : 'Keeping the answer failed.',
     };
   }
+}
+
+/** A phrase's explanation as the card shows it. */
+export type ExplainedPhrase = {
+  phrase: string;
+  explanation: string;
+  /** The Wikipedia article Make it a card would write from, when one was named. */
+  article: string | null;
+  /** Set once Make it a card has written a card from it. */
+  madeCardId: string | null;
+};
+
+export type ExplainPhraseResult = { explained?: ExplainedPhrase; error?: string };
+
+function shown(stored: StoredExplanation): ExplainedPhrase {
+  return {
+    phrase: stored.phrase,
+    explanation: stored.explanation,
+    article: stored.article,
+    madeCardId: stored.madeCardId,
+  };
+}
+
+/**
+ * Explain a phrase selected on a card (plan #1057): a few sentences on what
+ * it means and how it connects to the card. Kept against the card, so
+ * selecting the same phrase again reads it back and costs nothing. The phrase
+ * has to be on the card, in its text, its passage or its conversation with
+ * Dash. The underlined terms of plan #1056 call this with the tapped term.
+ */
+// latency: pending
+export async function explainPhrase(id: string, selection: string): Promise<ExplainPhraseResult> {
+  const user = await requireUser();
+  const card = CardId.safeParse(id);
+  if (!card.success) return { error: 'Could not tell which card that was.' };
+  const checked = checkedPhrase(selection);
+  if ('error' in checked) return { error: checked.error };
+
+  const supabase = await createLearnClient();
+  const row = await loadFeedCardRow(supabase, card.data).catch(() => null);
+  const material = row ? cardMaterial(row) : null;
+  if (!material) return { error: 'That card is no longer there.' };
+
+  try {
+    const kept = await loadExplanation(supabase, card.data, checked.phrase);
+    if (kept) return { explained: shown(kept) };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Reading that card failed.' };
+  }
+
+  const texts = [material.title, material.text];
+  if (!phraseOnCard(checked.phrase, texts)) {
+    // Not in the card itself: perhaps in one of Dash's answers about it.
+    const core = await createCoreClient();
+    const turns = await loadConversation(core, { kind: 'feed_card', ref: card.data }).catch(
+      () => [] as TalkTurn[],
+    );
+    if (!phraseOnCard(checked.phrase, turns.map((turn) => turn.body))) {
+      return { error: 'That phrase is not on this card. Select it from the card itself.' };
+    }
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'Explaining needs ANTHROPIC_API_KEY to be set.' };
+
+  const spend = collectSpend();
+  const result = await explainPhraseOnCard({
+    phrase: checked.phrase,
+    card: material,
+    anthropicApiKey: apiKey,
+    onSpend: spend.sink,
+  });
+  await recordLearnSpend(user.id, 'explain-phrase', spend.reports);
+  if (!result.ok) return { error: `Dash could not explain that: ${result.detail}` };
+
+  try {
+    const saved = await saveExplanation(supabase, user.id, {
+      cardId: card.data,
+      phrase: checked.phrase,
+      model: EXPLAIN_MODEL,
+      explanation: result.explanation,
+      article: result.article,
+      section: result.section,
+    });
+    return { explained: shown(saved) };
+  } catch {
+    // The explanation was paid for; show it even though it was not kept.
+    return {
+      explained: {
+        phrase: checked.phrase,
+        explanation: result.explanation,
+        article: result.article,
+        madeCardId: null,
+      },
+    };
+  }
+}
+
+export type PhraseCardResult = {
+  /** The card written, to go next in the deck. Null when it is written but cannot be shown yet. */
+  card?: FeedCard | null;
+  /** The card already made from this phrase on an earlier press. */
+  already?: boolean;
+  error?: string;
+};
+
+/**
+ * Make it a card, under a phrase's explanation (plan #1057). The card is
+ * written from the Wikipedia article the explanation named, while you wait,
+ * and comes back so the deck can put it next. Its idea is saved as a concept
+ * by the card writer, as every Learn now idea is. Pressed again, it gives
+ * back the card already made rather than writing another.
+ */
+// latency: pending
+export async function makePhraseCard(id: string, selection: string): Promise<PhraseCardResult> {
+  const user = await requireUser();
+  const card = CardId.safeParse(id);
+  if (!card.success) return { error: 'Could not tell which card that was.' };
+  const checked = checkedPhrase(selection);
+  if ('error' in checked) return { error: checked.error };
+
+  const supabase = await createLearnClient();
+  const [row, kept] = await Promise.all([
+    loadFeedCardRow(supabase, card.data).catch(() => null),
+    loadExplanation(supabase, card.data, checked.phrase).catch(() => null),
+  ]);
+  const material = row ? cardMaterial(row) : null;
+  if (!row || !material) return { error: 'That card is no longer there.' };
+  if (!kept) return { error: 'Explain the phrase first, then make it a card.' };
+
+  const cardOf = async (cardId: string) => {
+    const made = await loadFeedCardRow(supabase, cardId).catch(() => null);
+    return made ? toFeedCard(made) : null;
+  };
+  if (kept.madeCardId) return { card: await cardOf(kept.madeCardId), already: true };
+  if (!kept.article) {
+    return { error: 'Dash named no Wikipedia article for this phrase, so there is nothing to write a card from.' };
+  }
+
+  const depth = row.depth === 'working' || row.depth === 'advanced' || row.depth === 'specialist' ? row.depth : null;
+  const made = await makeAskedCard(user.id, {
+    phrase: kept.phrase,
+    askedOn: material.title,
+    article: kept.article,
+    section: kept.section,
+    depth,
+  }).catch((error: unknown) => ({
+    ok: false as const,
+    detail: error instanceof Error ? error.message : 'Could not make that card.',
+  }));
+  if (!made.ok) return { error: made.detail };
+
+  await setMadeCard(supabase, kept.id, made.cardId).catch(() => undefined);
+  return { card: await cardOf(made.cardId) };
 }
 
 export type UnitCheckResult = {

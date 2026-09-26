@@ -330,6 +330,14 @@ Conversations they had with Dash about a Learn card or a newsletter story, one p
 
 ## Mentions (leads only)
 
+### `learn.phrase_explanations` (Learn)
+
+Phrases they selected on Learn cards to have explained, with the explanation.
+
+- Search: `phrase`, `explanation`
+- Name a row by `phrase`; link it by `id`
+- card_id is the Learn now card the phrase was on; made_card_id is set when they asked for a card of its own.
+
 ### `learn.feed_cards` (Learn)
 
 Cards the daily feed drew for them, with whether they read, saved or passed each.

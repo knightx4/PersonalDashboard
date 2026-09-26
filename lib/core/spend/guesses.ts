@@ -150,6 +150,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // The card's section, the conversation so far and the question in; a few
   // short paragraphs out.
   'reply-about-card': run(SONNET, 4_000, 400),
+  // The card and its passage in; a few sentences and an article's name out.
+  'explain-phrase': run(SONNET, 4_000, 300),
+  // One Wikipedia section in, a card for each of up to three ideas out.
+  'write-asked-card': run(SONNET, 4_000, 2_000),
 
   // Jobs.
   'enrich-company': run(HAIKU, 10_000, 500),
@@ -173,13 +177,16 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'reply-to-comment': run(HAIKU, 3_000, 250),
   'suggest-from-digest': background(run(HAIKU, 5_000, 800)),
 
-  // News. All but the last from the digest cron or a script.
+  // News. All but the last two from the digest cron or a script.
   'digest-issue': background(unit(HAIKU, 3_000, 300)),
   'group-stories': background(unit(VOYAGE_LITE, 2_000, 0)),
   'score-importance': background(unit(HAIKU, 1_500, 200)),
   'measure-repeats': background(run(VOYAGE_LITE, 100_000, 0)),
   // Up to 24 searches, whose results are read back in on each round.
   'recommend-newsletters': run(OPUS, 60_000, 5_000),
+  // The story's summary and text, the discussion so far and the view in; a
+  // counterpoint or a question out.
+  'discuss-story': run(SONNET, 3_000, 300),
 
   // Goals: one sentence filed against open goals and steps, which are
   // listed in the prompt. Grows with the size of the tree.

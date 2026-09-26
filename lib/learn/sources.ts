@@ -104,6 +104,15 @@ export const learnSources: ModuleSources = {
       note: 'concept_id is the idea a note is about, whose page is /learn/c/<concept_id>; card_id is the Learn now card it was written on, null when written on the idea page or once the card is gone.',
     },
     {
+      table: 'learn.phrase_explanations',
+      module: 'Learn',
+      holds: 'Phrases they selected on Learn cards to have explained, with the explanation.',
+      weight: 'incidental',
+      search: ['phrase', 'explanation'],
+      title: 'phrase',
+      note: 'card_id is the Learn now card the phrase was on; made_card_id is set when they asked for a card of its own.',
+    },
+    {
       table: 'learn.feed_cards',
       module: 'Learn',
       holds: 'Cards the daily feed drew for them, with whether they read, saved or passed each.',
