@@ -8,6 +8,7 @@ import { Progress, SectionTally } from '@/components/plan-tree/counts';
 import { ColumnHeader } from '@/components/plan-tree/grid';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
+import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Segmented } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
@@ -20,8 +21,10 @@ import {
   numberSteps,
   outlineSteps,
   viewGoalRows,
+  type GoalRowNode,
   type GoalView,
 } from '@/lib/goals/plan-rows';
+import { goalStages, stageMeta } from '@/lib/goals/goal-page';
 import { countAside, type StepRunView } from '@/lib/goals/shaping';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import { GoalRow, type GoalRowContext } from './goal-row';
@@ -33,6 +36,11 @@ const RUN_POLL_MS = 15_000;
 
 const NO_RUNS: Record<string, StepRunView> = {};
 const NO_FILES: Record<string, LinkedFile[]> = {};
+
+/** A step that is finished or dropped, which folds away under the open ones. */
+function isClosed(row: GoalRowNode): boolean {
+  return row.step.status === 'done' || row.step.status === 'dropped';
+}
 
 /** What a narrowed view says when nothing is in it. */
 const EMPTY_VIEW: Record<Exclude<GoalView, 'all'>, { title: string; description: string }> = {
@@ -58,9 +66,11 @@ const EMPTY_VIEW: Record<Exclude<GoalView, 'all'>, { title: string; description:
  *
  * One card: a heading with the plan's count of steps by state and its banded
  * bar, the column header, and a row per step from the plan's shared tree.
- * A goal whose top-level steps have steps of their own is drawn in stages
- * instead: the heading card with the count and bar, then a card per stage,
- * labelled Stage 1 of N, so a long map reads as its parts.
+ * Finished steps fold away under the open ones. A goal whose top-level steps
+ * have steps of their own is drawn in stages instead (plan #1078): the first
+ * unfinished stage open under "Stage 1 of N", and every other stage folded to
+ * one line saying whether it is done or how far along, so the page opens on
+ * the work in hand.
  * Steps from other goals that count towards this one follow in a second card,
  * which has no column header of its own since its columns line up with the
  * first, and each row names the goal it comes from under its title.
@@ -132,40 +142,58 @@ export function StepTree({
 
   const substeps = own.rows.filter((row) => row.kind !== 'decision');
   // A goal whose top-level steps hold steps of their own is laid out in
-  // stages: one card each, in order, so the path reads as its parts. Top-level
-  // steps with nothing under them go in a last card of their own.
+  // stages (plan #1078): the current one open, the others folded to one line
+  // each that says how far along it is. Top-level steps with nothing under
+  // them go in a last card of their own.
   const allStages = own.rows.filter((row) => row.children.length > 0);
+  const stageOf = new Map((goalStages(map.steps) ?? []).map((stage) => [stage.id, stage]));
   const staged = allStages.length >= 2;
 
-  // The view narrows the rows, not the layout: a goal drawn in stages stays in
-  // stages, and each stage keeps its number, so "Stage 3 of 4" means the same
-  // under every view. A stage with nothing in the view is left out.
-  const shown = viewGoalRows(own.rows, view);
-  const shownById = new Map(shown.map((row) => [row.id, row]));
-  const stages = allStages.map((row) => shownById.get(row.id) ?? null);
-  const loose = own.rows
-    .filter((row) => row.children.length === 0)
-    .flatMap((row) => shownById.get(row.id) ?? []);
+  // The view narrows the rows of a goal that is one list. A goal in stages
+  // has its folds in place of a view, so it shows every row.
+  const shown = viewGoalRows(own.rows, staged ? 'all' : view);
+  // Finished steps fold away under the open ones.
+  const shownOpen = shown.filter((row) => !isClosed(row));
+  const shownDone = shown.filter(isClosed);
+  const loose = own.rows.filter((row) => row.children.length === 0);
+  const current = allStages.find((row) => stageOf.get(row.id)?.state === 'current') ?? null;
+  const folded = allStages.filter((row) => row !== current);
   const shownLinked = linked.flatMap(({ entry, row }) => {
-    const narrowed = row ? viewGoalRows([row], view)[0] : undefined;
+    const narrowed = row ? viewGoalRows([row], staged ? 'all' : view)[0] : undefined;
     return narrowed ? [{ entry, row: narrowed }] : [];
   });
-  // The first card drawn carries the column header, whichever stage that is.
-  const firstStage = stages.findIndex(Boolean);
-  const firstCard = firstStage === -1 ? stages.length : firstStage;
-  const emptyView = view !== 'all' && shown.length === 0 ? EMPTY_VIEW[view] : null;
+  const emptyView = !staged && view !== 'all' && shown.length === 0 ? EMPTY_VIEW[view] : null;
   const counts = [...own.rows, ...linked.flatMap(({ row }) => (row ? [row] : []))];
+  const rowOf = (row: GoalRowNode) => (
+    <GoalRow
+      key={row.id}
+      node={row}
+      trail={[]}
+      context={context}
+      index={substeps.findIndex((step) => step.id === row.id)}
+      count={substeps.length}
+    />
+  );
+  const stageCard = (row: GoalRowNode, header: boolean) => (
+    <div className={cn(cardVariants({ padding: 'none' }), 'overflow-hidden')}>
+      <ul className="divide-y divide-border">
+        {header && <ColumnHeader priority="When" />}
+        {rowOf(row)}
+      </ul>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
       <section aria-label="Steps" className="space-y-2">
-        {map.steps.length === 0 ? (
+        {map.steps.length === 0 && (
           <EmptyState
             icon={ListTree}
             title="No steps yet"
             description="Break the goal into the things that have to happen. Any step can hold sub-steps of its own."
           />
-        ) : (
+        )}
+        {map.steps.length > 0 && !staged && (
           <div className={cn(cardVariants({ padding: 'none' }), 'overflow-hidden')}>
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2.5">
               <h2 className="text-body font-semibold text-ink">Steps</h2>
@@ -205,67 +233,92 @@ export function StepTree({
                 />
               </div>
             )}
-            {!staged && shown.length > 0 && (
+            {shownOpen.length > 0 && (
               <ul className="divide-y divide-border">
                 <ColumnHeader priority="When" />
-                {shown.map((row) => (
-                  <GoalRow
-                    key={row.id}
-                    node={row}
-                    trail={[]}
-                    context={context}
-                    index={substeps.findIndex((step) => step.id === row.id)}
-                    count={substeps.length}
-                  />
-                ))}
+                {shownOpen.map(rowOf)}
               </ul>
+            )}
+            {shownDone.length > 0 && (
+              <div className="border-t border-border px-3 py-1.5">
+                <Disclosure title="Finished" meta={shownDone.length}>
+                  <ul className="divide-y divide-border">{shownDone.map(rowOf)}</ul>
+                </Disclosure>
+              </div>
             )}
             {/* Inside the card, under a rule, as the plan's "Add a step" sits
                 at the foot of a module (plan #983), on the same py-1.5 line as
                 every other add line on the page. */}
-            {!staged && (
+            <div className="border-t border-border px-3 py-1.5">
+              <StepComposer parentId={map.goal.id} label="Add a step" bare />
+            </div>
+          </div>
+        )}
+        {staged && current && (
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-1">
+              <h2 className="text-body font-semibold text-ink">
+                Stage {allStages.indexOf(current) + 1} of {allStages.length}
+              </h2>
+              {stageOf.get(current.id) && (
+                <span className="tabular text-small text-ink-muted">
+                  {stageMeta(stageOf.get(current.id)!)}
+                </span>
+              )}
+            </div>
+            {stageCard(current, true)}
+          </div>
+        )}
+        {staged && !current && (
+          <p className="px-1 text-ui text-ink-muted">Every stage is done.</p>
+        )}
+        {staged && folded.length > 0 && (
+          <div className="space-y-1 pt-2">
+            <h2 className="px-1 text-small font-semibold text-ink-muted">
+              {current ? 'Other stages' : 'Stages'}
+            </h2>
+            {folded.map((row) => {
+              const stage = stageOf.get(row.id);
+              return (
+                <Disclosure
+                  key={row.id}
+                  className="px-1"
+                  title={`${allStages.indexOf(row) + 1}. ${row.title}`}
+                  meta={stage ? stageMeta(stage) : undefined}
+                >
+                  {stageCard(row, false)}
+                </Disclosure>
+              );
+            })}
+          </div>
+        )}
+        {staged && loose.length > 0 && (
+          <div className="space-y-1 pt-2">
+            <h2 className="px-1 text-small font-semibold text-ink-muted">Other steps</h2>
+            <div className={cn(cardVariants({ padding: 'none' }), 'overflow-hidden')}>
+              <ul className="divide-y divide-border">
+                {!current && <ColumnHeader priority="When" />}
+                {loose.filter((row) => !isClosed(row)).map(rowOf)}
+              </ul>
+              {loose.some(isClosed) && (
+                <div className="border-t border-border px-3 py-1.5">
+                  <Disclosure title="Finished" meta={loose.filter(isClosed).length}>
+                    <ul className="divide-y divide-border">{loose.filter(isClosed).map(rowOf)}</ul>
+                  </Disclosure>
+                </div>
+              )}
               <div className="border-t border-border px-3 py-1.5">
                 <StepComposer parentId={map.goal.id} label="Add a step" bare />
               </div>
-            )}
+            </div>
           </div>
         )}
-        {staged &&
-          [...stages, ...(loose.length > 0 ? [null] : [])].map((stage, i) => {
-            if (i < stages.length && !stage) return null;
-            return (
-              <div key={stage?.id ?? 'loose'} className="space-y-1">
-                <h3 className="px-1 text-small font-semibold text-ink-muted">
-                  {stage ? `Stage ${i + 1} of ${stages.length}` : 'Other steps'}
-                </h3>
-                <div className={cn(cardVariants({ padding: 'none' }), 'overflow-hidden')}>
-                  <ul className="divide-y divide-border">
-                    {i === firstCard && <ColumnHeader priority="When" />}
-                    {(stage ? [stage] : loose).map((row) => (
-                      <GoalRow
-                        key={row.id}
-                        node={row}
-                        trail={[]}
-                        context={context}
-                        index={substeps.findIndex((step) => step.id === row.id)}
-                        count={substeps.length}
-                      />
-                    ))}
-                  </ul>
-                  {!stage && (
-                    <div className="border-t border-border px-3 py-1.5">
-                      <StepComposer parentId={map.goal.id} label="Add a step" bare />
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        {staged && !own.rows.some((row) => row.children.length === 0) && (
+        {staged && loose.length === 0 && (
           <div className="px-1">
             <StepComposer parentId={map.goal.id} label="Add a stage or a step" />
           </div>
         )}
+        {map.steps.length === 0 && <StepComposer parentId={map.goal.id} label="Add a step" />}
         {aside > 0 && (
           <Button
             type="button"
@@ -279,7 +332,6 @@ export function StepTree({
               : `Show ${aside === 1 ? 'the question' : `the ${aside} questions`} put aside`}
           </Button>
         )}
-        {map.steps.length === 0 && <StepComposer parentId={map.goal.id} label="Add a step" />}
       </section>
 
       {shownLinked.length > 0 && (
