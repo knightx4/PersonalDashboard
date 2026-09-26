@@ -475,27 +475,36 @@ point is that opening the app after a busy fortnight should not feel like a
 debt.
 
 After five or more days since the last visit, the home opens with a catch-up
-for the rest of that day: the runs Claude finished while you were away, what
-is waiting on you, and one next step per goal, with everything else folded
-under it. The last visit is kept in `goals.visits`.
+for the rest of that day: what Dash did while you were away (the list below),
+what is waiting on you, and one next step per goal, with everything else
+folded under it. The last visit is kept in `goals.visits`.
 
 ### Since your last visit
 
-On any other day, the home opens with the runs that ended since your last
-sitting, newest first (plan #1010): the step each worked, the goal it
-mapped with the steps and questions it proposed, the facts it filed, or that
-it failed and why. Each line links to the goal it was on, at the step when it
-was on one; a morning or weekly run links to its own page. Most of these are
-the night run's, but a run carries no mark of who started it, so a run you
-started before leaving is listed too.
+On any other day, the home opens with what Dash did since your last sitting
+(plan #1076), newest run first, in three kinds of line:
+
+- A result: the note or draft a run stored on a step. **Read** opens the step
+  on its goal's page, where the result is shown and marked read. When the
+  same run closed the step, the line has an **Undo** that puts the step back
+  as it was and clears the result.
+- A change to the map, worded as the run's own page words it ("Added step
+  Call the servicer"), with **Undo**. It is the run page's undo (plan #1013),
+  so a change undone in one place reads as undone in the other, and a change
+  that has moved on since says why it stays.
+- A run that failed, and why.
+
+Changes are capped at ten, with the rest counted and left to each run's page;
+results are never capped. A result you have not read from before this sitting
+stays at the end of the list until you read it.
 
 A sitting is page loads less than thirty minutes apart (`SITTING_MINUTES`
 in `lib/goals/catch-up.ts`), and the list reads from the last visit before
 this sitting (`goals.visits.previous_visit_at`). Reloading the home, or a
-press on it, keeps the list; the next sitting clears it. What each run did is
-counted from its `goals.history` rows by `run_id`
-(`lib/goals/since-visit.ts`). On a day back from time away the catch-up
-lists the runs instead.
+press on it, keeps the list and shows an undone line as undone; the next
+sitting clears it. After time away that visit is the one before the gap, so
+the catch-up shows the same list. The rules are in `lib/goals/done-since.ts`
+and the reads in `lib/goals/done-since-store.ts`.
 
 ## Your examples, broken down
 

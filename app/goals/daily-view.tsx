@@ -2,7 +2,6 @@ import Link from 'next/link';
 import {
   BookOpenText,
   ChevronRight,
-  CircleAlert,
   CircleHelp,
   FilePen,
   Flag,
@@ -20,6 +19,7 @@ import { Card } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { CatchUp } from '@/lib/goals/catch-up';
+import type { DoneSince } from '@/lib/goals/done-since';
 import {
   WAITING_GROUP,
   type DailyGoal,
@@ -32,10 +32,9 @@ import {
 import { formatDay, formatInstant } from '@/lib/goals/dates';
 import { VERDICT_LABELS, type GoalReview, type Verdict } from '@/lib/goals/reviews';
 import { missedLine, progressLine, type HomeRhythm } from '@/lib/goals/rhythms';
-import { JOB_LABELS, type RunListing } from '@/lib/goals/runs';
 import { STEP_KIND_LABELS } from '@/lib/goals/steps';
-import type { SinceEntry, SinceVisit } from '@/lib/goals/since-visit';
 import type { Suggestion } from '@/lib/goals/suggestions';
+import { DoneSinceList } from './done-since-list';
 import { GoalProgress } from './goal-progress';
 import { DidYouGoList, SuggestionsList } from './suggestions-list';
 
@@ -85,7 +84,8 @@ type View = Daily & {
   /** Events you said you were going to whose day has passed (plan #1020). */
   didYouGo?: Suggestion[];
   catchUp?: CatchUp | null;
-  sinceVisit?: SinceVisit | null;
+  /** What Dash did since your last visit (plan #1076). */
+  done?: DoneSince | null;
   /** Claude's latest note on all the goals (goals.briefs), and when it was written. */
   brief?: { body: string; when: string | null } | null;
 };
@@ -181,8 +181,9 @@ export function DailyView({
   /** The account's zone, for the times on the week's suggestions. */
   timeZone: string;
 }) {
-  const lately = view.sinceVisit && view.sinceVisit.entries.length > 0 && (
-    <SinceVisitView sinceVisit={view.sinceVisit} timeZone={timeZone} />
+  const done = view.done ?? null;
+  const lately = done && done.items.length > 0 && (
+    <DoneSinceView done={done} timeZone={timeZone} />
   );
 
   const note = view.brief && <HomeBrief brief={view.brief} />;
@@ -258,7 +259,7 @@ export function DailyView({
     return (
       <div className="space-y-6">
         {note}
-        <CatchUpView catchUp={view.catchUp} timeZone={timeZone} waiting={yourMove} />
+        <CatchUpView catchUp={view.catchUp} done={done} timeZone={timeZone} waiting={yourMove} />
         {folded.length > 0 && (
           <SectionFold title="Everything else" hint={folded.join(', ')} defaultOpen={false}>
             <div className="space-y-6">{rest}</div>
@@ -481,70 +482,22 @@ function DashSection({ dash }: { dash: DashQueue }) {
   );
 }
 
-/** What Claude did since your last sitting (plan #1010), newest first. */
-function SinceVisitView({ sinceVisit, timeZone }: { sinceVisit: SinceVisit; timeZone: string }) {
+/**
+ * What Dash did since your last sitting (plan #1076): results to read,
+ * changes with their undo, failed runs. On a day back from time away the
+ * catch-up shows the same list under its own heading.
+ */
+function DoneSinceView({ done, timeZone }: { done: DoneSince; timeZone: string }) {
   return (
     <section aria-labelledby="since-heading" className="space-y-2">
       <div className="px-1">
         <h2 id="since-heading" className="text-ui font-semibold text-ink">
           Since your last visit
         </h2>
-        <p className="text-small text-ink-muted">
-          Since {formatInstant(sinceVisit.since, timeZone)}
-        </p>
+        <p className="text-small text-ink-muted">Since {formatInstant(done.since, timeZone)}</p>
       </div>
-      <Card>
-        <ul className="divide-y divide-border">
-          {sinceVisit.entries.map((entry) => (
-            <SinceRow key={entry.runId} entry={entry} />
-          ))}
-        </ul>
-        {sinceVisit.more > 0 && (
-          <Link
-            href="/goals/runs"
-            className="card-pad-x row-pad flex items-center gap-1.5 border-t border-border text-small text-ink-muted transition-colors duration-150 hover:text-ink"
-          >
-            {sinceVisit.more} more on the Runs page
-          </Link>
-        )}
-      </Card>
+      <DoneSinceList done={done} />
     </section>
-  );
-}
-
-function SinceRow({ entry }: { entry: SinceEntry }) {
-  const Icon = entry.failed ? CircleAlert : Sparkles;
-  return (
-    <li>
-      <Link
-        href={entry.href}
-        className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
-      >
-        <Icon
-          className={`mt-0.5 size-4 shrink-0 ${entry.failed ? 'text-danger' : 'text-ink-muted'}`}
-          strokeWidth={1.75}
-          aria-hidden
-        />
-        <span className="min-w-0 flex-1">
-          <span className="block text-ui break-words text-ink">{entry.title}</span>
-          <span
-            className={`block text-small break-words ${entry.failed ? 'text-danger' : 'text-ink-muted'}`}
-          >
-            {entry.line}
-          </span>
-          {entry.error && (
-            <span className="line-clamp-2 block text-small break-words text-ink-muted">
-              {entry.error}
-            </span>
-          )}
-        </span>
-        <ChevronRight
-          className="mt-0.5 size-4 shrink-0 text-ink-muted"
-          strokeWidth={1.75}
-          aria-hidden
-        />
-      </Link>
-    </li>
   );
 }
 
@@ -553,16 +506,18 @@ function plural(count: number, noun: string): string {
 }
 
 /**
- * The catch-up after time away (plan #1019): what Claude finished, what is
+ * The catch-up after time away (plan #1019): what Dash did (plan #1076), what is
  * waiting on you (the same list the ordinary home leads with), and the first
  * next step of each goal.
  */
 function CatchUpView({
   catchUp,
+  done,
   timeZone,
   waiting,
 }: {
   catchUp: CatchUp;
+  done: DoneSince | null;
   timeZone: string;
   waiting: React.ReactNode;
 }) {
@@ -577,25 +532,11 @@ function CatchUpView({
             Since {formatInstant(catchUp.since, timeZone)}
           </p>
         </div>
-        {catchUp.runs.length > 0 ? (
-          <Card>
-            <ul className="divide-y divide-border">
-              {catchUp.runs.map((run) => (
-                <RunRow key={run.id} run={run} timeZone={timeZone} />
-              ))}
-            </ul>
-            {catchUp.moreRuns > 0 && (
-              <Link
-                href="/goals/runs"
-                className="card-pad-x row-pad flex items-center gap-1.5 border-t border-border text-small text-ink-muted transition-colors duration-150 hover:text-ink"
-              >
-                {catchUp.moreRuns} more on the Runs page
-              </Link>
-            )}
-          </Card>
+        {done && done.items.length > 0 ? (
+          <DoneSinceList done={done} />
         ) : (
           <p className="px-1 text-small text-ink-muted">
-            Dash finished no runs while you were away.
+            Dash finished nothing while you were away.
           </p>
         )}
       </section>
@@ -621,40 +562,6 @@ function CatchUpView({
         </section>
       )}
     </>
-  );
-}
-
-function RunRow({ run, timeZone }: { run: RunListing; timeZone: string }) {
-  const meta = [
-    run.item?.title ?? run.area?.name ?? null,
-    run.endedAt ? formatInstant(run.endedAt, timeZone, { weekday: false }) : null,
-  ].filter((line): line is string => line !== null);
-  return (
-    <li>
-      <Link
-        href={`/goals/runs/${run.id}`}
-        className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
-      >
-        <Sparkles
-          className="mt-0.5 size-4 shrink-0 text-ink-muted"
-          strokeWidth={1.75}
-          aria-hidden
-        />
-        <span className="min-w-0 flex-1">
-          <span className="line-clamp-2 block text-ui break-words text-ink">
-            {run.summary ?? JOB_LABELS[run.job]}
-          </span>
-          <span className="block text-small break-words text-ink-muted">
-            {[JOB_LABELS[run.job], ...meta].join(' · ')}
-          </span>
-        </span>
-        <ChevronRight
-          className="mt-0.5 size-4 shrink-0 text-ink-muted"
-          strokeWidth={1.75}
-          aria-hidden
-        />
-      </Link>
-    </li>
   );
 }
 
