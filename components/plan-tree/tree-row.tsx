@@ -258,6 +258,12 @@ export function TreeRow<E extends TreeCatalogEntry>({
 
   const closed = isClosed(node.status);
   const isDecision = node.kind === 'decision';
+  // What the open button calls the row. A plan step's number is its handle,
+  // the one the commits and comments use, so the button says it. A page that
+  // anchors its rows by its own id has no such number: a goal step's is only
+  // its place in reading order, which the page shows nowhere, so the button
+  // says the outline the row reads ("12.1").
+  const handle = anchorId ? node.outline : node.number;
   // A setup job still open. Closed, it is an ordinary finished row -- the
   // errand is run, and a box inviting you to run it again would be a lie.
   const setupOpen = node.kind === 'setup' && !closed;
@@ -370,7 +376,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
             type="button"
             onClick={() => setOpen((value) => !value)}
             aria-expanded={open}
-            title={open ? `Close #${node.number}` : `Open #${node.number}`}
+            title={open ? `Close #${handle}` : `Open #${handle}`}
             className="min-w-0 flex-1 self-center text-left hover:text-accent"
           >
             <span
@@ -455,7 +461,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
             the step to change: "where is this" is the question the page exists
             for, and answering it differently should not be a form. */}
         <ActionMenu
-          label={`Status of #${node.number} ${node.title}`}
+          label={`Status of #${node.outline} ${node.title}`}
           items={statusMenu}
           align="start"
           className="justify-self-start"
@@ -533,7 +539,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
               {quickActions}
             </div>
           )}
-          <ActionMenu label={`Actions for #${node.number}`} items={menu} />
+          <ActionMenu label={`Actions for #${node.outline}`} items={menu} />
         </div>
       </li>
 

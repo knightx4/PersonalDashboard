@@ -123,7 +123,8 @@ export const HEALTH: Record<PlanHealth, HealthWord> = {
 };
 
 /** A step as a tooltip names it: "#12 The title". */
-export type StepRef = { number: number; title: string };
+/** A step as a tooltip names it: by its outline ("12.1") where it has one. */
+export type StepRef = { number: number; outline?: string; title: string };
 
 /**
  * What the tooltip on a health word needs to know about the step, beyond its
@@ -142,7 +143,7 @@ export type HealthFacts = {
   waitingOn: readonly StepRef[];
 };
 
-const named = (ref: StepRef) => `#${ref.number} ${ref.title}`;
+const named = (ref: StepRef) => `#${ref.outline ?? ref.number} ${ref.title}`;
 
 export function healthOf(
   health: PlanHealth,
