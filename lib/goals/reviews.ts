@@ -4,7 +4,7 @@
  * Once a week the weekly run reads every open goal against its done-when and
  * writes a row to goals.reviews (supabase/migrations-goals/0025): on track,
  * stalled or waiting on you, one sentence on why and one on the next move. A
- * stalled goal also gets that next move as a proposed step under it, and the
+ * stalled goal also gets that next move as a step under it, and the
  * database refuses a stalled verdict without one. The Goals home shows the
  * newest verdict on each goal's card.
  *
@@ -43,7 +43,7 @@ export type GoalReview = {
   verdict: Verdict;
   reason: string;
   nextMove: string;
-  /** The proposed step a stalled verdict came with. */
+  /** The step a stalled verdict came with. */
   stepId: string | null;
   runId: string | null;
   createdAt: string;
@@ -202,7 +202,7 @@ export function reviewLines(goal: ReviewGoal): string[] {
     `- ${done}`,
     ...(goal.stalled
       ? [
-          `- Nothing done in ${STALLED_AFTER_DAYS} days or more: the verdict is stalled, with a proposed next step.`,
+          `- Nothing done in ${STALLED_AFTER_DAYS} days or more: the verdict is stalled, with its next step added under it.`,
         ]
       : []),
     ...(goal.last

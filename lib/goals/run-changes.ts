@@ -139,6 +139,7 @@ const FIELD_WORDS: Record<string, string> = {
   collection_id: 'the collection',
   block_ask: 'what it is waiting on',
   block_kind: 'what it is waiting on',
+  acts: 'what it does outside the plan',
   resolution: 'the answer',
   rhythm_count: 'the rhythm',
   rhythm_period: 'the rhythm',
