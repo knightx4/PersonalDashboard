@@ -462,8 +462,11 @@ export function AppShell({
   const tabs = sections.slice(0, overflow ? 3 : 4);
 
   const dockKey = (moduleById(module) ?? HOME_MARK).key.from;
+  // Taller than the icons need: a thumb target, and on a phone a bar you can
+  // hit without looking. The icons stay at the dock's 20px (the icon law);
+  // the room is in the padding.
   const dockItem =
-    'press flex w-full flex-col items-center gap-0.5 px-1 pb-2 pt-2.5 text-micro font-medium';
+    'press flex w-full flex-col items-center gap-1 px-1 pb-3 pt-3.5 text-micro font-medium';
 
   const dockTabs = tabs.map((section) => {
     const Icon = section.icon ? NAV_ICONS[section.icon] : null;
@@ -479,7 +482,7 @@ export function AppShell({
           <span className="truncate">{section.label}</span>
           {section.badge !== undefined && section.badge > 0 && (
             <span
-              className="absolute right-1/2 top-1.5 -mr-4 size-1.5 rounded-full bg-caution-fill"
+              className="absolute right-1/2 top-2.5 -mr-4 size-1.5 rounded-full bg-caution-fill"
               aria-hidden
             />
           )}
@@ -659,7 +662,7 @@ export function AppShell({
             Lightbox it is the difference between a white strip across the top
             of a black bench and one continuous bench. */}
             <header className="sticky top-0 z-chrome bg-page/85 backdrop-blur">
-              <div className="flex h-14 items-center gap-2 px-3 sm:px-5">
+              <div className="flex h-16 items-center gap-2 px-3 sm:px-5 lg:h-14">
                 <button
                   type="button"
                   onClick={() => setDrawer(true)}
