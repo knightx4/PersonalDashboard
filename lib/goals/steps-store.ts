@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
+import { normalizeTimeZone } from '@/lib/core/timezone';
 import {
   loadInformation,
   type Collection,
@@ -20,6 +21,7 @@ import {
 } from '@/lib/goals/dependencies';
 import {
   buildForest,
+  markStartDates,
   type LinkedStep,
   type RhythmPeriod,
   type Step,
@@ -42,6 +44,7 @@ import { syncRhythms } from '@/lib/goals/rhythms-store';
 import { goalProgress, type GoalProgress } from '@/lib/goals/status';
 import { todoSteps, type TodoStep } from '@/lib/goals/todo';
 import { nextPosition, reorder, type Goal, type GoalStatus } from '@/lib/goals/tree';
+import { todayIn } from '@/lib/todo/tasks/model';
 
 /**
  * Reads and writes for the step tree under a goal (plan #925).
@@ -68,6 +71,7 @@ type ItemRow = {
   resolution: string | null;
   dismissed_at: string | null;
   due_on: string | null;
+  starts_on: string | null;
   position: number;
   rhythm_count: number | null;
   rhythm_period: RhythmPeriod | null;
@@ -112,7 +116,7 @@ async function loadDependencies(
 const ITEM_COLUMNS =
   'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, fog_dismissed_at, ' +
   'resolution, ' +
-  'dismissed_at, due_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
+  'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
   'unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds';
 
 const toStep = (row: ItemRow): Step => ({
@@ -126,6 +130,7 @@ const toStep = (row: ItemRow): Step => ({
   resolution: row.resolution,
   dismissedAt: row.dismissed_at,
   dueOn: row.due_on,
+  startsOn: row.starts_on,
   position: row.position,
   rhythmCount: row.rhythm_count,
   rhythmPeriod: row.rhythm_period,
@@ -220,6 +225,7 @@ export async function loadGoalMap(
     rows.filter((r) => r.level === 'step').map(toStep),
   );
   attachDependencies(byGoal, nodes, dependencies);
+  markStartDates(byGoal, today);
   const titles = new Map(goals.map((g) => [g.id, g.title]));
 
   const linked: LinkedStep[] = [];
@@ -289,6 +295,7 @@ export async function loadGoalMap(
  */
 export async function loadGoalProgress(
   client: GoalsSupabaseClient,
+  today: string,
 ): Promise<Record<string, GoalProgress>> {
   const [{ data, error }, dependencies] = await Promise.all([
     client.from('items').select(ITEM_COLUMNS).is('archived_at', null),
@@ -302,6 +309,7 @@ export async function loadGoalProgress(
     rows.filter((r) => r.level === 'step').map(toStep),
   );
   attachDependencies(byGoal, nodes, dependencies);
+  markStartDates(byGoal, today);
   const out: Record<string, GoalProgress> = {};
   for (const [goalId, steps] of byGoal) {
     if (steps.length > 0) out[goalId] = goalProgress(steps);
@@ -554,7 +562,7 @@ export async function unlinkStep(client: GoalsSupabaseClient, linkId: string): P
  */
 export async function loadLiveTree(
   client: GoalsSupabaseClient,
-  { userId }: { userId?: string } = {},
+  { userId, today }: { userId?: string; today?: string } = {},
 ): Promise<{ goals: { goal: Goal; areaName: string }[]; byGoal: Map<string, StepNode[]> }> {
   let itemsQuery = client.from('items').select(ITEM_COLUMNS).is('archived_at', null);
   let areasQuery = client.from('areas').select('id, name').is('archived_at', null);
@@ -591,7 +599,33 @@ export async function loadLiveTree(
     rows.filter((r) => r.level === 'step').map(toStep),
   );
   attachDependencies(byGoal, nodes, dependencies);
+  if (today) markStartDates(byGoal, today);
   return { goals, byGoal };
+}
+
+/**
+ * Today in the account's zone, for the runs that read with the service role
+ * and have no signed-in page to ask. UTC when the setting cannot be read,
+ * which is at most a day out on a start date.
+ */
+export async function accountToday(
+  client: GoalsSupabaseClient,
+  userId: string,
+  now: number,
+): Promise<string> {
+  let zone: string | null = null;
+  try {
+    const { data } = await client
+      .schema('core')
+      .from('account_settings')
+      .select('timezone')
+      .eq('user_id', userId)
+      .maybeSingle();
+    zone = normalizeTimeZone((data?.timezone as string | undefined) ?? null);
+  } catch {
+    // Read as UTC, as the comment above says.
+  }
+  return todayIn(zone ?? 'UTC', new Date(now));
 }
 
 /**
@@ -602,7 +636,7 @@ export async function loadDailyView(
   client: GoalsSupabaseClient,
   { userId, today }: Today,
 ): Promise<DailyView & { rhythms: HomeRhythm[]; practices: Practice[] }> {
-  const { goals, byGoal } = await loadLiveTree(client);
+  const { goals, byGoal } = await loadLiveTree(client, { today });
   const live = liveRhythms(
     goals.map((g) => g.goal),
     byGoal,
@@ -638,7 +672,7 @@ export async function loadTodoGoals(
   client: GoalsSupabaseClient,
   { userId, today }: Today,
 ): Promise<{ steps: TodoStep[]; rhythms: TodoRhythm[] }> {
-  const { goals, byGoal } = await loadLiveTree(client);
+  const { goals, byGoal } = await loadLiveTree(client, { today });
   const goalList = goals.map((g) => g.goal);
   const live = liveRhythms(goalList, byGoal);
   const records = await syncRhythms(client, userId, live, today);

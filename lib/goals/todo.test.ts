@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildForest, type Step } from './steps';
+import { buildForest, markStartDates, type Step } from './steps';
 import { canShowOnTodo, todoSteps } from './todo';
 import type { Goal } from './tree';
 
@@ -59,8 +59,25 @@ describe('todoSteps', () => {
       ],
     );
     expect(out).toEqual([
-      { id: 'flagged', title: 'flagged', dueOn: '2026-10-01', goalId: 'g', goalTitle: 'Goal g' },
-      { id: 'deep', title: 'deep', dueOn: null, goalId: 'g', goalTitle: 'Goal g' },
+      { id: 'flagged', title: 'flagged', dueOn: '2026-10-01', startsOn: null, goalId: 'g', goalTitle: 'Goal g' },
+      { id: 'deep', title: 'deep', dueOn: null, startsOn: null, goalId: 'g', goalTitle: 'Goal g' },
+    ]);
+  });
+
+  it('keeps a step for later, with the day it starts, which a step under it shares', () => {
+    const { byGoal } = buildForest(
+      ['g'],
+      [
+        step('autopay', 'g', { onTodo: true, startsOn: '2026-11-01' }),
+        step('each', 'autopay', { onTodo: true }),
+        step('begun', 'g', { onTodo: true, startsOn: '2026-09-01' }),
+      ],
+    );
+    markStartDates(byGoal, '2026-09-26');
+    expect(todoSteps([goal('g')], byGoal).map((s) => [s.id, s.startsOn])).toEqual([
+      ['autopay', '2026-11-01'],
+      ['each', '2026-11-01'],
+      ['begun', null],
     ]);
   });
 

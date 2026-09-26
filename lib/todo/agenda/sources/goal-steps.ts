@@ -94,14 +94,17 @@ export const goalStepsSource: AgendaSource = {
       ...suggestionItems,
       ...steps
         // An undated step is always in the window: it goes in "Someday", as an
-        // undated task does. A dated one waits until the horizon reaches it.
+        // undated task does. A dated one waits until the horizon reaches it,
+        // and so does one that cannot start yet, which shows on the day it
+        // starts when it has no due date.
+        .filter((step) => step.startsOn === null || step.startsOn <= ctx.to)
         .filter((step) => step.dueOn === null || step.dueOn <= ctx.to)
         .map(
           (step): AgendaItem => ({
             key: `${PREFIX}${step.id}`,
             source: 'goal_steps',
             title: step.title,
-            day: step.dueOn,
+            day: step.dueOn ?? step.startsOn,
             at: null,
             link: { href: `/goals/${step.goalId}`, label: step.goalTitle },
             action: null,

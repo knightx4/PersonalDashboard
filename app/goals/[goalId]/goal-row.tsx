@@ -469,6 +469,8 @@ export function GoalRow({
           <span className="whitespace-normal text-ink-muted">
             {progressLine(step.rhythmPeriod, current)}
           </span>
+        ) : step.waitsUntil ? (
+          <span className="text-ink-muted">Starts {formatDate(step.waitsUntil)}</span>
         ) : step.dueOn ? (
           <span className="text-ink-muted">Due {formatDate(step.dueOn)}</span>
         ) : null
@@ -553,6 +555,7 @@ export function GoalRow({
           {current && step.rhythmPeriod && (
             <span>{progressLine(step.rhythmPeriod, current)}</span>
           )}
+          {step.waitsUntil && <span>Starts {formatDate(step.waitsUntil)}</span>}
           {step.dueOn && <span>Due {formatDate(step.dueOn)}</span>}
           {onTodo && <span>On Todo</span>}
           {links.map((link) => (

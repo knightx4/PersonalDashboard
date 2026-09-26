@@ -89,12 +89,14 @@ function holdsParent(node: StepNode): boolean {
  *  - Nothing it or a step above it waits on is still open.
  *  - Nothing beneath it is still open.
  *  - No step above it is proposed or dropped, or blocked on you.
+ *  - Its start date, or one above it, has come (`waitsUntil`).
  */
 export function isStepReady(
   node: StepNode,
   ancestors: readonly Pick<StepNode, 'status' | 'blockKind'>[],
 ): boolean {
   if (node.status !== 'open' && !isStaleStepBlock(node)) return false;
+  if (node.waitsUntil) return false;
   if ((node.waitingOn ?? []).length > 0) return false;
   if (node.children.some(holdsParent)) return false;
   if (ancestors.some((a) => a.status === 'dropped' || a.status === 'proposed')) return false;

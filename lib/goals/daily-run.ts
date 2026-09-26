@@ -33,7 +33,9 @@ export type ReadyStep = { id: string; title: string; goalId: string; goalTitle: 
  * `claude` step under an open goal, reached through open steps only, with no
  * open step beneath it and nothing produced yet. A step with open sub-steps
  * waits on them, as on the home, and so does one waiting on other steps
- * (plan #981). A blocked step and what is under it wait on you.
+ * (plan #981). A blocked step and what is under it wait on you. A step whose
+ * start date has not come waits for it, with everything under it; the
+ * caller marks those with markStartDates.
  */
 export function readyClaudeSteps(goals: Goal[], stepsByGoal: Map<string, StepNode[]>): ReadyStep[] {
   const ready: ReadyStep[] = [];
@@ -42,6 +44,7 @@ export function readyClaudeSteps(goals: Goal[], stepsByGoal: Map<string, StepNod
     const walk = (nodes: StepNode[]) => {
       for (const node of nodes) {
         if (node.status !== 'open' && !isStaleStepBlock(node)) continue;
+        if (node.waitsUntil) continue;
         if (
           node.kind === 'claude' &&
           node.result === null &&

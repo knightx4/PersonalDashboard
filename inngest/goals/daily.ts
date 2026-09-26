@@ -7,7 +7,7 @@ import { loadOutOfDateAnswers } from '@/lib/goals/answers-store';
 import { DAILY_STEP_LIMIT, dailyRunText, ranRecently, readyClaudeSteps } from '@/lib/goals/daily-run';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { recordAndFire } from '@/lib/goals/shaping-store';
-import { loadLiveTree } from '@/lib/goals/steps-store';
+import { accountToday, loadLiveTree } from '@/lib/goals/steps-store';
 import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
 
 /**
@@ -61,8 +61,10 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
   const lastAt = (last.data?.[0]?.created_at as string | undefined) ?? null;
   if (ranRecently(lastAt, now)) return { skipped: 'a morning run already started today' };
 
+  // A step whose start date has not come is left for a later morning.
+  const today = await accountToday(client, userId, now);
   const [{ goals, byGoal }, stale] = await Promise.all([
-    loadLiveTree(client, { userId }),
+    loadLiveTree(client, { userId, today }),
     loadOutOfDateAnswers(client, userId),
   ]);
   const ready = readyClaudeSteps(
