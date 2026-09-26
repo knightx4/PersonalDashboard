@@ -202,10 +202,12 @@ describe('approvalLine', () => {
     expect(approvalLine(base).approve).toBe('Approve goal');
   });
 
-  it('offers no button once approved with nothing waiting, and one when more is proposed', () => {
+  it('offers no button once approved, and sends a step that acts outside the plan to its own row', () => {
     expect(approvalLine({ ...base, approvedAt: '2026-09-20T00:00:00Z' }).approve).toBeNull();
-    expect(approvalLine({ ...base, approvedAt: '2026-09-20T00:00:00Z', proposed: 1 }).approve).toBe(
-      'Approve it',
+    const held = approvalLine({ ...base, approvedAt: '2026-09-20T00:00:00Z', proposed: 1 });
+    expect(held.approve).toBeNull();
+    expect(held.text).toBe(
+      'One step waits on your approval below, because Dash working it would do something outside the plan.',
     );
   });
 

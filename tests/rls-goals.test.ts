@@ -430,13 +430,72 @@ describe('approval once per goal (plan #932)', () => {
     }) as Promise<T>;
   }
 
+  /** A goal Claude proposed, the one kind that is not approved: yours are approved as you add them. */
   async function newGoal(title: string): Promise<string> {
-    const [row] = await asUser(userA, (tx) => tx<{ id: string }[]>`
-      insert into items (user_id, level, area_id, title, fog)
-      values (${userA}, 'goal', ${areaA}, ${title}, 'Not sure what good looks like yet')
+    const [row] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title, fog, status)
+      values (${userA}, 'goal', ${areaA}, ${title}, 'Not sure what good looks like yet', 'proposed')
       returning id`);
     return row.id;
   }
+
+  it('approves a goal you add as you add it, so Claude’s steps under it go in live', async () => {
+    const [goal] = await asUser(userA, (tx) => tx<{ id: string; approved: boolean }[]>`
+      insert into items (user_id, level, area_id, title)
+      values (${userA}, 'goal', ${areaA}, 'Read twelve books') returning id, approved_at is not null as approved`);
+    expect(goal.approved).toBe(true);
+
+    const [step] = await asClaude((tx) => tx<{ status: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goal.id}, 'claude', 'List twenty books worth reading') returning status`);
+    expect(step.status).toBe('open');
+
+    // Written with no session, as a seed is, a goal is left as written.
+    const [seeded] = await admin<{ approved: boolean }[]>`
+      insert into items (user_id, level, area_id, title)
+      values (${userA}, 'goal', ${areaA}, 'Seeded goal') returning approved_at is not null as approved`;
+    expect(seeded.approved).toBe(false);
+  });
+
+  it('holds a step that acts outside the plan until you approve it', async () => {
+    const [goal] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title)
+      values (${userA}, 'goal', ${areaA}, 'Lower the loan rate') returning id`);
+    const acts = 'Sends the hardship request to Nelnet from your Gmail.';
+
+    await expect(
+      asClaude((tx) => tx`
+        insert into items (user_id, level, parent_id, kind, title, acts)
+        values (${userA}, 'step', ${goal.id}, 'claude', 'Send the hardship request', ${acts})`),
+    ).rejects.toThrow(/insert it with status proposed/);
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into items (user_id, level, parent_id, kind, title, acts)
+        values (${userA}, 'step', ${goal.id}, 'mine', 'Send it myself', ${acts})`),
+    ).rejects.toThrow(/items_acts_ck/);
+
+    const [step] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, acts, status)
+      values (${userA}, 'step', ${goal.id}, 'claude', 'Send the hardship request', ${acts}, 'proposed')
+      returning id`);
+    await expect(
+      asClaude((tx) => tx`update items set status = 'open' where id = ${step.id}`),
+    ).rejects.toThrow(/Only the person can approve/);
+    await asClaude((tx) => tx`update items set title = 'Send the hardship letter' where id = ${step.id}`);
+
+    await asUser(userA, (tx) => tx`select settle_proposal(${step.id}, true)`);
+    await expect(
+      asClaude((tx) => tx`update items set acts = 'Sends it to Navient too.' where id = ${step.id}`),
+    ).rejects.toThrow(/may not change what a live step does/);
+
+    // A live step with no effect outside the plan cannot be given one either.
+    const [plain] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goal.id}, 'claude', 'Draft the letter') returning id`);
+    await expect(
+      asClaude((tx) => tx`update items set acts = ${acts} where id = ${plain.id}`),
+    ).rejects.toThrow(/may not change what a live step does/);
+  });
 
   it('holds Claude to proposals and questions under a goal you have not approved', async () => {
     const goal = await newGoal('Have good relationships');
@@ -709,9 +768,9 @@ describe('one proposal at a time, and fog put aside (plan #960)', () => {
   }
 
   it('approves one proposal with those beneath it and leaves the goal unapproved', async () => {
-    const [goal] = await asUser(userA, (tx) => tx<{ id: string }[]>`
-      insert into items (user_id, level, area_id, title)
-      values (${userA}, 'goal', ${areaA}, 'Run a half marathon') returning id`);
+    const [goal] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title, status)
+      values (${userA}, 'goal', ${areaA}, 'Run a half marathon', 'proposed') returning id`);
     const parent = await propose(goal.id, 'Pick a plan');
     const child = await propose(parent, 'Compare three plans', 'claude');
     const other = await propose(goal.id, 'Buy shoes');

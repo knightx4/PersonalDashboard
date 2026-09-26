@@ -254,13 +254,18 @@ const NEEDS_NAMED = 3;
  * What a step is held up by, in one line, for the Needs block of an opened
  * step (plan #959), as the plan's Needs line says it: what a blocked step
  * said it needs (plan #981), the steps it waits on and the open steps under
- * it, named, or your approval on a proposal. Null when nothing holds it up,
+ * it, named, or your approval on a proposal, naming what the step would do
+ * outside the plan when that is why it waits. Null when nothing holds it up,
  * which includes a question waiting on you, since its answer box already says
  * so.
  */
 export function stepNeeds(node: StepNode): string | null {
   const health = stepHealth(node);
-  if (health === 'proposed') return 'Your approval. Nothing happens to it until then.';
+  if (health === 'proposed') {
+    return node.acts
+      ? `Your approval, since Dash working it does this outside the plan: ${node.acts}`
+      : 'Your approval. Nothing happens to it until then.';
+  }
   if (health === 'blocked') return node.blockAsk ?? 'Something from you. Nothing says what yet.';
   if (health !== 'waiting') return null;
   if (isStepBlocked(node) && node.blockAsk) return node.blockAsk;
