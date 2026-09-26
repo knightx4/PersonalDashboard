@@ -165,3 +165,16 @@ export function standingChange(
       : null,
   };
 }
+
+/**
+ * Whether an open information step is waiting on you to see a changed answer
+ * (plan #1050): some answer on it moved after the step closed, which reopened
+ * it (plan #997), and #1048 settled that you close it again. Closing it makes
+ * the new answers the ones the next statement is measured from.
+ */
+export function awaitsSeenIt(
+  status: string,
+  answers: ReadonlyArray<Pick<StepAnswer, 'changed'>>,
+): boolean {
+  return status === 'open' && answers.some((a) => a.changed !== null);
+}

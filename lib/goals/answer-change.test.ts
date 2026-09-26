@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { answerChange, standingChange } from '@/lib/goals/answer-change';
+import { answerChange, awaitsSeenIt, standingChange } from '@/lib/goals/answer-change';
 import { readChanged, readClosed, readMeaning, readValue } from '@/lib/goals/answers';
 
 // The loans step as it stands on the live site (plan #1035's done-when).
@@ -167,5 +167,24 @@ describe('standingChange (plan #997)', () => {
     expect(readChanged(null, loan)).toBeNull();
     expect(readChanged('2026-09-25T08:00:00Z', loan)).toEqual({ at: '2026-09-25T08:00:00Z', recordId: loan });
     expect(readChanged('2026-09-25T08:00:00Z', 'nope')).toEqual({ at: '2026-09-25T08:00:00Z', recordId: null });
+  });
+});
+
+describe('awaitsSeenIt (plan #1050)', () => {
+  const moved = { changed: { at: '2026-09-26T09:00:00Z', recordId: null } };
+  const still = { changed: null };
+
+  it('offers Seen it on an open step with a changed answer', () => {
+    expect(awaitsSeenIt('open', [still, moved])).toBe(true);
+  });
+
+  it('does not offer it when no answer changed', () => {
+    expect(awaitsSeenIt('open', [still, still])).toBe(false);
+    expect(awaitsSeenIt('open', [])).toBe(false);
+  });
+
+  it('does not offer it once the step is closed or put aside', () => {
+    expect(awaitsSeenIt('done', [moved])).toBe(false);
+    expect(awaitsSeenIt('blocked', [moved])).toBe(false);
   });
 });

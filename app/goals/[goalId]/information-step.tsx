@@ -16,7 +16,7 @@ import {
   type StepAnswer,
   type StepQuestion,
 } from '@/lib/goals/answers';
-import { standingChange } from '@/lib/goals/answer-change';
+import { awaitsSeenIt, standingChange } from '@/lib/goals/answer-change';
 import { idField, liveFields, type CollectionField } from '@/lib/goals/collections';
 import type { Collection, CollectionRecord } from '@/lib/goals/collections-store';
 import {
@@ -31,6 +31,7 @@ import {
   unfinishedReason,
 } from '@/lib/goals/information';
 import type { StepNode } from '@/lib/goals/steps';
+import { setStepStatusAction } from './actions';
 import {
   archiveRecordAction,
   confirmRecordAction,
@@ -95,6 +96,7 @@ export function InformationStep({
         fields={collection.fields}
         records={records}
       />
+      {awaitsSeenIt(node.status, answers) && <SeenItButton stepId={node.id} />}
       {line && <p className="text-small text-ink-muted">{line}</p>}
       {reason && <p className="text-small text-ink-muted">{reason}</p>}
       {collection.shape === 'one' ? (
@@ -208,6 +210,34 @@ function ChangeLines({ answer, records }: { answer: StepAnswer; records: Collect
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * Closes a step that a changed answer reopened (plan #1050; #1048 settled
+ * that you close it). One button for the whole step, since closing is per
+ * step. The database does the rest when the step closes: each answer's
+ * wording, date and amount become the closing values the next statement is
+ * measured from (#1047), and the change is cleared.
+ */
+function SeenItButton({ stepId }: { stepId: string }) {
+  const toast = useToast();
+  const [, close, closing] = useActionState(async (_prev: object, form: FormData) => {
+    const result = await setStepStatusAction(form);
+    if (result.error) toast({ text: result.error });
+    return result;
+  }, {});
+  return (
+    <form action={close} className="flex flex-wrap items-center gap-2">
+      <input type="hidden" name="id" value={stepId} />
+      <input type="hidden" name="status" value="done" />
+      <Button type="submit" size="sm" variant="secondary" pending={closing}>
+        Seen it
+      </Button>
+      <span className="text-small text-ink-muted">
+        Closes the step. The next statement is measured from these answers.
+      </span>
+    </form>
   );
 }
 

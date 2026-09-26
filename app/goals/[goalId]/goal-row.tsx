@@ -10,6 +10,7 @@ import type { ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
 import { FieldError, InlineInput } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
+import { awaitsSeenIt } from '@/lib/goals/answer-change';
 import { awaitsReview } from '@/lib/goals/daily';
 import { offersPrepare, offersSend, sendJob } from '@/lib/goals/handover';
 import type { GoalRowNode } from '@/lib/goals/plan-rows';
@@ -252,6 +253,9 @@ export function GoalRow({
   const current = step.status === 'open' ? (rhythm?.current ?? null) : null;
   const filled = step.collectionId ? context.information[step.collectionId] : undefined;
   const links = context.linksOf[step.id] ?? [];
+  // A changed answer reopened it, and it waits on your Seen it (plan #1050).
+  const answerChanged =
+    filled !== undefined && awaitsSeenIt(step.status, context.answers[step.id] ?? []);
 
   async function archive(form: FormData) {
     const result = await archiveStepAction(form);
@@ -465,7 +469,9 @@ export function GoalRow({
            size. A rhythm's count runs to three or four words ("0 of 1 this
            week"), so it wraps onto a second line the way the plan's "Next ·
            L" does rather than being cut off (plan #983). */
-        current && step.rhythmPeriod ? (
+        answerChanged ? (
+          <span className="whitespace-normal text-caution">An answer changed</span>
+        ) : current && step.rhythmPeriod ? (
           <span className="whitespace-normal text-ink-muted">
             {progressLine(step.rhythmPeriod, current)}
           </span>
