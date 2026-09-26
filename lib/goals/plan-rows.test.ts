@@ -3,6 +3,7 @@ import { HEALTH } from '@/lib/plan/health-words';
 import { attachDependencies, type DependencyRow } from './dependencies';
 import {
   REVIEW_ASK,
+  YOURS_ASK,
   countGoalView,
   goalCatalog,
   goalRows,
@@ -62,7 +63,9 @@ const dep = (id: string, itemId: string, dependsOnId: string): DependencyRow => 
 describe('goalRows', () => {
   it('reads a step blocked on you as the plan does, with its ask as the tooltip and Needs line', () => {
     const { rows } = rowsOf(
-      tree([step('a', 'g', { status: 'blocked', blockKind: 'outside', blockAsk: 'The bank letter' })]),
+      tree([
+        step('a', 'g', { status: 'blocked', blockKind: 'outside', blockAsk: 'The bank letter' }),
+      ]),
     );
     const row = find(rows, 'a');
     expect(row.status).toBe('blocked');
@@ -82,7 +85,10 @@ describe('goalRows', () => {
     expect(row.health.title).toBe('Waits on #1 List balances');
     expect(row.move.word).toBe('Held up');
     expect(row.dependsOn).toEqual([
-      { dependencyId: 'd1', item: { id: 'a', number: 1, title: 'List balances', status: 'not_started' } },
+      {
+        dependencyId: 'd1',
+        item: { id: 'a', number: 1, title: 'List balances', status: 'not_started' },
+      },
     ]);
     expect(find(rows, 'a').blocks).toEqual([{ id: 'b', number: 2, title: 'b' }]);
   });
@@ -92,7 +98,7 @@ describe('goalRows', () => {
       tree(
         [
           step('a', 'g', { status: 'done' }),
-          step('b', 'g'),
+          step('b', 'g', { kind: 'claude' }),
           step('c', 'g', { status: 'blocked', blockKind: 'steps', blockAsk: 'a first' }),
         ],
         [dep('d1', 'b', 'a'), dep('d2', 'c', 'a')],
@@ -114,11 +120,35 @@ describe('goalRows', () => {
     expect(row.blockAsk).toBeNull();
   });
 
-  it('gives your steps the Yours move and leaves a Claude step to the run', () => {
+  it('puts a ready step of yours on you and keeps Ready for a Claude step', () => {
     const { rows } = rowsOf(tree([step('a', 'g'), step('b', 'g', { kind: 'claude' })]));
-    expect(find(rows, 'a').move.word).toBe('Yours');
+    const a = find(rows, 'a');
+    expect(a.status).toBe('not_started');
+    expect(a.health.name).toBe('blocked');
+    expect(a.health.title).toBe(YOURS_ASK);
+    expect(a.move.word).toBe('Needs you');
+    expect(a.need).toBe(YOURS_ASK);
     expect(find(rows, 'b').move.word).toBe('');
     expect(find(rows, 'b').health.name).toBe('ready');
+    expect(find(rows, 'b').need).toBeNull();
+  });
+
+  it('leaves a step of yours that waits on another, or holds sub-steps, off you', () => {
+    const { rows } = rowsOf(
+      tree(
+        [
+          step('a', 'g', { kind: 'claude' }),
+          step('b', 'g'),
+          step('stage', 'g'),
+          step('s1', 'stage', { kind: 'claude' }),
+        ],
+        [dep('d1', 'b', 'a')],
+      ),
+    );
+    expect(find(rows, 'b').health.name).toBe('waiting');
+    expect(find(rows, 'b').need).toBeNull();
+    expect(find(rows, 'stage').need).toBeNull();
+    expect(find(rows, 's1').health.name).toBe('ready');
   });
 
   it('reads a question as unanswered and an answered one as answered', () => {
@@ -147,10 +177,7 @@ describe('goalRows', () => {
       ['b', '4'],
     ]);
     expect(find(hidden.rows, 'a').children.map((row) => row.id)).toEqual(['a1']);
-    expect(find(rowsOf(roots, true).rows, 'a').children.map((row) => row.id)).toEqual([
-      'a1',
-      'q',
-    ]);
+    expect(find(rowsOf(roots, true).rows, 'a').children.map((row) => row.id)).toEqual(['a1', 'q']);
   });
 
   it('counts the goal as the plan counts a module', () => {
@@ -158,7 +185,7 @@ describe('goalRows', () => {
       tree([
         step('a', 'g', { status: 'done' }),
         step('b', 'g', { status: 'blocked', blockKind: 'outside', blockAsk: 'x' }),
-        step('c', 'g'),
+        step('c', 'g', { kind: 'claude' }),
         step('p', 'g', { status: 'proposed' }),
       ]),
     );
@@ -196,7 +223,13 @@ describe('viewGoalRows', () => {
     list.flatMap((row) => [row.id, ...ids(row.children)]);
 
   it('shows everything under Everything', () => {
-    expect(ids(viewGoalRows(rows, 'all'))).toEqual(['stage', 'done', 'blocked', 'claude', 'question']);
+    expect(ids(viewGoalRows(rows, 'all'))).toEqual([
+      'stage',
+      'done',
+      'blocked',
+      'claude',
+      'question',
+    ]);
   });
 
   it('leaves the closed steps out of Open', () => {

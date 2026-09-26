@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { buildForest, type Step } from '@/lib/goals/steps';
-import { REVIEW_ASK } from '@/lib/goals/plan-rows';
+import { REVIEW_ASK, YOURS_ASK } from '@/lib/goals/plan-rows';
 import type { GoalMap } from '@/lib/goals/steps-store';
 
 vi.mock('next/navigation', () => ({
@@ -89,8 +89,13 @@ describe('the Needs line on a goal step', () => {
     expect(html).toContain(`Needs: </span>${REVIEW_ASK}`);
   });
 
-  it('leaves an open step with its detail', () => {
-    const html = render([step('a', { title: 'List balances' })]);
+  it('says what a ready step of yours waits on you for', () => {
+    const html = render([step('a', { title: 'Call the bank' })]);
+    expect(html).toContain(`Needs: </span>${YOURS_ASK}`);
+  });
+
+  it('leaves a ready Claude step with its detail', () => {
+    const html = render([step('a', { title: 'List balances', kind: 'claude' })]);
     expect(html).not.toContain('Needs: ');
     expect(html).toContain('The detail line');
   });
