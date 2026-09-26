@@ -140,12 +140,29 @@ something you turned down. The rules for the run are in
 
 ## Approval
 
-Claude proposes; you approve. On the dev plan every proposed step waits for
-approval separately, which at goal scale would be a lot of tapping. So approval
-happens once per goal: you approve a goal's first breakdown, and after that
-Claude may add, reorder and split steps beneath it without asking. It may not
-add a new goal, change a goal's done-when or drop one of your steps without
-approval. Those stay proposals.
+You approve what Claude does outside the plan, and the goals it proposes. You
+do not approve its steps. Research, a comparison, a draft or a calculation
+changes nothing beyond the goal's own map, so a goal you add is approved as you
+add it, and Claude adds, splits and reorders steps under it without asking
+(`migrations-goals/0042`).
+
+What waits on you:
+
+- **A goal Claude proposed**, with the steps under it, since adding a goal is
+  deciding what you want. Approving the goal opens them all.
+- **A step that acts outside the plan**: sending an email or a message,
+  submitting a form or an application, booking or buying, posting or sharing,
+  or changing your records outside Goals. It is a Claude step whose `acts`
+  holds one sentence naming what working it does ("Sends the hardship request
+  to help@nelnet.net from your Gmail"). It arrives proposed, the row shows
+  the sentence with Approve and Turn down, and no run works it until you
+  approve that step. The database refuses Claude writing such a step in any
+  other status, opening one, or changing what a live step does.
+
+Claude may still not change a goal's done-when, drop one of your steps or
+answer a question for you. It asks those as a question step. A step that
+depends on an unanswered question is written live but waits on that question,
+so it stays out of the runs until you answer.
 
 ## Where things live
 
@@ -279,7 +296,7 @@ the same allowance. So Goals runs on a schedule rather than on every change:
 - **Weekly.** A verdict on each open goal against its done-when: on track,
   stalled or waiting on you, with one sentence on why and the next move,
   shown on the goal's card on the Goals home. A goal with nothing done in
-  three weeks reads stalled, and its next move is proposed as a step
+  three weeks reads stalled, and its next move is added as a step
   (plan #1018). Then research for each goal of the kinds of help it asks for:
   events, volunteer openings, reading, courses or job leads (plan #1028).
   Each suggestion carries its kind and has quick **going / not for me**
@@ -296,7 +313,7 @@ the same allowance. So Goals runs on a schedule rather than on every change:
 - **After an answer.** Answering a question on a goal fires one run for that
   goal once ten minutes pass with no further answer, so several answers in
   one sitting cost one run. It settles the provisional steps the answers
-  held up and proposes anything new (plan #1017).
+  held up and adds anything new (plan #1017).
 
 ## Claude's own work
 
@@ -432,12 +449,12 @@ waiting on your approval looks under way:
 - **Your move**, grouped by what it asks of you. *Decide*: questions, and
   what a run flagged. *Approve*: goals Claude proposed, one row per area
   (the All goals page has Approve and Turn down on each, and Approve all for
-  an area), and proposed steps on an approved goal. *Read*: a result Claude
+  an area), and steps that would act outside the plan. *Read*: a result Claude
   produced, and the context and drafts it found for a goal. *Do*: your own
   next steps across every goal, with the rhythms running out of days.
 - **Dash is on it**: the runs going now, the Claude steps the next morning
-  run will work, and the Claude steps held until you approve the goal or the
-  proposal they sit under.
+  run will work, and the Claude steps held until you approve the goal they
+  sit under or the action they would take.
 - **Your goals**: each goal's bar, its weekly verdict and the way into its
   tree.
 
@@ -742,7 +759,7 @@ A sketch for the migration, not the migration itself.
   below them, `level` (`goal` or `step`), `kind`, `status`, `title`, `detail`,
   `acceptance`, `fog`, `resolution`, `due_on`, `starts_on` (a step's first
   possible day, "Steps for later"), `on_todo`, `approved_at`,
-  `position`, and `rhythm_count` with `rhythm_period` for rhythms. A goal's
+  `acts` (on a Claude step, what working it does outside the plan), `position`, and `rhythm_count` with `rhythm_period` for rhythms. A goal's
   `help_kinds` lists the weekly help it asks for, each an entry of `kind`
   (events, volunteering, reading, courses or job_leads) and a `note` on what
   to look for (plan #1027). When Claude maps a goal it proposes kinds in

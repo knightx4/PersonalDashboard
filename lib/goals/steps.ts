@@ -91,6 +91,12 @@ export type Step = {
   blockAsk?: string | null;
   /** Who clears the block: `steps` when the steps it waits on close, `outside` when you do. */
   blockKind?: StepBlockKind | null;
+  /**
+   * On a `claude` step, what working it does outside the goal's map, such as
+   * sending an email (goals migration 0042). Such a step waits on your
+   * approval; one with none goes live without it.
+   */
+  acts?: string | null;
 };
 
 /**

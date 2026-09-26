@@ -86,6 +86,7 @@ type ItemRow = {
   questions: unknown;
   block_ask: string | null;
   block_kind: StepBlockKind | null;
+  acts: string | null;
   help_kinds: unknown;
   proposed_help_kinds: unknown;
 };
@@ -116,7 +117,7 @@ const ITEM_COLUMNS =
   'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, fog_dismissed_at, ' +
   'resolution, ' +
   'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
-  'unit, target, collection_id, asks_for, questions, block_ask, block_kind, help_kinds, proposed_help_kinds';
+  'unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -142,6 +143,7 @@ const toStep = (row: ItemRow): Step => ({
   questions: readQuestions(row.questions),
   blockAsk: row.block_ask,
   blockKind: row.block_kind,
+  acts: row.acts,
 });
 
 const toGoal = (row: ItemRow): Goal => ({

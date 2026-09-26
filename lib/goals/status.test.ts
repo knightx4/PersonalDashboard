@@ -177,6 +177,9 @@ describe('stepNeeds', () => {
 
   it('asks for approval on a proposal and says nothing when nothing holds a step', () => {
     expect(stepNeeds(node('p', { status: 'proposed' }))).toMatch(/^Your approval/);
+    expect(
+      stepNeeds(node('s', { kind: 'claude', status: 'proposed', acts: 'Sends the letter to Nelnet.' })),
+    ).toBe('Your approval, since Dash working it does this outside the plan: Sends the letter to Nelnet.');
     expect(stepNeeds(node('a'))).toBeNull();
     expect(stepNeeds(node('q', { kind: 'decision' }))).toBeNull();
     expect(stepNeeds(node('d', { status: 'done', children: [node('x')] }))).toBeNull();

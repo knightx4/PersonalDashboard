@@ -132,7 +132,7 @@ describe('reviewLines', () => {
     expect(lines).toContain('- Done when: not written yet');
     expect(lines).toContain('- Nothing done since it was approved 40 days ago.');
     expect(lines).toContain(
-      '- Nothing done in 21 days or more: the verdict is stalled, with a proposed next step.',
+      '- Nothing done in 21 days or more: the verdict is stalled, with its next step added under it.',
     );
   });
 });
