@@ -535,11 +535,17 @@ export function AppShell({
     </li>
   );
 
-  // One or two tabs to the switcher's left. The bar holds four at the most --
-  // three plus More, or four with no More -- so this is dead centre of five
-  // and one past centre of four.
-  const split = dockTabs.length >= 3 ? 2 : 1;
-  const dock = [...dockTabs.slice(0, split), dockSwitcher, ...dockTabs.slice(split)];
+  // The switcher sits dead centre whatever the count. The bar holds four tabs
+  // at the most, and an odd count leaves the right side one short, so it is
+  // padded with an empty slot rather than letting the switcher slide one past
+  // the middle (note 202571c8).
+  const count = dockTabs.length;
+  const side = Math.ceil(count / 2);
+  const right = dockTabs.slice(side);
+  while (right.length < side) {
+    right.push(<li key={`__pad${right.length}`} aria-hidden />);
+  }
+  const dock = [...dockTabs.slice(0, side), dockSwitcher, ...right];
 
   return (
     <ToastProvider>
