@@ -24,9 +24,10 @@ import type { OperationName } from '@/lib/core/spend/guesses';
  * it is working on and passes that to the hint.
  *
  * Learn is filled in by plan #917; Jobs, Shopping, Vault and Dash's comment
- * replies by #918. News has one paid button, Reload on the recommended
- * newsletters (#947); its summaries and story groups are made by the digest
- * cron when an issue arrives.
+ * replies by #918. News has two paid presses, Reload on the recommended
+ * newsletters (#947) and sending a view when discussing a story (#1060); its
+ * summaries and story groups are made by the digest cron when an issue
+ * arrives.
  */
 export const PAID_ACTIONS = {
   // Learn: a track and its ideas
@@ -123,6 +124,8 @@ export const PAID_ACTIONS = {
   // News: making the list of recommended newsletters. The view also presses
   // this once on its own, the first time it opens with no list stored.
   'app/news/all/actions.ts#remakeRecommendations': ['recommend-newsletters'],
+  // News: Dash's reply in a discussion of a Quick read story
+  'app/news/quick/actions.ts#discussQuickStory': ['discuss-story'],
 
   // Goals: filing a sentence from the capture box, on every page
   'app/goals/capture-actions.ts#fileGoalCapture': ['file-capture'],

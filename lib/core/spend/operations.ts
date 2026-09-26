@@ -70,6 +70,9 @@ export const SPEND_OPERATIONS = {
     // Making the list of free newsletters recommended on the Newsletters tab,
     // with a web search for each topic. Opus, one run per press of Reload.
     'recommend-newsletters',
+    // Dash's reply when you discuss a Quick read story (plan #1060). Sonnet,
+    // one call per round, three rounds at most.
+    'discuss-story',
   ],
   goals: [
     // Filing a sentence from the capture box against open goals and steps

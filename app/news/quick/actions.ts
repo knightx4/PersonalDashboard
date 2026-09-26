@@ -3,9 +3,27 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSpend } from '@/lib/core/spend/record';
+import { serverEnv } from '@/lib/env';
 import { createNewsClient } from '@/lib/news/auth/server';
+import { NEWS_SCHEMA } from '@/lib/news/db/schema-name';
 import { openStory, passStories, unpassStories } from '@/lib/news/issues/quick';
+import { readStories } from '@/lib/news/issues/stories';
+import {
+  discussGuidance,
+  discussionClosed,
+  roundsTaken,
+  storyMaterial,
+  storyRef,
+  storySubject,
+} from '@/lib/news/quick/discuss';
 import { setReaction } from '@/lib/news/quick/reactions';
+import { replyAbout } from '@/lib/talk/reply';
+import { appendTurns, loadConversation } from '@/lib/talk/store';
+import { turnBody, type TalkTurn } from '@/lib/talk/talk';
 
 const PassInput = z.object({
   issueId: z.string().uuid(),
@@ -155,4 +173,122 @@ export async function reactToQuickStory(
   }
   revalidatePath('/news');
   return { error: null };
+}
+
+/**
+ * The discussion of one story so far (plan #1060), oldest first, for the
+ * Discuss sheet to show when it opens. Read each time the sheet opens rather
+ * than with the page, so Quick read's load is unchanged and a reopened story
+ * shows what was said in another tab. Empty when there is none.
+ */
+// latency: pending -- the sheet opens at once and shows the thread when it arrives
+export async function loadStoryDiscussion(
+  issueId: string,
+  storyIndex: number,
+): Promise<{ turns: TalkTurn[]; error: string | null }> {
+  const parsed = PassInput.safeParse({ issueId, storyIndex });
+  if (!parsed.success) return { turns: [], error: 'That story could not be found.' };
+
+  await requireUser();
+  const core = await createCoreClient();
+  try {
+    const turns = await loadConversation(core, {
+      kind: 'news_story',
+      ref: storyRef(parsed.data.issueId, parsed.data.storyIndex),
+    });
+    return { turns, error: null };
+  } catch {
+    return { turns: [], error: 'Your discussion could not be read. Try again.' };
+  }
+}
+
+function anthropicKey(): string | undefined {
+  try {
+    return serverEnv().ANTHROPIC_API_KEY ?? undefined;
+  } catch {
+    return process.env.ANTHROPIC_API_KEY ?? undefined;
+  }
+}
+
+/**
+ * One round of discussing a Quick read story with Dash (plan #1060): keep
+ * what the person wrote, then Dash's reply, which argues the other side or
+ * asks what their view rests on. The third reply closes the discussion with
+ * a line on where their view held and where it was thin, and nothing more is
+ * taken after it.
+ *
+ * The story is read again from the newsletter rather than taken from the
+ * browser: its headline, summary and the story's own text are what Dash
+ * reads. The person's turn is written before the reply is asked for, so a
+ * failed reply keeps it, and the turns returned are what the table holds.
+ * The reply's cost is recorded under news, discuss-story.
+ */
+// latency: pending -- the view shows in the thread at once and "Dash is replying" holds the place of the reply
+export async function discussQuickStory(
+  issueId: string,
+  storyIndex: number,
+  raw: string,
+): Promise<{ turns?: TalkTurn[]; error?: string }> {
+  const parsed = PassInput.safeParse({ issueId, storyIndex });
+  if (!parsed.success) return { error: 'That story could not be found.' };
+  const checked = turnBody(raw);
+  if ('error' in checked) return { error: checked.error };
+
+  const user = await requireUser();
+  const [news, core] = await Promise.all([createNewsClient(), createCoreClient()]);
+
+  const { data: issue, error: issueError } = await news
+    .from('issues')
+    .select('stories')
+    .eq('id', parsed.data.issueId)
+    .maybeSingle();
+  assertSchemaExposed(issueError, NEWS_SCHEMA);
+  if (issueError) return { error: 'The story could not be read. Try again.' };
+  // Indexed in the raw array, as reactions.ts does: readStories drops
+  // malformed entries, which would shift every index after them.
+  const stories = (issue as { stories: unknown } | null)?.stories;
+  const entry = Array.isArray(stories) ? stories[parsed.data.storyIndex] : undefined;
+  const [story] = entry === undefined ? [] : readStories([entry]);
+  if (!story) return { error: 'That story is no longer in its newsletter.' };
+
+  const subject = storySubject(parsed.data.issueId, parsed.data.storyIndex, story.headline);
+  let earlier: TalkTurn[];
+  let kept: TalkTurn[];
+  try {
+    earlier = await loadConversation(core, subject);
+    if (discussionClosed(earlier)) return { error: 'This discussion has had its three rounds.' };
+    kept = await appendTurns(core, user.id, subject, [{ role: 'user', body: checked.body }]);
+  } catch {
+    return { error: 'That was not kept. Try again.' };
+  }
+
+  const key = anthropicKey();
+  if (!key) return { turns: kept, error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot reply.' };
+
+  const spent: SpendReport[] = [];
+  const reply = await replyAbout({
+    subject: { kind: 'news_story', title: story.headline, material: storyMaterial(story) },
+    turns: [...earlier, ...kept],
+    guidance: discussGuidance(roundsTaken(earlier) + 1),
+    anthropicApiKey: key,
+    onSpend: (report) => spent.push(report),
+  });
+  for (const report of spent) {
+    await recordSpend(core, user.id, {
+      module: 'news',
+      operation: 'discuss-story',
+      model: report.model,
+      usage: report.usage,
+    });
+  }
+  if (!reply.ok) return { turns: kept, error: `Dash could not reply: ${reply.detail}` };
+
+  try {
+    const answer = await appendTurns(core, user.id, subject, [
+      { role: 'assistant', body: reply.reply },
+    ]);
+    return { turns: [...kept, ...answer] };
+  } catch {
+    return { turns: kept, error: 'Dash replied, but the reply was not kept. Try again.' };
+  }
 }
