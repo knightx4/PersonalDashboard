@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Work the build plan in plan_items — the tree of features and steps on /dev/plan. Three jobs. Building: pick the next ready step (or a named one), build it against its acceptance criteria, verify, commit with the step number, close it with a note. Shaping: turn an idea from the ideas page into a proposed feature with steps, done-whens and sizes, for the person to approve — never built, never approved by a session. Re-shaping: re-read a feature against the questions answered beneath it, graduating fog into proposed steps, dropping what an answer made pointless, and writing any new question as a decision. Use when the user says "work the plan", "build the next step", "do plan #12", "shape idea …", "re-shape feature #95", "what's next on the plan", or a routine is fired from the Plan or Ideas page.
+description: Work the build plan in plan_items — the tree of features and steps on /dev/plan. Three jobs. Building: pick the next ready step (or a named one), build it against its acceptance criteria, verify, commit with the step number, close it with a note. Shaping: turn an idea from the ideas page into a proposed feature with steps, done-whens and sizes, for the person to approve — never built, never approved by a session. Re-shaping: re-read a feature against the questions answered beneath it, graduating fog into steps (ready under an approved feature, proposed only when they act outside the repository), dropping what an answer made pointless, and writing any new question as a decision. Use when the user says "work the plan", "build the next step", "do plan #12", "shape idea …", "re-shape feature #95", "what's next on the plan", or a routine is fired from the Plan or Ideas page.
 ---
 
 # Working the plan
@@ -38,7 +38,12 @@ npx tsx scripts/plan.ts needs "<what to set>" --for <n> [--detail "…"]
                                                # the same feature and makes <n> wait on it
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
-                                               [--from <n>]  # stamp: whose answer made this
+                                               [--proposed] [--from <n>]
+                                               # ready under an approved feature, a
+                                               # proposal under a proposed one.
+                                               # --proposed: a new feature, or a step
+                                               # that acts outside the repository.
+                                               # --from: whose answer made this
 npx tsx scripts/plan.ts add "the question?" --parent <n> --kind decision --detail "…"
 npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
 npx tsx scripts/plan.ts fog <n> --note "…"    # what cannot be seen yet about
@@ -69,6 +74,16 @@ If `DATABASE_URL` is missing, read `reference/offline.md` rather than guessing.
 - A **proposed** step is nobody's to build. It is a proposal waiting on the
   person. `next` never lists one, `start` refuses one, and nothing in this
   skill moves one out of `proposed` — that is the person's move, on the page.
+
+  **Approval is per feature.** The person approves a feature once, and that
+  approves every step beneath it. A step a session adds under an approved
+  feature later, while building or re-shaping, goes in ready to build and
+  stamped with the session that added it; `/dev/plan` marks it and offers a
+  one-press drop, so the person can still turn it down. Three things are
+  still proposals: a new feature (shaping, or new work a re-shape finds
+  under a finished feature), anything beneath a feature still proposed, and
+  a step that acts outside the repository, as **Steps that act outside the
+  repository** in `reference/building.md` defines.
 - A step **assigned to Claude** is yours to pick up on your own. `next --claude`
   lists them in order.
 - A step **named by the user** ("do #12", or a routine fired from the page with
@@ -221,7 +236,7 @@ Each is one file. Read the one you were sent for; do not read the others.
 
 | Status | Meaning |
 |---|---|
-| `proposed` | Written by a session from an idea. Waiting on the person. Never built. |
+| `proposed` | Waiting on the person's approve. Never built. A new feature and the steps shaped under it, or a step that acts outside the repository. |
 | `not_started` | Decided on, not begun. |
 | `in_progress` | Claimed right now. At most one at a time. |
 | `blocked` | Needs an answer or something outside the repo. Reason required. |
