@@ -1860,6 +1860,7 @@ const savedStories: SavedViewProps = {
       senderName: 'Infra Weekly',
       receivedAt: '2026-09-22T07:14:00Z',
       savedAt: '2026-09-23T08:02:00Z',
+      discussedIndex: 0,
       arrived: '22 Sep, 07:14',
     },
     {

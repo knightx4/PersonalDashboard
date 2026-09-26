@@ -5,6 +5,7 @@ import {
   discussGuidance,
   discussionClosed,
   roundsTaken,
+  parseStoryRef,
   storyMaterial,
   storyRef,
   storySubject,
@@ -22,6 +23,13 @@ describe('discuss rules', () => {
       ref: `${ISSUE}:0`,
       title: 'Rates held',
     });
+  });
+
+  it('reads the issue id and story index back from a ref', () => {
+    expect(parseStoryRef(storyRef(ISSUE, 12))).toEqual({ issueId: ISSUE, storyIndex: 12 });
+    expect(parseStoryRef('card-1')).toBeNull();
+    expect(parseStoryRef(`${ISSUE}:`)).toBeNull();
+    expect(parseStoryRef(`${ISSUE}:-1`)).toBeNull();
   });
 
   it('gives Dash the summary and the story text, skipping what is missing', () => {
@@ -60,6 +68,8 @@ const store = vi.hoisted(() => ({
   guidance: [] as string[],
   material: [] as string[],
   spend: [] as unknown[],
+  saved: [] as { userId: string; issueId: string; headline: string }[],
+  saveFails: false,
   clock: 0,
 }));
 
@@ -91,6 +101,13 @@ vi.mock('@/lib/news/auth/server', () => ({
       }),
     }),
   }),
+}));
+vi.mock('@/lib/news/saved/stories', () => ({
+  saveStory: async (_c: unknown, input: { userId: string; issueId: string; headline: string }) => {
+    if (store.saveFails) throw new Error('down');
+    store.saved.push(input);
+    return true;
+  },
 }));
 vi.mock('@/lib/talk/store', () => ({
   loadConversation: async () => [...store.turns],
@@ -134,6 +151,8 @@ describe('discussQuickStory', () => {
     store.guidance = [];
     store.material = [];
     store.spend = [];
+    store.saved = [];
+    store.saveFails = false;
     store.clock = 0;
   });
 
@@ -174,10 +193,25 @@ describe('discussQuickStory', () => {
     ]);
   });
 
+  it('saves the story when the discussion starts, by its headline', async () => {
+    const { discussQuickStory } = await import('@/app/news/quick/actions');
+    await discussQuickStory(ISSUE, 1, 'I think holding was right.');
+    expect(store.saved[0]).toEqual({ userId: 'user-1', issueId: ISSUE, headline: 'Rates held' });
+  });
+
+  it('still replies when saving the story fails', async () => {
+    store.saveFails = true;
+    const { discussQuickStory } = await import('@/app/news/quick/actions');
+    const result = await discussQuickStory(ISSUE, 1, 'A view.');
+    expect(result.error).toBeUndefined();
+    expect(result.turns?.map((t) => t.role)).toEqual(['user', 'assistant']);
+  });
+
   it('refuses a story index the newsletter does not have', async () => {
     const { discussQuickStory } = await import('@/app/news/quick/actions');
     const result = await discussQuickStory(ISSUE, 7, 'A view.');
     expect(result.error).toMatch(/no longer in its newsletter/);
     expect(store.turns).toHaveLength(0);
+    expect(store.saved).toHaveLength(0);
   });
 });
