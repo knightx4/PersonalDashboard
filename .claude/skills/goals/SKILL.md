@@ -109,7 +109,7 @@ with recursive tree as (
   where c.archived_at is null
 )
 select id, parent_id, depth, kind, status, title, detail, acceptance, resolution,
-       dismissed_at, collection_id, asks_for, questions, position, due_on, rhythm_count,
+       dismissed_at, collection_id, asks_for, questions, position, due_on, starts_on, rhythm_count,
        rhythm_period, block_ask, block_kind
 from tree order by depth, position;
 
@@ -721,7 +721,9 @@ person reads these on a phone once a day.
 3. **Build the schedule** (phase): a `claude` step for the month-by-month
    schedule and payoff date, provisional on the order question.
 4. **Set up the payments** (phase): autopay on each loan (yours), with the
-   extra payment going to the first loan in the order.
+   extra payment going to the first loan in the order. While the loans are
+   in grace, with the first payment months away, the autopay step gets a
+   `starts_on` in the month before that payment ("Steps for later").
 5. **Keep it on track** (phase): a monthly `rhythm` to log each balance, and a
    quarterly `claude` review of progress against the schedule.
 
@@ -983,6 +985,29 @@ Unblocking is setting it back to `open`; the database clears `block_ask` and
 comment, a record or an answer. `block_kind = 'steps'` is for a block that
 waits on the steps it depends on and clears itself once they all close; a
 plain dependency row is almost always the better way to say that.
+
+## Steps for later
+
+A step that makes no sense until a date is a **step for later**: `starts_on`
+on the step, the first day it can be done. Turning on autopay for a loan whose
+first payment is in December is a November job; renewing a lease is a job for
+two months before it ends. Until that day the step and everything beneath it
+stay off the home's next steps, out of the morning and night runs, off Todo
+(a step on Todo shows on its start day), and a rhythm under it counts no
+periods. The goal page shows it as "Starts 1 Nov". From that day it is an
+ordinary open step.
+
+Set it when you map a goal and the date is known, from a due date, a
+statement or what the person said; leave it null when the step can start at
+once. Only steps take one, and a step with a `due_on` must start on or before
+it. It is not a dependency: use `goals.dependencies` when a step waits on
+another step, and `starts_on` when it waits on the calendar.
+
+```sql
+set local goals.actor = 'claude';
+update goals.items set starts_on = '2026-11-01'
+where id = '<step id>' and user_id = '<user>' and level = 'step';
+```
 
 ## The morning run
 

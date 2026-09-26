@@ -61,6 +61,12 @@ export type Step = {
   dismissedAt?: string | null;
   /** YYYY-MM-DD. */
   dueOn: string | null;
+  /**
+   * The first day it can be done, YYYY-MM-DD (migrations-goals/0043). Until
+   * then it and everything under it wait; see `startsLater`. Null or absent
+   * for a step that can start at once.
+   */
+  startsOn?: string | null;
   position: number;
   rhythmCount: number | null;
   rhythmPeriod: RhythmPeriod | null;
@@ -100,6 +106,12 @@ export type StepNode = Step & {
   blocks?: StepRef[];
   /** What holds it up: its own unfinished dependencies and those of every step above it. */
   waitingOn?: StepRef[];
+  /**
+   * The day it can start, when that is still ahead: its own start date or a
+   * later one on a step above it. Set by `markStartDates`; absent once the
+   * day has come.
+   */
+  waitsUntil?: string;
 };
 
 /** A step from another goal's tree that also counts towards this one. */
@@ -157,6 +169,26 @@ export function buildForest(
   return { byGoal, goalOf, nodes };
 }
 
+/**
+ * Mark each step that cannot start yet (migrations-goals/0043): its own start
+ * date, or that of a step above it, is after `today` (YYYY-MM-DD). The mark,
+ * `waitsUntil`, is the latest such date, so a sub-step of a step for November
+ * waits for November too. The loaders call this once with the account's
+ * today; everything that picks what is next reads the mark.
+ */
+export function markStartDates(byGoal: ReadonlyMap<string, StepNode[]>, today: string): void {
+  const walk = (list: StepNode[], above: string | null) => {
+    for (const node of list) {
+      const own = node.startsOn && node.startsOn > today ? node.startsOn : null;
+      const until = own && (!above || own > above) ? own : above;
+      if (until) node.waitsUntil = until;
+      else delete node.waitsUntil;
+      walk(node.children, until);
+    }
+  };
+  for (const roots of byGoal.values()) walk(roots, null);
+}
+
 /** How many steps a branch holds, and how many of them are closed. */
 export function countSteps(nodes: StepNode[]): { total: number; closed: number } {
   let total = 0;
@@ -187,6 +219,7 @@ export type StepFields = {
   acceptance?: string | null;
   kind?: StepKind;
   due_on?: string | null;
+  starts_on?: string | null;
   rhythm_count?: number | null;
   rhythm_period?: RhythmPeriod | null;
 };
@@ -209,7 +242,7 @@ function isDate(value: string): boolean {
 /**
  * The step fields present on a form, in the table's own column names so the
  * result can be written as it is. A field that is absent is left alone; a
- * detail, done-when or due date sent empty is cleared. The title cannot be
+ * detail, done-when, due date or start date sent empty is cleared. The title cannot be
  * cleared.
  *
  * Kind and rhythm go together, because the table refuses one without the
@@ -257,6 +290,16 @@ export function parseStepFields(
     const due = clean(rawDue);
     if (due && !isDate(due)) return { ok: false, error: 'That is not a date.' };
     fields.due_on = due;
+  }
+
+  const rawStart = get('startsOn');
+  if (present(rawStart)) {
+    const start = clean(rawStart);
+    if (start && !isDate(start)) return { ok: false, error: 'That is not a date.' };
+    fields.starts_on = start;
+  }
+  if (fields.starts_on && fields.due_on && fields.starts_on > fields.due_on) {
+    return { ok: false, error: 'A step has to start on or before the day it is due.' };
   }
 
   const rawKind = get('kind');

@@ -52,7 +52,7 @@ export async function loadCaptureContext(
   client: GoalsSupabaseClient,
   { userId, today }: Today,
 ): Promise<CaptureContext> {
-  const { goals, byGoal } = await loadLiveTree(client);
+  const { goals, byGoal } = await loadLiveTree(client, { today });
   const live = liveRhythms(
     goals.map((g) => g.goal),
     byGoal,

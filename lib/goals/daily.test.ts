@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dailyView, NEXT_PER_GOAL, readWaiting, WAITING_GROUP } from './daily';
-import { buildForest, type Step } from './steps';
+import { buildForest, markStartDates, type Step } from './steps';
 import type { Goal } from './tree';
 
 function goal(id: string, extra: Partial<Goal> = {}): { goal: Goal; areaName: string } {
@@ -64,6 +64,30 @@ describe('dailyView next items', () => {
     );
     expect(nextIds(result, 'g')).toEqual(['m1', 'm2']);
     expect(result.dash.ready).toEqual([{ id: 'c1', title: 'c1', goalId: 'g', goalTitle: 'Goal g' }]);
+  });
+
+  it('leaves a step for later, and anything under it, off until its start date', () => {
+    const steps = [
+      step('now', 'g'),
+      step('autopay', 'g', { startsOn: '2026-11-01' }),
+      step('ask', 'g', { kind: 'decision', startsOn: '2026-11-01' }),
+      step('stage', 'g', { kind: 'mine', startsOn: '2026-11-01' }),
+      step('under', 'stage', { kind: 'claude' }),
+    ];
+    const at = (today: string) => {
+      const { byGoal } = buildForest(['g'], steps);
+      markStartDates(byGoal, today);
+      return dailyView([goal('g')], byGoal, today);
+    };
+    const before = at(TODAY);
+    expect(nextIds(before, 'g')).toEqual(['now']);
+    expect(before.waiting).toEqual([]);
+    expect(before.dash.ready).toEqual([]);
+
+    const after = at('2026-11-01');
+    expect(nextIds(after, 'g')).toEqual(['now', 'autopay']);
+    expect(after.waiting.map((w) => w.id)).toEqual(['ask']);
+    expect(after.dash.ready.map((r) => r.id)).toEqual(['under']);
   });
 
   it('orders by due date within each kind, undated after dated', () => {

@@ -18,6 +18,7 @@
  */
 import type { DevTone } from '@/components/dev/state-label';
 import { DEV_STATE_WORD } from '@/lib/dev/words';
+import { formatDay } from '@/lib/goals/dates';
 import { awaitsReview } from '@/lib/goals/daily';
 import { isStepBlocked } from '@/lib/goals/dependencies';
 import { awaitsAnswer } from '@/lib/goals/shaping';
@@ -46,6 +47,7 @@ export const STEP_HEALTHS = [
   'yours',
   'working',
   'waiting',
+  'later',
   'aside',
   'done',
   'answered',
@@ -84,6 +86,7 @@ const MOVE_OF: Record<StepHealth, StepMove> = {
   yours: 'on_you',
   working: 'with_claude',
   waiting: 'waiting',
+  later: 'waiting',
   aside: 'waiting',
   done: 'settled',
   answered: 'settled',
@@ -104,6 +107,7 @@ export const STEP_HEALTH_GLYPHS: Record<StepHealth, StatusGlyph> = {
   yours: PLAN_HEALTH_GLYPHS.ready,
   working: PLAN_HEALTH_GLYPHS.working,
   waiting: PLAN_HEALTH_GLYPHS.waiting,
+  later: PLAN_HEALTH_GLYPHS.waiting,
   aside: PLAN_HEALTH_GLYPHS.unanswered,
   done: PLAN_HEALTH_GLYPHS.done,
   answered: PLAN_HEALTH_GLYPHS.answered,
@@ -119,6 +123,7 @@ const HEALTH_TITLE: Record<StepHealth, string> = {
   yours: 'Yours to do.',
   working: 'Claude does this one. The morning run works it and leaves the result here.',
   waiting: 'Waits on the steps under it.',
+  later: 'Waits for its start date.',
   aside: 'Put aside with Not now. It waits until you come back to it.',
   done: 'Done.',
   answered: 'Answered.',
@@ -146,6 +151,8 @@ export function stepHealth(node: StepNode): StepHealth {
   if (node.status === 'dropped') return 'dropped';
   if (node.status === 'done') return node.kind === 'decision' ? 'answered' : 'done';
   if (node.status === 'proposed') return 'proposed';
+  // Before its start date nothing else about it is due yet (migrations-goals/0043).
+  if (node.waitsUntil) return 'later';
   // A block on the steps it waits on is waiting; one on you is yours. A block
   // whose steps have all closed no longer holds, and the step reads as open.
   if (isStepBlocked(node)) return node.blockKind === 'steps' ? 'waiting' : 'blocked';
@@ -226,6 +233,8 @@ export function stepState(node: StepNode): StepState {
     const open = node.children.filter(holdsOpen);
     const beneath = movesLine(countMoves(flatten(open).filter((step) => !isClosed(step))));
     title = `Waits on the ${plural(open.length, 'open step', 'open steps')} under it${beneath ? `: ${beneath}` : ''}.`;
+  } else if (health === 'later' && node.waitsUntil) {
+    title = `Starts ${formatDay(node.waitsUntil)}. Until then it stays off your list and out of Claude's runs.`;
   } else if (health === 'answered' && node.resolution) {
     title = `Answered: ${node.resolution}`;
   } else if (health === 'yours' && node.kind === 'rhythm') {

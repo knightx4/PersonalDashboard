@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DAILY_GAP_MS, dailyRunText, ranRecently, readyClaudeSteps } from './daily-run';
-import { buildForest, type Step } from './steps';
+import { buildForest, markStartDates, type Step } from './steps';
 import type { Goal } from './tree';
 
 function goal(id: string, extra: Partial<Goal> = {}): Goal {
@@ -40,13 +40,32 @@ function step(id: string, parentId: string, extra: Partial<Step> = {}): Step {
   };
 }
 
-function ready(goals: Goal[], steps: Step[]) {
+function ready(goals: Goal[], steps: Step[], today?: string) {
   const { byGoal } = buildForest(
     goals.map((g) => g.id),
     steps,
   );
+  if (today) markStartDates(byGoal, today);
   return readyClaudeSteps(goals, byGoal).map((s) => s.id);
 }
+
+describe('steps for later', () => {
+  const steps = [
+    step('now', 'a'),
+    step('november', 'a', { startsOn: '2026-11-01' }),
+    step('stage', 'a', { kind: 'mine', startsOn: '2026-11-01' }),
+    step('under', 'stage'),
+    step('started', 'a', { startsOn: '2026-09-01' }),
+  ];
+
+  it('leaves a step, and what is under it, until its start date', () => {
+    expect(ready([goal('a')], steps, '2026-09-26')).toEqual(['now', 'started']);
+  });
+
+  it('works them from the start date on', () => {
+    expect(ready([goal('a')], steps, '2026-11-01')).toEqual(['now', 'november', 'under', 'started']);
+  });
+});
 
 describe('readyClaudeSteps', () => {
   it('takes open Claude steps with nothing produced yet, in page order', () => {

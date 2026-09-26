@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { buildForest, countSteps, describeRhythm, parseStepFields, type Step } from './steps';
+import {
+  buildForest,
+  countSteps,
+  describeRhythm,
+  markStartDates,
+  parseStepFields,
+  type Step,
+} from './steps';
 
 function step(id: string, parentId: string, extra: Partial<Step> = {}): Step {
   return {
@@ -50,6 +57,29 @@ describe('buildForest', () => {
   });
 });
 
+describe('markStartDates', () => {
+  it('marks a step whose start is ahead, and what is under it with the later of the two', () => {
+    const { byGoal, nodes } = buildForest(
+      ['g'],
+      [
+        step('nov', 'g', { startsOn: '2026-11-01' }),
+        step('dec', 'nov', { startsOn: '2026-12-01' }),
+        step('oct', 'nov', { startsOn: '2026-10-01' }),
+        step('past', 'g', { startsOn: '2026-09-01' }),
+      ],
+    );
+    markStartDates(byGoal, '2026-09-26');
+    expect(nodes.get('nov')?.waitsUntil).toBe('2026-11-01');
+    expect(nodes.get('dec')?.waitsUntil).toBe('2026-12-01');
+    expect(nodes.get('oct')?.waitsUntil).toBe('2026-11-01');
+    expect(nodes.get('past')?.waitsUntil).toBeUndefined();
+
+    markStartDates(byGoal, '2026-11-01');
+    expect(nodes.get('nov')?.waitsUntil).toBeUndefined();
+    expect(nodes.get('dec')?.waitsUntil).toBe('2026-12-01');
+  });
+});
+
 describe('countSteps', () => {
   it('counts every level and treats done and dropped as closed', () => {
     const { byGoal } = buildForest(
@@ -82,6 +112,16 @@ describe('parseStepFields', () => {
       ok: true,
       value: { detail: null, acceptance: null, due_on: null },
     });
+  });
+
+  it('takes a start date, and refuses one after the due date', () => {
+    expect(parseStepFields(form({ startsOn: '2026-11-01', dueOn: '2026-12-01' }))).toEqual({
+      ok: true,
+      value: { starts_on: '2026-11-01', due_on: '2026-12-01' },
+    });
+    expect(parseStepFields(form({ startsOn: '' }))).toEqual({ ok: true, value: { starts_on: null } });
+    expect(parseStepFields(form({ startsOn: '2026-12-02', dueOn: '2026-12-01' })).ok).toBe(false);
+    expect(parseStepFields(form({ startsOn: '2026-13-01' })).ok).toBe(false);
   });
 
   it('refuses a date that is not one', () => {

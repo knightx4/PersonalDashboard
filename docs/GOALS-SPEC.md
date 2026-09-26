@@ -81,6 +81,31 @@ recurrence), so the rhythm lives in Goals and shows on Todo through the agenda
 source described below, as an item for the current period until that period's
 count is met.
 
+### Steps for later
+
+Some steps belong in a goal's map long before they can be done. Turning on
+autopay for the student loans is part of paying them off, but nothing is due
+until December, so it is a job for November. A step takes a **start date**
+(`items.starts_on`, `migrations-goals/0043`), the first day it can be done,
+set from Start when you edit it or by Claude when it maps the goal.
+
+Before that day the step, and everything beneath it, waits:
+
+- it is left out of the home's next steps, and a question under it is not
+  asked yet;
+- the morning and night runs do not work a Claude step for later;
+- a step shown on Todo appears on its start date, or on its due date when it
+  has one;
+- a rhythm for later counts no periods, so it cannot be missed before it
+  starts;
+- on the goal page it reads "Starts 1 Nov" and counts as waiting, not as on
+  you.
+
+On the day it becomes an ordinary open step. A start date is for waiting on
+the calendar; waiting on another step is a dependency ("Blocked and waiting"
+in the goals skill). Only steps take one, and a step with both dates starts
+on or before the day it is due.
+
 ### Fog and refining a goal
 
 A goal can go in vague. "Get fit" is written with **fog**, the same field the
@@ -715,7 +740,8 @@ A sketch for the migration, not the migration itself.
 - `goals.items`: the tree. One table for goals and steps, as `plan_items` is
   one table for features and steps. `area_id` on top-level rows, `parent_id`
   below them, `level` (`goal` or `step`), `kind`, `status`, `title`, `detail`,
-  `acceptance`, `fog`, `resolution`, `due_on`, `on_todo`, `approved_at`,
+  `acceptance`, `fog`, `resolution`, `due_on`, `starts_on` (a step's first
+  possible day, "Steps for later"), `on_todo`, `approved_at`,
   `position`, and `rhythm_count` with `rhythm_period` for rhythms. A goal's
   `help_kinds` lists the weekly help it asks for, each an entry of `kind`
   (events, volunteering, reading, courses or job_leads) and a `note` on what

@@ -259,8 +259,15 @@ function onlyChanged(form: FormData, node: StepNode): FormData {
     detail: node.detail ?? '',
     acceptance: node.acceptance ?? '',
     dueOn: node.dueOn ?? '',
+    startsOn: node.startsOn ?? '',
   };
+  // The two dates go together when either changed, so the start can be
+  // checked against the due date the form shows.
+  const datesChanged = ['dueOn', 'startsOn'].some(
+    (key) => String(form.get(key) ?? '').trim() !== before[key],
+  );
   for (const [key, value] of Object.entries(before)) {
+    if (datesChanged && (key === 'dueOn' || key === 'startsOn')) continue;
     if (String(form.get(key) ?? '').trim() === value) form.delete(key);
   }
   if (form.get('kind') === node.kind) {
@@ -331,7 +338,16 @@ export function StepEditForm({
         <div className="flex flex-wrap items-center gap-2">
           <ChipInput
             type="date"
+            name="startsOn"
+            icon="Start"
+            defaultValue={node.startsOn ?? ''}
+            aria-label={`The first day ${node.title} can be done`}
+            title="Until this day the step stays off your list and out of Claude's runs"
+          />
+          <ChipInput
+            type="date"
             name="dueOn"
+            icon="Due"
             defaultValue={node.dueOn ?? ''}
             aria-label={`When ${node.title} is due`}
           />
