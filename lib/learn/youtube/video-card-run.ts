@@ -53,14 +53,16 @@ type CardRow = {
 
 const one = <T>(value: T | T[] | null): T | null => (Array.isArray(value) ? (value[0] ?? null) : value);
 
-async function readPile(learn: LearnSupabaseClient): Promise<PileVideo[]> {
-  const { data, error } = await learn
+async function readPile(learn: LearnSupabaseClient, userId?: string): Promise<PileVideo[]> {
+  let query = learn
     .from('watch_list')
     .select(
       'user_id, video_id, item_id, stretches, item:catalogue_items!watch_list_item_id_fkey(title, author, provider:catalogue_providers!catalogue_items_provider_id_fkey(name))',
     )
     .eq('verdict', 'card')
     .is('left_playlist_at', null);
+  if (userId) query = query.eq('user_id', userId);
+  const { data, error } = await query;
   if (error) throw new Error(`Reading the card pile failed: ${error.message}`);
   return ((data ?? []) as unknown as PileRow[]).flatMap((row): PileVideo[] => {
     const item = one(row.item);
@@ -78,11 +80,13 @@ async function readPile(learn: LearnSupabaseClient): Promise<PileVideo[]> {
   });
 }
 
-async function readStored(learn: LearnSupabaseClient): Promise<StoredVideoCard[]> {
-  const { data, error } = await learn
+async function readStored(learn: LearnSupabaseClient, userId?: string): Promise<StoredVideoCard[]> {
+  let query = learn
     .from('feed_cards')
     .select('id, user_id, video_id, video_start_seconds, status, drop_reason, summary')
     .eq('reason', 'video');
+  if (userId) query = query.eq('user_id', userId);
+  const { data, error } = await query;
   if (error) throw new Error(`Reading the video cards failed: ${error.message}`);
   return ((data ?? []) as CardRow[]).map((row) => ({
     id: row.id,
@@ -154,6 +158,21 @@ async function move(learn: LearnSupabaseClient, ids: string[], to: 'withdraw' | 
   const { data, error } = await query.select('id');
   if (error) throw new Error(`Moving the video cards failed: ${error.message}`);
   return (data ?? []).length;
+}
+
+/**
+ * Set aside and bring back one person's video cards now, without writing any
+ * (#1068). Called when you move a video by hand, so its cards leave or return
+ * to Learn now at once rather than on the next hourly run. Writing a new card
+ * costs a model call, so that is left to the hourly run, which writes the
+ * stretches of a video moved into the card pile within the hour.
+ */
+export async function settleVideoCards(
+  learn: LearnSupabaseClient,
+  userId: string,
+): Promise<{ withdrawn: number; revived: number }> {
+  const plan = planVideoCards(await readPile(learn, userId), await readStored(learn, userId));
+  return { withdrawn: await move(learn, plan.withdraw, 'withdraw'), revived: await move(learn, plan.revive, 'revive') };
 }
 
 /**
