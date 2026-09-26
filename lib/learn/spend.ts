@@ -127,6 +127,11 @@ export const LEARN_OPERATIONS = [
   // Also each note embedded to find the themes nearest it before it is read
   // (plan #818), from the sweep and from reading one note on its page.
   'embed-map',
+  // Embedding every vault note, so feature #1110 can show a person's own notes
+  // beside what they relate to (plan #1111). Recorded against the note's
+  // owner, from the vault sync and from the map sweep's tick, which is also
+  // the backfill. A note is embedded again only when its text changes.
+  'embed-notes',
   // Asking Haiku which vault themes are one subject under two names (plan
   // #811), twenty pairs a call. Recorded through the service role from the map
   // sweep's cron tick, against the account whose themes were judged.

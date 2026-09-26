@@ -26,6 +26,11 @@ $$;
 
 grant anon, authenticated, service_role to postgres;
 
+-- Supabase lets every API role use the extensions schema, so a function that
+-- names a pgvector type runs for a signed-in caller there. The same here, or
+-- a test calling one as a user fails on a permission the live project grants.
+grant usage on schema extensions to anon, authenticated, service_role;
+
 create schema if not exists auth;
 grant usage on schema auth to anon, authenticated, service_role;
 

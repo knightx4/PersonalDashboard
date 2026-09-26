@@ -17,6 +17,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { admin, asUser, closeDb, createUser, truncateAll } from './helpers/db-vault';
 
+/** A vector literal of the width note_embeddings takes. */
+const VECTOR = `[${new Array(1024).fill(0.01).join(',')}]`;
+
 let userA = '';
 let userB = '';
 let connectionA = '';
@@ -164,6 +167,13 @@ beforeAll(async () => {
   await admin`
     insert into map_merge_resets (user_id, reset, kind, merge_id, outcome, detail)
     values (${userA}, 'plan #879', 'theme', ${mergeA}, 'failed', 'name-taken: taken')`;
+
+  // A note's vector (plan #1111), written through the function the sync uses
+  // so the hash is the one it would store.
+  await admin`
+    select store_note_embeddings(jsonb_build_array(jsonb_build_object(
+      'note_id', note_id, 'body_hash', body_hash, 'embedding', ${VECTOR}::text, 'model', 'voyage-4-lite')))
+    from stale_note_embeddings(1, ${userA})`;
 });
 
 afterAll(async () => {
@@ -195,6 +205,7 @@ describe('RLS coverage', () => {
       'map_merges',
       'map_sweep_notes',
       'map_sweeps',
+      'note_embeddings',
       'notes',
       'position_edges',
       'position_link_pairs',
@@ -813,5 +824,40 @@ describe('the merge log, across users', () => {
     await expect(
       asUser(userA, (tx) => tx`delete from map_merge_resets where merge_id = ${mergeA}`),
     ).rejects.toThrow(/permission denied/);
+  });
+});
+
+describe('note embeddings, across users', () => {
+  it('shows the owner their note vectors and another user none', async () => {
+    const own = await asUser(userA, (tx) => tx`select note_id from note_embeddings`);
+    const other = await asUser(userB, (tx) => tx`select note_id from note_embeddings`);
+    expect([own.length, other.length]).toEqual([1, 0]);
+  });
+
+  it('lists only the caller\'s own stale notes and will not store a vector on another user\'s note', async () => {
+    const [hash] = await admin<{ h: string }[]>`
+      select md5(note_embedding_text(title, body)) as h from notes where id = ${noteA}`;
+    const stale = await asUser(userB, (tx) => tx`select note_id from stale_note_embeddings(100, null)`);
+    expect(stale.map((row) => row.note_id)).not.toContain(noteA);
+
+    const [row] = await asUser(
+      userB,
+      (tx) => tx`select store_note_embeddings(${tx.json([
+        { note_id: noteA, body_hash: hash.h, embedding: VECTOR, model: 'm' },
+      ] as never)}) as written`,
+    );
+    expect(row.written).toBe(0);
+    const [kept] = await admin<{ model: string }[]>`
+      select embedding_model as model from note_embeddings where note_id = ${noteA}`;
+    expect(kept.model).toBe('voyage-4-lite');
+  });
+
+  it('takes a note off the stale list once stored, and puts it back when the note changes', async () => {
+    const before = await asUser(userA, (tx) => tx`select note_id from stale_note_embeddings(100, null)`);
+    expect(before.map((row) => row.note_id)).not.toContain(noteA);
+
+    await admin`update notes set body = body || ' and one more line' where id = ${noteA}`;
+    const after = await asUser(userA, (tx) => tx`select note_id from stale_note_embeddings(100, null)`);
+    expect(after.map((row) => row.note_id)).toContain(noteA);
   });
 });

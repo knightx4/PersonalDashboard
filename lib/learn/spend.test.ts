@@ -79,6 +79,7 @@ describe('the operation names', () => {
       'embed-feed-ideas',
       'write-curriculum',
       'embed-map',
+      'embed-notes',
       'propose-theme-merges',
       'propose-position-merges',
       'link-positions',

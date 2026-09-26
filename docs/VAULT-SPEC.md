@@ -63,6 +63,11 @@ Listing these because they will otherwise get invented.
 - **No semantic search, no embeddings, no pgvector in v1.** The extension is not
   installed and this spec does not install it. Postgres full-text is enough for
   a viewer and defers a real decision until there is a real consumer.
+  The consumers have since arrived. Themes and positions carry Voyage vectors
+  for the map's merge passes (plan #810, `migrations-vault/0006`), and every
+  note has one in `obsidian.note_embeddings` for showing related notes
+  elsewhere in the app (plan #1111, `migrations-vault/0021`). A note's vector
+  is remade only when the hash of its title and body changes.
 - **No graph view, no canvas, no plugins, no Dataview queries.** Obsidian renders
   those; this does not compete with Obsidian.
 - **No sharing.** Same as the rest of the app: one user's view of their own data,
