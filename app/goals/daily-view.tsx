@@ -55,7 +55,7 @@ import { DidYouGoList, SuggestionsList } from './suggestions-list';
  * nothing Claude will do is listed as yours, and nothing waiting on your
  * approval looks like it is under way.
  *
- * Then the goals themselves, each with its bar and the weekly verdict
+ * Then the goals themselves, each with its bar and the day's status
  * (plan #1018) and a way into its tree.
  *
  * After time away (plan #935) nothing is shown as overdue. A rhythm with
@@ -116,6 +116,8 @@ const VERDICT_TONES: Record<Verdict, DevTone> = {
   on_track: 'positive',
   stalled: 'caution',
   waiting_on_you: 'caution',
+  waiting_on_date: 'quiet',
+  waiting_on_goal: 'quiet',
 };
 
 function rhythmLine(rhythm: HomeRhythm): string {
@@ -695,7 +697,7 @@ function byArea(goals: DailyGoal[]): { areaId: string; areaName: string; goals: 
 }
 
 /**
- * One goal: its bar, the weekly verdict and the way into its tree. Listed
+ * One goal: its bar, its status and the way into its tree. Listed
  * under its area, so the area is not repeated on the row.
  */
 export function GoalRow({ daily }: { daily: DailyGoal }) {
@@ -728,8 +730,8 @@ export function GoalRow({ daily }: { daily: DailyGoal }) {
 }
 
 /**
- * The weekly run's newest verdict on the goal (plan #1018): the verdict and
- * why on one line, the next move on the next. A stalled goal's next move is
+ * The goal's newest status (plans #1018, #1074): the verdict and why on one
+ * line, the next move and its date on the next. A stalled goal's next move is
  * also a proposed step, which Your move above offers to approve.
  */
 function ReviewLine({ review }: { review: GoalReview }) {
@@ -741,12 +743,15 @@ function ReviewLine({ review }: { review: GoalReview }) {
           glyph={null}
           word={VERDICT_LABELS[review.verdict]}
           tone={VERDICT_TONES[review.verdict]}
-          title={`Weekly check, ${checked}`}
+          title={`Dash’s check, ${checked}`}
           className="mr-1.5 font-semibold"
         />
         {review.reason}
       </p>
-      <p>Next: {review.nextMove}</p>
+      <p>
+        Next: {review.nextMove}
+        {review.nextOn && ` (${formatDay(review.nextOn)})`}
+      </p>
     </div>
   );
 }

@@ -131,5 +131,32 @@ describe('dailyRunText', () => {
     expect(text).toContain('goals.runs id run-1');
     expect(text).toContain('"Compare three gyms" (goals.items id s1), under the goal "Get fit"');
     expect(text).toContain('The morning run');
+    expect(text).not.toContain('goals.reviews');
+  });
+
+  it('puts every open goal up for its status first, with the five verdicts (plan #1074)', () => {
+    const text = dailyRunText({
+      userId: 'user-1',
+      runId: 'run-1',
+      steps: [],
+      review: [
+        {
+          id: 'g',
+          title: 'Land your next role',
+          acceptance: 'An offer accepted.',
+          lastDoneAt: '2026-09-25T12:00:00Z',
+          quietDays: 1,
+          stalled: false,
+          last: null,
+        },
+      ],
+    });
+    expect(text).toContain('goals.reviews');
+    expect(text).toContain('on_track, stalled, waiting_on_you, waiting_on_date or waiting_on_goal');
+    expect(text).toContain('next_on');
+    expect(text).toContain('waits_on_id');
+    expect(text).toContain('Goal "Land your next role" (goals.items id g)');
+    expect(text).toContain('No Claude step is ready today.');
+    expect(text).not.toContain('Leaving a note');
   });
 });

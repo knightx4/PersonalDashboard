@@ -1,8 +1,9 @@
 /**
  * The weekly goals run, as the daily cron calls it (plan #934): it marks last
  * week's unanswered suggestions ignored every day, and once a week fires the
- * goals routine with every open goal to review (plan #1018), each goal's kinds
- * of help and the past reactions to each kind in its brief (plan #1028).
+ * goals routine with each goal's kinds of help and the past reactions to each
+ * kind in its brief (plan #1028). The verdicts it once wrote (plan #1018) are
+ * the morning run's now (plan #1074).
  *
  * The client is a stand-in that answers each table's query from a fixture and
  * records every insert and update, as in goals-daily-run.test.ts.
@@ -181,7 +182,7 @@ describe('runGoalsWeekly', () => {
     const fetch = okFetch();
     const result = await runGoalsWeekly({ client, routine, now: NOW, fetch });
 
-    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 3, goals: 2, past: 1, ignored: 2 });
+    expect(result).toEqual({ started: true, runId: 'run-1', open: 3, goals: 2, past: 1, ignored: 2 });
 
     expect(writes[0]).toMatchObject({ table: 'suggestions', op: 'update', values: { reaction: 'ignored' } });
     expect(writes[0].filters).toContainEqual(['eq', 'user_id', USER]);
@@ -215,19 +216,16 @@ describe('runGoalsWeekly', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('reviews every open goal, and a goal quiet for three weeks reads stalled', async () => {
+  it('leaves the verdicts to the morning run (plan #1074)', async () => {
     const { client } = fakeClient({ items: [QUIET, SLEPT, { ...RHYTHM, parent_id: 'q' }] });
     const fetch = okFetch();
     const result = await runGoalsWeekly({ client, routine, now: NOW, fetch });
-    expect(result).toMatchObject({ started: true, reviewed: 1, goals: 0 });
+    expect(result).toMatchObject({ started: true, open: 1, goals: 0 });
 
     const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     const text = (JSON.parse(init.body as string) as { text: string }).text;
-    expect(text).toContain(
-      'Goal "Sleep by eleven" (goals.items id q)\n- Done when: Asleep by eleven five nights a week for a month.\n' +
-        '- Last thing done: 2026-09-01, 29 days ago.\n' +
-        '- Nothing done in 21 days or more: the verdict is stalled, with its next step added under it.',
-    );
+    expect(text).toContain('does not write to goals.reviews');
+    expect(text).not.toContain('- Done when:');
     expect(text).toContain('nothing to research');
   });
 
@@ -235,7 +233,7 @@ describe('runGoalsWeekly', () => {
     const { client, writes } = fakeClient({ items: [{ ...QUIET, status: 'done' }] });
     const fetch = okFetch();
     const result = await runGoalsWeekly({ client, routine, now: NOW, fetch });
-    expect(result).toEqual({ skipped: 'no open goal to review', ignored: 2 });
+    expect(result).toEqual({ skipped: 'no open goal', ignored: 2 });
     expect(writes.map((w) => w.table)).toEqual(['suggestions']);
     expect(fetch).not.toHaveBeenCalled();
   });

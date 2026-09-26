@@ -14,18 +14,21 @@ import {
 } from '@/lib/goals/reviews';
 
 /**
- * Reads for the weekly verdicts (plan #1018). The rules are in
- * lib/goals/reviews.ts; the weekly run writes the rows through the connector,
+ * Reads for each goal's status (plans #1018, #1074). The rules are in
+ * lib/goals/reviews.ts; the daily run writes the rows through the connector,
  * so nothing here writes.
  *
- * The home passes the signed-in client and row level security scopes it. The
- * weekly cron stage passes the service-role client with `userId`.
+ * The Goals pages pass the signed-in client and row level security scopes
+ * it. The daily cron stage passes the service-role client with `userId`.
  */
 
 /** How far back the newest verdict is looked for. A goal reviewed longer ago than this shows none. */
 export const REVIEWS_SHOWN_FOR_DAYS = 28;
 
-/** The newest verdict on each goal from the last four weeks. */
+/**
+ * The newest review of each goal from the last four weeks: the goal's
+ * status. `isCurrent` in lib/goals/reviews.ts says whether it is today's.
+ */
 export async function loadLatestReviews(
   client: GoalsSupabaseClient,
   { userId, now = Date.now() }: { userId?: string; now?: number } = {},
@@ -43,7 +46,7 @@ export async function loadLatestReviews(
   return latestByGoal(reviews);
 }
 
-/** When anything was last done on each of the owner's goals, for the weekly brief. */
+/** When anything was last done on each of the owner's goals, for the daily brief. */
 export async function loadGoalActivity(
   client: GoalsSupabaseClient,
   userId: string,
