@@ -16,6 +16,7 @@ import {
   Weight,
   X,
 } from 'lucide-react';
+import { CardNotes } from '@/components/learn/card-notes';
 import { ClipPlayer } from '@/components/learn/clip-player';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
@@ -36,8 +37,10 @@ import type { TrackOffer } from '@/lib/learn/flow/offer';
 import { weeksResting, type RestingOffer } from '@/lib/learn/lessons/resting';
 import { answerTrackOffer } from '../flow/actions';
 import {
+  addCardNote,
   answerRestingTrack,
   answerUnitCheck,
+  deleteCardNote,
   dismissCard,
   loadMoreCards,
   makeTrackOfCard,
@@ -599,6 +602,17 @@ function DeckCard({
               </details>
             </section>
           )}
+
+          {/* Your notes on this card and its idea (plan #1058), under the
+              card's own body and before the source's text. */}
+          <CardNotes
+            id={card.id}
+            cardId={card.id}
+            notes={card.notes ?? []}
+            add={(body) => addCardNote(card.id, body)}
+            remove={deleteCardNote}
+            className="mt-4"
+          />
 
           {/* The source's own text, folded: the card above is what to read
               first, and this is there for when you want the whole section.

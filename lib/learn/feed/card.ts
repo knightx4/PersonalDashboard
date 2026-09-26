@@ -9,6 +9,8 @@
  * card from. No database here, so all of it is tested directly.
  */
 
+import type { CardNote } from '@/lib/learn/notes/notes';
+
 export type FeedCardRow = {
   id: string;
   reason: 'interest' | 'gap' | 'goal' | 'queued' | 'lesson' | 'unit_check';
@@ -105,6 +107,12 @@ export type FeedCard = {
    * absent on a card built straight from its row.
    */
   video?: FeedVideo | null;
+  /**
+   * The notes you wrote on this card and on its idea from anywhere else,
+   * oldest first (plan #1058). Attached after the deck is dealt, like the
+   * video, so absent on a card built straight from its row.
+   */
+  notes?: CardNote[];
 };
 
 /** A clip shown on a card: the video, and the span of it that matched. */

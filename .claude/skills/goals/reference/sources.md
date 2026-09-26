@@ -83,6 +83,14 @@ Topics they typed in to learn, in their own words.
 - Search: `asked`
 - Name a row by `asked`; link it by `id`
 
+### `learn.card_notes` (Learn)
+
+Notes they wrote on Learn cards and on ideas, in their own words.
+
+- Search: `body`
+- Name a row by `body`; link it by `id`
+- concept_id is the idea a note is about, whose page is /learn/c/<concept_id>; card_id is the Learn now card it was written on, null when written on the idea page or once the card is gone.
+
 ### `news.preferences` (News)
 
 The neighbourhood they want local news for.

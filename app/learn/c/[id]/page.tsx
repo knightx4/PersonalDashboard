@@ -25,6 +25,10 @@ import { nextRung, probesFor, type ProbeRow } from '@/lib/learn/graph/session';
 import { openingQuestionFor } from '@/lib/learn/graph/opening';
 import type { Concept, Mentioned } from '@/lib/learn/graph/model';
 import { ReadAbout } from '@/app/learn/s/[id]/read-about';
+import { CardNotes } from '@/components/learn/card-notes';
+import { loadConceptNotes } from '@/lib/learn/notes/store';
+import { deleteCardNote } from '@/app/learn/now/actions';
+import { addConceptNote } from './actions';
 import { BranchFromClaim } from './branch-from-claim';
 import { MaterialForClaim, NoMaterialNote } from './material';
 
@@ -48,7 +52,9 @@ export const dynamic = 'force-dynamic';
  * the page says which of you wrote the sentence being read. The fourth is
  * queueing a piece of the catalogue's material for this claim, which needs no
  * approval screen either: the list it is pressed from is the proposal, which
- * is what #725 settled.
+ * is what #725 settled. The fifth is a note on the idea (plan #1058), which is
+ * yours and asks nothing first; the notes written on its Learn now cards show
+ * beside it.
  */
 
 function ConceptLink({ concept }: { concept: Concept }) {
@@ -192,7 +198,7 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
   const { concept, subject, prerequisites, dependents, refersTo, referredToBy } = view;
   const probes = await probesFor(supabase, concept.id);
 
-  const [opening, material] = await Promise.all([
+  const [opening, material, notes] = await Promise.all([
     // The question asked before any of this subject existed, when there was
     // one. It is where a state of known or shaky on a first chain came from,
     // so a page showing the state has to be able to show what established it.
@@ -209,6 +215,8 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
       // which is what separates "nothing matched" from "nobody has looked".
       searchedAt: concept.catalogueSearchedAt,
     }),
+    // Your notes on this idea, from its cards and from this page (plan #1058).
+    loadConceptNotes(supabase, concept.id),
   ]);
 
   const connected =
@@ -247,6 +255,19 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
           <p className="max-w-prose text-ui text-ink-muted">{concept.claimOriginal}</p>
         </Group>
       )}
+
+      {/* Your notes on the idea, next to the claim they are about: the ones
+          written on its Learn now cards and the ones written here. */}
+      <CardSection title="Your notes" className="mb-5">
+        <CardNotes
+          id={concept.id}
+          cardId={null}
+          notes={notes}
+          add={addConceptNote.bind(null, concept.id)}
+          remove={deleteCardNote}
+          titled={false}
+        />
+      </CardSection>
 
       <CardSection title="Where it stands" className="mb-5">
         <p className="flex gap-2 text-ui text-ink">

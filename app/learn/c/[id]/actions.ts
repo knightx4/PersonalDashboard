@@ -14,6 +14,8 @@ import { generateChain } from '@/lib/learn/graph/generate';
 import { isSameClaim, MAX_CLAIM, rewriteClaimPatch } from '@/lib/learn/graph/rewrite';
 import { existingConcepts, saveChain } from '@/lib/learn/graph/save';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
+import { noteBody, type NoteWrite } from '@/lib/learn/notes/notes';
+import { insertConceptNote } from '@/lib/learn/notes/store';
 
 /**
  * Going deeper on a phrase inside a claim.
@@ -271,4 +273,24 @@ export async function queueMaterial(formData: FormData): Promise<void> {
   revalidatePath('/learn/lists');
   revalidatePath(`/learn/c/${conceptId.data}`);
   redirect(`/learn/r/${readingId}`);
+}
+
+/**
+ * A note written on the idea's own page (plan #1058). It has no card, and
+ * shows on every Learn now card for this idea as well as here.
+ */
+// latency: pending
+export async function addConceptNote(conceptId: string, body: string): Promise<NoteWrite> {
+  const user = await requireUser();
+  const concept = z.string().uuid().safeParse(conceptId);
+  if (!concept.success) return { error: 'Could not tell which idea that was.' };
+  const parsed = noteBody(body);
+  if ('error' in parsed) return { error: parsed.error };
+  const supabase = await createLearnClient();
+  try {
+    const note = await insertConceptNote(supabase, user.id, concept.data, parsed.body);
+    return note ? { note } : { error: 'That idea is not there any more.' };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'That note was not kept.' };
+  }
 }
