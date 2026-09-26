@@ -42,6 +42,10 @@ import { flagsWaiting } from '@/lib/goals/flags';
 import { goalStatus } from '@/lib/goals/goal-status';
 import type { GoalReview } from '@/lib/goals/reviews';
 import { loadLatestReviews } from '@/lib/goals/reviews-store';
+import { goalMatchText } from '@/lib/goals/related-notes';
+import { createVaultClient } from '@/lib/vault/auth/server';
+import { relatedNotes, toLink } from '@/lib/vault/notes/related';
+import { RelatedNotes } from '@/components/vault/related-notes';
 import { GoalStatusCard } from './goal-status';
 import { GoalAddRow } from './goal-add-row';
 import { GoalContext } from './goal-context';
@@ -62,6 +66,10 @@ export const dynamic = 'force-dynamic';
  * #925): every step and sub-step under it, and the steps from other goals
  * that also count towards it. One tap from the home, and meant for looking at
  * the whole map rather than for the daily visit.
+ *
+ * Up to two of your vault notes on the goal's subject stream in under what
+ * Claude found for it (plan #1114), matched on the title and the done-when
+ * (lib/goals/related-notes.ts). The lookup is started and not awaited.
  */
 /**
  * What the Claude panel says. Outside the component because it reads the
@@ -169,7 +177,13 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
   // The latest run on each step sent, prepared or asked about from its row
   // (plan #1044), so a reload shows it going. A failed read leaves the lines
   // out rather than the page.
-  const core = await createCoreClient();
+  const [core, vault] = await Promise.all([createCoreClient(), createVaultClient()]);
+  const related = relatedNotes(
+    vault,
+    user.id,
+    goalMatchText({ title: map.goal.title, acceptance: map.goal.acceptance }),
+    { core },
+  ).then((found) => found.map(toLink));
   const [stepRuns, filesOf, brief, review] = await Promise.all([
     loadStepRuns(client, stepIdsOn(map)).catch((): Record<string, GoalRun> => ({})),
     // The files the goal and its steps link to. A failed read leaves them
@@ -254,6 +268,7 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
           />
         )}
         <GoalContext items={shownContext(context)} />
+        <RelatedNotes notes={related} className="px-1" />
         {!numberEmpty && <GoalNumber {...number} />}
         {!helpEmpty && <GoalHelp {...help} />}
         {!linksEmpty && <GoalLinksSection {...linked} />}

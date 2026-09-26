@@ -24,6 +24,11 @@ import {
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { matchKey, type RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import { prepKey, type PrepNote } from '@/lib/jobs/interview/prep-payload';
+import { pursuitMatchText } from '@/lib/jobs/related-notes';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { createVaultClient } from '@/lib/vault/auth/server';
+import { relatedNotes, toLink } from '@/lib/vault/notes/related';
+import { RelatedNotes } from '@/components/vault/related-notes';
 
 /** The columns of an interview row the prep key is computed from. */
 type PrepInterviewRow = {
@@ -42,6 +47,12 @@ export const metadata = { title: 'Role' };
  * The page you actually live in: the posting, the requirement map, the
  * timeline, the answers, the interviews, the notes, and every email that has
  * been linked to this pursuit.
+ *
+ * Up to two of your vault notes on the company or the role stream in under
+ * the linked tasks (plan #1114), matched on the company, the role and the
+ * opening of the description (lib/jobs/related-notes.ts). A pursuit with no
+ * description shows none. The lookup is started once the role is read and not
+ * awaited, so the rest of the page does not wait on it.
  */
 export default async function RoleDetailPage({
   params,
@@ -94,6 +105,20 @@ export default async function RoleDetailPage({
 
   const current = (applications ?? [])[0];
   if (!current) notFound();
+
+  // No description, no text and no lookup (lib/jobs/related-notes.ts).
+  const matchText = pursuitMatchText({
+    company: company.name,
+    title: role.title as string | null,
+    jdText: role.jd_text as string | null,
+  });
+  const [core, vault] = matchText
+    ? await Promise.all([createCoreClient(), createVaultClient()])
+    : [null, null];
+  const related =
+    matchText && vault
+      ? relatedNotes(vault, user.id, matchText, { core }).then((found) => found.map(toLink))
+      : null;
 
   const [
     { data: events },
@@ -457,6 +482,8 @@ export default async function RoleDetailPage({
           tasks={linkedTasks}
           timezone={timezone}
         />
+
+        <RelatedNotes notes={related} />
 
         <RoleDetailPanels
           roleId={role.id as string}
