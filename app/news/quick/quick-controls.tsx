@@ -15,6 +15,7 @@ import {
 import { useFormStatus } from 'react-dom';
 import { ArrowLeft, ArrowRight, EyeOff, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/toast';
 import { parseBack, pushBack } from '@/lib/news/quick/back';
 import { swipeAxis, swipeFarEnough } from '@/lib/news/quick/swipe';
 import type { NewsTopic } from '@/lib/news/issues/topics';
@@ -26,6 +27,7 @@ import {
   recordArticleOpened,
   unpassQuickPage,
 } from './actions';
+import { showHiddenTopic } from '../settings/actions';
 
 /**
  * The id of the form Next submits. A swipe on the card (#855) submits the
@@ -201,8 +203,25 @@ function NextPageButton() {
  * that has a topic.
  */
 export function HideTopicForm({ topic }: { topic: NewsTopic }) {
+  const toast = useToast();
+  // With an undo for a while after (note b9414236), since the button sits
+  // beside Save and Next and is easy to hit by mistake. The toast lives in the
+  // shell, so it outlasts the card the press takes away.
+  async function hide(form: FormData) {
+    await hideQuickTopic(form);
+    toast({
+      text: `${topic} is hidden from Quick read. News settings lists what is hidden.`,
+      undone: `${topic} is back in Quick read.`,
+      duration: 10_000,
+      undo: async () => {
+        const restore = new FormData();
+        restore.set('topic', topic);
+        await showHiddenTopic(restore);
+      },
+    });
+  }
   return (
-    <form action={hideQuickTopic}>
+    <form action={hide}>
       <input type="hidden" name="topic" value={topic} />
       <HideTopicButton topic={topic} />
     </form>
