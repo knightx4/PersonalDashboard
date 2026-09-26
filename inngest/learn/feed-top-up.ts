@@ -20,6 +20,7 @@ import type { LearnOperation } from '@/lib/learn/spend';
 import type { LessonTopUpSummary } from '@/lib/learn/lessons/top-up';
 import { lessonsWanted, writeLessonsFor } from '@/lib/learn/lessons/top-up';
 import { linkAimTracks } from '@/lib/learn/lessons/aim-tracks';
+import { addTeachBackCard } from '@/lib/learn/feed/teach-back-store';
 import { createFeedPicker, loadFeedFields, peopleToPickFor } from './feed-picks';
 import { createLessonPorts } from './lesson-top-up';
 
@@ -351,8 +352,15 @@ async function topUpWith(
     target,
     deadline: options.deadline,
   });
-  if (!lessons) return sections;
-  return { ...sections, readyBefore, skipped: false, lessons };
+  // One card in ten, by default, asks you to explain an idea you kept (plan
+  // #1054). No model call, so it runs whether or not anything was written.
+  const teachBack = await addTeachBackCard(learn, userId).catch((error: unknown) => {
+    console.error('[learn feed top-up] teach-back', error instanceof Error ? error.message : error);
+    return null;
+  });
+  const withTeach = teachBack === 'added' ? { ...sections, teachBack: true } : sections;
+  if (!lessons) return withTeach;
+  return { ...withTeach, readyBefore, skipped: false, lessons };
 }
 
 export type FeedTopUpResult = { people: TopUpSummary[] };

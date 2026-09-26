@@ -89,6 +89,8 @@ export async function loadLessonInput(
         .select('concept_id, status, reason, difficulty')
         .eq('user_id', userId)
         .not('concept_id', 'is', null)
+        // A teach-back (plan #1054) asks again about an idea already dealt.
+        .neq('reason', 'teach_back')
         .or(`status.neq.${UNSEEN_STATUS},reason.eq.lesson`)
         .order('id')
         .range(from, to),
