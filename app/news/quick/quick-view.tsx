@@ -20,6 +20,7 @@ import {
   QuickSwipe,
   ReactionButtons,
 } from './quick-controls';
+import { DiscussButton } from './discuss-sheet';
 
 export type QuickReadViewProps = {
   /** The story to show, or null when there is none left. */
@@ -303,6 +304,13 @@ function PhoneCard({
               {story && (
                 <SaveStoryButton issueId={card.issueId} headline={story.headline} saved={saved} />
               )}
+              {story && (
+                <DiscussButton
+                  issueId={card.issueId}
+                  storyIndex={card.storyIndex}
+                  headline={story.headline}
+                />
+              )}
               <ReactionButtons
                 issueId={card.issueId}
                 storyIndex={card.storyIndex}
@@ -371,6 +379,11 @@ function gridStory(
           <ArticleLink href={story.link} issueId={card.issueId} storyIndex={card.storyIndex} />
         )}
         <SaveStoryButton issueId={card.issueId} headline={story.headline} saved={saved} />
+        <DiscussButton
+          issueId={card.issueId}
+          storyIndex={card.storyIndex}
+          headline={story.headline}
+        />
         <ReactionButtons issueId={card.issueId} storyIndex={card.storyIndex} reaction={reaction} />
       </>
     ),
