@@ -9,6 +9,7 @@ import {
   MATCH_TEXT_MAX_CHARS,
   RELATED_NOTE_MIN_SIMILARITY,
   RELATED_NOTES_SHOWN,
+  relatedNotesForStored,
   type RelatedNotesPorts,
 } from '@/lib/vault/notes/related';
 
@@ -105,5 +106,49 @@ describe('matchText', () => {
   it('closes up whitespace and cuts a long text', () => {
     expect(matchText(' a\n\n b\t c ')).toBe('a b c');
     expect(matchText('x'.repeat(MATCH_TEXT_MAX_CHARS + 50))).toHaveLength(MATCH_TEXT_MAX_CHARS);
+  });
+});
+
+describe('relatedNotesForStored', () => {
+  function fakeVault(rows: { note_id: string; path: string; title: string | null; similarity: number }[]) {
+    const calls: Record<string, unknown>[] = [];
+    return {
+      calls,
+      vault: {
+        async rpc(_name: string, args: Record<string, unknown>) {
+          calls.push(args);
+          return { data: rows, error: null };
+        },
+      } as never,
+    };
+  }
+
+  it('looks each stored vector up and keys the notes as passed', async () => {
+    const { vault, calls } = fakeVault([
+      { note_id: 'n1', path: 'Energy.md', title: 'Energy', similarity: 0.7 },
+      { note_id: 'n2', path: 'Weak.md', title: 'Weak', similarity: 0.4 },
+    ]);
+    const found = await relatedNotesForStored(vault, 'user-1', [
+      { key: 'story:1', embedding: JSON.stringify(vector()), model: 'voyage-4-lite' },
+    ]);
+    expect(found.get('story:1')).toEqual([
+      { noteId: 'n1', title: 'Energy', href: '/vault/n/Energy.md' },
+    ]);
+    expect(calls[0]).toMatchObject({ p_user_id: 'user-1', embedding_model_filter: 'voyage-4-lite' });
+  });
+
+  it('gives a vector that does not parse, or has no model, no notes and no lookup', async () => {
+    const { vault, calls } = fakeVault([
+      { note_id: 'n1', path: 'Energy.md', title: 'Energy', similarity: 0.9 },
+    ]);
+    const found = await relatedNotesForStored(vault, 'user-1', [
+      { key: 'bad', embedding: '[not json', model: 'voyage-4-lite' },
+      { key: 'short', embedding: '[0.1,0.2]', model: 'voyage-4-lite' },
+      { key: 'nomodel', embedding: vector(), model: null },
+    ]);
+    expect(found.get('bad')).toEqual([]);
+    expect(found.get('short')).toEqual([]);
+    expect(found.get('nomodel')).toEqual([]);
+    expect(calls).toHaveLength(0);
   });
 });

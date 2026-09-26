@@ -161,7 +161,11 @@ export async function findRelatedNotes(
   return toRelated(await ports.nearest(vector, settled), settled.minSimilarity);
 }
 
-function readVector(value: unknown): number[] | null {
+/**
+ * A vector as PostgREST returns a pgvector column: the text `[0.1,…]`, or an
+ * array already parsed. Null for anything that is not a full-length vector.
+ */
+export function readVector(value: unknown): number[] | null {
   const parsed = typeof value === 'string' ? (JSON.parse(value) as unknown) : value;
   return Array.isArray(parsed) &&
     parsed.length === EMBEDDING_DIMENSIONS &&
@@ -297,4 +301,43 @@ export async function relatedNotesForVector(
     console.error('[vault related notes]', error instanceof Error ? error.message : error);
     return [];
   }
+}
+
+/** What a page needs to draw a related note: its title and where it opens. */
+export type RelatedNoteLink = Pick<RelatedNote, 'noteId' | 'title' | 'href'>;
+
+/** A stored document vector a page already holds, under the key it looks it up by. */
+export type StoredVector = { key: string; embedding: unknown; model: string | null };
+
+/**
+ * The related notes for several stored vectors at once, such as every story
+ * on a Quick read page, keyed as they were passed. A vector that does not
+ * parse, or has no model, gets none. The lookups run side by side; each is one
+ * call to obsidian.nearest_notes. Never throws.
+ */
+export async function relatedNotesForStored(
+  vault: VaultSupabaseClient,
+  userId: string,
+  stored: readonly StoredVector[],
+  options: RelatedNotesOptions = {},
+): Promise<Map<string, RelatedNoteLink[]>> {
+  const found = await Promise.all(
+    stored.map(async ({ key, embedding, model }): Promise<[string, RelatedNoteLink[]]> => {
+      let vector: number[] | null = null;
+      try {
+        vector = readVector(embedding);
+      } catch {
+        vector = null;
+      }
+      if (!vector || !model) return [key, []];
+      const notes = await relatedNotesForVector(vault, userId, { vector, model }, options);
+      return [key, notes.map(toLink)];
+    }),
+  );
+  return new Map(found);
+}
+
+/** The fields a page draws, without the score: the score is not shown (law 3). */
+export function toLink({ noteId, title, href }: RelatedNote): RelatedNoteLink {
+  return { noteId, title, href };
 }
