@@ -18,6 +18,7 @@ import {
   goalCatalog,
   goalRows,
   numberSteps,
+  outlineSteps,
   viewGoalRows,
   type GoalView,
 } from '@/lib/goals/plan-rows';
@@ -100,8 +101,10 @@ export function StepTree({
   }, [anyRunning, router]);
 
   const { own, linked, context } = useMemo(() => {
-    const numbers = numberSteps([map.steps, ...map.linked.map((entry) => [entry.step])]);
-    const options = { numbers, threads: map.threads, showAside };
+    const trees = [map.steps, ...map.linked.map((entry) => [entry.step])];
+    const numbers = numberSteps(trees);
+    const outlines = outlineSteps(trees);
+    const options = { numbers, outlines, threads: map.threads, showAside };
     const context: GoalRowContext = {
       goalTitle: map.goal.title,
       todoOn,
@@ -110,7 +113,7 @@ export function StepTree({
       answers: map.answers,
       linksOf: map.linksOf,
       otherGoals: map.otherGoals,
-      catalog: goalCatalog(map.steps, numbers),
+      catalog: goalCatalog(map.steps, numbers, outlines),
       unfolded,
       opened,
       informationSeam,

@@ -64,8 +64,17 @@ export type TreeQuestionHolder = {
   children: readonly TreeQuestion[];
 };
 
-/** Another step, as a dependency chip names it. */
-export type TreeStepRef = { id: string; number: number; title: string; status: PlanStatus };
+/**
+ * Another step, as a dependency chip names it. The outline ("12.1") is what
+ * the chip shows where there is one; the number where there is not.
+ */
+export type TreeStepRef = {
+  id: string;
+  number: number;
+  outline?: string;
+  title: string;
+  status: PlanStatus;
+};
 
 /** A step's dependencies, both ways. */
 export type TreeDependencyNode = {
@@ -82,6 +91,7 @@ export type TreeDependencyNode = {
 export type TreeCatalogEntry = {
   id: string;
   number: number;
+  outline?: string;
   title: string;
   parentId: string | null;
   depth: number;

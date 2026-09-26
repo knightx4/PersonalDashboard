@@ -68,6 +68,8 @@ export function TalkThread({
   label,
   placeholder,
   waiting = 'Dash is replying…',
+  closed,
+  hint,
 }: {
   /** Unique on the page: the textarea's id is built from it. */
   id: string;
@@ -78,6 +80,14 @@ export function TalkThread({
   placeholder?: string;
   /** The line shown while the reply is being written. */
   waiting?: string;
+  /**
+   * Whether the thread has ended, given its turns: the line to show in place
+   * of the box, or null while it is open. A discussion of a news story closes
+   * after three replies (plan #1060). Left out, the thread never closes.
+   */
+  closed?: (turns: readonly TalkTurn[]) => string | null;
+  /** Beside the button that opens the box: the $ hint for what a reply costs. */
+  hint?: React.ReactNode;
 }) {
   const [turns, setTurns] = useState<TalkTurn[]>([...initial]);
   const [writing, setWriting] = useState(false);
@@ -86,6 +96,7 @@ export function TalkThread({
   const [sending, startSend] = useTransition();
   const form = useRef<HTMLFormElement>(null);
   const now = useClockNow();
+  const ended = sending ? null : (closed?.(turns) ?? null);
 
   const submit = () => {
     const checked = turnBody(draft);
@@ -141,8 +152,13 @@ export function TalkThread({
         </ul>
       )}
 
-      {!writing ? (
-        <AddTrigger label={label} onClick={() => setWriting(true)} disabled={sending} />
+      {ended ? (
+        <p className="text-ui text-ink-muted">{ended}</p>
+      ) : !writing ? (
+        <div className="flex items-center gap-1">
+          <AddTrigger label={label} onClick={() => setWriting(true)} disabled={sending} />
+          {hint}
+        </div>
       ) : (
         <form
           ref={form}

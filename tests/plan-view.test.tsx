@@ -391,9 +391,10 @@ describe('PlanView', () => {
     expect(html).not.toContain('>Dash<');
     expect(render('claude')).toContain('The anonymous page');
     expect(html).toContain('>Ready<');
-    expect(html).toContain('Waits on #3');
+    // Named by where it sits, as its row reads: #3 is the feature's second step.
+    expect(html).toContain('Waits on #1.2');
     // Of the feature's three leaf steps one is done, one is ready and one waits
-    // on #3; amber, blue, green in that order (note 42aa1fa4).
+    // on #1.2; amber, blue, green in that order (note 42aa1fa4).
     expect(html).toContain('1 not ready, 1 ready or underway, 1 done of 3');
     // The note stands in for the missing detail under the title.
     expect(html).toContain('Note: Waiting on the RPC review.');

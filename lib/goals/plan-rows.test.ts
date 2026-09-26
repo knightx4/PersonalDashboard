@@ -8,6 +8,7 @@ import {
   goalCatalog,
   goalRows,
   numberSteps,
+  outlineSteps,
   viewGoalRows,
   type GoalRowNode,
 } from './plan-rows';
@@ -42,7 +43,12 @@ function tree(steps: Step[], deps: DependencyRow[] = []): StepNode[] {
 }
 
 function rowsOf(roots: StepNode[], showAside = false) {
-  return goalRows(roots, { numbers: numberSteps([roots]), threads: {}, showAside });
+  return goalRows(roots, {
+    numbers: numberSteps([roots]),
+    outlines: outlineSteps([roots]),
+    threads: {},
+    showAside,
+  });
 }
 
 function find(rows: readonly GoalRowNode[], id: string): GoalRowNode {
@@ -87,10 +93,16 @@ describe('goalRows', () => {
     expect(row.dependsOn).toEqual([
       {
         dependencyId: 'd1',
-        item: { id: 'a', number: 1, title: 'List balances', status: 'not_started' },
+        item: {
+          id: 'a',
+          number: 1,
+          outline: '1',
+          title: 'List balances',
+          status: 'not_started',
+        },
       },
     ]);
-    expect(find(rows, 'a').blocks).toEqual([{ id: 'b', number: 2, title: 'b' }]);
+    expect(find(rows, 'a').blocks).toEqual([{ id: 'b', number: 2, outline: '2', title: 'b' }]);
   });
 
   it('reads a step as ready once what it waits on closes, and a stale block the same way', () => {
@@ -164,7 +176,7 @@ describe('goalRows', () => {
     expect(find(rows, 'r').health.title).toBe('B');
   });
 
-  it('numbers steps in reading order and leaves put-aside questions out until asked for', () => {
+  it('labels steps by their place and leaves put-aside questions out until asked for', () => {
     const roots = tree([
       step('a', 'g'),
       step('a1', 'a'),
@@ -174,9 +186,11 @@ describe('goalRows', () => {
     const hidden = rowsOf(roots);
     expect(hidden.rows.map((row) => [row.id, row.outline])).toEqual([
       ['a', '1'],
-      ['b', '4'],
+      ['b', '2'],
     ]);
-    expect(find(hidden.rows, 'a').children.map((row) => row.id)).toEqual(['a1']);
+    expect(find(hidden.rows, 'a').children.map((row) => [row.id, row.outline])).toEqual([
+      ['a1', '1.1'],
+    ]);
     expect(find(rowsOf(roots, true).rows, 'a').children.map((row) => row.id)).toEqual(['a1', 'q']);
   });
 
@@ -198,12 +212,40 @@ describe('goalRows', () => {
   });
 });
 
+describe('outlineSteps', () => {
+  it('numbers sub-steps under their step: 2, 2.1, 2.2, 2.2.1', () => {
+    const roots = tree([
+      step('a', 'g'),
+      step('b', 'g'),
+      step('b1', 'b'),
+      step('b2', 'b'),
+      step('b21', 'b2'),
+      step('b22', 'b2'),
+    ]);
+    expect([...outlineSteps([roots])]).toEqual([
+      ['a', '1'],
+      ['b', '2'],
+      ['b1', '2.1'],
+      ['b2', '2.2'],
+      ['b21', '2.2.1'],
+      ['b22', '2.2.2'],
+    ]);
+  });
+
+  it('carries the top-level count on across the trees a page shows', () => {
+    const own = tree([step('a', 'g'), step('a1', 'a')]);
+    const linked = tree([step('x', 'g'), step('x1', 'x')]).slice(0, 1);
+    expect(outlineSteps([own, linked]).get('x')).toBe('2');
+    expect(outlineSteps([own, linked]).get('x1')).toBe('2.1');
+  });
+});
+
 describe('goalCatalog', () => {
-  it('lists every step with its number, depth and whether it is closed', () => {
+  it('lists every step with its number, outline, depth and whether it is closed', () => {
     const roots = tree([step('a', 'g'), step('a1', 'a', { status: 'done' })]);
-    expect(goalCatalog(roots, numberSteps([roots]))).toEqual([
-      { id: 'a', number: 1, title: 'a', parentId: 'g', depth: 0, closed: false },
-      { id: 'a1', number: 2, title: 'a1', parentId: 'a', depth: 1, closed: true },
+    expect(goalCatalog(roots, numberSteps([roots]), outlineSteps([roots]))).toEqual([
+      { id: 'a', number: 1, outline: '1', title: 'a', parentId: 'g', depth: 0, closed: false },
+      { id: 'a1', number: 2, outline: '1.1', title: 'a1', parentId: 'a', depth: 1, closed: true },
     ]);
   });
 });

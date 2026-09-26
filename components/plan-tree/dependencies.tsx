@@ -11,12 +11,20 @@ import { cn } from '@/lib/cn';
 import type { TreeActionState, TreeActions, TreeCatalogEntry, TreeDependencyNode } from './types';
 
 /**
- * A step as it is named in a chip: its number and title. A goal step can
- * wait on a step under another goal, which has no number on this page and
- * comes through as 0, so that one is named by its title alone (plan #983).
+ * How a chip points at a step: its outline ("12.1") as the rows read, or its
+ * number where it has no outline. A goal step can wait on a step under
+ * another goal, which has no number on this page and comes through as 0, so
+ * that one has no handle and is named by its title alone (plan #983).
  */
-function stepName(ref: { number: number; title: string }): string {
-  return ref.number > 0 ? `#${ref.number} ${ref.title}` : ref.title;
+function stepHandle(ref: { number: number; outline?: string }): string | null {
+  if (ref.outline) return `#${ref.outline}`;
+  return ref.number > 0 ? `#${ref.number}` : null;
+}
+
+/** A step as it is named in a chip: its handle and title. */
+function stepName(ref: { number: number; outline?: string; title: string }): string {
+  const handle = stepHandle(ref);
+  return handle ? `${handle} ${ref.title}` : ref.title;
 }
 
 /**
@@ -97,9 +105,7 @@ export function Dependencies<E extends TreeCatalogEntry>({
                 <button
                   type="submit"
                   disabled={removePending}
-                  aria-label={`Stop waiting on ${
-                    link.item.number > 0 ? `#${link.item.number}` : link.item.title
-                  }`}
+                  aria-label={`Stop waiting on ${stepHandle(link.item) ?? link.item.title}`}
                   className="press rounded-full p-0.5 hover:bg-surface/60"
                 >
                   <X className="size-3" strokeWidth={2} aria-hidden />
