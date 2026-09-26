@@ -447,6 +447,22 @@ that ends in a written answer, are the next two steps and are not built yet.
 Cards written before this carry no idea name. They are shown as before, titled
 by article and section, until the top-up has replaced them.
 
+## Explaining a phrase (plan #1057)
+
+Select a word or phrase anywhere on a card, including in Dash's answers under
+Ask about this card, and an Explain button shows above the swipes. Dash
+explains it in three to five sentences: what it means, then how it connects to
+the card. The same Sonnet call names the English Wikipedia article that
+teaches the phrase. The explanation is kept in `learn.phrase_explanations`
+against the card and the phrase, so selecting it again costs nothing.
+
+Under the explanation, Make it a card fetches that article, picks the section
+the call named (the lead when it is missing) as a row with the reason `asked`,
+and writes it while you wait with the top-up's own writer. The card goes next
+in the deck, its why line names the phrase, and its idea is saved as a concept
+like any other. A write that fails leaves the row picked for the next top-up.
+Start a track makes a reading track on the phrase, as the new-topic page does.
+
 ## Cost
 
 Two model calls per card, one to name the material and one to write the card.

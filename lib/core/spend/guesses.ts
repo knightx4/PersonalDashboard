@@ -150,6 +150,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // The card's section, the conversation so far and the question in; a few
   // short paragraphs out.
   'reply-about-card': run(SONNET, 4_000, 400),
+  // The card and its passage in; a few sentences and an article's name out.
+  'explain-phrase': run(SONNET, 4_000, 300),
+  // One Wikipedia section in, a card for each of up to three ideas out.
+  'write-asked-card': run(SONNET, 4_000, 2_000),
 
   // Jobs.
   'enrich-company': run(HAIKU, 10_000, 500),

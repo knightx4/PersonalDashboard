@@ -55,6 +55,7 @@ import {
   type NewTrackResult,
   type UnitCheckResult,
 } from './actions';
+import { PhraseExplainer, usePhraseExplainer } from './phrase-explainer';
 
 /**
  * The Learn now deck (LEARN-NOW-SPEC, "Cards after the first week").
@@ -166,6 +167,19 @@ export function LearnNowFeed({
     if (picked) setPickedUp(picked);
   }, []);
 
+  /**
+   * A card made from a phrase on the current one (plan #1057) goes next,
+   * unless the deck already holds it.
+   */
+  const putNext = useCallback((made: FeedCard) => {
+    if (!loaded.current.includes(made.id)) loaded.current = [...loaded.current, made.id];
+    setDeck((cards) => {
+      if (cards.some((card) => card.id === made.id)) return cards;
+      const [head, ...rest] = cards;
+      return head ? [head, made, ...rest] : [made];
+    });
+  }, []);
+
   /** Take the card off the top of the deck, and bring the next into view. */
   const advance = useCallback((id: string) => {
     setLeaving(null);
@@ -220,7 +234,8 @@ export function LearnNowFeed({
   // The arrow keys, away from anything you are typing in.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      // Shift with an arrow extends a text selection on the card.
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
       const target = event.target as HTMLElement | null;
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
       const swipeAs: SwipeAction | null =
@@ -294,6 +309,7 @@ export function LearnNowFeed({
               leaving={leaving?.id === current.id ? leaving.swipe : null}
               onSwipe={swipe}
               onDismiss={dismiss}
+              onMadeCard={putNext}
             />
           )}
         </>
@@ -361,11 +377,14 @@ function DeckCard({
   leaving,
   onSwipe,
   onDismiss,
+  onMadeCard,
 }: {
   card: FeedCard;
   leaving: SwipeAction | null;
   onSwipe: (swipe: SwipeAction) => void;
   onDismiss: () => void;
+  /** A card made from a phrase on this one, to go next in the deck. */
+  onMadeCard: (card: FeedCard) => void;
 }) {
   const [drag, setDrag] = useState<Drag | null>(null);
   const [saved, setSaved] = useState<{ id: string; title: string } | null>(null);
@@ -377,6 +396,8 @@ function DeckCard({
   const [difficulty, setDifficulty] = useState<CardDifficulty | null>(card.difficulty);
   const rating = useRef(0);
   const surface = useRef<HTMLDivElement>(null);
+  const body = useRef<HTMLElement>(null);
+  const phrases = usePhraseExplainer(card.id, body);
   const swipeRef = useRef(onSwipe);
   useEffect(() => {
     swipeRef.current = onSwipe;
@@ -396,6 +417,10 @@ function DeckCard({
       const target = event.target as HTMLElement | null;
       // Buttons, links and the folds keep their own taps.
       if (target?.closest('button, a, summary, input, textarea')) return;
+      // With text selected on the card, a drag moves the selection's handles
+      // rather than the card (plan #1057).
+      const selected = document.getSelection();
+      if (selected && !selected.isCollapsed && element.contains(selected.anchorNode)) return;
       start = { x: event.touches[0]!.clientX, y: event.touches[0]!.clientY };
       axis = null;
       last = { x: 0, y: 0 };
@@ -501,7 +526,10 @@ function DeckCard({
     <div
       ref={surface}
       className={cn(
-        'relative select-none sm:select-auto',
+        'relative',
+        // Text on the card can be selected to have it explained (plan #1057);
+        // a drag already claimed as a swipe selects nothing.
+        drag && 'select-none',
         !drag && 'transition-[transform,opacity] duration-200 ease-out',
         leaving && 'opacity-0',
       )}
@@ -522,7 +550,7 @@ function DeckCard({
       )}
 
       <Card padding="none">
-        <article className="card-pad min-w-0">
+        <article ref={body} className="card-pad min-w-0">
           <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-small text-ink-muted">
             <span>{card.why}</span>
             {card.depth && (
@@ -810,34 +838,45 @@ function DeckCard({
 
         {/* The three swipes as buttons, held at the foot of the screen while
             a long card is read, so leaving a card never needs a scroll back. */}
-        <div className="sticky bottom-0 grid grid-cols-3 gap-2 rounded-b-[inherit] border-t border-border bg-surface card-pad-x py-2">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => onSwipe('skipped')}
-            aria-keyshortcuts="ArrowLeft"
-          >
-            <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-            Not now
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            onClick={() => onSwipe('known')}
-            aria-keyshortcuts="ArrowDown"
-          >
-            <ArrowDown className="size-3.5" strokeWidth={2} aria-hidden />
-            Got it
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => onSwipe('review')}
-            aria-keyshortcuts="ArrowRight"
-          >
-            Work on this
-            <ArrowRight className="size-3.5" strokeWidth={2} aria-hidden />
-          </Button>
+        <div className="sticky bottom-0 rounded-b-[inherit] border-t border-border bg-surface card-pad-x py-2">
+          {/* A phrase selected on the card, and its explanation (plan
+              #1057), above the swipes so it is on screen wherever the
+              phrase was. */}
+          <PhraseExplainer
+            cardId={card.id}
+            cardTitle={card.title}
+            state={phrases}
+            onMadeCard={onMadeCard}
+          />
+          <div className="grid grid-cols-3 gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => onSwipe('skipped')}
+              aria-keyshortcuts="ArrowLeft"
+            >
+              <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
+              Not now
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => onSwipe('known')}
+              aria-keyshortcuts="ArrowDown"
+            >
+              <ArrowDown className="size-3.5" strokeWidth={2} aria-hidden />
+              Got it
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => onSwipe('review')}
+              aria-keyshortcuts="ArrowRight"
+            >
+              Work on this
+              <ArrowRight className="size-3.5" strokeWidth={2} aria-hidden />
+            </Button>
+          </div>
         </div>
       </Card>
     </div>
