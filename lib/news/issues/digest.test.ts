@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   bodyText,
   digestIssue,
+  ISSUE_PURPOSES,
   readDigest,
   readLine,
   writeDigest,
@@ -657,6 +658,31 @@ describe('the Local topic (note 552a9407)', () => {
     const message = haiku.create.mock.calls[0][0].messages[0].content as string;
     expect(message).not.toContain('local area');
     expect(digest.stories[0].topic).toBe('Other');
+  });
+});
+
+describe('reading the purpose', () => {
+  it('keeps a purpose on the list and drops one that is not', () => {
+    const appeal = readDigest({ summary: 'Please give.', purpose: ' Fundraising ', stories: [] });
+    expect(typeof appeal === 'string' ? null : appeal.purpose).toBe('fundraising');
+    const odd = readDigest({ summary: 'Something.', purpose: 'gossip', stories: [] });
+    expect(typeof odd === 'string' ? null : odd).not.toHaveProperty('purpose');
+  });
+
+  it('asks the model for a purpose from the list', async () => {
+    const { haiku } = await run(reported({ line: 'An appeal', summary: 'Give.', stories: [] }));
+    const schema = haiku.create.mock.calls[0][0].tools[0].input_schema;
+    expect(schema.required).toContain('purpose');
+    expect(schema.properties.purpose.enum).toEqual([...ISSUE_PURPOSES]);
+  });
+
+  it('saves the purpose on the issue, null when the reply gave none', async () => {
+    const appeal = await run(
+      reported({ line: 'An appeal', summary: 'Give.', purpose: 'fundraising', stories: [] }),
+    );
+    expect(appeal.news.updates[0]).toMatchObject({ purpose: 'fundraising' });
+    const none = await run(reported({ line: 'Plain', summary: 'Plain.', stories: [] }));
+    expect(none.news.updates[0]).toMatchObject({ purpose: null });
   });
 });
 

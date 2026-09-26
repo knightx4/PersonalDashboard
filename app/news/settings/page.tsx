@@ -121,7 +121,7 @@ export default async function NewsSettingsPage() {
             <p className="text-body leading-relaxed text-ink-muted">
               {hidden.length
                 ? 'Stories on these topics are left out of Quick read. They still show in the newsletter list and in each newsletter.'
-                : 'Nothing is hidden. Press Fewer like this on a Quick read card to stop seeing stories on its topic there.'}
+                : 'Nothing is hidden from Quick read.'}
             </p>
             {hidden.length > 0 && <HiddenTopicList topics={hidden} />}
           </CardBody>

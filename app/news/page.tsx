@@ -6,6 +6,7 @@ import { formatArrival, issueHref } from '@/lib/news/issues/list';
 import { loadQuickRead, loadQuickSignals } from '@/lib/news/issues/quick';
 import { readTopic } from '@/lib/news/issues/topics';
 import { loadHiddenTopics } from '@/lib/news/quick/hidden-topics';
+import { loadReactions, reactionKey, type Reaction } from '@/lib/news/quick/reactions';
 import { loadSavedHeadlines } from '@/lib/news/saved/stories';
 import {
   cardPasses,
@@ -33,8 +34,9 @@ export const dynamic = 'force-dynamic';
  * the address, so Next keeps it: the action re-renders the page at the address
  * it was pressed on. The topic chip (#860) rides on the address the same way,
  * as `?topic=`, and a value that is not a topic reads as every topic.
- * Topics hidden with Fewer like this (#861) are left out of both the card and
- * the chips.
+ * Topics hidden in News settings (#861) are left out of both the card and
+ * the chips. Newsletters that are not news (a welcome, a confirmation, a
+ * fundraising appeal) are left out by loadQuickRead.
  *
  * The laptop page (#941) is worked out beside the card, from the same rows:
  * quickPage gives the stories Next would show one at a time, and the view
@@ -82,11 +84,14 @@ export default async function QuickReadPage({
 
   // The saved headlines of every newsletter on the page, read once each.
   const issueIds = [...new Set([card, upNext, ...page].flatMap((c) => (c ? [c.issueId] : [])))];
-  const savedIn = new Map(
-    await Promise.all(
+  const [savedIn, reactions] = await Promise.all([
+    Promise.all(
       issueIds.map(async (id) => [id, await loadSavedHeadlines(client, id)] as const),
-    ),
-  );
+    ).then((entries) => new Map(entries)),
+    // Only a record for now, so a failed read leaves the thumbs empty rather than the page.
+    loadReactions(client, issueIds).catch(() => new Map<string, Reaction>()),
+  ]);
+  const reactionOf = (c: QuickCard) => reactions.get(reactionKey(c.issueId, c.storyIndex)) ?? null;
   const isSaved = (c: QuickCard) =>
     c.kind === 'story' && Boolean(savedIn.get(c.issueId)?.has(c.story.headline));
   const saved = card ? isSaved(card) : false;
@@ -98,6 +103,7 @@ export default async function QuickReadPage({
       nothingYet={issues.length === 0}
       hiddenCount={hidden.length}
       saved={saved}
+      reaction={card ? reactionOf(card) : null}
       pictures={wanted}
       picturesHref={quickHref({ pictures: !wanted, topic })}
       issueHref={
@@ -107,6 +113,7 @@ export default async function QuickReadPage({
         card: c,
         arrived: formatArrival(c.receivedAt, settings.timezone),
         saved: isSaved(c),
+        reaction: reactionOf(c),
         issueHref: issueHref(c.issueId, { original: false, pictures: wanted, from: null }),
       }))}
       upNext={
@@ -114,6 +121,7 @@ export default async function QuickReadPage({
           card: upNext,
           arrived: formatArrival(upNext.receivedAt, settings.timezone),
           saved: isSaved(upNext),
+          reaction: reactionOf(upNext),
           issueHref: issueHref(upNext.issueId, { original: false, pictures: wanted, from: null }),
         }
       }

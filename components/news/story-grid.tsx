@@ -23,7 +23,7 @@ export type GridStory = {
   link?: string | null;
   /** Under the summary, such as the full-story fold. It may grow the card. */
   body?: React.ReactNode;
-  /** The far end of the card's foot: Save, Fewer like this and the like. */
+  /** The far end of the card's foot: Save, the thumbs and the like. */
   actions?: React.ReactNode;
 };
 

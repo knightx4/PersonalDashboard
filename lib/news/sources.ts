@@ -44,5 +44,6 @@ export const newsSources: ModuleSources = {
     { table: 'news.senders', reason: 'Newsletter senders.' },
     { table: 'news.story_groups', reason: 'Clustering of stories for the digest.' },
     { table: 'news.story_passes', reason: 'Stories passed over.' },
+    { table: 'news.story_reactions', reason: 'Thumbs up and down on Quick read cards.' },
   ],
 };

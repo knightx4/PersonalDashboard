@@ -239,6 +239,47 @@ describe('news.story_passes', () => {
   });
 });
 
+describe('news.story_reactions', () => {
+  it('shows a user only their own thumbs', async () => {
+    await asUser(userA, (tx) => tx`
+      insert into story_reactions (user_id, issue_id, story_index, reaction, headline)
+      values (${userA}, ${issueA}, 0, 'up', 'A story')`);
+
+    const mine = await asUser(userA, (tx) => tx<{ reaction: string }[]>`
+      select reaction from story_reactions`);
+    expect(mine.map((r) => r.reaction)).toEqual(['up']);
+
+    const theirs = await asUser(userB, (tx) => tx`select 1 from story_reactions`);
+    expect(theirs).toHaveLength(0);
+  });
+
+  it('keeps one reaction per story, and only up or down', async () => {
+    await expect(
+      admin`insert into story_reactions (user_id, issue_id, story_index, reaction, headline)
+        values (${userA}, ${issueA}, 0, 'down', 'A story')`,
+    ).rejects.toThrow(/story_reactions_pkey/);
+
+    await expect(
+      admin`insert into story_reactions (user_id, issue_id, story_index, reaction, headline)
+        values (${userA}, ${issueA}, 1, 'meh', 'A story')`,
+    ).rejects.toThrow(/story_reactions_reaction_ck/);
+  });
+
+  it("refuses a reaction on another account's newsletter, even under their id", async () => {
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into story_reactions (user_id, issue_id, story_index, reaction, headline)
+        values (${userB}, ${issueA}, 1, 'up', 'A story')`),
+    ).rejects.toThrow(/story_reactions_issue_fk/);
+
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into story_reactions (user_id, issue_id, story_index, reaction, headline)
+        values (${userA}, ${issueA}, 1, 'up', 'A story')`),
+    ).rejects.toThrow(/row-level security/);
+  });
+});
+
 describe('news.story_groups', () => {
   const vector = `[${new Array(1024).fill(0).map((_, i) => (i === 0 ? 1 : 0)).join(',')}]`;
 
@@ -469,6 +510,7 @@ describe('RLS coverage', () => {
       'senders',
       'story_groups',
       'story_passes',
+      'story_reactions',
     ]);
   });
 

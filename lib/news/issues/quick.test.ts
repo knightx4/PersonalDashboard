@@ -15,7 +15,7 @@ function fakeClient(answer: (table: string, calls: Call[]) => { data: unknown; e
     from(table: string) {
       const own: Call[] = [];
       const chain: Record<string, unknown> = {};
-      for (const method of ['select', 'not', 'order', 'limit', 'in', 'eq', 'is', 'upsert', 'update']) {
+      for (const method of ['select', 'not', 'or', 'order', 'limit', 'in', 'eq', 'is', 'upsert', 'update']) {
         chain[method] = (...args: unknown[]) => {
           const call = { table, method, args };
           calls.push(call);
@@ -66,6 +66,16 @@ describe('loadQuickRead', () => {
       table: 'story_passes',
       method: 'in',
       args: ['issue_id', ['i1']],
+    });
+  });
+
+  it('asks only for issues that are news, or whose purpose is not known', async () => {
+    const { client, calls } = fakeClient(() => ({ data: [], error: null }));
+    await loadQuickRead(client);
+    expect(calls).toContainEqual({
+      table: 'issues',
+      method: 'or',
+      args: ['purpose.is.null,purpose.eq.news'],
     });
   });
 
