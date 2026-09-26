@@ -176,6 +176,13 @@ export const LEARN_OPERATIONS = [
   // Dash's reply in a conversation about a Learn now card (plan #1053), made
   // by lib/talk/reply.ts. One Sonnet call per question asked on a card.
   'reply-about-card',
+  // Explaining a phrase selected on a Learn now card (plan #1057). One Sonnet
+  // call per phrase per card; selecting it again reads the stored one.
+  'explain-phrase',
+  // Make it a card, under a phrase's explanation (plan #1057): the same call
+  // as 'write-feed-card', made on the press while the person waits rather
+  // than by the top-up, so what asked-for cards cost can be read on its own.
+  'write-asked-card',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

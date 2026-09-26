@@ -92,6 +92,8 @@ describe('the operation names', () => {
       'write-unit-check',
       'mark-unit-check',
       'reply-about-card',
+      'explain-phrase',
+      'write-asked-card',
     ]);
   });
 });

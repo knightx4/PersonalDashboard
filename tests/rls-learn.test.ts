@@ -124,6 +124,7 @@ describe('RLS coverage', () => {
       'next_outcomes',
       'opening_questions',
       'opening_sweeps',
+      'phrase_explanations',
       'probes',
       'quiz_questions',
       'quiz_sources',
@@ -1231,6 +1232,83 @@ describe('notes on cards and ideas', () => {
     const [row] = await admin<{ card_id: string | null; concept_id: string | null; body: string }[]>`
       select card_id, concept_id, body from card_notes where id = ${noteA}`;
     expect(row).toEqual({ card_id: null, concept_id: conceptA, body: 'Like 1930s America?' });
+  });
+});
+
+describe('phrases explained on cards', () => {
+  // 0062_phrase_explanations.sql (plan #1057). A phrase selected on a Learn
+  // now card, Dash's explanation of it, and the card it was made into.
+  let cardA = '';
+  let rowA = '';
+
+  beforeAll(async () => {
+    const [provider] = await admin<{ id: string }[]>`
+      insert into catalogue_providers (slug, name, home_url, licence, ingest_note)
+      values ('wikipedia', 'Wikipedia', 'https://en.wikipedia.org', 'CC BY-SA',
+              'REST API, no key, section text')
+      on conflict (slug) do update set name = excluded.name
+      returning id`;
+    const [item] = await admin<{ id: string }[]>`
+      insert into catalogue_items (provider_id, external_id, title, kind, canonical_url)
+      values (${provider.id}, 'AlphaGo', 'AlphaGo', 'article', 'https://en.wikipedia.org/wiki/AlphaGo')
+      returning id`;
+    const [segment] = await admin<{ id: string }[]>`
+      insert into catalogue_segments (item_id, ordinal, section_anchor, heading, text)
+      values (${item.id}, 1, 'Algorithm', 'Algorithm', 'AlphaGo uses a Monte Carlo tree search...')
+      returning id`;
+    const [card] = await admin<{ id: string }[]>`
+      insert into feed_cards (user_id, reason, theme_name, item_id, segment_id)
+      values (${userA}, 'interest', 'Games', ${item.id}, ${segment.id})
+      returning id`;
+    cardA = card.id;
+    const [row] = await asUser(
+      userA,
+      (tx) => tx<{ id: string }[]>`
+        insert into phrase_explanations (user_id, card_id, phrase, explanation, article, model)
+        values (${userA}, ${cardA}, 'tree search', 'Searching a tree of moves.', 'Monte Carlo tree search', 'test')
+        returning id`,
+    );
+    rowA = row.id;
+  });
+
+  it('shows the owner their explanations and another user none of them', async () => {
+    const own = await asUser(userA, (tx) => tx`select id from phrase_explanations`);
+    const other = await asUser(userB, (tx) => tx`select id from phrase_explanations`);
+    expect(own.map((r) => r.id)).toEqual([rowA]);
+    expect(other).toHaveLength(0);
+  });
+
+  it("does not let a user explain a phrase on another account's card", async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into phrase_explanations (user_id, card_id, phrase, explanation, model)
+                   values (${userB}, ${cardA}, 'self-play', 'Playing itself.', 'test')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('keeps one explanation per phrase on a card, whatever its case', async () => {
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into phrase_explanations (user_id, card_id, phrase, explanation, model)
+                   values (${userA}, ${cardA}, 'Tree Search', 'Again.', 'test')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('refuses an asked card with no phrase', async () => {
+    await expect(
+      admin`insert into feed_cards (user_id, reason, item_id, segment_id, idea_index)
+            select ${userA}, 'asked', item_id, segment_id, 5 from feed_cards where id = ${cardA}`,
+    ).rejects.toThrow();
+  });
+
+  it('goes with the card it was selected on', async () => {
+    await admin`delete from feed_cards where id = ${cardA}`;
+    const left = await admin`select id from phrase_explanations where id = ${rowA}`;
+    expect(left).toHaveLength(0);
   });
 });
 

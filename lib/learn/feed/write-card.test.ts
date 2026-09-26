@@ -6,6 +6,7 @@ import {
   cardPrompt,
   readCardReport,
   whyLine,
+  describePick,
   writeCard,
   type CardToWrite,
 } from './write-card';
@@ -56,6 +57,7 @@ const stored = {
   example: reported.example,
   question: reported.question,
   answer: reported.answer,
+  mentions: [],
 };
 
 describe('the why line', () => {
@@ -89,6 +91,16 @@ describe('the why line for a goal', () => {
   it('names it when the goal sits in no field', () => {
     expect(whyLine({ ...interest, reason: 'goal', themeName: null, aimName: 'Startup finance', field: null })).toBe(
       'For your goal: Startup finance.',
+    );
+  });
+  it('names the phrase and the card it was asked for on (plan #1057)', () => {
+    const asked = { ...interest, reason: 'asked' as const, themeName: null, field: null, askedPhrase: 'tree search' };
+    expect(whyLine({ ...asked, askedOn: 'AlphaGo beat Lee Sedol' })).toBe(
+      'You asked for a card on “tree search” from AlphaGo beat Lee Sedol.',
+    );
+    expect(whyLine(asked)).toBe('You asked for a card on “tree search”.');
+    expect(describePick({ ...asked, askedOn: 'AlphaGo beat Lee Sedol' })).toContain(
+      'they met the phrase "tree search" on a card about AlphaGo beat Lee Sedol',
     );
   });
 });
@@ -147,6 +159,29 @@ describe('reading the report', () => {
       verdict: 'ready',
       ideas: [{ ...stored, question: null, answer: null }],
     });
+  });
+
+  it('keeps the mentions the card really uses, and drops the rest (plan #1056)', () => {
+    const report = readCardReport({
+      fit: 'Fits.',
+      matches: true,
+      ideas: [
+        {
+          ...reported,
+          mentions: [
+            { phrase: 'Neural  network', why: 'What does the squeezing.' },
+            { phrase: 'rebuild error', why: 'Not in the card.' },
+            { phrase: reported.name, why: 'The card itself.' },
+            { phrase: 'neural network', why: 'Said twice.' },
+            { phrase: 'bottleneck' },
+          ],
+        },
+      ],
+    });
+    expect(report.verdict === 'ready' && report.ideas[0].mentions).toEqual([
+      { phrase: 'Neural network', why: 'What does the squeezing.' },
+      { phrase: 'bottleneck', why: '' },
+    ]);
   });
 
   it('drops a report that does not match its schema', () => {
