@@ -438,6 +438,12 @@ export function GoalTopSurface() {
             createdAt: '2026-09-25T08:00:00Z',
           }}
           briefWhen="today"
+          current
+          stages={[
+            { id: 's1', title: 'Know what you owe', index: 1, state: 'done', done: 3, live: 3 },
+            { id: 's2', title: 'Pay the dearest card first', index: 2, state: 'current', done: 1, live: 4 },
+            { id: 's3', title: 'Both cards at zero', index: 3, state: 'later', done: 0, live: 2 },
+          ]}
           review={{
             id: 'rev-1',
             goalId: cards.id,

@@ -1,18 +1,21 @@
 import Link from 'next/link';
 import { CircleHelp, Flag, ListChecks, Megaphone, Sparkles, User } from 'lucide-react';
-import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { FileBody } from '@/components/files/file-body';
 import { Card } from '@/components/ui/card';
+import { Disclosure } from '@/components/ui/disclosure';
+import { Meter } from '@/components/ui/meter';
 import type { Brief } from '@/lib/goals/briefs';
 import { formatDay } from '@/lib/goals/dates';
 import { claudeLine, type GoalStatusView, type StatusRowKind } from '@/lib/goals/goal-status';
-import { VERDICT_LABELS, type GoalReview, type Verdict } from '@/lib/goals/reviews';
+import type { Stage } from '@/lib/goals/goal-page';
+import type { GoalReview } from '@/lib/goals/reviews';
+import { VerdictLabel } from '../goal-line';
 
 /**
- * The top of a goal's page (lib/goals/goal-status.ts): Claude's latest note on
- * where the goal stands, its status for the day, and everything on the goal that
- * is waiting on you, each opening where it is done lower on the page. With no
- * note yet, the status's reason and next move stand in for it.
+ * The top of a goal's page (lib/goals/goal-status.ts, plan #1078): Dash's
+ * status for the day, its latest note or the status's reason, the next move
+ * with its date, a track of the stages, and, folded, everything on the goal
+ * that is waiting on you, each opening where it is done lower on the page.
  */
 
 const ROW_ICONS: Record<StatusRowKind, typeof User> = {
@@ -23,41 +26,32 @@ const ROW_ICONS: Record<StatusRowKind, typeof User> = {
   do: User,
 };
 
-const VERDICT_TONES: Record<Verdict, DevTone> = {
-  on_track: 'positive',
-  stalled: 'caution',
-  waiting_on_you: 'caution',
-  waiting_on_date: 'quiet',
-  waiting_on_goal: 'quiet',
-};
-
 export type GoalStatusCardProps = {
   status: GoalStatusView;
   brief: Brief | null;
   /** When the note was written, to follow "written": "today", "on 3 Oct". */
   briefWhen: string | null;
   review: GoalReview | null;
+  /** Whether that status is recent enough to stand as today's (isCurrent). */
+  current: boolean;
+  /** The goal's stages, for the track along the foot; null for a goal that is one list. */
+  stages: Stage[] | null;
 };
 
-export function GoalStatusCard({ status, brief, briefWhen, review }: GoalStatusCardProps) {
+export function GoalStatusCard({ status, brief, briefWhen, review, current, stages }: GoalStatusCardProps) {
   const dash = claudeLine(status);
+  const waiting = status.yourMove.length + status.moreSteps;
   return (
     <section aria-labelledby="status-heading">
       <Card padding="standard" className="space-y-3">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <h2 id="status-heading" className="text-ui font-semibold text-ink">
-            Where it stands
-          </h2>
-          {review && (
-            <StateLabel
-              glyph={null}
-              word={VERDICT_LABELS[review.verdict]}
-              tone={VERDICT_TONES[review.verdict]}
-              title="Dash’s check on this goal"
-              className="text-small font-semibold"
-            />
-          )}
-        </div>
+        <h2 id="status-heading" className="sr-only">
+          Where it stands
+        </h2>
+        {review ? (
+          <VerdictLabel review={review} current={current} />
+        ) : (
+          <p className="text-small text-ink-muted">Dash has not checked this goal yet.</p>
+        )}
 
         {brief ? (
           <div className="space-y-1">
@@ -65,22 +59,19 @@ export function GoalStatusCard({ status, brief, briefWhen, review }: GoalStatusC
             {briefWhen && <p className="text-small text-ink-muted">Dash’s note, written {briefWhen}</p>}
           </div>
         ) : (
-          review && (
-            <div className="space-y-0.5 text-small text-ink">
-              <p>{review.reason}</p>
-              <p className="text-ink-muted">
-                Next: {review.nextMove}
-                {review.nextOn && ` (${formatDay(review.nextOn)})`}
-              </p>
-            </div>
-          )
+          review && <p className="text-ui text-ink">{review.reason}</p>
+        )}
+        {review && (
+          <p className="text-small text-ink-muted">
+            Next: <span className="text-ink">{review.nextMove}</span>
+            {review.nextOn && `, ${formatDay(review.nextOn)}`}
+          </p>
         )}
 
-        <div className="space-y-1">
-          <h3 className="text-small font-semibold text-ink-muted">Your move</h3>
-          {status.yourMove.length === 0 ? (
-            <p className="text-small text-ink-muted">Nothing on this goal is waiting on you.</p>
-          ) : (
+        {stages && <StageTrack stages={stages} />}
+
+        {waiting > 0 && (
+          <Disclosure title="Waiting on you" meta={waiting}>
             <ul className="space-y-1">
               {status.yourMove.map((row) => {
                 const Icon = row.kind === 'approve' && row.href.startsWith('#step-') ? ListChecks : ROW_ICONS[row.kind];
@@ -100,15 +91,58 @@ export function GoalStatusCard({ status, brief, briefWhen, review }: GoalStatusC
               })}
               {status.moreSteps > 0 && (
                 <li className="pl-5 text-small text-ink-muted">
-                  {status.moreSteps === 1 ? '1 more step' : `${status.moreSteps} more steps`} of yours in the tree
+                  {status.moreSteps === 1 ? '1 more step' : `${status.moreSteps} more steps`} of yours in the stages
                 </li>
               )}
             </ul>
-          )}
-        </div>
+          </Disclosure>
+        )}
 
         {dash && <p className="text-small text-ink-muted">{dash}</p>}
       </Card>
     </section>
+  );
+}
+
+/**
+ * The stages as one bar of segments: a finished stage full, the current one
+ * filled as far as its steps are done, the rest empty. The first and last
+ * stages are named under it, so the bar reads as the way from one to the
+ * other.
+ */
+function StageTrack({ stages }: { stages: Stage[] }) {
+  const current = stages.find((stage) => stage.state === 'current');
+  const label = current
+    ? `Stage ${current.index} of ${stages.length}`
+    : `All ${stages.length} stages done`;
+  return (
+    <div className="space-y-1">
+      <div className="flex gap-1" role="img" aria-label={label}>
+        {stages.map((stage) =>
+          stage.state === 'current' ? (
+            <Meter
+              key={stage.id}
+              value={stage.done}
+              max={stage.live}
+              fill="bg-positive"
+              track="sunken"
+              minFraction={0.15}
+              label={`${stage.title}: ${stage.done} of ${stage.live} done`}
+              className="flex-1"
+            />
+          ) : (
+            <span
+              key={stage.id}
+              title={stage.title}
+              className={`h-1.5 flex-1 rounded-full ${stage.state === 'done' ? 'bg-positive' : 'bg-sunken'}`}
+            />
+          ),
+        )}
+      </div>
+      <div className="flex justify-between gap-3 text-small text-ink-ghost">
+        <span className="min-w-0 truncate">{stages[0].title}</span>
+        <span className="min-w-0 truncate text-right">{stages[stages.length - 1].title}</span>
+      </div>
+    </div>
   );
 }
