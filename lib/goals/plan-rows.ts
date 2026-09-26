@@ -66,7 +66,8 @@ export type GoalRowNode = {
   comment: null;
   fog: null;
   fogDismissedAt: null;
-  matches: true;
+  /** Under a view: whether this row matched or is only here for what is beneath it. */
+  matches: boolean;
   rollup: PlanProgress;
   dependsOn: { dependencyId: string; item: Ref & { status: PlanStatus } }[];
   waitingOn: Ref[];
@@ -268,4 +269,59 @@ export function goalCatalog(
   };
   walk(roots, 0);
   return out;
+}
+
+/**
+ * The views over a goal's steps, as the dev plan has over the plan (note
+ * 9b6eba99): everything, what is still open, what waits on you, and what is
+ * ready for Dash to take.
+ */
+export const GOAL_VIEWS = ['all', 'open', 'you', 'ready'] as const;
+export type GoalView = (typeof GOAL_VIEWS)[number];
+
+export const GOAL_VIEW_LABEL: Record<GoalView, string> = {
+  all: 'Everything',
+  open: 'Open',
+  you: 'On you',
+  ready: 'Ready',
+};
+
+/** The healths the dev plan's "On you" view is made of (`needsThePerson` in lib/plan/tree.ts). */
+const ON_YOU: ReadonlySet<string> = new Set(['unanswered', 'proposed', 'blocked', 'setup']);
+
+function matchesGoalView(row: GoalRowNode, view: GoalView): boolean {
+  const open = row.status !== 'done' && row.status !== 'dropped';
+  switch (view) {
+    case 'all':
+      return true;
+    case 'open':
+      return open;
+    case 'you':
+      return open && ON_YOU.has(row.health.name);
+    case 'ready':
+      return open && row.health.name === 'ready';
+  }
+}
+
+/**
+ * The rows narrowed to a view. A row that does not match stays, dimmed, when
+ * something beneath it does, so a matching sub-step is still seen in its
+ * place -- the same rule as the plan's views.
+ */
+export function viewGoalRows(rows: readonly GoalRowNode[], view: GoalView): GoalRowNode[] {
+  if (view === 'all') return [...rows];
+  return rows.flatMap((row) => {
+    const children = viewGoalRows(row.children, view);
+    const matches = matchesGoalView(row, view);
+    if (!matches && children.length === 0) return [];
+    return [{ ...row, children, matches }];
+  });
+}
+
+/** How many rows, at any depth, a view matches. */
+export function countGoalView(rows: readonly GoalRowNode[], view: GoalView): number {
+  return rows.reduce(
+    (sum, row) => sum + (matchesGoalView(row, view) ? 1 : 0) + countGoalView(row.children, view),
+    0,
+  );
 }

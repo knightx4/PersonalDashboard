@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { HEALTH } from '@/lib/plan/health-words';
 import { attachDependencies, type DependencyRow } from './dependencies';
-import { REVIEW_ASK, goalCatalog, goalRows, numberSteps, type GoalRowNode } from './plan-rows';
+import {
+  REVIEW_ASK,
+  countGoalView,
+  goalCatalog,
+  goalRows,
+  numberSteps,
+  viewGoalRows,
+  type GoalRowNode,
+} from './plan-rows';
 import { buildForest, type Step, type StepNode } from './steps';
 
 function step(id: string, parentId: string, extra: Partial<Step> = {}): Step {
@@ -170,5 +178,39 @@ describe('goalCatalog', () => {
       { id: 'a', number: 1, title: 'a', parentId: 'g', depth: 0, closed: false },
       { id: 'a1', number: 2, title: 'a1', parentId: 'a', depth: 1, closed: true },
     ]);
+  });
+});
+
+describe('viewGoalRows', () => {
+  // A stage holding one done step, one blocked on you and one of Claude's
+  // that is ready; and a question at the top level.
+  const roots = tree([
+    step('stage', 'g'),
+    step('done', 'stage', { status: 'done' }),
+    step('blocked', 'stage', { status: 'blocked', blockKind: 'outside', blockAsk: 'The letter' }),
+    step('claude', 'stage', { kind: 'claude' }),
+    step('question', 'g', { kind: 'decision' }),
+  ]);
+  const { rows } = rowsOf(roots);
+  const ids = (list: readonly GoalRowNode[]): string[] =>
+    list.flatMap((row) => [row.id, ...ids(row.children)]);
+
+  it('shows everything under Everything', () => {
+    expect(ids(viewGoalRows(rows, 'all'))).toEqual(['stage', 'done', 'blocked', 'claude', 'question']);
+  });
+
+  it('leaves the closed steps out of Open', () => {
+    expect(ids(viewGoalRows(rows, 'open'))).toEqual(['stage', 'blocked', 'claude', 'question']);
+  });
+
+  it('keeps what waits on you under On you, with the stage over it dimmed', () => {
+    const shown = viewGoalRows(rows, 'you');
+    expect(ids(shown)).toEqual(['stage', 'blocked', 'question']);
+    expect(shown[0].matches).toBe(false);
+    expect(countGoalView(rows, 'you')).toBe(2);
+  });
+
+  it("keeps Dash's ready steps under Ready", () => {
+    expect(ids(viewGoalRows(rows, 'ready'))).toEqual(['stage', 'claude']);
   });
 });
