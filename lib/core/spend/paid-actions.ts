@@ -161,6 +161,8 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'Fired four times a day by pg_cron to fetch and embed the YouTube library\'s transcripts; no press starts it.',
   'app/api/cron/youtube-library/route.ts#POST':
     'Fired four times a day by pg_cron to fetch and embed the YouTube library\'s transcripts; no press starts it.',
+  'app/learn/now/actions.ts#loadMoreCards':
+    'Called by the Learn now deck on its own while four cards are still ahead, to load the next few; no press starts it. The paid part is matching a card with no stored concept vector to your vault notes (plan #1113), one short embedding per card, paid once, since the vector is kept by the text\'s hash.',
 };
 
 /** Every paid press, in the order written. */
