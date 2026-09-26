@@ -19,8 +19,11 @@
  *   Dash, as it does on the plan; a step only you can do, with nothing in its
  *   way, is waiting on you to do it and say so. A step of yours that holds
  *   sub-steps is a stage, not a job, and is left to them.
- * - Goal steps have no number, so each is numbered in reading order from 1.
- *   The row, the dependency chips and the picker all show that number.
+ * - Goal steps have no number, so each is given two: a number in reading
+ *   order from 1, which is the row's handle, and an outline, which is what
+ *   the row, the dependency chips and the picker show. The outline reads as
+ *   the plan's does: 12 for a top-level step, 12.1 and 12.2 under it, 12.1.1
+ *   under those.
  *
  * Pure, so the mapping is tested without a page.
  */
@@ -63,7 +66,7 @@ function yoursToDo(step: StepNode, ready: ReadonlySet<string>): boolean {
   );
 }
 
-type Ref = { id: string; number: number; title: string };
+type Ref = { id: string; number: number; outline?: string; title: string };
 
 /** One goal step as the shared tree row reads it, with its step alongside. */
 export type GoalRowNode = {
@@ -176,20 +179,51 @@ export function numberSteps(trees: readonly (readonly StepNode[])[]): Map<string
 }
 
 /**
+ * Where every step in these trees sits, as the row labels it: the top-level
+ * steps count from 1 across all the trees, and each step's sub-steps count
+ * from 1 under it, so the second sub-step of the twelfth step is 12.2 and
+ * its first sub-step 12.2.1. Given all the trees a page shows at once, so no
+ * two rows share an outline.
+ */
+export function outlineSteps(trees: readonly (readonly StepNode[])[]): Map<string, string> {
+  const outlines = new Map<string, string>();
+  const walk = (list: readonly StepNode[], prefix: string) =>
+    list.forEach((step, index) => {
+      if (outlines.has(step.id)) return;
+      const outline = `${prefix}${index + 1}`;
+      outlines.set(step.id, outline);
+      walk(step.children, `${outline}.`);
+    });
+  let top = 0;
+  for (const roots of trees) {
+    for (const root of roots) {
+      if (outlines.has(root.id)) continue;
+      top += 1;
+      outlines.set(root.id, String(top));
+      walk(root.children, `${top}.`);
+    }
+  }
+  return outlines;
+}
+
+/**
  * The rows for a list of steps.
  *
- * `numbers` comes from `numberSteps` over everything on the page. A step
- * named in a dependency that is not on the page reads as #0, which only a
- * dependency across goals written by the routine can produce.
+ * `numbers` comes from `numberSteps` and `outlines` from `outlineSteps`, both
+ * over everything on the page. A step named in a dependency that is not on
+ * the page reads as #0 with no outline, which only a dependency across goals
+ * written by the routine can produce.
  */
 export function goalRows(
   roots: readonly StepNode[],
   {
     numbers,
+    outlines = new Map(),
     threads,
     showAside,
   }: {
     numbers: ReadonlyMap<string, number>;
+    outlines?: ReadonlyMap<string, string>;
     threads: Readonly<Record<string, DevComment[]>>;
     showAside: boolean;
   },
@@ -199,6 +233,7 @@ export function goalRows(
   const ref = (step: { id: string; title: string }): Ref => ({
     id: step.id,
     number: numbers.get(step.id) ?? 0,
+    outline: outlines.get(step.id),
     title: titles.get(step.id) ?? step.title,
   });
   const ready = readySteps(roots);
@@ -223,7 +258,7 @@ export function goalRows(
     return {
       id: step.id,
       number,
-      outline: String(number),
+      outline: outlines.get(step.id) ?? String(number),
       title: step.title,
       detail: step.detail,
       resolution: step.resolution,
@@ -274,9 +309,11 @@ export function goalRows(
 export function goalCatalog(
   roots: readonly StepNode[],
   numbers: ReadonlyMap<string, number>,
+  outlines: ReadonlyMap<string, string> = new Map(),
 ): {
   id: string;
   number: number;
+  outline?: string;
   title: string;
   parentId: string | null;
   depth: number;
@@ -288,6 +325,7 @@ export function goalCatalog(
       out.push({
         id: step.id,
         number: numbers.get(step.id) ?? 0,
+        outline: outlines.get(step.id),
         title: step.title,
         parentId: step.parentId,
         depth,

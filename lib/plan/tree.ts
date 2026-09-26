@@ -42,6 +42,8 @@ export type PlanProgress = {
 export type PlanRef = {
   id: string;
   number: number;
+  /** Where it sits in the tree ("595.2"), once the tree is built. */
+  outline?: string;
   title: string;
   status: PlanStatus;
   module: ModuleId | null;
@@ -448,6 +450,25 @@ export function buildPlanTree(data: PlanData, liveness?: PlanLiveness): PlanSect
   const roots = (childrenOf.get(null) ?? []).map((item) =>
     build(item, [], [], String(item.number)),
   );
+
+  // A chip names the step it points at the way that step's row reads, so the
+  // refs get their outline now that every row has one.
+  const outlines = new Map<string, string>();
+  const collect = (node: PlanNode) => {
+    outlines.set(node.id, node.outline);
+    node.children.forEach(collect);
+  };
+  roots.forEach(collect);
+  const place = (ref: PlanRef) => {
+    ref.outline = outlines.get(ref.id);
+  };
+  const placeAll = (node: PlanNode) => {
+    node.dependsOn.forEach((link) => place(link.item));
+    node.blocks.forEach(place);
+    node.waitingOn.forEach(place);
+    node.children.forEach(placeAll);
+  };
+  roots.forEach(placeAll);
 
   const scopes: Array<ModuleId | null> = [...MODULES.map((module) => module.id), null];
   return scopes
