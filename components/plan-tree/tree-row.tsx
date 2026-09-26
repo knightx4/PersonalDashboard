@@ -11,6 +11,7 @@ import { StateLabel, TONE_TEXT, type DevTone } from '@/components/dev/state-labe
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { planRowId, type PlanRefTitles } from '@/lib/comments/refs';
 import { isClosed, isDismissed } from '@/lib/plan/load';
+import { sessionOrigin, type SessionOrigin } from '@/lib/plan/origin';
 import type { PlanProgress } from '@/lib/plan/tree';
 import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { cn } from '@/lib/cn';
@@ -173,6 +174,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
   actions,
   anchorId,
   origin = null,
+  addedBy = null,
   source,
   need = null,
   marks,
@@ -205,6 +207,12 @@ export function TreeRow<E extends TreeCatalogEntry>({
   anchorId?: string;
   /** The answer that produced this row, when a re-shape wrote it. */
   origin?: { number: number; gist: string } | null;
+  /**
+   * Which session wrote this row ready to build, when one did: the day, and
+   * the session's id for the hover text. The dev plan's, for a step added
+   * under a feature you had already approved.
+   */
+  addedBy?: SessionOrigin | null;
   /** Where the step lives when the page shows it away from home: a line under the title, in text only. */
   source?: string;
   /**
@@ -269,13 +277,19 @@ export function TreeRow<E extends TreeCatalogEntry>({
   const setupOpen = node.kind === 'setup' && !closed;
 
   // The line under the title: what it involves, or failing that your note --
-  // minus the stamp, which has its own line above and should not be said
-  // twice on one row.
+  // minus the stamps, which have their own lines above and should not be said
+  // twice on one row. The session stamp is left out whether or not it is
+  // shown: on a closed step it is history, and "Note: Added by session cse_…"
+  // is not what the step was about.
   const gloss =
     (node.detail ?? node.comment ?? '')
       .split('\n')
-      .find((line) => line.trim() && !(origin && line.includes(`#${origin.number}'s answer:`))) ??
-    '';
+      .find(
+        (line) =>
+          line.trim() &&
+          !(origin && line.includes(`#${origin.number}'s answer:`)) &&
+          !sessionOrigin(line),
+      ) ?? '';
 
   const inset = rowInset(trail);
 
@@ -437,6 +451,17 @@ export function TreeRow<E extends TreeCatalogEntry>({
             {origin && (
               <span className="block truncate text-small text-ink-ghost">
                 From #{origin.number}&apos;s answer: {origin.gist}
+              </span>
+            )}
+            {/* The same, for a step a session wrote ready to build. Approval
+                stops at the feature, so this row never asked you; saying so
+                is what the Drop at the top of its menu is for. */}
+            {addedBy && (
+              <span
+                title={addedBy.session ? `Session ${addedBy.session}` : undefined}
+                className="block truncate text-small text-ink-ghost"
+              >
+                Added by Dash on {addedBy.date}
               </span>
             )}
             {source && (
