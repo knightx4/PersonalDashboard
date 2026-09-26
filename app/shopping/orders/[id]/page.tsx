@@ -19,6 +19,7 @@ import { OrderItemTags } from '../order-item-tags';
 import { restoreDeletedOrder } from '@/app/shopping/orders/actions';
 import { Button } from '@/components/ui/button';
 import { orderItemTags } from '@/lib/orders/search';
+import { GmailAnchor } from '@/components/ui/gmail-anchor';
 
 export const metadata = { title: 'Order' };
 
@@ -412,14 +413,14 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       </p>
                     </div>
                     {href && (
-                      <a
+                      <GmailAnchor
                         href={href}
                         target="_blank"
                         rel="noreferrer"
                         className="shrink-0 text-ui text-ink-muted transition-colors duration-150 hover:text-accent hover:underline"
                       >
                         Open in Gmail
-                      </a>
+                      </GmailAnchor>
                     )}
                   </li>
                 );

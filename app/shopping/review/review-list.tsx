@@ -39,6 +39,7 @@ import {
 import { AttachChoices, useAttachEmail } from './attach-email';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { canReadAsOrder } from '@/lib/review/read-order';
+import { GmailAnchor } from '@/components/ui/gmail-anchor';
 
 function classificationLabel(value: string): string {
   return value.replaceAll('_', ' ');
@@ -272,14 +273,14 @@ function OrderRow({ row }: { row: ReviewOrderRow }) {
           </p>
           <div className="flex flex-wrap justify-end gap-2">
             {row.gmailHref && (
-              <a
+              <GmailAnchor
                 href={row.gmailHref}
                 target="_blank"
                 rel="noreferrer"
                 className={buttonVariants({ variant: 'ghost', size: 'sm' })}
               >
                 Gmail
-              </a>
+              </GmailAnchor>
             )}
             <Link
               href={`/shopping/orders/${row.orderId}`}
@@ -368,14 +369,14 @@ function EmailRow({
             </Link>
           )}
           {row.gmailHref && (
-            <a
+            <GmailAnchor
               href={row.gmailHref}
               target="_blank"
               rel="noreferrer"
               className={buttonVariants({ variant: 'secondary', size: 'sm' })}
             >
               Open in Gmail
-            </a>
+            </GmailAnchor>
           )}
           <DismissEmailButton messageId={row.messageId} />
           <ExcludeSenderButton
