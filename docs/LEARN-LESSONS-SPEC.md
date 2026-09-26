@@ -387,7 +387,9 @@ Each step ships on its own.
    as Practice Flow chooses it and shown after the second card; Start writes
    the track and its curriculum, and Not now and Never go through Practice
    Flow's own action. "Make this a track" on a section card makes the article a
-   track with a curriculum, and the top-up lays out its first unit.
+   track with a curriculum, and the top-up lays out its first unit. The offer,
+   and a resting track offered back, later moved out of the feed onto Tracks
+   (note 8a1789df), at the top of the page.
 3. **Units written as you go.** Built (plan #969). New tracks start with three
    or four units, and a unit is added when a track runs short.
 4. **Too hard adds a prerequisite.** Built (plan #970). The top-up adds what

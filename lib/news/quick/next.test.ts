@@ -5,6 +5,7 @@ import {
   nextCard,
   quickHref,
   quickPage,
+  quickProgress,
   quickTopics,
   type QuickIssue,
   type StoryPass,
@@ -336,5 +337,44 @@ describe('quickPage', () => {
     ];
     expect(quickPage([older], senders, passes)).toEqual([]);
     expect(quickPage([], senders, [])).toEqual([]);
+  });
+});
+
+describe('quickProgress', () => {
+  it('counts the stories Quick read could show, and how many were passed', () => {
+    expect(quickProgress([older, newer], senders, [])).toEqual({ read: 0, total: 4 });
+    expect(
+      quickProgress([older, newer], senders, [
+        { issueId: 'old', storyIndex: 0 },
+        { issueId: 'new', storyIndex: 1 },
+      ]),
+    ).toEqual({ read: 2, total: 4 });
+  });
+
+  it('leaves out muted senders and hidden topics, and narrows to a topic', () => {
+    const tagged = (headline: string, topic: string) => ({ ...story(headline), topic });
+    const mixed = issue('mix', 's1', '2026-09-22T09:00:00Z', {
+      stories: [tagged('mix-0', 'Politics'), tagged('mix-1', 'Sport')],
+    });
+    const hush = issue('hush', 's3', '2026-09-23T09:00:00Z', { stories: [tagged('h', 'Sport')] });
+    expect(quickProgress([mixed, hush], senders, [])).toEqual({ read: 0, total: 2 });
+    expect(quickProgress([mixed, hush], senders, [], { hidden: ['Sport'] })).toEqual({
+      read: 0,
+      total: 1,
+    });
+    expect(
+      quickProgress([mixed, hush], senders, [{ issueId: 'mix', storyIndex: 1 }], { topic: 'Sport' }),
+    ).toEqual({ read: 1, total: 1 });
+  });
+
+  it('counts one event run by several newsletters once, read when any telling was passed', () => {
+    const groups = [
+      { issueId: 'old', storyIndex: 0, groupId: 'g' },
+      { issueId: 'new', storyIndex: 0, groupId: 'g' },
+    ];
+    expect(quickProgress([older, newer], senders, [], {}, groups)).toEqual({ read: 0, total: 3 });
+    expect(
+      quickProgress([older, newer], senders, [{ issueId: 'new', storyIndex: 0 }], {}, groups),
+    ).toEqual({ read: 1, total: 3 });
   });
 });

@@ -12,9 +12,8 @@ import { clockTime, embedUrl } from '@/lib/learn/youtube/format';
  *
  * The no-cookie embed `embedUrl` builds, so nothing is set by YouTube until
  * the video is played. `deferred` shows a button in the player's place and
- * loads the iframe only when it is pressed. Learn now uses it because a deck
- * preloads the cards behind the one on screen, and an iframe each would load
- * a YouTube player for every card nobody watches.
+ * loads the iframe only when it is pressed, for a page that would otherwise
+ * load a player for every clip on it.
  */
 export function ClipPlayer({
   videoId,
