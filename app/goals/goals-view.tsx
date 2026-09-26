@@ -188,6 +188,7 @@ function AreaSection({
 
   const goalCount = area.goals.length;
   const items: ActionMenuItem[] = [
+    { id: 'open', label: 'Open the area', href: `/goals/area/${area.id}` },
     ...moveItems(menuAction(moveAreaAction), area.id, index, count),
     {
       id: 'archive',
@@ -232,7 +233,7 @@ function AreaSection({
           maxLength={AREA_NOTE_MAX}
           defaultValue={area.note ?? ''}
           key={`note-${area.note ?? ''}`}
-          placeholder="What you want from this, in a sentence"
+          placeholder="What you want from this area, in a sentence"
           aria-label={`What you want from ${area.name}`}
           disabled={savingNote}
           onBlur={commitOnBlur(area.note ?? '')}
@@ -426,7 +427,7 @@ function SettleProposedGoal({
 }
 
 /** Approve every goal Claude proposed in the area at once. */
-function ApproveArea({ areaId, count }: { areaId: string; count: number }) {
+export function ApproveArea({ areaId, count }: { areaId: string; count: number }) {
   const [state, approve, approving] = useActionState(approveAreaAction, initial);
   return (
     <form action={approve} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
@@ -479,7 +480,7 @@ function GoalComposer({ areaId, areaName }: { areaId: string; areaName: string }
             required
             autoFocus
             maxLength={GOAL_TITLE_MAX}
-            placeholder="A goal, such as pay off the credit cards"
+            placeholder="A goal: an outcome that ends, such as pay off the credit cards"
             aria-label={`New goal in ${areaName}`}
           />
           {vague ? (
@@ -554,7 +555,7 @@ function AreaComposer() {
             required
             autoFocus
             maxLength={AREA_NAME_MAX}
-            placeholder="An area, such as money or the city"
+            placeholder="An area: a direction that never finishes, such as Career or The city"
             aria-label="New area"
           />
         </div>

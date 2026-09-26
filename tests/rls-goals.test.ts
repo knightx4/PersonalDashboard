@@ -1669,6 +1669,41 @@ describe('phases close themselves (0040)', () => {
   });
 });
 
+describe('a goal is an outcome, not a practice (0041)', () => {
+  function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  it('refuses a practice from Claude as a goal title or done-when', async () => {
+    await expect(
+      asClaude((tx) => tx`
+        insert into items (user_id, level, area_id, title, status)
+        values (${userA}, 'goal', ${areaA}, 'Go to one urbanism event a week', 'proposed')`),
+    ).rejects.toThrow(/outcome, not a practice/);
+    await expect(
+      asClaude((tx) => tx`
+        insert into items (user_id, level, area_id, title, acceptance, status)
+        values (${userA}, 'goal', ${areaA}, 'Know ten people in the scene', 'Kept for eight of the last ten weeks', 'proposed')`),
+    ).rejects.toThrow(/outcome, not a practice/);
+  });
+
+  it('lets Claude propose an outcome, with the practice inside it as a rhythm', async () => {
+    const [goal] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title, acceptance, status)
+      values (${userA}, 'goal', ${areaA}, 'Know ten people in the scene by name',
+              'Ten people in housing or transit would recognise you.', 'proposed')
+      returning id`);
+    const [rhythm] = await asClaude((tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, rhythm_count, rhythm_period, status)
+      values (${userA}, 'step', ${goal.id}, 'rhythm', 'Attend one urbanism event a week', 1, 'week', 'proposed')
+      returning id`);
+    expect(rhythm.id).toBeTruthy();
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`

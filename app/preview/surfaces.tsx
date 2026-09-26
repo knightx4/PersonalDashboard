@@ -1890,9 +1890,10 @@ const savedStories: SavedViewProps = {
   ],
 };
 
-/** The job search's ten sections, as its layout lists them. */
+/** The job search's eleven sections, as its layout lists them. */
 const shellSections: NavSection[] = [
   { href: '/jobs/today', label: 'This week', icon: 'week' },
+  { href: '/jobs/thoughts', label: 'Career goals', icon: 'careerGoals' },
   { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
   { href: '/jobs/roles', label: 'Roles', icon: 'roles' },
   { href: '/jobs/companies', label: 'Companies', icon: 'companies' },

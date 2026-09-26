@@ -27,6 +27,9 @@ const NO_RUNS: Record<string, StepRunView> = {};
  *
  * One card: a heading with the plan's count of steps by state and its banded
  * bar, the column header, and a row per step from the plan's shared tree.
+ * A goal whose top-level steps have steps of their own is drawn in stages
+ * instead: the heading card with the count and bar, then a card per stage,
+ * labelled Stage 1 of N, so a long map reads as its parts.
  * Steps from other goals that count towards this one follow in a second card,
  * which has no column header of its own since its columns line up with the
  * first, and each row names the goal it comes from under its title.
@@ -90,6 +93,12 @@ export function StepTree({
   }, [map, todoOn, showAside, unfolded, opened, informationSeam, runs]);
 
   const substeps = own.rows.filter((row) => row.kind !== 'decision');
+  // A goal whose top-level steps hold steps of their own is laid out in
+  // stages: one card each, in order, so the path reads as its parts. Top-level
+  // steps with nothing under them go in a last card of their own.
+  const stages = own.rows.filter((row) => row.children.length > 0);
+  const loose = own.rows.filter((row) => row.children.length === 0);
+  const staged = stages.length >= 2;
 
   return (
     <div className="space-y-6">
@@ -109,25 +118,62 @@ export function StepTree({
                 <Progress label={map.goal.title} progress={own.progress} bands={own.bands} />
               </span>
             </div>
-            <ul className="divide-y divide-border">
-              <ColumnHeader priority="When" />
-              {own.rows.map((row) => (
-                <GoalRow
-                  key={row.id}
-                  node={row}
-                  trail={[]}
-                  context={context}
-                  index={substeps.indexOf(row)}
-                  count={substeps.length}
-                />
-              ))}
-            </ul>
+            {!staged && (
+              <ul className="divide-y divide-border">
+                <ColumnHeader priority="When" />
+                {own.rows.map((row) => (
+                  <GoalRow
+                    key={row.id}
+                    node={row}
+                    trail={[]}
+                    context={context}
+                    index={substeps.indexOf(row)}
+                    count={substeps.length}
+                  />
+                ))}
+              </ul>
+            )}
             {/* Inside the card, under a rule, as the plan's "Add a step" sits
                 at the foot of a module (plan #983), on the same py-1.5 line as
                 every other add line on the page. */}
-            <div className="border-t border-border px-3 py-1.5">
-              <StepComposer parentId={map.goal.id} label="Add a step" bare />
+            {!staged && (
+              <div className="border-t border-border px-3 py-1.5">
+                <StepComposer parentId={map.goal.id} label="Add a step" bare />
+              </div>
+            )}
+          </div>
+        )}
+        {staged &&
+          [...stages, ...(loose.length > 0 ? [null] : [])].map((stage, i) => (
+            <div key={stage?.id ?? 'loose'} className="space-y-1">
+              <h3 className="px-1 text-small font-semibold text-ink-muted">
+                {stage ? `Stage ${i + 1} of ${stages.length}` : 'Other steps'}
+              </h3>
+              <div className={cn(cardVariants({ padding: 'none' }), 'overflow-hidden')}>
+                <ul className="divide-y divide-border">
+                  {i === 0 && <ColumnHeader priority="When" />}
+                  {(stage ? [stage] : loose).map((row) => (
+                    <GoalRow
+                      key={row.id}
+                      node={row}
+                      trail={[]}
+                      context={context}
+                      index={substeps.indexOf(row)}
+                      count={substeps.length}
+                    />
+                  ))}
+                </ul>
+                {!stage && (
+                  <div className="border-t border-border px-3 py-1.5">
+                    <StepComposer parentId={map.goal.id} label="Add a step" bare />
+                  </div>
+                )}
+              </div>
             </div>
+          ))}
+        {staged && loose.length === 0 && (
+          <div className="px-1">
+            <StepComposer parentId={map.goal.id} label="Add a stage or a step" />
           </div>
         )}
         {aside > 0 && (

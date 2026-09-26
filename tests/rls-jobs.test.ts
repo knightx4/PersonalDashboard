@@ -193,6 +193,12 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.quiet_dismissals = quiet.id;
 
+  const [thought] = await admin<{ id: string }[]>`
+    insert into thoughts (user_id, body)
+    values (${userId}, ${`${tag} wants a finance systems role`})
+    returning id`;
+  ids.thoughts = thought.id;
+
   return ids;
 }
 
