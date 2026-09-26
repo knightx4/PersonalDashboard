@@ -121,6 +121,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // is a press; the sweep reads the rest a chunk at a time in the background.
   'map-note': run(HAIKU, 20_000, 3_000),
   'embed-map': unit(VOYAGE_LITE, 1_000, 0),
+  'embed-notes': background(unit(VOYAGE_LITE, 1_500, 0)),
   'map-sweep': background(unit(HAIKU, 4_000, 400)),
   'propose-theme-merges': background(unit(HAIKU, 8_000, 300)),
   'propose-position-merges': background(unit(HAIKU, 9_000, 300)),

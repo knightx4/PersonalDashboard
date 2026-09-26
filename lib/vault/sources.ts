@@ -57,6 +57,7 @@ export const vaultSources: ModuleSources = {
     { table: 'obsidian.map_merges', reason: 'Map upkeep: merges applied.' },
     { table: 'obsidian.map_sweep_notes', reason: 'Map upkeep: which notes a sweep read.' },
     { table: 'obsidian.map_sweeps', reason: 'Map upkeep.' },
+    { table: 'obsidian.note_embeddings', reason: 'A vector per note for matching by subject; read through notes.' },
     { table: 'obsidian.position_edges', reason: 'Links between positions; read through positions.' },
     { table: 'obsidian.position_link_pairs', reason: 'Map upkeep: candidate links.' },
     { table: 'obsidian.position_link_scans', reason: 'Map upkeep.' },
