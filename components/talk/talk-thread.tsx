@@ -69,6 +69,7 @@ export function TalkThread({
   placeholder,
   waiting = 'Dash is replying…',
   closed,
+  hint,
 }: {
   /** Unique on the page: the textarea's id is built from it. */
   id: string;
@@ -85,6 +86,8 @@ export function TalkThread({
    * after three replies (plan #1060). Left out, the thread never closes.
    */
   closed?: (turns: readonly TalkTurn[]) => string | null;
+  /** Beside the button that opens the box: the $ hint for what a reply costs. */
+  hint?: React.ReactNode;
 }) {
   const [turns, setTurns] = useState<TalkTurn[]>([...initial]);
   const [writing, setWriting] = useState(false);
@@ -152,7 +155,10 @@ export function TalkThread({
       {ended ? (
         <p className="text-ui text-ink-muted">{ended}</p>
       ) : !writing ? (
-        <AddTrigger label={label} onClick={() => setWriting(true)} disabled={sending} />
+        <div className="flex items-center gap-1">
+          <AddTrigger label={label} onClick={() => setWriting(true)} disabled={sending} />
+          {hint}
+        </div>
       ) : (
         <form
           ref={form}
