@@ -51,6 +51,7 @@ import {
 } from './actions';
 import { markMentions } from '@/lib/learn/feed/mentions';
 import { Mentioned, PhraseExplainer, usePhraseExplainer } from './phrase-explainer';
+import { TeachBackCard } from './teach-back-card';
 
 /**
  * The Learn now deck (LEARN-NOW-SPEC, "Cards after the first week").
@@ -73,7 +74,8 @@ import { Mentioned, PhraseExplainer, usePhraseExplainer } from './phrase-explain
  * Track offers, a theme from your notes (plan #968) or a track you have left
  * alone (plan #1045), are on Tracks rather than in the deck (note 8a1789df).
  *
- * A unit check (plan #971) has no swipes either: it is answered or skipped.
+ * A unit check (plan #971) has no swipes either: it is answered or skipped,
+ * and so is a teach-back (plan #1054, ./teach-back-card.tsx).
  */
 
 const SWIPE_X = 90;
@@ -187,7 +189,10 @@ export function LearnNowFeed({
       .catch(() => setError('Not interested was not recorded. Check your connection.'));
   }, [advance, current]);
 
-  /** Skip on a unit check: it goes as Not interested does, and the unit stays done. */
+  /**
+   * Skip on a unit check or a teach-back: it goes as Not interested does. The
+   * unit stays done, and the idea keeps its state.
+   */
   const skipCheck = useCallback(() => {
     if (!current) return;
     const id = current.id;
@@ -195,9 +200,9 @@ export function LearnNowFeed({
     advance(id);
     void dismissCard(id)
       .then((result) => {
-        if (result.error) setError(`Skipping that check was not recorded: ${result.error}`);
+        if (result.error) setError(`Skipping that card was not recorded: ${result.error}`);
       })
-      .catch(() => setError('Skipping that check was not recorded. Check your connection.'));
+      .catch(() => setError('Skipping that card was not recorded. Check your connection.'));
   }, [advance, current]);
 
   // The arrow keys, away from anything you are typing in.
@@ -215,8 +220,9 @@ export function LearnNowFeed({
             : event.key === 'ArrowLeft'
               ? 'skipped'
               : null;
-      // A unit check has no swipes; its buttons are the only way past.
-      if (!swipeAs || !current || current.kind === 'check') return;
+      // A unit check and a teach-back have no swipes; their buttons are the
+      // only way past.
+      if (!swipeAs || !current || current.kind === 'check' || current.kind === 'teach') return;
       event.preventDefault();
       swipe(swipeAs);
     };
@@ -251,6 +257,13 @@ export function LearnNowFeed({
           </p>
           {current.kind === 'check' ? (
             <UnitCheckCard
+              key={current.id}
+              card={current}
+              onSkip={skipCheck}
+              onNext={() => advance(current.id)}
+            />
+          ) : current.kind === 'teach' ? (
+            <TeachBackCard
               key={current.id}
               card={current}
               onSkip={skipCheck}

@@ -188,8 +188,9 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
           )
           .eq('user_id', userId)
           // Lessons are drawn by the tracks, not by themes, fields or goals,
-          // so they neither use up a target nor set how deep a pick goes.
-          .neq('reason', 'lesson')
+          // so they neither use up a target nor set how deep a pick goes. A
+          // teach-back (plan #1054) is an idea already dealt, asked again.
+          .not('reason', 'in', '(lesson,teach_back)')
           .order('created_at', { ascending: false })
           .range(from, to),
       'your cards',

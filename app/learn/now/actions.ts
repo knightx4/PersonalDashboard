@@ -43,6 +43,18 @@ import { replyAbout } from '@/lib/talk/reply';
 import { makeAskedCard } from '@/inngest/learn/asked-card';
 import { checkedPhrase, EXPLAIN_MODEL, explainPhraseOnCard, phraseOnCard } from '@/lib/learn/feed/explain-phrase';
 import { loadExplanation, saveExplanation, setMadeCard, type StoredExplanation } from '@/lib/learn/feed/phrases-store';
+import { markExplanation, markFollowUp, TEACH_BACK_MODEL, type TeachBackIdea } from '@/lib/learn/feed/mark-teach-back';
+import {
+  explanationReply,
+  followUpReply,
+  isTeachBackRate,
+  parseTeachBack,
+  teachBackState,
+  teachBackView,
+  type TeachBackRecord,
+  type TeachBackView,
+} from '@/lib/learn/feed/teach-back';
+import { recordTeachBackProbe, saveTeachBackEvery, settleTeachBackState } from '@/lib/learn/feed/teach-back-store';
 
 /**
  * The Learn now feed's actions (plan #808).
@@ -693,4 +705,179 @@ export async function answerRestingTrack(
 
   if (answer.data === 'picked_up') after(() => topUpFeedAfterResponse(user.id));
   return {};
+}
+
+export type TeachBackResult = {
+  turns?: TalkTurn[];
+  error?: string;
+  /** Where the card has got to after this answer. */
+  teach?: TeachBackView;
+};
+
+type TeachRow = {
+  reason: string;
+  status: string;
+  concept_id: string | null;
+  idea_name: string | null;
+  hook: string | null;
+  summary: string | null;
+  teach_back: unknown;
+};
+
+/**
+ * Answer a teach-back (plan #1054). The first answer is the explanation:
+ * Haiku marks it against the idea's claim and basis for what was right, what
+ * was missing and whether it had an example of its own, and writes one
+ * follow-up question. The second answer is to that question, and is marked
+ * too. Both are kept in the card's conversation, the marks on the card, and
+ * each answer as a question at the defence rung on the idea's own page.
+ *
+ * The idea's state follows #1055, teach-back is the defence rung: an
+ * explanation that does not hold leaves it shaky, one that holds makes it
+ * known, and holding through the follow-up makes it sharp.
+ */
+// latency: pending
+export async function explainBack(id: string, body: string): Promise<TeachBackResult> {
+  const user = await requireUser();
+  const card = CardId.safeParse(id);
+  if (!card.success) return { error: 'Could not tell which card that was.' };
+  const checked = turnBody(body);
+  if ('error' in checked) return { error: checked.error };
+
+  const supabase = await createLearnClient();
+  const { data, error } = await supabase
+    .from('feed_cards')
+    .select('reason, status, concept_id, idea_name, hook, summary, teach_back')
+    .eq('id', card.data)
+    .maybeSingle();
+  if (error) return { error: `Reading that card failed: ${error.message}` };
+  const row = data as TeachRow | null;
+  if (!row || row.reason !== 'teach_back' || !row.concept_id || !row.idea_name || !row.hook) {
+    return { error: 'That card is no longer there.' };
+  }
+  const conceptId = row.concept_id;
+  const record = parseTeachBack(row.teach_back);
+  if (record?.stage === 'done') return { error: 'That one has been marked already.' };
+
+  const { data: conceptRow, error: conceptError } = await supabase
+    .from('concepts')
+    .select('name, claim, basis')
+    .eq('id', conceptId)
+    .maybeSingle();
+  if (conceptError) return { error: `Reading the idea failed: ${conceptError.message}` };
+  if (!conceptRow) return { error: 'The idea this card asks about is no longer there.' };
+  const idea = conceptRow as TeachBackIdea;
+
+  const core = await createCoreClient();
+  const subject: TalkSubject = { kind: 'feed_card', ref: card.data, title: row.idea_name };
+  let asked: TalkTurn[];
+  try {
+    asked = await appendTurns(core, user.id, subject, [{ role: 'user', body: checked.body }]);
+  } catch (caught) {
+    return { error: caught instanceof Error ? caught.message : 'Keeping your answer failed.' };
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { turns: asked, error: 'Marking needs ANTHROPIC_API_KEY to be set.' };
+
+  const spend = collectSpend();
+  let next: TeachBackRecord;
+  let reply: string;
+  try {
+    if (!record) {
+      const marked = await markExplanation({
+        idea,
+        prompt: row.hook,
+        response: checked.body,
+        anthropicApiKey: apiKey,
+        onSpend: spend.sink,
+      });
+      await recordLearnSpend(user.id, 'mark-teach-back', spend.reports);
+      if (!marked.ok) return { turns: asked, error: `Marking failed: ${marked.detail}` };
+      next = {
+        stage: 'follow_up',
+        explanation: checked.body,
+        explained: marked.marking,
+        followUp: marked.followUp,
+        followUpExpected: marked.followUpExpected,
+        state: teachBackState(marked.marking.holds, null),
+      };
+      reply = explanationReply(marked.marking, marked.followUp);
+      await recordTeachBackProbe(supabase, user.id, {
+        conceptId,
+        question: row.hook,
+        expected: idea.claim,
+        response: checked.body,
+        marking: marked.marking,
+        model: TEACH_BACK_MODEL,
+      });
+    } else {
+      const marked = await markFollowUp({
+        idea,
+        explanation: record.explanation,
+        followUp: record.followUp,
+        expected: record.followUpExpected,
+        response: checked.body,
+        anthropicApiKey: apiKey,
+        onSpend: spend.sink,
+      });
+      await recordLearnSpend(user.id, 'mark-teach-back', spend.reports);
+      if (!marked.ok) return { turns: asked, error: `Marking failed: ${marked.detail}` };
+      const state = teachBackState(record.explained.holds, marked.marking.holds);
+      next = { ...record, stage: 'done', answered: marked.marking, state };
+      reply = followUpReply(marked.marking, idea.name, state);
+      await recordTeachBackProbe(supabase, user.id, {
+        conceptId,
+        question: record.followUp,
+        expected: record.followUpExpected,
+        response: checked.body,
+        marking: marked.marking,
+        model: TEACH_BACK_MODEL,
+      });
+    }
+
+    await settleTeachBackState(supabase, user.id, conceptId, next.state);
+    const done = next.stage === 'done';
+    const { error: saveError } = await supabase
+      .from('feed_cards')
+      .update({
+        teach_back: next,
+        // Answered through the follow-up, it is finished and never comes back.
+        ...(done ? { status: 'tested', acted_at: new Date().toISOString() } : {}),
+      })
+      .eq('id', card.data);
+    if (saveError) throw new Error(`Recording the marks failed: ${saveError.message}`);
+  } catch (caught) {
+    return { turns: asked, error: caught instanceof Error ? caught.message : 'Could not mark that.' };
+  }
+
+  const view = teachBackView(conceptId, idea.claim, next);
+  try {
+    const answered = await appendTurns(core, user.id, subject, [{ role: 'assistant', body: reply }]);
+    return { turns: [...asked, ...answered], teach: view };
+  } catch (caught) {
+    return {
+      turns: asked,
+      teach: view,
+      error: caught instanceof Error ? caught.message : 'Keeping the marks in the thread failed.',
+    };
+  }
+}
+
+/**
+ * How often the deck asks for a teach-back (plan #1054): one card in five,
+ * ten, twenty or forty, or never. Kept in learn.settings; the top-up reads it
+ * when it next runs.
+ */
+// latency: optimistic
+export async function setTeachBackEvery(every: number): Promise<CardActionResult> {
+  const user = await requireUser();
+  if (!isTeachBackRate(every)) return { error: 'That is not one of the choices.' };
+  const supabase = await createLearnClient();
+  try {
+    await saveTeachBackEvery(supabase, user.id, every);
+    return {};
+  } catch (caught) {
+    return { error: caught instanceof Error ? caught.message : 'Could not keep that.' };
+  }
 }

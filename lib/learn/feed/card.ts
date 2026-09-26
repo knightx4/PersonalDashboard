@@ -12,10 +12,11 @@
 import type { CardNote } from '@/lib/learn/notes/notes';
 import { keepMentions, type CardMention } from './mentions';
 import type { TalkTurn } from '@/lib/talk/talk';
+import { teachBackView, type TeachBackView } from './teach-back';
 
 export type FeedCardRow = {
   id: string;
-  reason: 'interest' | 'gap' | 'goal' | 'queued' | 'lesson' | 'unit_check' | 'asked';
+  reason: 'interest' | 'gap' | 'goal' | 'queued' | 'lesson' | 'unit_check' | 'asked' | 'teach_back';
   status: string;
   /** The idea's short name. Null on cards written before one idea per card. */
   idea_name?: string | null;
@@ -35,6 +36,8 @@ export type FeedCardRow = {
   check_answer?: string | null;
   /** The ideas the card mentions, as the writer stored them (plan #1056). */
   mentions?: unknown;
+  /** A teach-back's exchange once marked (plan #1054). Null until then. */
+  teach_back?: unknown;
   depth?: string | null;
   difficulty?: string | null;
   item: CatalogueItem | null;
@@ -53,13 +56,14 @@ type CatalogueSegment = { heading: string | null; text: string; section_anchor: 
 
 export type FeedCard = {
   id: string;
-  reason: 'interest' | 'gap' | 'goal' | 'lesson' | 'unit_check' | 'asked';
+  reason: 'interest' | 'gap' | 'goal' | 'lesson' | 'unit_check' | 'asked' | 'teach_back';
   /**
    * A section card, made from a Wikipedia section, a lesson written for a
-   * concept in one of your tracks (LEARN-LESSONS-SPEC; plan #978), or the
-   * optional check on a unit you have finished (plan #971).
+   * concept in one of your tracks (LEARN-LESSONS-SPEC; plan #978), the
+   * optional check on a unit you have finished (plan #971), or an idea you
+   * kept, to explain back (plan #1054).
    */
-  kind: 'section' | 'lesson' | 'check';
+  kind: 'section' | 'lesson' | 'check' | 'teach';
   /**
    * The idea's name, or "Article: Section" on a card written before ideas. A
    * lesson's is its concept's name.
@@ -128,6 +132,10 @@ export type FeedCard = {
    * none.
    */
   conversation?: TalkTurn[];
+  /** Where a teach-back has got to (plan #1054). Only on a teach card. */
+  teach?: TeachBackView;
+  /** How often teach-backs come, for the setting on a teach card. Attached at load. */
+  teachEvery?: number;
 };
 
 /** A clip shown on a card: the video, and the span of it that matched. */
@@ -254,6 +262,7 @@ export function toFeedCard(row: FeedCardRow): FeedCard | null {
   if (row.reason === 'queued') return null;
   if (row.reason === 'lesson') return toLessonCard(row);
   if (row.reason === 'unit_check') return toCheckCard(row);
+  if (row.reason === 'teach_back') return toTeachCard(row);
   if (!row.item || !row.segment || !row.summary || !row.why) return null;
   const { shown, rest, restMinutes } = splitForReading(row.segment.text);
   return {
@@ -375,6 +384,46 @@ function toCheckCard(row: FeedCardRow): FeedCard | null {
     link: null,
     site: null,
     licence: null,
+  };
+}
+
+/**
+ * A teach-back (plan #1054): titled by the idea, with when it was kept above
+ * it and the question as its hook. The idea's claim is the answer, so the
+ * card carries it only once the exchange is over, as a unit check keeps its
+ * expected answer back.
+ */
+function toTeachCard(row: FeedCardRow): FeedCard | null {
+  const title = row.idea_name?.trim();
+  const question = row.hook?.trim();
+  if (!title || !question || !row.why || !row.concept_id) return null;
+  return {
+    id: row.id,
+    reason: 'teach_back',
+    kind: 'teach',
+    title,
+    source: null,
+    track: null,
+    article: '',
+    section: null,
+    why: row.why,
+    takeaway: null,
+    context: row.context?.trim() || null,
+    hook: question,
+    summary: '',
+    example: null,
+    question,
+    answer: null,
+    depth: null,
+    difficulty: null,
+    returning: row.status === 'review' || row.status === 'skipped' ? row.status : null,
+    shown: [],
+    rest: [],
+    restMinutes: 0,
+    link: null,
+    site: null,
+    licence: null,
+    teach: teachBackView(row.concept_id, row.summary?.trim() || null, row.teach_back ?? null),
   };
 }
 

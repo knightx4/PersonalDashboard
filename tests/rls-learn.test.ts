@@ -130,6 +130,7 @@ describe('RLS coverage', () => {
       'quiz_sources',
       'quizzes',
       'readings',
+      'settings',
       'sources',
       'subjects',
       'theme_fields',
@@ -1309,6 +1310,69 @@ describe('phrases explained on cards', () => {
     await admin`delete from feed_cards where id = ${cardA}`;
     const left = await admin`select id from phrase_explanations where id = ${rowA}`;
     expect(left).toHaveLength(0);
+  });
+});
+
+describe('teach-backs and Learn settings', () => {
+  // 0064_teach_back.sql (plan #1054). A teach-back is a card about an idea
+  // already kept, with no section; learn.settings holds how often they come.
+  let conceptA = '';
+
+  beforeAll(async () => {
+    const [subject] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Teach-back subject') returning id`;
+    const [concept] = await admin<{ id: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis)
+      values (${userA}, ${subject.id}, 'Tree search', 'Searching ahead beats judging a position alone.',
+              'Written by hand for this test.')
+      returning id`;
+    conceptA = concept.id;
+    await asUser(userA, (tx) => tx`insert into settings (user_id, teach_back_every) values (${userA}, 20)`);
+  });
+
+  it('takes a teach-back card with an idea and no section', async () => {
+    const [card] = await admin<{ id: string }[]>`
+      insert into feed_cards (user_id, reason, status, concept_id, idea_name, summary, why, context, hook)
+      values (${userA}, 'teach_back', 'ready', ${conceptA}, 'Tree search', 'claim', 'why', 'context', 'Explain it')
+      returning id`;
+    await admin`update feed_cards set teach_back = '{"stage": "follow_up"}'::jsonb where id = ${card.id}`;
+    const [row] = await admin<{ teach_back: { stage: string } }[]>`
+      select teach_back from feed_cards where id = ${card.id}`;
+    expect(row.teach_back.stage).toBe('follow_up');
+  });
+
+  it('refuses a teach-back with no idea, and teach-back marks on any other card', async () => {
+    await expect(
+      admin`insert into feed_cards (user_id, reason, status, idea_name, summary, why, context, hook)
+            values (${userA}, 'teach_back', 'ready', 'Tree search', 'claim', 'why', 'context', 'Explain it')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into feed_cards (user_id, reason, reading_id, teach_back)
+            values (${userA}, 'queued', null, '{}'::jsonb)`,
+    ).rejects.toThrow();
+  });
+
+  it('shows the owner their settings and another user none', async () => {
+    const own = await asUser(userA, (tx) => tx`select teach_back_every from settings`);
+    const other = await asUser(userB, (tx) => tx`select teach_back_every from settings`);
+    expect(own.map((r) => r.teach_back_every)).toEqual([20]);
+    expect(other).toHaveLength(0);
+  });
+
+  it("does not let a user write another account's settings", async () => {
+    await expect(
+      asUser(userB, (tx) => tx`insert into settings (user_id, teach_back_every) values (${userA}, 5)`),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`update settings set teach_back_every = 0`);
+    const [row] = await admin<{ teach_back_every: number }[]>`
+      select teach_back_every from settings where user_id = ${userA}`;
+    expect(row.teach_back_every).toBe(20);
+  });
+
+  it('refuses a rate of one in one', async () => {
+    await expect(
+      asUser(userA, (tx) => tx`update settings set teach_back_every = 1`),
+    ).rejects.toThrow();
   });
 });
 

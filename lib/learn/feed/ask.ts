@@ -7,13 +7,15 @@ import { cardTitle, type FeedCardRow } from './card';
  * A section card's passage is its catalogue section; a lesson's is the
  * section it cites, when one was close enough to its claim. A unit check has
  * nothing to ask about here, since its expected answer stays on the server
- * until the check is answered, and a queued reading is not a card.
+ * until the check is answered, and a queued reading is not a card. A
+ * teach-back has neither: its conversation is the explanation being marked,
+ * and its claim is the answer (plan #1054).
  */
 
 export type CardMaterial = { title: string; text: string };
 
 export function cardMaterial(row: FeedCardRow): CardMaterial | null {
-  if (row.reason === 'queued' || row.reason === 'unit_check') return null;
+  if (row.reason === 'queued' || row.reason === 'unit_check' || row.reason === 'teach_back') return null;
 
   const lesson = row.reason === 'lesson';
   const item = lesson ? (row.source_item ?? null) : row.item;

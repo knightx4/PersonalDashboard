@@ -183,6 +183,10 @@ export const LEARN_OPERATIONS = [
   // as 'write-feed-card', made on the press while the person waits rather
   // than by the top-up, so what asked-for cards cost can be read on its own.
   'write-asked-card',
+  // Marking a teach-back on a Learn now card (plan #1054): the explanation,
+  // which also writes the one follow-up question, and then the answer to the
+  // follow-up. One Haiku call for each.
+  'mark-teach-back',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
