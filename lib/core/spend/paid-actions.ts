@@ -57,6 +57,7 @@ export const PAID_ACTIONS = {
   ],
   'app/learn/now/actions.ts#makeTrackOfCard': ['place-track', 'write-curriculum'],
   'app/learn/now/actions.ts#answerUnitCheck': ['mark-unit-check'],
+  'app/learn/now/actions.ts#askAboutCard': ['reply-about-card'],
 
   // Learn: questions
   'app/learn/s/[id]/probe/actions.ts#askQuestion': ['write-probe', 'write-applied-case'],

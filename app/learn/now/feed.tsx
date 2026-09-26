@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { CardNotes } from '@/components/learn/card-notes';
+import { TalkThread } from '@/components/talk/talk-thread';
 import { ClipPlayer } from '@/components/learn/clip-player';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
@@ -40,6 +41,7 @@ import {
   addCardNote,
   answerRestingTrack,
   answerUnitCheck,
+  askAboutCard,
   deleteCardNote,
   dismissCard,
   loadMoreCards,
@@ -613,6 +615,24 @@ function DeckCard({
             remove={deleteCardNote}
             className="mt-4"
           />
+
+          {/* Ask about this card (plan #1052): a saved conversation with Dash,
+              answered from the card and the passage it was written from. */}
+          <section className="mt-4">
+            <TalkThread
+              id={`ask-${card.id}`}
+              turns={card.conversation ?? []}
+              send={(body) => askAboutCard(card.id, body)}
+              label="Ask about this card"
+              placeholder="What would you like to know?"
+              hint={
+                <PaidHint
+                  action="app/learn/now/actions.ts#askAboutCard"
+                  what="Cost of an answer"
+                />
+              }
+            />
+          </section>
 
           {/* The source's own text, folded: the card above is what to read
               first, and this is there for when you want the whole section.

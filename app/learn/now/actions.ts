@@ -34,6 +34,11 @@ import { markUnitCheck } from '@/lib/learn/lessons/write-unit-check';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { SAVED_FROM_FEED, saveFeedSection } from '@/lib/learn/tracks/save';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { cardMaterial, CARD_REPLY_GUIDANCE } from '@/lib/learn/feed/ask';
+import { turnBody, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
+import { appendTurns, loadConversation } from '@/lib/talk/store';
+import { replyAbout } from '@/lib/talk/reply';
 
 /**
  * The Learn now feed's actions (plan #808).
@@ -330,6 +335,65 @@ export async function makeTrackOfCard(id: string): Promise<NewTrackResult> {
   }
   after(() => topUpFeedAfterResponse(user.id));
   return { track: { id: made.subjectId, name: made.name, units: made.units } };
+}
+
+export type AskResult = { turns?: TalkTurn[]; error?: string };
+
+/**
+ * Ask about this card (plan #1052). The question is kept before Dash is asked,
+ * so a failed reply or a closed tab leaves it in the thread; the reply is kept
+ * when it comes. Dash is given the card's own text and the passage it was
+ * written from, and told to say when a question goes past them.
+ */
+// latency: pending
+export async function askAboutCard(id: string, question: string): Promise<AskResult> {
+  const user = await requireUser();
+  const card = CardId.safeParse(id);
+  if (!card.success) return { error: 'Could not tell which card that was.' };
+  const checked = turnBody(question);
+  if ('error' in checked) return { error: checked.error };
+
+  const supabase = await createLearnClient();
+  const row = await loadFeedCardRow(supabase, card.data).catch(() => null);
+  const material = row ? cardMaterial(row) : null;
+  if (!material) return { error: 'That card is no longer there.' };
+
+  const core = await createCoreClient();
+  const subject: TalkSubject = { kind: 'feed_card', ref: card.data, title: material.title };
+  let earlier: TalkTurn[];
+  let asked: TalkTurn[];
+  try {
+    earlier = await loadConversation(core, subject);
+    asked = await appendTurns(core, user.id, subject, [{ role: 'user', body: checked.body }]);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Keeping your question failed.' };
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { turns: asked, error: 'Answering needs ANTHROPIC_API_KEY to be set.' };
+
+  const spend = collectSpend();
+  const reply = await replyAbout({
+    subject: { kind: 'feed_card', title: material.title, material: material.text },
+    turns: [...earlier, ...asked],
+    guidance: CARD_REPLY_GUIDANCE,
+    anthropicApiKey: apiKey,
+    onSpend: spend.sink,
+  });
+  await recordLearnSpend(user.id, 'reply-about-card', spend.reports);
+  if (!reply.ok) return { turns: asked, error: `Dash could not answer: ${reply.detail}` };
+
+  try {
+    const answered = await appendTurns(core, user.id, subject, [
+      { role: 'assistant', body: reply.reply },
+    ]);
+    return { turns: [...asked, ...answered] };
+  } catch (error) {
+    return {
+      turns: asked,
+      error: error instanceof Error ? error.message : 'Keeping the answer failed.',
+    };
+  }
 }
 
 export type UnitCheckResult = {
