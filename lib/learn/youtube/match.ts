@@ -23,10 +23,13 @@ const EMBED_BATCH = 128;
 
 /**
  * How close a video's title and description has to be to one of your ideas
- * to be worth a credit. A starting point: set before any video had a vector,
- * so it is checked against the first matches and moved if they read wrong.
+ * to be worth a credit. Set at 0.45 before any video had a vector, then raised
+ * after the first run on 26 September 2026: of the 28 picks between 0.45 and
+ * 0.50 about two thirds were unrelated (Hooke's law for a muscle protein, plate
+ * tectonics for settlement mounds, mythology outtakes for a founder story),
+ * against about one in eight above 0.50.
  */
-export const MATCH_MIN_SIMILARITY = 0.45;
+export const MATCH_MIN_SIMILARITY = 0.5;
 
 /** Nearest videos kept per idea before the transcribed ones are dropped. */
 export const MATCH_PER_CONCEPT = 3;
