@@ -9,9 +9,11 @@ import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { RelatedNotes } from '@/components/vault/related-notes';
 import { cn } from '@/lib/cn';
 import { cardPasses, type QuickCard } from '@/lib/news/quick/next';
 import type { Reaction } from '@/lib/news/quick/reactions';
+import type { RelatedNoteLink } from '@/lib/vault/notes/related';
 import {
   ArticleLink,
   QuickDeck,
@@ -40,6 +42,11 @@ export type QuickReadViewProps = {
   saved?: boolean;
   /** The thumbs up or down already pressed on the card, if any. */
   reaction?: Reaction | null;
+  /**
+   * Your notes on the card's subject (plan #1113), usually a promise the page
+   * started and did not wait for. Left out or empty, nothing is drawn.
+   */
+  related?: RelatedNotesProp;
   /** Whether pictures load: on unless the reader turned them off with ?pictures=0. */
   pictures: boolean;
   picturesHref: string;
@@ -70,8 +77,12 @@ export type QuickPageStory = {
   saved: boolean;
   /** The thumbs up or down already pressed on it; left out, none. */
   reaction?: Reaction | null;
+  /** Your notes on its subject, as `related` on the card. */
+  related?: RelatedNotesProp;
   issueHref: string;
 };
+
+type RelatedNotesProp = readonly RelatedNoteLink[] | Promise<readonly RelatedNoteLink[]> | null;
 
 /**
  * What Quick read draws, split from the page so the preview gallery can render
@@ -85,6 +96,7 @@ export function QuickReadView({
   progress = null,
   saved = false,
   reaction = null,
+  related = null,
   pictures,
   picturesHref,
   issueHref,
@@ -198,6 +210,7 @@ export function QuickReadView({
               arrived={arrived}
               saved={saved}
               reaction={reaction}
+              related={related}
               pictures={pictures}
               issueHref={issueHref}
               topic={topic}
@@ -210,6 +223,7 @@ export function QuickReadView({
                 arrived={upNext.arrived}
                 saved={upNext.saved}
                 reaction={upNext.reaction ?? null}
+                related={upNext.related ?? null}
                 pictures={pictures}
                 issueHref={upNext.issueHref}
                 topic={topic}
@@ -251,6 +265,7 @@ function PhoneCard({
   arrived,
   saved,
   reaction,
+  related,
   pictures,
   issueHref,
   topic,
@@ -259,6 +274,7 @@ function PhoneCard({
   arrived: string | null;
   saved: boolean;
   reaction: Reaction | null;
+  related: RelatedNotesProp;
   pictures: boolean;
   issueHref: string | null;
   topic: string | null;
@@ -308,6 +324,7 @@ function PhoneCard({
                 </Link>
               )}
             </div>
+            <RelatedNotes notes={related} className="mt-4" />
           </div>
           <div className="card-pad-x flex flex-wrap items-center justify-between gap-3 border-t border-border py-3">
             <p className="text-ui text-ink-muted">
@@ -346,7 +363,7 @@ function PhoneCard({
  * counts as seen, and an essay, which has no article, links to its newsletter.
  */
 function gridStory(
-  { card, arrived, saved, reaction = null, issueHref }: QuickPageStory,
+  { card, arrived, saved, reaction = null, related = null, issueHref }: QuickPageStory,
   pictures: boolean,
 ): GridStory {
   const from = [card.from ?? 'Unknown sender', arrived].filter(Boolean).join(' · ');
@@ -386,6 +403,7 @@ function gridStory(
           className="mt-1.5"
         />
         <StoryText text={story.text} summary={story.summary} />
+        <RelatedNotes notes={related} className="mt-3" />
       </>
     ),
     actions: (
