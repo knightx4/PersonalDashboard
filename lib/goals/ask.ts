@@ -160,7 +160,7 @@ async function produceReply(input: GoalAskInput): Promise<GoalAskOutcome> {
             input.itemId,
           );
     // On the goal itself there is no one step to take: that is Work on this.
-    if (!located) return handToRoutine(input, history, 'You asked Claude to work on the goal.');
+    if (!located) return handToRoutine(input, history, 'You asked Dash to work on the goal.');
     return sendFromComment(input, commentMode(located.step));
   }
 
@@ -246,10 +246,10 @@ async function sendFromComment(
 
   const said =
     sent.job === 'prepare'
-      ? `Claude is preparing "${sent.title}" for you. What it writes will show on the step, which stays yours.`
+      ? `Dash is preparing "${sent.title}" for you. What it writes will show on the step, which stays yours.`
       : sent.job === 'phase'
-        ? `Claude is working on the phase "${sent.title}". What it produces will show on its steps.`
-        : `Claude is working on "${sent.title}". What it produces will show on the step when it is done.`;
+        ? `Dash is working on the phase "${sent.title}". What it produces will show on its steps.`
+        : `Dash is working on "${sent.title}". What it produces will show on the step when it is done.`;
   await say(input, said);
   return { ok: true, message: said };
 }
@@ -275,7 +275,7 @@ async function handToRoutine(
   const { lastRun } = await loadShaping(input.client, input.goalId);
   if (runInFlight(lastRun, Date.now())) {
     return refuse(
-      `${why} Claude is already working on this goal, and that run will not see this comment. ` +
+      `${why} Dash is already working on this goal, and that run will not see this comment. ` +
         'Ask again once it finishes.',
     );
   }
@@ -307,5 +307,5 @@ async function handToRoutine(
   });
   if (!started.ok) return refuse(`${why} I could not start the goals routine: ${started.error}`);
 
-  return { ok: true, message: 'Claude is working on this goal. Its reply lands in this thread.' };
+  return { ok: true, message: 'Dash is working on this goal. Its reply lands in this thread.' };
 }

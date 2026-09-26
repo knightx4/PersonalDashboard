@@ -125,7 +125,7 @@ function StepRunLine({ run, inset }: { run: StepRunView; inset: React.CSSPropert
       >
         <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-accent" aria-hidden />
         <span>
-          Claude is on this · {run.running} · {details}
+          Dash is on this · {run.running} · {details}
         </span>
       </li>
     );
@@ -378,12 +378,12 @@ export function GoalRow({
       ]
     : [];
   const sendable = offersSend(step);
-  const sendLabel = sendJob(step) === 'phase' ? 'Send this phase to Claude' : 'Send to Claude';
+  const sendLabel = sendJob(step) === 'phase' ? 'Send this phase to Dash' : 'Send to Dash';
   const sendItems: ActionMenuItem[] = sendable
     ? [{ id: 'send', label: sendLabel, formAction: sendAction, formFields: { id: step.id } }]
     : [];
   const preparable = offersPrepare(step);
-  const prepareLabel = step.result || step.resultUrl ? 'Prepare it again' : 'Ask Claude to prepare this';
+  const prepareLabel = step.result || step.resultUrl ? 'Prepare it again' : 'Ask Dash to prepare this';
   const prepareItems: ActionMenuItem[] = preparable
     ? [{ id: 'prepare', label: prepareLabel, formAction: prepareAction, formFields: { id: step.id } }]
     : [];

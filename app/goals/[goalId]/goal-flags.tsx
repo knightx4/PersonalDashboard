@@ -33,7 +33,7 @@ export function GoalFlags({ flags }: { flags: GoalFlag[] }) {
   return (
     <section aria-labelledby="flags-heading" className="space-y-2">
       <h2 id="flags-heading" className="px-1 text-ui font-semibold text-ink">
-        Claude flagged
+        Dash flagged
       </h2>
       {flags.map((flag) => (
         <FlagCard key={flag.id} flag={flag} />
@@ -54,7 +54,7 @@ function FlagCard({ flag }: { flag: GoalFlag }) {
         )}
         {flag.ask && <p className="text-small break-words text-ink">{flag.ask}</p>}
         {!open && (
-          <p className="text-small text-ink-muted">Answered. Claude closes it once it has acted on your answer.</p>
+          <p className="text-small text-ink-muted">Answered. Dash closes it once it has acted on your answer.</p>
         )}
       </div>
       <CommentThread
@@ -63,7 +63,7 @@ function FlagCard({ flag }: { flag: GoalFlag }) {
         thread={flag.thread}
         store={FLAG_STORE}
         submit={{ action: answerFlagAction, label: open ? 'Answer' : 'Say more' }}
-        placeholder="Your answer. Claude acts on it and replies here."
+        placeholder="Your answer. Dash acts on it and replies here."
       />
       {open && (
         <form action={dismiss} className="flex items-center gap-2">

@@ -165,7 +165,7 @@ export function ClaudeResult({ node, files = [] }: { node: StepNode; files?: Lin
   return (
     <div className="mt-1 space-y-1 px-1">
       <p className="text-small text-ink-muted">
-        {prepared ? 'What Claude prepared for this' : unread ? 'Claude’s result, to read' : 'Claude’s result'}
+        {prepared ? 'What Dash prepared for this' : unread ? 'Dash’s result, to read' : 'Dash’s result'}
       </p>
       {node.result && <FileBody markdown={node.result} compact />}
       {files.length > 0 && (
@@ -349,7 +349,7 @@ export function StepEditForm({
             icon="Start"
             defaultValue={node.startsOn ?? ''}
             aria-label={`The first day ${node.title} can be done`}
-            title="Until this day the step stays off your list and out of Claude's runs"
+            title="Until this day the step stays off your list and out of Dash's runs"
           />
           <ChipInput
             type="date"

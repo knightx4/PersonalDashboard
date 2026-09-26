@@ -374,7 +374,7 @@ Read from the job search on 26 Sept. No applications or messages were sent.`;
 export function FileSurface() {
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="Your applications by role family" description="Written by Claude · updated Sat 26 Sept, 09:12" />
+      <PageHeader title="Your applications by role family" description="Written by Dash · updated Sat 26 Sept, 09:12" />
       <div className="space-y-6">
         <Card padding="standard">
           <FileBody markdown={FILE_BODY} />
@@ -399,7 +399,7 @@ export function GoalTopSurface() {
           status={{
             yourMove: [
               { id: 'which', kind: 'question', label: 'Answer', title: 'Which card first?', href: '#step-which' },
-              { id: 'compare', kind: 'read', label: 'Read Claude’s result', title: 'Compare the two cards’ rates', href: '#step-compare' },
+              { id: 'compare', kind: 'read', label: 'Read Dash’s result', title: 'Compare the two cards’ rates', href: '#step-compare' },
               { id: 'call', kind: 'do', label: 'Do by 3 Oct', title: 'Call the card company', href: '#step-call' },
             ],
             moreSteps: 2,

@@ -48,7 +48,7 @@ export function AreaPlanner({
   const line = running ? (
     <p role="status" className="flex items-center gap-1.5 text-small text-accent">
       <span className="size-1.5 animate-pulse rounded-full bg-accent" aria-hidden />
-      <span>Claude is planning this area · {running}</span>
+      <span>Dash is planning this area · {running}</span>
     </p>
   ) : run?.error ? (
     <p className="text-small text-danger">
@@ -66,7 +66,7 @@ export function AreaPlanner({
     </p>
   ) : !hasGoals ? (
     <p className="text-small text-ink-muted">
-      No goals yet. Claude can propose the goals this area needs, from what you wrote above.
+      No goals yet. Dash can propose the goals this area needs, from what you wrote above.
     </p>
   ) : null;
 

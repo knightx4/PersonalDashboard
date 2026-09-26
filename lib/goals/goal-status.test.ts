@@ -75,7 +75,7 @@ describe('goalStatus', () => {
     expect(labels.soon).toBe('Do by 3 Oct');
   });
 
-  it('asks for approval of a goal Claude proposed, and counts its Claude steps as held', () => {
+  it('asks for approval of a goal Dash proposed, and counts its Dash steps as held', () => {
     const view = status([step('c', { kind: 'claude' })], { ...GOAL, status: 'proposed' });
     expect(view.yourMove).toEqual([
       expect.objectContaining({ kind: 'approve', href: '#claude-heading' }),
@@ -83,10 +83,10 @@ describe('goalStatus', () => {
     expect(view.claudeHeld).toBe(1);
   });
 
-  it('counts the Claude steps the next run will work, and says nothing is waiting when nothing is', () => {
+  it('counts the Dash steps the next run will work, and says nothing is waiting when nothing is', () => {
     const view = status([step('c1', { kind: 'claude' }), step('c2', { kind: 'claude' })]);
     expect(view.yourMove).toEqual([]);
-    expect(claudeLine(view)).toBe('Claude will work 2 steps on its next run.');
+    expect(claudeLine(view)).toBe('Dash will work 2 steps on its next run.');
   });
 
   it('puts the flags passed in first, pointing at the flag', () => {
@@ -99,13 +99,13 @@ describe('goalStatus', () => {
 });
 
 describe('claudeLine', () => {
-  it('is null when Claude has nothing lined up', () => {
+  it('is null when Dash has nothing lined up', () => {
     expect(claudeLine({ claudeReady: 0, claudeHeld: 0 })).toBeNull();
   });
 
   it('names held steps as waiting on approval', () => {
     expect(claudeLine({ claudeReady: 1, claudeHeld: 1 })).toBe(
-      'Claude will work 1 step on its next run. 1 Claude step waits for your approval.',
+      'Dash will work 1 step on its next run. 1 Dash step waits for your approval.',
     );
   });
 });

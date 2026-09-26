@@ -111,7 +111,7 @@ export async function planAreaAction(
   const id = Id.safeParse(form.get('id'));
   if (!id.success) return { error: 'Could not tell which area that was.' };
   if (!(await isOwner({ user }))) {
-    return { error: 'Only the account that owns this app can start a Claude run.' };
+    return { error: 'Only the account that owns this app can start a Dash run.' };
   }
   const routine = goalsRoutine();
   if (!routine.id) {
@@ -141,10 +141,10 @@ export async function planAreaAction(
   try {
     runs = await loadAreaRuns(client);
   } catch {
-    return { error: 'Could not tell whether Claude is already on this area. Try again.' };
+    return { error: 'Could not tell whether Dash is already on this area. Try again.' };
   }
   if (runInFlight(runs[id.data] ?? null, Date.now())) {
-    return { error: 'Claude is already planning this area. Its proposals will show here when it is done.' };
+    return { error: 'Dash is already planning this area. Its proposals will show here when it is done.' };
   }
 
   const result = await startAreaRun({

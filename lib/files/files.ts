@@ -132,6 +132,6 @@ export function originItemId(origin: string | null): string | null {
 
 /** Who wrote it and which version it is, for the line under the title. */
 export function authorLine(file: Pick<FileListing, 'madeBy' | 'version'>): string {
-  const who = file.madeBy === 'claude' ? 'Written by Claude' : 'Written by you';
+  const who = file.madeBy === 'claude' ? 'Written by Dash' : 'Written by you';
   return file.version > 1 ? `${who} · version ${file.version}` : who;
 }

@@ -62,7 +62,7 @@ applications or messages were sent").
 ## Writing
 
 Write to docs/WRITING-GUIDE.md: direct, specific, no slogans, no "not X,
-it's Y", no em dashes for rhythm. Address the person as "you". Use their real
+it's Y", no em dashes for rhythm. Address the person as "you", and yourself as "I" or "Dash", never "Claude". Use their real
 names for things (the company, the account, the servicer), never
 placeholders; where a fact is not findable, say so and leave a marked blank.
 

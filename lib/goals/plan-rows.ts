@@ -51,7 +51,7 @@ import {
 } from '@/lib/plan/tree';
 
 /** What the health tooltip says about a Claude result waiting to be read. */
-export const REVIEW_ASK = 'Claude has finished this. Read what it produced and mark it read.';
+export const REVIEW_ASK = 'Dash has finished this. Read what it produced and mark it read.';
 
 /** What a ready step of yours waits on you for. */
 export const YOURS_ASK = 'Yours to do. Do it and mark it done, or answer what is in the way.';

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { authorLine, fileHref, fileVersionHref, originItemId, parseVersion, toDoc } from './files';
 
 describe('files', () => {
-  it('reads a row, treating any author but Claude as the person', () => {
+  it('reads a row, treating any author but Dash as the person', () => {
     const doc = toDoc({
       id: 'f',
       title: 'Applications by role family',
@@ -40,7 +40,7 @@ describe('files', () => {
   });
 
   it('says who wrote it, and the version once there is more than one', () => {
-    expect(authorLine({ madeBy: 'claude', version: 1 })).toBe('Written by Claude');
+    expect(authorLine({ madeBy: 'claude', version: 1 })).toBe('Written by Dash');
     expect(authorLine({ madeBy: 'you', version: 3 })).toBe('Written by you · version 3');
   });
 });

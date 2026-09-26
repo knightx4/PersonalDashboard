@@ -61,7 +61,7 @@ export type StepMove = 'on_you' | 'with_claude' | 'waiting' | 'settled';
 /** The three words, and what a closed step says instead. */
 export const STEP_MOVE_WORD: Record<StepMove, string> = {
   on_you: 'On you',
-  with_claude: 'With Claude',
+  with_claude: 'With Dash',
   waiting: 'Waiting',
   settled: '',
 };
@@ -116,12 +116,12 @@ export const STEP_HEALTH_GLYPHS: Record<StepHealth, StatusGlyph> = {
 
 /** Why a step says what it says, for the tooltip. */
 const HEALTH_TITLE: Record<StepHealth, string> = {
-  proposed: 'Claude proposed this step. Nothing happens to it until you approve it.',
+  proposed: 'Dash proposed this step. Nothing happens to it until you approve it.',
   unanswered: 'A question waiting on your answer.',
-  review: 'Claude has finished this. Read what it produced and mark it read.',
+  review: 'Dash has finished this. Read what it produced and mark it read.',
   blocked: 'Blocked until you give it what it needs.',
   yours: 'Yours to do.',
-  working: 'Claude does this one. The morning run works it and leaves the result here.',
+  working: 'Dash does this one. The morning run works it and leaves the result here.',
   waiting: 'Waits on the steps under it.',
   later: 'Waits for its start date.',
   aside: 'Put aside with Not now. It waits until you come back to it.',
@@ -189,7 +189,7 @@ function plural(count: number, one: string, many: string): string {
 function movesLine(counts: Record<StepMove, number>): string {
   return [
     counts.on_you > 0 ? `${counts.on_you} on you` : null,
-    counts.with_claude > 0 ? `${counts.with_claude} with Claude` : null,
+    counts.with_claude > 0 ? `${counts.with_claude} with Dash` : null,
     counts.waiting > 0 ? `${counts.waiting} waiting` : null,
   ]
     .filter(Boolean)
@@ -234,7 +234,7 @@ export function stepState(node: StepNode): StepState {
     const beneath = movesLine(countMoves(flatten(open).filter((step) => !isClosed(step))));
     title = `Waits on the ${plural(open.length, 'open step', 'open steps')} under it${beneath ? `: ${beneath}` : ''}.`;
   } else if (health === 'later' && node.waitsUntil) {
-    title = `Starts ${formatDay(node.waitsUntil)}. Until then it stays off your list and out of Claude's runs.`;
+    title = `Starts ${formatDay(node.waitsUntil)}. Until then it stays off your list and out of Dash's runs.`;
   } else if (health === 'answered' && node.resolution) {
     title = `Answered: ${node.resolution}`;
   } else if (health === 'yours' && node.kind === 'rhythm') {
@@ -297,7 +297,7 @@ export type ProgressBand = (typeof PROGRESS_BANDS)[number];
 export const PROGRESS_BAND_WORD: Record<ProgressBand, string> = {
   on_you: 'on you',
   waiting: 'waiting',
-  with_claude: 'with Claude',
+  with_claude: 'with Dash',
   done: 'done',
 };
 
@@ -368,7 +368,7 @@ export function goalMoveLabel(progress: GoalProgress): { word: string; tone: Dev
   const line = movesLine(progress.moves);
   const titles: Record<StepMove, string> = {
     on_you: 'Something here is waiting on you',
-    with_claude: 'Claude has the next move here',
+    with_claude: 'Dash has the next move here',
     waiting: 'Every open step here waits on the steps under it',
     settled: 'Nothing open on this goal',
   };

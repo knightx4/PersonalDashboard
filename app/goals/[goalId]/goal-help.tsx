@@ -66,7 +66,7 @@ export function GoalHelp({
           Weekly help
         </h2>
         {proposed && !editing && (
-          <span className="text-small text-ink-muted">Proposed by Claude</span>
+          <span className="text-small text-ink-muted">Proposed by Dash</span>
         )}
         {!editing && !proposed && (
           <Button

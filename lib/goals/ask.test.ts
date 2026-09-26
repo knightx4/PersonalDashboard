@@ -1,5 +1,5 @@
 /**
- * "@dash draft this for me" on a step hands that step to Claude (plan #1003).
+ * "@dash draft this for me" on a step hands that step to Dash (plan #1003).
  * The model, the stores and the hand-over are stubbed: what is checked is
  * which hand-over the comment starts and what the thread is told.
  */
@@ -94,7 +94,7 @@ beforeEach(() => {
   mocks.askGoalReplyModel.mockResolvedValue({ ok: true, input: { send_step: true, needs_routine: false } });
 });
 
-describe('an @dash comment asking Claude to take the step', () => {
+describe('an @dash comment asking Dash to take the step', () => {
   it('prepares a step of yours, with the comment in the brief, and says so', async () => {
     mocks.sendGoalStep.mockResolvedValue({ ok: true, job: 'prepare', title: 'Email the servicer', runId: 'r' });
     const outcome = await askDashOnGoal(input());
@@ -103,16 +103,16 @@ describe('an @dash comment asking Claude to take the step', () => {
     );
     expect(outcome.ok).toBe(true);
     expect(said()).toEqual([
-      'Claude is preparing "Email the servicer" for you. What it writes will show on the step, which stays yours.',
+      'Dash is preparing "Email the servicer" for you. What it writes will show on the step, which stays yours.',
     ]);
   });
 
-  it("sends a step of Claude's to be worked", async () => {
+  it("sends a step of Dash's to be worked", async () => {
     mocks.sendGoalStep.mockResolvedValue({ ok: true, job: 'step', title: 'Compare the repayment plans', runId: 'r' });
     await askDashOnGoal(input({ itemId: 'claude-1', itemTitle: 'Compare the repayment plans', question: 'do this' }));
     expect(mocks.sendGoalStep).toHaveBeenCalledWith(expect.objectContaining({ stepId: 'claude-1', mode: 'send' }));
     expect(said()[0]).toBe(
-      'Claude is working on "Compare the repayment plans". What it produces will show on the step when it is done.',
+      'Dash is working on "Compare the repayment plans". What it produces will show on the step when it is done.',
     );
   });
 

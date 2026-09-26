@@ -45,7 +45,7 @@ export async function setGoalStepStatus(
   const status = Status.safeParse(form.get('status'));
   if (!id.success || !status.success) return { error: 'Could not tell which step that was.' };
   const next = status.data === 'open' ? 'open' : stepStatusFromPlan(status.data);
-  if (next === null) return { error: 'A step is proposed only by Claude.' };
+  if (next === null) return { error: 'A step is proposed only by Dash.' };
   try {
     const client = await createGoalsClient();
     if (next === 'blocked') {

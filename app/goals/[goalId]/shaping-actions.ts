@@ -50,7 +50,7 @@ export async function workOnGoalAction(
   const goalId = Id.safeParse(form.get('goalId'));
   if (!goalId.success) return { error: 'Could not tell which goal that was.' };
   if (!(await isOwner({ user }))) {
-    return { error: 'Only the account that owns this app can start a Claude run.' };
+    return { error: 'Only the account that owns this app can start a Dash run.' };
   }
 
   const routine = goalsRoutine();
@@ -75,7 +75,7 @@ export async function workOnGoalAction(
 
   const { lastRun } = await loadShaping(client, goal.id as string);
   if (runInFlight(lastRun, Date.now())) {
-    return { error: 'Claude is already working on this goal. Its changes will show here when it is done.' };
+    return { error: 'Dash is already working on this goal. Its changes will show here when it is done.' };
   }
 
   const result = await startGoalRun({
@@ -124,7 +124,7 @@ async function handOver(form: FormData, mode: SendMode): Promise<ShapingActionSt
   const id = Id.safeParse(form.get('id'));
   if (!id.success) return { error: 'Could not tell which step that was.' };
   if (!(await isOwner({ user }))) {
-    return { error: 'Only the account that owns this app can start a Claude run.' };
+    return { error: 'Only the account that owns this app can start a Dash run.' };
   }
   const routine = goalsRoutine();
   if (!routine.id) {
@@ -147,7 +147,7 @@ async function handOver(form: FormData, mode: SendMode): Promise<ShapingActionSt
     });
   } catch {
     return {
-      error: mode === 'prepare' ? 'Claude could not be asked. Try again.' : 'The step could not be sent. Try again.',
+      error: mode === 'prepare' ? 'Dash could not be asked. Try again.' : 'The step could not be sent. Try again.',
     };
   }
   if (!sent.ok) {
@@ -156,12 +156,12 @@ async function handOver(form: FormData, mode: SendMode): Promise<ShapingActionSt
     return { error: sent.error };
   }
   if (sent.job === 'prepare') {
-    return saved(`Asked Claude to prepare "${sent.title}". What it writes will show on the step, which stays yours.`);
+    return saved(`Asked Dash to prepare "${sent.title}". What it writes will show on the step, which stays yours.`);
   }
   return saved(
     sent.job === 'phase'
-      ? `Sent "${sent.title}" to Claude. It will work the Claude steps in it, in order.`
-      : `Sent "${sent.title}" to Claude. What it produces will show on the step.`,
+      ? `Sent "${sent.title}" to Dash. It will work Dash’s steps in it, in order.`
+      : `Sent "${sent.title}" to Dash. What it produces will show on the step.`,
   );
 }
 

@@ -143,16 +143,16 @@ function waitingLine(item: WaitingItem): string {
       return `${item.count} proposed ${item.count === 1 ? 'step' : 'steps'} to approve`;
     case 'plan':
       return item.count === 1
-        ? `Goal Claude proposed · ${item.goalTitle}`
-        : `${item.count} goals Claude proposed: ${item.goals.map((g) => g.title).join(', ')}`;
+        ? `Goal Dash proposed · ${item.goalTitle}`
+        : `${item.count} goals Dash proposed: ${item.goals.map((g) => g.title).join(', ')}`;
     case 'review':
-      return `Claude’s result to read · ${item.goalTitle}`;
+      return `Dash’s result to read · ${item.goalTitle}`;
     case 'flag':
-      return `Claude flagged this · ${item.goalTitle}`;
+      return `Dash flagged this · ${item.goalTitle}`;
     case 'context':
-      return `${plural(item.count, 'thing')} Claude found in your other modules`;
+      return `${plural(item.count, 'thing')} Dash found in your other modules`;
     case 'drafts':
-      return `${plural(item.count, 'draft')} Claude filled in, to confirm`;
+      return `${plural(item.count, 'draft')} Dash filled in, to confirm`;
   }
 }
 
@@ -287,7 +287,7 @@ function HomeBrief({ brief }: { brief: { body: string; when: string | null } }) 
     <section aria-labelledby="brief-heading">
       <Card padding="standard" className="space-y-1">
         <h2 id="brief-heading" className="text-ui font-semibold text-ink">
-          From Claude
+          From Dash
         </h2>
         <FileBody markdown={brief.body} compact />
         {brief.when && <p className="text-small text-ink-muted">Written {brief.when}</p>}
@@ -593,7 +593,7 @@ function CatchUpView({
           </Card>
         ) : (
           <p className="px-1 text-small text-ink-muted">
-            Claude finished no runs while you were away.
+            Dash finished no runs while you were away.
           </p>
         )}
       </section>

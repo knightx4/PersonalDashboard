@@ -72,6 +72,15 @@ When you add one, decide which it is: a table that holds what the person
 wrote, wants, did or has is a source; settings, join rows and bookkeeping are
 not. Then run `npm run sources:write` so the goals routine reads the new list.
 
+## The assistant is Dash
+
+In anything the person reads, the assistant is **Dash**, never "Claude": labels,
+buttons, empty states, error messages, and what runs write into the app
+(results, files, notes, replies). Code identifiers, database values such as
+`made_by = 'claude'`, and the prompts a run is given can keep the name. The
+one exception is where the app names the vendor as a fact, such as the privacy
+page saying which models read your notes.
+
 ## Secrets are the exception
 
 A value only the person has — an API token, a deployment secret — cannot be
