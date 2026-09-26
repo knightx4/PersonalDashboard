@@ -29,7 +29,7 @@ export const HIT_KINDS = {
   plan: 'Plan',
   spec: 'Spec',
   idea: 'Idea',
-  feedback: 'Bug or request',
+  feedback: 'Feedback',
 } as const;
 
 export type HitKind = keyof typeof HIT_KINDS;

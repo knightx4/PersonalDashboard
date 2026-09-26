@@ -19,9 +19,16 @@ export type FeedbackStatus =
   | 'done'
   | 'declined';
 
+/**
+ * Mirrors the `feedback_kind` enum. A like (migration 0106) says something
+ * works and should be kept; it is not work, so it sorts after the other two.
+ */
+export const FEEDBACK_KINDS = ['bug', 'feature', 'like'] as const;
+export type FeedbackKind = (typeof FEEDBACK_KINDS)[number];
+
 export type FeedbackRow = {
   id: string;
-  kind: 'bug' | 'feature';
+  kind: FeedbackKind;
   body: string;
   pagePath: string | null;
   status: FeedbackStatus;
@@ -49,15 +56,16 @@ export function isOutstanding(row: FeedbackRow): boolean {
 
 /**
  * Same order the notes loop works them in: blocked first because it needs you,
- * then bugs, then priority, then oldest.
+ * then bugs, then feature requests, then likes, then priority, then oldest.
  */
 const RANK: Record<string, number> = { blocked: 0, in_progress: 1, open: 2, planned: 3 };
+const KIND_RANK: Record<FeedbackKind, number> = { bug: 0, feature: 1, like: 2 };
 
 export function sortOutstanding(rows: readonly FeedbackRow[]): FeedbackRow[] {
   return [...rows].sort((a, b) => {
     const byStatus = (RANK[a.status] ?? 9) - (RANK[b.status] ?? 9);
     if (byStatus !== 0) return byStatus;
-    if (a.kind !== b.kind) return a.kind === 'bug' ? -1 : 1;
+    if (a.kind !== b.kind) return (KIND_RANK[a.kind] ?? 9) - (KIND_RANK[b.kind] ?? 9);
     if (a.priority !== b.priority) return a.priority - b.priority;
     return a.createdAt.localeCompare(b.createdAt);
   });
@@ -138,7 +146,7 @@ export type OtherFeedbackRow = {
   id: string;
   /** Who filed it. Null only when the address could not be read. */
   email: string | null;
-  kind: 'bug' | 'feature';
+  kind: FeedbackKind;
   body: string;
   pagePath: string | null;
   createdAt: string;
