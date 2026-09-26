@@ -8,8 +8,15 @@ looking live until somebody notices.
 
 So when the user says "re-shape #95", or a routine is fired from the
 **Re-shape** button with a re-shape turn, the job is to read the feature
-against everything now known and write down what has changed — as
-**proposals**, and nothing else.
+against everything now known and write down what has changed, and nothing
+else.
+
+The person approved the feature, and approval stops there: the steps a
+re-shape adds beneath it are ready to build without a second approval. Two
+things are still proposals. A step that acts outside the repository waits for
+the person (**Steps that act outside the repository** in `building.md`), and
+so does new work out of a finished feature (step 1), because that is a new
+feature and every feature is theirs to approve.
 
 1. **Read the feature.** `show <n>`: its done-when, its fog, its open steps,
    and *Decided so far* — every question settled beneath it. Then read the
@@ -17,14 +24,18 @@ against everything now known and write down what has changed — as
    know what is there.
 
    **A feature that is already `done` or `dropped` takes no new rows.** Its
-   status says it is finished, and a proposal appearing inside it reads as the
+   status says it is finished, and a new row appearing inside it reads as the
    feature having re-opened itself. Re-shaping one is still legitimate — an
    answer can land under it long after it closed — but everything the re-shape
    turns up there is *new work*, so it goes at the top level:
-   `add "…"` with no `--parent`, a detail that opens by saying it came out of
-   `#<n>`, and the steps and questions under **that**. The one write a
-   re-shape may still make to the closed feature is `fog <n> --clear`, and
-   only once the new feature that dispels the fog exists.
+   `add "…" --proposed` with no `--parent`, a detail that opens by saying it
+   came out of `#<n>`, and the steps and questions under **that**. Pass
+   `--proposed` every time: `add` without a parent writes a not-started row,
+   and a new feature waits for the person like any other. The steps under it
+   are then proposed without the flag, because the feature above them is.
+   The one write a re-shape may still make to the closed feature is
+   `fog <n> --clear`, and only once the new feature that dispels the fog
+   exists.
 2. **Graduate the fog.** If an answer, or the code, has made the fog
    specifiable, write those steps now: `add "…" --parent <n> --done-when "…"
    --size s|m|l --from <the decision>`, and clear the patch in the same breath
@@ -34,8 +45,8 @@ against everything now known and write down what has changed — as
    DNS) takes `--proposed` and waits for the person, as **Steps that act
    outside the repository** in `building.md` says. **`--from` on every row a re-shape
    writes**: it stamps the step with the answer that produced it, and a
-   proposed step appearing under a feature somebody approved last week is
-   confusing until it says why it is there. The gist is read off the
+   step appearing under a feature somebody approved last week is confusing
+   until it says why it is there. The gist is read off the
    decision's own answer, so it cannot be paraphrased into something nobody
    said. Fog that is *still* fog stays exactly as it is — a patch
    rewritten into something vaguer is worse than one left alone. If part of it
@@ -59,15 +70,20 @@ against everything now known and write down what has changed — as
    tests as shaping, the same one patch of fog, and the same three parts to a
    decision — see **How a decision must be written**.
 5. **Stop.** Do not `approve`, do not `answer` a decision, do not `start` or
-   build anything, and do not re-propose what the feature already holds —
+   build anything, and do not add again what the feature already holds —
    read the existing steps first, including ones an earlier re-shape added,
    and everything under *Already dismissed*, which is what the person has
    turned down and is not to be written back in any form.
-   Report what you proposed, what you dropped and why, what fog you cleared,
-   and anything you noticed and deliberately left alone, all **by number and
-   title**.
+   Report what you added (saying which went in ready and which as
+   proposals), what you dropped and why, what fog you cleared, and anything
+   you noticed and deliberately left alone, all **by number and title**.
 
-The contract this rests on: a re-shape writes proposed rows. The plan adapts
-continuously, and nothing changes without an approve — the same review, from
-a second direction.
+The contract this rests on: the person approves a feature once, and the plan
+beneath it adapts without asking again. What makes that safe is that every
+row a re-shape adds says where it came from. `--from` names the answer, the
+session stamp names the run, and `/dev/plan` marks an open step a session
+added with a one-press drop, so the person can undo any of them without
+reading the whole feature again. What still waits for an approve is what the
+original approval did not cover: a new feature, and a step that acts outside
+the repository.
 

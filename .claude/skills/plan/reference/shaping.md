@@ -30,6 +30,10 @@ nothing else.
    `--idea` links the idea to the feature, which is what turns the idea's
    button into "in the plan as #n". Do this on the feature, not a step.
 
+   `--proposed` is not optional. A new feature is always the person's to
+   approve, and `add` with no `--parent` writes a not-started row unless it
+   is told otherwise.
+
    **The detail opens with the vision line.** Its first line names the part
    of the vision the feature serves, quoting the phrase it serves or staying
    close to it:
@@ -48,7 +52,7 @@ nothing else.
    like.
 4. **Write the steps beneath it**, each `--parent <n>` and each with a
    `--done-when` and a `--size`. Steps under a proposed feature are proposed
-   automatically. Three to eight steps is the usual shape; a step sized `l`
+   automatically, and approving the feature approves them with it. Three to eight steps is the usual shape; a step sized `l`
    should be split. Order them the way they would be built, and add
    `depends <n> --on <m>` where one genuinely cannot start before another.
    Put migrations and schema first, the page last, and the tests inside the
@@ -112,7 +116,10 @@ nothing else.
    decisions, do not assign anything to Claude, do not write code. Report the
    feature and its steps **by number and title**, and the questions. The
    person approves on `/dev/plan`, and only then does the building loop in `building.md`
-   apply.
+   apply. That one approval is the last the feature needs: steps a session
+   adds beneath it later go in ready to build, except a step that acts
+   outside the repository (see **Steps that act outside the repository** in
+   `building.md`).
 
 If the idea is already in the plan (`ideas` does not list it), say so and
 stop rather than shaping it twice. If the idea is really a bug or a one-line
