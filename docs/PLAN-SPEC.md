@@ -44,7 +44,7 @@ beside them.
 | `parent_id` | The step this is part of, or null at the top of a module's plan. Cascades on delete: removing a feature removes its steps. |
 | `title`, `detail` | What it is, and what it involves. |
 | `acceptance` | *Done when.* Written before the work, it is what the work is checked against. A step without one is closed on somebody's opinion. |
-| `status` | `proposed`, `not_started`, `in_progress`, `blocked`, `done`, `dropped`. A proposed step was written by a session from an idea and is waiting on the person; see *Proposals* below. |
+| `status` | `proposed`, `not_started`, `in_progress`, `blocked`, `done`, `dropped`. A proposed step is waiting on the person's approve: a feature a session shaped, the steps shaped under it, or a step that acts outside the repository. See *Proposals* below. |
 | `kind` | `build`, `decision` or `setup`. A build step closes on a commit; a decision closes on an answer; a setup step is a job of the person's outside the repo and closes when they say they have done it, with no commit. See *Decisions, setup and fog* below. |
 | `fog` | The *not yet specified* note: one paragraph admitting what cannot yet be seen well enough to write steps for. Allowed on any step, meaningful mostly on a feature. |
 | `dismissed_at`, `fog_dismissed_at` | Put aside as not right now — the row, and the patch of fog on it, separately. Not a status: nothing has been settled, it is only out of sight. See *Not right now* below. |
@@ -235,6 +235,38 @@ ready either, whatever its own status says. Nothing in the skill or the CLI
 moves a step out of `proposed` except the person's approve, on the page or
 with `scripts/plan.ts approve`.
 
+### Approval stops at the feature
+
+The person approves a feature once (#1095). A step a session adds beneath an
+approved feature later, while building a step or re-shaping the feature, is
+written `not_started` and is ready like any other. Until #1095 it was written
+`proposed` and waited for a second approval of work the first had already
+agreed to.
+
+`scripts/plan.ts add` decides from the chain above the new row
+(`addsAsProposal` in `lib/plan/origin.ts`). A `proposed` row anywhere above
+it makes it a proposal; otherwise it is written ready, with its own comment
+line `Added by session cse_… on YYYY-MM-DD.` naming the session. `--proposed`
+forces a proposal. A row with no parent is a new feature and is written with
+`--proposed` by the procedures that write one: shaping, and a re-shape that
+finds new work under a feature already done or dropped.
+
+The person keeps the last word on these steps. On `/dev/plan` an open step a
+session added shows "Added by Dash on <date>" under its title, with the
+session on hover, and its ⋯ menu opens with **Drop**: one press, the same
+write as choosing Dropped from the status menu, and reversible there. The
+marker goes once the step is done or dropped.
+
+One kind of step still waits for approval under an approved feature: a step
+whose work has an effect outside the repository and the app's own schema,
+such as sending a message, buying something, publishing, or changing another
+service's settings or DNS. A session adds it with `--proposed`, and nothing
+works it until the person approves it. The list and the reasons are under
+*Steps that act outside the repository* in
+`.claude/skills/plan/reference/building.md`, which takes the rule from the
+goals skill. A setup step written with `needs` is not one of these: it is the
+person's own job from the start and is never proposed.
+
 ### Suggestions
 
 The other direction. Once fog stopped being the place to park a follow-on,
@@ -346,8 +378,9 @@ it graduates into sub-steps and is cleared once they exist. Two things do
 that graduating, and until they were built the sentence you just read
 described a person doing it by hand: **Re-shape** (below), and a build
 session that learns enough while working a step beneath the feature to
-specify what the fog admitted it could not. Both write proposed steps and
-clear the patch; neither approves anything. It shows in the tree under the step it belongs to
+specify what the fog admitted it could not. Both write the steps and clear
+the patch. Under an approved feature the steps go in ready to build (see
+*Approval stops at the feature*); neither ever approves a proposal. It shows in the tree under the step it belongs to
 rather than behind the fold, because a plan's own admission that part of it
 is missing is no use if you have to open a step to find it. Empty fog
 renders nothing.
@@ -647,7 +680,7 @@ behind it. `PLAN_HEALTHS` in `lib/plan/tree.ts` is the set, thirteen of them:
 |---|---|
 | `unanswered` | An open question. Not "not started" — nothing happens to it until it is answered, and it closes on an answer rather than a commit. One of the three states the *On you* view is made of. |
 | `answered` | A settled question. It carries the resolution and no commit, the resolution is its tooltip, and it is the one state the counts beside a module heading leave out: a decision recorded is neither work outstanding nor work that shipped. |
-| `proposed` | Written by a session, waiting on the person. Out of the progress denominator and out of the bands, which is what keeps it from being `not_started`. |
+| `proposed` | Waiting on the person's approve. Out of the progress denominator and out of the bands, which is what keeps it from being `not_started`. |
 | `in_progress` | Claimed, with nothing known about the run behind it: none recorded, or one nobody has asked GitHub about, and the clock has not run out. What every caller that hands in no liveness gets, which is all the status column supports on its own. |
 | `working` | Claimed, and the run pushed something inside the twenty-minute mark. |
 | `quiet` | Claimed, and nothing pushed since. The guard counts it as live and #574 settled that re-sending it asks first. |
@@ -784,6 +817,8 @@ ideas               ideas not yet shaped into the plan, dismissals left out
 idea "…" [--module <id>] [--from <n>]   a follow-on, filed as a suggestion
 add "…" --parent <n> [--done-when "…"] [--size s|m|l] [--proposed] [--idea <id>]
                     [--fog "…"] [--kind decision|setup]
+                    ready under an approved feature, proposed under a proposed
+                    one; --proposed for a new feature or an outside step
 needs "…" --for <n> [--detail "…"]   a setup job of the person's, and the edge to it
 approve <n>         a person's move: the step and the proposed steps beneath it
 answer <n> --note   a person's move: closes a decision on its answer, no commit
@@ -815,17 +850,20 @@ answering a decision recorded the answer and changed nothing else. The
 button on a feature fires the same routine with a *re-shape* turn instead
 of a build one, carrying the feature, its fog, its open steps and every
 answer settled beneath it. The session graduates fog that the answers made
-specifiable into proposed steps and clears the patch, drops a step an
-answer made pointless with the reason, and writes any question an answer
-surfaced as a fresh decision.
+specifiable into steps and clears the patch, drops a step an answer made
+pointless with the reason, and writes any question an answer surfaced as a
+fresh decision.
 
 On request rather than on every answer: several questions are usually
-settled in one sitting, and one session that has read all of them proposes
+settled in one sitting, and one session that has read all of them writes
 better than three racing over the same feature. It also keeps answering
 independent — the answer is recorded by its own action, so a re-shape that
-cannot start loses nothing. Everything it writes is `proposed`, and nothing
-it proposes is started; the plan adapts continuously and still changes only
-on an approve. It refuses a proposal, which has nothing agreed to adapt,
+cannot start loses nothing. The steps it adds under the feature are ready to
+build, since the person approved the feature, and each carries the answer
+that produced it and the session that wrote it. Two things it writes are
+proposed: a step that acts outside the repository, and new work out of a
+feature already closed, which goes in as a new top-level feature. It starts
+nothing itself. It refuses a proposal, which has nothing agreed to adapt,
 and a leaf step, which has nothing beneath it to re-read.
 
 **The skill.** `.claude/skills/plan/SKILL.md` is the front door: which steps
