@@ -73,6 +73,7 @@ import { FILED_IDEAS_SQL } from '../lib/ideas/load';
 import { IDEA_WINDOW_MINUTES, ideaAllowance, ideaCapRefusal } from '../lib/ideas/rate';
 import { MODULES, isModuleId } from '../lib/modules';
 import { planBrief, STATUS_WORD } from '../lib/plan/brief';
+import type { VisionBodies } from '../lib/specs/vision';
 import { closeRefusal, commitOnMain } from '../lib/plan/github';
 import {
   needsLines,
@@ -286,6 +287,13 @@ async function loadState(
   const data = await loadData(sql, userId);
   const liveness = planLiveness(data.items, await loadRuns(sql, userId), Date.now());
   return { sections: buildPlanTree(data, liveness), liveness };
+}
+
+/** The visions written on the specs page, by scope; the app's is under `app`. */
+async function loadVisions(sql: Sql, userId: string): Promise<VisionBodies> {
+  const rows = await sql<{ module: string; body: string }[]>`
+    select module, body from module_visions where user_id = ${userId}`;
+  return Object.fromEntries(rows.map((row) => [row.module, row.body])) as VisionBodies;
 }
 
 async function loadTree(sql: Sql, userId: string): Promise<PlanSection[]> {
@@ -869,7 +877,9 @@ async function main(): Promise<void> {
       const { sections, liveness } = await loadState(sql, userId);
       const node = findNode(sections, item.id);
       if (!node) fail(`#${item.number} is not in the tree.`);
-      process.stdout.write(planBrief(sections, node, { liveness }));
+      process.stdout.write(
+        planBrief(sections, node, { liveness, visions: await loadVisions(sql, userId) }),
+      );
       return;
     }
 
