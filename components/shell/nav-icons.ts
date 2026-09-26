@@ -14,6 +14,7 @@ import {
   CalendarClock,
   CalendarDays,
   CalendarRange,
+  Compass,
   ClipboardCheck,
   Frame,
   History,
@@ -74,6 +75,9 @@ export const NAV_ICONS = {
   answers: MessageSquareText,
   analytics: BarChart3,
   activity: Activity,
+  // Career goals: which way you are heading, so the compass. Not Target,
+  // which is Learn's Goals tab, and not Flag, which is the Goals workspace.
+  careerGoals: Compass,
   // Dev
   bugs: Bug,
   raised: MessageCircleQuestion,

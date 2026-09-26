@@ -295,3 +295,23 @@ export function missedLine(period: RhythmPeriod, missed: number): string {
   const [one, many] = PERIOD_NOUNS[period];
   return `${missed} ${missed === 1 ? one : many} missed`;
 }
+
+/** A practice as an area's page lists it: this period's count against its target, and misses behind it. */
+export type Practice = LiveRhythm & { count: number; missed: number };
+
+/**
+ * Every live rhythm with this period's progress, for an area's page, in the
+ * order they came. A rhythm with no current period yet reads as 0 so far.
+ */
+export function practices(rhythms: LiveRhythm[], records: Map<string, RhythmRecord>): Practice[] {
+  return rhythms.map((rhythm) => {
+    const record = records.get(rhythm.id);
+    const current = record?.current;
+    return {
+      ...rhythm,
+      target: current?.target ?? rhythm.target,
+      count: current?.count ?? 0,
+      missed: current && current.count < current.target ? (record?.missed ?? 0) : 0,
+    };
+  });
+}

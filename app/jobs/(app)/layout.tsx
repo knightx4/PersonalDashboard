@@ -69,13 +69,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const brief = await loadJobsBrief(user.id, reviewCount);
 
   /**
-   * Ten sections is over the eight the design language allows, and grouping
+   * Eleven sections is over the eight the design language allows, and grouping
    * them is a routing change rather than a nav one -- so for now the strip
    * scrolls, fades at the edge, and brings the active tab into view. See
    * docs/DESIGN-UPDATE-PLAN.md.
    */
   const sections: NavSection[] = [
     { href: '/jobs/today', label: 'This week', icon: 'week' },
+    { href: '/jobs/thoughts', label: 'Career goals', icon: 'careerGoals' },
     { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
     { href: '/jobs/roles', label: 'Roles', icon: 'roles' },
     { href: '/jobs/companies', label: 'Companies', icon: 'companies' },

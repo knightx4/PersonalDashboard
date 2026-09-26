@@ -82,6 +82,26 @@ export function parseAreaName(raw: unknown): Parsed<string> {
   return { ok: true, value: name };
 }
 
+/**
+ * Words that make a title or done-when a practice rather than an outcome:
+ * a rate ("one event a week", "three times a month", "every morning",
+ * "weekly") or a streak ("kept for eight of the last ten weeks"). A goal is
+ * the outcome a practice serves; the practice goes inside it as a rhythm
+ * step (docs/GOALS-SPEC.md, "The three levels"). goals.reads_as_practice
+ * (migrations-goals/0041) is the same test in SQL, which the database holds
+ * Claude to; the two must agree.
+ */
+const PRACTICE =
+  /\b(?:(?:every|each|per)\s+(?:day|week|month|weekday|weekend|morning|evening|night)|(?<!\b(?:within|in|by|for|after|than|over|under|about)\s)a\s+(?:day|week|month)|kept\s+for|daily|weekly|monthly|nightly)\b/i;
+
+/** Whether a goal's title or done-when reads as a practice rather than an outcome. */
+export function readsAsPractice(text: string | null | undefined): boolean {
+  return typeof text === 'string' && PRACTICE.test(text);
+}
+
+const PRACTICE_ERROR =
+  'That reads like a practice, something you do again and again. A goal is the outcome it serves, such as "Know ten people in the scene by name"; add the practice inside that goal as a rhythm step.';
+
 /** An area's note: trimmed, and null when cleared, which is allowed. */
 export function parseAreaNote(raw: unknown): Parsed<string | null> {
   const note = clean(raw);
@@ -115,6 +135,7 @@ export function parseGoalFields(
     if (title.length > GOAL_TITLE_MAX) {
       return { ok: false, error: `Keep the title under ${GOAL_TITLE_MAX} characters.` };
     }
+    if (readsAsPractice(title)) return { ok: false, error: PRACTICE_ERROR };
     fields.title = title;
   } else if (requireTitle) {
     return { ok: false, error: 'Give the goal a title.' };
@@ -126,6 +147,7 @@ export function parseGoalFields(
     if (acceptance && acceptance.length > GOAL_ACCEPTANCE_MAX) {
       return { ok: false, error: `Keep the done-when under ${GOAL_ACCEPTANCE_MAX} characters.` };
     }
+    if (readsAsPractice(acceptance)) return { ok: false, error: PRACTICE_ERROR };
     fields.acceptance = acceptance;
   }
 
