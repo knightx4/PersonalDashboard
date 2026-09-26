@@ -21,6 +21,7 @@ import type { LessonTopUpSummary } from '@/lib/learn/lessons/top-up';
 import { lessonsWanted, writeLessonsFor } from '@/lib/learn/lessons/top-up';
 import { linkAimTracks } from '@/lib/learn/lessons/aim-tracks';
 import { addTeachBackCard } from '@/lib/learn/feed/teach-back-store';
+import { writeVideoCards, type VideoCardPassResult } from '@/lib/learn/youtube/video-card-run';
 import { createFeedPicker, loadFeedFields, peopleToPickFor } from './feed-picks';
 import { createLessonPorts } from './lesson-top-up';
 
@@ -47,6 +48,13 @@ export const FEED_TOP_UP_BUDGET_MS = 230_000;
  * page's request, so it is kept well inside the page's own limit.
  */
 export const FEED_TOP_UP_AFTER_RESPONSE_MS = 120_000;
+
+/**
+ * Time the video card pass may start writes in, from the start of the hourly
+ * call. A write started just before it runs about half a minute past, and the
+ * people after it have the rest of the budget.
+ */
+export const VIDEO_CARDS_MS = 60_000;
 
 const OPERATION: LearnOperation = 'write-feed-card';
 const EMBED_OPERATION: LearnOperation = 'embed-feed-ideas';
@@ -137,6 +145,9 @@ async function loadPicked(
     )
     .eq('user_id', userId)
     .eq('status', 'picked')
+    // A card from a video stretch is written by the video card pass, which
+    // has the transcript it needs (plan #1067).
+    .neq('reason', 'video')
     .order('created_at', { ascending: true })
     .limit(limit);
   if (error) throw new Error(`Reading your picked cards failed: ${error.message}`);
@@ -332,15 +343,7 @@ async function topUpWith(
       return summary.picked.interest + summary.picked.gap + summary.picked.goal;
     },
     write: (id, card) =>
-      writePickedCard(learn, apiKey, id, card, async (spend, embedSpend) => {
-        // Awaited, so the rows land before the function is frozen.
-        for (const report of spend) {
-          await recordSpend(core, id, { module: 'learn', operation: OPERATION, model: report.model, usage: report.usage });
-        }
-        for (const report of embedSpend) {
-          await recordSpend(core, id, { module: 'learn', operation: EMBED_OPERATION, model: report.model, usage: report.usage });
-        }
-      }),
+      writePickedCard(learn, apiKey, id, card, (spend, embedSpend) => recordCardSpend(core, id, spend, embedSpend)),
     now: Date.now,
   };
 
@@ -363,22 +366,51 @@ async function topUpWith(
   return { ...withTeach, readyBefore, skipped: false, lessons };
 }
 
-export type FeedTopUpResult = { people: TopUpSummary[] };
+export type FeedTopUpResult = { videos: VideoCardPassResult | null; people: TopUpSummary[] };
+
+/** Spend for one card write, under the feed's own operations. */
+async function recordCardSpend(
+  core: Context['core'],
+  userId: string,
+  spend: SpendReport[],
+  embedSpend: SpendReport[],
+): Promise<void> {
+  // Awaited, so the rows land before the function is frozen.
+  for (const report of spend) {
+    await recordSpend(core, userId, { module: 'learn', operation: OPERATION, model: report.model, usage: report.usage });
+  }
+  for (const report of embedSpend) {
+    await recordSpend(core, userId, { module: 'learn', operation: EMBED_OPERATION, model: report.model, usage: report.usage });
+  }
+}
 
 /**
- * The hourly call: everyone with placed themes or an active goal, and fewer
- * than twenty ready cards, is topped up, one person after another, inside one
- * budget.
+ * The hourly call. First the videos in everyone's card pile become cards
+ * (plan #1067), whatever the deck holds, since the pile is a list of its own.
+ * Then everyone with placed themes or an active goal, and fewer than twenty
+ * ready cards, is topped up, one person after another, inside one budget.
  */
 export async function runFeedTopUp(): Promise<FeedTopUpResult> {
-  const deadline = Date.now() + FEED_TOP_UP_BUDGET_MS;
+  const started = Date.now();
+  const deadline = started + FEED_TOP_UP_BUDGET_MS;
   const context = await createContext();
+  // A failure here leaves the pile for the next hour and the deck unaffected.
+  const videos = await writeVideoCards(context.learn, {
+    deadline: started + VIDEO_CARDS_MS,
+    write: (userId, card) =>
+      writePickedCard(context.learn, context.apiKey, userId, card, (spend, embedSpend) =>
+        recordCardSpend(context.core, userId, spend, embedSpend),
+      ),
+  }).catch((error: unknown) => {
+    console.error('[learn feed top-up] video cards', error instanceof Error ? error.message : error);
+    return null;
+  });
   const people: TopUpSummary[] = [];
   for (const userId of await peopleToPickFor(context.learn)) {
     if (Date.now() >= deadline) break;
     people.push(await topUpWith(context, userId, { threshold: READY_TARGET, deadline }));
   }
-  return { people };
+  return { videos, people };
 }
 
 /**
