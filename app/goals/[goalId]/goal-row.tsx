@@ -446,6 +446,9 @@ export function GoalRow({
       actions={GOAL_TREE_ACTIONS}
       anchorId={`step-${step.id}`}
       source={fromGoal ? `From ${fromGoal.title}` : undefined}
+      // What a step waiting on you is waiting for (note 5aa7216c), as the dev
+      // plan's Needs line says it.
+      need={node.need}
       comments={GOAL_COMMENTS}
       threadPlaceholder="A note on this step. Tag @dash to ask about it, or to give it figures to file."
       dependencies={{ catalog: context.catalog, groupOf: () => context.goalTitle }}

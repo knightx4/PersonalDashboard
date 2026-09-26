@@ -6,17 +6,28 @@ import {
   startTransition,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from 'react';
 import { useFormStatus } from 'react-dom';
-import { ArrowRight, EyeOff, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ArrowRight, EyeOff, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/toast';
+import { parseBack, pushBack } from '@/lib/news/quick/back';
 import { swipeAxis, swipeFarEnough } from '@/lib/news/quick/swipe';
 import type { NewsTopic } from '@/lib/news/issues/topics';
 import type { StoryPass } from '@/lib/news/quick/next';
-import { hideQuickTopic, passQuickPage, passQuickStory, recordArticleOpened } from './actions';
+import {
+  hideQuickTopic,
+  passQuickPage,
+  passQuickStory,
+  recordArticleOpened,
+  unpassQuickPage,
+} from './actions';
+import { showHiddenTopic } from '../settings/actions';
 
 /**
  * The id of the form Next submits. A swipe on the card (#855) submits the
@@ -108,11 +119,71 @@ export function QuickDeck({
  * the next set. The stories go as issueId and storyIndex pairs, in order.
  */
 export function QuickPageForm({ stories }: { stories: readonly StoryPass[] }) {
+  const raw = useSyncExternalStore(subscribeBack, readBackRaw, () => null);
+  const back = useMemo(() => parseBack(raw), [raw]);
+  const previous = back.at(-1);
   return (
-    <form action={passQuickPage}>
-      <PassFields stories={stories} />
-      <NextPageButton />
-    </form>
+    <div className="flex flex-wrap items-center gap-2">
+      {/* Previous page (note 460be33e): takes back the last Next page's
+          passes, so a page skipped too fast comes back. Only once there is
+          a page in this tab to go back to. */}
+      {previous && (
+        <form
+          action={async (form) => {
+            writeBack(back.slice(0, -1));
+            await unpassQuickPage(form);
+          }}
+        >
+          <PassFields stories={previous} />
+          <PreviousPageButton />
+        </form>
+      )}
+      <form
+        action={async (form) => {
+          writeBack(pushBack(back, stories));
+          await passQuickPage(form);
+        }}
+      >
+        <PassFields stories={stories} />
+        <NextPageButton />
+      </form>
+    </div>
+  );
+}
+
+/** Where the pages Previous page can go back to are kept: this tab, and only this tab. */
+const BACK_KEY = 'news:quick-read:back';
+const backListeners = new Set<() => void>();
+
+function subscribeBack(listener: () => void) {
+  backListeners.add(listener);
+  return () => backListeners.delete(listener);
+}
+
+function readBackRaw(): string | null {
+  try {
+    return sessionStorage.getItem(BACK_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeBack(stack: readonly StoryPass[][]) {
+  try {
+    sessionStorage.setItem(BACK_KEY, JSON.stringify(stack));
+  } catch {
+    // Storage refused: Previous page simply has nothing to go back to.
+  }
+  for (const listener of backListeners) listener();
+}
+
+function PreviousPageButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" size="lg" variant="secondary" pending={pending}>
+      {!pending && <ArrowLeft className="size-4" strokeWidth={2} aria-hidden />}
+      {pending ? 'Loading…' : 'Previous page'}
+    </Button>
   );
 }
 
@@ -132,8 +203,25 @@ function NextPageButton() {
  * that has a topic.
  */
 export function HideTopicForm({ topic }: { topic: NewsTopic }) {
+  const toast = useToast();
+  // With an undo for a while after (note b9414236), since the button sits
+  // beside Save and Next and is easy to hit by mistake. The toast lives in the
+  // shell, so it outlasts the card the press takes away.
+  async function hide(form: FormData) {
+    await hideQuickTopic(form);
+    toast({
+      text: `${topic} is hidden from Quick read. News settings lists what is hidden.`,
+      undone: `${topic} is back in Quick read.`,
+      duration: 10_000,
+      undo: async () => {
+        const restore = new FormData();
+        restore.set('topic', topic);
+        await showHiddenTopic(restore);
+      },
+    });
+  }
   return (
-    <form action={hideQuickTopic}>
+    <form action={hide}>
       <input type="hidden" name="topic" value={topic} />
       <HideTopicButton topic={topic} />
     </form>

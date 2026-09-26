@@ -15,6 +15,10 @@
  * - A Claude step whose result you have not read is on you: it is read as
  *   blocked on you, with the tooltip saying what to do. Only its health and
  *   move are read that way; its status stays what it is.
+ * - So is a step of yours that is ready (note e501d1a5). Ready means ready for
+ *   Dash, as it does on the plan; a step only you can do, with nothing in its
+ *   way, is waiting on you to do it and say so. A step of yours that holds
+ *   sub-steps is a stage, not a job, and is left to them.
  * - Goal steps have no number, so each is numbered in reading order from 1.
  *   The row, the dependency chips and the picker all show that number.
  *
@@ -46,6 +50,19 @@ import {
 /** What the health tooltip says about a Claude result waiting to be read. */
 export const REVIEW_ASK = 'Claude has finished this. Read what it produced and mark it read.';
 
+/** What a ready step of yours waits on you for. */
+export const YOURS_ASK = 'Yours to do. Do it and mark it done, or answer what is in the way.';
+
+/** A step of yours with nothing in its way: on you, not ready for Dash. */
+function yoursToDo(step: StepNode, ready: ReadonlySet<string>): boolean {
+  return (
+    step.kind === 'mine' &&
+    step.status === 'open' &&
+    step.children.length === 0 &&
+    ready.has(step.id)
+  );
+}
+
 type Ref = { id: string; number: number; title: string };
 
 /** One goal step as the shared tree row reads it, with its step alongside. */
@@ -66,7 +83,8 @@ export type GoalRowNode = {
   comment: null;
   fog: null;
   fogDismissedAt: null;
-  matches: true;
+  /** Under a view: whether this row matched or is only here for what is beneath it. */
+  matches: boolean;
   rollup: PlanProgress;
   dependsOn: { dependencyId: string; item: Ref & { status: PlanStatus } }[];
   waitingOn: Ref[];
@@ -74,6 +92,8 @@ export type GoalRowNode = {
   children: GoalRowNode[];
   /** The goal step this row draws. */
   step: StepNode;
+  /** What the step waits on you for, when it does: the row's Needs line (note 5aa7216c). */
+  need: string | null;
   health: ReturnType<typeof healthWordsOf>;
   move: ReturnType<typeof moveWordsFor>;
 };
@@ -106,13 +126,15 @@ function shadowOf(
   number: (ref: StepRef) => Ref,
 ): Shadow {
   const review = awaitsReview(step);
+  const yours = yoursToDo(step, ready);
+  const onYou = review || yours;
   return {
     id: step.id,
     kind: step.kind === 'decision' ? 'decision' : 'build',
-    status: review ? 'blocked' : planStatusOf(step.status),
+    status: onYou ? 'blocked' : planStatusOf(step.status),
     assignee: step.kind === 'mine' || step.kind === 'rhythm' ? 'me' : null,
-    blockKind: review ? 'outside' : (step.blockKind ?? null),
-    blockAsk: review ? REVIEW_ASK : (step.blockAsk ?? null),
+    blockKind: onYou ? 'outside' : (step.blockKind ?? null),
+    blockAsk: review ? REVIEW_ASK : yours ? YOURS_ASK : (step.blockAsk ?? null),
     dismissedAt: step.dismissedAt ?? null,
     ready: ready.has(step.id),
     dependsOn: (step.dependsOn ?? []).map((link) => ({
@@ -225,6 +247,7 @@ export function goalRows(
       blocks: (step.blocks ?? []).map(ref),
       children: pairs.map(([child, childShadow]) => toRow(child, childShadow)),
       step,
+      need: shadow.status === 'blocked' && shadow.blockKind !== 'steps' ? shadow.blockAsk : null,
       health: healthWordsOf(planHealthOf(asPlan(shadow)), facts),
       move: moveWordsFor(
         planMoveOf(asPlan(shadow)),
@@ -251,7 +274,14 @@ export function goalRows(
 export function goalCatalog(
   roots: readonly StepNode[],
   numbers: ReadonlyMap<string, number>,
-): { id: string; number: number; title: string; parentId: string | null; depth: number; closed: boolean }[] {
+): {
+  id: string;
+  number: number;
+  title: string;
+  parentId: string | null;
+  depth: number;
+  closed: boolean;
+}[] {
   const out: ReturnType<typeof goalCatalog> = [];
   const walk = (list: readonly StepNode[], depth: number) => {
     for (const step of list) {
@@ -268,4 +298,59 @@ export function goalCatalog(
   };
   walk(roots, 0);
   return out;
+}
+
+/**
+ * The views over a goal's steps, as the dev plan has over the plan (note
+ * 9b6eba99): everything, what is still open, what waits on you, and what is
+ * ready for Dash to take.
+ */
+export const GOAL_VIEWS = ['all', 'open', 'you', 'ready'] as const;
+export type GoalView = (typeof GOAL_VIEWS)[number];
+
+export const GOAL_VIEW_LABEL: Record<GoalView, string> = {
+  all: 'Everything',
+  open: 'Open',
+  you: 'On you',
+  ready: 'Ready',
+};
+
+/** The healths the dev plan's "On you" view is made of (`needsThePerson` in lib/plan/tree.ts). */
+const ON_YOU: ReadonlySet<string> = new Set(['unanswered', 'proposed', 'blocked', 'setup']);
+
+function matchesGoalView(row: GoalRowNode, view: GoalView): boolean {
+  const open = row.status !== 'done' && row.status !== 'dropped';
+  switch (view) {
+    case 'all':
+      return true;
+    case 'open':
+      return open;
+    case 'you':
+      return open && ON_YOU.has(row.health.name);
+    case 'ready':
+      return open && row.health.name === 'ready';
+  }
+}
+
+/**
+ * The rows narrowed to a view. A row that does not match stays, dimmed, when
+ * something beneath it does, so a matching sub-step is still seen in its
+ * place -- the same rule as the plan's views.
+ */
+export function viewGoalRows(rows: readonly GoalRowNode[], view: GoalView): GoalRowNode[] {
+  if (view === 'all') return [...rows];
+  return rows.flatMap((row) => {
+    const children = viewGoalRows(row.children, view);
+    const matches = matchesGoalView(row, view);
+    if (!matches && children.length === 0) return [];
+    return [{ ...row, children, matches }];
+  });
+}
+
+/** How many rows, at any depth, a view matches. */
+export function countGoalView(rows: readonly GoalRowNode[], view: GoalView): number {
+  return rows.reduce(
+    (sum, row) => sum + (matchesGoalView(row, view) ? 1 : 0) + countGoalView(row.children, view),
+    0,
+  );
 }

@@ -10,7 +10,7 @@ import {
   type StoryPass,
 } from '@/lib/news/quick/next';
 import type { InterestRow } from '@/lib/news/quick/rank';
-import { markRead } from './read';
+import { markRead, markUnread } from './read';
 
 /**
  * How many newsletters Quick read looks through, newest first.
@@ -230,6 +230,59 @@ async function finishIfDone(client: NewsSupabaseClient, issueId: string): Promis
   const finished = issueFinished(toQuickIssue(issue.data as QuickRow), toPasses(passes.data));
   if (finished) await markRead(client, issueId);
   return finished;
+}
+
+/**
+ * Take back a page of passes (note 460be33e): Previous page on Quick read, for
+ * a Next page pressed too fast. The stories come back into the pool, and as
+ * they ranked above what replaced them, the page they were on comes back too.
+ *
+ * A story whose article you opened stays passed, with the interest it
+ * recorded: you read that one, so it was not skipped. A newsletter the page
+ * finished goes back to unread once it has stories left again.
+ */
+export async function unpassStories(
+  client: NewsSupabaseClient,
+  { stories }: { stories: readonly StoryPass[] },
+): Promise<void> {
+  const byIssue = new Map<string, number[]>();
+  for (const story of stories) {
+    byIssue.set(story.issueId, [...(byIssue.get(story.issueId) ?? []), story.storyIndex]);
+  }
+  await Promise.all(
+    [...byIssue].map(async ([issueId, indexes]) => {
+      const before = await readIssuePasses(client, issueId);
+      const removed = await client
+        .from('story_passes')
+        .delete()
+        .eq('issue_id', issueId)
+        .in('story_index', indexes)
+        .is('opened_at', null);
+      assertSchemaExposed(removed.error, NEWS_SCHEMA);
+      if (removed.error) {
+        throw new Error(`news: taking back those stories failed (${removed.error.message})`);
+      }
+      // Unread again only where this page is what finished it: a newsletter
+      // you read on its own page and never finished here keeps its mark.
+      const after = await readIssuePasses(client, issueId);
+      if (before && after && before.finished && !after.finished) {
+        await markUnread(client, issueId);
+      }
+    }),
+  );
+}
+
+/** One newsletter and whether every card it makes has been passed, read fresh. */
+async function readIssuePasses(
+  client: NewsSupabaseClient,
+  issueId: string,
+): Promise<{ finished: boolean } | null> {
+  const [issue, passes] = await Promise.all([
+    client.from('issues').select(QUICK_COLUMNS).eq('id', issueId).maybeSingle(),
+    client.from('story_passes').select('issue_id, story_index').eq('issue_id', issueId),
+  ]);
+  if (issue.error || !issue.data || passes.error) return null;
+  return { finished: issueFinished(toQuickIssue(issue.data as QuickRow), toPasses(passes.data)) };
 }
 
 /**
