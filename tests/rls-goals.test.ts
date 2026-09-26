@@ -1795,6 +1795,7 @@ describe('RLS coverage', () => {
     expect(tables.map((r) => r.tablename)).toEqual([
       'answers',
       'areas',
+      'briefs',
       'captures',
       'collection_goals',
       'collections',

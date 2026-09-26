@@ -15,6 +15,7 @@ import {
   User,
 } from 'lucide-react';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
+import { FileBody } from '@/components/files/file-body';
 import { Card } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -85,6 +86,8 @@ type View = Daily & {
   didYouGo?: Suggestion[];
   catchUp?: CatchUp | null;
   sinceVisit?: SinceVisit | null;
+  /** Claude's latest note on all the goals (goals.briefs), and when it was written. */
+  brief?: { body: string; when: string | null } | null;
 };
 
 const KIND_ICONS: Record<NextItem['kind'], typeof User> = { mine: User, claude: Sparkles };
@@ -180,6 +183,8 @@ export function DailyView({
     <SinceVisitView sinceVisit={view.sinceVisit} timeZone={timeZone} />
   );
 
+  const note = view.brief && <HomeBrief brief={view.brief} />;
+
   const hasDash =
     view.dash.ready.length + view.dash.held.length + (view.dash.running?.length ?? 0) > 0;
   if (view.goals.length === 0 && view.waiting.length === 0 && !lately && !hasDash) {
@@ -250,6 +255,7 @@ export function DailyView({
     ].filter(Boolean);
     return (
       <div className="space-y-6">
+        {note}
         <CatchUpView catchUp={view.catchUp} timeZone={timeZone} waiting={yourMove} />
         {folded.length > 0 && (
           <SectionFold title="Everything else" hint={folded.join(', ')} defaultOpen={false}>
@@ -262,10 +268,31 @@ export function DailyView({
 
   return (
     <div className="space-y-6">
+      {note}
       {lately}
       {yourMove}
       {rest}
     </div>
+  );
+}
+
+/**
+ * Claude's latest note across every goal (goals.briefs with no goal), written
+ * as the daily or weekly run finishes: what moved, what is waiting on you,
+ * what it will do next. The rows below are the full list; the note is the
+ * reading of it.
+ */
+function HomeBrief({ brief }: { brief: { body: string; when: string | null } }) {
+  return (
+    <section aria-labelledby="brief-heading">
+      <Card padding="standard" className="space-y-1">
+        <h2 id="brief-heading" className="text-ui font-semibold text-ink">
+          From Claude
+        </h2>
+        <FileBody markdown={brief.body} compact />
+        {brief.when && <p className="text-small text-ink-muted">Written {brief.when}</p>}
+      </Card>
+    </section>
   );
 }
 

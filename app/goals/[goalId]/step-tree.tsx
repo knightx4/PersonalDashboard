@@ -1,5 +1,6 @@
 'use client';
 
+import type { LinkedFile } from '@/lib/files/files';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ListFilter, ListTree } from 'lucide-react';
@@ -31,6 +32,7 @@ import type { InformationSeam } from './information-step';
 const RUN_POLL_MS = 15_000;
 
 const NO_RUNS: Record<string, StepRunView> = {};
+const NO_FILES: Record<string, LinkedFile[]> = {};
 
 /** What a narrowed view says when nothing is in it. */
 const EMPTY_VIEW: Record<Exclude<GoalView, 'all'>, { title: string; description: string }> = {
@@ -70,11 +72,14 @@ export function StepTree({
   opened = false,
   informationSeam,
   runs = NO_RUNS,
+  files = NO_FILES,
 }: {
   map: GoalMap;
   todoOn: boolean;
   /** The latest run on each step sent or prepared from its row, by step id (plan #1044). */
   runs?: Record<string, StepRunView>;
+  /** The files each step links to, by step id. */
+  files?: Record<string, LinkedFile[]>;
   /** Start with every step's sub-steps showing. */
   unfolded?: boolean;
   /** Start with every step opened. A seam for the gallery; nothing in the app passes it. */
@@ -113,6 +118,7 @@ export function StepTree({
       opened,
       informationSeam,
       runs,
+      files,
     };
     return {
       own: goalRows(map.steps, options),
@@ -122,7 +128,7 @@ export function StepTree({
       })),
       context,
     };
-  }, [map, todoOn, showAside, unfolded, opened, informationSeam, runs]);
+  }, [map, todoOn, showAside, unfolded, opened, informationSeam, runs, files]);
 
   const substeps = own.rows.filter((row) => row.kind !== 'decision');
   // A goal whose top-level steps hold steps of their own is laid out in
