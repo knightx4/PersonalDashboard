@@ -5,11 +5,12 @@ import { requireUser } from '@/lib/auth/server';
 import { newsAddress, newsDomainOrNull } from '@/lib/news/address';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { deliveryGap } from '@/lib/news/inbound/readiness';
+import { NEWS_TOPICS } from '@/lib/news/issues/topics';
 import { loadHiddenTopics } from '@/lib/news/quick/hidden-topics';
 import { loadOrCreateLocalPart } from '@/lib/news/settings/address';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { AddressCard } from './address-card';
-import { HiddenTopicList } from './hidden-topics';
+import { TopicPicker } from './hidden-topics';
 import { LocalAreaField } from './local-area';
 import { loadLocalArea } from '@/lib/news/settings/local-area';
 import { replaceAddress } from './actions';
@@ -18,7 +19,7 @@ export const metadata = { title: 'News settings' };
 export const dynamic = 'force-dynamic';
 
 /**
- * The address, and the topics hidden from Quick read (plan #861).
+ * The address, and the topics Quick read shows (plan #861, note ee75aef9).
  *
  * Opening this page for the first time is what creates the address -- there
  * is no button to press before the workspace works, and nothing to seed by
@@ -40,7 +41,7 @@ export default async function NewsSettingsPage() {
     <div className="mx-auto max-w-2xl">
       <PageHeader
         title="News settings"
-        description="The address newsletters are sent to, how to replace it, where Local news is about, and the topics kept out of Quick read."
+        description="The address newsletters are sent to, how to replace it, where Local news is about, and which topics Quick read shows."
       />
 
       <div className="space-y-5">
@@ -115,15 +116,14 @@ export default async function NewsSettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Hidden from Quick read</CardTitle>
+            <CardTitle>Topics in Quick read</CardTitle>
           </CardHeader>
           <CardBody className="space-y-4">
             <p className="text-body leading-relaxed text-ink-muted">
-              {hidden.length
-                ? 'Stories on these topics are left out of Quick read. They still show in the newsletter list and in each newsletter.'
-                : 'Nothing is hidden from Quick read.'}
+              Quick read shows stories on the ticked topics. Press a topic to hide it, and again to
+              bring it back. Hidden topics still show in the newsletter list and in each newsletter.
             </p>
-            {hidden.length > 0 && <HiddenTopicList topics={hidden} />}
+            <TopicPicker topics={NEWS_TOPICS} hidden={hidden} />
           </CardBody>
         </Card>
       </div>

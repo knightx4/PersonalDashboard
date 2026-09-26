@@ -20,6 +20,9 @@ import { AreasGrid, type OpenedThemes } from './areas-grid';
 import { destinationsFor, openedPlace, runnerUpOf, targetValue } from '@/lib/learn/areas/move';
 import { loadPlacedThemes } from '@/lib/learn/areas/themes-load';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { chooseTrackOffer } from '@/lib/learn/flow/offer';
+import { chooseRestingOffer } from '@/lib/learn/lessons/resting-load';
+import { TrackOffers } from '@/components/learn/track-offers';
 import { loadNotes } from '@/lib/vault/notes/load';
 
 /** How many notes the picker offers. Scaffolding; the sweep needs no picker. */
@@ -68,6 +71,20 @@ export default async function KnowPage({
   const subjects = await loadSubjects(supabase);
   const unfinished = await unfinishedSweep(supabase);
   const settings = await loadAccountSettings(user.id);
+
+  // One track offer a visit (note 8a1789df, moved here from Learn now): a
+  // resting track first (plan #1045), else a theme from your notes (plan
+  // #968). An offer that could not be worked out is an offer not made.
+  const resting = await chooseRestingOffer(supabase, user.id).catch((error: unknown) => {
+    console.error('[learn tracks] resting track', error instanceof Error ? error.message : error);
+    return null;
+  });
+  const themeOffer = resting
+    ? null
+    : await chooseTrackOffer(supabase, vault).catch((error: unknown) => {
+        console.error('[learn tracks] track offer', error instanceof Error ? error.message : error);
+        return null;
+      });
 
   // Scaffolding for the first slice of the vault pass: a list to pick one note
   // out of. The sweep that follows picks its own and needs no list, so this is
@@ -134,6 +151,8 @@ export default async function KnowPage({
       />
 
       {making && <CustomTrackForm />}
+
+      <TrackOffers offer={themeOffer} resting={resting} />
 
       {rows.length === 0 ? (
         <EmptyState

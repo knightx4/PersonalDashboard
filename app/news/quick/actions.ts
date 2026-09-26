@@ -100,10 +100,10 @@ export async function passQuickPage(formData: FormData): Promise<void> {
 }
 
 /**
- * Previous page on a laptop (note 460be33e): take back the passes the last
- * Next page recorded, so a page skipped too fast comes back. The form carries
- * the stories that page showed, which the browser kept when Next page was
- * pressed; nothing on the server remembers pages.
+ * Previous page on a laptop, and Back on a phone (note 460be33e): take back
+ * the passes the last Next page or Next story recorded, so what was skipped
+ * too fast comes back. The form carries the stories it showed, which the
+ * browser kept when Next was pressed; nothing on the server remembers pages.
  */
 // latency: pending
 export async function unpassQuickPage(formData: FormData): Promise<void> {

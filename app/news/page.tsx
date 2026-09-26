@@ -13,6 +13,7 @@ import {
   nextCard,
   quickHref,
   quickPage,
+  quickProgress,
   quickTopics,
   type QuickCard,
 } from '@/lib/news/quick/next';
@@ -81,6 +82,7 @@ export default async function QuickReadPage({
   const page = quickPage(issues, senders, passes, filter, undefined, signals);
   const wanted = params.pictures !== '0';
   const topics = quickTopics(issues, senders, passes, hidden, signals.groups);
+  const progress = quickProgress(issues, senders, passes, filter, signals.groups);
 
   // The saved headlines of every newsletter on the page, read once each.
   const issueIds = [...new Set([card, upNext, ...page].flatMap((c) => (c ? [c.issueId] : [])))];
@@ -102,6 +104,7 @@ export default async function QuickReadPage({
       arrived={card ? formatArrival(card.receivedAt, settings.timezone) : null}
       nothingYet={issues.length === 0}
       hiddenCount={hidden.length}
+      progress={progress}
       saved={saved}
       reaction={card ? reactionOf(card) : null}
       pictures={wanted}
