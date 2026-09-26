@@ -155,6 +155,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'match-evidence': run(OPUS, 10_000, 3_000),
   'draft-answer': run(OPUS, 6_000, 800),
   'propose-evidence': run(OPUS, 8_000, 3_000),
+  'suggest-learning-tracks': run(OPUS, 4_000, 900),
 
   // Shopping. Reading order emails is per email: inbox sync does it in the
   // background, and the reparse and review buttons know how many they send.

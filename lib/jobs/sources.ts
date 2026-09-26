@@ -156,6 +156,7 @@ export const jobsSources: ModuleSources = {
     { table: 'job_search.ingested_messages', reason: 'Mail sync bookkeeping.' },
     { table: 'job_search.interview_groups', reason: 'Groups the interviews of one loop; the interviews hold the notes.' },
     { table: 'job_search.interview_group_messages', reason: 'Join rows between groups and mail.' },
+    { table: 'job_search.learning_tracks', reason: 'Tracks Claude suggested from the career goals; the ones started are Learn goals in learn.aims.' },
     { table: 'job_search.interview_participants', reason: 'Join rows between interviews and contacts.' },
     { table: 'job_search.message_link_dismissals', reason: 'Dismissed suggestions in the inbox.' },
     { table: 'job_search.quiet_dismissals', reason: 'Dismissed quiet-application nudges.' },

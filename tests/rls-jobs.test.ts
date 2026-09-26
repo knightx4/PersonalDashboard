@@ -199,6 +199,12 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.thoughts = thought.id;
 
+  const [track] = await admin<{ id: string }[]>`
+    insert into learning_tracks (user_id, name, why)
+    values (${userId}, ${`${tag} finance systems`}, 'The roles ask for it.')
+    returning id`;
+  ids.learning_tracks = track.id;
+
   return ids;
 }
 
