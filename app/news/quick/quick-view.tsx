@@ -31,6 +31,11 @@ export type QuickReadViewProps = {
   nothingYet: boolean;
   /** How many topics are hidden in News settings, so caught up can say they are set aside. */
   hiddenCount?: number;
+  /**
+   * How many of the stories Quick read could show under this topic have been
+   * read, of how many (note 0a5ff399). Left out, no count is drawn.
+   */
+  progress?: { read: number; total: number } | null;
   /** Whether the card's story is on the Saved list (plan #869). */
   saved?: boolean;
   /** The thumbs up or down already pressed on the card, if any. */
@@ -77,6 +82,7 @@ export function QuickReadView({
   arrived,
   nothingYet,
   hiddenCount = 0,
+  progress = null,
   saved = false,
   reaction = null,
   pictures,
@@ -151,23 +157,32 @@ export function QuickReadView({
       <PageHeader
         title="Quick read"
         actions={
-          showToggle && (
-            <Link
-              href={picturesHref}
-              className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), toggleWidth)}
-            >
-              {pictures ? (
-                <>
-                  <ImageOff className="size-3.5" strokeWidth={1.75} aria-hidden />
-                  Hide pictures
-                </>
-              ) : (
-                <>
-                  <ImageIcon className="size-3.5" strokeWidth={1.75} aria-hidden />
-                  Show pictures
-                </>
+          (progress || showToggle) && (
+            <div className="flex items-center gap-3">
+              {progress && (
+                <span className="text-small text-ink-muted tabular-nums">
+                  {progress.read} of {progress.total} read
+                </span>
               )}
-            </Link>
+              {showToggle && (
+                <Link
+                  href={picturesHref}
+                  className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), toggleWidth)}
+                >
+                  {pictures ? (
+                    <>
+                      <ImageOff className="size-3.5" strokeWidth={1.75} aria-hidden />
+                      Hide pictures
+                    </>
+                  ) : (
+                    <>
+                      <ImageIcon className="size-3.5" strokeWidth={1.75} aria-hidden />
+                      Show pictures
+                    </>
+                  )}
+                </Link>
+              )}
+            </div>
           )
         }
       />
