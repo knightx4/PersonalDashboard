@@ -6,6 +6,7 @@ import {
   cardPrompt,
   readCardReport,
   whyLine,
+  describePick,
   writeCard,
   type CardToWrite,
 } from './write-card';
@@ -89,6 +90,16 @@ describe('the why line for a goal', () => {
   it('names it when the goal sits in no field', () => {
     expect(whyLine({ ...interest, reason: 'goal', themeName: null, aimName: 'Startup finance', field: null })).toBe(
       'For your goal: Startup finance.',
+    );
+  });
+  it('names the phrase and the card it was asked for on (plan #1057)', () => {
+    const asked = { ...interest, reason: 'asked' as const, themeName: null, field: null, askedPhrase: 'tree search' };
+    expect(whyLine({ ...asked, askedOn: 'AlphaGo beat Lee Sedol' })).toBe(
+      'You asked for a card on “tree search” from AlphaGo beat Lee Sedol.',
+    );
+    expect(whyLine(asked)).toBe('You asked for a card on “tree search”.');
+    expect(describePick({ ...asked, askedOn: 'AlphaGo beat Lee Sedol' })).toContain(
+      'they met the phrase "tree search" on a card about AlphaGo beat Lee Sedol',
     );
   });
 });

@@ -76,12 +76,15 @@ export type CardToWrite = {
   id: string;
   /** The catalogue segment, for finding the ideas already held near it. */
   segmentId?: string | null;
-  reason: 'interest' | 'gap' | 'goal';
+  reason: 'interest' | 'gap' | 'goal' | 'asked';
   /** The theme it was picked for; set for interest. */
   themeName: string | null;
   /** The goal it was picked for; set for a goal card (plan #900). */
   aimName: string | null;
-  /** Null only for a goal card whose goal is not placed in a field. */
+  /** The phrase it was asked for, and the card it was on; set for asked (plan #1057). */
+  askedPhrase?: string | null;
+  askedOn?: string | null;
+  /** Null for a goal card whose goal is not placed in a field, and for an asked card. */
   field: { name: string; scope: string } | null;
   /**
    * For a gap: whether the person writes about the field (untested) or has
@@ -146,8 +149,16 @@ function midSentence(name: string): string {
 }
 
 /** The line under the card's title saying why it is in the feed. */
-export function whyLine(card: Pick<CardToWrite, 'reason' | 'themeName' | 'aimName' | 'field' | 'gap'>): string {
+export function whyLine(
+  card: Pick<CardToWrite, 'reason' | 'themeName' | 'aimName' | 'field' | 'gap' | 'askedPhrase' | 'askedOn'>,
+): string {
   if (card.reason === 'goal' && card.aimName) return `For your goal: ${card.aimName.trim()}.`;
+  if (card.reason === 'asked' && card.askedPhrase) {
+    const on = card.askedOn?.trim();
+    return on
+      ? `You asked for a card on “${card.askedPhrase.trim()}” from ${on}.`
+      : `You asked for a card on “${card.askedPhrase.trim()}”.`;
+  }
   const field = card.field?.name ?? 'a field';
   if (card.reason === 'interest' && card.themeName) {
     return `You write about ${midSentence(card.themeName)} (${field}).`;
@@ -208,7 +219,11 @@ const payloadSchema = z.object({
 export function describePick(card: CardToWrite): string {
   const field = card.field ? `${card.field.name}. ${card.field.scope}` : '';
   const pick =
-    card.reason === 'goal' && card.aimName
+    card.reason === 'asked' && card.askedPhrase
+      ? `Asked for by name: they met the phrase "${card.askedPhrase.trim()}"` +
+        (card.askedOn?.trim() ? ` on a card about ${card.askedOn.trim()}` : '') +
+        ' and want a card of its own on it. Write the ideas that explain it, and say the section does not serve only when it is not about it.'
+      : card.reason === 'goal' && card.aimName
       ? `Picked for a goal they set themselves: ${card.aimName}.` +
         (card.field ? ` The field it sits in: ${field}` : ' It sits in no one field.')
       : card.reason === 'interest' && card.themeName

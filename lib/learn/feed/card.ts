@@ -14,7 +14,7 @@ import type { TalkTurn } from '@/lib/talk/talk';
 
 export type FeedCardRow = {
   id: string;
-  reason: 'interest' | 'gap' | 'goal' | 'queued' | 'lesson' | 'unit_check';
+  reason: 'interest' | 'gap' | 'goal' | 'queued' | 'lesson' | 'unit_check' | 'asked';
   status: string;
   /** The idea's short name. Null on cards written before one idea per card. */
   idea_name?: string | null;
@@ -50,7 +50,7 @@ type CatalogueSegment = { heading: string | null; text: string; section_anchor: 
 
 export type FeedCard = {
   id: string;
-  reason: 'interest' | 'gap' | 'goal' | 'lesson' | 'unit_check';
+  reason: 'interest' | 'gap' | 'goal' | 'lesson' | 'unit_check' | 'asked';
   /**
    * A section card, made from a Wikipedia section, a lesson written for a
    * concept in one of your tracks (LEARN-LESSONS-SPEC; plan #978), or the
