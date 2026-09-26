@@ -357,3 +357,39 @@ describe('a stopped night on Dash', () => {
     expect(draw(stopped)).toContain('You stopped it.');
   });
 });
+
+describe('the goals half on Dash', () => {
+  const goals = {
+    on: [
+      {
+        id: 'r1',
+        doing: 'Working the goal step',
+        title: 'Find three courses',
+        at: '2026-09-17T04:10:00Z',
+        nowOn: 'Reading the course pages',
+      },
+    ],
+    readySteps: 2,
+    toMap: 0,
+  };
+
+  it('names a goal run going and counts goal steps ready', () => {
+    const html = draw({ goals });
+    expect(html).toContain('Working the goal step');
+    expect(html).toContain('Find three courses');
+    expect(html).toContain('20m');
+    expect(html).toContain('Reading the course pages');
+    expect(html).toContain('2 goal steps ready');
+  });
+
+  it('reads as Ready on a fresh card when only goals have work', () => {
+    const html = draw({
+      run: run({ running: false, endedAt: '2026-09-17T04:00:00Z', endedReason: 'You stopped it.' }),
+      fresh: true,
+      ready: 0,
+      goals: { on: [], readySteps: 1, toMap: 1 },
+    });
+    expect(html).toContain('Ready');
+    expect(html).toContain('1 goal step ready · 1 goal to map');
+  });
+});

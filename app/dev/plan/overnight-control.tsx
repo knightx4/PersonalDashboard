@@ -28,6 +28,7 @@ import {
   type FeatureProgress,
   type OnNow,
 } from '@/lib/digest/night';
+import { goalsReadyLine, type GoalOnLine, type GoalsStatus } from '@/lib/goals/runner-status';
 import { elapsedSince, remainingUntil } from '@/lib/plan/elapsed';
 import { commitSubject, type StoredPush } from '@/lib/plan/liveness';
 import { readyFeaturesLine } from '@/lib/plan/overnight-choice';
@@ -144,6 +145,43 @@ function OnFeature({
           <span className="sr-only">Working on</span>
           <span className="tabular text-ink">{fire.step.ref}</span>
           <span className="min-w-0 truncate text-ink">{fire.step.title}</span>
+        </p>
+      )}
+    </>
+  );
+}
+
+/**
+ * A goal run going now, drawn the way `OnFeature` draws a plan feature, with
+ * what the session last said it was on hung beneath it.
+ */
+function OnGoal({ run, now }: { run: GoalOnLine; now: number }) {
+  return (
+    <>
+      <p className="text-small text-ink-muted">
+        {run.doing}
+        {run.title && (
+          <>
+            {' '}
+            <span className="text-ink">{run.title}</span>
+          </>
+        )}
+        {now > 0 && (
+          <>
+            {' · '}
+            <span className="tabular">{elapsedSince(run.at, now)}</span>
+          </>
+        )}
+      </p>
+      {run.nowOn && (
+        <p className="flex min-w-0 items-baseline gap-1.5 pl-2 text-small text-ink-muted">
+          <CornerDownRight
+            className="size-3 shrink-0 translate-y-0.5 text-ink-ghost"
+            strokeWidth={1.75}
+            aria-hidden
+          />
+          <span className="sr-only">Now on</span>
+          <span className="min-w-0 truncate text-ink">{run.nowOn}</span>
         </p>
       )}
     </>
@@ -357,6 +395,7 @@ export function OvernightControl({
   push,
   ready,
   readySteps,
+  goals = null,
   fresh = false,
   label = 'Overnight',
   bare = false,
@@ -381,6 +420,12 @@ export function OvernightControl({
   ready: number;
   /** The ready steps beneath those features, printed beside the count. */
   readySteps?: number;
+  /**
+   * The goals half of the same runner, as `goalsStatus` reads it: the goal
+   * runs going and what the next ticks could pick up. Dash passes it; the plan
+   * page is about the plan and leaves it off.
+   */
+  goals?: GoalsStatus | null;
   /**
    * Leave a finished run behind once it has stopped, and say only what is
    * ready for the next one.
@@ -463,6 +508,7 @@ export function OvernightControl({
   const live = standing === 'running' || standing === 'paused';
   // A stopped run on a fresh card reads as one that was never started.
   const resting = fresh && !live;
+  const goalsReady = goals ? goalsReadyLine(goals) : null;
 
   const router = useRouter();
   useEffect(() => {
@@ -519,7 +565,7 @@ export function OvernightControl({
           <Moon className="size-4 text-ink-muted" aria-hidden />
           {label}
         </span>
-        {resting && ready > 0 ? (
+        {resting && (ready > 0 || goalsReady) ? (
           <StateLabel glyph="half" word={DEV_STATE_WORD.ready} tone="accent" />
         ) : (
           <OvernightState standing={resting ? 'off' : standing} />
@@ -540,6 +586,7 @@ export function OvernightControl({
             Said in both states, because before bed it is what decides whether
             to start a night at all. */}
         <p className="text-small text-ink-muted">{readyFeaturesLine(ready, readySteps)}</p>
+        {goalsReady && <p className="text-small text-ink-muted">{goalsReady}</p>}
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {standing === 'running' && (
@@ -690,6 +737,16 @@ export function OvernightControl({
           />
           {showBlocked && night.blocked.length > 0 && <BlockedSteps night={night} />}
           {night.closed.length > 0 && <WhichSteps night={night} />}
+        </div>
+      )}
+
+      {/* Goal runs, whoever started them: a step sent by hand is still the
+          thing Dash is working on, and it is on no plan row. */}
+      {goals && goals.on.length > 0 && (
+        <div className="space-y-0.5">
+          {goals.on.map((run) => (
+            <OnGoal key={run.id} run={run} now={now} />
+          ))}
         </div>
       )}
 

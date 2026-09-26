@@ -1,6 +1,7 @@
 import { OvernightControl } from '@/app/dev/plan/overnight-control';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { Card } from '@/components/ui/card';
+import type { GoalsStatus } from '@/lib/goals/runner-status';
 import type { NotesLastRun } from '@/lib/feedback/last-worked';
 import type { OvernightRun } from '@/lib/plan/overnight';
 import type { RunnerCard } from '@/lib/plan/runner-card';
@@ -28,6 +29,7 @@ export function StatusPanel({
   run,
   canSend,
   card,
+  goals,
   openNotes,
   notesLastRun,
 }: {
@@ -36,6 +38,8 @@ export function StatusPanel({
   canSend: boolean;
   /** What the runner's card says, as `runnerCard` reads it for both pages. */
   card: RunnerCard;
+  /** The goals half of the same runner, or null when it could not be read. */
+  goals: GoalsStatus | null;
   /** Outstanding notes, so "run it" is an answerable question. */
   openNotes: number;
   /** What the notes routine did last, so the row says something between runs. */
@@ -54,6 +58,7 @@ export function StatusPanel({
         push={card.push}
         ready={card.ready}
         readySteps={card.readySteps}
+        goals={goals}
         next={card.next}
         fresh
         label="Plan"

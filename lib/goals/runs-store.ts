@@ -77,3 +77,15 @@ export async function loadRunsEndedSince(
   if (error) throw new Error(`Could not read the runs since your last visit: ${error.message}`);
   return toRunListings((data ?? []) as unknown as RunRowWithItem[]);
 }
+
+/** Runs still marked started, for the Status panel on Dash; `runOutcome` says which are really going. */
+export async function loadStartedGoalRuns(client: GoalsSupabaseClient): Promise<RunListing[]> {
+  const { data, error } = await client
+    .from('runs')
+    .select(RUN_SELECT)
+    .eq('status', 'started')
+    .order('created_at', { ascending: false })
+    .limit(GOAL_RUNS_SHOWN);
+  if (error) throw new Error(`Could not read the goal runs going: ${error.message}`);
+  return toRunListings((data ?? []) as unknown as RunRowWithItem[]);
+}

@@ -18,12 +18,31 @@ import { ConversationsView } from './conversations-view';
 import { DigestPanel } from './digest-panel';
 import { RaisedView } from './raised-view';
 import { StatusPanel } from './status-panel';
+import { createGoalsClient } from '@/lib/goals/auth/server';
+import { loadStartedGoalRuns } from '@/lib/goals/runs-store';
+import { goalsStatus } from '@/lib/goals/runner-status';
+import { loadGoalsNight } from '@/inngest/goals/overnight';
 
 export const metadata = { title: 'Dash' };
 
 /** The time the check-backs are measured against. Outside the component because it reads the clock. */
 function readClock(): number {
   return Date.now();
+}
+
+/** The goal runs going and the goals night's rows, or null when they could not be read. */
+async function readGoals(userId: string) {
+  try {
+    const client = await createGoalsClient();
+    const [started, night] = await Promise.all([
+      loadStartedGoalRuns(client),
+      loadGoalsNight(client, userId, readClock()),
+    ]);
+    return { started, night };
+  } catch (error) {
+    console.error(`Dash could not read the goal runs: ${(error as Error).message}`);
+    return null;
+  }
 }
 
 /**
@@ -51,6 +70,9 @@ function readClock(): number {
 export default async function DevRaisedPage() {
   const user = await requireUser();
   const supabase = await createClient();
+  // The goals half of the same runner, read alongside the rest. A goals read
+  // that fails leaves the Plan row as it was rather than taking the page down.
+  const goalsRead = readGoals(user.id);
   const [
     queue,
     digest,
@@ -116,6 +138,16 @@ export default async function DevRaisedPage() {
     lastRuns: Object.values(lastRuns),
   });
 
+  // What the goals half is on and what it could pick up.
+  const goalsRows = await goalsRead;
+  const goals = goalsRows
+    ? goalsStatus({
+        ...goalsRows,
+        nightStartedAt: overnight?.running ? overnight.startedAt : null,
+        now,
+      })
+    : null;
+
   // What every "#494" on this page is called. Built once here rather than
   // looked up where each one is drawn: a raise with nine references in it
   // would otherwise be nine lookups inside a render.
@@ -131,6 +163,7 @@ export default async function DevRaisedPage() {
         run={overnight}
         canSend={Boolean(planRoutine().token)}
         card={card}
+        goals={goals}
         openNotes={openNotes.count ?? 0}
         notesLastRun={notesLastRun}
       />
