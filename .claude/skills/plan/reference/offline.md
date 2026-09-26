@@ -22,6 +22,11 @@ select d.depends_on_id, p.number, p.title, p.status
 from plan_dependencies d join plan_items p on p.id = d.depends_on_id
 where d.item_id = '…';
 
+-- the visions, when shaping: one row per workspace that has one, keyed by
+-- workspace id, and the app's under 'app'. The feature's detail opens with
+-- the part of its workspace's vision it serves.
+select module, body from module_visions where user_id = '…';
+
 -- a proposal, when shaping (steps beneath: same, with parent_id set)
 insert into plan_items (user_id, module, title, detail, acceptance, size, status, position)
 values ('…', 'shopping', '…', '…', '…', 'l', 'proposed', 10)

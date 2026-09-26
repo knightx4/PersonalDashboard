@@ -235,6 +235,20 @@ in one line:
 
 Never mark a note `done` with the fix unverified, and never silently drop one.
 
+## When a note works against the vision
+
+Each workspace has a vision on the specs page, saying what it is for, and the
+app has one for the whole. Read the one for the note's workspace (the page path
+says which) with `select module, body from module_visions where user_id = '…'`;
+the app's is stored under `app`.
+
+A note that asks for something the vision argues against is not yours to
+settle by building it. Raise it, quoting the note and the passage of the vision
+it contradicts, with the ask being whether the vision changes or the note is
+declined. Then block the note, naming the raise. If part of the note does not
+depend on the answer, such as a bug on the same screen, fix that part first and
+say in the block note what was fixed.
+
 ## When something belongs to nobody's note
 
 Three places take something a session has to say, and they are not

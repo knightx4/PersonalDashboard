@@ -8,9 +8,10 @@ import { threadText } from '@/lib/comments/context';
 import { codeMatches } from '@/lib/feedback/code';
 import { planRoutine } from '@/lib/feedback/routine';
 import { IDEA_COLUMNS, ideaRowFrom } from '@/lib/ideas/load';
-import { FOG_RULE, PLAIN_ENGLISH_RULE, QUESTION_RULE } from '@/lib/plan/brief';
+import { FOG_RULE, PLAIN_ENGLISH_RULE, QUESTION_RULE, visionFor } from '@/lib/plan/brief';
 import { MODULE_IDS, MODULES } from '@/lib/modules';
 import { startRoutineRun } from '@/lib/plan/runs';
+import { loadVisionBodies } from '@/lib/specs/vision';
 
 export type IdeaActionState = {
   error?: string;
@@ -236,6 +237,10 @@ export async function shapeIdea(
   const scope = idea.module;
   const label = scope ? (MODULES.find((m) => m.id === scope)?.label ?? scope) : 'the app as a whole';
   const said = threadText(idea.thread);
+  // The feature has to name the part of this vision it serves (shaping.md),
+  // chosen by the same rule as a step brief's: the workspace's, or the app's
+  // for an idea about the whole app, and none for a workspace without one.
+  const vision = visionFor({ module: scope }, await loadVisionBodies(supabase, user.id));
 
   const text =
     `Shape idea ${String(idea.id).slice(0, 8)} into the plan, following ` +
@@ -244,6 +249,7 @@ export async function shapeIdea(
     'each with a done-when and a size, all in the proposed status and linked back to the idea. ' +
     'Do not build anything and do not approve anything.\n\n' +
     `${PLAIN_ENGLISH_RULE}\n\n${FOG_RULE}\n\n${QUESTION_RULE}\n\n` +
+    (vision ? `## Vision\n\n${vision}\n\n` : '') +
     `Idea ${idea.id} (about ${label}):\n\n${idea.body}\n` +
     (said ? `\n${said}` : '');
 
