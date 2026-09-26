@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   AWAY_DAYS,
-  CATCH_UP_RUNS_SHOWN,
   SITTING_MINUTES,
   catchUp,
   catchUpSince,
@@ -9,7 +8,6 @@ import {
   type VisitRecord,
 } from './catch-up';
 import type { DailyGoal } from './daily';
-import type { RunListing } from './runs';
 
 const at = (iso: string) => new Date(iso);
 
@@ -80,22 +78,6 @@ describe('nextVisit sittings (plan #1010)', () => {
   });
 });
 
-function run(id: string, extra: Partial<RunListing> = {}): RunListing {
-  return {
-    id,
-    job: 'daily',
-    status: 'done',
-    createdAt: '2026-09-20T06:00:00Z',
-    endedAt: '2026-09-20T06:10:00Z',
-    summary: `Run ${id}`,
-    error: null,
-    lastSeenAt: null,
-    nowOn: null,
-    item: null,
-    ...extra,
-  };
-}
-
 function daily(id: string, next: string[]): DailyGoal {
   return {
     goal: {
@@ -119,32 +101,8 @@ function daily(id: string, next: string[]): DailyGoal {
 describe('catchUp', () => {
   const since = '2026-09-18T08:00:00Z';
 
-  it('keeps the runs that finished while away, newest first', () => {
-    const result = catchUp(
-      since,
-      [
-        run('old', { endedAt: '2026-09-17T06:00:00Z' }),
-        run('failed', { status: 'failed', endedAt: '2026-09-21T06:00:00Z' }),
-        run('a', { endedAt: '2026-09-19T06:00:00Z' }),
-        run('b', { endedAt: '2026-09-22T06:00:00Z' }),
-      ],
-      { goals: [], waiting: [] },
-    );
-    expect(result.runs.map((r) => r.id)).toEqual(['b', 'a']);
-    expect(result.moreRuns).toBe(0);
-  });
-
-  it('caps the runs and counts the rest', () => {
-    const runs = Array.from({ length: CATCH_UP_RUNS_SHOWN + 2 }, (_, i) =>
-      run(`r${i}`, { endedAt: `2026-09-2${i % 5}T06:0${i}:00Z` }),
-    );
-    const result = catchUp(since, runs, { goals: [], waiting: [] });
-    expect(result.runs).toHaveLength(CATCH_UP_RUNS_SHOWN);
-    expect(result.moreRuns).toBe(2);
-  });
-
   it('takes one next step per goal and skips a goal with none', () => {
-    const result = catchUp(since, [], {
+    const result = catchUp(since, {
       goals: [daily('g1', ['First', 'Second']), daily('g2', []), daily('g3', ['Only'])],
       waiting: [],
     });
