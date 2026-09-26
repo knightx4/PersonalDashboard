@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { FieldError, InlineInput } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { awaitsSeenIt } from '@/lib/goals/answer-change';
+import type { LinkedFile } from '@/lib/files/files';
 import { awaitsReview } from '@/lib/goals/daily';
 import { offersPrepare, offersSend, sendJob } from '@/lib/goals/handover';
 import type { GoalRowNode } from '@/lib/goals/plan-rows';
@@ -81,6 +82,8 @@ const GOAL_TREE_ACTIONS: TreeActions = {
 const GOAL_COMMENTS = { target: 'goal' as const, store: GOALS_STORE };
 
 /** What every row on one goal page shares. */
+const NO_FILES: LinkedFile[] = [];
+
 export type GoalRowContext = {
   goalTitle: string;
   todoOn: boolean;
@@ -98,6 +101,8 @@ export type GoalRowContext = {
   informationSeam?: InformationSeam;
   /** The latest run on each step sent or prepared from its row, by step id (plan #1044). */
   runs: Record<string, StepRunView>;
+  /** The files each step links to, by step id (core.files through goals.links). */
+  files?: Record<string, LinkedFile[]>;
 };
 
 /**
@@ -384,6 +389,7 @@ export function GoalRow({
     : [];
   const handedOver = (sendState.error ?? sendState.message) ? sendState : prepareState;
   const run = context.runs[step.id];
+  const stepFiles = context.files?.[step.id] ?? NO_FILES;
   // Once the page holds the run a press started, its line says what the
   // press's message said and more, so the message gives way to it. A refusal
   // is still said: it started nothing.
@@ -529,10 +535,13 @@ export function GoalRow({
           {isDecision &&
             step.status !== 'dropped' &&
             (step.status === 'open' || step.resolution !== null) && <Question node={step} />}
-          {step.kind === 'claude' && (awaitsReview(step) || step.result || step.resultUrl) && (
-            <ClaudeResult node={step} />
+          {step.kind === 'claude' &&
+            (awaitsReview(step) || step.result || step.resultUrl || stepFiles.length > 0) && (
+              <ClaudeResult node={step} files={stepFiles} />
+            )}
+          {step.kind === 'mine' && (step.result || step.resultUrl || stepFiles.length > 0) && (
+            <ClaudeResult node={step} files={stepFiles} />
           )}
-          {step.kind === 'mine' && (step.result || step.resultUrl) && <ClaudeResult node={step} />}
           {rhythm && rhythm.past.length > 0 && step.rhythmPeriod && (
             <PastPeriods past={rhythm.past} period={step.rhythmPeriod} />
           )}
