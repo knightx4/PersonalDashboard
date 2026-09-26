@@ -99,8 +99,11 @@ export function dailyRunText(input: {
           '',
           'Follow .claude/skills/goals/SKILL.md, the section "The morning run". For each step,',
           'produce what its title and done-when ask for, store it in the step\'s result (and',
-          'result_url when it lives somewhere with a link), and close the step as done. A step',
-          'you cannot finish stays open, with the reason in the run summary.',
+          'result_url when it lives somewhere with a link), and close the step as done. Anything',
+          'longer than a few lines goes in a file linked from the step, with its summary as the',
+          'result (the section "Files"). A step you cannot finish stays open, with the reason in',
+          'the run summary. Before closing the run, leave a note on each goal you worked and one',
+          'for the Goals home (the section "Leaving a note").',
           '',
         ]
       : []),
