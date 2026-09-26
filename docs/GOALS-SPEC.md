@@ -283,9 +283,13 @@ Every automated job is a routine run. Runs count against the Claude plan's
 usage and daily routine limits, and the dev plan and overnight runner draw on
 the same allowance. So Goals runs on a schedule rather than on every change:
 
-- **Daily, early morning.** When a `claude` step is ready, one run works up
-  to ten of them (`DAILY_STEP_LIMIT` in `lib/goals/daily-run.ts`) and the
-  rest wait for the next morning. You open the app about once a day, so this
+- **Daily, early morning.** While any goal is open, one run gives each open
+  goal its status for the day (plan #1074): on track, stalled, waiting on
+  you, waiting on a date or waiting on another goal, with one sentence on
+  why, the next move and its date. A goal with nothing done in three weeks
+  reads stalled, and its next move is added as a step (plan #1018). The
+  same run then works up to ten ready `claude` steps (`DAILY_STEP_LIMIT` in
+  `lib/goals/daily-run.ts`) and the rest wait for the next morning. You open the app about once a day, so this
   is when the work has to be ready. The morning run does not map new or
   foggy goals; the night run does that.
 - **Overnight.** While the overnight runner on `/dev/plan` is started, it
@@ -293,11 +297,7 @@ the same allowance. So Goals runs on a schedule rather than on every change:
   once a night, and then works ready `claude` steps one at a time between
   features. See "Claude's
   own work" below.
-- **Weekly.** A verdict on each open goal against its done-when: on track,
-  stalled or waiting on you, with one sentence on why and the next move,
-  shown on the goal's card on the Goals home. A goal with nothing done in
-  three weeks reads stalled, and its next move is added as a step
-  (plan #1018). Then research for each goal of the kinds of help it asks for:
+- **Weekly.** Research for each goal of the kinds of help it asks for:
   events, volunteer openings, reading, courses or job leads (plan #1028).
   Each suggestion carries its kind and has quick **going / not for me**
   buttons, and the next week's research for a kind reads the reactions to
@@ -455,7 +455,7 @@ waiting on your approval looks under way:
 - **Dash is on it**: the runs going now, the Claude steps the next morning
   run will work, and the Claude steps held until you approve the goal they
   sit under or the action they would take.
-- **Your goals**: each goal's bar, its weekly verdict and the way into its
+- **Your goals**: each goal's bar, its status and the way into its
   tree.
 
 A phase closes itself once every step under it is closed
@@ -783,8 +783,11 @@ A sketch for the migration, not the migration itself.
   whether it was kept.
 - `goals.suggestions`: what Claude suggested, the kind of help it is, your
   reaction, and whether it happened.
-- `goals.reviews`: the weekly verdict on each open goal, with why, the next
-  move, the step proposed for a stalled one, and the run that wrote it.
+- `goals.reviews`: each open goal's status, one row a day from the morning
+  run: the verdict, why, the next move and its date (`next_on`), the step
+  proposed for a stalled one, the goal a `waiting_on_goal` one waits on
+  (`waits_on_id`), and the run that wrote it. The newest row per goal is its
+  status (`loadLatestReviews` in `lib/goals/reviews-store.ts`).
 - `goals.runs`: one row per routine run, as `plan_runs` does for the dev plan.
   `job` says what fired it (`daily`, `weekly`, `goal`, `reshape`, `step`,
   `phase` or `prepare`), `item_id` the goal or step it is on, and

@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
+import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
+  REVIEW_CURRENT_HOURS,
   STALLED_AFTER_DAYS,
+  VERDICTS,
+  VERDICT_LABELS,
   goalActivity,
+  isCurrent,
   latestByGoal,
   reviewGoals,
   reviewLines,
   toReview,
   type GoalReview,
+  type ReviewRow,
 } from '@/lib/goals/reviews';
+import { REVIEWS_SHOWN_FOR_DAYS, loadLatestReviews } from '@/lib/goals/reviews-store';
 import type { Goal } from '@/lib/goals/tree';
 
 const NOW = Date.parse('2026-10-01T12:00:00Z');
@@ -34,7 +41,9 @@ function review(over: Partial<GoalReview>): GoalReview {
     verdict: 'on_track',
     reason: 'Two steps closed this week.',
     nextMove: 'Pay the Visa.',
+    nextOn: null,
     stepId: null,
+    waitsOnId: null,
     runId: 'run-1',
     createdAt: '2026-09-24T12:00:00Z',
     ...over,
@@ -86,7 +95,7 @@ describe('reviewGoals', () => {
     expect(reviewGoals([goal({})], activity, new Map(), NOW)[0]).toMatchObject({ quietDays: 6, stalled: false });
   });
 
-  it('leaves out goals that are not open, and carries last week’s verdict', () => {
+  it('leaves out goals that are not open, and carries the last verdict', () => {
     const last = review({ verdict: 'waiting_on_you' });
     const goals = reviewGoals(
       [goal({}), goal({ id: 'x', status: 'proposed' }), goal({ id: 'd', status: 'done' })],
@@ -101,7 +110,7 @@ describe('reviewGoals', () => {
 });
 
 describe('reviewLines', () => {
-  it('states the done-when, the last thing done and last week’s verdict', () => {
+  it('states the done-when, the last thing done and the last verdict', () => {
     const lines = reviewLines({
       id: 'g',
       title: 'Pay off the cards',
@@ -154,11 +163,112 @@ describe('rows', () => {
       verdict: 'stalled',
       reason: 'Quiet.',
       next_move: 'Call.',
+      next_on: null,
       step_id: 's',
+      waits_on_id: null,
       run_id: null,
       created_at: '2026-09-24T12:00:00Z',
     };
     expect(toReview(row)).toMatchObject({ goalId: 'g', verdict: 'stalled', nextMove: 'Call.', stepId: 's' });
     expect(toReview({ ...row, verdict: 'done' })).toBeNull();
+  });
+
+  it('reads the two waiting verdicts with their date and the goal waited on', () => {
+    const base = {
+      id: 'r',
+      item_id: 'g',
+      reason: 'Nothing can move before the info session.',
+      next_move: 'Go to the TA info session.',
+      step_id: null,
+      run_id: 'run-1',
+      created_at: '2026-09-26T12:00:00Z',
+    };
+    expect(
+      toReview({ ...base, verdict: 'waiting_on_date', next_on: '2026-10-02', waits_on_id: null }),
+    ).toMatchObject({ verdict: 'waiting_on_date', nextOn: '2026-10-02', waitsOnId: null });
+    expect(toReview({ ...base, verdict: 'waiting_on_goal', next_on: null, waits_on_id: 'h' })).toMatchObject({
+      verdict: 'waiting_on_goal',
+      nextOn: null,
+      waitsOnId: 'h',
+    });
+  });
+
+  it('labels all five verdicts', () => {
+    expect(VERDICTS).toEqual(['on_track', 'stalled', 'waiting_on_you', 'waiting_on_date', 'waiting_on_goal']);
+    expect(VERDICTS.map((v) => VERDICT_LABELS[v])).toEqual([
+      'On track',
+      'Stalled',
+      'Waiting on you',
+      'Waiting on a date',
+      'Waiting on another goal',
+    ]);
+  });
+});
+
+describe('isCurrent', () => {
+  it('holds a status written in the last day and a half, and no older', () => {
+    const at = (hours: number) => new Date(NOW - hours * 60 * 60 * 1000).toISOString();
+    expect(isCurrent(review({ createdAt: at(20) }), NOW)).toBe(true);
+    expect(isCurrent(review({ createdAt: at(REVIEW_CURRENT_HOURS) }), NOW)).toBe(true);
+    expect(isCurrent(review({ createdAt: at(REVIEW_CURRENT_HOURS + 1) }), NOW)).toBe(false);
+  });
+});
+
+describe('loadLatestReviews', () => {
+  function fakeClient(rows: ReviewRow[]) {
+    const calls: { method: string; args: unknown[] }[] = [];
+    const builder: Record<string, unknown> = {
+      then(resolve: (value: unknown) => unknown) {
+        return Promise.resolve({ data: rows, error: null }).then(resolve);
+      },
+    };
+    for (const name of ['select', 'gte', 'eq', 'order']) {
+      builder[name] = (...args: unknown[]) => {
+        calls.push({ method: name, args });
+        return builder;
+      };
+    }
+    const client = {
+      from: (table: string) => {
+        calls.push({ method: 'from', args: [table] });
+        return builder;
+      },
+    } as unknown as GoalsSupabaseClient;
+    return { client, calls };
+  }
+
+  function row(over: Partial<ReviewRow>): ReviewRow {
+    return {
+      id: 'r',
+      item_id: 'g',
+      verdict: 'on_track',
+      reason: 'Moving.',
+      next_move: 'Send three applications.',
+      next_on: null,
+      step_id: null,
+      waits_on_id: null,
+      run_id: 'run-1',
+      created_at: '2026-09-30T12:00:00Z',
+      ...over,
+    };
+  }
+
+  it('returns the newest status per goal, with the new verdicts, from the last four weeks', async () => {
+    const { client, calls } = fakeClient([
+      row({ id: 'g-old', created_at: '2026-09-29T12:00:00Z' }),
+      row({ id: 'g-new', verdict: 'waiting_on_date', next_on: '2026-10-02' }),
+      row({ id: 'h1', item_id: 'h', verdict: 'waiting_on_goal', waits_on_id: 'g' }),
+      row({ id: 'x', item_id: 'x', verdict: 'retired' }),
+    ]);
+    const latest = await loadLatestReviews(client, { userId: 'u', now: NOW });
+
+    expect([...latest.keys()].sort()).toEqual(['g', 'h']);
+    expect(latest.get('g')).toMatchObject({ id: 'g-new', verdict: 'waiting_on_date', nextOn: '2026-10-02' });
+    expect(latest.get('h')).toMatchObject({ verdict: 'waiting_on_goal', waitsOnId: 'g' });
+
+    expect(calls).toContainEqual({ method: 'from', args: ['reviews'] });
+    expect(calls).toContainEqual({ method: 'eq', args: ['user_id', 'u'] });
+    const since = new Date(NOW - REVIEWS_SHOWN_FOR_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    expect(calls).toContainEqual({ method: 'gte', args: ['created_at', since] });
   });
 });

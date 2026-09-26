@@ -1,12 +1,14 @@
 /**
- * The weekly verdict on each open goal (plan #1018).
+ * The status of each open goal (plans #1018, #1074).
  *
- * Once a week the weekly run reads every open goal against its done-when and
- * writes a row to goals.reviews (supabase/migrations-goals/0025): on track,
- * stalled or waiting on you, one sentence on why and one on the next move. A
- * stalled goal also gets that next move as a step under it, and the
- * database refuses a stalled verdict without one. The Goals home shows the
- * newest verdict on each goal's card.
+ * Every day the daily run reads every open goal against its done-when and
+ * writes a row to goals.reviews (supabase/migrations-goals/0025, 0046): one
+ * of five verdicts, one sentence on why, one on the next move, and the next
+ * move's date where it has one. A stalled goal also gets that next move as a
+ * step under it, and the database refuses a stalled verdict without one. A
+ * goal waiting on a date carries the date, and one waiting on another goal
+ * names that goal. The newest row per goal is its status, and the Goals
+ * pages show it.
  *
  * What the run cannot see for itself is when anything was last done on a
  * goal, so the brief says it for each goal, measured here: the newest of a
@@ -24,14 +26,34 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** Nothing done for this many days reads stalled, whatever else the goal has going. */
 export const STALLED_AFTER_DAYS = 21;
 
-export const VERDICTS = ['on_track', 'stalled', 'waiting_on_you'] as const;
+export const VERDICTS = [
+  'on_track',
+  'stalled',
+  'waiting_on_you',
+  'waiting_on_date',
+  'waiting_on_goal',
+] as const;
 export type Verdict = (typeof VERDICTS)[number];
 
 export const VERDICT_LABELS: Record<Verdict, string> = {
   on_track: 'On track',
   stalled: 'Stalled',
   waiting_on_you: 'Waiting on you',
+  waiting_on_date: 'Waiting on a date',
+  waiting_on_goal: 'Waiting on another goal',
 };
+
+/**
+ * How long a status counts as today's. The daily run writes one a day, so a
+ * status older than this means a run was missed, and a page can say so
+ * rather than show it as current.
+ */
+export const REVIEW_CURRENT_HOURS = 36;
+
+/** Whether a review is recent enough to stand as the goal's status now. */
+export function isCurrent(review: GoalReview, now: number): boolean {
+  return now - Date.parse(review.createdAt) <= REVIEW_CURRENT_HOURS * 60 * 60 * 1000;
+}
 
 export function isVerdict(value: unknown): value is Verdict {
   return typeof value === 'string' && (VERDICTS as readonly string[]).includes(value);
@@ -43,8 +65,12 @@ export type GoalReview = {
   verdict: Verdict;
   reason: string;
   nextMove: string;
+  /** The next move's date (YYYY-MM-DD), where it has one. Always set for waiting_on_date. */
+  nextOn: string | null;
   /** The step a stalled verdict came with. */
   stepId: string | null;
+  /** The other goal a waiting_on_goal verdict waits on. */
+  waitsOnId: string | null;
   runId: string | null;
   createdAt: string;
 };
@@ -55,12 +81,15 @@ export type ReviewRow = {
   verdict: string;
   reason: string;
   next_move: string;
+  next_on: string | null;
   step_id: string | null;
+  waits_on_id: string | null;
   run_id: string | null;
   created_at: string;
 };
 
-export const REVIEW_COLUMNS = 'id, item_id, verdict, reason, next_move, step_id, run_id, created_at';
+export const REVIEW_COLUMNS =
+  'id, item_id, verdict, reason, next_move, next_on, step_id, waits_on_id, run_id, created_at';
 
 /** A row as the app reads it, or null for a verdict this code does not know. */
 export function toReview(row: ReviewRow): GoalReview | null {
@@ -71,7 +100,9 @@ export function toReview(row: ReviewRow): GoalReview | null {
     verdict: row.verdict,
     reason: row.reason,
     nextMove: row.next_move,
+    nextOn: row.next_on ?? null,
     stepId: row.step_id,
+    waitsOnId: row.waits_on_id ?? null,
     runId: row.run_id,
     createdAt: row.created_at,
   };
@@ -145,7 +176,7 @@ export function goalActivity(
   return activity;
 }
 
-/** A goal as the weekly brief lists it for review. */
+/** A goal as the daily brief lists it for review. */
 export type ReviewGoal = {
   id: string;
   title: string;
@@ -155,7 +186,7 @@ export type ReviewGoal = {
   quietDays: number | null;
   /** Three weeks of nothing: the verdict has to be stalled. */
   stalled: boolean;
-  /** Last week's verdict, when there was one. */
+  /** The last verdict, when there was one. */
   last: GoalReview | null;
 };
 

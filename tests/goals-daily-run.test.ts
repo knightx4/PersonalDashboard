@@ -1,7 +1,8 @@
 /**
  * The morning goals run, as the daily cron calls it (plan #933): it fires the
  * goals routine once, with the run row written first, and only when there is
- * a Claude step to work and no morning run already today.
+ * an open goal to give a status (plan #1074) or work to do, and no morning
+ * run already today.
  *
  * The client is a stand-in that answers each table's query from a fixture and
  * records every insert and update, so what the run writes is checked without
@@ -37,6 +38,7 @@ function fakeClient(fixture: Fixture) {
       }
       if (table === 'areas') return { data: [{ id: 'area', name: 'Money' }], error: null };
       if (table === 'answers') return { data: fixture.answers ?? [], error: null };
+      if (table === 'reviews' || table === 'readings') return { data: [], error: null };
       return { data: fixture.items, error: null };
     };
     const builder: Record<string, unknown> = {
@@ -56,7 +58,7 @@ function fakeClient(fixture: Fixture) {
         return Promise.resolve(result()).then(resolve);
       },
     };
-    for (const name of ['select', 'eq', 'is', 'not', 'order', 'limit', 'single']) {
+    for (const name of ['select', 'eq', 'is', 'not', 'gte', 'order', 'limit', 'single']) {
       builder[name] = () => builder;
     }
     return builder;
@@ -117,7 +119,7 @@ describe('runGoalsDaily', () => {
     const fetch = okFetch();
     const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
 
-    expect(result).toEqual({ started: true, runId: 'run-1', steps: 1, held: 0, answers: 0 });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 1, held: 0, answers: 0 });
     expect(writes[0]).toMatchObject({
       table: 'runs',
       op: 'insert',
@@ -133,13 +135,26 @@ describe('runGoalsDaily', () => {
     expect(text).toContain('"Compare three gyms" (goals.items id s1)');
   });
 
-  it('spends no run when no Claude step is ready', async () => {
+  it('gives every open goal its status each morning, with or without a ready step (plan #1074)', async () => {
     const worked = { ...READY, result: 'Gym A', status: 'done' };
-    const { client, writes } = fakeClient({ items: [GOAL, worked] });
+    const { client } = fakeClient({ items: [GOAL, worked] });
+    const fetch = okFetch();
+    const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 0 });
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    const text = (JSON.parse(init.body as string) as { text: string }).text;
+    expect(text).toContain('goals.reviews');
+    expect(text).toContain('Goal "Get fit" (goals.items id g)');
+    expect(text).toContain('No Claude step is ready today.');
+  });
+
+  it('spends no run when no goal is open and nothing is ready', async () => {
+    const done = { ...GOAL, status: 'done' };
+    const { client, writes } = fakeClient({ items: [done] });
     const fetch = okFetch();
     const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
     expect(result).toEqual({
-      skipped: 'no Claude steps are ready and no answers are out of date',
+      skipped: 'no open goal, no Claude step ready and no answer out of date',
     });
     expect(writes).toEqual([]);
     expect(fetch).not.toHaveBeenCalled();
@@ -166,7 +181,7 @@ describe('runGoalsDaily', () => {
     });
     const fetch = okFetch();
     const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
-    expect(result).toEqual({ started: true, runId: 'run-1', steps: 0, held: 0, answers: 1 });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 1 });
     const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     const text = (JSON.parse(init.body as string) as { text: string }).text;
     expect(text).toContain('"List the loans" (goals.items id s2)');
