@@ -167,14 +167,16 @@ function WeekSection({ health }: { health: WeekHealth | null }) {
         This week
       </h2>
       {stats ? (
-        <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {stats.map((stat) => (
-            <Card key={stat.label} padding="dense" className="flex flex-col-reverse gap-1">
-              <dt className="text-small text-ink-muted">{stat.label}</dt>
-              <dd className="tabular text-title font-semibold text-ink">{stat.value}</dd>
-            </Card>
-          ))}
-        </dl>
+        <Card padding="dense">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+            {stats.map((stat) => (
+              <div key={stat.label} className="flex flex-col-reverse gap-1">
+                <dt className="text-small text-ink-muted">{stat.label}</dt>
+                <dd className="tabular text-title font-semibold text-ink">{stat.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </Card>
       ) : (
         <p className="px-1 text-small text-ink-muted">
           The week’s numbers could not be read just now.
