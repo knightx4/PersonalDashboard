@@ -35,6 +35,7 @@ import { Card } from '@/components/ui/card';
 import { GoalAddRow } from './goal-add-row';
 import { GoalContext } from './goal-context';
 import { GoalFlags } from './goal-flags';
+import { GoalHeadingField } from './goal-heading';
 import { GoalThread } from './goal-comments';
 import { GoalHelp } from './goal-help';
 import { GoalLinksSection } from './goal-links';
@@ -175,8 +176,10 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
         <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> {map.areaName}
       </Link>
       <PageHeader
-        title={map.goal.title}
-        description={map.goal.acceptance ?? undefined}
+        title={<GoalHeadingField goalId={map.goal.id} field="title" value={map.goal.title} />}
+        description={
+          <GoalHeadingField goalId={map.goal.id} field="acceptance" value={map.goal.acceptance} />
+        }
       />
       {map.goal.fog && (
         <GoalFog
