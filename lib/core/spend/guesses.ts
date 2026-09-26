@@ -122,6 +122,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'map-note': run(HAIKU, 20_000, 3_000),
   'embed-map': unit(VOYAGE_LITE, 1_000, 0),
   'embed-notes': background(unit(VOYAGE_LITE, 1_500, 0)),
+  'embed-note-match': unit(VOYAGE_LITE, 300, 0),
   'map-sweep': background(unit(HAIKU, 4_000, 400)),
   'propose-theme-merges': background(unit(HAIKU, 8_000, 300)),
   'propose-position-merges': background(unit(HAIKU, 9_000, 300)),

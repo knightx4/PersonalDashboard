@@ -68,6 +68,10 @@ Listing these because they will otherwise get invented.
   note has one in `obsidian.note_embeddings` for showing related notes
   elsewhere in the app (plan #1111, `migrations-vault/0021`). A note's vector
   is remade only when the hash of its title and body changes.
+  Other pages find the notes nearest their own text through
+  `lib/vault/notes/related.ts` and `obsidian.nearest_notes` (plan #1112,
+  `migrations-vault/0022`): at most two, each above one similarity threshold,
+  with the page's text embedded once and kept by its hash.
 - **No graph view, no canvas, no plugins, no Dataview queries.** Obsidian renders
   those; this does not compete with Obsidian.
 - **No sharing.** Same as the rest of the app: one user's view of their own data,
