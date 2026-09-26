@@ -778,7 +778,7 @@ describe('health and status, as two columns', () => {
     // label, and the health word and the status word follow it in order.
     const from = html.indexOf('Status of #1 Share links');
     expect(from).toBeGreaterThan(-1);
-    const row = html.slice(from, from + 900);
+    const row = html.slice(from, from + 1200);
     expect(row).toContain('In progress');
     expect(row).not.toContain('Not started');
   });
