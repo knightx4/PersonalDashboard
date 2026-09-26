@@ -10,6 +10,7 @@ import { requireOwner } from '@/lib/dev/owner';
  * matters, so no session should come back to it. Closing one with what it
  * found is a session's move (`plan.ts checked`), so there is no button for it.
  */
+// latency: pending
 export async function dropCheckBack(formData: FormData): Promise<void> {
   await requireOwner();
   const user = await requireUser();

@@ -195,6 +195,15 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.plan_runs = planRun.id;
 
+  const [checkBack] = await admin<{ id: string }[]>`
+    insert into check_backs (user_id, title, detail, due_at, plan_item_id, source, woke_run_id)
+    values (
+      ${userId}, ${`${tag} wants another look`}, ${`${tag} started something slow`},
+      now() + interval '2 hours', ${planItem.id}, ${`${tag}'s routine, plan #1`}, ${planRun.id}
+    )
+    returning id`;
+  ids.check_backs = checkBack.id;
+
   const [commitCheck] = await admin<{ id: string }[]>`
     insert into plan_commit_checks (user_id, commit_sha, merge_sha, conclusion)
     values (${userId}, ${'abc1234'}, ${'def5678'}, 'passed')
