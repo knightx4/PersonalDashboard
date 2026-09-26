@@ -26,6 +26,16 @@ export function storyRef(issueId: string, storyIndex: number): string {
   return `${issueId}:${storyIndex}`;
 }
 
+/**
+ * The issue id and story index a ref names, or null when it is not one
+ * storyRef wrote.
+ */
+export function parseStoryRef(ref: string): { issueId: string; storyIndex: number } | null {
+  const match = /^([0-9a-f-]{36}):(\d+)$/i.exec(ref);
+  if (!match) return null;
+  return { issueId: match[1], storyIndex: Number(match[2]) };
+}
+
 /** The story as a conversation subject, titled with its headline. */
 export function storySubject(issueId: string, storyIndex: number, headline: string): TalkSubject {
   return { kind: 'news_story', ref: storyRef(issueId, storyIndex), title: headline };
