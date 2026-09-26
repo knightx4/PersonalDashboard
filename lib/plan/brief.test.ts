@@ -393,3 +393,42 @@ describe('planBrief, on a claimed step', () => {
     );
   });
 });
+
+describe('the vision at the top of a brief', () => {
+  const sections = buildPlanTree({
+    items: [
+      item({
+        id: 'app-feature',
+        title: 'Sign-in everywhere',
+        module: null,
+        acceptance: 'One login.',
+      }),
+      item({
+        id: 'app-step',
+        title: 'Share the session cookie',
+        module: null,
+        parentId: 'app-feature',
+      }),
+      item({ id: 'shop-step', title: 'A basket', module: 'shopping' }),
+    ],
+    dependencies: [],
+  });
+  const visions = { app: 'One place for the whole of a life.', shopping: 'Buy less, better.' };
+
+  it('opens a step with no workspace with the app vision, above the destination', () => {
+    const brief = planBrief(sections, findNode(sections, 'app-step')!, { visions });
+    expect(brief).toContain('## Vision\n\nOne place for the whole of a life.');
+    expect(brief.indexOf('## Vision')).toBeLessThan(brief.indexOf('## Destination'));
+  });
+
+  it('prints no vision section when the app has none written', () => {
+    const brief = planBrief(sections, findNode(sections, 'app-step')!, { visions: {} });
+    expect(brief).not.toContain('## Vision');
+    expect(planBrief(sections, findNode(sections, 'app-step')!)).not.toContain('## Vision');
+  });
+
+  it('does not give a step in a workspace the app vision', () => {
+    const brief = planBrief(sections, findNode(sections, 'shop-step')!, { visions });
+    expect(brief).not.toContain('One place for the whole of a life.');
+  });
+});

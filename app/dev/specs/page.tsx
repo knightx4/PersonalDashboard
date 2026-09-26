@@ -6,7 +6,7 @@ import { cardVariants } from '@/components/ui/card';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { SPECS, groupSpecs, type SpecDoc } from '@/lib/specs/registry';
 import { specCommentCounts } from '@/lib/specs/load';
-import { loadModuleVisions } from '@/lib/specs/vision';
+import { APP_VISION, loadModuleVisions } from '@/lib/specs/vision';
 import { ModuleVisionPanel } from './vision-view';
 import { cn } from '@/lib/cn';
 
@@ -27,8 +27,8 @@ export const metadata = { title: 'Specs' };
  * keeps the document and the code honest about each other.
  *
  * The one thing on this page that is written here is the vision at the head of
- * each workspace: what the workspace is for, above every document under it,
- * and the person's rather than the repository's. That is the layer a session
+ * each group: what the workspace, or the app as a whole, is for, above every
+ * document under it, and the person's rather than the repository's. That is the layer a session
  * reads first, and it is edited in place because a paragraph that needs a
  * commit to change is one that goes stale.
  */
@@ -72,7 +72,7 @@ export default async function SpecsPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader
         title="Specs"
-        description="The vision for each workspace, and the documents behind it read from the repository. Comment on any section; tag @dash in one to ask about it."
+        description="The vision for the app and each workspace, and the documents behind it read from the repository. Comment on any section; tag @dash in one to ask about it."
       />
 
       <div className="space-y-2">
@@ -112,16 +112,14 @@ export default async function SpecsPage() {
           >
             <div className="pt-2">
               {/* Above the documents rather than among them, because it is the
-                  layer above them. The app-wide group has none: a vision is
-                  what one workspace is for, and "the app as a whole" already
-                  has a writing guide standing for it. */}
-              {group.module && (
-                <ModuleVisionPanel
-                  module={group.module}
-                  label={group.label}
-                  vision={visions[group.module] ?? null}
-                />
-              )}
+                  layer above them. The app-wide group has one too: what the
+                  app as a whole is for, which a step with no workspace is
+                  briefed with. */}
+              <ModuleVisionPanel
+                module={group.module ?? APP_VISION}
+                label={group.module ? group.label : 'the app'}
+                vision={visions[group.module ?? APP_VISION] ?? null}
+              />
 
               {group.specs.length > 0 && (
                 <ul className="space-y-2">

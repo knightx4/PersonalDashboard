@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
 import { MODULE_IDS } from '@/lib/modules';
+import { APP_VISION } from '@/lib/specs/vision';
 
 /**
  * Writing the vision for a workspace.
@@ -25,10 +26,11 @@ export type VisionActionState = {
   message?: string;
 };
 
+// A workspace, or `app` for the vision of the app as a whole.
 const moduleSchema = z
   .string()
   .trim()
-  .refine((value) => (MODULE_IDS as readonly string[]).includes(value), {
+  .refine((value) => value === APP_VISION || (MODULE_IDS as readonly string[]).includes(value), {
     message: 'That is not a workspace.',
   });
 

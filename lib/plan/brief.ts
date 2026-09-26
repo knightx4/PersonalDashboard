@@ -1,5 +1,6 @@
 import { commentLine } from '@/lib/comments/context';
 import { MODULES } from '@/lib/modules';
+import { APP_VISION, type VisionBodies } from '@/lib/specs/vision';
 import { hasLiveFog, isClosed, isDismissed, type PlanStatus } from './load';
 import { reshapeOrigin } from './origin';
 import {
@@ -254,7 +255,28 @@ export type BriefOptions = {
    * Without it, a claim reads as the status column reads.
    */
   liveness?: PlanLiveness;
+  /**
+   * The visions the person has written on the specs page, by scope, from
+   * `loadVisionBodies` in lib/specs/vision.ts. A step with no workspace opens
+   * with the app's; without this the brief carries no vision at all.
+   */
+  visions?: VisionBodies;
 };
+
+/**
+ * The vision a step is briefed with, or null for none.
+ *
+ * A step with no workspace gets the vision for the app as a whole. A step in
+ * a workspace gets nothing here yet; its workspace's own vision is the next
+ * thing to read in.
+ */
+export function visionFor(
+  node: Pick<PlanNode, 'module'>,
+  visions: VisionBodies | undefined,
+): string | null {
+  if (node.module) return null;
+  return visions?.[APP_VISION]?.trim() || null;
+}
 
 /**
  * What has been said on the rows a brief carries, oldest first.
@@ -363,6 +385,13 @@ export function planBrief(
   const origin = reshapeOrigin(node.comment);
   if (origin) {
     out.push(`From #${origin.number}'s answer: ${origin.gist}`);
+  }
+
+  // What the app is for, above where the feature is going: the layer a
+  // session should read before anything that was decided under it.
+  const vision = visionFor(node, options.visions);
+  if (vision) {
+    out.push('', '## Vision', '', vision);
   }
 
   // Where the whole feature is going, above what this one step is for. A step

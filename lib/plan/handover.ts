@@ -28,6 +28,7 @@ import {
   underwayRefusal,
 } from './liveness';
 import { QUESTION_RULE, planBrief } from './brief';
+import { loadVisionBodies } from '@/lib/specs/vision';
 import { endRunsOnStep, loadLastRuns, reshapeUnderway, startRoutineRun } from './runs';
 import { isClosed, loadPlan } from './load';
 import {
@@ -252,6 +253,7 @@ export async function handStepToClaude(input: {
   // couple of hundred lines the session then carries for the whole run. A step
   // with anything beneath it is a batch, so it goes to the front door.
   const alone = flatten([node]).length === 1;
+  const visions = await loadVisionBodies(supabase, userId);
   const text = alone
     ? `Build plan step #${node.number}, "${node.title}", following ` +
       '.claude/skills/plan/reference/building.md. The brief is below; it is the plan as the ' +
@@ -259,14 +261,14 @@ export async function handStepToClaude(input: {
       'it, verify, commit with the step number in the subject, and close it with a note. ' +
       'Merge it to main when it is closed.\n\n' +
       `${QUESTION_RULE}\n\n` +
-      planBrief(sections, node, { thread: true, liveness })
+      planBrief(sections, node, { thread: true, liveness, visions })
     : `Build plan step #${node.number}, "${node.title}", and the steps beneath it, following ` +
       '.claude/skills/plan/SKILL.md -- the Building section, which has more than one step to ' +
       'build and so is orchestrated: send each step to its own subagent and keep your own ' +
       'context for the batch. The brief is below; it is the plan as the app holds it right ' +
       'now, and the plan is the source of truth.\n\n' +
       `${QUESTION_RULE}\n\n` +
-      planBrief(sections, node, { thread: true, liveness });
+      planBrief(sections, node, { thread: true, liveness, visions });
 
   const result = await startRoutineRun({
     supabase,
@@ -444,6 +446,7 @@ export async function handFeatureToClaude(input: {
   // on it. The session sets it when it claims, one at a time, and clears it
   // when it closes the step -- which is what the plan skill already tells it to
   // do.
+  const visions = await loadVisionBodies(supabase, userId);
   const text =
     `Work plan feature #${node.number}, "${node.title}", to completion, following ` +
     '.claude/skills/plan/SKILL.md. This is a batch, so it is orchestrated: send each step ' +
@@ -455,7 +458,7 @@ export async function handFeatureToClaude(input: {
     'says how. Report every step you closed, by number and ' +
     'title.\n\nThe brief is below; it is the plan as the app holds it right now, and ' +
     'the plan is the source of truth.\n\n' +
-    planBrief(sections, node, { thread: true, liveness });
+    planBrief(sections, node, { thread: true, liveness, visions });
 
   const result = await startRoutineRun({
     supabase,
