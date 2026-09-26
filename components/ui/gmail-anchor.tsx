@@ -1,38 +1,32 @@
 'use client';
 
 import type { AnchorHTMLAttributes, MouseEvent } from 'react';
-import { gmailAppUrl, isIOS } from '@/lib/email/gmail-open';
+import { useRouter } from 'next/navigation';
+import { gmailIdFromHref, isMobileBrowser } from '@/lib/email/gmail-open';
 
 /**
- * An `<a>` to a Gmail conversation that also works on an iPhone.
+ * An `<a>` to a Gmail conversation that also works on a phone.
  *
- * The web link opens the conversation on a desktop, but mobile Gmail ignores
- * the part that names it and shows the inbox. On iOS this hands the tap to the
- * Gmail app instead, and falls back to the web link if the page is still in
- * front a moment later, which is what happens when the app is not installed.
+ * The web link opens the conversation on a desktop, but mobile Gmail, in the
+ * browser and in the app, ignores the part that names it and shows the inbox.
+ * Google offers no phone link that does better. So on a phone this opens the
+ * conversation in the dashboard's own reader at /mail/<id> instead.
  */
 export function GmailAnchor({
   href,
   onClick,
   ...rest
 }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) {
+  const router = useRouter();
+
   function handleClick(event: MouseEvent<HTMLAnchorElement>) {
     onClick?.(event);
     if (event.defaultPrevented) return;
-    if (!isIOS(navigator.userAgent, navigator.maxTouchPoints)) return;
-    const appHref = gmailAppUrl(href);
-    if (!appHref) return;
-
+    if (!isMobileBrowser(navigator.userAgent, navigator.maxTouchPoints)) return;
+    const id = gmailIdFromHref(href);
+    if (!id) return;
     event.preventDefault();
-    const fallback = window.setTimeout(() => {
-      if (document.visibilityState === 'visible') window.location.href = href;
-    }, 1500);
-    const cancel = () => {
-      if (document.visibilityState === 'hidden') window.clearTimeout(fallback);
-    };
-    document.addEventListener('visibilitychange', cancel, { once: true });
-    window.addEventListener('pagehide', () => window.clearTimeout(fallback), { once: true });
-    window.location.href = appHref;
+    router.push(`/mail/${id}`);
   }
 
   return <a href={href} onClick={handleClick} {...rest} />;

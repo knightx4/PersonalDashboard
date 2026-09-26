@@ -18,23 +18,41 @@ export function gmailOpenUrl(opts: {
   return `${base}#all/${encodeURIComponent(target)}`;
 }
 
-/**
- * The Gmail iOS app's link for the same conversation.
- *
- * Mobile Gmail drops the `#all/<id>` fragment the web link relies on, so on a
- * phone that link lands on the message list. The iOS app registers the
- * `googlegmail://` scheme, and `cv=<thread id>` opens a conversation. Google
- * does not document the scheme, so the caller falls back to the web link when
- * the app does not open.
- */
-export function gmailAppUrl(webHref: string): string | null {
-  const match = /#all\/([^/?#]+)$/.exec(webHref);
-  if (!match) return null;
-  return `googlegmail:///cv=${match[1]}/accountId=0`;
+/** The Gmail id an "Open in Gmail" link names, from its `#all/<id>` fragment. */
+export function gmailIdFromHref(webHref: string): string | null {
+  const match = /#all\/([0-9a-f]+)$/i.exec(webHref);
+  return match ? match[1] : null;
 }
 
-/** iPhone, or an iPad (which reports itself as a Mac but has a touch screen). */
-export function isIOS(userAgent: string, maxTouchPoints = 0): boolean {
-  if (/iPhone|iPad|iPod/.test(userAgent)) return true;
+/**
+ * A phone or tablet browser. iPadOS reports itself as a Mac, so a Mac with a
+ * touch screen counts too.
+ */
+export function isMobileBrowser(userAgent: string, maxTouchPoints = 0): boolean {
+  if (/Android|iPhone|iPad|iPod|Mobi/.test(userAgent)) return true;
   return /Macintosh/.test(userAgent) && maxTouchPoints > 1;
+}
+
+/** Just the address from a header like `Jane Doe <jane@example.com>`. */
+export function bareAddress(header: string | null): string | null {
+  if (!header) return null;
+  const angled = /<([^>]+)>/.exec(header);
+  const address = (angled ? angled[1] : header).trim();
+  return address.includes('@') ? address : null;
+}
+
+/**
+ * A `mailto:` reply to a message. On a phone this opens the default mail app,
+ * which is Gmail when the phone is set up that way.
+ */
+export function replyMailto(message: {
+  fromAddress: string | null;
+  replyToAddress: string | null;
+  subject: string | null;
+}): string | null {
+  const to = bareAddress(message.replyToAddress) ?? bareAddress(message.fromAddress);
+  if (!to) return null;
+  const subject = message.subject?.trim() ?? '';
+  const reply = /^re:/i.test(subject) ? subject : `Re: ${subject}`.trim();
+  return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(reply)}`;
 }

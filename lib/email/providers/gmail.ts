@@ -176,34 +176,14 @@ export const gmailProvider: GmailOAuthProvider = {
 
   async getMessage(accessToken, messageId, opts): Promise<GmailMessageContent> {
     const format = opts?.format === 'metadata' ? 'metadata' : 'full';
-    const data = await gmailJson<{
-      id: string;
-      threadId?: string;
-      internalDate?: string;
-      payload?: {
-        mimeType?: string;
-        headers?: Array<{ name?: string; value?: string }>;
-        body?: { data?: string };
-        parts?: unknown[];
-      };
-    }>(
+    const data = await gmailJson<GmailApiMessage>(
       accessToken,
       `users/me/messages/${encodeURIComponent(messageId)}?format=${format}`,
     );
 
-    const headers = data.payload?.headers;
     const full = format === 'full';
     return {
-      id: data.id,
-      threadId: data.threadId ?? null,
-      internalDate: data.internalDate ? new Date(Number(data.internalDate)) : null,
-      fromAddress: headerValue(headers, 'From'),
-      // Reply-To carries the employer far more often than From does, because
-      // From is usually the ATS. Capturing it is what makes domain linking work.
-      replyToAddress: headerValue(headers, 'Reply-To'),
-      subject: headerValue(headers, 'Subject'),
-      text: full ? gmailPayloadToText(data.payload as never) : '',
-      html: full ? gmailPayloadToHtml(data.payload as never) : '',
+      ...messageContent(data, full),
       calendar: full ? await collectCalendar(accessToken, data.id, data.payload) : [],
     };
   },
@@ -217,6 +197,53 @@ export const gmailProvider: GmailOAuthProvider = {
     return Buffer.from(data.data.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
   },
 };
+
+type GmailApiMessage = {
+  id: string;
+  threadId?: string;
+  internalDate?: string;
+  payload?: {
+    mimeType?: string;
+    headers?: Array<{ name?: string; value?: string }>;
+    body?: { data?: string };
+    parts?: unknown[];
+  };
+};
+
+function messageContent(data: GmailApiMessage, full: boolean): GmailMessageContent {
+  const headers = data.payload?.headers;
+  return {
+    id: data.id,
+    threadId: data.threadId ?? null,
+    internalDate: data.internalDate ? new Date(Number(data.internalDate)) : null,
+    fromAddress: headerValue(headers, 'From'),
+    // Reply-To carries the employer far more often than From does, because
+    // From is usually the ATS. Capturing it is what makes domain linking work.
+    replyToAddress: headerValue(headers, 'Reply-To'),
+    subject: headerValue(headers, 'Subject'),
+    text: full ? gmailPayloadToText(data.payload as never) : '',
+    html: full ? gmailPayloadToHtml(data.payload as never) : '',
+    calendar: [],
+  };
+}
+
+/**
+ * Every message in a Gmail conversation, oldest first, bodies included.
+ *
+ * For reading an email inside the dashboard on a phone, where a link into
+ * Gmail lands on the inbox rather than the conversation. Calendar parts are
+ * left out: nothing on that page reads them.
+ */
+export async function getGmailThread(
+  accessToken: string,
+  threadId: string,
+): Promise<GmailMessageContent[]> {
+  const data = await gmailJson<{ messages?: GmailApiMessage[] }>(
+    accessToken,
+    `users/me/threads/${encodeURIComponent(threadId)}?format=full`,
+  );
+  return (data.messages ?? []).map((message) => messageContent(message, true));
+}
 
 /** An invite is a few kilobytes; anything larger is not one. */
 const MAX_CALENDAR_ATTACHMENT_BYTES = 512_000;
