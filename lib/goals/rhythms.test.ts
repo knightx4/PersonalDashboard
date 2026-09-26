@@ -182,7 +182,9 @@ describe('recordsOf and homeRhythms', () => {
     expect(record?.missed).toBe(1);
 
     const shown = homeRhythms([rhythm()], recordsOf(rows, '2026-09-25'), '2026-09-25');
-    expect(shown).toEqual([{ ...rhythm(), count: 0, daysLeft: 3, atRisk: true, missed: 1 }]);
+    expect(shown).toEqual([
+      { ...rhythm(), count: 0, daysLeft: 3, atRisk: true, missed: 1, startsOn: MON },
+    ]);
     expect(progressLine('week', shown[0])).toBe('0 of 1 this week');
   });
 

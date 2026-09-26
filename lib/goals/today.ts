@@ -78,6 +78,10 @@ export type TodayItem = {
   unblocks: number;
   /** YYYY-MM-DD it is for, or null when undated. */
   on: string | null;
+  /** For a rhythm: the current period's first day, which Log one counts against. */
+  startsOn?: string;
+  /** For a suggestion: the page it came from, when it has one. */
+  url?: string;
 };
 
 /** The button each kind carries. */
@@ -142,7 +146,16 @@ type Candidate = TodayItem & {
 
 /** The ranked Today list, at most TODAY_CAP long. */
 export function todayList(input: TodayInput): TodayItem[] {
-  return rankToday(todayCandidates(input)).slice(0, TODAY_CAP);
+  return todayRanked(input).slice(0, TODAY_CAP);
+}
+
+/**
+ * Everything that could be on Today, ranked, without the cap. The home shows
+ * the first TODAY_CAP and folds the rest under them, so nothing on you is
+ * out of reach.
+ */
+export function todayRanked(input: TodayInput): TodayItem[] {
+  return rankToday(todayCandidates(input));
 }
 
 /**
@@ -311,6 +324,7 @@ export function todayCandidates(input: TodayInput): Candidate[] {
         goalTitle: rhythm.goalTitle,
         unblocks: 0,
         on: null,
+        startsOn: rhythm.startsOn,
       },
       { daysLeft: rhythm.daysLeft, short },
     );
@@ -365,6 +379,7 @@ export function todayCandidates(input: TodayInput): Candidate[] {
       ...owner,
       unblocks: 0,
       on: s.happensOn,
+      ...(s.url ? { url: s.url } : {}),
     });
   }
 
@@ -419,6 +434,8 @@ export function rankToday(candidates: readonly Candidate[]): TodayItem[] {
       action: c.action,
       unblocks: c.unblocks,
       on: c.on,
+      ...(c.startsOn ? { startsOn: c.startsOn } : {}),
+      ...(c.url ? { url: c.url } : {}),
     }));
 }
 
