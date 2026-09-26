@@ -169,8 +169,8 @@ export type SpecGroup = {
  * Every workspace gets a group, whether or not a document has been written for
  * it, because the group is also where its vision is written and a workspace
  * nobody has specified yet is exactly the one that wants one. The app-wide
- * group is the exception and is dropped when it is empty: it has no vision of
- * its own, so with no documents there is nothing in it at all.
+ * group is kept on the same terms: the vision for the app as a whole is
+ * written at its head.
  *
  * Pure, and it takes the comment counts rather than reading them, so the
  * grouping and the numbers on the folded rows can be tested without a database.
@@ -181,17 +181,15 @@ export function groupSpecs(
 ): SpecGroup[] {
   const scopes: Array<ModuleId | null> = [...MODULES.map((module) => module.id), null];
 
-  return scopes
-    .map((scope) => {
-      const mine = specs.filter((spec) => spec.module === scope);
-      return {
-        module: scope,
-        label: scope
-          ? (MODULES.find((module) => module.id === scope)?.label ?? scope)
-          : 'The app as a whole',
-        specs: mine,
-        comments: mine.reduce((total, spec) => total + (counts[spec.slug] ?? 0), 0),
-      };
-    })
-    .filter((group) => group.module !== null || group.specs.length > 0);
+  return scopes.map((scope) => {
+    const mine = specs.filter((spec) => spec.module === scope);
+    return {
+      module: scope,
+      label: scope
+        ? (MODULES.find((module) => module.id === scope)?.label ?? scope)
+        : 'The app as a whole',
+      specs: mine,
+      comments: mine.reduce((total, spec) => total + (counts[spec.slug] ?? 0), 0),
+    };
+  });
 }

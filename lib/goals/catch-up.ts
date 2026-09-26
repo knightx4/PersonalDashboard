@@ -9,14 +9,14 @@
  * shows while `backOn` is today: it survives going into a goal and back, and
  * opening the home the next day finds an ordinary daily view.
  *
- * The catch-up itself is three things, in this order: the runs Claude
- * finished while you were away, what is waiting on you, and one next step per
- * goal. Everything else on the home is folded under it.
+ * The catch-up itself is three things, in this order: what Dash did while
+ * you were away (lib/goals/done-since.ts, the same list as any other
+ * sitting's), what is waiting on you, and one next step per goal. Everything
+ * else on the home is folded under it.
  *
  * Pure. The read and write are in lib/goals/visits-store.ts.
  */
 import type { DailyGoal, NextItem, WaitingItem } from '@/lib/goals/daily';
-import type { RunListing } from '@/lib/goals/runs';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -30,9 +30,6 @@ export const AWAY_DAYS = 5;
  * does not empty the list; the next sitting does.
  */
 export const SITTING_MINUTES = 30;
-
-/** The most finished runs the catch-up lists; the rest are on the Runs page. */
-export const CATCH_UP_RUNS_SHOWN = 6;
 
 export type VisitRecord = {
   /** ISO instant of the latest visit. */
@@ -78,10 +75,6 @@ export function catchUpSince(record: VisitRecord | null, today: string): string 
 export type CatchUp = {
   /** ISO instant the time away began. */
   since: string;
-  /** Runs that finished while you were away, newest first, at most CATCH_UP_RUNS_SHOWN. */
-  runs: RunListing[];
-  /** Finished runs left out by the cap. */
-  moreRuns: number;
   waiting: WaitingItem[];
   /** The first next item of each goal that has one, in the home's goal order. */
   next: { goalId: string; goalTitle: string; item: NextItem }[];
@@ -89,19 +82,10 @@ export type CatchUp = {
 
 export function catchUp(
   since: string,
-  runs: RunListing[],
   view: { goals: DailyGoal[]; waiting: WaitingItem[] },
 ): CatchUp {
-  const from = Date.parse(since);
-  const finished = runs
-    .filter(
-      (run) => run.status === 'done' && run.endedAt !== null && Date.parse(run.endedAt) > from,
-    )
-    .sort((a, b) => Date.parse(b.endedAt as string) - Date.parse(a.endedAt as string));
   return {
     since,
-    runs: finished.slice(0, CATCH_UP_RUNS_SHOWN),
-    moreRuns: Math.max(0, finished.length - CATCH_UP_RUNS_SHOWN),
     waiting: view.waiting,
     next: view.goals.flatMap((daily) =>
       daily.next.length > 0

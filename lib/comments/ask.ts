@@ -17,6 +17,7 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { loadVisionBodies } from '@/lib/specs/vision';
 import { serverEnv } from '@/lib/env';
 import { FEEDBACK_COLUMNS, feedbackRowFrom } from '@/lib/feedback/load';
 import { planRoutine } from '@/lib/feedback/routine';
@@ -88,7 +89,7 @@ async function subjectOf(input: AskInput): Promise<Subject | null> {
     const node = findNode(sections, id);
     if (!node) return null;
     return {
-      context: planBrief(sections, node),
+      context: planBrief(sections, node, { visions: await loadVisionBodies(supabase, userId) }),
       thread: node.thread,
       label: `#${node.number} ${node.title}`,
     };

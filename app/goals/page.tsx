@@ -6,11 +6,11 @@ import { loadBrief } from '@/lib/goals/briefs-store';
 import { catchUp, catchUpSince } from '@/lib/goals/catch-up';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { withWaiting, type DailyView as Daily } from '@/lib/goals/daily';
+import type { DoneSince } from '@/lib/goals/done-since';
+import { loadDoneSince } from '@/lib/goals/done-since-store';
 import { flagsWaiting } from '@/lib/goals/flags';
 import { loadGoalFlags, loadGoalTitles } from '@/lib/goals/flags-store';
 import { loadHomeExtras } from '@/lib/goals/home-store';
-import { loadRunsEndedSince } from '@/lib/goals/runs-store';
-import { loadSinceVisit } from '@/lib/goals/since-visit-store';
 import { loadDailyView } from '@/lib/goals/steps-store';
 import { didYouGoSuggestions, homeSuggestions } from '@/lib/goals/suggestions';
 import { loadGoingSuggestions, loadRecentSuggestions } from '@/lib/goals/suggestions-store';
@@ -50,8 +50,8 @@ function noteWhen(brief: Brief, timeZone: string): string {
  *
  * Each visit is recorded (plan #1019). On the day you come back after five or
  * more days away, the page leads with a catch-up from the day you left.
- * Otherwise it leads with what Claude did since your last sitting (plan
- * #1010), which the next sitting clears. What a run flagged on a goal
+ * Otherwise it leads with what Dash did since your last sitting (plan
+ * #1076): results to read, changes with an undo, failed runs. What a run flagged on a goal
  * (plan #1015) is listed under Your move with the rest.
  *
  * Claude's latest note on all the goals (goals.briefs, written by the daily
@@ -88,10 +88,14 @@ export default async function GoalsPage() {
     dash: { ...daily.dash, running: extras.running },
   };
   const since = catchUpSince(visit, today);
-  const away = since ? catchUp(since, await loadRunsEndedSince(client, since), view) : null;
-  // The catch-up already lists the runs from the time away.
-  const lately =
-    !away && visit.previousVisitAt ? await loadSinceVisit(client, visit.previousVisitAt) : null;
+  const away = since ? catchUp(since, view) : null;
+  // What Dash did since the visit before this sitting (plan #1076); after time
+  // away that visit is the one before it, so the catch-up shows the same list.
+  // A first visit has no window, and lists only results still unread. A
+  // failed read leaves the list out rather than the page.
+  const done = await loadDoneSince(client, visit.previousVisitAt ?? visit.lastVisitAt).catch(
+    (): DoneSince | null => null,
+  );
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -102,7 +106,7 @@ export default async function GoalsPage() {
           suggestions: homeSuggestions(suggestions, today),
           didYouGo: didYouGoSuggestions(going, today),
           catchUp: away,
-          sinceVisit: lately,
+          done,
           brief: brief ? { body: brief.body, when: noteWhen(brief, account.timezone) } : null,
         }}
         timeZone={account.timezone}

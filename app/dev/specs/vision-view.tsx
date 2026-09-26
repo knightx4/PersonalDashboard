@@ -8,8 +8,7 @@ import { Button } from '@/components/ui/button';
 import { FieldError, FieldHint, Textarea } from '@/components/ui/field';
 import { commentWhen } from '@/lib/comments/when';
 import { useClockNow } from '@/lib/use-clock-now';
-import type { ModuleVision } from '@/lib/specs/vision';
-import type { ModuleId } from '@/lib/modules';
+import type { ModuleVision, VisionScope } from '@/lib/specs/vision';
 
 /**
  * A workspace's vision, at the head of its group on the specs page.
@@ -29,7 +28,8 @@ export function ModuleVisionPanel({
   label,
   vision,
 }: {
-  module: ModuleId;
+  /** A workspace, or `app` for the app as a whole. */
+  module: VisionScope;
   /** What the workspace is called, for the trigger and the box's hint. */
   label: string;
   /** What is written now, or nothing. */
@@ -62,9 +62,11 @@ export function ModuleVisionPanel({
           placeholder={`What ${label} is for, and what would make it worth having. A session reads this before the specs under it.`}
         />
         <FieldHint>
-          The highest layer over this workspace. Everything below it is a
-          document in the repository; this one is yours. Saving an empty box
-          takes it back.
+          {module === 'app'
+            ? "The highest layer over the whole app, read before any workspace's own. "
+            : 'The highest layer over this workspace. '}
+          Everything below it is a document in the repository; this one is
+          yours. Saving an empty box takes it back.
         </FieldHint>
         <div className="flex flex-wrap items-center gap-2">
           <Button type="submit" size="sm" disabled={pending}>
