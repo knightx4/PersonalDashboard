@@ -3,59 +3,36 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { writtenWhen, type Brief } from '@/lib/goals/briefs';
 import { loadBrief } from '@/lib/goals/briefs-store';
-import { catchUp, catchUpSince } from '@/lib/goals/catch-up';
 import { createGoalsClient } from '@/lib/goals/auth/server';
-import { withWaiting, type DailyView as Daily } from '@/lib/goals/daily';
 import type { DoneSince } from '@/lib/goals/done-since';
 import { loadDoneSince } from '@/lib/goals/done-since-store';
-import { flagsWaiting } from '@/lib/goals/flags';
-import { loadGoalFlags, loadGoalTitles } from '@/lib/goals/flags-store';
-import { loadHomeExtras } from '@/lib/goals/home-store';
-import { loadDailyView } from '@/lib/goals/steps-store';
-import { didYouGoSuggestions, homeSuggestions } from '@/lib/goals/suggestions';
-import { loadGoingSuggestions, loadRecentSuggestions } from '@/lib/goals/suggestions-store';
+import { loadHome } from '@/lib/goals/home-store';
 import { recordVisit } from '@/lib/goals/visits-store';
 import { todayIn } from '@/lib/todo/tasks/model';
-import { DailyView } from './daily-view';
+import { HomeView } from './home-view';
 
 export const metadata = { title: 'Goals' };
 export const dynamic = 'force-dynamic';
 
-/**
- * Every goal on the home by id, open or proposed, so the context and drafts
- * waiting on either can be named. Outside the component, with the clock read
- * here, because reading the clock during render is unstable.
- */
-function homeExtras(client: Awaited<ReturnType<typeof createGoalsClient>>, daily: Daily) {
-  const titles = new Map<string, string>(daily.goals.map((d) => [d.goal.id, d.goal.title]));
-  for (const item of daily.waiting) {
-    if (item.kind === 'plan') for (const goal of item.goals) titles.set(goal.id, goal.title);
-  }
-  return loadHomeExtras(client, titles, Date.now()).catch(() => ({ waiting: [], running: [] }));
-}
-
-/** When Claude's note was written. Outside the component because it reads the clock. */
-function noteWhen(brief: Brief, timeZone: string): string {
+/** When Dash's note was written. Outside the component because it reads the clock. */
+function noteWhen(brief: Brief, timeZone: string): string | null {
   return writtenWhen(brief, timeZone, Date.now());
 }
 
+/** The clock, read outside the component because reading it during render is unstable. */
+function now(): number {
+  return Date.now();
+}
+
 /**
- * The Goals home, for a once-a-day visit (docs/GOALS-SPEC.md, "The daily
- * view"; plan #926), sorted by whose move it is: what is on you (decide,
- * approve, read, do), then what Dash has in hand, then the goals
- * themselves. Adding and arranging goals is on the All goals tab, and each
- * goal's full tree is one tap from here. The weekly run's suggestions
- * (plan #934) sit after what is waiting on you, below "Did you go?" for the
- * events you said you were going to whose day has passed (plan #1020).
+ * The Goals home (plan #1077): a sentence on where the goals stand, Today,
+ * each open goal on one line, and what Dash did since your last visit. The
+ * layout and what moved where from the old home are in home-view.tsx.
  *
- * Each visit is recorded (plan #1019). On the day you come back after five or
- * more days away, the page leads with a catch-up from the day you left.
- * Otherwise it leads with what Dash did since your last sitting (plan
- * #1076): results to read, changes with an undo, failed runs. What a run flagged on a goal
- * (plan #1015) is listed under Your move with the rest.
- *
- * Claude's latest note on all the goals (goals.briefs, written by the daily
- * and weekly runs) heads the page when there is one.
+ * Each visit is recorded (plan #1019), and what Dash did is read from the
+ * visit before this sitting (plan #1076); after time away that is the visit
+ * before you left, so the list covers the whole time away. A first visit has
+ * no window, and lists only results still unread.
  *
  * The loader checks that the schema is exposed, so a deployment where `goals`
  * is not exposed to PostgREST says so here instead of showing an empty page
@@ -66,33 +43,15 @@ export default async function GoalsPage() {
   const account = await loadAccountSettings(user.id);
   const client = await createGoalsClient();
   const today = todayIn(account.timezone);
-  const [daily, suggestions, going, visit, flags, brief] = await Promise.all([
-    loadDailyView(client, { userId: user.id, today }),
-    loadRecentSuggestions(client),
-    loadGoingSuggestions(client),
+  const [home, visit, brief] = await Promise.all([
+    createClient().then((supabase) =>
+      loadHome(client, supabase, { userId: user.id, today, now: now() }),
+    ),
     recordVisit(client, { userId: user.id, today }),
-    createClient().then((supabase) => loadGoalFlags(supabase, { userId: user.id })),
     // A failed read leaves the note out rather than the page.
     loadBrief(client, null).catch((): Brief | null => null),
   ]);
-  // What runs flagged on a goal (plan #1015) lives in public.raised_items, so
-  // it joins the waiting list here rather than in the step trees.
-  const [titles, extras] = await Promise.all([
-    loadGoalTitles(client, flags.map((flag) => flag.goalId)).catch(() => new Map<string, string>()),
-    // The context and drafts waiting to be read, and the runs going now.
-    homeExtras(client, daily),
-  ]);
-  const view = {
-    ...daily,
-    waiting: withWaiting(daily.waiting, [...flagsWaiting(flags, titles), ...extras.waiting]),
-    dash: { ...daily.dash, running: extras.running },
-  };
-  const since = catchUpSince(visit, today);
-  const away = since ? catchUp(since, view) : null;
-  // What Dash did since the visit before this sitting (plan #1076); after time
-  // away that visit is the one before it, so the catch-up shows the same list.
-  // A first visit has no window, and lists only results still unread. A
-  // failed read leaves the list out rather than the page.
+  // A failed read says so in its section rather than failing the page.
   const done = await loadDoneSince(client, visit.previousVisitAt ?? visit.lastVisitAt).catch(
     (): DoneSince | null => null,
   );
@@ -100,15 +59,10 @@ export default async function GoalsPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Goals" />
-      <DailyView
-        view={{
-          ...view,
-          suggestions: homeSuggestions(suggestions, today),
-          didYouGo: didYouGoSuggestions(going, today),
-          catchUp: away,
-          done,
-          brief: brief ? { body: brief.body, when: noteWhen(brief, account.timezone) } : null,
-        }}
+      <HomeView
+        {...home}
+        done={done}
+        brief={brief ? { body: brief.body, when: noteWhen(brief, account.timezone) } : null}
         timeZone={account.timezone}
       />
     </div>

@@ -26,9 +26,13 @@ against everything now known and write down what has changed — as
    re-shape may still make to the closed feature is `fog <n> --clear`, and
    only once the new feature that dispels the fog exists.
 2. **Graduate the fog.** If an answer, or the code, has made the fog
-   specifiable, write those steps now: `add "…" --parent <n> --proposed
-   --done-when "…" --size s|m|l --from <the decision>`, and clear the patch in
-   the same breath with `fog <n> --clear`. **`--from` on every row a re-shape
+   specifiable, write those steps now: `add "…" --parent <n> --done-when "…"
+   --size s|m|l --from <the decision>`, and clear the patch in the same breath
+   with `fog <n> --clear`. Under an approved feature they go in ready to build;
+   a step that acts outside the repository (sending an email or a message,
+   submitting, buying, changing records elsewhere such as a Vercel setting or
+   DNS) takes `--proposed` and waits for the person, as **Steps that act
+   outside the repository** in `building.md` says. **`--from` on every row a re-shape
    writes**: it stamps the step with the answer that produced it, and a
    proposed step appearing under a feature somebody approved last week is
    confusing until it says why it is there. The gist is read off the

@@ -22,6 +22,11 @@ select d.depends_on_id, p.number, p.title, p.status
 from plan_dependencies d join plan_items p on p.id = d.depends_on_id
 where d.item_id = '…';
 
+-- the visions, when shaping: one row per workspace that has one, keyed by
+-- workspace id, and the app's under 'app'. The feature's detail opens with
+-- the part of its workspace's vision it serves.
+select module, body from module_visions where user_id = '…';
+
 -- a proposal, when shaping (steps beneath: same, with parent_id set)
 insert into plan_items (user_id, module, title, detail, acceptance, size, status, position)
 values ('…', 'shopping', '…', '…', '…', 'l', 'proposed', 10)
@@ -32,6 +37,33 @@ update ideas set plan_item_id = '<the feature id>' where id = '<the idea id>';
 -- Fog goes in the `fog` column of the feature the same insert creates.
 insert into plan_items (user_id, module, parent_id, title, detail, kind, status, position)
 values ('…', 'shopping', '<the feature id>', '…?', '…', 'decision', 'proposed', 20);
+
+-- add, when building or re-shaping: a step under a feature. Approval stops
+-- at the feature, so the status follows the chain above the new row. Read it
+-- first: a 'proposed' anywhere in it means the step is proposed too.
+with recursive chain as (
+  select id, parent_id, status from plan_items
+  where id = '<the parent id>' and user_id = '…'
+  union all
+  select p.id, p.parent_id, p.status from plan_items p
+  join chain on p.id = chain.parent_id
+  where p.user_id = '…'
+)
+select bool_or(status = 'proposed') as proposed from chain;
+-- Nothing proposed above, and the step stays inside the repository: write it
+-- not_started, stamped on its own line with the session that added it (the
+-- `cse_…` id in CLAUDE_CODE_REMOTE_SESSION_ID; 'Added by a session on
+-- <date>.' when there is none). This is what `add` writes and what
+-- lib/plan/origin.ts reads back for the page's drop, so keep the wording
+-- exactly. A re-shape puts its 'From #63''s answer: …' line first and this
+-- one beneath it. A proposed chain, or a step that would act outside the
+-- repository (what `--proposed` is for; building.md, 'Steps that act
+-- outside the repository'): status 'proposed', and no stamp.
+insert into plan_items (user_id, module, parent_id, title, acceptance, size,
+                        status, position, comment)
+values ('…', 'dev', '<the parent id>', '…', '…', 's', 'not_started', 30,
+        'Added by session cse_… on <YYYY-MM-DD>.')
+returning id, number;
 
 -- needs: something only the person can supply, written as a job of theirs
 -- rather than as a block on the step that ran into it. Two writes, and both

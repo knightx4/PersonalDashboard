@@ -254,7 +254,12 @@ export type AtRiskRhythm = LiveRhythm & { count: number; daysLeft: number };
  * back after time away"; plan #935): this period's progress, and the missed
  * periods before it folded into one count rather than listed one by one.
  */
-export type HomeRhythm = AtRiskRhythm & { atRisk: boolean; missed: number };
+export type HomeRhythm = AtRiskRhythm & {
+  atRisk: boolean;
+  missed: number;
+  /** The current period's first day (YYYY-MM-DD), which logging one against it names. */
+  startsOn: string;
+};
 
 /**
  * The live rhythms the home shows, one each, in the order they came: those
@@ -281,6 +286,7 @@ export function homeRhythms(
       daysLeft: daysLeft(current, today),
       atRisk,
       missed,
+      startsOn: current.startsOn,
     });
   }
   return out;
