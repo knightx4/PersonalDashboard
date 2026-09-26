@@ -46,7 +46,9 @@ write instead, and the database refuses one from Claude
 **Stages** are the top level of a goal's tree when it has one: three to six
 parts of the path, in order, each with a done-when of its own and steps
 beneath it. *Land your next role* runs from knowing the target to saying
-yes. The goal page draws each stage as its own card, "Stage 1 of 6", and a
+yes. The goal page opens the first stage not yet finished under "Stage 1 of
+6" and folds every other stage to one line saying whether it is done or how
+far along it is, with a track of all of them under Dash's status. A
 stage closes itself when every step under it is closed
 (`migrations-goals/0040`). A goal whose parts are independent outcomes is
 several goals instead; parts that follow one another toward one done-when
