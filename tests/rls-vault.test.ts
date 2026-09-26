@@ -216,6 +216,7 @@ describe('RLS coverage', () => {
       'positions',
       'sync_runs',
       'tensions',
+      'text_embeddings',
       'theme_notes',
       'theme_positions',
       'themes',
@@ -859,5 +860,42 @@ describe('note embeddings, across users', () => {
     await admin`update notes set body = body || ' and one more line' where id = ${noteA}`;
     const after = await asUser(userA, (tx) => tx`select note_id from stale_note_embeddings(100, null)`);
     expect(after.map((row) => row.note_id)).toContain(noteA);
+  });
+});
+
+describe('nearest notes and the text cache (plan #1112)', () => {
+  const nearest = (tx: import('postgres').TransactionSql, exclude: string[] | null = null) =>
+    tx`select note_id, similarity from nearest_notes(${VECTOR}, null, 5, 0.5, 'voyage-4-lite', ${exclude}::uuid[])`;
+
+  it('finds the owner\'s note and nothing for another user', async () => {
+    const own = await asUser(userA, (tx) => nearest(tx));
+    const other = await asUser(userB, (tx) => nearest(tx));
+    expect(own.map((row) => row.note_id)).toEqual([noteA]);
+    expect(Number(own[0].similarity)).toBeCloseTo(1, 5);
+    expect(other).toEqual([]);
+  });
+
+  it('leaves out a soft-deleted note and a note the caller excludes', async () => {
+    expect(await asUser(userA, (tx) => nearest(tx, [noteA]))).toEqual([]);
+    await admin`update notes set deleted_at = now() where id = ${noteA}`;
+    try {
+      expect(await asUser(userA, (tx) => nearest(tx))).toEqual([]);
+    } finally {
+      await admin`update notes set deleted_at = null where id = ${noteA}`;
+    }
+  });
+
+  it('keeps a text vector for its owner only', async () => {
+    await asUser(userA, (tx) => tx`
+      insert into text_embeddings (user_id, text_hash, embedding_model, embedding)
+      values (${userA}, 'h1', 'voyage-4-lite', ${VECTOR})`);
+    const own = await asUser(userA, (tx) => tx`select text_hash from text_embeddings`);
+    const other = await asUser(userB, (tx) => tx`select text_hash from text_embeddings`);
+    expect([own.length, other.length]).toEqual([1, 0]);
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into text_embeddings (user_id, text_hash, embedding_model, embedding)
+        values (${userA}, 'h2', 'voyage-4-lite', ${VECTOR})`),
+    ).rejects.toThrow();
   });
 });

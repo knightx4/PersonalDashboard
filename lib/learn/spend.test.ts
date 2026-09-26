@@ -80,6 +80,7 @@ describe('the operation names', () => {
       'write-curriculum',
       'embed-map',
       'embed-notes',
+      'embed-note-match',
       'propose-theme-merges',
       'propose-position-merges',
       'link-positions',
