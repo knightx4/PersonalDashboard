@@ -583,8 +583,8 @@ function DeckCard({
           )}
 
           {/* A lecture clip close to this idea, when the YouTube library has
-              one. It loads only when pressed: the deck preloads the cards
-              behind this one, and a player each would load for nothing. */}
+              one, embedded without a press (note d5402c07). Only the card on
+              screen is drawn, so the cards loaded behind it load no player. */}
           {card.video && (
             <section className="mt-4">
               <h3 className="text-small font-semibold text-ink-muted">Watch it explained</h3>
@@ -593,7 +593,6 @@ function DeckCard({
                 title={card.video.title}
                 start={card.video.start}
                 end={card.video.end}
-                deferred
                 className="mt-1.5"
               />
             </section>
