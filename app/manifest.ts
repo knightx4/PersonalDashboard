@@ -17,14 +17,15 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Personal Dashboard',
     short_name: 'Dash',
-    description:
-      'What you own, what you spent, and where your job search stands, in one account.',
+    description: 'What you own, what you spent, and where your job search stands, in one account.',
     id: '/',
     start_url: '/',
     scope: '/',
     display: 'standalone',
-    background_color: '#f7f4ed',
-    theme_color: '#f7f4ed',
+    background_color:
+      '#f7f4ed' /* ui-ok: the manifest is JSON for the OS, which cannot read a token; this is --c-canvas */,
+    theme_color:
+      '#f7f4ed' /* ui-ok: the manifest is JSON for the OS, which cannot read a token; this is --c-canvas */,
     icons: [
       { src: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
       { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' },
