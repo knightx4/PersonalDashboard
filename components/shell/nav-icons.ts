@@ -22,6 +22,7 @@ import {
   LayoutDashboard,
   Lightbulb,
   List,
+  ListVideo,
   ListTodo,
   Mail,
   Map,
@@ -122,6 +123,9 @@ export const NAV_ICONS = {
   // them. A screen with a play mark, not the YouTube logo, because a brand
   // mark in the nav would be the only one.
   videos: MonitorPlay,
+  // Your own list of videos to watch (plan #1069): a list with a play mark,
+  // so it reads as the list rather than the library above it.
+  watchList: ListVideo,
   // News. An envelope, the same object the workspace's own mark draws, because
   // the tab and the mark name the same thing and picking a second object for
   // it would say there are two.

@@ -71,3 +71,11 @@ export function youtubeVideoId(url: string | null | undefined): string | null {
   }
   return id && VIDEO_ID.test(id) ? id : null;
 }
+
+/**
+ * YouTube's own still for a video, 320 by 180. Every public video has one at
+ * this address, so nothing is stored for it.
+ */
+export function thumbnailUrl(videoId: string): string {
+  return `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+}
