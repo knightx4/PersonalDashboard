@@ -32,9 +32,14 @@ vi.mock('@/inngest/goals/quiet-runs', () => ({
   runGoalsQuietSweep: vi.fn(async () => ({ closed: [] })),
 }));
 
+vi.mock('@/inngest/dev/check-backs', () => ({
+  runCheckBackWake: vi.fn(async () => ({ woken: [] })),
+}));
+
 const { GET, POST } = await import('@/app/api/cron/overnight/route');
 const { runOvernightTick } = await import('@/inngest/dev/overnight');
 const { runGoalsQuietSweep } = await import('@/inngest/goals/quiet-runs');
+const { runCheckBackWake } = await import('@/inngest/dev/check-backs');
 
 function tickRequest(token: string | null) {
   const headers = new Headers({ host: 'example.test', 'x-forwarded-proto': 'https' });
@@ -50,6 +55,7 @@ describe('the overnight tick route', () => {
     process.env.CRON_SECRET = 'secret-token';
     vi.mocked(runOvernightTick).mockClear();
     vi.mocked(runGoalsQuietSweep).mockClear();
+    vi.mocked(runCheckBackWake).mockClear();
   });
 
   it('refuses a request without the shared secret, on both verbs', async () => {
@@ -57,6 +63,7 @@ describe('the overnight tick route', () => {
     expect((await POST(tickRequest(null))).status).toBe(401);
     expect(runOvernightTick).not.toHaveBeenCalled();
     expect(runGoalsQuietSweep).not.toHaveBeenCalled();
+    expect(runCheckBackWake).not.toHaveBeenCalled();
   });
 
   it('refuses a wrong secret', async () => {
@@ -75,6 +82,7 @@ describe('the overnight tick route', () => {
       fired: 0,
       results: {},
       goalsQuiet: { closed: [] },
+      checkBackWake: { woken: [] },
     });
     expect(runOvernightTick).toHaveBeenCalled();
   });
@@ -147,5 +155,13 @@ describe('the pg_cron schedule', () => {
       // The person setting this up reads SETUP.md, not the migration.
       expect(setup).toContain(name);
     }
+  });
+
+  it('wakes Dash for overdue check-backs on every tick, and still ticks when that fails', async () => {
+    vi.mocked(runCheckBackWake).mockRejectedValueOnce(new Error('check-backs read failed'));
+    const response = await POST(tickRequest('secret-token'));
+    expect(response.status).toBe(200);
+    expect((await response.json()).checkBackWake).toEqual({ error: 'check-backs read failed' });
+    expect(runOvernightTick).toHaveBeenCalled();
   });
 });

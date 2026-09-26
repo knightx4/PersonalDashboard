@@ -11,6 +11,7 @@ const ABOUT_THE_APP = 'About building this app, not the person’s life.';
 export const devSources: ModuleSources = {
   sources: [],
   notSources: [
+    'public.check_backs',
     'public.ideas',
     'public.plan_items',
     'public.plan_dependencies',

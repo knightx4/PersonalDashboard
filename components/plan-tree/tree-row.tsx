@@ -173,6 +173,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
   anchorId,
   origin = null,
   source,
+  need = null,
   marks,
   priority,
   quickActions,
@@ -205,6 +206,13 @@ export function TreeRow<E extends TreeCatalogEntry>({
   origin?: { number: number; gist: string } | null;
   /** Where the step lives when the page shows it away from home: a line under the title, in text only. */
   source?: string;
+  /**
+   * What the step is waiting on you for, said on the row in place of its note
+   * while it is closed. The ask is otherwise behind the fold or in a tooltip,
+   * and a row that says "Waiting on you" without saying for what sends you
+   * opening it to find out.
+   */
+  need?: string | null;
   /** Marks after the title and the comment count. */
   marks?: ReactNode;
   /** The priority column, from sm up. Empty when not given. */
@@ -273,7 +281,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
         className={cn(
           ROW_GRID,
           'group scroll-mt-24 px-3',
-          gloss && !open ? 'py-1.5' : 'py-2',
+          (gloss || need) && !open ? 'py-1.5' : 'py-2',
           !node.matches && 'opacity-60',
           closed && 'opacity-70',
         )}
@@ -427,7 +435,13 @@ export function TreeRow<E extends TreeCatalogEntry>({
             {source && (
               <span className="block truncate text-small text-ink-ghost">{source}</span>
             )}
-            {gloss && !open && (
+            {need && !open && (
+              <span className="block truncate text-small text-ink">
+                <span className="font-medium text-caution">Needs: </span>
+                {need}
+              </span>
+            )}
+            {gloss && !open && !need && (
               <span className="block truncate text-small text-ink-muted">
                 {!node.detail && 'Note: '}
                 {gloss}

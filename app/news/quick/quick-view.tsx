@@ -62,9 +62,6 @@ export type QuickPageStory = {
   issueHref: string;
 };
 
-const DESCRIPTION =
-  'One story at a time from your newsletters: the big and the new first, and what you tend to open.';
-
 /**
  * What Quick read draws, split from the page so the preview gallery can render
  * it from a fixture. Loading and working out the card stay in page.tsx.
@@ -84,12 +81,16 @@ export function QuickReadView({
   upNext = null,
 }: QuickReadViewProps) {
   const topic = topics.selected;
-  const chips = <TopicChips {...topics} className="mb-4" />;
+  // No description under the title, and the chips pulled up to it: the page is
+  // read every day, the line said what it is to somebody who already knew, and
+  // the laptop page is meant to fit one screen down to its Next page button
+  // (note 85fc201a).
+  const chips = <TopicChips {...topics} className="-mt-2 mb-3" />;
 
   if (!card) {
     return (
       <div className="mx-auto max-w-2xl">
-        <PageHeader title="Quick read" description={DESCRIPTION} />
+        <PageHeader title="Quick read" />
         {chips}
         {topic ? (
           <EmptyState
@@ -142,7 +143,6 @@ export function QuickReadView({
     <div className={cn('mx-auto max-w-2xl', grid && 'md:max-w-5xl')}>
       <PageHeader
         title="Quick read"
-        description={DESCRIPTION}
         actions={
           showToggle && (
             <Link
@@ -205,7 +205,7 @@ export function QuickReadView({
             pictures={pictures}
             compact
           />
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             <p className="text-ui text-ink-muted">
               Next page marks {page.length === 1 ? 'this story' : `all ${page.length} stories`} as
               seen.

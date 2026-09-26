@@ -43,7 +43,8 @@ export type RunJob =
   | 'notes'
   | 'review'
   | 'comment'
-  | 'raise';
+  | 'raise'
+  | 'check_back';
 
 /**
  * What to call the press, where the page names the run behind a step.
@@ -63,6 +64,7 @@ export const RUN_JOB_LABEL: Record<RunJob, string> = {
   review: 'A UI review',
   comment: 'A reply to a comment',
   raise: 'An answer on a raise',
+  check_back: 'A check-back',
 };
 
 /**
@@ -83,6 +85,7 @@ export const RUN_JOB_NOUN: Record<RunJob, string> = {
   review: 'ui review',
   comment: 'comment reply',
   raise: 'raise answer',
+  check_back: 'check-back',
 };
 
 /**

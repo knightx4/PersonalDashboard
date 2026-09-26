@@ -71,6 +71,24 @@ describe('the bottom bar', () => {
     expect(order).toEqual(['Agenda', 'Calendar', 'Switch', 'All', 'More']);
   });
 
+  it('keeps the switcher in the middle when there are only three tabs beside it', () => {
+    // Two sections and More: an odd count, which used to leave the switcher
+    // one past centre of four (note 202571c8). The short side is padded so
+    // the bar is five slots and the switcher is the third.
+    const html = render(
+      [
+        { href: '/goals', label: 'Areas', exact: true },
+        { href: '/goals/all', label: 'All' },
+      ],
+      '/goals/settings',
+    );
+    const slots = [...bar(html).matchAll(/<li( aria-hidden="true")?>/g)];
+    expect(slots).toHaveLength(5);
+    expect(slots[4][1]).toBeTruthy();
+    const order = [...bar(html).matchAll(/>(Areas|All|Switch|More)</g)].map((m) => m[1]);
+    expect(order).toEqual(['Areas', 'All', 'Switch', 'More']);
+  });
+
   it('leaves room under the page for it, whether or not there are sections', () => {
     expect(render([])).toContain('pb-24');
     expect(render([{ href: '/todo', label: 'Agenda' }])).toContain('pb-24');

@@ -12,12 +12,19 @@ import { loadOvernightRun } from '@/lib/plan/overnight';
 import { runnerCard } from '@/lib/plan/runner-card';
 import { planRoutine } from '@/lib/feedback/routine';
 import { loadNotesLastRun } from '@/lib/feedback/last-worked';
+import { CHECK_BACK_COLUMNS, checkBackFrom } from '@/lib/plan/check-backs';
+import { CheckBacksPanel } from './check-backs-panel';
 import { ConversationsView } from './conversations-view';
 import { DigestPanel } from './digest-panel';
 import { RaisedView } from './raised-view';
 import { StatusPanel } from './status-panel';
 
 export const metadata = { title: 'Dash' };
+
+/** The time the check-backs are measured against. Outside the component because it reads the clock. */
+function readClock(): number {
+  return Date.now();
+}
 
 /**
  * The page you open in the morning: your day, and your conversations.
@@ -55,6 +62,7 @@ export default async function DevRaisedPage() {
     started,
     openNotes,
     notesLastRun,
+    checkBacks,
   ] = await Promise.all([
     loadRaised(supabase, user.id),
     loadDigest(supabase, user.id),
@@ -75,7 +83,16 @@ export default async function DevRaisedPage() {
       .eq('user_id', user.id)
       .in('status', ['open', 'in_progress', 'blocked', 'planned']),
     loadNotesLastRun(supabase, user.id),
+    // What Dash has said it will come back to, soonest first.
+    supabase
+      .from('check_backs')
+      .select(CHECK_BACK_COLUMNS)
+      .eq('user_id', user.id)
+      .eq('status', 'waiting')
+      .order('due_at'),
   ]);
+  const comingBack = (checkBacks.data ?? []).map((row) => checkBackFrom(row as Record<string, unknown>));
+  const now = readClock();
 
   // Everything waiting on you, in the three groups the section is drawn in:
   // what you have to go and do, what you have to answer, what you only have to
@@ -117,6 +134,7 @@ export default async function DevRaisedPage() {
         openNotes={openNotes.count ?? 0}
         notesLastRun={notesLastRun}
       />
+      <CheckBacksPanel rows={comingBack} now={now} />
       <DigestPanel digest={digest} />
       <RaisedView queue={queue} groups={groups} titles={titles} />
       <ConversationsView conversations={conversations} titles={titles} />

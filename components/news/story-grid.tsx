@@ -70,7 +70,15 @@ export function StoryGrid({ stories, pictures, compact = false, className }: Sto
     tallLead: !compact && pictures && Boolean(stories[0]?.image),
   });
   return (
-    <div className={cn('grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3', className)}>
+    <div
+      className={cn(
+        'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
+        // Quick read's page is meant to fit one screen with its Next page
+        // button, so its cards sit closer (note 85fc201a).
+        compact ? 'gap-3' : 'gap-4',
+        className,
+      )}
+    >
       {stories.map((story, index) => {
         const span = spans[index];
         return (
@@ -131,14 +139,19 @@ function StoryGridCard({
             )}
           />
         )}
-        <div className={cn('flex min-w-0 flex-1 flex-col', small ? 'card-pad-dense' : 'card-pad')}>
+        <div
+          className={cn('flex min-w-0 flex-1 flex-col', compact ? 'card-pad-dense' : 'card-pad')}
+        >
           {story.from && <p className="truncate text-ui text-ink-muted">{story.from}</p>}
           <Heading
             className={cn(
               'break-words text-ink',
               story.from && 'mt-1',
               lead
-                ? 'font-display text-title tracking-tight'
+                ? cn(
+                    'font-display tracking-tight',
+                    compact ? 'text-body font-semibold' : 'text-title',
+                  )
                 : cn('font-semibold', small ? 'text-ui' : 'text-body'),
             )}
           >
@@ -147,7 +160,11 @@ function StoryGridCard({
           <p
             className={cn(
               'mt-1.5 break-words',
-              small ? 'line-clamp-3 text-ui' : 'text-body leading-relaxed',
+              small
+                ? 'line-clamp-2 text-ui'
+                : compact
+                  ? 'line-clamp-3 text-ui'
+                  : 'text-body leading-relaxed',
               lead ? 'text-ink' : 'text-ink-muted',
             )}
           >
