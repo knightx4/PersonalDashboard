@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { authorizeCron } from '@/inngest/cron/authorize';
+import { runCheckBackWake } from '@/inngest/dev/check-backs';
 import { runOvernightTick } from '@/inngest/dev/overnight';
 import { runGoalsQuietSweep } from '@/inngest/goals/quiet-runs';
 
@@ -37,13 +38,27 @@ async function goalsQuietRuns() {
   }
 }
 
+/**
+ * Wakes Dash for check-backs an hour past due that no session has picked up
+ * (supabase/migrations/0103). Same clock for the same reason as the sweep
+ * above, and the same rule: a failure is reported beside the tick.
+ */
+async function checkBacks() {
+  try {
+    return await runCheckBackWake();
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'failed' };
+  }
+}
+
 async function tick(request: NextRequest) {
   if (!authorizeCron(request)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const goalsQuiet = await goalsQuietRuns();
+  const checkBackWake = await checkBacks();
   try {
-    return NextResponse.json({ ok: true, ...(await runOvernightTick()), goalsQuiet });
+    return NextResponse.json({ ok: true, ...(await runOvernightTick()), goalsQuiet, checkBackWake });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'failed' },

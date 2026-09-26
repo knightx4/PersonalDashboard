@@ -119,7 +119,15 @@ thousand tokens, and gets to the end.
 1. **Read the raises first.** `raises`, before claiming anything. An open raise
    is the person still waiting to be asked; an answered one carries a reply
    written while nothing was awake, and that answer is what to build against
-   from then on.
+   from then on. When `raises` ends by saying check-backs are due, run
+   `check-backs` and do each one before the batch: it is a look an earlier
+   session asked to take at a set time, and closing it is `checked <id> --note
+   "what it found"`. To leave one yourself, for something whose result you
+   cannot see yet (a scheduled run, a queue draining, a deploy), use
+   `check-back "<what to look at>" --after 2h --detail "what to check and what
+   to do about each answer"` rather than a routine on the account: it shows on
+   the Dash tab, any session can finish it, and the tick wakes one an hour past
+   due if none has.
 2. **Work out the order.** `show <the feature>` gives the tree, the done-whens
    and what waits on what. List the steps you are going to build, in dependency
    order. Steps that wait on nothing come first; a step whose dependency is

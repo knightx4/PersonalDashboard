@@ -29,6 +29,14 @@
  *                                [--detail "…"] [--module <id>]
  *                                [--from <n>] [--source "…"]   # ask the person something
  *   npx tsx scripts/plan.ts raises                      # open raises, and answers not replied to
+ *   npx tsx scripts/plan.ts check-back "<title>" --after 2h|90m|1d | --at <ISO time>
+ *                                [--detail "what to check and what to do"]
+ *                                [--from <n>] [--source "…"] [--no-wake]
+ *                                # come back to something after some time: the
+ *                                # next session to run after it falls due picks
+ *                                # it up, and the tick wakes one if none has
+ *   npx tsx scripts/plan.ts check-backs [--all]         # due first, then coming up
+ *   npx tsx scripts/plan.ts checked <id> --note "what it found" [--drop]
  *   npx tsx scripts/plan.ts approve <n>                 # a person's move, never a session's
  *   npx tsx scripts/plan.ts start <n>
  *   npx tsx scripts/plan.ts done <n> --note "what shipped" [--commit <sha>]
@@ -76,6 +84,15 @@ import {
   setupStartRefusal,
 } from '../lib/plan/needs';
 import { reshapeStamp } from '../lib/plan/origin';
+import {
+  CHECK_BACK_COLUMNS,
+  checkBackFrom,
+  dueWords,
+  isDue,
+  MAX_DELAY_MS,
+  parseDelay,
+  type CheckBack,
+} from '../lib/plan/check-backs';
 import { CLAIM_WORD, type ClaimRun } from '../lib/plan/liveness';
 import { storedReading } from '../lib/plan/run-end';
 import { CONSEQUENCE_SHAPE, consequenceFrom, parseConsequenceArg } from '../lib/raised/consequence';
@@ -400,6 +417,34 @@ function lastAuthor(row: RaisedListRow): string | null {
   return comments.length === 0 ? null : comments[comments.length - 1].author;
 }
 
+function printCheckBack(row: CheckBack, now: number): void {
+  const when = row.status === 'waiting' ? `due ${dueWords(row.dueAt, now)}` : row.status;
+  console.log(`\n${row.id.slice(0, 8)}  ${when}  ${row.title}`);
+  if (row.source) console.log(`  from ${row.source}`);
+  if (row.detail) console.log(`  ${row.detail.replace(/\s+/g, ' ')}`);
+  if (row.wokeAt) console.log(`  a session was woken for it at ${row.wokeAt}`);
+  if (!row.wake && row.status === 'waiting') console.log('  waits for a session: the tick will not wake one');
+  if (row.outcome) console.log(`  found: ${row.outcome.replace(/\s+/g, ' ')}`);
+}
+
+async function loadCheckBacks(sql: Sql, userId: string, all: boolean): Promise<CheckBack[]> {
+  const rows = await sql<Record<string, unknown>[]>`
+    select ${sql.unsafe(CHECK_BACK_COLUMNS)}
+    from check_backs
+    where user_id = ${userId}
+      and (${all} or status = 'waiting' or closed_at > now() - interval '2 days')
+    order by (status = 'waiting') desc, due_at`;
+  return rows.map((row) =>
+    checkBackFrom({
+      ...row,
+      due_at: (row.due_at as Date).toISOString(),
+      created_at: (row.created_at as Date).toISOString(),
+      closed_at: row.closed_at ? (row.closed_at as Date).toISOString() : null,
+      woke_at: row.woke_at ? (row.woke_at as Date).toISOString() : null,
+    }),
+  );
+}
+
 function printRaise(row: RaisedListRow): void {
   const scope = row.module && isModuleId(row.module) ? row.module : null;
   console.log(`\n${row.id.slice(0, 8)}  ${moduleLabel(scope)}  ${row.title}`);
@@ -674,8 +719,19 @@ async function main(): Promise<void> {
         (row) => row.status === 'answered' && lastAuthor(row) === 'me',
       );
 
+      // Check-backs are read at the same moment as the raises: the skill's
+      // first step is this command, so a due one is seen by every run.
+      const now = Date.now();
+      const due = (await loadCheckBacks(sql, userId, false)).filter((row) => isDue(row, now));
+      const dueLine =
+        due.length > 0
+          ? `\n${due.length} check-back${due.length === 1 ? ' is' : 's are'} due. Do ${due.length === 1 ? 'it' : 'them'} ` +
+            'before the work you came for: npx tsx scripts/plan.ts check-backs'
+          : null;
+
       if (open.length === 0 && answered.length === 0) {
         console.log('Nothing raised is waiting, and every answer has been replied to.');
+        if (dueLine) console.log(dueLine);
         return;
       }
 
@@ -687,6 +743,100 @@ async function main(): Promise<void> {
         console.log('\n== Answered, not yet replied to');
         for (const row of answered) printRaise(row);
       }
+      if (dueLine) console.log(dueLine);
+      return;
+    }
+
+    /**
+     * Coming back to something after some time. The next session to run once
+     * it falls due picks it up (the line under `raises`), and the tick wakes
+     * one when none has within the hour (inngest/dev/check-backs.ts). Use it
+     * where a routine on the account would otherwise be scheduled: this one is
+     * on the Dash tab, and any session can finish it.
+     */
+    if (command === 'check-back') {
+      const title = target?.trim();
+      if (!title) fail('Give it: check-back "<what to look at>" --after 2h [--detail "…"].');
+      if (title.length > 200) fail('A title is at most 200 characters.');
+      const detail = arg('--detail')?.trim() || null;
+      if (detail && detail.length > 4000) fail('A detail is at most 4000 characters.');
+
+      const after = arg('--after');
+      const at = arg('--at');
+      if (Boolean(after) === Boolean(at)) fail('Say when, with exactly one of --after 2h|90m|1d or --at <ISO time>.');
+      let dueAt: Date;
+      if (after) {
+        const delay = parseDelay(after);
+        if (delay === null) fail(`"${after}" is not a delay: write 90m, 2h, 1d or 1h30m, up to 30d.`);
+        dueAt = new Date(Date.now() + delay);
+      } else {
+        dueAt = new Date(at!);
+        if (Number.isNaN(dueAt.getTime())) fail(`"${at}" is not a time: write it like 2026-09-26T02:20:00Z.`);
+        if (dueAt.getTime() - Date.now() > MAX_DELAY_MS) fail('A check-back is at most 30 days away.');
+      }
+
+      const from = arg('--from');
+      const step = from ? await byNumber(sql, userId, from) : null;
+      const source = arg('--source') ?? (step ? `plan #${step.number}` : null);
+      const wake = !has('--no-wake');
+
+      const [row] = await sql<{ id: string }[]>`
+        insert into check_backs (user_id, title, detail, due_at, plan_item_id, source, wake)
+        values (${userId}, ${title}, ${detail}, ${dueAt}, ${step?.id ?? null}, ${source}, ${wake})
+        returning id`;
+      console.log(`${row.id.slice(0, 8)}  due ${dueWords(dueAt.toISOString(), Date.now())}: ${title}`);
+      console.log(
+        wake
+          ? 'The next session after it falls due picks it up; an hour past due, the tick wakes one.'
+          : 'The next session after it falls due picks it up. The tick will not wake one for it.',
+      );
+      return;
+    }
+
+    if (command === 'check-backs') {
+      const now = Date.now();
+      const rows = await loadCheckBacks(sql, userId, has('--all'));
+      const due = rows.filter((row) => isDue(row, now));
+      const coming = rows.filter((row) => row.status === 'waiting' && !isDue(row, now));
+      const closed = rows.filter((row) => row.status !== 'waiting');
+      if (rows.length === 0) {
+        console.log('No check-backs.');
+        return;
+      }
+      if (due.length > 0) {
+        console.log('\n== Due: do these now, then close each with `checked <id> --note "…"`');
+        for (const row of due) printCheckBack(row, now);
+      }
+      if (coming.length > 0) {
+        console.log('\n== Coming up');
+        for (const row of coming) printCheckBack(row, now);
+      }
+      if (closed.length > 0) {
+        console.log('\n== Closed lately');
+        for (const row of closed) printCheckBack(row, now);
+      }
+      return;
+    }
+
+    if (command === 'checked') {
+      const prefix = target?.trim();
+      if (!prefix || !/^[0-9a-f-]{4,36}$/i.test(prefix)) fail('Name it by its id: checked <id> --note "…".');
+      const note = arg('--note')?.trim();
+      if (!note) fail('Say what the check found, or why it no longer matters: --note "…".');
+      if (note.length > 4000) fail('A note is at most 4000 characters.');
+      const status = has('--drop') ? 'dropped' : 'done';
+
+      const matches = await sql<{ id: string; title: string }[]>`
+        select id, title from check_backs
+        where user_id = ${userId} and status = 'waiting' and id::text like ${`${prefix.toLowerCase()}%`}`;
+      if (matches.length === 0) fail(`No waiting check-back starts with ${prefix}.`);
+      if (matches.length > 1) fail(`${prefix} matches ${matches.length} check-backs; give more of the id.`);
+
+      await sql`
+        update check_backs
+        set status = ${status}, outcome = ${note}, closed_at = now()
+        where id = ${matches[0].id} and user_id = ${userId}`;
+      console.log(`${matches[0].id.slice(0, 8)}  ${status}: ${matches[0].title}`);
       return;
     }
 
