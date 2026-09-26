@@ -26,7 +26,16 @@ export function subtreeOf(
   return ids;
 }
 
-/** How a step reads in a picker: its depth, its number and its title. */
-export function catalogLabel(entry: { depth: number; number: number; title: string }): string {
-  return `${'· '.repeat(entry.depth)}#${entry.number} ${entry.title}`;
+/**
+ * How a step reads in a picker: its depth, its place and its title. The place
+ * is the outline ("12.1") where the step has one, as the rows read, and the
+ * number otherwise.
+ */
+export function catalogLabel(entry: {
+  depth: number;
+  number: number;
+  outline?: string;
+  title: string;
+}): string {
+  return `${'· '.repeat(entry.depth)}#${entry.outline ?? entry.number} ${entry.title}`;
 }
