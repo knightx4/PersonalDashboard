@@ -12,7 +12,7 @@ import { FieldError, InlineInput } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { awaitsReview } from '@/lib/goals/daily';
 import { offersPrepare, offersSend, sendJob } from '@/lib/goals/handover';
-import type { GoalRowNode } from '@/lib/goals/plan-rows';
+import { REVIEW_ASK, type GoalRowNode } from '@/lib/goals/plan-rows';
 import { progressLine } from '@/lib/goals/rhythms';
 import { countProposed, type StepRunView } from '@/lib/goals/shaping';
 import { STEP_KIND_LABELS, countSteps, describeRhythm } from '@/lib/goals/steps';
@@ -446,6 +446,16 @@ export function GoalRow({
       actions={GOAL_TREE_ACTIONS}
       anchorId={`step-${step.id}`}
       source={fromGoal ? `From ${fromGoal.title}` : undefined}
+      // What a step waiting on you is waiting for (note 5aa7216c), as the dev
+      // plan's Needs line says it: the block's ask, or the read a finished
+      // Claude step is waiting on.
+      need={
+        awaitsReview(step)
+          ? REVIEW_ASK
+          : step.status === 'blocked' && step.blockKind !== 'steps'
+            ? (step.blockAsk ?? null)
+            : null
+      }
       comments={GOAL_COMMENTS}
       threadPlaceholder="A note on this step. Tag @dash to ask about it, or to give it figures to file."
       dependencies={{ catalog: context.catalog, groupOf: () => context.goalTitle }}
