@@ -11,6 +11,14 @@ nothing else.
 2. **Read the code it touches.** The module's spec in `docs/`, the routes and
    lib directories it would change, the tests that would need to grow. Decide
    what already exists, what has to be added, and in what order.
+
+   Read the vision too. It says what the workspace is for, in the person's
+   words, and the feature has to name the part of it that it serves. A routine
+   fired from the ideas page carries it in its brief under **Vision**. Without
+   a brief, read it from `module_visions` (the query is in `offline.md`): the
+   idea's workspace's vision, or the one stored under `app` when the idea is
+   about the app as a whole. A workspace with no vision written does not fall
+   back to the app's, the same rule the step briefs follow.
 3. **Write the feature.** One top-level step for the idea, in its module:
 
    ```
@@ -21,6 +29,23 @@ nothing else.
 
    `--idea` links the idea to the feature, which is what turns the idea's
    button into "in the plan as #n". Do this on the feature, not a step.
+
+   **The detail opens with the vision line.** Its first line names the part
+   of the vision the feature serves, quoting the phrase it serves or staying
+   close to it:
+
+   ```
+   Vision: "keep every receipt findable in one search", which this serves by …
+   ```
+
+   Every feature gets one, and there are two other forms. A feature that
+   serves no part of the vision says so and says why it is still worth
+   building: `Vision: serves none of it; …`. The person should see that before
+   approving, not find it out afterwards. A workspace with no vision written
+   gets `Vision: none written for <workspace>.` The line goes in the detail
+   and not the done-when, because the done-when is printed as the Destination
+   in every step brief under the feature and has to say what finished looks
+   like.
 4. **Write the steps beneath it**, each `--parent <n>` and each with a
    `--done-when` and a `--size`. Steps under a proposed feature are proposed
    automatically. Three to eight steps is the usual shape; a step sized `l`
