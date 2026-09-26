@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { CardToWrite, WriteResult } from '@/lib/learn/feed/write-card';
-import { writeVideoCards } from './video-card-run';
+import { settleVideoCards, writeVideoCards } from './video-card-run';
 import { WITHDRAWN } from './video-cards';
 
 /**
@@ -187,5 +187,31 @@ describe('writeVideoCards', () => {
     const result = await writeVideoCards(fakeLearn(tables), { deadline: Date.now() - 1, write });
     expect(write).not.toHaveBeenCalled();
     expect(result.stopped).toMatch(/out of time/);
+  });
+});
+
+describe('settleVideoCards', () => {
+  it('sets one person\'s cards aside and back at once, writing nothing and leaving other people\'s alone', async () => {
+    const tables = setUp();
+    const learn = fakeLearn(tables);
+    await writeVideoCards(learn, { deadline: Date.now() + 60_000, write: writer(tables) });
+    tables.feed_cards!.push({
+      id: 'theirs', user_id: 'user-2', reason: 'video', video_id: 'ccccccccccc', video_start_seconds: 0, status: 'ready', drop_reason: null, summary: 'Why.',
+    });
+
+    tables.watch_list![0]!.verdict = 'watch';
+    expect(await settleVideoCards(learn, USER)).toEqual({ withdrawn: 2, revived: 0 });
+    expect(videoCards(tables)).toEqual([
+      [30, 'dropped'],
+      [400, 'dropped'],
+    ]);
+    expect(tables.feed_cards!.find((row) => row.id === 'theirs')).toMatchObject({ status: 'ready' });
+
+    tables.watch_list![0]!.verdict = 'card';
+    expect(await settleVideoCards(learn, USER)).toEqual({ withdrawn: 0, revived: 2 });
+    expect(videoCards(tables)).toEqual([
+      [30, 'ready'],
+      [400, 'ready'],
+    ]);
   });
 });

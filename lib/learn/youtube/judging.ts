@@ -13,7 +13,9 @@ import {
   screenVideos,
   SCREEN_BATCH,
   transcriptWindows,
+  type FiledVideo,
   type LearnerProfile,
+  type Verdict,
   type TranscriptStatus,
   type VideoToScreen,
 } from './judge-video';
@@ -32,7 +34,10 @@ import { loadTranscript, MAX_ATTEMPTS, queueTranscripts } from './transcripts';
  *
  * A verdict you set (verdict_by 'you', #1068) is never read or written here:
  * every read skips a row with a verdict, and every write is guarded on
- * verdict_by as well, for a move made while the run was working.
+ * verdict_by as well, for a move made while the run was working. Your moves
+ * are read, though, as examples in the profile both passes are sent. The
+ * judge's own answer goes in judge_verdict beside the verdict, so a move keeps
+ * what it disagreed with.
  *
  * Runs with the service client, so every read and write names the person.
  */
@@ -44,6 +49,8 @@ const MAX_TRACKS = 12;
 const MAX_GOALS = 20;
 const MAX_IDEAS = 60;
 const NAMES_PER_THEME = 4;
+/** Videos you filed yourself, sent as examples (#1068). */
+const MAX_FILED = 15;
 
 type ItemRow = {
   title: string;
@@ -156,7 +163,26 @@ export async function loadLearnerProfile(learn: LearnSupabaseClient, userId: str
     byTheme.set(theme, names);
   }
 
+  const filedRows = await learn
+    .from('watch_list')
+    .select('verdict, judge_verdict, item:catalogue_items!watch_list_item_id_fkey(title, author)')
+    .eq('user_id', userId)
+    .eq('verdict_by', 'you')
+    .order('judged_at', { ascending: false, nullsFirst: false })
+    .limit(MAX_FILED);
+  if (filedRows.error) throw new Error(`Reading the videos you filed failed: ${filedRows.error.message}`);
+  type FiledRow = {
+    verdict: Verdict;
+    judge_verdict: Verdict | null;
+    item: { title: string; author: string | null } | { title: string; author: string | null }[] | null;
+  };
+  const filed = ((filedRows.data ?? []) as unknown as FiledRow[]).flatMap((row): FiledVideo[] => {
+    const item = Array.isArray(row.item) ? row.item[0] : row.item;
+    return item ? [{ title: item.title, channel: item.author, judge: row.judge_verdict, you: row.verdict }] : [];
+  });
+
   return {
+    filed,
     tracks,
     goals: ((goalRows.data ?? []) as { title: string; detail: string | null }[]).map((goal) => ({ title: goal.title, detail: goal.detail })),
     ideas: [...byTheme].map(([theme, names]) => ({ theme, names })),
@@ -248,6 +274,7 @@ export async function judgeWatchLists(
         if (row.decision === 'skip') {
           await writeRow(learn, video, {
             verdict: 'skip',
+            judge_verdict: 'skip',
             verdict_by: 'judge',
             why: row.why,
             judged_from: 'title',
@@ -308,6 +335,7 @@ export async function judgeWatchLists(
     const stamp = now().toISOString();
     await writeRow(learn, video, {
       verdict: judged.verdict,
+      judge_verdict: judged.verdict,
       verdict_by: 'judge',
       why: judged.why,
       judged_from: judgedFrom,
