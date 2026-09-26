@@ -26,7 +26,7 @@ import { ARTICLE_GAP, POOL_FACTOR, spreadDeck, type Spreadable } from './spread'
  */
 
 const CARD_SELECT =
-  'id, reason, status, idea_name, concept_id, theme_name, aim_name, field_id, summary, why, takeaway, context, hook, example, check_question, check_answer, depth, difficulty, ' +
+  'id, reason, status, idea_name, concept_id, theme_name, aim_name, field_id, summary, why, takeaway, context, hook, example, check_question, check_answer, mentions, depth, difficulty, ' +
   'track_name, unit_title, subject_id, ' +
   'item:catalogue_items!feed_cards_item_id_fkey(title, canonical_url, licence), ' +
   'segment:catalogue_segments!feed_cards_segment_id_fkey(heading, text, section_anchor), ' +
