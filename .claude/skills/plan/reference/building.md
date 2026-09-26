@@ -52,7 +52,10 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
 2. **Read the brief.** `show <n>`. Read the "Done when" section twice; it is
    what the work is checked against. If there is none, write one from the
    detail and the parent's context before starting, and say so in the note.
-   The brief also carries **Destination** — the feature's own done-when — and
+   Where the step's workspace has a vision written, the brief opens with it
+   under **Vision** (the app's, for a step with no workspace): what the
+   workspace is for, and the thing a change that meets its done-when can
+   still miss. The brief also carries **Destination** — the feature's own done-when — and
    **Decided so far**, every question already settled beneath that feature.
    Build against those: they are the answers you would otherwise ask for
    again.
