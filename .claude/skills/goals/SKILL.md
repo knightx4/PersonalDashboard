@@ -20,7 +20,8 @@ when you cannot settle it yourself (see "Decide first, ask last").
 
 Through the **Supabase** connector (`mcp__Supabase__execute_sql`, loaded with
 ToolSearch), project `asjztutnqxbecruvyrbj`. Every table is in the `goals`
-schema. Filter every read and write by the `user_id` in your brief.
+schema except files, which are in `core` (see "Files"). Filter every read and
+write by the `user_id` in your brief.
 
 **Every write declares who and which run, in the same call:**
 
@@ -131,7 +132,10 @@ where c.user_id = '<user>' and c.archived_at is null;
 
 Also worth a look where they exist: the area's other goals (so you do not
 propose a duplicate), `goals.readings` for a measured goal, `goals.links` for a
-goal tied to Learn or the job search, the comments on the goal and its steps
+goal tied to Learn or the job search, the files the goal and its steps link to
+(`goals.links` with `kind` `file`, then `core.files`; read them before redoing
+work an earlier run already wrote up), the newest note on the goal
+(`goals.briefs`), the comments on the goal and its steps
 (`goals.comments`), and the recent `goals.history` rows for this goal's steps.
 A step the person dropped or archived tells you what they did not want. Do not
 propose it again.
@@ -1079,18 +1083,27 @@ Before each one, report it on the run row with `now_on` the step's title
    for.
 2. Produce it: a research note, a draft, a list. Write it for the person to
    read on a phone: plain words, the answer first, sources as links where
-   you used any. Use web search where the step needs current facts.
-3. Store it on the step and close the step in one write. `result` is the text
-   itself (up to 100,000 characters). `result_url` is optional, for when it
-   also lives at a link. Only a `claude` step takes either here; a step of
-   the person's takes them only when it is prepared ("A step of yours to
-   prepare").
+   you used any. Use web search where the step needs current facts. `result`
+   is markdown, and the page renders it: tables, lists and links show as
+   such.
+3. Decide where it lives. A short answer, a few lines that are read once,
+   goes in `result` whole. Anything longer, anything with a table, and
+   anything the person or a later step will come back to is a **file**
+   ("Files"): write the file, link it from the step, and put only its
+   summary in `result`, two or three sentences ending with the link. When a
+   file on the same question already exists (a step that updates last
+   month's breakdown), revise that file instead of writing a new one.
+4. Store the result on the step and close the step in one write. `result` is
+   the text itself (up to 100,000 characters). `result_url` is optional, for
+   when it also lives at a link outside the app. Only a `claude` step takes
+   either here; a step of the person's takes them only when it is prepared
+   ("A step of yours to prepare").
 
    ```sql
    set local goals.actor = 'claude';
    set local goals.run_id = '<the run id>';
    update goals.items
-   set result = '<what you produced>', result_url = null, status = 'done'
+   set result = '<what you produced, or the file''s summary and link>', result_url = null, status = 'done'
    where id = '<step id>' and user_id = '<user>' and kind = 'claude';
    ```
 
@@ -1104,6 +1117,9 @@ steps"). One whose facts are not findable stays open with no result. Say why
 in the run summary either way, and where a choice would unblock it, add it as
 a question step under the same goal. The summary names each step worked and
 each one left.
+
+Before closing the run, leave a note on each goal whose steps you worked,
+and one for the Goals home ("Leaving a note").
 
 An information step the brief lists under "answers out of date" is not a
 `claude` step and gets no `result`. Work its listed answers again as in
@@ -1165,7 +1181,9 @@ step's brief does. They will do the step; you write what they need to do it.
 
    `result_url` is for when it also lives somewhere with a link. Change
    nothing else: the step stays `mine` and `open`, and ticking it is theirs.
-   Preparing it again replaces the earlier text.
+   Preparing it again replaces the earlier text. Something long, such as a
+   full application pack or a month's budget, goes in a file linked from the
+   step, as in "The morning run", with the short version in `result`.
 4. Close the run row with a summary that says what you prepared and anything
    you could not find.
 
@@ -1237,6 +1255,14 @@ values ('<user>', '<goal id>', '<the run id>', 'waiting_on_you',
 One row per goal per run. Rows are never updated: next week's run adds a new
 one, and the card shows the newest. The summary gives the count of each
 verdict and names the stalled goals.
+
+After the verdicts, leave a note on every open goal and one for the Goals
+home ("Leaving a note"). The weekly run is the one run that writes a note on
+every goal, so these are the notes the person reads most.
+
+Where a goal's files hold figures that have moved since they were written
+(the applications breakdown, a debt plan's balances), revise those files with
+the new figures and a `change_note`, and say so in the goal's note.
 
 ### Researching the help each goal asks for
 
@@ -1385,6 +1411,104 @@ puts your reply in `goals.comments`.
 
 Close the run row as for any other run; the summary says what you replied and
 what you changed.
+
+## Files
+
+A file is a piece of writing kept as its own page (`core.files`, opened at
+`/goals/files/<id>`), for anything too long for a step's result or worth
+coming back to: a breakdown of their data, research, a comparison, a plan, a
+draft. What goes in one is in `reference/files.md`; read it before you write
+your first file in a run. Files are in the `core` schema, which has no actor
+setting: `made_by = 'claude'` is what marks a file as yours.
+
+Write it, link it from the step that asked for it, and link it from the goal
+when it bears on the goal as a whole, in one call:
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+with file as (
+  insert into core.files (user_id, title, summary, body, made_by, origin)
+  values ('<user>', 'Your applications by role family',
+          'FP&A and accounting answer and interview best; strategic finance is 43% of the volume at average conversion.',
+          '<the markdown>', 'claude', 'goals.items:<step id>')
+  returning id
+)
+insert into goals.links (user_id, item_id, kind, target_id)
+select '<user>', item_id, 'file', file.id
+from file, (values ('<step id>'::uuid), ('<goal id>'::uuid)) as items(item_id)
+returning target_id;
+```
+
+- `title` says what it is about, in the person's words, up to 200 characters.
+- `summary` is the answer in one or two sentences (up to 600 characters). It
+  shows under the title wherever the file is listed.
+- `origin` is `goals.items:<id>` of the step that asked for it, or of the goal
+  when no one step did.
+- Link a step to its file with `goals.links` as above. The step's result then
+  ends with the link as markdown: `[Read the file](/goals/files/<id>)`.
+
+**Revising.** Update the row. The database numbers the new version and keeps
+the old one; you never write `version` or `core.file_versions`. Set
+`change_note` in the same update to one sentence on what changed.
+
+```sql
+update core.files
+set body = '<the new markdown>', summary = '<the new answer>',
+    change_note = 'Added the October applications; FP&A reply rate is now 61%.'
+where id = '<file id>' and user_id = '<user>';
+```
+
+Never delete a file. One that no longer applies gets `archived_at = now()`,
+and only when the person asked or the step it served was dropped.
+
+## Leaving a note
+
+Each goal's page opens with a box headed "Where it stands", and the Goals
+home opens with one headed "From Claude". The words in both are a note you
+leave in `goals.briefs` as a run finishes. The pages list what is waiting on
+the person themselves, row by row; the note is your reading of it: what
+moved, what matters now, and what you will do next.
+
+**When.** Every run that worked on a goal (a goal run, a re-shape, a sent step
+or phase, a prepared step, a flag answered) leaves one note on that goal. The
+morning run leaves one on each goal whose steps it worked. The weekly run
+leaves one on every open goal. The morning and weekly runs also leave one note
+for the home, with no `item_id`, covering every goal.
+
+**What.** A few lines of markdown, up to 2,000 characters, and usually under
+600. Write it for someone glancing at the top of the page:
+
+- Where the goal stands against its done-when, with the figure when there is
+  one ("Balance is $18,250, down $1,400 this month").
+- What changed since the last note: what you did, what they did, what came in.
+  Link a file you wrote or revised.
+- What is waiting on them, most important first, by name ("Answer *Which lane
+  first?*; it decides the next three steps"). Do not list everything: the box
+  lists it underneath.
+- What you will do next, if anything is lined up.
+
+The home's note does the same across all goals in three to six lines: the one
+or two things most worth their attention today, and anything that went wrong
+(a failed step, a due date that moved). Name goals by their titles.
+
+Plain sentences, the person as "you", no heading, no sign-off, and nothing
+repeated from the goal's own title or done-when. Write to
+docs/WRITING-GUIDE.md.
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+insert into goals.briefs (user_id, item_id, run_id, body)
+values ('<user>', '<goal id>', '<the run id>', '<the note>');
+
+-- the home's note
+insert into goals.briefs (user_id, item_id, run_id, body)
+values ('<user>', null, '<the run id>', '<the note>');
+```
+
+Rows are never updated: the page shows the newest, and the older ones are the
+record.
 
 ## Stopping
 

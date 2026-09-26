@@ -32,6 +32,17 @@ import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { Card } from '@/components/ui/card';
+import { FileLinks } from '@/components/files/file-links';
+import type { LinkedFile } from '@/lib/files/files';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { writtenWhen, type Brief } from '@/lib/goals/briefs';
+import { loadBrief } from '@/lib/goals/briefs-store';
+import { loadFilesOf } from '@/lib/goals/files-store';
+import { flagsWaiting } from '@/lib/goals/flags';
+import { goalStatus } from '@/lib/goals/goal-status';
+import type { GoalReview } from '@/lib/goals/reviews';
+import { loadLatestReviews } from '@/lib/goals/reviews-store';
+import { GoalStatusCard } from './goal-status';
 import { GoalAddRow } from './goal-add-row';
 import { GoalContext } from './goal-context';
 import { GoalFlags } from './goal-flags';
@@ -98,6 +109,27 @@ function stepRunLines(runs: Record<string, GoalRun>) {
   return stepRunViews(runs, Date.now());
 }
 
+/** When Claude's note was written. Outside the component because it reads the clock. */
+function noteWhen(brief: Brief, timeZone: string): string {
+  return writtenWhen(brief, timeZone, Date.now());
+}
+
+/** Every file on the goal and its steps, once each, the goal's own first. */
+function goalFiles(goalId: string, filesOf: Record<string, LinkedFile[]>): LinkedFile[] {
+  const seen = new Set<string>();
+  const out: LinkedFile[] = [];
+  const add = (files: LinkedFile[] | undefined) => {
+    for (const file of files ?? []) {
+      if (seen.has(file.fileId)) continue;
+      seen.add(file.fileId);
+      out.push(file);
+    }
+  };
+  add(filesOf[goalId]);
+  for (const [itemId, files] of Object.entries(filesOf)) if (itemId !== goalId) add(files);
+  return out;
+}
+
 export default async function GoalMapPage({ params }: { params: Promise<{ goalId: string }> }) {
   const { goalId } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(goalId)) notFound();
@@ -137,9 +169,27 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
   // The latest run on each step sent, prepared or asked about from its row
   // (plan #1044), so a reload shows it going. A failed read leaves the lines
   // out rather than the page.
-  const stepRuns = await loadStepRuns(client, stepIdsOn(map)).catch(
-    (): Record<string, GoalRun> => ({}),
+  const core = await createCoreClient();
+  const [stepRuns, filesOf, brief, review] = await Promise.all([
+    loadStepRuns(client, stepIdsOn(map)).catch((): Record<string, GoalRun> => ({})),
+    // The files the goal and its steps link to. A failed read leaves them
+    // out rather than the page, as do the note and the verdict below.
+    loadFilesOf(client, core, [map.goal.id, ...stepIdsOn(map)]).catch(
+      (): Record<string, LinkedFile[]> => ({}),
+    ),
+    loadBrief(client, map.goal.id).catch((): Brief | null => null),
+    loadLatestReviews(client)
+      .then((reviews) => reviews.get(map.goal.id) ?? null)
+      .catch((): GoalReview | null => null),
+  ]);
+  const status = goalStatus(
+    map.goal,
+    map.areaName,
+    map.steps,
+    today,
+    flagsWaiting(flags, new Map([[map.goal.id, map.goal.title]])),
   );
+  const files = goalFiles(map.goal.id, filesOf);
   const shapeable = map.goal.status === 'open' || map.goal.status === 'proposed';
   const linkedAims = new Set(links?.aims.map((aim) => aim.aimId));
   const aimChoices = aims?.filter((aim) => !linkedAims.has(aim.id)) ?? null;
@@ -189,6 +239,12 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
         />
       )}
       <div className="space-y-6">
+        <GoalStatusCard
+          status={status}
+          brief={brief}
+          briefWhen={brief ? noteWhen(brief, account.timezone) : null}
+          review={review}
+        />
         {flags.length > 0 && <GoalFlags flags={flags} />}
         {shapeable && (
           <GoalShaping
@@ -201,6 +257,14 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
         {!numberEmpty && <GoalNumber {...number} />}
         {!helpEmpty && <GoalHelp {...help} />}
         {!linksEmpty && <GoalLinksSection {...linked} />}
+        {files.length > 0 && (
+          <section aria-labelledby="files-heading" className="space-y-2">
+            <h2 id="files-heading" className="px-1 text-ui font-semibold text-ink">
+              Files
+            </h2>
+            <FileLinks files={files} />
+          </section>
+        )}
         <GoalAddRow
           number={numberEmpty ? number : null}
           help={helpEmpty ? help : null}
@@ -210,6 +274,7 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
           map={map}
           todoOn={moduleEnabled(account, 'todo')}
           runs={stepRunLines(stepRuns)}
+          files={filesOf}
         />
         {/* The goal's own thread (plan #957). Each step has its own, under its details. */}
         <Card padding="dense">

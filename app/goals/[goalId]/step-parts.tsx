@@ -4,6 +4,8 @@ import { formatDay } from '@/lib/goals/dates';
 import { useActionState, useState } from 'react';
 import { CircleUser, Repeat, Target } from 'lucide-react';
 import { AnswerBox, TheAnswered, TheOptions, useAnswerDraft } from '@/components/dev/question';
+import { FileBody } from '@/components/files/file-body';
+import { FileLinks } from '@/components/files/file-links';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -11,6 +13,7 @@ import { ChipInput, ChipSelect, ComposeTitle, InlineInput, Textarea } from '@/co
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
+import type { LinkedFile } from '@/lib/files/files';
 import { countProposed } from '@/lib/goals/shaping';
 import {
   RHYTHM_COUNT_MAX,
@@ -151,8 +154,11 @@ export function Question({ node }: { node: StepNode }) {
  * On a step of yours it is what Claude prepared for you to do it (plan
  * #1001). That waits on the step itself, which is still yours to tick, so it
  * has no Mark read.
+ *
+ * The text is markdown. A longer piece is kept as a file (core.files) and the
+ * result is its summary, with the file linked under it.
  */
-export function ClaudeResult({ node }: { node: StepNode }) {
+export function ClaudeResult({ node, files = [] }: { node: StepNode; files?: LinkedFile[] }) {
   const [state, review, reviewing] = useActionState(reviewResultAction, answerInitial);
   const prepared = node.kind !== 'claude';
   const unread = !prepared && node.reviewedAt === null;
@@ -161,8 +167,9 @@ export function ClaudeResult({ node }: { node: StepNode }) {
       <p className="text-small text-ink-muted">
         {prepared ? 'What Claude prepared for this' : unread ? 'Claude’s result, to read' : 'Claude’s result'}
       </p>
-      {node.result && (
-        <p className="text-small break-words whitespace-pre-wrap text-ink">{node.result}</p>
+      {node.result && <FileBody markdown={node.result} compact />}
+      {files.length > 0 && (
+        <FileLinks files={files} />
       )}
       {node.resultUrl && (
         <a

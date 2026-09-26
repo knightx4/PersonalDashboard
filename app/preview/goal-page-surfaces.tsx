@@ -1,9 +1,13 @@
 import type { ComponentProps } from 'react';
 import { PageHeader } from '@/components/shell/page-header';
+import { Card } from '@/components/ui/card';
 import { DailyView } from '@/app/goals/daily-view';
 import { GoalsView } from '@/app/goals/goals-view';
 import { GoalAddRow } from '@/app/goals/[goalId]/goal-add-row';
 import { GoalLinksSection } from '@/app/goals/[goalId]/goal-links';
+import { GoalStatusCard } from '@/app/goals/[goalId]/goal-status';
+import { FileBody } from '@/components/files/file-body';
+import { FileLinks } from '@/components/files/file-links';
 import { GoalNumber } from '@/app/goals/[goalId]/goal-number';
 import { GoalFog, GoalShaping } from '@/app/goals/[goalId]/goal-shaping';
 import { StepTree } from '@/app/goals/[goalId]/step-tree';
@@ -220,7 +224,16 @@ export function GoalsHomeSurface() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Goals" />
-      <DailyView view={home} timeZone="Europe/London" />
+      <DailyView
+        view={{
+          ...home,
+          brief: {
+            body: 'The card balance is down to **$6,980**, $730 lower than August. The one thing waiting on you is *Which card first?* on **Pay off the credit cards**: it decides the next three steps. The quant role search is waiting on two recruiters; I will check for replies on Monday.',
+            when: 'today',
+          },
+        }}
+        timeZone="Europe/London"
+      />
     </div>
   );
 }
@@ -329,6 +342,48 @@ const cardRuns = goalRunRows(
   'Europe/London',
 );
 
+const cardFiles = [
+  {
+    fileId: 'f-rates',
+    title: 'Which card to pay first',
+    summary: 'Paying the 27% card first saves about $310 over paying the smaller balance first.',
+  },
+];
+
+const FILE_BODY = `283 applications are in the tracker since March. **FP&A and accounting answer and interview best.** Strategic finance is 43% of what you sent but converts at about the average, and AI expert gigs and real estate barely answer.
+
+| Role family | Sent | Replied | Interviewed | Rejected early |
+|---|---:|---:|---:|---:|
+| Strategic finance | 121 | 60 (50%) | 3 (2%) | 46 of 51 |
+| FP&A | 38 | 24 (63%) | 9 (24%) | 8 of 12 |
+| Accounting | 31 | 18 (58%) | 6 (19%) | 7 of 9 |
+| Chief of staff & operations | 43 | 19 (44%) | 1 (2%) | 14 of 16 |
+
+## What to do with it
+
+1. Move two of this week's strategic finance slots to FP&A roles.
+2. Lead the FP&A resume with the three-statement model.
+
+## What this does not show
+
+- 154 applications never answered, so their stage is unknown.
+
+Read from the job search on 26 Sept. No applications or messages were sent.`;
+
+/** A file as its page shows it: the body in its card. The summary is for lists. */
+export function FileSurface() {
+  return (
+    <div className="mx-auto max-w-3xl">
+      <PageHeader title="Your applications by role family" description="Written by Claude · updated Sat 26 Sept, 09:12" />
+      <div className="space-y-6">
+        <Card padding="standard">
+          <FileBody markdown={FILE_BODY} />
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 /**
  * The top of a goal page that has something in each section: the Claude
  * line, the number with four monthly readings, and one Learn goal linked. The
@@ -340,6 +395,36 @@ export function GoalTopSurface() {
     <div className="mx-auto max-w-3xl">
       <PageHeader title={cards.title} description={cards.acceptance ?? undefined} />
       <div className="space-y-6">
+        <GoalStatusCard
+          status={{
+            yourMove: [
+              { id: 'which', kind: 'question', label: 'Answer', title: 'Which card first?', href: '#step-which' },
+              { id: 'compare', kind: 'read', label: 'Read Claude’s result', title: 'Compare the two cards’ rates', href: '#step-compare' },
+              { id: 'call', kind: 'do', label: 'Do by 3 Oct', title: 'Call the card company', href: '#step-call' },
+            ],
+            moreSteps: 2,
+            claudeReady: 1,
+            claudeHeld: 0,
+          }}
+          brief={{
+            id: 'brief-1',
+            itemId: cards.id,
+            runId: null,
+            body: 'Down to **$6,980** from $8,420 in June, about $480 a month, which clears both cards by next June. I compared the two rates ([the file](#)): paying the 27% card first saves about $310. Answering *Which card first?* settles the next three steps.',
+            createdAt: '2026-09-25T08:00:00Z',
+          }}
+          briefWhen="today"
+          review={{
+            id: 'rev-1',
+            goalId: cards.id,
+            verdict: 'waiting_on_you',
+            reason: 'Two steps closed this week and the next one is yours.',
+            nextMove: 'Answer “Which card first?” on the goal.',
+            stepId: null,
+            runId: null,
+            createdAt: '2026-09-21T08:00:00Z',
+          }}
+        />
         <GoalShaping
           goalId={cards.id}
           approval={approvalLine({
@@ -355,6 +440,12 @@ export function GoalTopSurface() {
         />
         <GoalNumber goalId={cards.id} unit="$" target={0} readings={readings} today={TODAY} />
         <GoalLinksSection goalId={cards.id} links={links} aimChoices={aimChoices} jobsOn />
+        <section aria-labelledby="files-heading" className="space-y-2">
+          <h2 id="files-heading" className="px-1 text-ui font-semibold text-ink">
+            Files
+          </h2>
+          <FileLinks files={cardFiles} />
+        </section>
       </div>
     </div>
   );

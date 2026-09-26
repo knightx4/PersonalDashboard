@@ -74,6 +74,7 @@ import {
   GoalBareSurface,
   GoalLinkingSurface,
   GoalTopSurface,
+  FileSurface,
   GoalsAllSurface,
   GoalsHomeSurface,
   InformationListSurface,
@@ -2294,6 +2295,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalTopSurface />,
+  },
+  {
+    /* A file Claude wrote (core.files): the summary, then a table, a list
+     * and a caveats section in the body. */
+    id: 'goals-file',
+    label: 'Goals · a file',
+    module: 'goals',
+    width: 'page',
+    render: () => <FileSurface />,
   },
   {
     /* A goal just added: the Claude line and the row of add lines. */
