@@ -187,6 +187,11 @@ export const LEARN_OPERATIONS = [
   // which also writes the one follow-up question, and then the answer to the
   // follow-up. One Haiku call for each.
   'mark-teach-back',
+  // Summarising a video on your list for the Videos section (plan #1069): one
+  // Haiku call from its description when it arrives, and one more from its
+  // transcript once that is stored. Recorded through the service role from
+  // the YouTube library run, against the account whose list it is.
+  'summarise-video',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

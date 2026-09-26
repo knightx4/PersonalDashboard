@@ -95,6 +95,7 @@ describe('the operation names', () => {
       'explain-phrase',
       'write-asked-card',
       'mark-teach-back',
+      'summarise-video',
     ]);
   });
 });

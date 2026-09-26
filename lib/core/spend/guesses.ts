@@ -157,6 +157,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // One idea's claim and basis and what was written in; the marks and a
   // follow-up question out. The follow-up's marking is the same size or less.
   'mark-teach-back': run(HAIKU, 1_500, 400),
+  // A description (about 800 tokens) or up to 40,000 characters of transcript
+  // in, a paragraph and five points out. Weighted towards the description,
+  // which every video gets and most keep.
+  'summarise-video': background(unit(HAIKU, 4_000, 350)),
 
   // Jobs.
   'enrich-company': run(HAIKU, 10_000, 500),

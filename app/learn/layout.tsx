@@ -120,8 +120,17 @@ export default async function LearnLayout({ children }: { children: React.ReactN
     },
     // The owner's alone, because every transcript it fetches spends the
     // owner's TranscriptAPI credits.
+    // Your list of videos to watch (plan #1069), read from the playlist set on
+    // the YouTube page, so the owner's for the same reason.
     ...(owner
       ? [
+          {
+            href: '/learn/videos',
+            label: 'Videos',
+            icon: 'watchList' as const,
+            exact: true,
+            alsoMatches: ['/learn/videos/'],
+          },
           {
             href: '/learn/youtube',
             label: 'YouTube',
