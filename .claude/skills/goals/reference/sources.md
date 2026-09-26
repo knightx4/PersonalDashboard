@@ -52,6 +52,14 @@ Positions they hold, each a sentence drawn from their notes.
 - Name a row by `name`; link it by `id`
 - position_sources (position_id, quote) gives the sentence in the note each one came from.
 
+### `obsidian.note_connections` (Vault)
+
+Each week, notes they wrote recently that come back to an older note of theirs, with a sentence on what they share.
+
+- Search: `sentence`
+- Name a row by `sentence`; link it by `id`
+- older_note_id and recent_note_ids point at obsidian.notes. week_ending is the day the week was read back from. A row with dismissed_at set is one they hid as not useful.
+
 ### `obsidian.tensions` (Vault)
 
 Places where two of their positions pull against each other.
