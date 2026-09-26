@@ -1,10 +1,12 @@
 import 'server-only';
 
+import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { createVaultServiceSupabase } from '@/inngest/vault/supabase-admin';
 import { decryptAccessToken, vaultPortsFor } from '@/lib/vault/db/ports';
 import { VaultAuthError } from '@/lib/vault/providers';
 import { runVaultSync, type VaultConnectionRow } from '@/lib/vault/sync/run';
 import { activeRun } from '@/lib/vault/sync/manual';
+import { embedVaultNotes } from '@/lib/vault/notes/embed';
 import type { SyncRunSummary } from '@/lib/vault/sync/progress';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 
@@ -187,6 +189,8 @@ export async function syncOneConnection(
       .update({ last_error: null })
       .eq('id', connection.id);
 
+    if (result.notesWritten > 0) await embedAfterSync(supabase, connection.user_id);
+
     return result;
   } catch (err) {
     const message = err instanceof Error ? err.message : 'failed';
@@ -206,6 +210,34 @@ export async function syncOneConnection(
     }
 
     throw err;
+  }
+}
+
+/**
+ * How long a sync may spend embedding the notes it wrote (plan #1111). A daily
+ * sync writes a handful, which is one call; a first sync writes the whole
+ * vault, and the map sweep's tick embeds the rest within minutes. Kept short
+ * because the daily cron runs other stages after the vault inside one
+ * 300-second limit.
+ */
+const EMBED_AFTER_SYNC_MS = 20_000;
+
+/**
+ * Give the notes this sync wrote their vectors, as far as the time allows.
+ * Never throws: the sync itself succeeded, and a note left unembedded is
+ * picked up by the next map sweep tick.
+ */
+async function embedAfterSync(supabase: VaultSupabaseClient, userId: string): Promise<void> {
+  try {
+    const result = await embedVaultNotes(supabase, createCoreServiceSupabase(), {
+      userId,
+      deadline: Date.now() + EMBED_AFTER_SYNC_MS,
+    });
+    if (result.stopped && result.stopped.reason !== 'time' && result.stopped.reason !== 'no-key') {
+      console.error('[vault sync] note embedding', result.stopped.reason, result.stopped.detail);
+    }
+  } catch (err) {
+    console.error('[vault sync] note embedding', err instanceof Error ? err.message : err);
   }
 }
 

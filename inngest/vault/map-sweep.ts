@@ -9,6 +9,7 @@ import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { acceptNoteMap } from '@/lib/vault/map/accept';
 import { scorePositionCentrality, type CentralityResult } from '@/lib/vault/map/centrality';
 import { embedMapRows, type MapEmbedResult } from '@/lib/vault/map/embed';
+import { embedVaultNotes, type NoteEmbedResult } from '@/lib/vault/notes/embed';
 import { linkPositions, type LinkPassResult } from '@/lib/vault/map/link-positions';
 import { applyMergeProposals, type ApplyResult } from '@/lib/vault/map/merge-apply';
 import { proposePositionMerges, type PositionMergeResult } from '@/lib/vault/map/merge-positions';
@@ -49,6 +50,14 @@ export const EMBED_UNTIL_MS = 280_000;
  * no longer use the whole tick and leave positions unjudged.
  */
 export const THEME_MERGE_UNTIL_MS = 150_000;
+
+/**
+ * When embedding vault notes stops starting new chunks (plan #1111). Early
+ * enough that a backfill of the whole vault leaves the merge passes their
+ * share of the tick; a backlog longer than this finishes over the next few
+ * ticks.
+ */
+export const NOTE_EMBED_UNTIL_MS = 120_000;
 
 /**
  * When applying the theme proposals stops (plan #820). Normally a few
@@ -98,6 +107,11 @@ export type MapSweepTickSummary = {
    */
   embedded: Pick<MapEmbedResult, 'themes' | 'positions' | 'stopped'> | null;
   /**
+   * Notes given a vector because they had none or had changed (plan #1111):
+   * the backfill, and whatever a sync ran out of time for. Null when it threw.
+   */
+  notesEmbedded: Pick<NoteEmbedResult, 'embedded' | 'stopped'> | null;
+  /**
    * Theme merge proposals written after embedding (plan #811). Null when the
    * pass did not run: no ANTHROPIC_API_KEY, embedding still catching up, or
    * it threw.
@@ -135,6 +149,7 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
     finished: 0,
     failed: [],
     embedded: null,
+    notesEmbedded: null,
     themeMerges: null,
     positionMerges: null,
     applied: { theme: null, position: null },
@@ -183,6 +198,18 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
     };
   } catch (err) {
     console.error('[map sweep] embedding', err instanceof Error ? err.message : err);
+  }
+
+  // Every note with no vector or a stale one, for the related-notes panels
+  // (feature #1110). Same key and the same no-key stop as above.
+  try {
+    const notes = await embedVaultNotes(supabase, createCoreServiceSupabase(), {
+      userId: null,
+      deadline: startedAt + NOTE_EMBED_UNTIL_MS,
+    });
+    summary.notesEmbedded = { embedded: notes.embedded, stopped: notes.stopped };
+  } catch (err) {
+    console.error('[map sweep] note embedding', err instanceof Error ? err.message : err);
   }
 
   // Theme pairs that have no merge proposal yet. Waits while embedding is
