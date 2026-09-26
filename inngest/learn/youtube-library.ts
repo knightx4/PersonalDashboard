@@ -32,6 +32,7 @@ import {
   type WatchListSync,
 } from '@/lib/learn/youtube/watch-list';
 import { summariseWatchLists, type SummaryPassResult } from '@/lib/learn/youtube/summaries';
+import { judgeWatchLists, type JudgePassResult } from '@/lib/learn/youtube/judging';
 
 /**
  * The YouTube library's work, run with the service-role client.
@@ -56,9 +57,15 @@ const TICK_WATCH_LIST_MS = 30_000;
  * forty videos in the window, so a new playlist is summarised within a day.
  */
 const TICK_SUMMARY_MS = 60_000;
-const TICK_LIST_MS = 90_000;
+/**
+ * Then the judge (plan #1066): the title screen, ten videos a call, and the
+ * verdicts on videos whose transcripts have arrived, four at a time. The
+ * transcripts it asks for are fetched later in this run, inside its allowance.
+ */
+const TICK_JUDGE_MS = 95_000;
+const TICK_LIST_MS = 115_000;
 /** Titles and descriptions are embedded until here, then the queue is topped up. */
-const TICK_METADATA_MS = 120_000;
+const TICK_METADATA_MS = 135_000;
 const TICK_TRANSCRIBE_MS = 210_000;
 const TICK_EMBED_MS = 270_000;
 
@@ -103,6 +110,37 @@ async function summariseLists(learn: LearnSupabaseClient, deadline: number): Pro
   }
 }
 
+/**
+ * Judge the videos on everybody's list, each call recorded against the person
+ * whose list it is. Like the summaries, nothing without an Anthropic key.
+ */
+async function judgeLists(learn: LearnSupabaseClient, deadline: number): Promise<JudgePassResult | null> {
+  const anthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!anthropicApiKey) return null;
+  const core = createCoreServiceSupabase();
+  const rows: Promise<unknown>[] = [];
+  try {
+    return await judgeWatchLists(learn, {
+      anthropicApiKey,
+      deadline,
+      onSpend: (userId, pass, report) =>
+        void rows.push(
+          recordSpend(core, userId, {
+            module: 'learn',
+            operation: pass === 'screen' ? 'screen-video' : 'judge-video',
+            model: report.model,
+            usage: report.usage,
+          }),
+        ),
+    });
+  } catch (error) {
+    console.error('[youtube-library] judging your list', error instanceof Error ? error.message : error);
+    return null;
+  } finally {
+    await Promise.all(rows);
+  }
+}
+
 export type TickReport = {
   channels: { name: string; result: ListChannelResult }[];
   transcripts: TranscribeResult | null;
@@ -116,10 +154,12 @@ export type TickReport = {
   watchLists?: WatchListSync[];
   /** Summaries written for the videos on those lists (plan #1069). */
   summaries?: SummaryPassResult | null;
+  /** Verdicts written and transcripts asked for on those lists (plan #1066). */
+  judging?: JudgePassResult | null;
 };
 
 /**
- * The scheduled run: read your playlist into your list and summarise what is new on it, re-list every channel, queue the videos that best match
+ * The scheduled run: read your playlist into your list, summarise and judge what is new on it, re-list every channel, queue the videos that best match
  * your ideas, then work through the queue within this run's share of the
  * month's credits, then embed what is new.
  */
@@ -134,6 +174,7 @@ export async function runYouTubeLibraryTick(): Promise<TickReport> {
     console.error('[youtube-library] reading your playlist', error instanceof Error ? error.message : error);
   }
   report.summaries = await summariseLists(learn, started + TICK_SUMMARY_MS);
+  report.judging = await judgeLists(learn, started + TICK_JUDGE_MS);
 
   for (const channel of await loadChannels(learn)) {
     if (Date.now() >= started + TICK_LIST_MS) break;

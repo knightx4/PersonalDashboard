@@ -192,6 +192,13 @@ export const LEARN_OPERATIONS = [
   // transcript once that is stored. Recorded through the service role from
   // the YouTube library run, against the account whose list it is.
   'summarise-video',
+  // Judging a video on your list (plan #1066). The screen reads ten titles
+  // and descriptions in one Haiku call and throws out the clear skips before
+  // any transcript credit is spent; the judge reads one video's transcript
+  // windows, or its chapters, and settles watch, card or skip. Apart so the
+  // cheap pass can be read against the one that reads whole transcripts.
+  'screen-video',
+  'judge-video',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

@@ -161,6 +161,12 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // in, a paragraph and five points out. Weighted towards the description,
   // which every video gets and most keep.
   'summarise-video': background(unit(HAIKU, 4_000, 350)),
+  // The judge (plan #1066). The screen sends the profile once with ten
+  // titles and descriptions and gets ten one-line reasons back; the second
+  // pass sends the profile with one video's transcript windows, up to 60,000
+  // characters, or its chapter titles.
+  'screen-video': background(unit(HAIKU, 5_000, 700)),
+  'judge-video': background(unit(HAIKU, 12_000, 400)),
 
   // Jobs.
   'enrich-company': run(HAIKU, 10_000, 500),
