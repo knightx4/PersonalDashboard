@@ -8,10 +8,15 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import type { SavedStory } from '@/lib/news/saved/stories';
+import { DiscussButton } from '../quick/discuss-sheet';
 import { removeSaved } from './actions';
 
-/** A saved story with its newsletter's arrival already formatted: "22 Sep, 07:14". */
-export type SavedListStory = SavedStory & { arrived: string };
+/**
+ * A saved story with its newsletter's arrival already formatted: "22 Sep, 07:14",
+ * and, when it was discussed with Dash, the story index its discussion names
+ * (plan #1061).
+ */
+export type SavedListStory = SavedStory & { arrived: string; discussedIndex?: number | null };
 
 /**
  * The Saved tab's stories, or how to save one when there are none (plan #870).
@@ -20,6 +25,9 @@ export type SavedListStory = SavedStory & { arrived: string };
  * the server refuses brings it back with a toast, both from useOptimisticWrite.
  * The empty state is drawn here rather than by the page so removing the last
  * story shows it at once instead of after the refresh.
+ *
+ * A story discussed with Dash carries a Discussed button beside Remove, which
+ * opens the same sheet as Discuss in Quick read with the exchange in it.
  */
 export function SavedList({ stories }: { stories: SavedListStory[] }) {
   const { shown, run } = useOptimisticWrite<SavedListStory[], string>({
@@ -93,17 +101,26 @@ export function SavedList({ stories }: { stories: SavedListStory[] }) {
                 ) : (
                   <span aria-hidden />
                 )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  title="Take this story off your Saved list"
-                  onClick={() => run(story.id)}
-                  className="-mr-2.5"
-                >
-                  <BookmarkMinus className="size-3.5" strokeWidth={1.75} aria-hidden />
-                  Remove
-                </Button>
+                <div className="-mr-2.5 flex items-center gap-1">
+                  {story.issueId && story.discussedIndex != null && (
+                    <DiscussButton
+                      issueId={story.issueId}
+                      storyIndex={story.discussedIndex}
+                      headline={story.headline}
+                      discussed
+                    />
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    title="Take this story off your Saved list"
+                    onClick={() => run(story.id)}
+                  >
+                    <BookmarkMinus className="size-3.5" strokeWidth={1.75} aria-hidden />
+                    Remove
+                  </Button>
+                </div>
               </div>
             </article>
           </li>

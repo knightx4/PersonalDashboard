@@ -29,15 +29,20 @@ const closedLine = (turns: readonly TalkTurn[]) =>
  * document.body rather than inside the card, so the card's swipe never sees
  * a touch in the sheet. The thread is read each time it opens, so reopening a
  * story shows the exchange as the table holds it.
+ *
+ * `discussed` is the Saved tab's form of it (plan #1061): the same sheet,
+ * labelled Discussed, on a story that already has an exchange.
  */
 export function DiscussButton({
   issueId,
   storyIndex,
   headline,
+  discussed = false,
 }: {
   issueId: string;
   storyIndex: number;
   headline: string;
+  discussed?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -47,11 +52,15 @@ export function DiscussButton({
         variant="ghost"
         size="sm"
         aria-expanded={open}
-        title="Say what you make of this story and hear the other side"
+        title={
+          discussed
+            ? 'See what you and Dash said about this story'
+            : 'Say what you make of this story and hear the other side'
+        }
         onClick={() => setOpen(true)}
       >
         <MessagesSquare className="size-3.5" strokeWidth={1.75} aria-hidden />
-        Discuss
+        {discussed ? 'Discussed' : 'Discuss'}
       </Button>
       {open && (
         <DiscussSheet

@@ -21,6 +21,7 @@ import {
   storySubject,
 } from '@/lib/news/quick/discuss';
 import { setReaction } from '@/lib/news/quick/reactions';
+import { saveStory } from '@/lib/news/saved/stories';
 import { replyAbout } from '@/lib/talk/reply';
 import { appendTurns, loadConversation } from '@/lib/talk/store';
 import { turnBody, type TalkTurn } from '@/lib/talk/talk';
@@ -211,6 +212,27 @@ function anthropicKey(): string | undefined {
 }
 
 /**
+ * Save a story that is being discussed, and refresh the pages that show
+ * whether it is saved. saveStory ignores a story already on the list, so this
+ * runs on every round without moving its saved_at.
+ */
+async function keepDiscussedStory(
+  news: Awaited<ReturnType<typeof createNewsClient>>,
+  userId: string,
+  issueId: string,
+  headline: string,
+): Promise<void> {
+  try {
+    await saveStory(news, { userId, issueId, headline });
+  } catch {
+    return;
+  }
+  revalidatePath('/news');
+  revalidatePath('/news/saved');
+  revalidatePath(`/news/i/${issueId}`);
+}
+
+/**
  * One round of discussing a Quick read story with Dash (plan #1060): keep
  * what the person wrote, then Dash's reply, which argues the other side or
  * asks what their view rests on. The third reply closes the discussion with
@@ -222,6 +244,12 @@ function anthropicKey(): string | undefined {
  * reads. The person's turn is written before the reply is asked for, so a
  * failed reply keeps it, and the turns returned are what the table holds.
  * The reply's cost is recorded under news, discuss-story.
+ *
+ * Once the person's turn is kept, the story is saved as well (plan #1061), so
+ * the Saved tab lists it with its exchange. That is the first moment the
+ * conversation exists to be found. A story already saved keeps its row, and a
+ * save that fails is left for the Save button rather than failing the
+ * discussion.
  */
 // latency: pending -- the view shows in the thread at once and "Dash is replying" holds the place of the reply
 export async function discussQuickStory(
@@ -261,6 +289,8 @@ export async function discussQuickStory(
   } catch {
     return { error: 'That was not kept. Try again.' };
   }
+
+  await keepDiscussedStory(news, user.id, parsed.data.issueId, story.headline);
 
   const key = anthropicKey();
   if (!key) return { turns: kept, error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot reply.' };
