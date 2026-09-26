@@ -260,8 +260,9 @@ export function stepRunViews(runs: Record<string, GoalRun>, now: number): Record
 /**
  * What the goal page says about approval, and what its button is called, or
  * null for no button. Approving opens the goal if Claude proposed it and every
- * proposed step under it, and from then on Claude may add, split and reorder
- * steps beneath it without asking.
+ * proposed step under it. A goal you add is approved as you add it, and
+ * Claude adds, splits and reorders steps beneath an approved goal without
+ * asking.
  *
  * An approved goal with nothing proposed says only what questions are waiting,
  * or nothing: what approval allows was said when it was asked for, and saying
@@ -295,10 +296,14 @@ export function approvalLine(input: {
       approve: input.proposed > 0 ? 'Approve breakdown' : 'Approve goal',
     };
   }
+  // Claude's steps under an approved goal go in live (goals migration 0042).
+  // What still waits is a step that would act outside the plan, such as
+  // sending an email, and each is approved on its own row, where the page
+  // says what it would do, rather than all at once from here.
   if (input.proposed > 0) {
     return {
-      text: `${steps(input.proposed)} proposed since you approved this goal.${asks}`,
-      approve: input.proposed === 1 ? 'Approve it' : 'Approve them',
+      text: `${input.proposed === 1 ? 'One step waits' : `${input.proposed} steps wait`} on your approval below, because Dash working ${input.proposed === 1 ? 'it' : 'them'} would do something outside the plan.${asks}`,
+      approve: null,
     };
   }
   return { text: asks.trim(), approve: null };

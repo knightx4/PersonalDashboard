@@ -5,7 +5,8 @@
  * the answers given lately and fires the goals routine once per goal that
  * has one it has not been run on since. The run follows the skill's
  * "Re-shaping after answers" section: it settles the provisional steps the
- * answers held up and writes anything new as a proposal.
+ * answers held up and writes anything new, as a live step unless working it
+ * would act outside the plan (goals migration 0042).
  *
  * The rules that need no database live here: which goals are due, and the
  * brief. The reads and writes are in inngest/goals/reshape.ts.
@@ -168,7 +169,8 @@ export function reshapeRunText(input: { userId: string; runId: string; goal: Res
     '',
     'Follow .claude/skills/goals/SKILL.md, the sections "Re-shaping after answers" and',
     '"The re-shape run". Settle each provisional step the answers bear on, and write',
-    'anything new as a proposal. Do not map the goal again, and do not work Claude steps.',
+    'anything new as a live step, or as a proposal if working it would act outside the plan.',
+    'Do not map the goal again, and do not work Claude steps.',
     '',
     `The goals belong to user_id ${input.userId}. This run is goals.runs id ${input.runId},`,
     'already written as started. Set goals.run_id to it on every write, and close that row',

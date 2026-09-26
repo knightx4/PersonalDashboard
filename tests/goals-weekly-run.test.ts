@@ -226,7 +226,7 @@ describe('runGoalsWeekly', () => {
     expect(text).toContain(
       'Goal "Sleep by eleven" (goals.items id q)\n- Done when: Asleep by eleven five nights a week for a month.\n' +
         '- Last thing done: 2026-09-01, 29 days ago.\n' +
-        '- Nothing done in 21 days or more: the verdict is stalled, with a proposed next step.',
+        '- Nothing done in 21 days or more: the verdict is stalled, with its next step added under it.',
     );
     expect(text).toContain('nothing to research');
   });

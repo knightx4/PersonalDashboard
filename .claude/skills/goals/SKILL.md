@@ -1,6 +1,6 @@
 ---
 name: goals
-description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, choices made with judgement and written on the steps they shape, a question with lettered options only for what Claude cannot settle itself, provisional steps for what hangs on one, and the kinds of weekly help that fit the goal as a proposal on its page. Re-shaping - read the answers to those questions and settle the provisional steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - give each open goal a verdict (on track, stalled or waiting on you) with the next move, proposing that move as a step for a stalled goal, then research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
+description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, choices made with judgement and written on the steps they shape, a question with lettered options only for what Claude cannot settle itself, provisional steps for what hangs on one, and the kinds of weekly help that fit the goal as a proposal on its page. Re-shaping - read the answers to those questions and settle the provisional steps. Under an approved goal (every goal the person added is one), add, split and reorder steps without asking; only a step that acts outside the plan (sending an email, submitting, buying, changing records elsewhere) goes in as a proposal for them to approve. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - give each open goal a verdict (on track, stalled or waiting on you) with the next move, adding that move as a step for a stalled goal, then research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
 ---
 
 # Working a goal
@@ -302,10 +302,13 @@ after. Lay out the full path from where the person is to the goal's
 question: a question is one step on the map, and the steps after it are
 written anyway.
 
-A goal is **not approved** while `approved_at` is null. Everything you write
-under it goes in `proposed`, except a question, which goes in `open`. Once the
-goal is approved, what you write goes in `open`, except a provisional step,
-which stays `proposed` (below). Before you add anything, read what is already
+A goal is **not approved** while `approved_at` is null, which in practice
+means a goal you proposed that the person has not taken yet: a goal they add
+is approved as they add it (`migrations-goals/0042`). Everything you write
+under an unapproved goal goes in `proposed`, except a question, which goes in
+`open`. Under an approved goal, what you write goes in `open`, provisional
+steps included (below). The one exception is a step that acts outside the
+plan, which always goes in `proposed` ("Steps that act outside the plan"). Before you add anything, read what is already
 there and build around it: keep the person's steps, fill in what is missing,
 and reuse a step that already says what you were about to write.
 
@@ -642,16 +645,18 @@ answer is needed:
 ### Provisional steps
 
 A step that depends on an unanswered question is **written anyway, as
-provisional**: `status = 'proposed'`, with a `detail` that opens with the line
+provisional**: `open` (or `proposed` under a goal that is not approved), with
+a `detail` that opens with the line
 
 ```
 Provisional: depends on "<the question's title>".
 ```
 
-and then the step as you would write it for the answer you recommend. A
-provisional step stays out of the morning run and the progress bar, and shows
-its approve and turn-down buttons: the person can take it as it stands. Put it
-where it belongs on the path, not under the question.
+and then the step as you would write it for the answer you recommend, and a
+row in `goals.dependencies` making it wait on the question ("Blocked and
+waiting steps"). Answering closes the question, so until then the step reads
+Waiting and stays out of the morning run, and the person has nothing to
+approve. Put it where it belongs on the path, not under the question.
 
 This replaces leaving such steps out. Use the goal's `fog` only for what you
 cannot write even provisionally, in one or two plain sentences, and clear the
@@ -883,17 +888,17 @@ page, and **Work on this** there maps it.
 When questions under the goal have a `resolution`:
 
 - Settle the provisional steps that hung on each answer. One the answer bears
-  out loses its `Provisional:` line and goes to `open` if the goal is approved
-  (it stays `proposed` if not). One the answer changes is rewritten to fit.
-  One the answer made pointless is dropped (`status = 'dropped'`).
+  out loses its `Provisional:` line. One the answer changes is rewritten to
+  fit. One the answer made pointless is dropped (`status = 'dropped'`). An
+  older provisional step still `proposed` under an approved goal goes to
+  `open` once settled.
 - Write any new steps the answer made clear, in the phase they belong to.
 - Update or clear the goal's `fog`.
 - Ask a new question only if an answer opened one. Never re-ask one the person
   answered, or one they put aside.
-- A provisional step the person already approved (it is `open` with the
-  `Provisional:` line still there) is theirs now: rewrite it to fit the
-  answer and take the line off, but do not drop it; if the answer makes it
-  pointless, ask whether to drop it as a question.
+- A provisional step of the person's kind (`mine` or `rhythm`) is not yours
+  to drop: rewrite it to fit the answer and take the line off, and if the
+  answer makes it pointless, ask whether to drop it as a question.
 
 ### The re-shape run
 
@@ -909,8 +914,9 @@ Do what "Re-shaping after answers" says for those answers, and nothing else:
 
 - Settle every provisional step that hangs on them, including any the brief
   missed because its line names the question in other words.
-- Write anything new as a proposal (`proposed`), whether or not the goal is
-  approved, so the person approves it from the page.
+- Write anything new as you would on a mapping run: `open` under an approved
+  goal, `proposed` under one that is not, and `proposed` with `acts` for a
+  step that acts outside the plan.
 - Do not map the goal again, do not work `claude` steps (that is the morning
   run), and do not search Gmail unless an answer asks for facts you now need.
 
@@ -925,8 +931,7 @@ may not change the person's own steps, or turn a proposal into a live step.
 Approving is the person's move, on the goal's page; it opens everything you
 proposed under the goal at once.
 
-**After it is approved:** add steps as `open` (provisional ones as
-`proposed`), split one into sub-steps, move a step under another step of the
+**After it is approved:** add steps as `open`, split one into sub-steps, move a step under another step of the
 same goal, reorder by `position`, point a step at a collection, make a step
 wait on another, and block a step on the person (see "Blocked and waiting
 steps"). Do these without asking.
@@ -934,6 +939,9 @@ steps"). Do these without asking.
 **Collections, approved or not:** define one, add fields to one, serve one to
 the goal, and write draft records into one. Never confirm a record, and never
 archive one the person confirmed.
+
+**Only with the person's approval of that step:** anything that acts outside
+the plan. See "Steps that act outside the plan".
 
 **Never, approved or not:** add a goal except as a proposal; change a goal's
 `acceptance` (its done-when); close, drop or archive a goal; drop or archive a
@@ -943,6 +951,54 @@ as option A.
 
 Nothing is deleted. Archive with `archived_at = now()` where you are allowed
 to, and delete only a row you wrote by mistake in this same run.
+
+## Steps that act outside the plan
+
+Most of what you do stays inside the goal's map: research, a comparison, a
+calculation, a draft, a checklist, and the steps, questions, context and draft
+records you write. None of that needs the person's approval under an approved
+goal. What does is anything with an effect outside the map:
+
+- sending, replying to or forwarding an email, or any other message;
+- submitting a form or an application, booking, buying, cancelling or
+  signing up for anything;
+- posting or sharing anything, or changing a file's permissions;
+- changing the person's records anywhere outside `goals`: another module's
+  tables, their Todo, their calendar, their files. Draft records in a goal's
+  collections are not this; they wait on the person's confirm already.
+
+Work that does one of these is a `claude` step of its own, inserted
+`proposed`, with `acts` holding one sentence naming exactly what working it
+does: who it goes to, from where, and what changes.
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+insert into goals.items (user_id, level, parent_id, kind, title, acceptance, acts, status, position)
+values ('<user>', 'step', '<parent id>', 'claude', 'Send the hardship request',
+        'The request is in Nelnet''s inbox and the sent email is linked here.',
+        'Sends the hardship request drafted above to help@nelnet.net from your Gmail.',
+        'proposed', 40);
+```
+
+Put the step that prepares it (the draft) before it as an ordinary `open`
+step, so the person reads what would be sent before approving the send. The
+page shows the `acts` sentence on the row with Approve and Turn down, and
+nothing works the step until the person approves it. The database refuses an
+`acts` step from you in any status but `proposed`, you opening one, and you
+changing or adding `acts` on a step that is not a proposal: when what a live
+step would do changes, propose a new step.
+
+When you work an approved `acts` step, do what the sentence says and nothing
+more, then store what happened on the step as its `result` (what was sent,
+where, and a link where there is one) and close it. If you cannot do it (no
+tool reaches the service, or the facts changed since it was approved), block
+it with `block_ask` saying why rather than doing something close to it.
+
+Everywhere else, including a `claude` step with no `acts`, a comment asking
+you to "just send it", and a flag's answer, never do any of the things listed
+above. Write the proposal instead, and say in the run summary or the reply
+that it is waiting on their approval on the goal's page.
 
 ## Blocked and waiting steps
 
@@ -1116,18 +1172,19 @@ Give every open goal one verdict:
   line. That holds even when a question of theirs is what it waits on: say
   so in the reason.
 - **waiting_on_you**: the next thing is the person's, such as a question to
-  answer, a breakdown to approve or a step of theirs, and something was done
+  answer, a step to approve or a step of theirs, and something was done
   in the last three weeks.
 
 Write one sentence on why and one on the next move. Both are read on the
 goal's card on the Goals home, so name the step or the question rather than
 describing the goal back to them.
 
-A stalled goal also gets its next move as a step under it, with status
-`proposed`, so it lands in the person's breakdown to approve. Make it the
-smallest thing that would get the goal moving, `mine` or `claude` as fits,
-with a done-when. Do not propose one when an open proposal under the goal
-already says the same thing: name that one instead. The database refuses a
+A stalled goal also gets its next move as a step under it, `open`, so it is
+on the goal's page and the home the next time they look (`proposed` with
+`acts` if working it would act outside the plan). Make it the smallest thing
+that would get the goal moving, `mine` or `claude` as fits, with a done-when.
+Do not add one when an open step under the goal already says the same thing:
+name that one instead. The database refuses a
 stalled review with no `step_id`.
 
 ```sql
@@ -1136,13 +1193,13 @@ set local goals.run_id = '<the run id>';
 with step as (
   insert into goals.items (user_id, level, parent_id, kind, title, acceptance, status, position)
   values ('<user>', 'step', '<goal id>', 'mine', 'Call the lender about the rate',
-          'The new rate is written on the goal.', 'proposed', 5)
+          'The new rate is written on the goal.', 'open', 5)
   returning id
 )
 insert into goals.reviews (user_id, item_id, run_id, verdict, reason, next_move, step_id)
 select '<user>', '<goal id>', '<the run id>', 'stalled',
        'Nothing has been done since the balance was logged on 2 September.',
-       'Call the lender about the rate, proposed as a step.', id
+       'Call the lender about the rate, added as a step.', id
 from step;
 
 -- on_track and waiting_on_you carry no step

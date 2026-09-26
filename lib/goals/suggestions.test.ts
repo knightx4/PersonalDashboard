@@ -162,7 +162,7 @@ describe('the brief', () => {
     });
     expect(text).toContain('review every open goal below against its done-when');
     expect(text).toContain('Goal "Sleep by eleven" (goals.items id q)\n- Done when: Asleep by eleven');
-    expect(text).toContain('the verdict is stalled, with a proposed next step');
+    expect(text).toContain('the verdict is stalled, with its next step added under it');
     expect(text).toContain('nothing to research');
     expect(text).not.toContain('What you suggested before');
     expect(text).toContain('run_id on every review and\nsuggestion');
