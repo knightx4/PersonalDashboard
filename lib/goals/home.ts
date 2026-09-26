@@ -109,3 +109,109 @@ export function homeSummary(goals: readonly Pick<HomeGoal, 'review'>[]): string 
       : `${clauses.slice(0, -1).join(', ')} and ${clauses[clauses.length - 1]}`;
   return `${sentence}.`;
 }
+
+// ---------------------------------------------------------------------------
+// This week (plan #1079): four numbers at the bottom of the home that say
+// whether Goals is working.
+// ---------------------------------------------------------------------------
+
+/** How long a step of yours goes without a change before it counts as stuck. */
+export const STUCK_DAYS = 7;
+
+/** How many days of visits goals.visits.visit_days keeps (migrations-goals/0047). */
+export const VISIT_DAYS_KEPT = 28;
+
+/** The four numbers, for the week holding today. */
+export type WeekHealth = {
+  /** Dash's steps closed as done this week. */
+  dashFinished: number;
+  /** Everything on you now: Today and what is folded under it. */
+  waitingOnYou: number;
+  /** Your open steps that nothing has changed for STUCK_DAYS. */
+  stuck: number;
+  /** The days this week you opened the Goals home. */
+  daysVisited: number;
+};
+
+/** A week as days (YYYY-MM-DD, `endsOn` excluded) and as instants (`to` excluded). */
+export type WeekSpan = { startsOn: string; endsOn: string; from: string; to: string };
+
+/**
+ * The visit days after a visit today: today added once, oldest first, and
+ * nothing older than VISIT_DAYS_KEPT days kept.
+ */
+export function nextVisitDays(days: readonly string[], today: string): string[] {
+  const oldest = new Date(Date.parse(`${today}T00:00:00Z`) - (VISIT_DAYS_KEPT - 1) * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  return [...new Set([...days, today])].filter((day) => day >= oldest && day <= today).sort();
+}
+
+/** The step shape stuckSteps reads: a node of the live tree. */
+type StuckNode = {
+  id: string;
+  kind: string;
+  status: string;
+  children: StuckNode[];
+  waitingOn?: unknown[];
+  waitsUntil?: string;
+};
+
+/**
+ * How many of your steps are stuck: open steps of yours under an open goal,
+ * with no open step beneath them (their sub-steps are the thing to do), not
+ * waiting on another step or a later start date, and unchanged for
+ * STUCK_DAYS. `updatedAt` holds each step's last change; a step missing from
+ * it is not counted. A step under one that is closed, dropped or blocked is
+ * not counted either, since the step above it settles it.
+ */
+export function stuckSteps(
+  goals: readonly { goal: { id: string; status: string } }[],
+  byGoal: ReadonlyMap<string, readonly StuckNode[]>,
+  updatedAt: ReadonlyMap<string, string>,
+  now: number,
+): number {
+  const cutoff = now - STUCK_DAYS * 86_400_000;
+  let count = 0;
+  const visit = (node: StuckNode) => {
+    if (node.status !== 'open') return;
+    const openChildren = node.children.filter((child) => child.status === 'open');
+    if (openChildren.length > 0) {
+      openChildren.forEach(visit);
+      return;
+    }
+    if (node.kind !== 'mine') return;
+    if ((node.waitingOn?.length ?? 0) > 0 || node.waitsUntil) return;
+    const changed = updatedAt.get(node.id);
+    if (changed !== undefined && Date.parse(changed) < cutoff) count += 1;
+  };
+  for (const { goal } of goals) {
+    if (goal.status !== 'open') continue;
+    (byGoal.get(goal.id) ?? []).forEach(visit);
+  }
+  return count;
+}
+
+/** The four numbers from what the store read. */
+export function weekHealth(input: {
+  week: WeekSpan;
+  /** When each of Dash's done steps was closed. */
+  dashClosedAt: readonly string[];
+  waitingOnYou: number;
+  stuck: number;
+  visitDays: readonly string[];
+}): WeekHealth {
+  const from = Date.parse(input.week.from);
+  const to = Date.parse(input.week.to);
+  return {
+    dashFinished: input.dashClosedAt.filter((at) => {
+      const t = Date.parse(at);
+      return t >= from && t < to;
+    }).length,
+    waitingOnYou: input.waitingOnYou,
+    stuck: input.stuck,
+    daysVisited: new Set(
+      input.visitDays.filter((day) => day >= input.week.startsOn && day < input.week.endsOn),
+    ).size,
+  };
+}

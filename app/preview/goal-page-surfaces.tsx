@@ -53,7 +53,9 @@ function goal(id: string, areaId: string, title: string, extra: Partial<Goal> = 
   };
 }
 
-function progress(extra: Partial<GoalProgress> & Pick<GoalProgress, 'bands' | 'move'>): GoalProgress {
+function progress(
+  extra: Partial<GoalProgress> & Pick<GoalProgress, 'bands' | 'move'>,
+): GoalProgress {
   const live = Object.values(extra.bands).reduce((a, b) => a + b, 0);
   return {
     live,
@@ -88,7 +90,10 @@ const cardsProgress = progress({
 
 /* ------------------------------------------------------------------ home */
 
-function review(goalId: string, extra: Partial<GoalReview> & Pick<GoalReview, 'verdict'>): GoalReview {
+function review(
+  goalId: string,
+  extra: Partial<GoalReview> & Pick<GoalReview, 'verdict'>,
+): GoalReview {
   return {
     id: `review-${goalId}`,
     goalId,
@@ -193,7 +198,10 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
     {
       goal: fund,
       areaName: 'Money',
-      progress: progress({ bands: { on_you: 1, waiting: 0, with_claude: 0, done: 1 }, move: 'on_you' }),
+      progress: progress({
+        bands: { on_you: 1, waiting: 0, with_claude: 0, done: 1 },
+        move: 'on_you',
+      }),
       review: review(fund.id, {
         verdict: 'on_track',
         reason: 'The account is open.',
@@ -207,7 +215,10 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
     {
       goal: job,
       areaName: 'Career',
-      progress: progress({ bands: { on_you: 0, waiting: 2, with_claude: 0, done: 3 }, move: 'waiting' }),
+      progress: progress({
+        bands: { on_you: 0, waiting: 2, with_claude: 0, done: 3 },
+        move: 'waiting',
+      }),
       review: review(job.id, {
         verdict: 'waiting_on_date',
         reason: 'Two recruiters have the CV.',
@@ -222,7 +233,10 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
     {
       goal: marathon,
       areaName: 'Health',
-      progress: progress({ bands: { on_you: 0, waiting: 0, with_claude: 0, done: 0 }, move: 'settled' }),
+      progress: progress({
+        bands: { on_you: 0, waiting: 0, with_claude: 0, done: 0 },
+        move: 'settled',
+      }),
       review: null,
       current: false,
       next: null,
@@ -247,6 +261,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
     ],
     more: 0,
   },
+  health: { dashFinished: 4, waitingOnYou: 3, stuck: 1, daysVisited: 2 },
   brief: {
     body: 'The card balance is down to **$6,980**, $730 lower than August. The one thing waiting on you is *Which card first?* on **Pay off the credit cards**: it decides the next three steps.',
     when: 'today',
@@ -304,9 +319,21 @@ export function GoalsAllSurface() {
 /* ------------------------------------------------------------ goal page */
 
 const readings: Reading[] = [
-  { id: 'r1', value: 8420, readOn: '2026-06-01', note: 'Both cards, from the statements', captureId: null },
+  {
+    id: 'r1',
+    value: 8420,
+    readOn: '2026-06-01',
+    note: 'Both cards, from the statements',
+    captureId: null,
+  },
   { id: 'r2', value: 7960, readOn: '2026-07-01', note: null, captureId: null },
-  { id: 'r3', value: 7710, readOn: '2026-08-01', note: 'Paid extra after the bonus', captureId: 'cap-1' },
+  {
+    id: 'r3',
+    value: 7710,
+    readOn: '2026-08-01',
+    note: 'Paid extra after the bonus',
+    captureId: 'cap-1',
+  },
   { id: 'r4', value: 6980, readOn: '2026-09-01', note: null, captureId: null },
 ];
 
@@ -331,7 +358,12 @@ const aimChoices = [{ id: 'aim-2', name: 'Behavioural economics' }];
 /** The fixed instant the run lines are measured from, a day after the latest run. */
 const NOW = Date.parse('2026-09-25T09:00:00Z');
 
-function run(id: string, createdAt: string, endedAt: string, extra: Partial<RunListing> = {}): RunListing {
+function run(
+  id: string,
+  createdAt: string,
+  endedAt: string,
+  extra: Partial<RunListing> = {},
+): RunListing {
   return {
     id,
     job: 'goal',
@@ -359,7 +391,8 @@ const cardRuns = goalRunRows(
       error: 'The routine token was rejected.',
     }),
     run('run-1', '2026-09-01T08:10:00Z', '2026-09-01T08:31:00Z', {
-      summary: 'Mapped the goal: list the cards, call about the rates, then pay the highest rate first.',
+      summary:
+        'Mapped the goal: list the cards, call about the rates, then pay the highest rate first.',
     }),
   ],
   NOW,
@@ -398,7 +431,10 @@ Read from the job search on 26 Sept. No applications or messages were sent.`;
 export function FileSurface() {
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="Your applications by role family" description="Written by Dash · updated Sat 26 Sept, 09:12" />
+      <PageHeader
+        title="Your applications by role family"
+        description="Written by Dash · updated Sat 26 Sept, 09:12"
+      />
       <div className="space-y-6">
         <Card padding="standard">
           <FileBody markdown={FILE_BODY} />
@@ -422,9 +458,27 @@ export function GoalTopSurface() {
         <GoalStatusCard
           status={{
             yourMove: [
-              { id: 'which', kind: 'question', label: 'Answer', title: 'Which card first?', href: '#step-which' },
-              { id: 'compare', kind: 'read', label: 'Read Dash’s result', title: 'Compare the two cards’ rates', href: '#step-compare' },
-              { id: 'call', kind: 'do', label: 'Do by 3 Oct', title: 'Call the card company', href: '#step-call' },
+              {
+                id: 'which',
+                kind: 'question',
+                label: 'Answer',
+                title: 'Which card first?',
+                href: '#step-which',
+              },
+              {
+                id: 'compare',
+                kind: 'read',
+                label: 'Read Dash’s result',
+                title: 'Compare the two cards’ rates',
+                href: '#step-compare',
+              },
+              {
+                id: 'call',
+                kind: 'do',
+                label: 'Do by 3 Oct',
+                title: 'Call the card company',
+                href: '#step-call',
+              },
             ],
             moreSteps: 2,
             claudeReady: 1,
@@ -441,7 +495,14 @@ export function GoalTopSurface() {
           current
           stages={[
             { id: 's1', title: 'Know what you owe', index: 1, state: 'done', done: 3, live: 3 },
-            { id: 's2', title: 'Pay the dearest card first', index: 2, state: 'current', done: 1, live: 4 },
+            {
+              id: 's2',
+              title: 'Pay the dearest card first',
+              index: 2,
+              state: 'current',
+              done: 1,
+              live: 4,
+            },
             { id: 's3', title: 'Both cards at zero', index: 3, state: 'later', done: 0, live: 2 },
           ]}
           review={{
@@ -497,7 +558,12 @@ export function GoalBareSurface() {
       <div className="space-y-6">
         <GoalShaping
           goalId={marathon.id}
-          approval={approvalLine({ goalStatus: 'open', approvedAt: null, proposed: 0, questions: 0 })}
+          approval={approvalLine({
+            goalStatus: 'open',
+            approvedAt: null,
+            proposed: 0,
+            questions: 0,
+          })}
           runs={[]}
           moreRuns={false}
           running={null}
@@ -506,7 +572,12 @@ export function GoalBareSurface() {
         <GoalAddRow
           number={number}
           help={{ goalId: marathon.id, helpKinds: [] }}
-          links={{ goalId: marathon.id, links: { aims: [], jobSearch: null, jobs: [] }, aimChoices, jobsOn: true }}
+          links={{
+            goalId: marathon.id,
+            links: { aims: [], jobSearch: null, jobs: [] },
+            aimChoices,
+            jobsOn: true,
+          }}
         />
       </div>
     </div>
@@ -558,7 +629,14 @@ const income: Collection = {
 const incomeRecord: CollectionRecord = {
   id: 'rec-income',
   collectionId: income.id,
-  data: { pay: 3150, payday: 28, employer: 'Northwind Analytics Ltd', other: null, tax_code: '1257L', pension: 5 },
+  data: {
+    pay: 3150,
+    payday: 28,
+    employer: 'Northwind Analytics Ltd',
+    other: null,
+    tax_code: '1257L',
+    pension: 5,
+  },
   version: 1,
   position: 10,
   source: 'document',
@@ -576,7 +654,12 @@ const loanFields: CollectionField[] = [
   { key: 'payment', label: 'Monthly payment', type: 'money' },
   { key: 'due_day', label: 'Payment day', type: 'day_of_month' },
   { key: 'account', label: 'Account number', type: 'text' },
-  { key: 'kind', label: 'Kind of loan', type: 'choice', options: ['Car', 'Personal', 'Student', 'Other'] },
+  {
+    key: 'kind',
+    label: 'Kind of loan',
+    type: 'choice',
+    options: ['Car', 'Personal', 'Student', 'Other'],
+  },
   { key: 'started', label: 'Started', type: 'date' },
   { key: 'ends', label: 'Final payment', type: 'date' },
   { key: 'original', label: 'Amount borrowed', type: 'money' },
@@ -643,7 +726,13 @@ const loanRecords: CollectionRecord[] = [
     sourceRef: 'user-1/7a1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d-car-finance-agreement.pdf',
   }),
   loan('loan-student', 20, {
-    data: { lender: 'Student Loans Company', balance: 41230, rate: null, payment: 112, due_day: null },
+    data: {
+      lender: 'Student Loans Company',
+      balance: 41230,
+      rate: null,
+      payment: 112,
+      due_day: null,
+    },
     source: 'gmail',
     sourceRef: '18f2a9c4d7e1b305',
     draft: true,

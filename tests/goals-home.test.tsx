@@ -105,13 +105,19 @@ function render(extra: Partial<Parameters<typeof HomeView>[0]> = {}): string {
     <HomeView
       goals={[goal]}
       today={[
-        item('q', { kind: 'question', title: 'Avalanche or snowball?', action: 'Answer', unblocks: 3 }),
+        item('q', {
+          kind: 'question',
+          title: 'Avalanche or snowball?',
+          action: 'Answer',
+          unblocks: 3,
+        }),
         item('a'),
       ]}
       later={[item('b', { title: 'Call the card company' })]}
       done={done}
       brief={null}
       timeZone="UTC"
+      health={{ dashFinished: 10, waitingOnYou: 3, stuck: 0, daysVisited: 1 }}
       {...extra}
     />,
   );
@@ -128,13 +134,37 @@ describe('the Goals home', () => {
       'Choose avalanche or snowball',
       'What Dash did since',
       'Drafted the payoff order',
+      'This week',
     ];
     const positions = order.map((text) => html.indexOf(text));
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
-    for (const old of ['Your move', 'Dash is on it', 'Suggested this week', 'While you were away']) {
+    for (const old of [
+      'Your move',
+      'Dash is on it',
+      'Suggested this week',
+      'While you were away',
+    ]) {
       expect(html).not.toContain(old);
     }
+  });
+
+  it('ends with the week’s four numbers', () => {
+    const html = render();
+    const week = html.slice(html.indexOf('This week'));
+    const order = [
+      '10</dd>',
+      'steps Dash finished',
+      '3</dd>',
+      'waiting on you',
+      '0</dd>',
+      'steps of yours untouched for a week',
+      '1</dd>',
+      'day you visited',
+    ];
+    const positions = order.map((text) => week.indexOf(text));
+    expect(positions.every((p) => p >= 0)).toBe(true);
+    expect(render({ health: null })).toContain('The week’s numbers could not be read just now.');
   });
 
   it('gives each thing today one button, and folds the rest under them', () => {
@@ -162,7 +192,9 @@ describe('the Goals home', () => {
     const html = render();
     expect(html).toMatch(/href="\/goals\/g1#step-s9"[^>]*>Read</);
     expect(html).toContain('>Undo<');
-    expect(render({ done: { ...done, items: [] } })).toContain('Nothing new since your last visit.');
+    expect(render({ done: { ...done, items: [] } })).toContain(
+      'Nothing new since your last visit.',
+    );
   });
 
   it('offers to add a goal when there are none', () => {

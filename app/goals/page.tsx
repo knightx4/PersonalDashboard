@@ -6,6 +6,7 @@ import { loadBrief } from '@/lib/goals/briefs-store';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import type { DoneSince } from '@/lib/goals/done-since';
 import { loadDoneSince } from '@/lib/goals/done-since-store';
+import { weekHealth } from '@/lib/goals/home';
 import { loadHome } from '@/lib/goals/home-store';
 import { recordVisit } from '@/lib/goals/visits-store';
 import { todayIn } from '@/lib/todo/tasks/model';
@@ -26,7 +27,8 @@ function now(): number {
 
 /**
  * The Goals home (plan #1077): a sentence on where the goals stand, Today,
- * each open goal on one line, and what Dash did since your last visit. The
+ * each open goal on one line, what Dash did since your last visit, and the
+ * week's four numbers (plan #1079). The
  * layout and what moved where from the old home are in home-view.tsx.
  *
  * Each visit is recorded (plan #1019), and what Dash did is read from the
@@ -45,7 +47,12 @@ export default async function GoalsPage() {
   const today = todayIn(account.timezone);
   const [home, visit, brief] = await Promise.all([
     createClient().then((supabase) =>
-      loadHome(client, supabase, { userId: user.id, today, now: now() }),
+      loadHome(client, supabase, {
+        userId: user.id,
+        today,
+        timeZone: account.timezone,
+        now: now(),
+      }),
     ),
     recordVisit(client, { userId: user.id, today }),
     // A failed read leaves the note out rather than the page.
@@ -56,12 +63,25 @@ export default async function GoalsPage() {
     (): DoneSince | null => null,
   );
 
+  const { week, ...rest } = home;
+  // The count of what is on you is the whole of Today, folded part included.
+  const health = week
+    ? weekHealth({
+        week: week.span,
+        dashClosedAt: week.dashClosedAt,
+        waitingOnYou: home.today.length + home.later.length,
+        stuck: week.stuck,
+        visitDays: visit.visitDays,
+      })
+    : null;
+
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Goals" />
       <HomeView
-        {...home}
+        {...rest}
         done={done}
+        health={health}
         brief={brief ? { body: brief.body, when: noteWhen(brief, account.timezone) } : null}
         timeZone={account.timezone}
       />
