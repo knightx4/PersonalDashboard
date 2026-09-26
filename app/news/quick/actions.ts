@@ -5,8 +5,7 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { openStory, passStories, unpassStories } from '@/lib/news/issues/quick';
-import { readTopic } from '@/lib/news/issues/topics';
-import { hideTopic } from '@/lib/news/quick/hidden-topics';
+import { setReaction } from '@/lib/news/quick/reactions';
 
 const PassInput = z.object({
   issueId: z.string().uuid(),
@@ -120,23 +119,40 @@ export async function recordArticleOpened(issueId: string, storyIndex: number): 
   await openStory(client, { userId: user.id, ...parsed.data });
 }
 
+const ReactInput = z.object({
+  issueId: z.string().uuid(),
+  storyIndex: z.number().int().min(0),
+  reaction: z.enum(['up', 'down']).nullable(),
+});
+
 /**
- * Fewer like this (plan #861): hide the card's topic from Quick read and bring
- * up the next card.
+ * Thumbs up or thumbs down on a card, or null to take it back. They took the
+ * place of Fewer like this on the card.
  *
- * Nothing is passed. The card leaves because its topic is now hidden, and it
- * comes back if the topic is brought back from News settings. The newsletter
- * list is untouched, so only Quick read and the settings page are refreshed.
+ * For now this only records the press: the card stays, nothing is hidden and
+ * the ranking does not read it yet (lib/news/quick/reactions.ts). `reaction`
+ * is the state wanted rather than a flip, so a second press that lands after
+ * a failed first cannot invert it. Quick read is refreshed so the button comes
+ * back as the server now has it; the card is the same one, since a reaction
+ * changes nothing about which card is next.
  */
-// latency: pending
-export async function hideQuickTopic(formData: FormData): Promise<void> {
-  const topic = readTopic(formData.get('topic'));
-  if (!topic) return;
+// latency: optimistic -- the thumb fills at once, and a refused write puts it back with a toast
+export async function reactToQuickStory(
+  issueId: string,
+  storyIndex: number,
+  reaction: 'up' | 'down' | null,
+): Promise<{ error: string | null }> {
+  const parsed = ReactInput.safeParse({ issueId, storyIndex, reaction });
+  if (!parsed.success) return { error: 'That story could not be found.' };
 
   const user = await requireUser();
   const client = await createNewsClient();
-  await hideTopic(client, { userId: user.id, topic });
-
+  try {
+    const found = await setReaction(client, { userId: user.id, ...parsed.data });
+    if (!found) return { error: 'That newsletter is no longer there.' };
+  } catch {
+    return { error: 'That did not save. Try again.' };
+  }
   revalidatePath('/news');
-  revalidatePath('/news/settings');
+  return { error: null };
 }

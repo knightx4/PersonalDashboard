@@ -61,6 +61,12 @@ import { IMPORTANCE_RUBRIC } from './importance-rubric';
  * IMPORTANCE_RUBRIC (importance-rubric.ts), kept on the story as `importance`,
  * which Quick read ranks by. A rating that is not a whole number from 1 to 5
  * is dropped and the story kept without one.
+ *
+ * Purpose. The model also says what the issue is for, one of ISSUE_PURPOSES,
+ * stored as `purpose` by 0014_issue_purpose.sql. Quick read leaves out every
+ * issue whose purpose is not news: welcome emails, confirmations, fundraising
+ * appeals and the like. A purpose not on the list is dropped and the column
+ * left null, which Quick read shows as it did before.
  */
 
 export const DIGEST_MODEL = 'claude-haiku-4-5';
@@ -69,6 +75,31 @@ export const DIGEST_MODEL = 'claude-haiku-4-5';
 export const DIGEST_OPERATION: NewsOperation = 'digest-issue';
 
 const TOOL_NAME = 'report_digest';
+
+/**
+ * What an issue can be for. Only `news` reaches Quick read; the rest carry
+ * nothing to read and stay in the newsletter list only. The same list is the
+ * check constraint in supabase/migrations-news/0014_issue_purpose.sql.
+ */
+export const ISSUE_PURPOSES = [
+  'news',
+  'welcome',
+  'confirmation',
+  'fundraising',
+  'promotion',
+  'notification',
+] as const;
+
+export type IssuePurpose = (typeof ISSUE_PURPOSES)[number];
+
+/** A purpose on ISSUE_PURPOSES, or undefined for anything else. */
+export function readPurpose(value: unknown): IssuePurpose | undefined {
+  if (typeof value !== 'string') return undefined;
+  const purpose = value.trim().toLowerCase();
+  return (ISSUE_PURPOSES as readonly string[]).includes(purpose)
+    ? (purpose as IssuePurpose)
+    : undefined;
+}
 
 /**
  * Longest body sent, in characters. The stored text bodies run to about
@@ -117,6 +148,9 @@ the story.
 
 LEAVE OUT sponsor messages and advertisements, housekeeping such as "view in
 browser", subscription and unsubscribe text, social links, and the sign-off.
+Leave out as well any item that asks the reader for something rather than
+reporting: a donation or membership appeal, an invitation to the newsletter's
+own event, a survey, a referral scheme, or a plug for its podcast, app or shop.
 
 LINKS. Each link in the email appears as a marker such as [link 3], placed
 after the words it was attached to. For each story, give the number of the
@@ -142,6 +176,19 @@ area is named, never pick Local.
 
 ${IMPORTANCE_RUBRIC}
 
+PURPOSE. Say what the issue as a whole is for:
+news: it reports or analyses events, ideas or information, including a single
+  essay, column or opinion piece.
+welcome: it greets a new subscriber or explains what the newsletter will send.
+confirmation: it asks to confirm a subscription or email address, gives a
+  verification code, or confirms a signup or a change to one.
+fundraising: it asks the reader to donate, become a member or pay.
+promotion: it sells or advertises something, such as an event, a product, a
+  course or a sale, rather than reporting.
+notification: it only says that something is available elsewhere, such as a
+  live video, a new podcast episode or a post to open on another site.
+When an issue carries real news beside an appeal or a promotion, it is news.
+
 ONE ESSAY. When the issue is a single article or essay rather than a set of
 items, the summary covers it and the story list is empty. Do not cut one essay
 into stories by its sections.`;
@@ -157,6 +204,11 @@ const TOOL = {
         description: `What this issue covers, in one line of at most ${LINE_CHARS} characters.`,
       },
       summary: { type: 'string' },
+      purpose: {
+        type: 'string',
+        enum: [...ISSUE_PURPOSES],
+        description: 'What the issue as a whole is for.',
+      },
       stories: {
         type: 'array',
         items: {
@@ -194,7 +246,7 @@ const TOOL = {
         },
       },
     },
-    required: ['line', 'summary', 'stories'],
+    required: ['line', 'summary', 'purpose', 'stories'],
   },
 };
 
@@ -205,8 +257,16 @@ export type DigestSource = {
   htmlBody: string | null;
 };
 
-/** `line` is null when the reply left it out. */
-export type Digest = { line: string | null; summary: string; stories: NewsStory[] };
+/**
+ * `line` is null when the reply left it out, and `purpose` is absent when the
+ * reply gave none on ISSUE_PURPOSES.
+ */
+export type Digest = {
+  line: string | null;
+  summary: string;
+  purpose?: IssuePurpose;
+  stories: NewsStory[];
+};
 
 /** What became of one issue. */
 export type DigestOutcome =
@@ -420,7 +480,7 @@ export function readDigest(
   images: readonly string[] = [],
 ): Digest | string {
   if (!input || typeof input !== 'object') return 'The model returned no digest.';
-  const { line, summary, stories } = input as Record<string, unknown>;
+  const { line, summary, purpose, stories } = input as Record<string, unknown>;
   if (typeof summary !== 'string' || !summary.trim()) return 'The model returned no summary.';
   const linked = Array.isArray(stories)
     ? stories.map((story: unknown) => {
@@ -438,7 +498,14 @@ export function readDigest(
         return out;
       })
     : stories;
-  return { line: readLine(line), summary: summary.trim(), stories: readStories(linked) };
+  const digest: Digest = {
+    line: readLine(line),
+    summary: summary.trim(),
+    stories: readStories(linked),
+  };
+  const known = readPurpose(purpose);
+  if (known) digest.purpose = known;
+  return digest;
 }
 
 /**
@@ -567,6 +634,7 @@ export async function digestIssue(input: {
       ? {
           summary: outcome.summary,
           summary_line: outcome.line,
+          purpose: outcome.purpose ?? null,
           stories: outcome.stories,
           digest_error: null,
         }

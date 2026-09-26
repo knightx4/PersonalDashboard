@@ -13,21 +13,21 @@ import {
   type ReactNode,
 } from 'react';
 import { useFormStatus } from 'react-dom';
-import { ArrowLeft, ArrowRight, EyeOff, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ExternalLink, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/toast';
+import { cn } from '@/lib/cn';
 import { parseBack, pushBack } from '@/lib/news/quick/back';
 import { swipeAxis, swipeFarEnough } from '@/lib/news/quick/swipe';
-import type { NewsTopic } from '@/lib/news/issues/topics';
+import type { Reaction } from '@/lib/news/quick/reactions';
 import type { StoryPass } from '@/lib/news/quick/next';
+import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import {
-  hideQuickTopic,
   passQuickPage,
   passQuickStory,
+  reactToQuickStory,
   recordArticleOpened,
   unpassQuickPage,
 } from './actions';
-import { showHiddenTopic } from '../settings/actions';
 
 /**
  * The id of the form Next submits. A swipe on the card (#855) submits the
@@ -198,49 +198,64 @@ function NextPageButton() {
 }
 
 /**
- * Fewer like this (plan #861): hides the card's topic from Quick read, and the
- * page comes back with the next card that is not on it. Drawn only on a story
- * that has a topic.
+ * Thumbs up and thumbs down, where Fewer like this used to be. For now they
+ * only record the press (reactToQuickStory): the card stays and nothing is
+ * hidden. Pressing the thumb already down takes it back; pressing the other
+ * one swaps. Optimistic, as Save is: the thumb fills at once and a refused
+ * write puts it back with a toast.
  */
-export function HideTopicForm({ topic }: { topic: NewsTopic }) {
-  const toast = useToast();
-  // With an undo for a while after (note b9414236), since the button sits
-  // beside Save and Next and is easy to hit by mistake. The toast lives in the
-  // shell, so it outlasts the card the press takes away.
-  async function hide(form: FormData) {
-    await hideQuickTopic(form);
-    toast({
-      text: `${topic} is hidden from Quick read. News settings lists what is hidden.`,
-      undone: `${topic} is back in Quick read.`,
-      duration: 10_000,
-      undo: async () => {
-        const restore = new FormData();
-        restore.set('topic', topic);
-        await showHiddenTopic(restore);
-      },
-    });
-  }
+export function ReactionButtons({
+  issueId,
+  storyIndex,
+  reaction,
+}: {
+  issueId: string;
+  storyIndex: number;
+  reaction: Reaction | null;
+}) {
+  const { shown, run, failed } = useOptimisticWrite<Reaction | null, Reaction | null>({
+    value: reaction,
+    apply: (_current, next) => next,
+    write: (next) => reactToQuickStory(issueId, storyIndex, next),
+  });
+  const press = (thumb: Reaction) => run(shown === thumb ? null : thumb);
   return (
-    <form action={hide}>
-      <input type="hidden" name="topic" value={topic} />
-      <HideTopicButton topic={topic} />
-    </form>
-  );
-}
-
-function HideTopicButton({ topic }: { topic: NewsTopic }) {
-  const { pending } = useFormStatus();
-  return (
-    <Button
-      type="submit"
-      variant="ghost"
-      size="sm"
-      pending={pending}
-      title={`Stop showing ${topic} stories in Quick read`}
-    >
-      {!pending && <EyeOff className="size-3.5" strokeWidth={1.75} aria-hidden />}
-      {pending ? 'Hiding…' : 'Fewer like this'}
-    </Button>
+    <div className="flex items-center" role="group" aria-label="How was this story?">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        aria-pressed={shown === 'up'}
+        aria-label="Thumbs up"
+        title={shown === 'up' ? 'Take back your thumbs up' : 'More stories like this'}
+        onClick={() => press('up')}
+        className={cn(shown === 'up' && 'text-accent', failed && 'text-danger')}
+      >
+        <ThumbsUp
+          className="size-4"
+          strokeWidth={1.75}
+          fill={shown === 'up' ? 'currentColor' : 'none'}
+          aria-hidden
+        />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        aria-pressed={shown === 'down'}
+        aria-label="Thumbs down"
+        title={shown === 'down' ? 'Take back your thumbs down' : 'Fewer stories like this'}
+        onClick={() => press('down')}
+        className={cn(shown === 'down' && 'text-accent', failed && 'text-danger')}
+      >
+        <ThumbsDown
+          className="size-4"
+          strokeWidth={1.75}
+          fill={shown === 'down' ? 'currentColor' : 'none'}
+          aria-hidden
+        />
+      </Button>
+    </div>
   );
 }
 

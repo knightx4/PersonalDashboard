@@ -11,13 +11,14 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
 import { cardPasses, type QuickCard } from '@/lib/news/quick/next';
+import type { Reaction } from '@/lib/news/quick/reactions';
 import {
   ArticleLink,
-  HideTopicForm,
   QuickDeck,
   QuickNextForm,
   QuickPageForm,
   QuickSwipe,
+  ReactionButtons,
 } from './quick-controls';
 
 export type QuickReadViewProps = {
@@ -27,10 +28,12 @@ export type QuickReadViewProps = {
   arrived: string | null;
   /** Whether no newsletter has been summarised yet, which is not the same as caught up. */
   nothingYet: boolean;
-  /** How many topics are hidden with Fewer like this, so caught up can say they are set aside. */
+  /** How many topics are hidden in News settings, so caught up can say they are set aside. */
   hiddenCount?: number;
   /** Whether the card's story is on the Saved list (plan #869). */
   saved?: boolean;
+  /** The thumbs up or down already pressed on the card, if any. */
+  reaction?: Reaction | null;
   /** Whether pictures load: on unless the reader turned them off with ?pictures=0. */
   pictures: boolean;
   picturesHref: string;
@@ -59,6 +62,8 @@ export type QuickPageStory = {
   card: QuickCard;
   arrived: string | null;
   saved: boolean;
+  /** The thumbs up or down already pressed on it; left out, none. */
+  reaction?: Reaction | null;
   issueHref: string;
 };
 
@@ -72,6 +77,7 @@ export function QuickReadView({
   nothingYet,
   hiddenCount = 0,
   saved = false,
+  reaction = null,
   pictures,
   picturesHref,
   issueHref,
@@ -175,6 +181,7 @@ export function QuickReadView({
               card={card}
               arrived={arrived}
               saved={saved}
+              reaction={reaction}
               pictures={pictures}
               issueHref={issueHref}
               topic={topic}
@@ -186,6 +193,7 @@ export function QuickReadView({
                 card={upNext.card}
                 arrived={upNext.arrived}
                 saved={upNext.saved}
+                reaction={upNext.reaction ?? null}
                 pictures={pictures}
                 issueHref={upNext.issueHref}
                 topic={topic}
@@ -226,6 +234,7 @@ function PhoneCard({
   card,
   arrived,
   saved,
+  reaction,
   pictures,
   issueHref,
   topic,
@@ -233,6 +242,7 @@ function PhoneCard({
   card: QuickCard;
   arrived: string | null;
   saved: boolean;
+  reaction: Reaction | null;
   pictures: boolean;
   issueHref: string | null;
   topic: string | null;
@@ -293,7 +303,11 @@ function PhoneCard({
               {story && (
                 <SaveStoryButton issueId={card.issueId} headline={story.headline} saved={saved} />
               )}
-              {story?.topic && <HideTopicForm topic={story.topic} />}
+              <ReactionButtons
+                issueId={card.issueId}
+                storyIndex={card.storyIndex}
+                reaction={reaction}
+              />
               <QuickNextForm stories={cardPasses(card)} />
             </div>
           </div>
@@ -309,7 +323,7 @@ function PhoneCard({
  * counts as seen, and an essay, which has no article, links to its newsletter.
  */
 function gridStory(
-  { card, arrived, saved, issueHref }: QuickPageStory,
+  { card, arrived, saved, reaction = null, issueHref }: QuickPageStory,
   pictures: boolean,
 ): GridStory {
   const from = [card.from ?? 'Unknown sender', arrived].filter(Boolean).join(' · ');
@@ -320,9 +334,16 @@ function gridStory(
       summary: card.summary,
       from,
       actions: (
-        <Link href={issueHref} className="text-ui text-accent hover:underline">
-          Read the newsletter
-        </Link>
+        <>
+          <Link href={issueHref} className="text-ui text-accent hover:underline">
+            Read the newsletter
+          </Link>
+          <ReactionButtons
+            issueId={card.issueId}
+            storyIndex={card.storyIndex}
+            reaction={reaction}
+          />
+        </>
       ),
     };
   }
@@ -350,7 +371,7 @@ function gridStory(
           <ArticleLink href={story.link} issueId={card.issueId} storyIndex={card.storyIndex} />
         )}
         <SaveStoryButton issueId={card.issueId} headline={story.headline} saved={saved} />
-        {story.topic && <HideTopicForm topic={story.topic} />}
+        <ReactionButtons issueId={card.issueId} storyIndex={card.storyIndex} reaction={reaction} />
       </>
     ),
   };

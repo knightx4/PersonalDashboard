@@ -58,6 +58,11 @@ function toPasses(rows: { issue_id: string; story_index: number }[] | null): Sto
 /**
  * The summarised newsletters, newest first, and every story passed in them.
  *
+ * An issue the summariser named as something other than news (a welcome, a
+ * confirmation, a fundraising appeal; ISSUE_PURPOSES in digest.ts) is left out
+ * here, so it never becomes a card. One summarised before purposes existed
+ * has none and is kept.
+ *
  * Muting is not applied here: nextCard applies it from the senders, so they
  * are loaded unfiltered by loadSenders in load.ts.
  */
@@ -68,6 +73,7 @@ export async function loadQuickRead(
     .from('issues')
     .select(QUICK_COLUMNS)
     .not('summary', 'is', null)
+    .or('purpose.is.null,purpose.eq.news')
     .order('received_at', { ascending: false })
     .limit(QUICK_PAGE);
   assertSchemaExposed(error, NEWS_SCHEMA);
