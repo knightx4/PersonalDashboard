@@ -121,6 +121,15 @@ export const learnSources: ModuleSources = {
       title: 'summary',
       note: 'status says what they did with a card; saved and tested cards say more than drawn ones.',
     },
+    {
+      table: 'learn.watch_list',
+      module: 'Learn',
+      holds: 'YouTube videos they chose to watch, saved to their playlist, with a verdict on each once judged.',
+      weight: 'intent',
+      search: ['why', 'summary'],
+      title: 'video_id',
+      note: 'item_id is the catalogue_items row of kind video, which has the title and description. verdict is watch, card or skip, with why; watched_at is set when they watched it; left_playlist_at when they took it off the playlist.',
+    },
   ],
   notSources: [
     { table: 'learn.area_check_articles', reason: 'Reference data for placing subjects.' },

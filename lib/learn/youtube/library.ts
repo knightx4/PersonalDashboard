@@ -191,7 +191,7 @@ async function storedExternalIds(
   }
 }
 
-function videoRow(providerId: string, video: YouTubeVideo) {
+export function videoRow(providerId: string, video: YouTubeVideo) {
   const description = video.description.trim();
   return {
     provider_id: providerId,
