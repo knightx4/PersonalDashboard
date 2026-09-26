@@ -1,42 +1,53 @@
 'use client';
 
-import { useFormStatus } from 'react-dom';
+import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/cn';
 import type { NewsTopic } from '@/lib/news/issues/topics';
-import { showHiddenTopic } from './actions';
+import { useOptimisticWrite } from '@/lib/use-optimistic-write';
+import { setTopicShown } from './actions';
 
 /**
- * The topics hidden from Quick read with Fewer like this (plan #861), each
- * with the button that brings it back. The newsletter list never hid them, so
- * only Quick read changes when one comes back.
+ * Every topic, each pressed while Quick read shows it (note ee75aef9). Press
+ * one to hide it from Quick read's cards and chips, press it again to bring it
+ * back. The newsletter list never hid them, so only Quick read changes.
+ * Optimistic: the chip changes at once and a refused write puts it back with
+ * a toast.
  */
-export function HiddenTopicList({ topics }: { topics: readonly NewsTopic[] }) {
+export function TopicPicker({
+  topics,
+  hidden,
+}: {
+  topics: readonly NewsTopic[];
+  hidden: readonly NewsTopic[];
+}) {
   return (
-    <ul className="divide-y divide-border">
+    <div className="flex flex-wrap gap-2" role="group" aria-label="Topics shown in Quick read">
       {topics.map((topic) => (
-        <li key={topic} className="flex items-center justify-between gap-3 py-2">
-          <span className="text-body text-ink">{topic}</span>
-          <form action={showHiddenTopic}>
-            <input type="hidden" name="topic" value={topic} />
-            <ShowButton topic={topic} />
-          </form>
-        </li>
+        <TopicChip key={topic} topic={topic} shown={!hidden.includes(topic)} />
       ))}
-    </ul>
+    </div>
   );
 }
 
-function ShowButton({ topic }: { topic: NewsTopic }) {
-  const { pending } = useFormStatus();
+function TopicChip({ topic, shown }: { topic: NewsTopic; shown: boolean }) {
+  const { shown: on, run, failed } = useOptimisticWrite<boolean, boolean>({
+    value: shown,
+    apply: (_current, next) => next,
+    write: (next) => setTopicShown(topic, next),
+  });
   return (
     <Button
-      type="submit"
-      variant="secondary"
+      type="button"
+      variant={on ? 'secondary' : 'ghost'}
       size="sm"
-      pending={pending}
-      aria-label={`Show ${topic} in Quick read again`}
+      aria-pressed={on}
+      title={on ? `Hide ${topic} from Quick read` : `Show ${topic} in Quick read`}
+      onClick={() => run(!on)}
+      className={cn(!on && 'line-through', failed && 'text-danger')}
     >
-      {pending ? 'Bringing back…' : 'Show again'}
+      {on && <Check className="size-3.5" strokeWidth={2} aria-hidden />}
+      {topic}
     </Button>
   );
 }
