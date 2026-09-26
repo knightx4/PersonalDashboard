@@ -6,10 +6,14 @@ import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { TranscriptCredits } from '@/components/learn/transcript-credits';
 import { cn } from '@/lib/cn';
+import { getUser } from '@/lib/auth/server';
 import { isOwner } from '@/lib/dev/owner';
 import { createLearnClient } from '@/lib/learn/auth/server';
+import { playlistUrl } from '@/lib/learn/providers/youtube';
 import { loadChannelSummaries, loadUsage, type ChannelSummary } from '@/lib/learn/youtube/load';
+import { loadWatchListSettings, type WatchListSettings } from '@/lib/learn/youtube/watch-list';
 import { AddChannel } from './add-channel';
+import { WatchListPlaylist } from './watch-list-playlist';
 
 export const dynamic = 'force-dynamic';
 // Following a channel lists every video and playlist it has, which for a big
@@ -40,11 +44,34 @@ function listedLine(channel: ChannelSummary): string {
   return parts.join(' · ');
 }
 
+function hoursAgo(iso: string, now: number): string {
+  const hours = Math.floor((now - new Date(iso).getTime()) / 3_600_000);
+  if (hours < 1) return 'within the hour';
+  if (hours < 48) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+  return `${Math.floor(hours / 24)} days ago`;
+}
+
+function listLine(list: WatchListSettings, now: number): string {
+  if (!list.playlistId) {
+    return 'YouTube does not let apps read Watch later. Save videos to a playlist of your own instead, set it to unlisted, and paste its link here; it is read four times a day.';
+  }
+  const count = `${list.videos.toLocaleString('en-GB')} ${list.videos === 1 ? 'video' : 'videos'} on your list`;
+  return list.readAt ? `${count}, read ${hoursAgo(list.readAt, now)}.` : `${count}; not read yet.`;
+}
+
 export default async function YouTubeLibraryPage() {
   if (!(await isOwner())) notFound();
+  const user = await getUser();
+  if (!user) notFound();
 
   const learn = await createLearnClient();
-  const [channels, usage] = await Promise.all([loadChannelSummaries(learn), loadUsage(learn)]);
+  const [channels, usage, list] = await Promise.all([
+    loadChannelSummaries(learn),
+    loadUsage(learn),
+    loadWatchListSettings(learn, user.id),
+  ]);
+  // eslint-disable-next-line react-hooks/purity -- a server component, rendered once per request
+  const now = Date.now();
 
   return (
     <>
@@ -52,6 +79,17 @@ export default async function YouTubeLibraryPage() {
 
       <div className="space-y-6">
         <TranscriptCredits usage={usage} />
+
+        <section>
+          <h2 className="mb-2 text-ui font-semibold text-ink-muted">Your playlist</h2>
+          <p className="mb-2 text-small text-ink-muted">{listLine(list, now)}</p>
+          {list.error && (
+            <p role="alert" className="mb-2 text-small text-danger">
+              The last read failed: {list.error}
+            </p>
+          )}
+          <WatchListPlaylist current={list.playlistId ? playlistUrl(list.playlistId) : null} />
+        </section>
 
         {channels.length === 0 ? (
           <EmptyState

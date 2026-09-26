@@ -1,7 +1,9 @@
 import 'server-only';
 
 import { z } from 'zod';
+import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { createLearnServiceSupabase } from '@/inngest/learn/supabase-admin';
+import { recordSpend } from '@/lib/core/spend/record';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { embedVideoSegmentsOverRest, restLedger } from '@/lib/learn/catalogue/embed-rest';
 import type { EmbedSweepResult } from '@/lib/learn/catalogue/embed-sweep';
@@ -22,6 +24,15 @@ import {
   type RequestedBy,
   type TranscribeResult,
 } from '@/lib/learn/youtube/transcripts';
+import { parsePlaylistInput } from '@/lib/learn/providers/youtube';
+import {
+  saveWatchListPlaylist,
+  syncWatchList,
+  syncWatchLists,
+  type WatchListSync,
+} from '@/lib/learn/youtube/watch-list';
+import { summariseWatchLists, type SummaryPassResult } from '@/lib/learn/youtube/summaries';
+import { judgeWatchLists, type JudgePassResult } from '@/lib/learn/youtube/judging';
 
 /**
  * The YouTube library's work, run with the service-role client.
@@ -39,9 +50,22 @@ const PRESS_TRANSCRIBE_MS = 150_000;
 const PRESS_EMBED_MS = 240_000;
 
 /** The scheduled run's budget, out of the route's 300 seconds. */
-const TICK_LIST_MS = 90_000;
+/** Your own playlist is read first: a few calls, and it is what you asked for. */
+const TICK_WATCH_LIST_MS = 30_000;
+/**
+ * Then the list's summaries (plan #1069), four Haiku calls at a time: about
+ * forty videos in the window, so a new playlist is summarised within a day.
+ */
+const TICK_SUMMARY_MS = 60_000;
+/**
+ * Then the judge (plan #1066): the title screen, ten videos a call, and the
+ * verdicts on videos whose transcripts have arrived, four at a time. The
+ * transcripts it asks for are fetched later in this run, inside its allowance.
+ */
+const TICK_JUDGE_MS = 95_000;
+const TICK_LIST_MS = 115_000;
 /** Titles and descriptions are embedded until here, then the queue is topped up. */
-const TICK_METADATA_MS = 120_000;
+const TICK_METADATA_MS = 135_000;
 const TICK_TRANSCRIBE_MS = 210_000;
 const TICK_EMBED_MS = 270_000;
 
@@ -59,6 +83,64 @@ async function embedNew(learn: LearnSupabaseClient, deadline: number): Promise<E
   return embedVideoSegmentsOverRest(learn, { userId: await ownerId(learn), deadline, limit: 640 });
 }
 
+/**
+ * Summarise the videos on everybody's list, each call recorded against the
+ * person whose list it is. Nothing is written without an Anthropic key, and a
+ * failure leaves the rest of the run to go ahead.
+ */
+async function summariseLists(learn: LearnSupabaseClient, deadline: number): Promise<SummaryPassResult | null> {
+  const anthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!anthropicApiKey) return null;
+  const core = createCoreServiceSupabase();
+  const rows: Promise<unknown>[] = [];
+  try {
+    return await summariseWatchLists(learn, {
+      anthropicApiKey,
+      deadline,
+      onSpend: (userId, report) =>
+        void rows.push(
+          recordSpend(core, userId, { module: 'learn', operation: 'summarise-video', model: report.model, usage: report.usage }),
+        ),
+    });
+  } catch (error) {
+    console.error('[youtube-library] summarising your list', error instanceof Error ? error.message : error);
+    return null;
+  } finally {
+    await Promise.all(rows);
+  }
+}
+
+/**
+ * Judge the videos on everybody's list, each call recorded against the person
+ * whose list it is. Like the summaries, nothing without an Anthropic key.
+ */
+async function judgeLists(learn: LearnSupabaseClient, deadline: number): Promise<JudgePassResult | null> {
+  const anthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!anthropicApiKey) return null;
+  const core = createCoreServiceSupabase();
+  const rows: Promise<unknown>[] = [];
+  try {
+    return await judgeWatchLists(learn, {
+      anthropicApiKey,
+      deadline,
+      onSpend: (userId, pass, report) =>
+        void rows.push(
+          recordSpend(core, userId, {
+            module: 'learn',
+            operation: pass === 'screen' ? 'screen-video' : 'judge-video',
+            model: report.model,
+            usage: report.usage,
+          }),
+        ),
+    });
+  } catch (error) {
+    console.error('[youtube-library] judging your list', error instanceof Error ? error.message : error);
+    return null;
+  } finally {
+    await Promise.all(rows);
+  }
+}
+
 export type TickReport = {
   channels: { name: string; result: ListChannelResult }[];
   transcripts: TranscribeResult | null;
@@ -68,10 +150,16 @@ export type TickReport = {
   metadata?: MetadataEmbedResult | null;
   /** Transcripts queued because the video matched one of your ideas. */
   matched?: MatchQueueResult | null;
+  /** Each pasted playlist read into learn.watch_list (plan #1065). */
+  watchLists?: WatchListSync[];
+  /** Summaries written for the videos on those lists (plan #1069). */
+  summaries?: SummaryPassResult | null;
+  /** Verdicts written and transcripts asked for on those lists (plan #1066). */
+  judging?: JudgePassResult | null;
 };
 
 /**
- * The scheduled run: re-list every channel, queue the videos that best match
+ * The scheduled run: read your playlist into your list, summarise and judge what is new on it, re-list every channel, queue the videos that best match
  * your ideas, then work through the queue within this run's share of the
  * month's credits, then embed what is new.
  */
@@ -79,6 +167,14 @@ export async function runYouTubeLibraryTick(): Promise<TickReport> {
   const started = Date.now();
   const learn = createLearnServiceSupabase();
   const report: TickReport = { channels: [], transcripts: null, allowance: 0, embedding: null };
+
+  try {
+    report.watchLists = await syncWatchLists(learn, { deadline: started + TICK_WATCH_LIST_MS });
+  } catch (error) {
+    console.error('[youtube-library] reading your playlist', error instanceof Error ? error.message : error);
+  }
+  report.summaries = await summariseLists(learn, started + TICK_SUMMARY_MS);
+  report.judging = await judgeLists(learn, started + TICK_JUDGE_MS);
 
   for (const channel of await loadChannels(learn)) {
     if (Date.now() >= started + TICK_LIST_MS) break;
@@ -220,6 +316,26 @@ export async function transcribeNow(videoIds: string[], requestedBy: RequestedBy
 
   const embedding = transcripts.segments > 0 ? await embedNew(learn, started + PRESS_EMBED_MS) : null;
   return { transcripts, queued: count ?? 0, embedding };
+}
+
+export type WatchListPlaylistReport =
+  | { ok: true; playlistId: string | null; sync: WatchListSync | null }
+  | { ok: false; error: string };
+
+/**
+ * Keep the playlist pasted into Learn settings and read it at once, so the
+ * list fills without waiting for the next run. An empty paste forgets it.
+ */
+export async function setWatchListPlaylist(userId: string, raw: string): Promise<WatchListPlaylistReport> {
+  const learn = createLearnServiceSupabase();
+  if (!raw.trim()) {
+    await saveWatchListPlaylist(learn, userId, null);
+    return { ok: true, playlistId: null, sync: null };
+  }
+  const input = parsePlaylistInput(raw);
+  if (!input.ok) return input;
+  await saveWatchListPlaylist(learn, userId, input.playlistId);
+  return { ok: true, playlistId: input.playlistId, sync: await syncWatchList(learn, userId, input.playlistId) };
 }
 
 /** A playlist's videos, in order, by catalogue item id of the playlist. */

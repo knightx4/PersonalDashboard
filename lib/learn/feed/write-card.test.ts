@@ -298,3 +298,48 @@ describe('the call', () => {
     expect(calls).toHaveLength(0);
   });
 });
+
+describe('a card from a video stretch (plan #1067)', () => {
+  const video: CardToWrite = {
+    id: 'v1',
+    reason: 'video',
+    themeName: null,
+    aimName: null,
+    field: null,
+    gap: null,
+    article: 'Cash flow in ten minutes',
+    section: '0:30 to 2:30',
+    text: 'So the thing about cash is that it runs out before profit does.',
+    depth: null,
+    video: { title: 'Cash flow in ten minutes', channel: 'A channel', point: 'Cash runs out before profit does.' },
+    maxIdeas: 1,
+  };
+
+  it('tells the writer it is reading a transcript, with the video and the point', () => {
+    const pick = describePick(video);
+    expect(pick).toContain('"Cash flow in ten minutes" by A channel');
+    expect(pick).toContain('The part worth a card: Cash runs out before profit does.');
+    expect(pick).toContain('transcript of that part of the video');
+    expect(cardPrompt(video)).toContain('Section: 0:30 to 2:30');
+  });
+
+  it('says where the card came from on the why line', () => {
+    expect(whyLine(video)).toBe('From a video on your playlist.');
+  });
+
+  it('keeps one idea from the stretch', async () => {
+    const second = { ...reported, name: 'Payment terms move cash', claim: 'Terms decide who holds the cash.' };
+    const client = {
+      messages: {
+        create: async () => ({
+          content: [{ type: 'tool_use', name: 'report_ideas', input: { fit: 'Fits.', matches: true, ideas: [reported, second] } }],
+          stop_reason: 'tool_use',
+          usage: { input_tokens: 900, output_tokens: 150 },
+        }),
+      },
+    } as unknown as Anthropic;
+    const result = await writeCard({ card: video, anthropicApiKey: 'unused', client });
+    expect(result).toMatchObject({ outcome: 'ready', why: 'From a video on your playlist.' });
+    expect(result.outcome === 'ready' && result.ideas.map((idea) => idea.name)).toEqual([reported.name]);
+  });
+});

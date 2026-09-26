@@ -183,6 +183,22 @@ export const LEARN_OPERATIONS = [
   // as 'write-feed-card', made on the press while the person waits rather
   // than by the top-up, so what asked-for cards cost can be read on its own.
   'write-asked-card',
+  // Marking a teach-back on a Learn now card (plan #1054): the explanation,
+  // which also writes the one follow-up question, and then the answer to the
+  // follow-up. One Haiku call for each.
+  'mark-teach-back',
+  // Summarising a video on your list for the Videos section (plan #1069): one
+  // Haiku call from its description when it arrives, and one more from its
+  // transcript once that is stored. Recorded through the service role from
+  // the YouTube library run, against the account whose list it is.
+  'summarise-video',
+  // Judging a video on your list (plan #1066). The screen reads ten titles
+  // and descriptions in one Haiku call and throws out the clear skips before
+  // any transcript credit is spent; the judge reads one video's transcript
+  // windows, or its chapters, and settles watch, card or skip. Apart so the
+  // cheap pass can be read against the one that reads whole transcripts.
+  'screen-video',
+  'judge-video',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

@@ -61,6 +61,7 @@ export const PAID_ACTIONS = {
   'app/learn/now/actions.ts#askAboutCard': ['reply-about-card'],
   'app/learn/now/actions.ts#explainPhrase': ['explain-phrase'],
   'app/learn/now/actions.ts#makePhraseCard': ['write-asked-card'],
+  'app/learn/now/actions.ts#explainBack': ['mark-teach-back'],
 
   // Learn: questions
   'app/learn/s/[id]/probe/actions.ts#askQuestion': ['write-probe', 'write-applied-case'],

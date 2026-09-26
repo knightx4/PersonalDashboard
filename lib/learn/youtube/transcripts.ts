@@ -26,13 +26,13 @@ import { creditState, monthStart, monthlyAllowance, type CreditState } from './b
 export const TRANSCRIPT_BUCKET = 'learn-transcripts';
 
 /** A video that failed this many times is left alone until pressed again. */
-const MAX_ATTEMPTS = 5;
+export const MAX_ATTEMPTS = 5;
 
 /** A video with no captions is looked at again after this long. */
 const NO_CAPTIONS_RETRY_MS = 30 * 86_400_000;
 
 export type TranscriptState = 'queued' | 'fetched' | 'none' | 'failed';
-export type RequestedBy = 'press' | 'auto' | 'course' | 'match';
+export type RequestedBy = 'press' | 'auto' | 'course' | 'match' | 'list';
 export type CallTrigger = 'press' | 'scheduled';
 
 export function storagePathFor(videoId: string): string {

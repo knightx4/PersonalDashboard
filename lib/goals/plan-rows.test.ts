@@ -4,6 +4,8 @@ import { attachDependencies, type DependencyRow } from './dependencies';
 import {
   REVIEW_ASK,
   YOURS_ASK,
+  YOURS_BENEATH,
+  YOURS_WORD,
   countGoalView,
   goalCatalog,
   goalRows,
@@ -137,12 +139,33 @@ describe('goalRows', () => {
     const a = find(rows, 'a');
     expect(a.status).toBe('not_started');
     expect(a.health.name).toBe('blocked');
+    expect(a.health.word).toBe(YOURS_WORD);
     expect(a.health.title).toBe(YOURS_ASK);
     expect(a.move.word).toBe('Needs you');
     expect(a.need).toBe(YOURS_ASK);
     expect(find(rows, 'b').move.word).toBe('');
     expect(find(rows, 'b').health.name).toBe('ready');
     expect(find(rows, 'b').need).toBeNull();
+  });
+
+  it('words a stage Your move only while its blocked steps are all yours', () => {
+    const { rows } = rowsOf(
+      tree([
+        step('stage', 'g'),
+        step('s1', 'stage'),
+        step('other', 'g'),
+        step('o1', 'other'),
+        step('o2', 'other', { status: 'blocked', blockKind: 'outside', blockAsk: 'The letter' }),
+      ]),
+    );
+    const stage = find(rows, 'stage');
+    expect(stage.health.name).toBe('blocked');
+    expect(stage.health.word).toBe(YOURS_WORD);
+    expect(stage.health.title).toBe(YOURS_BENEATH);
+    const other = find(rows, 'other');
+    expect(other.health.name).toBe('blocked');
+    expect(other.health.word).toBe(HEALTH.blocked.word);
+    expect(find(rows, 'o2').health.word).toBe(HEALTH.blocked.word);
   });
 
   it('leaves a step of yours that waits on another, or holds sub-steps, off you', () => {

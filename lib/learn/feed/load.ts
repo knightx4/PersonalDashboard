@@ -17,6 +17,7 @@ import { youtubeVideoId } from '@/lib/learn/youtube/format';
 import { loadNotesForCards } from '@/lib/learn/notes/store';
 import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { loadConversations } from '@/lib/talk/store';
+import { TEACH_BACK_DEFAULT_EVERY } from './teach-back';
 import { ARTICLE_GAP, POOL_FACTOR, spreadDeck, type Spreadable } from './spread';
 
 /**
@@ -26,8 +27,8 @@ import { ARTICLE_GAP, POOL_FACTOR, spreadDeck, type Spreadable } from './spread'
  */
 
 const CARD_SELECT =
-  'id, reason, status, idea_name, concept_id, theme_name, aim_name, field_id, summary, why, takeaway, context, hook, example, check_question, check_answer, mentions, depth, difficulty, ' +
-  'track_name, unit_title, subject_id, ' +
+  'id, reason, status, idea_name, concept_id, theme_name, aim_name, field_id, summary, why, takeaway, context, hook, example, check_question, check_answer, mentions, teach_back, depth, difficulty, ' +
+  'track_name, unit_title, subject_id, video_id, video_start_seconds, video_end_seconds, ' +
   'item:catalogue_items!feed_cards_item_id_fkey(title, canonical_url, licence), ' +
   'segment:catalogue_segments!feed_cards_segment_id_fkey(heading, text, section_anchor), ' +
   'source_item:catalogue_items!feed_cards_source_item_id_fkey(title, canonical_url, licence), ' +
@@ -122,7 +123,20 @@ export async function loadFeedPage(
   const dealt = spreadDeck(dealable, recent, limit).map((entry) => entry.card);
   const conceptOf = new Map(rows.map((row) => [row.id, row.concept_id ?? null]));
   const withIdeas = await withNotes(supabase, await withVideos(supabase, dealt, conceptOf), conceptOf);
-  return withConversations(supabase, withIdeas);
+  return withTeachEvery(supabase, await withConversations(supabase, withIdeas));
+}
+
+/**
+ * A teach-back (plan #1054) carries the setting for how often they come, so
+ * the card can offer to change it. Read only when one is dealt; a failed read
+ * shows the default rather than failing the page.
+ */
+async function withTeachEvery(supabase: LearnSupabaseClient, cards: FeedCard[]): Promise<FeedCard[]> {
+  if (!cards.some((card) => card.kind === 'teach')) return cards;
+  const { data, error } = await supabase.from('settings').select('teach_back_every').maybeSingle();
+  if (error) console.error('[learn now] teach-back setting', error.message);
+  const every = (data as { teach_back_every: number } | null)?.teach_back_every ?? TEACH_BACK_DEFAULT_EVERY;
+  return cards.map((card) => (card.kind === 'teach' ? { ...card, teachEvery: every } : card));
 }
 
 /**
@@ -223,6 +237,8 @@ async function withVideos(
 
   return cards.map((card) => {
     const concept = conceptOf.get(card.id);
+    // A card written from a video already plays the stretch it came from.
+    if (card.video) return card;
     const video = concept ? byConcept.get(concept) : undefined;
     return video ? { ...card, video } : card;
   });

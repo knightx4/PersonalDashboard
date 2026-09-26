@@ -108,6 +108,8 @@ export type TopUpSummary = {
   stopped: 'deadline' | 'nothing-to-pick' | 'pick-rounds' | 'no-progress' | null;
   /** The lessons written before the section cards (plan #978), when that ran. */
   lessons?: LessonTopUpSummary;
+  /** Set when a teach-back was put into the deck after the cards (plan #1054). */
+  teachBack?: boolean;
 };
 
 export async function runTopUpFor(

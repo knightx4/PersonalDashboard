@@ -7,6 +7,7 @@ import {
   parseChannelPlaylistsPage,
   parseChannelsResponse,
   parseIsoDuration,
+  parsePlaylistInput,
   parsePlaylistItemsPage,
   parsePlaylistResponse,
   parseVideosResponse,
@@ -142,8 +143,19 @@ describe('parsePlaylistItemsPage', () => {
     expect(parsePlaylistItemsPage(body)).toEqual({
       ok: true,
       videoIds: ['a', 'b'],
+      addedAt: {},
       nextPageToken: 'page-2',
     });
+  });
+
+  it('keeps when each video was added, when the snippet was asked for', () => {
+    const body = JSON.stringify({
+      items: [
+        { contentDetails: { videoId: 'a' }, snippet: { publishedAt: '2026-09-20T08:00:00Z' } },
+        { contentDetails: { videoId: 'b' }, snippet: { publishedAt: 'not a date' } },
+      ],
+    });
+    expect(parsePlaylistItemsPage(body)).toMatchObject({ addedAt: { a: '2026-09-20T08:00:00Z' } });
   });
 
   it('says there is no next page when there is not', () => {
@@ -179,8 +191,18 @@ describe('parseVideosResponse', () => {
         canonicalUrl: 'https://www.youtube.com/watch?v=abc123',
         durationSeconds: 2389,
         publishedAt: '2009-05-06',
+        channelId: null,
+        channelTitle: null,
       },
     ]);
+  });
+
+  it("keeps the uploading channel, for a video from somebody else's channel", () => {
+    const body = JSON.stringify({
+      items: [{ id: 'abc123', snippet: { title: 'T', channelId: 'UCx', channelTitle: 'Some Channel' } }],
+    });
+    const parsed = parseVideosResponse(body);
+    expect(parsed).toMatchObject({ ok: true, videos: [{ channelId: 'UCx', channelTitle: 'Some Channel' }] });
   });
 
   it('leaves out a video the API returned nothing about', () => {
@@ -231,6 +253,34 @@ describe('parseChannelInput', () => {
   it('refuses what is not a channel', () => {
     expect(parseChannelInput('').ok).toBe(false);
     expect(parseChannelInput('https://example.com/@someone').ok).toBe(false);
+  });
+});
+
+describe('parsePlaylistInput', () => {
+  const id = 'PLO3R7kM37fxE1234567890abcdefghij';
+
+  it('takes a playlist link, a video link played in the playlist, or the bare id', () => {
+    expect(parsePlaylistInput(`https://www.youtube.com/playlist?list=${id}`)).toEqual({ ok: true, playlistId: id });
+    expect(parsePlaylistInput(`youtube.com/playlist?list=${id}&si=abc`)).toEqual({ ok: true, playlistId: id });
+    expect(parsePlaylistInput(`https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=${id}&index=3`)).toEqual({
+      ok: true,
+      playlistId: id,
+    });
+    expect(parsePlaylistInput(`https://youtu.be/dQw4w9WgXcQ?list=${id}`)).toEqual({ ok: true, playlistId: id });
+    expect(parsePlaylistInput(`  ${id} `)).toEqual({ ok: true, playlistId: id });
+  });
+
+  it('says Watch later cannot be read rather than storing a list that comes back empty', () => {
+    const parsed = parsePlaylistInput('https://www.youtube.com/playlist?list=WL');
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) expect(parsed.error).toMatch(/Watch later/);
+  });
+
+  it('refuses what is not a playlist', () => {
+    expect(parsePlaylistInput('').ok).toBe(false);
+    expect(parsePlaylistInput('https://www.youtube.com/@MITOCW').ok).toBe(false);
+    expect(parsePlaylistInput(`https://example.com/playlist?list=${id}`).ok).toBe(false);
+    expect(parsePlaylistInput('https://www.youtube.com/playlist?list=a b').ok).toBe(false);
   });
 });
 

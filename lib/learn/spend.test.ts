@@ -94,6 +94,10 @@ describe('the operation names', () => {
       'reply-about-card',
       'explain-phrase',
       'write-asked-card',
+      'mark-teach-back',
+      'summarise-video',
+      'screen-video',
+      'judge-video',
     ]);
   });
 });

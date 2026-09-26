@@ -479,6 +479,35 @@ carry an empty list and show no underlines; selecting a phrase still works on
 all of them, and old section cards gain underlines only as the top-up replaces
 them.
 
+## Explaining an idea back (plan #1054)
+
+Every so often the deck gives you an idea you kept and asks you to explain it
+to a friend in a few sentences. Kept means swiped known or "work on this", or
+saved, at least three days ago. The idea kept longest ago goes first, leaving
+out one asked about in the last thirty days and one already sharp.
+
+The card is a row with the reason `teach_back`, written by the top-up with no
+model call once enough other cards have been written since the last one. The
+rate starts at one card in ten and is kept in `learn.settings`
+(`teach_back_every`); the menu at the foot of the card offers one in five,
+ten, twenty or forty, or never. A teach-back still waiting to be answered
+holds off the next.
+
+What you write goes into the card's conversation (`core.conversations`). Haiku
+marks it against the idea's claim and basis: what was right, what was missing,
+and whether you gave an example of your own. The same call writes one
+follow-up question, which you answer in the same thread and which is marked
+too. The marks are kept on the card in `feed_cards.teach_back`, and each answer
+is kept as a question at the defence rung in `learn.probes`, so the idea's
+page lists both.
+
+Teach-back is the defence rung (#1055). An explanation that does not hold
+leaves the idea shaky. One that holds makes it known straight away, and
+holding through the follow-up makes it sharp. The claim is shown once the
+exchange is over. Like a unit check the card has no swipes: it is answered or
+skipped, and Ask and phrase explanations are not offered on it, since its
+conversation is the answer being marked and its claim is the answer.
+
 ## Cost
 
 Two model calls per card, one to name the material and one to write the card.

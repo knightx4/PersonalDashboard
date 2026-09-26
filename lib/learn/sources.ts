@@ -121,6 +121,15 @@ export const learnSources: ModuleSources = {
       title: 'summary',
       note: 'status says what they did with a card; saved and tested cards say more than drawn ones.',
     },
+    {
+      table: 'learn.watch_list',
+      module: 'Learn',
+      holds: 'YouTube videos they chose to watch, saved to their playlist, with a verdict on each once judged.',
+      weight: 'intent',
+      search: ['why', 'summary'],
+      title: 'video_id',
+      note: 'item_id is the catalogue_items row of kind video, which has the title and description. verdict is watch, card or skip, with why; watched_at is set when they watched it; left_playlist_at when they took it off the playlist.',
+    },
   ],
   notSources: [
     { table: 'learn.area_check_articles', reason: 'Reference data for placing subjects.' },
@@ -142,6 +151,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.probes', reason: 'Mastery-check questions and grades.' },
     { table: 'learn.quiz_questions', reason: 'Questions inside a quiz; read through quizzes.' },
     { table: 'learn.quiz_sources', reason: 'Material a quiz was written from.' },
+    { table: 'learn.settings', reason: 'Settings for how Learn behaves.' },
     { table: 'learn.theme_fields', reason: 'Model placement of vault themes.' },
     { table: 'learn.track_offers', reason: 'Tracks the feed offered.' },
     { table: 'learn.transcript_calls', reason: 'Transcript fetch bookkeeping.' },
