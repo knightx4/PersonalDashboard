@@ -5,7 +5,7 @@
  * "Work on this" on a goal fires the goals routine for that goal. The session
  * follows .claude/skills/goals: it maps the whole path for the goal (phases,
  * Claude steps, information steps pre-filled from Gmail, provisional steps,
- * questions with lettered options), proposed until you approve the goal;
+ * choices made with judgement, a question only where it cannot decide), proposed until you approve the goal;
  * after that it may add, split and reorder steps beneath it without asking. The database holds it to that
  * (supabase/migrations-goals/0006).
  *
@@ -163,8 +163,12 @@ export function goalRunText(input: {
     '',
     'Follow .claude/skills/goals/SKILL.md. Read it first: it says how to map the whole path',
     'for a goal (phases, Claude steps, information steps pre-filled from Gmail, provisional',
-    'steps, questions with lettered options, and the kinds of weekly help to propose), what',
-    'you may change before and after the goal is approved, and how every write is labelled.',
+    'steps, and the kinds of weekly help to propose), what you may change before and after',
+    'the goal is approved, and how every write is labelled.',
+    '',
+    'Make the choices yourself wherever judgement can, as "Decide first, ask last" says, so',
+    'the person is left with steps to do rather than options to pick. Ask only what you',
+    'cannot settle, and withdraw open questions of yours that fail that test.',
     '',
     'Before you map, look in the other modules for what they already hold about this goal,',
     'as "Pulling in from the other modules" says, starting from the catalogue in',

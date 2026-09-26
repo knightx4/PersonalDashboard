@@ -85,9 +85,13 @@ count is met.
 
 A goal can go in vague. "Get fit" is written with **fog**, the same field the
 dev plan uses for a feature nobody can specify yet: one honest paragraph
-saying what is not known. Claude then asks one or two questions as `decision`
-steps ("strength or endurance? where are you now?") and, once they are
-answered, proposes concrete goals beneath it, such as *bench 200 lbs by March*.
+saying what is not known. Claude settles what it can from the person's notes
+and its own judgement, and asks as a `decision` step only what it cannot
+settle ("where are you now?"). Once that is answered it proposes concrete
+goals beneath it, such as *bench 200 lbs by March*. Questions are the
+exception: the goals skill's "Decide first, ask last" gives the test, and a
+choice Claude made shows on the steps it shapes as a `Decided:` line the
+person can overrule.
 This is the shape and re-shape flow from `.claude/skills/plan`, pointed at a
 goal instead of an idea.
 

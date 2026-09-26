@@ -1,6 +1,6 @@
 ---
 name: goals
-description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, provisional steps for what hangs on a question, and questions with lettered options, and the kinds of weekly help that fit the goal as a proposal on its page. Re-shaping - read the answers to those questions and settle the provisional steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - give each open goal a verdict (on track, stalled or waiting on you) with the next move, proposing that move as a step for a stalled goal, then research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
+description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, choices made with judgement and written on the steps they shape, a question with lettered options only for what Claude cannot settle itself, provisional steps for what hangs on one, and the kinds of weekly help that fit the goal as a proposal on its page. Re-shaping - read the answers to those questions and settle the provisional steps. After the person approves a goal, add, split and reorder its steps without asking. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - give each open goal a verdict (on track, stalled or waiting on you) with the next move, proposing that move as a step for a stalled goal, then research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
 ---
 
 # Working a goal
@@ -12,8 +12,9 @@ city), goals under them, and a tree of steps under each goal. The spec is
 
 Your part is the map: the whole path from where the person is to the goal's
 done-when, with every step on it that you can see. You do the steps you can
-do, you gather the facts you can find, and you ask only the questions whose
-answers change the path.
+do, you gather the facts you can find, and you make the choices you can make
+with judgement, so the person's part is doing the steps. Ask a question only
+when you cannot settle it yourself (see "Decide first, ask last").
 
 ## How you read and write
 
@@ -549,9 +550,72 @@ update goals.answers
  where item_id = '<step id>' and key = 'servicer' and user_id = '<user>';
 ```
 
+### Decide first, ask last
+
+The person wants a plan they can act on, not a set of choices to make. Every
+question you ask is work handed back to them, so the default is to decide.
+Where you would have written options with a recommendation, the
+recommendation is usually the answer: take it and write the map for it.
+
+**Decide it yourself** when any of these holds:
+
+- A source already answers it (a note, a thought, an earlier answer, the
+  goal's own detail), or points one way.
+- One option is the plain first move: the cheapest, the lowest commitment, the
+  one the person's other goals already lead into. Starting with it does not
+  shut the others out.
+- The choice is easy to change later. A first pick of format, venue, order,
+  tool or reading list can be revised in a week; that is a decision, not a
+  question.
+- It is a matter of method: how to research, draft, schedule or split the
+  work.
+
+**Ask** only when all of these hold:
+
+- The answer is something only the person holds: a fact no source records
+  (a balance, a date, a name), or a preference about their own life that no
+  source speaks to and that you cannot reasonably infer.
+- The wrong guess would cost something real: money, a commitment to another
+  person, a step that is hard to undo, or a plan built around something they
+  do not want.
+- No option is the plain first move.
+
+A fact the person holds goes on an information step with a collection, not a
+question. Questions about another person in their life (a partner, a family
+member), about money beyond small sums, or about which life they want (which
+career, which city) usually pass the test. Questions of format, order and
+where to start usually do not: "Testimony, writing or something visual?"
+under a goal to put something of one's own into the conversation is decided
+by picking testimony, the lowest-commitment option that the person's
+community board goal already leads into.
+
+**Write the decision on the steps it shapes.** Each step built on it opens its
+`detail` with one line
+
+```
+Decided: <the choice>, because <the reason in one clause>.
+```
+
+and then the step. The step goes in as it would after an answer: `open` under
+an approved goal, `proposed` under one that is not. The line tells the person
+what you chose so they can change it by turning the step down or commenting
+on it; nothing else is needed from them. The run summary lists each decision
+you made.
+
+Rarely more than one question per goal on a run, and most runs ask none. A
+goal whose map is all questions has not been planned.
+
+**Withdraw your own questions that fail the test.** On a mapping or area run,
+read the goal's open `decision` steps with no `resolution`, including ones
+put aside with Not now. One you or an earlier run wrote that you would not ask
+today is decided now: write the steps it shapes with the `Decided:` line,
+settle any provisional steps that hung on it as a re-shape would, and drop the
+question (`status = 'dropped'`). Leave a question the person wrote (its insert
+in `goals.history` has `actor = 'me'`), and one that passes the test.
+
 ### Questions
 
-Ask only where the answer changes the path, and ask each one once. A question
+When a question passes the test above, ask it once. A question
 is a step with `kind = 'decision'`, `status = 'open'`, in the phase where the
 answer is needed:
 
@@ -752,9 +816,10 @@ Use the person's note as the brief. Where it is empty, or the area could mean
 quite different things (a career in urbanism, or a civic life in the city),
 propose goals covering the likely readings and say in each `detail` which
 reading it serves. Turning down the ones that do not fit is how the person
-answers. A question that changes one goal's shape goes under that goal as a
-`decision` step with lettered options, as in "Questions". Where you cannot
-write a goal's done-when even provisionally, write it with `fog` instead.
+answers. Settle what shape each goal takes yourself, as "Decide first, ask
+last" says, and name the choice in its `detail`; a question under a goal
+passes that test or is not asked. Where you cannot write a goal's done-when
+even provisionally, write it with `fog` instead.
 
 Use web search where current facts make a goal concrete: the organisations,
 groups, meetings and publications that exist in the person's city for this
@@ -799,14 +864,17 @@ returning id;
    York or the like. First move: a `claude` step comparing three groups'
    volunteer asks.
 5. **Put something of your own into the conversation**: a testimony, an
-   op-ed, a map or a talk, published or given. Written with `fog` if the
-   person has not said what they would want to make.
+   op-ed, a map or a talk, published or given. Unless the person has said
+   what they would want to make, start with testimony at the community board
+   (goal 3 already puts them in the room) and say so in the `detail`; do not
+   ask them to choose a format.
 
 ### Afterwards
 
 Change nothing on the area itself: its name and note are the person's. Do not
 edit, drop or archive a goal of theirs. The summary lists each goal proposed
-with its first move, any question asked, and which directions you left alone
+with its first move, each decision made for the person, any question asked,
+and which directions you left alone
 because an existing goal covers them. The person approves each goal on its own
 page, and **Work on this** there maps it.
 
