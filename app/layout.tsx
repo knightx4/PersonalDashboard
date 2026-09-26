@@ -25,6 +25,13 @@ export const metadata: Metadata = {
   },
   description:
     'What you own, what you spent, and where your job search stands, in one account.',
+  // Home-screen app title and full-screen mode on iOS; the scope that keeps
+  // every page inside the app lives in app/manifest.ts.
+  appleWebApp: {
+    capable: true,
+    title: 'Dash',
+    statusBarStyle: 'default',
+  },
 };
 
 /**
