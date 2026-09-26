@@ -21,6 +21,7 @@ import { ClipPlayer } from '@/components/learn/clip-player';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { Card } from '@/components/ui/card';
+import { RelatedNotes } from '@/components/vault/related-notes';
 import { Field, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import {
@@ -50,6 +51,7 @@ import {
   type UnitCheckResult,
 } from './actions';
 import { markMentions } from '@/lib/learn/feed/mentions';
+import type { RelatedNoteLink } from '@/lib/vault/notes/related';
 import { Mentioned, PhraseExplainer, usePhraseExplainer } from './phrase-explainer';
 import { TeachBackCard } from './teach-back-card';
 
@@ -94,10 +96,17 @@ type MadeTrack = NonNullable<NewTrackResult['track']>;
 
 export function LearnNowFeed({
   first,
+  firstRelated,
   ready: firstReady,
   low,
 }: {
   first: FeedCard[];
+  /**
+   * Your notes on each of the first cards' ideas (plan #1113), by card, still
+   * being looked up when the deck is drawn. Cards loaded later carry theirs
+   * as `relatedNotes`.
+   */
+  firstRelated?: Record<string, Promise<readonly RelatedNoteLink[]>>;
   ready: number;
   /** Below this many ready cards, loading more starts a top-up. */
   low: number;
@@ -273,6 +282,7 @@ export function LearnNowFeed({
             <DeckCard
               key={current.id}
               card={current}
+              related={current.relatedNotes ?? firstRelated?.[current.id] ?? null}
               leaving={leaving?.id === current.id ? leaving.swipe : null}
               onSwipe={swipe}
               onDismiss={dismiss}
@@ -341,12 +351,15 @@ function heading(drag: Drag | null): SwipeAction | null {
 
 function DeckCard({
   card,
+  related,
   leaving,
   onSwipe,
   onDismiss,
   onMadeCard,
 }: {
   card: FeedCard;
+  /** Your notes on the card's idea, or the promise of them (plan #1113). */
+  related: readonly RelatedNoteLink[] | Promise<readonly RelatedNoteLink[]> | null;
   leaving: SwipeAction | null;
   onSwipe: (swipe: SwipeAction) => void;
   onDismiss: () => void;
@@ -624,6 +637,10 @@ function DeckCard({
               </details>
             </section>
           )}
+
+          {/* What you wrote in the vault about this idea (plan #1113), under
+              the material and before the notes kept on the card. */}
+          <RelatedNotes notes={related} className="mt-4" />
 
           {/* Your notes on this card and its idea (plan #1058), under the
               card's own body and before the source's text. */}

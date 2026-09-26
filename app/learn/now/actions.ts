@@ -24,6 +24,7 @@ import {
   recordFeedAction,
   setCardDifficulty,
 } from '@/lib/learn/feed/load';
+import { relatedNotesForCards } from '@/lib/learn/feed/related-notes';
 import { settleIdeaFromSwipe } from '@/lib/learn/feed/ideas-store';
 import { noteBody, type NoteWrite } from '@/lib/learn/notes/notes';
 import { deleteNote, insertCardNote } from '@/lib/learn/notes/store';
@@ -83,7 +84,16 @@ export async function loadMoreCards(shown: string[]): Promise<MoreCards> {
     countReadyCards(supabase),
   ]);
   after(() => topUpFeedAfterResponse(user.id));
-  return { cards, ready };
+  // These cards load behind the one on screen, so waiting for their related
+  // notes here is not waiting in front of anybody (plan #1113).
+  const related = await relatedNotesForCards(supabase, user.id, cards);
+  return {
+    cards: cards.map((card) => {
+      const notes = related.get(card.id);
+      return notes ? { ...card, relatedNotes: notes } : card;
+    }),
+    ready,
+  };
 }
 
 /**

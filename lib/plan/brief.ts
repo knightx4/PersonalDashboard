@@ -257,8 +257,9 @@ export type BriefOptions = {
   liveness?: PlanLiveness;
   /**
    * The visions the person has written on the specs page, by scope, from
-   * `loadVisionBodies` in lib/specs/vision.ts. A step with no workspace opens
-   * with the app's; without this the brief carries no vision at all.
+   * `loadVisionBodies` in lib/specs/vision.ts. A step opens with its
+   * workspace's, or the app's when it has no workspace; without this the brief
+   * carries no vision at all.
    */
   visions?: VisionBodies;
 };
@@ -266,16 +267,18 @@ export type BriefOptions = {
 /**
  * The vision a step is briefed with, or null for none.
  *
- * A step with no workspace gets the vision for the app as a whole. A step in
- * a workspace gets nothing here yet; its workspace's own vision is the next
- * thing to read in.
+ * Pass the top of the step's tree, not the step: the plan page files a whole
+ * tree under its root's module, and a step's own module column can disagree
+ * with it, so the root is what says which workspace the step is in. A tree
+ * with no workspace gets the vision for the app as a whole. A workspace with
+ * no vision written gets nothing, not the app's in its place: the app's is
+ * about the whole, and a session would read it as the workspace's own.
  */
 export function visionFor(
-  node: Pick<PlanNode, 'module'>,
+  root: Pick<PlanNode, 'module'>,
   visions: VisionBodies | undefined,
 ): string | null {
-  if (node.module) return null;
-  return visions?.[APP_VISION]?.trim() || null;
+  return visions?.[root.module ?? APP_VISION]?.trim() || null;
 }
 
 /**
@@ -387,9 +390,9 @@ export function planBrief(
     out.push(`From #${origin.number}'s answer: ${origin.gist}`);
   }
 
-  // What the app is for, above where the feature is going: the layer a
+  // What the workspace is for, above where the feature is going: the layer a
   // session should read before anything that was decided under it.
-  const vision = visionFor(node, options.visions);
+  const vision = visionFor(ancestors[0] ?? node, options.visions);
   if (vision) {
     out.push('', '## Vision', '', vision);
   }

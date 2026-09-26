@@ -6,6 +6,8 @@ import { formatArrival } from '@/lib/news/issues/list';
 import { discussedIndexes } from '@/lib/news/saved/discussed';
 import { loadStoryConversations } from '@/lib/news/saved/discussed-store';
 import { loadSavedStories } from '@/lib/news/saved/stories';
+import { createVaultClient } from '@/lib/vault/auth/server';
+import { relatedNotes, toLink } from '@/lib/vault/notes/related';
 import { SavedView } from './saved-view';
 
 export const metadata = { title: 'Saved' };
@@ -22,10 +24,21 @@ export const dynamic = 'force-dynamic';
  * conversations are read alongside the stories and matched by issue and
  * headline (lib/news/saved/discussed.ts); a failed read of them leaves the
  * list without the marks rather than failing the page.
+ *
+ * Each story shows up to two of your own notes on its subject (plan #1113),
+ * matched on its headline and summary. A saved story is a copy that outlives
+ * its newsletter, so it is matched on its own words rather than on the
+ * newsletter's stored vector; the vector is kept by the text's hash, so a
+ * story costs one embedding call the first time the list shows it. The
+ * lookups are started and not awaited, and stream in under each story.
  */
 export default async function SavedPage() {
   const user = await requireUser();
-  const [client, core] = await Promise.all([createNewsClient(), createCoreClient()]);
+  const [client, core, vault] = await Promise.all([
+    createNewsClient(),
+    createCoreClient(),
+    createVaultClient(),
+  ]);
   const [settings, stories, conversations] = await Promise.all([
     loadAccountSettings(user.id),
     loadSavedStories(client),
@@ -39,6 +52,9 @@ export default async function SavedPage() {
         ...story,
         arrived: formatArrival(story.receivedAt, settings.timezone),
         discussedIndex: discussed.get(story.id) ?? null,
+        related: relatedNotes(vault, user.id, `${story.headline}\n${story.summary}`, {
+          core,
+        }).then((notes) => notes.map(toLink)),
       }))}
     />
   );

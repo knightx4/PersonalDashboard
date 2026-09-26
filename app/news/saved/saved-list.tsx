@@ -6,17 +6,24 @@ import { StoryText } from '@/components/news/story-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { RelatedNotes } from '@/components/vault/related-notes';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import type { SavedStory } from '@/lib/news/saved/stories';
+import type { RelatedNoteLink } from '@/lib/vault/notes/related';
 import { DiscussButton } from '../quick/discuss-sheet';
 import { removeSaved } from './actions';
 
 /**
  * A saved story with its newsletter's arrival already formatted: "22 Sep, 07:14",
  * and, when it was discussed with Dash, the story index its discussion names
- * (plan #1061).
+ * (plan #1061), and your notes on its subject (plan #1113), usually still
+ * being looked up when the list is drawn.
  */
-export type SavedListStory = SavedStory & { arrived: string; discussedIndex?: number | null };
+export type SavedListStory = SavedStory & {
+  arrived: string;
+  discussedIndex?: number | null;
+  related?: readonly RelatedNoteLink[] | Promise<readonly RelatedNoteLink[]> | null;
+};
 
 /**
  * The Saved tab's stories, or how to save one when there are none (plan #870).
@@ -87,6 +94,7 @@ export function SavedList({ stories }: { stories: SavedListStory[] }) {
                 )}
               </div>
               <StoryText text={story.text ?? undefined} summary={story.summary} />
+              <RelatedNotes notes={story.related} className="mt-2" />
               <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
                 {story.link ? (
                   <a
