@@ -10,13 +10,14 @@
  */
 
 import type { CardNote } from '@/lib/learn/notes/notes';
+import { clockTime } from '@/lib/learn/youtube/format';
 import { keepMentions, type CardMention } from './mentions';
 import type { TalkTurn } from '@/lib/talk/talk';
 import { teachBackView, type TeachBackView } from './teach-back';
 
 export type FeedCardRow = {
   id: string;
-  reason: 'interest' | 'gap' | 'goal' | 'queued' | 'lesson' | 'unit_check' | 'asked' | 'teach_back';
+  reason: 'interest' | 'gap' | 'goal' | 'queued' | 'lesson' | 'unit_check' | 'asked' | 'teach_back' | 'video';
   status: string;
   /** The idea's short name. Null on cards written before one idea per card. */
   idea_name?: string | null;
@@ -49,6 +50,10 @@ export type FeedCardRow = {
   /** The section a lesson cites, when one was close enough to its claim. */
   source_item?: CatalogueItem | null;
   source_segment?: CatalogueSegment | null;
+  /** A card from a video on your playlist (plan #1067): the video and the stretch it came from. */
+  video_id?: string | null;
+  video_start_seconds?: number | null;
+  video_end_seconds?: number | null;
 };
 
 type CatalogueItem = { title: string; canonical_url: string; licence: string | null };
@@ -56,7 +61,7 @@ type CatalogueSegment = { heading: string | null; text: string; section_anchor: 
 
 export type FeedCard = {
   id: string;
-  reason: 'interest' | 'gap' | 'goal' | 'lesson' | 'unit_check' | 'asked' | 'teach_back';
+  reason: 'interest' | 'gap' | 'goal' | 'lesson' | 'unit_check' | 'asked' | 'teach_back' | 'video';
   /**
    * A section card, made from a Wikipedia section, a lesson written for a
    * concept in one of your tracks (LEARN-LESSONS-SPEC; plan #978), the
@@ -117,7 +122,8 @@ export type FeedCard = {
   /**
    * A YouTube clip close to the card's idea, when the library has one
    * (`video_clips_for_concepts`). Attached after the deck is dealt, so it is
-   * absent on a card built straight from its row.
+   * absent on a card built straight from its row, except on a card written
+   * from a video (plan #1067), which carries its own stretch.
    */
   video?: FeedVideo | null;
   /**
@@ -264,6 +270,7 @@ export function toFeedCard(row: FeedCardRow): FeedCard | null {
   if (row.reason === 'unit_check') return toCheckCard(row);
   if (row.reason === 'teach_back') return toTeachCard(row);
   if (!row.item || !row.segment || !row.summary || !row.why) return null;
+  if (row.reason === 'video') return toVideoCard(row, row.item, row.segment);
   const { shown, rest, restMinutes } = splitForReading(row.segment.text);
   return {
     id: row.id,
@@ -295,6 +302,52 @@ export function toFeedCard(row: FeedCardRow): FeedCard | null {
     link: sectionLink(row.item.canonical_url, row.segment.section_anchor),
     site: siteName(row.item.canonical_url),
     licence: licenceFor(row.item.licence, row.item.canonical_url),
+  };
+}
+
+/** "Lecture 3: Eigenvalues at 12:04": the video a card came from, and where in it. */
+export function videoSourceLine(title: string, start: number): string {
+  return `${title.trim()} at ${clockTime(start)}`;
+}
+
+/**
+ * A card from a video on your playlist (plan #1067): a section card whose
+ * source is a stretch of the video. The player on the card starts where the
+ * stretch does, and the link opens the video's own page at that minute. The
+ * transcript is not folded in under the card, since the player is there.
+ */
+function toVideoCard(row: FeedCardRow, item: CatalogueItem, segment: CatalogueSegment): FeedCard | null {
+  const videoId = row.video_id?.trim();
+  const start = row.video_start_seconds;
+  if (!videoId || start === null || start === undefined || !row.summary || !row.why) return null;
+  return {
+    id: row.id,
+    reason: 'video',
+    kind: 'section',
+    title: row.idea_name?.trim() || item.title,
+    source: videoSourceLine(item.title, start),
+    track: null,
+    article: item.title,
+    section: segment.heading,
+    why: row.why,
+    takeaway: row.takeaway?.trim() || null,
+    context: row.context?.trim() || null,
+    hook: row.hook?.trim() || null,
+    summary: row.summary,
+    example: row.example?.trim() || null,
+    question: row.check_question && row.check_answer ? row.check_question : null,
+    answer: row.check_question && row.check_answer ? row.check_answer : null,
+    mentions: keepMentions(row.mentions),
+    depth: null,
+    difficulty: isCardDifficulty(row.difficulty) ? row.difficulty : null,
+    returning: row.status === 'review' || row.status === 'skipped' ? row.status : null,
+    shown: [],
+    rest: [],
+    restMinutes: 0,
+    link: `/learn/videos/${videoId}?t=${start}`,
+    site: 'your playlist',
+    licence: null,
+    video: { videoId, title: item.title, start, end: row.video_end_seconds ?? null },
   };
 }
 

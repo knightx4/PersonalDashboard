@@ -258,3 +258,33 @@ describe('a track offer and Make this a track (plan #968)', () => {
     expect(canMakeTrack({ kind: 'section', article: ' ' })).toBe(false);
   });
 });
+
+describe('a card from a video on your playlist (plan #1067)', () => {
+  const video = row({
+    reason: 'video',
+    idea_name: 'Cash runs out first',
+    item: { title: 'Cash flow in ten minutes', canonical_url: 'https://www.youtube.com/watch?v=aaaaaaaaaaa', licence: null },
+    segment: { heading: null, text: 'the transcript', section_anchor: null },
+    video_id: 'aaaaaaaaaaa',
+    video_start_seconds: 724,
+    video_end_seconds: 845,
+  });
+
+  it('names the video and the minute, and plays and links from that minute', () => {
+    const card = toFeedCard(video)!;
+    expect(card).toMatchObject({
+      reason: 'video',
+      kind: 'section',
+      title: 'Cash runs out first',
+      source: 'Cash flow in ten minutes at 12:04',
+      link: '/learn/videos/aaaaaaaaaaa?t=724',
+      video: { videoId: 'aaaaaaaaaaa', title: 'Cash flow in ten minutes', start: 724, end: 845 },
+      shown: [],
+      licence: null,
+    });
+  });
+
+  it('shows nothing for a video card that lost its stretch', () => {
+    expect(toFeedCard({ ...video, video_start_seconds: null })).toBeNull();
+  });
+});

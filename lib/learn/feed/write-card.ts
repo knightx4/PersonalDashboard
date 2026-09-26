@@ -79,7 +79,7 @@ export type CardToWrite = {
   id: string;
   /** The catalogue segment, for finding the ideas already held near it. */
   segmentId?: string | null;
-  reason: 'interest' | 'gap' | 'goal' | 'asked';
+  reason: 'interest' | 'gap' | 'goal' | 'asked' | 'video';
   /** The theme it was picked for; set for interest. */
   themeName: string | null;
   /** The goal it was picked for; set for a goal card (plan #900). */
@@ -103,6 +103,13 @@ export type CardToWrite = {
   depth: Depth | null;
   /** Ideas already met nearest the section. Empty when none are held or none could be looked up. */
   known?: KnownIdea[];
+  /**
+   * For a card from a video on the playlist (plan #1067): the video, and the
+   * point the judge found in the stretch whose transcript is `text`.
+   */
+  video?: { title: string; channel: string | null; point: string } | null;
+  /** The most cards to keep from the section. MAX_IDEAS when unset; one for a video stretch. */
+  maxIdeas?: number;
 };
 
 /** One idea's card, named by the columns it is stored in. */
@@ -160,6 +167,7 @@ function midSentence(name: string): string {
 export function whyLine(
   card: Pick<CardToWrite, 'reason' | 'themeName' | 'aimName' | 'field' | 'gap' | 'askedPhrase' | 'askedOn'>,
 ): string {
+  if (card.reason === 'video') return 'From a video on your playlist.';
   if (card.reason === 'goal' && card.aimName) return `For your goal: ${card.aimName.trim()}.`;
   if (card.reason === 'asked' && card.askedPhrase) {
     const on = card.askedOn?.trim();
@@ -229,8 +237,15 @@ const payloadSchema = z.object({
 /** What the model is told the section was picked for. Exported for the test. */
 export function describePick(card: CardToWrite): string {
   const field = card.field ? `${card.field.name}. ${card.field.scope}` : '';
+  const video = card.video;
   const pick =
-    card.reason === 'asked' && card.askedPhrase
+    card.reason === 'video' && video
+      ? `Picked from a video they saved to watch: "${video.title}"` +
+        (video.channel?.trim() ? ` by ${video.channel.trim()}` : '') +
+        `. The part worth a card: ${video.point.trim()}\n` +
+        'The section below is the transcript of that part of the video, not a Wikipedia section. ' +
+        'Write the one idea that part makes, as one card, and say it does not serve only when the transcript does not make it.'
+      : card.reason === 'asked' && card.askedPhrase
       ? `Asked for by name: they met the phrase "${card.askedPhrase.trim()}"` +
         (card.askedOn?.trim() ? ` on a card about ${card.askedOn.trim()}` : '') +
         ' and want a card of its own on it. Write the ideas that explain it, and say the section does not serve only when it is not about it.'
@@ -462,5 +477,6 @@ export async function writeCard(input: {
 
   const report = readCardReport(block.input);
   if (report.verdict === 'dropped') return { outcome: 'dropped', reason: report.reason };
-  return { outcome: 'ready', ideas: report.ideas, why: whyLine(card) };
+  const keep = Math.max(1, Math.min(card.maxIdeas ?? MAX_IDEAS, MAX_IDEAS));
+  return { outcome: 'ready', ideas: report.ideas.slice(0, keep), why: whyLine(card) };
 }
