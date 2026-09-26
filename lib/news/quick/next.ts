@@ -336,6 +336,32 @@ export function nextCard(
   return rankedCards(issues, senders, passes, filter, signals)[0] ?? null;
 }
 
+/**
+ * How far through Quick read you are (note 0a5ff399): of the stories it could
+ * show under this filter, how many you have moved past. Counted in cards, so
+ * one event several newsletters ran is one story, as Next shows it, and read
+ * when any telling of it was passed. Only the newsletters loadQuickRead reads
+ * count, and muted senders and hidden topics are left out, as for nextCard.
+ */
+export function quickProgress(
+  issues: readonly QuickIssue[],
+  senders: readonly NewsSender[],
+  passes: readonly StoryPass[],
+  filter: QuickFilter = {},
+  groups: readonly StoryGroupRow[] = [],
+): { read: number; total: number } {
+  const byId = new Map(senders.map((sender) => [sender.id, sender]));
+  const stories = new Map<string, boolean>();
+  for (const c of candidates(issues, byId, passes, groups)) {
+    if (!fits(c.slot, filter)) continue;
+    const key = c.groupId ?? `${c.issue.id}:${c.slot.storyIndex}`;
+    stories.set(key, (stories.get(key) ?? false) || c.passed);
+  }
+  let read = 0;
+  for (const passed of stories.values()) if (passed) read += 1;
+  return { read, total: stories.size };
+}
+
 /** How many stories a laptop page of Quick read holds at most. */
 export const QUICK_PAGE_SIZE = 5;
 

@@ -1,5 +1,6 @@
 /**
- * The pages Previous page can go back to on Quick read (note 460be33e).
+ * The pages Previous page can go back to on Quick read (note 460be33e), and
+ * on a phone the cards Back can go back to: a card is a page of one story.
  *
  * Kept in the tab, not the database: a few pages is all the ask needs --
  * "enough to go back to the last one if you skipped too fast" -- and a tab

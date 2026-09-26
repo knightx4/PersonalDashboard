@@ -43,11 +43,52 @@ export const QUICK_NEXT_FORM = 'quick-read-next';
  * card: its own first, then its repeats.
  */
 export function QuickNextForm({ stories }: { stories: readonly StoryPass[] }) {
+  const raw = useSyncExternalStore(subscribeBack, readBackStoriesRaw, () => null);
+  const back = useMemo(() => parseBack(raw), [raw]);
+  const previous = back.at(-1);
   return (
-    <form id={QUICK_NEXT_FORM} action={passQuickStory}>
-      <PassFields stories={stories} />
-      <NextButton />
-    </form>
+    <>
+      {/* Previous story (note 460be33e, on a phone): takes back the last
+          Next story's pass, so a card skipped too fast comes back. Only once
+          there is a card in this tab to go back to. */}
+      {previous && (
+        <form
+          action={async (form) => {
+            writeBack(BACK_STORIES_KEY, back.slice(0, -1));
+            await unpassQuickPage(form);
+          }}
+        >
+          <PassFields stories={previous} />
+          <PreviousStoryButton />
+        </form>
+      )}
+      <form
+        id={QUICK_NEXT_FORM}
+        action={async (form) => {
+          writeBack(BACK_STORIES_KEY, pushBack(back, stories));
+          await passQuickStory(form);
+        }}
+      >
+        <PassFields stories={stories} />
+        <NextButton />
+      </form>
+    </>
+  );
+}
+
+function PreviousStoryButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button
+      type="submit"
+      size="lg"
+      variant="secondary"
+      pending={pending}
+      aria-label="Previous story"
+    >
+      {!pending && <ArrowLeft className="size-4" strokeWidth={2} aria-hidden />}
+      {pending ? 'Loading…' : 'Back'}
+    </Button>
   );
 }
 
@@ -119,7 +160,7 @@ export function QuickDeck({
  * the next set. The stories go as issueId and storyIndex pairs, in order.
  */
 export function QuickPageForm({ stories }: { stories: readonly StoryPass[] }) {
-  const raw = useSyncExternalStore(subscribeBack, readBackRaw, () => null);
+  const raw = useSyncExternalStore(subscribeBack, readBackPagesRaw, () => null);
   const back = useMemo(() => parseBack(raw), [raw]);
   const previous = back.at(-1);
   return (
@@ -130,7 +171,7 @@ export function QuickPageForm({ stories }: { stories: readonly StoryPass[] }) {
       {previous && (
         <form
           action={async (form) => {
-            writeBack(back.slice(0, -1));
+            writeBack(BACK_PAGES_KEY, back.slice(0, -1));
             await unpassQuickPage(form);
           }}
         >
@@ -140,7 +181,7 @@ export function QuickPageForm({ stories }: { stories: readonly StoryPass[] }) {
       )}
       <form
         action={async (form) => {
-          writeBack(pushBack(back, stories));
+          writeBack(BACK_PAGES_KEY, pushBack(back, stories));
           await passQuickPage(form);
         }}
       >
@@ -151,8 +192,13 @@ export function QuickPageForm({ stories }: { stories: readonly StoryPass[] }) {
   );
 }
 
-/** Where the pages Previous page can go back to are kept: this tab, and only this tab. */
-const BACK_KEY = 'news:quick-read:back';
+/**
+ * Where the pages Previous page, and the cards Back on a phone, can go back
+ * to are kept: this tab, and only this tab. Two stacks, so a window resized
+ * across the md break does not take back a page with a card's button.
+ */
+const BACK_PAGES_KEY = 'news:quick-read:back';
+const BACK_STORIES_KEY = 'news:quick-read:back-stories';
 const backListeners = new Set<() => void>();
 
 function subscribeBack(listener: () => void) {
@@ -160,17 +206,20 @@ function subscribeBack(listener: () => void) {
   return () => backListeners.delete(listener);
 }
 
-function readBackRaw(): string | null {
+function readBackRaw(key: string): string | null {
   try {
-    return sessionStorage.getItem(BACK_KEY);
+    return sessionStorage.getItem(key);
   } catch {
     return null;
   }
 }
 
-function writeBack(stack: readonly StoryPass[][]) {
+const readBackPagesRaw = () => readBackRaw(BACK_PAGES_KEY);
+const readBackStoriesRaw = () => readBackRaw(BACK_STORIES_KEY);
+
+function writeBack(key: string, stack: readonly StoryPass[][]) {
   try {
-    sessionStorage.setItem(BACK_KEY, JSON.stringify(stack));
+    sessionStorage.setItem(key, JSON.stringify(stack));
   } catch {
     // Storage refused: Previous page simply has nothing to go back to.
   }
