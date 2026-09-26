@@ -343,7 +343,7 @@ async function topUpWith(
       return summary.picked.interest + summary.picked.gap + summary.picked.goal;
     },
     write: (id, card) =>
-      writePickedCard(learn, apiKey, id, card, (spend, embedSpend) => recordCardSpend(core, id, spend, embedSpend)),
+      writePickedCard(learn, apiKey, id, card, (spend, embedSpend) => keepCardSpend(core, id, spend, embedSpend)),
     now: Date.now,
   };
 
@@ -368,8 +368,13 @@ async function topUpWith(
 
 export type FeedTopUpResult = { videos: VideoCardPassResult | null; people: TopUpSummary[] };
 
-/** Spend for one card write, under the feed's own operations. */
-async function recordCardSpend(
+/**
+ * Spend for one card write, under the feed's own operations. Not named
+ * record…Spend: lib/core/spend/action-graph.ts reads a call by that name as
+ * a recorder whose arguments name the operation, and follows this one into
+ * the recordSpend calls below instead.
+ */
+async function keepCardSpend(
   core: Context['core'],
   userId: string,
   spend: SpendReport[],
@@ -399,7 +404,7 @@ export async function runFeedTopUp(): Promise<FeedTopUpResult> {
     deadline: started + VIDEO_CARDS_MS,
     write: (userId, card) =>
       writePickedCard(context.learn, context.apiKey, userId, card, (spend, embedSpend) =>
-        recordCardSpend(context.core, userId, spend, embedSpend),
+        keepCardSpend(context.core, userId, spend, embedSpend),
       ),
   }).catch((error: unknown) => {
     console.error('[learn feed top-up] video cards', error instanceof Error ? error.message : error);
