@@ -29,7 +29,8 @@ import { noteHref } from '@/lib/vault/paths';
  * The vector for a text is kept in obsidian.text_embeddings by the sha256 of
  * the text and the model, so the same story or card seen twice is embedded
  * once. The lookup is obsidian.nearest_notes (supabase/migrations-vault/0022),
- * which leaves out soft-deleted notes.
+ * which leaves out soft-deleted notes, notes with under 20 characters written
+ * in them (0023), and templates and CLAUDE.md or AGENTS.md files (0024).
  *
  * Never throws. No key, a failed call or a failed read returns no notes, and
  * the page shows none.

@@ -18,7 +18,9 @@ import type { RelatedNoteLink } from '@/lib/vault/notes/related';
  * related note, and a placeholder would promise one (law 2).
  *
  * The lookups are lib/news/quick/related-notes.ts and
- * lib/learn/feed/related-notes.ts, both over lib/vault/notes/related.ts.
+ * lib/learn/feed/related-notes.ts, and on the role and goal pages the text
+ * from lib/jobs/related-notes.ts and lib/goals/related-notes.ts (plan #1114),
+ * all over lib/vault/notes/related.ts.
  * The similarity is not shown: the threshold already decided these are close,
  * and a percentage would claim more than it measures (law 3).
  */
