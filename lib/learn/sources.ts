@@ -95,6 +95,15 @@ export const learnSources: ModuleSources = {
       title: 'source_hint',
     },
     {
+      table: 'learn.card_notes',
+      module: 'Learn',
+      holds: 'Notes they wrote on Learn cards and on ideas, in their own words.',
+      weight: 'intent',
+      search: ['body'],
+      title: 'body',
+      note: 'concept_id is the idea a note is about, whose page is /learn/c/<concept_id>; card_id is the Learn now card it was written on, null when written on the idea page or once the card is gone.',
+    },
+    {
       table: 'learn.feed_cards',
       module: 'Learn',
       holds: 'Cards the daily feed drew for them, with whether they read, saved or passed each.',

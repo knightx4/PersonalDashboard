@@ -105,6 +105,7 @@ describe('RLS coverage', () => {
       'area_check_articles',
       'area_domains',
       'area_fields',
+      'card_notes',
       'catalogue_course_items',
       'catalogue_items',
       'catalogue_judgements',
@@ -1126,6 +1127,110 @@ describe('what you did with a row on Learn next', () => {
     const left = await admin<{ id: string }[]>`
       select id from next_outcomes where concept_id = ${concept}`;
     expect(left).toHaveLength(0);
+  });
+});
+
+describe('notes on cards and ideas', () => {
+  // 0061_card_notes.sql (plan #1058). Written by their owner on a Learn now
+  // card or an idea's page, kept against the card and its idea, and kept on
+  // the idea when the card goes.
+  let cardA = '';
+  let conceptA = '';
+  let noteA = '';
+
+  beforeAll(async () => {
+    const [provider] = await admin<{ id: string }[]>`
+      insert into catalogue_providers (slug, name, home_url, licence, ingest_note)
+      values ('wikipedia', 'Wikipedia', 'https://en.wikipedia.org', 'CC BY-SA',
+              'REST API, no key, section text')
+      on conflict (slug) do update set name = excluded.name
+      returning id`;
+    const [item] = await admin<{ id: string }[]>`
+      insert into catalogue_items (provider_id, external_id, title, kind, canonical_url)
+      values (${provider.id}, 'Deflation', 'Deflation', 'article', 'https://en.wikipedia.org/wiki/Deflation')
+      returning id`;
+    const [segment] = await admin<{ id: string }[]>`
+      insert into catalogue_segments (item_id, ordinal, section_anchor, heading, text)
+      values (${item.id}, 1, 'Causes', 'Causes', 'Prices fall when...')
+      returning id`;
+    const [subject] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Notes subject') returning id`;
+    const [concept] = await admin<{ id: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis)
+      values (${userA}, ${subject.id}, 'Deflation', 'Falling prices can deepen a slump.',
+              'Written by hand for this test.')
+      returning id`;
+    conceptA = concept.id;
+    const [card] = await admin<{ id: string }[]>`
+      insert into feed_cards (user_id, reason, theme_name, item_id, segment_id, concept_id)
+      values (${userA}, 'interest', 'Prices', ${item.id}, ${segment.id}, ${conceptA})
+      returning id`;
+    cardA = card.id;
+    const [note] = await asUser(
+      userA,
+      (tx) => tx<{ id: string }[]>`
+        insert into card_notes (user_id, card_id, concept_id, body)
+        values (${userA}, ${cardA}, ${conceptA}, 'Like 1930s America?')
+        returning id`,
+    );
+    noteA = note.id;
+  });
+
+  it('shows the owner their notes and another user none of them', async () => {
+    const own = await asUser(userA, (tx) => tx`select id from card_notes`);
+    const other = await asUser(userB, (tx) => tx`select id from card_notes`);
+    expect(own.map((r) => r.id)).toEqual([noteA]);
+    expect(other).toHaveLength(0);
+  });
+
+  it('does not let a user file a note under another account', async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into card_notes (user_id, concept_id, body)
+                   values (${userA}, ${conceptA}, 'Planted')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("does not let a user pin their own note to another account's card or idea", async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into card_notes (user_id, card_id, body)
+                   values (${userB}, ${cardA}, 'On your card')`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into card_notes (user_id, concept_id, body)
+                   values (${userB}, ${conceptA}, 'On your idea')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('refuses an empty note', async () => {
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into card_notes (user_id, concept_id, body)
+                   values (${userA}, ${conceptA}, '   ')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('lets only the owner delete a note', async () => {
+    await asUser(userB, (tx) => tx`delete from card_notes`);
+    const left = await admin`select id from card_notes where id = ${noteA}`;
+    expect(left).toHaveLength(1);
+  });
+
+  it('keeps the note on its idea when the card goes', async () => {
+    await admin`delete from feed_cards where id = ${cardA}`;
+    const [row] = await admin<{ card_id: string | null; concept_id: string | null; body: string }[]>`
+      select card_id, concept_id, body from card_notes where id = ${noteA}`;
+    expect(row).toEqual({ card_id: null, concept_id: conceptA, body: 'Like 1930s America?' });
   });
 });
 

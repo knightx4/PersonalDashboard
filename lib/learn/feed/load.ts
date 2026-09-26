@@ -14,6 +14,7 @@ import {
   type FeedVideo,
 } from './card';
 import { youtubeVideoId } from '@/lib/learn/youtube/format';
+import { loadNotesForCards } from '@/lib/learn/notes/store';
 import { ARTICLE_GAP, POOL_FACTOR, spreadDeck, type Spreadable } from './spread';
 
 /**
@@ -118,7 +119,32 @@ export async function loadFeedPage(
   const recent = await recentInDeck(supabase, exclude.slice(-ARTICLE_GAP));
   const dealt = spreadDeck(dealable, recent, limit).map((entry) => entry.card);
   const conceptOf = new Map(rows.map((row) => [row.id, row.concept_id ?? null]));
-  return withVideos(supabase, dealt, conceptOf);
+  return withNotes(supabase, await withVideos(supabase, dealt, conceptOf), conceptOf);
+}
+
+/**
+ * Each card with the notes written on it and on its idea (plan #1058). A
+ * failed read leaves the cards without them rather than failing the page; the
+ * notes are still kept, and show on the next load.
+ */
+async function withNotes(
+  supabase: LearnSupabaseClient,
+  cards: FeedCard[],
+  conceptOf: Map<string, string | null>,
+): Promise<FeedCard[]> {
+  try {
+    const byCard = await loadNotesForCards(
+      supabase,
+      cards.map((card) => ({ id: card.id, conceptId: conceptOf.get(card.id) ?? null })),
+    );
+    return cards.map((card) => {
+      const notes = byCard.get(card.id);
+      return notes ? { ...card, notes } : card;
+    });
+  } catch (error) {
+    console.error('[learn now] notes for cards', error instanceof Error ? error.message : error);
+    return cards;
+  }
 }
 
 /**

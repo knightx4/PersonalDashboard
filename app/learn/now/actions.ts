@@ -24,6 +24,8 @@ import {
   setCardDifficulty,
 } from '@/lib/learn/feed/load';
 import { settleIdeaFromSwipe } from '@/lib/learn/feed/ideas-store';
+import { noteBody, type NoteWrite } from '@/lib/learn/notes/notes';
+import { deleteNote, insertCardNote } from '@/lib/learn/notes/store';
 import { startTrackFromCard } from '@/lib/learn/feed/test-me';
 import { makeTrackFromCard, startTrackFromOffer } from '@/lib/learn/lessons/new-track';
 import { recordRestingPress } from '@/lib/learn/lessons/resting-load';
@@ -78,6 +80,43 @@ export async function openCardSource(id: string): Promise<void> {
 }
 
 export type CardActionResult = { error?: string };
+
+/**
+ * A note written on a card (plan #1058), kept against the card and the idea
+ * it teaches. The card is read back rather than trusted from the page, so the
+ * idea comes from the card's own row and RLS has said the card is yours.
+ * Writing a note moves nothing in the deck.
+ */
+// latency: pending
+export async function addCardNote(id: string, body: string): Promise<NoteWrite> {
+  const user = await requireUser();
+  const card = CardId.safeParse(id);
+  if (!card.success) return { error: 'Could not tell which card that was.' };
+  const parsed = noteBody(body);
+  if ('error' in parsed) return { error: parsed.error };
+  const supabase = await createLearnClient();
+  try {
+    const note = await insertCardNote(supabase, user.id, card.data, parsed.body);
+    return note ? { note } : { error: 'That card is no longer there.' };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'That note was not kept.' };
+  }
+}
+
+/** Deletes one of your notes, from a card or from an idea's page. */
+// latency: pending
+export async function deleteCardNote(id: string): Promise<CardActionResult> {
+  await requireUser();
+  const note = CardId.safeParse(id);
+  if (!note.success) return { error: 'Could not tell which note that was.' };
+  const supabase = await createLearnClient();
+  try {
+    await deleteNote(supabase, note.data);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'That note was not deleted.' };
+  }
+  return {};
+}
 
 // latency: optimistic
 export async function dismissCard(id: string): Promise<CardActionResult> {
