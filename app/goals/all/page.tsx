@@ -1,5 +1,6 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { requireUser } from '@/lib/auth/server';
+import { loadAccountSettings } from '@/lib/core/account/settings';
 import { isOwner } from '@/lib/dev/owner';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { areaRunView, type AreaRunView } from '@/lib/goals/shaping';
@@ -7,6 +8,7 @@ import { loadAreaRuns } from '@/lib/goals/shaping-store';
 import { loadAreas, loadGoals } from '@/lib/goals/store';
 import { loadGoalProgress } from '@/lib/goals/steps-store';
 import { groupGoals } from '@/lib/goals/tree';
+import { todayIn } from '@/lib/todo/tasks/model';
 import { GoalsView } from '../goals-view';
 
 export const metadata = { title: 'All goals' };
@@ -30,11 +32,11 @@ function areaRunViews(runs: Awaited<ReturnType<typeof loadAreaRuns>>): Record<st
 
 export default async function AllGoalsPage() {
   const user = await requireUser();
-  const client = await createGoalsClient();
+  const [client, account] = await Promise.all([createGoalsClient(), loadAccountSettings(user.id)]);
   const [areas, goals, progress, runs, canRun] = await Promise.all([
     loadAreas(client),
     loadGoals(client),
-    loadGoalProgress(client),
+    loadGoalProgress(client, todayIn(account.timezone)),
     loadAreaRuns(client),
     isOwner({ user }),
   ]);

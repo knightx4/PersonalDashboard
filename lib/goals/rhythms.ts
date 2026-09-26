@@ -80,6 +80,8 @@ export function liveRhythms(goals: Goal[], byGoal: Map<string, StepNode[]>): Liv
     const walk = (nodes: StepNode[]) => {
       for (const node of nodes) {
         if (node.status !== 'open') continue;
+        // A practice for later counts no periods, and misses none, until it starts.
+        if (node.waitsUntil) continue;
         if (node.kind === 'rhythm' && node.rhythmCount && node.rhythmPeriod) {
           out.push({
             id: node.id,

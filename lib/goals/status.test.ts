@@ -40,6 +40,14 @@ describe('stepState', () => {
     expect(stepState(node('e', { kind: 'rhythm' })).word).toBe('On you');
   });
 
+  it('reads a step for later as waiting, with the day it starts', () => {
+    const later = stepState(node('a', { startsOn: '2026-11-01', waitsUntil: '2026-11-01' }));
+    expect(later).toMatchObject({ health: 'later', move: 'waiting', word: 'Waiting' });
+    expect(later.title).toContain('Starts 1 Nov');
+    // Once the day has come the loader leaves the mark off, and it is yours again.
+    expect(stepState(node('b', { startsOn: '2026-09-01' })).word).toBe('On you');
+  });
+
   it('puts proposals, questions and unread results on you', () => {
     expect(stepHealth(node('a', { status: 'proposed', kind: 'claude' }))).toBe('proposed');
     expect(stepHealth(node('b', { kind: 'decision' }))).toBe('unanswered');

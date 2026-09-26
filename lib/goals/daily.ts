@@ -255,6 +255,8 @@ export function dailyView(
           );
         }
         if (node.status !== 'open' && !isStaleStepBlock(node)) continue;
+        // Not yet: it and everything under it wait for its start date.
+        if (node.waitsUntil) continue;
 
         if (node.kind === 'decision') {
           if (node.resolution === null && !node.dismissedAt) {

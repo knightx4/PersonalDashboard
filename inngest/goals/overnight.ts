@@ -18,7 +18,7 @@ import { runOutcome, type RunJob } from '@/lib/goals/runs';
 import type { GoalRunStatus } from '@/lib/goals/shaping';
 import { startGoalRun } from '@/lib/goals/shaping-store';
 import type { StepNode } from '@/lib/goals/steps';
-import { loadLiveTree } from '@/lib/goals/steps-store';
+import { accountToday, loadLiveTree } from '@/lib/goals/steps-store';
 import {
   loadOvernightRun,
   overnightVerdict,
@@ -257,9 +257,15 @@ function indexTree(byGoal: Map<string, StepNode[]>) {
 }
 
 /** The live goals, the ready Claude steps, every run on the account, and each goal's last progress. */
-export async function loadGoalsNight(client: GoalsSupabaseClient, userId: string): Promise<GoalsNight> {
+export async function loadGoalsNight(
+  client: GoalsSupabaseClient,
+  userId: string,
+  now: number = Date.now(),
+): Promise<GoalsNight> {
+  // A step whose start date has not come is not the night's to take.
+  const today = await accountToday(client, userId, now);
   const [{ goals, byGoal }, runs, activity] = await Promise.all([
-    loadLiveTree(client, { userId }),
+    loadLiveTree(client, { userId, today }),
     client
       .from('runs')
       .select('job, item_id, status, created_at, last_seen_at')
@@ -345,7 +351,7 @@ export async function runGoalsNight(input: {
   return goalsNightTick({
     now,
     loadRun: () => loadOvernightRun(supabase, userId),
-    loadNight: () => loadGoalsNight(goals(), userId),
+    loadNight: () => loadGoalsNight(goals(), userId, now),
     fire: async (step) => {
       const sent = await sendGoalStep({
         client: goals(),
