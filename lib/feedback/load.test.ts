@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   FEEDBACK_COLUMNS,
   feedbackRowFrom,
+  isNotesWork,
   parseFeedbackKind,
   queueOfKind,
   type FeedbackQueue,
@@ -78,5 +79,13 @@ describe('the kind filter', () => {
     expect(likes.closed.map((r) => r.id)).toEqual(['l2']);
     expect(likes.blocked).toEqual([]);
     expect(queueOfKind(queue, null)).toBe(queue);
+  });
+});
+
+describe('isNotesWork', () => {
+  it('leaves likes out of what a notes run works', () => {
+    expect(isNotesWork({ kind: 'bug' })).toBe(true);
+    expect(isNotesWork({ kind: 'feature' })).toBe(true);
+    expect(isNotesWork({ kind: 'like' })).toBe(false);
   });
 });

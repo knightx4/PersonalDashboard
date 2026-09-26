@@ -7,7 +7,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { TERMINAL_STATUSES } from '@/lib/jobs/pipeline';
 import { countOpenTasks } from '@/lib/todo/tasks/load';
-import { OUTSTANDING_STATUSES } from '@/lib/feedback/load';
+import { NOTES_WORK_KINDS, OUTSTANDING_STATUSES } from '@/lib/feedback/load';
 import type { ModuleId } from '@/lib/modules';
 
 /**
@@ -92,12 +92,14 @@ export async function loadModuleCounts(userId: string): Promise<ModuleCounts> {
     ),
     // The dev workspace's own number: what is still waiting to be worked in
     // the notes queue, which is the only thing there anyone is behind on.
+    // Likes are not waiting to be worked, so they are not counted.
     safe(
       supabase
         .from('feedback_items')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
         .in('status', [...OUTSTANDING_STATUSES])
+        .in('kind', [...NOTES_WORK_KINDS])
         .then((r) => r.count),
       null,
     ),

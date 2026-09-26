@@ -12,6 +12,7 @@ import { loadOvernightRun } from '@/lib/plan/overnight';
 import { runnerCard } from '@/lib/plan/runner-card';
 import { planRoutine } from '@/lib/feedback/routine';
 import { loadNotesLastRun } from '@/lib/feedback/last-worked';
+import { NOTES_WORK_KINDS } from '@/lib/feedback/load';
 import { CHECK_BACK_COLUMNS, checkBackFrom } from '@/lib/plan/check-backs';
 import { CheckBacksPanel } from './check-backs-panel';
 import { ConversationsView } from './conversations-view';
@@ -103,7 +104,9 @@ export default async function DevRaisedPage() {
       .from('feedback_items')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id)
-      .in('status', ['open', 'in_progress', 'blocked', 'planned']),
+      .in('status', ['open', 'in_progress', 'blocked', 'planned'])
+      // Beside the routine button, so only what a notes run would work.
+      .in('kind', [...NOTES_WORK_KINDS]),
     loadNotesLastRun(supabase, user.id),
     // What Dash has said it will come back to, soonest first.
     supabase
