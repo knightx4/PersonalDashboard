@@ -111,8 +111,10 @@ describe('groupSpecs', () => {
     expect(todo?.specs).toEqual([]);
   });
 
-  it('leaves out the app-wide group when nothing is filed under it', () => {
-    expect(groupSpecs([spec('a', 'learn')]).some(moduleOf(null))).toBe(false);
+  it('keeps the app-wide group with nothing filed under it, because the app vision is written there', () => {
+    const app = groupSpecs([spec('a', 'learn')]).find(moduleOf(null));
+    expect(app).toBeDefined();
+    expect(app?.specs).toEqual([]);
   });
 
   it('sums the comments on a group, which is what the folded row shows', () => {

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { loadVisionBodies } from '@/lib/specs/vision';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
 import { isModuleId, type ModuleId } from '@/lib/modules';
@@ -1205,7 +1206,10 @@ async function startReshape(
     `fog you cleared.\n\n${PLAIN_ENGLISH_RULE}\n\n${FOG_RULE}\n\n${QUESTION_RULE}\n\n${DISMISSAL_RULE}\n\nThe brief is below; it is the plan as the app holds it right ` +
     'now, and the plan is the source of truth. "Decided so far" is every answer settled ' +
     'beneath this feature.\n\n' +
-    planBrief(sections, node, { thread: true }) +
+    planBrief(sections, node, {
+      thread: true,
+      visions: await loadVisionBodies(supabase, userId),
+    }) +
     (dismissed ? `\n${dismissed}` : '');
 
   return startRoutineRun({
