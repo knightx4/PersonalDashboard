@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { FEEDBACK_COLUMNS, feedbackRowFrom } from '@/lib/feedback/load';
+import {
+  FEEDBACK_COLUMNS,
+  feedbackRowFrom,
+  parseFeedbackKind,
+  queueOfKind,
+  type FeedbackQueue,
+} from '@/lib/feedback/load';
 
 /** A row as PostgREST hands it back, before the app shape. */
 function row(over: Record<string, unknown> = {}): Record<string, unknown> {
@@ -45,5 +51,32 @@ describe('FEEDBACK_COLUMNS', () => {
   it('asks for the thread as well as the note', () => {
     expect(FEEDBACK_COLUMNS).toContain('thread:dev_comments(');
     expect(FEEDBACK_COLUMNS).toContain('resolution_note');
+  });
+});
+
+describe('the kind filter', () => {
+  it('reads a kind off the URL and ignores anything else', () => {
+    expect(parseFeedbackKind('like')).toBe('like');
+    expect(parseFeedbackKind(['bug', 'like'])).toBe('bug');
+    expect(parseFeedbackKind('idea')).toBeNull();
+    expect(parseFeedbackKind(undefined)).toBeNull();
+  });
+
+  it('narrows every list in the queue to one kind', () => {
+    const like = feedbackRowFrom(row({ id: 'l1', kind: 'like' }));
+    const bug = feedbackRowFrom(row({ id: 'b1', kind: 'bug', status: 'blocked' }));
+    const done = feedbackRowFrom(row({ id: 'l2', kind: 'like', status: 'done' }));
+    const queue: FeedbackQueue = {
+      rows: [like, bug, done],
+      outstanding: [bug, like],
+      closed: [done],
+      blocked: [bug],
+    };
+
+    const likes = queueOfKind(queue, 'like');
+    expect(likes.outstanding.map((r) => r.id)).toEqual(['l1']);
+    expect(likes.closed.map((r) => r.id)).toEqual(['l2']);
+    expect(likes.blocked).toEqual([]);
+    expect(queueOfKind(queue, null)).toBe(queue);
   });
 });

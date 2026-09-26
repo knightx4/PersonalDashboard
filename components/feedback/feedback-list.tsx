@@ -19,8 +19,14 @@ import { cn } from '@/lib/cn';
 import { feedbackHealth, type FeedbackHealth } from '@/lib/dev/health';
 import { FEEDBACK_HEALTH_WORD } from '@/lib/dev/words';
 import { FEEDBACK_HEALTH_GLYPHS } from '@/lib/status-glyphs';
-import { isOutstanding, type FeedbackRow } from '@/lib/feedback/load';
+import {
+  FEEDBACK_KINDS,
+  FEEDBACK_KIND_LABEL,
+  isOutstanding,
+  type FeedbackRow,
+} from '@/lib/feedback/load';
 import { surfaceOf } from '@/lib/feedback/surfaces';
+import { KIND_TONE } from '@/components/feedback/kind-tone';
 
 // Defined in lib/feedback so both workspaces' pages and this component agree
 // on one shape.
@@ -105,12 +111,10 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
         <span
           className={cn(
             'rounded-full px-2 py-0.5 text-micro font-semibold uppercase tracking-wide',
-            row.kind === 'bug'
-              ? 'bg-danger-tint text-danger'
-              : 'bg-accent-tint text-accent',
+            KIND_TONE[row.kind],
           )}
         >
-          {row.kind}
+          {FEEDBACK_KIND_LABEL[row.kind]}
         </span>
         <StateLabel
           glyph={FEEDBACK_HEALTH_GLYPHS[health]}
@@ -164,10 +168,13 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
               name="kind"
               defaultValue={row.kind}
               className="w-32"
-              aria-label="Bug or feature"
+              aria-label="Bug, feature or like"
             >
-              <option value="bug">Bug</option>
-              <option value="feature">Feature</option>
+              {FEEDBACK_KINDS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {FEEDBACK_KIND_LABEL[kind]}
+                </option>
+              ))}
             </Select>
             <Button type="submit" size="sm" pending={editPending}>
               {editPending ? 'Saving…' : 'Save'}
