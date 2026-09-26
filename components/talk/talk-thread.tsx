@@ -68,6 +68,7 @@ export function TalkThread({
   label,
   placeholder,
   waiting = 'Dash is replying…',
+  hint,
 }: {
   /** Unique on the page: the textarea's id is built from it. */
   id: string;
@@ -78,6 +79,8 @@ export function TalkThread({
   placeholder?: string;
   /** The line shown while the reply is being written. */
   waiting?: string;
+  /** Beside the button that opens the box: the $ hint for what a reply costs. */
+  hint?: React.ReactNode;
 }) {
   const [turns, setTurns] = useState<TalkTurn[]>([...initial]);
   const [writing, setWriting] = useState(false);
@@ -142,7 +145,10 @@ export function TalkThread({
       )}
 
       {!writing ? (
-        <AddTrigger label={label} onClick={() => setWriting(true)} disabled={sending} />
+        <div className="flex items-center gap-1">
+          <AddTrigger label={label} onClick={() => setWriting(true)} disabled={sending} />
+          {hint}
+        </div>
       ) : (
         <form
           ref={form}
