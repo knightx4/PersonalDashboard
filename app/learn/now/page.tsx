@@ -9,11 +9,8 @@ import { topUpFeedAfterResponse } from '@/inngest/learn/feed-top-up';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { countReadyCards, loadFeedPage } from '@/lib/learn/feed/load';
-import { chooseTrackOffer } from '@/lib/learn/flow/offer';
-import { chooseRestingOffer } from '@/lib/learn/lessons/resting-load';
 import { READY_LOW } from '@/lib/learn/feed/top-up';
 import { loadReadNow } from '@/lib/learn/tracks/load';
-import { createVaultClient } from '@/lib/vault/auth/server';
 import { openReading } from '../r/[id]/actions';
 import { LearnNowFeed } from './feed';
 import { FinishButton } from './finish-button';
@@ -40,36 +37,17 @@ export const maxDuration = 300;
  * Then the cards the app wrote, one at a time (`./feed.tsx`), with the next
  * few already loaded behind the one on screen.
  *
- * One card a visit may be a track offer: the strongest theme in your notes
- * with no track, chosen as Practice Flow chooses it (plan #968). It is read
- * afresh on each visit and nothing records that it was shown, so the one in
- * the deck is always the one a press in either place left next.
- *
- * A track you have left alone takes that place first (plan #1045): two weeks
- * after it goes dormant it is offered back, and a visit that offers one
- * offers no theme.
+ * Track offers, a new theme or a resting track, are on Tracks rather than
+ * here (note 8a1789df): the deck is for reading.
  */
 export default async function LearnNowPage() {
   const user = await requireUser();
   const supabase = await createLearnClient();
-  const [readings, cards, ready, resting, themeOffer] = await Promise.all([
+  const [readings, cards, ready] = await Promise.all([
     loadReadNow(supabase),
     loadFeedPage(supabase, []),
     countReadyCards(supabase),
-    // An offer that could not be worked out is an offer not made.
-    chooseRestingOffer(supabase, user.id).catch((error: unknown) => {
-      console.error('[learn now] resting track', error instanceof Error ? error.message : error);
-      return null;
-    }),
-    createVaultClient()
-      .then((vault) => chooseTrackOffer(supabase, vault))
-      .catch((error: unknown) => {
-        console.error('[learn now] track offer', error instanceof Error ? error.message : error);
-        return null;
-      }),
   ]);
-  // One offer a visit, and a resting track goes first.
-  const offer = resting ? null : themeOffer;
   // Opening the page counts as a response: when seven or fewer are ready,
   // more are written while you read the first.
   after(() => topUpFeedAfterResponse(user.id));
@@ -153,7 +131,7 @@ export default async function LearnNowPage() {
         </Card>
       )}
 
-      <LearnNowFeed first={cards} ready={ready} low={READY_LOW} offer={offer} resting={resting} />
+      <LearnNowFeed first={cards} ready={ready} low={READY_LOW} />
     </div>
   );
 }
