@@ -10,8 +10,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { catchUp } from '@/lib/goals/catch-up';
 import type { DailyGoal, WaitingItem } from '@/lib/goals/daily';
+import type { DoneSince } from '@/lib/goals/done-since';
 
 vi.mock('@/app/goals/suggestion-actions', () => ({ reactToSuggestionAction: vi.fn() }));
+vi.mock('@/app/goals/runs/[runId]/actions', () => ({ undoRunChangeAction: vi.fn() }));
 
 const { DailyView } = await import('@/app/goals/daily-view');
 
@@ -54,28 +56,30 @@ const base = {
   dash: { ready: [], held: [] },
 };
 
+const done: DoneSince = {
+  since: '2026-09-18T08:00:00Z',
+  items: [
+    {
+      kind: 'result',
+      id: 's9',
+      title: 'Drafted the payoff order',
+      goalId: 'g1',
+      goalTitle: 'Pay off the debts',
+      href: '/goals/g1#step-s9',
+      unread: true,
+      runId: 'r1',
+      undo: { runId: 'r1', key: '41', state: 'undoable', reason: null },
+      at: '2026-09-20T06:10:00Z',
+    },
+  ],
+  more: 0,
+};
+
 function render(withCatchUp: boolean): string {
-  const away = withCatchUp
-    ? catchUp(
-        '2026-09-18T08:00:00Z',
-        [
-          {
-            id: 'r1',
-            job: 'daily',
-            status: 'done',
-            createdAt: '2026-09-20T06:00:00Z',
-            endedAt: '2026-09-20T06:10:00Z',
-            summary: 'Drafted the payoff order',
-            error: null,
-            lastSeenAt: null,
-            nowOn: null,
-            item: null,
-          },
-        ],
-        base,
-      )
-    : null;
-  return renderToStaticMarkup(<DailyView view={{ ...base, catchUp: away }} timeZone="UTC" />);
+  const away = withCatchUp ? catchUp('2026-09-18T08:00:00Z', base) : null;
+  return renderToStaticMarkup(
+    <DailyView view={{ ...base, catchUp: away, done: withCatchUp ? done : null }} timeZone="UTC" />,
+  );
 }
 
 describe('the Goals home after time away', () => {
@@ -91,7 +95,7 @@ describe('the Goals home after time away', () => {
     const positions = order.map((text) => html.indexOf(text));
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
-    expect(html).toContain('href="/goals/runs/r1"');
+    expect(html).toContain('href="/goals/g1#step-s9"');
     // Only the first next step is in the catch-up; the second waits in the goal's tree.
     const fold = html.indexOf('Everything else');
     expect(html.indexOf('List every balance')).toBeLessThan(fold);
@@ -106,5 +110,27 @@ describe('the Goals home after time away', () => {
     expect(html.indexOf('Your move')).toBeLessThan(html.indexOf('List every balance'));
     expect(html).toContain('Call the card company');
     expect(html.indexOf('List every balance')).toBeLessThan(html.indexOf('Dash is on it'));
+  });
+
+  it('lists what Dash did with Read and Undo, and shows an undone line as undone', () => {
+    const html = renderToStaticMarkup(<DailyView view={{ ...base, done }} timeZone="UTC" />);
+    expect(html).toContain('Since your last visit');
+    expect(html).toMatch(/href="\/goals\/g1#step-s9"[^>]*>Read</);
+    expect(html).toContain('>Undo<');
+
+    const undone: DoneSince = {
+      ...done,
+      items: done.items.map((item) =>
+        item.kind === 'result' && item.undo
+          ? { ...item, unread: false, undo: { ...item.undo, state: 'undone' } }
+          : item,
+      ),
+    };
+    const after = renderToStaticMarkup(
+      <DailyView view={{ ...base, done: undone }} timeZone="UTC" />,
+    );
+    expect(after).toContain('Undone');
+    expect(after).toContain('line-through');
+    expect(after).not.toContain('>Undo<');
   });
 });
