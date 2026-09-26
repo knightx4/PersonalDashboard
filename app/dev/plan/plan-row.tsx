@@ -41,7 +41,7 @@ import {
   moveFor as moveWordsFor,
   type HealthFacts,
 } from '@/lib/plan/health-words';
-import { reshapeOrigin } from '@/lib/plan/origin';
+import { reshapeOrigin, sessionOrigin } from '@/lib/plan/origin';
 import { quietSendAsk } from '@/lib/plan/liveness';
 import { isResolvingAnswers, type LastRun } from '@/lib/plan/run-end';
 import { type RunRaise } from '@/lib/plan/work';
@@ -414,6 +414,32 @@ function ownMoveWord(node: PlanNode, context?: MoveContext): PlanMove {
  * the question. Recomputed as the clock ticks, so the state clears on its own
  * when the run ages out rather than on the next navigation.
  */
+/**
+ * The row's menu, with Drop put first on a step a session added.
+ *
+ * Approval stops at the feature (#1095), so a session can write a step under
+ * one you approved and it goes in ready to build without asking you. The
+ * least that owes you is a way to take it out again from the row: one press,
+ * no step to open, no reason to type. It is the same write the status menu's
+ * Dropped makes, and the step can be put back from there. Only while the step
+ * is open; a closed one has had its answer.
+ */
+export function withSessionDrop(
+  node: Pick<PlanNode, 'id' | 'status' | 'comment'>,
+  menu: ActionMenuItem[],
+): ActionMenuItem[] {
+  if (isClosed(node.status) || !sessionOrigin(node.comment)) return menu;
+  return [
+    {
+      id: 'drop-session-step',
+      label: 'Drop',
+      formAction: (formData: FormData) => setPlanItemStatus({}, formData),
+      formFields: { id: node.id, status: 'dropped' },
+    },
+    ...menu,
+  ];
+}
+
 function useResolving(lastRuns: Readonly<Record<string, LastRun>>, now: number): MoveContext {
   return useMemo(
     () => ({
@@ -612,6 +638,11 @@ export function PlanRow({
   // The answer that produced this row, on the steps a re-shape wrote and on
   // nothing else.
   const origin = reshapeOrigin(node.comment);
+  // And the session that wrote it ready to build, while it is still open. Once
+  // the step is closed the question it raises -- keep this or not -- has been
+  // answered one way or the other, and the stamp stays in the comment as
+  // history.
+  const addedBy = closed ? null : sessionOrigin(node.comment);
 
   // A proposal's first choice is to approve it, with the proposed steps
   // beneath it; the plain statuses follow, and "proposed" is not offered on a
@@ -680,7 +711,7 @@ export function PlanRow({
   const assignLabel = mine ? `Not mine${beneath}` : `Mine${beneath}`;
   const assignValue = mine ? '' : 'me';
 
-  const menu: ActionMenuItem[] = [
+  const menu: ActionMenuItem[] = withSessionDrop(node, [
     {
       // First, because keeping a step back is the move this page exists to make
       // and it should not need the step opened first.
@@ -749,7 +780,7 @@ export function PlanRow({
       formAction: (formData: FormData) => deletePlanItem({}, formData),
       formFields: { id: node.id },
     },
-  ];
+  ]);
 
   const inset = rowInset(trail);
   const actionError =
@@ -776,6 +807,7 @@ export function PlanRow({
       menu={menu}
       actions={PLAN_TREE_ACTIONS}
       origin={origin}
+      addedBy={addedBy}
       titles={refTitles}
       dependencies={{ catalog, groupOf: (entry) => scopeLabel(entry.module) }}
       marks={
