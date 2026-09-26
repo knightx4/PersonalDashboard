@@ -320,6 +320,15 @@ Each thing they bought, from their order emails.
 - Scoped to the person through order_id → orders.user_id
 - Prices and dates are on the row and its order; sum them for a spending goal rather than copying them.
 
+### `core.files` (Files)
+
+Longer pieces written for them and kept as pages: research notes, breakdowns of their data, plans, drafts.
+
+- Search: `title`, `summary`, `body`
+- Name a row by `title`; link it by `id`
+- Opens at `/goals/files/<id>`
+- Skip rows with archived_at set. made_by 'claude' is a run's work, 'you' is theirs. A goal or step links one through goals.links with kind 'file'. Read the file before redoing its work, and revise it rather than writing a second one on the same question.
+
 ### `core.conversations` (Learn)
 
 Conversations they had with Dash about a Learn card or a newsletter story, one per thing read.
@@ -329,6 +338,14 @@ Conversations they had with Dash about a Learn card or a newsletter story, one p
 - subject_kind says what it is about: 'feed_card' with subject_ref the learn.feed_cards id, or 'news_story'. The words are in core.conversation_turns, joined by conversation_id.
 
 ## Mentions (leads only)
+
+### `learn.phrase_explanations` (Learn)
+
+Phrases they selected on Learn cards to have explained, with the explanation.
+
+- Search: `phrase`, `explanation`
+- Name a row by `phrase`; link it by `id`
+- card_id is the Learn now card the phrase was on; made_card_id is set when they asked for a card of its own.
 
 ### `learn.feed_cards` (Learn)
 

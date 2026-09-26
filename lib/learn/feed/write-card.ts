@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { describeDepth, type Depth } from './depth';
+import { keepMentions, MAX_MENTIONS, type CardMention } from './mentions';
 
 /**
  * Writing the Learn now cards for one fetched section (LEARN-NOW-SPEC, "How
@@ -22,6 +23,8 @@ import { describeDepth, type Depth } from './depth';
  *   summary   why the claim holds, from the section
  *   example   the idea applied to a real case or a worked number
  *   question  one question that makes you use the idea, and its answer
+ *   mentions  up to three other ideas the card leans on, in the card's own
+ *             words, underlined on the card (plan #1056)
  *
  * The call is given the ideas the person has already met nearest the section,
  * and writes no card for any of them. A section with no idea left, or one that
@@ -76,12 +79,15 @@ export type CardToWrite = {
   id: string;
   /** The catalogue segment, for finding the ideas already held near it. */
   segmentId?: string | null;
-  reason: 'interest' | 'gap' | 'goal';
+  reason: 'interest' | 'gap' | 'goal' | 'asked';
   /** The theme it was picked for; set for interest. */
   themeName: string | null;
   /** The goal it was picked for; set for a goal card (plan #900). */
   aimName: string | null;
-  /** Null only for a goal card whose goal is not placed in a field. */
+  /** The phrase it was asked for, and the card it was on; set for asked (plan #1057). */
+  askedPhrase?: string | null;
+  askedOn?: string | null;
+  /** Null for a goal card whose goal is not placed in a field, and for an asked card. */
   field: { name: string; scope: string } | null;
   /**
    * For a gap: whether the person writes about the field (untested) or has
@@ -115,6 +121,11 @@ export type IdeaCard = {
   /** Both set, or both null: a question with no answer to check against is left off. */
   question: string | null;
   answer: string | null;
+  /**
+   * Other ideas the card leans on, each in words the card itself uses
+   * (plan #1056). Absent on a lesson, whose writer does not name them.
+   */
+  mentions?: CardMention[];
 };
 
 export type CardReport =
@@ -146,8 +157,16 @@ function midSentence(name: string): string {
 }
 
 /** The line under the card's title saying why it is in the feed. */
-export function whyLine(card: Pick<CardToWrite, 'reason' | 'themeName' | 'aimName' | 'field' | 'gap'>): string {
+export function whyLine(
+  card: Pick<CardToWrite, 'reason' | 'themeName' | 'aimName' | 'field' | 'gap' | 'askedPhrase' | 'askedOn'>,
+): string {
   if (card.reason === 'goal' && card.aimName) return `For your goal: ${card.aimName.trim()}.`;
+  if (card.reason === 'asked' && card.askedPhrase) {
+    const on = card.askedOn?.trim();
+    return on
+      ? `You asked for a card on “${card.askedPhrase.trim()}” from ${on}.`
+      : `You asked for a card on “${card.askedPhrase.trim()}”.`;
+  }
   const field = card.field?.name ?? 'a field';
   if (card.reason === 'interest' && card.themeName) {
     return `You write about ${midSentence(card.themeName)} (${field}).`;
@@ -183,6 +202,8 @@ example: Two to four sentences applying the idea to one specific situation: a re
 
 question and answer: One question that makes the person use this idea on a situation, predict an outcome, or explain why something happens. Never ask them to recall a definition, a figure or a date. The answer is two or three sentences, and says why.
 
+mentions: The two or three other ideas this card leans on that a reader might not know, such as a technique, a named effect or a term of art the card uses without explaining. For each, the phrase copied exactly as it appears in the claim, context, evidence, why or example, and one plain line on why it matters to this card. Pick only words already in the card, never a word you would have to add, and never the card's own name. At most ${MAX_MENTIONS}; give an empty list when the card leans on nothing a reader would stop at.
+
 Style for every part: plain sentences. No slogans, no rhetorical questions outside the question field, no "not X, but Y" contrasts, no dashes used for rhythm. Never refer to "the section", "the article", "the text" or "the author". Do not address the reader as "you" outside the question.
 
 Report through ${TOOL_NAME}.`;
@@ -196,6 +217,7 @@ const ideaSchema = z.object({
   example: z.string().nullable().optional(),
   question: z.string().nullable().optional(),
   answer: z.string().nullable().optional(),
+  mentions: z.array(z.unknown()).nullable().optional(),
 });
 
 const payloadSchema = z.object({
@@ -208,7 +230,11 @@ const payloadSchema = z.object({
 export function describePick(card: CardToWrite): string {
   const field = card.field ? `${card.field.name}. ${card.field.scope}` : '';
   const pick =
-    card.reason === 'goal' && card.aimName
+    card.reason === 'asked' && card.askedPhrase
+      ? `Asked for by name: they met the phrase "${card.askedPhrase.trim()}"` +
+        (card.askedOn?.trim() ? ` on a card about ${card.askedOn.trim()}` : '') +
+        ' and want a card of its own on it. Write the ideas that explain it, and say the section does not serve only when it is not about it.'
+      : card.reason === 'goal' && card.aimName
       ? `Picked for a goal they set themselves: ${card.aimName}.` +
         (card.field ? ` The field it sits in: ${field}` : ' It sits in no one field.')
       : card.reason === 'interest' && card.themeName
@@ -258,6 +284,12 @@ function readIdea(input: unknown): IdeaCard | string {
     answer &&
     question.length <= MAX_QUESTION_CHARS &&
     answer.length <= MAX_ANSWER_CHARS;
+  // A mention whose words the card does not use is dropped on its own: the
+  // explanation it opens refuses a phrase that is not on the card.
+  const mentions = keepMentions(parsed.data.mentions, {
+    name,
+    texts: [takeaway, context, hook, summary, example],
+  });
   return {
     name,
     takeaway,
@@ -267,6 +299,7 @@ function readIdea(input: unknown): IdeaCard | string {
     example,
     question: asked ? question : null,
     answer: asked ? answer : null,
+    mentions,
   };
 }
 
@@ -385,8 +418,20 @@ export async function writeCard(input: {
                     example: ideaPart('The idea applied to one specific case or a worked number.'),
                     question: ideaPart('One question that makes them use the idea.'),
                     answer: ideaPart('The answer, with why, in two or three sentences.'),
+                    mentions: {
+                      type: ['array', 'null'],
+                      description: `Up to ${MAX_MENTIONS} other ideas the card leans on, each in words copied exactly from the card.`,
+                      items: {
+                        type: 'object',
+                        properties: {
+                          phrase: { type: 'string', description: 'The words exactly as the card has them.' },
+                          why: { type: 'string', description: 'One plain line on why it matters to this card.' },
+                        },
+                        required: ['phrase', 'why'],
+                      },
+                    },
                   },
-                  required: ['name', 'claim', 'context', 'evidence', 'why', 'example', 'question', 'answer'],
+                  required: ['name', 'claim', 'context', 'evidence', 'why', 'example', 'question', 'answer', 'mentions'],
                 },
               },
             },

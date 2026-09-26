@@ -447,6 +447,38 @@ that ends in a written answer, are the next two steps and are not built yet.
 Cards written before this carry no idea name. They are shown as before, titled
 by article and section, until the top-up has replaced them.
 
+## Explaining a phrase (plan #1057)
+
+Select a word or phrase anywhere on a card, including in Dash's answers under
+Ask about this card, and an Explain button shows above the swipes. Dash
+explains it in three to five sentences: what it means, then how it connects to
+the card. The same Sonnet call names the English Wikipedia article that
+teaches the phrase. The explanation is kept in `learn.phrase_explanations`
+against the card and the phrase, so selecting it again costs nothing.
+
+Under the explanation, Make it a card fetches that article, picks the section
+the call named (the lead when it is missing) as a row with the reason `asked`,
+and writes it while you wait with the top-up's own writer. The card goes next
+in the deck, its why line names the phrase, and its idea is saved as a concept
+like any other. A write that fails leaves the row picked for the next top-up.
+Start a track makes a reading track on the phrase, as the new-topic page does.
+
+### Underlined ideas (plan #1056)
+
+The call that writes a card also names up to three other ideas the card leans
+on, each as words the card already uses and one line on why it matters to the
+card. They are kept in `feed_cards.mentions`, and any phrase the card does not
+contain, or that is the card's own name, is dropped before it is stored. The
+card underlines each one where it is first read, in the takeaway, the context,
+the evidence, the reasoning or the example. A tap opens the same explanation a
+selection does, with no selection needed, and is kept as an ordinary
+`learn.phrase_explanations` row. The underline's tooltip carries the why line.
+
+This costs no extra call. Cards written before it, lessons and unit checks
+carry an empty list and show no underlines; selecting a phrase still works on
+all of them, and old section cards gain underlines only as the top-up replaces
+them.
+
 ## Cost
 
 Two model calls per card, one to name the material and one to write the card.

@@ -138,6 +138,8 @@ export const NAV_ICONS = {
   // Every run Claude made on your goals, newest first: a record of what was
   // done, so the same clock-and-arrow the changelog uses.
   goalsRuns: History,
+  // Files Claude wrote for your goals: a page of writing, so a page.
+  goalsFiles: FileText,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
 } as const;

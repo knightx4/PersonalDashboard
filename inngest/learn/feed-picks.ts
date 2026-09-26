@@ -145,7 +145,7 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
   type Placement = { theme_id: string; field_id: string };
   type Theme = { id: string; name: string; about: string; strength: number | string | null };
   type Card = {
-    reason: 'interest' | 'gap' | 'goal' | 'queued';
+    reason: 'interest' | 'gap' | 'goal' | 'queued' | 'asked';
     theme_id: string | null;
     aim_id: string | null;
     field_id: string | null;
@@ -236,7 +236,9 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
     if (card.reason === 'gap' && card.field_id) wantMoreFields.add(card.field_id);
   }
   for (const card of cards) {
-    if (card.reason === 'queued') continue;
+    // A card asked for on a phrase (plan #1057) was drawn by nobody, so it
+    // takes no share of the draw.
+    if (card.reason === 'queued' || card.reason === 'asked') continue;
     picked[card.reason] += 1;
     const created = Date.parse(card.created_at);
     if (created >= windowFrom) {
