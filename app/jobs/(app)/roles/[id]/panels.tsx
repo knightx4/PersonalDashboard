@@ -89,6 +89,7 @@ import { groupableDays, sectionInterviews } from '@/lib/jobs/interview-groups';
 import { ReminderActions } from '@/app/jobs/(app)/today/reminder-actions';
 import { ChipInput, ComposeTitle, InlineInput, Input, Label, Select } from '@/components/ui/field';
 import { PaidHint } from '@/components/ui/paid-hint';
+import { GmailAnchor } from '@/components/ui/gmail-anchor';
 
 type Tab = 'timeline' | 'posting' | 'answers' | 'interviews' | 'notes' | 'mail';
 
@@ -375,7 +376,7 @@ function NotRealPursuit({ applicationId }: { applicationId: string }) {
  */
 function GmailLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <a
+    <GmailAnchor
       href={href}
       target="_blank"
       rel="noopener noreferrer"
@@ -388,7 +389,7 @@ function GmailLink({ href, children }: { href: string; children: React.ReactNode
         aria-hidden
       />
       <span className="sr-only">Open in Gmail</span>
-    </a>
+    </GmailAnchor>
   );
 }
 

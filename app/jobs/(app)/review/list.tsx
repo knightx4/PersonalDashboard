@@ -48,6 +48,7 @@ import {
   unacknowledgeEvents,
   type DismissedMessage,
 } from './actions';
+import { GmailAnchor } from '@/components/ui/gmail-anchor';
 
 /**
  * Keyboard-first, because the queue is worked in bursts.
@@ -414,7 +415,7 @@ function MessageRow({
           Not relevant
         </Button>
         {row.gmailHref && (
-          <a
+          <GmailAnchor
             href={row.gmailHref}
             target="_blank"
             rel="noreferrer noopener"
@@ -422,7 +423,7 @@ function MessageRow({
           >
             Open in Gmail
             <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
-          </a>
+          </GmailAnchor>
         )}
       </footer>
     </>
