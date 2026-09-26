@@ -122,8 +122,13 @@ export function readyFeatureCount(sections: readonly PlanSection[]): number {
  * and so the zero reads as a state rather than as a number with a noun after
  * it: "no features are ready" is the thing worth noticing on a card whose
  * night is about to stop early.
+ *
+ * `steps`, when given, adds how many ready steps sit beneath those features,
+ * which is how much work a started run has in front of it.
  */
-export function readyFeaturesLine(count: number): string {
+export function readyFeaturesLine(count: number, steps?: number): string {
   if (count === 0) return 'no features ready';
-  return count === 1 ? '1 feature ready' : `${count} features ready`;
+  const features = count === 1 ? '1 feature ready' : `${count} features ready`;
+  if (!steps) return features;
+  return `${features} · ${steps === 1 ? '1 step' : `${steps} steps`}`;
 }

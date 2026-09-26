@@ -53,7 +53,9 @@ export function StatusPanel({
         refreshReadings
         push={card.push}
         ready={card.ready}
+        readySteps={card.readySteps}
         next={card.next}
+        fresh
         label="Plan"
         bare
         showBlocked={false}

@@ -12,11 +12,13 @@ import {
   type PlanActionState,
 } from './actions';
 import { OvernightState } from '@/components/dev/overnight-state';
+import { StateLabel } from '@/components/dev/state-label';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError, Input, Select } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
+import { DEV_STATE_WORD } from '@/lib/dev/words';
 import {
   nightBudgetLine,
   nightClosedLine,
@@ -354,6 +356,8 @@ export function OvernightControl({
   night,
   push,
   ready,
+  readySteps,
+  fresh = false,
   label = 'Overnight',
   bare = false,
   showBlocked = true,
@@ -375,6 +379,18 @@ export function OvernightControl({
    * from.
    */
   ready: number;
+  /** The ready steps beneath those features, printed beside the count. */
+  readySteps?: number;
+  /**
+   * Leave a finished run behind once it has stopped, and say only what is
+   * ready for the next one.
+   *
+   * Dash is opened on the way back to work, and a card leading with "Stopped",
+   * the old run's totals and "Ended 20h ago" answered a question nobody opening
+   * it was asking. The plan page keeps the last run's account; Dash starts
+   * clean, and what that run did is in the digest further down.
+   */
+  fresh?: boolean;
   /**
    * What to call the runner here.
    *
@@ -445,6 +461,8 @@ export function OvernightControl({
   const now = useClockNow();
   const standing = overnightStanding(run);
   const live = standing === 'running' || standing === 'paused';
+  // A stopped run on a fresh card reads as one that was never started.
+  const resting = fresh && !live;
 
   const router = useRouter();
   useEffect(() => {
@@ -501,10 +519,15 @@ export function OvernightControl({
           <Moon className="size-4 text-ink-muted" aria-hidden />
           {label}
         </span>
-        <OvernightState standing={standing} />
+        {resting && ready > 0 ? (
+          <StateLabel glyph="half" word={DEV_STATE_WORD.ready} tone="accent" />
+        ) : (
+          <OvernightState standing={resting ? 'off' : standing} />
+        )}
         {/* The totals are the headline while a night is on; a night that is
-            over or has never run has none, and says what it is doing instead. */}
-        {night && (live || night.features.length > 0) ? (
+            over or has never run has none, and says what it is doing instead.
+            A fresh card says neither: the ready count beside it is the news. */}
+        {resting ? null : night && (live || night.features.length > 0) ? (
           <Totals night={night} />
         ) : (
           <p className="text-small text-ink-muted">{overnightLine(run, now)}</p>
@@ -516,7 +539,7 @@ export function OvernightControl({
             spent in -- the ask on note 2721ff74 was "features (not steps)".
             Said in both states, because before bed it is what decides whether
             to start a night at all. */}
-        <p className="text-small text-ink-muted">{readyFeaturesLine(ready)}</p>
+        <p className="text-small text-ink-muted">{readyFeaturesLine(ready, readySteps)}</p>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {standing === 'running' && (
@@ -656,7 +679,7 @@ export function OvernightControl({
       {/* The last night, once it is over: when it ended and why, what it left
           on you, and what it closed. The reason moves down here from the
           header, where the totals now stand. */}
-      {standing === 'stopped' && night && (
+      {standing === 'stopped' && !resting && night && (
         <div className="space-y-1">
           {/* A night that fired nothing has no totals, so its reason is
               already in the header where the totals would be. */}

@@ -38,6 +38,8 @@ export type RunnerCard = {
   progress: FeatureProgress | null;
   push: StoredPush | null;
   ready: number;
+  /** The ready steps beneath those features, counted the same way. */
+  readySteps: number;
   /** The features the next ticks would fire, in the order they would fire them. */
   next: DigestNightRef[];
 };
@@ -97,7 +99,8 @@ export function runnerCard(input: {
   const busy = new Set([...on.map((line) => line.ref), night?.lastFire?.ref]);
   const next: DigestNightRef[] = [];
   const seen = new Set<string>();
-  for (const step of workOrder(sections, { only: 'runner' })) {
+  const order = workOrder(sections, { only: 'runner' });
+  for (const step of order) {
     const feature = topFeatureOf(sections, step);
     const ref = `#${feature.number}`;
     if (seen.has(ref)) continue;
@@ -107,5 +110,13 @@ export function runnerCard(input: {
     if (next.length === NEXT_SHOWN) break;
   }
 
-  return { night, on, progress, push, ready: readyFeatureCount(sections), next };
+  return {
+    night,
+    on,
+    progress,
+    push,
+    ready: readyFeatureCount(sections),
+    readySteps: order.length,
+    next,
+  };
 }

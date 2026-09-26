@@ -325,3 +325,35 @@ describe('the steps a night left blocked', () => {
     expect(html).not.toContain('Needs a key');
   });
 });
+
+describe('a stopped night on Dash', () => {
+  const stopped = {
+    run: run({ running: false, endedAt: '2026-09-17T04:00:00Z', endedReason: 'You stopped it.' }),
+    night: night({
+      standing: 'stopped',
+      endedAt: '2026-09-17T04:00:00Z',
+      endedReason: 'You stopped it.',
+    }),
+  };
+
+  it('starts clean, saying only what is ready', () => {
+    const html = draw({ ...stopped, fresh: true, readySteps: 7 });
+    expect(html).toContain('Ready');
+    expect(html).toContain('3 features ready · 7 steps');
+    expect(html).not.toContain('Stopped');
+    expect(html).not.toContain('You stopped it.');
+    expect(html).not.toContain('Ended');
+    expect(html).not.toContain('Which steps');
+    expect(html).not.toContain('features spent');
+  });
+
+  it('reads as off when nothing is ready', () => {
+    const html = draw({ ...stopped, fresh: true, ready: 0 });
+    expect(html).toContain('Off');
+    expect(html).toContain('no features ready');
+  });
+
+  it('keeps the last run’s account on the plan page', () => {
+    expect(draw(stopped)).toContain('You stopped it.');
+  });
+});
