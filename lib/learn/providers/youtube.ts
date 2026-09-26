@@ -48,6 +48,9 @@ export type YouTubeVideo = {
   durationSeconds: number | null;
   /** ISO date, which is what `catalogue_items.published_at` takes. */
   publishedAt: string | null;
+  /** The uploading channel, when `videos.list` said. */
+  channelId?: string | null;
+  channelTitle?: string | null;
 };
 
 export type YouTubePlaylist = {
@@ -105,9 +108,10 @@ export function playlistItemsRequestUrl(
   playlistId: string,
   key: string,
   pageToken?: string,
+  part: 'contentDetails' | 'snippet,contentDetails' = 'contentDetails',
 ): string {
   const url = new URL('playlistItems', API_BASE);
-  url.searchParams.set('part', 'contentDetails');
+  url.searchParams.set('part', part);
   url.searchParams.set('playlistId', playlistId);
   url.searchParams.set('maxResults', String(PAGE_SIZE));
   if (pageToken) url.searchParams.set('pageToken', pageToken);
@@ -269,11 +273,21 @@ const ItemsResponse = z.object({
   error: z.object({ message: z.string() }).optional(),
   nextPageToken: z.string().optional(),
   items: z
-    .array(z.object({ contentDetails: z.object({ videoId: z.string() }).optional() }))
+    .array(
+      z.object({
+        contentDetails: z.object({ videoId: z.string() }).optional(),
+        snippet: z.object({ publishedAt: z.string().optional() }).optional(),
+      }),
+    )
     .optional(),
 });
 
-export type PlaylistPage = { videoIds: string[]; nextPageToken: string | null };
+export type PlaylistPage = {
+  videoIds: string[];
+  /** When each video was put in the playlist, when the snippet was asked for. */
+  addedAt: Record<string, string>;
+  nextPageToken: string | null;
+};
 export type PlaylistPageResult = ({ ok: true } & PlaylistPage) | YouTubeFailure;
 
 /**
@@ -297,6 +311,7 @@ export function parsePlaylistItemsPage(body: string): PlaylistPageResult {
   if (parsed.data.error) return fail('error', parsed.data.error.message);
 
   const videoIds: string[] = [];
+  const addedAt: Record<string, string> = {};
   const seen = new Set<string>();
   for (const item of parsed.data.items ?? []) {
     const id = item.contentDetails?.videoId;
@@ -308,9 +323,11 @@ export function parsePlaylistItemsPage(body: string): PlaylistPageResult {
     if (seen.has(id)) continue;
     seen.add(id);
     videoIds.push(id);
+    const added = item.snippet?.publishedAt;
+    if (added && !Number.isNaN(Date.parse(added))) addedAt[id] = added;
   }
 
-  return { ok: true, videoIds, nextPageToken: parsed.data.nextPageToken ?? null };
+  return { ok: true, videoIds, addedAt, nextPageToken: parsed.data.nextPageToken ?? null };
 }
 
 const VideosResponse = z.object({
@@ -324,6 +341,8 @@ const VideosResponse = z.object({
             title: z.string(),
             description: z.string().optional(),
             publishedAt: z.string().optional(),
+            channelId: z.string().optional(),
+            channelTitle: z.string().optional(),
           })
           .optional(),
         contentDetails: z.object({ duration: z.string().optional() }).optional(),
@@ -365,6 +384,8 @@ export function parseVideosResponse(body: string): VideosResult {
       canonicalUrl: watchUrl(item.id),
       durationSeconds: duration ? parseIsoDuration(duration) : null,
       publishedAt: item.snippet.publishedAt?.slice(0, 10) ?? null,
+      channelId: item.snippet.channelId ?? null,
+      channelTitle: item.snippet.channelTitle ?? null,
     });
   }
 
@@ -409,6 +430,11 @@ export type PlaylistOrderOptions = {
   stopAt?: Set<string>;
   /** The runaway guard, in pages of fifty. */
   maxPages?: number;
+  /**
+   * Ask for each item's snippet as well, for when it was added to the
+   * playlist. Same quota, larger answers, so only for a playlist of your own.
+   */
+  withAddedAt?: boolean;
 };
 
 /**
@@ -417,32 +443,37 @@ export type PlaylistOrderOptions = {
 export async function fetchPlaylistVideoIds(
   playlistId: string,
   options: PlaylistOrderOptions = {},
-): Promise<({ ok: true; videoIds: string[]; complete: boolean }) | YouTubeFailure> {
+): Promise<
+  ({ ok: true; videoIds: string[]; addedAt: Record<string, string>; complete: boolean }) | YouTubeFailure
+> {
   const key = youTubeKey();
   if (typeof key !== 'string') return key;
 
   const orderedIds: string[] = [];
+  const addedAt: Record<string, string> = {};
+  const part = options.withAddedAt ? 'snippet,contentDetails' : 'contentDetails';
   const seen = new Set<string>();
   let pageToken: string | undefined;
   const maxPages = options.maxPages ?? MAX_PAGES;
 
   for (let page = 0; page < maxPages; page += 1) {
-    const body = await getJson(playlistItemsRequestUrl(playlistId, key, pageToken));
+    const body = await getJson(playlistItemsRequestUrl(playlistId, key, pageToken, part));
     if (!body.ok) return body;
     const parsed = parsePlaylistItemsPage(body.text);
     if (!parsed.ok) return parsed;
 
     for (const id of parsed.videoIds) {
-      if (options.stopAt?.has(id)) return { ok: true, videoIds: orderedIds, complete: true };
+      if (options.stopAt?.has(id)) return { ok: true, videoIds: orderedIds, addedAt, complete: true };
       if (seen.has(id)) continue;
       seen.add(id);
       orderedIds.push(id);
+      if (parsed.addedAt[id]) addedAt[id] = parsed.addedAt[id];
     }
-    if (!parsed.nextPageToken) return { ok: true, videoIds: orderedIds, complete: true };
+    if (!parsed.nextPageToken) return { ok: true, videoIds: orderedIds, addedAt, complete: true };
     pageToken = parsed.nextPageToken;
   }
 
-  return { ok: true, videoIds: orderedIds, complete: false };
+  return { ok: true, videoIds: orderedIds, addedAt, complete: false };
 }
 
 /**
@@ -564,6 +595,44 @@ export function parseChannelInput(raw: string): ChannelInput {
   }
 
   return { ok: false, error: `${trimmed} does not look like a YouTube channel.` };
+}
+
+const PLAYLIST_ID = /^[A-Za-z0-9_-]{10,64}$/;
+
+/** Playlists YouTube keeps for every account, which the API answers empty. */
+const PRIVATE_LISTS = new Set(['WL', 'LL', 'LM']);
+
+export type PlaylistInput = { ok: true; playlistId: string } | { ok: false; error: string };
+
+/**
+ * A playlist as somebody would paste it: a link with `list=` in it, from the
+ * playlist page or from a video played inside it, or the bare id.
+ */
+export function parsePlaylistInput(raw: string): PlaylistInput {
+  const trimmed = raw.trim();
+  if (!trimmed) return { ok: false, error: 'Paste the link to your playlist.' };
+
+  let id = trimmed;
+  if (!PLAYLIST_ID.test(trimmed)) {
+    let url: URL | null = null;
+    try {
+      url = new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`);
+    } catch {
+      url = null;
+    }
+    const list = url && /(^|\.)(youtube\.com|youtu\.be)$/i.test(url.hostname) ? url.searchParams.get('list') : null;
+    if (!list) return { ok: false, error: `${trimmed} is not a link to a YouTube playlist.` };
+    id = list;
+  }
+
+  if (PRIVATE_LISTS.has(id)) {
+    return {
+      ok: false,
+      error: 'YouTube does not let apps read Watch later or Liked videos. Save the videos to a playlist of your own and paste that.',
+    };
+  }
+  if (!PLAYLIST_ID.test(id)) return { ok: false, error: `${id} does not look like a YouTube playlist id.` };
+  return { ok: true, playlistId: id };
 }
 
 export function channelsRequestUrl(input: { handle: string } | { channelId: string }, key: string): string {

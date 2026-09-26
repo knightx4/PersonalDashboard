@@ -8,6 +8,7 @@ import {
   relistChannel,
   removeChannel,
   setChannelAutoTranscribe,
+  setWatchListPlaylist,
   transcribeNow,
   type TranscribeReport,
 } from '@/inngest/learn/youtube-library';
@@ -140,6 +141,30 @@ export async function transcribePlaylistAction(_prev: PressState, formData: Form
     const report = await transcribeNow(videoIds, 'course');
     revalidatePath('/learn/youtube', 'layout');
     return transcribeLine(report);
+  } catch (error) {
+    return failed(error);
+  }
+}
+
+/**
+ * The playlist your list is read from (plan #1065), kept in Learn settings
+ * and read at once. An empty field forgets it and leaves the list as it is.
+ */
+// latency: pending
+export async function setWatchListPlaylistAction(_prev: PressState, formData: FormData): Promise<PressState> {
+  try {
+    const user = await requireOwner();
+    const report = await setWatchListPlaylist(user.id, String(formData.get('playlist') ?? ''));
+    if (!report.ok) return { error: report.error };
+    revalidatePath('/learn/youtube');
+    if (!report.sync) return { message: 'Playlist forgotten. The videos already on your list stay.' };
+    if (report.sync.error) return { error: `Playlist kept, but YouTube did not answer: ${report.sync.error}` };
+    const parts = [
+      report.sync.added > 0 ? `${plural(report.sync.added, 'video', 'videos')} added to your list` : 'nothing new on it',
+    ];
+    if (report.sync.left > 0) parts.push(`${report.sync.left} no longer on the playlist`);
+    if (report.sync.unavailable > 0) parts.push(`${report.sync.unavailable} private or deleted, left out`);
+    return { message: `Playlist kept: ${parts.join(', ')}. It is read again four times a day.` };
   } catch (error) {
     return failed(error);
   }

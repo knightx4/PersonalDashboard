@@ -138,6 +138,7 @@ describe('RLS coverage', () => {
       'tracks',
       'transcript_calls',
       'video_transcripts',
+      'watch_list',
     ]);
   });
 });
@@ -1372,6 +1373,53 @@ describe('teach-backs and Learn settings', () => {
   it('refuses a rate of one in one', async () => {
     await expect(
       asUser(userA, (tx) => tx`update settings set teach_back_every = 1`),
+    ).rejects.toThrow();
+  });
+});
+
+describe('your list of videos', () => {
+  // 0065_watch_list.sql (plan #1065). One row per person and video, read from
+  // the playlist in learn.settings by the service role, and theirs alone.
+  const video = 'dQw4w9WgXcQ';
+
+  beforeAll(async () => {
+    await admin`insert into watch_list (user_id, video_id) values (${userA}, ${video})`;
+  });
+
+  it('shows the owner their list and another user none', async () => {
+    const own = await asUser(userA, (tx) => tx`select video_id, came_from from watch_list`);
+    const other = await asUser(userB, (tx) => tx`select video_id from watch_list`);
+    expect(own).toEqual([{ video_id: video, came_from: 'playlist' }]);
+    expect(other).toHaveLength(0);
+  });
+
+  it("does not let a user add to or mark another account's list", async () => {
+    await expect(
+      asUser(userB, (tx) => tx`insert into watch_list (user_id, video_id) values (${userA}, 'aaaaaaaaaaa')`),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`update watch_list set watched_at = now()`);
+    const [row] = await admin<{ watched_at: Date | null }[]>`
+      select watched_at from watch_list where user_id = ${userA} and video_id = ${video}`;
+    expect(row.watched_at).toBeNull();
+  });
+
+  it('holds one row per video, and refuses a verdict or stretch that cannot be', async () => {
+    await expect(admin`insert into watch_list (user_id, video_id) values (${userA}, ${video})`).rejects.toThrow();
+    await expect(
+      admin`update watch_list set verdict = 'maybe' where user_id = ${userA}`,
+    ).rejects.toThrow();
+    await expect(
+      admin`update watch_list set best_start_seconds = 300, best_end_seconds = 60 where user_id = ${userA}`,
+    ).rejects.toThrow();
+    await expect(
+      admin`update watch_list set verdict_by = 'you' where user_id = ${userA}`,
+    ).rejects.toThrow();
+  });
+
+  it('keeps the playlist in settings, and only as an id', async () => {
+    await admin`update settings set youtube_playlist_id = 'PLabcdefghij1234' where user_id = ${userA}`;
+    await expect(
+      admin`update settings set youtube_playlist_id = 'https://youtube.com/x' where user_id = ${userA}`,
     ).rejects.toThrow();
   });
 });

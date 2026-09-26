@@ -91,6 +91,14 @@ Notes they wrote on Learn cards and on ideas, in their own words.
 - Name a row by `body`; link it by `id`
 - concept_id is the idea a note is about, whose page is /learn/c/<concept_id>; card_id is the Learn now card it was written on, null when written on the idea page or once the card is gone.
 
+### `learn.watch_list` (Learn)
+
+YouTube videos they chose to watch, saved to their playlist, with a verdict on each once judged.
+
+- Search: `why`, `summary`
+- Name a row by `video_id`; link it by `id`
+- item_id is the catalogue_items row of kind video, which has the title and description. verdict is watch, card or skip, with why; watched_at is set when they watched it; left_playlist_at when they took it off the playlist.
+
 ### `news.preferences` (News)
 
 The neighbourhood they want local news for.
