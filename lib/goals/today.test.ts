@@ -60,6 +60,7 @@ function rhythm(id: string, goalId: string, extra: Partial<HomeRhythm> = {}): Ho
     daysLeft: 2,
     atRisk: true,
     missed: 0,
+    startsOn: '2026-09-21',
     ...extra,
   };
 }

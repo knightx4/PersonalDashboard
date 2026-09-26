@@ -2294,10 +2294,9 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalOpenedSurface />,
   },
   {
-    /* The Goals home on an ordinary week (plan #1043): a question and a
-     * result waiting, a rhythm running late, a suggestion, two goals with
-     * next steps, one waiting on other people with nothing next, and one
-     * with no steps at all. */
+    /* The Goals home on an ordinary week (plans #1043, #1077): five things
+     * today and one folded under them, four goals with their statuses (one
+     * checked days ago, one with no steps), and a result Dash wrote. */
     id: 'goals-home',
     label: 'Goals · home',
     module: 'goals',

@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
-import { DailyView } from '@/app/goals/daily-view';
+import { HomeView } from '@/app/goals/home-view';
 import { GoalsView } from '@/app/goals/goals-view';
 import { GoalAddRow } from '@/app/goals/[goalId]/goal-add-row';
 import { GoalLinksSection } from '@/app/goals/[goalId]/goal-links';
@@ -19,6 +19,7 @@ import type { GoalLinks } from '@/lib/goals/links';
 import type { Reading } from '@/lib/goals/readings';
 import { goalRunRows, type RunListing } from '@/lib/goals/runs';
 import { approvalLine } from '@/lib/goals/shaping';
+import type { GoalReview } from '@/lib/goals/reviews';
 import type { GoalProgress } from '@/lib/goals/status';
 import { buildForest, type Step } from '@/lib/goals/steps';
 import type { GoalMap } from '@/lib/goals/steps-store';
@@ -87,153 +88,176 @@ const cardsProgress = progress({
 
 /* ------------------------------------------------------------------ home */
 
-const home: ComponentProps<typeof DailyView>['view'] = {
-  waiting: [
+function review(goalId: string, extra: Partial<GoalReview> & Pick<GoalReview, 'verdict'>): GoalReview {
+  return {
+    id: `review-${goalId}`,
+    goalId,
+    reason: '',
+    nextMove: '',
+    nextOn: null,
+    stepId: null,
+    waitsOnId: null,
+    runId: null,
+    createdAt: `${TODAY}T06:00:00Z`,
+    ...extra,
+  };
+}
+
+const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
+  today: [
     {
       kind: 'question',
       id: 'which',
       title: 'Which card goes first?',
+      detail: null,
       goalId: cards.id,
       goalTitle: cards.title,
+      action: 'Answer',
+      unblocks: 3,
+      on: null,
     },
     {
-      kind: 'review',
-      id: 'script',
-      title: 'Draft what to say on the call',
+      kind: 'step',
+      id: 'standing',
+      title: 'Set up a standing order of $200 on payday',
+      detail: null,
+      goalId: fund.id,
+      goalTitle: fund.title,
+      action: 'Done',
+      unblocks: 0,
+      on: '2026-10-01',
+    },
+    {
+      kind: 'rhythm',
+      id: 'review',
+      title: 'Check the budget every week',
+      detail: '0 of 1 this week, 2 days left',
       goalId: cards.id,
       goalTitle: cards.title,
+      action: 'Log one',
+      unblocks: 0,
+      on: null,
+      startsOn: '2026-09-21',
     },
     {
-      kind: 'context',
-      id: job.id,
-      title: job.title,
+      kind: 'went',
+      id: 'sug-0',
+      title: 'Did you go to Open evening at the options desk?',
+      detail: null,
       goalId: job.id,
       goalTitle: job.title,
-      count: 3,
+      action: 'I went',
+      unblocks: 0,
+      on: TODAY,
     },
+    {
+      kind: 'suggestion',
+      id: 'sug-1',
+      title: 'Quant finance meetup: volatility surfaces in practice',
+      detail: 'The Railway Tavern, London',
+      goalId: job.id,
+      goalTitle: job.title,
+      action: 'Going',
+      unblocks: 0,
+      on: '2026-10-01',
+      url: 'https://example.com/meetup',
+    },
+  ],
+  later: [
     {
       kind: 'plan',
       id: 'a-health',
-      title: 'Health',
+      title: 'Look over 2 goals proposed in Health',
+      detail: null,
       goalId: 'g-sleep',
       goalTitle: 'Sleep before midnight',
-      count: 2,
-      goals: [
-        { id: 'g-sleep', title: 'Sleep before midnight' },
-        { id: 'g-strength', title: 'Lift three times a week' },
-      ],
-    },
-  ],
-  dash: {
-    running: [
-      { id: 'run-1', label: 'Work on this', on: job.title, progress: 'on Reading the vault for job notes, 2 minutes ago' },
-    ],
-    ready: [{ id: 'cmp', title: 'Compare the two cards’ rates', goalId: cards.id, goalTitle: cards.title }],
-    held: [{ goalId: 'g-sleep', goalTitle: 'Sleep before midnight', count: 2, on: 'goal' }],
-  },
-  suggestions: [
-    {
-      id: 'sug-1',
-      itemId: null,
-      kind: 'events',
-      title: 'Quant finance meetup: volatility surfaces in practice',
-      detail: 'A talk and drinks, in the back room of a pub near Liverpool Street.',
-      url: 'https://example.com/meetup',
-      place: 'The Railway Tavern, London',
-      source: 'Meetup',
-      happensOn: '2026-10-01',
-      startsAt: '2026-10-01T18:30:00+01:00',
-      reaction: null,
-      attended: null,
-      createdAt: '2026-09-21T06:00:00Z',
-    },
-  ],
-  didYouGo: [
-    {
-      id: 'sug-0',
-      itemId: null,
-      kind: 'events',
-      title: 'Open evening at the options desk',
-      detail: null,
-      url: null,
-      place: 'Canary Wharf',
-      source: 'Eventbrite',
-      happensOn: '2026-09-18',
-      startsAt: null,
-      reaction: 'going',
-      attended: null,
-      createdAt: '2026-09-14T06:00:00Z',
-    },
-  ],
-  rhythms: [
-    {
-      id: 'review',
-      title: 'Check the budget every week',
-      target: 1,
-      period: 'week',
-      goalId: cards.id,
-      goalTitle: cards.title,
-      count: 0,
-      daysLeft: 2,
-      atRisk: true,
-      missed: 1,
+      action: 'Review',
+      unblocks: 0,
+      on: null,
     },
   ],
   goals: [
     {
       goal: cards,
       areaName: 'Money',
-      next: [
-        { id: 'call', title: 'Call the card company', kind: 'mine', dueOn: '2026-10-03', under: 'Get the rates lowered' },
-        { id: 'consolidate', title: 'Look into a consolidation loan', kind: 'claude', dueOn: null, under: null },
-        { id: 'income', title: 'Write down what comes in each month', kind: 'mine', dueOn: null, under: null },
-      ],
-      more: 2,
-      hasSteps: true,
       progress: cardsProgress,
+      review: review(cards.id, {
+        verdict: 'waiting_on_you',
+        reason: 'The order of the cards decides the next three steps.',
+        nextMove: 'Choose which card to pay first',
+      }),
+      current: true,
+      next: null,
+      hasSteps: true,
     },
     {
       goal: fund,
       areaName: 'Money',
-      next: [
-        {
-          id: 'standing',
-          title: 'Set up a standing order of $200 on payday',
-          kind: 'mine',
-          dueOn: '2026-10-01',
-          under: null,
-        },
-      ],
-      more: 0,
-      hasSteps: true,
       progress: progress({ bands: { on_you: 1, waiting: 0, with_claude: 0, done: 1 }, move: 'on_you' }),
+      review: review(fund.id, {
+        verdict: 'on_track',
+        reason: 'The account is open.',
+        nextMove: 'Set up the standing order',
+        nextOn: '2026-10-01',
+      }),
+      current: true,
+      next: null,
+      hasSteps: true,
     },
     {
       goal: job,
       areaName: 'Career',
-      next: [],
-      more: 0,
-      hasSteps: true,
       progress: progress({ bands: { on_you: 0, waiting: 2, with_claude: 0, done: 3 }, move: 'waiting' }),
+      review: review(job.id, {
+        verdict: 'waiting_on_date',
+        reason: 'Two recruiters have the CV.',
+        nextMove: 'Check for replies',
+        nextOn: '2026-09-28',
+        createdAt: '2026-09-22T06:00:00Z',
+      }),
+      current: false,
+      next: null,
+      hasSteps: true,
     },
-    { goal: marathon, areaName: 'Health', next: [], more: 0, hasSteps: false },
+    {
+      goal: marathon,
+      areaName: 'Health',
+      progress: progress({ bands: { on_you: 0, waiting: 0, with_claude: 0, done: 0 }, move: 'settled' }),
+      review: null,
+      current: false,
+      next: null,
+      hasSteps: false,
+    },
   ],
+  done: {
+    since: '2026-09-24T19:30:00Z',
+    items: [
+      {
+        kind: 'result',
+        id: 'script',
+        title: 'Draft what to say on the call',
+        goalId: cards.id,
+        goalTitle: cards.title,
+        href: `/goals/${cards.id}#step-script`,
+        unread: true,
+        runId: 'run-1',
+        undo: null,
+        at: '2026-09-25T06:10:00Z',
+      },
+    ],
+    more: 0,
+  },
+  brief: {
+    body: 'The card balance is down to **$6,980**, $730 lower than August. The one thing waiting on you is *Which card first?* on **Pay off the credit cards**: it decides the next three steps.',
+    when: 'today',
+  },
 };
 
 export function GoalsHomeSurface() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Goals" />
-      <DailyView
-        view={{
-          ...home,
-          brief: {
-            body: 'The card balance is down to **$6,980**, $730 lower than August. The one thing waiting on you is *Which card first?* on **Pay off the credit cards**: it decides the next three steps. The quant role search is waiting on two recruiters; I will check for replies on Monday.',
-            when: 'today',
-          },
-        }}
-        timeZone="Europe/London"
-      />
+      <HomeView {...home} timeZone="Europe/London" />
     </div>
   );
 }
