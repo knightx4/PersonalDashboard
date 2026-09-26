@@ -35,7 +35,7 @@ function node(id: string, extra: Partial<StepNode> = {}): StepNode {
 describe('stepState', () => {
   it('gives every open step one of the three words', () => {
     expect(stepState(node('a')).word).toBe('On you');
-    expect(stepState(node('b', { kind: 'claude' })).word).toBe('With Claude');
+    expect(stepState(node('b', { kind: 'claude' })).word).toBe('With Dash');
     expect(stepState(node('c', { children: [node('d')] })).word).toBe('Waiting');
     expect(stepState(node('e', { kind: 'rhythm' })).word).toBe('On you');
   });
@@ -76,7 +76,7 @@ describe('stepState', () => {
       children: [node('x'), node('y', { kind: 'claude' }), node('z', { status: 'done' })],
     });
     expect(stepState(parent).title).toBe(
-      'Waits on the 2 open steps under it: 1 on you, 1 with Claude.',
+      'Waits on the 2 open steps under it: 1 on you, 1 with Dash.',
     );
   });
 
@@ -142,9 +142,9 @@ describe('goalProgress', () => {
     expect(progress.bands.on_you).toBe(1);
   });
 
-  it('reports Claude when nothing is on you', () => {
+  it('reports Dash when nothing is on you', () => {
     const progress = goalProgress([node('a', { kind: 'claude' }), node('b', { status: 'done' })]);
-    expect(goalMoveLabel(progress)).toMatchObject({ word: 'With Claude', tone: 'info' });
+    expect(goalMoveLabel(progress)).toMatchObject({ word: 'With Dash', tone: 'info' });
   });
 
   it('has nothing to say about an empty or finished goal', () => {
@@ -164,7 +164,7 @@ describe('stepNeeds', () => {
       ],
     });
     expect(stepNeeds(parent)).toBe(
-      'Get the numbers (on you), Check refinancing (with Claude) to close first.',
+      'Get the numbers (on you), Check refinancing (with Dash) to close first.',
     );
   });
 

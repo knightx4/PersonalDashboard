@@ -383,7 +383,7 @@ function GoalRow({
             className="inline-flex items-center gap-1 text-small text-ink-muted underline-offset-2 hover:text-ink hover:underline"
           >
             <ListTree className="size-3" strokeWidth={1.75} aria-hidden />
-            {goal.status === 'proposed' ? 'See what Claude proposed' : steps ? 'Full tree' : 'Break into steps'}
+            {goal.status === 'proposed' ? 'See what Dash proposed' : steps ? 'Full tree' : 'Break into steps'}
           </Link>
         </div>
         {goal.status === 'proposed' && <SettleProposedGoal goalId={goal.id} onTurnDown={archive} />}
@@ -433,7 +433,7 @@ export function ApproveArea({ areaId, count }: { areaId: string; count: number }
     <form action={approve} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
       <input type="hidden" name="id" value={areaId} />
       <p className="min-w-0 flex-1 text-small text-ink-muted">
-        Claude proposed {count} goals here. Approve the ones you want, or all of them.
+        Dash proposed {count} goals here. Approve the ones you want, or all of them.
       </p>
       <Button type="submit" size="sm" variant="secondary" pending={approving}>
         Approve all {count}

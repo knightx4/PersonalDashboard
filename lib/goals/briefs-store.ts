@@ -17,6 +17,6 @@ export async function loadBrief(
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (error) throw new Error(`Could not read Claude's note: ${error.message}`);
+  if (error) throw new Error(`Could not read Dash's note: ${error.message}`);
   return data ? toBrief(data as BriefRow) : null;
 }

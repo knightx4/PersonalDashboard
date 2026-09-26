@@ -67,7 +67,7 @@ export function GoalShaping({
   const status = running && (
     <p role="status" className="flex items-center gap-1.5 text-small text-accent">
       <span className="size-1.5 animate-pulse rounded-full bg-accent" aria-hidden />
-      <span>Claude is working on this · {progress}</span>
+      <span>Dash is working on this · {progress}</span>
     </p>
   );
   const history = runs.length > 0 && <RunHistory runs={runs} more={moreRuns} />;
@@ -121,7 +121,7 @@ export function GoalShaping({
   return (
     <section aria-labelledby="claude-heading" className="space-y-2">
       <h2 id="claude-heading" className="px-1 text-ui font-semibold text-ink">
-        Claude on this goal
+        Dash on this goal
       </h2>
       <Card className="space-y-2 p-3">
         <p className="text-ui text-ink">{approval.text}</p>

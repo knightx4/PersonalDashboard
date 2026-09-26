@@ -185,16 +185,16 @@ describe('planning an area', () => {
 describe('approvalLine', () => {
   const base = { goalStatus: 'open' as const, approvedAt: null, proposed: 0, questions: 0 };
 
-  it('offers to approve a goal Claude proposed', () => {
+  it('offers to approve a goal Dash proposed', () => {
     const line = approvalLine({ ...base, goalStatus: 'proposed', proposed: 2 });
     expect(line.approve).toBe('Approve goal');
-    expect(line.text).toMatch(/^Claude proposed this goal and 2 steps under it\./);
+    expect(line.text).toMatch(/^Dash proposed this goal and 2 steps under it\./);
   });
 
   it('offers to approve a breakdown, and names the questions waiting', () => {
     const line = approvalLine({ ...base, proposed: 4, questions: 1 });
     expect(line.approve).toBe('Approve breakdown');
-    expect(line.text).toContain('Claude proposed 4 steps.');
+    expect(line.text).toContain('Dash proposed 4 steps.');
     expect(line.text).toContain('One question for you is in the steps below.');
   });
 

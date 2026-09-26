@@ -51,7 +51,7 @@ function refusal(steps: StepNode[], id: string, runs: { itemId: string; job: str
 }
 
 describe('sendJob and offersSend', () => {
-  it('reads a Claude leaf as a step, anything with sub-steps as a phase, and your own leaf as neither', () => {
+  it('reads a Dash leaf as a step, anything with sub-steps as a phase, and your own leaf as neither', () => {
     expect(sendJob(node('a'))).toBe('step');
     expect(sendJob(node('p', { kind: 'mine', children: [node('a')] }))).toBe('phase');
     expect(sendJob(node('m', { kind: 'mine' }))).toBeNull();
@@ -70,7 +70,7 @@ describe('sendRefusal', () => {
   const s = node('s');
   const phase = node('p', { kind: 'mine', children: [s] });
 
-  it('lets a ready Claude step go', () => {
+  it('lets a ready Dash step go', () => {
     expect(refusal([phase], 's')).toBeNull();
     expect(refusal([phase], 'p')).toBeNull();
   });
@@ -99,7 +99,7 @@ describe('sendRefusal', () => {
     expect(refusal(steps, 'p')).toBe('Nothing under that phase is open, so there is nothing to send.');
   });
 
-  it('refuses a step Claude is already on through it, its phase, a step in it or the whole goal', () => {
+  it('refuses a step Dash is already on through it, its phase, a step in it or the whole goal', () => {
     expect(refusal([phase], 's', [{ itemId: 's', job: 'step', ago: 60_000 }])).toMatch(/already working on this step/);
     expect(refusal([phase], 's', [{ itemId: 'p', job: 'phase', ago: 60_000 }])).toMatch(/"p", which this is part of/);
     expect(refusal([phase], 'p', [{ itemId: 's', job: 'step', ago: 60_000 }])).toMatch(/a step in this phase/);
@@ -140,13 +140,13 @@ describe('prepare (plan #1001)', () => {
     ).toBeNull();
   });
 
-  it("refuses Claude's step, a blocked one of yours and one Claude is already preparing", () => {
+  it("refuses Dash's step, a blocked one of yours and one Dash is already preparing", () => {
     expect(prepareRefusal([node('a')], 'a')).toBe('Only a step of yours with no sub-steps can be prepared.');
     expect(prepareRefusal([node('b', { kind: 'mine', status: 'blocked', blockAsk: 'Your login.' })], 'b')).toBe(
       'That step is blocked: Your login.',
     );
     expect(prepareRefusal([node('m', { kind: 'mine' })], 'm', [{ itemId: 'm', job: 'prepare', ago: 60_000 }])).toBe(
-      'Claude is already preparing this step. What it writes will show here when it is done.',
+      'Dash is already preparing this step. What it writes will show here when it is done.',
     );
   });
 

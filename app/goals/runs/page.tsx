@@ -47,7 +47,7 @@ export default async function GoalRunsPage() {
         <EmptyState
           icon={History}
           title="No runs yet"
-          description="Press Work on this on a goal, and each run Claude makes on it will be listed here."
+          description="Press Work on this on a goal, and each run Dash makes on it will be listed here."
           action={{ label: 'All goals', href: '/goals/all' }}
         />
       ) : (

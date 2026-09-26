@@ -25,12 +25,12 @@ export default async function FilesPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="Files" description="Longer pieces Claude wrote for your goals, kept as pages." />
+      <PageHeader title="Files" description="Longer pieces Dash wrote for your goals, kept as pages." />
       {files.length === 0 ? (
         <EmptyState
           icon={FileText}
           title="No files yet"
-          description="When Claude works a step that needs more than a few lines, what it writes is kept here and linked from the step."
+          description="When Dash works a step that needs more than a few lines, what it writes is kept here and linked from the step."
         />
       ) : (
         <FileLinks

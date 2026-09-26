@@ -282,7 +282,7 @@ export function approvalLine(input: {
 
   if (input.goalStatus === 'proposed') {
     return {
-      text: `Claude proposed this goal${input.proposed > 0 ? ` and ${steps(input.proposed)} under it` : ''}. Approving adds it to your goals.${asks}`,
+      text: `Dash proposed this goal${input.proposed > 0 ? ` and ${steps(input.proposed)} under it` : ''}. Approving adds it to your goals.${asks}`,
       approve: 'Approve goal',
     };
   }
@@ -290,8 +290,8 @@ export function approvalLine(input: {
     return {
       text:
         (input.proposed > 0
-          ? `Claude proposed ${steps(input.proposed)}. Approving makes them live and lets Claude add and reorder steps here without asking.`
-          : 'Not approved yet, so anything Claude adds here waits for you. Approving lets it add and reorder steps without asking.') +
+          ? `Dash proposed ${steps(input.proposed)}. Approving makes them live and lets Dash add and reorder steps here without asking.`
+          : 'Not approved yet, so anything Dash adds here waits for you. Approving lets it add and reorder steps without asking.') +
         asks,
       approve: input.proposed > 0 ? 'Approve breakdown' : 'Approve goal',
     };

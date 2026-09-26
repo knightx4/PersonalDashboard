@@ -123,7 +123,7 @@ export async function answerGoalFlag(input: {
     ok: false,
     error: `Your answer is saved, but no run started: ${why}`,
   });
-  if (!input.canRun) return unsaid('only the account that owns this app can start a Claude run.');
+  if (!input.canRun) return unsaid('only the account that owns this app can start a Dash run.');
   if (!resolveRoutineId(input.routine.id)) {
     return unsaid(
       'no goals routine is set on this deployment (CLAUDE_GOALS_ROUTINE_ID and CLAUDE_GOALS_ROUTINE_TOKEN).',
@@ -135,7 +135,7 @@ export async function answerGoalFlag(input: {
     input.client.from('items').select('title').eq('id', flag.goalId).maybeSingle(),
   ]);
   if (runInFlight(lastRun, Date.now())) {
-    return unsaid('Claude is already working on this goal. Say more once that run finishes.');
+    return unsaid('Dash is already working on this goal. Say more once that run finishes.');
   }
   const goalTitle = (goal.data?.title as string | undefined) ?? flag.title;
 
@@ -165,7 +165,7 @@ export async function answerGoalFlag(input: {
       .eq('user_id', userId);
     if (moved.error) console.error(`Flag ${flag.id} could not be marked answered: ${moved.error.message}`);
   }
-  return { ok: true, message: 'Claude is working on your answer. What it did lands in this thread.' };
+  return { ok: true, message: 'Dash is working on your answer. What it did lands in this thread.' };
 }
 
 /** Take one of your answers back out of a flag's thread. False when it was already gone. */

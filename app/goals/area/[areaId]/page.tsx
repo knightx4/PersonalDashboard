@@ -88,7 +88,7 @@ export default async function AreaPage({ params }: { params: Promise<{ areaId: s
       {proposed.length > 0 && (
         <section aria-labelledby="area-proposed-heading" className="space-y-2">
           <h2 id="area-proposed-heading" className="px-1 text-ui font-semibold text-ink">
-            Proposed by Claude
+            Proposed by Dash
           </h2>
           {proposed.length > 1 && <ApproveArea areaId={areaId} count={proposed.length} />}
           <Card>

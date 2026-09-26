@@ -124,7 +124,7 @@ export async function readGameShelfPhoto(input: {
     });
   } catch (error) {
     if (error instanceof Anthropic.RateLimitError) {
-      return { ok: false, error: 'Claude is rate-limiting us. Try again in a minute.' };
+      return { ok: false, error: 'The model is rate-limiting us. Try again in a minute.' };
     }
     if (error instanceof Anthropic.APIError) {
       return {

@@ -293,7 +293,7 @@ describe('fileCapture', () => {
     expect(saved[0]!.map(describeFiled)).toEqual([
       'Counted one towards "Step events" in Goal city',
       'Closed "Step talk" in Goal city',
-      'Added a step for Claude in Goal city: "Find the nonprofit’s volunteer sign-up"',
+      'Added a step for Dash in Goal city: "Find the nonprofit’s volunteer sign-up"',
     ]);
   });
 

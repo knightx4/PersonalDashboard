@@ -59,7 +59,7 @@ export function GoalStatusCard({ status, brief, briefWhen, review }: GoalStatusC
         {brief ? (
           <div className="space-y-1">
             <FileBody markdown={brief.body} compact />
-            {briefWhen && <p className="text-small text-ink-muted">Claude’s note, written {briefWhen}</p>}
+            {briefWhen && <p className="text-small text-ink-muted">Dash’s note, written {briefWhen}</p>}
           </div>
         ) : (
           review && (

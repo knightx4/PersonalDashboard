@@ -322,7 +322,7 @@ export function describeFiled(entry: FiledEntry): string {
       return `Recorded ${formatReading(entry.value, entry.unit)} for ${entry.goal_title}`;
     case 'add':
       return entry.step_kind === 'claude'
-        ? `Added a step for Claude in ${entry.goal_title}: "${entry.title}"`
+        ? `Added a step for Dash in ${entry.goal_title}: "${entry.title}"`
         : `Added a step in ${entry.goal_title}: "${entry.title}"`;
   }
 }

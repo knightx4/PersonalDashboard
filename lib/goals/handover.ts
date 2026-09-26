@@ -147,7 +147,7 @@ export function sendRefusal(
   if (!job) {
     return mode === 'prepare'
       ? 'Only a step of yours with no sub-steps can be prepared.'
-      : 'That step is yours. Only Claude\'s steps, and phases with steps in them, can be sent.';
+      : 'That step is yours. Only Dash\'s steps, and phases with steps in them, can be sent.';
   }
   if (isStepBlocked(step)) {
     return step.blockAsk ? `That step is blocked: ${step.blockAsk}` : 'That step is blocked.';
@@ -169,16 +169,16 @@ export function sendRefusal(
     if (!run.itemId) continue;
     if (run.itemId === step.id) {
       return job === 'prepare'
-        ? 'Claude is already preparing this step. What it writes will show here when it is done.'
-        : `Claude is already working on this ${job}. What it produces will show here when it is done.`;
+        ? 'Dash is already preparing this step. What it writes will show here when it is done.'
+        : `Dash is already working on this ${job}. What it produces will show here when it is done.`;
     }
     if (run.itemId === goal.id && (run.job === 'goal' || run.job === 'reshape')) {
-      return 'Claude is already working on the whole goal. Send this once that run has finished.';
+      return 'Dash is already working on the whole goal. Send this once that run has finished.';
     }
     const phase = above.find((node) => node.id === run.itemId);
-    if (phase) return `Claude is already working on "${phase.title}", which this is part of.`;
+    if (phase) return `Dash is already working on "${phase.title}", which this is part of.`;
     if (under.has(run.itemId)) {
-      return 'Claude is already working on a step in this phase. Send it once that run has finished.';
+      return 'Dash is already working on a step in this phase. Send it once that run has finished.';
     }
   }
   return null;

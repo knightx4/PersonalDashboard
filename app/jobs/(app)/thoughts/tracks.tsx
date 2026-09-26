@@ -49,7 +49,7 @@ export function LearningTracks({
       hint={
         hasEntries
           ? 'Subjects to learn for the job you describe below. Starting one adds it to your Learn goals, and Learn now brings you its lessons.'
-          : 'Write a career goals entry and Claude can suggest what to learn for it.'
+          : 'Write a career goals entry and Dash can suggest what to learn for it.'
       }
     >
       {message && <p className="mb-2 text-small text-ink-muted">{message}</p>}

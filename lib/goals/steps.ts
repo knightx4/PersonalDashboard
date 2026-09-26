@@ -30,7 +30,7 @@ export type RhythmPeriod = (typeof RHYTHM_PERIODS)[number];
 /** What each kind is called on the page, and whose it is. */
 export const STEP_KIND_LABELS: Record<StepKind, string> = {
   mine: 'Yours',
-  claude: "Claude's",
+  claude: "Dash's",
   decision: 'Question for you',
   rhythm: 'Rhythm',
 };

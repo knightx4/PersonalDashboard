@@ -62,7 +62,7 @@ function waitingRow(item: WaitingItem, steps: readonly StepNode[]): StatusRow | 
     case 'question':
       return { id: item.id, kind: 'question', label: 'Answer', title: item.title, href: `#step-${item.id}` };
     case 'flag':
-      return { id: item.id, kind: 'flag', label: 'Claude flagged', title: item.title, href: `#flag-${item.id}` };
+      return { id: item.id, kind: 'flag', label: 'Dash flagged', title: item.title, href: `#flag-${item.id}` };
     case 'breakdown': {
       const first = firstProposed(steps);
       return {
@@ -74,15 +74,15 @@ function waitingRow(item: WaitingItem, steps: readonly StepNode[]): StatusRow | 
       };
     }
     case 'plan':
-      return { id: item.id, kind: 'approve', label: 'Approve', title: 'This goal, which Claude proposed', href: '#claude-heading' };
+      return { id: item.id, kind: 'approve', label: 'Approve', title: 'This goal, which Dash proposed', href: '#claude-heading' };
     case 'review':
-      return { id: item.id, kind: 'read', label: 'Read Claude’s result', title: item.title, href: `#step-${item.id}` };
+      return { id: item.id, kind: 'read', label: 'Read Dash’s result', title: item.title, href: `#step-${item.id}` };
     case 'context':
       return {
         id: item.id,
         kind: 'read',
         label: 'Keep or dismiss',
-        title: plural(item.count, 'thing Claude found', 'things Claude found'),
+        title: plural(item.count, 'thing Dash found', 'things Dash found'),
         href: '#context-heading',
       };
     case 'drafts':
@@ -129,10 +129,10 @@ export function goalStatus(
 export function claudeLine(view: Pick<GoalStatusView, 'claudeReady' | 'claudeHeld'>): string | null {
   const parts: string[] = [];
   if (view.claudeReady > 0) {
-    parts.push(`Claude will work ${plural(view.claudeReady, 'step', 'steps')} on its next run`);
+    parts.push(`Dash will work ${plural(view.claudeReady, 'step', 'steps')} on its next run`);
   }
   if (view.claudeHeld > 0) {
-    parts.push(`${plural(view.claudeHeld, 'Claude step waits', 'Claude steps wait')} for your approval`);
+    parts.push(`${plural(view.claudeHeld, 'Dash step waits', 'Dash steps wait')} for your approval`);
   }
   return parts.length > 0 ? `${parts.join('. ')}.` : null;
 }
