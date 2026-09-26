@@ -42,7 +42,14 @@ export type FeedCardRow = {
   source_segment?: CatalogueSegment | null;
 };
 
-type CatalogueItem = { title: string; canonical_url: string; licence: string | null };
+type CatalogueItem = {
+  title: string;
+  canonical_url: string;
+  licence: string | null;
+  /** The article's lead image (learn migration 0060). Absent on older selects. */
+  image_url?: string | null;
+  image_file?: string | null;
+};
 type CatalogueSegment = { heading: string | null; text: string; section_anchor: string | null };
 
 export type FeedCard = {
@@ -105,6 +112,19 @@ export type FeedCard = {
    * absent on a card built straight from its row.
    */
   video?: FeedVideo | null;
+  /**
+   * The lead image of the article the card comes from, or cites. Null when
+   * the article has none, or none that is free to show.
+   */
+  image: FeedImage | null;
+};
+
+/** A picture on a card, and the file page that credits it. */
+export type FeedImage = {
+  url: string;
+  /** Alternative text: the article it illustrates. */
+  alt: string;
+  credit: string;
 };
 
 /** A clip shown on a card: the video, and the span of it that matched. */
@@ -114,6 +134,21 @@ export type FeedVideo = {
   start: number | null;
   end: number | null;
 };
+
+/**
+ * The image's file page, where its author and licence are. On English
+ * Wikipedia rather than Commons: that page shows a Commons file too, and a few
+ * lead images, mostly logos, are uploaded to Wikipedia alone.
+ */
+export function imageFilePage(file: string): string {
+  return `https://en.wikipedia.org/wiki/File:${encodeURIComponent(file.trim().replace(/\s+/g, '_'))}`;
+}
+
+/** The card's picture from its catalogue item, when the item has one. */
+export function imageFor(item: CatalogueItem | null | undefined): FeedImage | null {
+  if (!item?.image_url || !item.image_file) return null;
+  return { url: item.image_url, alt: item.title, credit: imageFilePage(item.image_file) };
+}
 
 /** Characters shown before the fold: about a phone screen of text. */
 export const SHOWN_CHARS = 700;
@@ -262,6 +297,7 @@ export function toFeedCard(row: FeedCardRow): FeedCard | null {
     link: sectionLink(row.item.canonical_url, row.segment.section_anchor),
     site: siteName(row.item.canonical_url),
     licence: licenceFor(row.item.licence, row.item.canonical_url),
+    image: imageFor(row.item),
   };
 }
 
@@ -311,6 +347,7 @@ function toLessonCard(row: FeedCardRow): FeedCard | null {
     link: item ? sectionLink(item.canonical_url, segment?.section_anchor ?? null) : null,
     site: item ? siteName(item.canonical_url) : null,
     licence: item ? licenceFor(item.licence, item.canonical_url) : null,
+    image: imageFor(item),
   };
 }
 
@@ -351,6 +388,7 @@ function toCheckCard(row: FeedCardRow): FeedCard | null {
     link: null,
     site: null,
     licence: null,
+    image: null,
   };
 }
 

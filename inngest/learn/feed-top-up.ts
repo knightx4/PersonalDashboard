@@ -20,6 +20,7 @@ import type { LearnOperation } from '@/lib/learn/spend';
 import type { LessonTopUpSummary } from '@/lib/learn/lessons/top-up';
 import { lessonsWanted, writeLessonsFor } from '@/lib/learn/lessons/top-up';
 import { linkAimTracks } from '@/lib/learn/lessons/aim-tracks';
+import { backfillArticleImages } from '@/lib/learn/catalogue/images';
 import { createFeedPicker, loadFeedFields, peopleToPickFor } from './feed-picks';
 import { createLessonPorts } from './lesson-top-up';
 
@@ -331,7 +332,11 @@ async function topUpWith(
   return { ...sections, readyBefore, skipped: false, lessons };
 }
 
-export type FeedTopUpResult = { people: TopUpSummary[] };
+export type FeedTopUpResult = {
+  people: TopUpSummary[];
+  /** Articles asked for their lead image this hour, and how many had one. */
+  images: { asked: number; found: number } | null;
+};
 
 /**
  * The hourly call: everyone with placed themes or an active goal, and fewer
@@ -341,12 +346,17 @@ export type FeedTopUpResult = { people: TopUpSummary[] };
 export async function runFeedTopUp(): Promise<FeedTopUpResult> {
   const deadline = Date.now() + FEED_TOP_UP_BUDGET_MS;
   const context = await createContext();
+  const images = await backfillArticleImages(context.learn).catch((error: unknown) => {
+    // A picture is a nicety: its failure never holds up anyone's cards.
+    console.error('[learn feed top-up] images', error instanceof Error ? error.message : error);
+    return null;
+  });
   const people: TopUpSummary[] = [];
   for (const userId of await peopleToPickFor(context.learn)) {
     if (Date.now() >= deadline) break;
     people.push(await topUpWith(context, userId, { threshold: READY_TARGET, deadline }));
   }
-  return { people };
+  return { people, images };
 }
 
 /**

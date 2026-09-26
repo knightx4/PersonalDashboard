@@ -6,6 +6,7 @@ import {
   canMakeTrack,
   cardTitle,
   feedEnd,
+  imageFilePage,
   licenceFor,
   OFFER_AFTER,
   offerDue,
@@ -34,6 +35,35 @@ function row(overrides: Partial<FeedCardRow> = {}): FeedCardRow {
     ...overrides,
   };
 }
+
+describe('the picture', () => {
+  it('shows the article image with a credit link to its file page', () => {
+    const card = toFeedCard(
+      row({
+        item: {
+          title: 'Urbanization',
+          canonical_url: 'https://en.wikipedia.org/wiki/Urbanization',
+          licence: null,
+          image_url: 'https://upload.wikimedia.org/x.jpg',
+          image_file: "Tokyo's skyline.jpg",
+        },
+      }),
+    );
+    expect(card?.image).toEqual({
+      url: 'https://upload.wikimedia.org/x.jpg',
+      alt: 'Urbanization',
+      credit: "https://en.wikipedia.org/wiki/File:Tokyo's_skyline.jpg",
+    });
+  });
+
+  it('has none when the article has none', () => {
+    expect(toFeedCard(row())?.image).toBeNull();
+  });
+
+  it('names the file page with underscores', () => {
+    expect(imageFilePage('A b.svg')).toBe('https://en.wikipedia.org/wiki/File:A_b.svg');
+  });
+});
 
 describe('the source line', () => {
   it('titles a section by article and heading, and the lead by article alone', () => {

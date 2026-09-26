@@ -52,6 +52,44 @@ import {
 } from './actions';
 
 /**
+ * The lead image of the article a card comes from (learn migration 0060).
+ *
+ * A plain img loaded straight from Wikimedia, which costs nothing to serve:
+ * next/image would fetch and re-encode every picture on this app's own
+ * function. Lazy, because the deck renders the cards behind the top one. On a
+ * white backing, because most of these are diagrams drawn for a white page.
+ * A picture that fails to load takes its space with it.
+ */
+function CardImage({ image }: { image: NonNullable<FeedCard['image']> }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return (
+    <figure className="mt-3">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={image.url}
+        alt={image.alt}
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        onError={() => setFailed(true)}
+        className="mx-auto max-h-56 w-full rounded-control bg-white object-contain"
+      />
+      <figcaption className="mt-1 text-right text-small text-ink-muted">
+        <a
+          href={image.credit}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 hover:text-accent"
+        >
+          Image credit
+        </a>
+      </figcaption>
+    </figure>
+  );
+}
+
+/**
  * The Learn now deck (LEARN-NOW-SPEC, "Cards after the first week").
  *
  * One card on the screen at a time, left by one of three swipes:
@@ -555,6 +593,8 @@ function DeckCard({
               <p className="mt-1 text-body font-medium text-ink">{card.takeaway}</p>
             </section>
           )}
+
+          {card.image && <CardImage image={card.image} />}
 
           {/* What this is about, before anything argues about it: the card
               has to stand on its own for someone who never saw the source. */}

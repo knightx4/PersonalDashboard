@@ -39,6 +39,7 @@ function article(title: string): WikipediaArticle {
     canonicalUrl: `https://en.wikipedia.org/wiki/${title.replace(/ /g, '_')}`,
     lengthChars: 100,
     sections: sections(null, 'History', 'Causes'),
+    image: null,
   };
 }
 

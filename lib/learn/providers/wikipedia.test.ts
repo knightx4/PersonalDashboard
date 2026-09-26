@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   articleRequestUrl,
+  imageFromPage,
+  imagesRequestUrl,
   parseArticleResponse,
+  parseImagesResponse,
   sectionsFromExtract,
 } from './wikipedia';
 
@@ -117,6 +120,65 @@ describe('articleRequestUrl', () => {
     expect(url.searchParams.get('exsectionformat')).toBe('wiki');
     expect(url.searchParams.get('redirects')).toBe('1');
   });
+
+  it('asks for the free lead image in the same request', () => {
+    const url = new URL(articleRequestUrl('Marginal utility'));
+    expect(url.searchParams.get('prop')).toBe('extracts|info|pageimages');
+    expect(url.searchParams.get('piprop')).toBe('thumbnail|name');
+    expect(url.searchParams.get('pilicense')).toBe('free');
+  });
+});
+
+const THUMB =
+  'https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8c/Supply-demand-equilibrium.svg/960px-Supply-demand-equilibrium.svg.png';
+
+describe('the lead image', () => {
+  it('keeps a Wikimedia thumbnail without the tracking parameters', () => {
+    expect(
+      imageFromPage({
+        thumbnail: { source: `${THUMB}?utm_source=en.wikipedia.org&utm_campaign=api` },
+        pageimage: 'Supply-demand-equilibrium.svg',
+      }),
+    ).toEqual({ url: THUMB, file: 'Supply-demand-equilibrium.svg' });
+  });
+
+  it('refuses an image from anywhere else, or with no file name', () => {
+    expect(imageFromPage({ thumbnail: { source: 'https://evil.example/x.png' }, pageimage: 'x.png' })).toBeNull();
+    expect(imageFromPage({ thumbnail: { source: 'http://upload.wikimedia.org/x.png' }, pageimage: 'x.png' })).toBeNull();
+    expect(imageFromPage({ thumbnail: { source: THUMB } })).toBeNull();
+    expect(imageFromPage({})).toBeNull();
+  });
+
+  it('asks for fifty titles at most in one batch', () => {
+    const titles = Array.from({ length: 60 }, (_, n) => `Title ${n}`);
+    const url = new URL(imagesRequestUrl(titles));
+    expect(url.searchParams.get('titles')?.split('|')).toHaveLength(50);
+    expect(url.searchParams.get('prop')).toBe('pageimages');
+  });
+
+  it('traces each asked title through normalising and redirects', () => {
+    const body = JSON.stringify({
+      query: {
+        normalized: [{ from: 'supply and demand', to: 'Supply and demand' }],
+        redirects: [{ from: 'Demand curve', to: 'Demand curve (economics)' }],
+        pages: [
+          { title: 'Supply and demand', thumbnail: { source: THUMB }, pageimage: 'S.svg' },
+          { title: 'Demand curve (economics)' },
+          { title: 'Nope', missing: true },
+        ],
+      },
+    });
+    const images = parseImagesResponse(body, ['supply and demand', 'Demand curve', 'Nope', 'Unasked']);
+    expect(images?.get('supply and demand')).toEqual({ url: THUMB, file: 'S.svg' });
+    expect(images?.get('Demand curve')).toBeNull();
+    expect(images?.get('Nope')).toBeNull();
+    // Left out of the answer: asked again next time.
+    expect(images?.has('Unasked')).toBe(false);
+  });
+
+  it('is null for an answer that is not the API', () => {
+    expect(parseImagesResponse('<html>', ['A'])).toBeNull();
+  });
 });
 
 function apiBody(page: Record<string, unknown>): string {
@@ -141,6 +203,7 @@ describe('parseArticleResponse', () => {
     expect(result.canonicalUrl).toBe('https://en.wikipedia.org/wiki/Marginal_utility');
     expect(result.lengthChars).toBe(MARGINAL_UTILITY.trim().length);
     expect(result.sections).toHaveLength(4);
+    expect(result.image).toBeNull();
   });
 
   it('builds the article url when the API did not give one', () => {

@@ -204,6 +204,12 @@ export async function storeArticle(
         text: section.text,
       })),
     );
+    await tx`
+      update learn.catalogue_items
+         set image_url = ${article.image?.url ?? null},
+             image_file = ${article.image?.file ?? null},
+             image_checked_at = now()
+       where id = ${itemId}`;
     const removed = await deleteTrailingSegments(tx, itemId, article.sections.length);
     return { itemId, written: article.sections.length, removed };
   }) as Promise<StoredArticle>;

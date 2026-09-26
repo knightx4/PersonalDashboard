@@ -18,10 +18,18 @@ export {
   WIKIPEDIA_PROVIDER_SLUG,
   articleRequestUrl,
   fetchWikipediaArticle,
+  fetchWikipediaImages,
   parseArticleResponse,
+  parseImagesResponse,
   sectionsFromExtract,
 } from './wikipedia';
-export type { WikipediaArticle, WikipediaFailure, WikipediaResult, WikipediaSection } from './wikipedia';
+export type {
+  WikipediaArticle,
+  WikipediaFailure,
+  WikipediaImage,
+  WikipediaResult,
+  WikipediaSection,
+} from './wikipedia';
 
 export {
   chaptersFromDescription,

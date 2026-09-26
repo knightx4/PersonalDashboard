@@ -14,7 +14,11 @@ import { fetchDocument } from './fetch';
  *
  * One request, to the MediaWiki action API:
  *
- *   action=query&prop=extracts|info&explaintext=1&exsectionformat=wiki
+ *   action=query&prop=extracts|info|pageimages&explaintext=1&exsectionformat=wiki
+ *
+ * `prop=pageimages` adds the article's lead image, when it has a freely
+ * licensed one, at no extra request: Learn now cards show it (learn migration
+ * 0060).
  *
  * `prop=extracts` with `explaintext` returns the whole article as plain text
  * with its headings still in wiki form (`== History ==`), which is the shape
@@ -54,7 +58,18 @@ export type WikipediaArticle = {
   canonicalUrl: string;
   lengthChars: number;
   sections: WikipediaSection[];
+  /** The article's lead image, or null when it has no free one. */
+  image: WikipediaImage | null;
 };
+
+/** A thumbnail on Wikimedia's servers and the file it was cut from. */
+export type WikipediaImage = {
+  url: string;
+  file: string;
+};
+
+/** How wide a thumbnail to ask for: wide enough for a card on a laptop. */
+export const THUMBNAIL_WIDTH = 640;
 
 export type WikipediaFailure = {
   ok: false;
@@ -82,11 +97,43 @@ export function articleRequestUrl(title: string): string {
   url.searchParams.set('formatversion', '2');
   // A title that redirects is followed here rather than stored twice.
   url.searchParams.set('redirects', '1');
-  url.searchParams.set('prop', 'extracts|info');
+  url.searchParams.set('prop', 'extracts|info|pageimages');
   url.searchParams.set('inprop', 'url');
+  setImageParams(url);
   url.searchParams.set('explaintext', '1');
   url.searchParams.set('exsectionformat', 'wiki');
   url.searchParams.set('titles', title);
+  return url.toString();
+}
+
+/**
+ * The lead image only, and only a free one. `pilicense=free` is the API's
+ * default; it is set anyway because a non-free image on a card is the one
+ * thing here that would be a problem.
+ */
+function setImageParams(url: URL): void {
+  url.searchParams.set('piprop', 'thumbnail|name');
+  url.searchParams.set('pithumbsize', String(THUMBNAIL_WIDTH));
+  url.searchParams.set('pilicense', 'free');
+}
+
+/** Most titles one API request takes. */
+export const IMAGE_BATCH = 50;
+
+/**
+ * Lead images for up to fifty articles at once, for the articles stored
+ * before the article request asked for one.
+ */
+export function imagesRequestUrl(titles: string[]): string {
+  const url = new URL(API_ENDPOINT);
+  url.searchParams.set('action', 'query');
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('formatversion', '2');
+  url.searchParams.set('redirects', '1');
+  url.searchParams.set('prop', 'pageimages');
+  setImageParams(url);
+  url.searchParams.set('pilimit', String(IMAGE_BATCH));
+  url.searchParams.set('titles', titles.slice(0, IMAGE_BATCH).join('|'));
   return url.toString();
 }
 
@@ -154,7 +201,87 @@ const Page = z.object({
   invalid: z.boolean().optional(),
   canonicalurl: z.string().optional(),
   extract: z.string().optional(),
+  thumbnail: z.object({ source: z.string() }).optional(),
+  pageimage: z.string().optional(),
 });
+
+type PageShape = z.infer<typeof Page>;
+
+/**
+ * The page's image, with the API's tracking parameters taken off the URL.
+ * Null for anything that is not an https address on Wikimedia's servers.
+ */
+export function imageFromPage(page: Pick<PageShape, 'thumbnail' | 'pageimage'>): WikipediaImage | null {
+  if (!page.thumbnail || !page.pageimage) return null;
+  let url: URL;
+  try {
+    url = new URL(page.thumbnail.source);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:') return null;
+  if (url.hostname !== 'wikimedia.org' && !url.hostname.endsWith('.wikimedia.org')) return null;
+  url.search = '';
+  return { url: url.toString(), file: page.pageimage };
+}
+
+/**
+ * Each title's image from a batch answer, keyed by the title as it was asked
+ * for. A title that was normalised or redirected is traced back through the
+ * API's `normalized` and `redirects` lists. A title the answer does not
+ * mention is left out, which the caller reads as not yet asked.
+ */
+export function parseImagesResponse(
+  body: string,
+  asked: string[],
+): Map<string, WikipediaImage | null> | null {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    return null;
+  }
+  const Rename = z.array(z.object({ from: z.string(), to: z.string() }));
+  const parsed = z
+    .object({
+      query: z
+        .object({
+          pages: z.array(Page).optional(),
+          normalized: Rename.optional(),
+          redirects: Rename.optional(),
+        })
+        .optional(),
+    })
+    .safeParse(payload);
+  if (!parsed.success || !parsed.data.query) return null;
+  const { pages = [], normalized = [], redirects = [] } = parsed.data.query;
+
+  const byTitle = new Map(pages.map((page) => [page.title, page]));
+  const renamed = (from: string, list: { from: string; to: string }[]) =>
+    list.find((entry) => entry.from === from)?.to ?? from;
+
+  const images = new Map<string, WikipediaImage | null>();
+  for (const title of asked) {
+    const page = byTitle.get(renamed(renamed(title, normalized), redirects));
+    if (!page) continue;
+    images.set(title, page.missing || page.invalid ? null : imageFromPage(page));
+  }
+  return images;
+}
+
+/**
+ * Lead images for up to fifty titles, or null when the request failed. Never
+ * retried here: the backfill that calls it runs every hour.
+ */
+export async function fetchWikipediaImages(
+  titles: string[],
+): Promise<Map<string, WikipediaImage | null> | null> {
+  const asked = titles.slice(0, IMAGE_BATCH);
+  if (asked.length === 0) return new Map();
+  const fetched = await fetchDocument(imagesRequestUrl(asked));
+  if (!fetched.ok || fetched.contentType !== 'json') return null;
+  return parseImagesResponse(fetched.text, asked);
+}
 
 const ApiResponse = z.object({
   error: z.object({ code: z.string(), info: z.string() }).optional(),
@@ -199,6 +326,7 @@ export function parseArticleResponse(body: string): WikipediaResult {
     canonicalUrl: page.canonicalurl ?? new URL(externalId, ARTICLE_BASE).toString(),
     lengthChars: extract.length,
     sections,
+    image: imageFromPage(page),
   };
 }
 

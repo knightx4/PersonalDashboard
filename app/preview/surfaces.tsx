@@ -1943,6 +1943,7 @@ const deckCards: FeedCard[] = [
     link: null,
     site: null,
     licence: null,
+    image: null,
   },
   {
     id: '00000000-0000-4000-8000-000000000001',
@@ -1980,6 +1981,7 @@ const deckCards: FeedCard[] = [
     link: 'https://en.wikipedia.org/wiki/Cobweb_model#Mechanism',
     site: 'Wikipedia',
     licence: 'CC BY-SA 4.0',
+    image: null,
   },
   {
     id: '00000000-0000-4000-8000-000000000002',
@@ -2010,6 +2012,7 @@ const deckCards: FeedCard[] = [
     link: 'https://en.wikipedia.org/wiki/Tax_incidence',
     site: 'Wikipedia',
     licence: 'CC BY-SA 4.0',
+    image: null,
   },
 ];
 

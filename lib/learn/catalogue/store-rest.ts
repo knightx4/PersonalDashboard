@@ -62,6 +62,9 @@ export async function storeArticleOverRest(
         length_chars: article.lengthChars,
         duration_seconds: null,
         published_at: null,
+        image_url: article.image?.url ?? null,
+        image_file: article.image?.file ?? null,
+        image_checked_at: new Date().toISOString(),
       },
       { onConflict: 'provider_id,external_id' },
     )
