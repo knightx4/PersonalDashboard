@@ -13,7 +13,7 @@ import { loadAreaRuns } from '@/lib/goals/shaping-store';
 import { loadDailyView } from '@/lib/goals/steps-store';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { AreaPlanner } from '../../area-planner';
-import { GoalRow } from '../../daily-view';
+import { GoalRow } from './area-goal-row';
 import { ApproveArea } from '../../goals-view';
 
 export const metadata = { title: 'Area' };
