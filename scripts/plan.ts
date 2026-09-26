@@ -14,6 +14,9 @@
  *                                [--detail "…"] [--done-when "…"] [--fog "…"]
  *                                [--proposed] [--idea <id prefix>]
  *                                [--kind decision|setup] [--from <n>]
+ *                                # under an approved feature a step is ready
+ *                                # to build, stamped with the session that
+ *                                # added it; --proposed holds it for the person
  *   npx tsx scripts/plan.ts needs "<what to set>" --for <n> [--detail "…"]
  *                                # something only the person can supply: one
  *                                # setup job of theirs, under the feature that
@@ -84,7 +87,7 @@ import {
   setupHome,
   setupStartRefusal,
 } from '../lib/plan/needs';
-import { reshapeStamp } from '../lib/plan/origin';
+import { addsAsProposal, currentSession, reshapeStamp, sessionStamp } from '../lib/plan/origin';
 import {
   CHECK_BACK_COLUMNS,
   checkBackFrom,
@@ -907,9 +910,27 @@ async function main(): Promise<void> {
             where user_id = ${userId} and parent_id is null and module is not distinct from ${scope}
             order by position desc limit 1`;
 
-      // A step under a proposed parent is a proposal too, whatever the flag
+      // Approval stops at the feature (#1095): under a chain nobody left
+      // proposed, a new step is ready to build unless --proposed says it
+      // waits for the person (a step that acts outside the repository). Under
+      // a proposed row anywhere above, it is a proposal whatever the flag
       // said: a decided step inside an undecided feature is a contradiction.
-      const proposed = has('--proposed') || parent?.status === 'proposed';
+      const ancestors = parent
+        ? await sql<{ status: string }[]>`
+            with recursive chain as (
+              select id, parent_id, status, 0 as depth from plan_items
+              where id = ${parent.id} and user_id = ${userId}
+              union all
+              select p.id, p.parent_id, p.status, chain.depth + 1 from plan_items p
+              join chain on p.id = chain.parent_id
+              where p.user_id = ${userId}
+            )
+            select status from chain order by depth`
+        : [];
+      const proposed = addsAsProposal(
+        ancestors.map((a) => a.status),
+        has('--proposed'),
+      );
 
       // A setup job is the person's by definition, so it is written as
       // theirs rather than left unassigned for somebody to wonder about.
@@ -929,6 +950,16 @@ async function main(): Promise<void> {
         if (from.kind !== 'decision') fail(`#${from.number} is not a decision.`);
         if (!from.resolution) fail(`#${from.number} has not been answered yet.`);
         comment = reshapeStamp(from.number, from.resolution);
+      }
+
+      // A step a session writes ready under an approved feature says so, on
+      // its own line, so the page can mark it and offer the drop. A person at
+      // their own terminal has no session and writes no stamp.
+      const session = currentSession(process.env);
+      const stamped = parent && !proposed && kind === 'build' && session !== undefined;
+      if (stamped) {
+        const line = sessionStamp({ session, date: new Date().toISOString().slice(0, 10) });
+        comment = comment ? `${comment}\n${line}` : line;
       }
 
       const [row] = await sql<{ id: string; number: number }[]>`
@@ -965,7 +996,9 @@ async function main(): Promise<void> {
               ? 'for you to set up'
               : proposed
                 ? 'proposed'
-                : 'added'
+                : stamped
+                  ? 'added ready to build'
+                  : 'added'
         }${
           parent ? ` under #${parent.number}` : ` at the top of ${moduleLabel(scope)}`
         }${ideaPrefix ? ` from idea ${ideaPrefix}` : ''}.`,
