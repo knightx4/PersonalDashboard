@@ -5,6 +5,10 @@ import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createTodoClient } from '@/lib/todo/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
+import { createGoalsClient } from '@/lib/goals/auth/server';
+import { loadDailyView } from '@/lib/goals/steps-store';
+import { createNewsClient } from '@/lib/news/auth/server';
+import { goalsWaitingText } from '@/lib/shell/home-model';
 import { todayInTimezone } from '@/lib/money';
 import type { ModuleId } from '@/lib/modules';
 
@@ -55,7 +59,9 @@ export async function loadShoppingBrief(
 ): Promise<Brief | null> {
   if (reviewCount > 0) {
     return {
-      text: `${plural(reviewCount, 'thing')} to review`,
+      // Imports the parser was not sure of: an order whose totals did not add
+      // up, or an email it could not match. "Things" said none of that.
+      text: `${plural(reviewCount, 'import')} to check`,
       href: '/shopping/review',
       tone: 'caution',
     };
@@ -105,7 +111,7 @@ export async function loadJobsBrief(
 ): Promise<Brief | null> {
   if (reviewCount > 0) {
     return {
-      text: `${plural(reviewCount, 'thing')} to review`,
+      text: `${plural(reviewCount, 'import')} to check`,
       href: '/jobs/review',
       tone: 'caution',
     };
@@ -169,10 +175,6 @@ export async function loadTodoBrief(
     0,
   );
 
-  if (overdue > 0) {
-    return { text: `${plural(overdue, 'thing')} overdue`, href: '/todo', tone: 'caution' };
-  }
-
   const due = await safe(
     supabase
       .from('tasks')
@@ -184,7 +186,17 @@ export async function loadTodoBrief(
     0,
   );
 
-  return due > 0 ? { text: `${plural(due, 'thing')} due today`, href: '/todo' } : null;
+  // Both numbers when both are true: eight late and two due today is a
+  // different morning from eight late and nothing else.
+  if (overdue > 0) {
+    const text =
+      due > 0
+        ? `${plural(overdue, 'task')} overdue, ${due} more due today`
+        : `${plural(overdue, 'task')} overdue`;
+    return { text, href: '/todo', tone: 'caution' };
+  }
+
+  return due > 0 ? { text: `${plural(due, 'task')} due today`, href: '/todo' } : null;
 }
 
 export async function loadVaultBrief(): Promise<Brief | null> {
@@ -233,6 +245,47 @@ export async function loadLearnBrief(): Promise<Brief | null> {
 
   if (!count) return null;
   return { text: `${plural(count, 'thing')} to read`, href: '/learn/lists' };
+}
+
+/**
+ * The goals brief: what the goals are waiting on you for, counted the way the
+ * Goals page groups it. A question or a flag earns the colour, because
+ * nothing moves on that goal until you answer it.
+ */
+export async function loadGoalsBrief(userId: string, timezone: string): Promise<Brief | null> {
+  const client = await createGoalsClient();
+  const daily = await safe(
+    loadDailyView(client, { userId, today: todayInTimezone(timezone) }),
+    null,
+  );
+  if (!daily) return null;
+  const waiting = goalsWaitingText(daily.waiting);
+  if (!waiting) return null;
+  return {
+    text: waiting.text,
+    href: '/goals',
+    ...(waiting.decide > 0 ? { tone: 'caution' as const } : {}),
+  };
+}
+
+/**
+ * The news brief: how many newsletters are waiting to be read. Said quietly;
+ * an unread newsletter is never urgent.
+ */
+export async function loadNewsBrief(): Promise<Brief | null> {
+  const client = await createNewsClient();
+  const count = await safe(
+    client
+      .from('issues')
+      // A muted sender's issues are out of the list, so out of the count.
+      .select('id, senders!inner ( muted )', { count: 'exact', head: true })
+      .is('read_at', null)
+      .eq('senders.muted', false)
+      .then((result) => result.count),
+    null,
+  );
+  if (!count) return null;
+  return { text: `${plural(count, 'unread newsletter')}`, href: '/news' };
 }
 
 export type BriefFor = ModuleId | null;
