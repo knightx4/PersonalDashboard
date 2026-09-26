@@ -56,6 +56,17 @@ export const REVIEW_ASK = 'Claude has finished this. Read what it produced and m
 /** What a ready step of yours waits on you for. */
 export const YOURS_ASK = 'Yours to do. Do it and mark it done, or answer what is in the way.';
 
+/**
+ * The health word for a step that is yours and ready. It is on you in the
+ * plan's terms, but "Waiting on you" read as if something were stuck, when
+ * all it means is that the next move is yours. The goals home names the same
+ * list Your move.
+ */
+export const YOURS_WORD = 'Your move';
+
+/** The tooltip on a stage whose only open work is steps of yours. */
+export const YOURS_BENEATH = 'A step beneath this one is yours to do.';
+
 /** A step of yours with nothing in its way: on you, not ready for Dash. */
 function yoursToDo(step: StepNode, ready: ReadonlySet<string>): boolean {
   return (
@@ -109,6 +120,8 @@ type Shadow = {
   assignee: PlanAssignee | null;
   blockKind: 'steps' | 'outside' | null;
   blockAsk: string | null;
+  /** A ready step of yours, read as blocked on you but worded Your move. */
+  yours: boolean;
   dismissedAt: string | null;
   ready: boolean;
   dependsOn: { dependencyId: string; item: { id: string; status: PlanStatus } }[];
@@ -138,6 +151,7 @@ function shadowOf(
     assignee: step.kind === 'mine' || step.kind === 'rhythm' ? 'me' : null,
     blockKind: onYou ? 'outside' : (step.blockKind ?? null),
     blockAsk: review ? REVIEW_ASK : yours ? YOURS_ASK : (step.blockAsk ?? null),
+    yours,
     dismissedAt: step.dismissedAt ?? null,
     ready: ready.has(step.id),
     dependsOn: (step.dependsOn ?? []).map((link) => ({
@@ -151,6 +165,29 @@ function shadowOf(
 
 function shadowFlat(node: Shadow): Shadow[] {
   return [node, ...node.children.flatMap(shadowFlat)];
+}
+
+/**
+ * Whether a row reading blocked is blocked only by steps of yours that are
+ * ready: the row itself, or, for a stage, every blocked row beneath it. A
+ * real block or a Claude result to read anywhere in there keeps the plan's
+ * "Waiting on you".
+ */
+function onlyYours(shadow: Shadow): boolean {
+  if (shadow.status === 'blocked') return shadow.yours;
+  const blocked = shadowFlat(shadow)
+    .slice(1)
+    .filter((row) => row.status === 'blocked');
+  return blocked.length > 0 && blocked.every((row) => row.yours);
+}
+
+/** The plan's health for a row, with a ready step of yours worded Your move. */
+function goalHealth(shadow: Shadow, facts: HealthFacts) {
+  const health = healthWordsOf(planHealthOf(asPlan(shadow)), facts);
+  if (health.name !== 'blocked' || !onlyYours(shadow)) return health;
+  // A closed row keeps its tooltip, which names the open steps beneath it.
+  const title = facts.closed ? health.title : shadow.yours ? YOURS_ASK : YOURS_BENEATH;
+  return { ...health, word: YOURS_WORD, title };
 }
 
 /** A question put aside with Not now. Left out of the rows unless they are asked for. */
@@ -283,7 +320,7 @@ export function goalRows(
       children: pairs.map(([child, childShadow]) => toRow(child, childShadow)),
       step,
       need: shadow.status === 'blocked' && shadow.blockKind !== 'steps' ? shadow.blockAsk : null,
-      health: healthWordsOf(planHealthOf(asPlan(shadow)), facts),
+      health: goalHealth(shadow, facts),
       move: moveWordsFor(
         planMoveOf(asPlan(shadow)),
         planMoveOf(asPlan({ ...shadow, children: [] })),
