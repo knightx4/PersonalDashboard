@@ -42,6 +42,22 @@ describe('profileText', () => {
   it('says none rather than leaving a heading empty', () => {
     expect(profileText({ tracks: [], goals: [], ideas: [] }).match(/- none/g)).toHaveLength(3);
   });
+
+  it('lists the videos you filed yourself as examples, with what the judge had said', () => {
+    const text = profileText({
+      tracks: [],
+      goals: [],
+      ideas: [],
+      filed: [
+        { title: 'Excel in ten minutes', channel: 'A channel', judge: 'skip', you: 'watch' },
+        { title: 'A lecture', channel: null, judge: null, you: 'card' },
+      ],
+    });
+    expect(text).toContain('VIDEOS THEY FILED THEMSELVES');
+    expect(text).toContain('- "Excel in ten minutes" (A channel): judged SKIP, they moved it to WATCH');
+    expect(text).toContain('- "A lecture": CARD');
+    expect(profileText({ tracks: [], goals: [], ideas: [] })).not.toContain('FILED');
+  });
 });
 
 describe('the screen', () => {

@@ -152,7 +152,7 @@ describe('judgeWatchLists', () => {
     const byId = new Map(tables.watch_list.map((row) => [row.video_id, row]));
 
     // The clear skip: a verdict from the title, and no transcript asked for.
-    expect(byId.get('bbbbbbbbbbb')).toMatchObject({ verdict: 'skip', verdict_by: 'judge', judged_from: 'title' });
+    expect(byId.get('bbbbbbbbbbb')).toMatchObject({ verdict: 'skip', judge_verdict: 'skip', verdict_by: 'judge', judged_from: 'title' });
     expect(tables.video_transcripts.some((row) => row.video_id === 'bbbbbbbbbbb')).toBe(false);
 
     // Let through: screened, reason kept, transcript queued for the list.
@@ -161,7 +161,7 @@ describe('judgeWatchLists', () => {
 
     // Judged from its transcript: a watch verdict with a start and end minute.
     const watched = byId.get('ccccccccccc')!;
-    expect(watched).toMatchObject({ verdict: 'watch', verdict_by: 'judge', judged_from: 'transcript', best_start_seconds: 0 });
+    expect(watched).toMatchObject({ verdict: 'watch', judge_verdict: 'watch', verdict_by: 'judge', judged_from: 'transcript', best_start_seconds: 0 });
     expect(watched.best_end_seconds as number).toBeGreaterThan(0);
     expect(watched.stretches).toEqual([{ startSeconds: 0, endSeconds: expect.any(Number), point: 'Sets up the sheet.' }]);
 

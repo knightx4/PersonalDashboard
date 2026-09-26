@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { closestIdeas, filterVideos, type ListVideo } from './videos';
+import { closestIdeas, filterVideos, pileCounts, verdictReason, videoHref, type ListVideo } from './videos';
 
 const video = (videoId: string, title: string, channel: string | null, verdict: ListVideo['verdict'] = null): ListVideo => ({
   videoId,
@@ -9,9 +9,13 @@ const video = (videoId: string, title: string, channel: string | null, verdict: 
   addedAt: '2026-09-26T10:00:00Z',
   watchedAt: null,
   verdict,
+  verdictBy: verdict ? 'judge' : null,
+  judgeVerdict: verdict,
   why: null,
   bestStartSeconds: null,
   bestEndSeconds: null,
+  screenedAt: null,
+  stretchCount: 0,
 });
 
 const list = [
@@ -33,6 +37,46 @@ describe('filterVideos', () => {
 
   it('narrows to one verdict', () => {
     expect(filterVideos(list, { verdict: 'skip' }).map((v) => v.title)).toEqual(['The Kelly criterion']);
+  });
+
+  it('narrows to the videos not judged yet, and counts each pile', () => {
+    expect(filterVideos(list, { verdict: 'unjudged' }).map((v) => v.title)).toEqual(['Tidal locking']);
+    expect(filterVideos(list, { verdict: 'watch', q: 'kelly' })).toEqual([]);
+    expect(pileCounts(list)).toEqual({ watch: 1, card: 0, skip: 1, unjudged: 1 });
+  });
+});
+
+describe('videoHref', () => {
+  it('opens a Watch video at its best minute and anything else at the start', () => {
+    const watch = { ...video('aaaaaaaaaaa', 'How tides work', null, 'watch'), bestStartSeconds: 724 };
+    expect(videoHref(watch)).toBe('/learn/videos/aaaaaaaaaaa?t=724');
+    expect(videoHref({ ...watch, bestStartSeconds: null })).toBe('/learn/videos/aaaaaaaaaaa');
+    // Moved to card, it keeps the minute but no longer opens there.
+    expect(videoHref({ ...watch, verdict: 'card' })).toBe('/learn/videos/aaaaaaaaaaa');
+  });
+});
+
+describe('verdictReason', () => {
+  const judged = { ...video('bbbbbbbbbbb', 'The Kelly criterion', null, 'skip'), why: 'Touches none of your tracks.' };
+
+  it('gives the judge\'s reason for its own verdict', () => {
+    expect(verdictReason(judged)).toBe('Touches none of your tracks.');
+  });
+
+  it('says a video you moved was yours, and what the judge had said', () => {
+    expect(verdictReason({ ...judged, verdict: 'watch', verdictBy: 'you' })).toBe(
+      'You moved this from skip. The judge had said: Touches none of your tracks.',
+    );
+    expect(verdictReason({ ...judged, verdict: 'watch', verdictBy: 'you', judgeVerdict: null, why: null })).toBe(
+      'Filed by you before the judge read it.',
+    );
+  });
+
+  it('says what a video with no verdict is waiting for', () => {
+    expect(verdictReason({ ...judged, verdict: null, verdictBy: null, why: null })).toMatch(/next library run/);
+    expect(verdictReason({ ...judged, verdict: null, verdictBy: null, screenedAt: '2026-09-26T10:00:00Z' })).toMatch(
+      /waits on its transcript/,
+    );
   });
 });
 

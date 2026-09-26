@@ -55,7 +55,15 @@ export type LearnerProfile = {
   goals: { title: string; detail: string | null }[];
   /** Ideas from Learn now, by the theme each belongs to. */
   ideas: { theme: string; names: string[] }[];
+  /**
+   * Videos you filed yourself on the Videos page (#1068), newest first: what
+   * the judge said, if it had read the video, and where you put it. Read by
+   * both passes as examples of what you disagree with.
+   */
+  filed?: FiledVideo[];
 };
+
+export type FiledVideo = { title: string; channel: string | null; judge: Verdict | null; you: Verdict };
 
 export function isEmptyProfile(profile: LearnerProfile): boolean {
   return profile.tracks.length === 0 && profile.goals.length === 0 && profile.ideas.length === 0;
@@ -85,6 +93,15 @@ export function profileText(profile: LearnerProfile): string {
   lines.push('', 'IDEAS (from their Learn now feed, by theme):');
   if (profile.ideas.length === 0) lines.push('- none');
   for (const idea of profile.ideas) lines.push(`- Theme "${idea.theme}": ${idea.names.map((name) => clip(name, 80)).join('; ')}`);
+  const filed = profile.filed ?? [];
+  if (filed.length > 0) {
+    lines.push('', 'VIDEOS THEY FILED THEMSELVES (where the sorting got it wrong; judge videos like these the way they did):');
+    for (const video of filed) {
+      const channel = video.channel ? ` (${clip(video.channel, 60)})` : '';
+      const judge = video.judge && video.judge !== video.you ? `judged ${video.judge.toUpperCase()}, they moved it to ` : '';
+      lines.push(`- "${clip(video.title, 120)}"${channel}: ${judge}${video.you.toUpperCase()}`);
+    }
+  }
   return lines.join('\n');
 }
 
