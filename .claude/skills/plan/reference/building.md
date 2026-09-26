@@ -33,6 +33,9 @@ npx tsx scripts/plan.ts reopen <n>             # put it back to not started
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
                                                [--proposed] [--size s|m|l] [--from <n>]
+                                               # under an approved feature the step is
+                                               # ready to build; --proposed only for a
+                                               # step that acts outside the repository
 npx tsx scripts/plan.ts add "the question?" --parent <n> --kind decision --detail "…"
 npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
 npx tsx scripts/plan.ts fog <n> --note "…"     # what cannot be seen yet; --clear once it can
@@ -121,10 +124,13 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
    the merge comes before the close.
 8. **Before closing, look up once.** If the feature above your step carries
    fog, and what you just learned makes it specifiable, write those steps now
-   — `add "…" --parent <the feature> --proposed --done-when "…" --size s|m|l` —
-   and clear the patch with `fog <the feature> --clear`. Proposed, always: they
-   are a proposal like any other and wait for the same approve. Say in your
-   report what you graduated and what you cleared.
+   — `add "…" --parent <the feature> --done-when "…" --size s|m|l` — and
+   clear the patch with `fog <the feature> --clear`. Under a feature the
+   person has approved they go in ready to build, marked as added by your
+   session; under one still proposed they are proposals whatever you pass. A
+   step among them that acts outside the repository takes `--proposed` (see
+   **Steps that act outside the repository**). Say in your report what you
+   graduated and what you cleared.
 
    Most of the time the answer is no, and no is the right answer: you are
    heads-down on one done-when and will miss most of what a re-shape would
@@ -251,6 +257,54 @@ Recommend A: the nesting is one column and nobody has asked for it."
 A step that should not be done is `drop <n> --note "why"`; say "out of scope:
 …" when that is the reason, since there is no status for it. Never delete a
 step; deleting is the user's.
+
+## Steps that act outside the repository
+
+Under a feature the person has approved, the steps a session adds are ready
+to build without asking. What still waits for their approval is a step whose
+work has an effect outside the repository and the app's own schema. The rule
+is the goals skill's ("Steps that act outside the plan"), with the plan's
+examples:
+
+- sending, replying to or forwarding an email, or posting any other message:
+  a comment on a GitHub issue or on someone else's pull request, a note in a
+  channel;
+- submitting, booking, buying, cancelling or signing up for anything: a
+  domain, a paid plan or credits, a form to an app store or a registrar;
+- posting or sharing anything, or changing who can see it: publishing a page,
+  opening a repository, changing a file's permissions;
+- changing records outside the repository: a Vercel project's settings or
+  environment, DNS, another service's configuration, or the person's own rows
+  in the live database when the change rewrites or deletes what they wrote.
+
+Writing code, tests and documents, committing, the merge to main, and
+applying a migration the step needs all stay inside, as `CLAUDE.md` says.
+
+Such work is a step of its own, added with `--proposed`:
+
+```
+npx tsx scripts/plan.ts add "Point the dashboard domain at Vercel" --parent <n> \
+  --proposed --size s --detail "Changes the A record for dash.example.com in
+  Cloudflare to Vercel's address, replacing the current Netlify one." \
+  --done-when "dash.example.com serves the app over HTTPS."
+```
+
+The detail opens with one sentence naming exactly what working it does: who
+it goes to, from where, and what changes. Put the step that prepares it (the
+draft, the config written in the repo) before it as an ordinary step, so the
+person reads what would be sent or changed before approving it. Nothing works
+the step until they approve it on `/dev/plan`; after that it is built like
+any other.
+
+When a ready step turns out to need one of these, do the part inside the
+repository, and add the outside part as a proposed step rather than doing it
+under the ready step's approval. The same goes when what an approved outside
+step would do changes: propose a new step instead of widening the old one.
+
+This is not a setup step. A setup step, written with `needs`, is a job the
+person does themselves, such as setting a key only they hold; it is theirs
+from the start and is never proposed. An outside-the-repository step is work
+a session would do once the person agrees to it.
 
 ## When the step needs something only the user can supply
 

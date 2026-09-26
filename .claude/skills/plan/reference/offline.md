@@ -57,7 +57,8 @@ select bool_or(status = 'proposed') as proposed from chain;
 -- lib/plan/origin.ts reads back for the page's drop, so keep the wording
 -- exactly. A re-shape puts its 'From #63''s answer: …' line first and this
 -- one beneath it. A proposed chain, or a step that would act outside the
--- repository (what `--proposed` is for): status 'proposed', and no stamp.
+-- repository (what `--proposed` is for; building.md, 'Steps that act
+-- outside the repository'): status 'proposed', and no stamp.
 insert into plan_items (user_id, module, parent_id, title, acceptance, size,
                         status, position, comment)
 values ('…', 'dev', '<the parent id>', '…', '…', 's', 'not_started', 30,
