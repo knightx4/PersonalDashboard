@@ -409,7 +409,21 @@ describe('the vision at the top of a brief', () => {
         module: null,
         parentId: 'app-feature',
       }),
-      item({ id: 'shop-step', title: 'A basket', module: 'shopping' }),
+      item({
+        id: 'shop-feature',
+        title: 'A basket',
+        module: 'shopping',
+        acceptance: 'Everything bought in one place.',
+      }),
+      item({
+        id: 'shop-step',
+        title: 'Add to basket',
+        module: 'shopping',
+        parentId: 'shop-feature',
+      }),
+      // Filed under shopping by its root, whatever its own column says.
+      item({ id: 'stray-step', title: 'Clear the basket', module: null, parentId: 'shop-feature' }),
+      item({ id: 'news-step', title: 'A digest', module: 'news' }),
     ],
     dependencies: [],
   });
@@ -427,8 +441,21 @@ describe('the vision at the top of a brief', () => {
     expect(planBrief(sections, findNode(sections, 'app-step')!)).not.toContain('## Vision');
   });
 
-  it('does not give a step in a workspace the app vision', () => {
+  it("opens a step in a workspace with that workspace's vision, above the destination", () => {
     const brief = planBrief(sections, findNode(sections, 'shop-step')!, { visions });
+    expect(brief).toContain('## Vision\n\nBuy less, better.');
+    expect(brief).not.toContain('One place for the whole of a life.');
+    expect(brief.indexOf('## Vision')).toBeLessThan(brief.indexOf('## Destination'));
+  });
+
+  it('reads the workspace from the top of the tree, not the step', () => {
+    const brief = planBrief(sections, findNode(sections, 'stray-step')!, { visions });
+    expect(brief).toContain('## Vision\n\nBuy less, better.');
+  });
+
+  it('prints no vision section for a workspace with none, and no app vision in its place', () => {
+    const brief = planBrief(sections, findNode(sections, 'news-step')!, { visions });
+    expect(brief).not.toContain('## Vision');
     expect(brief).not.toContain('One place for the whole of a life.');
   });
 });
