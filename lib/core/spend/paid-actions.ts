@@ -91,6 +91,9 @@ export const PAID_ACTIONS = {
   'app/jobs/(app)/roles/[id]/actions.ts#writeRoundPrepNote': ['write-interview-prep'],
   'app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence': ['draft-answer'],
   'app/jobs/(app)/settings/evidence-actions.ts#proposeEvidence': ['propose-evidence'],
+  'app/jobs/(app)/thoughts/actions.ts#suggestTracks': ['suggest-learning-tracks'],
+  // Starting a suggested track adds a Learn goal, as the Learn Goals page does.
+  'app/jobs/(app)/thoughts/actions.ts#startTrack': ['place-aim', 'write-curriculum'],
 
   // Shopping
   'app/shopping/inventory/add/actions.ts#previewPasteBookList': ['parse-paste-list'],

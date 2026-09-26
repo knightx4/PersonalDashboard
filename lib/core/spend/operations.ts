@@ -27,6 +27,9 @@ export const SPEND_OPERATIONS = {
     // Proposing evidence items from a pasted or uploaded source, on the
     // evidence settings page. Opus.
     'propose-evidence',
+    // Suggesting learning tracks from the career goals entries, on the Career
+    // goals page. Opus.
+    'suggest-learning-tracks',
   ],
   shopping: [
     // Reading an order confirmation email into an order: from inbox ingest,
