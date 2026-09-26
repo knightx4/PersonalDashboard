@@ -2,10 +2,11 @@
  * The morning run (docs/GOALS-SPEC.md, "What Claude does, and when"; plan
  * #933).
  *
- * Each morning the daily cron fires the goals routine once for the owner, if
- * there is a Claude step ready for it. The routine works each one, stores what
- * it produced on the step and closes it, and the home lists the result as
- * waiting on you until you mark it read.
+ * Each morning the daily cron fires the goals routine once for the owner,
+ * while there is an open goal. The run first gives every open goal its status
+ * for the day (plan #1074; lib/goals/reviews.ts), then works each Claude step
+ * that is ready, stores what it produced on the step and closes it, and the
+ * home lists the result as waiting on you until you mark it read.
  *
  * The rules that need no database live here: which steps are ready, whether
  * a run already happened today, and the brief the routine is fired with. The
@@ -13,6 +14,7 @@
  */
 import type { OutOfDateStep } from '@/lib/goals/answers';
 import { isStaleStepBlock, waitsOnNothing } from '@/lib/goals/dependencies';
+import { reviewLines, type ReviewGoal } from '@/lib/goals/reviews';
 import type { StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
 
@@ -69,17 +71,20 @@ export function ranRecently(lastDailyRunAt: string | null, now: number): boolean
 
 /**
  * The turn appended to the goals routine's standing prompt for the morning
- * run. It names the account, the run row already written, the steps to work
- * and the information steps whose answers are out of date (plan #989), so
- * the session does not have to decide what is ready.
+ * run. It names the account and the run row already written, then every open
+ * goal to give a status (plan #1074), then the steps to work and the
+ * information steps whose answers are out of date (plan #989), so the session
+ * does not have to decide what is ready.
  */
 export function dailyRunText(input: {
   userId: string;
   runId: string;
   steps: ReadyStep[];
   answers?: OutOfDateStep[];
+  review?: ReviewGoal[];
 }): string {
   const answers = input.answers ?? [];
+  const review = input.review ?? [];
   const lines = input.steps.map(
     (step) => `- "${step.title}" (goals.items id ${step.id}), under the goal "${step.goalTitle}"`,
   );
@@ -89,12 +94,24 @@ export function dailyRunText(input: {
       step.questions.map((q) => `"${q}"`).join(', '),
   );
   return [
-    input.steps.length > 0
-      ? 'The morning run: work the Claude steps that are ready.'
-      : 'The morning run: no Claude step is ready, but some answers are out of date.',
+    'The morning run.',
     '',
+    ...(review.length > 0
+      ? [
+          'First, give every open goal below its status for today: one row in goals.reviews each,',
+          'with a verdict of on_track, stalled, waiting_on_you, waiting_on_date or waiting_on_goal,',
+          'one sentence on why, one on the next move, and next_on for the next move\'s date where it',
+          'has one. A stalled goal also gets that next move as a step under it, named as step_id; a',
+          'goal waiting on a date needs next_on; one waiting on another goal names it as',
+          'waits_on_id. Follow .claude/skills/goals/SKILL.md, "Reviewing each goal".',
+          '',
+          ...review.flatMap((g) => [...reviewLines(g), '']),
+        ]
+      : []),
     ...(input.steps.length > 0
       ? [
+          review.length > 0 ? 'Then work the Claude steps that are ready:' : 'Work the Claude steps that are ready:',
+          '',
           ...lines,
           '',
           'Follow .claude/skills/goals/SKILL.md, the section "The morning run". For each step,',
@@ -102,11 +119,12 @@ export function dailyRunText(input: {
           'result_url when it lives somewhere with a link), and close the step as done. Anything',
           'longer than a few lines goes in a file linked from the step, with its summary as the',
           'result (the section "Files"). A step you cannot finish stays open, with the reason in',
-          'the run summary. Before closing the run, leave a note on each goal you worked and one',
-          'for the Goals home (the section "Leaving a note").',
+          'the run summary.',
           '',
         ]
-      : []),
+      : review.length > 0
+        ? ['No Claude step is ready today.', '']
+        : []),
     ...(answers.length > 0
       ? [
           'These information steps have answers out of date, since a row they read has changed:',
@@ -118,8 +136,15 @@ export function dailyRunText(input: {
           '',
         ]
       : []),
+    ...(input.steps.length > 0
+      ? [
+          'Before closing the run, leave a note on each goal you worked and one for the Goals home',
+          '(the section "Leaving a note").',
+          '',
+        ]
+      : []),
     `The goals belong to user_id ${input.userId}. This run is goals.runs id ${input.runId},`,
-    'already written as started. Set goals.run_id to it on every write, and close that row',
-    'with a summary (or as failed, with the reason) before you stop.',
+    'already written as started. Set goals.run_id to it on every write, and run_id on every',
+    'review, and close that row with a summary (or as failed, with the reason) before you stop.',
   ].join('\n');
 }

@@ -1,6 +1,6 @@
 ---
 name: goals
-description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, choices made with judgement and written on the steps they shape, a question with lettered options only for what Claude cannot settle itself, provisional steps for what hangs on one, and the kinds of weekly help that fit the goal as a proposal on its page. Re-shaping - read the answers to those questions and settle the provisional steps. Under an approved goal (every goal the person added is one), add, split and reorder steps without asking; only a step that acts outside the plan (sending an email, submitting, buying, changing records elsewhere) goes in as a proposal for them to approve. Morning run - work the ready Claude steps and store what each produced on the step. Weekly run - give each open goal a verdict (on track, stalled or waiting on you) with the next move, adding that move as a step for a stalled goal, then research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
+description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, choices made with judgement and written on the steps they shape, a question with lettered options only for what Claude cannot settle itself, provisional steps for what hangs on one, and the kinds of weekly help that fit the goal as a proposal on its page. Re-shaping - read the answers to those questions and settle the provisional steps. Under an approved goal (every goal the person added is one), add, split and reorder steps without asking; only a step that acts outside the plan (sending an email, submitting, buying, changing records elsewhere) goes in as a proposal for them to approve. Morning run - give each open goal its status for the day (on track, stalled, waiting on you, waiting on a date or waiting on another goal) with the next move and its date, adding that move as a step for a stalled goal, then work the ready Claude steps and store what each produced on the step. Weekly run - research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind, and leave a note on every open goal. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
 ---
 
 # Working a goal
@@ -1074,11 +1074,16 @@ where id = '<step id>' and user_id = '<user>' and level = 'step';
 
 ## The morning run
 
-The daily cron fires the routine each morning when a `claude` step is ready,
-or when an information step has an answer out of date
-(`inngest/goals/daily.ts`), with a brief listing those steps and the
-`goals.runs` row it wrote with `job` `daily`. Work only the steps it names.
-Before each one, report it on the run row with `now_on` the step's title
+The daily cron fires the routine each morning while there is an open goal
+(`inngest/goals/daily.ts`), with the `goals.runs` row it wrote with `job`
+`daily` and a brief listing every open goal to review, then the `claude`
+steps that are ready and the information steps with an answer out of date.
+Review first ("Reviewing each goal", below), then work only the steps it
+names.
+
+### Working the ready steps
+
+Before each step, report it on the run row with `now_on` the step's title
 ("Reporting progress"). For each one:
 
 1. Read the step, its goal and the steps around it, as in "Reading the goal".
@@ -1128,6 +1133,89 @@ An information step the brief lists under "answers out of date" is not a
 `claude` step and gets no `result`. Work its listed answers again as in
 "Answers on an information step", leave its status alone, and name each
 answer rewritten or confirmed in the summary.
+
+### Reviewing each goal
+
+Every morning run begins here, before any step is worked, and it runs even on
+a morning with no step ready: each open goal carries a status that is never
+more than a day old, and this is the only run that writes it. The brief lists
+every open goal with its done-when, when anything was last done on it (a step
+closed as done, or a reading logged), and the last verdict when there was
+one. Read each goal's tree before judging it: what is done, what is open,
+what waits on the person, what waits on a date, and what waits on you.
+
+While reading, look for what is new since yesterday (rows with `created_at`
+or `updated_at` after the last morning run) in the sources each goal draws
+on: the tables its kept context comes from, and the `intent` sources in the
+catalogue. A new thoughts entry or a vault note can change a goal's next
+move. Write what matters as context, proposed, and say so in the reason.
+
+Give every open goal one verdict, taking the first that fits:
+
+- **stalled**: nothing is moving and nobody is on it. **A goal with nothing
+  done in three weeks is stalled**, and the brief says so on that goal's
+  line. That holds even when a question of theirs, a date or another goal is
+  what it waits on: say so in the reason.
+- **waiting_on_you**: the next thing is the person's, such as a question to
+  answer, a step to approve or a step of theirs.
+- **waiting_on_goal**: the next step waits on a step under another goal (a
+  row in `goals.dependencies`, or a step blocked on it). Name that goal in
+  `waits_on_id`.
+- **waiting_on_date**: nothing can move until a date, such as a step whose
+  `starts_on` is later, a reply due, or an event. That date goes in
+  `next_on`, and the database refuses this verdict without it.
+- **on_track**: it is moving towards its done-when at a pace that gets there,
+  and the next thing is yours or already under way.
+
+Write one sentence on why and one on the next move. Both are read on the
+goal's line on the Goals home, so name the step or the question rather than
+describing the goal back to them. Put the next move's date in `next_on`
+whenever it has one: the step's due date or start date, the event's day.
+Leave it null rather than inventing one.
+
+A stalled goal also gets its next move as a step under it, `open`, so it is
+on the goal's page and the home the next time they look (`proposed` with
+`acts` if working it would act outside the plan). Make it the smallest thing
+that would get the goal moving, `mine` or `claude` as fits, with a done-when.
+Do not add one when an open step under the goal already says the same thing,
+including the one yesterday's run added: name that one instead. The database
+refuses a stalled review with no `step_id`.
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+with step as (
+  insert into goals.items (user_id, level, parent_id, kind, title, acceptance, status, position)
+  values ('<user>', 'step', '<goal id>', 'mine', 'Call the lender about the rate',
+          'The new rate is written on the goal.', 'open', 5)
+  returning id
+)
+insert into goals.reviews (user_id, item_id, run_id, verdict, reason, next_move, step_id)
+select '<user>', '<goal id>', '<the run id>', 'stalled',
+       'Nothing has been done since the balance was logged on 2 September.',
+       'Call the lender about the rate, added as a step.', id
+from step;
+
+-- the other verdicts carry no step
+insert into goals.reviews (user_id, item_id, run_id, verdict, reason, next_move, next_on)
+values ('<user>', '<goal id>', '<the run id>', 'waiting_on_you',
+        'Two sub-steps closed this week and the next one is yours.',
+        'Answer "Which card first?" on the goal.', null);
+
+insert into goals.reviews (user_id, item_id, run_id, verdict, reason, next_move, next_on)
+values ('<user>', '<goal id>', '<the run id>', 'waiting_on_date',
+        'The applications are in and nothing moves before the info session.',
+        'Go to the TA info session.', '2026-10-02');
+
+insert into goals.reviews (user_id, item_id, run_id, verdict, reason, next_move, waits_on_id)
+values ('<user>', '<goal id>', '<the run id>', 'waiting_on_goal',
+        'The move waits on the pay floor settled under "Land your next role".',
+        'Accept the pay floor on that goal.', '<the other goal''s id>');
+```
+
+One row per goal per run. Rows are never updated: tomorrow's run adds a new
+one, and the pages show the newest. The run summary gives the count of each
+verdict and names the stalled goals.
 
 ## A step or phase sent from its row
 
@@ -1193,79 +1281,9 @@ step's brief does. They will do the step; you write what they need to do it.
 ## The weekly run
 
 Once a week the daily cron fires the routine with the `goals.runs` row it
-wrote with `job` `weekly` (`inngest/goals/weekly.ts`). The run does two
-things, in this order: it reviews every open goal, then it researches the
-help the goals ask for.
-
-While reviewing, look for what is new since the last weekly run (rows with
-`created_at` or `updated_at` after it) in the sources each goal draws on: the tables its kept context comes from, and the
-`intent` sources in the catalogue. A new thoughts entry or a vault note
-written this week can change a goal's next move. Write what matters as
-context, proposed, and say so in the verdict's reason.
-
-### Reviewing each goal
-
-The brief lists every open goal with its done-when, when anything was last
-done on it (a step closed as done, or a reading logged), and last week's
-verdict when there was one. Read each goal's tree before judging it: what is
-done, what is open, what waits on the person, and what waits on you.
-
-Give every open goal one verdict:
-
-- **on_track**: it is moving towards its done-when at a pace that gets there.
-- **stalled**: nothing is moving and nobody is on it. **A goal with nothing
-  done in three weeks is stalled**, and the brief says so on that goal's
-  line. That holds even when a question of theirs is what it waits on: say
-  so in the reason.
-- **waiting_on_you**: the next thing is the person's, such as a question to
-  answer, a step to approve or a step of theirs, and something was done
-  in the last three weeks.
-
-Write one sentence on why and one on the next move. Both are read on the
-goal's card on the Goals home, so name the step or the question rather than
-describing the goal back to them.
-
-A stalled goal also gets its next move as a step under it, `open`, so it is
-on the goal's page and the home the next time they look (`proposed` with
-`acts` if working it would act outside the plan). Make it the smallest thing
-that would get the goal moving, `mine` or `claude` as fits, with a done-when.
-Do not add one when an open step under the goal already says the same thing:
-name that one instead. The database refuses a
-stalled review with no `step_id`.
-
-```sql
-set local goals.actor = 'claude';
-set local goals.run_id = '<the run id>';
-with step as (
-  insert into goals.items (user_id, level, parent_id, kind, title, acceptance, status, position)
-  values ('<user>', 'step', '<goal id>', 'mine', 'Call the lender about the rate',
-          'The new rate is written on the goal.', 'open', 5)
-  returning id
-)
-insert into goals.reviews (user_id, item_id, run_id, verdict, reason, next_move, step_id)
-select '<user>', '<goal id>', '<the run id>', 'stalled',
-       'Nothing has been done since the balance was logged on 2 September.',
-       'Call the lender about the rate, added as a step.', id
-from step;
-
--- on_track and waiting_on_you carry no step
-insert into goals.reviews (user_id, item_id, run_id, verdict, reason, next_move)
-values ('<user>', '<goal id>', '<the run id>', 'waiting_on_you',
-        'Two sub-steps closed this week and the next one is yours.',
-        'Answer "Which card first?" on the goal.');
-```
-
-One row per goal per run. Rows are never updated: next week's run adds a new
-one, and the card shows the newest. The summary gives the count of each
-verdict and names the stalled goals.
-
-After the verdicts, leave a note on every open goal and one for the Goals
-home ("Leaving a note"). The weekly run is the one run that writes a note on
-every goal, so these are the notes the person reads most.
-
-Where a goal's files hold figures that have moved since they were written
-(the applications breakdown, a debt plan's balances), revise those files with
-the new figures and a `change_note`, and say so in the goal's note.
+wrote with `job` `weekly` (`inngest/goals/weekly.ts`). It researches the
+help the goals ask for, then leaves a note on every open goal. It writes no
+verdicts: each goal's status is the morning run's ("Reviewing each goal").
 
 ### Researching the help each goal asks for
 
@@ -1349,9 +1367,19 @@ Never write `reaction`, `reacted_at` or `attended`. Going and not for me are
 the person's buttons on the Goals home, whether they went is their tick on
 Todo, and marking the unanswered ones ignored is done by the cron. The guard
 (`goals` 0008) refuses a Claude write to any of them. The summary says how
-many verdicts of each kind you wrote and which goals are stalled, how many
-suggestions you wrote of each kind, and what in each kind's past reactions
-you followed.
+many suggestions you wrote of each kind, and what in each kind's past
+reactions you followed.
+
+### The week's notes
+
+After the research, leave a note on every open goal and one for the Goals
+home ("Leaving a note"), reading each goal's newest status in
+`goals.reviews`. The weekly run is the one run that writes a note on every
+goal, so these are the notes the person reads most.
+
+Where a goal's files hold figures that have moved since they were written
+(the applications breakdown, a debt plan's balances), revise those files with
+the new figures and a `change_note`, and say so in the goal's note.
 
 ## Flagging something on a goal
 

@@ -6,6 +6,8 @@ import { outOfDateSteps } from '@/lib/goals/answers';
 import { loadOutOfDateAnswers } from '@/lib/goals/answers-store';
 import { DAILY_STEP_LIMIT, dailyRunText, ranRecently, readyClaudeSteps } from '@/lib/goals/daily-run';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
+import { reviewGoals } from '@/lib/goals/reviews';
+import { loadGoalActivity, loadLatestReviews } from '@/lib/goals/reviews-store';
 import { recordAndFire } from '@/lib/goals/shaping-store';
 import { accountToday, loadLiveTree } from '@/lib/goals/steps-store';
 import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
@@ -14,13 +16,16 @@ import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
  * The morning goals run (docs/GOALS-SPEC.md, "What Claude does, and when";
  * plan #933), a stage of the daily cron.
  *
- * Fires the goals routine once for the owner when a Claude step is ready or
- * an information step has an answer out of date (plan #989), with the run
- * row written first and both named in its brief. It starts nothing when the
- * routine is not set on the deployment, when a morning run already started
- * in the last twenty hours, or when there is neither, because each run
- * spends the owner's routine allowance. A
- * fire that fails throws, so the cron reports the stage as failed.
+ * Fires the goals routine once for the owner each morning while there is an
+ * open goal, with the run row written first. The brief lists every open goal
+ * to give its status for the day (plan #1074), then the Claude steps that are
+ * ready and the information steps with an answer out of date (plan #989). A
+ * status is never more than a day old because this run writes one every day,
+ * so it no longer waits for a ready step. It starts nothing when the routine
+ * is not set on the deployment, when a morning run already started in the
+ * last twenty hours, or when there is no open goal and nothing to work,
+ * because each run spends the owner's routine allowance. A fire that fails
+ * throws, so the cron reports the stage as failed.
  *
  * The owner only: goals are personal, and the allowance the run spends is
  * the owner's.
@@ -28,7 +33,15 @@ import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
 
 export type GoalsDailyResult =
   | { skipped: string }
-  | { started: true; runId: string; steps: number; held: number; answers: number };
+  | {
+      started: true;
+      runId: string;
+      /** Open goals given a status. */
+      reviewed: number;
+      steps: number;
+      held: number;
+      answers: number;
+    };
 
 export type GoalsDailyDeps = {
   client: GoalsSupabaseClient;
@@ -63,10 +76,18 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
 
   // A step whose start date has not come is left for a later morning.
   const today = await accountToday(client, userId, now);
-  const [{ goals, byGoal }, stale] = await Promise.all([
+  const [{ goals, byGoal }, stale, activity, latest] = await Promise.all([
     loadLiveTree(client, { userId, today }),
     loadOutOfDateAnswers(client, userId),
+    loadGoalActivity(client, userId),
+    loadLatestReviews(client, { userId, now }),
   ]);
+  const review = reviewGoals(
+    goals.map((g) => g.goal),
+    activity,
+    latest,
+    now,
+  );
   const ready = readyClaudeSteps(
     goals.map((g) => g.goal),
     byGoal,
@@ -76,8 +97,8 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
     byGoal,
     stale,
   );
-  if (ready.length === 0 && answers.length === 0) {
-    return { skipped: 'no Claude steps are ready and no answers are out of date' };
+  if (review.length === 0 && ready.length === 0 && answers.length === 0) {
+    return { skipped: 'no open goal, no Claude step ready and no answer out of date' };
   }
   const steps = ready.slice(0, DAILY_STEP_LIMIT);
 
@@ -87,7 +108,7 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
     job: 'daily',
     itemId: null,
     routine,
-    text: (runId) => dailyRunText({ userId, runId, steps, answers }),
+    text: (runId) => dailyRunText({ userId, runId, steps, answers, review }),
     fetch: deps?.fetch,
   });
   // Thrown so the cron reports the stage as failed. The run row, when there
@@ -98,6 +119,7 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
   return {
     started: true,
     runId: result.runId,
+    reviewed: review.length,
     steps: steps.length,
     held: ready.length - steps.length,
     answers: answers.length,

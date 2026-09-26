@@ -420,7 +420,9 @@ export function GoalTopSurface() {
             verdict: 'waiting_on_you',
             reason: 'Two steps closed this week and the next one is yours.',
             nextMove: 'Answer “Which card first?” on the goal.',
+            nextOn: null,
             stepId: null,
+            waitsOnId: null,
             runId: null,
             createdAt: '2026-09-21T08:00:00Z',
           }}

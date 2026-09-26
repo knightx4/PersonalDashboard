@@ -4,14 +4,15 @@ import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { FileBody } from '@/components/files/file-body';
 import { Card } from '@/components/ui/card';
 import type { Brief } from '@/lib/goals/briefs';
+import { formatDay } from '@/lib/goals/dates';
 import { claudeLine, type GoalStatusView, type StatusRowKind } from '@/lib/goals/goal-status';
 import { VERDICT_LABELS, type GoalReview, type Verdict } from '@/lib/goals/reviews';
 
 /**
  * The top of a goal's page (lib/goals/goal-status.ts): Claude's latest note on
- * where the goal stands, the weekly verdict, and everything on the goal that
+ * where the goal stands, its status for the day, and everything on the goal that
  * is waiting on you, each opening where it is done lower on the page. With no
- * note yet, the weekly verdict's reason and next move stand in for it.
+ * note yet, the status's reason and next move stand in for it.
  */
 
 const ROW_ICONS: Record<StatusRowKind, typeof User> = {
@@ -26,6 +27,8 @@ const VERDICT_TONES: Record<Verdict, DevTone> = {
   on_track: 'positive',
   stalled: 'caution',
   waiting_on_you: 'caution',
+  waiting_on_date: 'quiet',
+  waiting_on_goal: 'quiet',
 };
 
 export type GoalStatusCardProps = {
@@ -50,7 +53,7 @@ export function GoalStatusCard({ status, brief, briefWhen, review }: GoalStatusC
               glyph={null}
               word={VERDICT_LABELS[review.verdict]}
               tone={VERDICT_TONES[review.verdict]}
-              title="The weekly check's verdict"
+              title="Dash’s check on this goal"
               className="text-small font-semibold"
             />
           )}
@@ -65,7 +68,10 @@ export function GoalStatusCard({ status, brief, briefWhen, review }: GoalStatusC
           review && (
             <div className="space-y-0.5 text-small text-ink">
               <p>{review.reason}</p>
-              <p className="text-ink-muted">Next: {review.nextMove}</p>
+              <p className="text-ink-muted">
+                Next: {review.nextMove}
+                {review.nextOn && ` (${formatDay(review.nextOn)})`}
+              </p>
             </div>
           )
         )}
