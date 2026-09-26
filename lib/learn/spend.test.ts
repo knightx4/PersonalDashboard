@@ -91,6 +91,7 @@ describe('the operation names', () => {
       'add-lesson-floor',
       'write-unit-check',
       'mark-unit-check',
+      'reply-about-card',
     ]);
   });
 });

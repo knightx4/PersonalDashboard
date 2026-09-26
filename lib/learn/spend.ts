@@ -173,6 +173,9 @@ export const LEARN_OPERATIONS = [
   // Marking an answer to a unit check against the unit's outcome (plan #971),
   // from the press on the card. One Haiku call per answer.
   'mark-unit-check',
+  // Dash's reply in a conversation about a Learn now card (plan #1053), made
+  // by lib/talk/reply.ts. One Sonnet call per question asked on a card.
+  'reply-about-card',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

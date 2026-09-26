@@ -147,6 +147,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'write-unit-check': background(unit(HAIKU, 1_500, 250)),
   // The same unit, the question, the expected answer and what was written.
   'mark-unit-check': run(HAIKU, 1_500, 120),
+  // The card's section, the conversation so far and the question in; a few
+  // short paragraphs out.
+  'reply-about-card': run(SONNET, 4_000, 400),
 
   // Jobs.
   'enrich-company': run(HAIKU, 10_000, 500),

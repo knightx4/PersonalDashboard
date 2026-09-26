@@ -10,6 +10,7 @@
  */
 
 import type { CardNote } from '@/lib/learn/notes/notes';
+import type { TalkTurn } from '@/lib/talk/talk';
 
 export type FeedCardRow = {
   id: string;
@@ -113,6 +114,12 @@ export type FeedCard = {
    * video, so absent on a card built straight from its row.
    */
   notes?: CardNote[];
+  /**
+   * The conversation with Dash about this card, oldest first (plan #1053).
+   * Attached after the deck is dealt, like the notes; absent when there is
+   * none.
+   */
+  conversation?: TalkTurn[];
 };
 
 /** A clip shown on a card: the video, and the span of it that matched. */
