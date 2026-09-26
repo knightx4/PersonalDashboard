@@ -1651,6 +1651,20 @@ const issueFailed: IssueViewProps = {
  * The Quick read card (plan #851): the lead story of the roundup above, with
  * its picture and its text folded under the summary, three more to come.
  */
+/** Two of your notes on a story's subject (plan #1113), as the lookup returns them. */
+const previewRelatedNotes = [
+  {
+    noteId: 'note-related-1',
+    title: 'Failover drills we never ran',
+    href: '/vault/n/Work/Failover%20drills%20we%20never%20ran.md',
+  },
+  {
+    noteId: 'note-related-2',
+    title: 'On replication lag',
+    href: '/vault/n/Ideas/On%20replication%20lag.md',
+  },
+];
+
 const quickStory: QuickReadViewProps = {
   card: {
     kind: 'story',
@@ -1676,6 +1690,7 @@ const quickStory: QuickReadViewProps = {
   },
   arrived: '22 Sep, 07:14',
   nothingYet: false,
+  related: previewRelatedNotes,
   pictures: true,
   picturesHref: '/news?pictures=0',
   issueHref: '/news/i/issue-1',
@@ -1696,6 +1711,7 @@ const quickStory: QuickReadViewProps = {
 /** A single-essay newsletter as one card: its subject and its summary, no picture. */
 const quickEssay: QuickReadViewProps = {
   ...quickStory,
+  related: null,
   card: {
     kind: 'essay',
     summary: issueEssay.digest!.summary,
@@ -1725,6 +1741,7 @@ const quickPageView: QuickReadViewProps = {
       card: quickStory.card!,
       arrived: '22 Sep, 07:14',
       saved: false,
+      related: previewRelatedNotes,
       issueHref: '/news/i/issue-1',
     },
     {
@@ -1862,6 +1879,7 @@ const savedStories: SavedViewProps = {
       savedAt: '2026-09-23T08:02:00Z',
       discussedIndex: 0,
       arrived: '22 Sep, 07:14',
+      related: previewRelatedNotes.slice(0, 1),
     },
     {
       id: 'saved-2',
@@ -1945,6 +1963,13 @@ const deckCards: FeedCard[] = [
     link: null,
     site: null,
     licence: null,
+    relatedNotes: [
+      {
+        noteId: 'note-related-3',
+        title: 'Rent control in my city',
+        href: '/vault/n/Housing/Rent%20control%20in%20my%20city.md',
+      },
+    ],
   },
   {
     id: '00000000-0000-4000-8000-000000000001',

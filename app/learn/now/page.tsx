@@ -9,6 +9,7 @@ import { topUpFeedAfterResponse } from '@/inngest/learn/feed-top-up';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { countReadyCards, loadFeedPage } from '@/lib/learn/feed/load';
+import { relatedNotesForCards } from '@/lib/learn/feed/related-notes';
 import { READY_LOW } from '@/lib/learn/feed/top-up';
 import { loadReadNow } from '@/lib/learn/tracks/load';
 import { openReading } from '../r/[id]/actions';
@@ -39,6 +40,11 @@ export const maxDuration = 300;
  *
  * Track offers, a new theme or a resting track, are on Tracks rather than
  * here (note 8a1789df): the deck is for reading.
+ *
+ * A card shows up to two of your own notes on its idea (plan #1113). For the
+ * first cards the lookup is started here and passed down unawaited, one
+ * promise a card, so the deck paints first and the notes stream in under the
+ * card's material. Cards loaded later carry theirs.
  */
 export default async function LearnNowPage() {
   const user = await requireUser();
@@ -51,6 +57,10 @@ export default async function LearnNowPage() {
   // Opening the page counts as a response: when seven or fewer are ready,
   // more are written while you read the first.
   after(() => topUpFeedAfterResponse(user.id));
+  const related = relatedNotesForCards(supabase, user.id, cards);
+  const firstRelated = Object.fromEntries(
+    cards.map((card) => [card.id, related.then((found) => found.get(card.id) ?? [])]),
+  );
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -131,7 +141,7 @@ export default async function LearnNowPage() {
         </Card>
       )}
 
-      <LearnNowFeed first={cards} ready={ready} low={READY_LOW} />
+      <LearnNowFeed first={cards} firstRelated={firstRelated} ready={ready} low={READY_LOW} />
     </div>
   );
 }

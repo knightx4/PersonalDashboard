@@ -1,6 +1,9 @@
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createNewsClient } from '@/lib/news/auth/server';
+import { relatedNotesForStories, storyKey } from '@/lib/news/quick/related-notes';
+import { createVaultClient } from '@/lib/vault/auth/server';
+import type { RelatedNoteLink } from '@/lib/vault/notes/related';
 import { loadSenders } from '@/lib/news/issues/load';
 import { formatArrival, issueHref } from '@/lib/news/issues/list';
 import { loadQuickRead, loadQuickSignals } from '@/lib/news/issues/quick';
@@ -51,6 +54,10 @@ export const dynamic = 'force-dynamic';
  * event several newsletters ran shows once, naming the others, and goes up
  * the queue; so do lead stories and the topics and newsletters whose articles
  * you open. What it ranks with comes from loadQuickSignals.
+ *
+ * Each story shows up to two of your own notes on its subject (plan #1113).
+ * The lookup is started here and handed down unawaited, so the card paints
+ * without waiting for it and the notes stream in beneath it.
  */
 export default async function QuickReadPage({
   searchParams,
@@ -60,7 +67,7 @@ export default async function QuickReadPage({
   const params = await searchParams;
   const topic = readTopic(params.topic) ?? null;
   const user = await requireUser();
-  const client = await createNewsClient();
+  const [client, vault] = await Promise.all([createNewsClient(), createVaultClient()]);
 
   const [settings, senders, { issues, passes }, hidden] = await Promise.all([
     loadAccountSettings(user.id),
@@ -98,6 +105,12 @@ export default async function QuickReadPage({
     c.kind === 'story' && Boolean(savedIn.get(c.issueId)?.has(c.story.headline));
   const saved = card ? isSaved(card) : false;
 
+  // Started, not awaited: RelatedNotes waits for it in its own Suspense.
+  const onPage = [card, upNext, ...page].flatMap((c) => (c?.kind === 'story' ? [c] : []));
+  const related = relatedNotesForStories(client, vault, user.id, onPage);
+  const relatedOf = (c: QuickCard): Promise<RelatedNoteLink[]> | null =>
+    c.kind === 'story' ? related.then((found) => found.get(storyKey(c)) ?? []) : null;
+
   return (
     <QuickReadView
       card={card}
@@ -107,6 +120,7 @@ export default async function QuickReadPage({
       progress={progress}
       saved={saved}
       reaction={card ? reactionOf(card) : null}
+      related={card ? relatedOf(card) : null}
       pictures={wanted}
       picturesHref={quickHref({ pictures: !wanted, topic })}
       issueHref={
@@ -117,6 +131,7 @@ export default async function QuickReadPage({
         arrived: formatArrival(c.receivedAt, settings.timezone),
         saved: isSaved(c),
         reaction: reactionOf(c),
+        related: relatedOf(c),
         issueHref: issueHref(c.issueId, { original: false, pictures: wanted, from: null }),
       }))}
       upNext={
@@ -125,6 +140,7 @@ export default async function QuickReadPage({
           arrived: formatArrival(upNext.receivedAt, settings.timezone),
           saved: isSaved(upNext),
           reaction: reactionOf(upNext),
+          related: relatedOf(upNext),
           issueHref: issueHref(upNext.issueId, { original: false, pictures: wanted, from: null }),
         }
       }

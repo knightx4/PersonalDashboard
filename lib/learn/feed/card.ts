@@ -14,6 +14,7 @@ import { clockTime } from '@/lib/learn/youtube/format';
 import { keepMentions, type CardMention } from './mentions';
 import type { TalkTurn } from '@/lib/talk/talk';
 import { teachBackView, type TeachBackView } from './teach-back';
+import type { RelatedNoteLink } from '@/lib/vault/notes/related';
 
 export type FeedCardRow = {
   id: string;
@@ -138,6 +139,12 @@ export type FeedCard = {
    * none.
    */
   conversation?: TalkTurn[];
+  /**
+   * Your vault notes on the card's idea (plan #1113), at most two. Attached to
+   * the cards loadMoreCards returns; the first page's come separately, as
+   * promises, so the page paints without waiting for them.
+   */
+  relatedNotes?: RelatedNoteLink[];
   /** Where a teach-back has got to (plan #1054). Only on a teach card. */
   teach?: TeachBackView;
   /** How often teach-backs come, for the setting on a teach card. Attached at load. */
