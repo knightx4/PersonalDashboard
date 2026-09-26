@@ -1856,6 +1856,27 @@ form[data-auto-submit] [data-fallback-submit] {
   padding-bottom: 0.25em;
 }
 
+/* The same typography at the size of the text around it, for markdown inside
+   a step's row or a card (components/files/file-body.tsx). Headings drop to
+   the body size so a result's "## Summary" does not outrank the page. */
+.vault-prose.prose-compact {
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: none;
+}
+
+.vault-prose.prose-compact > * + * {
+  margin-top: 0.6em;
+}
+
+.vault-prose.prose-compact h1,
+.vault-prose.prose-compact h2,
+.vault-prose.prose-compact h3,
+.vault-prose.prose-compact h4 {
+  font-size: 1em;
+  margin-top: 1em;
+}
+
 /* ---------------------------------------------------------------------------
  * Jobs prose.
  *

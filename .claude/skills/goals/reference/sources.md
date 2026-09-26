@@ -320,6 +320,15 @@ Each thing they bought, from their order emails.
 - Scoped to the person through order_id → orders.user_id
 - Prices and dates are on the row and its order; sum them for a spending goal rather than copying them.
 
+### `core.files` (Files)
+
+Longer pieces written for them and kept as pages: research notes, breakdowns of their data, plans, drafts.
+
+- Search: `title`, `summary`, `body`
+- Name a row by `title`; link it by `id`
+- Opens at `/goals/files/<id>`
+- Skip rows with archived_at set. made_by 'claude' is a run's work, 'you' is theirs. A goal or step links one through goals.links with kind 'file'. Read the file before redoing its work, and revise it rather than writing a second one on the same question.
+
 ### `core.conversations` (Learn)
 
 Conversations they had with Dash about a Learn card or a newsletter story, one per thing read.

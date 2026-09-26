@@ -26,6 +26,7 @@ export const goalsSources: ModuleSources = {
     'goals.comments',
     'goals.suggestions',
     'goals.reviews',
+    'goals.briefs',
     'goals.runs',
     'goals.history',
     'goals.visits',
