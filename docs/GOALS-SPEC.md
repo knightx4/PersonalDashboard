@@ -1,5 +1,8 @@
 # Goals
 
+What Goals is for, and the test each change here is checked against, is in
+[GOALS-VISION.md](GOALS-VISION.md). This spec is the detail beneath it.
+
 A workspace for the things you are working towards in your own life, run the
 way `/dev/plan` runs the app: a tree of what has to happen, with Claude doing
 the parts it can and your parts showing up as a short list of things to do.
