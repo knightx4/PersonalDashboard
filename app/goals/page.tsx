@@ -1,6 +1,8 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import { writtenWhen, type Brief } from '@/lib/goals/briefs';
+import { loadBrief } from '@/lib/goals/briefs-store';
 import { catchUp, catchUpSince } from '@/lib/goals/catch-up';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { withWaiting, type DailyView as Daily } from '@/lib/goals/daily';
@@ -32,6 +34,11 @@ function homeExtras(client: Awaited<ReturnType<typeof createGoalsClient>>, daily
   return loadHomeExtras(client, titles, Date.now()).catch(() => ({ waiting: [], running: [] }));
 }
 
+/** When Claude's note was written. Outside the component because it reads the clock. */
+function noteWhen(brief: Brief, timeZone: string): string {
+  return writtenWhen(brief, timeZone, Date.now());
+}
+
 /**
  * The Goals home, for a once-a-day visit (docs/GOALS-SPEC.md, "The daily
  * view"; plan #926), sorted by whose move it is: what is on you (decide,
@@ -47,6 +54,9 @@ function homeExtras(client: Awaited<ReturnType<typeof createGoalsClient>>, daily
  * #1010), which the next sitting clears. What a run flagged on a goal
  * (plan #1015) is listed under Your move with the rest.
  *
+ * Claude's latest note on all the goals (goals.briefs, written by the daily
+ * and weekly runs) heads the page when there is one.
+ *
  * The loader checks that the schema is exposed, so a deployment where `goals`
  * is not exposed to PostgREST says so here instead of showing an empty page
  * that looks right.
@@ -56,12 +66,14 @@ export default async function GoalsPage() {
   const account = await loadAccountSettings(user.id);
   const client = await createGoalsClient();
   const today = todayIn(account.timezone);
-  const [daily, suggestions, going, visit, flags] = await Promise.all([
+  const [daily, suggestions, going, visit, flags, brief] = await Promise.all([
     loadDailyView(client, { userId: user.id, today }),
     loadRecentSuggestions(client),
     loadGoingSuggestions(client),
     recordVisit(client, { userId: user.id, today }),
     createClient().then((supabase) => loadGoalFlags(supabase, { userId: user.id })),
+    // A failed read leaves the note out rather than the page.
+    loadBrief(client, null).catch((): Brief | null => null),
   ]);
   // What runs flagged on a goal (plan #1015) lives in public.raised_items, so
   // it joins the waiting list here rather than in the step trees.
@@ -91,6 +103,7 @@ export default async function GoalsPage() {
           didYouGo: didYouGoSuggestions(going, today),
           catchUp: away,
           sinceVisit: lately,
+          brief: brief ? { body: brief.body, when: noteWhen(brief, account.timezone) } : null,
         }}
         timeZone={account.timezone}
       />

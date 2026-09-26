@@ -1,5 +1,6 @@
 import { coreSources } from '@/lib/core/sources';
 import { devSources } from '@/lib/dev/sources';
+import { filesSources } from '@/lib/files/sources';
 import { goalsSources } from '@/lib/goals/sources';
 import { shoppingSources } from '@/lib/inventory/sources';
 import { jobsSources } from '@/lib/jobs/sources';
@@ -25,6 +26,7 @@ const MODULES: readonly ModuleSources[] = [
   newsSources,
   shoppingSources,
   goalsSources,
+  filesSources,
   coreSources,
   devSources,
 ];
