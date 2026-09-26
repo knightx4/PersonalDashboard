@@ -44,6 +44,10 @@ import { isCurrent, type GoalReview } from '@/lib/goals/reviews';
 import { loadLatestReviews } from '@/lib/goals/reviews-store';
 import { goalFindings, goalStages, rhythmSteps } from '@/lib/goals/goal-page';
 import { SectionFold } from '@/components/ui/disclosure';
+import { goalMatchText } from '@/lib/goals/related-notes';
+import { createVaultClient } from '@/lib/vault/auth/server';
+import { relatedNotes, toLink } from '@/lib/vault/notes/related';
+import { RelatedNotes } from '@/components/vault/related-notes';
 import { GoalStatusCard } from './goal-status';
 import { GoalFindings, GoalRhythms } from './goal-found';
 import { GoalAddRow } from './goal-add-row';
@@ -66,6 +70,11 @@ export const dynamic = 'force-dynamic';
  * current stage open and the others folded, its rhythms, what Dash found, and
  * everything that feeds the goal (context, links, help, files, runs,
  * comments) under one Details fold.
+ *
+ * Up to two of your vault notes on the goal's subject stream in under what
+ * Dash found (plan #1114), outside the Details fold, matched on the title and
+ * the done-when (lib/goals/related-notes.ts). The lookup is started and not
+ * awaited.
  */
 /**
  * What the Claude panel says. Outside the component because it reads the
@@ -183,7 +192,13 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
   // The latest run on each step sent, prepared or asked about from its row
   // (plan #1044), so a reload shows it going. A failed read leaves the lines
   // out rather than the page.
-  const core = await createCoreClient();
+  const [core, vault] = await Promise.all([createCoreClient(), createVaultClient()]);
+  const related = relatedNotes(
+    vault,
+    user.id,
+    goalMatchText({ title: map.goal.title, acceptance: map.goal.acceptance }),
+    { core },
+  ).then((found) => found.map(toLink));
   const [stepRuns, filesOf, brief, review] = await Promise.all([
     loadStepRuns(client, stepIdsOn(map)).catch((): Record<string, GoalRun> => ({})),
     // The files the goal and its steps link to. A failed read leaves them
@@ -296,6 +311,7 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
         />
         <GoalRhythms steps={rhythmSteps(map.steps)} records={map.rhythms} />
         <GoalFindings findings={goalFindings(map.steps)} />
+        <RelatedNotes notes={related} className="px-1" />
         {/* Everything that feeds the goal rather than being its work: one
             fold, closed on arrival (plan #1078). */}
         <SectionFold title="Details" hint={detailsHint || undefined} defaultOpen={false}>

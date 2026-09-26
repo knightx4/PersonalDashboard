@@ -864,6 +864,16 @@ describe('note embeddings, across users', () => {
 });
 
 describe('nearest notes and the text cache (plan #1112)', () => {
+  // Long enough to clear the stub floor (vault 0023). The vector is unchanged:
+  // it was stored for the note, not computed from the body.
+  const LONG_BODY = 'I am quitting. I told them this morning and it felt right.';
+  beforeAll(async () => {
+    await admin`update notes set body = ${LONG_BODY} where id = ${noteA}`;
+  });
+  afterAll(async () => {
+    await admin`update notes set body = 'I am quitting.' where id = ${noteA}`;
+  });
+
   const nearest = (tx: import('postgres').TransactionSql, exclude: string[] | null = null) =>
     tx`select note_id, similarity from nearest_notes(${VECTOR}, null, 5, 0.5, 'voyage-4-lite', ${exclude}::uuid[])`;
 
@@ -882,6 +892,26 @@ describe('nearest notes and the text cache (plan #1112)', () => {
       expect(await asUser(userA, (tx) => nearest(tx))).toEqual([]);
     } finally {
       await admin`update notes set deleted_at = null where id = ${noteA}`;
+    }
+  });
+
+  // Plan #1114 (vault 0023, 0024): a note with next to nothing written in it,
+  // a template or an instruction file is never offered as a related note.
+  // noteA's fixture body ("I am quitting.") is itself under the 20-character
+  // floor, so the cases above lengthen it for the duration.
+  it('leaves out a stub, a template and an instruction file', async () => {
+    const withBody = async (body: string, path: string) => {
+      await admin`update notes set body = ${body}, path = ${path} where id = ${noteA}`;
+      return (await asUser(userA, (tx) => nearest(tx))).map((row) => row.note_id);
+    };
+    try {
+      expect(await withBody('[[AI]] #idea', 'Journal/2019-04-02.md')).toEqual([]);
+      expect(await withBody(LONG_BODY, 'Resources/Templates/Idea.md')).toEqual([]);
+      expect(await withBody(LONG_BODY, 'CLAUDE.md')).toEqual([]);
+      expect(await withBody(LONG_BODY, 'Journal/2019-04-02.md')).toEqual([noteA]);
+    } finally {
+      await admin`
+        update notes set body = ${LONG_BODY}, path = 'Journal/2019-04-02.md' where id = ${noteA}`;
     }
   });
 
