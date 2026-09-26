@@ -295,6 +295,17 @@ describe('filing a note', () => {
     expect(state.writes).toEqual(['feedback_items']);
   });
 
+  /** A like goes in the same way as the other two (plan #1102). */
+  it('files a like from the header button', async () => {
+    const result = await (bugs.submitFeedback as Action)(
+      {},
+      form({ kind: 'like', body: 'the plan opening on what is next', page_path: '/dev/plan' }),
+    );
+
+    expect(result).toEqual({ message: 'Like saved.' });
+    expect(state.writes).toEqual(['feedback_items']);
+  });
+
   /** The owner is still asked. Dropping that would weaken a working check. */
   it('still asks the owner for the code', async () => {
     state.session = { id: OWNER_ID, email: 'owner@example.com' };

@@ -1,7 +1,8 @@
 import { SectionFold } from '@/components/ui/disclosure';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import type { OtherFeedbackRow } from '@/lib/feedback/load';
+import { FEEDBACK_KIND_LABEL, type OtherFeedbackRow } from '@/lib/feedback/load';
+import { KIND_TONE } from '@/components/feedback/kind-tone';
 
 /**
  * What the other accounts have filed, under your own two sections.
@@ -42,10 +43,10 @@ export function OtherUsersFeedback({ rows }: { rows: OtherFeedbackRow[] }) {
               <span
                 className={cn(
                   'rounded-full px-2 py-0.5 text-micro font-semibold uppercase tracking-wide',
-                  row.kind === 'bug' ? 'bg-danger-tint text-danger' : 'bg-accent-tint text-accent',
+                  KIND_TONE[row.kind],
                 )}
               >
-                {row.kind}
+                {FEEDBACK_KIND_LABEL[row.kind]}
               </span>
               {/* The account, first among the facts: on this list it is the
                   one thing the note itself cannot tell you. */}

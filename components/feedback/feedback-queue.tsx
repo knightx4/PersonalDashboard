@@ -1,10 +1,19 @@
+import Link from 'next/link';
 import { MessageSquarePlus } from 'lucide-react';
 import { Banner } from '@/components/ui/banner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SectionFold } from '@/components/ui/disclosure';
 import { FeedbackList } from '@/components/feedback/feedback-list';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
-import type { FeedbackQueue } from '@/lib/feedback/load';
+import { segmentedFrame } from '@/components/ui/segmented';
+import { cn } from '@/lib/cn';
+import {
+  FEEDBACK_KINDS,
+  FEEDBACK_KIND_LABEL,
+  queueOfKind,
+  type FeedbackKind,
+  type FeedbackQueue,
+} from '@/lib/feedback/load';
 
 /**
  * The queue itself, without a page header.
@@ -14,10 +23,17 @@ import type { FeedbackQueue } from '@/lib/feedback/load';
  * which shell sat above it. Both of those are redirects to /dev/bugs now, and
  * this stays split because a queue view and a page are still different things.
  */
-export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
-  const { rows, outstanding, closed, blocked } = queue;
+export function FeedbackQueueView({
+  queue,
+  kind = null,
+}: {
+  queue: FeedbackQueue;
+  /** The `?kind=` filter, or null for every kind. */
+  kind?: FeedbackKind | null;
+}) {
+  const { outstanding, closed, blocked } = queueOfKind(queue, kind);
 
-  if (rows.length === 0) {
+  if (queue.rows.length === 0) {
     return (
       <div className="space-y-6">
         {/* No `action`: the thing that fills this is the message button in the
@@ -39,7 +55,13 @@ export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
           past every note to reach the button that works them -- and the count
           beside it already says what scrolling would have told you. */}
       <div className="mb-6">
-        <RunRoutineButton openCount={outstanding.length} divider="bottom" />
+        {/* The whole queue's count whatever the filter says: the button
+            works every outstanding note, not only the kind on screen. */}
+        <RunRoutineButton openCount={queue.outstanding.length} divider="bottom" />
+      </div>
+
+      <div className="mb-6">
+        <KindFilter kind={kind} />
       </div>
 
       {/* The shared banner, and `warn` rather than danger. This was a
@@ -63,6 +85,11 @@ export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
           finished, and the outstanding notes got harder to reach for it. The
           count on the closed line is the whole reason to open it. Law 10. */}
       <div className="space-y-6">
+        {outstanding.length === 0 && closed.length === 0 && kind && (
+          <p className="text-ui text-ink-muted">
+            No {FEEDBACK_KIND_LABEL[kind].toLowerCase()}s yet.
+          </p>
+        )}
         {outstanding.length > 0 && (
           <SectionFold title="Outstanding" count={outstanding.length}>
             <FeedbackList rows={outstanding} />
@@ -75,5 +102,40 @@ export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * Which kinds are listed, as links rather than state (law 5), so a filtered
+ * queue survives a refresh and can be linked. All is the plain URL.
+ */
+function KindFilter({ kind }: { kind: FeedbackKind | null }) {
+  const options: ReadonlyArray<{ value: FeedbackKind | null; label: string }> = [
+    { value: null, label: 'All' },
+    ...FEEDBACK_KINDS.map((value) => ({ value, label: `${FEEDBACK_KIND_LABEL[value]}s` })),
+  ];
+  return (
+    <span role="group" aria-label="Which kind to list" className={segmentedFrame}>
+      {options.map((option) => {
+        const on = option.value === kind;
+        return (
+          <Link
+            key={option.value ?? 'all'}
+            href={option.value ? `/dev/bugs?kind=${option.value}` : '/dev/bugs'}
+            scroll={false}
+            aria-current={on ? 'true' : undefined}
+            className={cn(
+              'press inline-flex h-(--control-h) items-center px-2.5 text-ui font-medium',
+              'transition-colors duration-150 focus-visible:outline-2 focus-visible:-outline-offset-2',
+              on
+                ? 'bg-accent-tint text-accent'
+                : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
+            )}
+          >
+            {option.label}
+          </Link>
+        );
+      })}
+    </span>
   );
 }
