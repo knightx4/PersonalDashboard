@@ -49,6 +49,7 @@ vi.mock('@/app/dev/plan/actions', () => {
 });
 
 const { PlanView } = await import('@/app/dev/plan/plan-view');
+const { withSessionDrop } = await import('@/app/dev/plan/plan-row');
 type PlanCatalogEntry = Parameters<typeof PlanView>[0]['catalog'][number];
 
 let counter = 0;
@@ -1192,5 +1193,93 @@ describe('a setup step on the plan', () => {
     expect(html).not.toContain('What to set up');
     // The detail comes back as an ordinary step's does.
     expect(html).toContain('Make a key at resend.com');
+  });
+});
+
+describe('a step a session added under an approved feature', () => {
+  const stamp = 'Added by session cse_01abc on 2026-09-26.';
+
+  function drawAdded(status: PlanItem['status'] = 'not_started', comment = stamp) {
+    const feature = item({ id: 'f', title: 'Approval stops at the feature', module: 'dev' });
+    const added = item({
+      id: 'a',
+      title: 'The step a session wrote',
+      parentId: 'f',
+      module: 'dev',
+      status,
+      comment,
+    });
+    const tree = buildPlanTree({ items: [feature, added], dependencies: [] });
+    return renderToStaticMarkup(
+      <PlanView
+        sections={applyView(tree, 'all')}
+        finished={[]}
+        summary={summarize(tree)}
+        view="all"
+        catalog={catalogOf(tree)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+  }
+
+  it('says on the row that Dash added it, and when, without opening it', () => {
+    const html = drawAdded();
+    expect(html).toContain('Added by Dash on 2026-09-26');
+    // The session is there for whoever wants it, under the pointer.
+    expect(html).toContain('title="Session cse_01abc"');
+    // Said once: the stamp is not also shown as the row's note.
+    expect(html).not.toContain('Note: Added by');
+    expect(html).not.toContain('Claude');
+  });
+
+  it('says it beside a re-shape stamp, each on its own line', () => {
+    const html = drawAdded('not_started', `From #63's answer: On the server.\n${stamp}`);
+    expect(html).toContain('On the server.');
+    expect(html).toContain('Added by Dash on 2026-09-26');
+  });
+
+  it('reads the stamp with no session id too', () => {
+    const html = drawAdded('not_started', 'Added by a session on 2026-09-25.');
+    expect(html).toContain('Added by Dash on 2026-09-25');
+    expect(html).not.toContain('title="Session');
+  });
+
+  it('stops marking the step once it is closed', () => {
+    expect(drawAdded('done')).not.toContain('Added by Dash');
+    expect(drawAdded('dropped')).not.toContain('Added by Dash');
+  });
+
+  it('marks nothing on a step without the stamp', () => {
+    expect(drawAdded('not_started', 'Waiting on the RPC review.')).not.toContain('Added by Dash');
+  });
+
+  describe('its menu', () => {
+    const rest = [{ id: 'assign', label: 'Mine', onSelect: () => {} }];
+
+    it('puts Drop first, one press that drops this step', () => {
+      const menu = withSessionDrop({ id: 'a', status: 'not_started', comment: stamp }, rest);
+      expect(menu.map((entry) => entry.label)).toEqual(['Drop', 'Mine']);
+      const [drop] = menu;
+      // No confirm and no note to type: the step can be put back from the
+      // status menu, so a second press would only be in the way.
+      expect(drop.confirm).toBeUndefined();
+      expect(drop.formFields).toEqual({ id: 'a', status: 'dropped' });
+    });
+
+    it('offers it on a blocked or underway step as well', () => {
+      for (const status of ['in_progress', 'blocked'] as const) {
+        expect(withSessionDrop({ id: 'a', status, comment: stamp }, rest)[0].label).toBe('Drop');
+      }
+    });
+
+    it('leaves the menu alone on a closed step or one without the stamp', () => {
+      expect(withSessionDrop({ id: 'a', status: 'done', comment: stamp }, rest)).toBe(rest);
+      expect(withSessionDrop({ id: 'a', status: 'dropped', comment: stamp }, rest)).toBe(rest);
+      expect(withSessionDrop({ id: 'a', status: 'not_started', comment: null }, rest)).toBe(rest);
+    });
   });
 });
