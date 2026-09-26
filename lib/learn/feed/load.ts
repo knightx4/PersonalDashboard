@@ -15,6 +15,8 @@ import {
 } from './card';
 import { youtubeVideoId } from '@/lib/learn/youtube/format';
 import { loadNotesForCards } from '@/lib/learn/notes/store';
+import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
+import { loadConversations } from '@/lib/talk/store';
 import { ARTICLE_GAP, POOL_FACTOR, spreadDeck, type Spreadable } from './spread';
 
 /**
@@ -119,7 +121,35 @@ export async function loadFeedPage(
   const recent = await recentInDeck(supabase, exclude.slice(-ARTICLE_GAP));
   const dealt = spreadDeck(dealable, recent, limit).map((entry) => entry.card);
   const conceptOf = new Map(rows.map((row) => [row.id, row.concept_id ?? null]));
-  return withNotes(supabase, await withVideos(supabase, dealt, conceptOf), conceptOf);
+  const withIdeas = await withNotes(supabase, await withVideos(supabase, dealt, conceptOf), conceptOf);
+  return withConversations(supabase, withIdeas);
+}
+
+/**
+ * Each card with its conversation with Dash (plan #1053), from core through
+ * the same session. A failed read leaves the cards without them, as a failed
+ * notes read does; the turns are still kept.
+ */
+async function withConversations(
+  supabase: LearnSupabaseClient,
+  cards: FeedCard[],
+): Promise<FeedCard[]> {
+  if (cards.length === 0) return cards;
+  try {
+    const core = supabase.schema(CORE_SCHEMA) as unknown as CoreSupabaseClient;
+    const byCard = await loadConversations(
+      core,
+      'feed_card',
+      cards.map((card) => card.id),
+    );
+    return cards.map((card) => {
+      const conversation = byCard.get(card.id);
+      return conversation ? { ...card, conversation } : card;
+    });
+  } catch (error) {
+    console.error('[learn now] conversations for cards', error instanceof Error ? error.message : error);
+    return cards;
+  }
 }
 
 /**
