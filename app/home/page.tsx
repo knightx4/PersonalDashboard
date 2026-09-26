@@ -17,17 +17,21 @@ import { loadMainCheck } from '@/lib/shell/main-check';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { isOwner } from '@/lib/dev/owner';
 import { loadAgenda } from '@/lib/todo/agenda/load';
-import { BUCKET_LABELS } from '@/lib/todo/tasks/model';
+import { BUCKET_LABELS, dueDay } from '@/lib/todo/tasks/model';
 import { countReviewItems as countShoppingReview } from '@/lib/review/load';
 import { countReviewItems as countJobsReview } from '@/lib/jobs/review/load';
 import {
+  loadGoalsBrief,
   loadJobsBrief,
+  loadNewsBrief,
   loadLearnBrief,
   loadShoppingBrief,
   loadTodoBrief,
   loadVaultBrief,
   type Brief,
 } from '@/lib/shell/brief';
+import { loadUpdates } from '@/lib/shell/updates';
+import { whenLabel } from '@/lib/shell/home-model';
 import { cn } from '@/lib/cn';
 
 export const metadata = { title: 'Home' };
@@ -66,9 +70,12 @@ function greeting(timezone: string, now: Date): string {
  *
  * A quiet day looks quiet. When no workspace has anything to say, the column
  * is the day's sigil and one line, not five rows of "nothing". The agenda's
- * overdue and due-today entries follow, capped, because they are the one list
- * worth seeing before choosing a room. The tiles come last and are small:
- * they are doors, and doors do not need to be the biggest thing in the hall.
+ * overdue and due-today entries follow, capped, with a count of the rest.
+ * Then the next seven days from the same agenda (interviews, events, return
+ * deadlines, tasks), and then what changed in the last three days: replies
+ * from companies, new orders, newsletters that arrived. Each of those cards
+ * is left out when it has nothing in it. The tiles come last and are small,
+ * because they are only there to get you into a workspace.
  *
  * A module switched off under Account is not listed anywhere here. That is
  * what the switch means.
@@ -110,7 +117,14 @@ export default async function HomePage() {
     on('jobs') ? safe(countJobsReview(jobs, core, user.id), 0) : 0,
   ]);
 
-  const loaded = await Promise.all([
+  const [loaded, updates] = await Promise.all([
+    loadBriefs(),
+    // The feed swallows its own failures per source, and this guards the rest.
+    safe(loadUpdates(user.id, on, now), []),
+  ]);
+
+  async function loadBriefs() {
+    return Promise.all([
     on('shopping')
       ? safe(loadShoppingBrief(user.id, settings.timezone, shoppingReview), null)
       : null,
@@ -118,7 +132,10 @@ export default async function HomePage() {
     on('todo') ? safe(loadTodoBrief(user.id, settings.timezone), null) : null,
     on('vault') ? safe(loadVaultBrief(), null) : null,
     on('learn') ? safe(loadLearnBrief(), null) : null,
-  ]);
+    on('goals') ? safe(loadGoalsBrief(user.id, settings.timezone), null) : null,
+    on('news') ? safe(loadNewsBrief(), null) : null,
+    ]);
+  }
   // The dev workspace has no brief of its own yet: its queue is the feedback
   // list, and the button in the header already says how long it is.
   const paired: ReadonlyArray<readonly [ModuleId, Brief | null]> = [
@@ -127,16 +144,48 @@ export default async function HomePage() {
     ['todo', loaded[2]],
     ['vault', loaded[3]],
     ['learn', loaded[4]],
+    ['goals', loaded[5]],
+    ['news', loaded[6]],
   ];
   const briefs = paired.filter(
     (entry): entry is readonly [ModuleId, Brief] => entry[1] !== null,
   );
 
-  // Overdue and today only, capped. Everything else is a page away.
-  const due = (agenda?.piles ?? [])
+  // Overdue and today only, capped. Everything else is a page away, and the
+  // card says how much of it there is so the cap is not mistaken for all.
+  const dueAll = (agenda?.piles ?? [])
     .filter((pile) => pile.bucket === 'overdue' || pile.bucket === 'today')
-    .flatMap((pile) => pile.entries.map((entry) => ({ bucket: pile.bucket, entry })))
-    .slice(0, 5);
+    .flatMap((pile) => pile.entries.map((entry) => ({ bucket: pile.bucket, entry })));
+  const due = dueAll.slice(0, 5);
+  const dueMore = dueAll.length - due.length;
+
+  // The next seven days after today: what is booked and what falls due. The
+  // agenda already gathers interviews, return deadlines, events and tasks
+  // into its "soon" pile, so this reads that pile rather than asking each
+  // workspace again.
+  const soonPile = (agenda?.piles ?? []).find((pile) => pile.bucket === 'soon');
+  const week = [
+    ...(soonPile?.context ?? []).map((entry) => ({
+      key: `context-${entry.key}`,
+      day: entry.day,
+      at: entry.at,
+      label: entry.label,
+      detail: entry.detail,
+      href: entry.link?.href ?? '/todo',
+      booked: true,
+    })),
+    ...(soonPile?.entries ?? []).map((entry) => ({
+      key: `entry-${entry.key}`,
+      day: (entry.task ? dueDay(entry.task, settings.timezone) : entry.item?.day) ?? null,
+      at: entry.task?.dueAt ?? entry.item?.at ?? null,
+      label: entry.task?.title ?? entry.item?.title ?? '',
+      detail: entry.item?.detail ?? null,
+      href: agendaHref(entry),
+      booked: false,
+    })),
+  ]
+    .sort((a, b) => (a.day ?? '9999').localeCompare(b.day ?? '9999') || (a.at ?? '').localeCompare(b.at ?? ''))
+    .slice(0, 6);
 
   // What today already holds -- an event you typed, an interview -- above the
   // things to do, and without a checkbox for the same reason the agenda gives
@@ -310,6 +359,93 @@ export default async function HomePage() {
                   ))}
                 </ul>
               )}
+              {dueMore > 0 && (
+                <Link
+                  href="/todo"
+                  className="mt-2 block text-small text-ink-muted hover:text-accent"
+                >
+                  {dueMore} more on the agenda
+                </Link>
+              )}
+            </Card>
+          )}
+
+          {/* The next seven days, so a Tuesday interview is seen on Saturday
+              rather than on Tuesday. Nothing when nothing is coming. */}
+          {week.length > 0 && (
+            <Card padding="standard" className="mt-4">
+              <div className="flex items-baseline justify-between gap-2">
+                <h2 className="text-ui font-semibold text-ink">This week</h2>
+                <Link
+                  href="/todo"
+                  className="text-small font-medium text-accent underline underline-offset-2"
+                >
+                  The agenda
+                </Link>
+              </div>
+              <ul className="mt-2 divide-y divide-border">
+                {week.map((row) => (
+                  <li key={row.key} className="flex items-baseline gap-3 py-1.5">
+                    <span className="tabular w-20 shrink-0 text-small text-ink-muted">
+                      {row.day ? dayLabel(row.day) : ''}
+                      {row.booked && row.at ? ` ${timeLabel(row.at, settings.timezone)}` : ''}
+                    </span>
+                    {row.booked && (
+                      <CalendarClock
+                        className="size-3.5 shrink-0 self-center text-accent"
+                        strokeWidth={1.75}
+                        aria-hidden
+                      />
+                    )}
+                    <Link
+                      href={row.href}
+                      className="min-w-0 flex-1 truncate text-ui text-ink hover:text-accent"
+                    >
+                      {row.label}
+                      {row.detail && <span className="text-ink-muted"> · {row.detail}</span>}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          {/* What happened in the last three days: replies, orders, the
+              newsletters that came in. Each line names the thing, so the page
+              can be read without opening a workspace to see what a count was
+              counting. */}
+          {updates.length > 0 && (
+            <Card padding="standard" className="mt-4">
+              <h2 className="text-ui font-semibold text-ink">Updates</h2>
+              <ul className="mt-2 divide-y divide-border">
+                {updates.map((update) => {
+                  const body = (
+                    <>
+                      <span className="block truncate text-ui text-ink">{update.text}</span>
+                      {update.detail && (
+                        <span className="block truncate text-small text-ink-muted">
+                          {update.detail}
+                        </span>
+                      )}
+                    </>
+                  );
+                  return (
+                    <li key={update.key} className="flex items-center gap-3 py-2">
+                      <ModuleMark module={update.module} size="sm" />
+                      {update.href ? (
+                        <Link href={update.href} className="min-w-0 flex-1 hover:opacity-80">
+                          {body}
+                        </Link>
+                      ) : (
+                        <span className="min-w-0 flex-1">{body}</span>
+                      )}
+                      <span className="tabular shrink-0 text-small text-ink-muted">
+                        {whenLabel(update.at, now, settings.timezone)}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
             </Card>
           )}
 
@@ -331,6 +467,23 @@ export default async function HomePage() {
       </AppShell>
     </div>
   );
+}
+
+/** "Tue 29", for a day in the coming week. The day is already the reader's. */
+function dayLabel(day: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${day}T00:00:00Z`));
+}
+
+function timeLabel(at: string, timezone: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(at));
 }
 
 /**
