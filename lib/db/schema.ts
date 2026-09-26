@@ -554,7 +554,7 @@ export const gameDetails = pgTable(
   ],
 );
 
-export const feedbackKind = pgEnum('feedback_kind', ['bug', 'feature']);
+export const feedbackKind = pgEnum('feedback_kind', ['bug', 'feature', 'like']);
 
 export const feedbackStatus = pgEnum('feedback_status', [
   'open',
@@ -566,8 +566,8 @@ export const feedbackStatus = pgEnum('feedback_status', [
 ]);
 
 /**
- * Bugs and feature requests captured from the header button, with the page
- * the user was on when they wrote it.
+ * Bugs, feature requests and likes captured from the header button, with the
+ * page the user was on when they wrote it.
  */
 export const feedbackItems = pgTable(
   'feedback_items',

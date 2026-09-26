@@ -44,8 +44,14 @@ export function raiseContext(row: RaisedRow): string {
   return out.join('\n') + '\n';
 }
 
+const NOTE_HEADING: Record<FeedbackRow['kind'], string> = {
+  bug: '# A bug report',
+  feature: '# A feature request',
+  like: '# A like: something that works and should be kept',
+};
+
 /**
- * A bug report or a feature request as it stands.
+ * A bug report, a feature request or a like as it stands.
  *
  * The resolution note is the half a question is usually about: it holds what a
  * run said when it stopped, which on a blocked note is the question it is
@@ -54,7 +60,7 @@ export function raiseContext(row: RaisedRow): string {
  */
 export function noteContext(note: FeedbackRow): string {
   const out = [
-    note.kind === 'bug' ? '# A bug report' : '# A feature request',
+    NOTE_HEADING[note.kind] ?? '# A feature request',
     '',
     `Status: ${note.status}`,
     `Filed: ${note.createdAt.slice(0, 10)}`,

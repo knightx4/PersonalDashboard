@@ -146,4 +146,8 @@ describe('noteContext', () => {
     expect(written).not.toContain('Filed from:');
     expect(written).not.toContain('What a run said');
   });
+
+  it('calls a like a like', () => {
+    expect(noteContext(note({ kind: 'like' }))).toContain('# A like');
+  });
 });
