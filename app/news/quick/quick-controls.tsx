@@ -6,17 +6,26 @@ import {
   startTransition,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from 'react';
 import { useFormStatus } from 'react-dom';
-import { ArrowRight, EyeOff, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ArrowRight, EyeOff, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { parseBack, pushBack } from '@/lib/news/quick/back';
 import { swipeAxis, swipeFarEnough } from '@/lib/news/quick/swipe';
 import type { NewsTopic } from '@/lib/news/issues/topics';
 import type { StoryPass } from '@/lib/news/quick/next';
-import { hideQuickTopic, passQuickPage, passQuickStory, recordArticleOpened } from './actions';
+import {
+  hideQuickTopic,
+  passQuickPage,
+  passQuickStory,
+  recordArticleOpened,
+  unpassQuickPage,
+} from './actions';
 
 /**
  * The id of the form Next submits. A swipe on the card (#855) submits the
@@ -108,11 +117,71 @@ export function QuickDeck({
  * the next set. The stories go as issueId and storyIndex pairs, in order.
  */
 export function QuickPageForm({ stories }: { stories: readonly StoryPass[] }) {
+  const raw = useSyncExternalStore(subscribeBack, readBackRaw, () => null);
+  const back = useMemo(() => parseBack(raw), [raw]);
+  const previous = back.at(-1);
   return (
-    <form action={passQuickPage}>
-      <PassFields stories={stories} />
-      <NextPageButton />
-    </form>
+    <div className="flex flex-wrap items-center gap-2">
+      {/* Previous page (note 460be33e): takes back the last Next page's
+          passes, so a page skipped too fast comes back. Only once there is
+          a page in this tab to go back to. */}
+      {previous && (
+        <form
+          action={async (form) => {
+            writeBack(back.slice(0, -1));
+            await unpassQuickPage(form);
+          }}
+        >
+          <PassFields stories={previous} />
+          <PreviousPageButton />
+        </form>
+      )}
+      <form
+        action={async (form) => {
+          writeBack(pushBack(back, stories));
+          await passQuickPage(form);
+        }}
+      >
+        <PassFields stories={stories} />
+        <NextPageButton />
+      </form>
+    </div>
+  );
+}
+
+/** Where the pages Previous page can go back to are kept: this tab, and only this tab. */
+const BACK_KEY = 'news:quick-read:back';
+const backListeners = new Set<() => void>();
+
+function subscribeBack(listener: () => void) {
+  backListeners.add(listener);
+  return () => backListeners.delete(listener);
+}
+
+function readBackRaw(): string | null {
+  try {
+    return sessionStorage.getItem(BACK_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeBack(stack: readonly StoryPass[][]) {
+  try {
+    sessionStorage.setItem(BACK_KEY, JSON.stringify(stack));
+  } catch {
+    // Storage refused: Previous page simply has nothing to go back to.
+  }
+  for (const listener of backListeners) listener();
+}
+
+function PreviousPageButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" size="lg" variant="secondary" pending={pending}>
+      {!pending && <ArrowLeft className="size-4" strokeWidth={2} aria-hidden />}
+      {pending ? 'Loading…' : 'Previous page'}
+    </Button>
   );
 }
 

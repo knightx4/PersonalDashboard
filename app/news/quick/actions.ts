@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createNewsClient } from '@/lib/news/auth/server';
-import { openStory, passStories } from '@/lib/news/issues/quick';
+import { openStory, passStories, unpassStories } from '@/lib/news/issues/quick';
 import { readTopic } from '@/lib/news/issues/topics';
 import { hideTopic } from '@/lib/news/quick/hidden-topics';
 
@@ -79,6 +79,25 @@ export async function passQuickPage(formData: FormData): Promise<void> {
 
   revalidatePath('/news');
   if (finished) revalidatePath('/news/all');
+}
+
+/**
+ * Previous page on a laptop (note 460be33e): take back the passes the last
+ * Next page recorded, so a page skipped too fast comes back. The form carries
+ * the stories that page showed, which the browser kept when Next page was
+ * pressed; nothing on the server remembers pages.
+ */
+// latency: pending
+export async function unpassQuickPage(formData: FormData): Promise<void> {
+  const stories = readPairs(formData);
+  if (!stories) return;
+
+  await requireUser();
+  const client = await createNewsClient();
+  await unpassStories(client, { stories });
+
+  revalidatePath('/news');
+  revalidatePath('/news/all');
 }
 
 /**
