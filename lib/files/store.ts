@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { threadFrom, type DevComment } from '@/lib/comments/load';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import {
@@ -89,4 +90,36 @@ export async function loadListingsById(
   if (error) throw new Error(`Could not read the linked files: ${error.message}`);
   for (const row of (data ?? []) as ListingRow[]) byId.set(row.id, toListing(row));
   return byId;
+}
+
+/** The thread under a file, oldest first (migration 0119). */
+export async function loadFileThread(
+  core: CoreSupabaseClient,
+  fileId: string,
+): Promise<DevComment[]> {
+  const { data, error } = await core
+    .from('file_comments')
+    .select('id, author, body, created_at')
+    .eq('file_id', fileId)
+    .order('created_at');
+  if (error) throw new Error(`Could not read the comments: ${error.message}`);
+  return threadFrom(data ?? []);
+}
+
+/** Write one comment of yours on a file. */
+export async function writeFileComment(
+  core: CoreSupabaseClient,
+  input: { userId: string; fileId: string; body: string },
+): Promise<void> {
+  const { error } = await core
+    .from('file_comments')
+    .insert({ user_id: input.userId, file_id: input.fileId, author: 'me', body: input.body });
+  if (error) throw new Error(error.message);
+}
+
+/** Take a comment back out. False when there was none of yours with that id. */
+export async function deleteFileComment(core: CoreSupabaseClient, id: string): Promise<boolean> {
+  const { data, error } = await core.from('file_comments').delete().eq('id', id).select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
 }
