@@ -1,0 +1,13 @@
+Subject: Your appointment has been rescheduled
+From: Smile Dental <noreply@nexhealth.com>
+
+Hi Sam,
+
+Your dental cleaning has moved.
+
+New time: Thursday, October 8 at 10:00 AM
+Location: 120 Grand St, Brooklyn, NY 11211
+
+Confirmation number: SD48213
+
+Smile Dental

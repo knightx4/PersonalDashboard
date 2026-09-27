@@ -439,6 +439,21 @@ describe('scrubbing what nobody claimed', () => {
     expect(row.subject).toBe('Your receipt from Apple.');
   });
 
+  it('keeps a booking confirmation the appointments linker claimed (plan #1127)', async () => {
+    const id = await seedMessage(accountA, 'scrub-booking', 'Reservation confirmed at Lilia');
+    await admin`insert into public.ingested_messages (id, classification) values (${id}, 'not_relevant')`;
+    await admin`insert into job_search.ingested_messages (id, classification) values (${id}, 'not_relevant')`;
+    await admin`
+      insert into todo.appointment_messages (id, user_id, claimed, parse_status)
+      values (${id}, ${userA}, true, 'parsed')`;
+
+    await admin`select core.scrub_unclaimed_messages()`;
+
+    const [row] = await admin<{ subject: string | null }[]>`
+      select subject from ingested_messages where id = ${id}`;
+    expect(row.subject).toBe('Reservation confirmed at Lilia');
+  });
+
   it('scrubs the envelope once nobody wants it', async () => {
     const id = await seedMessage(accountA, 'scrub-unwanted', 'Newsletter');
     await admin`insert into public.ingested_messages (id, classification) values (${id}, 'not_relevant')`;

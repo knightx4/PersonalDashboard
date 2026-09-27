@@ -72,6 +72,10 @@ export const SPEND_OPERATIONS = {
     // The morning brief of the day (plan #1123). Haiku, one call per person
     // a day from the hourly day-brief cron, none on a quiet day; background.
     'write-day-brief',
+    // Reading a booking confirmation, change or cancellation into an
+    // appointment for the agenda, during inbox ingest (plan #1127). Haiku,
+    // one call per email the rules claim; background, no button.
+    'read-appointment-email',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one

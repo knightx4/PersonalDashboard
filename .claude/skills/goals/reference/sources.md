@@ -311,6 +311,15 @@ Events they put on their own calendar.
 - Name a row by `title`; link it by `id`
 - Opens at `/todo/calendar`
 
+### `todo.appointments` (Todo)
+
+Appointments and reservations they booked, read from the confirmation emails: doctor, dentist, haircut, a table.
+
+- Search: `title`, `provider`, `location`
+- Name a row by `title`; link it by `id`
+- Opens at `/todo`
+- starts_on is the day in their zone and starts_at the instant when the mail gave a time. status 'cancelled' means a cancellation email came after the booking.
+
 ### `news.saved_stories` (News)
 
 Stories from their newsletters they chose to keep.

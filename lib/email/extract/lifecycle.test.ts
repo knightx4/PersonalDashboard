@@ -145,3 +145,37 @@ describe('tracking from store shipping mail', () => {
     expect(carrierTrackingUrl(null, '12345678901')).toBeNull();
   });
 });
+
+describe('the day a parcel should arrive (plan #1127)', () => {
+  it('keeps the day a shipping email names', () => {
+    const extracted = extractLifecycleFromEmail({
+      classification: 'shipping',
+      subject: 'Your package has shipped',
+      text: 'Tracking number: 1Z999AA10123456784\nArriving Thursday, October 1',
+      receivedAt: new Date('2026-09-27T14:00:00Z'),
+    });
+    expect(extracted?.expectedOn).toBe('2026-10-01');
+  });
+
+  it('puts an out-for-delivery parcel on the day the email came', () => {
+    const extracted = extractLifecycleFromEmail({
+      classification: 'shipping',
+      subject: 'Your package is out for delivery',
+      text: 'Tracking number: 1Z999AA10123456784',
+      receivedAt: new Date('2026-09-27T14:00:00Z'),
+    });
+    expect(extracted?.shipmentStatus).toBe('out_for_delivery');
+    expect(extracted?.expectedOn).toBe('2026-09-27');
+  });
+
+  it('has no expected day once delivered', () => {
+    const { subject, text } = loadFixture('amazon-delivered.txt');
+    const extracted = extractLifecycleFromEmail({
+      classification: 'delivery',
+      subject,
+      text,
+      receivedAt: new Date('2026-08-20T18:00:00Z'),
+    });
+    expect(extracted?.expectedOn).toBeNull();
+  });
+});

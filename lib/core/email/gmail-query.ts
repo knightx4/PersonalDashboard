@@ -2,6 +2,7 @@ import { ATS_DOMAINS } from '@/lib/jobs/email/ats-senders';
 import { ORDER_SUBJECT_TERMS } from '@/lib/email/providers/gmail-query';
 import { RECRUITING_SUBJECT_TERMS } from '@/lib/jobs/email/providers/gmail-query';
 import { RECURRING_SUBJECT_TERMS } from '@/lib/recurring/rules';
+import { APPOINTMENT_SUBJECT_TERMS } from '@/lib/todo/appointments/rules';
 
 export { companyDomainQuery } from '@/lib/jobs/email/providers/gmail-query';
 
@@ -12,8 +13,8 @@ export { companyDomainQuery } from '@/lib/jobs/email/providers/gmail-query';
  * meant every message either of them wanted was fetched twice and the metadata
  * parsed twice. This asks for the union instead: commerce's order-shaped
  * subjects, the ATS sender domains and application-shaped subjects the job
- * side looks for, and the subscription and bill subjects of the recurring
- * payments linker.
+ * side looks for, the subscription and bill subjects of the recurring
+ * payments linker, and the booking subjects of the appointments linker.
  *
  * It stays a union of keywords rather than "everything in the window" on
  * purpose. Fetching every message would have better recall, but it multiplies
@@ -39,7 +40,9 @@ export function candidateQuery(backfillWindowDays: number): string {
   const recurring = RECURRING_SUBJECT_TERMS.filter((t) => !ORDER_SUBJECT_TERMS.includes(t))
     .map((t) => `subject:${t}`)
     .join(' OR ');
-  return `newer_than:${days}d (${orders} OR ${ats} OR ${recruiting} OR ${recurring})`;
+  // Booking confirmations for the agenda (plan #1127).
+  const appointments = APPOINTMENT_SUBJECT_TERMS.map((t) => `subject:${t}`).join(' OR ');
+  return `newer_than:${days}d (${orders} OR ${ats} OR ${recruiting} OR ${recurring} OR ${appointments})`;
 }
 
 /**

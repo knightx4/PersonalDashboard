@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  extractExpectedDeliveryOn,
   extractLifecycleEventAt,
   extractOrderDateYmd,
   parseLooseCalendarDate,
@@ -62,5 +63,32 @@ describe('extractLifecycleEventAt', () => {
     expect(extractLifecycleEventAt('Your package has shipped.', 'shipped', received)).toBe(
       received.toISOString(),
     );
+  });
+});
+
+describe('extractExpectedDeliveryOn (plan #1127)', () => {
+  // A Sunday.
+  const received = new Date('2026-09-27T14:00:00Z');
+
+  it('reads a weekday and a month-day', () => {
+    expect(extractExpectedDeliveryOn('Arriving Wednesday, October 1', received)).toBe('2026-10-01');
+    expect(extractExpectedDeliveryOn('Estimated delivery: Oct 3 - Oct 5', received)).toBe('2026-10-03');
+    expect(extractExpectedDeliveryOn('Expected delivery date: 10/02/2026', received)).toBe('2026-10-02');
+  });
+
+  it('counts a bare weekday, today and tomorrow from the day the email came', () => {
+    expect(extractExpectedDeliveryOn('Arriving Wednesday', received)).toBe('2026-09-30');
+    expect(extractExpectedDeliveryOn('Get it by Friday', received)).toBe('2026-10-02');
+    expect(extractExpectedDeliveryOn('Arriving today by 10pm', received)).toBe('2026-09-27');
+    expect(extractExpectedDeliveryOn('Your package arrives tomorrow', received)).toBe('2026-09-28');
+  });
+
+  it('puts a January day read in December in the next year', () => {
+    expect(extractExpectedDeliveryOn('Arriving Jan 3', new Date('2026-12-28T12:00:00Z'))).toBe('2027-01-03');
+  });
+
+  it('reads through markup and gives null when no day is named', () => {
+    expect(extractExpectedDeliveryOn('<b>Arriving:</b> <span>Thu, Oct 1</span>', received)).toBe('2026-10-01');
+    expect(extractExpectedDeliveryOn('Free delivery by Amazon. Your package has shipped.', received)).toBeNull();
   });
 });
