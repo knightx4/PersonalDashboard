@@ -65,6 +65,9 @@ export const SPEND_OPERATIONS = {
     // the review" on /timeline/year, and once a year per person from the
     // year review cron.
     'write-year-review',
+    // The morning brief of the day (plan #1123). Haiku, one call per person
+    // a day from the hourly day-brief cron, none on a quiet day; background.
+    'write-day-brief',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one

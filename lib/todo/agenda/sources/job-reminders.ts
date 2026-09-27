@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
+import { sessionClients } from '@/lib/todo/agenda/clients';
 import {
   addressOnly,
   composeFollowUp,
@@ -60,7 +61,7 @@ export const jobRemindersSource: AgendaSource = {
     'Follow-ups, prep and thank-yous the job search is holding, with the follow-up already written.',
 
   async fetch(ctx: SourceContext): Promise<AgendaItem[]> {
-    const supabase = await createJobsClient();
+    const supabase = await (ctx.clients ?? sessionClients).jobs();
 
     const { data, error } = await supabase
       .from('reminders')

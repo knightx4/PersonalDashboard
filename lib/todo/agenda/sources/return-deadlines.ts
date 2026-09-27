@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { createClient } from '@/lib/auth/server';
+import { sessionClients } from '@/lib/todo/agenda/clients';
 import { dismiss, undismiss } from '@/lib/todo/agenda/dismissals';
 import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
@@ -36,7 +36,7 @@ export const returnDeadlinesSource: AgendaSource = {
   description: 'Return windows about to close on things you have not sent back.',
 
   async fetch(ctx: SourceContext): Promise<AgendaItem[]> {
-    const supabase = await createClient();
+    const supabase = await (ctx.clients ?? sessionClients).shopping();
 
     const { data, error } = await supabase
       .from('orders')

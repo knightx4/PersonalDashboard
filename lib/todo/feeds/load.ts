@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { createTodoClient } from '@/lib/todo/auth/server';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { decryptToken } from '@/lib/crypto/tokens';
-import { TODO_SCHEMA } from '@/lib/todo/db/schema-name';
+import { TODO_SCHEMA, type TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { addDays } from '@/lib/todo/tasks/model';
 import { wallClockToInstant } from '@/lib/todo/time';
 import type { Event } from '@/lib/todo/events/model';
@@ -117,8 +117,9 @@ export async function loadFeedEventsInWindow(
   userId: string,
   window: { from: string; to: string },
   timezone: string,
+  client?: TodoSupabaseClient,
 ): Promise<SubscribedEvent[]> {
-  const supabase = await createTodoClient();
+  const supabase = client ?? (await createTodoClient());
 
   const { data: feeds, error: feedError } = await supabase
     .from('calendar_feeds')

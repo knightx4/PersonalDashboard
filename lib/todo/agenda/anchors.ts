@@ -1,9 +1,6 @@
 import 'server-only';
 
-import { createClient as createShoppingClient } from '@/lib/auth/server';
-import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
-import { createLearnClient } from '@/lib/learn/auth/server';
-import { createVaultClient } from '@/lib/vault/auth/server';
+import { sessionClients, type AgendaClients } from '@/lib/todo/agenda/clients';
 import { LINK_TARGETS, type LinkTarget, type TaskLink } from '@/lib/todo/links/model';
 
 /**
@@ -28,7 +25,10 @@ export interface Anchor {
 
 type Row = Record<string, unknown>;
 
-export async function resolveAnchors(links: TaskLink[]): Promise<Map<string, Anchor>> {
+export async function resolveAnchors(
+  links: TaskLink[],
+  clients: AgendaClients = sessionClients,
+): Promise<Map<string, Anchor>> {
   const byTarget = new Map<LinkTarget, Set<string>>();
   for (const link of links) {
     // Only the anchor is labelled. A `source` link says where a task came from,
@@ -47,7 +47,7 @@ export async function resolveAnchors(links: TaskLink[]): Promise<Map<string, Anc
   for (const target of LINK_TARGETS) {
     const ids = byTarget.get(target);
     if (!ids || ids.size === 0) continue;
-    lookups.push(lookup(target, [...ids], labels));
+    lookups.push(lookup(clients, target, [...ids], labels));
   }
 
   await Promise.all(lookups);
@@ -63,6 +63,7 @@ export async function resolveAnchors(links: TaskLink[]): Promise<Map<string, Anc
 }
 
 async function lookup(
+  clients: AgendaClients,
   target: LinkTarget,
   ids: string[],
   into: Map<string, Anchor>,
@@ -72,7 +73,7 @@ async function lookup(
   // barer than it might.
   try {
     if (target === 'order') {
-      const supabase = await createShoppingClient();
+      const supabase = await clients.shopping();
       const { data } = await supabase
         .from('orders')
         .select('id, external_order_number, merchants ( name )')
@@ -91,7 +92,7 @@ async function lookup(
     }
 
     if (target === 'inventory') {
-      const supabase = await createShoppingClient();
+      const supabase = await clients.shopping();
       const { data } = await supabase
         .from('inventory_items')
         .select('id, name, variant')
@@ -107,7 +108,7 @@ async function lookup(
     }
 
     if (target === 'saved') {
-      const supabase = await createShoppingClient();
+      const supabase = await clients.shopping();
       const { data } = await supabase.from('saved_items').select('id, title').in('id', ids);
       for (const row of (data ?? []) as Row[]) {
         into.set(`saved:${row.id as string}`, {
@@ -119,7 +120,7 @@ async function lookup(
     }
 
     if (target === 'reading') {
-      const supabase = await createLearnClient();
+      const supabase = await clients.learn();
       const { data } = await supabase
         .from('readings')
         .select('id, title, sources ( title )')
@@ -137,7 +138,7 @@ async function lookup(
     }
 
     if (target === 'track') {
-      const supabase = await createLearnClient();
+      const supabase = await clients.learn();
       const { data } = await supabase.from('tracks').select('id, title').in('id', ids);
       for (const row of (data ?? []) as Row[]) {
         into.set(`track:${row.id as string}`, {
@@ -149,7 +150,7 @@ async function lookup(
     }
 
     if (target === 'subject') {
-      const supabase = await createLearnClient();
+      const supabase = await clients.learn();
       const { data } = await supabase.from('subjects').select('id, name').in('id', ids);
       for (const row of (data ?? []) as Row[]) {
         into.set(`subject:${row.id as string}`, {
@@ -161,7 +162,7 @@ async function lookup(
     }
 
     if (target === 'note') {
-      const supabase = await createVaultClient();
+      const supabase = await clients.vault();
       const { data } = await supabase.from('notes').select('id, title, path').in('id', ids);
       for (const row of (data ?? []) as Row[]) {
         into.set(`note:${row.id as string}`, {
@@ -172,7 +173,7 @@ async function lookup(
       return;
     }
 
-    const supabase = await createJobsClient();
+    const supabase = await clients.jobs();
 
     if (target === 'company') {
       const { data } = await supabase.from('companies').select('id, name, slug').in('id', ids);

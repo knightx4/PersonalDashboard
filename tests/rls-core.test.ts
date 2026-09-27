@@ -256,6 +256,42 @@ describe('year reviews', () => {
   });
 });
 
+describe('day briefs', () => {
+  /**
+   * The morning brief (plan #1123). The hourly run writes it with the service
+   * role; the person only reads their own, and cannot write one.
+   */
+  async function seedBrief(userId: string, day: string): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into core.day_briefs (user_id, day, body, facts, model)
+      values (${userId}, ${day}, 'You have the Acme interview at 09:30.',
+              ${admin.json([{ kind: 'booked', text: '09:30: Interview with Acme' }])}, 'claude-haiku-4-5')
+      returning id`;
+    return row.id;
+  }
+
+  it('shows the owner their brief and another user none', async () => {
+    const id = await seedBrief(userA, '2026-09-28');
+    expect(await asUser(userA, (tx) => tx`select id from core.day_briefs where id = ${id}`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from core.day_briefs`)).toHaveLength(0);
+  });
+
+  it('does not let the owner write or rewrite one', async () => {
+    const id = await seedBrief(userA, '2026-09-27');
+    await expect(
+      asUser(userA, (tx) => tx`update core.day_briefs set body = 'Something else.' where id = ${id}`),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      asUser(userA, (tx) => tx`insert into core.day_briefs (user_id, day, body) values (${userA}, '2026-09-26', 'Made up.')`),
+    ).rejects.toThrow(/permission denied/);
+  });
+
+  it('keeps one brief a day', async () => {
+    await seedBrief(userA, '2026-09-25');
+    await expect(seedBrief(userA, '2026-09-25')).rejects.toThrow(/day_briefs_user_day_uq/);
+  });
+});
+
 describe('cross-user reads', () => {
   it('shows the owner their mailbox, its jobs and its messages', async () => {
     const seen = await asUser(userA, async (tx) => ({

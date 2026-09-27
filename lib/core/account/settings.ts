@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createCoreClient } from '@/lib/core/auth/server';
+import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { normalizeTimeZone } from '@/lib/core/timezone';
 import { MODULE_IDS, isModuleId, type ModuleId } from '@/lib/modules';
 import { parseTheme, SYSTEM_THEME, type Theme } from '@/lib/theme';
@@ -58,8 +59,11 @@ function toModuleIds(raw: unknown): ModuleId[] {
 /** The columns that have always been here, and the one that may not be yet. */
 const BASE_COLUMNS = 'display_name, timezone, display_currency, enabled_modules';
 
-export async function loadAccountSettings(userId: string): Promise<AccountSettings> {
-  const supabase = await createCoreClient();
+export async function loadAccountSettings(
+  userId: string,
+  client?: CoreSupabaseClient,
+): Promise<AccountSettings> {
+  const supabase = client ?? (await createCoreClient());
 
   const withTheme = await supabase
     .from('account_settings')

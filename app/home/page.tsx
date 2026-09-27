@@ -66,7 +66,8 @@ function greeting(timezone: string, now: Date): string {
  * The front door to the account, not to any one module.
  *
  * It reads like this morning's front page rather than a launcher: the date,
- * set large, then the one sentence each workspace would say if it could say
+ * set large, with this morning's brief under it once the day-brief cron has
+ * written one (plan #1123), then the one sentence each workspace would say if it could say
  * only one -- the same brief that sits in each workspace's top bar, gathered
  * here in one column. That is the question none of the modules can answer on
  * its own: what, across all of them, needs me today. Under it, in a week
@@ -126,11 +127,24 @@ export default async function HomePage() {
   const thisWeek = observationWeek(now).week;
   const nextWeek = new Date(Date.parse(`${thisWeek}T00:00:00Z`) + 7 * 86_400_000).toISOString().slice(0, 10);
 
-  const [loaded, updates, observations] = await Promise.all([
+  const [loaded, updates, observations, dayBrief] = await Promise.all([
     loadBriefs(),
     // The feed swallows its own failures per source, and this guards the rest.
     safe(loadUpdates(user.id, on, now), []),
     safe(readObservations(shopping, { fromWeek: thisWeek, toWeek: nextWeek }), []),
+    // This morning's brief (plan #1123), written by the hourly day-brief cron
+    // from six in the person's zone. Before then there is none, and the page
+    // opens on the date as it always did.
+    safe(
+      core
+        .from('day_briefs')
+        .select('body')
+        .eq('user_id', user.id)
+        .eq('day', today)
+        .maybeSingle()
+        .then((result) => (result.data?.body as string | undefined) ?? null),
+      null,
+    ),
   ]);
 
   async function loadBriefs() {
@@ -237,6 +251,7 @@ export default async function HomePage() {
             <h1 className="font-display mt-1 text-figure-lg font-semibold tracking-[-0.04em] text-ink sm:text-figure-xl">
               {date}
             </h1>
+            {dayBrief && <p className="mt-3 max-w-prose text-body text-ink">{dayBrief}</p>}
           </header>
 
           {/* The doors, as marks, right under the date.

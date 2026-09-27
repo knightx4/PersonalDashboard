@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createTodoClient } from '@/lib/todo/auth/server';
+import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 
 /**
  * The overlay: the only thing this module stores about an obligation it does
@@ -20,8 +21,11 @@ export type Dismissals = Map<string, { until: string | null }>;
 /** Which foreign_source enum value a source's dismissals are stored under. */
 export type DismissalSource = 'return_deadline' | 'goal_step';
 
-export async function loadDismissals(userId: string): Promise<Dismissals> {
-  const supabase = await createTodoClient();
+export async function loadDismissals(
+  userId: string,
+  client?: TodoSupabaseClient,
+): Promise<Dismissals> {
+  const supabase = client ?? (await createTodoClient());
 
   const { data } = await supabase
     .from('dismissals')
