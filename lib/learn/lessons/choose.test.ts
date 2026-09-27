@@ -81,6 +81,57 @@ function wideTrack(id: string, count: number): LessonTrack {
 
 const weight = (value: number, stopped = false): TrackWeight => ({ weight: value, stopped });
 
+describe("a goal's outlined track (plan #1139)", () => {
+  const doneTrack = (outline?: 'written' | 'wanted'): LessonTrack => ({
+    subjectId: 's',
+    name: 'S',
+    units: [{ id: 'u1' }, { id: 'u2' }],
+    goals: [goal('u1', 'one'), goal('u2', 'two')],
+    graph: graphOf({ one: 'known', two: 'sharp' }),
+    ...(outline ? { outline } : {}),
+  });
+
+  it('asks for no unit after the last once every unit is done', () => {
+    expect(planTrack(doneTrack('written'), new Set())).toEqual({ kind: 'finished' });
+  });
+
+  it('asks for no next unit while the last one runs short, and still teaches it', () => {
+    const plan = planTrack({ ...chainTrack('s', { 's-a': 'known' }), outline: 'written' }, new Set());
+    expect(plan.kind).toBe('teach');
+    expect(plan).not.toHaveProperty('need');
+  });
+
+  it('still asks for the chain of a unit not laid out yet', () => {
+    const track: LessonTrack = { ...doneTrack('written'), goals: [goal('u1', 'one'), goal('u2', null)] };
+    expect(planTrack(track, new Set())).toMatchObject({ kind: 'need', need: { because: 'no-chain', unitId: 'u2' } });
+  });
+
+  it("asks for the outline of a goal's track that has none, in place of a next unit", () => {
+    const choice = chooseLessons({
+      tracks: [doneTrack('wanted'), { ...chainTrack('t'), outline: 'wanted' }],
+      weights: new Map(),
+      carded: new Set(),
+      goalTracks: new Set(['s', 't']),
+      slots: 2,
+    });
+    expect(choice.needs).toEqual([
+      { subjectId: 's', subjectName: 'S', because: 'no-outline', unitId: 'u2' },
+      { subjectId: 't', subjectName: 'T', because: 'no-outline', unitId: 't-u1' },
+    ]);
+    expect(choice.picks.map((pick) => pick.concept.id)).toEqual(['t-a']);
+  });
+
+  it('asks nothing of a track already outlined', () => {
+    const choice = chooseLessons({
+      tracks: [doneTrack('written')],
+      weights: new Map(),
+      carded: new Set(),
+      slots: 2,
+    });
+    expect(choice).toMatchObject({ picks: [], needs: [], waiting: [] });
+  });
+});
+
 describe('planTrack', () => {
   it('teaches the concept whose prerequisites are known, in the first unit not done', () => {
     const track: LessonTrack = {

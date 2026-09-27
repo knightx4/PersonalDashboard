@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextUnitPrompt } from '@/lib/learn/graph/curriculum';
+import { nextUnitPrompt, outlinePrompt } from '@/lib/learn/graph/curriculum';
 import type { Concept, Graph, KnowledgeState } from '@/lib/learn/graph/model';
 import { shownInTrack } from './add-unit';
 
@@ -54,5 +54,28 @@ describe('the next unit prompt', () => {
     expect(prompt).toContain('The track has no units yet, so this is its first.');
     expect(prompt).toContain('- and 5 more');
     expect(prompt).not.toContain('Idea 44');
+  });
+});
+
+describe("the whole outline prompt (plan #1139)", () => {
+  it('asks a new track for the whole course within the depth', () => {
+    const prompt = outlinePrompt({ subject: 'SaaS metrics', asked: 'ARR and churn', bounds: { min: 8, max: 12 }, units: [] });
+    expect(prompt).toContain('between 8 and 12 units');
+    expect(prompt).toContain('The track has no units yet.');
+  });
+
+  it('asks a track with units only for those after them, counting them in', () => {
+    const prompt = outlinePrompt({
+      subject: 'SaaS metrics',
+      asked: null,
+      bounds: { min: 8, max: 12 },
+      units: [
+        { title: 'ARR', covers: 'Recurring revenue.', outcome: 'Compute ARR.' },
+        { title: 'Churn', covers: 'Losses.', outcome: 'Compute churn.' },
+      ],
+    });
+    expect(prompt).toContain('counting the 2 it already has, so write between 6 and 10 more');
+    expect(prompt).toContain('1. ARR. Covers: Recurring revenue. Outcome: Compute ARR.');
+    expect(prompt).toContain('Write only the units after these.');
   });
 });

@@ -162,6 +162,22 @@ far, which concepts you know, and which you rated too hard or kept for work,
 so the new unit builds on what you have shown. Tracks written before this keep
 all their units, and new ones are added after the last.
 
+### A goal's track is outlined whole
+
+Plan #1139. A learning goal's track gets every unit in one call when the goal
+is saved, so the whole course shows from the start. The count follows the
+goal's depth: 5 to 8 units for familiar, 8 to 12 for solid, 12 to 16 for deep
+(`OUTLINE_UNITS` in `lib/learn/graph/curriculum-payload.ts`). A track that
+already had units keeps them, and the outline is written after them.
+`learn.subjects.outlined_at` records that a track has its outline (learn 0072).
+
+No unit is written one at a time for an outlined track: the top-up raises no
+`all-units-done`, `last-unit-short` or `no-curriculum` need for it. A goal's
+track that has no outline yet, because the call failed when the goal was saved
+or the goal was set before outlines, raises `no-outline` instead, and the top-up
+writes the outline (`ensureOutline` in `lib/learn/lessons/outline.ts`). Tracks
+not made from a goal still get their units as they go.
+
 ## The unit check
 
 When a unit is done, the next card from that track is its unit check: one
@@ -356,10 +372,10 @@ the goal share in `chooseLessons` (`lib/learn/lessons/choose.ts`).
 0056). Saving a goal places it, then gives it a track found or made by the
 goal's name, copies the goal's placement onto the track when the track has
 none, and writes the track's first units from the goal's line and depth
-("city design, as a learning goal: enough to use it and explain it"). The
-Learn now top-up gives a track to any active goal still without one before it
-chooses lessons, with no model call, and writes that track's first unit as it
-does for any track with no curriculum. Archiving a goal leaves its track as
+("city design, as a learning goal: enough to use it and explain it"); since
+plan #1139 that is the track's whole outline. The Learn now top-up gives a
+track to any active goal still without one before it chooses lessons, with no
+model call, and then writes that track's outline. Archiving a goal leaves its track as
 one of your tracks, without the goal's share. Rewording a goal leaves the
 track's name.
 

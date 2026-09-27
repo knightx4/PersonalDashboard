@@ -91,6 +91,7 @@ describe('the operation names', () => {
       'embed-lesson-claim',
       'lay-out-lesson-unit',
       'write-next-unit',
+      'write-outline',
       'add-lesson-floor',
       'write-unit-check',
       'mark-unit-check',

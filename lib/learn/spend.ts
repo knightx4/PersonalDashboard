@@ -176,6 +176,11 @@ export const LEARN_OPERATIONS = [
   // which writes a new track's first units on a press, so what growing tracks
   // costs can be read on its own.
   'write-next-unit',
+  // Writing a learning goal's whole outline from the background top-up (plan
+  // #1139), for a goal's track that has none: one set before outlines existed,
+  // or one whose outline failed when the goal was saved. On a press the same
+  // call records as 'write-curriculum'.
+  'write-outline',
   // Adding what a lesson rated too hard rests on, under its concept (plan
   // #970), from the background top-up. The same call as 'propose-floor',
   // which a press on the probe page records.
