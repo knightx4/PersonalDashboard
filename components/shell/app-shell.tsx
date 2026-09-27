@@ -285,9 +285,13 @@ export function AppShell({
   }, [searching]);
 
   const active = sections.find(isActive);
-  // The top bar names the page. Falling back to the workspace rather than to
-  // nothing: a bar that goes blank on an unlisted route reads as broken.
-  const title = active?.label ?? moduleById(module)?.label ?? 'Home';
+  // The top bar names the workspace, and the page's own heading names the
+  // page. It used to name the section, which on a section's first page is the
+  // heading's exact words a few inches lower: "Quick read" twice. Below that
+  // first page the section follows as a link back up to it, so a company or an
+  // order still says where it sits.
+  const title = moduleById(module)?.label ?? 'Home';
+  const crumb = active && pathname !== active.href ? active : undefined;
 
   useEffect(() => {
     if (!drawer) return;
@@ -696,6 +700,19 @@ export function AppShell({
                 title reads better than an account icon pushed off the edge. */}
                 <h2 className="font-display min-w-0 truncate text-body font-semibold tracking-tight text-shell-ink">
                   {title}
+                  {crumb && (
+                    <>
+                      <span className="px-1.5 font-normal text-shell-muted" aria-hidden>
+                        ›
+                      </span>
+                      <Link
+                        href={crumb.href}
+                        className="font-normal text-shell-muted transition-colors hover:text-shell-ink"
+                      >
+                        {crumb.label}
+                      </Link>
+                    </>
+                  )}
                 </h2>
 
                 {/* The one thing this workspace would say if it could say only

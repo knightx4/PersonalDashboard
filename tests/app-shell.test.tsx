@@ -13,8 +13,10 @@ import type { NavSection } from '@/components/shell/app-shell';
 import type { ModuleId } from '@/lib/modules';
 import { SYSTEM_THEME } from '@/lib/theme';
 
+const route = vi.hoisted(() => ({ pathname: '/home' }));
+
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/home',
+  usePathname: () => route.pathname,
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
   useSearchParams: () => new URLSearchParams(),
 }));
@@ -338,5 +340,46 @@ describe('the search button on a phone', () => {
 
   it('draws it outside a workspace too', () => {
     expect(header(shell(null))).toContain('title="Search"');
+  });
+});
+
+describe('the top bar title', () => {
+  const sections: NavSection[] = [
+    { href: '/news', label: 'Quick read', exact: true, alsoMatches: ['/news/story/'] },
+    { href: '/news/saved', label: 'Saved' },
+  ];
+
+  function title(pathname: string): string {
+    route.pathname = pathname;
+    try {
+      const html = renderToStaticMarkup(
+        <AppShell
+          account="11111111-1111-4111-8111-111111111111"
+          module="news"
+          sections={sections}
+          displayName="Sam"
+          email="sam@example.com"
+          theme={SYSTEM_THEME}
+        >
+          <p>The page</p>
+        </AppShell>,
+      );
+      const at = html.indexOf('<h2');
+      expect(at).toBeGreaterThan(-1);
+      return html.slice(at, html.indexOf('</h2>', at));
+    } finally {
+      route.pathname = '/home';
+    }
+  }
+
+  it("names the workspace, not the section the page's own heading already names", () => {
+    const bar = title('/news');
+    expect(bar).toContain('>News');
+    expect(bar).not.toContain('Quick read');
+  });
+
+  it('follows the workspace with a link back to the section below its first page', () => {
+    expect(title('/news/story/1')).toContain('href="/news">Quick read</a>');
+    expect(title('/news/saved/2')).toContain('href="/news/saved">Saved</a>');
   });
 });
