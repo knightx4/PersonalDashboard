@@ -103,6 +103,19 @@ describe('sectionsFromExtract', () => {
     expect(section.anchor).toBe("Marshall's_scissors_&_Jevons");
   });
 
+  it('marks stubs and link lists as not searchable, and keeps them', () => {
+    const long = 'The mound rises as each town is built on the ruins of the last. '.repeat(6);
+    const sections = sectionsFromExtract(
+      extract(long, '== Characteristics ==', 'Short.', '== History ==', long, '== See also ==', long),
+    );
+    expect(sections.map((s) => [s.heading, s.searchable])).toEqual([
+      [null, true],
+      ['Characteristics', false],
+      ['History', true],
+      ['See also', false],
+    ]);
+  });
+
   it('returns nothing for an extract with no text', () => {
     expect(sectionsFromExtract('')).toEqual([]);
   });

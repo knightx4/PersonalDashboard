@@ -213,18 +213,41 @@ export async function loadPendingVisionEdits(
   return byScope;
 }
 
+/** The edit as `decide_vision_edit` leaves it: which workspace, and both texts. */
+export type DecidedVisionEdit = {
+  module: VisionScope;
+  /** The vision the edit was drafted against; null when there was none. */
+  visionBody: string | null;
+  proposedBody: string | null;
+  status: VisionEditStatus | null;
+};
+
 /**
  * Accept or dismiss a pending edit. Accepting replaces the workspace's vision
  * with the proposed text in the same transaction as the status change.
+ *
+ * Returns the decided edit, so an accept can re-shape the workspace it named
+ * (plan #1137). `edit` is null when the function answered with no row.
  */
 export async function decideVisionEdit(
   supabase: SupabaseClient,
   editId: string,
   accept: boolean,
-): Promise<{ error: string | null }> {
-  const { error } = await supabase.rpc('decide_vision_edit', {
+): Promise<{ error: string | null; edit: DecidedVisionEdit | null }> {
+  const { data, error } = await supabase.rpc('decide_vision_edit', {
     p_edit: editId,
     p_accept: accept,
   });
-  return { error: error?.message ?? null };
+  if (error) return { error: error.message, edit: null };
+  const row = (Array.isArray(data) ? data[0] : data) as Partial<Row> | null | undefined;
+  if (!row || typeof row.module !== 'string') return { error: null, edit: null };
+  return {
+    error: null,
+    edit: {
+      module: row.module as VisionScope,
+      visionBody: row.vision_body ?? null,
+      proposedBody: row.proposed_body ?? null,
+      status: row.status ?? null,
+    },
+  };
 }

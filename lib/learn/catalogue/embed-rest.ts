@@ -38,6 +38,7 @@ export function restVideoSegmentStore(learn: LearnSupabaseClient): SegmentStore 
         .from('catalogue_segments')
         .select('id, text, catalogue_items!catalogue_segments_item_id_fkey!inner(kind)')
         .is('embedding', null)
+        .eq('searchable', true)
         .eq('catalogue_items.kind', 'video')
         .order('item_id')
         .order('ordinal')
@@ -54,6 +55,7 @@ export function restVideoSegmentStore(learn: LearnSupabaseClient): SegmentStore 
           .from('catalogue_segments')
           .update({ embedding: vectorLiteral(row.vector), embedding_model: row.model, embedded_at: at })
           .eq('id', row.id)
+          .eq('searchable', true)
           .select('id');
         if (error) throw new Error(`Storing a segment's embedding failed: ${error.message}`);
         written += (data ?? []).length;

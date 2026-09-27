@@ -87,3 +87,35 @@ reading the whole feature again. What still waits for an approve is what the
 original approval did not cover: a new feature, and a step that acts outside
 the repository.
 
+
+## After a vision edit
+
+A second kind of re-shape starts when the person accepts a new vision for a
+workspace on the specs page (#1109 settled that it should). The turn names the
+workspace, gives the new vision and the one it replaced, and lists every open
+feature there. One run reads them all.
+
+It differs from the re-shape above in one way: **it writes only proposals and
+questions.** The person approved these features against the old vision, and
+that approval does not stretch to what a new vision implies, so nothing this
+run writes is ready to build and nothing is dropped by it.
+
+1. **Read each listed feature** with `show <n>`, then the code where the new
+   vision bears on it. Most features will read the same under the new vision;
+   those get nothing.
+2. **Ask before any drop.** A step, or a whole feature, the new vision makes
+   pointless gets a decision under that feature: `add "Drop #<n> now that the
+   vision says …?" --parent <the feature> --kind decision --detail "A — Drop
+   it. … B — Keep it. … Recommend …"`, quoting the part of the vision that
+   argues for dropping. Never `drop`.
+3. **Propose new work.** Work the new vision calls for that no open feature
+   covers is a new feature: `add "…" --proposed --module <id>` with no
+   `--parent` (no `--module` for the app's own vision), whose detail opens by
+   naming the part of the vision it serves, with its steps under it. Work that
+   belongs inside a listed feature is a step under it, and it takes
+   `--proposed` too, although the feature is approved.
+4. **Stop.** No approve, no answer, no start, no fog graduated or rewritten,
+   and nothing added again that a feature already holds or that is listed as
+   dismissed. The run changes rows, not code, so it does not commit. Report,
+   by number and title, what you proposed, which drops you asked about, and
+   which features you read and left alone.
