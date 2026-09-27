@@ -12,6 +12,10 @@ Three rules, and they are the same rule as never answering your own decision:
 
 - **Never dismiss anything.** Not a question, not fog, not a suggestion. A
   session that can put its own questions out of sight has no questions.
+  The one exception is the weekly vision review
+  (`.claude/skills/vision-review`), which the person asked to dismiss
+  session-filed ideas that serve no part of a workspace's vision, each with a
+  comment saying why.
 - **Never bring one back.** If a dismissed question turns out to block the work
   in front of you, say so — `block <n> --ask "…"` on your step, naming it.
 - **Never write it again.** A re-shape is handed what was dismissed under the
