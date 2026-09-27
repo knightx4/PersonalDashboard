@@ -144,7 +144,7 @@ export function WorkspaceSwitcher({
         id: null as ModuleId | null,
         href: '/home',
         label: 'Home',
-        description: 'Everything, and what needs you today',
+        description: '',
       },
       ...visible.map((module) => ({
         id: module.id as ModuleId | null,
@@ -335,7 +335,9 @@ function WorkspaceRowBody({
         {/* The live count, not the static description: the switcher is the only
             surface that can answer "is anything happening in the workspaces I
             am not looking at", so it should. */}
-        <span className="tabular block text-small leading-snug text-ink-muted">{detail}</span>
+        {detail && (
+          <span className="tabular block text-small leading-snug text-ink-muted">{detail}</span>
+        )}
       </span>
       {isCurrent && (
         <Check className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={2} aria-hidden />
@@ -381,7 +383,7 @@ export function WorkspaceSheet({
   if (!open) return null;
 
   const rows = [
-    { id: null as ModuleId | null, href: '/home', label: 'Home', description: 'Everything, and what needs you today' },
+    { id: null as ModuleId | null, href: '/home', label: 'Home', description: '' },
     ...visibleModules(enabled, current).map((module) => ({
       id: module.id as ModuleId | null,
       href: module.home,
