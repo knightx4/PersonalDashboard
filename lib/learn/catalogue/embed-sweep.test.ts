@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { EMBEDDING_DIMENSIONS } from '@/lib/learn/embed/voyage';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import {
+  combinedStore,
   runEmbedSweep,
   vectorLiteral,
   type EmbedCall,
@@ -301,5 +302,45 @@ describe('runEmbedSweep', () => {
     await runEmbedSweep({ store, embed: fakeEmbed() }, { chunk: 5 });
 
     expect(store.reads).toEqual([5, 5, 5]);
+  });
+});
+
+describe('segments and passages in one sweep (plan #1132)', () => {
+  it('embeds the segments first, then the passages, each written back to its own table', async () => {
+    const segmentRows = segments(3);
+    const passageRows: Row[] = Array.from({ length: 5 }, (_, index) => ({
+      id: `p${index}`,
+      text: `passage ${index}`,
+      embedding: null,
+      model: null,
+    }));
+    const embed = fakeEmbed();
+
+    const result = await runEmbedSweep(
+      { store: combinedStore(fakeStore(segmentRows), fakeStore(passageRows)), embed },
+      { chunk: 4 },
+    );
+
+    expect(result.embedded).toBe(8);
+    expect(result.stopped).toBeNull();
+    expect(embed.batches[0]).toEqual(['section 0', 'section 1', 'section 2', 'passage 0']);
+    expect(segmentRows.every((row) => row.embedding !== null)).toBe(true);
+    expect(passageRows.every((row) => row.embedding !== null && row.model === 'voyage-4-lite')).toBe(true);
+  });
+
+  it('keeps to the one limit across both', async () => {
+    const segmentRows = segments(2);
+    const passageRows: Row[] = [
+      { id: 'p0', text: 'passage 0', embedding: null, model: null },
+      { id: 'p1', text: 'passage 1', embedding: null, model: null },
+    ];
+
+    const result = await runEmbedSweep(
+      { store: combinedStore(fakeStore(segmentRows), fakeStore(passageRows)), embed: fakeEmbed() },
+      { chunk: 10, limit: 3 },
+    );
+
+    expect(result.embedded).toBe(3);
+    expect(passageRows.filter((row) => row.embedding === null)).toHaveLength(1);
   });
 });

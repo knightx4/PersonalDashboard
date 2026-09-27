@@ -3,6 +3,7 @@ import {
   WIKIPEDIA_PROVIDER_SLUG,
   type WikipediaArticle,
 } from '@/lib/learn/providers/wikipedia';
+import { passageRowsForSections } from '@/lib/learn/catalogue/passages';
 
 /**
  * Writing a fetched article into the catalogue.
@@ -70,6 +71,15 @@ export type StoredArticle = {
   /** Segments written, which is every section the article has. */
   written: number;
   /** Segments deleted because the article no longer has that section. */
+  removed: number;
+  /** Passages the article's searchable sections are now cut into. */
+  passages?: number;
+};
+
+export type StoredPassages = {
+  /** Passages the item's searchable sections are now cut into. */
+  written: number;
+  /** Passages deleted because their section is now cut into fewer, or none. */
   removed: number;
 };
 
@@ -219,8 +229,62 @@ export async function storeArticle(
       })),
     );
     const removed = await deleteTrailingSegments(tx, itemId, article.sections.length);
-    return { itemId, written: article.sections.length, removed };
+    const passages = await storePassagesForItem(tx, itemId);
+    return { itemId, written: article.sections.length, removed, passages: passages.written };
   }) as Promise<StoredArticle>;
+}
+
+/**
+ * Cut an article's stored sections into passages and write them (plan #1132).
+ *
+ * Reads the sections as stored, so it serves both the article writer above,
+ * which calls it after writing the sections, and the backfill of articles
+ * stored before passages existed (#1133), which calls it on each article
+ * without fetching anything. Only items of kind `article` are cut; for any
+ * other item this reads no sections and writes nothing.
+ *
+ * Idempotent. Passages are upserted on `(segment_id, ordinal)`, a passage
+ * whose text is unchanged keeps its vector, one whose text changed loses it,
+ * and passages past a section's new count are deleted, including every
+ * passage of a section that is no longer searchable. Running it twice on the
+ * same text changes nothing the second time.
+ */
+export async function storePassagesForItem(sql: Sql, itemId: string): Promise<StoredPassages> {
+  const sections = await sql<{ id: string; heading: string | null; text: string }[]>`
+    select s.id, s.heading, s.text
+      from learn.catalogue_segments s
+      join learn.catalogue_items i on i.id = s.item_id
+     where s.item_id = ${itemId} and i.kind = 'article'
+     order by s.ordinal`;
+  if (sections.length === 0) return { written: 0, removed: 0 };
+
+  const rows = passageRowsForSections(sections);
+  if (rows.length > 0) {
+    await sql`
+      insert into learn.catalogue_passages
+        ${sql(rows, 'segment_id', 'ordinal', 'text')}
+      on conflict (segment_id, ordinal) do update
+         set text = excluded.text,
+             embedding = case when catalogue_passages.text is distinct from excluded.text
+                              then null else catalogue_passages.embedding end,
+             embedding_model = case when catalogue_passages.text is distinct from excluded.text
+                                    then null else catalogue_passages.embedding_model end,
+             embedded_at = case when catalogue_passages.text is distinct from excluded.text
+                                then null else catalogue_passages.embedded_at end`;
+  }
+
+  const counts = new Map<string, number>();
+  for (const row of rows) counts.set(row.segment_id, (counts.get(row.segment_id) ?? 0) + 1);
+  const ids = sections.map((section) => section.id);
+  const kept = sections.map((section) => counts.get(section.id) ?? 0);
+
+  const removed = await sql<{ id: string }[]>`
+    delete from learn.catalogue_passages p
+     using unnest(${ids}::uuid[], ${kept}::int[]) as k(segment_id, kept)
+     where p.segment_id = k.segment_id and p.ordinal >= k.kept
+    returning p.id`;
+
+  return { written: rows.length, removed: removed.length };
 }
 
 /**

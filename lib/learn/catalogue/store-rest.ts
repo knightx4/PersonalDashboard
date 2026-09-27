@@ -1,6 +1,7 @@
 import { WIKIPEDIA_PROVIDER_SLUG, type WikipediaArticle } from '@/lib/learn/providers/wikipedia';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import type { CatalogueSegmentInput, StoredArticle } from './store';
+import { passageRowsForSections } from './passages';
+import type { CatalogueSegmentInput, StoredArticle, StoredPassages } from './store';
 
 /**
  * Writing a fetched article into the catalogue through the service-role
@@ -81,13 +82,73 @@ export async function storeArticleOverRest(
     searchable: section.searchable,
   }));
   const { removed, segments } = await writeSegmentsOverRest(learn, itemId, rows, article.title);
+  const passages = await storePassagesForItemOverRest(learn, itemId, article.title);
 
   return {
     itemId,
     written: article.sections.length,
     removed,
+    passages: passages.written,
     segments,
   };
+}
+
+/**
+ * Cut an article's stored sections into passages and write them, over HTTPS.
+ *
+ * `storePassagesForItem` in store.ts does the same over a `postgres`
+ * connection, and the rules are its rules: only items of kind `article`, the
+ * sections as stored, upserted on `(segment_id, ordinal)`, a passage whose
+ * text changed written with its vector cleared, an unchanged one left alone,
+ * and passages past a section's new count deleted. Re-running it writes
+ * nothing. The backfill (#1133) can call it on each stored article.
+ */
+export async function storePassagesForItemOverRest(
+  learn: LearnSupabaseClient,
+  itemId: string,
+  label = itemId,
+): Promise<StoredPassages> {
+  const sections = await learn
+    .from('catalogue_segments')
+    .select('id, heading, text, catalogue_items!catalogue_segments_item_id_fkey!inner(kind)')
+    .eq('item_id', itemId)
+    .eq('catalogue_items.kind', 'article')
+    .order('ordinal');
+  if (sections.error) throw new Error(`Reading ${label}'s sections failed: ${sections.error.message}`);
+  const stored = (sections.data ?? []) as { id: string; heading: string | null; text: string }[];
+  if (stored.length === 0) return { written: 0, removed: 0 };
+
+  const existing = await learn
+    .from('catalogue_passages')
+    .select('id, segment_id, ordinal, text')
+    .in(
+      'segment_id',
+      stored.map((section) => section.id),
+    );
+  if (existing.error) throw new Error(`Reading ${label}'s passages failed: ${existing.error.message}`);
+  const had = (existing.data ?? []) as { id: string; segment_id: string; ordinal: number; text: string }[];
+  const storedText = new Map(had.map((row) => [`${row.segment_id}:${row.ordinal}`, row.text]));
+
+  const rows = passageRowsForSections(stored);
+  const changed = rows
+    .filter((row) => storedText.get(`${row.segment_id}:${row.ordinal}`) !== row.text)
+    .map((row) => ({ ...row, embedding: null, embedding_model: null, embedded_at: null }));
+  if (changed.length > 0) {
+    const { error } = await learn
+      .from('catalogue_passages')
+      .upsert(changed, { onConflict: 'segment_id,ordinal' });
+    if (error) throw new Error(`Storing ${label}'s passages failed: ${error.message}`);
+  }
+
+  const counts = new Map<string, number>();
+  for (const row of rows) counts.set(row.segment_id, (counts.get(row.segment_id) ?? 0) + 1);
+  const stale = had.filter((row) => row.ordinal >= (counts.get(row.segment_id) ?? 0)).map((row) => row.id);
+  if (stale.length > 0) {
+    const { error } = await learn.from('catalogue_passages').delete().in('id', stale);
+    if (error) throw new Error(`Trimming ${label}'s passages failed: ${error.message}`);
+  }
+
+  return { written: rows.length, removed: stale.length };
 }
 
 /**

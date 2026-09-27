@@ -146,11 +146,16 @@ export function vectorLiteral(vector: number[]): string {
 export function segmentStore(sql: postgres.Sql): SegmentStore {
   return {
     async unembedded(limit) {
+      // A section cut into passages is searched by its passages, so its own
+      // vector would never be read (learn migration 0070). Only the article
+      // sections stored before passages existed, and lecture segments, are
+      // embedded here.
       return sql<UnembeddedSegment[]>`
-        select id, text
-          from learn.catalogue_segments
-         where embedding is null and searchable
-         order by item_id, ordinal
+        select s.id, s.text
+          from learn.catalogue_segments s
+         where s.embedding is null and s.searchable
+           and not exists (select 1 from learn.catalogue_passages p where p.segment_id = s.id)
+         order by s.item_id, s.ordinal
          limit ${limit}`;
     },
 
@@ -176,6 +181,73 @@ export function segmentStore(sql: postgres.Sql): SegmentStore {
         returning s.id`;
 
       return written.length;
+    },
+  };
+}
+
+/**
+ * The same two statements over `learn.catalogue_passages` (plan #1132).
+ *
+ * Read in `(segment_id, ordinal)` order, the partial index's, and written only
+ * while the passage still has the text it was read with, as the segments are.
+ */
+export function passageStore(sql: postgres.Sql): SegmentStore {
+  return {
+    async unembedded(limit) {
+      return sql<UnembeddedSegment[]>`
+        select id, text
+          from learn.catalogue_passages
+         where embedding is null
+         order by segment_id, ordinal
+         limit ${limit}`;
+    },
+
+    async store(rows) {
+      if (rows.length === 0) return 0;
+
+      const ids = rows.map((row) => row.id);
+      const texts = rows.map((row) => row.text);
+      const vectors = rows.map((row) => vectorLiteral(row.vector));
+      const models = rows.map((row) => row.model);
+
+      const written = await sql<{ id: string }[]>`
+        update learn.catalogue_passages as p
+           set embedding = v.embedding::extensions.vector,
+               embedding_model = v.model,
+               embedded_at = now()
+          from unnest(${ids}::uuid[], ${texts}::text[], ${vectors}::text[], ${models}::text[])
+               as v(id, text, embedding, model)
+         where p.id = v.id and p.text = v.text
+        returning p.id`;
+
+      return written.length;
+    },
+  };
+}
+
+/**
+ * Two stores read as one: everything the first has to embed, then the second.
+ *
+ * How one sweep embeds segments and passages under one limit, one deadline
+ * and one result. Each row goes back to the store it was read from, told
+ * apart by id (both tables key on uuids, so an id is in one or the other).
+ */
+export function combinedStore(first: SegmentStore, second: SegmentStore): SegmentStore {
+  const fromSecond = new Set<string>();
+  return {
+    async unembedded(limit) {
+      const head = await first.unembedded(limit);
+      if (head.length >= limit) return head;
+      const tail = await second.unembedded(limit - head.length);
+      for (const row of tail) fromSecond.add(row.id);
+      return [...head, ...tail];
+    },
+
+    async store(rows) {
+      const toSecond = rows.filter((row) => fromSecond.has(row.id));
+      const toFirst = rows.filter((row) => !fromSecond.has(row.id));
+      for (const row of toSecond) fromSecond.delete(row.id);
+      return (await first.store(toFirst)) + (await second.store(toSecond));
     },
   };
 }
@@ -301,7 +373,8 @@ export async function runEmbedSweep(
 }
 
 /**
- * Embed every segment that has none, against the live catalogue.
+ * Embed every segment and every article passage that has none, against the
+ * live catalogue. Segments come first, then passages, under the one limit.
  *
  * `userId` is the account the spend goes to. Null writes no ledger row, which
  * is for a caller that has no account to name rather than a way to embed for
@@ -313,7 +386,7 @@ export async function embedCatalogueSegments(
 ): Promise<EmbedSweepResult> {
   return runEmbedSweep(
     {
-      store: segmentStore(sql),
+      store: combinedStore(segmentStore(sql), passageStore(sql)),
       embed: ({ texts, model, onSpend }) =>
         embedTexts({ texts, model, inputType: 'document', apiKey: options.apiKey, onSpend }),
       ledger: options.userId ? catalogueLedger(sql, options.userId) : undefined,

@@ -65,6 +65,43 @@ export function restVideoSegmentStore(learn: LearnSupabaseClient): SegmentStore 
   };
 }
 
+/**
+ * Article passages with no vector, over HTTPS (plan #1132).
+ *
+ * The same reads and writes as `passageStore` in embed-sweep.ts. The write
+ * matches on the id alone, for the reason the video store above gives.
+ */
+export function restPassageStore(learn: LearnSupabaseClient): SegmentStore {
+  return {
+    async unembedded(limit) {
+      const { data, error } = await learn
+        .from('catalogue_passages')
+        .select('id, text')
+        .is('embedding', null)
+        .order('segment_id')
+        .order('ordinal')
+        .limit(limit);
+      if (error) throw new Error(`Reading unembedded passages failed: ${error.message}`);
+      return ((data ?? []) as { id: string; text: string }[]).map((row) => ({ id: row.id, text: row.text }));
+    },
+
+    async store(rows) {
+      let written = 0;
+      const at = new Date().toISOString();
+      for (const row of rows) {
+        const { data, error } = await learn
+          .from('catalogue_passages')
+          .update({ embedding: vectorLiteral(row.vector), embedding_model: row.model, embedded_at: at })
+          .eq('id', row.id)
+          .select('id');
+        if (error) throw new Error(`Storing a passage's embedding failed: ${error.message}`);
+        written += (data ?? []).length;
+      }
+      return written;
+    },
+  };
+}
+
 /** One spend row per call, under the owner, as `catalogueLedger` does. */
 export function restLedger(learn: LearnSupabaseClient, userId: string): (report: SpendReport) => Promise<void> {
   return async (report) => {
@@ -93,6 +130,25 @@ export async function embedVideoSegmentsOverRest(
   return runEmbedSweep(
     {
       store: restVideoSegmentStore(learn),
+      embed: ({ texts, model, onSpend }) => embedTexts({ texts, model, inputType: 'document', onSpend }),
+      ledger: options.userId ? restLedger(learn, options.userId) : undefined,
+    },
+    options,
+  );
+}
+
+/**
+ * Embed article passages that have no vector, over HTTPS. For the backfill
+ * (#1133) and any caller without a `postgres` connection; the Learn now pass
+ * still leaves articles unembedded.
+ */
+export async function embedPassagesOverRest(
+  learn: LearnSupabaseClient,
+  options: EmbedSweepOptions & { userId: string | null },
+): Promise<EmbedSweepResult> {
+  return runEmbedSweep(
+    {
+      store: restPassageStore(learn),
       embed: ({ texts, model, onSpend }) => embedTexts({ texts, model, inputType: 'document', onSpend }),
       ledger: options.userId ? restLedger(learn, options.userId) : undefined,
     },
