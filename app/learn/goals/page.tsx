@@ -62,7 +62,7 @@ export default async function GoalsPage() {
   const plans: Record<string, GoalPlanLink> = Object.fromEntries(
     (await loadPlans(supabase, user.id).catch(() => [])).map((plan) => [
       plan.aimId,
-      { href: `/learn/s/${plan.subjectId}`, line: progressLine(plan.progress) },
+      { href: `/learn/s/${plan.subjectId}`, line: progressLine(plan.progress, plan.finished) },
     ]),
   );
 

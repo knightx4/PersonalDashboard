@@ -89,8 +89,29 @@ export function planProgress(units: readonly PlanUnit[]): PlanProgress {
   };
 }
 
-/** "3 of 24 pieces passed", or what is still being written. */
-export function progressLine(progress: Pick<PlanProgress, 'passed' | 'total' | 'units' | 'unitsWritten'>): string {
+/**
+ * Whether the plan is finished (plan #1146): its final project passed and
+ * every piece passed. A unit not split into pieces yet means the total is not
+ * final, so a plan with one is not finished, and nor is a plan with no pieces.
+ */
+export function planFinished(
+  progress: Pick<PlanProgress, 'passed' | 'total' | 'units' | 'unitsWritten'>,
+  projectPassed: boolean,
+): boolean {
+  return (
+    projectPassed &&
+    progress.total > 0 &&
+    progress.passed === progress.total &&
+    progress.unitsWritten === progress.units
+  );
+}
+
+/** "3 of 24 pieces passed", what is still being written, or that the plan is finished. */
+export function progressLine(
+  progress: Pick<PlanProgress, 'passed' | 'total' | 'units' | 'unitsWritten'>,
+  finished = false,
+): string {
+  if (finished) return `Finished · ${progress.total} ${progress.total === 1 ? 'piece' : 'pieces'} and the final project passed`;
   if (progress.total === 0) {
     return progress.units === 0 ? 'No units yet' : 'Pieces not written yet';
   }

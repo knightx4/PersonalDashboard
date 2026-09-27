@@ -65,6 +65,16 @@ export const practicePayloadSchema = z.object({
 
 export type PracticePayload = z.infer<typeof practicePayloadSchema>;
 
+/** How much of the writer's report is kept: points, figures and the table's size. */
+export type WrittenLimits = { points: number; figures: number; columns: number; rows: number };
+
+export const PRACTICE_LIMITS: WrittenLimits = {
+  points: MAX_POINTS,
+  figures: MAX_FIGURES,
+  columns: MAX_COLUMNS,
+  rows: MAX_ROWS,
+};
+
 /** A task ready to store. */
 export type WrittenPractice = {
   task: string;
@@ -77,17 +87,21 @@ export type WrittenPractice = {
 
 /**
  * The writer's report checked and tidied. A task with no text, no points or
- * no worked answer is refused; everything else is trimmed to fit: at most six
- * points and six figures, a table of at most eight columns and twelve rows
- * with every row the width of the header, and figures named once each.
+ * no worked answer is refused; everything else is trimmed to fit: for a
+ * piece's practice at most six points and six figures, a table of at most
+ * eight columns and twelve rows with every row the width of the header, and
+ * figures named once each. The final project passes larger limits.
  */
-export function toWrittenPractice(payload: PracticePayload): { ok: true; practice: WrittenPractice } | { ok: false; reason: string } {
+export function toWrittenPractice(
+  payload: PracticePayload,
+  limits: WrittenLimits = PRACTICE_LIMITS,
+): { ok: true; practice: WrittenPractice } | { ok: false; reason: string } {
   const task = payload.task.trim();
   const worked = payload.worked.trim();
   if (task === '') return { ok: false, reason: 'The task came back empty.' };
   if (worked === '') return { ok: false, reason: 'The task came back without a worked answer.' };
 
-  const points = payload.points.map((point) => point.trim()).filter(Boolean).slice(0, MAX_POINTS);
+  const points = payload.points.map((point) => point.trim()).filter(Boolean).slice(0, limits.points);
   if (points.length === 0) return { ok: false, reason: 'The task came back without the points it is marked on.' };
 
   const seen = new Set<string>();
@@ -98,12 +112,12 @@ export function toWrittenPractice(payload: PracticePayload): { ok: true; practic
     if (label === '' || seen.has(key)) continue;
     seen.add(key);
     figures.push({ label, unit: figure.unit?.trim() || null });
-    if (figures.length === MAX_FIGURES) break;
+    if (figures.length === limits.figures) break;
   }
 
-  const columns = (payload.columns ?? []).map((column) => column.trim()).slice(0, MAX_COLUMNS);
+  const columns = (payload.columns ?? []).map((column) => column.trim()).slice(0, limits.columns);
   const rows = (payload.rows ?? [])
-    .slice(0, MAX_ROWS)
+    .slice(0, limits.rows)
     .map((row) => columns.map((_, index) => String(row[index] ?? '').trim()))
     .filter((row) => row.some((cell) => cell !== ''));
   const data = columns.length > 0 && rows.length > 0 ? { columns, rows } : null;

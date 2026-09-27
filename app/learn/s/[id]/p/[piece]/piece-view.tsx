@@ -391,7 +391,7 @@ function PracticeCard({
 
 const NUMBER_LIKE = /^[-+(]?[$£€]?[\d.,]+%?[)]?[kmb]?$/i;
 
-function PracticeData({ table }: { table: PracticeTable }) {
+export function PracticeData({ table }: { table: PracticeTable }) {
   const numeric = table.columns.map((_, index) =>
     table.rows.every((row) => row[index] === '' || NUMBER_LIKE.test(row[index].replace(/\s/g, ''))),
   );

@@ -8,7 +8,8 @@ import type { PlanSummary } from '@/lib/learn/lessons/plan-store';
  * Each learning goal's plan with its progress, on Learn now (plan #1143). A
  * goal's lessons left the deck for its plan, so this is the way to them from
  * the page Learn opens on: the plan's name opens the plan, and Next up opens
- * the piece that is next in its suggested order.
+ * the piece that is next in its suggested order. A plan with its final project
+ * and every piece passed says it is finished (plan #1146).
  */
 export function PlansShelf({ plans }: { plans: readonly PlanSummary[] }) {
   if (plans.length === 0) return null;
@@ -24,7 +25,7 @@ export function PlansShelf({ plans }: { plans: readonly PlanSummary[] }) {
                 <Link href={`/learn/s/${plan.subjectId}`} className="text-body font-medium text-ink hover:underline">
                   {plan.name}
                 </Link>
-                <span className="text-small text-ink-muted tabular-nums">{progressLine(progress)}</span>
+                <span className="text-small text-ink-muted tabular-nums">{progressLine(progress, plan.finished)}</span>
               </div>
               <Meter
                 value={progress.passed}
@@ -40,6 +41,14 @@ export function PlansShelf({ plans }: { plans: readonly PlanSummary[] }) {
                     className="text-accent hover:underline"
                   >
                     {progress.next.title}
+                  </Link>
+                </p>
+              )}
+              {!progress.next && !plan.projectPassed && progress.total > 0 && progress.unitsWritten === progress.units && (
+                <p className="mt-2 text-ui text-ink-muted">
+                  Next up:{' '}
+                  <Link href={`/learn/s/${plan.subjectId}#final-project`} className="text-accent hover:underline">
+                    the final project
                   </Link>
                 </p>
               )}

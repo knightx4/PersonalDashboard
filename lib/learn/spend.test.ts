@@ -100,6 +100,8 @@ describe('the operation names', () => {
       'mark-piece-check',
       'write-piece-practice',
       'mark-piece-practice',
+      'write-plan-project',
+      'mark-plan-project',
       'write-review-question',
       'mark-review-question',
       'reply-about-card',

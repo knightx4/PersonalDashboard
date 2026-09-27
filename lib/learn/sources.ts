@@ -112,6 +112,15 @@ export const learnSources: ModuleSources = {
       note: 'practice_id is the task in learn.piece_practice, whose piece_id is the piece.',
     },
     {
+      table: 'learn.plan_project_handins',
+      module: 'Learn',
+      holds: 'What they handed in for the final project of a learning goal\'s plan, marked point by point, with whether it passed.',
+      weight: 'record',
+      search: ['answer'],
+      title: 'answer',
+      note: 'project_id is the project in learn.plan_projects, whose subject_id is the goal\'s track.',
+    },
+    {
       table: 'learn.quizzes',
       module: 'Learn',
       holds: 'Quizzes they set themselves, and what each was preparing for.',
@@ -184,6 +193,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.opening_questions', reason: 'Placement questions for a new subject.' },
     { table: 'learn.opening_sweeps', reason: 'Placement bookkeeping.' },
     { table: 'learn.piece_practice', reason: 'Practice tasks Dash wrote; read through what was handed in for them.' },
+    { table: 'learn.plan_projects', reason: 'Final projects Dash wrote; read through what was handed in for them.' },
     { table: 'learn.probes', reason: 'Mastery-check questions and grades.' },
     { table: 'learn.quiz_questions', reason: 'Questions inside a quiz; read through quizzes.' },
     { table: 'learn.quiz_sources', reason: 'Material a quiz was written from.' },

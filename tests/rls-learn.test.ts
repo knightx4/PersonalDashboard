@@ -130,6 +130,8 @@ describe('RLS coverage', () => {
       'piece_practice',
       'piece_practice_handins',
       'plan_pieces',
+      'plan_project_handins',
+      'plan_projects',
       'probes',
       'quiz_questions',
       'quiz_sources',
@@ -850,6 +852,67 @@ describe("the pieces a goal's unit is split into", () => {
     ).rejects.toThrow();
   });
 
+  // learn 0078_plan_projects.sql (plan #1146). The owner's plan page writes
+  // the track's one final project and each marked hand-in; neither is edited
+  // afterwards, and the composite keys stop either landing on someone else's
+  // track.
+  let projectA = '';
+
+  it("lets the owner write a plan's final project and hand it in, and shows nobody else", async () => {
+    const [project] = await asUser(
+      userA,
+      (tx) => tx<{ id: string }[]>`insert into plan_projects (user_id, subject_id, title, task, figures, points, worked)
+                 values (${userA}, ${subjectA}, 'Retention and payback', 'Work out NRR and CAC payback.',
+                         '[{"label": "NRR", "unit": "%"}]'::jsonb, array['NRR is 115%.'], 'NRR = 115%.')
+                 returning id`,
+    );
+    projectA = project.id;
+    await asUser(
+      userA,
+      (tx) => tx`insert into plan_project_handins (user_id, project_id, answer, figures, marks, passed)
+                 values (${userA}, ${projectA}, 'Divided.', '[{"label": "NRR", "value": "115%"}]'::jsonb,
+                         '[{"point": "NRR is 115%.", "met": true, "note": "Right."}]'::jsonb, true)`,
+    );
+    const own = await asUser(userA, (tx) => tx`select passed from plan_project_handins`);
+    expect(own).toEqual([{ passed: true }]);
+    expect(await asUser(userB, (tx) => tx`select id from plan_projects`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`select id from plan_project_handins`)).toHaveLength(0);
+  });
+
+  it("refuses a second project for a plan, a project or hand-in on another user's, an empty hand-in and an edit", async () => {
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into plan_projects (user_id, subject_id, title, task, points, worked)
+                   values (${userA}, ${subjectA}, 'Again', 'Again.', array['A point.'], 'Worked.')`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into plan_projects (user_id, subject_id, title, task, points, worked)
+                   values (${userB}, ${subjectA}, 'Smuggled', 'Smuggled.', array['A point.'], 'Worked.')`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into plan_project_handins (user_id, project_id, answer, marks, passed)
+                   values (${userB}, ${projectA}, 'Smuggled.', '[]'::jsonb, true)`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into plan_project_handins (user_id, project_id, answer, marks, passed)
+                   values (${userA}, ${projectA}, ' ', '[]'::jsonb, false)`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userA, (tx) => tx`update plan_project_handins set passed = false where project_id = ${projectA}`),
+    ).rejects.toThrow();
+  });
+
   it('goes with its unit and its track', async () => {
     await admin`delete from subjects where id = ${subjectA}`;
     const [row] = await admin<{ count: number }[]>`
@@ -864,6 +927,12 @@ describe("the pieces a goal's unit is split into", () => {
     const [handIns] = await admin<{ count: number }[]>`
       select count(*)::int as count from piece_practice_handins where practice_id = ${practiceA}`;
     expect(handIns.count).toBe(0);
+    const [projects] = await admin<{ count: number }[]>`
+      select count(*)::int as count from plan_projects where subject_id = ${subjectA}`;
+    expect(projects.count).toBe(0);
+    const [projectHandIns] = await admin<{ count: number }[]>`
+      select count(*)::int as count from plan_project_handins where project_id = ${projectA}`;
+    expect(projectHandIns.count).toBe(0);
   });
 });
 
