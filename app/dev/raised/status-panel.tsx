@@ -5,6 +5,8 @@ import type { GoalsStatus } from '@/lib/goals/runner-status';
 import type { NotesLastRun } from '@/lib/feedback/last-worked';
 import type { OvernightRun } from '@/lib/plan/overnight';
 import type { RunnerCard } from '@/lib/plan/runner-card';
+import type { VisionReviewStatus } from '@/lib/specs/vision-review-run';
+import { VisionReviewLine } from './vision-review-line';
 
 /**
  * What is running, at the top of the page you open in the morning.
@@ -22,6 +24,9 @@ import type { RunnerCard } from '@/lib/plan/runner-card';
  * what it tells you. The digest below still says "Overnight" where it reports
  * the night that happened, which is a different fact from this one.
  *
+ * Below them, the weekly vision review (plan #1108). It has no button because
+ * it runs by itself, but when it last ran belongs with the other routines.
+ *
  * One card with a rule between the rows rather than two cards: they are the
  * same kind of thing and the answer you want is both of them at once (law 11).
  */
@@ -32,6 +37,8 @@ export function StatusPanel({
   goals,
   openNotes,
   notesLastRun,
+  vision,
+  now,
 }: {
   run: OvernightRun | null;
   /** Whether the deployment has the token the plan runner fires through. */
@@ -44,6 +51,9 @@ export function StatusPanel({
   openNotes: number;
   /** What the notes routine did last, so the row says something between runs. */
   notesLastRun: NotesLastRun | null;
+  /** The weekly vision review's last run, or null when it could not be read. */
+  vision: VisionReviewStatus | null;
+  now: number;
 }) {
   return (
     <Card padding="dense" className="space-y-3">
@@ -73,6 +83,11 @@ export function StatusPanel({
           lastRun={notesLastRun}
         />
       </div>
+      {vision && (
+        <div className="border-t border-border pt-3">
+          <VisionReviewLine status={vision} now={now} />
+        </div>
+      )}
     </Card>
   );
 }

@@ -19,6 +19,14 @@ person's words until they accept an edit.
 The table, its rules and the loaders are described in
 `supabase/migrations/0108_vision_reviews.sql` and `lib/specs/vision-review.ts`.
 
+## How it is fired
+
+Once a week, on Sundays, by `/api/cron/vision-review`, which fires the
+routine whose prompt is `reference/routine-prompt.md` and records the fire in
+`plan_runs` with job `vision`. The tick refuses when a review was written in
+the last six days, so a review run by hand midweek counts as that week's and
+the Sunday tick after it starts nothing.
+
 ## Working without the CLI
 
 There is no script for this yet. Use the **`Supabase`** connector
