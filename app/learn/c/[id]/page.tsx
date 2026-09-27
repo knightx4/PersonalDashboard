@@ -294,8 +294,10 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
             from what you know about it. */}
         <p className="mt-2 text-small text-ink-muted">{concept.basis}</p>
 
+        {/* Offered whatever state the claim is in: this page is where you ask
+            for material on one claim, known or untested alike (#1070). */}
         <div className="mt-3">
-          <ReadAbout concept={concept} subjectId={subject.id} />
+          <ReadAbout concept={concept} subjectId={subject.id} anyState />
           {/* Where a claim with nothing found for it says why, under the
               button that goes looking. */}
           <NoMaterialNote view={material} />
