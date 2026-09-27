@@ -1,0 +1,5 @@
+Subject: Confirm your subscription to Morning Notes
+From: Morning Notes <hello@morningnotes.example>
+
+Please confirm your subscription by clicking the link below. If you did not
+sign up, ignore this email.

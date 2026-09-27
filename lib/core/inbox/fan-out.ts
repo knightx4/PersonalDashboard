@@ -54,6 +54,22 @@ export interface DomainLinker {
     /** Wall clock this pass may spend. */
     budgetMs: number;
   }): Promise<void>;
+  /**
+   * Older mail this workspace wants offered to it, found by a Gmail search of
+   * its own.
+   *
+   * The backfill lists only what the union query in lib/core/email/gmail-query
+   * asks for, and the scrub wipes the sender and subject of what nobody
+   * claimed. A workspace added after the mailbox was read would otherwise
+   * never see anything older than the day it was added. The pump pages
+   * through this search once per `version` (catchUpAccount in
+   * sync-account.ts), offering each page to every linker the same way the
+   * backfill does, and bumping `version` runs it again.
+   */
+  readonly catchUp?: {
+    version: number;
+    query: () => string;
+  };
   link(opts: {
     userId: string;
     accountId: string;
@@ -73,7 +89,7 @@ export type FanOutResult = Record<string, LinkerCounters | { error: string }>;
 /**
  * Run every linker over the same envelopes.
  *
- * Sequential rather than parallel: both linkers hit Gmail for bodies and the
+ * Sequential rather than parallel: every linker hits Gmail for bodies and the
  * same rate limit, and interleaving them buys nothing while making a 429 twice
  * as likely.
  *

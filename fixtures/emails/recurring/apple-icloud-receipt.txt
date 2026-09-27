@@ -1,0 +1,27 @@
+Subject: Your receipt from Apple.
+From: Apple <no_reply@email.apple.com>
+
+Receipt
+
+APPLE ACCOUNT
+alex@example.com
+
+DATE
+Sep 20, 2026
+
+ORDER ID
+MXXXXXXXXX
+
+DOCUMENT NO.
+000000000000
+
+iCloud+
+iCloud+ with 200 GB (Monthly)
+Renews October 20, 2026
+$2.99
+
+Subtotal $2.99
+Tax $0.00
+Total $2.99
+
+Billed to Visa .... 0000

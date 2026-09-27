@@ -538,3 +538,126 @@ export async function sweepAccount(
     budgetMs: opts.budgetMs,
   });
 }
+
+/** Messages listed per page of a catch-up search. */
+const CATCH_UP_PAGE_SIZE = 40;
+
+export type CatchUpResult = {
+  /** Per linker domain: pages read this call and whether its search is done. */
+  [domain: string]: { pages: number; messages: number; done: boolean; error?: string };
+};
+
+/**
+ * Page through each linker's own search of older mail, as far as the budget
+ * allows. See `catchUp` on DomainLinker.
+ *
+ * Each page goes through processPage exactly as a backfill page does: every
+ * linker is offered it, scrubbed envelopes are read again so a workspace that
+ * never judged them gets its say, and the scrub runs after. The cursor is
+ * saved after every page, so a pump that runs out of time resumes on the next
+ * sync rather than starting over.
+ */
+export async function catchUpAccount(
+  supabase: CoreSupabaseClient,
+  opts: {
+    userId: string;
+    accountId: string;
+    linkers: readonly DomainLinker[];
+    budgetMs: number;
+    /** Whether another page fits; the pump's own guard. */
+    canStartPage?: (remainingMs: number, slowestPageMs: number) => boolean;
+  },
+): Promise<CatchUpResult> {
+  const result: CatchUpResult = {};
+  const searching = opts.linkers.filter((linker) => linker.catchUp);
+  if (searching.length === 0 || opts.budgetMs <= 0) return result;
+
+  const deadline = Date.now() + opts.budgetMs;
+  const fits =
+    opts.canStartPage ?? ((remaining: number, slowest: number) => remaining >= Math.max(30_000, slowest * 1.3));
+
+  const encryptionKey = gmailOAuthEnv().TOKEN_ENCRYPTION_KEY;
+  const account = await loadAccount(supabase, opts.userId, opts.accountId);
+  if (account.status !== 'active') return result;
+  const accessToken = await ensureAccessToken(supabase, account, encryptionKey);
+
+  let slowestPageMs = 0;
+
+  for (const linker of searching) {
+    const search = linker.catchUp!;
+    const entry = { pages: 0, messages: 0, done: false } as CatchUpResult[string];
+    result[linker.domain] = entry;
+
+    const { data: state } = await supabase
+      .from('inbox_catch_ups')
+      .select('query_version, page_token, completed_at, messages_seen')
+      .eq('email_account_id', account.id)
+      .eq('linker', linker.domain)
+      .maybeSingle();
+
+    const sameVersion = state?.query_version === search.version;
+    if (sameVersion && state?.completed_at) {
+      entry.done = true;
+      continue;
+    }
+    let pageToken: string | null = sameVersion ? ((state?.page_token as string | null) ?? null) : null;
+    let seen = sameVersion ? Number(state?.messages_seen ?? 0) : 0;
+
+    try {
+      while (fits(deadline - Date.now(), slowestPageMs)) {
+        const startedAt = Date.now();
+        const listed = await gmailProvider.listMessages(accessToken, {
+          query: search.query(),
+          maxResults: CATCH_UP_PAGE_SIZE,
+          pageToken: pageToken ?? undefined,
+        });
+        const messageIds = listed.messages.map((m) => m.id);
+
+        const progress: SyncProgress = {
+          ...emptyEnvelopeCounters(),
+          jobId: '',
+          done: false,
+          nextPageToken: null,
+        };
+        await processPage(supabase, {
+          userId: opts.userId,
+          accountId: account.id,
+          accountEmail: account.email_address,
+          accessToken,
+          messageIds,
+          linkers: opts.linkers,
+          progress,
+          refetchScrubbed: true,
+        });
+
+        pageToken = listed.nextPageToken ?? null;
+        seen += messageIds.length;
+        entry.pages += 1;
+        entry.messages += messageIds.length;
+        entry.done = pageToken == null || messageIds.length === 0;
+
+        await supabase.from('inbox_catch_ups').upsert(
+          {
+            email_account_id: account.id,
+            linker: linker.domain,
+            query_version: search.version,
+            page_token: entry.done ? null : pageToken,
+            messages_seen: seen,
+            completed_at: entry.done ? new Date().toISOString() : null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'email_account_id,linker' },
+        );
+
+        slowestPageMs = Math.max(slowestPageMs, Date.now() - startedAt);
+        if (entry.done) break;
+      }
+    } catch (err) {
+      // Never fatal: the cursor is saved per page, and the next sync resumes.
+      entry.error = err instanceof Error ? err.message : String(err);
+      console.error('inbox catch-up failed', linker.domain, entry.error);
+    }
+  }
+
+  return result;
+}
