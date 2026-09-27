@@ -1,5 +1,6 @@
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
+import { SummarySection } from './_home/summary-section';
 import { ThisWeekSection } from './_home/this-week-section';
 
 export const metadata = { title: 'Home' };
@@ -32,6 +33,7 @@ export default async function JobsHome() {
     <>
       <PageHeader title="Home" description="Where the search stands and what needs you this week." />
       <div className="space-y-8">
+        <SummarySection supabase={supabase} userId={user.id} />
         <ThisWeekSection
           supabase={supabase}
           userId={user.id}
