@@ -7,6 +7,7 @@ import {
   type Answer,
   type GoalRunStamp,
 } from './reshape-run';
+import { attachDependencies } from './dependencies';
 import { buildForest, type Step } from './steps';
 import type { Goal } from './tree';
 
@@ -121,6 +122,30 @@ describe('goalsToReshape', () => {
     const answers = [{ questionId: 'q', answeredAt: ago(30) }];
     expect(due({ answers, runs: [{ itemId: 'debt', status: 'started', createdAt: ago(35) }] })).toEqual([]);
     expect(due({ answers, runs: [{ itemId: 'debt', status: 'done', createdAt: ago(35) }] })).toHaveLength(1);
+  });
+
+  it('names a step that waits on the answered question, such as one asked about after a week (plan #1083)', () => {
+    const sat = step('sat', 'debt', { kind: 'mine', title: 'Call the servicer' });
+    const still = step('still', 'debt', {
+      kind: 'decision',
+      status: 'done',
+      title: 'Do you still want to call the servicer?',
+      resolution: 'B — Drop it.',
+    });
+    const goals = [goal('debt', { title: 'Pay off student debt' })];
+    const { byGoal, nodes } = buildForest(['debt'], [sat, still]);
+    attachDependencies(byGoal, nodes, [{ id: 'd1', itemId: 'sat', dependsOnId: 'still' }]);
+    const [only] = goalsToReshape({
+      goals,
+      stepsByGoal: byGoal,
+      answers: [{ questionId: 'still', answeredAt: ago(11) }],
+      runs: [],
+      now: NOW,
+    });
+    expect(only.waiting).toEqual([{ id: 'sat', title: 'Call the servicer', status: 'open' }]);
+    const text = reshapeRunText({ userId: 'u', runId: 'r', goal: only });
+    expect(text).toContain('"Call the servicer" (goals.items id sat), open');
+    expect(text).toContain('dropped_on');
   });
 
   it('ignores answers to steps that are not live questions, and closed goals', () => {

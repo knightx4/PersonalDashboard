@@ -47,6 +47,12 @@ export type ReshapeGoal = {
   questions: AnsweredQuestion[];
   /** The steps whose detail says they depend on one of those questions. */
   provisional: ProvisionalStep[];
+  /**
+   * The steps that wait on one of those questions (goals.dependencies) and
+   * are not already listed as provisional: among them a step of the person's
+   * the morning run asked about because it had sat for a week (plan #1083).
+   */
+  waiting: ProvisionalStep[];
   /** The latest answer on the goal, as an ISO instant. */
   latestAnswer: string;
 };
@@ -133,11 +139,22 @@ export function goalsToReshape(input: {
       }
     });
 
+    const asked = new Set(questions.map((q) => q.id));
+    const listed = new Set(provisional.map((p) => p.id));
+    const waiting: ProvisionalStep[] = [];
+    walk(steps, (node) => {
+      if (listed.has(node.id) || node.status === 'dropped' || node.status === 'done') return;
+      if ((node.dependsOn ?? []).some((link) => asked.has(link.item.id))) {
+        waiting.push({ id: node.id, title: node.title, status: node.status });
+      }
+    });
+
     due.push({
       goalId: goal.id,
       goalTitle: goal.title,
       questions,
       provisional,
+      waiting,
       latestAnswer: new Date(latest).toISOString(),
     });
   }
@@ -158,6 +175,7 @@ export function reshapeRunText(input: { userId: string; runId: string; goal: Res
     goal.provisional.length > 0
       ? goal.provisional.map((s) => `- "${s.title}" (goals.items id ${s.id}), ${s.status}`)
       : ['- none found by their Provisional line; read the tree for any that hang on these answers'];
+  const waiting = goal.waiting.map((s) => `- "${s.title}" (goals.items id ${s.id}), ${s.status}`);
   return [
     `Re-shape one goal after answers: "${goal.goalTitle}" (goals.items id ${goal.goalId}).`,
     '',
@@ -167,6 +185,16 @@ export function reshapeRunText(input: { userId: string; runId: string; goal: Res
     'Provisional steps that name those questions:',
     ...provisional,
     '',
+    ...(waiting.length > 0
+      ? [
+          'Steps that wait on those questions. Where the question asked whether the person still',
+          'wants the step, do what the answer says: keep it, split it, give it a start date, or',
+          'drop it with dropped_on naming the question (the section "Moving a step that has sat',
+          'for a week").',
+          ...waiting,
+          '',
+        ]
+      : []),
     'Follow .claude/skills/goals/SKILL.md, the sections "Re-shaping after answers" and',
     '"The re-shape run". Settle each provisional step the answers bear on, and write',
     'anything new as a live step, or as a proposal if working it would act outside the plan.',
