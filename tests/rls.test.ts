@@ -141,6 +141,21 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     values (${userId}, 'learn', ${`${tag} wants Learn to know what it does not know`})`;
   ids.module_visions = userId;
 
+  // A pending edit, one per user and workspace, so seeding A and B each once
+  // stays inside the one-pending index.
+  const [visionReview] = await admin<{ id: string }[]>`
+    insert into vision_reviews (
+      user_id, module, review_id, outcome, vision_body, proposed_body, note, status
+    )
+    values (
+      ${userId}, 'learn', gen_random_uuid(), 'edit',
+      ${`${tag} wants Learn to know what it does not know`},
+      ${`${tag} wants Learn to say what to read next`},
+      ${`${tag} filed two notes asking what to read next`}, 'pending'
+    )
+    returning id`;
+  ids.vision_reviews = visionReview.id;
+
   // Keyed by (user_id, target, row_id) rather than an id of its own, so what
   // goes in `ids` is the row the thread hangs off -- see ROW_KEY below.
   await admin`
