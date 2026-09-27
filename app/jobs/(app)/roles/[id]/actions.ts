@@ -92,42 +92,6 @@ export async function addNote(input: {
 }
 
 /**
- * Rewrite a note.
- *
- * The role is passed in rather than looked up: the caller is the page the note
- * is being written on, it already knows which role it is, and a note that is
- * saved but does not reappear until a hard reload is a note you write twice.
- */
-// latency: pending
-export async function updateNote(input: {
-  noteId: string;
-  roleId: string;
-  body: string;
-}): Promise<{ error: string | null }> {
-  const parsed = z
-    .object({
-      noteId: z.string().uuid(),
-      roleId: z.string().uuid(),
-      body: z.string().trim().min(1, 'A note needs some text.').max(50_000),
-    })
-    .safeParse(input);
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-
-  const user = await requireUser();
-  const supabase = await createClient();
-
-  const { error } = await supabase
-    .from('notes')
-    .update({ body: parsed.data.body })
-    .eq('id', parsed.data.noteId)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
-
-  revalidatePath(`/jobs/roles/${parsed.data.roleId}`);
-  return { error: null };
-}
-
-/**
  * The cover letter under the application's answers (note b4cecf70), in
  * applications.cover_letter. Not cover_letters.body, which is the shared case
  * page's statement and public once shared. Saving it empty clears it.

@@ -94,7 +94,7 @@ export const jobsSources: ModuleSources = {
     {
       table: 'job_search.notes',
       module: 'Job search',
-      holds: 'Notes they wrote on roles, companies and applications.',
+      holds: "Notes they wrote on roles, companies and applications. On a role these are its comment thread, where author 'claude' marks Dash's replies.",
       weight: 'record',
       search: ['body'],
       title: 'body',
