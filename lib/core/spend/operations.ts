@@ -30,6 +30,13 @@ export const SPEND_OPERATIONS = {
     // Suggesting learning tracks from the career goals entries, on the Career
     // goals page. Opus.
     'suggest-learning-tracks',
+    // Choosing people to contact and writing what to say to each, from the
+    // job suggestion cron and the button on This week. Sonnet, one call.
+    'suggest-outreach',
+    // Finding open postings worth applying for with a web search, from the
+    // job suggestion cron (weekly) and the button on This week. Sonnet, up to
+    // six searches.
+    'find-openings',
   ],
   shopping: [
     // Reading an order confirmation email into an order: from inbox ingest,

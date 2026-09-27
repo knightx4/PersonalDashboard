@@ -45,7 +45,7 @@ Answer the question your search actually turns on: where in the funnel are you l
 Listing these because Cursor will otherwise invent them.
 
 - No auto-apply. Never fills out and submits an application form on your behalf. It drafts, you paste.
-- No job board or aggregation. It does not go find roles for you.
+- No job board or aggregation. It does not scrape or mirror listings. Revised on 27 September 2026: Dash runs one web search a week for open postings that fit the career goals and suggests up to five on This week (`lib/jobs/suggest`). Nothing is saved to the pipeline until you press Save.
 - No scraping of anything behind a login, and no LinkedIn scraping. Contacts are entered manually or pasted.
 - No resume builder or ATS keyword scoring. Resume versions are stored and referenced, not generated.
 - No recruiter-side features. One candidate's view of one search.
@@ -614,7 +614,7 @@ Same machinery, longer output, plus a structure derived from the requirement map
 
 **Company detail.** Research notes, all roles at that company across time, contacts, all touches, all linked email. The reason companies are a separate entity is that this page stays valuable after a specific role closes.
 
-**Contacts and outreach.** List, detail, touch log with response tracking. Message drafting for outreach was to be later work; it has since been settled the other way — `lib/jobs/followup/compose.ts` is a deterministic template and stays one. Recording sends is MVP, because the response rate is only computable if the sends are recorded from the start.
+**Contacts and outreach.** List, detail, touch log with response tracking. Follow-ups on a quiet application stay a deterministic template (`lib/jobs/followup/compose.ts`). First messages to people are drafted by Dash since 27 September 2026: the suggestion run picks up to three people worth contacting from the pipeline and the contact list, and writes why, what to do and the message, which you copy, edit and send yourself (`lib/jobs/suggest`). Pressing Sent records the touch. Recording sends is MVP, because the response rate is only computable if the sends are recorded from the start.
 
 **Interviews.** Scheduled and past. Prep notes before, debrief after. A prompt to write the debrief that evening while it is fresh, since a debrief written three days later is worth very little.
 
@@ -638,7 +638,7 @@ intent.
 - Cover letter generation — folded into the shareable page rather than built as its own artifact
 - ✅ Requirement mapping rendered on the role page, each line scored against the evidence bank
 - ✅ Canonical answer promotion flow
-- ~~Outreach message drafting from company research plus contact context~~ — settled the other way: `lib/jobs/followup/compose.ts` is a deterministic template and stays one
+- ✅ Outreach message drafting from contact and pipeline context, revised on 27 September 2026 after first being settled the other way. Follow-ups stay the template in `lib/jobs/followup/compose.ts`; first messages come from the suggestion run in `lib/jobs/suggest`
 - **The shareable application page.** A public URL per application, unguessable slug, expiring, rendering the requirement map with your evidence beside each line plus a written statement of interest. Include the link in applications. It is a work sample and a cover letter in one, and it costs nothing once the requirement map exists.
 - ✅ Follow-up reminders on rules: no response after N days, thank-you note after an interview, deadline approaching
 - ~~Browser extension replacing the bookmarklet, with save-this-role~~ — out of scope: a distribution problem wearing a feature's clothes

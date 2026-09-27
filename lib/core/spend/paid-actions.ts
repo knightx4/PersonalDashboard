@@ -99,6 +99,8 @@ export const PAID_ACTIONS = {
   'app/jobs/(app)/thoughts/actions.ts#suggestTracks': ['suggest-learning-tracks'],
   // Starting a suggested track adds a Learn goal, as the Learn Goals page does.
   'app/jobs/(app)/thoughts/actions.ts#startTrack': ['place-aim', 'write-curriculum'],
+  'app/jobs/(app)/today/actions.ts#suggestPeople': ['suggest-outreach'],
+  'app/jobs/(app)/today/actions.ts#suggestOpenings': ['find-openings'],
 
   // Shopping
   'app/shopping/inventory/add/actions.ts#previewPasteBookList': ['parse-paste-list'],
@@ -184,6 +186,10 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'Fired four times a day by pg_cron to fetch and embed the YouTube library\'s transcripts; no press starts it.',
   'app/api/cron/youtube-library/route.ts#POST':
     'Fired four times a day by pg_cron to fetch and embed the YouTube library\'s transcripts; no press starts it.',
+  'app/api/cron/job-suggestions/route.ts#GET':
+    'Fired daily by pg_cron; writes people to contact every three days and postings to apply for once a week, for each account where they are due. The presses on This week are priced under app/jobs/(app)/today/actions.ts.',
+  'app/api/cron/job-suggestions/route.ts#POST':
+    'Fired daily by pg_cron; writes people to contact every three days and postings to apply for once a week, for each account where they are due. The presses on This week are priced under app/jobs/(app)/today/actions.ts.',
   'app/learn/now/actions.ts#loadMoreCards':
     'Called by the Learn now deck on its own while four cards are still ahead, to load the next few; no press starts it. The paid part is matching a card with no stored concept vector to your vault notes (plan #1113), one short embedding per card, paid once, since the vector is kept by the text\'s hash.',
 };

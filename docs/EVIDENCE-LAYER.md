@@ -55,7 +55,10 @@ fills the compose window with a deterministic template and says why in its
 header: instant, free, the same every time, readable in full and disagreeable
 with — "and the text is going out over your name, which is the wrong place to
 be surprised." The spec listed outreach drafting as a generation feature. The
-app has already answered that question, and the answer is binding on this plan.
+app has already answered that question for follow-ups, and the answer is
+binding on this plan. First messages to people were revisited on 27 September
+2026 at the person's request: the suggestion run in `lib/jobs/suggest` drafts
+them, shown in full on This week for the person to copy, edit and send.
 
 **The development loop is note-driven.** Feedback goes into `feedback_items`
 from inside the app, and each note becomes one commit (`docs/NOTES-WORKFLOW.md`;
@@ -68,7 +71,7 @@ commit-sized slices, not four big pieces of work.
 |---|---|
 | Canonical answer promotion flow | **Shipped.** `promoteToCanonical` in the role page's Answers panel; a repeat question auto-fills from the canonical answer. |
 | Follow-up reminders on rules | **Shipped.** `inngest/jobs/cron/sweep.ts` raises them nightly, `/jobs/today` shows them. |
-| Outreach message drafting | **Settled the other way.** `lib/jobs/followup/compose.ts` is a template and should stay one. |
+| Outreach message drafting | Follow-ups stay the template in `lib/jobs/followup/compose.ts`. First messages to people are drafted by the suggestion run in `lib/jobs/suggest` (27 September 2026). |
 | Requirement mapping on the role page | **Half.** Requirements are extracted and rendered; nothing matches evidence to them. |
 | Answer generation with evidence grounding | Not built. |
 | Cover letter generation | Not built. `cover_letters` has no code touching it at all. |
@@ -293,8 +296,9 @@ worth doing last, when the names have settled.
 
 ## Out of scope, on purpose
 
-- **Outreach generation.** Settled by `lib/jobs/followup/compose.ts`. If the
-  template is wrong for a case, fix the template.
+- **Follow-up generation.** Settled by `lib/jobs/followup/compose.ts`. If the
+  template is wrong for a case, fix the template. First messages to people are
+  the one exception, drafted in `lib/jobs/suggest`.
 - **Cover letters as their own artifact.** Folded into slice 5.
 - **The browser extension.** The bookmarklet works and costs one click. An
   extension is a store listing, a review cycle and a permissions prompt — a

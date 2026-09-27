@@ -205,6 +205,13 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.learning_tracks = track.id;
 
+  const [suggestion] = await admin<{ id: string }[]>`
+    insert into suggestions (user_id, kind, contact_id, company_id, headline, why, move, channel, message)
+    values (${userId}, 'reach_out', ${contact.id}, ${company.id}, ${`Ask ${tag} Recruiter about the role`},
+            'They replied last month.', '1. Send the note.', 'email', 'Hi, is the role still open?')
+    returning id`;
+  ids.suggestions = suggestion.id;
+
   return ids;
 }
 
