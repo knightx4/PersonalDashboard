@@ -24,6 +24,9 @@ export const SPEND_OPERATIONS = {
     // Drafting an answer to an application question from the evidence bank.
     // Opus.
     'draft-answer',
+    // Dash replying to a comment tagged @dash on a role, and writing the
+    // cover letter when the comment asks for one (note 89ad8bef). Sonnet.
+    'reply-to-role-comment',
     // Proposing evidence items from a pasted or uploaded source, on the
     // evidence settings page. Opus.
     'propose-evidence',

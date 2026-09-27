@@ -10,6 +10,8 @@
  *   npx tsx scripts/notes.ts show <id>          # the note, and the thread under it
  *   npx tsx scripts/notes.ts start <id>
  *   npx tsx scripts/notes.ts done <id> --note "what changed" [--commit <sha>]
+ *                                # refused unless GitHub says that commit is on
+ *                                # main, and refused if GitHub cannot be asked
  *   npx tsx scripts/notes.ts block <id> --note "the question blocking it"
  *   npx tsx scripts/notes.ts decline <id> --note "why not"
  *   npx tsx scripts/notes.ts priority <id> <1|2|3>
@@ -38,6 +40,8 @@ import { LAWS, RESTRAINT_LAWS, SHAPE_LAWS, SPEND_LAWS } from '../app/dev/ui/laws
 import { checkClose, surfaceOf } from '../lib/feedback/surfaces';
 import { NOTES_WORK_KINDS } from '../lib/feedback/load';
 import { feedbackItems } from '../lib/db/schema';
+import { closeRefusal, commitOnMain } from '../lib/plan/github';
+import { branchesContaining } from '../lib/plan/branches';
 
 /**
  * A direct connection rather than lib/db/admin.ts: that module is marked
@@ -316,13 +320,37 @@ async function main(): Promise<void> {
       process.exit(1);
     }
     const resolution = decision.resolution;
+    const commit = command === 'done' ? (arg('--commit') ?? currentCommit()) : null;
+
+    // Done means on main. A note closed against a commit that only exists on
+    // a branch tells the person it shipped when it has not, which is what
+    // happened to 89ad8bef: closed with "not yet merged to main" in its own
+    // resolution. The same guard `plan.ts done` has, and for the same reason
+    // an answer GitHub would not give is refused too.
+    if (command === 'done') {
+      if (!commit) {
+        console.error('done needs a commit on main: none was given and HEAD could not be read.');
+        process.exit(1);
+      }
+      const landing = await commitOnMain({ sha: commit });
+      const refusal = closeRefusal({
+        sha: commit,
+        landing,
+        branches: branchesContaining(commit),
+        what: 'the note',
+      });
+      if (refusal) {
+        console.error(refusal);
+        process.exit(1);
+      }
+    }
 
     await database
       .update(feedbackItems)
       .set({
         status,
         resolutionNote: resolution,
-        commitSha: command === 'done' ? (arg('--commit') ?? currentCommit()) : null,
+        commitSha: commit,
         // Blocked notes are not finished, so they get no completion time.
         completedAt: command === 'block' ? null : new Date(),
       })

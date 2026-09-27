@@ -219,7 +219,7 @@ const rolePanels: PanelProps = {
       unsupportedClaims: [],
     },
   ],
-  notes: [],
+  thread: [],
   interviewGroups: [{ id: 'g1', label: 'First round', roundNumber: 1, notes: '', messageIds: [] }],
   companyName: 'The D. E. Shaw group',
   matchCandidates: [],

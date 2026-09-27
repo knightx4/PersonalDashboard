@@ -101,6 +101,17 @@ describe('closeRefusal', () => {
     expect(said).toContain('no branch here carries it');
   });
 
+  it('names what is being closed, so the notes queue can use it too', () => {
+    const said = closeRefusal({
+      sha: 'c2d9f5f',
+      landing: landing({ onMain: false, status: 'ahead' }),
+      branches: ['origin/claude/epic-johnson-3rcpty'],
+      what: 'the note',
+    });
+    expect(said).toContain('then close the note against what landed');
+    expect(said).not.toContain('the step');
+  });
+
   it('refuses a close that could not reach GitHub, and repeats what it said', () => {
     const said = closeRefusal({
       sha: 'a405587',

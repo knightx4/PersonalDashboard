@@ -24,7 +24,9 @@ npx tsx scripts/notes.ts list --all           # including closed, and likes
 npx tsx scripts/notes.ts next                 # the open note to claim next
 npx tsx scripts/notes.ts show <id>            # the note, and the thread under it
 npx tsx scripts/notes.ts start <id>           # claim it (in_progress)
-npx tsx scripts/notes.ts done <id> --note "…" # close it; records HEAD commit
+npx tsx scripts/notes.ts done <id> --note "…" [--commit <sha>]
+                                              # close it; refused unless the
+                                              # commit is on main
 npx tsx scripts/notes.ts block <id> --note "…" # cannot proceed; say what is needed
 npx tsx scripts/notes.ts decline <id> --note "…" # will not do; say why
 npx tsx scripts/notes.ts priority <id> 1|2|3
@@ -73,7 +75,10 @@ where feedback_item_id = '…' order by created_at;
 -- start (a like is never claimed, so the update refuses one)
 update feedback_items set status = 'in_progress' where id = '…' and kind <> 'like';
 
--- done (after committing, so HEAD is the commit that did it)
+-- done (only once the note's commit is on origin/main: see "Done means on
+-- main" below. Check it first, every time, with
+--   git fetch origin && git merge-base --is-ancestor <sha> origin/main
+-- and do not run this update if that exits non-zero.)
 -- For a surface note (page_path like '/preview?s=%') the resolution note must
 -- start with the law, exactly as the CLI writes it: 'Law 13 — …'. The CLI
 -- refuses without it; doing the writes by hand does not make that optional.
@@ -97,10 +102,10 @@ and it does not stop applying because the writes are being made by hand.
 | Status | Meaning |
 |---|---|
 | `open` | Filed, not started. |
-| `in_progress` | Claimed right now. At most one at a time. |
+| `in_progress` | Claimed right now, or committed and waiting for the batch to reach main. At most one being worked at a time. |
 | `blocked` | Needs an answer or an external dependency. Reason required. |
 | `planned` | Accepted, deliberately deferred to a later batch. |
-| `done` | Shipped and verified. Carries the commit. |
+| `done` | On main and verified. Carries a commit that main contains. |
 | `declined` | Will not be done. Reason required. |
 
 `blocked` and `planned` are the "pending" states. They are legitimate, but each
@@ -156,9 +161,12 @@ one is closed.
 6. **Commit the note on its own.** One note per commit, so a change can be
    traced back to the ask and reverted alone. End the subject with the short
    id: `Fix the shelf photo picker (note 3f9c1a2b)`.
-7. **Close it.** `done <id> --note "what changed, in one sentence"`. The commit
-   sha is recorded automatically from HEAD, so close it after committing.
-8. **Push once per batch**, not per note, then report.
+7. **Do not close it yet.** Write down its id, its commit and the one-sentence
+   resolution, and leave it `in_progress`. A note's commit on the batch branch
+   is not shipped, and the queue must not say it is.
+8. **Push once per batch**, not per note: merge the batch to main as in
+   *Pushing the batch* below, and only then close each note in it, then
+   report.
 
 `node_modules` is empty on a fresh web container, so step 5 cannot run until
 the dependencies are installed. The SessionStart hook in `.claude/hooks/`
@@ -231,6 +239,30 @@ Merge with `--no-ff`, subject `Merge the notes batch: …`, saying what was in
 it. The merge commit is how a batch is found again later; a fast-forward
 leaves the run with no shape at all.
 
+Push main, then close the batch's notes, each against its own commit:
+`done <id> --commit <sha> --note "…"`. This is the only place a note is
+closed as done.
+
+## Done means on main
+
+A note is `done` only when main carries its commit. Committed on a branch,
+pushed to a branch, or "merged later" are all `in_progress`. Note 89ad8bef was
+closed with "not yet merged to main" in its own resolution, and the page said
+Done about work that was nowhere the app could run it.
+
+`notes.ts done` asks GitHub whether main contains the commit and refuses the
+close when it does not, or when GitHub cannot be asked, the same guard
+`plan.ts done` has. Doing the writes by hand does not make it optional:
+before the `done` update, `git fetch origin` and
+`git merge-base --is-ancestor <sha> origin/main`, and close only when that
+exits zero. After a `--no-ff` merge the note's own commit is on main, so the
+sha recorded is still the note's commit, not the merge.
+
+When the batch cannot reach main (the gate will not pass, a conflict you
+cannot resolve), push the batch branch so the work survives, and `block` each
+note in it, naming the branch: `On claude/…, not merged: <what stopped it>`.
+Never `done` with a branch in the resolution note.
+
 ## When a note cannot be finished
 
 Mark it `blocked` immediately and move to the next one — do not stall the
@@ -244,7 +276,8 @@ in one line:
 - Needs information only the user has → the specific question.
 - Too large for a batch → what it really involves, and a proposed split.
 
-Never mark a note `done` with the fix unverified, and never silently drop one.
+Never mark a note `done` with the fix unverified or off main, and never
+silently drop one.
 
 ## When a note works against the vision
 
