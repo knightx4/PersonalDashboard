@@ -78,10 +78,14 @@ function fakeClient() {
       state.writes.push(table);
       return builder;
     },
-    rpc: async (name: string) =>
-      name === 'app_owner'
-        ? { data: { userId: OWNER_ID, email: 'owner@example.com' }, error: null }
-        : { data: null, error: null },
+    rpc: async (name: string) => {
+      if (name === 'app_owner') {
+        return { data: { userId: OWNER_ID, email: 'owner@example.com' }, error: null };
+      }
+      // Any other function is a write as much as `from()` is.
+      state.writes.push(name);
+      return { data: null, error: null };
+    },
   };
 }
 
@@ -158,6 +162,7 @@ const comments = await import('@/app/dev/comment-actions');
 const ideas = await import('@/app/dev/ideas/actions');
 const plan = await import('@/app/dev/plan/actions');
 const raised = await import('@/app/dev/raised/actions');
+const specs = await import('@/app/dev/specs/actions');
 const surfaces = await import('@/app/dev/surfaces/actions');
 const review = await import('@/app/dev/ui/review/actions');
 
@@ -212,6 +217,16 @@ const LOCKED: ReadonlyArray<{ file: string; name: string; run: () => Promise<unk
     file: 'app/dev/raised/actions.ts',
     name: 'decideRaise',
     run: () => (raised.decideRaise as Action)({}, form({ id: SOME_UUID, answer: 'yes' })),
+  },
+  {
+    file: 'app/dev/specs/actions.ts',
+    name: 'acceptVisionEdit',
+    run: () => (specs.acceptVisionEdit as Action)({}, form({ id: SOME_UUID })),
+  },
+  {
+    file: 'app/dev/specs/actions.ts',
+    name: 'dismissVisionEdit',
+    run: () => (specs.dismissVisionEdit as Action)({}, form({ id: SOME_UUID })),
   },
   {
     file: 'app/dev/surfaces/actions.ts',
