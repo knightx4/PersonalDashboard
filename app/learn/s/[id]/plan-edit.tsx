@@ -6,6 +6,7 @@ import { Plus } from 'lucide-react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { addUnitToPlan, moveUnitInPlan, removeUnitFromPlan, type PlanEditState } from './actions';
 
 /**
@@ -125,6 +126,7 @@ export function AddUnitForm({ subjectId }: { subjectId: string }) {
           className="min-w-0 flex-1"
         />
         <AddButton />
+        <PaidHint action="app/learn/s/[id]/actions.ts#addUnitToPlan" what="Cost of writing what the unit covers" />
       </div>
       <p className="mt-1 text-small text-ink-muted">
         It goes at the end, where you can move it, and Dash writes what it covers. Its pieces are written when the plan reaches it.
