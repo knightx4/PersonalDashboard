@@ -323,9 +323,15 @@ and reuse a step that already says what you were about to write.
 
 1. **Stages at the top level.** (Older runs, and the Send a phase job, call
    them phases; they are the same thing.) Three to six steps under the goal, in the
-   order they happen, each a stage of the path: for a debt goal, get the
+   order they roughly happen, each a stage of the path: for a debt goal, get the
    numbers, choose the order, build the schedule, set up the payments, keep it
-   on track. A phase has `kind = 'mine'`, an `acceptance` saying what is true
+   on track. Stage order is not a gate: the morning run works ready steps in
+   every stage, and the goal page opens every stage under way. When a stage
+   genuinely cannot start before another is done (applications wait on the
+   résumé), add a dependency from its first steps to the step they need
+   ("Blocked and waiting steps"); the page then reads that stage as waiting on
+   the other. Leave stages that can run side by side without one (networking
+   alongside the résumé). A phase has `kind = 'mine'`, an `acceptance` saying what is true
    when the stage is over, and sub-steps. It reads Waiting while its sub-steps
    are open, and closes itself once they are all done or dropped (a trigger,
    `migrations-goals/0040`); never close a phase yourself. A merge is the
@@ -795,8 +801,8 @@ covers a direction means you leave that direction alone.
      name", so propose the second and put the first inside it. The database
      refuses a goal from you whose title or done-when reads as a rate or a
      streak (`goals.reads_as_practice`, migrations-goals/0041).
-   - **Parts that follow one another toward one done-when are stages of one
-     goal**, not several goals. Knowing the target, a résumé, a network,
+   - **Parts that serve one done-when are stages of one goal**, not several
+     goals, whether they follow one another or run side by side. Knowing the target, a résumé, a network,
      applying, interviewing and negotiating all serve getting the job: that
      is one goal, *Land your next role*, with six stages. Propose several
      goals only for outcomes that stand on their own.
