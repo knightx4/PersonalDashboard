@@ -7,7 +7,9 @@
  * on autopay", "Filed 4 loans", "Closed Check loan drafts", "Merged Settle
  * on your pay floor into Name your target role", "Closed Send the
  * application: Your application for Finance Manager is in Jobs, sent 12
- * September" (a step of yours closed from evidence, plan #1082). Each change that
+ * September" (a step of yours closed from evidence, plan #1082), "Dropped
+ * Email the planning group on your answer to Do you still want to email the
+ * planning group?" (plan #1083). Each change that
  * Claude made carries an Undo, which puts that row back as it was:
  *
  * - A row Claude added is archived, or deleted where the table keeps no
@@ -144,6 +146,7 @@ const FIELD_WORDS: Record<string, string> = {
   block_kind: 'what it is waiting on',
   evidence: 'what Dash saw',
   evidence_source: 'what Dash saw',
+  dropped_on: 'the answer it was dropped on',
   acts: 'what it does outside the plan',
   resolution: 'the answer',
   rhythm_count: 'the rhythm',
@@ -233,6 +236,9 @@ function itemSentence(row: HistoryRow, names: ChangeNames): string {
 
   if (newV.status === 'dropped' && typeof newV.merged_into === 'string') {
     return `Merged ${title} into ${itemTitle(newV.merged_into, names)}`;
+  }
+  if (newV.status === 'dropped' && typeof newV.dropped_on === 'string') {
+    return `Dropped ${title} on your answer to ${itemTitle(newV.dropped_on, names, 'a question')}`;
   }
   if ('status' in newV) {
     if (newV.status === 'done') {
@@ -655,6 +661,7 @@ export function namesNeeded(rows: readonly HistoryRow[]): {
     add(items, v.goal_id);
     add(items, v.depends_on_id);
     add(items, v.merged_into);
+    add(items, v.dropped_on);
     add(collections, v.collection_id);
   }
   return { items: [...items], collections: [...collections], records: [...records] };

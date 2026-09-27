@@ -378,6 +378,37 @@ describe('a merge of two steps (plan #1081)', () => {
   });
 });
 
+describe('a step dropped on your answer (plan #1083)', () => {
+  function dropped(): HistoryRow {
+    return row({
+      row_id: 'step-1',
+      action: 'update',
+      old_values: { status: 'open', dropped_on: null, closed_at: null },
+      new_values: { status: 'dropped', dropped_on: 'step-2', closed_at: 'x' },
+    });
+  }
+
+  it('reads as one line naming the question, whose undo reopens the step', () => {
+    const drop = dropped();
+    const [line] = changeLines([drop], [], names());
+    expect(line.sentence).toBe('Dropped Turn on autopay on your answer to Check loan drafts');
+    expect(line.state).toBe('undoable');
+    expect(line.targets).toEqual([
+      {
+        kind: 'revert',
+        table: 'items',
+        rowId: 'step-1',
+        historyId: drop.id,
+        values: { status: 'open', dropped_on: null },
+      },
+    ]);
+  });
+
+  it('asks for the question by name', () => {
+    expect(namesNeeded([dropped()]).items).toEqual(['step-1', 'step-2']);
+  });
+});
+
 describe('a step of yours closed from evidence (plan #1082)', () => {
   const seen = 'Your application for Finance Manager is in Jobs, sent 12 September.';
 

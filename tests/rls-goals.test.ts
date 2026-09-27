@@ -1961,6 +1961,116 @@ describe('Claude closes a step of yours from evidence (plan #1082)', () => {
   });
 });
 
+describe('Claude drops a step of yours on your answer (plan #1083)', () => {
+  function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  async function step(parent: string, title: string, kind = 'mine'): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${parent}, ${kind}, ${title}) returning id`;
+    return row.id;
+  }
+
+  async function goal(title: string): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title, approved_at)
+      values (${userA}, 'goal', ${areaA}, ${title}, now()) returning id`;
+    return row.id;
+  }
+
+  /** The still-want-it question beside a step, which the step waits on. */
+  async function askAbout(parent: string, stepId: string): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, detail)
+      values (${userA}, 'step', ${parent}, 'decision', 'Do you still want to do this?',
+              ${'A — Keep it. Dash splits it smaller.\nB — Drop it.'})
+      returning id`;
+    await admin`
+      insert into dependencies (user_id, item_id, depends_on_id)
+      values (${userA}, ${stepId}, ${row.id})`;
+    return row.id;
+  }
+
+  async function answer(question: string, resolution: string): Promise<void> {
+    await asUser(userA, (tx) => tx`
+      update items set resolution = ${resolution}, status = 'done' where id = ${question}`);
+  }
+
+  type Row = { status: string; dropped_on: string | null };
+  async function row(id: string): Promise<Row> {
+    const [r] = await admin<Row[]>`select status, dropped_on from items where id = ${id}`;
+    return r;
+  }
+
+  it('drops the step on the answer as one history row, and the undo reopens it', async () => {
+    const g = await goal('Get plugged into the scene');
+    const own = await step(g, 'Email the planning group');
+    const q = await askAbout(g, own);
+
+    // Not before the answer.
+    await expect(
+      asClaude((tx) => tx`update items set status = 'dropped', dropped_on = ${q} where id = ${own}`),
+    ).rejects.toThrow(/no answer yet/);
+
+    await answer(q, 'B — Drop it.');
+    await expect(
+      asClaude((tx) => tx`update items set status = 'dropped' where id = ${own}`),
+    ).rejects.toThrow(/on your answer to a question/);
+    await asClaude((tx) => tx`update items set status = 'dropped', dropped_on = ${q} where id = ${own}`);
+    expect(await row(own)).toEqual({ status: 'dropped', dropped_on: q });
+    const drop = (await historyOf(own)).at(-1);
+    expect(drop?.actor).toBe('claude');
+    expect(drop?.new_values).toMatchObject({ status: 'dropped', dropped_on: q });
+    expect(drop?.old_values).toMatchObject({ status: 'open', dropped_on: null });
+
+    // The undo writes the old values back.
+    await asUser(userA, (tx) => tx`update items set status = 'open', dropped_on = null where id = ${own}`);
+    expect(await row(own)).toEqual({ status: 'open', dropped_on: null });
+
+    // Reopening by hand clears it too.
+    await asClaude((tx) => tx`update items set status = 'dropped', dropped_on = ${q} where id = ${own}`);
+    await asUser(userA, (tx) => tx`update items set status = 'open' where id = ${own}`);
+    expect(await row(own)).toEqual({ status: 'open', dropped_on: null });
+  });
+
+  it('refuses a question the step does not wait on, one from another goal, or open work beneath', async () => {
+    const g = await goal('Speak at the board');
+    const other = await goal('Pay off the loans');
+    const own = await step(g, 'Sign up to speak');
+    const unrelated = await step(g, 'Pick the fight');
+    const q = await askAbout(g, unrelated);
+    await answer(q, 'B — Drop it.');
+    const elsewhereStep = await step(other, 'Call the servicer');
+    const elsewhere = await askAbout(other, elsewhereStep);
+    await answer(elsewhere, 'B — Drop it.');
+    await admin`
+      insert into dependencies (user_id, item_id, depends_on_id) values (${userA}, ${own}, ${elsewhere})`;
+
+    await expect(
+      asClaude((tx) => tx`update items set status = 'dropped', dropped_on = ${q} where id = ${own}`),
+    ).rejects.toThrow(/does not wait on/);
+    await expect(
+      asClaude((tx) => tx`update items set status = 'dropped', dropped_on = ${elsewhere} where id = ${own}`),
+    ).rejects.toThrow(/same goal/);
+    await expect(
+      asClaude((tx) => tx`update items set status = 'dropped', dropped_on = ${own} where id = ${unrelated}`),
+    ).rejects.toThrow(/answer to a question/);
+
+    const phase = await step(g, 'Get the testimony ready');
+    await step(phase, 'Put the draft in your own words');
+    const pq = await askAbout(g, phase);
+    await answer(pq, 'B — Drop it.');
+    await expect(
+      asClaude((tx) => tx`update items set status = 'dropped', dropped_on = ${pq} where id = ${phase}`),
+    ).rejects.toThrow(/open sub-steps/);
+  });
+});
+
 describe('a goal is an outcome, not a practice (0041)', () => {
   function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
     return admin.begin(async (tx) => {

@@ -187,6 +187,18 @@ the run reads which of its closes you undid, never closes a step again on the
 evidence it was undone on, and holds back on a source whose closes you keep
 undoing (the goals skill, "Closing a step from evidence").
 
+No step of yours sits for more than a week without a move (plan #1083). The
+morning brief lists each open step of yours that nothing has touched in seven
+days (its row unchanged, nothing added or changed beneath it, no comment from
+you), and the run gives each one move: it splits the step into smaller
+sub-steps, prepares it as **Prepare** would, or adds a question beside it
+asking whether you still want it and makes the step wait on that question.
+Each is an ordinary change on the Goals home with an Undo. If you answer that
+you no longer want it, the re-shape run drops the step with `dropped_on`
+naming the question, which the database allows only for a question the step
+waits on and you have answered (`migrations-goals/0051`). It reads "Dropped X
+on your answer to Y", and its Undo reopens the step.
+
 A step that depends on an unanswered question is written live but waits on that question,
 so it stays out of the runs until you answer.
 
@@ -313,7 +325,9 @@ the same allowance. So Goals runs on a schedule rather than on every change:
   goal its status for the day (plan #1074): on track, stalled, waiting on
   you, waiting on a date or waiting on another goal, with one sentence on
   why, the next move and its date. A goal with nothing done in three weeks
-  reads stalled, and its next move is added as a step (plan #1018). The
+  reads stalled, and its next move is added as a step (plan #1018). Before
+  the verdicts, each step of yours untouched for a week gets a move (plan
+  #1083, "Approval" above). The
   same run then works up to ten ready `claude` steps (`DAILY_STEP_LIMIT` in
   `lib/goals/daily-run.ts`) and the rest wait for the next morning. You open the app about once a day, so this
   is when the work has to be ready. The morning run does not map new or
@@ -797,7 +811,9 @@ A sketch for the migration, not the migration itself.
   `acts` (on a Claude step, what working it does outside the plan),
   `merged_into` (on a step dropped as a duplicate, the step that carries its
   work; plan #1081), `evidence` with `evidence_source` (on a step of yours
-  Claude closed, what it saw and where; plan #1082), `position`, and `rhythm_count` with `rhythm_period` for rhythms. A goal's
+  Claude closed, what it saw and where; plan #1082), `dropped_on` (on a step
+  of yours dropped on your answer, the question you answered; plan #1083),
+  `position`, and `rhythm_count` with `rhythm_period` for rhythms. A goal's
   `help_kinds` lists the weekly help it asks for, each an entry of `kind`
   (events, volunteering, reading, courses or job_leads) and a `note` on what
   to look for (plan #1027). When Claude maps a goal it proposes kinds in
