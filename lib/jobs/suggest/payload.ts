@@ -1,22 +1,27 @@
 /**
  * Reading what the suggestion calls report, before anything is stored.
  *
- * The model is told the rules; these check them. An outreach suggestion must
- * name a candidate it was given, and a posting must carry a link that is a
- * web address and not one already suggested or applied for. Text is trimmed
- * to the column limits and has the person's banned constructions taken out
- * where that can be done without rewriting (the em dash, above all).
+ * The model is told the rules; these check them. A person must not be someone
+ * already suggested or already a contact, and a posting must carry a link that
+ * is a web address and not one already suggested or applied for. Text is
+ * trimmed to the column limits and has the person's banned constructions taken
+ * out where that can be done without rewriting (the em dash, above all).
  */
-import type { Candidate } from './candidates';
-
 export const MAX_OUTREACH = 3;
 export const MAX_OPENINGS = 5;
 
 export const CHANNELS = ['linkedin_dm', 'linkedin_connect', 'email', 'intro', 'event', 'other'] as const;
 export type Channel = (typeof CHANNELS)[number];
 
-export type OutreachSuggestion = {
-  candidate: Candidate;
+export type PersonSuggestion = {
+  /** Null for an event or a group rather than one person. */
+  personName: string | null;
+  personTitle: string | null;
+  company: string | null;
+  /** Where the person was found. */
+  sourceUrl: string | null;
+  /** A LinkedIn people search that finds them or people like them. */
+  searchQuery: string | null;
   headline: string;
   why: string;
   move: string;
@@ -58,31 +63,6 @@ function clean(value: unknown, max: number): string | null {
   return read === null ? null : cleanText(read);
 }
 
-export function parseOutreachPayload(raw: unknown, candidates: readonly Candidate[]): OutreachSuggestion[] {
-  const list = (raw as { suggestions?: unknown } | null)?.suggestions;
-  if (!Array.isArray(list)) return [];
-  const byRef = new Map(candidates.map((candidate) => [candidate.ref, candidate]));
-  const used = new Set<string>();
-  const out: OutreachSuggestion[] = [];
-
-  for (const entry of list) {
-    if (out.length >= MAX_OUTREACH) break;
-    const item = entry as Record<string, unknown>;
-    const ref = typeof item.ref === 'string' ? item.ref.trim() : '';
-    const candidate = byRef.get(ref);
-    if (!candidate || used.has(ref)) continue;
-    const headline = clean(item.headline, 300);
-    const why = clean(item.why, 1000);
-    const move = clean(item.move, 1500);
-    const message = clean(item.message, 4000);
-    if (!headline || !why || !move || !message) continue;
-    const channel = CHANNELS.includes(item.channel as Channel) ? (item.channel as Channel) : 'other';
-    used.add(ref);
-    out.push({ candidate, headline, why, move, channel, message });
-  }
-  return out;
-}
-
 /** A company and title reduced to what two spellings of the same role share. */
 export function roleKey(company: string, title: string): string {
   const norm = (s: string) =>
@@ -92,6 +72,16 @@ export function roleKey(company: string, title: string): string {
       .replace(/[^a-z0-9]+/g, ' ')
       .trim();
   return `${norm(company)}|${norm(title)}`;
+}
+
+/** A person reduced to what two spellings of the same name share. */
+export function personKey(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function webAddress(value: unknown): string | null {
@@ -104,6 +94,48 @@ function webAddress(value: unknown): string | null {
   } catch {
     return null;
   }
+}
+
+export function parsePeoplePayload(raw: unknown, taken: { people: ReadonlySet<string> }): PersonSuggestion[] {
+  const list = (raw as { suggestions?: unknown } | null)?.suggestions;
+  if (!Array.isArray(list)) return [];
+  const people = new Set(taken.people);
+  const out: PersonSuggestion[] = [];
+
+  for (const entry of list) {
+    if (out.length >= MAX_OUTREACH) break;
+    const item = entry as Record<string, unknown>;
+    const headline = clean(item.headline, 300);
+    const why = clean(item.why, 1000);
+    const move = clean(item.move, 1500);
+    const message = clean(item.message, 4000);
+    if (!headline || !why || !move || !message) continue;
+    const personName = clean(item.person_name, 200);
+    if (personName) {
+      const key = personKey(personName);
+      if (people.has(key)) continue;
+      people.add(key);
+    }
+    const channel = CHANNELS.includes(item.channel as Channel) ? (item.channel as Channel) : 'other';
+    out.push({
+      personName,
+      personTitle: clean(item.person_title, 300),
+      company: clean(item.company, 200),
+      sourceUrl: webAddress(item.source_url),
+      searchQuery: clean(item.search_query, 300),
+      headline,
+      why,
+      move,
+      channel,
+      message,
+    });
+  }
+  return out;
+}
+
+/** The LinkedIn people search for a query. */
+export function linkedinSearchUrl(query: string): string {
+  return `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(query)}`;
 }
 
 export function parseOpeningsPayload(

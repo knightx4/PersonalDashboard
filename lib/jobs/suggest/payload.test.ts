@@ -1,43 +1,66 @@
 import { describe, expect, it } from 'vitest';
-import type { Candidate } from './candidates';
-import { cleanText, parseOpeningsPayload, parseOutreachPayload, roleKey, splitSubject } from './payload';
+import {
+  cleanText,
+  linkedinSearchUrl,
+  parseOpeningsPayload,
+  parsePeoplePayload,
+  personKey,
+  roleKey,
+  splitSubject,
+} from './payload';
 
-const candidate = (ref: string): Candidate => ({
-  ref,
-  contactId: `id-${ref}`,
-  companyId: 'acme',
-  companyName: 'Acme',
-  name: 'Priya',
-  score: 3,
-  facts: [],
-});
-
-describe('parseOutreachPayload', () => {
-  const entry = (ref: string) => ({
-    ref,
-    headline: 'Ask Priya for a referral',
-    why: 'She replied last month.',
+describe('parsePeoplePayload', () => {
+  const entry = (over: Record<string, unknown> = {}) => ({
+    person_name: 'Dana Wu',
+    person_title: 'Director of Strategic Finance',
+    company: 'Ramp',
+    source_url: 'https://ramp.com/team#dana',
+    search_query: 'Dana Wu Ramp',
+    headline: 'Ask Dana Wu about strategic finance at Ramp',
+    why: 'She moved from FP&A into strategic finance, the step you want.',
     move: '1. Send the note.',
-    channel: 'email',
-    message: 'Subject: Data Analyst role\n\nHi Priya — quick question.',
+    channel: 'linkedin_connect',
+    message: 'Hi Dana — I read your post on planning cycles.',
+    ...over,
   });
 
-  it('keeps suggestions for known candidates once each, and takes out em dashes', () => {
-    const out = parseOutreachPayload(
-      { suggestions: [entry('c1'), entry('c1'), entry('c9'), entry('c2')] },
-      [candidate('c1'), candidate('c2')],
+  it('keeps a new person once, drops someone already known, and takes out em dashes', () => {
+    const out = parsePeoplePayload(
+      { suggestions: [entry(), entry({ person_name: 'dana  wu' }), entry({ person_name: 'Sam Old' }), entry({ person_name: 'Lee Park' })] },
+      { people: new Set([personKey('Sam Old')]) },
     );
-    expect(out.map((s) => s.candidate.ref)).toEqual(['c1', 'c2']);
-    expect(out[0].message).toContain('Hi Priya, quick question.');
+    expect(out.map((s) => s.personName)).toEqual(['Dana Wu', 'Lee Park']);
+    expect(out[0]).toMatchObject({ sourceUrl: 'https://ramp.com/team', searchQuery: 'Dana Wu Ramp', channel: 'linkedin_connect' });
+    expect(out[0].message).toBe('Hi Dana, I read your post on planning cycles.');
   });
 
-  it('drops an entry with no message and reads an unknown channel as other', () => {
-    const out = parseOutreachPayload(
-      { suggestions: [{ ...entry('c1'), message: '  ' }, { ...entry('c2'), channel: 'fax' }] },
-      [candidate('c1'), candidate('c2')],
+  it('keeps an event with no person, and drops an entry with no message', () => {
+    const out = parsePeoplePayload(
+      {
+        suggestions: [
+          entry({ person_name: null, person_title: null, channel: 'event', headline: 'Go to the FP&A meetup' }),
+          entry({ person_name: 'Lee Park', message: ' ' }),
+        ],
+      },
+      { people: new Set() },
     );
     expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ personName: null, channel: 'event' });
+  });
+
+  it('keeps at most three and reads an unknown channel as other', () => {
+    const out = parsePeoplePayload(
+      { suggestions: ['A B', 'C D', 'E F', 'G H'].map((name) => entry({ person_name: name, channel: 'fax' })) },
+      { people: new Set() },
+    );
+    expect(out).toHaveLength(3);
     expect(out[0].channel).toBe('other');
+  });
+
+  it('builds the LinkedIn people search', () => {
+    expect(linkedinSearchUrl('FP&A Ramp')).toBe(
+      'https://www.linkedin.com/search/results/people/?keywords=FP%26A%20Ramp',
+    );
   });
 });
 

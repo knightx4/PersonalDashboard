@@ -18,7 +18,7 @@ import type { LearnOperation } from '@/lib/learn/spend';
  * the guesses with it. Where the ledger already had a few runs by September
  * 2026, the tokens were set so the guess lands near them.
  *
- * **Web search fees are not in these figures.** `enrich-company`, `find-openings`,
+ * **Web search fees are not in these figures.** `enrich-company`, `find-openings`, `suggest-outreach`,
  * `resolve-reference`, `estimate-resale-price` and `recommend-newsletters` call
  * the web search tool, which bills $10 per thousand searches on top of tokens. The ledger records
  * tokens only (lib/core/spend/pricing.ts), so a guess that added the fee would
@@ -184,9 +184,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'draft-answer': run(OPUS, 6_000, 800),
   'propose-evidence': run(OPUS, 8_000, 3_000),
   'suggest-learning-tracks': run(OPUS, 4_000, 900),
-  // The career goals, a CV excerpt and up to twelve people with their facts
-  // in; three suggestions with a message each out.
-  'suggest-outreach': run(SONNET, 9_000, 1_800),
+  // The career goals, a CV excerpt and the names already known in, then up
+  // to six searches whose results come back as input; three people with a
+  // message each out.
+  'suggest-outreach': run(SONNET, 45_000, 3_000),
   // The career goals and the companies already applied to, then up to six
   // searches whose results come back as input; five postings out.
   'find-openings': run(SONNET, 45_000, 2_500),
