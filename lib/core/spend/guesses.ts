@@ -218,6 +218,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'write-day-brief': background(run(HAIKU, 1_500, 200)),
   // One booking email in, the day, time and place out.
   'read-appointment-email': background(unit(HAIKU, 2_500, 150)),
+  // The record, up to eight events and eight subject lines in; a short email out.
+  'write-draft': background(unit(SONNET, 1_500, 300)),
 
   // News. All but the last two from the digest cron or a script.
   'digest-issue': background(unit(HAIKU, 3_000, 300)),

@@ -5,6 +5,7 @@ import type { AgendaSource, SourceId } from '@/lib/todo/agenda/sources';
 import { appointmentsSource } from '@/lib/todo/agenda/sources/appointments';
 import { billsSource } from '@/lib/todo/agenda/sources/bills';
 import { deliveriesSource } from '@/lib/todo/agenda/sources/deliveries';
+import { draftsSource } from '@/lib/todo/agenda/sources/drafts';
 import { goalStepsSource } from '@/lib/todo/agenda/sources/goal-steps';
 import { jobInterviewsSource } from '@/lib/todo/agenda/sources/job-interviews';
 import { jobRemindersSource } from '@/lib/todo/agenda/sources/job-reminders';
@@ -25,6 +26,7 @@ const SOURCES: AgendaSource[] = [
   deliveriesSource,
   appointmentsSource,
   billsSource,
+  draftsSource,
 ];
 
 export function allSources(): AgendaSource[] {
