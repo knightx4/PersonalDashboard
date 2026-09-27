@@ -205,6 +205,35 @@ goal tracks with no pieces and writes up to two (`writeDuePieces` in
 such as by opening the unit on the track page, and the units laid out before
 pieces existed. Tracks not made from a goal get no pieces.
 
+### A piece is worked through on its own page
+
+Plan #1141. Each piece opens at `/learn/s/[id]/p/[piece]`, linked from its
+unit on the track page. Any piece opens at any time; the suggested order locks
+nothing. The page shows the piece's lessons one after another, in the order of
+its ideas, and ends with its check.
+
+A lesson is the same stored card whether Learn now or the plan reached the
+idea first: one `lesson` row in `learn.feed_cards` per concept. An idea with no
+lesson yet has it written when the piece is opened, one idea after another,
+first idea first, by the same Sonnet call the top-up makes
+(`writeLessonCard` in `inngest/learn/lesson-top-up.ts`). An idea the writer
+declined shows its claim and the reason.
+
+The check is one question needing the piece's ideas together, answered from
+memory in a sentence or two. Haiku writes it when Ask me the question is
+pressed and marks what is written, as the unit check does
+(`lib/learn/lessons/write-piece-check.ts`). Each question asked is a row in
+`learn.piece_checks` (learn 0074) with the answer expected, what was written,
+the mark and the marker's sentence on it. The expected answer stays on the
+server until the question is answered.
+
+A right answer sets the piece's `passed_at` and marks each of its ideas
+tested: sharp stays sharp and every other state becomes known, since the
+answer needed the idea. A wrong answer says what it was missing, shows the
+answer expected, and offers another question, written knowing the ones already
+asked so it is not the same one reworded. Nothing on the page marks a piece
+passed any other way.
+
 ## The unit check
 
 When a unit is done, the next card from that track is its unit check: one
@@ -238,6 +267,8 @@ From the spend ledger, 24 September 2026:
 | A lesson | Once per concept served | 1.5¢ |
 | A goal unit's pieces | Once per laid-out unit of a goal | about 1¢ |
 | A unit check marked | When one is answered | 0.2¢ |
+| A piece's question written | On Ask me the question, and each retry | about 0.2¢ |
+| A piece's answer marked | When one is answered | 0.2¢ |
 
 A lesson is written only for a concept that is about to be served, so nothing
 is thrown away after writing. About half of the sections picked today are.

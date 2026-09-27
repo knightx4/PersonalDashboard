@@ -286,6 +286,13 @@ Pieces of about half an hour each unit of a learning goal is split into, with wh
 - Search: `title`
 - Name a row by `title`; link it by `id`
 
+### `learn.piece_checks` (Learn)
+
+Questions at the end of each piece of a learning goal's plan, with what they answered and whether it was right.
+
+- Search: `question`, `response`
+- Name a row by `question`; link it by `id`
+
 ### `learn.quizzes` (Learn)
 
 Quizzes they set themselves, and what each was preparing for.

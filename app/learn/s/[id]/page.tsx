@@ -18,6 +18,7 @@ import { SectionFold } from '@/components/ui/disclosure';
 import { loadCurriculum, type StoredUnit } from '@/lib/learn/graph/curriculum-store';
 import { unitGoal } from '@/lib/learn/graph/curriculum-payload';
 import { curriculumRows, type UnitRow } from '@/lib/learn/graph/curriculum-view';
+import { loadTrackPieces, type PieceSibling } from '@/lib/learn/lessons/piece-store';
 import { deleteSubject } from './actions';
 import { WriteCurriculum } from './curriculum';
 import { PullArticles } from './pull-articles';
@@ -126,11 +127,14 @@ function UnitSection({
   graph,
   subjectId,
   timezone,
+  pieces,
 }: {
   row: UnitRow<StoredUnit>;
   graph: Graph;
   subjectId: string;
   timezone: string;
+  /** The unit's pieces, on a learning goal's track once they are written (plan #1140). */
+  pieces: readonly PieceSibling[];
 }) {
   const { unit } = row;
   return (
@@ -159,6 +163,21 @@ function UnitSection({
           <span className="text-ink-muted">By the end: </span>
           {unit.outcome}
         </p>
+      )}
+
+      {/* Each piece opens on its own page, in any order (plan #1141). */}
+      {pieces.length > 0 && (
+        <ol className="mt-2 space-y-1">
+          {pieces.map((piece) => (
+            <li key={piece.id} className="flex items-baseline gap-2 text-ui">
+              <span className="w-5 shrink-0 text-ink-muted tabular-nums">{piece.ordinal}.</span>
+              <Link href={`/learn/s/${subjectId}/p/${piece.id}`} className="text-accent hover:underline">
+                {piece.title}
+              </Link>
+              {piece.passed && <span className="text-small text-ink-muted">passed</span>}
+            </li>
+          ))}
+        </ol>
       )}
 
       {row.state === 'not-opened' ? (
@@ -233,7 +252,7 @@ export default async function SubjectPage({
   const subject = await loadSubject(supabase, id);
   if (!subject) notFound();
 
-  const [graph, goals, settings, interest, units] = await Promise.all([
+  const [graph, goals, settings, interest, units, pieces] = await Promise.all([
     loadGraph(supabase, id),
     loadGoals(supabase, id),
     loadAccountSettings(user.id),
@@ -242,6 +261,8 @@ export default async function SubjectPage({
     // A curriculum that cannot be read leaves the page as it was before
     // tracks had one, with every goal listed on its own.
     loadCurriculum(supabase, id).catch(() => [] as StoredUnit[]),
+    // A goal's pieces that cannot be read leave the units without their links.
+    loadTrackPieces(supabase, user.id, id).catch(() => new Map<string, PieceSibling[]>()),
   ]);
   const counts = countStates(graph);
   const { rows: unitRows, outside } = curriculumRows(units, goals, graph);
@@ -352,6 +373,7 @@ export default async function SubjectPage({
                   graph={graph}
                   subjectId={id}
                   timezone={settings.timezone}
+                  pieces={pieces.get(row.unit.id) ?? []}
                 />
               ))}
             </ol>

@@ -96,6 +96,8 @@ describe('the operation names', () => {
       'add-lesson-floor',
       'write-unit-check',
       'mark-unit-check',
+      'write-piece-check',
+      'mark-piece-check',
       'reply-about-card',
       'explain-phrase',
       'write-asked-card',
