@@ -110,6 +110,7 @@ describe('RLS coverage', () => {
       'catalogue_items',
       'catalogue_judgements',
       'catalogue_links',
+      'catalogue_passages',
       'catalogue_providers',
       'catalogue_segments',
       'concept_edges',
@@ -330,7 +331,9 @@ describe('the catalogue, which belongs to nobody', () => {
   // right ones are that everybody can read them and nobody can write them
   // through the API. catalogue_links is the exception -- a link points into
   // one person's graph -- and it gets the usual treatment.
-  const SHARED = ['catalogue_providers', 'catalogue_items', 'catalogue_segments'];
+  // catalogue_passages (learn 0070) is shared the same way: paragraph cuts of
+  // article sections, searched but never anybody's.
+  const SHARED = ['catalogue_providers', 'catalogue_items', 'catalogue_segments', 'catalogue_passages'];
 
   it('lets any signed-in user read the shared catalogue', async () => {
     await admin`
@@ -353,6 +356,13 @@ describe('the catalogue, which belongs to nobody', () => {
         userB,
         (tx) => tx`insert into catalogue_providers (slug, name, home_url, licence, ingest_note)
                    values ('planted', 'Planted', 'https://example.com', 'none', 'planted')`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into catalogue_passages (segment_id, ordinal, text)
+                   values (gen_random_uuid(), 0, 'planted')`,
       ),
     ).rejects.toThrow();
   });
