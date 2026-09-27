@@ -118,7 +118,8 @@ describe("a goal's outlined track (plan #1139)", () => {
       { subjectId: 's', subjectName: 'S', because: 'no-outline', unitId: 'u2' },
       { subjectId: 't', subjectName: 'T', because: 'no-outline', unitId: 't-u1' },
     ]);
-    expect(choice.picks.map((pick) => pick.concept.id)).toEqual(['t-a']);
+    // A goal's lessons are on its plan, not in Learn now (plan #1143).
+    expect(choice.picks).toEqual([]);
   });
 
   it('asks nothing of a track already outlined', () => {
@@ -397,63 +398,32 @@ describe('chooseLessons', () => {
   });
 });
 
-describe('the tracks of learning goals', () => {
-  const count = (picks: { subjectId: string }[], id: string) => picks.filter((pick) => pick.subjectId === id).length;
-
-  it('share one slot in three between them, whatever the weights', () => {
+describe('the tracks of learning goals (plan #1143)', () => {
+  it('take no lesson slot, leaving every slot to the other tracks', () => {
     const choice = chooseLessons({
-      tracks: [wideTrack('goal', 10), wideTrack('a', 10), wideTrack('b', 10)],
-      weights: new Map([
-        ['goal', weight(0.25)],
-        ['a', weight(4)],
-        ['b', weight(4)],
-      ]),
+      tracks: [wideTrack('goal', 10), wideTrack('a', 10)],
+      weights: new Map([['goal', weight(4)]]),
       carded: new Set(),
       goalTracks: new Set(['goal']),
-      slots: 9,
+      slots: 6,
     });
-    expect(count(choice.picks, 'goal')).toBe(3);
-    expect(choice.picks[0].subjectId).toBe('goal');
+    expect(choice.picks).toHaveLength(6);
+    expect(choice.picks.every((pick) => pick.subjectId === 'a')).toBe(true);
   });
 
-  it('split their third by weight, and count the cards already waiting', () => {
+  it('ask for no chain to be laid out, since the plan pass lays out their units', () => {
+    const track: LessonTrack = { ...chainTrack('goal'), goals: [] };
     const choice = chooseLessons({
-      tracks: [wideTrack('g1', 10), wideTrack('g2', 10), wideTrack('other', 10)],
-      weights: new Map([
-        ['g1', weight(3)],
-        ['g2', weight(1)],
-      ]),
-      carded: new Set(),
-      dealt: new Map([['other', 4]]),
-      goalTracks: new Set(['g1', 'g2']),
-      slots: 8,
-    });
-    // Four waiting plus eight: four of the twelve go to the goals.
-    expect(count(choice.picks, 'g1') + count(choice.picks, 'g2')).toBe(4);
-    expect(count(choice.picks, 'g1')).toBe(3);
-  });
-
-  it('take every slot when no other track has anything to teach, and give theirs up when they have nothing', () => {
-    const alone = chooseLessons({
-      tracks: [wideTrack('goal', 5)],
+      tracks: [track],
       weights: new Map(),
       carded: new Set(),
       goalTracks: new Set(['goal']),
       slots: 3,
     });
-    expect(count(alone.picks, 'goal')).toBe(3);
-
-    const empty = chooseLessons({
-      tracks: [wideTrack('goal', 2), wideTrack('other', 5)],
-      weights: new Map(),
-      carded: new Set(['goal-0', 'goal-1']),
-      goalTracks: new Set(['goal']),
-      slots: 3,
-    });
-    expect(count(empty.picks, 'other')).toBe(3);
+    expect(choice).toMatchObject({ picks: [], needs: [], waiting: [] });
   });
 
-  it('are never dormant while the goal is active', () => {
+  it('are never dormant while the goal is active, so their unit checks still come', () => {
     const choice = chooseLessons({
       tracks: [wideTrack('goal', 3), wideTrack('used', 3)],
       weights: new Map([
@@ -465,6 +435,5 @@ describe('the tracks of learning goals', () => {
       slots: 3,
     });
     expect(choice.dormant).toEqual([]);
-    expect(count(choice.picks, 'goal')).toBe(1);
   });
 });

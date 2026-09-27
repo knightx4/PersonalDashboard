@@ -1,8 +1,9 @@
 'use client';
 
 import { useActionState, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Gauge, ListChecks, MapPin, Target } from 'lucide-react';
+import { Gauge, ListChecks, MapPin, Route, Target } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
@@ -38,6 +39,9 @@ import {
 
 const initial: GoalActionState = {};
 
+/** A goal's plan page and its progress line (plan #1143). */
+export type GoalPlanLink = { href: string; line: string };
+
 function DepthOptions() {
   return AIM_DEPTHS.map((depth) => (
     <option key={depth} value={depth}>
@@ -53,12 +57,15 @@ export function GoalsView({
   aims,
   places,
   level3Counts,
+  plans = {},
 }: {
   aims: Aim[];
   /** Where each goal sits in the area grid, by id (#898). */
   places: Record<string, AimPlace>;
   /** The Level 3 goal's counts (#906); null when there is none or the read failed. */
   level3Counts: Level3Counts | null;
+  /** Each goal's plan, by id, once its track is made (plan #1143). */
+  plans?: Record<string, GoalPlanLink>;
 }) {
   const router = useRouter();
   const hasLevel3 = aims.some((aim) => aim.listSource === 'level3');
@@ -89,6 +96,7 @@ export function GoalsView({
                 aim={aim}
                 place={places[aim.id]}
                 level3Counts={level3Counts}
+                plan={plans[aim.id]}
               />
             ))}
           </ul>
@@ -108,10 +116,12 @@ function GoalRow({
   aim,
   place,
   level3Counts,
+  plan,
 }: {
   aim: Aim;
   place: AimPlace | undefined;
   level3Counts: Level3Counts | null;
+  plan?: GoalPlanLink;
 }) {
   const [editState, edit, editing] = useActionState(editGoal, initial);
   const [archiveState, archive, archiving] = useActionState(archiveGoal, initial);
@@ -185,6 +195,15 @@ function GoalRow({
           </>
         )}
         {place && <PlaceLine place={place} />}
+        {plan && (
+          <p className="flex items-center gap-1 px-1.5 text-small text-ink-muted">
+            <Route className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+            <Link href={plan.href} className="text-accent hover:underline">
+              Open the plan
+            </Link>
+            <span className="tabular-nums">· {plan.line}</span>
+          </p>
+        )}
         {error && <p className="px-1.5 text-small text-danger">{error}</p>}
       </div>
 

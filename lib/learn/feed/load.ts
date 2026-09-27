@@ -19,6 +19,7 @@ import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name'
 import { loadConversations } from '@/lib/talk/store';
 import { TEACH_BACK_DEFAULT_EVERY } from './teach-back';
 import { ARTICLE_GAP, POOL_FACTOR, spreadDeck, type Spreadable } from './spread';
+import { goalTrackIds, notPlanLessons } from './plan-lessons';
 
 /**
  * Reading and marking Learn now cards through the person's own session
@@ -70,6 +71,9 @@ export async function loadFeedPage(
   now: number = Date.now(),
 ): Promise<FeedCard[]> {
   const skip = exclude.slice(-MAX_EXCLUDED);
+  // A goal's lessons are on its plan (plan #1143). A failed read deals them
+  // rather than failing the deck.
+  const planLessons = notPlanLessons(await goalTrackIds(supabase).catch(() => []));
   const read = async (
     status: 'ready' | 'review' | 'skipped',
     count: number,
@@ -93,6 +97,7 @@ export async function loadFeedPage(
         .lt('acted_at', returnCutoff(status, now))
         .order('acted_at', { ascending: true });
     }
+    if (planLessons) query = query.or(planLessons);
     const leaveOut = [...skip, ...taken];
     if (leaveOut.length > 0) query = query.not('id', 'in', `(${leaveOut.join(',')})`);
     const { data, error } = await query.order('id').limit(count);
@@ -305,12 +310,16 @@ async function recentInDeck(supabase: LearnSupabaseClient, ids: string[]): Promi
 
 /** How many cards are ready, for the foot of the feed. */
 export async function countReadyCards(supabase: LearnSupabaseClient): Promise<number> {
-  const { count, error } = await supabase
+  const planLessons = notPlanLessons(await goalTrackIds(supabase).catch(() => []));
+  let query = supabase
     .from('feed_cards')
     .select('id', { count: 'exact', head: true })
     .eq('status', 'ready')
     .not('hook', 'is', null)
     .not('context', 'is', null);
+  // A goal's lessons are on its plan, not in the deck (plan #1143).
+  if (planLessons) query = query.or(planLessons);
+  const { count, error } = await query;
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) return 0;
   return count ?? 0;

@@ -268,6 +268,40 @@ note under the task. Whether typing the key figures is enough for those
 skills, or a file Dash reads is needed, is still open: the notes the first
 real tasks carry are the evidence for it.
 
+### The plan page
+
+Plan #1143. A learning goal's track page, `/learn/s/[id]`, opens on the
+goal's plan. It shows how many pieces are passed out of the pieces written,
+with a bar, then a Next up card for the first piece not passed in the
+suggested order, then every unit with its pieces. Each piece links to its own
+page whatever comes before it. A piece with its practice or its check passed,
+but not both, says which half is left. A unit whose ideas are not laid out yet
+says it is not split yet. The graph of each unit's ideas, and the forms that
+open a unit or go deeper in one, sit in a fold below the plan.
+
+Progress is the count of pieces passed, read from `plan_pieces.passed_at`.
+Next up is worked out in `planProgress` (`lib/learn/lessons/plan-view.ts`),
+and the reads are in `lib/learn/lessons/plan-store.ts`. A piece skipped
+earlier becomes Next up again once the pieces after it are passed.
+
+Learn now lists each plan above the deck, with its progress and a link to its
+Next up piece, and each goal on the Goals page links to its plan.
+
+A goal's lessons live on its plan, so Learn now deals none of them. The
+chooser gives a goal's track no lesson slot, and the deck and the count that
+decides when it is topped up leave out `lesson` cards whose track is an active
+goal's (`lib/learn/feed/plan-lessons.ts`), which covers lessons written from
+a piece's page. The unit check of a goal's track still comes in Learn now.
+Archiving the goal returns its lessons to the deck, since the track is then an
+ordinary one.
+
+Nothing waits on Learn now to lay out a goal's next unit any more. On every
+hourly run, whether or not the deck is short, the top-up lays out the first
+unit with no ideas of up to two goal tracks and splits each into pieces
+straight after (`layOutPlans` in `lib/learn/lessons/plan-layout.ts`). A plan's
+units are all laid out a few hours after its outline is written. A track whose
+layout failed is held for a day, as the lesson top-up holds one.
+
 ## The unit check
 
 When a unit is done, the next card from that track is its unit check: one
@@ -283,7 +317,8 @@ alone never does.
 - **Section picking** (naming, fetching and writing from a section) makes the
   exploratory cards and nothing else.
 - **Goals set on the Goals page** get a track each, since you set them on
-  purpose. Their card share (one in three) becomes that track's weight.
+  purpose. Their card share was one lesson slot in three until plan #1143
+  moved a goal's lessons onto its plan.
 - **Idea cards already written** stay in the feed until they are used up.
 - **Hidden per-article subjects** made for idea cards are no longer made. The
   ones that exist keep their concepts; pressing Test me on this, or Make this a
