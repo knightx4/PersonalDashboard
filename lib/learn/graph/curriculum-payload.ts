@@ -92,6 +92,56 @@ export function readCurriculum(input: unknown, fixed?: readonly string[]): Curri
   return { ok: true, units, goalUnit };
 }
 
+/**
+ * How many units a learning goal's whole outline holds, by how well the person
+ * wants to know the subject (plan #1139). A goal's track gets every unit at
+ * once rather than a few with more written as it goes.
+ */
+export const OUTLINE_UNITS: Record<'familiar' | 'solid' | 'deep', { min: number; max: number }> = {
+  familiar: { min: 5, max: 8 },
+  solid: { min: 8, max: 12 },
+  deep: { min: 12, max: 16 },
+};
+
+export type OutlineResult = { ok: true; units: CurriculumUnit[] } | { ok: false; detail: string };
+
+/**
+ * The units a whole outline adds after the ones the track already has,
+ * cleaned by the same rules as the first units. A title the track already has
+ * is left out. The track's units and the new ones together may run to `max`;
+ * the rest are cut. Fewer than `min` together is a failure, and at least one
+ * new unit is wanted whenever there is room for one.
+ */
+export function readOutline(
+  input: unknown,
+  bounds: { min: number; max: number },
+  existingTitles: readonly string[],
+): OutlineResult {
+  const parsed = payloadSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, detail: 'The outline did not match its schema.' };
+
+  const room = bounds.max - existingTitles.length;
+  const seen = new Set(existingTitles.map((title) => title.trim().toLowerCase()));
+  const units: CurriculumUnit[] = [];
+  for (const raw of parsed.data.units) {
+    if (units.length >= room) break;
+    const title = clean(raw.title);
+    const covers = clean(raw.covers);
+    const outcome = clean(raw.outcome);
+    const key = title.toLowerCase();
+    if (!title || !covers || !outcome || seen.has(key)) continue;
+    if (title.length > MAX_TITLE || covers.length > MAX_TEXT || outcome.length > MAX_TEXT) continue;
+    seen.add(key);
+    units.push({ title, covers, outcome });
+  }
+
+  const total = existingTitles.length + units.length;
+  if (total < bounds.min || (room > 0 && units.length === 0)) {
+    return { ok: false, detail: `The outline came back with ${units.length} usable units.` };
+  }
+  return { ok: true, units };
+}
+
 export type NextUnitResult = { ok: true; unit: CurriculumUnit } | { ok: false; detail: string };
 
 const nextUnitSchema = z.object({ title: z.string(), covers: z.string(), outcome: z.string() });
