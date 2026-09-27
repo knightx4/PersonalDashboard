@@ -78,6 +78,7 @@ import { MODULES, isModuleId } from '../lib/modules';
 import { planBrief, STATUS_WORD } from '../lib/plan/brief';
 import type { VisionBodies } from '../lib/specs/vision';
 import { closeRefusal, commitOnMain } from '../lib/plan/github';
+import { branchesContaining } from '../lib/plan/branches';
 import {
   needsLines,
   needsRefusal,
@@ -178,34 +179,6 @@ function currentCommit(): string | null {
     return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
   } catch {
     return null;
-  }
-}
-
-/**
- * Every branch this checkout knows that carries a commit, local and remote.
- *
- * Asked only to say where a commit that is not on main actually is. Git is the
- * one that can answer it: a commit a session never pushed does not exist at
- * GitHub at all, and that is the commonest way a step ends up closed against
- * work nowhere but one machine. A sha this checkout has never seen makes git
- * exit non-zero, and no branch is the honest answer to that.
- */
-function branchesContaining(sha: string): string[] {
-  // Straight into a shell, so nothing but a sha goes in. The format string is
-  // quoted for the same shell: its brackets are syntax to bash, and unquoted
-  // it makes git exit non-zero, which reads here as "on no branch".
-  if (!/^[0-9a-f]{7,40}$/.test(sha)) return [];
-  try {
-    const out = execSync(`git branch -a --contains ${sha} --format='%(refname:short)'`, {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
-    return out
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0 && line !== 'HEAD' && !line.startsWith('('));
-  } catch {
-    return [];
   }
 }
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useId, useRef, useState, useTransition } from 'react';
+import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import {
   CalendarClock,
   CheckCircle2,
@@ -12,11 +12,9 @@ import {
   ChevronDown,
   ListChecks,
   Mail,
-  Maximize2,
   MessageSquareText,
+  MessagesSquare,
   Pencil,
-  StickyNote,
-  X,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
@@ -41,6 +39,8 @@ import type { MatchVerdict, RequirementMatch } from '@/lib/jobs/evidence/match-p
 import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
 import type { PrepNote } from '@/lib/jobs/interview/prep-payload';
 import { RoundPrep } from './prep-note';
+import { RoleThread } from './role-thread';
+import type { DevComment } from '@/lib/comments/load';
 import {
   addQuestions,
   draftAnswerFromEvidence,
@@ -77,7 +77,6 @@ import {
   unlinkMessage,
   unlinkRoundMessage,
   unshareCasePage,
-  updateNote,
   updateReminder,
 } from './actions';
 import { dismissPursuit } from '@/app/jobs/(app)/pipeline/actions';
@@ -101,7 +100,9 @@ const TABS: Array<{ id: Tab; label: string; icon: typeof FileText }> = [
   // The id stays, so ?tab=answers links still land here.
   { id: 'answers', label: 'Application', icon: MessageSquareText },
   { id: 'interviews', label: 'Interviews', icon: CalendarClock },
-  { id: 'notes', label: 'Notes', icon: StickyNote },
+  // Notes became a comment thread (note 89ad8bef). The id stays, so ?tab=notes
+  // links still land here.
+  { id: 'notes', label: 'Comments', icon: MessagesSquare },
   { id: 'mail', label: 'Linked mail', icon: Mail },
 ];
 
@@ -194,7 +195,8 @@ export interface PanelProps {
     evidenceItemIds: string[];
     unsupportedClaims: string[];
   }>;
-  notes: Array<{ id: string; body: string; pinned: boolean; createdAt: string }>;
+  /** The comment thread on the role, oldest first: your notes and Dash's replies. */
+  thread: DevComment[];
   /** The rounds of the process. Every interview is inside one of these. */
   interviewGroups: Array<{
     id: string;
@@ -291,7 +293,7 @@ export function RoleDetailPanels(props: PanelProps & { initialTab?: Tab }) {
               : entry.id === 'interviews'
                 ? props.interviews.length
                 : entry.id === 'notes'
-                  ? props.notes.length
+                  ? props.thread.length
                   : entry.id === 'mail'
                     ? props.messages.length
                     : undefined;
@@ -324,7 +326,7 @@ export function RoleDetailPanels(props: PanelProps & { initialTab?: Tab }) {
       {tab === 'interviews' && (
         <Interviews {...props} seed={interviewSeed} onSeedUsed={() => setInterviewSeed(null)} />
       )}
-      {tab === 'notes' && <Notes {...props} />}
+      {tab === 'notes' && <RoleThread roleId={props.roleId} thread={props.thread} />}
       {tab === 'mail' && <LinkedMail {...props} onAddInterview={startInterviewFrom} />}
 
       <NotRealPursuit applicationId={props.applicationId} />
@@ -1617,7 +1619,14 @@ function Answers({ answers, applicationId, bankSize, roleId, coverLetter }: Pane
         </div>
       )}
 
-      <CoverLetter applicationId={applicationId} roleId={roleId} initial={coverLetter} />
+      {/* Keyed on the text so a letter Dash writes from the Comments tab
+          replaces what this box holds rather than sitting behind it. */}
+      <CoverLetter
+        key={coverLetter}
+        applicationId={applicationId}
+        roleId={roleId}
+        initial={coverLetter}
+      />
     </div>
   );
 }
@@ -3463,212 +3472,6 @@ function AddInterview({
         {error && <span className="text-small text-danger">{error}</span>}
       </div>
     </section>
-  );
-}
-
-function Notes({ notes, roleId, timezone }: PanelProps) {
-  const [body, setBody] = useState('');
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const [opened, setOpened] = useState<string | null>(null);
-
-  const open = notes.find((note) => note.id === opened) ?? null;
-
-  return (
-    <div className="space-y-3">
-      <section className={cardVariants({ padding: 'dense' })}>
-        <Textarea
-          rows={3}
-          value={body}
-          onChange={(event) => setBody(event.target.value)}
-          placeholder="Anything worth remembering about this role."
-        />
-        <div className="mt-2 flex items-center gap-3">
-          <Button
-            type="button"
-            size="sm"
-            disabled={pending || !body.trim()}
-            onClick={() =>
-              startTransition(async () => {
-                const result = await addNote({ roleId, body });
-                setError(result.error);
-                if (!result.error) setBody('');
-              })
-            }
-          >
-            Add note
-          </Button>
-          {error && <span className="text-small text-danger">{error}</span>}
-        </div>
-      </section>
-
-      {notes.map((note) => (
-        <article key={note.id} className={cn(cardVariants({ padding: 'dense' }), 'group relative')}>
-          {/* A note longer than a couple of lines is a document, and this list
-              is not where a document is read or written. The card stays the
-              list's summary of it; the window is the note itself. */}
-          <button
-            type="button"
-            title="Open the note"
-            onClick={() => setOpened(note.id)}
-            className="press absolute right-2 top-2 flex size-7 items-center justify-center rounded-lg text-ink-muted opacity-100 transition-opacity duration-150 hover:bg-sunken hover:text-ink sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
-          >
-            <Maximize2 className="size-3.5" strokeWidth={1.75} aria-hidden />
-            <span className="sr-only">Open the note</span>
-          </button>
-          <p className="whitespace-pre-wrap pr-8 text-ui text-ink">{note.body}</p>
-          <p className="tabular mt-1.5 text-small text-ink-muted">
-            {formatDate(note.createdAt, timezone)}
-          </p>
-        </article>
-      ))}
-
-      {open && (
-        <NoteWindow
-          key={open.id}
-          note={open}
-          roleId={roleId}
-          timezone={timezone}
-          onClose={() => setOpened(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-/**
- * One note, with the page out of the way.
- *
- * A note that is worth writing at length was being written into a three-line
- * box on a tab beside five other tabs, and read back as a paragraph squeezed
- * into a card. This is the same note with nothing else on the screen: one
- * column at reading width, the text at reading size, and a bar at the top that
- * says when it was written and whether it is saved.
- *
- * It saves on the way out as well as on demand -- closing an editor is not a
- * decision to discard what is in it, and being asked "save?" for something you
- * plainly meant to keep is the failure this avoids.
- */
-function NoteWindow({
-  note,
-  roleId,
-  timezone,
-  onClose,
-}: {
-  note: { id: string; body: string; createdAt: string };
-  roleId: string;
-  timezone: string;
-  onClose: () => void;
-}) {
-  const [body, setBody] = useState(note.body);
-  const [state, setState] = useState<'clean' | 'dirty' | 'saving' | 'saved'>('clean');
-  const [error, setError] = useState<string | null>(null);
-  const areaRef = useRef<HTMLTextAreaElement>(null);
-  const [, startTransition] = useTransition();
-
-  const dirty = body.trim() !== note.body.trim();
-
-  const save = useCallback(
-    (then?: () => void) => {
-      // Nothing to write is not a failure to write: closing an untouched note
-      // just closes it.
-      if (!dirty || !body.trim()) {
-        then?.();
-        return;
-      }
-      setState('saving');
-      startTransition(async () => {
-        const result = await updateNote({ noteId: note.id, roleId, body });
-        setError(result.error);
-        setState(result.error ? 'dirty' : 'saved');
-        if (!result.error) then?.();
-      });
-    },
-    [body, dirty, note.id, roleId],
-  );
-
-  useEffect(() => {
-    const area = areaRef.current;
-    if (area) {
-      area.focus();
-      area.setSelectionRange(area.value.length, area.value.length);
-    }
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, []);
-
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        save(onClose);
-      } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-        event.preventDefault();
-        save();
-      }
-    }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose, save]);
-
-  // Read off what is actually true rather than off the last thing that
-  // happened: typing a word and deleting it again leaves nothing to save.
-  const status =
-    error !== null
-      ? null
-      : state === 'saving'
-        ? 'Saving…'
-        : dirty
-          ? 'Unsaved'
-          : state === 'saved'
-            ? 'Saved'
-            : null;
-
-  return (
-    <div className="fixed inset-0 z-overlay flex flex-col bg-canvas">
-      <div className="flex items-center gap-3 border-b border-border px-4 py-2.5">
-        <button
-          type="button"
-          onClick={() => save(onClose)}
-          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
-        >
-          <X className="size-4" strokeWidth={2} aria-hidden />
-          <span className="sr-only">Close the note</span>
-        </button>
-        <span className="tabular text-small text-ink-muted">
-          {formatDate(note.createdAt, timezone)}
-        </span>
-        <span className="min-w-0 flex-1" />
-        {error && <span className="text-small text-danger">{error}</span>}
-        {status && <span className="text-small text-ink-muted">{status}</span>}
-        <Button
-          type="button"
-          size="sm"
-          disabled={state === 'saving' || !dirty}
-          onClick={() => save()}
-        >
-          Save
-        </Button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto flex h-full w-full max-w-prose px-6 py-8">
-          <textarea
-            ref={areaRef}
-            value={body}
-            onChange={(event) => {
-              setBody(event.target.value);
-              setState('dirty');
-            }}
-            aria-label="The note"
-            className="min-h-full w-full resize-none bg-transparent text-body leading-relaxed text-ink outline-none placeholder:text-ink-ghost"
-            placeholder="Write."
-          />
-        </div>
-      </div>
-    </div>
   );
 }
 
