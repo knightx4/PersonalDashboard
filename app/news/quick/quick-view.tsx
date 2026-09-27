@@ -4,6 +4,7 @@ import { AlsoInLine } from '@/components/news/also-in';
 import { SaveStoryButton } from '@/components/news/save-story-button';
 import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
+import { storyHref } from '@/lib/news/issues/list';
 import { TopicChips, type TopicChipsProps } from '@/components/news/topic-chips';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
@@ -309,7 +310,13 @@ function PhoneCard({
               {headline}
             </h2>
             <p className="mt-2 break-words text-body leading-relaxed text-ink">{summary}</p>
-            {story && <StoryText text={story.text} summary={summary} />}
+            {story && (
+              <StoryText
+                text={story.text}
+                summary={summary}
+                href={storyHref(card.issueId, card.storyIndex)}
+              />
+            )}
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
               {story?.link && (
                 <ArticleLink
@@ -402,7 +409,11 @@ function gridStory(
           pictures={pictures}
           className="mt-1.5"
         />
-        <StoryText text={story.text} summary={story.summary} />
+        <StoryText
+          text={story.text}
+          summary={story.summary}
+          href={storyHref(card.issueId, card.storyIndex)}
+        />
         <RelatedNotes notes={related} className="mt-3" />
       </>
     ),
