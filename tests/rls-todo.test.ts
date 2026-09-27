@@ -645,3 +645,36 @@ describe('everything cascades out with the account', () => {
     ).toEqual([0, 0, 0, 0, 0, 0]);
   });
 });
+
+describe('todo.appointments (plan #1127)', () => {
+  it('shows a user only their own, lets them cancel one, and not write one', async () => {
+    const [mine] = await admin<{ id: string }[]>`
+      insert into appointments (user_id, title, provider, provider_key, starts_on, starts_at, as_of)
+      values (${userA}, 'Dental cleaning', 'Smile Dental', 'smiledental', date '2026-10-06',
+              timestamptz '2026-10-06 19:30+00', now())
+      returning id`;
+    await admin`
+      insert into appointments (user_id, title, provider_key, starts_on, as_of)
+      values (${userB}, 'Their haircut', 'faderoom', date '2026-10-06', now())`;
+
+    const seen = await asUser(userA, (tx) => tx<{ title: string }[]>`select title from appointments`);
+    expect(seen.map((r) => r.title)).toEqual(['Dental cleaning']);
+
+    await asUser(userB, async (tx) => {
+      const updated = await tx`update appointments set status = 'cancelled' where id = ${mine.id}`;
+      expect(updated.count).toBe(0);
+    });
+    await asUser(userA, async (tx) => {
+      const updated = await tx`update appointments set status = 'cancelled' where id = ${mine.id}`;
+      expect(updated.count).toBe(1);
+    });
+
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into appointments (user_id, title, provider_key, starts_on, as_of)
+                   values (${userA}, 'Written by hand', 'x', date '2026-10-07', now())`,
+      ),
+    ).rejects.toThrow(/permission denied/);
+  });
+});

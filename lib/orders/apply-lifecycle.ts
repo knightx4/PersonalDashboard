@@ -29,7 +29,7 @@ async function upsertShipment(
   if (tracking) {
     const { data: existing } = await supabase
       .from('shipments')
-      .select('id, status, shipped_at, delivered_at, carrier, tracking_url')
+      .select('id, status, shipped_at, delivered_at, carrier, tracking_url, expected_on')
       .eq('order_id', orderId)
       .eq('tracking_number', tracking)
       .maybeSingle();
@@ -43,6 +43,7 @@ async function upsertShipment(
           status: nextStatus,
           carrier: extraction.carrier ?? existing.carrier,
           tracking_url: extraction.trackingUrl ?? existing.tracking_url,
+          expected_on: extraction.expectedOn ?? existing.expected_on,
           shipped_at: extraction.shippedAt ?? existing.shipped_at,
           delivered_at:
             nextStatus === 'delivered'
@@ -58,7 +59,7 @@ async function upsertShipment(
     // number arrived later. Filling it in keeps the order to one parcel.
     const { data: unnumbered } = await supabase
       .from('shipments')
-      .select('id, status, shipped_at, delivered_at, carrier, tracking_url')
+      .select('id, status, shipped_at, delivered_at, carrier, tracking_url, expected_on')
       .eq('order_id', orderId)
       .is('tracking_number', null)
       .order('created_at', { ascending: false })
@@ -75,6 +76,7 @@ async function upsertShipment(
           status: nextStatus,
           carrier: extraction.carrier ?? unnumbered.carrier,
           tracking_url: extraction.trackingUrl ?? unnumbered.tracking_url,
+          expected_on: extraction.expectedOn ?? unnumbered.expected_on,
           shipped_at: extraction.shippedAt ?? unnumbered.shipped_at,
           delivered_at:
             nextStatus === 'delivered'
@@ -95,6 +97,7 @@ async function upsertShipment(
       shipped_at: extraction.shippedAt,
       delivered_at:
         extraction.shipmentStatus === 'delivered' ? extraction.deliveredAt : null,
+      expected_on: extraction.expectedOn,
     });
     if (error) return { ok: false, error: error.message };
     return { ok: true };
@@ -103,7 +106,7 @@ async function upsertShipment(
   // No tracking number — update the latest open shipment, or create one.
   const { data: open } = await supabase
     .from('shipments')
-    .select('id, status, shipped_at, delivered_at, carrier, tracking_url')
+    .select('id, status, shipped_at, delivered_at, carrier, tracking_url, expected_on')
     .eq('order_id', orderId)
     .neq('status', 'delivered')
     .order('created_at', { ascending: false })
@@ -119,6 +122,7 @@ async function upsertShipment(
         status: nextStatus,
         carrier: extraction.carrier ?? open.carrier,
         tracking_url: extraction.trackingUrl ?? open.tracking_url,
+        expected_on: extraction.expectedOn ?? open.expected_on,
         shipped_at: extraction.shippedAt ?? open.shipped_at,
         delivered_at:
           nextStatus === 'delivered'
@@ -133,7 +137,7 @@ async function upsertShipment(
   if (extraction.shipmentStatus === 'delivered') {
     const { data: anyShipment } = await supabase
       .from('shipments')
-      .select('id, delivered_at, shipped_at, carrier, tracking_url, status')
+      .select('id, delivered_at, shipped_at, carrier, tracking_url, status, expected_on')
       .eq('order_id', orderId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -146,6 +150,7 @@ async function upsertShipment(
           status: 'delivered',
           carrier: extraction.carrier ?? anyShipment.carrier,
           tracking_url: extraction.trackingUrl ?? anyShipment.tracking_url,
+          expected_on: extraction.expectedOn ?? anyShipment.expected_on,
           shipped_at: extraction.shippedAt ?? anyShipment.shipped_at,
           delivered_at:
             extraction.deliveredAt ?? anyShipment.delivered_at ?? extraction.shippedAt,
@@ -165,6 +170,7 @@ async function upsertShipment(
     shipped_at: extraction.shippedAt,
     delivered_at:
       extraction.shipmentStatus === 'delivered' ? extraction.deliveredAt : null,
+    expected_on: extraction.expectedOn,
   });
   if (error) return { ok: false, error: error.message };
   return { ok: true };

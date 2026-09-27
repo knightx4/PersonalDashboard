@@ -16,6 +16,8 @@ import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { commerceLinker } from '@/lib/inbox/linker';
 import { jobLinker } from '@/lib/jobs/inbox/linker';
 import { recurringLinker } from '@/lib/recurring/linker';
+import { appointmentLinker } from '@/lib/todo/appointments/linker';
+import { createTodoServiceSupabase } from '@/inngest/todo/supabase-admin';
 import type { DomainLinker } from '@/lib/core/inbox/fan-out';
 import { canStartAnotherBatch } from '@/lib/core/inbox/pump-budget';
 
@@ -198,6 +200,10 @@ function buildLinkers(): DomainLinker[] {
     // Subscriptions and bills (plan #1125). Its tables are in public beside
     // the orders, so it takes the commerce side's client.
     recurringLinker(createServiceSupabase(), core),
+    // Appointments and reservations for the agenda (plan #1127), in the todo
+    // schema. Last, and its rules leave order, job and bill mail to the three
+    // above; it reads the person's zone through the core client.
+    appointmentLinker(createTodoServiceSupabase(), core),
   ];
 }
 
