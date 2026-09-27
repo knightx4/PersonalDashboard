@@ -44,15 +44,28 @@ write instead, and the database refuses one from Claude
 (`migrations-goals/0041`).
 
 **Stages** are the top level of a goal's tree when it has one: three to six
-parts of the path, in order, each with a done-when of its own and steps
-beneath it. *Land your next role* runs from knowing the target to saying
-yes. The goal page opens the first stage not yet finished under "Stage 1 of
-6" and folds every other stage to one line saying whether it is done or how
-far along it is, with a track of all of them under Dash's status. A
+parts of the path, each with a done-when of its own and steps beneath it.
+*Land your next role* runs from knowing the target to saying yes. They are
+listed in the order they roughly happen, but the order does not hold work
+back: the morning run works a ready step in any stage, so building a
+network can go on while the résumé is still being written. Where the order
+matters, a dependency says so (a step that waits on a step in another
+stage, under "Blocked and waiting steps"), and that is the only thing that
+holds a stage back.
+
+The goal page opens every stage under way under its own "Stage 3 of 6"
+heading: the first stage neither finished nor held, and any other stage
+with a step done or a result from Dash. It folds every other stage to one
+line saying whether it is done, how far along it is, or which stage it is
+waiting on ("1 step · waiting on stage 2"). A stage waits when a step in
+another stage holds it, by a dependency on the stage itself or on every
+open step in it. A track of all the stages sits under Dash's status. A
 stage closes itself when every step under it is closed
-(`migrations-goals/0040`). A goal whose parts are independent outcomes is
-several goals instead; parts that follow one another toward one done-when
-are stages.
+(`migrations-goals/0040`), whatever state the stages before it are in.
+
+A goal whose parts are independent outcomes is several goals instead;
+parts that serve one done-when are stages, even when some of them run side
+by side.
 
 **Steps** sit under a stage or directly under a goal, and a step can have
 sub-steps to any depth. Each step is one of four kinds:

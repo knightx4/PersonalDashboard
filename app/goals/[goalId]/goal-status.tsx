@@ -7,7 +7,7 @@ import { Meter } from '@/components/ui/meter';
 import type { Brief } from '@/lib/goals/briefs';
 import { formatDay } from '@/lib/goals/dates';
 import { claudeLine, type GoalStatusView, type StatusRowKind } from '@/lib/goals/goal-status';
-import type { Stage } from '@/lib/goals/goal-page';
+import { stagesLabel, stageWait, type Stage } from '@/lib/goals/goal-page';
 import type { GoalReview } from '@/lib/goals/reviews';
 import { VerdictLabel } from '../goal-line';
 
@@ -105,16 +105,13 @@ export function GoalStatusCard({ status, brief, briefWhen, review, current, stag
 }
 
 /**
- * The stages as one bar of segments: a finished stage full, the current one
- * filled as far as its steps are done, the rest empty. The first and last
+ * The stages as one bar of segments: a finished stage full, each stage under
+ * way filled as far as its steps are done, the rest empty. The first and last
  * stages are named under it, so the bar reads as the way from one to the
  * other.
  */
 function StageTrack({ stages }: { stages: Stage[] }) {
-  const current = stages.find((stage) => stage.state === 'current');
-  const label = current
-    ? `Stage ${current.index} of ${stages.length}`
-    : `All ${stages.length} stages done`;
+  const label = stagesLabel(stages);
   return (
     <div className="space-y-1">
       <div className="flex gap-1" role="img" aria-label={label}>
@@ -133,7 +130,7 @@ function StageTrack({ stages }: { stages: Stage[] }) {
           ) : (
             <span
               key={stage.id}
-              title={stage.title}
+              title={[stage.title, stageWait(stage)].filter(Boolean).join(': ')}
               className={`h-1.5 flex-1 rounded-full ${stage.state === 'done' ? 'bg-positive' : 'bg-sunken'}`}
             />
           ),
