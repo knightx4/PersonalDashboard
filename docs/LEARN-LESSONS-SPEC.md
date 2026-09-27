@@ -302,6 +302,35 @@ straight after (`layOutPlans` in `lib/learn/lessons/plan-layout.ts`). A plan's
 units are all laid out a few hours after its outline is written. A track whose
 layout failed is held for a day, as the lesson top-up holds one.
 
+### Changing a plan
+
+Plan #1144. Each unit on the plan has a menu to move it one place up or down,
+or to remove it. Below the units is one line to add a unit by name. The plan
+renumbers its units after every change, and Next up follows the new order
+because it is read from unit order.
+
+A unit with a passed piece can be moved but not removed, and its menu offers
+no remove. Removing any other unit asks once, in place, since it takes the
+unit's pieces with it and anything handed in for them. A goal still open under
+the removed unit is marked abandoned so its chain is no longer laid out as
+part of the plan. The ideas in that chain stay in the track, with whatever the
+person has shown about them.
+
+An added unit goes at the end of the plan, where it can be moved like any
+other. The person's title is kept as typed, and Dash writes what the unit
+covers and its outcome in one Sonnet call, recorded as `write-curriculum`.
+Without a key, or when that call fails, the unit is kept with its title
+alone, as a custom track keeps the units a person wrote. Its pieces come when
+the hourly plan pass reaches it, and until then it says it is not split yet.
+
+The writes are three functions in the learn schema
+(`supabase/migrations-learn/0076_plan_unit_edits.sql`): `move_curriculum_unit`,
+`remove_curriculum_unit` and `add_curriculum_unit`. They check the unit or
+track is the caller's, lock the track so two edits to one plan run in turn,
+and renumber the units in one transaction, which the unique ordinal needs. The
+table still grants a signed-in user no update or delete, so these are the only
+way to change a unit. The calls are in `lib/learn/lessons/plan-edit.ts`.
+
 ## The unit check
 
 When a unit is done, the next card from that track is its unit check: one

@@ -9,8 +9,9 @@ import type { CurriculumResult } from './curriculum-payload';
 /**
  * Reading and writing a track's curriculum (LEARN-GRAPH-SPEC, "The
  * curriculum"), through the person's own session. RLS limits every row to
- * their own, and the table takes inserts and reads only: a curriculum is
- * written once and goes with its track.
+ * their own, and the table takes inserts and reads only. A learning goal's
+ * plan moves, removes and adds units through the functions in learn 0076
+ * (`lib/learn/lessons/plan-edit.ts`, plan #1144).
  */
 
 export type StoredUnit = {

@@ -11,6 +11,7 @@ import {
   type PlanPiece,
   type PlanUnit,
 } from '@/lib/learn/lessons/plan-view';
+import { AddUnitForm, UnitMenu } from './plan-edit';
 
 /**
  * A learning goal's plan (plan #1143, LEARN-LESSONS-SPEC "The plan page"),
@@ -21,6 +22,9 @@ import {
  * Next up is only the first piece not passed in the suggested order. A unit
  * with no pieces yet says so: the top-up lays one or two out an hour and
  * splits each into pieces (plan-layout.ts).
+ *
+ * Each unit can be moved, removed while none of its pieces is passed, and a
+ * unit added by name at the foot (plan #1144, `plan-edit.tsx`).
  */
 export function PlanSection({ subjectId, units }: { subjectId: string; units: readonly PlanUnit[] }) {
   const progress = planProgress(units);
@@ -70,38 +74,63 @@ export function PlanSection({ subjectId, units }: { subjectId: string; units: re
       )}
 
       <ol className={cn(cardVariants(), 'divide-y divide-border')}>
-        {units.map((unit) => (
-          <PlanUnitRow key={unit.id} unit={unit} pieceHref={pieceHref} nextId={progress.next?.pieceId ?? null} />
+        {units.map((unit, index) => (
+          <PlanUnitRow
+            key={unit.id}
+            subjectId={subjectId}
+            unit={unit}
+            first={index === 0}
+            last={index === units.length - 1}
+            pieceHref={pieceHref}
+            nextId={progress.next?.pieceId ?? null}
+          />
         ))}
       </ol>
+      <AddUnitForm subjectId={subjectId} />
     </section>
   );
 }
 
 function PlanUnitRow({
+  subjectId,
   unit,
+  first,
+  last,
   pieceHref,
   nextId,
 }: {
+  subjectId: string;
   unit: PlanUnit;
+  first: boolean;
+  last: boolean;
   pieceHref: (pieceId: string) => string;
   nextId: string | null;
 }) {
   const passed = unit.pieces.filter((piece) => piece.state === 'passed').length;
   return (
     <li className="card-pad">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h3 className="text-body font-semibold text-ink">
-          <span className="mr-1.5 text-ink-muted tabular-nums">{unit.ordinal}.</span>
-          {unit.title}
-        </h3>
-        <span className="text-small text-ink-muted tabular-nums">
-          {unit.pieces.length === 0
-            ? 'Not split yet'
-            : passed === unit.pieces.length
-              ? 'Done'
-              : `${passed} of ${unit.pieces.length} passed`}
-        </span>
+      <div className="flex items-start gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <h3 className="text-body font-semibold text-ink">
+            <span className="mr-1.5 text-ink-muted tabular-nums">{unit.ordinal}.</span>
+            {unit.title}
+          </h3>
+          <span className="text-small text-ink-muted tabular-nums">
+            {unit.pieces.length === 0
+              ? 'Not split yet'
+              : passed === unit.pieces.length
+                ? 'Done'
+                : `${passed} of ${unit.pieces.length} passed`}
+          </span>
+        </div>
+        <UnitMenu
+          subjectId={subjectId}
+          unit={unit}
+          first={first}
+          last={last}
+          passed={passed}
+          pieces={unit.pieces.length}
+        />
       </div>
       {unit.outcome && (
         <p className="mt-1 text-ui text-ink">
