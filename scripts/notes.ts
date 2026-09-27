@@ -6,6 +6,7 @@
  * queue always reflects reality rather than intent.
  *
  *   npx tsx scripts/notes.ts list [--all]
+ *   npx tsx scripts/notes.ts next              # the open note to claim next
  *   npx tsx scripts/notes.ts show <id>          # the note, and the thread under it
  *   npx tsx scripts/notes.ts start <id>
  *   npx tsx scripts/notes.ts done <id> --note "what changed" [--commit <sha>]
@@ -15,6 +16,11 @@
  *   npx tsx scripts/notes.ts laws
  *
  * Ids may be given as the first 8 characters.
+ *
+ * Likes are not in the queue. A like says something works and should be kept,
+ * so there is nothing in it for a run to fix: `list` and `next` leave them
+ * out, `start` refuses one, and they stay open until the weekly vision review
+ * reads and closes them. `list --all` still shows them.
  *
  * Notes filed from /dev/surfaces are design notes, not defects in one screen.
  * What reads badly on one surface usually reads badly on several, so they are
@@ -30,6 +36,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
 import { LAWS, RESTRAINT_LAWS, SHAPE_LAWS, SPEND_LAWS } from '../app/dev/ui/laws';
 import { checkClose, surfaceOf } from '../lib/feedback/surfaces';
+import { NOTES_WORK_KINDS } from '../lib/feedback/load';
 import { feedbackItems } from '../lib/db/schema';
 
 /**
@@ -114,7 +121,7 @@ async function findOne(database: Db, idPrefix: string) {
 function rowLine(row: typeof feedbackItems.$inferSelect, width = 72): string {
   return [
     shortId(row.id),
-    row.kind === 'bug' ? 'BUG ' : 'FEAT',
+    row.kind === 'bug' ? 'BUG ' : row.kind === 'like' ? 'LIKE' : 'FEAT',
     `p${row.priority}`,
     row.status.padEnd(11),
     row.body.replace(/\s+/g, ' ').slice(0, width),
@@ -149,18 +156,40 @@ async function main(): Promise<void> {
 
   const database = db();
 
-  if (command === 'list') {
-    const all = process.argv.includes('--all');
-    const rows = await database
+  // The queue in work order: bugs first, then priority, then oldest. Likes
+  // are never in it (see the header); `--all` is the history, likes included.
+  const queue = (statuses: Status[] | null) =>
+    database
       .select()
       .from(feedbackItems)
-      .where(all ? sql`true` : inArray(feedbackItems.status, QUEUE_STATUSES))
+      .where(
+        statuses
+          ? and(
+              inArray(feedbackItems.status, statuses),
+              inArray(feedbackItems.kind, [...NOTES_WORK_KINDS]),
+            )
+          : sql`true`,
+      )
       .orderBy(
-        // Bugs first, then priority, then oldest — the order to work them in.
         sql`case when ${feedbackItems.kind} = 'bug' then 0 else 1 end`,
         feedbackItems.priority,
         feedbackItems.createdAt,
       );
+
+  if (command === 'next') {
+    const [row] = await queue(['open']);
+    if (!row) {
+      console.log('Nothing open to claim.');
+      return;
+    }
+    printRow(row, true);
+    console.log(`\n${row.body}`);
+    return;
+  }
+
+  if (command === 'list') {
+    const all = process.argv.includes('--all');
+    const rows = await queue(all ? null : QUEUE_STATUSES);
 
     if (rows.length === 0) {
       console.log(all ? 'No notes at all.' : 'Queue is empty — nothing open.');
@@ -249,6 +278,12 @@ async function main(): Promise<void> {
   const note = arg('--note');
 
   if (command === 'start') {
+    if (row.kind === 'like') {
+      console.error(
+        `${shortId(row.id)} is a like: nothing in it to fix. It stays open until the weekly review reads and closes it.`,
+      );
+      process.exit(1);
+    }
     await database
       .update(feedbackItems)
       .set({ status: 'in_progress' })

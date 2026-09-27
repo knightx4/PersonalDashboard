@@ -205,6 +205,7 @@ describe('RLS coverage', () => {
       'map_merges',
       'map_sweep_notes',
       'map_sweeps',
+      'note_connections',
       'note_embeddings',
       'notes',
       'position_edges',
@@ -927,5 +928,84 @@ describe('nearest notes and the text cache (plan #1112)', () => {
         insert into text_embeddings (user_id, text_hash, embedding_model, embedding)
         values (${userA}, 'h2', 'voyage-4-lite', ${VECTOR})`),
     ).rejects.toThrow();
+  });
+});
+
+describe('weekly connections (plan #1115)', () => {
+  // noteA is this week's note: it was inserted by the test run. olderA is
+  // given a date a month back and the same vector, so the two are a pair.
+  const LONG_BODY = 'I am quitting. I told them this morning and it felt right.';
+  const OLDER_BODY = 'On leaving a job: what I would want in place before I go, and who to tell first.';
+  let olderA = '';
+  let connectionRow = '';
+
+  beforeAll(async () => {
+    await admin`update notes set body = ${LONG_BODY} where id = ${noteA}`;
+    const [older] = await admin<{ id: string }[]>`
+      insert into notes (user_id, connection_id, path, title, body, blob_sha, size_bytes, written_at)
+      values (${userA}, ${connectionA}, 'Ideas/Leaving.md', 'Leaving', ${OLDER_BODY},
+              'sha-leaving', ${OLDER_BODY.length}, now() - interval '30 days')
+      returning id`;
+    olderA = older.id;
+    await admin`
+      select store_note_embeddings(jsonb_build_array(jsonb_build_object(
+        'note_id', note_id, 'body_hash', body_hash, 'embedding', ${VECTOR}::text, 'model', 'voyage-4-lite')))
+      from stale_note_embeddings(5, ${userA}) where note_id = ${olderA}`;
+    const [row] = await admin<{ id: string }[]>`
+      insert into note_connections (user_id, week_ending, older_note_id, recent_note_ids, sentence, similarity)
+      values (${userA}, current_date, ${olderA}, array[${noteA}]::uuid[], 'Both are about leaving a job.', 0.7)
+      returning id`;
+    connectionRow = row.id;
+  });
+
+  afterAll(async () => {
+    await admin`delete from note_connections where user_id = ${userA}`;
+    await admin`delete from notes where id = ${olderA}`;
+    await admin`update notes set body = 'I am quitting.' where id = ${noteA}`;
+  });
+
+  const neighbours = (tx: import('postgres').TransactionSql) =>
+    tx`select recent_id, older_id, similarity, mutual_rank
+         from recent_note_neighbours(${userA}, now() - interval '7 days', 5, 0.5)`;
+
+  it('pairs the week\'s note with the older one, for their owner only', async () => {
+    const own = await asUser(userA, (tx) => neighbours(tx));
+    expect(own.map((row) => [row.recent_id, row.older_id, row.mutual_rank])).toEqual([[noteA, olderA, 1]]);
+    expect(Number(own[0].similarity)).toBeCloseTo(1, 5);
+    expect(await asUser(userB, (tx) => neighbours(tx))).toEqual([]);
+  });
+
+  it('shows a connection to its owner only, who may hide it and change nothing else', async () => {
+    expect((await asUser(userA, (tx) => tx`select id from note_connections`)).length).toBe(1);
+    expect(await asUser(userB, (tx) => tx`select id from note_connections`)).toEqual([]);
+
+    const hiddenByB = await asUser(userB, (tx) => tx`
+      update note_connections set dismissed_at = now() where id = ${connectionRow} returning id`);
+    expect(hiddenByB).toEqual([]);
+
+    await expect(
+      asUser(userA, (tx) => tx`update note_connections set sentence = 'rewritten' where id = ${connectionRow}`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into note_connections (user_id, week_ending, older_note_id, recent_note_ids, similarity)
+        values (${userA}, current_date - 7, ${olderA}, array[${noteA}]::uuid[], 0.7)`),
+    ).rejects.toThrow();
+
+    const hidden = await asUser(userA, (tx) => tx`
+      update note_connections set dismissed_at = now() where id = ${connectionRow} returning id`);
+    expect(hidden.length).toBe(1);
+  });
+
+  it('moves a note\'s written_at only when it grows by about a paragraph', async () => {
+    const writtenAt = async () =>
+      (await admin<{ written_at: Date }[]>`select written_at from notes where id = ${olderA}`)[0].written_at.getTime();
+    const before = await writtenAt();
+
+    await admin`update notes set body = body || ' A few more words.', path = 'Ideas/Leaving a job.md' where id = ${olderA}`;
+    expect(await writtenAt()).toBe(before);
+
+    await admin`update notes set body = body || ${' ' + 'Another sentence about the plan. '.repeat(10)} where id = ${olderA}`;
+    expect(await writtenAt()).toBeGreaterThan(before);
   });
 });

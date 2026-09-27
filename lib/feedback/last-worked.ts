@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { NOTES_WORK_KINDS } from '@/lib/feedback/load';
 
 /**
  * What the notes routine did the last time it ran, for the Status panel.
@@ -11,7 +12,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * one before.
  *
  * The cost of inferring it: a note you closed yourself inside that window is
- * counted as the routine's. Nothing on the row says who closed it.
+ * counted as the routine's. Nothing on the row says who closed it. Likes are
+ * left out entirely: the weekly vision review closes those, never a notes run.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,12 +81,14 @@ export async function loadNotesLastRun(supabase: Db, userId: string): Promise<No
       .select('status, completed_at')
       .eq('user_id', userId)
       .in('status', ['done', 'declined'])
+      .in('kind', [...NOTES_WORK_KINDS])
       .gte('completed_at', since),
     supabase
       .from('feedback_items')
       .select('status, updated_at')
       .eq('user_id', userId)
       .eq('status', 'blocked')
+      .in('kind', [...NOTES_WORK_KINDS])
       .gte('updated_at', since),
   ]);
 

@@ -20,7 +20,8 @@ to look tidy, and not marked `done` because the session is ending.
 
 ```
 npx tsx scripts/notes.ts list                 # the queue, in work order
-npx tsx scripts/notes.ts list --all           # including closed
+npx tsx scripts/notes.ts list --all           # including closed, and likes
+npx tsx scripts/notes.ts next                 # the open note to claim next
 npx tsx scripts/notes.ts show <id>            # the note, and the thread under it
 npx tsx scripts/notes.ts start <id>           # claim it (in_progress)
 npx tsx scripts/notes.ts done <id> --note "…" # close it; records HEAD commit
@@ -31,6 +32,15 @@ npx tsx scripts/notes.ts laws          # the design laws; needs no database
 ```
 
 Ids are shown truncated; the first 8 characters are enough for every command.
+
+## Likes are not in the queue
+
+The header button files three kinds of note: a bug, a feature request, and a
+like. A like says something works and should be kept or extended. There is
+nothing in it to fix, so a notes run never claims one: `list` and `next` leave
+likes out, `start` refuses one, and the SQL below filters them the same way.
+Leave them `open`. The weekly vision review reads them and closes them, and a
+like closed by a notes run would be read as work nobody asked for.
 
 ## When the CLI cannot run
 
@@ -47,9 +57,10 @@ The procedure is identical, and these are the writes each command makes, so
 the queue records the same thing either way:
 
 ```sql
--- list
+-- list (never a like: see "Likes are not in the queue")
 select id, kind, status, priority, page_path, body, created_at
 from feedback_items where status in ('open','in_progress','blocked','planned')
+  and kind <> 'like'
 order by (kind = 'bug') desc, priority asc, created_at asc;
 
 -- the thread under a note: what was added after it was filed, oldest first.
@@ -59,8 +70,8 @@ order by (kind = 'bug') desc, priority asc, created_at asc;
 select author, body, created_at from dev_comments
 where feedback_item_id = '…' order by created_at;
 
--- start
-update feedback_items set status = 'in_progress' where id = '…';
+-- start (a like is never claimed, so the update refuses one)
+update feedback_items set status = 'in_progress' where id = '…' and kind <> 'like';
 
 -- done (after committing, so HEAD is the commit that did it)
 -- For a surface note (page_path like '/preview?s=%') the resolution note must
