@@ -263,7 +263,8 @@ export function sendRunText(input: {
       : [
           'Work this one step, as in the section "The morning run": produce what its title',
           'and done-when ask for, store it in the step\'s result (and result_url when it lives',
-          'somewhere with a link), and close the step as done. Touch no other step.',
+          'somewhere with a link), and close the step as done. Then add the next move the',
+          'result leads to, as point 5 of that section says. Touch no other step.',
         ];
 
   return [

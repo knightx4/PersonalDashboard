@@ -19,6 +19,7 @@ import {
   approvalLine,
   countOpenQuestions,
   countProposed,
+  nothingOpen,
   runInFlight,
   runProgress,
   stepRunViews,
@@ -96,6 +97,7 @@ function shapingLines(
       approvedAt,
       proposed: countProposed(steps),
       questions: countOpenQuestions(steps),
+      nothingOpen: nothingOpen(steps),
     }),
     runs: goalRunRows(history.runs, now, timeZone),
     moreRuns: history.more,
@@ -250,9 +252,15 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
   const shapingView = shapeable
     ? shapingLines(map.goal.status, map.steps, shaping.approvedAt, history, account.timezone)
     : null;
-  // Dash's panel stands above the stages while it has something to approve or
-  // a run is going; otherwise it is a run line and a button, under Details.
-  const shapingUp = Boolean(shapingView && (shapingView.approval.approve || shapingView.running));
+  // Dash's panel stands above the stages while it has something to approve, a
+  // run is going, or every step is finished and the goal needs its next ones;
+  // otherwise it is a run line and a button, under Details.
+  const shapingUp = Boolean(
+    shapingView &&
+      (shapingView.approval.approve ||
+        shapingView.running ||
+        (map.goal.status === 'open' && nothingOpen(map.steps))),
+  );
   const shapingPanel = shapingView && (
     <GoalShaping goalId={map.goal.id} {...shapingView} canRun={owner} />
   );

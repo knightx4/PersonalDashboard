@@ -116,8 +116,35 @@ describe('goalFindings', () => {
       node('b', { title: 'List people', result: 'A starter list. Ten names.', resultUrl: 'https://x' }),
     ]);
     expect(findings).toEqual([
-      { stepId: 'a1', from: 'Work out the pay floor', fact: 'Floor: $120k.', url: null },
-      { stepId: 'b', from: 'List people', fact: 'A starter list.', url: 'https://x' },
+      {
+        stepId: 'a1',
+        from: 'Work out the pay floor',
+        fact: 'Floor: $120k.',
+        result: 'Floor: $120k. Detail.',
+        url: null,
+        unread: true,
+      },
+      {
+        stepId: 'b',
+        from: 'List people',
+        fact: 'A starter list.',
+        result: 'A starter list. Ten names.',
+        url: 'https://x',
+        unread: false,
+      },
     ]);
+  });
+
+  it('links a finding to the first place its result points to, and knows when it is read', () => {
+    const [finding] = goalFindings([
+      node('c', {
+        kind: 'claude',
+        status: 'done',
+        reviewedAt: '2026-09-27T09:00:00Z',
+        result: 'Transportation Alternatives is the easiest start. Sign up at transalt.org/volunteer.',
+      }),
+    ]);
+    expect(finding.url).toBe('https://transalt.org/volunteer');
+    expect(finding.unread).toBe(false);
   });
 });
