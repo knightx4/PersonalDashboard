@@ -7,6 +7,9 @@ import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadPiecePage } from '@/lib/learn/lessons/piece-store';
 import { loadPieceStanding, loadPracticeView } from '@/lib/learn/lessons/practice-store';
+import { REVIEWS_AT_PIECE_START, type DueReview } from '@/lib/learn/lessons/review';
+import { loadDueReviews } from '@/lib/learn/lessons/review-store';
+import { ReviewList } from '@/app/learn/review/review-list';
 import { PieceLessons, PiecePassing } from './piece-view';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +26,9 @@ export const maxDuration = 120;
  * practice task (plan #1142), then its check. Any piece opens, in any order;
  * nothing is locked by the suggested one. The piece is passed only when a
  * hand-in for its practice meets every point and its check is answered right.
+ *
+ * Up to two ideas from this plan's passed pieces that are due for review open
+ * the page (plan #1145), leaving out this piece's own.
  */
 export default async function PiecePage({ params }: { params: Promise<{ id: string; piece: string }> }) {
   const { id, piece: pieceId } = await params;
@@ -36,6 +42,12 @@ export default async function PiecePage({ params }: { params: Promise<{ id: stri
     loadPieceStanding(learn, user.id, pieceId),
   ]);
   if (!page) notFound();
+  // A review list that cannot be read leaves the piece as it was.
+  const reviews = await loadDueReviews(learn, user.id, {
+    limit: REVIEWS_AT_PIECE_START,
+    subjectId: id,
+    skip: page.ideas.map((idea) => idea.conceptId),
+  }).catch((): DueReview[] => []);
 
   const { piece, subject, unit, siblings } = page;
 
@@ -64,6 +76,13 @@ export default async function PiecePage({ params }: { params: Promise<{ id: stri
           {unit.outcome}
         </p>
       )}
+
+      <ReviewList
+        reviews={reviews}
+        title="First, from earlier pieces"
+        description="Due for review today. A right answer brings the next question later; a miss brings it back tomorrow."
+        showPlan={false}
+      />
 
       {page.ideas.length === 0 ? (
         <p className="mb-6 text-body text-ink-muted">The ideas this piece covered are no longer in the track.</p>

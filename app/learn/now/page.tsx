@@ -14,6 +14,9 @@ import { READY_LOW } from '@/lib/learn/feed/top-up';
 import { loadReadNow } from '@/lib/learn/tracks/load';
 import { loadPlans, type PlanSummary } from '@/lib/learn/lessons/plan-store';
 import { PlansShelf } from '@/components/learn/plans-shelf';
+import { REVIEWS_IN_LEARN_NOW, type DueReview } from '@/lib/learn/lessons/review';
+import { loadDueReviews } from '@/lib/learn/lessons/review-store';
+import { ReviewList } from '../review/review-list';
 import { openReading } from '../r/[id]/actions';
 import { LearnNowFeed } from './feed';
 import { FinishButton } from './finish-button';
@@ -45,6 +48,8 @@ export const maxDuration = 300;
  *
  * Each learning goal's plan is listed above the deck with its progress (plan
  * #1143), since a goal's lessons are on its plan and no longer in the deck.
+ * Above the plans, the ideas of passed pieces that are due for review (plan
+ * #1145), up to five, most overdue first.
  *
  * A card shows up to two of your own notes on its idea (plan #1113). For the
  * first cards the lookup is started here and passed down unawaited, one
@@ -54,12 +59,14 @@ export const maxDuration = 300;
 export default async function LearnNowPage() {
   const user = await requireUser();
   const supabase = await createLearnClient();
-  const [readings, cards, ready, plans] = await Promise.all([
+  const [readings, cards, ready, plans, reviews] = await Promise.all([
     loadReadNow(supabase),
     loadFeedPage(supabase, []),
     countReadyCards(supabase),
     // Plans that cannot be read leave the shelf off rather than the page.
     loadPlans(supabase, user.id).catch((): PlanSummary[] => []),
+    // So does a review list that cannot be read.
+    loadDueReviews(supabase, user.id, { limit: REVIEWS_IN_LEARN_NOW }).catch((): DueReview[] => []),
   ]);
   // Opening the page counts as a response: when seven or fewer are ready,
   // more are written while you read the first.
@@ -147,6 +154,13 @@ export default async function LearnNowPage() {
           </ul>
         </Card>
       )}
+
+      <ReviewList
+        reviews={reviews}
+        title="Due for review"
+        description="Ideas from pieces you passed. A right answer brings the next question later; a miss brings it back tomorrow."
+        showPlan
+      />
 
       <PlansShelf plans={plans} />
 

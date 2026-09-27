@@ -293,6 +293,14 @@ Questions at the end of each piece of a learning goal's plan, with what they ans
 - Search: `question`, `response`
 - Name a row by `question`; link it by `id`
 
+### `learn.review_questions` (Learn)
+
+Review questions on ideas from pieces they passed, asked as each fell due, with what they answered and whether it was right.
+
+- Search: `question`, `response`
+- Name a row by `question`; link it by `id`
+- concept_id is the idea in learn.concepts; its next due date is review_due_on in learn.concept_state.
+
 ### `learn.piece_practice_handins` (Learn)
 
 What they handed in for the practice task in each piece of a learning goal's plan, marked point by point, with whether it passed.

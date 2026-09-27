@@ -331,6 +331,32 @@ and renumber the units in one transaction, which the unique ordinal needs. The
 table still grants a signed-in user no update or delete, so these are the only
 way to change a unit. The calls are in `lib/learn/lessons/plan-edit.ts`.
 
+### Passed pieces come back as review questions
+
+Plan #1145. When a piece is passed, each of its ideas goes on a review
+schedule, with its first question due the next day. A right answer moves the
+next question further out, through gaps of 1, 3, 7, 16 and 35 days and then
+doubling up to 180. A miss brings it back the next day and marks the idea
+shaky. A right answer leaves it known, or sharp if it was sharp. Either way
+the idea is marked tested. An idea already on the schedule from an earlier
+piece keeps the gap it has.
+
+Due questions show in two places. Learn now lists up to five above the plans,
+most overdue first, each naming the plan and piece it came from. A piece's
+page opens with up to two from the same plan, leaving out the piece's own
+ideas. A row starts with the idea's name and Ask me. Haiku writes one question
+from the idea's claim, told the questions already asked on it, and marks the
+answer as a piece's check is marked (`lib/learn/lessons/write-review.ts`). The
+spend kinds are `write-review-question` and `mark-review-question`. A question
+asked and not answered is shown again rather than written twice.
+
+The schedule is two columns on `learn.concept_state`: `review_interval_days`
+and `review_due_on`, a UTC date. The questions are rows in
+`learn.review_questions` (`supabase/migrations-learn/0077_idea_reviews.sql`).
+The rules are in `lib/learn/lessons/review.ts`, the reads and writes in
+`review-store.ts`, and the presses in `app/learn/review/actions.ts`. Reviews
+are not feed cards, so the deck and its top-up do not deal them.
+
 ## The unit check
 
 When a unit is done, the next card from that track is its unit check: one

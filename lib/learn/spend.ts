@@ -209,6 +209,13 @@ export const LEARN_OPERATIONS = [
   // Marking a hand-in for a piece's practice point by point (plan #1142),
   // from the press on the piece's page. One Haiku call per hand-in.
   'mark-piece-practice',
+  // Writing a review question on one idea of a passed piece when it falls
+  // due (plan #1145), on the press in Learn now or at the top of a piece's
+  // page. One Haiku call, and one more when the first gives its answer away.
+  'write-review-question',
+  // Marking an answer to a review question (plan #1145). One Haiku call per
+  // answer.
+  'mark-review-question',
   // Dash's reply in a conversation about a Learn now card (plan #1053), made
   // by lib/talk/reply.ts. One Sonnet call per question asked on a card.
   'reply-about-card',

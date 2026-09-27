@@ -94,6 +94,15 @@ export const learnSources: ModuleSources = {
       title: 'question',
     },
     {
+      table: 'learn.review_questions',
+      module: 'Learn',
+      holds: 'Review questions on ideas from pieces they passed, asked as each fell due, with what they answered and whether it was right.',
+      weight: 'record',
+      search: ['question', 'response'],
+      title: 'question',
+      note: 'concept_id is the idea in learn.concepts; its next due date is review_due_on in learn.concept_state.',
+    },
+    {
       table: 'learn.piece_practice_handins',
       module: 'Learn',
       holds: 'What they handed in for the practice task in each piece of a learning goal\'s plan, marked point by point, with whether it passed.',
