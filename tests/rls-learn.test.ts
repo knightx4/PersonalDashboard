@@ -135,6 +135,7 @@ describe('RLS coverage', () => {
       'quiz_sources',
       'quizzes',
       'readings',
+      'review_questions',
       'settings',
       'sources',
       'subjects',
@@ -970,6 +971,73 @@ describe("changing a goal's plan (plan #1144)", () => {
       }),
     ).rejects.toThrow();
     expect(await order(subjectB)).toHaveLength(0);
+  });
+});
+
+describe('review questions on passed ideas (plan #1145)', () => {
+  // learn 0077_idea_reviews.sql. The schedule is two columns on concept_state;
+  // the questions are rows keyed on (concept_id, user_id), so one cannot land
+  // on somebody else's idea.
+  let conceptA = '';
+
+  beforeAll(async () => {
+    const [subject] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Review subject') returning id`;
+    const [concept] = await admin<{ id: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis)
+      values (${userA}, ${subject.id}, 'Churn compounds', 'Each month loses a share of what is left.',
+              'Written by hand for this test.')
+      returning id`;
+    conceptA = concept.id;
+    await admin`insert into concept_state (concept_id, user_id, state, established, tested_at)
+                values (${conceptA}, ${userA}, 'known', 'tested', now())`;
+  });
+
+  it("lets the owner schedule an idea and ask and answer a question on it, and shows nobody else", async () => {
+    await asUser(
+      userA,
+      (tx) => tx`update concept_state set review_interval_days = 1, review_due_on = current_date
+                 where concept_id = ${conceptA}`,
+    );
+    await asUser(
+      userA,
+      (tx) => tx`insert into review_questions (user_id, concept_id, question, expected)
+                 values (${userA}, ${conceptA}, 'Why does a steady rate lose less each month?', 'It is a share of a smaller base.')`,
+    );
+    await asUser(
+      userA,
+      (tx) => tx`update review_questions set response = 'The base shrinks.', correct = true,
+                   marked_why = 'Right.', answered_at = now() where concept_id = ${conceptA}`,
+    );
+    expect(await asUser(userA, (tx) => tx`select correct from review_questions`)).toEqual([{ correct: true }]);
+    expect(await asUser(userB, (tx) => tx`select id from review_questions`)).toHaveLength(0);
+    await asUser(userB, (tx) => tx`update concept_state set review_interval_days = 35 where concept_id = ${conceptA}`);
+    const [state] = await admin<{ review_interval_days: number }[]>`
+      select review_interval_days from concept_state where concept_id = ${conceptA}`;
+    expect(state.review_interval_days).toBe(1);
+  });
+
+  it("refuses a question on another user's idea, a mark without an answer, and a gap without a date", async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into review_questions (user_id, concept_id, question, expected)
+                   values (${userB}, ${conceptA}, 'Smuggled?', 'Yes.')`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into review_questions (user_id, concept_id, question, expected, correct)
+                   values (${userA}, ${conceptA}, 'Half marked?', 'No.', true)`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`update concept_state set review_interval_days = 3, review_due_on = null where concept_id = ${conceptA}`,
+      ),
+    ).rejects.toThrow();
   });
 });
 

@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { KnowledgeState } from '@/lib/learn/graph/model';
+import { scheduleIdeas } from './review-store';
 import { passedState, toPieceCheck, type PieceCheck, type PieceCheckRow, type PieceForCheck } from './piece-check';
 
 /**
@@ -318,16 +319,23 @@ export async function markPieceIdeasTested(
   return conceptIds.length;
 }
 
-/** Set the piece passed, keeping the first date it was passed on. */
+/**
+ * Set the piece passed, keeping the first date it was passed on, and put its
+ * ideas on the review schedule (plan #1145) when this press is the one that
+ * passed it.
+ */
 export async function markPiecePassed(learn: LearnSupabaseClient, userId: string, pieceId: string): Promise<string> {
   const now = new Date().toISOString();
-  const { error } = await learn
+  const { data, error } = await learn
     .from('plan_pieces')
     .update({ passed_at: now })
     .eq('id', pieceId)
     .eq('user_id', userId)
-    .is('passed_at', null);
+    .is('passed_at', null)
+    .select('concept_ids');
   if (error) throw new Error(`Marking the piece passed failed: ${error.message}`);
+  const passed = ((data ?? []) as { concept_ids: string[] }[])[0];
+  if (passed) await scheduleIdeas(learn, userId, passed.concept_ids);
   return now;
 }
 
