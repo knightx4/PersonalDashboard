@@ -13,6 +13,7 @@ import { admin, asUser, closeDb, createUser, truncateAll } from './helpers/db-co
 let userA = '';
 let userB = '';
 const CARD = '6f1c1f5e-0000-4000-8000-000000000001';
+const ASK = '6f1c1f5e-0000-4000-8000-0000000000a5';
 
 /** appendTurns, as the person: start it without replacing one, then add turns. */
 async function append(
@@ -20,13 +21,15 @@ async function append(
   userId: string,
   ref: string,
   turns: { role: string; body: string }[],
+  kind = 'feed_card',
 ): Promise<void> {
+  // An ask conversation's id is its ref, and appendTurns sends it with the ref.
   await tx`
-    insert into conversations (user_id, subject_kind, subject_ref, title)
-    values (${userId}, 'feed_card', ${ref}, 'AlphaGo')
+    insert into conversations (id, user_id, subject_kind, subject_ref, title)
+    values (coalesce(${kind === 'ask' ? ref : null}::uuid, gen_random_uuid()), ${userId}, ${kind}, ${ref}, 'AlphaGo')
     on conflict (user_id, subject_kind, subject_ref) do nothing`;
   const [conversation] = await tx<{ id: string }[]>`
-    select id from conversations where subject_kind = 'feed_card' and subject_ref = ${ref}`;
+    select id from conversations where subject_kind = ${kind} and subject_ref = ${ref}`;
   for (const turn of turns) {
     await tx`
       insert into conversation_turns (conversation_id, user_id, role, body)
@@ -156,6 +159,64 @@ describe('another account', () => {
     await asUser(userB, (tx) => append(tx, userB, CARD, [{ role: 'user', body: 'My own question' }]));
     expect(await load(userB, CARD)).toEqual([{ role: 'user', body: 'My own question' }]);
     expect(await load(userA, CARD)).toHaveLength(3);
+  });
+});
+
+describe('a question asked from anywhere', () => {
+  it('starts under its own id, takes turns with what Dash looked up and cited, and reads back', async () => {
+    const citation = { table: 'todo.tasks', ref: 'k1', title: 'Call Acme', href: '/todo?task=k1' };
+    const id = await asUser(userA, async (tx) => {
+      const [started] = await tx<{ id: string }[]>`
+        insert into conversations (id, user_id, subject_kind, subject_ref, title)
+        values (${ASK}, ${userA}, 'ask', ${ASK}, 'What is overdue?')
+        returning id`;
+      await tx`
+        insert into conversation_turns (conversation_id, user_id, role, body)
+        values (${started.id}, ${userA}, 'user', 'What is overdue?')`;
+      await tx`
+        insert into conversation_turns (conversation_id, user_id, role, body, tool_calls, citations)
+        values (${started.id}, ${userA}, 'assistant', 'Calling Acme.',
+                ${tx.json([{ name: 'totals', input: { of: 'todos' }, result: [citation] }])},
+                ${tx.json([citation])})`;
+      return started.id;
+    });
+    // Picked up later: one more question in the same conversation.
+    await asUser(userA, (tx) => append(tx, userA, id, [{ role: 'user', body: 'And tomorrow?' }], 'ask'));
+
+    const turns = await asUser(
+      userA,
+      (tx) => tx<{ role: string; body: string; citations: unknown }[]>`
+        select t.role, t.body, t.citations
+        from conversations c join conversation_turns t on t.conversation_id = c.id
+        where c.subject_kind = 'ask' and c.subject_ref = ${id}
+        order by t.created_at`,
+    );
+    expect(turns).toEqual([
+      { role: 'user', body: 'What is overdue?', citations: null },
+      { role: 'assistant', body: 'Calling Acme.', citations: [citation] },
+      { role: 'user', body: 'And tomorrow?', citations: null },
+    ]);
+    expect(await asUser(userB, (tx) => tx`select id from conversations where subject_kind = 'ask'`)).toHaveLength(0);
+  });
+
+  it('refuses a ref other than its own id, and citations on the person\'s turn', async () => {
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`
+          insert into conversations (user_id, subject_kind, subject_ref) values (${userA}, 'ask', 'something-else')`,
+      ),
+    ).rejects.toThrow();
+    const [conversation] = await admin<{ id: string }[]>`
+      select id from conversations where user_id = ${userA} and subject_kind = 'ask'`;
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`
+          insert into conversation_turns (conversation_id, user_id, role, body, citations)
+          values (${conversation.id}, ${userA}, 'user', 'Mine', ${tx.json([])})`,
+      ),
+    ).rejects.toThrow();
   });
 });
 
