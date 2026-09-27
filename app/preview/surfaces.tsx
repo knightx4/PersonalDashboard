@@ -71,6 +71,7 @@ import { StoryText } from '@/components/news/story-text';
 import { PlanOpenedSurface, PlanTreeSurface } from './plan-surfaces';
 import { GoalOpenedSurface, GoalTreeSurface } from './goal-surfaces';
 import { AskDashSurface } from './ask-surfaces';
+import { TimelineSurface } from './timeline-surfaces';
 import {
   GoalBareSurface,
   GoalLinkingSurface,
@@ -2680,6 +2681,17 @@ export const SURFACES: readonly Surface[] = [
         <PreviewShell />
       </AskDashSurface>
     ),
+  },
+
+  {
+    /* The timeline (plan #1118): the months newest first, the newest open,
+     * each with its count per kind on the line that folds it. Fixtures in
+     * timeline-surfaces.tsx. */
+    id: 'timeline-page',
+    label: 'Timeline · What you did, month by month',
+    module: 'goals',
+    width: 'page',
+    render: () => <TimelineSurface />,
   },
 
   {

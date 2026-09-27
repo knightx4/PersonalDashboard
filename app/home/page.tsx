@@ -463,6 +463,15 @@ export default async function HomePage() {
               />
             ))}
           </nav>
+
+          {/* Everything the workspaces hold, by month (plan #1118). A line
+              rather than a tile: it is not a workspace. */}
+          <p className="mt-4 text-small text-ink-muted">
+            <Link href="/timeline" className="font-medium text-accent hover:underline">
+              Timeline
+            </Link>
+            {': what you did across the app, month by month.'}
+          </p>
         </div>
       </AppShell>
     </div>

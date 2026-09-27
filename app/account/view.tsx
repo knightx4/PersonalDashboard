@@ -34,6 +34,7 @@ export function AccountView({
       <YouSection email={email} settings={settings} />
       <ModulesSection enabled={settings.enabledModules} isOwner={isOwner} />
       <ModuleSettingsSection enabled={settings.enabledModules} />
+      <TimelineSection />
       <SpendSection />
       <SessionSection />
       <DangerSection vaultEnabled={settings.enabledModules.includes('vault')} />
@@ -212,6 +213,31 @@ function ModuleSettingsSection({ enabled }: { enabled: ModuleId[] }) {
   );
 }
 
+
+/**
+ * The timeline (plan #1118). An account page rather than a workspace's,
+ * because it reads all of them.
+ */
+function TimelineSection() {
+  return (
+    <section className={cardVariants({ padding: 'standard' })}>
+      <h2 className="text-body font-semibold text-ink">History</h2>
+      <p className="mt-0.5 text-ui text-ink-muted">
+        What you did in every workspace, read from what they already hold.
+      </p>
+      <ul className="mt-4 divide-y divide-border">
+        <li>
+          <a href="/timeline" className="block py-2.5 hover:text-accent">
+            <span className="block text-ui font-medium text-ink">Timeline</span>
+            <span className="block text-small text-ink-muted">
+              Orders, applications, tasks, notes, Learn and goals, month by month
+            </span>
+          </a>
+        </li>
+      </ul>
+    </section>
+  );
+}
 
 /**
  * What the models have cost.

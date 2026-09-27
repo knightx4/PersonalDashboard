@@ -43,3 +43,21 @@ export async function readTimeline(
     if (page.length < pageSize) return events;
   }
 }
+
+/**
+ * When the newest event before `before` happened, or null when there is none:
+ * what the timeline page needs to know whether there are earlier months to
+ * offer, and which month to jump to past a stretch with nothing in it.
+ */
+export async function latestEventBefore(
+  client: SupabaseClient,
+  before: string,
+  modules?: readonly TimelineModule[],
+): Promise<string | null> {
+  let request = client.schema('core').from('timeline').select('occurred_at').lt('occurred_at', before);
+  if (modules && modules.length > 0) request = request.in('module', [...modules]);
+  const { data, error } = await request.order('occurred_at', { ascending: false }).limit(1);
+  if (error) throw new Error(`Could not read the timeline: ${error.message}`);
+  const row = (data ?? [])[0] as { occurred_at: string } | undefined;
+  return row?.occurred_at ?? null;
+}
