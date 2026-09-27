@@ -87,7 +87,7 @@ import {
   interviewKindLabel,
 } from '@/lib/jobs/interview-kinds';
 import { groupableDays, sectionInterviews } from '@/lib/jobs/interview-groups';
-import { ReminderActions } from '@/app/jobs/(app)/today/reminder-actions';
+import { ReminderActions } from '@/app/jobs/(app)/_home/reminder-actions';
 import { ChipInput, ComposeTitle, InlineInput, Input, Label, Select } from '@/components/ui/field';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { GmailAnchor } from '@/components/ui/gmail-anchor';

@@ -14,8 +14,8 @@ export default function Error({
       what="this page"
       error={error}
       reset={reset}
-      backHref="/jobs/today"
-      backLabel="Back to this week"
+      backHref="/jobs"
+      backLabel="Back to Home"
     />
   );
 }

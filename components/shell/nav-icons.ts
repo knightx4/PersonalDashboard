@@ -18,6 +18,7 @@ import {
   ClipboardCheck,
   Frame,
   History,
+  House,
   KanbanSquare,
   LayoutDashboard,
   Lightbulb,
@@ -70,6 +71,8 @@ export const NAV_ICONS = {
   saved: Bookmark,
   share: Share2,
   // Jobs
+  // The Jobs front page: a house, for the page you come in by.
+  jobsHome: House,
   week: CalendarRange,
   pipeline: KanbanSquare,
   roles: Briefcase,

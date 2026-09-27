@@ -19,7 +19,7 @@ afterEach(() => {
 describe('rememberedPath', () => {
   it('lands where you last were in a workspace', () => {
     rememberLastPaths({ jobs: '/jobs/pipeline' });
-    expect(rememberedPath('jobs', '/jobs/today')).toBe('/jobs/pipeline');
+    expect(rememberedPath('jobs', '/jobs')).toBe('/jobs/pipeline');
   });
 
   it('lands Learn on its home whatever page you left it on', () => {
