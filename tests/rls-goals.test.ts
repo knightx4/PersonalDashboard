@@ -1852,6 +1852,115 @@ describe('Claude merges duplicate steps (plan #1081)', () => {
   });
 });
 
+describe('Claude closes a step of yours from evidence (plan #1082)', () => {
+  function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  async function step(parent: string, title: string, kind = 'mine'): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${parent}, ${kind}, ${title}) returning id`;
+    return row.id;
+  }
+
+  async function goal(title: string): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title, approved_at)
+      values (${userA}, 'goal', ${areaA}, ${title}, now()) returning id`;
+    return row.id;
+  }
+
+  type Row = { status: string; evidence: string | null; evidence_source: string | null };
+  async function row(id: string): Promise<Row> {
+    const [r] = await admin<Row[]>`
+      select status, evidence, evidence_source from items where id = ${id}`;
+    return r;
+  }
+
+  const seen = 'Your application for Finance Manager is in Jobs, sent 12 September.';
+
+  it('closes with what it saw as one history row, and the undo reopens it and clears the note', async () => {
+    const g = await goal('Land a role');
+    const apply = await step(g, 'Apply to the Finance Manager role');
+
+    await expect(
+      asClaude((tx) => tx`update items set status = 'done' where id = ${apply}`),
+    ).rejects.toThrow(/only on evidence/);
+
+    await asClaude((tx) => tx`
+      update items set status = 'done', evidence = ${seen}, evidence_source = 'jobs'
+      where id = ${apply}`);
+    expect(await row(apply)).toEqual({ status: 'done', evidence: seen, evidence_source: 'jobs' });
+    const close = (await historyOf(apply)).at(-1);
+    expect(close?.actor).toBe('claude');
+    expect(close?.new_values).toMatchObject({ status: 'done', evidence: seen, evidence_source: 'jobs' });
+    expect(close?.old_values).toMatchObject({ status: 'open', evidence: null, evidence_source: null });
+
+    // The undo writes the old values back.
+    await asUser(userA, (tx) => tx`
+      update items set status = 'open', evidence = null, evidence_source = null where id = ${apply}`);
+    expect(await row(apply)).toEqual({ status: 'open', evidence: null, evidence_source: null });
+
+    // Reopening by hand clears it as well.
+    await asClaude((tx) => tx`
+      update items set status = 'done', evidence = ${seen}, evidence_source = 'jobs'
+      where id = ${apply}`);
+    await asUser(userA, (tx) => tx`update items set status = 'open' where id = ${apply}`);
+    expect(await row(apply)).toEqual({ status: 'open', evidence: null, evidence_source: null });
+  });
+
+  it('refuses a close with open work beneath, an unknown source, or a note on an open step', async () => {
+    const g = await goal('Speak at the board');
+    const phase = await step(g, 'Get the testimony ready');
+    await step(phase, 'Put the draft in your own words');
+    const give = await step(g, 'Give it');
+
+    await expect(
+      asClaude((tx) => tx`
+        update items set status = 'done', evidence = 'You spoke on 3 October.', evidence_source = 'calendar'
+        where id = ${phase}`),
+    ).rejects.toThrow(/open sub-steps/);
+    await expect(
+      asClaude((tx) => tx`
+        update items set status = 'done', evidence = 'You said so.', evidence_source = 'hunch'
+        where id = ${give}`),
+    ).rejects.toThrow(/items_evidence_ck/);
+    await expect(
+      asClaude((tx) => tx`update items set status = 'done', evidence = 'No source.' where id = ${give}`),
+    ).rejects.toThrow(/items_evidence_ck/);
+    // On a step that stays open the note is simply not kept.
+    await asClaude((tx) => tx`
+      update items set evidence = 'Too early.', evidence_source = 'gmail' where id = ${give}`);
+    expect(await row(give)).toEqual({ status: 'open', evidence: null, evidence_source: null });
+  });
+
+  it('leaves Claude’s own steps and a phase closed by its last sub-step as before', async () => {
+    const g = await goal('Pay off the loans');
+    const phase = await step(g, 'Set up the payments');
+    const draft = await step(phase, 'Look up each servicer', 'claude');
+    const autopay = await step(phase, 'Turn on autopay');
+
+    await asClaude((tx) => tx`update items set status = 'done' where id = ${draft}`);
+    expect((await row(draft)).status).toBe('done');
+    await asClaude((tx) => tx`
+      update items set status = 'done', evidence = 'An email from Nelnet on 20 September confirms autopay is on.',
+                       evidence_source = 'gmail'
+      where id = ${autopay}`);
+    expect(await row(phase)).toEqual({ status: 'done', evidence: null, evidence_source: null });
+  });
+
+  it('lets you close your own step with no note', async () => {
+    const g = await goal('Know the target');
+    const own = await step(g, 'Write the target down');
+    await asUser(userA, (tx) => tx`update items set status = 'done' where id = ${own}`);
+    expect(await row(own)).toEqual({ status: 'done', evidence: null, evidence_source: null });
+  });
+});
+
 describe('a goal is an outcome, not a practice (0041)', () => {
   function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
     return admin.begin(async (tx) => {
