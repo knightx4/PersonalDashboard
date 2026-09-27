@@ -27,6 +27,15 @@ export const coreSources: ModuleSources = {
       title: 'body',
       note: "role 'user' is theirs and 'assistant' is Dash's: read their turns as what they wanted to know, and Dash's only for context. On Dash's answers to an 'ask', citations lists the rows it relied on. conversation_id joins core.conversations, which says what the turn is about.",
     },
+    {
+      table: 'core.observations',
+      module: 'Home',
+      holds: 'What Dash noticed each week across their modules, with a number and the timeline rows behind it, and whether they found it useful.',
+      weight: 'incidental',
+      search: ['sentence'],
+      title: 'sentence',
+      note: "The sentence is Dash's, not theirs: read it as a lead to check against the rows in evidence (core.timeline refs, `schema.table:id`). verdict 'not_useful' means they did not want it; 'useful' that they did. week is the Monday it was written for.",
+    },
   ],
   notSources: [
     { table: 'core.account_settings', reason: 'Settings.' },

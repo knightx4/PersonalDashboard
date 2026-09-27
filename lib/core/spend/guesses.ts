@@ -195,6 +195,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // Four or five rounds, each resending the tools (about 3,000 tokens, most
   // of it cached) and the lookups so far; a short answer out.
   'ask-dash': run(SONNET, 30_000, 1_000),
+  // Twelve weeks of the timeline, 381 events to 21 September 2026 at about
+  // 30 tokens each, and the weekly lines; up to three sentences with their
+  // ids out.
+  'write-observations': background(run(SONNET, 12_000, 600)),
 
   // News. All but the last two from the digest cron or a script.
   'digest-issue': background(unit(HAIKU, 3_000, 300)),
