@@ -183,6 +183,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // Shopping. Reading order emails is per email: inbox sync does it in the
   // background, and the reparse and review buttons know how many they send.
   'extract-email-order': unit(HAIKU, 3_000, 500),
+  'read-bill-email': background(unit(HAIKU, 2_500, 150)),
   'estimate-resale-price': unit(HAIKU, 6_000, 300),
   'read-shelf-photo': run(OPUS, 2_100, 1_500),
   'read-receipt-photo': run(HAIKU, 2_000, 600),

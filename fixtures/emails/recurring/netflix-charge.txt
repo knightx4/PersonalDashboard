@@ -1,0 +1,18 @@
+Subject: Your Netflix membership payment
+From: Netflix <info@account.netflix.com>
+
+Hi Alex,
+
+Thanks for being a Netflix member. We received your payment.
+
+Plan: Standard
+Amount charged: $17.99
+Payment date: September 3, 2026
+Billing period: Sep 3 - Oct 2, 2026
+Payment method: Visa ending in 0000
+
+Your next billing date is October 3, 2026. You'll be charged $17.99/month
+until you cancel.
+
+Questions? Visit the Help Center.
+The Netflix team

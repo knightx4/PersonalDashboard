@@ -1,6 +1,7 @@
 import { ATS_DOMAINS } from '@/lib/jobs/email/ats-senders';
 import { ORDER_SUBJECT_TERMS } from '@/lib/email/providers/gmail-query';
 import { RECRUITING_SUBJECT_TERMS } from '@/lib/jobs/email/providers/gmail-query';
+import { RECURRING_SUBJECT_TERMS } from '@/lib/recurring/rules';
 
 export { companyDomainQuery } from '@/lib/jobs/email/providers/gmail-query';
 
@@ -10,8 +11,9 @@ export { companyDomainQuery } from '@/lib/jobs/email/providers/gmail-query';
  * The two apps used to run their own searches over the same mailbox, which
  * meant every message either of them wanted was fetched twice and the metadata
  * parsed twice. This asks for the union instead: commerce's order-shaped
- * subjects, plus the ATS sender domains and application-shaped subjects the job
- * side looks for.
+ * subjects, the ATS sender domains and application-shaped subjects the job
+ * side looks for, and the subscription and bill subjects of the recurring
+ * payments linker.
  *
  * It stays a union of keywords rather than "everything in the window" on
  * purpose. Fetching every message would have better recall, but it multiplies
@@ -20,8 +22,8 @@ export { companyDomainQuery } from '@/lib/jobs/email/providers/gmail-query';
  * address with the subject "quick question" -- is covered by the second pass
  * below, over domains the user already tracks.
  *
- * Both term lists are owned by their own workspace and imported here, so
- * neither has to know this file exists to add a keyword.
+ * Each term list is owned by its workspace and imported here, so no
+ * workspace has to know this file exists to add a keyword.
  */
 function clampDays(days: number): number {
   return Math.min(730, Math.max(30, Math.round(days)));
@@ -32,7 +34,12 @@ export function candidateQuery(backfillWindowDays: number): string {
   const orders = ORDER_SUBJECT_TERMS.map((t) => `subject:${t}`).join(' OR ');
   const ats = `from:(${ATS_DOMAINS.join(' OR ')})`;
   const recruiting = `subject:(${RECRUITING_SUBJECT_TERMS.map((t) => `"${t}"`).join(' OR ')})`;
-  return `newer_than:${days}d (${orders} OR ${ats} OR ${recruiting})`;
+  // Subscriptions and bills (plan #1125). Terms already in the order list
+  // (receipt, invoice) are listed once.
+  const recurring = RECURRING_SUBJECT_TERMS.filter((t) => !ORDER_SUBJECT_TERMS.includes(t))
+    .map((t) => `subject:${t}`)
+    .join(' OR ');
+  return `newer_than:${days}d (${orders} OR ${ats} OR ${recruiting} OR ${recurring})`;
 }
 
 /**

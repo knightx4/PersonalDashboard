@@ -1,0 +1,14 @@
+Subject: Your Con Edison bill is ready
+From: Con Edison <conEdison@info.coned.com>
+
+Your bill is ready to view.
+
+Account ending in 0000
+Statement date: September 18, 2026
+Amount due: $84.12
+Due date: October 15, 2026
+
+Pay on time to avoid a late payment charge. Enroll in AutoPay and never miss
+a due date.
+
+Con Edison

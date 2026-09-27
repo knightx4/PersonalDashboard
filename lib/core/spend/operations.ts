@@ -36,6 +36,10 @@ export const SPEND_OPERATIONS = {
     // from reparsing confirmations, and from the review page's read button.
     // Haiku, one call per email.
     'extract-email-order',
+    // Reading a subscription or bill email into a recurring payment, during
+    // inbox ingest (plan #1125). Haiku, one call per email the rules claim;
+    // background, no button.
+    'read-bill-email',
     // Pricing an item for sale with a web search when no catalog knows it.
     // Haiku, up to two searches per item.
     'estimate-resale-price',

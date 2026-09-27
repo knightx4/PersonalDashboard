@@ -439,6 +439,29 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.fx_rates = fxRate.id;
 
+  const [payment] = await admin<{ id: string }[]>`
+    insert into recurring_payments (user_id, payee, payee_key, kind, amount_cents, period)
+    values (${userId}, ${`${tag} Streaming`}, ${`${tag}streaming`}, 'subscription', 1299, 'month')
+    returning id`;
+  ids.recurring_payments = payment.id;
+
+  const [billMessage] = await admin<{ id: string }[]>`
+    insert into core.ingested_messages (email_account_id, provider_message_id, subject)
+    values (${account.id}, ${`${tag}-bill-1`}, 'Your receipt')
+    returning id`;
+
+  const [recurringCharge] = await admin<{ id: string }[]>`
+    insert into recurring_charges (user_id, payment_id, message_id, event, amount_cents, occurred_on)
+    values (${userId}, ${payment.id}, ${billMessage.id}, 'charge', 1299, current_date)
+    returning id`;
+  ids.recurring_charges = recurringCharge.id;
+
+  const [recurringVerdict] = await admin<{ id: string }[]>`
+    insert into recurring_messages (id, user_id, claimed, parse_status, charge_id)
+    values (${billMessage.id}, ${userId}, true, 'parsed', ${recurringCharge.id})
+    returning id`;
+  ids.recurring_messages = recurringVerdict.id;
+
   // Not anybody's row: whether main is green is a fact about the repository,
   // so there is one reading per repository and every signed-in user reads the
   // same one. Tagged per seed because `repo` is the primary key and the two

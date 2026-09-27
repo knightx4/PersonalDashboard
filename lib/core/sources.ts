@@ -52,6 +52,7 @@ export const coreSources: ModuleSources = {
     { table: 'core.account_settings', reason: 'Settings.' },
     { table: 'core.day_briefs', reason: 'The morning brief, derived each day from the agenda, goals, news and Learn.' },
     { table: 'core.email_accounts', reason: 'Mailbox connections and their tokens.' },
+    { table: 'core.inbox_catch_ups', reason: 'Sync bookkeeping.' },
     { table: 'core.ingested_messages', reason: 'Mail sync bookkeeping; the Gmail connector reads mail.' },
     { table: 'core.model_spend', reason: 'Model cost accounting.' },
     { table: 'core.people', reason: 'Who a shopping order was for.' },
