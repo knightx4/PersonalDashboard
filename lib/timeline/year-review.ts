@@ -1,5 +1,6 @@
 import { formatMoney, type CurrencyCode } from '@/lib/money';
 import { monthKeyOf, monthLabel, monthStart, shiftMonth, type MonthKey } from './months';
+import { stripEventLabels } from './observations';
 import {
   eventRef,
   KIND_NOUNS,
@@ -337,6 +338,7 @@ export type ParagraphDropReason =
   | 'no-topic'
   | 'repeat-topic'
   | 'no-text'
+  | 'event-label'
   | 'no-number'
   | 'unshown-number'
   | 'unknown-evidence';
@@ -346,11 +348,12 @@ function isTopic(value: unknown): value is YearTopic {
 }
 
 /**
- * Keep what the model wrote that can be stored. A paragraph is dropped when
- * its topic is not one of YEAR_TOPICS or repeats one already kept, when it
- * has no number, when any number in it is not one the page shows, or when it
- * cites no rows or an id that was not in the summary. What is kept is in the
- * page's order of topics.
+ * Keep what the model wrote that can be stored. Bracketed event ids are
+ * taken out of the text (stripEventLabels). A paragraph is dropped when its
+ * topic is not one of YEAR_TOPICS or repeats one already kept, when an event
+ * id is left in its running text, when it has no number, when any number in
+ * it is not one the page shows, or when it cites no rows or an id that was
+ * not in the summary. What is kept is in the page's order of topics.
  */
 export function checkParagraphs(
   raw: readonly RawParagraph[],
@@ -369,11 +372,17 @@ export function checkParagraphs(
       dropped.push('repeat-topic');
       continue;
     }
-    const text = typeof item.text === 'string' ? cleanParagraph(item.text) : '';
-    if (!text) {
+    const written = typeof item.text === 'string' ? cleanParagraph(item.text) : '';
+    if (!written) {
       dropped.push('no-text');
       continue;
     }
+    const unlabelled = stripEventLabels(written);
+    if (unlabelled === null) {
+      dropped.push('event-label');
+      continue;
+    }
+    const text = cleanParagraph(unlabelled);
     const found = numbersIn(text);
     if (found.length === 0) {
       dropped.push('no-number');

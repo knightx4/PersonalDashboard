@@ -259,6 +259,19 @@ describe('checkParagraphs', () => {
     expect(dropped).toEqual(['unknown-evidence', 'unknown-evidence']);
   });
 
+  it('takes bracketed event ids out of a paragraph, and drops one with an id in its running text', () => {
+    const { kept, dropped } = checkParagraphs(
+      [
+        { topic: 'shopping', text: 'You placed 3 orders (E1-E3), 2 of them at Amazon.', evidence: [idOf(orderMarch)] },
+        { topic: 'jobs', text: 'You sent 24 applications, starting with ' + idOf(applications[0]!) + '.', evidence: [idOf(applications[0]!)] },
+      ],
+      events,
+      numbers,
+    );
+    expect(dropped).toEqual(['event-label']);
+    expect(kept.map((paragraph) => paragraph.text)).toEqual(['You placed 3 orders, 2 of them at Amazon.']);
+  });
+
   it('drops an unknown topic and a second paragraph on one topic', () => {
     const { kept, dropped } = checkParagraphs(
       [

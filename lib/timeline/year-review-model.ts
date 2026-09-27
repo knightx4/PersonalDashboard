@@ -42,6 +42,9 @@ Rules:
 - Cite the events the paragraph is about by their ids (E1, E2, ...) from the
   list, up to ${MAX_PARAGRAPH_EVIDENCE}: the ones it counts or names. Cite only
   ids that appear in the list.
+- The ids go in evidence and nowhere else. Never write one in the paragraph,
+  not even in brackets: the person reads the paragraph and the ids mean
+  nothing to them. Name the thing instead, such as the Acme interview.
 - Say what happened, not why. Do not guess at feelings or causes, and do not
   praise, encourage or advise.
 - No em dashes, no exclamation marks, no quotation marks.`;
