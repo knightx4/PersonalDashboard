@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
+import { sessionClients } from '@/lib/todo/agenda/clients';
 import { roundDetail, roundLabel, roundsOf } from '@/lib/jobs/interview-groups';
 import { interviewKindLabel } from '@/lib/jobs/interview-kinds';
 import type {
@@ -48,7 +48,7 @@ export const jobInterviewsSource: AgendaSource = {
   },
 
   async context(ctx: SourceContext): Promise<DayContext[]> {
-    const supabase = await createJobsClient();
+    const supabase = await (ctx.clients ?? sessionClients).jobs();
 
     const { data, error } = await supabase
       .from('interviews')

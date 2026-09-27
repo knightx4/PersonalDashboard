@@ -2,7 +2,7 @@ import 'server-only';
 
 import { createTodoClient } from '@/lib/todo/auth/server';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
-import { TODO_SCHEMA } from '@/lib/todo/db/schema-name';
+import { TODO_SCHEMA, type TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import type { Task, TaskStatus } from '@/lib/todo/tasks/model';
 
 /**
@@ -42,8 +42,8 @@ function toTask(row: Row): Task {
  * list shrinking. Only items are fetched done: a whole task that is finished
  * belongs to the archive. Bucketing and grouping happen in model.ts.
  */
-export async function loadOpenTasks(userId: string): Promise<Task[]> {
-  const supabase = await createTodoClient();
+export async function loadOpenTasks(userId: string, client?: TodoSupabaseClient): Promise<Task[]> {
+  const supabase = client ?? (await createTodoClient());
 
   const { data, error } = await supabase
     .from('tasks')

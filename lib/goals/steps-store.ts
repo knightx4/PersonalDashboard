@@ -677,7 +677,9 @@ export async function loadTodoGoals(
   client: GoalsSupabaseClient,
   { userId, today }: Today,
 ): Promise<{ steps: TodoStep[]; rhythms: TodoRhythm[] }> {
-  const { goals, byGoal } = await loadLiveTree(client, { today });
+  // userId narrows the read for a service-role client (the morning brief);
+  // under RLS it changes nothing.
+  const { goals, byGoal } = await loadLiveTree(client, { userId, today });
   const goalList = goals.map((g) => g.goal);
   const live = liveRhythms(goalList, byGoal);
   const records = await syncRhythms(client, userId, live, today);

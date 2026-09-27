@@ -2,7 +2,7 @@ import 'server-only';
 
 import { createTodoClient } from '@/lib/todo/auth/server';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
-import { TODO_SCHEMA } from '@/lib/todo/db/schema-name';
+import { TODO_SCHEMA, type TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { addDays } from '@/lib/todo/tasks/model';
 import { wallClockToInstant } from '@/lib/todo/time';
 import type { Event } from '@/lib/todo/events/model';
@@ -49,8 +49,9 @@ export async function loadEventsInWindow(
   userId: string,
   window: { from: string; to: string },
   timezone: string,
+  client?: TodoSupabaseClient,
 ): Promise<Event[]> {
-  const supabase = await createTodoClient();
+  const supabase = client ?? (await createTodoClient());
 
   const opens = wallClockToInstant(window.from, '00:00', timezone);
   const closes = wallClockToInstant(addDays(window.to, 1), '00:00', timezone);

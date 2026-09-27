@@ -44,13 +44,19 @@ export async function loadRecentSuggestions(
 }
 
 /** Every suggestion you said you are going to and have not ticked, for Todo. */
-export async function loadGoingSuggestions(client: GoalsSupabaseClient): Promise<Suggestion[]> {
-  const { data, error } = await client
+export async function loadGoingSuggestions(
+  client: GoalsSupabaseClient,
+  userId?: string,
+): Promise<Suggestion[]> {
+  // RLS narrows a session's read; a service-role client (the morning brief)
+  // has to name the person instead.
+  let query = client
     .from('suggestions')
     .select(SUGGESTION_COLUMNS)
     .eq('reaction', 'going')
-    .is('attended', null)
-    .order('happens_on', { ascending: true, nullsFirst: false });
+    .is('attended', null);
+  if (userId) query = query.eq('user_id', userId);
+  const { data, error } = await query.order('happens_on', { ascending: true, nullsFirst: false });
   if (error) throw new Error(`Could not read suggestions: ${error.message}`);
   return rows(data);
 }
