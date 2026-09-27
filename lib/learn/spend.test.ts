@@ -98,6 +98,8 @@ describe('the operation names', () => {
       'mark-unit-check',
       'write-piece-check',
       'mark-piece-check',
+      'write-piece-practice',
+      'mark-piece-practice',
       'reply-about-card',
       'explain-phrase',
       'write-asked-card',

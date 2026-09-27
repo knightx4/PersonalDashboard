@@ -293,6 +293,14 @@ Questions at the end of each piece of a learning goal's plan, with what they ans
 - Search: `question`, `response`
 - Name a row by `question`; link it by `id`
 
+### `learn.piece_practice_handins` (Learn)
+
+What they handed in for the practice task in each piece of a learning goal's plan, marked point by point, with whether it passed.
+
+- Search: `answer`
+- Name a row by `answer`; link it by `id`
+- practice_id is the task in learn.piece_practice, whose piece_id is the piece.
+
 ### `learn.quizzes` (Learn)
 
 Quizzes they set themselves, and what each was preparing for.

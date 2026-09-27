@@ -6,21 +6,23 @@ import { PageHeader } from '@/components/shell/page-header';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadPiecePage } from '@/lib/learn/lessons/piece-store';
-import { PieceCheckCard, PieceLessons } from './piece-view';
+import { loadPieceStanding, loadPracticeView } from '@/lib/learn/lessons/practice-store';
+import { PieceLessons, PiecePassing } from './piece-view';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Writing a missing lesson is one Sonnet call of up to a minute, and the
- * page's actions inherit this ceiling.
+ * Writing a missing lesson or the practice task is one Sonnet call of up to a
+ * minute, and the page's actions inherit this ceiling.
  */
 export const maxDuration = 120;
 
 /**
  * One piece of a learning goal's plan (plan #1141, LEARN-LESSONS-SPEC "A
  * piece is worked through on its own page"): its lessons in order, then its
- * check. Any piece opens, in any order; nothing is locked by the suggested
- * one. The piece is passed only by a right answer to its check.
+ * practice task (plan #1142), then its check. Any piece opens, in any order;
+ * nothing is locked by the suggested one. The piece is passed only when a
+ * hand-in for its practice meets every point and its check is answered right.
  */
 export default async function PiecePage({ params }: { params: Promise<{ id: string; piece: string }> }) {
   const { id, piece: pieceId } = await params;
@@ -28,7 +30,11 @@ export default async function PiecePage({ params }: { params: Promise<{ id: stri
 
   const user = await requireUser();
   const learn = await createLearnClient();
-  const page = await loadPiecePage(learn, user.id, id, pieceId);
+  const [page, practice, standing] = await Promise.all([
+    loadPiecePage(learn, user.id, id, pieceId),
+    loadPracticeView(learn, user.id, pieceId),
+    loadPieceStanding(learn, user.id, pieceId),
+  ]);
   if (!page) notFound();
 
   const { piece, subject, unit, siblings } = page;
@@ -65,11 +71,14 @@ export default async function PiecePage({ params }: { params: Promise<{ id: stri
         <>
           <PieceLessons subjectId={subject.id} pieceId={piece.id} ideas={page.ideas} />
           <div className="mt-6">
-            <PieceCheckCard
+            <PiecePassing
               subjectId={subject.id}
               pieceId={piece.id}
+              practice={practice}
               check={page.check}
               passedAt={piece.passedAt}
+              practicePassed={standing.practicePassed}
+              checkPassed={standing.checkPassed}
             />
           </div>
         </>
