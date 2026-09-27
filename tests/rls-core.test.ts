@@ -292,6 +292,60 @@ describe('day briefs', () => {
   });
 });
 
+describe('drafted messages', () => {
+  /**
+   * Follow-ups and return requests (plan #1129). The morning run writes them
+   * with the service role; the person reads their own and may only mark one
+   * sent, dismiss it or put it off.
+   */
+  async function seedDraft(userId: string, basis: string): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into core.drafted_messages
+        (user_id, kind, about_id, basis, about_label, subject, body, show_on, expires_at)
+      values (${userId}, 'follow_up', '00000000-0000-0000-0000-000000000001', ${basis},
+              'Acme', 'Following up', 'Hello,', '2026-09-27', now() + interval '3 days')
+      returning id`;
+    return row.id;
+  }
+
+  it('shows the owner their drafts and another user none', async () => {
+    const id = await seedDraft(userA, '2026-09-10T00:00:00.000Z');
+    expect(await asUser(userA, (tx) => tx`select id from core.drafted_messages where id = ${id}`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from core.drafted_messages`)).toHaveLength(0);
+  });
+
+  it('lets the owner mark one sent but not rewrite it or write one', async () => {
+    const id = await seedDraft(userA, '2026-09-11T00:00:00.000Z');
+    await asUser(userA, (tx) => tx`update core.drafted_messages set done_at = now() where id = ${id}`);
+    const [row] = await admin<{ done_at: Date | null }[]>`select done_at from core.drafted_messages where id = ${id}`;
+    expect(row.done_at).not.toBeNull();
+    await expect(
+      asUser(userA, (tx) => tx`update core.drafted_messages set body = 'Something else.' where id = ${id}`),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into core.drafted_messages
+          (user_id, kind, about_id, basis, about_label, subject, body, show_on, expires_at)
+          values (${userA}, 'follow_up', '00000000-0000-0000-0000-000000000002', 'x', 'Acme', 's', 'b',
+                  '2026-09-27', now())`,
+      ),
+    ).rejects.toThrow(/permission denied/);
+  });
+
+  it('does not let another user mark it sent', async () => {
+    const id = await seedDraft(userA, '2026-09-12T00:00:00.000Z');
+    await asUser(userB, (tx) => tx`update core.drafted_messages set done_at = now() where id = ${id}`);
+    const [row] = await admin<{ done_at: Date | null }[]>`select done_at from core.drafted_messages where id = ${id}`;
+    expect(row.done_at).toBeNull();
+  });
+
+  it('keeps one draft for each quiet stretch', async () => {
+    await seedDraft(userA, '2026-09-13T00:00:00.000Z');
+    await expect(seedDraft(userA, '2026-09-13T00:00:00.000Z')).rejects.toThrow(/drafted_messages_basis_uq/);
+  });
+});
+
 describe('cross-user reads', () => {
   it('shows the owner their mailbox, its jobs and its messages', async () => {
     const seen = await asUser(userA, async (tx) => ({
