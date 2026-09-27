@@ -275,8 +275,11 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
     .filter(Boolean)
     .join(' · ');
 
+  // As wide as the dev plan (app/dev/plan/page.tsx), which draws the same
+  // six-column grid: at max-w-3xl the fixed columns left a step's name about
+  // nine rem, and its description wrapped after a few words (note 68fd31b5).
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <Link
         href="/goals"
         className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-150 hover:text-ink"
