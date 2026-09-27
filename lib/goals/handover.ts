@@ -101,6 +101,18 @@ export function jobFor(step: Pick<StepNode, 'kind' | 'children'>, mode: SendMode
 
 const isOpen = (node: StepNode) => node.status === 'open' || node.status === 'blocked';
 
+/**
+ * Whether a phase has anything for a phase run to do: an open step of
+ * Claude's somewhere under it. A phase of only the person's own steps has
+ * none, so an @dash comment asking Dash to take it is asking for work the
+ * plan does not have yet, and goes to the goals routine to add as a step.
+ */
+export function hasClaudeWork(step: Pick<StepNode, 'children'>): boolean {
+  return step.children.some(
+    (child) => (child.kind === 'claude' && isOpen(child)) || hasClaudeWork(child),
+  );
+}
+
 /** Every id at or under a step. */
 function idsUnder(step: StepNode, into: Set<string> = new Set()): Set<string> {
   into.add(step.id);
@@ -214,6 +226,8 @@ export function sendRunText(input: {
   runId: string;
   /** The @dash comment that asked for it (plan #1003), when it came from the thread. */
   asked?: string;
+  /** What was said on the row before that comment, oldest first. */
+  thread?: readonly { author: string; body: string }[];
 }): string {
   const { target, job, collections } = input;
   const from = input.asked ? 'a comment on its row' : 'its row on the goal page';
@@ -272,6 +286,16 @@ export function sendRunText(input: {
       : `Work on one ${noun} of a goal, sent from ${from}.`,
     '',
     ...about,
+    ...(input.asked && (input.thread ?? []).length > 0
+      ? [
+          '',
+          'Said on its row before that, which may hold the links, files and details the ask',
+          'leans on:',
+          ...(input.thread ?? []).map(
+            (c) => `${c.author === 'claude' ? 'Claude' : 'The person'}: ${c.body}`,
+          ),
+        ]
+      : []),
     ...(input.asked
       ? [
           '',

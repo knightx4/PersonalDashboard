@@ -1300,9 +1300,10 @@ yours to work.
 
 The same run starts when the person writes `@dash` on a step asking Claude to
 take it ("do this", "draft this for me"; `lib/goals/ask.ts`). Then the brief
-also carries what they wrote, under "What they wrote". Treat anything in it
-about what to produce or how (shorter, more formal, addressed to someone) as
-part of the step's done-when. The quick reply has already said in the thread
+also carries what they wrote, under "What they wrote", and what was said on
+the row before it, where the links, file names and details the ask leans on
+usually are. Treat anything in them about what to produce or how (shorter,
+more formal, addressed to someone) as part of the step's done-when. The quick reply has already said in the thread
 that the run started, so there is nothing more to write there.
 
 - **A step** (`job` `step`): work that one Claude step as in "The morning
@@ -1330,7 +1331,10 @@ step's brief does. They will do the step; you write what they need to do it.
    clearly marked blank.
 2. Write the one form that fits: a draft email ready to send, a call script
    with what to say and what to ask, or numbered step-by-step instructions
-   for a site or a form. Keep it to what doing the step needs.
+   for a site or a form. Keep it to what doing the step needs. When what they
+   wrote asks for the work itself rather than help doing it ("review my
+   resume", "check my profile"), that work is what you write: the review, with
+   what to change and why.
 3. Store it in one write, as `claude`:
 
    ```sql
@@ -1504,6 +1508,19 @@ puts your reply in `goals.comments`.
   person's move (answering a question, approving, closing or dropping a step
   of theirs, deleting), is not done; say so in the reply and where on the page
   they do it.
+- Work you can do that a step of theirs describes ("review my resume and
+  LinkedIn", "you do this instead of me") is an instruction, never their move.
+  The quick reply passes it on when the step is a phase with nothing of
+  Claude's in it. Add a Claude step under that phase for the work (for example
+  "Review your resume and LinkedIn profile"), with the links and file names
+  from the thread in its detail, work it in this run as in "The morning run",
+  and store what it produced on it. Leave their steps as they are. Where their
+  done-when names someone else ("one outside review"), ask in the reply whether
+  your pass counts toward it rather than changing it.
+- A page you cannot read (a LinkedIn profile behind its login, a file not
+  shared with the account) is said plainly in the reply with what would work
+  instead, such as the profile saved as a PDF (More, then Save to PDF, on the
+  profile) and put in their Drive.
 - Facts the comment gives for a collection are filed as drafts, with
   `source = 'comment'` and `source_ref` the comment's id, for the person to
   confirm on the step. Never confirm one.

@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   sendGoalStep: vi.fn(),
   recordAndFire: vi.fn(),
   writeComment: vi.fn(),
+  loadThreads: vi.fn(),
 }));
 
 vi.mock('@/lib/goals/comment-model', () => ({ askGoalReplyModel: mocks.askGoalReplyModel }));
@@ -22,7 +23,7 @@ vi.mock('@/lib/goals/collections-store', () => ({
   loadInformation: vi.fn(async () => ({})),
 }));
 vi.mock('@/lib/goals/comments-store', () => ({
-  loadThreads: vi.fn(async () => ({})),
+  loadThreads: mocks.loadThreads,
   writeComment: mocks.writeComment,
 }));
 vi.mock('@/lib/goals/shaping-store', () => ({
@@ -35,6 +36,12 @@ vi.mock('@/lib/goals/steps-store', () => ({
     steps: [
       step('mine-1', 'mine', 'Email the servicer'),
       step('claude-1', 'claude', 'Compare the repayment plans'),
+      step('phase-mine', 'mine', 'Resume and LinkedIn ready to send', [
+        step('mine-2', 'mine', 'Update your resume with your most recent role'),
+      ]),
+      step('phase-work', 'mine', 'Know the options', [
+        step('claude-2', 'claude', 'List the lenders'),
+      ]),
     ],
     information: {},
   })),
@@ -43,7 +50,7 @@ vi.mock('@/lib/goals/steps-store', () => ({
 import { askDashOnGoal, type GoalAskInput } from './ask';
 import type { GoalsSupabaseClient } from './db/schema-name';
 
-function step(id: string, kind: string, title: string) {
+function step(id: string, kind: string, title: string, children: unknown[] = []) {
   return {
     id,
     parentId: 'g',
@@ -61,7 +68,7 @@ function step(id: string, kind: string, title: string) {
     result: null,
     resultUrl: null,
     reviewedAt: null,
-    children: [],
+    children,
   };
 }
 
@@ -91,6 +98,7 @@ const said = () => mocks.writeComment.mock.calls.map((call) => (call[1] as { bod
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.loadThreads.mockResolvedValue({});
   mocks.askGoalReplyModel.mockResolvedValue({ ok: true, input: { send_step: true, needs_routine: false } });
 });
 
@@ -127,6 +135,42 @@ describe('an @dash comment asking Dash to take the step', () => {
     await askDashOnGoal(input({ canRun: false }));
     expect(mocks.sendGoalStep).not.toHaveBeenCalled();
     expect(said()[0]).toContain('only the account that owns this app can start one');
+  });
+
+  it('passes what was said on the row before the comment into the hand-over', async () => {
+    mocks.loadThreads.mockResolvedValue({
+      'mine-1': [
+        { id: 'c0', author: 'me', body: 'the account number is in my Drive under Loans' },
+        { id: 'c', author: 'me', body: '@dash draft this for me' },
+      ],
+    });
+    mocks.sendGoalStep.mockResolvedValue({ ok: true, job: 'prepare', title: 'Email the servicer', runId: 'r' });
+    await askDashOnGoal(input());
+    expect(mocks.sendGoalStep).toHaveBeenCalledWith(
+      expect.objectContaining({
+        thread: [{ author: 'me', body: 'the account number is in my Drive under Loans' }],
+      }),
+    );
+  });
+
+  it('hands a phase of only your own steps to the goals routine, which adds a Dash step', async () => {
+    mocks.recordAndFire.mockResolvedValue({ ok: true, runId: 'r' });
+    const outcome = await askDashOnGoal(
+      input({ itemId: 'phase-mine', itemTitle: 'Resume and LinkedIn ready to send', question: 'no i want you to review it' }),
+    );
+    expect(mocks.sendGoalStep).not.toHaveBeenCalled();
+    expect(mocks.recordAndFire).toHaveBeenCalledWith(expect.objectContaining({ job: 'goal', itemId: 'g' }));
+    const brief = (mocks.recordAndFire.mock.calls[0][0] as { text: (runId: string) => string }).text('r');
+    expect(brief).toContain('holds only your own steps');
+    expect(brief).toContain('no i want you to review it');
+    expect(outcome.ok).toBe(true);
+  });
+
+  it('still sends a phase that has steps of Dash\'s in it', async () => {
+    mocks.sendGoalStep.mockResolvedValue({ ok: true, job: 'phase', title: 'Know the options', runId: 'r' });
+    await askDashOnGoal(input({ itemId: 'phase-work', itemTitle: 'Know the options', question: 'do this' }));
+    expect(mocks.sendGoalStep).toHaveBeenCalledWith(expect.objectContaining({ stepId: 'phase-work', mode: 'send' }));
+    expect(mocks.recordAndFire).not.toHaveBeenCalled();
   });
 
   it('works the whole goal when the comment is on the goal itself', async () => {

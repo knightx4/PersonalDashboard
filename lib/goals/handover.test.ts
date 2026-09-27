@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   commentMode,
+  hasClaudeWork,
   locateStep,
   offersPrepare,
   offersSend,
@@ -184,5 +185,34 @@ describe('from an @dash comment (plan #1003)', () => {
     const plain = sendRunText({ target, job: 'prepare', collections: [], userId: 'u', runId: 'r' });
     expect(plain).toContain('asked for from its row on the goal page');
     expect(plain).not.toContain('What they wrote');
+  });
+
+  it('puts what was said on the row before the comment in the brief', () => {
+    const target = locateStep(GOAL, [node('m', { kind: 'mine', title: 'Review the resume' })], 'm');
+    if (!target) throw new Error('no step');
+    const text = sendRunText({
+      target,
+      job: 'prepare',
+      collections: [],
+      userId: 'u',
+      runId: 'r',
+      asked: 'no i want you to review it',
+      thread: [
+        { author: 'me', body: 'my resume is in Drive under Career/Resumes' },
+        { author: 'claude', body: 'That one is yours to do.' },
+      ],
+    });
+    expect(text).toContain('The person: my resume is in Drive under Career/Resumes');
+    expect(text).toContain('Claude: That one is yours to do.');
+    expect(text.indexOf('Career/Resumes')).toBeLessThan(text.indexOf('no i want you to review it'));
+  });
+
+  it('knows a phase of only your own steps has nothing for a phase run', () => {
+    expect(hasClaudeWork(node('p', { kind: 'mine', children: [node('m', { kind: 'mine' })] }))).toBe(false);
+    expect(hasClaudeWork(node('p', { kind: 'mine', children: [node('c')] }))).toBe(true);
+    expect(hasClaudeWork(node('p', { children: [node('c', { status: 'done' })] }))).toBe(false);
+    expect(
+      hasClaudeWork(node('p', { kind: 'mine', children: [node('q', { kind: 'mine', children: [node('c')] })] })),
+    ).toBe(true);
   });
 });

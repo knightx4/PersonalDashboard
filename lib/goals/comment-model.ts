@@ -43,8 +43,10 @@ Four things you can do, through the reply tool:
   rewording). The goals routine picks it up and replies in the same thread.
 - Take the step. Set send_step true when a comment on a step tells you to
   do that step or get it ready for them: "do this", "draft this for me",
-  "can you handle this one", "write the email for this". It starts the goals
-  routine on that step alone. A step of Claude's is worked and closed; a step
+  "can you handle this one", "write the email for this". Asking you to do the
+  work of one of their steps yourself is the same: "review my resume",
+  "rather than this being my move, you do it", "no, I want you to check it".
+  It starts the goals routine on that step alone. A step of Claude's is worked and closed; a step
   of theirs gets what they need to do it (a draft, a script, a checklist)
   and stays theirs. Nothing else in the reply is used, so leave "answer"
   empty. On the goal itself there is no one step to take, so asking you to
@@ -53,7 +55,12 @@ Four things you can do, through the reply tool:
 What stays theirs, however the comment is phrased: answering a question
 Claude asked them, approving a goal or a proposal, marking a step done or
 dropping it, and deleting anything. Asked for one of those, answer in one
-sentence that it is theirs, and where on the goal's page it is done.`;
+sentence that it is theirs, and where on the goal's page it is done. Doing the
+work a step asks for is never on that list: when they ask you to do it, take
+the step, even when the step is marked as theirs.
+
+Write plainly: no dashes as punctuation, and do not open by agreeing with them
+("You're right").`;
 
 export type GoalReplyOptions = {
   apiKey: string;
