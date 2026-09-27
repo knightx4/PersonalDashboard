@@ -5,7 +5,9 @@
  * Every write a run makes lands in goals.history with the run's id, so the
  * run's page reads those rows and says what each one did: "Added step Turn
  * on autopay", "Filed 4 loans", "Closed Check loan drafts", "Merged Settle
- * on your pay floor into Name your target role". Each change that
+ * on your pay floor into Name your target role", "Closed Send the
+ * application: Your application for Finance Manager is in Jobs, sent 12
+ * September" (a step of yours closed from evidence, plan #1082). Each change that
  * Claude made carries an Undo, which puts that row back as it was:
  *
  * - A row Claude added is archived, or deleted where the table keeps no
@@ -140,6 +142,8 @@ const FIELD_WORDS: Record<string, string> = {
   collection_id: 'the collection',
   block_ask: 'what it is waiting on',
   block_kind: 'what it is waiting on',
+  evidence: 'what Dash saw',
+  evidence_source: 'what Dash saw',
   acts: 'what it does outside the plan',
   resolution: 'the answer',
   rhythm_count: 'the rhythm',
@@ -231,7 +235,10 @@ function itemSentence(row: HistoryRow, names: ChangeNames): string {
     return `Merged ${title} into ${itemTitle(newV.merged_into, names)}`;
   }
   if ('status' in newV) {
-    if (newV.status === 'done') return `Closed ${title}`;
+    if (newV.status === 'done') {
+      const seen = str(newV.evidence);
+      return seen ? `Closed ${title}: ${seen}` : `Closed ${title}`;
+    }
     if (newV.status === 'dropped') return `Dropped ${title}`;
     if (newV.status === 'open')
       return oldV.status === 'proposed' ? `Opened ${title}` : `Reopened ${title}`;
