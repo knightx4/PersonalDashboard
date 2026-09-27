@@ -1,6 +1,7 @@
 import 'server-only';
 
 import {
+  catchUpAccount,
   sweepAccount,
   syncEmailAccountBatch,
   syncEmailAccountIncrementalBatch,
@@ -14,6 +15,7 @@ import { createServiceSupabase as createJobServiceSupabase } from '@/inngest/job
 import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { commerceLinker } from '@/lib/inbox/linker';
 import { jobLinker } from '@/lib/jobs/inbox/linker';
+import { recurringLinker } from '@/lib/recurring/linker';
 import type { DomainLinker } from '@/lib/core/inbox/fan-out';
 import { canStartAnotherBatch } from '@/lib/core/inbox/pump-budget';
 
@@ -184,7 +186,7 @@ async function continueFetch(
  * write to the other's tables -- supabase-js carries the schema in the client
  * type, and the wrong one does not typecheck.
  *
- * Adding a third workspace later means adding a line here and nothing else in
+ * Adding another workspace means adding a line here and nothing else in
  * the sync: that is the whole point of the fan-out.
  */
 function buildLinkers(): DomainLinker[] {
@@ -193,6 +195,9 @@ function buildLinkers(): DomainLinker[] {
   return [
     commerceLinker(createServiceSupabase(), core),
     jobLinker(createJobServiceSupabase(), core),
+    // Subscriptions and bills (plan #1125). Its tables are in public beside
+    // the orders, so it takes the commerce side's client.
+    recurringLinker(createServiceSupabase(), core),
   ];
 }
 
@@ -346,7 +351,26 @@ export async function pumpInboxSync(opts: {
       console.error('inbox sweep failed', err);
     }
 
-    if (finished) return;
+    if (finished) {
+      // The mailbox is read, so what is left of the invocation goes on older
+      // mail a workspace asked for with its own search (catchUp on
+      // DomainLinker). It saves its place per page and resumes on the next
+      // sync, so it never hands off; a job that finished stays finished.
+      try {
+        const caughtUp = await catchUpAccount(supabase, {
+          userId: opts.userId,
+          accountId: opts.accountId,
+          linkers,
+          budgetMs: deadline - Date.now(),
+          canStartPage: (remainingMs, slowestPageMs) =>
+            canStartAnotherBatch({ remainingMs, slowestBatchMs: slowestPageMs }),
+        });
+        if (Object.keys(caughtUp).length > 0) console.info('inbox catch-up', caughtUp);
+      } catch (err) {
+        console.error('inbox catch-up failed', err);
+      }
+      return;
+    }
 
     await continueFetch(opts, supabase);
   } catch (err) {

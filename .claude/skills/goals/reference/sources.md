@@ -336,6 +336,22 @@ Each thing they bought, from their order emails.
 - Scoped to the person through order_id → orders.user_id
 - Prices and dates are on the row and its order; sum them for a spending goal rather than copying them.
 
+### `public.recurring_payments` (Shopping)
+
+Subscriptions and bills they pay regularly, found in their mail, with the latest amount and next date.
+
+- Search: `payee`
+- Name a row by `payee`; link it by `id`
+- amount_cents is in currency, per period (week, month, quarter, year). status 'cancelled' means a cancellation email came after the last charge; a next_date in the past means a charge that never arrived.
+
+### `public.recurring_charges` (Shopping)
+
+Each charge, bill, renewal notice or price change read from their mail, one per email.
+
+- Search: `event`
+- Name a row by `event`; link it by `id`
+- A rise is amount_cents above previous_amount_cents. Read with recurring_payments through payment_id for the payee.
+
 ### `core.files` (Files)
 
 Longer pieces written for them and kept as pages: research notes, breakdowns of their data, plans, drafts.
