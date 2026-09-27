@@ -378,6 +378,31 @@ describe('a merge of two steps (plan #1081)', () => {
   });
 });
 
+describe('a step of yours closed from evidence (plan #1082)', () => {
+  const seen = 'Your application for Finance Manager is in Jobs, sent 12 September.';
+
+  it('names what Dash saw, and its undo reopens the step and clears the note', () => {
+    const close = row({
+      row_id: 'step-1',
+      action: 'update',
+      old_values: { status: 'open', evidence: null, evidence_source: null, closed_at: null },
+      new_values: { status: 'done', evidence: seen, evidence_source: 'jobs', closed_at: 'x' },
+    });
+    const [line] = changeLines([close], [], names());
+    expect(line.sentence).toBe(`Closed Turn on autopay: ${seen}`);
+    expect(line.state).toBe('undoable');
+    expect(line.targets).toEqual([
+      {
+        kind: 'revert',
+        table: 'items',
+        rowId: 'step-1',
+        historyId: close.id,
+        values: { status: 'open', evidence: null, evidence_source: null },
+      },
+    ]);
+  });
+});
+
 describe('undo on a change to a row', () => {
   it('puts back the old values, leaving what the database keeps', () => {
     const closed = row({
