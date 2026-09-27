@@ -32,11 +32,12 @@ export const SPEND_OPERATIONS = {
     'suggest-learning-tracks',
     // Finding people to meet for the work the person wants, with a web
     // search, and writing what to say to each. From the job suggestion cron
-    // and the search button on Contacts. Sonnet, up to six searches.
+    // and the search button on Contacts. Sonnet, up to five searches and
+    // two calls.
     'suggest-outreach',
     // Finding open postings worth applying for with a web search, from the
-    // job suggestion cron (weekly) and the search button on Roles. Sonnet, up to
-    // six searches.
+    // job suggestion cron (weekly) and the search button on Roles. Sonnet, up
+    // to five searches and two calls.
     'find-openings',
   ],
   shopping: [
@@ -84,6 +85,10 @@ export const SPEND_OPERATIONS = {
     // appointment for the agenda, during inbox ingest (plan #1127). Haiku,
     // one call per email the rules claim; background, no button.
     'read-appointment-email',
+    // A follow-up on a quiet application or a return request, written to
+    // wait on the agenda (plan #1129). Sonnet, one call per draft, at most
+    // six a person a morning from the hourly day-brief cron; background.
+    'write-draft',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one

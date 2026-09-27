@@ -30,6 +30,7 @@ export const SOURCE_IDS = [
   'deliveries',
   'appointments',
   'bills',
+  'drafts',
 ] as const;
 
 export type SourceId = (typeof SOURCE_IDS)[number];
