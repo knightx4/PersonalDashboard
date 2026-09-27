@@ -229,7 +229,33 @@ export type CheckedObservation = {
 };
 
 /** Why an observation was left out; for the run's summary and the tests. */
-export type DropReason = 'no-sentence' | 'no-number' | 'unknown-evidence' | 'one-module' | 'repeat' | 'over-limit';
+export type DropReason =
+  | 'no-sentence'
+  | 'event-label'
+  | 'no-number'
+  | 'unknown-evidence'
+  | 'one-module'
+  | 'repeat'
+  | 'over-limit';
+
+/** One of the short ids the summary gives each event: E1, E298. */
+const EVENT_LABEL = /\bE\d+\b/;
+
+/** A bracketed group holding only event ids and the words joining them: "(E298-E301)", "[E3, E4 and E9]". */
+const LABEL_GROUP = /\s*[([]\s*E\d+(?:\s*(?:[-–—,;/]|\band\b|\bto\b)\s*E\d+)*\s*[)\]]/g;
+
+/**
+ * Take the summary's event ids out of text written for the person. The ids
+ * (E1, E298) only tie a claim to its rows, which are stored as evidence
+ * beside it; on the page they mean nothing. A bracketed group of nothing but
+ * ids is removed with its brackets. Returns null when an id is left in the
+ * running text, as in "screens like E268 and E247", since cutting it there
+ * would leave a broken sentence.
+ */
+export function stripEventLabels(text: string): string | null {
+  const stripped = text.replace(LABEL_GROUP, '').replace(/\s+([,.;:?…])/g, '$1');
+  return EVENT_LABEL.test(stripped) ? null : stripped;
+}
 
 /** A sentence as stored: one line, trimmed, no spaced dashes, capped, ending in a full stop. */
 export function cleanSentence(text: string): string {
@@ -268,8 +294,10 @@ export function overlap(a: string, b: string): number {
 const MODULE_ORDER = Object.keys(TIMELINE_KINDS) as TimelineModule[];
 
 /**
- * Keep what the model gave that can be stored. An observation is dropped
- * when it has no sentence, no number in it, cites an id that was not in the
+ * Keep what the model gave that can be stored. Bracketed event ids are
+ * taken out of the sentence (stripEventLabels). An observation is dropped
+ * when it has no sentence, an event id left in its running text, no number
+ * in it, cites an id that was not in the
  * summary, rests on rows from one module only, or says again what one marked
  * not useful said. At most MAX_OBSERVATIONS are kept, in the model's order.
  */
@@ -282,11 +310,17 @@ export function checkObservations(
   const dropped: DropReason[] = [];
 
   for (const item of raw) {
-    const sentence = typeof item.sentence === 'string' ? cleanSentence(item.sentence) : '';
-    if (!sentence) {
+    const written = typeof item.sentence === 'string' ? cleanSentence(item.sentence) : '';
+    if (!written) {
       dropped.push('no-sentence');
       continue;
     }
+    const unlabelled = stripEventLabels(written);
+    if (unlabelled === null) {
+      dropped.push('event-label');
+      continue;
+    }
+    const sentence = cleanSentence(unlabelled);
     if (!/\d/.test(sentence)) {
       dropped.push('no-number');
       continue;
