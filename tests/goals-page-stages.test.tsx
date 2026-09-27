@@ -1,8 +1,8 @@
 /**
- * The goal page opens on the work in hand (plan #1078): a goal in stages
- * shows its first unfinished stage open and folds every other stage to one
- * line, and a goal that is one list folds its finished steps under the open
- * ones.
+ * The goal page opens on the work in hand (plan #1078). A goal in stages is
+ * one card like any other (note 014bae50), opened on the Open view in place of
+ * the folded stages (note 9e8cd196), and a goal that is one list folds its
+ * finished steps under the open ones.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -71,7 +71,10 @@ function mapOf(steps: Step[]): GoalMap {
 function folds(html: string): { open: boolean; text: string }[] {
   return [...html.matchAll(/<details([^>]*)>([\s\S]*?)<\/summary>/g)].map((m) => ({
     open: /\bopen\b/.test(m[1]!),
-    text: m[2]!.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+    text: m[2]!
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim(),
   }));
 }
 
@@ -82,7 +85,11 @@ describe('a goal in stages', () => {
         step('interviews', { title: 'Walk into interviews ready', status: 'done', position: 5 }),
         step('answers', { title: 'Draft five answers', parentId: 'interviews', status: 'done' }),
         step('target', { title: 'Know the job you are aiming for', position: 10 }),
-        step('traction', { title: 'See where your search got traction', parentId: 'target', status: 'done' }),
+        step('traction', {
+          title: 'See where your search got traction',
+          parentId: 'target',
+          status: 'done',
+        }),
         step('floor', { title: 'Settle your pay floor', parentId: 'target', position: 20 }),
         step('resume', { title: 'Resume ready to send', position: 20 }),
         step('update', { title: 'Update your resume', parentId: 'resume' }),
@@ -91,18 +98,21 @@ describe('a goal in stages', () => {
     />,
   );
 
-  it('opens on the first unfinished stage, with how far along it is', () => {
-    expect(html).toContain('Stage 2 of 3');
-    expect(html).toContain('1 of 2 done');
+  it('draws every stage in the one steps card, with no stage headings', () => {
+    expect(html).not.toContain('Stage 2 of 3');
+    expect(html).not.toContain('Other stages');
+    expect(html.match(/>Steps<\/h2>/g)).toHaveLength(1);
+    expect(html).toContain('Know the job you are aiming for');
     expect(html).toContain('Settle your pay floor');
+    expect(html).toContain('Resume ready to send');
   });
 
-  it('folds the finished stage and the later one, each saying where it stands', () => {
-    const closed = folds(html).filter((fold) => !fold.open);
-    expect(closed.map((fold) => fold.text)).toEqual([
-      '1. Walk into interviews ready done',
-      '3. Resume ready to send 1 step',
-    ]);
+  it('opens on Open, leaving the finished stage out until Everything is chosen', () => {
+    expect(html).not.toContain('Walk into interviews ready');
+    const pressed = [
+      ...html.matchAll(/<button[^>]*aria-pressed="true"[^>]*>([\s\S]*?)<\/button>/g),
+    ].map((m) => m[1]!.replace(/<[^>]+>/g, '').trim());
+    expect(pressed).toEqual([expect.stringMatching(/^Open/)]);
   });
 });
 
