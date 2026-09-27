@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_TURN, toModelMessages, toTalkTurn, turnBody } from './talk';
+import { askTitle, MAX_ASK_TITLE, MAX_TURN, toModelMessages, toTalkTurn, turnBody } from './talk';
 
 describe('turnBody', () => {
   it('trims what was written', () => {
@@ -22,6 +22,35 @@ describe('toTalkTurn', () => {
       createdAt: '2026-09-26T10:00:00Z',
     });
     expect(toTalkTurn({ id: 't2', role: 'odd', body: 'Hm', created_at: 'x' }).role).toBe('user');
+  });
+
+  it('carries what Dash looked up and cited, and leaves both off when there is none', () => {
+    const citation = { table: 'todo.tasks', ref: 'k1', title: 'Call Acme', href: '/todo?task=k1' };
+    const turn = toTalkTurn({
+      id: 't3',
+      role: 'assistant',
+      body: 'One.',
+      created_at: 'x',
+      tool_calls: [{ name: 'search', input: {}, result: [] }],
+      citations: [citation],
+    });
+    expect(turn.citations).toEqual([citation]);
+    expect(turn.toolCalls).toHaveLength(1);
+    const plain = toTalkTurn({ id: 't4', role: 'assistant', body: 'Hi', created_at: 'x', tool_calls: null, citations: [] });
+    expect(plain).not.toHaveProperty('toolCalls');
+    expect(plain).not.toHaveProperty('citations');
+  });
+});
+
+describe('askTitle', () => {
+  it('puts the question on one line', () => {
+    expect(askTitle('  Which companies\n\nhave gone quiet?  ')).toBe('Which companies have gone quiet?');
+  });
+
+  it('cuts a long question at a word', () => {
+    const title = askTitle('word '.repeat(60));
+    expect(title.length).toBeLessThanOrEqual(MAX_ASK_TITLE);
+    expect(title.endsWith('word…')).toBe(true);
   });
 });
 

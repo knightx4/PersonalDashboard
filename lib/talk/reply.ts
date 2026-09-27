@@ -21,7 +21,10 @@ const TOOL_NAME = 'reply';
 /** How much of the subject's text goes in the prompt. A card's section is well under this. */
 export const MAX_MATERIAL = 12_000;
 
-const SUBJECT_NAME: Record<SubjectKind, string> = {
+/** The kinds this reply is for: something being read. An `ask` question is answered by calling tools instead. */
+type ReadingKind = Exclude<SubjectKind, 'ask'>;
+
+const SUBJECT_NAME: Record<ReadingKind, string> = {
   feed_card: 'a card from their reading feed',
   news_story: 'a newsletter story',
 };
@@ -49,7 +52,7 @@ export type TalkReply = { ok: true; reply: string } | { ok: false; detail: strin
 
 /** Dash's reply to the turns so far. Never throws. */
 export async function replyAbout(input: {
-  subject: { kind: SubjectKind; title: string; material: string };
+  subject: { kind: ReadingKind; title: string; material: string };
   /** The conversation so far, oldest first, ending with the person's turn. */
   turns: readonly Pick<TalkTurn, 'role' | 'body'>[];
   /** Instructions for this kind of exchange, added to the system prompt. */
