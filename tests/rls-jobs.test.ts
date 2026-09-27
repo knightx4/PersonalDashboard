@@ -212,6 +212,13 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.suggestions = suggestion.id;
 
+  // One row per person: when the Jobs home was last opened (plan #1152).
+  const [visit] = await admin<{ id: string }[]>`
+    insert into home_visits (user_id, last_visit_at)
+    values (${userId}, now())
+    returning id`;
+  ids.home_visits = visit.id;
+
   return ids;
 }
 

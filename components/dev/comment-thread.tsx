@@ -50,11 +50,12 @@ export type CommentStore = {
 };
 
 /**
- * What a thread is on: a dev row, a goal or step, or a file. Dash does not
- * answer in a file's thread; the goals run reads it before revising the file
- * (note 7a6a37aa), so there is no tag and nothing waits on a reply.
+ * What a thread is on: a dev row, a goal or step, a role in Jobs (note
+ * 89ad8bef), or a file. Dash does not answer in a file's thread; the goals
+ * run reads it before revising the file (note 7a6a37aa), so there is no tag
+ * and nothing waits on a reply.
  */
-export type ThreadTarget = CommentTarget | 'goal' | 'file';
+export type ThreadTarget = CommentTarget | 'goal' | 'role' | 'file';
 
 function DeleteComment({
   id,

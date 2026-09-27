@@ -1,5 +1,4 @@
-import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
-import { loadToday, INTERVIEW_HORIZON_DAYS } from '@/lib/jobs/today/load';
+import { INTERVIEW_HORIZON_DAYS, type TodayBoard } from '@/lib/jobs/today/load';
 import { HomeSection } from './home-section';
 import { TodayLists } from './this-week-lists';
 
@@ -11,20 +10,11 @@ import { TodayLists } from './this-week-lists';
  * #1150). A clear week used to fill that page with the finished state; here it
  * is one quiet line, because the sections above it may still have something
  * to say. Lists with nothing in them are left out rather than shown as zero.
+ *
+ * The page loads the board (loadToday) and hands it down, because the section
+ * above this one leaves out the mail this one lists as waiting on you.
  */
-export async function ThisWeekSection({
-  supabase,
-  userId,
-  timezone,
-  senderName,
-}: {
-  supabase: AppSupabaseClient;
-  userId: string;
-  timezone: string;
-  senderName: string | null;
-}) {
-  const board = await loadToday(supabase, userId, { senderName });
-
+export function ThisWeekSection({ board, timezone }: { board: TodayBoard; timezone: string }) {
   return (
     <HomeSection
       id="this-week"
