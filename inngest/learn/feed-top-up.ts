@@ -20,6 +20,7 @@ import type { LearnOperation } from '@/lib/learn/spend';
 import type { LessonTopUpSummary } from '@/lib/learn/lessons/top-up';
 import { lessonsWanted, writeLessonsFor } from '@/lib/learn/lessons/top-up';
 import { linkAimTracks } from '@/lib/learn/lessons/aim-tracks';
+import { writeDuePieces, type PiecesPassSummary } from '@/lib/learn/lessons/pieces';
 import { addTeachBackCard } from '@/lib/learn/feed/teach-back-store';
 import { writeVideoCards, type VideoCardPassResult } from '@/lib/learn/youtube/video-card-run';
 import { createFeedPicker, loadFeedFields, peopleToPickFor } from './feed-picks';
@@ -55,6 +56,12 @@ export const FEED_TOP_UP_AFTER_RESPONSE_MS = 120_000;
  * people after it have the rest of the budget.
  */
 export const VIDEO_CARDS_MS = 60_000;
+
+/**
+ * The pieces pass (plan #1140) is not started with less than this left: it
+ * makes up to two Sonnet calls one after the other, each well under a minute.
+ */
+export const PIECES_RESERVE_MS = 60_000;
 
 const OPERATION: LearnOperation = 'write-feed-card';
 const EMBED_OPERATION: LearnOperation = 'embed-feed-ideas';
@@ -332,6 +339,15 @@ async function topUpWith(
     });
   }
 
+  // Laid-out units of goal tracks with no pieces get theirs (plan #1140),
+  // whether or not the deck was short: the pieces belong to the goal's plan,
+  // and this pass is how units laid out before pieces existed get them.
+  let pieces: PiecesPassSummary | undefined;
+  if (options.deadline - Date.now() >= PIECES_RESERVE_MS) {
+    pieces = await writeDuePieces(learn, core, userId, apiKey);
+    for (const detail of pieces.failed) console.error('[learn feed top-up] pieces', detail);
+  }
+
   const ports: TopUpPorts = {
     countReady: (id) => countReady(learn, id),
     loadPicked: async (id, limit) => {
@@ -361,7 +377,11 @@ async function topUpWith(
     console.error('[learn feed top-up] teach-back', error instanceof Error ? error.message : error);
     return null;
   });
-  const withTeach = teachBack === 'added' ? { ...sections, teachBack: true } : sections;
+  const withTeach = {
+    ...sections,
+    ...(teachBack === 'added' ? { teachBack: true } : {}),
+    ...(pieces && pieces.written + pieces.failed.length > 0 ? { pieces } : {}),
+  };
   if (!lessons) return withTeach;
   return { ...withTeach, readyBefore, skipped: false, lessons };
 }

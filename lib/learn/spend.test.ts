@@ -92,6 +92,7 @@ describe('the operation names', () => {
       'lay-out-lesson-unit',
       'write-next-unit',
       'write-outline',
+      'write-plan-pieces',
       'add-lesson-floor',
       'write-unit-check',
       'mark-unit-check',

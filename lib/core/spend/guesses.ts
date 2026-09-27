@@ -147,6 +147,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // One unit, given the units so far and up to forty concept names in each list.
   'write-next-unit': background(unit(SONNET, 2_000, 300)),
   'write-outline': background(run(SONNET, 3_000, 1_500)),
+  // One unit and its ten or so ideas with their claims in, the pieces out.
+  'write-plan-pieces': background(unit(SONNET, 2_000, 400)),
   // One concept and the names of the others in its track.
   'add-lesson-floor': background(unit(SONNET, 3_000, 800)),
   // One unit's outcome and up to twelve of its ideas in, one question out.

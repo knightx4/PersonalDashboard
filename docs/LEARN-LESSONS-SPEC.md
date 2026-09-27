@@ -178,6 +178,33 @@ or the goal was set before outlines, raises `no-outline` instead, and the top-up
 writes the outline (`ensureOutline` in `lib/learn/lessons/outline.ts`). Tracks
 not made from a goal still get their units as they go.
 
+### A goal's units are split into pieces
+
+Plan #1140. Each laid-out unit of a learning goal's track is split into 3 to 6
+pieces, each one sitting of about 20 to 30 minutes covering a few of the
+unit's ideas, in a suggested order. A unit with fewer than three ideas gets
+one piece per idea. The order is a suggestion: nothing is locked by it.
+
+The ideas split are the unit's own, by the rule the unit check uses: its
+goals and everything they rest on that no earlier unit's goals also rest on,
+whatever the person knows of them (`unitIdeas` in
+`lib/learn/lessons/pieces-payload.ts`). Every idea falls in exactly one piece.
+One Sonnet call per unit groups them (`writePieces`); an idea the model leaves
+out goes in after the idea before it, so the call is not paid for twice.
+
+Pieces are stored in `learn.plan_pieces` (learn 0073): the unit, the piece's
+place in it, a title, the ideas it covers as `concept_ids` in teaching order,
+and `passed_at`, set when its check is passed. Progress on a plan is the count
+of pieces passed.
+
+They are written in two places, both in the hourly top-up. When the top-up
+lays out a goal track's unit, it writes the unit's pieces straight after. And
+on every run, whether or not the deck is short, a pass finds laid-out units of
+goal tracks with no pieces and writes up to two (`writeDuePieces` in
+`lib/learn/lessons/pieces.ts`). The pass covers units laid out any other way,
+such as by opening the unit on the track page, and the units laid out before
+pieces existed. Tracks not made from a goal get no pieces.
+
 ## The unit check
 
 When a unit is done, the next card from that track is its unit check: one
@@ -209,6 +236,7 @@ From the spend ledger, 24 September 2026:
 | A further unit | When a track runs out of units | 1.5¢ |
 | A unit's chain of concepts | When the unit is reached | 4¢ |
 | A lesson | Once per concept served | 1.5¢ |
+| A goal unit's pieces | Once per laid-out unit of a goal | about 1¢ |
 | A unit check marked | When one is answered | 0.2¢ |
 
 A lesson is written only for a concept that is about to be served, so nothing
