@@ -104,7 +104,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'grade-quiz-answer': run(HAIKU, 1_500, 200),
   'write-applied-case': run(HAIKU, 2_000, 500),
   'grade-applied-answer': run(HAIKU, 2_000, 300),
-  'write-curriculum': run(SONNET, 3_000, 900),
+  // A goal's whole outline (plan #1139) runs to sixteen units, where a new
+  // track's opening three or four came to about 900 tokens.
+  'write-curriculum': run(SONNET, 3_000, 1_500),
   'place-track': run(OPUS, 3_000, 400),
   'place-aim': run(OPUS, 2_500, 300),
 
@@ -144,6 +146,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'lay-out-lesson-unit': background(unit(SONNET, 4_000, 3_000)),
   // One unit, given the units so far and up to forty concept names in each list.
   'write-next-unit': background(unit(SONNET, 2_000, 300)),
+  'write-outline': background(run(SONNET, 3_000, 1_500)),
   // One concept and the names of the others in its track.
   'add-lesson-floor': background(unit(SONNET, 3_000, 800)),
   // One unit's outcome and up to twelve of its ideas in, one question out.

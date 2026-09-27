@@ -58,6 +58,13 @@ export type LessonTrack = {
   /** Every goal in the track, with the unit it was opened from. */
   goals: readonly UnitGoal[];
   graph: Graph;
+  /**
+   * A learning goal's track has its whole outline written at once (plan
+   * #1139), so no unit is ever written after its last. `written` is a track
+   * outlined already; `wanted` is a goal's track that is not yet, whose need
+   * is its outline. Left out for a track whose units are written as it goes.
+   */
+  outline?: 'written' | 'wanted';
 };
 
 export type ChooseLessonsInput = {
@@ -113,6 +120,12 @@ export type LessonPick = {
  *   still teaches what is left; `unitId` is the last unit, and the next unit
  *   is written after it so it is ready when this one is done.
  *
+ * - `no-outline`: the track is a learning goal's and its whole outline has
+ *   not been written (plan #1139). `unitId` is its last unit, or null. The
+ *   outline is written after the units it has, and this is the only unit
+ *   writing such a track ever gets: the three kinds above are never raised
+ *   for a goal's track.
+ *
  * Every kind but `no-chain` is met by writing a unit (plan #969,
  * LEARN-LESSONS-SPEC "Units are written as you go"); `unitId` is then the
  * track's last unit when the need was read, so a writer can tell that another
@@ -121,7 +134,7 @@ export type LessonPick = {
 export type TrackNeed = {
   subjectId: string;
   subjectName: string;
-  because: 'no-chain' | 'all-units-done' | 'no-curriculum' | 'last-unit-short';
+  because: 'no-chain' | 'all-units-done' | 'no-curriculum' | 'last-unit-short' | 'no-outline';
   unitId: string | null;
 };
 
@@ -154,7 +167,9 @@ export type LessonChoice = {
 type TrackPlan =
   | { kind: 'teach'; candidates: LessonPick[]; need?: TrackNeed }
   | { kind: 'need'; need: TrackNeed }
-  | { kind: 'waiting'; need?: TrackNeed };
+  | { kind: 'waiting'; need?: TrackNeed }
+  /** A goal's track with nothing to teach and no unit to be written after its last. */
+  | { kind: 'finished' };
 
 /**
  * The concepts under a lesson rated too hard: everything on the path to a
@@ -179,16 +194,20 @@ export function planTrack(
     need: { subjectId: track.subjectId, subjectName: track.name, because, unitId },
   });
 
-  if (track.units.length === 0) return need('no-curriculum', null);
+  // A goal's track is never given units one at a time (plan #1139).
+  const outlined = track.outline !== undefined;
+  if (track.units.length === 0) return outlined ? { kind: 'finished' } : need('no-curriculum', null);
 
   const { rows } = curriculumRows([...track.units], [...track.goals], track.graph);
   const current = rows.find((row) => row.next);
-  if (!current) return need('all-units-done', track.units[track.units.length - 1].id);
+  if (!current) {
+    return outlined ? { kind: 'finished' } : need('all-units-done', track.units[track.units.length - 1].id);
+  }
   if (current.state === 'not-opened') return need('no-chain', current.unit.id);
 
   const last = track.units[track.units.length - 1];
   const short =
-    current.unit.id === last.id && current.left < SHORT_UNIT_LEFT
+    !outlined && current.unit.id === last.id && current.left < SHORT_UNIT_LEFT
       ? { need: { subjectId: track.subjectId, subjectName: track.name, because: 'last-unit-short' as const, unitId: last.id } }
       : {};
 
@@ -246,8 +265,16 @@ export function chooseLessons(input: ChooseLessonsInput): LessonChoice {
     }
     const check = unitCheckDue(track, input.checked ?? new Set());
     if (check) checks.push(check);
+    if (track.outline === 'wanted') {
+      needs.push({
+        subjectId: track.subjectId,
+        subjectName: track.name,
+        because: 'no-outline',
+        unitId: track.units[track.units.length - 1]?.id ?? null,
+      });
+    }
     const plan = planTrack(track, input.carded, input.tooHard);
-    if (plan.need) needs.push(plan.need);
+    if ('need' in plan && plan.need) needs.push(plan.need);
     if (plan.kind === 'waiting') waiting.push(track.subjectId);
     else if (plan.kind === 'teach') queues.set(track.subjectId, plan.candidates);
   }

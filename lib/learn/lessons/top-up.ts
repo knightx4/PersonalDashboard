@@ -2,6 +2,7 @@ import type { AddedFloor, FloorDue } from './add-floor';
 import type { AddedUnit } from './add-unit';
 import type { LaidOutUnit } from './lay-out-unit';
 import type { LessonPick, TrackNeed } from './choose';
+import type { OutlineOutcome } from './outline';
 import type { UnitCheckDue } from './unit-check';
 
 /**
@@ -69,6 +70,8 @@ export type LessonTopUpPorts = {
   layOut(userId: string, subjectId: string): Promise<LaidOutUnit>;
   /** Write the unit after `lastUnitId`, the track's last when the need was read. */
   addUnit(userId: string, subjectId: string, lastUnitId: string | null): Promise<AddedUnit>;
+  /** Write the whole outline of a learning goal's track that has none (plan #1139). */
+  outline(userId: string, subjectId: string): Promise<OutlineOutcome>;
   /** Leave the track's layout alone until `until`. */
   hold(userId: string, subjectId: string, until: Date): Promise<void>;
   /** Lessons rated too hard with nothing added under them yet, newest first. */
@@ -92,7 +95,7 @@ export type LessonTopUpSummary = {
   floors: string[];
   /** Tracks whose done unit had its check written. */
   checks: string[];
-  /** Tracks a unit was written for, after their last. */
+  /** Tracks a unit, or a goal's whole outline, was written for, after their last. */
   added: string[];
   /** Tracks a unit was laid out for. */
   laidOut: string[];
@@ -110,7 +113,9 @@ export type LessonTopUpSummary = {
  *
  * A track that has run out of units, or is on its last with fewer than
  * three concepts left, or has no curriculum, first gets its next unit written
- * (plan #969). Then units are laid out for tracks whose next unit has no chain
+ * (plan #969). A learning goal's track is never given units that way: the
+ * only unit writing it gets is its whole outline, when it has none yet
+ * (plan #1139). Then units are laid out for tracks whose next unit has no chain
  * (`no-chain`), which includes a unit just written for a track with every unit
  * done. The chooser is asked again after each of the two when it changed
  * anything, so new concepts can take slots in the same run.
@@ -182,10 +187,16 @@ export async function writeLessonsFor(
 
   const toAdd = choice.needs.filter((need) => need.because !== 'no-chain').slice(0, MAX_UNITS_ADDED_PER_RUN);
   if (toAdd.length > 0 && deadline - ports.now() >= LAYOUT_RESERVE_MS) {
-    const results = await Promise.all(toAdd.map((need) => ports.addUnit(userId, need.subjectId, need.unitId)));
+    const results = await Promise.all(
+      toAdd.map((need) =>
+        need.because === 'no-outline'
+          ? ports.outline(userId, need.subjectId)
+          : ports.addUnit(userId, need.subjectId, need.unitId),
+      ),
+    );
     for (const [index, result] of results.entries()) {
       const need = toAdd[index]!;
-      if (result.outcome === 'added') summary.added.push(need.subjectId);
+      if (result.outcome === 'added' || result.outcome === 'written') summary.added.push(need.subjectId);
       else if (result.outcome === 'failed') {
         summary.failed.push(`${need.subjectName}: ${result.detail}`);
         await hold(need);

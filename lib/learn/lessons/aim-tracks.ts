@@ -1,9 +1,10 @@
 import 'server-only';
 
-import { AIM_DEPTH_LABELS, isAimDepth } from '@/lib/learn/aims';
+import { AIM_DEPTH_LABELS, isAimDepth, type AimDepth } from '@/lib/learn/aims';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import { ensureCurriculum } from '@/lib/learn/graph/curriculum-store';
 import { findOrCreateSubject } from '@/lib/learn/graph/save';
+import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
+import { ensureOutline } from './outline';
 
 /**
  * Each learning goal's track (LEARN-LESSONS-SPEC, "What happens to today's
@@ -21,11 +22,11 @@ import { findOrCreateSubject } from '@/lib/learn/graph/save';
  * theme's. A goal not placed yet leaves the track unplaced, and the next chain
  * written into it places it.
  *
- * Two callers. Saving a goal gives it its track and writes the track's first
- * units from the goal's wording and depth (`giveAimsTracks`), after the
- * response. The Learn now top-up gives a track to any goal still without one
- * (`linkAimTracks`), with no model call; the top-up then writes that track's
- * first unit, as it does for any track with no curriculum.
+ * Two callers. Saving a goal gives it its track and writes the track's whole
+ * outline from the goal's wording and depth (`giveAimsTracks`, plan #1139),
+ * after the response. The Learn now top-up gives a track to any goal still
+ * without one (`linkAimTracks`), with no model call; the top-up then writes
+ * the outline of any goal's track that has none (`aimTrackFor`).
  *
  * Every read and write names the person, since the top-up runs with the
  * service role.
@@ -50,8 +51,10 @@ export type AimTrack = {
   aimId: string;
   subjectId: string;
   name: string;
-  /** What the track's first units are written from. */
+  /** What the track's outline is written from. */
   asked: string;
+  /** How well the person wants to know it, which sizes the outline. */
+  depth: AimDepth;
 };
 
 /**
@@ -140,12 +143,35 @@ export async function linkAimTracks(supabase: LearnSupabaseClient, userId: strin
         if (!subjectId) continue;
       }
       await copyPlacement(supabase, userId, aim, subjectId);
-      tracks.push({ aimId: aim.id, subjectId, name: aim.name, asked: askedForAim(aim) });
+      tracks.push(aimTrack(aim, subjectId));
     } catch (error) {
       console.error('[learn aim tracks] link', aim.id, error instanceof Error ? error.message : error);
     }
   }
   return tracks;
+}
+
+function aimTrack(aim: AimTrackRow, subjectId: string): AimTrack {
+  return {
+    aimId: aim.id,
+    subjectId,
+    name: aim.name,
+    asked: askedForAim(aim),
+    depth: isAimDepth(aim.depth) ? aim.depth : 'familiar',
+  };
+}
+
+/**
+ * The active open goal whose track this is, or null when it is no goal's.
+ * The earliest goal wins when two share a track.
+ */
+export async function aimTrackFor(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  subjectId: string,
+): Promise<AimTrack | null> {
+  const aim = (await activeOpenAims(supabase, userId)).find((row) => row.subject_id === subjectId);
+  return aim ? aimTrack(aim, subjectId) : null;
 }
 
 async function linkedTrack(supabase: LearnSupabaseClient, userId: string, aimId: string): Promise<string | null> {
@@ -160,17 +186,20 @@ async function linkedTrack(supabase: LearnSupabaseClient, userId: string, aimId:
 }
 
 /**
- * Give every active open goal its track and the track its first units, from
- * the goal's wording and depth. A track that already has a curriculum keeps
- * it. Called after a goal is saved, once its placement has been tried, where
- * the spend is recorded on the person's session. Never throws.
+ * Give every active open goal its track and the track its whole outline, from
+ * the goal's wording and depth (plan #1139). A track already outlined is left
+ * alone, and one with units from before keeps them, with the outline after.
+ * Called after a goal is saved, once its placement has been tried, where the
+ * spend is recorded on the person's session. Never throws.
  */
 export async function giveAimsTracks(supabase: LearnSupabaseClient, userId: string): Promise<void> {
   try {
     const tracks = await linkAimTracks(supabase, userId);
     for (const track of tracks) {
-      const curriculum = await ensureCurriculum(supabase, userId, { id: track.subjectId, name: track.name }, track.asked);
-      if (!curriculum.ok) console.error('[learn aim tracks] curriculum', curriculum.detail);
+      const spend = collectSpend();
+      const outline = await ensureOutline(supabase, userId, track, process.env.ANTHROPIC_API_KEY, spend.sink);
+      await recordLearnSpend(userId, 'write-curriculum', spend.reports);
+      if (outline.outcome === 'failed') console.error('[learn aim tracks] outline', outline.detail);
     }
   } catch (error) {
     console.error('[learn aim tracks]', error instanceof Error ? error.message : error);

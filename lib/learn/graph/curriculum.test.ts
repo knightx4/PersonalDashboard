@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   FIRST_UNITS_MAX,
+  OUTLINE_UNITS,
   parseOwnUnits,
   readCurriculum,
   readNextUnit,
+  readOutline,
   unitGoal,
 } from './curriculum-payload';
 import { curriculumRows, type UnitGoal } from './curriculum-view';
@@ -21,6 +23,39 @@ function unit(n: number) {
     outcome: `Do the thing from unit ${n}.`,
   };
 }
+
+describe("reading a goal's whole outline (plan #1139)", () => {
+  const solid = OUTLINE_UNITS.solid;
+
+  it('keeps every unit of a new track up to the depth\'s most', () => {
+    const units = Array.from({ length: 14 }, (_, index) => unit(index + 1));
+    const result = readOutline({ units, goal_unit: null }, solid, []);
+    expect(result.ok && result.units.map((one) => one.title)).toEqual(
+      Array.from({ length: solid.max }, (_, index) => `Unit ${index + 1}`),
+    );
+  });
+
+  it('adds after the units a track has, leaving out a title it already has', () => {
+    const units = [unit(4), unit(5), unit(6), unit(7), unit(8)];
+    const result = readOutline({ units, goal_unit: null }, solid, ['Unit 1', 'Unit 2', 'Unit 3', 'unit 4']);
+    expect(result.ok && result.units.map((one) => one.title)).toEqual(['Unit 5', 'Unit 6', 'Unit 7', 'Unit 8']);
+  });
+
+  it('fails when the whole comes to fewer than the depth\'s least, or nothing new was written', () => {
+    expect(readOutline({ units: [unit(1), unit(2)], goal_unit: null }, solid, [])).toMatchObject({ ok: false });
+    expect(readOutline({ units: [unit(1)], goal_unit: null }, solid, ['Unit 1'].concat(['a', 'b', 'c', 'd', 'e', 'f', 'g'])))
+      .toMatchObject({ ok: false });
+    expect(readOutline({ units: 'none' }, solid, [])).toMatchObject({ ok: false });
+  });
+
+  it('sizes the outline by depth', () => {
+    expect(OUTLINE_UNITS).toEqual({
+      familiar: { min: 5, max: 8 },
+      solid: { min: 8, max: 12 },
+      deep: { min: 12, max: 16 },
+    });
+  });
+});
 
 describe('reading the next unit', () => {
   it('cleans the unit it was sent', () => {

@@ -6,7 +6,7 @@ import { loadTrackInterest } from '@/lib/learn/flow/interest-load';
 import { loadCurriculum } from '@/lib/learn/graph/curriculum-store';
 import { loadGoals, loadGraph, loadSubjects } from '@/lib/learn/graph/load';
 import { loadGoalTracks } from './aim-tracks';
-import { chooseLessons, type ChooseLessonsInput, type LessonChoice } from './choose';
+import { chooseLessons, type ChooseLessonsInput, type LessonChoice, type LessonTrack } from './choose';
 import { pickedUpSince } from './resting';
 import { loadRestingRecord } from './resting-load';
 
@@ -69,6 +69,17 @@ async function loadChecked(supabase: LearnSupabaseClient, userId: string): Promi
   return new Set(rows.map((row) => row.unit_id));
 }
 
+/** The person's tracks whose whole outline is written (plan #1139). */
+async function loadOutlined(supabase: LearnSupabaseClient, userId: string): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('subjects')
+    .select('id')
+    .eq('user_id', userId)
+    .not('outlined_at', 'is', null);
+  if (error) throw new Error(`Reading which tracks are outlined failed: ${error.message}`);
+  return new Set(((data ?? []) as { id: string }[]).map((row) => row.id));
+}
+
 /**
  * Every track, weighed, with its units, goals and graph, the concepts on
  * cards, the concepts whose lesson was rated too hard, the units that already
@@ -80,7 +91,7 @@ export async function loadLessonInput(
   userId: string,
   now: Date = new Date(),
 ): Promise<Omit<ChooseLessonsInput, 'slots'>> {
-  const [subjects, interest, cards, checked, goalTracks, resting] = await Promise.all([
+  const [subjects, interest, cards, checked, goalTracks, resting, outlined] = await Promise.all([
     loadSubjects(supabase, userId),
     loadTrackInterest(supabase, now, userId),
     readAll<CardRow>((from, to) =>
@@ -101,6 +112,7 @@ export async function loadLessonInput(
     loadChecked(supabase, userId),
     loadGoalTracks(supabase, userId),
     loadRestingRecord(supabase, userId),
+    loadOutlined(supabase, userId),
   ]);
 
   const tracks = await Promise.all(
@@ -110,7 +122,13 @@ export async function loadLessonInput(
         loadGoals(supabase, subject.id, userId),
         loadCurriculum(supabase, subject.id, userId),
       ]);
-      return { subjectId: subject.id, name: subject.name, units, goals, graph };
+      const outline: LessonTrack['outline'] = outlined.has(subject.id)
+        ? 'written'
+        : goalTracks.has(subject.id)
+          ? 'wanted'
+          : undefined;
+      const track: LessonTrack = { subjectId: subject.id, name: subject.name, units, goals, graph };
+      return outline ? { ...track, outline } : track;
     }),
   );
 

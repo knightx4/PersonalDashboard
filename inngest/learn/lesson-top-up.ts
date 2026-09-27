@@ -8,6 +8,8 @@ import { chooseLessonsFor } from '@/lib/learn/lessons/choose-load';
 import { findLessonSource, type LessonSource } from '@/lib/learn/lessons/closest-source';
 import { addLessonFloor, loadFloorsDue } from '@/lib/learn/lessons/add-floor';
 import { addNextUnit } from '@/lib/learn/lessons/add-unit';
+import { aimTrackFor } from '@/lib/learn/lessons/aim-tracks';
+import { ensureOutline } from '@/lib/learn/lessons/outline';
 import { layOutNextUnit } from '@/lib/learn/lessons/lay-out-unit';
 import { unitCheckWhy, type UnitCheckDue } from '@/lib/learn/lessons/unit-check';
 import { loadUnitForCheck } from '@/lib/learn/lessons/unit-check-store';
@@ -198,6 +200,17 @@ export function createLessonPorts(context: {
     choose: (userId, slots) => chooseLessonsFor(learn, userId, slots),
     layOut: (userId, subjectId) => layOutNextUnit(learn, core, userId, subjectId, apiKey),
     addUnit: (userId, subjectId, lastUnitId) => addNextUnit(learn, core, userId, subjectId, lastUnitId, apiKey),
+    outline: async (userId, subjectId) => {
+      const track = await aimTrackFor(learn, userId, subjectId);
+      if (!track) return { outcome: 'failed', detail: 'The track is no longer an open goal.' };
+      const spend: SpendReport[] = [];
+      const result = await ensureOutline(learn, userId, track, apiKey, (report) => spend.push(report));
+      // Awaited, so the rows land before a background function is frozen.
+      for (const report of spend) {
+        await recordSpend(core, userId, { module: 'learn', operation: 'write-outline', model: report.model, usage: report.usage });
+      }
+      return result;
+    },
     hold: async (userId, subjectId, until) => {
       const { error } = await learn
         .from('subjects')

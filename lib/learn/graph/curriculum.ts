@@ -8,9 +8,11 @@ import {
   FIRST_UNITS_MIN,
   readCurriculum,
   readNextUnit,
+  readOutline,
   type CurriculumResult,
   type CurriculumUnit,
   type NextUnitResult,
+  type OutlineResult,
 } from './curriculum-payload';
 
 /**
@@ -26,6 +28,10 @@ import {
  * The first call also says which unit the person's own first question belongs
  * to, so the chain approved alongside it is filed under that unit. A question
  * past the first units is filed under none.
+ *
+ * A learning goal's track is the exception (plan #1139): it gets its whole
+ * outline in one call (`writeOutline`), sized to the goal's depth, and no unit
+ * is written after it.
  *
  * A custom track may come with units the person wrote. Then the model keeps
  * them as given and only writes what each covers and its outcome.
@@ -135,6 +141,123 @@ export async function writeCurriculum(input: {
   );
   if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
   return readCurriculum(block.input, input.units);
+}
+
+const OUTLINE_SYSTEM = `You write the whole curriculum for one track of study that the person set as a learning goal. They will see every unit from the start and work through them at their own pace, so this is the complete course from its first unit to its last.
+
+You are given the track's name, what the person asked for, how many units the whole course should have, and any units the track already has. Those units are fixed: the course starts with them, in their order. Write only the units that come after them.
+
+- Each unit is a real block of study, roughly a week of evenings.
+- In teaching order: a unit only depends on units before it.
+- Where the track has no units yet, start where the subject starts for an adult who already knows the everyday meaning of the basic terms, so there is no "What is X" unit.
+- Cover the whole of what was asked, to the depth asked. As the course goes on, reach the parts past the introduction: the standard models, the evidence, how it is applied, and where it is contested.
+- Do not repeat a unit the track already has or teach again what it covers.
+- Each unit is specific: "Price elasticity and tax incidence", not "Key concepts".
+- title: under 60 characters.
+- covers: one or two sentences naming the ideas the unit teaches.
+- outcome: one sentence saying what the person can do once they have learned it, starting with a verb.
+
+Plain sentences. No slogans, no "not X, but Y" contrasts, no dashes used for rhythm.
+
+Report through ${TOOL_NAME}, with goal_unit null.`;
+
+/** The prompt for a whole outline. Exported so its content is tested without a model. */
+export function outlinePrompt(input: {
+  subject: string;
+  asked: string | null;
+  bounds: { min: number; max: number };
+  units: readonly CurriculumUnit[];
+}): string {
+  const had = input.units.length;
+  const range =
+    had === 0
+      ? `The whole course has between ${input.bounds.min} and ${input.bounds.max} units.`
+      : `The whole course has between ${input.bounds.min} and ${input.bounds.max} units, counting the ${had} it already has, so write between ${Math.max(1, input.bounds.min - had)} and ${input.bounds.max - had} more.`;
+  return [
+    `The track: ${input.subject}`,
+    input.asked ? `What they asked for: ${input.asked}` : 'They did not say more than the name.',
+    range,
+    '',
+    ...(had > 0
+      ? [
+          'The units the track already has, fixed, in order:',
+          ...input.units.map(
+            (unit, index) =>
+              `${index + 1}. ${unit.title}${unit.covers ? `. Covers: ${unit.covers}` : ''}${unit.outcome ? ` Outcome: ${unit.outcome}` : ''}`,
+          ),
+          '',
+          'Write only the units after these.',
+        ]
+      : ['The track has no units yet.']),
+    '',
+    `Call ${TOOL_NAME}.`,
+  ].join('\n');
+}
+
+/**
+ * The whole outline of a learning goal's track (plan #1139): every unit after
+ * the ones it already has, so that together they number between
+ * `bounds.min` and `bounds.max`. Returns only the new units.
+ */
+export async function writeOutline(input: {
+  subject: string;
+  asked: string | null;
+  bounds: { min: number; max: number };
+  /** The track's units so far, in order. Kept, and the outline goes after them. */
+  units: readonly CurriculumUnit[];
+  anthropicApiKey: string;
+  client?: Anthropic;
+  onSpend?: SpendSink;
+}): Promise<OutlineResult> {
+  const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
+
+  let response;
+  try {
+    response = await client.messages.create({
+      model: CURRICULUM_MODEL,
+      max_tokens: 6000,
+      system: OUTLINE_SYSTEM,
+      tools: [
+        {
+          name: TOOL_NAME,
+          description: 'Report the units of the curriculum, in teaching order.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              units: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    title: { type: 'string' },
+                    covers: { type: 'string' },
+                    outcome: { type: 'string' },
+                  },
+                  required: ['title', 'covers', 'outcome'],
+                },
+              },
+              goal_unit: { type: ['integer', 'null'] },
+            },
+            required: ['units', 'goal_unit'],
+          },
+        },
+      ],
+      tool_choice: forceTool(TOOL_NAME),
+      messages: [{ role: 'user', content: outlinePrompt(input) }],
+    });
+  } catch (error) {
+    return { ok: false, detail: error instanceof Error ? error.message : 'The outline call failed.' };
+  }
+
+  input.onSpend?.({ model: CURRICULUM_MODEL, usage: usageFrom(response.usage) });
+
+  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
+  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
+  return readOutline(
+    block.input,
+    input.bounds,
+    input.units.map((unit) => unit.title),
+  );
 }
 
 const NEXT_TOOL_NAME = 'report_next_unit';
