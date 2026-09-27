@@ -165,6 +165,10 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'Fired on Mondays by pg_cron to write the week\'s connections between new and older vault notes; no press starts it.',
   'app/api/cron/note-connections/route.ts#POST':
     'Fired on Mondays by pg_cron to write the week\'s connections between new and older vault notes; no press starts it.',
+  'app/api/cron/observations/route.ts#GET':
+    'Fired on Mondays by pg_cron to write the week\'s observations across the modules; no press starts it.',
+  'app/api/cron/observations/route.ts#POST':
+    'Fired on Mondays by pg_cron to write the week\'s observations across the modules; no press starts it.',
   'app/api/cron/youtube-library/route.ts#GET':
     'Fired four times a day by pg_cron to fetch and embed the YouTube library\'s transcripts; no press starts it.',
   'app/api/cron/youtube-library/route.ts#POST':

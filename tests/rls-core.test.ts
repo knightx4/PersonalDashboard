@@ -141,6 +141,66 @@ describe('saved views', () => {
   });
 });
 
+describe('observations', () => {
+  /**
+   * What Dash noticed across the modules (plan #1119). The weekly run writes
+   * them with the service role; the person reads their own and may change
+   * only the verdict, since the page's "not useful" is all they need and the
+   * sentence and its evidence are what the verdict is about.
+   */
+  async function seedObservation(userId: string, week: string): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into core.observations (user_id, week, position, sentence, evidence, modules, model)
+      values (${userId}, ${week}, 1, 'You placed 2 orders in the 3 days after a rejection.',
+              ${['job_search.application_events:a', 'public.orders:b']}, ${['shopping', 'jobs']},
+              'claude-sonnet-5')
+      returning id`;
+    return row.id;
+  }
+
+  it('shows the owner their observations and another user none', async () => {
+    const id = await seedObservation(userA, '2026-09-28');
+    expect(await asUser(userA, (tx) => tx`select id from core.observations where id = ${id}`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from core.observations`)).toHaveLength(0);
+  });
+
+  it('lets the owner mark one not useful, and nobody else', async () => {
+    const id = await seedObservation(userA, '2026-09-21');
+    const theirs = await asUser(
+      userB,
+      (tx) => tx`update core.observations set verdict = 'not_useful', verdict_at = now() where id = ${id} returning id`,
+    );
+    expect(theirs).toHaveLength(0);
+    const mine = await asUser(
+      userA,
+      (tx) => tx`update core.observations set verdict = 'not_useful', verdict_at = now() where id = ${id} returning verdict`,
+    );
+    expect(mine).toEqual([{ verdict: 'not_useful' }]);
+  });
+
+  it('does not let the owner rewrite the sentence or add one', async () => {
+    const id = await seedObservation(userA, '2026-09-14');
+    await expect(
+      asUser(userA, (tx) => tx`update core.observations set sentence = 'Something else, 1.' where id = ${id}`),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into core.observations (user_id, week, position, sentence, evidence, modules)
+                   values (${userA}, '2026-09-07', 1, 'Made up, 1.', ${['a.b:1', 'c.d:2']}, ${['todo', 'vault']})`,
+      ),
+    ).rejects.toThrow(/permission denied/);
+  });
+
+  it('refuses a week that does not start on a Monday, and a verdict without a date', async () => {
+    await expect(seedObservation(userA, '2026-09-15')).rejects.toThrow(/observations_week_monday_ck/);
+    const id = await seedObservation(userA, '2026-09-07');
+    await expect(
+      admin`update core.observations set verdict = 'useful' where id = ${id}`,
+    ).rejects.toThrow(/observations_verdict_at_ck/);
+  });
+});
+
 describe('cross-user reads', () => {
   it('shows the owner their mailbox, its jobs and its messages', async () => {
     const seen = await asUser(userA, async (tx) => ({

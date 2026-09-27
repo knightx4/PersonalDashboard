@@ -387,3 +387,11 @@ Every newsletter issue they receive, with its summary.
 - Name a row by `subject`; link it by `id`
 - Opens at `/news/i/<id>`
 - Leads only: an issue mentioning a subject says nothing about what they want.
+
+### `core.observations` (Home)
+
+What Dash noticed each week across their modules, with a number and the timeline rows behind it, and whether they found it useful.
+
+- Search: `sentence`
+- Name a row by `sentence`; link it by `id`
+- The sentence is Dash's, not theirs: read it as a lead to check against the rows in evidence (core.timeline refs, `schema.table:id`). verdict 'not_useful' means they did not want it; 'useful' that they did. week is the Monday it was written for.

@@ -58,6 +58,9 @@ export const SPEND_OPERATIONS = {
     // calling read tools until it answers: up to nine calls, each sending
     // the conversation and the lookups so far.
     'ask-dash',
+    // The weekly observations across the modules (plan #1119). Sonnet, one
+    // call per person a week, from the observations cron; background.
+    'write-observations',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one
