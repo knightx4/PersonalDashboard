@@ -126,6 +126,7 @@ describe('RLS coverage', () => {
       'opening_questions',
       'opening_sweeps',
       'phrase_explanations',
+      'plan_pieces',
       'probes',
       'quiz_questions',
       'quiz_sources',
@@ -683,6 +684,74 @@ describe('the curriculum at the top of a track', () => {
     await admin`delete from subjects where id = ${subjectA}`;
     const [row] = await admin<{ count: number }[]>`
       select count(*)::int as count from curriculum_units where id = ${unitA}`;
+    expect(row.count).toBe(0);
+  });
+});
+
+describe("the pieces a goal's unit is split into", () => {
+  // learn 0073_plan_pieces.sql (plan #1140). The owner reads their pieces and
+  // may mark one passed; the composite keys to subjects and to units are what
+  // stop a piece landing on someone else's track or unit.
+  let subjectA = '';
+  let subjectB = '';
+  let unitA = '';
+  let pieceA = '';
+
+  beforeAll(async () => {
+    const [a] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'SaaS metrics') returning id`;
+    const [b] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userB}, 'Bob plans') returning id`;
+    subjectA = a.id;
+    subjectB = b.id;
+    const [unit] = await admin<{ id: string }[]>`
+      insert into curriculum_units (user_id, subject_id, ordinal, title, covers, outcome)
+      values (${userA}, ${subjectA}, 1, 'Retention', 'Cohorts and churn.', 'Read a cohort grid.')
+      returning id`;
+    unitA = unit.id;
+    const [piece] = await admin<{ id: string }[]>`
+      insert into plan_pieces (user_id, subject_id, unit_id, ordinal, title)
+      values (${userA}, ${subjectA}, ${unitA}, 1, 'Reading a cohort grid')
+      returning id`;
+    pieceA = piece.id;
+  });
+
+  it('shows the owner their pieces and another user none of them', async () => {
+    const own = await asUser(userA, (tx) => tx`select id from plan_pieces`);
+    const other = await asUser(userB, (tx) => tx`select id from plan_pieces`);
+    expect(own).toHaveLength(1);
+    expect(other).toHaveLength(0);
+  });
+
+  it('lets the owner mark a piece passed, and nobody else', async () => {
+    await asUser(userB, (tx) => tx`update plan_pieces set passed_at = now() where id = ${pieceA}`);
+    const [before] = await admin<{ passed_at: string | null }[]>`
+      select passed_at from plan_pieces where id = ${pieceA}`;
+    expect(before.passed_at).toBeNull();
+    await asUser(userA, (tx) => tx`update plan_pieces set passed_at = now() where id = ${pieceA}`);
+    const [after] = await admin<{ passed_at: string | null }[]>`
+      select passed_at from plan_pieces where id = ${pieceA}`;
+    expect(after.passed_at).not.toBeNull();
+  });
+
+  it("refuses a piece on another user's unit", async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into plan_pieces (user_id, subject_id, unit_id, ordinal, title)
+                   values (${userB}, ${subjectB}, ${unitA}, 2, 'Smuggled')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('does not let a signed-in user delete a piece', async () => {
+    await expect(asUser(userA, (tx) => tx`delete from plan_pieces where id = ${pieceA}`)).rejects.toThrow();
+  });
+
+  it('goes with its unit and its track', async () => {
+    await admin`delete from subjects where id = ${subjectA}`;
+    const [row] = await admin<{ count: number }[]>`
+      select count(*)::int as count from plan_pieces where id = ${pieceA}`;
     expect(row.count).toBe(0);
   });
 });
