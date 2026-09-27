@@ -34,7 +34,8 @@ Not "This file analyses your applications by role family."
   without re-reading the rest: who, what, by when.
 - **Items to act on one at a time** (roles to apply to, events, courses) get a
   short section each, with the link, the facts that decide it and anything to
-  check first.
+  check first. Each person to contact and each open role in the file also
+  goes to Jobs ("People and roles you find go to Jobs" in the skill).
 - **Prose for the argument.** Short paragraphs, plain words, no headings for
   a piece that is three paragraphs long.
 

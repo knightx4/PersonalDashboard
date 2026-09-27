@@ -92,7 +92,7 @@ export function RecommendedPeople({ suggestions }: { suggestions: OpenSuggestion
   return (
     <RecommendedSection
       title="People to meet"
-      hint="People you have not met who do the work you want, found by Dash, with what to say. Sent adds them to your contacts."
+      hint="People worth reaching out to, from Dash's searches and anything a goal step turned up, with what to say. Sent adds them to your contacts."
       empty="Dash looks for new people every few days, from your career goals and CV. The next ones will appear here."
       button="Search now"
       searching="Searching…"
@@ -113,7 +113,7 @@ export function RecommendedRoles({ suggestions }: { suggestions: OpenSuggestion[
   return (
     <RecommendedSection
       title="Recommended roles"
-      hint="Open postings that fit your career goals, found by Dash. Save one to add it to your pipeline as a lead."
+      hint="Open postings that fit your career goals, from Dash's searches and anything a goal step turned up. Save one to add it to your pipeline as a lead."
       empty="Dash searches for open roles every week, from your career goals and CV. The next ones will appear here."
       button="Search now"
       searching="Searching…"
@@ -178,6 +178,7 @@ function PersonRow({ suggestion }: { suggestion: OpenSuggestion }) {
         )}
       </div>
       <p className="text-small text-ink-muted">{suggestion.why}</p>
+      {suggestion.foundIn && <p className="text-small text-ink-muted">{suggestion.foundIn}</p>}
       <p className="whitespace-pre-line text-ui text-ink">{suggestion.move}</p>
       {message && (
         <div className="rounded-card bg-canvas p-3">
@@ -273,6 +274,7 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
         {suggestion.location && <span className="text-small text-ink-muted">{suggestion.location}</span>}
       </div>
       <p className="text-small text-ink-muted">{suggestion.why}</p>
+      {suggestion.foundIn && <p className="text-small text-ink-muted">{suggestion.foundIn}</p>}
       <p className="whitespace-pre-line text-ui text-ink">{suggestion.move}</p>
       <div className="flex flex-wrap items-center gap-2">
         {suggestion.url && (

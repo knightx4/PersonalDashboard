@@ -957,6 +957,32 @@ describe('weekly suggestions (plan #934)', () => {
     expect(row.kind).toBe('reading');
   });
 
+  it('copies a job lead to the recommended roles in Jobs, once per link (goals 0055)', async () => {
+    const lead = (title: string) =>
+      asClaude((tx) => tx`
+        insert into suggestions (user_id, item_id, kind, title, detail, url, place)
+        values (${userA}, ${goalA}, 'job_leads', ${title}, 'Fits the target.',
+                'https://example.test/jobs/1', 'New York')`);
+    await lead('Senior Associate, Kroll');
+    await lead('Senior Associate, Kroll (again)');
+    await asClaude((tx) => tx`
+      insert into suggestions (user_id, kind, title, url)
+      values (${userA}, 'reading', 'A book', 'https://example.test/book')`);
+
+    const rows = await admin<{ kind: string; headline: string; location: string; found_in: string; goal_item_id: string }[]>`
+      select kind, headline, location, found_in, goal_item_id
+      from job_search.suggestions where user_id = ${userA}`;
+    expect(rows).toEqual([
+      {
+        kind: 'apply',
+        headline: 'Senior Associate, Kroll',
+        location: 'New York',
+        found_in: 'Weekly goals run for Pay off the debts',
+        goal_item_id: goalA,
+      },
+    ]);
+  });
+
   it('records your going, not for me and whether you went on the row', async () => {
     const walk = await suggest('A walking tour');
     await asUser(userA, (tx) => tx`

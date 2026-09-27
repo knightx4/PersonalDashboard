@@ -199,7 +199,8 @@ async function runReachOut(
       model: SUGGEST_MODEL,
     });
     if (!insertError) headlines.push(suggestion.headline);
-    else console.error('[jobs suggestions] reach_out insert', insertError.message);
+    // 23505: a goal step already recommended this person.
+    else if (insertError.code !== '23505') console.error('[jobs suggestions] reach_out insert', insertError.message);
   }
   return { ran: true, written: headlines.length, headlines, spend, error: null };
 }
