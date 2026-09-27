@@ -142,9 +142,10 @@ export function StepTree({
 
   const substeps = own.rows.filter((row) => row.kind !== 'decision');
   // A goal whose top-level steps hold steps of their own is laid out in
-  // stages (plan #1078): the current one open, the others folded to one line
-  // each that says how far along it is. Top-level steps with nothing under
-  // them go in a last card of their own.
+  // stages (plan #1078): every stage under way open, since stages can run
+  // alongside each other, and the others folded to one line each that says
+  // how far along it is or which stage holds it. Top-level steps with
+  // nothing under them go in a last card of their own.
   const allStages = own.rows.filter((row) => row.children.length > 0);
   const stageOf = new Map((goalStages(map.steps) ?? []).map((stage) => [stage.id, stage]));
   const staged = allStages.length >= 2;
@@ -156,8 +157,8 @@ export function StepTree({
   const shownOpen = shown.filter((row) => !isClosed(row));
   const shownDone = shown.filter(isClosed);
   const loose = own.rows.filter((row) => row.children.length === 0);
-  const current = allStages.find((row) => stageOf.get(row.id)?.state === 'current') ?? null;
-  const folded = allStages.filter((row) => row !== current);
+  const current = allStages.filter((row) => stageOf.get(row.id)?.state === 'current');
+  const folded = allStages.filter((row) => !current.includes(row));
   const shownLinked = linked.flatMap(({ entry, row }) => {
     const narrowed = row ? viewGoalRows([row], staged ? 'all' : view)[0] : undefined;
     return narrowed ? [{ entry, row: narrowed }] : [];
@@ -254,28 +255,30 @@ export function StepTree({
             </div>
           </div>
         )}
-        {staged && current && (
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-1">
-              <h2 className="text-body font-semibold text-ink">
-                Stage {allStages.indexOf(current) + 1} of {allStages.length}
-              </h2>
-              {stageOf.get(current.id) && (
-                <span className="tabular text-small text-ink-muted">
-                  {stageMeta(stageOf.get(current.id)!)}
-                </span>
-              )}
-            </div>
-            {stageCard(current, true)}
-          </div>
-        )}
-        {staged && !current && (
+        {staged &&
+          current.map((row, i) => {
+            const stage = stageOf.get(row.id);
+            return (
+              <div key={row.id} className={cn('space-y-2', i > 0 && 'pt-2')}>
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-1">
+                  <h2 className="text-body font-semibold text-ink">
+                    Stage {allStages.indexOf(row) + 1} of {allStages.length}
+                  </h2>
+                  {stage && (
+                    <span className="tabular text-small text-ink-muted">{stageMeta(stage)}</span>
+                  )}
+                </div>
+                {stageCard(row, i === 0)}
+              </div>
+            );
+          })}
+        {staged && current.length === 0 && (
           <p className="px-1 text-ui text-ink-muted">Every stage is done.</p>
         )}
         {staged && folded.length > 0 && (
           <div className="space-y-1 pt-2">
             <h2 className="px-1 text-small font-semibold text-ink-muted">
-              {current ? 'Other stages' : 'Stages'}
+              {current.length > 0 ? 'Other stages' : 'Stages'}
             </h2>
             {folded.map((row) => {
               const stage = stageOf.get(row.id);
@@ -297,7 +300,7 @@ export function StepTree({
             <h2 className="px-1 text-small font-semibold text-ink-muted">Other steps</h2>
             <div className={cn(cardVariants({ padding: 'none' }), 'overflow-hidden')}>
               <ul className="divide-y divide-border">
-                {!current && <ColumnHeader priority="When" />}
+                {current.length === 0 && <ColumnHeader priority="When" />}
                 {loose.filter((row) => !isClosed(row)).map(rowOf)}
               </ul>
               {loose.some(isClosed) && (
