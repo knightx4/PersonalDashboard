@@ -44,9 +44,10 @@ import { GoalProgress } from './goal-progress';
  *
  * Each area is a heading, a line saying what you want from it, and its goals
  * in a card beneath, with Plan this area asking Claude to propose the goals
- * it needs. Everything is
- * edited where it stands (law 12): a name, a title, a done-when or a note of
- * fog is an inline input saved on blur. Reordering and archiving sit in each
+ * it needs. Everything but a goal's title is
+ * edited where it stands (law 12): a name, a done-when or a note of fog is an
+ * inline input saved on blur. A goal's title opens its tree, where it is
+ * renamed. Reordering and archiving sit in each
  * row's menu, which works the same with a thumb as with a mouse. Archiving
  * offers an undo, and the record of it stays in the history either way.
  */
@@ -319,21 +320,14 @@ function GoalRow({
   return (
     <li className="card-pad-x row-pad flex items-start gap-2">
       <div className="min-w-0 flex-1">
-        <form action={edit}>
-          <input type="hidden" name="id" value={goal.id} />
-          <InlineInput
-            name="title"
-            required
-            maxLength={GOAL_TITLE_MAX}
-            defaultValue={goal.title}
-            key={`title-${goal.title}`}
-            aria-label={`Rename ${goal.title}`}
-            disabled={editing}
-            onBlur={commitOnBlur(goal.title, { required: true })}
-            onKeyDown={revertOnEscape(goal.title)}
-            className="font-medium"
-          />
-        </form>
+        {/* The name opens the tree, where it is renamed; editing it here
+            took the click meant for opening the goal. */}
+        <Link
+          href={`/goals/${goal.id}`}
+          className="block px-1 py-0.5 font-medium text-ink underline-offset-2 hover:underline"
+        >
+          {goal.title}
+        </Link>
         <form action={edit}>
           <input type="hidden" name="id" value={goal.id} />
           <InlineTextarea
