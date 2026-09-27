@@ -15,6 +15,7 @@
 import type { OutOfDateStep } from '@/lib/goals/answers';
 import { isStaleStepBlock, waitsOnNothing } from '@/lib/goals/dependencies';
 import { reviewLines, type ReviewGoal } from '@/lib/goals/reviews';
+import { staleLine, type StaleStep } from '@/lib/goals/stale-steps';
 import type { StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
 
@@ -71,10 +72,11 @@ export function ranRecently(lastDailyRunAt: string | null, now: number): boolean
 
 /**
  * The turn appended to the goals routine's standing prompt for the morning
- * run. It names the account and the run row already written, then every open
- * goal to give a status (plan #1074), then the steps to work and the
- * information steps whose answers are out of date (plan #989), so the session
- * does not have to decide what is ready.
+ * run. It names the account and the run row already written, then the steps
+ * of the person's that have sat for a week and need a move (plan #1083),
+ * then every open goal to give a status (plan #1074), then the steps to work
+ * and the information steps whose answers are out of date (plan #989), so
+ * the session does not have to decide what is ready or what has sat.
  */
 export function dailyRunText(input: {
   userId: string;
@@ -82,9 +84,11 @@ export function dailyRunText(input: {
   steps: ReadyStep[];
   answers?: OutOfDateStep[];
   review?: ReviewGoal[];
+  stale?: StaleStep[];
 }): string {
   const answers = input.answers ?? [];
   const review = input.review ?? [];
+  const sitting = input.stale ?? [];
   const lines = input.steps.map(
     (step) => `- "${step.title}" (goals.items id ${step.id}), under the goal "${step.goalTitle}"`,
   );
@@ -102,6 +106,18 @@ export function dailyRunText(input: {
           '(in Jobs, Gmail, their calendar or Todo), setting evidence and evidence_source with the',
           'close. Follow .claude/skills/goals/SKILL.md, "Closing a step from evidence".',
           '',
+          ...(sitting.length > 0
+            ? [
+                'Then give each of these steps of the person\'s a move. Nothing has touched them in a',
+                'week or more. Split it into smaller sub-steps, prepare it for them, or ask beside it',
+                'whether they still want it and make it wait on that question. Leave one you just',
+                'closed from evidence or merged. Follow .claude/skills/goals/SKILL.md, "Moving a step',
+                'that has sat for a week".',
+                '',
+                ...sitting.map(staleLine),
+                '',
+              ]
+            : []),
           'Then give every open goal below its status for today: one row in goals.reviews each,',
           'with a verdict of on_track, stalled, waiting_on_you, waiting_on_date or waiting_on_goal,',
           'one sentence on why, one on the next move, and next_on for the next move\'s date where it',

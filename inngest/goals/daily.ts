@@ -9,6 +9,8 @@ import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { reviewGoals } from '@/lib/goals/reviews';
 import { loadGoalActivity, loadLatestReviews } from '@/lib/goals/reviews-store';
 import { recordAndFire } from '@/lib/goals/shaping-store';
+import { STALE_STEP_LIMIT, staleSteps } from '@/lib/goals/stale-steps';
+import { loadStepTouches } from '@/lib/goals/stale-steps-store';
 import { accountToday, loadLiveTree } from '@/lib/goals/steps-store';
 import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
 
@@ -18,10 +20,11 @@ import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
  *
  * Fires the goals routine once for the owner each morning while there is an
  * open goal, with the run row written first. The brief lists every open goal
- * to give its status for the day (plan #1074), then the Claude steps that are
- * ready and the information steps with an answer out of date (plan #989). A
- * status is never more than a day old because this run writes one every day,
- * so it no longer waits for a ready step. It starts nothing when the routine
+ * to give its status for the day (plan #1074), the steps of the owner's that
+ * have sat untouched for a week and need a move (plan #1083), then the Claude
+ * steps that are ready and the information steps with an answer out of date
+ * (plan #989). A status is never more than a day old because this run writes
+ * one every day, so it no longer waits for a ready step. It starts nothing when the routine
  * is not set on the deployment, when a morning run already started in the
  * last twenty hours, or when there is no open goal and nothing to work,
  * because each run spends the owner's routine allowance. A fire that fails
@@ -41,6 +44,8 @@ export type GoalsDailyResult =
       steps: number;
       held: number;
       answers: number;
+      /** Steps of the person's that have sat for a week, listed for a move. */
+      stale: number;
     };
 
 export type GoalsDailyDeps = {
@@ -76,11 +81,12 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
 
   // A step whose start date has not come is left for a later morning.
   const today = await accountToday(client, userId, now);
-  const [{ goals, byGoal }, stale, activity, latest] = await Promise.all([
+  const [{ goals, byGoal }, stale, activity, latest, touched] = await Promise.all([
     loadLiveTree(client, { userId, today }),
     loadOutOfDateAnswers(client, userId),
     loadGoalActivity(client, userId),
     loadLatestReviews(client, { userId, now }),
+    loadStepTouches(client, userId),
   ]);
   const review = reviewGoals(
     goals.map((g) => g.goal),
@@ -101,6 +107,14 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
     return { skipped: 'no open goal, no Claude step ready and no answer out of date' };
   }
   const steps = ready.slice(0, DAILY_STEP_LIMIT);
+  // A step of the person's untouched for a week gets a move (plan #1083).
+  // Only an open goal has one, so the review above already starts the run.
+  const sitting = staleSteps(
+    goals.map((g) => g.goal),
+    byGoal,
+    touched,
+    now,
+  ).slice(0, STALE_STEP_LIMIT);
 
   const result = await recordAndFire({
     client,
@@ -108,7 +122,7 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
     job: 'daily',
     itemId: null,
     routine,
-    text: (runId) => dailyRunText({ userId, runId, steps, answers, review }),
+    text: (runId) => dailyRunText({ userId, runId, steps, answers, review, stale: sitting }),
     fetch: deps?.fetch,
   });
   // Thrown so the cron reports the stage as failed. The run row, when there
@@ -123,5 +137,6 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
     steps: steps.length,
     held: ready.length - steps.length,
     answers: answers.length,
+    stale: sitting.length,
   };
 }
