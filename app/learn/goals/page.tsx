@@ -3,7 +3,9 @@ import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadActiveAims, loadAimAreaNames, loadLevel3Counts } from '@/lib/learn/aims-store';
 import { aimPlace, type Aim, type AimPlace, type Level3Counts } from '@/lib/learn/aims';
-import { GoalsView } from './goals-view';
+import { loadPlans } from '@/lib/learn/lessons/plan-store';
+import { progressLine } from '@/lib/learn/lessons/plan-view';
+import { GoalsView, type GoalPlanLink } from './goals-view';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +23,7 @@ function placesOf(aims: Aim[], areaNames: Map<string, string>): Record<string, A
 }
 
 export default async function GoalsPage() {
-  await requireUser();
+  const user = await requireUser();
   const supabase = await createLearnClient();
 
   // A failed read becomes a line where the list would be, not a broken page.
@@ -55,6 +57,15 @@ export default async function GoalsPage() {
     }
   }
 
+  // Each goal's plan and how far through it you are (plan #1143). A failed
+  // read leaves the goals without the link rather than failing the page.
+  const plans: Record<string, GoalPlanLink> = Object.fromEntries(
+    (await loadPlans(supabase, user.id).catch(() => [])).map((plan) => [
+      plan.aimId,
+      { href: `/learn/s/${plan.subjectId}`, line: progressLine(plan.progress) },
+    ]),
+  );
+
   return (
     <>
       <PageHeader
@@ -62,7 +73,7 @@ export default async function GoalsPage() {
         description="A few broad things you want to learn, and how well. Learn now brings you cards towards them."
       />
       {aims ? (
-        <GoalsView aims={aims} places={places} level3Counts={level3Counts} />
+        <GoalsView aims={aims} places={places} level3Counts={level3Counts} plans={plans} />
       ) : (
         <p className="text-ui text-ink-muted">Your goals could not be read. Reload to try again.</p>
       )}

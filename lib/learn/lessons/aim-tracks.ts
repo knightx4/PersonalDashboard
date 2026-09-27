@@ -11,10 +11,10 @@ import { ensureOutline } from './outline';
  * pieces" and build step 6; plan #972).
  *
  * An open goal on the Goals page has a track, recorded in `aims.subject_id`
- * (learn 0056), and its Learn now cards are that track's lessons, chosen as
- * every other track's are. The goals' tracks share one lesson slot in three
- * between them (`chooseLessons`). The Level 3 goal is left out: it still
- * draws section cards from its list.
+ * (learn 0056), and the track is the goal's plan (plan #1143): its lessons are
+ * on the plan's pieces, not in Learn now, and the top-up lays its units out
+ * ahead (`plan-layout.ts`). The Level 3 goal is left out: it still draws
+ * section cards from its list.
  *
  * The track is found by the goal's name, so a goal named like a track the
  * person already has takes that track. It takes the goal's placement when the

@@ -20,7 +20,10 @@ import type { LearnOperation } from '@/lib/learn/spend';
 import type { LessonTopUpSummary } from '@/lib/learn/lessons/top-up';
 import { lessonsWanted, writeLessonsFor } from '@/lib/learn/lessons/top-up';
 import { linkAimTracks } from '@/lib/learn/lessons/aim-tracks';
+import { goalTrackIds, notPlanLessons } from '@/lib/learn/feed/plan-lessons';
 import { writeDuePieces, type PiecesPassSummary } from '@/lib/learn/lessons/pieces';
+import { layOutPlans, type PlanLayoutSummary } from '@/lib/learn/lessons/plan-layout';
+import { loadPlanLayoutsDue } from '@/lib/learn/lessons/plan-store';
 import { addTeachBackCard } from '@/lib/learn/feed/teach-back-store';
 import { writeVideoCards, type VideoCardPassResult } from '@/lib/learn/youtube/video-card-run';
 import { createFeedPicker, loadFeedFields, peopleToPickFor } from './feed-picks';
@@ -112,7 +115,10 @@ type PickedRow = {
 };
 
 async function countReady(learn: LearnSupabaseClient, userId: string): Promise<number> {
-  const { count, error } = await learn
+  // A goal's lessons are on its plan and not dealt (plan #1143), so they do
+  // not count towards the twenty.
+  const planLessons = notPlanLessons(await goalTrackIds(learn, userId));
+  let query = learn
     .from('feed_cards')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
@@ -121,6 +127,8 @@ async function countReady(learn: LearnSupabaseClient, userId: string): Promise<n
     // served as new, so they do not count towards the twenty (LEARN-NOW-SPEC,
     // "Cards after the first week").
     .not('context', 'is', null);
+  if (planLessons) query = query.or(planLessons);
+  const { count, error } = await query;
   if (error) throw new Error(`Counting your ready cards failed: ${error.message}`);
   return count ?? 0;
 }
@@ -339,6 +347,25 @@ async function topUpWith(
     });
   }
 
+  // Each goal's plan is laid out ahead, a unit or two an hour, whether or not
+  // the deck was short (plan #1143): its lessons no longer come through Learn
+  // now, so nothing else would lay out its next unit. The lay-out port writes
+  // the unit's pieces straight after.
+  const lessonPorts = createLessonPorts({ learn, core, apiKey });
+  const plans: PlanLayoutSummary | null = await layOutPlans(
+    {
+      due: (id, limit) => loadPlanLayoutsDue(learn, id, limit),
+      layOut: lessonPorts.layOut,
+      hold: lessonPorts.hold,
+      now: Date.now,
+    },
+    { userId, deadline: options.deadline },
+  ).catch((error: unknown) => {
+    console.error('[learn feed top-up] plans', error instanceof Error ? error.message : error);
+    return null;
+  });
+  for (const detail of plans?.failed ?? []) console.error('[learn feed top-up] plans', detail);
+
   // Laid-out units of goal tracks with no pieces get theirs (plan #1140),
   // whether or not the deck was short: the pieces belong to the goal's plan,
   // and this pass is how units laid out before pieces existed get them.
@@ -381,6 +408,7 @@ async function topUpWith(
     ...sections,
     ...(teachBack === 'added' ? { teachBack: true } : {}),
     ...(pieces && pieces.written + pieces.failed.length > 0 ? { pieces } : {}),
+    ...(plans && plans.laidOut.length + plans.failed.length > 0 ? { plans } : {}),
   };
   if (!lessons) return withTeach;
   return { ...withTeach, readyBefore, skipped: false, lessons };

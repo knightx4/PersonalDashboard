@@ -19,8 +19,11 @@ import { loadCurriculum, type StoredUnit } from '@/lib/learn/graph/curriculum-st
 import { unitGoal } from '@/lib/learn/graph/curriculum-payload';
 import { curriculumRows, type UnitRow } from '@/lib/learn/graph/curriculum-view';
 import { loadTrackPieces, type PieceSibling } from '@/lib/learn/lessons/piece-store';
+import { loadPlan, planGoalFor } from '@/lib/learn/lessons/plan-store';
+import type { PlanUnit } from '@/lib/learn/lessons/plan-view';
 import { deleteSubject } from './actions';
 import { WriteCurriculum } from './curriculum';
+import { PlanSection } from './plan';
 import { PullArticles } from './pull-articles';
 import { PullCourse } from './pull-course';
 import {
@@ -264,6 +267,10 @@ export default async function SubjectPage({
     // A goal's pieces that cannot be read leave the units without their links.
     loadTrackPieces(supabase, user.id, id).catch(() => new Map<string, PieceSibling[]>()),
   ]);
+  // A learning goal's track opens on its plan (plan #1143). A plan that
+  // cannot be read leaves the page as an ordinary track's.
+  const planGoal = await planGoalFor(supabase, user.id, id).catch(() => null);
+  const plan: PlanUnit[] | null = planGoal ? await loadPlan(supabase, user.id, id).catch(() => null) : null;
   const counts = countStates(graph);
   const { rows: unitRows, outside } = curriculumRows(units, goals, graph);
   const live =
@@ -356,10 +363,30 @@ export default async function SubjectPage({
         </p>
       )}
 
+      {plan && !showEverything && <PlanSection subjectId={id} units={plan} />}
+
       {units.length === 0 ? (
         <WriteCurriculum subjectId={id} />
       ) : (
-        !showEverything && (
+        !showEverything &&
+        (plan ? (
+          // The plan lists the pieces; the ideas behind each unit stay a fold
+          // away, with the forms that open a unit or go deeper in one.
+          <SectionFold title="The ideas behind each unit" defaultOpen={false} className="mb-6">
+            <ol className={cn(cardVariants(), 'divide-y divide-border')}>
+              {unitRows.map((row) => (
+                <UnitSection
+                  key={row.unit.id}
+                  row={row}
+                  graph={graph}
+                  subjectId={id}
+                  timezone={settings.timezone}
+                  pieces={[]}
+                />
+              ))}
+            </ol>
+          </SectionFold>
+        ) : (
           <section className="mb-6">
             <h2 className="mb-2 text-ui font-semibold text-ink-muted">
               Curriculum · {unitRows.filter((row) => row.state === 'done').length} of{' '}
@@ -378,7 +405,7 @@ export default async function SubjectPage({
               ))}
             </ol>
           </section>
-        )
+        ))
       )}
 
       {units.length > 0 && !showEverything ? (

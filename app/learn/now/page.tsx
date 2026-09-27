@@ -12,6 +12,8 @@ import { countReadyCards, loadFeedPage } from '@/lib/learn/feed/load';
 import { relatedNotesForCards } from '@/lib/learn/feed/related-notes';
 import { READY_LOW } from '@/lib/learn/feed/top-up';
 import { loadReadNow } from '@/lib/learn/tracks/load';
+import { loadPlans, type PlanSummary } from '@/lib/learn/lessons/plan-store';
+import { PlansShelf } from '@/components/learn/plans-shelf';
 import { openReading } from '../r/[id]/actions';
 import { LearnNowFeed } from './feed';
 import { FinishButton } from './finish-button';
@@ -41,6 +43,9 @@ export const maxDuration = 300;
  * Track offers, a new theme or a resting track, are on Tracks rather than
  * here (note 8a1789df): the deck is for reading.
  *
+ * Each learning goal's plan is listed above the deck with its progress (plan
+ * #1143), since a goal's lessons are on its plan and no longer in the deck.
+ *
  * A card shows up to two of your own notes on its idea (plan #1113). For the
  * first cards the lookup is started here and passed down unawaited, one
  * promise a card, so the deck paints first and the notes stream in under the
@@ -49,10 +54,12 @@ export const maxDuration = 300;
 export default async function LearnNowPage() {
   const user = await requireUser();
   const supabase = await createLearnClient();
-  const [readings, cards, ready] = await Promise.all([
+  const [readings, cards, ready, plans] = await Promise.all([
     loadReadNow(supabase),
     loadFeedPage(supabase, []),
     countReadyCards(supabase),
+    // Plans that cannot be read leave the shelf off rather than the page.
+    loadPlans(supabase, user.id).catch((): PlanSummary[] => []),
   ]);
   // Opening the page counts as a response: when seven or fewer are ready,
   // more are written while you read the first.
@@ -140,6 +147,8 @@ export default async function LearnNowPage() {
           </ul>
         </Card>
       )}
+
+      <PlansShelf plans={plans} />
 
       <LearnNowFeed first={cards} firstRelated={firstRelated} ready={ready} low={READY_LOW} />
     </div>
