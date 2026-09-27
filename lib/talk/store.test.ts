@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
-import { appendTurns, loadConversation, loadConversations } from './store';
+import { appendTurns, listConversations, loadConversation, loadConversations, startAsk } from './store';
 
 /**
  * The loader and the append, against a client that records what it was asked
@@ -19,6 +19,8 @@ function fakeClient(rows: { conversations?: unknown[]; conversation?: unknown; i
         select: (...args: unknown[]) => (calls.push({ table, op: 'select', args }), chain),
         eq: (...args: unknown[]) => (calls.push({ table, op: 'eq', args }), chain),
         in: (...args: unknown[]) => (calls.push({ table, op: 'in', args }), chain),
+        order: (...args: unknown[]) => (calls.push({ table, op: 'order', args }), chain),
+        limit: (...args: unknown[]) => (calls.push({ table, op: 'limit', args }), chain),
         upsert: async (...args: unknown[]) => {
           calls.push({ table, op: 'upsert', args });
           return { error: null };
@@ -114,5 +116,90 @@ describe('appendTurns', () => {
     const { client, calls } = fakeClient({});
     expect(await appendTurns(client, 'user-1', { kind: 'feed_card', ref: 'card-1' }, [])).toEqual([]);
     expect(calls).toEqual([]);
+  });
+});
+
+describe('an ask conversation', () => {
+  it('starts one per question, named by its own id, titled with the question', async () => {
+    const { client, calls } = fakeClient({});
+    const subject = await startAsk(client, 'user-1', '  What did I spend\non eBay flips this quarter?  ');
+
+    expect(subject.kind).toBe('ask');
+    expect(subject.title).toBe('What did I spend on eBay flips this quarter?');
+    const insert = calls.find((call) => call.op === 'insert');
+    expect(insert?.table).toBe('conversations');
+    expect(insert?.args[0]).toEqual({
+      id: subject.ref,
+      user_id: 'user-1',
+      subject_kind: 'ask',
+      subject_ref: subject.ref,
+      title: subject.title,
+    });
+  });
+
+  it('keeps what Dash looked up and cited on its own turn, and nothing on the person\'s', async () => {
+    const citation = { table: 'job_search.applications', ref: 'app-1', title: 'Acme', href: '/job-search/app-1' };
+    const toolCall = { name: 'search', input: { q: 'Acme' }, result: [citation] };
+    const { client, calls } = fakeClient({
+      conversation: { id: 'conv-1' },
+      inserted: [
+        { id: 't1', role: 'user', body: 'Acme?', created_at: '1', tool_calls: null, citations: null },
+        { id: 't2', role: 'assistant', body: 'Applied.', created_at: '2', tool_calls: [toolCall], citations: [citation] },
+      ],
+    });
+
+    const turns = await appendTurns(client, 'user-1', { kind: 'ask', ref: 'conv-1' }, [
+      { role: 'user', body: 'Acme?', citations: [citation] },
+      { role: 'assistant', body: 'Applied.', toolCalls: [toolCall], citations: [citation] },
+    ]);
+
+    const upsert = calls.find((call) => call.op === 'upsert');
+    expect(upsert?.args[0]).toMatchObject({ id: 'conv-1', subject_kind: 'ask', subject_ref: 'conv-1' });
+    const insert = calls.find((call) => call.op === 'insert');
+    expect(insert?.args[0]).toEqual([
+      { conversation_id: 'conv-1', user_id: 'user-1', role: 'user', body: 'Acme?' },
+      {
+        conversation_id: 'conv-1',
+        user_id: 'user-1',
+        role: 'assistant',
+        body: 'Applied.',
+        tool_calls: [toolCall],
+        citations: [citation],
+      },
+    ]);
+    expect(turns[0]).not.toHaveProperty('citations');
+    expect(turns[1].toolCalls).toEqual([toolCall]);
+    expect(turns[1].citations).toEqual([citation]);
+  });
+
+  it('lists past questions by their last turn, newest first', async () => {
+    const { client, calls } = fakeClient({
+      conversations: [
+        {
+          id: 'c2',
+          subject_kind: 'ask',
+          subject_ref: 'c2',
+          title: 'Newer start',
+          created_at: '2026-09-27T09:00:00+00:00',
+          conversation_turns: [],
+        },
+        {
+          id: 'c1',
+          subject_kind: 'ask',
+          subject_ref: 'c1',
+          title: 'Older start, added to since',
+          created_at: '2026-09-26T09:00:00+00:00',
+          conversation_turns: [{ created_at: '2026-09-26T09:00:01+00:00' }, { created_at: '2026-09-27T10:00:00+00:00' }],
+        },
+      ],
+    });
+
+    const list = await listConversations(client, 'ask');
+
+    expect(list.map((row) => [row.id, row.lastAt, row.turnCount])).toEqual([
+      ['c1', '2026-09-27T10:00:00+00:00', 2],
+      ['c2', '2026-09-27T09:00:00+00:00', 0],
+    ]);
+    expect(calls).toContainEqual({ table: 'conversations', op: 'eq', args: ['subject_kind', 'ask'] });
   });
 });

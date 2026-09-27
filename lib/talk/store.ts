@@ -3,10 +3,11 @@ import 'server-only';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import {
+  askTitle,
   toTalkTurn,
   TURN_SELECT,
+  type NewTalkTurn,
   type SubjectKind,
-  type TalkRole,
   type TalkSubject,
   type TalkTurn,
   type TalkTurnRow,
@@ -81,13 +82,16 @@ export async function appendTurns(
   core: CoreSupabaseClient,
   userId: string,
   subject: TalkSubject,
-  turns: readonly { role: TalkRole; body: string }[],
+  turns: readonly NewTalkTurn[],
 ): Promise<TalkTurn[]> {
   if (turns.length === 0) return [];
 
   // Starting it is a no-op when it exists, so the title it began with stays.
+  // An `ask` conversation's id is its ref (conversations_ask_ref_ck), and the
+  // check runs before the conflict is found, so the id goes in with it.
   const { error: startError } = await core.from('conversations').upsert(
     {
+      ...(subject.kind === 'ask' ? { id: subject.ref } : {}),
       user_id: userId,
       subject_kind: subject.kind,
       subject_ref: subject.ref,
@@ -115,9 +119,91 @@ export async function appendTurns(
         user_id: userId,
         role: turn.role,
         body: turn.body,
+        // Only Dash's turns carry these (conversation_turns_*_ck), and an
+        // empty list is stored as nothing.
+        ...(turn.role === 'assistant' && turn.toolCalls?.length ? { tool_calls: turn.toolCalls } : {}),
+        ...(turn.role === 'assistant' && turn.citations?.length ? { citations: turn.citations } : {}),
       })),
     )
     .select(TURN_SELECT);
   if (error) throw new Error(`Keeping that failed: ${error.message}`);
   return ((data ?? []) as TalkTurnRow[]).map(toTalkTurn).sort(byTime);
+}
+
+/**
+ * Starts a conversation for a question asked from anywhere (kind `ask`, plan
+ * #1086) and returns its subject, for appendTurns and loadConversation. Every
+ * question starts a new one: the id is made here so the ref can be the same
+ * id, which the table checks. The title is the question, cut to one line.
+ */
+export async function startAsk(
+  core: CoreSupabaseClient,
+  userId: string,
+  question: string,
+): Promise<TalkSubject & { kind: 'ask' }> {
+  const id = crypto.randomUUID();
+  const title = askTitle(question) || null;
+  const { error } = await core
+    .from('conversations')
+    .insert({ id, user_id: userId, subject_kind: 'ask', subject_ref: id, title });
+  assertSchemaExposed(error, CORE_SCHEMA);
+  if (error) throw new Error(`Starting the conversation failed: ${error.message}`);
+  return { kind: 'ask', ref: id, title };
+}
+
+/** One conversation in a list of them, newest activity first. */
+export type ConversationSummary = {
+  id: string;
+  kind: SubjectKind;
+  ref: string;
+  title: string | null;
+  createdAt: string;
+  /** When the last turn was written; the start when it has none. */
+  lastAt: string;
+  turnCount: number;
+};
+
+type SummaryRow = {
+  id: string;
+  subject_kind: string;
+  subject_ref: string;
+  title: string | null;
+  created_at: string;
+  conversation_turns: { created_at: string }[] | null;
+};
+
+/**
+ * The conversations of one kind, most recently added to first: the list of
+ * past questions that reopens them (plan #1090). Reads the most recently
+ * started `limit` and orders those by their last turn.
+ */
+export async function listConversations(
+  core: CoreSupabaseClient,
+  kind: SubjectKind,
+  limit = 50,
+): Promise<ConversationSummary[]> {
+  const { data, error } = await core
+    .from('conversations')
+    .select('id, subject_kind, subject_ref, title, created_at, conversation_turns (created_at)')
+    .eq('subject_kind', kind)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  assertSchemaExposed(error, CORE_SCHEMA);
+  if (error) throw new Error(`Reading your conversations failed: ${error.message}`);
+
+  return ((data ?? []) as SummaryRow[])
+    .map((row) => {
+      const turns = row.conversation_turns ?? [];
+      const lastAt = turns.reduce((last, turn) => (turn.created_at > last ? turn.created_at : last), row.created_at);
+      return {
+        id: row.id,
+        kind: row.subject_kind as SubjectKind,
+        ref: row.subject_ref,
+        title: row.title,
+        createdAt: row.created_at,
+        lastAt,
+        turnCount: turns.length,
+      };
+    })
+    .sort((a, b) => b.lastAt.localeCompare(a.lastAt));
 }
