@@ -29,6 +29,10 @@ import type { LearnOperation } from '@/lib/learn/spend';
  * credentials it already holds; `recordSpend` is the same insert through RLS,
  * and this is that insert with the owner named explicitly.
  *
+ * A segment marked not searchable (lib/learn/catalogue/searchable.ts) is
+ * never read here: a stub section or a link list stays without a vector for
+ * good, which is what keeps it out of every claim's candidates.
+ *
  * Two rules the caller can rely on.
  *
  * **A segment is only given a vector for the text it still has.** The write
@@ -71,7 +75,7 @@ export type EmbeddedSegment = UnembeddedSegment & { vector: number[]; model: str
  * leaves the written rows written -- and none of that is about SQL.
  */
 export type SegmentStore = {
-  /** At most `limit` segments with no embedding. */
+  /** At most `limit` searchable segments with no embedding. */
   unembedded(limit: number): Promise<UnembeddedSegment[]>;
   /** Write the vectors whose segment still has the text it was read with. */
   store(rows: EmbeddedSegment[]): Promise<number>;
@@ -145,7 +149,7 @@ export function segmentStore(sql: postgres.Sql): SegmentStore {
       return sql<UnembeddedSegment[]>`
         select id, text
           from learn.catalogue_segments
-         where embedding is null
+         where embedding is null and searchable
          order by item_id, ordinal
          limit ${limit}`;
     },
@@ -168,7 +172,7 @@ export function segmentStore(sql: postgres.Sql): SegmentStore {
                embedded_at = now()
           from unnest(${ids}::uuid[], ${texts}::text[], ${vectors}::text[], ${models}::text[])
                as v(id, text, embedding, model)
-         where s.id = v.id and s.text = v.text
+         where s.id = v.id and s.text = v.text and s.searchable
         returning s.id`;
 
       return written.length;
