@@ -426,3 +426,65 @@ export async function loadActivity(
 
   return { runs, entries, highlights, lastSweepAt };
 }
+
+/** The changes since a given moment, for the Jobs home (plan #1152). */
+export type ActivitySince = {
+  /** Newest first, at most `limit`. */
+  entries: ActivityEntry[];
+  /** How many there are in all, so Home can say how many more the Activity tab has. */
+  total: number;
+  /** A read failed; the entries may be short, and Home says so. */
+  error: string | null;
+};
+
+/**
+ * What the syncs changed since `since`: the roles the inbox opened and the
+ * events it wrote, merged by activityEntries like the Activity tab's feed.
+ *
+ * Events you entered yourself are left out, since you already know about
+ * them, and so are the events named in `excludeEventIds`: This week lists
+ * mail waiting on you, and Home does not show the same message twice.
+ */
+export async function loadActivitySince(
+  supabase: AppSupabaseClient,
+  userId: string,
+  { since, limit, excludeEventIds = [] }: { since: string; limit: number; excludeEventIds?: readonly string[] },
+): Promise<ActivitySince> {
+  let events = supabase
+    .from('application_events')
+    .select(
+      'id, kind, source, summary, created_at, applications!inner ( roles!inner ( id, title, companies!inner ( name ) ) )',
+      { count: 'exact' },
+    )
+    .eq('user_id', userId)
+    .gt('created_at', since)
+    .neq('source', 'manual');
+  if (excludeEventIds.length > 0) {
+    events = events.not('id', 'in', `(${excludeEventIds.join(',')})`);
+  }
+
+  const [roleRows, eventRows] = await Promise.all([
+    supabase
+      .from('applications')
+      .select('id, created_at, roles!inner ( id, title, companies!inner ( name ) )', {
+        count: 'exact',
+      })
+      .eq('user_id', userId)
+      .gt('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+    events.order('created_at', { ascending: false }).limit(limit),
+  ]);
+
+  const entries = activityEntries({
+    newRoles: (roleRows.data ?? []) as unknown as NewRoleRow[],
+    events: (eventRows.data ?? []) as unknown as EventRow[],
+    limit,
+  });
+
+  return {
+    entries,
+    total: (roleRows.count ?? 0) + (eventRows.count ?? 0),
+    error: roleRows.error?.message ?? eventRows.error?.message ?? null,
+  };
+}

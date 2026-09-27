@@ -12,7 +12,7 @@ import { WaitingActions } from './waiting-actions';
 /**
  * The week itself, lifted out of the section so it can be photographed.
  *
- * ThisWeekSection loads the board and decides whether the week is clear; this
+ * ThisWeekSection takes the board and decides whether the week is clear; this
  * is the three lists. Each list's heading is an h3, under the section's h2.
  * The preview gallery cannot import a page whose first line asks for a
  * signed-in user.
