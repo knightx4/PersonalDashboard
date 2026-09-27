@@ -443,20 +443,25 @@ export type RepeatPressOptions = CatalogueSearchOptions & {
  * because PostgREST was unhappy.
  */
 async function anyEmbeddedSince(supabase: LearnSupabaseClient, at: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('catalogue_segments')
-    .select('id')
-    .gt('embedded_at', at)
-    .limit(1)
-    .maybeSingle();
+  // Segments, and the article passages an article section is now found by
+  // (plan #1132): a passage embedded since the last search is something new.
+  for (const table of ['catalogue_segments', 'catalogue_passages']) {
+    const { data, error } = await supabase
+      .from(table)
+      .select('id')
+      .gt('embedded_at', at)
+      .limit(1)
+      .maybeSingle();
 
-  assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) {
-    console.warn('[learn catalogue] reading what is new failed', error.message);
-    return true;
+    assertSchemaExposed(error, LEARN_SCHEMA);
+    if (error) {
+      console.warn('[learn catalogue] reading what is new failed', error.message);
+      return true;
+    }
+    if (data !== null) return true;
   }
 
-  return data !== null;
+  return false;
 }
 
 /**

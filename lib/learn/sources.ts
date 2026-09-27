@@ -139,6 +139,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.catalogue_items', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.catalogue_judgements', reason: 'Model judgements on catalogue items.' },
     { table: 'learn.catalogue_links', reason: 'Model links from catalogue items to concepts.' },
+    { table: 'learn.catalogue_passages', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.catalogue_providers', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.catalogue_segments', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.concept_edges', reason: 'Graph structure; read through concepts.' },

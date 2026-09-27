@@ -200,7 +200,15 @@ export function rankNearest(
     .slice(0, limit);
 }
 
-/** What `learn.nearest_catalogue_segments` returns, one row per candidate. */
+/**
+ * What `learn.nearest_catalogue_segments` returns, one row per candidate.
+ *
+ * An article section is scored by its best paragraph passage
+ * (`learn.catalogue_passages`, plan #1132) rather than by its own vector, and
+ * the row is still the section with its whole text: the similarity is the
+ * passage's, and what the judge reads is the section. Its own vector is read
+ * only while it has no passages. Lecture segments are unchanged.
+ */
 type NearestRow = {
   segment_id: string;
   item_id: string;
