@@ -86,6 +86,14 @@ export const learnSources: ModuleSources = {
       title: 'title',
     },
     {
+      table: 'learn.piece_checks',
+      module: 'Learn',
+      holds: 'Questions at the end of each piece of a learning goal\'s plan, with what they answered and whether it was right.',
+      weight: 'record',
+      search: ['question', 'response'],
+      title: 'question',
+    },
+    {
       table: 'learn.quizzes',
       module: 'Learn',
       holds: 'Quizzes they set themselves, and what each was preparing for.',

@@ -195,6 +195,13 @@ export const LEARN_OPERATIONS = [
   // Marking an answer to a unit check against the unit's outcome (plan #971),
   // from the press on the card. One Haiku call per answer.
   'mark-unit-check',
+  // Writing the question at the end of a piece of a learning goal's plan
+  // (plan #1141), on the press on the piece's page. One Haiku call, and one
+  // more for each fresh question after a wrong answer.
+  'write-piece-check',
+  // Marking an answer to a piece's check (plan #1141), from the press on the
+  // piece's page. One Haiku call per answer.
+  'mark-piece-check',
   // Dash's reply in a conversation about a Learn now card (plan #1053), made
   // by lib/talk/reply.ts. One Sonnet call per question asked on a card.
   'reply-about-card',

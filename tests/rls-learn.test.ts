@@ -126,6 +126,7 @@ describe('RLS coverage', () => {
       'opening_questions',
       'opening_sweeps',
       'phrase_explanations',
+      'piece_checks',
       'plan_pieces',
       'probes',
       'quiz_questions',
@@ -748,11 +749,51 @@ describe("the pieces a goal's unit is split into", () => {
     await expect(asUser(userA, (tx) => tx`delete from plan_pieces where id = ${pieceA}`)).rejects.toThrow();
   });
 
+  // learn 0074_piece_checks.sql (plan #1141). The owner asks and answers a
+  // piece's check; the composite key to the piece stops a check landing on
+  // someone else's.
+  it("lets the owner ask and answer a piece's check, and shows nobody else", async () => {
+    await asUser(
+      userA,
+      (tx) => tx`insert into piece_checks (user_id, piece_id, question, expected)
+                 values (${userA}, ${pieceA}, 'Why does churn compound?', 'Each month loses a share of what is left.')`,
+    );
+    await asUser(
+      userA,
+      (tx) => tx`update piece_checks set response = 'It is a share of what remains.', correct = true,
+                   marked_why = 'Right.', answered_at = now() where piece_id = ${pieceA}`,
+    );
+    const own = await asUser(userA, (tx) => tx`select correct from piece_checks`);
+    const other = await asUser(userB, (tx) => tx`select id from piece_checks`);
+    expect(own).toEqual([{ correct: true }]);
+    expect(other).toHaveLength(0);
+  });
+
+  it("refuses a check on another user's piece, and a mark without an answer", async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into piece_checks (user_id, piece_id, question, expected)
+                   values (${userB}, ${pieceA}, 'Smuggled?', 'Yes.')`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into piece_checks (user_id, piece_id, question, expected, correct)
+                   values (${userA}, ${pieceA}, 'Half marked?', 'No.', true)`,
+      ),
+    ).rejects.toThrow();
+  });
+
   it('goes with its unit and its track', async () => {
     await admin`delete from subjects where id = ${subjectA}`;
     const [row] = await admin<{ count: number }[]>`
       select count(*)::int as count from plan_pieces where id = ${pieceA}`;
     expect(row.count).toBe(0);
+    const [checks] = await admin<{ count: number }[]>`
+      select count(*)::int as count from piece_checks where piece_id = ${pieceA}`;
+    expect(checks.count).toBe(0);
   });
 });
 
