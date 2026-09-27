@@ -36,6 +36,17 @@ export const coreSources: ModuleSources = {
       title: 'sentence',
       note: "The sentence is Dash's, not theirs: read it as a lead to check against the rows in evidence (core.timeline refs, `schema.table:id`). verdict 'not_useful' means they did not want it; 'useful' that they did. week is the Monday it was written for.",
     },
+    {
+      table: 'core.year_reviews',
+      module: 'Home',
+      holds: 'What Dash wrote about each year from their timeline, with the year\'s counts and spend and the rows behind each paragraph.',
+      weight: 'incidental',
+      search: ['paragraphs'],
+      title: 'year',
+      ref: 'year',
+      href: (year) => `/timeline/year/${year}`,
+      note: "The paragraphs are Dash's, not theirs: each is {topic, text, evidence}, with evidence as core.timeline refs (`schema.table:id`). totals holds the counts per kind, spend per currency, each month, the top shops and the goals with steps done. complete is false while the year was still going when it was written; through is how far it read.",
+    },
   ],
   notSources: [
     { table: 'core.account_settings', reason: 'Settings.' },

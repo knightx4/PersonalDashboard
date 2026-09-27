@@ -199,6 +199,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // 30 tokens each, and the weekly lines; up to three sentences with their
   // ids out.
   'write-observations': background(run(SONNET, 12_000, 600)),
+  // A year of the timeline, about 600 events to September 2026 at about 25
+  // tokens each, and the totals; up to five paragraphs with their ids out.
+  'write-year-review': run(SONNET, 20_000, 2_000),
 
   // News. All but the last two from the digest cron or a script.
   'digest-issue': background(unit(HAIKU, 3_000, 300)),

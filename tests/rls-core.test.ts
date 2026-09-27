@@ -201,6 +201,61 @@ describe('observations', () => {
   });
 });
 
+describe('year reviews', () => {
+  /**
+   * The year in review (plan #1121). The page's button writes it under the
+   * person's session, so they may insert and update their own rows; a review
+   * written after its year ended is kept as it is, by the trigger.
+   */
+  async function writeReview(userId: string, year: number, complete: boolean) {
+    return asUser(
+      userId,
+      (tx) => tx`insert into core.year_reviews (user_id, year, timezone, through, complete, events, totals, paragraphs, model)
+                 values (${userId}, ${year}, 'UTC', now(), ${complete}, 25, '{}'::jsonb,
+                         '[{"topic":"shopping","text":"You placed 3 orders.","evidence":["public.orders:a"]}]'::jsonb,
+                         'claude-sonnet-5')
+                 returning id`,
+    );
+  }
+
+  it('shows the owner their review and another user none', async () => {
+    await writeReview(userA, 2020, false);
+    expect(await asUser(userA, (tx) => tx`select year from core.year_reviews where year = 2020`)).toEqual([{ year: 2020 }]);
+    expect(await asUser(userB, (tx) => tx`select year from core.year_reviews`)).toHaveLength(0);
+  });
+
+  it('refuses a review written for someone else', async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into core.year_reviews (user_id, year, timezone, through, totals)
+                   values (${userA}, 2019, 'UTC', now(), '{}'::jsonb)`,
+      ),
+    ).rejects.toThrow(/row-level security/);
+  });
+
+  it('rewrites a review written during the year, and keeps one written after it ended', async () => {
+    await writeReview(userA, 2021, false);
+    const rewritten = await asUser(
+      userA,
+      (tx) => tx`update core.year_reviews set events = 30 where year = 2021 returning events`,
+    );
+    expect(rewritten).toEqual([{ events: 30 }]);
+
+    await writeReview(userA, 2022, true);
+    await expect(
+      asUser(userA, (tx) => tx`update core.year_reviews set events = 31 where year = 2022`),
+    ).rejects.toThrow(/kept as it is/);
+  });
+
+  it('refuses paragraphs with no model behind them', async () => {
+    await expect(
+      admin`insert into core.year_reviews (user_id, year, timezone, through, totals, paragraphs)
+            values (${userA}, 2024, 'UTC', now(), '{}'::jsonb, '[{"topic":"jobs"}]'::jsonb)`,
+    ).rejects.toThrow(/year_reviews_model_ck/);
+  });
+});
+
 describe('cross-user reads', () => {
   it('shows the owner their mailbox, its jobs and its messages', async () => {
     const seen = await asUser(userA, async (tx) => ({

@@ -1,6 +1,9 @@
 import { requireUser } from '@/lib/auth/server';
 import { AppShell } from '@/components/shell/app-shell';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { estimatePaidActions, paidActionsUnder } from '@/lib/core/spend/paid-actions';
 import { isOwner } from '@/lib/dev/owner';
 import { loadModuleCounts } from '@/lib/modules/counts';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
@@ -15,12 +18,15 @@ import { loadMainCheck } from '@/lib/shell/main-check';
  */
 export default async function TimelineLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
-  const [settings, counts, raised, mainCheck, owner] = await Promise.all([
+  const core = await createCoreClient();
+  const [settings, counts, raised, mainCheck, owner, costs] = await Promise.all([
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
     loadRaisedNotifications(user.id),
     loadMainCheck(),
     isOwner({ user }),
+    // Writing a year's review is a paid press (plan #1121).
+    estimatePaidActions(core, user.id, paidActionsUnder('app/timeline/')).catch(() => ({})),
   ]);
 
   return (
@@ -38,7 +44,9 @@ export default async function TimelineLayout({ children }: { children: React.Rea
         notifications={raised}
         mainCheck={mainCheck}
       >
-        <div className="mx-auto max-w-3xl">{children}</div>
+        <PaidCostsProvider costs={costs}>
+          <div className="mx-auto max-w-3xl">{children}</div>
+        </PaidCostsProvider>
       </AppShell>
     </div>
   );
