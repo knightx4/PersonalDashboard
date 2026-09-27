@@ -199,6 +199,18 @@ naming the question, which the database allows only for a question the step
 waits on and you have answered (`migrations-goals/0051`). It reads "Dropped X
 on your answer to Y", and its Undo reopens the step.
 
+Closing a whole goal stays yours (plan #1084). When the morning run reads a
+goal's done-when as met, its status for the day is `met`, with a short
+summary of how it got there, and Today offers **Close goal** with it. A goal
+with nothing done in three weeks (no step closed as done, no reading logged)
+is offered **Park goal**: a parked goal keeps its steps and leaves the home,
+Todo and the runs until you press **Take it back up** on the All goals page.
+Both offers carry a quiet **Keep it open**, which records `kept_open_at` on
+the goal: a met status older than that is not offered again, and the three
+weeks count from it. Taking a goal back up counts the same way. The buttons
+are your own writes; the database refuses Claude any change to a goal's
+status and any write of `kept_open_at` (`migrations-goals/0052`).
+
 A step that depends on an unanswered question is written live but waits on that question,
 so it stays out of the runs until you answer.
 
@@ -322,9 +334,11 @@ usage and daily routine limits, and the dev plan and overnight runner draw on
 the same allowance. So Goals runs on a schedule rather than on every change:
 
 - **Daily, early morning.** While any goal is open, one run gives each open
-  goal its status for the day (plan #1074): on track, stalled, waiting on
-  you, waiting on a date or waiting on another goal, with one sentence on
-  why, the next move and its date. A goal with nothing done in three weeks
+  goal its status for the day (plan #1074): done-when met, on track,
+  stalled, waiting on you, waiting on a date or waiting on another goal,
+  with one sentence on why, the next move and its date. A met goal's reason
+  is a summary of how it got there, and it is the proposal to close it
+  ("Approval" above). A goal with nothing done in three weeks
   reads stalled, and its next move is added as a step (plan #1018). Before
   the verdicts, each step of yours untouched for a week gets a move (plan
   #1083, "Approval" above). The
@@ -813,7 +827,9 @@ A sketch for the migration, not the migration itself.
   work; plan #1081), `evidence` with `evidence_source` (on a step of yours
   Claude closed, what it saw and where; plan #1082), `dropped_on` (on a step
   of yours dropped on your answer, the question you answered; plan #1083),
-  `position`, and `rhythm_count` with `rhythm_period` for rhythms. A goal's
+  `kept_open_at` (on a goal, when you last kept it open against a proposal
+  to close or park it; plan #1084), `position`, and `rhythm_count` with
+  `rhythm_period` for rhythms. A goal's status can also be `parked`. A goal's
   `help_kinds` lists the weekly help it asks for, each an entry of `kind`
   (events, volunteering, reading, courses or job_leads) and a `note` on what
   to look for (plan #1027). When Claude maps a goal it proposes kinds in
@@ -840,7 +856,8 @@ A sketch for the migration, not the migration itself.
 - `goals.reviews`: each open goal's status, one row a day from the morning
   run: the verdict, why, the next move and its date (`next_on`), the step
   proposed for a stalled one, the goal a `waiting_on_goal` one waits on
-  (`waits_on_id`), and the run that wrote it. The newest row per goal is its
+  (`waits_on_id`), and the run that wrote it. A `met` verdict is the
+  proposal to close the goal, with the summary as its reason. The newest row per goal is its
   status (`loadLatestReviews` in `lib/goals/reviews-store.ts`).
 - `goals.runs`: one row per routine run, as `plan_runs` does for the dev plan.
   `job` says what fired it (`daily`, `weekly`, `goal`, `reshape`, `step`,

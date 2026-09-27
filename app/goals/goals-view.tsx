@@ -33,6 +33,7 @@ import {
   moveGoalAction,
   renameAreaAction,
   setAreaNoteAction,
+  settleGoalAction,
   type GoalsActionState,
 } from './actions';
 import { AreaPlanner } from './area-planner';
@@ -387,6 +388,9 @@ function GoalRow({
           </Link>
         </div>
         {goal.status === 'proposed' && <SettleProposedGoal goalId={goal.id} onTurnDown={archive} />}
+        {(goal.status === 'parked' || goal.status === 'done') && (
+          <TakeBackUp goalId={goal.id} status={goal.status} />
+        )}
         {editState.error && <p className="px-1 text-small text-danger">{editState.error}</p>}
       </div>
       <ActionMenu label={`${goal.title} actions`} items={items} />
@@ -423,6 +427,25 @@ function SettleProposedGoal({
       </form>
       {state.error && <span className="text-small text-danger">{state.error}</span>}
     </div>
+  );
+}
+
+/**
+ * A parked or closed goal says so where it stands, with the one move back
+ * (plan #1084). Taking it back up opens it again and counts as keeping it
+ * open, so it is not offered for parking again for three weeks.
+ */
+function TakeBackUp({ goalId, status }: { goalId: string; status: 'parked' | 'done' }) {
+  const [state, reopen, reopening] = useActionState(settleGoalAction, initial);
+  return (
+    <form action={reopen} className="flex flex-wrap items-center gap-2 px-1 pt-1">
+      <input type="hidden" name="id" value={goalId} />
+      <span className="text-small text-ink-muted">{status === 'parked' ? 'Parked' : 'Closed'}</span>
+      <Button type="submit" name="move" value="reopen" size="sm" variant="ghost" pending={reopening}>
+        {status === 'parked' ? 'Take it back up' : 'Reopen'}
+      </Button>
+      {state.error && <span className="text-small text-danger">{state.error}</span>}
+    </form>
   );
 }
 

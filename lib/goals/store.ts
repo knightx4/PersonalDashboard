@@ -315,3 +315,38 @@ export async function setGoalArchived(
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;
 }
+
+/**
+ * Your answer to a proposal to close or park a goal, or taking one back up
+ * (plan #1084). `close` and `park` act on an open goal; `keep` records that
+ * you kept it open, so the proposal is not made again on the same reading;
+ * `reopen` brings a parked or closed goal back to open and counts as keeping
+ * it open. False when the goal is not in the state the move starts from.
+ */
+export type GoalMove = 'close' | 'park' | 'keep' | 'reopen';
+
+export async function settleGoal(
+  client: GoalsSupabaseClient,
+  id: string,
+  move: GoalMove,
+): Promise<boolean> {
+  const now = new Date().toISOString();
+  const change =
+    move === 'close'
+      ? { status: 'done' }
+      : move === 'park'
+        ? { status: 'parked' }
+        : move === 'keep'
+          ? { kept_open_at: now }
+          : { status: 'open', kept_open_at: now };
+  let query = client
+    .from('items')
+    .update(change)
+    .eq('id', id)
+    .eq('level', 'goal')
+    .is('archived_at', null);
+  query = move === 'reopen' ? query.in('status', ['parked', 'done']) : query.eq('status', 'open');
+  const { data, error } = await query.select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}

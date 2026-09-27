@@ -423,6 +423,39 @@ describe('todayList ranking', () => {
   });
 });
 
+describe('proposals to close or park a goal (plan #1084)', () => {
+  const debt = goal('debt', 'Pay off student debt', 'Money');
+  const board = goal('board', 'Be a regular at your community board', 'The city');
+
+  it('puts a close with its summary early, and a park late, each with its own button', () => {
+    const list = todayList(
+      input([debt, board], [step('first', 'board'), step('flagged', 'debt', { dueOn: '2026-09-30' })], {
+        proposals: [
+          { kind: 'park', goalId: 'board', goalTitle: board.goal.title, quietDays: 23 },
+          {
+            kind: 'close',
+            goalId: 'debt',
+            goalTitle: debt.goal.title,
+            summary: 'The last loan was paid off on 20 September.',
+          },
+        ],
+      }),
+    );
+    expect(list.map((item) => [item.kind, item.id, item.action])).toEqual([
+      ['step', 'flagged', 'Done'],
+      ['close', 'debt', 'Close goal'],
+      ['step', 'first', 'Done'],
+      ['park', 'board', 'Park goal'],
+    ]);
+    expect(list[1]).toMatchObject({
+      title: 'Its done-when is met: close the goal',
+      detail: 'The last loan was paid off on 20 September.',
+      goalId: 'debt',
+    });
+    expect(list[3].title).toBe('Nothing done in 23 days: park the goal');
+  });
+});
+
 describe('helpers', () => {
   it('reads a question out of a Needs line', () => {
     expect(askedOfYou('Which board is yours? Tell me the borough.')).toBe('Which board is yours?');

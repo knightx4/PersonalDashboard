@@ -131,7 +131,8 @@ export function sendRefusal(
     return 'This goal is not approved yet. Approve it, then send its steps.';
   }
   if (goal.status !== 'open') {
-    return `This goal is ${goal.status === 'done' ? 'done' : 'dropped'}, so nothing on it is sent.`;
+    const state = goal.status === 'done' ? 'done' : goal.status === 'parked' ? 'parked' : 'dropped';
+    return `This goal is ${state}, so nothing on it is sent.`;
   }
   const proposal = [...above, step].find((node) => node.status === 'proposed');
   if (proposal) {

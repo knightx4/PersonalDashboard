@@ -2106,6 +2106,72 @@ describe('a goal is an outcome, not a practice (0041)', () => {
   });
 });
 
+describe('closing and parking a goal stays yours (plan #1084)', () => {
+  function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  async function newGoal(title: string): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title) values (${userA}, 'goal', ${areaA}, ${title})
+      returning id`;
+    return row.id;
+  }
+
+  type Row = { status: string; closed_at: Date | null; kept_open_at: Date | null };
+  async function row(id: string): Promise<Row> {
+    const [r] = await admin<Row[]>`select status, closed_at, kept_open_at from items where id = ${id}`;
+    return r;
+  }
+
+  it('lets you park a goal and take it back up, with no close recorded', async () => {
+    const goal = await newGoal('Learn to sail');
+    await asUser(userA, (tx) => tx`update items set status = 'parked' where id = ${goal}`);
+    expect(await row(goal)).toMatchObject({ status: 'parked', closed_at: null, kept_open_at: null });
+    await asUser(userA, (tx) => tx`update items set status = 'open', kept_open_at = now() where id = ${goal}`);
+    const back = await row(goal);
+    expect(back.status).toBe('open');
+    expect(back.kept_open_at).not.toBeNull();
+    const actions = (await historyOf(goal)).map((h) => h.new_values?.status).filter(Boolean);
+    expect(actions).toEqual(['open', 'parked', 'open']);
+  });
+
+  it('refuses a parked step, and kept_open_at on a step', async () => {
+    const [step] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Pick a boat') returning id`;
+    await expect(admin`update items set status = 'parked' where id = ${step.id}`).rejects.toThrow(
+      /items_parked_goal_ck/,
+    );
+    await expect(admin`update items set kept_open_at = now() where id = ${step.id}`).rejects.toThrow(
+      /items_kept_open_goal_ck/,
+    );
+  });
+
+  it('refuses Claude closing, parking or keeping open a goal, but takes its met verdict', async () => {
+    const goal = await newGoal('Clear the card balance');
+    await expect(asClaude((tx) => tx`update items set status = 'parked' where id = ${goal}`)).rejects.toThrow(
+      /may not close, drop or archive a goal/,
+    );
+    await expect(asClaude((tx) => tx`update items set status = 'done' where id = ${goal}`)).rejects.toThrow(
+      /may not close, drop or archive a goal/,
+    );
+    await expect(
+      asClaude((tx) => tx`update items set kept_open_at = now() where id = ${goal}`),
+    ).rejects.toThrow(/only you answer a proposal/);
+    await admin`
+      insert into reviews (user_id, item_id, verdict, reason, next_move)
+      values (${userA}, ${goal}, 'met', 'The balance reached zero on 20 September.', 'Close the goal.')`;
+    await asUser(userA, (tx) => tx`update items set status = 'done' where id = ${goal}`);
+    const closed = await row(goal);
+    expect(closed.status).toBe('done');
+    expect(closed.closed_at).not.toBeNull();
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`
