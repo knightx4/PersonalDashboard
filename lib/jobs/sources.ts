@@ -153,6 +153,7 @@ export const jobsSources: ModuleSources = {
   notSources: [
     { table: 'job_search.attachments', reason: 'Uploaded files; their text is in resume_versions.' },
     { table: 'job_search.excluded_senders', reason: 'Mail filtering settings.' },
+    { table: 'job_search.home_visits', reason: 'When the Jobs home was last opened.' },
     { table: 'job_search.ingested_messages', reason: 'Mail sync bookkeeping.' },
     { table: 'job_search.interview_groups', reason: 'Groups the interviews of one loop; the interviews hold the notes.' },
     { table: 'job_search.interview_group_messages', reason: 'Join rows between groups and mail.' },
