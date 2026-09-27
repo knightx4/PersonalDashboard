@@ -8,9 +8,10 @@ import { chooseLessonsFor } from '@/lib/learn/lessons/choose-load';
 import { findLessonSource, type LessonSource } from '@/lib/learn/lessons/closest-source';
 import { addLessonFloor, loadFloorsDue } from '@/lib/learn/lessons/add-floor';
 import { addNextUnit } from '@/lib/learn/lessons/add-unit';
-import { aimTrackFor } from '@/lib/learn/lessons/aim-tracks';
+import { aimTrackFor, loadGoalTracks } from '@/lib/learn/lessons/aim-tracks';
 import { ensureOutline } from '@/lib/learn/lessons/outline';
 import { layOutNextUnit } from '@/lib/learn/lessons/lay-out-unit';
+import { writeUnitPiecesRecorded } from '@/lib/learn/lessons/pieces';
 import { unitCheckWhy, type UnitCheckDue } from '@/lib/learn/lessons/unit-check';
 import { loadUnitForCheck } from '@/lib/learn/lessons/unit-check-store';
 import { UNIT_CHECK_MODEL, writeUnitCheck } from '@/lib/learn/lessons/write-unit-check';
@@ -198,7 +199,20 @@ export function createLessonPorts(context: {
 
   return {
     choose: (userId, slots) => chooseLessonsFor(learn, userId, slots),
-    layOut: (userId, subjectId) => layOutNextUnit(learn, core, userId, subjectId, apiKey),
+    layOut: async (userId, subjectId) => {
+      const result = await layOutNextUnit(learn, core, userId, subjectId, apiKey);
+      // A goal's unit is split into pieces as soon as its ideas are laid out
+      // (plan #1140). A failure here leaves it to the pieces pass, which finds
+      // laid-out units without pieces on a later run.
+      if (result.outcome === 'laid-out') {
+        const goalTracks = await loadGoalTracks(learn, userId).catch(() => new Set<string>());
+        if (goalTracks.has(subjectId)) {
+          const pieces = await writeUnitPiecesRecorded(learn, core, userId, { subjectId, unitId: result.unitId }, apiKey);
+          if (pieces.outcome === 'failed') console.error('[learn lesson top-up] pieces', pieces.detail);
+        }
+      }
+      return result;
+    },
     addUnit: (userId, subjectId, lastUnitId) => addNextUnit(learn, core, userId, subjectId, lastUnitId, apiKey),
     outline: async (userId, subjectId) => {
       const track = await aimTrackFor(learn, userId, subjectId);
