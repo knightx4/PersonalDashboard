@@ -269,7 +269,7 @@ export function stepRunViews(runs: Record<string, GoalRun>, now: number): Record
  * it on every visit after is furniture (ui finding 133242ff, plan #1038).
  */
 export function approvalLine(input: {
-  goalStatus: 'proposed' | 'open' | 'done' | 'dropped';
+  goalStatus: 'proposed' | 'open' | 'parked' | 'done' | 'dropped';
   approvedAt: string | null;
   proposed: number;
   questions: number;

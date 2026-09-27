@@ -141,7 +141,23 @@ describe('reviewLines', () => {
     expect(lines).toContain('- Done when: not written yet');
     expect(lines).toContain('- Nothing done since it was approved 40 days ago.');
     expect(lines).toContain(
-      '- Nothing done in 21 days or more: the verdict is stalled, with its next step added under it.',
+      '- Nothing done in 21 days or more: the verdict is stalled, with its next step added under it, unless its done-when is met.',
+    );
+  });
+
+  it('says when the person kept a goal open against a proposal', () => {
+    const lines = reviewLines({
+      id: 'g',
+      title: 'Pay off the cards',
+      acceptance: 'Both cards at zero.',
+      lastDoneAt: null,
+      quietDays: 3,
+      stalled: false,
+      last: null,
+      keptOpenAt: '2026-09-24T18:00:00Z',
+    });
+    expect(lines).toContain(
+      '- The person kept it open on 2026-09-24 rather than close or park it. Read it as met again only on something done since then.',
     );
   });
 });
@@ -193,14 +209,15 @@ describe('rows', () => {
     });
   });
 
-  it('labels all five verdicts', () => {
-    expect(VERDICTS).toEqual(['on_track', 'stalled', 'waiting_on_you', 'waiting_on_date', 'waiting_on_goal']);
+  it('labels all six verdicts', () => {
+    expect(VERDICTS).toEqual(['on_track', 'stalled', 'waiting_on_you', 'waiting_on_date', 'waiting_on_goal', 'met']);
     expect(VERDICTS.map((v) => VERDICT_LABELS[v])).toEqual([
       'On track',
       'Stalled',
       'Waiting on you',
       'Waiting on a date',
       'Waiting on another goal',
+      'Done-when met',
     ]);
   });
 });

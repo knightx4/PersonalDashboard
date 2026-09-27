@@ -59,6 +59,7 @@ export function nextMove(line: HomeGoal): { text: string; on: string | null } | 
 
 /** The order the summary names the verdicts in: what needs you first. */
 const SUMMARY_ORDER: (Verdict | 'none')[] = [
+  'met',
   'waiting_on_you',
   'stalled',
   'on_track',
@@ -69,6 +70,7 @@ const SUMMARY_ORDER: (Verdict | 'none')[] = [
 
 /** What a count of goals "is" or "are", singular and plural. */
 const SUMMARY_VERBS: Record<Verdict | 'none', [string, string]> = {
+  met: ['has met its done-when', 'have met their done-when'],
   waiting_on_you: ['is waiting on you', 'are waiting on you'],
   stalled: ['has stalled', 'have stalled'],
   on_track: ['is on track', 'are on track'],

@@ -1,14 +1,16 @@
 /**
- * The status of each open goal (plans #1018, #1074).
+ * The status of each open goal (plans #1018, #1074, #1084).
  *
  * Every day the daily run reads every open goal against its done-when and
- * writes a row to goals.reviews (supabase/migrations-goals/0025, 0046): one
- * of five verdicts, one sentence on why, one on the next move, and the next
- * move's date where it has one. A stalled goal also gets that next move as a
- * step under it, and the database refuses a stalled verdict without one. A
- * goal waiting on a date carries the date, and one waiting on another goal
- * names that goal. The newest row per goal is its status, and the Goals
- * pages show it.
+ * writes a row to goals.reviews (supabase/migrations-goals/0025, 0046, 0052):
+ * one of six verdicts, one sentence on why, one on the next move, and the
+ * next move's date where it has one. A stalled goal also gets that next move
+ * as a step under it, and the database refuses a stalled verdict without
+ * one. A goal waiting on a date carries the date, and one waiting on another
+ * goal names that goal. A goal whose done-when is met reads `met`, with a
+ * summary of how it got there as the reason, and Today offers to close it
+ * (lib/goals/goal-proposals.ts). The newest row per goal is its status, and
+ * the Goals pages show it.
  *
  * What the run cannot see for itself is when anything was last done on a
  * goal, so the brief says it for each goal, measured here: the newest of a
@@ -32,6 +34,7 @@ export const VERDICTS = [
   'waiting_on_you',
   'waiting_on_date',
   'waiting_on_goal',
+  'met',
 ] as const;
 export type Verdict = (typeof VERDICTS)[number];
 
@@ -41,6 +44,7 @@ export const VERDICT_LABELS: Record<Verdict, string> = {
   waiting_on_you: 'Waiting on you',
   waiting_on_date: 'Waiting on a date',
   waiting_on_goal: 'Waiting on another goal',
+  met: 'Done-when met',
 };
 
 /**
@@ -188,6 +192,8 @@ export type ReviewGoal = {
   stalled: boolean;
   /** The last verdict, when there was one. */
   last: GoalReview | null;
+  /** When you last kept it open against a proposal to close or park it (plan #1084). */
+  keptOpenAt?: string | null;
 };
 
 /** Every open goal, in tree order, with what the review needs to know about it. */
@@ -211,6 +217,7 @@ export function reviewGoals(
         quietDays,
         stalled: quietDays !== null && quietDays >= STALLED_AFTER_DAYS,
         last: latest.get(g.id) ?? null,
+        keptOpenAt: g.keptOpenAt ?? null,
       };
     });
 }
@@ -233,11 +240,16 @@ export function reviewLines(goal: ReviewGoal): string[] {
     `- ${done}`,
     ...(goal.stalled
       ? [
-          `- Nothing done in ${STALLED_AFTER_DAYS} days or more: the verdict is stalled, with its next step added under it.`,
+          `- Nothing done in ${STALLED_AFTER_DAYS} days or more: the verdict is stalled, with its next step added under it, unless its done-when is met.`,
         ]
       : []),
     ...(goal.last
       ? [`- Last verdict (${day(goal.last.createdAt)}): ${VERDICT_LABELS[goal.last.verdict].toLowerCase()}. ${goal.last.reason}`]
+      : []),
+    ...(goal.keptOpenAt
+      ? [
+          `- The person kept it open on ${day(goal.keptOpenAt)} rather than close or park it. Read it as met again only on something done since then.`,
+        ]
       : []),
   ];
 }

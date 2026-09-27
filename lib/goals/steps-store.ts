@@ -62,7 +62,8 @@ type ItemRow = {
   area_id: string | null;
   parent_id: string | null;
   kind: StepKind | null;
-  status: StepStatus;
+  /** A goal's row can also read parked (0052). */
+  status: StepStatus | 'parked';
   title: string;
   detail: string | null;
   acceptance: string | null;
@@ -89,6 +90,7 @@ type ItemRow = {
   acts: string | null;
   help_kinds: unknown;
   proposed_help_kinds: unknown;
+  kept_open_at?: string | null;
 };
 
 type LinkRow = { id: string; item_id: string; goal_id: string };
@@ -117,13 +119,15 @@ const ITEM_COLUMNS =
   'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, fog_dismissed_at, ' +
   'resolution, ' +
   'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
-  'unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds';
+  'unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds, ' +
+  'kept_open_at';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
   parentId: row.parent_id as string,
   kind: row.kind as StepKind,
-  status: row.status,
+  // A step is never parked; the database refuses it (0052).
+  status: row.status as StepStatus,
   title: row.title,
   detail: row.detail,
   acceptance: row.acceptance,
@@ -161,6 +165,7 @@ const toGoal = (row: ItemRow): Goal => ({
   dueOn: row.due_on,
   helpKinds: readHelpKinds(row.help_kinds),
   proposedHelpKinds: readHelpKinds(row.proposed_help_kinds),
+  keptOpenAt: row.kept_open_at ?? null,
 });
 
 export type GoalMap = {

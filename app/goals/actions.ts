@@ -17,6 +17,7 @@ import {
   renameArea,
   setAreaNote,
   setGoalArchived,
+  settleGoal,
   unarchiveArea,
   updateGoal,
 } from '@/lib/goals/store';
@@ -299,4 +300,38 @@ export async function archiveGoalAction(form: FormData): Promise<GoalsActionStat
     return { error: 'The goal could not be archived. Try again.' };
   }
   return saved();
+}
+
+const Move = z.enum(['close', 'park', 'keep', 'reopen']);
+
+const MOVE_WORDS: Record<z.infer<typeof Move>, string> = {
+  close: 'Closed.',
+  park: 'Parked. Take it back up from All goals.',
+  keep: 'Kept open.',
+  reopen: 'Taken back up.',
+};
+
+/**
+ * Your answer to a proposal on Today to close or park a goal, or keeping it
+ * open instead, and taking a parked or closed goal back up from All goals
+ * (plan #1084). Always your own write: the database refuses Claude a change
+ * to a goal's status.
+ */
+// latency: pending
+export async function settleGoalAction(
+  _prev: GoalsActionState,
+  form: FormData,
+): Promise<GoalsActionState> {
+  await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  const move = Move.safeParse(form.get('move'));
+  if (!id.success || !move.success) return { error: 'Could not tell which goal that was.' };
+  try {
+    const changed = await settleGoal(await createGoalsClient(), id.data, move.data);
+    if (!changed) return { error: 'That goal has already changed. Reload to see it.' };
+  } catch {
+    return { error: 'The goal could not be changed. Try again.' };
+  }
+  revalidatePath('/goals', 'layout');
+  return { done: Date.now(), message: MOVE_WORDS[move.data] };
 }

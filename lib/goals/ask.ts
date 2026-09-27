@@ -10,7 +10,8 @@
  * A comment on a step telling Claude to take it ("@dash draft this for me")
  * hands that step over (plan #1003) through the same hand-over as the row's
  * Send and Prepare, lib/goals/handover-store.ts, so it refuses what they
- * refuse and the thread says why.
+ * refuse and the thread says why. A phase with nothing of Claude's in it goes
+ * to the goals routine instead, which adds the step the comment asks for.
  *
  * The same shape as lib/comments/ask.ts for the dev pages, and the same rule:
  * every outcome the person can see is written into the thread, including the
@@ -35,7 +36,7 @@ import {
 import { askGoalReplyModel } from '@/lib/goals/comment-model';
 import { loadThreads, writeComment } from '@/lib/goals/comments-store';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
-import { commentMode, locateStep } from '@/lib/goals/handover';
+import { commentMode, hasClaudeWork, jobFor, locateStep } from '@/lib/goals/handover';
 import { sendGoalStep } from '@/lib/goals/handover-store';
 import { goalRunText, runInFlight } from '@/lib/goals/shaping';
 import { loadShaping, recordAndFire } from '@/lib/goals/shaping-store';
@@ -161,7 +162,17 @@ async function produceReply(input: GoalAskInput): Promise<GoalAskOutcome> {
           );
     // On the goal itself there is no one step to take: that is Work on this.
     if (!located) return handToRoutine(input, history, 'You asked Dash to work on the goal.');
-    return sendFromComment(input, commentMode(located.step));
+    const mode = commentMode(located.step);
+    // A phase of only your own steps gives a phase run nothing to do, so
+    // "review it for me" there is new work: a Dash step the routine adds.
+    if (jobFor(located.step, mode) === 'phase' && !hasClaudeWork(located.step)) {
+      return handToRoutine(
+        input,
+        history,
+        'You asked Dash to do work in a phase that holds only your own steps, so it needs a Dash step added for it.',
+      );
+    }
+    return sendFromComment(input, mode, history);
   }
 
   const outcomes: FilingOutcome[] = [];
@@ -225,6 +236,7 @@ function routineUnavailable(input: GoalAskInput): string | null {
 async function sendFromComment(
   input: GoalAskInput,
   mode: ReturnType<typeof commentMode>,
+  history: readonly { author: string; body: string }[],
 ): Promise<GoalAskOutcome> {
   const refuse = async (said: string): Promise<GoalAskOutcome> => {
     await say(input, said);
@@ -241,6 +253,7 @@ async function sendFromComment(
     routine: input.routine,
     mode,
     asked: input.question,
+    thread: history.map(({ author, body }) => ({ author, body })),
   });
   if (!sent.ok) return refuse(`I did not start it: ${sent.error}`);
 
