@@ -17,7 +17,11 @@ export const GOAL_FOG_MAX = 4000;
 /** supabase/migrations-goals/0029. */
 export const AREA_NOTE_MAX = 4000;
 
-export type GoalStatus = 'proposed' | 'open' | 'done' | 'dropped';
+/**
+ * A goal's status. `parked` is a goal set aside to come back to (plan #1084):
+ * it keeps its steps, leaves the home and the runs, and only a goal can be it.
+ */
+export type GoalStatus = 'proposed' | 'open' | 'parked' | 'done' | 'dropped';
 
 export type Area = {
   id: string;
@@ -49,6 +53,11 @@ export type Goal = {
   helpKinds?: HelpKindChoice[];
   /** The kinds Claude proposed when it mapped the goal, waiting for you (plan #1029). Goal page only. */
   proposedHelpKinds?: HelpKindChoice[];
+  /**
+   * When you last kept the goal open against a proposal to close or park it,
+   * or took it back up (plan #1084); null when you never have.
+   */
+  keptOpenAt?: string | null;
 };
 
 export type AreaWithGoals = Area & { goals: Goal[] };

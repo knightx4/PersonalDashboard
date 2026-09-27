@@ -3,6 +3,9 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { flagsWaiting } from '@/lib/goals/flags';
+import { goalProposals } from '@/lib/goals/goal-proposals';
+import type { GoalReview } from '@/lib/goals/reviews';
+import { loadGoalActivity, loadLatestReviews } from '@/lib/goals/reviews-store';
 import { loadGoalFlags } from '@/lib/goals/flags-store';
 import { homeRhythms, liveRhythms } from '@/lib/goals/rhythms';
 import { syncRhythms } from '@/lib/goals/rhythms-store';
@@ -36,23 +39,32 @@ export async function loadToday(
 /**
  * What Today ranks, read around a live tree the caller already has, so the
  * home reads the tree and syncs the rhythms once for Today and the goal lines
- * both (lib/goals/home-store.ts).
+ * both (lib/goals/home-store.ts). The newest review of each goal comes back
+ * beside it, for the goal lines. A failed read of the reviews or of what was
+ * last done leaves the proposals to close or park a goal out (plan #1084).
  */
 export async function loadTodayInput(
   client: GoalsSupabaseClient,
   supabase: Db,
-  { userId, today, tree }: { userId: string; today: string; tree: LiveTree },
-): Promise<TodayInput> {
+  {
+    userId,
+    today,
+    tree,
+    now = Date.now(),
+  }: { userId: string; today: string; tree: LiveTree; now?: number },
+): Promise<TodayInput & { reviews: Map<string, GoalReview> }> {
   const { goals, byGoal } = tree;
   const live = liveRhythms(
     goals.map((g) => g.goal),
     byGoal,
   );
-  const [flags, recent, going, records] = await Promise.all([
+  const [flags, recent, going, records, reviews, activity] = await Promise.all([
     loadGoalFlags(supabase, { userId }).catch(() => []),
     loadRecentSuggestions(client).catch(() => []),
     loadGoingSuggestions(client).catch(() => []),
     syncRhythms(client, userId, live, today),
+    loadLatestReviews(client, { now }).catch(() => new Map<string, GoalReview>()),
+    loadGoalActivity(client, userId).catch(() => null),
   ]);
   const titles = new Map(goals.map(({ goal }) => [goal.id, goal.title]));
   return {
@@ -63,5 +75,9 @@ export async function loadTodayInput(
     flags: flagsWaiting(flags, titles),
     suggestions: homeSuggestions(recent, today),
     didYouGo: didYouGoSuggestions(going, today),
+    proposals: activity
+      ? goalProposals({ goals: goals.map((g) => g.goal), reviews, activity, now })
+      : [],
+    reviews,
   };
 }

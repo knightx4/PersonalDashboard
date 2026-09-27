@@ -120,7 +120,7 @@ export function chooseNightSteps(input: {
 export type NightGoal = {
   id: string;
   title: string;
-  status: 'proposed' | 'open' | 'done' | 'dropped';
+  status: 'proposed' | 'open' | 'parked' | 'done' | 'dropped';
   /** When you approved its map, or null before you have. */
   approvedAt: string | null;
   createdAt: string;

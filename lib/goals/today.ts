@@ -7,7 +7,9 @@
  * go?". A Claude step blocked on a question to you (its Needs line asks
  * something) is on you as well, since answering it is what frees the step.
  * Results to read are left out: they are what Dash did, which the home lists
- * separately (plan #1076).
+ * separately (plan #1076). A proposal to close a goal whose done-when is met,
+ * or to park one nothing has moved on for three weeks, is on you too (plan
+ * #1084; lib/goals/goal-proposals.ts).
  *
  * The order, first rule first:
  *
@@ -39,6 +41,7 @@ import {
   isStepBlocked,
   waitsOnNothing,
 } from '@/lib/goals/dependencies';
+import type { GoalProposal } from '@/lib/goals/goal-proposals';
 import type { HomeRhythm } from '@/lib/goals/rhythms';
 import type { StepNode } from '@/lib/goals/steps';
 import type { Suggestion } from '@/lib/goals/suggestions';
@@ -56,14 +59,17 @@ export type TodayKind =
   | 'rhythm'
   | 'step'
   | 'suggestion'
-  | 'plan';
+  | 'plan'
+  | 'close'
+  | 'park';
 
 export type TodayItem = {
   kind: TodayKind;
   /**
    * The row the action is on: the step for a question, an ask, a step or a
    * rhythm; the raised_items row for a flag; the suggestion for a suggestion
-   * or "Did you go?"; the goal for a breakdown; the area for a plan.
+   * or "Did you go?"; the goal for a breakdown, a close or a park; the area
+   * for a plan.
    */
   id: string;
   /** What to do, as the line reads. */
@@ -95,6 +101,8 @@ export const TODAY_ACTIONS: Record<TodayKind, string> = {
   step: 'Done',
   suggestion: 'Going',
   plan: 'Review',
+  close: 'Close goal',
+  park: 'Park goal',
 };
 
 /**
@@ -102,19 +110,22 @@ export const TODAY_ACTIONS: Record<TodayKind, string> = {
  * above it, a flag is something that already happened out in the world, and
  * "Did you go?" is about a day already gone. A step of yours finishes the
  * work when you do it, where answering a blocked Claude step only lets Dash
- * start on it, so the step comes first. A proposed goal holds up nothing
- * until you want it, so it comes last.
+ * start on it, so the step comes first. A goal whose done-when is met is
+ * finished work waiting on one press, so closing it comes early. Parking a
+ * quiet goal and a proposed goal hold up nothing, so they come last.
  */
 const KIND_ORDER: Record<TodayKind, number> = {
   question: 0,
   flag: 1,
   went: 2,
-  breakdown: 3,
-  rhythm: 4,
-  step: 5,
-  ask: 6,
-  suggestion: 7,
-  plan: 8,
+  close: 3,
+  breakdown: 4,
+  rhythm: 5,
+  step: 6,
+  ask: 7,
+  suggestion: 8,
+  park: 9,
+  plan: 10,
 };
 
 export type TodayInput = {
@@ -132,6 +143,8 @@ export type TodayInput = {
   suggestions: readonly Suggestion[];
   /** The ones to ask "Did you go?" about (didYouGoSuggestions). */
   didYouGo: readonly Suggestion[];
+  /** Goals to close or park (goalProposals). */
+  proposals?: readonly GoalProposal[];
 };
 
 type Candidate = TodayItem & {
@@ -381,6 +394,20 @@ export function todayCandidates(input: TodayInput): Candidate[] {
       on: s.happensOn,
       ...(s.url ? { url: s.url } : {}),
     });
+  }
+
+  for (const p of input.proposals ?? []) {
+    const base = { id: p.goalId, goalId: p.goalId, goalTitle: p.goalTitle, unblocks: 0, on: null };
+    if (p.kind === 'close') {
+      add({ ...base, kind: 'close', title: 'Its done-when is met: close the goal', detail: p.summary });
+    } else {
+      add({
+        ...base,
+        kind: 'park',
+        title: `Nothing done in ${p.quietDays} days: park the goal`,
+        detail: 'Parking keeps its steps and takes it off the home and out of Dash\'s runs until you take it back up.',
+      });
+    }
   }
 
   return out;

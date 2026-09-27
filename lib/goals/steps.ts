@@ -35,8 +35,11 @@ export const STEP_KIND_LABELS: Record<StepKind, string> = {
   rhythm: 'Rhythm',
 };
 
-/** A step's status: a goal's four, and blocked, which only a step can be (plan #981). */
-export type StepStatus = GoalStatus | 'blocked';
+/**
+ * A step's status: a goal's, less parked, which only a goal can be (plan
+ * #1084), and blocked, which only a step can be (plan #981).
+ */
+export type StepStatus = Exclude<GoalStatus, 'parked'> | 'blocked';
 
 export const STEP_STATUS_LABELS: Record<StepStatus, string> = {
   proposed: 'Proposed',
