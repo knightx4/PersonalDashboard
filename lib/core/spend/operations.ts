@@ -85,6 +85,10 @@ export const SPEND_OPERATIONS = {
     // appointment for the agenda, during inbox ingest (plan #1127). Haiku,
     // one call per email the rules claim; background, no button.
     'read-appointment-email',
+    // A follow-up on a quiet application or a return request, written to
+    // wait on the agenda (plan #1129). Sonnet, one call per draft, at most
+    // six a person a morning from the hourly day-brief cron; background.
+    'write-draft',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one

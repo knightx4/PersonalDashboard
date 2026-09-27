@@ -2,8 +2,9 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { authorizeCron } from '@/inngest/cron/authorize';
 import { runDayBriefs } from '@/inngest/core/day-brief';
 
-// The agenda read and at most one Haiku call for each person in their morning.
-export const maxDuration = 120;
+// The agenda read and at most one Haiku call for each person in their
+// morning, after at most six Sonnet drafts written side by side (plan #1129).
+export const maxDuration = 180;
 
 /**
  * The morning brief (plan #1123).

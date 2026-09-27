@@ -13,7 +13,9 @@ import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { recordSpend } from '@/lib/core/spend/record';
 import type { CoreOperation } from '@/lib/core/spend/operations';
 import { normalizeTimeZone } from '@/lib/core/timezone';
-import { agendaFacts, goalFact, learnFact, newsFact, type BriefFact } from '@/lib/day-brief/facts';
+import { agendaFacts, briefDay, goalFact, learnFact, newsFact, type BriefFact } from '@/lib/day-brief/facts';
+import { runDraftsFor, type DraftsResult } from '@/lib/drafts/run';
+import { draftPorts } from '@/inngest/core/drafts';
 import { BRIEF_MODEL, writeBrief } from '@/lib/day-brief/model';
 import { runDayBriefFor, type DayBriefPorts, type DayBriefResult } from '@/lib/day-brief/run';
 import { dailyView } from '@/lib/goals/daily';
@@ -37,6 +39,10 @@ import { loadAgenda } from '@/lib/todo/agenda/load';
  * `written` in the ports is where the brief leaves the database: it is sent
  * as a phone notification (plan #1124) to every browser the person switched
  * it on for on the account page (core.push_subscriptions).
+ *
+ * Before the brief, in the same morning window, the run writes the day's
+ * follow-ups and return requests (plan #1129, lib/drafts/run.ts), so they
+ * are on the agenda the brief is gathered from.
  */
 
 const OPERATION: CoreOperation = 'write-day-brief';
@@ -249,7 +255,7 @@ export function dayBriefPorts(core: CoreSupabaseClient, clients: AgendaClients, 
 
 export type DayBriefsSummary = {
   people: number;
-  results: { userId: string; result: DayBriefResult }[];
+  results: { userId: string; result: DayBriefResult; drafts?: DraftsResult }[];
   failed: string[];
 };
 
@@ -262,11 +268,23 @@ export async function runDayBriefs(now: Date = new Date()): Promise<DayBriefsSum
     timezone: normalizeTimeZone(row.timezone) ?? 'UTC',
   }));
 
-  const ports = dayBriefPorts(core, serviceClients(), now);
+  const clients = serviceClients();
+  const ports = dayBriefPorts(core, clients, now);
+  const drafting = draftPorts(clients);
   const summary: DayBriefsSummary = { people: people.length, results: [], failed: [] };
   for (const person of people) {
     try {
-      summary.results.push({ userId: person.userId, result: await runDayBriefFor(ports, person, now) });
+      const day = briefDay(person.timezone, now);
+      let drafts: DraftsResult | undefined;
+      if (day) {
+        try {
+          drafts = await runDraftsFor(drafting, { userId: person.userId, today: day }, now);
+        } catch (err) {
+          // A failed draft run costs the drafts, not the brief.
+          summary.failed.push(`drafts: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+      summary.results.push({ userId: person.userId, result: await runDayBriefFor(ports, person, now), drafts });
     } catch (err) {
       summary.failed.push(err instanceof Error ? err.message : String(err));
     }
