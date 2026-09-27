@@ -136,6 +136,10 @@ export const PAID_ACTIONS = {
   'app/goals/[goalId]/document-actions.ts#readIntoFormAction': ['read-into-form'],
   // Goals: Dash's reply to a comment on a goal or a step that tags it
   'app/goals/[goalId]/comment-actions.ts#addGoalComment': ['reply-to-goal-comment'],
+
+  // Dash: a question about anything in the app, from the sheet in the shell,
+  // ⌘K or /ask (plan #1090)
+  'app/ask/actions.ts#askDashQuestion': ['ask-dash'],
 } as const satisfies Record<string, readonly OperationName[]>;
 
 export type PaidAction = keyof typeof PAID_ACTIONS;

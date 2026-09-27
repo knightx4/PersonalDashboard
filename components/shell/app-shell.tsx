@@ -20,6 +20,7 @@ import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
 import { SearchBar, type SearchBarHandle } from '@/components/shell/search-bar';
 import { CaptureButton, CaptureProvider } from '@/components/shell/capture';
+import { AskDashButton, AskDashProvider } from '@/components/shell/ask-dash';
 import { KeyHintsProvider, Kbd } from '@/components/shell/key-hints';
 import { ToastProvider } from '@/components/ui/toast';
 import { scrim } from '@/components/ui/popover';
@@ -554,6 +555,7 @@ export function AppShell({
     <ToastProvider>
       <KeyHintsProvider />
       <CaptureProvider modules={workspaces}>
+      <AskDashProvider>
         <div
           className={cn(
             // The ground, not a container: the sidebar and the page pane are both
@@ -662,7 +664,7 @@ export function AppShell({
             Lightbox it is the difference between a white strip across the top
             of a black bench and one continuous bench. */}
             <header className="sticky top-0 z-chrome bg-page/85 backdrop-blur">
-              <div className="flex h-16 items-center gap-2 px-3 sm:px-5 lg:h-14">
+              <div className="flex h-16 items-center gap-1 px-3 sm:gap-2 sm:px-5 lg:h-14">
                 <button
                   type="button"
                   onClick={() => setDrawer(true)}
@@ -688,7 +690,11 @@ export function AppShell({
                   />
                 </span>
 
-                <h2 className="font-display shrink-0 truncate text-body font-semibold tracking-tight text-shell-ink">
+                {/* Allowed to shrink, and truncate, as the last thing in the row
+                that can: on a phone the account controls (seven with Dash and
+                notifications, #1090) are wider than what is left, and a cut
+                title reads better than an account icon pushed off the edge. */}
+                <h2 className="font-display min-w-0 truncate text-body font-semibold tracking-tight text-shell-ink">
                   {title}
                 </h2>
 
@@ -770,7 +776,7 @@ export function AppShell({
                 their theme, their notifications, their feedback, their
                 account. The workspace's own settings moved into its column --
                 see sidebarInner. */}
-                <div className="flex shrink-0 items-center gap-0.5">
+                <div className="flex shrink-0 items-center sm:gap-0.5">
                   {/* Search, below lg, where there is no field in the bar. It
                   opens the same box the shortcut opens, on the same rows and
                   the same ranking, with the chip that widens it to everything
@@ -790,6 +796,9 @@ export function AppShell({
                     <span className="sr-only">Search</span>
                   </button>
 
+                  {/* Dash, from any page (plan #1090): a question about
+                  anything in the app, answered with links to what it used. */}
+                  <AskDashButton />
                   <CaptureButton />
                   <ThemePicker value={theme} />
                   <NotificationsButton notifications={notifications} />
@@ -881,6 +890,7 @@ export function AppShell({
             everything={searchingEverything}
           />
         </div>
+      </AskDashProvider>
       </CaptureProvider>
     </ToastProvider>
   );

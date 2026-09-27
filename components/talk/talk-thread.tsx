@@ -1,12 +1,19 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
-import { ArrowUp, Bot, CircleUser } from 'lucide-react';
+import { useEffect, useRef, useState, useTransition } from 'react';
+import Link from 'next/link';
+import { ArrowUp, Bot, CircleUser, CornerDownRight } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
 import { commentWhen, exactTime } from '@/lib/comments/when';
-import { turnBody, MAX_TURN, type TalkRole, type TalkTurn } from '@/lib/talk/talk';
+import {
+  turnBody,
+  MAX_TURN,
+  type TalkCitation,
+  type TalkRole,
+  type TalkTurn,
+} from '@/lib/talk/talk';
 import { useClockNow } from '@/lib/use-clock-now';
 
 /**
@@ -56,8 +63,36 @@ function Turn({ turn, grouped, now }: { turn: TalkTurn; grouped: boolean; now: n
           </div>
         )}
         <p className="text-body whitespace-pre-wrap text-ink">{turn.body}</p>
+        {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} />}
       </div>
     </li>
+  );
+}
+
+/**
+ * The rows an answer rests on, each a link to where it lives (plan #1090).
+ * Only a question asked of Dash from anywhere carries these; a card's or a
+ * story's thread never does, so it draws exactly as it did.
+ */
+function Cited({ citations }: { citations: readonly TalkCitation[] }) {
+  return (
+    <ul className="pt-1" aria-label="What this answer used">
+      {citations.map((citation) => (
+        <li key={`${citation.table}:${citation.ref}`} className="flex min-w-0 items-baseline gap-1.5">
+          <CornerDownRight
+            className="size-3 shrink-0 translate-y-0.5 text-ink-ghost"
+            strokeWidth={2}
+            aria-hidden
+          />
+          <Link
+            href={citation.href}
+            className="min-w-0 truncate text-ui text-accent underline-offset-2 hover:underline"
+          >
+            {citation.title}
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -70,6 +105,8 @@ export function TalkThread({
   waiting = 'Dash is replying…',
   closed,
   hint,
+  startWriting = false,
+  ask,
 }: {
   /** Unique on the page: the textarea's id is built from it. */
   id: string;
@@ -88,9 +125,20 @@ export function TalkThread({
   closed?: (turns: readonly TalkTurn[]) => string | null;
   /** Beside the button that opens the box: the $ hint for what a reply costs. */
   hint?: React.ReactNode;
+  /**
+   * Open with the box already up and the cursor in it. For a surface opened
+   * in order to write, such as the Ask Dash sheet, where the button first
+   * would be a second press for the same intent.
+   */
+  startWriting?: boolean;
+  /**
+   * Send this as soon as the thread appears: the words typed into ⌘K and
+   * chosen as a question for Dash (plan #1090). Sent once per mount.
+   */
+  ask?: string;
 }) {
   const [turns, setTurns] = useState<TalkTurn[]>([...initial]);
-  const [writing, setWriting] = useState(false);
+  const [writing, setWriting] = useState(startWriting && !ask);
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [sending, startSend] = useTransition();
@@ -98,8 +146,8 @@ export function TalkThread({
   const now = useClockNow();
   const ended = sending ? null : (closed?.(turns) ?? null);
 
-  const submit = () => {
-    const checked = turnBody(draft);
+  const submit = (raw: string = draft) => {
+    const checked = turnBody(raw);
     if ('error' in checked) {
       setError(checked.error);
       return;
@@ -128,6 +176,16 @@ export function TalkThread({
       }
     });
   };
+
+  // Once per mount, including under Strict Mode's second effect run: a
+  // question sent twice is two answers paid for.
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!ask || asked.current) return;
+    asked.current = true;
+    submit(ask);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sent once, on arrival
+  }, []);
 
   return (
     <div className="space-y-2">

@@ -13,6 +13,7 @@ import {
   type SearchScope,
 } from '@/lib/search/scope';
 import { useCapture } from '@/components/shell/capture';
+import { useAskDash } from '@/components/shell/ask-dash';
 import { matchCaptureActions } from '@/lib/capture/actions';
 import { setTheme } from '@/app/theme-actions';
 import { MODULES, type ModuleId } from '@/lib/modules';
@@ -176,7 +177,7 @@ export type SearchCommand = {
   label: string;
   hint?: string;
   module?: ModuleId | null;
-  icon?: 'theme';
+  icon?: 'theme' | 'dash';
   run: () => void;
 };
 
@@ -300,6 +301,7 @@ export function useSearchRows({
   const [matching, setMatching] = useState<Matching>(() => matchingNow(account));
   const router = useRouter();
   const { open: openCapture, actions: captureActions } = useCapture();
+  const askDash = useAskDash();
 
   const commands = useMemo<SearchCommand[]>(() => {
     const visible = MODULES.filter(
@@ -552,13 +554,34 @@ export function useSearchRows({
    * putting the navigation half first is the tie-break, because it is the half
    * that is always right and always instant.
    */
-  const rows = useMemo<SearchRow[]>(
-    () => [
+  /**
+   * Ask Dash what was typed (plan #1090), on every query. Last, so a search
+   * that finds the thing still opens it on Enter, and there even when nothing
+   * matches, which is when a question is most likely what was meant. First
+   * when it ends in a question mark, since then it plainly is one. Not
+   * narrowed by the scope, because Dash reads every workspace you have.
+   */
+  const ask = useMemo<SearchCommand | null>(() => {
+    if (!askDash || needle.length < MIN_QUERY) return null;
+    return {
+      id: 'ask-dash',
+      label: needle,
+      hint: 'Ask Dash',
+      module: null,
+      icon: 'dash',
+      run: () => askDash.open(needle),
+    };
+  }, [askDash, needle]);
+
+  const rows = useMemo<SearchRow[]>(() => {
+    const found: SearchRow[] = [
       ...matches.map((command) => ({ kind: 'command' as const, command })),
       ...hits.map((hit) => ({ kind: 'hit' as const, hit })),
-    ],
-    [matches, hits],
-  );
+    ];
+    if (!ask) return found;
+    const row: SearchRow = { kind: 'command', command: ask };
+    return ask.label.endsWith('?') ? [row, ...found] : [...found, row];
+  }, [matches, hits, ask]);
 
   const run = useCallback(
     (row: SearchRow | undefined) => {
