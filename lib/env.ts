@@ -140,6 +140,10 @@ export function serverEnv() {
       CLAUDE_GOALS_ROUTINE_ID: z.string().min(1).optional(),
       /** Bearer for the goals routine. Scoped to it, not to the account. */
       CLAUDE_GOALS_ROUTINE_TOKEN: z.string().min(1).optional(),
+      /** The routine the weekly vision review fires (plan #1108). No fallback. */
+      CLAUDE_VISION_ROUTINE_ID: z.string().min(1).optional(),
+      /** Bearer for the vision review routine. Scoped to it, not to the account. */
+      CLAUDE_VISION_ROUTINE_TOKEN: z.string().min(1).optional(),
       /** BoardGameGeek approved-application token (bearer). */
       BGG_API_TOKEN: z.string().min(1).optional(),
       /** Optional. UPCitemdb paid key; the trial endpoint works without it. */

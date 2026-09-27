@@ -93,6 +93,21 @@ export function goalsRoutine(): RoutineTarget {
   };
 }
 
+/**
+ * The routine that reviews each workspace's vision -- fired once a week by
+ * /api/cron/vision-review (plan #1108).
+ *
+ * No fallback to the shared id, for the reason the goals routine has none: a
+ * review sent to the plan routine would build a step instead. With no id set
+ * the weekly tick says so and starts nothing.
+ */
+export function visionRoutine(): RoutineTarget {
+  return {
+    id: firstSet(process.env.CLAUDE_VISION_ROUTINE_ID),
+    token: firstSet(process.env.CLAUDE_VISION_ROUTINE_TOKEN, process.env.CLAUDE_API_KEY),
+  };
+}
+
 /** The beta header the routine API requires, as documented. */
 const ROUTINE_BETA = 'experimental-cc-routine-2026-04-01';
 const ANTHROPIC_VERSION = '2023-06-01';

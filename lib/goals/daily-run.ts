@@ -98,7 +98,11 @@ export function dailyRunText(input: {
     '',
     ...(review.length > 0
       ? [
-          'First, give every open goal below its status for today: one row in goals.reviews each,',
+          'First, close each step of the person\'s under these goals that you can see has happened',
+          '(in Jobs, Gmail, their calendar or Todo), setting evidence and evidence_source with the',
+          'close. Follow .claude/skills/goals/SKILL.md, "Closing a step from evidence".',
+          '',
+          'Then give every open goal below its status for today: one row in goals.reviews each,',
           'with a verdict of on_track, stalled, waiting_on_you, waiting_on_date or waiting_on_goal,',
           'one sentence on why, one on the next move, and next_on for the next move\'s date where it',
           'has one. A stalled goal also gets that next move as a step under it, named as step_id; a',

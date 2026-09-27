@@ -12,6 +12,7 @@ import { loadOvernightRun } from '@/lib/plan/overnight';
 import { runnerCard } from '@/lib/plan/runner-card';
 import { planRoutine } from '@/lib/feedback/routine';
 import { loadNotesLastRun } from '@/lib/feedback/last-worked';
+import { loadVisionReviewStatus } from '@/lib/specs/vision-review-run';
 import { NOTES_WORK_KINDS } from '@/lib/feedback/load';
 import { CHECK_BACK_COLUMNS, checkBackFrom } from '@/lib/plan/check-backs';
 import { CheckBacksPanel } from './check-backs-panel';
@@ -86,6 +87,7 @@ export default async function DevRaisedPage() {
     openNotes,
     notesLastRun,
     checkBacks,
+    vision,
   ] = await Promise.all([
     loadRaised(supabase, user.id),
     loadDigest(supabase, user.id),
@@ -115,6 +117,7 @@ export default async function DevRaisedPage() {
       .eq('user_id', user.id)
       .eq('status', 'waiting')
       .order('due_at'),
+    loadVisionReviewStatus(supabase, user.id),
   ]);
   const comingBack = (checkBacks.data ?? []).map((row) => checkBackFrom(row as Record<string, unknown>));
   const now = readClock();
@@ -169,6 +172,8 @@ export default async function DevRaisedPage() {
         goals={goals}
         openNotes={openNotes.count ?? 0}
         notesLastRun={notesLastRun}
+        vision={vision}
+        now={now}
       />
       <CheckBacksPanel rows={comingBack} now={now} />
       <DigestPanel digest={digest} />

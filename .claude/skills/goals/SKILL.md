@@ -1,6 +1,6 @@
 ---
 name: goals
-description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, choices made with judgement and written on the steps they shape, a question with lettered options only for what Claude cannot settle itself, provisional steps for what hangs on one, and the kinds of weekly help that fit the goal as a proposal on its page. Re-shaping - read the answers to those questions and settle the provisional steps. Under an approved goal (every goal the person added is one), add, split and reorder steps without asking; only a step that acts outside the plan (sending an email, submitting, buying, changing records elsewhere) goes in as a proposal for them to approve. Morning run - give each open goal its status for the day (on track, stalled, waiting on you, waiting on a date or waiting on another goal) with the next move and its date, adding that move as a step for a stalled goal, then work the ready Claude steps and store what each produced on the step. Weekly run - research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind, and leave a note on every open goal. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
+description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, choices made with judgement and written on the steps they shape, a question with lettered options only for what Claude cannot settle itself, provisional steps for what hangs on one, and the kinds of weekly help that fit the goal as a proposal on its page. Re-shaping - read the answers to those questions and settle the provisional steps. Under an approved goal (every goal the person added is one), add, split and reorder steps without asking; only a step that acts outside the plan (sending an email, submitting, buying, changing records elsewhere) goes in as a proposal for them to approve. Morning run - close each step of the person's it can see has happened (in Jobs, Gmail, the calendar or Todo) with a note naming the evidence, then give each open goal its status for the day (on track, stalled, waiting on you, waiting on a date or waiting on another goal) with the next move and its date, adding that move as a step for a stalled goal, then work the ready Claude steps and store what each produced on the step. Weekly run - research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind, and leave a note on every open goal. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
 ---
 
 # Working a goal
@@ -950,8 +950,9 @@ proposed under the goal at once.
 **After it is approved:** add steps as `open`, split one into sub-steps, move a step under another step of the
 same goal, reorder by `position`, point a step at a collection, make a step
 wait on another, block a step on the person (see "Blocked and waiting
-steps"), and merge two steps that ask for the same thing (see "Merging
-duplicate steps"). Do these without asking.
+steps"), merge two steps that ask for the same thing (see "Merging
+duplicate steps"), and close a step of the person's when you have seen that
+it happened (see "Closing a step from evidence"). Do these without asking.
 
 **Collections, approved or not:** define one, add fields to one, serve one to
 the goal, and write draft records into one. Never confirm a record, and never
@@ -962,8 +963,8 @@ the plan. See "Steps that act outside the plan".
 
 **Never, approved or not:** add a goal except as a proposal; change a goal's
 `acceptance` (its done-when); close, drop or archive a goal; drop or archive a
-`mine` or `rhythm` step other than by merging it; answer a question; approve
-anything. When one of these
+`mine` or `rhythm` step other than by merging it; close a `mine` step without
+evidence, or close a `rhythm` at all; answer a question; approve anything. When one of these
 seems right, ask it as a question step instead, with the change you would make
 as option A.
 
@@ -1034,6 +1035,98 @@ emptied "Set your pay floor" phase into the same step.
 
 Name each merge in the run's summary ("Merged 3 duplicate steps on Land your
 next role").
+
+## Closing a step from evidence
+
+A step of the person's closes as soon as you see it happened, without
+asking: an application logged in Jobs, an event on their calendar whose day
+has passed, a confirmation email, a task ticked in Todo. The close is listed
+on the Goals home with what you saw and an Undo, which is why it needs no
+approval. The morning run does this while reviewing each goal, before
+merging duplicates, so the verdict counts what is really done.
+
+Only a `mine` step with nothing open beneath it closes this way. A `claude`
+step closes on its result, a question closes when the person answers it, a
+phase closes itself when its last sub-step closes, and a rhythm repeats, so
+it never closes: evidence for a rhythm ("5 applications sent this week") is
+a line in the run summary, not a close.
+
+**What counts.** The evidence has to meet the step's whole done-when, not
+part of it, and it has to be something the person did or a party they dealt
+with confirmed, not something that only mentions the subject. Read the
+`acceptance`, then look where that kind of thing is recorded:
+
+- **Jobs** (`job_search.applications` with its role, `application_events`,
+  `interviews`). Clear: an application to the role the step names with
+  `submitted_at` set or a status other than `lead` or `drafting`; an
+  interview whose time has passed with status `completed`. Not enough: a role saved but not applied to;
+  an application with no role when the step names one.
+- **Calendar** (`todo.events`, which they put on their own calendar;
+  `goals.suggestions`). Clear: an event in `todo.events` whose day has passed
+  and which is the event the step names; a suggestion with `attended = true`.
+  Not enough: an event from a subscribed feed (`todo.feed_events`), which
+  says the event happened but not that they went; a suggestion marked
+  `going` with `attended` still null, since the home is already asking "Did
+  you go?".
+- **Todo** (`todo.tasks`). Clear: a task marked done that is the same action
+  as the step, by its title or by a link to the same row.
+- **Gmail.** Clear: a message from the other party confirming the exact
+  thing: "Your autopay is now active" for every loan the step covers, a
+  receipt for the payment the step asks for with its amount and date, "We
+  received your application for …". Not enough: a statement or reminder
+  showing a payment is due, a thread that discusses the thing, a newsletter,
+  the person's own draft, and a confirmation for a different account or
+  amount than the step names.
+
+When the evidence is older than the step, it still counts if it shows the
+done-when is met now (autopay turned on before the step was written). When
+you are unsure, leave the step open: a missed close costs the person one
+tick, and a wrong one costs them noticing it and pressing Undo.
+
+**Read the undos first.** Before closing anything, read which of your closes
+from evidence the person undid in the last sixty days:
+
+```sql
+select h.new_values ->> 'evidence_source' as source,
+       h.new_values ->> 'evidence' as evidence,
+       i.title, h.created_at,
+       exists (select 1 from goals.history u where u.undoes = h.id) as undone
+from goals.history h
+join goals.items i on i.id = h.row_id
+where h.user_id = '<user>' and h.table_name = 'items' and h.actor = 'claude'
+  and h.new_values ->> 'evidence' is not null
+  and h.created_at > now() - interval '60 days'
+order by h.created_at desc;
+```
+
+Never close a step again from the evidence it was undone on. When two of the
+last five closes from one source were undone, close from that source only
+on a message or row that names the step's exact thing, and say in the run
+summary which source you held back on and why.
+
+**How.** One update, setting the note and its source with the close:
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+update goals.items
+set status = 'done',
+    evidence = 'Your application for Finance Manager at Ramp is in Jobs, sent 12 September.',
+    evidence_source = 'jobs'
+where id = '<step id>' and user_id = '<user>' and kind = 'mine';
+```
+
+`evidence` is one line, up to 500 characters, that the person reads on the
+Goals home after "Closed <the step>:". Name the thing you saw and its date,
+and where it is: "The Nelnet email of 20 September says autopay is on for
+both loans." `evidence_source` is `jobs`, `gmail`, `calendar` or `todo`. The
+database refuses a close of one of the person's steps without both, and one
+with an open sub-step beneath it (`migrations-goals/0050`); close the
+sub-steps from their own evidence first, and the phase follows by itself.
+Reopening the step, by hand or by the Undo, clears the note.
+
+Name each close in the run summary ("Closed 2 steps from evidence on Land
+your next role").
 
 ## Steps that act outside the plan
 
@@ -1217,9 +1310,10 @@ every open goal with its done-when, when anything was last done on it (a step
 closed as done, or a reading logged), and the last verdict when there was
 one. Read each goal's tree before judging it: what is done, what is open,
 what waits on the person, what waits on a date, and what waits on you.
-Merge any two steps that ask for the same thing while you read (see "Merging
-duplicate steps"), before the verdict, so the verdict names the step that
-survived.
+First close each step of the person's that you can see has happened (see
+"Closing a step from evidence"). Then merge any two steps that ask for the
+same thing (see "Merging duplicate steps"). Both come before the verdict, so
+the verdict counts what is really done and names the step that survived.
 
 While reading, look for what is new since yesterday (rows with `created_at`
 or `updated_at` after the last morning run) in the sources each goal draws

@@ -185,6 +185,21 @@ waits for you to tick it off rather than closing with its other sub-steps. A
 step that waited on the dropped one is made to wait on the survivor too
 (`migrations-goals/0049`).
 
+Claude also closes one of your steps when it sees the step happened (plan
+#1082): an application logged in Jobs, an event on your own calendar whose
+day has passed, a ticked Todo task, or an email from the other party
+confirming the exact thing. The morning run looks for this while reviewing
+each goal. The close sets `evidence`, one line naming what was seen and when,
+and `evidence_source` (`jobs`, `gmail`, `calendar` or `todo`) in the same
+write. It reads "Closed X: <what Dash saw>" on the run's page and the Goals
+home, and its Undo reopens the step and clears the note. The database refuses
+Claude closing one of your steps without evidence, or with a sub-step still
+open beneath it (`migrations-goals/0050`), and Claude never closes a rhythm.
+Which evidence is reliable enough is tuned from the undos: before closing,
+the run reads which of its closes you undid, never closes a step again on the
+evidence it was undone on, and holds back on a source whose closes you keep
+undoing (the goals skill, "Closing a step from evidence").
+
 A step that depends on an unanswered question is written live but waits on that question,
 so it stays out of the runs until you answer.
 
@@ -794,7 +809,8 @@ A sketch for the migration, not the migration itself.
   possible day, "Steps for later"), `on_todo`, `approved_at`,
   `acts` (on a Claude step, what working it does outside the plan),
   `merged_into` (on a step dropped as a duplicate, the step that carries its
-  work; plan #1081), `position`, and `rhythm_count` with `rhythm_period` for rhythms. A goal's
+  work; plan #1081), `evidence` with `evidence_source` (on a step of yours
+  Claude closed, what it saw and where; plan #1082), `position`, and `rhythm_count` with `rhythm_period` for rhythms. A goal's
   `help_kinds` lists the weekly help it asks for, each an entry of `kind`
   (events, volunteering, reading, courses or job_leads) and a `note` on what
   to look for (plan #1027). When Claude maps a goal it proposes kinds in
