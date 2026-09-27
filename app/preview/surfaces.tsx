@@ -70,6 +70,7 @@ import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
 import { PlanOpenedSurface, PlanTreeSurface } from './plan-surfaces';
 import { GoalOpenedSurface, GoalTreeSurface } from './goal-surfaces';
+import { AskDashSurface } from './ask-surfaces';
 import {
   GoalBareSurface,
   GoalLinkingSurface,
@@ -2118,6 +2119,28 @@ function SpendEstimates() {
   );
 }
 
+/** The jobs shell with This week in it, for surfaces drawn over a whole page. */
+function PreviewShell() {
+  return (
+    <AppShell
+      account="preview"
+      module="jobs"
+      sections={shellSections}
+      settingsHref="/jobs/settings"
+      settingsLabel="Job search settings"
+      feedbackHref="/dev/bugs"
+      displayName="Chris"
+      email="chris@example.com"
+      isOwner
+      counts={{ jobs: '12', shopping: '3', todo: '8' }}
+      theme={{ kind: 'written', id: 'paper' }}
+      brief={null}
+    >
+      <TodayLists board={todayBoard} timezone="Europe/London" />
+    </AppShell>
+  );
+}
+
 export const SURFACES: readonly Surface[] = [
   {
     id: 'jobs-role-timeline',
@@ -2629,6 +2652,33 @@ export const SURFACES: readonly Surface[] = [
           />
         </div>
       </CaptureProvider>
+    ),
+  },
+
+  {
+    /* Ask Dash (plan #1090): the sheet the Dash button in the top bar opens,
+     * over the same shell as below, first on a new question with the earlier
+     * ones under it, then with an answer and the rows it used. Fixtures
+     * stand in for the server actions (ask-surfaces.tsx). */
+    id: 'ask-dash-new',
+    label: 'Ask Dash · A new question',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashSurface open>
+        <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
+    id: 'ask-dash-answer',
+    label: 'Ask Dash · An answer with its rows',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashSurface open question="What did I spend on eBay flips this quarter?">
+        <PreviewShell />
+      </AskDashSurface>
     ),
   },
 

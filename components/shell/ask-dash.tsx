@@ -1,0 +1,476 @@
+'use client';
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { createPortal } from 'react-dom';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Bot, SquarePen, X } from 'lucide-react';
+import { TalkThread, type TalkSend } from '@/components/talk/talk-thread';
+import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
+import { scrim } from '@/components/ui/popover';
+import { commentWhen } from '@/lib/comments/when';
+import type { PaidCosts } from '@/lib/core/spend/paid-actions';
+import type { ConversationSummary } from '@/lib/talk/store';
+import type { TalkTurn } from '@/lib/talk/talk';
+import { useClockNow } from '@/lib/use-clock-now';
+import {
+  askDashCosts,
+  askDashQuestion,
+  openAskQuestion,
+  recentAskQuestions,
+} from '@/app/ask/actions';
+
+/**
+ * Ask Dash, from any page (plan #1090).
+ *
+ * The Dash button in the top bar opens a sheet where you type a question and
+ * read the answer, with the rows it used as links under it. ⌘K offers the
+ * same for whatever was typed there, and sends it on arrival. The sheet is
+ * the News discuss sheet's shape (app/news/quick/discuss-sheet.tsx): up from
+ * the bottom on a phone, in from the right on a laptop, so the page stays in
+ * view beside it.
+ *
+ * A question starts a conversation that is kept (core.conversations, kind
+ * `ask`), so the sheet opens on the last few and /ask lists them all; either
+ * reopens one to carry on. Following a link in an answer closes the sheet,
+ * since the page it goes to is what was asked for.
+ *
+ * The state is in a provider for the same reason as capture's
+ * (components/shell/capture.tsx): opening it must not re-render the page, and
+ * both the button and ⌘K need to open it.
+ */
+
+/**
+ * Where the sheet reads and writes: the server actions in app/ask/actions.ts,
+ * or typed fixtures in the surface gallery, which cannot sign in.
+ */
+export type AskSource = {
+  ask: typeof askDashQuestion;
+  recent: typeof recentAskQuestions;
+  open: typeof openAskQuestion;
+  costs: typeof askDashCosts;
+};
+
+const ACTIONS: AskSource = {
+  ask: askDashQuestion,
+  recent: recentAskQuestions,
+  open: openAskQuestion,
+  costs: askDashCosts,
+};
+
+type AskDashHandle = {
+  /** Open the sheet on a new question, sending `question` at once when given. */
+  open: (question?: string) => void;
+  source: AskSource;
+};
+
+const AskDashContext = createContext<AskDashHandle | null>(null);
+
+/**
+ * The handle, or null outside the shell. Null rather than a throw so a search
+ * box drawn on its own (the gallery, a test) simply has no Ask Dash row.
+ */
+export function useAskDash(): AskDashHandle | null {
+  return useContext(AskDashContext);
+}
+
+const ACTION = 'app/ask/actions.ts#askDashQuestion';
+
+/** One opening of the sheet; the key makes a fresh one on every open. */
+type Session = { key: number; ask?: string };
+
+/**
+ * One sheet per page. A provider inside another stands down, so the gallery
+ * can wrap the whole shell in one fed with fixtures and the shell's own
+ * provider leaves the job to it.
+ */
+export function AskDashProvider({
+  source,
+  children,
+}: {
+  source?: AskSource;
+  children: React.ReactNode;
+}) {
+  const outer = useContext(AskDashContext);
+  if (outer) return <>{children}</>;
+  return <AskDashRoot source={source ?? ACTIONS}>{children}</AskDashRoot>;
+}
+
+function AskDashRoot({ source, children }: { source: AskSource; children: React.ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null);
+  const opened = useRef(0);
+  const open = useCallback((question?: string) => {
+    opened.current += 1;
+    const ask = question?.trim();
+    setSession({ key: opened.current, ask: ask || undefined });
+  }, []);
+  const close = useCallback(() => setSession(null), []);
+  const handle = useMemo<AskDashHandle>(() => ({ open, source }), [open, source]);
+
+  // A link in an answer goes somewhere else in the app, and the sheet should
+  // not stay over the page it opened.
+  const pathname = usePathname();
+  const at = useRef(pathname);
+  useEffect(() => {
+    if (at.current === pathname) return;
+    at.current = pathname;
+    setSession(null);
+  }, [pathname]);
+
+  return (
+    <AskDashContext.Provider value={handle}>
+      {children}
+      {session && (
+        <AskDashSheet key={session.key} ask={session.ask} source={source} onClose={close} />
+      )}
+    </AskDashContext.Provider>
+  );
+}
+
+/** The button in the top bar, beside capture. */
+export function AskDashButton() {
+  const handle = useAskDash();
+  if (!handle) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => handle.open()}
+      title="Ask Dash"
+      className="press flex size-8 shrink-0 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink"
+    >
+      <Bot className="size-4" strokeWidth={1.75} aria-hidden />
+      <span className="sr-only">Ask Dash</span>
+    </button>
+  );
+}
+
+/**
+ * Sends a question and keeps the conversation it started, so the next one in
+ * the same thread continues it. `onConversation` hears the ref once there is
+ * one. Shared with the /ask page's thread.
+ */
+export function useAskSend(
+  initialRef: string | null,
+  onConversation?: (ref: string) => void,
+): TalkSend {
+  const source = useAskDash()?.source ?? ACTIONS;
+  const ref = useRef(initialRef);
+  const heard = useRef(onConversation);
+  useEffect(() => {
+    heard.current = onConversation;
+  });
+  return useCallback<TalkSend>(async (body) => {
+    const result = await source.ask(body, ref.current);
+    if (result.conversation && result.conversation.ref !== ref.current) {
+      ref.current = result.conversation.ref;
+      heard.current?.(result.conversation.ref);
+    }
+    return { turns: result.turns, error: result.error };
+  }, [source]);
+}
+
+/** What Dash says while it looks: long enough that the wait needs a reason. */
+export const ASK_WAITING = 'Dash is looking it up. This can take up to twenty seconds.';
+
+/** The sheet shows a new question, or an earlier one reopened. */
+type View =
+  | { kind: 'new'; ask?: string }
+  | { kind: 'earlier'; ref: string; title: string | null };
+
+function AskDashSheet({
+  ask,
+  source,
+  onClose,
+}: {
+  ask?: string;
+  source: AskSource;
+  onClose: () => void;
+}) {
+  const [view, setView] = useState<View>({ kind: 'new', ask });
+  // Bumped on every change of view, so the thread below starts afresh.
+  const [threadKey, setThreadKey] = useState(0);
+  // Whether the question on screen has become a conversation, which is when
+  // "New question" has something to leave.
+  const [started, setStarted] = useState(false);
+  const [costs, setCosts] = useState<PaidCosts>({});
+
+  useEffect(() => {
+    let live = true;
+    source
+      .costs()
+      .then((found) => {
+        if (live) setCosts(found);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [source]);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      // Escape in the box closes the box first (TalkThread), and marks the
+      // event handled; only a second Escape closes the sheet.
+      if (event.key === 'Escape' && !event.defaultPrevented) onClose();
+    }
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [onClose]);
+
+  function show(next: View) {
+    setView(next);
+    setStarted(next.kind === 'earlier');
+    setThreadKey((key) => key + 1);
+  }
+
+  const hint = <PaidHint action={ACTION} what="Cost of each answer from Dash" />;
+
+  return createPortal(
+    <div className="fixed inset-0 z-overlay">
+      <button type="button" aria-label="Close Dash" onClick={onClose} className={scrim} />
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ask-dash-title"
+        className="absolute inset-x-0 bottom-0 flex max-h-[85dvh] flex-col rounded-t-xl border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:inset-y-0 md:left-auto md:right-0 md:max-h-none md:w-[min(30rem,100vw)] md:rounded-none md:border-l md:border-t-0 md:pb-0"
+      >
+        <PaidCostsProvider costs={costs}>
+          <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 id="ask-dash-title" className="text-ui font-semibold text-ink">
+                  Ask Dash
+                </h2>
+                {hint}
+              </div>
+              {view.kind === 'earlier' && view.title && (
+                <p className="mt-0.5 line-clamp-2 break-words text-ui text-ink-muted">
+                  {view.title}
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-0.5">
+              {started && (
+                <button
+                  type="button"
+                  onClick={() => show({ kind: 'new' })}
+                  title="New question"
+                  className="press flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
+                >
+                  <SquarePen className="size-4" strokeWidth={2} aria-hidden />
+                  <span className="sr-only">New question</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="press flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
+              >
+                <X className="size-4" strokeWidth={2} aria-hidden />
+                <span className="sr-only">Close Dash</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3">
+            {view.kind === 'new' ? (
+              <NewQuestion
+                key={threadKey}
+                ask={view.ask}
+                source={source}
+                hint={hint}
+                onStarted={() => setStarted(true)}
+                onReopen={(conversation) =>
+                  show({ kind: 'earlier', ref: conversation.ref, title: conversation.title })
+                }
+              />
+            ) : (
+              <EarlierQuestion
+                key={threadKey}
+                conversationRef={view.ref}
+                source={source}
+                hint={hint}
+              />
+            )}
+          </div>
+        </PaidCostsProvider>
+      </aside>
+    </div>,
+    document.body,
+  );
+}
+
+function NewQuestion({
+  ask,
+  source,
+  hint,
+  onStarted,
+  onReopen,
+}: {
+  ask?: string;
+  source: AskSource;
+  hint: React.ReactNode;
+  onStarted: () => void;
+  onReopen: (conversation: ConversationSummary) => void;
+}) {
+  const send = useAskSend(null, onStarted);
+  const [asked, setAsked] = useState(Boolean(ask));
+  const [recent, setRecent] = useState<{ conversations: ConversationSummary[]; error?: string } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    let live = true;
+    source
+      .recent()
+      .catch(() => ({ conversations: [], error: 'Your earlier questions could not be read.' }))
+      .then((found) => {
+        if (live) setRecent(found);
+      });
+    return () => {
+      live = false;
+    };
+  }, [source]);
+
+  return (
+    <>
+      {/* The empty state: said once, before the first question, and gone
+          once there is an answer to read instead. */}
+      {!asked && (
+        <div className="flex gap-2">
+          <div className="flex w-4 shrink-0 justify-center pt-1">
+            <Bot className="size-3.5 text-ink-ghost" strokeWidth={2} aria-hidden />
+          </div>
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <span className="text-small font-semibold text-ink">Dash</span>
+            <p className="text-body text-ink">
+              Ask me about anything in here: what you spent, who has not replied, what you wrote
+              about something. I look it up in your own things and link what I used. I only read,
+              so I cannot change anything.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <TalkThread
+        id="ask-dash"
+        turns={[]}
+        send={async (body) => {
+          setAsked(true);
+          return send(body);
+        }}
+        label={asked ? 'Ask a follow-up' : 'Ask a question'}
+        placeholder="What did I spend on eBay this month?"
+        waiting={ASK_WAITING}
+        startWriting
+        ask={ask}
+        hint={hint}
+      />
+
+      {!asked && <Earlier recent={recent} onReopen={onReopen} />}
+    </>
+  );
+}
+
+/** The last few questions, under a new one, each reopening in the sheet. */
+function Earlier({
+  recent,
+  onReopen,
+}: {
+  recent: { conversations: ConversationSummary[]; error?: string } | null;
+  onReopen: (conversation: ConversationSummary) => void;
+}) {
+  const now = useClockNow();
+  if (!recent) return null;
+  if (recent.error) return <p className="text-ui text-danger">{recent.error}</p>;
+  // A first visit has nothing earlier, and says nothing about it.
+  if (recent.conversations.length === 0) return null;
+  return (
+    <section aria-labelledby="ask-dash-earlier" className="pt-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 id="ask-dash-earlier" className="text-small font-semibold text-ink-muted">
+          Earlier questions
+        </h3>
+        <Link href="/ask" className="text-small text-accent underline-offset-2 hover:underline">
+          All of them
+        </Link>
+      </div>
+      <ul className="mt-1 divide-y divide-border">
+        {recent.conversations.map((conversation) => (
+          <li key={conversation.id}>
+            <button
+              type="button"
+              onClick={() => onReopen(conversation)}
+              className="flex w-full items-baseline gap-3 py-2 text-left hover:text-accent"
+            >
+              <span className="min-w-0 flex-1 truncate text-ui text-ink">
+                {conversation.title ?? 'A question'}
+              </span>
+              <time dateTime={conversation.lastAt} className="tabular shrink-0 text-small text-ink-muted">
+                {commentWhen(conversation.lastAt, now)}
+              </time>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function EarlierQuestion({
+  conversationRef,
+  source,
+  hint,
+}: {
+  conversationRef: string;
+  source: AskSource;
+  hint: React.ReactNode;
+}) {
+  const send = useAskSend(conversationRef);
+  const [loaded, setLoaded] = useState<{ turns: TalkTurn[]; error?: string } | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    source
+      .open(conversationRef)
+      .catch(() => ({ turns: [], error: 'That conversation could not be read. Try again.' }))
+      .then((found) => {
+        if (live) setLoaded(found);
+      });
+    return () => {
+      live = false;
+    };
+  }, [conversationRef, source]);
+
+  if (!loaded) {
+    return (
+      <p className="text-ui text-ink-muted" aria-live="polite">
+        Reading the conversation…
+      </p>
+    );
+  }
+  if (loaded.error) return <p className="text-ui text-danger">{loaded.error}</p>;
+  return (
+    <TalkThread
+      id={`ask-${conversationRef}`}
+      turns={loaded.turns}
+      send={send}
+      label="Ask a follow-up"
+      placeholder="Ask more about this"
+      waiting={ASK_WAITING}
+      hint={hint}
+    />
+  );
+}
