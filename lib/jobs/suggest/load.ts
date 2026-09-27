@@ -18,6 +18,8 @@ export type OpenSuggestion = {
   personTitle: string | null;
   sourceUrl: string | null;
   searchQuery: string | null;
+  /** Where it was found, when not by the suggestion run's own search. */
+  foundIn: string | null;
   contact: { id: string; name: string; email: string | null; linkedinUrl: string | null } | null;
   createdAt: string;
 };
@@ -37,6 +39,7 @@ type Row = {
   person_title: string | null;
   source_url: string | null;
   search_query: string | null;
+  found_in: string | null;
   created_at: string;
   contacts: { id: string; full_name: string; email: string | null; linkedin_url: string | null } | null;
   companies: { name: string; slug: string } | null;
@@ -55,13 +58,13 @@ export async function loadOpenSuggestions(
   const { data, error } = await supabase
     .from('suggestions')
     .select(
-      'id, kind, headline, why, move, channel, message, url, location, company_name, person_name, person_title, source_url, search_query, created_at, contacts ( id, full_name, email, linkedin_url ), companies ( name, slug )',
+      'id, kind, headline, why, move, channel, message, url, location, company_name, person_name, person_title, source_url, search_query, found_in, created_at, contacts ( id, full_name, email, linkedin_url ), companies ( name, slug )',
     )
     .eq('user_id', userId)
     .eq('status', 'open')
     .eq('kind', kind)
     .order('created_at', { ascending: false })
-    .limit(20);
+    .limit(50);
   // A missing table or a failed read hides the section rather than the page.
   if (error) return [];
 
@@ -85,6 +88,7 @@ export async function loadOpenSuggestions(
         personTitle: row.person_title,
         sourceUrl: row.source_url,
         searchQuery: row.search_query,
+        foundIn: row.found_in,
         contact: contact
           ? { id: contact.id, name: contact.full_name, email: contact.email, linkedinUrl: contact.linkedin_url }
           : null,

@@ -1357,6 +1357,10 @@ Before each step, report it on the run row with `now_on` the step's title
    summary in `result`, two or three sentences ending with the link. When a
    file on the same question already exists (a step that updates last
    month's breakdown), revise that file instead of writing a new one.
+
+   Every person worth contacting and every open role in what you produced
+   also goes to Jobs, as in "People and roles you find go to Jobs", whether
+   the step was about the job search or not.
 4. Store the result on the step and close the step in one write. `result` is
    the text itself (up to 100,000 characters). `result_url` is optional, for
    when it also lives at a link outside the app. Only a `claude` step takes
@@ -1417,6 +1421,60 @@ An information step the brief lists under "answers out of date" is not a
 `claude` step and gets no `result`. Work its listed answers again as in
 "Answers on an information step", leave its status alone, and name each
 answer rewritten or confirmed in the summary.
+
+### People and roles you find go to Jobs
+
+The Jobs module's Contacts and Roles pages list the people Dash recommends
+reaching out to and the open roles it recommends, from
+`job_search.suggestions`. A person or a posting that is named only in a
+step's `result` or a file never reaches those lists, so write each one there
+as well, in the same run, from any step or run that turns them up: the
+morning run, a step or phase sent from its row, a step of the person's being
+prepared, and the mapping and area runs.
+
+- **A person** is a real, named person the result suggests the person
+  contact: an alumnus at a target company, a former colleague, a recruiter,
+  a hiring manager. Not a placeholder ("your old engagement partner"), and
+  not someone already in `job_search.contacts` or in a live process with
+  them.
+- **A role** is a specific posting, title and company, that is open now,
+  with its own link. Not a company with "nothing open", and not a role
+  already in `job_search.applications`.
+
+One row each. `found_in` names the step (`Goal step: <title>`), or the file
+when no step holds it (`Research file: <title>`), and `goal_item_id` is that
+step. `why` and `move` are plain sentences, and a person's `message` is one
+ready to send, with `Subject:` on its first line when `channel` is `email`.
+`channel` is one of `linkedin_connect` (someone they do not know yet),
+`linkedin_dm`, `email`, `intro`, `event` or `other`.
+The database refuses a second row for the same posting link or the same
+person's name, so `on conflict do nothing` covers a find already listed.
+
+```sql
+insert into job_search.suggestions
+  (user_id, kind, company_name, person_name, person_title, source_url, search_query,
+   headline, why, move, channel, message, found_in, goal_item_id, model)
+values
+  ('<user>', 'reach_out', 'Alvarez & Marsal', 'Jonathan Massey', 'Director, Transaction Advisory',
+   'https://www.linkedin.com/in/…', 'Jonathan Massey Alvarez & Marsal',
+   'Jonathan Massey, Director at Alvarez & Marsal',
+   'Yale SOM, and at the firm whose due diligence opening fits your EY years best.',
+   'Send the note on LinkedIn. If he answers, ask for twenty minutes on how the team hires.',
+   'linkedin_connect', '<the message>', 'Goal step: Find Yale SOM alumni at your target companies',
+   '<step id>', 'goals run')
+on conflict do nothing;
+
+insert into job_search.suggestions
+  (user_id, kind, company_name, headline, why, move, url, location, found_in, goal_item_id, model)
+values
+  ('<user>', 'apply', 'Kroll', 'Senior Associate, Technical Accounting Advisory',
+   'Clears the $130,000 floor and uses the technical accounting work from EY.',
+   'Read the posting. Save it as a lead, then lead the resume with the revenue-testing project.',
+   'https://…', 'New York', 'Goal step: Open roles at accounting advisory firms', '<step id>', 'goals run')
+on conflict do nothing;
+```
+
+The summary says how many people and roles went to Jobs.
 
 ### Reviewing each goal
 
@@ -1597,6 +1655,8 @@ step's brief does. They will do the step; you write what they need to do it.
    Preparing it again replaces the earlier text. Something long, such as a
    full application pack or a month's budget, goes in a file linked from the
    step, as in "The morning run", with the short version in `result`.
+   A person to contact or an open role named in it goes to Jobs too, as in
+   "People and roles you find go to Jobs".
 4. Close the run row with a summary that says what you prepared and anything
    you could not find.
 
@@ -1656,8 +1716,10 @@ rule for dates:
   start date, or null for one taken at your own pace.
 - **job_leads**: open roles that fit the goal and the note. Company career
   pages and the job boards the note names. `happens_on` is the closing date
-  when there is one, else null. The Jobs module tracks applications, so a
-  lead is a pointer to a role, not an application.
+  when there is one, else null, and `place` is where the role is based. The
+  Jobs module tracks applications, so a lead is a pointer to a role, not an
+  application. Each lead with a link is copied to the Roles page's
+  recommended roles as it is written (`goals` 0055), so write it here only.
 
 Then write the finds:
 
