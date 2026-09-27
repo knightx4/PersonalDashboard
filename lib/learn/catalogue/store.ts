@@ -287,6 +287,42 @@ export async function storePassagesForItem(sql: Sql, itemId: string): Promise<St
   return { written: rows.length, removed: removed.length };
 }
 
+export type BackfilledPassages = StoredPassages & {
+  /** Articles that had a searchable section with no passages. */
+  items: number;
+};
+
+/**
+ * Cut passages for every article that has a searchable section without any
+ * (plan #1133).
+ *
+ * The backfill for articles stored before passages existed, and a repair for
+ * any a writer missed. It runs `storePassagesForItem` on each such article, so
+ * it reads the stored sections and fetches nothing, and it is idempotent: once
+ * every searchable section has its passages the query finds no article and it
+ * writes nothing. The "Pull them in" press and `npm run catalogue -- --embed`
+ * run it before the embedding pass, so the passages it writes are embedded in
+ * the same run.
+ */
+export async function storeMissingPassages(sql: Sql): Promise<BackfilledPassages> {
+  const items = await sql<{ item_id: string }[]>`
+    select distinct s.item_id
+      from learn.catalogue_segments s
+      join learn.catalogue_items i on i.id = s.item_id
+     where i.kind = 'article'
+       and s.searchable
+       and not exists (select 1 from learn.catalogue_passages p where p.segment_id = s.id)`;
+
+  let written = 0;
+  let removed = 0;
+  for (const { item_id } of items) {
+    const stored = await storePassagesForItem(sql, item_id);
+    written += stored.written;
+    removed += stored.removed;
+  }
+  return { items: items.length, written, removed };
+}
+
 /**
  * Writing a fetched course into the catalogue.
  *
