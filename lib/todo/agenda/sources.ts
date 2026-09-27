@@ -27,6 +27,8 @@ export const SOURCE_IDS = [
   'job_interviews',
   'return_deadlines',
   'goal_steps',
+  'deliveries',
+  'appointments',
 ] as const;
 
 export type SourceId = (typeof SOURCE_IDS)[number];

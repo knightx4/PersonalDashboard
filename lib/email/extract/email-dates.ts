@@ -166,3 +166,79 @@ export function extractLifecycleEventAt(
   }
   return receivedAt?.toISOString() ?? null;
 }
+
+const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+const WEEKDAY =
+  '(?:Mon(?:day)?|Tue(?:s|sday)?|Wed(?:nesday)?|Thu(?:r|rs|rsday)?|Fri(?:day)?|Sat(?:urday)?|Sun(?:day)?)\\.?';
+
+/** The phrases a shipping email puts in front of the day a parcel should come. */
+const EXPECTED_LABEL =
+  '(?:arriving|arrives|estimated\\s+delivery(?:\\s+date)?|expected\\s+delivery(?:\\s+date)?|delivery\\s+(?:estimate|expected|estimated)|estimated\\s+arrival(?:\\s+date)?|expected\\s+(?:to\\s+arrive|arrival)|scheduled\\s+delivery(?:\\s+date)?|get\\s+it|(?:will|should)\\s+arrive|delivery\\s+by)';
+
+function weekdayIndex(raw: string): number | null {
+  const lower = raw.toLowerCase().replace(/\.$/, '');
+  const index = WEEKDAYS.findIndex((day) => day.startsWith(lower.slice(0, 3)));
+  return index >= 0 ? index : null;
+}
+
+function addDaysYmd(ymd: string, days: number): string {
+  const date = new Date(`${ymd}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * A month and day with no year is in the year the email arrived, unless that
+ * puts it well before the email: "Arriving Jan 3" in a December email is next
+ * January.
+ */
+function rollForward(ymd: string, received: string, hadYear: boolean): string {
+  if (hadYear || ymd >= addDaysYmd(received, -60)) return ymd;
+  const next = `${Number(ymd.slice(0, 4)) + 1}${ymd.slice(4)}`;
+  return parseLooseCalendarDate(next, Number(next.slice(0, 4))) ?? ymd;
+}
+
+/**
+ * The day a shipping email says the parcel should arrive, as YYYY-MM-DD, or
+ * null when it names none.
+ *
+ * Read from the phrase stores print beside the date: "Arriving Wednesday,
+ * October 1", "Estimated delivery: Oct 3 - Oct 5", "Get it by Friday".
+ * "Today" and "tomorrow" and a bare weekday are counted from the day the email
+ * arrived; a range gives its first day, when the parcel may first come.
+ */
+export function extractExpectedDeliveryOn(
+  blob: string,
+  receivedAt: Date | null,
+): string | null {
+  const received = receivedYmd(receivedAt);
+  const year = Number(received.slice(0, 4));
+  const text = blob.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ');
+
+  const label = new RegExp(`\\b${EXPECTED_LABEL}\\b[:\\s]*(?:on|by)?[:\\s]*`, 'gi');
+  for (const found of text.matchAll(label)) {
+    const rest = text.slice((found.index ?? 0) + found[0].length, (found.index ?? 0) + found[0].length + 60);
+
+    const relative = rest.match(/^(today|tomorrow)\b/i);
+    if (relative) return relative[1].toLowerCase() === 'today' ? received : addDaysYmd(received, 1);
+
+    const dated =
+      rest.match(new RegExp(`^(?:${WEEKDAY},?\\s+)?(${MONTH_DAY})`, 'i')) ??
+      rest.match(new RegExp(`^(?:${WEEKDAY},?\\s+)?(\\d{1,2}\\/\\d{1,2}(?:\\/\\d{2,4})?)\\b`, 'i'));
+    if (dated) {
+      const raw = dated[1].includes('/') && dated[1].split('/').length === 2 ? `${dated[1]}/${year}` : dated[1];
+      const ymd = parseLooseCalendarDate(raw, year);
+      if (ymd) return rollForward(ymd, received, /\d{4}\s*$/.test(dated[1]));
+    }
+
+    const bareDay = rest.match(new RegExp(`^(${WEEKDAY})(?![a-z])`, 'i'));
+    if (bareDay) {
+      const wanted = weekdayIndex(bareDay[1]);
+      if (wanted != null) {
+        const from = new Date(`${received}T00:00:00Z`).getUTCDay();
+        return addDaysYmd(received, (wanted - from + 7) % 7);
+      }
+    }
+  }
+  return null;
+}

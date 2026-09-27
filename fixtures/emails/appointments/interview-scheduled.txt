@@ -1,0 +1,4 @@
+Subject: Interview appointment confirmed: Acme Corp
+From: Acme Recruiting <recruiting@acme.example>
+
+Your interview is on October 7 at 2:00 PM.

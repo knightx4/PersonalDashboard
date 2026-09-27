@@ -842,6 +842,7 @@ export const shipments = pgTable(
     status: shipmentStatus('status').notNull().default('pending'),
     shippedAt: timestamp('shipped_at', { withTimezone: true }),
     deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+    expectedOn: date('expected_on'),
     ...timestamps,
   },
   (t) => [index('shipments_order_idx').on(t.orderId)],

@@ -1,6 +1,6 @@
 import type { MessageClassification } from './schema';
 import type { ShipmentStatus } from '@/lib/status';
-import { extractLifecycleEventAt } from './email-dates';
+import { extractExpectedDeliveryOn, extractLifecycleEventAt } from './email-dates';
 import { extractOrderNumber, parseMoneyToCents } from './heuristic';
 
 export type LifecycleExtraction = {
@@ -12,6 +12,12 @@ export type LifecycleExtraction = {
   /** ISO timestamptz when known. */
   shippedAt: string | null;
   deliveredAt: string | null;
+  /**
+   * YYYY-MM-DD the parcel should arrive, from a shipping email that names one
+   * ("Arriving Wednesday", "Estimated delivery: Oct 3"), or the day an "out for
+   * delivery" email came. The agenda's deliveries source reads it.
+   */
+  expectedOn: string | null;
   refundAmountCents: number | null;
   /** Product name snippets from return/refund mail. */
   itemNameHints: string[];
@@ -167,6 +173,14 @@ export function extractLifecycleFromEmail(input: {
     status === 'delivered'
       ? extractLifecycleEventAt(blob, 'delivered', input.receivedAt ?? null)
       : null;
+  const expectedOn =
+    (input.classification === 'shipping' || input.classification === 'delivery') &&
+    status !== 'delivered'
+      ? (extractExpectedDeliveryOn(blob, input.receivedAt ?? null) ??
+        (status === 'out_for_delivery'
+          ? (input.receivedAt ?? new Date()).toISOString().slice(0, 10)
+          : null))
+      : null;
   const refundAmountCents =
     input.classification === 'return' ? extractRefundCents(blob) : null;
   const itemNameHints =
@@ -192,6 +206,7 @@ export function extractLifecycleFromEmail(input: {
     shipmentStatus: status,
     shippedAt,
     deliveredAt,
+    expectedOn,
     refundAmountCents,
     itemNameHints,
     confidence: orderNumber || trackingNumber ? 0.7 : 0.45,
