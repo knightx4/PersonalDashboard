@@ -460,6 +460,21 @@ The newsletter workspace adds three of its own, all optional:
 | `MAILGUN_SIGNING_KEY` | The HTTP webhook signing key every inbound post is checked against. Not the API key. | Mailgun, Sending → Webhooks. |
 | `MAILGUN_API_KEY` | The sending key, used only to send the unsubscribe mail a publisher asked for by address. Not the signing key. | Mailgun, Send → API keys. |
 
+The morning brief reaches a phone as a notification (plan #1124) through web
+push, which signs every message with a VAPID key pair. Both halves are set in
+the Vercel project for Production and Preview. Without them the brief is still
+written and shown on the home page, and the account page says notifications
+are not set up.
+
+| Variable | What it is | Where it comes from |
+|---|---|---|
+| `VAPID_PUBLIC_KEY` | The public half. The account page hands it to the browser when it subscribes. | `npx web-push generate-vapid-keys` |
+| `VAPID_PRIVATE_KEY` | The private half, which signs each push. Never committed. | The same command. |
+| `VAPID_SUBJECT` | Optional. Who is sending, as a `mailto:` or `https:` URL. Defaults to the production domain. | You choose it. |
+
+Replacing the pair invalidates every existing subscription: each device has to
+turn the switch on the account page off and on again.
+
 ---
 
 ## Local development
