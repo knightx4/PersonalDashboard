@@ -153,7 +153,9 @@ export async function loadJobsBrief(
     0,
   );
 
-  return events > 0 ? { text: `${plural(events, 'update')} in the last day` } : null;
+  return events > 0
+    ? { text: `${plural(events, 'update')} in the last day`, href: '/jobs/activity' }
+    : null;
 }
 
 export async function loadTodoBrief(
