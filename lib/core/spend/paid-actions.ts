@@ -176,6 +176,10 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'Fired on 2 January by pg_cron to write the year just gone for everyone with events in it; no press starts it.',
   'app/api/cron/year-review/route.ts#POST':
     'Fired on 2 January by pg_cron to write the year just gone for everyone with events in it; no press starts it.',
+  'app/api/cron/day-brief/route.ts#GET':
+    'Fired every hour by pg_cron to write the morning brief for whoever it is six to eleven in the morning for; no press starts it.',
+  'app/api/cron/day-brief/route.ts#POST':
+    'Fired every hour by pg_cron to write the morning brief for whoever it is six to eleven in the morning for; no press starts it.',
   'app/api/cron/youtube-library/route.ts#GET':
     'Fired four times a day by pg_cron to fetch and embed the YouTube library\'s transcripts; no press starts it.',
   'app/api/cron/youtube-library/route.ts#POST':

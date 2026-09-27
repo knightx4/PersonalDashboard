@@ -2,6 +2,7 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 import { createGoalsClient } from '@/lib/goals/auth/server';
+import { sessionClients } from '@/lib/todo/agenda/clients';
 import { countTowards } from '@/lib/goals/rhythms-store';
 import { progressLine } from '@/lib/goals/rhythms';
 import { loadTodoGoals, setStepStatus } from '@/lib/goals/steps-store';
@@ -55,10 +56,10 @@ export const goalStepsSource: AgendaSource = {
 
   async fetch(ctx: SourceContext): Promise<AgendaItem[]> {
     const today = todayIn(ctx.timezone, ctx.now);
-    const client = await createGoalsClient();
+    const client = await (ctx.clients ?? sessionClients).goals();
     const [{ steps, rhythms }, going] = await Promise.all([
       loadTodoGoals(client, { userId: ctx.userId, today }),
-      loadGoingSuggestions(client),
+      loadGoingSuggestions(client, ctx.userId),
     ]);
 
     const suggestionItems: AgendaItem[] = todoSuggestions(going, today, ctx.to).map((s) => ({

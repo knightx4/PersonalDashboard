@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createTodoClient } from '@/lib/todo/auth/server';
+import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { isSourceId, type SourceId } from '@/lib/todo/agenda/sources';
 
 /**
@@ -29,8 +30,11 @@ export const DEFAULT_AGENDA_SETTINGS: AgendaSettings = {
   horizonDays: 7,
 };
 
-export async function loadAgendaSettings(userId: string): Promise<AgendaSettings> {
-  const supabase = await createTodoClient();
+export async function loadAgendaSettings(
+  userId: string,
+  client?: TodoSupabaseClient,
+): Promise<AgendaSettings> {
+  const supabase = client ?? (await createTodoClient());
 
   const { data } = await supabase
     .from('agenda_settings')

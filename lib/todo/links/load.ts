@@ -2,7 +2,7 @@ import 'server-only';
 
 import { createTodoClient } from '@/lib/todo/auth/server';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
-import { TODO_SCHEMA } from '@/lib/todo/db/schema-name';
+import { TODO_SCHEMA, type TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { TARGET_COLUMNS, LINK_TARGETS, type LinkTarget, type TaskLink } from '@/lib/todo/links/model';
 import type { Task, TaskStatus } from '@/lib/todo/tasks/model';
 
@@ -90,10 +90,13 @@ export async function loadTasksFor(
  * task's anchor as it renders, which is a query per row and does not look slow
  * until the list is long.
  */
-export async function loadLinksForTasks(taskIds: string[]): Promise<TaskLink[]> {
+export async function loadLinksForTasks(
+  taskIds: string[],
+  client?: TodoSupabaseClient,
+): Promise<TaskLink[]> {
   if (taskIds.length === 0) return [];
 
-  const supabase = await createTodoClient();
+  const supabase = client ?? (await createTodoClient());
 
   const { data, error } = await supabase
     .from('task_links')

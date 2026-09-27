@@ -13,7 +13,9 @@ import { NEWS_SCHEMA, type NewsSupabaseClient } from '@/lib/news/db/schema-name'
  * session: a message posted by the mail service arrives with nobody signed in,
  * and the address it was sent to is the only thing that says whose it is. The
  * one other caller is scripts/news-digest.ts, which summarises stored issues
- * across accounts and passes each issue's own user id down.
+ * across accounts and passes each issue's own user id down, and the morning
+ * brief (inngest/core/day-brief.ts), which reads one story per person by
+ * their user id.
  * Everything a page or an action does goes through lib/news/auth/server.ts and
  * the policies instead.
  *

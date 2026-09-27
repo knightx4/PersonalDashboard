@@ -11,6 +11,7 @@ import { loadDismissals } from '@/lib/todo/agenda/dismissals';
 import { loadAgendaSettings } from '@/lib/todo/agenda/settings';
 import { activeSources } from '@/lib/todo/agenda/registry';
 import { eventContext, subscribedContext } from '@/lib/todo/agenda/events';
+import { sessionClients, type AgendaClients } from '@/lib/todo/agenda/clients';
 import { mergeAgenda, type AgendaPile } from '@/lib/todo/agenda/merge';
 import type { AgendaItem, DayContext, SourceContext } from '@/lib/todo/agenda/sources';
 
@@ -31,11 +32,18 @@ export interface Agenda {
   failed: string[];
 }
 
-export async function loadAgenda(userId: string, now: Date = new Date()): Promise<Agenda> {
+export async function loadAgenda(
+  userId: string,
+  now: Date = new Date(),
+  clients: AgendaClients = sessionClients,
+): Promise<Agenda> {
+  // Asked for once and shared: on a page each is a cookie-bound client, and
+  // from the morning brief's cron each is a service-role one.
+  const [core, todo] = await Promise.all([clients.core(), clients.todo()]);
   const [account, agendaSettings, tasks] = await Promise.all([
-    loadAccountSettings(userId),
-    loadAgendaSettings(userId),
-    loadOpenTasks(userId),
+    loadAccountSettings(userId, core),
+    loadAgendaSettings(userId, todo),
+    loadOpenTasks(userId, todo),
   ]);
 
   const today = todayIn(account.timezone, now);
@@ -48,6 +56,7 @@ export async function loadAgenda(userId: string, now: Date = new Date()): Promis
     from: addDays(today, -365),
     to: addDays(today, agendaSettings.horizonDays),
     now,
+    clients,
   };
 
   // A switched-off module's sources never run, whatever this module's own
@@ -61,19 +70,22 @@ export async function loadAgenda(userId: string, now: Date = new Date()): Promis
   // before today, because a meeting you have been to is over, not overdue.
   const [[items, context, failed], events, feedEvents] = await Promise.all([
     runSources(active, ctx),
-    loadEventsInWindow(userId, { from: today, to: ctx.to }, account.timezone),
+    loadEventsInWindow(userId, { from: today, to: ctx.to }, account.timezone, todo),
     // The calendars you subscribe to, read from the stored copy over the same
     // days. An appointment somebody else scheduled is context like any other
     // event: it is on your day and there is nothing to tick.
-    loadFeedEventsInWindow(userId, { from: today, to: ctx.to }, account.timezone),
+    loadFeedEventsInWindow(userId, { from: today, to: ctx.to }, account.timezone, todo),
   ]);
 
-  const links = await loadLinksForTasks(tasks.map((task) => task.id));
-  const anchors = await resolveAnchors(links);
+  const links = await loadLinksForTasks(
+    tasks.map((task) => task.id),
+    todo,
+  );
+  const anchors = await resolveAnchors(links, clients);
 
   // Only asked for when something might need it: the dismissal overlay exists
   // for sources, and a page with no sources on has nothing to overlay.
-  const dismissals = active.length > 0 ? await loadDismissals(userId) : new Map();
+  const dismissals = active.length > 0 ? await loadDismissals(userId, todo) : new Map();
 
   return {
     piles: mergeAgenda({

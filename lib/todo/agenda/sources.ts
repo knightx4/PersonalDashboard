@@ -1,4 +1,5 @@
 import type { ModuleId } from '@/lib/modules';
+import type { AgendaClients } from '@/lib/todo/agenda/clients';
 
 /**
  * A source is something that knows about obligations this module does not own.
@@ -88,6 +89,11 @@ export interface SourceContext {
   /** Inclusive, YYYY-MM-DD. */
   to: string;
   now: Date;
+  /**
+   * The clients to read with. Absent on a page, which reads on the session;
+   * the morning brief passes service-role ones (lib/todo/agenda/clients.ts).
+   */
+  clients?: AgendaClients;
 }
 
 /**
