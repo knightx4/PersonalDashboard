@@ -13,11 +13,13 @@ import { DISPLAY_CURRENCIES } from '@/lib/fx/money-fx';
 import { modulesFor, type ModuleId } from '@/lib/modules';
 import { updateAccountSettings, updateEnabledModules, type AccountState } from './actions';
 import { cardVariants } from '@/components/ui/card';
+import { NotificationsSection } from './notifications';
 
 export function AccountView({
   email,
   settings,
   isOwner,
+  vapidPublicKey,
 }: {
   email: string;
   settings: {
@@ -28,11 +30,14 @@ export function AccountView({
   };
   /** Whether this account owns the app. Read on the server; see lib/dev/owner. */
   isOwner: boolean;
+  /** The key browsers subscribe to push with; null when the server has none. */
+  vapidPublicKey: string | null;
 }) {
   return (
     <div className="space-y-6">
       <YouSection email={email} settings={settings} />
       <ModulesSection enabled={settings.enabledModules} isOwner={isOwner} />
+      <NotificationsSection publicKey={vapidPublicKey} />
       <ModuleSettingsSection enabled={settings.enabledModules} />
       <TimelineSection />
       <SpendSection />

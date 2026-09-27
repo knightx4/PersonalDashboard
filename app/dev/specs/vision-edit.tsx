@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError } from '@/components/ui/field';
+import { useToast } from '@/components/ui/toast';
 import { commentWhen } from '@/lib/comments/when';
 import { FEEDBACK_KIND_LABEL, type FeedbackKind } from '@/lib/feedback/load';
 import { useClockNow } from '@/lib/use-clock-now';
@@ -20,8 +21,9 @@ import type { VisionReview } from '@/lib/specs/vision-review';
  *
  * The proposed text, the review's reason for it, and the notes and likes it
  * cites, with Accept and Dismiss. Accepting replaces the vision above with the
- * proposed text; dismissing leaves the vision as it is. Either way the edit
- * leaves the page, since the page shows only edits still waiting.
+ * proposed text and has Dash re-read the workspace's open features against it
+ * (#1137); dismissing leaves the vision as it is. Either way the edit leaves
+ * the page, since the page shows only edits still waiting.
  */
 export function VisionEditPanel({
   edit,
@@ -34,8 +36,16 @@ export function VisionEditPanel({
   /** What the workspace is called. */
   label: string;
 }) {
+  const toast = useToast();
+  // The panel leaves the page once the edit is decided, so what the accept
+  // says -- including a re-shape that did not start -- goes in a toast, which
+  // outlives it.
   const [accepted, accept, accepting] = useActionState(
-    acceptVisionEdit,
+    async (prev: VisionEditActionState, formData: FormData) => {
+      const next = await acceptVisionEdit(prev, formData);
+      if (next.message) toast({ text: next.message, duration: 12000 });
+      return next;
+    },
     {} as VisionEditActionState,
   );
   const [dismissed, dismiss, dismissing] = useActionState(
@@ -99,6 +109,10 @@ export function VisionEditPanel({
         </Button>
         <FieldError>{accepted.error ?? dismissed.error}</FieldError>
       </form>
+      <p className="text-caption text-ink-ghost">
+        Accepting also has Dash re-read the open features in {label} against the new vision.
+        What it would change comes back as proposals for you to approve.
+      </p>
     </section>
   );
 }

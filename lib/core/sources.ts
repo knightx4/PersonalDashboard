@@ -55,6 +55,7 @@ export const coreSources: ModuleSources = {
     { table: 'core.ingested_messages', reason: 'Mail sync bookkeeping; the Gmail connector reads mail.' },
     { table: 'core.model_spend', reason: 'Model cost accounting.' },
     { table: 'core.people', reason: 'Who a shopping order was for.' },
+    { table: 'core.push_subscriptions', reason: 'Browsers that accepted notifications, for sending the morning brief.' },
     { table: 'core.saved_views', reason: 'Saved list filters.' },
     { table: 'core.sync_jobs', reason: 'Sync bookkeeping.' },
     { table: 'public.profiles', reason: 'Display name and settings.' },

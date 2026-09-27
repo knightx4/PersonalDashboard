@@ -1,0 +1,76 @@
+import { describe, expect, it, vi } from 'vitest';
+import { BRIEF_URL, briefPayload, sendToPerson, type PushPorts, type PushSubscriptionRow } from './send';
+
+const NOW = new Date('2026-09-28T06:05:00Z');
+
+function sub(id: string): PushSubscriptionRow {
+  return { id, endpoint: `https://push.example/${id}`, p256dh: 'key', auth: 'secret' };
+}
+
+function ports(rows: PushSubscriptionRow[], send: PushPorts['send']): PushPorts {
+  return {
+    subscriptions: vi.fn(async () => rows),
+    send: vi.fn(send),
+    forget: vi.fn(async () => undefined),
+    sent: vi.fn(async () => undefined),
+  };
+}
+
+describe('the brief notification', () => {
+  it('carries the brief and opens the home page, one per day', () => {
+    expect(briefPayload('  You have the Acme interview at 09:30.  ', '2026-09-28')).toEqual({
+      title: 'Your day',
+      body: 'You have the Acme interview at 09:30.',
+      url: BRIEF_URL,
+      tag: 'day-brief-2026-09-28',
+    });
+    expect(BRIEF_URL).toBe('/home');
+  });
+
+  it('sends to every browser the person switched it on for', async () => {
+    const p = ports([sub('phone'), sub('laptop')], async () => 201);
+    const payload = briefPayload('A quiet day.', '2026-09-28');
+    expect(await sendToPerson(p, 'user-a', payload, NOW)).toEqual({ sent: 2, forgotten: 0, failed: 0 });
+    expect(p.subscriptions).toHaveBeenCalledWith('user-a');
+    expect(p.send).toHaveBeenCalledWith(sub('phone'), JSON.stringify(payload));
+    expect(p.sent).toHaveBeenCalledWith(['phone', 'laptop'], NOW);
+    expect(p.forget).not.toHaveBeenCalled();
+  });
+
+  it('sends nothing when the switch is off everywhere', async () => {
+    const p = ports([], async () => 201);
+    expect(await sendToPerson(p, 'user-a', briefPayload('x', '2026-09-28'), NOW)).toEqual({
+      sent: 0,
+      forgotten: 0,
+      failed: 0,
+    });
+    expect(p.send).not.toHaveBeenCalled();
+  });
+
+  it('forgets a subscription the push service says is gone', async () => {
+    const p = ports([sub('removed'), sub('expired'), sub('phone')], async (row) => {
+      if (row.id === 'removed') throw Object.assign(new Error('Gone'), { statusCode: 410 });
+      if (row.id === 'expired') throw Object.assign(new Error('Not found'), { statusCode: 404 });
+      return 201;
+    });
+    expect(await sendToPerson(p, 'user-a', briefPayload('x', '2026-09-28'), NOW)).toEqual({
+      sent: 1,
+      forgotten: 2,
+      failed: 0,
+    });
+    expect(vi.mocked(p.forget).mock.calls[0][0].sort()).toEqual(['expired', 'removed']);
+  });
+
+  it('keeps a subscription through any other failure', async () => {
+    const p = ports([sub('phone')], async () => {
+      throw Object.assign(new Error('Service unavailable'), { statusCode: 503 });
+    });
+    expect(await sendToPerson(p, 'user-a', briefPayload('x', '2026-09-28'), NOW)).toEqual({
+      sent: 0,
+      forgotten: 0,
+      failed: 1,
+    });
+    expect(p.forget).not.toHaveBeenCalled();
+    expect(p.sent).not.toHaveBeenCalled();
+  });
+});
