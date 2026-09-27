@@ -127,6 +127,8 @@ describe('RLS coverage', () => {
       'opening_sweeps',
       'phrase_explanations',
       'piece_checks',
+      'piece_practice',
+      'piece_practice_handins',
       'plan_pieces',
       'probes',
       'quiz_questions',
@@ -786,6 +788,66 @@ describe("the pieces a goal's unit is split into", () => {
     ).rejects.toThrow();
   });
 
+  // learn 0075_piece_practice.sql (plan #1142). The owner's page writes the
+  // piece's one task and each marked hand-in; neither is edited afterwards,
+  // and the composite keys stop either landing on someone else's piece.
+  let practiceA = '';
+
+  it("lets the owner write a piece's practice task and hand it in, and shows nobody else", async () => {
+    const [task] = await asUser(
+      userA,
+      (tx) => tx<{ id: string }[]>`insert into piece_practice (user_id, piece_id, task, figures, points, worked)
+                 values (${userA}, ${pieceA}, 'Work out NRR from the table.', '[{"label": "NRR", "unit": "%"}]'::jsonb,
+                         array['NRR is 112%.'], 'NRR = 1,120 / 1,000 = 112%.')
+                 returning id`,
+    );
+    practiceA = task.id;
+    await asUser(
+      userA,
+      (tx) => tx`insert into piece_practice_handins (user_id, practice_id, answer, figures, marks, passed)
+                 values (${userA}, ${practiceA}, 'Divided.', '[{"label": "NRR", "value": "112%"}]'::jsonb,
+                         '[{"point": "NRR is 112%.", "met": true, "note": "Right."}]'::jsonb, true)`,
+    );
+    const own = await asUser(userA, (tx) => tx`select passed from piece_practice_handins`);
+    expect(own).toEqual([{ passed: true }]);
+    expect(await asUser(userB, (tx) => tx`select id from piece_practice`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`select id from piece_practice_handins`)).toHaveLength(0);
+  });
+
+  it('refuses a second task for a piece, a task or hand-in on another user\'s, an empty hand-in and an edit', async () => {
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into piece_practice (user_id, piece_id, task, points, worked)
+                   values (${userA}, ${pieceA}, 'Again.', array['A point.'], 'Worked.')`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into piece_practice (user_id, piece_id, task, points, worked)
+                   values (${userB}, ${pieceA}, 'Smuggled.', array['A point.'], 'Worked.')`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into piece_practice_handins (user_id, practice_id, answer, marks, passed)
+                   values (${userB}, ${practiceA}, 'Smuggled.', '[]'::jsonb, true)`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into piece_practice_handins (user_id, practice_id, answer, marks, passed)
+                   values (${userA}, ${practiceA}, ' ', '[]'::jsonb, false)`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userA, (tx) => tx`update piece_practice_handins set passed = true where practice_id = ${practiceA}`),
+    ).rejects.toThrow();
+  });
+
   it('goes with its unit and its track', async () => {
     await admin`delete from subjects where id = ${subjectA}`;
     const [row] = await admin<{ count: number }[]>`
@@ -794,6 +856,12 @@ describe("the pieces a goal's unit is split into", () => {
     const [checks] = await admin<{ count: number }[]>`
       select count(*)::int as count from piece_checks where piece_id = ${pieceA}`;
     expect(checks.count).toBe(0);
+    const [practice] = await admin<{ count: number }[]>`
+      select count(*)::int as count from piece_practice where piece_id = ${pieceA}`;
+    expect(practice.count).toBe(0);
+    const [handIns] = await admin<{ count: number }[]>`
+      select count(*)::int as count from piece_practice_handins where practice_id = ${practiceA}`;
+    expect(handIns.count).toBe(0);
   });
 });
 

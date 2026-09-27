@@ -66,6 +66,8 @@ export const PAID_ACTIONS = {
   // Learn: questions
   'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': ['write-piece-check'],
   'app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck': ['mark-piece-check'],
+  'app/learn/s/[id]/p/[piece]/actions.ts#writePiecePractice': ['write-piece-practice'],
+  'app/learn/s/[id]/p/[piece]/actions.ts#handInPractice': ['mark-piece-practice'],
   'app/learn/s/[id]/probe/actions.ts#askQuestion': ['write-probe', 'write-applied-case'],
   'app/learn/s/[id]/probe/actions.ts#answerQuestion': ['name-misconception', 'grade-applied-answer'],
   'app/learn/s/[id]/probe/actions.ts#findFloor': ['propose-floor'],

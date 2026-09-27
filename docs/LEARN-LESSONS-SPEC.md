@@ -194,8 +194,8 @@ out goes in after the idea before it, so the call is not paid for twice.
 
 Pieces are stored in `learn.plan_pieces` (learn 0073): the unit, the piece's
 place in it, a title, the ideas it covers as `concept_ids` in teaching order,
-and `passed_at`, set when its check is passed. Progress on a plan is the count
-of pieces passed.
+and `passed_at`, set when its practice and its check are both passed.
+Progress on a plan is the count of pieces passed.
 
 They are written in two places, both in the hourly top-up. When the top-up
 lays out a goal track's unit, it writes the unit's pieces straight after. And
@@ -210,7 +210,7 @@ pieces existed. Tracks not made from a goal get no pieces.
 Plan #1141. Each piece opens at `/learn/s/[id]/p/[piece]`, linked from its
 unit on the track page. Any piece opens at any time; the suggested order locks
 nothing. The page shows the piece's lessons one after another, in the order of
-its ideas, and ends with its check.
+its ideas, then its practice task, and ends with its check.
 
 A lesson is the same stored card whether Learn now or the plan reached the
 idea first: one `lesson` row in `learn.feed_cards` per concept. An idea with no
@@ -227,12 +227,46 @@ pressed and marks what is written, as the unit check does
 the mark and the marker's sentence on it. The expected answer stays on the
 server until the question is answered.
 
-A right answer sets the piece's `passed_at` and marks each of its ideas
-tested: sharp stays sharp and every other state becomes known, since the
-answer needed the idea. A wrong answer says what it was missing, shows the
+A right answer marks each of the piece's ideas tested: sharp stays sharp and
+every other state becomes known, since the answer needed the idea. It sets the
+piece's `passed_at` only when the practice is passed too (plan #1142). A wrong answer says what it was missing, shows the
 answer expected, and offers another question, written knowing the ones already
 asked so it is not the same one reworded. Nothing on the page marks a piece
 passed any other way.
+
+### A piece has a practice task
+
+Plan #1142. Between a piece's lessons and its check sits one hands-on task,
+such as working out net revenue retention from a small table or laying out a
+cohort grid. The piece is passed only when a hand-in for the task meets every
+point and the check is answered right, in either order. Nothing on the page
+marks either one done by hand, and nothing locks: the check can be answered
+before the practice.
+
+Sonnet writes the task the first time the piece's page opens, from the piece's
+ideas and whichever of its lessons are written (`writePractice` in
+`lib/learn/lessons/write-practice.ts`). A task has its text, an optional table
+of at most 8 columns and 12 rows, up to six key figures to type in by name,
+two to six points a complete hand-in has, and a worked answer. A point that
+checks a figure states the expected value and how close counts. One task per
+piece, in `learn.piece_practice` (learn 0075).
+
+Hand-in is typed into the page: a box for each named figure and a box for the
+working. Haiku marks it point by point (`markAgainstPoints` in
+`lib/learn/lessons/mark-points.ts`), each point met or not with one sentence
+to the person: what they got right, or what is missing and where to look,
+without giving the expected figure away. Every point met passes the practice.
+Each hand-in is a row in `learn.piece_practice_handins` with its marks, and a
+hand-in that misses a point can be revised and handed in again. The points and
+the worked answer stay on the server until the practice is passed; then the
+worked answer can be opened.
+
+A skill normally done in a spreadsheet, such as a revenue bridge or a
+financial model, still gets a task that can be typed in, and the writer says
+in `spreadsheet_note` what the typed version leaves out. The page shows that
+note under the task. Whether typing the key figures is enough for those
+skills, or a file Dash reads is needed, is still open: the notes the first
+real tasks carry are the evidence for it.
 
 ## The unit check
 
