@@ -71,6 +71,7 @@ import { StoryText } from '@/components/news/story-text';
 import { PlanOpenedSurface, PlanTreeSurface } from './plan-surfaces';
 import { GoalOpenedSurface, GoalTreeSurface } from './goal-surfaces';
 import { AskDashSurface } from './ask-surfaces';
+import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import {
   GoalBareSurface,
@@ -2843,6 +2844,22 @@ export const SURFACES: readonly Surface[] = [
     render: () => (
       <StoryGrid stories={gridStories.map((story) => ({ ...story, image: null }))} pictures />
     ),
+  },
+  {
+    /* Shopping's Recurring page (plan #1126): the monthly figure, what is
+     * coming up with a price rise marked, and what stopped charging. */
+    id: 'shopping-recurring',
+    label: 'Shopping · Recurring payments',
+    module: 'shopping',
+    width: 'page',
+    render: () => <RecurringSurface />,
+  },
+  {
+    id: 'shopping-recurring-empty',
+    label: 'Shopping · Recurring with nothing found',
+    module: 'shopping',
+    width: 'page',
+    render: () => <RecurringEmptySurface />,
   },
   {
     id: 'news-saved',

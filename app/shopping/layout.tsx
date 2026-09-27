@@ -77,6 +77,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: '/shopping/inventory', label: 'Inventory', icon: 'inventory' },
     { href: '/shopping/sell', label: 'Sell', icon: 'sell' },
     { href: '/shopping/returns', label: 'Returns', icon: 'returns' },
+    { href: '/shopping/recurring', label: 'Recurring', icon: 'recurring' },
     { href: '/shopping/saved', label: 'Saved', icon: 'saved' },
     { href: '/shopping/share', label: 'Share', icon: 'share' },
     { href: '/shopping/review', label: 'Review', icon: 'review', badge: reviewCount },

@@ -32,6 +32,7 @@ import {
   MessageSquareText,
   MonitorPlay,
   Receipt,
+  Repeat,
   Share2,
   Shapes,
   StickyNote,
@@ -64,6 +65,8 @@ export const NAV_ICONS = {
   inventory: Boxes,
   sell: Tag,
   returns: Undo2,
+  // What you pay for again and again: subscriptions and bills (plan #1126).
+  recurring: Repeat,
   saved: Bookmark,
   share: Share2,
   // Jobs
