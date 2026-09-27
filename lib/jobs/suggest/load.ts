@@ -1,7 +1,7 @@
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { SuggestionKind } from './cadence';
 
-/** One open suggestion as This week shows it. */
+/** One open suggestion as Roles or Contacts shows it. */
 export type OpenSuggestion = {
   id: string;
   kind: SuggestionKind;
@@ -46,10 +46,11 @@ function one<T>(value: T | T[] | null): T | null {
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
-/** The open suggestions, newest first, people before postings. */
+/** The open suggestions of one kind, newest first. */
 export async function loadOpenSuggestions(
   supabase: AppSupabaseClient,
   userId: string,
+  kind: SuggestionKind,
 ): Promise<OpenSuggestion[]> {
   const { data, error } = await supabase
     .from('suggestions')
@@ -58,6 +59,7 @@ export async function loadOpenSuggestions(
     )
     .eq('user_id', userId)
     .eq('status', 'open')
+    .eq('kind', kind)
     .order('created_at', { ascending: false })
     .limit(20);
   // A missing table or a failed read hides the section rather than the page.
@@ -88,6 +90,5 @@ export async function loadOpenSuggestions(
           : null,
         createdAt: row.created_at,
       };
-    })
-    .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'reach_out' ? -1 : 1));
+    });
 }

@@ -28,85 +28,105 @@ const CHANNEL_LABELS: Record<string, string> = {
 };
 
 /**
- * What Dash suggests doing next: people to meet who do the work you want, with
- * the message written, and open postings it found. The daily run fills it (lib/jobs/suggest); the
- * two buttons ask for more now.
+ * Dash's recommendations, each list on the page it belongs to: people to meet
+ * at the top of Contacts, roles to apply for at the top of Roles. The daily
+ * run fills them (lib/jobs/suggest), so they are there when the page opens;
+ * the search button is for a list that has run dry.
  */
-export function Suggestions({ suggestions }: { suggestions: OpenSuggestion[] }) {
+function RecommendedSection({
+  title,
+  hint,
+  empty,
+  button,
+  searching,
+  paidHint,
+  action,
+  count,
+  children,
+}: {
+  title: string;
+  hint: string;
+  empty: string;
+  button: string;
+  searching: string;
+  /** The PaidHint for the search button, written out where the action is named. */
+  paidHint: React.ReactNode;
+  action: () => Promise<SuggestState>;
+  count: number;
+  children: React.ReactNode;
+}) {
   const [pending, run] = useTransition();
-  const [which, setWhich] = useState<'people' | 'roles' | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const ask = (kind: 'people' | 'roles', action: () => Promise<SuggestState>) => {
+  const ask = () => {
     setNotice(null);
-    setWhich(kind);
     run(async () => {
       const result = await action();
       setNotice(result.error ?? result.message ?? null);
     });
   };
 
-  const people = suggestions.filter((s) => s.kind === 'reach_out');
-  const roles = suggestions.filter((s) => s.kind === 'apply');
-
   return (
     <Card padding="dense">
       <header className="mb-1 flex flex-wrap items-center justify-between gap-2">
         <span className="flex items-baseline gap-2">
           <Sparkles className="size-4 self-center text-accent" strokeWidth={1.75} aria-hidden />
-          <h2 className="text-ui font-semibold text-ink">Dash suggests</h2>
+          <h2 className="text-ui font-semibold text-ink">{title}</h2>
+          {count > 0 && <span className="tabular text-small text-ink-muted">{count}</span>}
         </span>
-        <span className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            pending={pending && which === 'people'}
-            disabled={pending}
-            onClick={() => ask('people', suggestPeople)}
-          >
-            {pending && which === 'people' ? 'Searching…' : 'Find people to meet'}
+        <span className="flex items-center gap-2">
+          <Button type="button" size="sm" variant="ghost" pending={pending} onClick={ask}>
+            {pending ? searching : button}
           </Button>
-          <PaidHint action="app/jobs/(app)/today/actions.ts#suggestPeople" what="Cost of a search for people" />
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            pending={pending && which === 'roles'}
-            disabled={pending}
-            onClick={() => ask('roles', suggestOpenings)}
-          >
-            {pending && which === 'roles' ? 'Searching…' : 'Find roles'}
-          </Button>
-          <PaidHint action="app/jobs/(app)/today/actions.ts#suggestOpenings" what="Cost of a search for roles" align="end" />
+          {paidHint}
         </span>
       </header>
-      <p className="mb-2 text-small text-ink-muted">
-        {suggestions.length > 0
-          ? 'New people worth meeting for the work you want, with what to say, and open roles that fit.'
-          : 'Every few days Dash looks for people you have not met who do the work you want, and once a week for open roles that fit your career goals.'}
-      </p>
+      <p className="mb-2 text-small text-ink-muted">{count > 0 ? hint : empty}</p>
       {notice && <p className="mb-2 text-small text-ink-muted">{notice}</p>}
-
-      {people.length > 0 && (
-        <ul className="divide-y divide-border">
-          {people.map((suggestion) => (
-            <PersonRow key={suggestion.id} suggestion={suggestion} />
-          ))}
-        </ul>
-      )}
-
-      {roles.length > 0 && (
-        <>
-          {people.length > 0 && <h3 className="mt-3 mb-1 text-small font-medium text-ink-muted">Roles to apply for</h3>}
-          <ul className="divide-y divide-border">
-            {roles.map((suggestion) => (
-              <RoleRow key={suggestion.id} suggestion={suggestion} />
-            ))}
-          </ul>
-        </>
-      )}
+      {count > 0 && <ul className="divide-y divide-border">{children}</ul>}
     </Card>
+  );
+}
+
+export function RecommendedPeople({ suggestions }: { suggestions: OpenSuggestion[] }) {
+  return (
+    <RecommendedSection
+      title="People to meet"
+      hint="People you have not met who do the work you want, found by Dash, with what to say. Sent adds them to your contacts."
+      empty="Dash looks for new people every few days, from your career goals and CV. The next ones will appear here."
+      button="Search now"
+      searching="Searching…"
+      paidHint={
+        <PaidHint action="app/jobs/(app)/recommend/actions.ts#suggestPeople" what="Cost of a search for people" align="end" />
+      }
+      action={suggestPeople}
+      count={suggestions.length}
+    >
+      {suggestions.map((suggestion) => (
+        <PersonRow key={suggestion.id} suggestion={suggestion} />
+      ))}
+    </RecommendedSection>
+  );
+}
+
+export function RecommendedRoles({ suggestions }: { suggestions: OpenSuggestion[] }) {
+  return (
+    <RecommendedSection
+      title="Recommended roles"
+      hint="Open postings that fit your career goals, found by Dash. Save one to add it to your pipeline as a lead."
+      empty="Dash searches for open roles every week, from your career goals and CV. The next ones will appear here."
+      button="Search now"
+      searching="Searching…"
+      paidHint={
+        <PaidHint action="app/jobs/(app)/recommend/actions.ts#suggestOpenings" what="Cost of a search for roles" align="end" />
+      }
+      action={suggestOpenings}
+      count={suggestions.length}
+    >
+      {suggestions.map((suggestion) => (
+        <RoleRow key={suggestion.id} suggestion={suggestion} />
+      ))}
+    </RecommendedSection>
   );
 }
 

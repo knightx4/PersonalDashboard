@@ -12,14 +12,14 @@ describe('suggestionsPayload', () => {
     ).toEqual({
       title: 'Dash suggests',
       body: 'Ask Priya for a referral at Acme, and 1 more to contact. 2 open roles that fit what you want.',
-      url: '/jobs/today',
+      url: '/jobs/contacts',
       tag: 'job-suggestions-2026-09-27',
     });
   });
 
   it('names a single role', () => {
-    expect(suggestionsPayload({ people: [], roles: ['Analyst at Initech'] }, 'd')?.body).toBe(
-      'One open role that fits: Analyst at Initech.',
-    );
+    const payload = suggestionsPayload({ people: [], roles: ['Analyst at Initech'] }, 'd');
+    expect(payload?.body).toBe('One open role that fits: Analyst at Initech.');
+    expect(payload?.url).toBe('/jobs/roles');
   });
 });

@@ -58,7 +58,7 @@ be surprised." The spec listed outreach drafting as a generation feature. The
 app has already answered that question for follow-ups, and the answer is
 binding on this plan. First messages to people were revisited on 27 September
 2026 at the person's request: the suggestion run in `lib/jobs/suggest` drafts
-them, shown in full on This week for the person to copy, edit and send.
+them, shown in full under People to meet on Contacts for the person to copy, edit and send.
 
 **The development loop is note-driven.** Feedback goes into `feedback_items`
 from inside the app, and each note becomes one commit (`docs/NOTES-WORKFLOW.md`;
