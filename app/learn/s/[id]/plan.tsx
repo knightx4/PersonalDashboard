@@ -4,14 +4,17 @@ import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { Meter } from '@/components/ui/meter';
 import { cn } from '@/lib/cn';
+import type { ProjectView } from '@/lib/learn/lessons/project';
 import {
   PIECE_STATE_WORDS,
+  planFinished,
   planProgress,
   progressLine,
   type PlanPiece,
   type PlanUnit,
 } from '@/lib/learn/lessons/plan-view';
 import { AddUnitForm, UnitMenu } from './plan-edit';
+import { ProjectCard } from './project';
 
 /**
  * A learning goal's plan (plan #1143, LEARN-LESSONS-SPEC "The plan page"),
@@ -25,9 +28,23 @@ import { AddUnitForm, UnitMenu } from './plan-edit';
  *
  * Each unit can be moved, removed while none of its pieces is passed, and a
  * unit added by name at the foot (plan #1144, `plan-edit.tsx`).
+ *
+ * The plan ends with its final project (plan #1146, `project.tsx`), open from
+ * the start. The plan is finished once the project and every piece are
+ * passed, and the progress line then says so.
  */
-export function PlanSection({ subjectId, units }: { subjectId: string; units: readonly PlanUnit[] }) {
+export function PlanSection({
+  subjectId,
+  units,
+  project,
+}: {
+  subjectId: string;
+  units: readonly PlanUnit[];
+  /** The final project, or null before its brief is written. */
+  project: ProjectView | null;
+}) {
   const progress = planProgress(units);
+  const finished = planFinished(progress, project?.passed ?? false);
   const pieceHref = (pieceId: string) => `/learn/s/${subjectId}/p/${pieceId}`;
 
   return (
@@ -36,7 +53,7 @@ export function PlanSection({ subjectId, units }: { subjectId: string; units: re
         <h2 id="plan-heading" className="text-ui font-semibold text-ink-muted">
           Plan
         </h2>
-        <span className="text-small text-ink-muted tabular-nums">{progressLine(progress)}</span>
+        <span className="text-small text-ink-muted tabular-nums">{progressLine(progress, finished)}</span>
       </div>
       <Meter
         value={progress.passed}
@@ -69,7 +86,9 @@ export function PlanSection({ subjectId, units }: { subjectId: string; units: re
             ? 'Its pieces are written unit by unit, a unit or two an hour. The first will be here soon.'
             : progress.unitsWritten < progress.units
               ? 'Every piece written so far is passed. The next unit is being split into pieces.'
-              : 'Every piece of this plan is passed.'}
+              : finished
+                ? 'You have finished this plan: every piece and the final project are passed.'
+                : 'Every piece of this plan is passed. Pass the final project below to finish it.'}
         </p>
       )}
 
@@ -87,6 +106,7 @@ export function PlanSection({ subjectId, units }: { subjectId: string; units: re
         ))}
       </ol>
       <AddUnitForm subjectId={subjectId} />
+      <ProjectCard subjectId={subjectId} project={project} canWrite={units.length > 0} finished={finished} />
     </section>
   );
 }

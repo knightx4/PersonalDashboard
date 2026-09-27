@@ -21,6 +21,8 @@ import { curriculumRows, type UnitRow } from '@/lib/learn/graph/curriculum-view'
 import { loadTrackPieces, type PieceSibling } from '@/lib/learn/lessons/piece-store';
 import { loadPlan, planGoalFor } from '@/lib/learn/lessons/plan-store';
 import type { PlanUnit } from '@/lib/learn/lessons/plan-view';
+import type { ProjectView } from '@/lib/learn/lessons/project';
+import { loadProjectView } from '@/lib/learn/lessons/project-store';
 import { deleteSubject } from './actions';
 import { WriteCurriculum } from './curriculum';
 import { PlanSection } from './plan';
@@ -270,7 +272,14 @@ export default async function SubjectPage({
   // A learning goal's track opens on its plan (plan #1143). A plan that
   // cannot be read leaves the page as an ordinary track's.
   const planGoal = await planGoalFor(supabase, user.id, id).catch(() => null);
-  const plan: PlanUnit[] | null = planGoal ? await loadPlan(supabase, user.id, id).catch(() => null) : null;
+  const [plan, project]: [PlanUnit[] | null, ProjectView | null] = planGoal
+    ? await Promise.all([
+        loadPlan(supabase, user.id, id).catch(() => null),
+        // A project that cannot be read shows as not written yet, and opening
+        // the page asks for it again, which returns the stored one.
+        loadProjectView(supabase, user.id, id).catch(() => null),
+      ])
+    : [null, null];
   const counts = countStates(graph);
   const { rows: unitRows, outside } = curriculumRows(units, goals, graph);
   const live =
@@ -363,7 +372,7 @@ export default async function SubjectPage({
         </p>
       )}
 
-      {plan && !showEverything && <PlanSection subjectId={id} units={plan} />}
+      {plan && !showEverything && <PlanSection subjectId={id} units={plan} project={project} />}
 
       {units.length === 0 ? (
         <WriteCurriculum subjectId={id} />

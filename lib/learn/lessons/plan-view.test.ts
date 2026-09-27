@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pieceState, planProgress, progressLine, type PieceState, type PlanUnit } from './plan-view';
+import { pieceState, planFinished, planProgress, progressLine, type PieceState, type PlanUnit } from './plan-view';
 
 /**
  * A learning goal's plan (plan #1143): progress is the pieces passed out of
@@ -69,5 +69,25 @@ describe('progressLine', () => {
     );
     expect(progressLine({ passed: 0, total: 0, units: 4, unitsWritten: 0 })).toBe('Pieces not written yet');
     expect(progressLine({ passed: 0, total: 0, units: 0, unitsWritten: 0 })).toBe('No units yet');
+  });
+});
+
+describe('planFinished', () => {
+  // plan #1146: the final project passed and every piece passed.
+  const all = { passed: 24, total: 24, units: 6, unitsWritten: 6 };
+
+  it('holds only when the project and every piece are passed', () => {
+    expect(planFinished(all, true)).toBe(true);
+    expect(planFinished(all, false)).toBe(false);
+    expect(planFinished({ ...all, passed: 23 }, true)).toBe(false);
+  });
+
+  it('does not hold while a unit is not split into pieces, or with no pieces at all', () => {
+    expect(planFinished({ passed: 20, total: 20, units: 6, unitsWritten: 5 }, true)).toBe(false);
+    expect(planFinished({ passed: 0, total: 0, units: 0, unitsWritten: 0 }, true)).toBe(false);
+  });
+
+  it('is what the progress line says once it holds', () => {
+    expect(progressLine(all, true)).toBe('Finished · 24 pieces and the final project passed');
   });
 });

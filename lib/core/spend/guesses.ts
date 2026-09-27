@@ -165,6 +165,12 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // The piece, the task, its points, the worked answer and the hand-in; a
   // sentence per point out.
   'mark-piece-practice': run(HAIKU, 2_000, 300),
+  // The plan's outline, every unit with what it covers, in; a brief with a
+  // table, its points and a worked answer out.
+  'write-plan-project': run(SONNET, 3_000, 2_000),
+  // The unit titles, the brief, its points, the worked answer and the
+  // hand-in; a sentence per point out.
+  'mark-plan-project': run(HAIKU, 4_000, 450),
   // One idea's name and claim and the questions already asked on it, one
   // question out.
   'write-review-question': run(HAIKU, 800, 200),

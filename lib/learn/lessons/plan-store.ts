@@ -4,7 +4,8 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { loadCurriculum } from '@/lib/learn/graph/curriculum-store';
 import { nextUnitToOpen } from './lay-out-unit';
 import type { PlanLayoutDue } from './plan-layout';
-import { pieceState, planProgress, type PlanProgress, type PlanUnit } from './plan-view';
+import { pieceState, planFinished, planProgress, type PlanProgress, type PlanUnit } from './plan-view';
+import { loadProjectsPassed } from './project-store';
 
 /**
  * The reads behind a learning goal's plan (plan #1143): one plan for its page,
@@ -122,8 +123,18 @@ export async function loadPlan(learn: LearnSupabaseClient, userId: string, subje
   }));
 }
 
-/** One goal's plan as Learn now and the Goals page list it. */
-export type PlanSummary = { aimId: string; name: string; subjectId: string; progress: PlanProgress };
+/**
+ * One goal's plan as Learn now and the Goals page list it. `finished` is its
+ * final project passed with every piece passed (plan #1146).
+ */
+export type PlanSummary = {
+  aimId: string;
+  name: string;
+  subjectId: string;
+  progress: PlanProgress;
+  projectPassed: boolean;
+  finished: boolean;
+};
 
 /**
  * Every active goal's plan with its progress, oldest goal first. Next up is
@@ -134,7 +145,7 @@ export async function loadPlans(learn: LearnSupabaseClient, userId: string): Pro
   const aims = await goalsWithTracks(learn, userId);
   if (aims.length === 0) return [];
   const subjectIds = [...new Set(aims.map((aim) => aim.subject_id))];
-  const [units, pieces] = await Promise.all([
+  const [units, pieces, projectsPassed] = await Promise.all([
     learn
       .from('curriculum_units')
       .select('id, subject_id, ordinal, title')
@@ -142,15 +153,13 @@ export async function loadPlans(learn: LearnSupabaseClient, userId: string): Pro
       .in('subject_id', subjectIds)
       .order('ordinal'),
     loadPieces(learn, userId, subjectIds),
+    loadProjectsPassed(learn, userId, subjectIds),
   ]);
   if (units.error) throw new Error(`Reading the plans' units failed: ${units.error.message}`);
   const unitRows = (units.data ?? []) as { id: string; subject_id: string; ordinal: number; title: string }[];
 
-  return aims.map((aim) => ({
-    aimId: aim.id,
-    name: aim.name,
-    subjectId: aim.subject_id,
-    progress: planProgress(
+  return aims.map((aim) => {
+    const progress = planProgress(
       unitRows
         .filter((unit) => unit.subject_id === aim.subject_id)
         .map((unit) => ({
@@ -168,8 +177,17 @@ export async function loadPlans(learn: LearnSupabaseClient, userId: string): Pro
               state: piece.passed_at === null ? ('open' as const) : ('passed' as const),
             })),
         })),
-    ),
-  }));
+    );
+    const projectPassed = projectsPassed.has(aim.subject_id);
+    return {
+      aimId: aim.id,
+      name: aim.name,
+      subjectId: aim.subject_id,
+      progress,
+      projectPassed,
+      finished: planFinished(progress, projectPassed),
+    };
+  });
 }
 
 /**

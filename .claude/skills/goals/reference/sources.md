@@ -309,6 +309,14 @@ What they handed in for the practice task in each piece of a learning goal's pla
 - Name a row by `answer`; link it by `id`
 - practice_id is the task in learn.piece_practice, whose piece_id is the piece.
 
+### `learn.plan_project_handins` (Learn)
+
+What they handed in for the final project of a learning goal's plan, marked point by point, with whether it passed.
+
+- Search: `answer`
+- Name a row by `answer`; link it by `id`
+- project_id is the project in learn.plan_projects, whose subject_id is the goal's track.
+
 ### `learn.quizzes` (Learn)
 
 Quizzes they set themselves, and what each was preparing for.

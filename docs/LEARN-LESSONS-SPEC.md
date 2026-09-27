@@ -357,6 +357,46 @@ The rules are in `lib/learn/lessons/review.ts`, the reads and writes in
 `review-store.ts`, and the presses in `app/learn/review/actions.ts`. Reviews
 are not feed cards, so the deck and its top-up do not deal them.
 
+### A plan ends with a final project
+
+Plan #1146. Each plan ends with one larger task that uses the whole course,
+such as working out a SaaS company's retention and CAC payback from a table
+of its reported figures and saying whether its growth is efficient. It sits at
+the foot of the plan page, below the units, and is open from the start: it
+can be handed in whatever pieces are passed, and nothing locks on it.
+
+Sonnet writes the brief the first time the plan page opens, from the goal and
+every unit of the outline with what each covers (`writeProject` in
+`lib/learn/lessons/write-project.ts`). The step's brief asked for it to be
+written with the outline; writing it on the first open instead gives the
+plans that already had outlines a project too, and the person sees it on the
+same visit either way. A brief has a title, its text, a table of at most 8
+columns and 16 rows, up to eight key figures to type in by name, four to
+eight points a complete hand-in has, and a worked answer. One project per
+goal's track, in `learn.plan_projects` (learn 0078). It hangs off the track
+rather than a unit, so moving, removing or adding units leaves it in place.
+
+Hand-in works as a piece's practice does: a box for each named figure and one
+for the working and conclusion, up to 8,000 characters. Haiku marks it point
+by point with `markAgainstPoints`, told the goal and the unit titles. Each
+hand-in is a row in `learn.plan_project_handins`, and one that misses a point
+can be revised and handed in again. The points and the worked answer stay on
+the server until the project is passed. A project normally done in a
+spreadsheet is still typed in and carries a `spreadsheet_note`, as practice
+tasks do.
+
+A plan is finished when its project is passed and every piece is passed
+(`planFinished` in `lib/learn/lessons/plan-view.ts`). A unit not split into
+pieces yet means the piece total is not final, so a plan with one is not
+finished. A unit added after the plan was finished makes it unfinished again
+until its pieces are passed. The plan page's progress line, the Your plans
+shelf on Learn now and the goal's line on the Goals page all say Finished. On
+the shelf, a plan with every piece passed and the project not yet passed
+links to the project as Next up. Passed pieces keep coming back as review
+questions after the plan is finished.
+
+The spend kinds are `write-plan-project` and `mark-plan-project`.
+
 ## The unit check
 
 When a unit is done, the next card from that track is its unit check: one
