@@ -27,9 +27,13 @@ const EMBED_BATCH = 128;
  * after the first run on 26 September 2026: of the 28 picks between 0.45 and
  * 0.50 about two thirds were unrelated (Hooke's law for a muscle protein, plate
  * tectonics for settlement mounds, mythology outtakes for a founder story),
- * against about one in eight above 0.50.
+ * against about one in eight above 0.50. Raised again on 27 September, with
+ * 4,736 of 23,845 videos embedded: of the 17 candidates between 0.50 and 0.53
+ * about half were unrelated (eyewitness memory for jury nullification, a
+ * coupon-collector puzzle for consumer choice, election basics for housing
+ * overhangs), against about one in five above 0.53.
  */
-export const MATCH_MIN_SIMILARITY = 0.5;
+export const MATCH_MIN_SIMILARITY = 0.53;
 
 /** Nearest videos kept per idea before the transcribed ones are dropped. */
 export const MATCH_PER_CONCEPT = 3;
