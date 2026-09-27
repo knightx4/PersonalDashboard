@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { afterFailure, decodeTranscript, encodeTranscript, storagePathFor } from '@/lib/learn/youtube/transcripts';
+import { failureFromStatus } from '@/lib/learn/providers/transcriptapi';
 
 const NOW = new Date('2026-09-24T12:00:00Z');
 
@@ -57,6 +58,12 @@ describe('afterFailure', () => {
 
   it('stops the run on a rate limit, since the next video would meet the same one', () => {
     expect(afterFailure(failure('rate-limited', true), 0, NOW).stopRun).toBe(true);
+  });
+
+  it('carries on past a timeout on one video, and tries it again later', () => {
+    const timeout = afterFailure(failureFromStatus(408, ''), 0, NOW);
+    expect(timeout.stopRun).toBe(false);
+    expect(timeout.update).toMatchObject({ state: 'failed', attempts: 1, retry_after: '2026-09-24T13:00:00.000Z' });
   });
 
   it('does not schedule a retry for an error that will not change', () => {
