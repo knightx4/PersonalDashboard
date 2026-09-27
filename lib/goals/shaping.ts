@@ -273,6 +273,8 @@ export function approvalLine(input: {
   approvedAt: string | null;
   proposed: number;
   questions: number;
+  /** Whether every step on the goal is finished or dropped (see `nothingOpen`). */
+  nothingOpen?: boolean;
 }): { text: string; approve: string | null } {
   const steps = (n: number) => `${n} ${n === 1 ? 'step' : 'steps'}`;
   const asks =
@@ -306,5 +308,23 @@ export function approvalLine(input: {
       approve: null,
     };
   }
+  if (input.nothingOpen && input.goalStatus === 'open') {
+    return {
+      text: 'Every step on this goal is finished, and the goal is not done yet. Work on this and Dash will lay out what comes next.',
+      approve: null,
+    };
+  }
   return { text: asks.trim(), approve: null };
+}
+
+/**
+ * Whether a goal has steps and none of them is still to do: each one, at any
+ * depth, is done or dropped. Such a goal has run out of map before reaching
+ * its done-when, which is the moment to ask Dash for the next steps.
+ */
+export function nothingOpen(steps: readonly { status: string; children: readonly unknown[] }[]): boolean {
+  type Node = { status: string; children: readonly Node[] };
+  const all = (nodes: readonly Node[]): Node[] => nodes.flatMap((node) => [node, ...all(node.children)]);
+  const flat = all(steps as readonly Node[]);
+  return flat.length > 0 && flat.every((node) => node.status === 'done' || node.status === 'dropped');
 }

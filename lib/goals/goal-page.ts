@@ -5,6 +5,8 @@
  *
  * Pure, so the page's reading of the tree is tested without a database.
  */
+import { awaitsReview } from '@/lib/goals/daily';
+import { firstLink } from '@/lib/goals/result-links';
 import type { StepNode } from '@/lib/goals/steps';
 
 /**
@@ -201,8 +203,15 @@ export type Finding = {
   /** The step it came from, named beside the fact. */
   from: string;
   fact: string;
-  /** Where the full result also lives, when it has a link. */
+  /** The whole result, which the finding opens to. */
+  result: string;
+  /**
+   * Where to go from it: where the full result lives, or else the first
+   * place the result points to (a sign-up page, an event), or null.
+   */
   url: string | null;
+  /** Whether it waits to be marked read, which the finding can do. */
+  unread: boolean;
 };
 
 /** The longest a fact runs before it is cut, in characters. */
@@ -239,7 +248,8 @@ export function firstSentence(markdown: string): string {
 /**
  * What Dash found on this goal: every step carrying a result, in the order
  * of the map, each as its first sentence and the step it came from. The
- * full result stays on the step, which the fact links to.
+ * finding opens to the whole result, so reading it does not mean finding
+ * the step and opening its row.
  */
 export function goalFindings(steps: readonly StepNode[]): Finding[] {
   const out: Finding[] = [];
@@ -247,7 +257,16 @@ export function goalFindings(steps: readonly StepNode[]): Finding[] {
     for (const node of nodes) {
       if (node.status !== 'dropped' && node.result?.trim()) {
         const fact = firstSentence(node.result);
-        if (fact) out.push({ stepId: node.id, from: node.title, fact, url: node.resultUrl });
+        if (fact) {
+          out.push({
+            stepId: node.id,
+            from: node.title,
+            fact,
+            result: node.result,
+            url: node.resultUrl ?? firstLink(node.result),
+            unread: awaitsReview(node),
+          });
+        }
       }
       walk(node.children);
     }

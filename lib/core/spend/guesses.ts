@@ -192,6 +192,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // Core.
   'reply-to-comment': run(HAIKU, 3_000, 250),
   'suggest-from-digest': background(run(HAIKU, 5_000, 800)),
+  // Four or five rounds, each resending the tools (about 3,000 tokens, most
+  // of it cached) and the lookups so far; a short answer out.
+  'ask-dash': run(SONNET, 30_000, 1_000),
 
   // News. All but the last two from the digest cron or a script.
   'digest-issue': background(unit(HAIKU, 3_000, 300)),

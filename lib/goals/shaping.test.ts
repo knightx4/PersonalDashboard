@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   approvalLine,
+  nothingOpen,
   areaRunText,
   areaRunView,
   awaitsAnswer,
@@ -185,6 +186,12 @@ describe('planning an area', () => {
 describe('approvalLine', () => {
   const base = { goalStatus: 'open' as const, approvedAt: null, proposed: 0, questions: 0 };
 
+  it('asks for the next steps on an approved goal whose steps are all finished', () => {
+    const line = approvalLine({ ...base, approvedAt: '2026-09-26T18:17:00Z', nothingOpen: true });
+    expect(line.approve).toBeNull();
+    expect(line.text).toMatch(/^Every step on this goal is finished/);
+  });
+
   it('offers to approve a goal Dash proposed', () => {
     const line = approvalLine({ ...base, goalStatus: 'proposed', proposed: 2 });
     expect(line.approve).toBe('Approve goal');
@@ -217,5 +224,20 @@ describe('approvalLine', () => {
     expect(approvalLine({ ...base, approvedAt, questions: 2 }).text).toBe(
       '2 questions for you are in the steps below.',
     );
+  });
+});
+
+describe('nothingOpen', () => {
+  type N = { status: string; children: N[] };
+  const n = (status: string, children: N[] = []): N => ({ status, children });
+
+  it('is true when every step at every depth is done or dropped', () => {
+    expect(nothingOpen([n('done'), n('dropped')])).toBe(true);
+  });
+
+  it('is false with an open step anywhere, or with no steps at all', () => {
+    expect(nothingOpen([n('done', [n('open')])])).toBe(false);
+    expect(nothingOpen([n('done'), n('blocked')])).toBe(false);
+    expect(nothingOpen([])).toBe(false);
   });
 });

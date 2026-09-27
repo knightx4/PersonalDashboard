@@ -54,6 +54,10 @@ export const SPEND_OPERATIONS = {
     'reply-to-comment',
     // Suggesting plan steps from the daily dev digest. Haiku; background.
     'suggest-from-digest',
+    // Dash answering a question asked from any page (plan #1089). Sonnet,
+    // calling read tools until it answers: up to nine calls, each sending
+    // the conversation and the lookups so far.
+    'ask-dash',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one

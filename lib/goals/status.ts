@@ -118,7 +118,7 @@ export const STEP_HEALTH_GLYPHS: Record<StepHealth, StatusGlyph> = {
 const HEALTH_TITLE: Record<StepHealth, string> = {
   proposed: 'Dash proposed this step. Nothing happens to it until you approve it.',
   unanswered: 'A question waiting on your answer.',
-  review: 'Dash has finished this. Read what it produced and mark it read.',
+  review: 'Read what Dash found and mark it read.',
   blocked: 'Blocked until you give it what it needs.',
   yours: 'Yours to do.',
   working: 'Dash does this one. The morning run works it and leaves the result here.',

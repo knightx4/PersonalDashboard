@@ -1341,6 +1341,13 @@ Before each step, report it on the run row with `now_on` the step's title
    you used any. Use web search where the step needs current facts. `result`
    is markdown, and the page renders it: tables, lists and links show as
    such.
+
+   The first sentence is what the goal page shows under "What Dash found",
+   so make it the takeaway, naming the place or date it turns on. Write every
+   place as a markdown link with its full address
+   (`[transalt.org/volunteer](https://transalt.org/volunteer)`), not a bare
+   name, and put the one the person should open first before any other: the
+   page puts that link beside the finding.
 3. Decide where it lives. A short answer, a few lines that are read once,
    goes in `result` whole. Anything longer, anything with a table, and
    anything the person or a later step will come back to is a **file**
@@ -1361,6 +1368,34 @@ Before each step, report it on the run row with `now_on` the step's title
    set result = '<what you produced, or the file''s summary and link>', result_url = null, status = 'done'
    where id = '<step id>' and user_id = '<user>' and kind = 'claude';
    ```
+
+5. Leave the next move on the goal, in the same run. A result that leads
+   somewhere (a sign-up, an event, an email to send, a choice between
+   options) is only useful if the goal then says what to do with it, and a
+   goal left with every step finished and its done-when not met has no map.
+   Under an approved goal, add the step the result leads to, `open`, as in
+   "Mapping a goal": usually the person's, with the link, the date and what
+   to say or bring in its `detail`, and a `due_on` or `starts_on` when the
+   result names a date. Do not add one when an open step already says it.
+
+   **A result that compares options ends in a pick and the others kept.**
+   Decide the plain first move as in "Decide first, ask last" and write it as
+   the next step, its `detail` opening with the `Decided:` line. Then list
+   the other options in the same `detail`, one per line, each with its link
+   and its own first move, so the person can switch by editing the step
+   rather than reading the result again:
+
+   ```
+   Decided: Transportation Alternatives first, because it is one 30-minute session with a fixed date.
+   Join the Volunteer Info Session on Zoom: [transalt.org/volunteer](https://transalt.org/volunteer).
+   Other options:
+   - Open Plans: email hello@openplans.org naming a campaign ([openplans.org/get-involved](https://openplans.org/get-involved)).
+   - Open New York: join as a member, then go to a New Member Meeting ([opennewyork.org](https://opennewyork.org)).
+   ```
+
+   Ask a question instead only when it passes that section's test. Under a
+   goal that is not approved, the step goes in `proposed`. Name each step
+   added in the summary.
 
 The home then lists the step under "Waiting on you" until the person presses
 **Mark read**. Never write `reviewed_at`: reading it is theirs, and the guard
@@ -1426,6 +1461,12 @@ describing the goal back to them. Put the next move's date in `next_on`
 whenever it has one: the step's due date or start date, the event's day.
 Leave it null rather than inventing one.
 
+A goal whose steps are all done or dropped, with its done-when not met,
+has run out of map. Give it its next move as a step the same way as a
+stalled goal below, without waiting the three weeks, and when you can see
+more than the one move, map the rest as in "Mapping a goal". Its verdict is
+then whatever fits the new step, usually waiting_on_you.
+
 A stalled goal also gets its next move as a step under it, `open`, so it is
 on the goal's page and the home the next time they look (`proposed` with
 `acts` if working it would act outside the plan). Make it the smallest thing
@@ -1489,7 +1530,8 @@ more formal, addressed to someone) as part of the step's done-when. The quick re
 that the run started, so there is nothing more to write there.
 
 - **A step** (`job` `step`): work that one Claude step as in "The morning
-  run", and touch no other step. If it turns out to need something only the
+  run", including the next move it leads to (point 5 there), and touch no
+  other step. If it turns out to need something only the
   person has, block it with `block_ask` rather than guessing.
 - **A phase** (`job` `phase`): work the open Claude steps in it, in order, as
   in "The morning run". Leave the person's own steps and the questions alone.

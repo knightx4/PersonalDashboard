@@ -138,8 +138,9 @@ export function dailyRunText(input: {
           'produce what its title and done-when ask for, store it in the step\'s result (and',
           'result_url when it lives somewhere with a link), and close the step as done. Anything',
           'longer than a few lines goes in a file linked from the step, with its summary as the',
-          'result (the section "Files"). A step you cannot finish stays open, with the reason in',
-          'the run summary.',
+          'result (the section "Files"). Then add the next move each result leads to (point 5 of',
+          'that section), so no goal is left with every step finished. A step you cannot finish',
+          'stays open, with the reason in the run summary.',
           '',
         ]
       : review.length > 0
