@@ -146,6 +146,7 @@ const rolePanels: PanelProps = {
   requirementMatchesAt: null,
   requirementMatchesStale: false,
   bankSize: 6,
+  coverLetter: '',
   caseStatement: '',
   caseSlug: null,
   caseExpiresAt: null,

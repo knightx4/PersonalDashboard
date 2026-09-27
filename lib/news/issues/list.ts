@@ -165,6 +165,11 @@ export function issueReturn(
  *
  * Pictures are on unless turned off, so only `pictures=0` is ever written.
  */
+/** One story of an issue on its own page (note a18729e3); `index` is its place in the digest. */
+export function storyHref(issueId: string, index: number): string {
+  return `/news/i/${issueId}/s/${index}`;
+}
+
 export function issueHref(
   id: string,
   { original, pictures, from }: { original: boolean; pictures: boolean; from: string | null },
