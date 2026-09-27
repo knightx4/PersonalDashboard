@@ -152,7 +152,8 @@ describe('dailyRunText', () => {
       ],
     });
     expect(text).toContain('goals.reviews');
-    expect(text).toContain('on_track, stalled, waiting_on_you, waiting_on_date or waiting_on_goal');
+    expect(text).toContain('met, on_track, stalled, waiting_on_you, waiting_on_date or');
+    expect(text).toContain('summary of how it got there');
     expect(text).toContain('next_on');
     expect(text).toContain('waits_on_id');
     expect(text).toContain('Goal "Land your next role" (goals.items id g)');

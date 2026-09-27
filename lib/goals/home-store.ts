@@ -7,7 +7,6 @@ import { STUCK_DAYS, stuckSteps, type HomeGoal, type WeekSpan } from '@/lib/goal
 import { weekInstants } from '@/lib/goals/links';
 import { isCurrent } from '@/lib/goals/reviews';
 import { periodOf } from '@/lib/goals/rhythms';
-import { loadLatestReviews } from '@/lib/goals/reviews-store';
 import { goalProgress } from '@/lib/goals/status';
 import { loadLiveTree } from '@/lib/goals/steps-store';
 import { TODAY_CAP, todayRanked, type TodayItem } from '@/lib/goals/today';
@@ -92,13 +91,14 @@ export async function loadHome(
   }: { userId: string; today: string; timeZone: string; now: number },
 ): Promise<Home> {
   const tree = await loadLiveTree(client, { today });
-  const [input, reviews, week] = await Promise.all([
-    loadTodayInput(client, supabase, { userId, today, tree }),
-    // A failed read leaves the statuses off the lines rather than the page.
-    loadLatestReviews(client).catch(() => new Map()),
+  const [input, week] = await Promise.all([
+    // Its reviews double as the goal lines' statuses; a failed read of them
+    // leaves the statuses off the lines rather than the page.
+    loadTodayInput(client, supabase, { userId, today, tree, now }),
     // A failed read says so in the week's section rather than failing the page.
     loadWeek(client, tree, { today, timeZone, now }).catch((): WeekReads | null => null),
   ]);
+  const { reviews } = input;
   const ranked = todayRanked(input);
   const goals = dailyView(tree.goals, tree.byGoal, today).goals.map((daily): HomeGoal => {
     const review = reviews.get(daily.goal.id) ?? null;

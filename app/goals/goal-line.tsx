@@ -17,6 +17,7 @@ export const VERDICT_TONES: Record<Verdict, DevTone> = {
   waiting_on_you: 'caution',
   waiting_on_date: 'quiet',
   waiting_on_goal: 'quiet',
+  met: 'positive',
 };
 
 /**

@@ -146,7 +146,7 @@ export function goalContext(context: GoalReplyContext): { text: string; refs: Re
   const out = [
     `# A goal: ${goal.title}`,
     '',
-    `Status: ${STEP_STATUS_LABELS[goal.status].toLowerCase()}`,
+    `Status: ${goal.status === 'parked' ? 'parked' : STEP_STATUS_LABELS[goal.status].toLowerCase()}`,
   ];
   if (goal.acceptance) out.push(`Done when: ${goal.acceptance}`);
   if (goal.fog) out.push(`Not known yet: ${goal.fog}`);

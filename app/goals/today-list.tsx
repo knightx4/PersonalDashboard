@@ -11,6 +11,7 @@ import { formatDay } from '@/lib/goals/dates';
 import type { TodayItem, TodayKind } from '@/lib/goals/today';
 import { countRhythmAction, setStepStatusAction } from './[goalId]/actions';
 import { addGoalComment } from './[goalId]/comment-actions';
+import { settleGoalAction } from './actions';
 import { answerFlagAction } from './[goalId]/flag-actions';
 import { answerGoalQuestion } from './[goalId]/tree-actions';
 import { reactToSuggestionAction, recordAttendedAction } from './suggestion-actions';
@@ -32,6 +33,9 @@ import { reactToSuggestionAction, recordAttendedAction } from './suggestion-acti
  * - a step of yours: done
  * - a suggestion: going, which puts it on Todo, with a quiet Not for me
  * - proposed steps or goals: a link to where they are approved
+ * - a goal whose done-when is met: close it, with a quiet Keep it open
+ * - a goal nothing has moved on for three weeks: park it, with the same
+ *   quiet Keep it open
  *
  * The two quiet second buttons are the answers the old home's lists had, kept
  * so that saying no is not something only the database can do.
@@ -53,12 +57,16 @@ const PRIMARY_VALUE: Partial<Record<TodayKind, [string, string]>> = {
   went: ['went', 'yes'],
   step: ['status', 'done'],
   suggestion: ['reaction', 'going'],
+  close: ['move', 'close'],
+  park: ['move', 'park'],
 };
 
 /** The quiet second answer, where the old home offered one. */
 const SECOND: Partial<Record<TodayKind, [string, string, string]>> = {
   went: ['went', 'no', 'No'],
   suggestion: ['reaction', 'not_for_me', 'Not for me'],
+  close: ['move', 'keep', 'Keep it open'],
+  park: ['move', 'keep', 'Keep it open'],
 };
 
 /** What each kind says once its button has worked, where the row stays to say it. */
@@ -82,6 +90,9 @@ function act(kind: TodayKind, form: FormData): Promise<State> {
       return setStepStatusAction(form);
     case 'suggestion':
       return reactToSuggestionAction({}, form);
+    case 'close':
+    case 'park':
+      return settleGoalAction({}, form);
     case 'breakdown':
     case 'plan':
       return Promise.resolve({ error: 'Open it to look it over.' });

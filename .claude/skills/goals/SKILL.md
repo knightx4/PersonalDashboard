@@ -966,7 +966,9 @@ archive one the person confirmed.
 the plan. See "Steps that act outside the plan".
 
 **Never, approved or not:** add a goal except as a proposal; change a goal's
-`acceptance` (its done-when); close, drop or archive a goal; drop or archive a
+`acceptance` (its done-when); close, park, drop or archive a goal, or set its
+`kept_open_at` (propose closing with a `met` verdict instead, see "Reviewing
+each goal"; Today offers parking by itself); drop or archive a
 `mine` or `rhythm` step other than by merging it or on the person's answer
 (`dropped_on`); close a `mine` step without
 evidence, or close a `rhythm` at all; answer a question; approve anything. When one of these
@@ -1440,6 +1442,16 @@ move. Write what matters as context, proposed, and say so in the reason.
 
 Give every open goal one verdict, taking the first that fits:
 
+- **met**: the done-when is met. This is the proposal to close the goal: the
+  Goals home offers it on Today with one button, and closing stays the
+  person's move. The reason is a short summary of how the goal got there,
+  naming the steps that did it and the evidence closed with them (the
+  `evidence` on its closed steps, the "Closed", "Merged" and "Dropped" rows
+  in `goals.history`), in 500 characters or fewer. The next move is "Close
+  the goal." Read the done-when literally: most of it done is on_track, not
+  met. When the brief says the person kept the goal open, it is met again
+  only on something done since that day. This comes before stalled, so a met
+  goal with nothing done in three weeks still reads met.
 - **stalled**: nothing is moving and nobody is on it. **A goal with nothing
   done in three weeks is stalled**, and the brief says so on that goal's
   line. That holds even when a question of theirs, a date or another goal is
@@ -1505,11 +1517,22 @@ insert into goals.reviews (user_id, item_id, run_id, verdict, reason, next_move,
 values ('<user>', '<goal id>', '<the run id>', 'waiting_on_goal',
         'The move waits on the pay floor settled under "Land your next role".',
         'Accept the pay floor on that goal.', '<the other goal''s id>');
+
+insert into goals.reviews (user_id, item_id, run_id, verdict, reason, next_move)
+values ('<user>', '<goal id>', '<the run id>', 'met',
+        'The last loan was paid off on 20 September (the closing statement in Gmail), after autopay went on in June and the card was cleared in August.',
+        'Close the goal.');
 ```
+
+A goal with nothing done in three weeks is also offered for parking on
+Today, whatever its verdict: parking keeps its steps and takes it off the
+home and out of the runs until the person takes it back up. That offer is
+the app's, from what was last done, so there is nothing to write for it.
+A parked goal is not in the brief.
 
 One row per goal per run. Rows are never updated: tomorrow's run adds a new
 one, and the pages show the newest. The run summary gives the count of each
-verdict and names the stalled goals.
+verdict and names the stalled goals and the met ones.
 
 ## A step or phase sent from its row
 
