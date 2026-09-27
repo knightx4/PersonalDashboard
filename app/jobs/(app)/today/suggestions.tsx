@@ -2,13 +2,13 @@
 
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
-import { Copy, ExternalLink, Mail, Sparkles } from 'lucide-react';
+import { Copy, ExternalLink, Mail, Search, Sparkles } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { gmailComposeUrl } from '@/lib/jobs/followup/compose';
 import type { OpenSuggestion } from '@/lib/jobs/suggest/load';
-import { splitSubject } from '@/lib/jobs/suggest/payload';
+import { linkedinSearchUrl, splitSubject } from '@/lib/jobs/suggest/payload';
 import {
   dismissSuggestion,
   markSuggestionSent,
@@ -23,13 +23,13 @@ const CHANNEL_LABELS: Record<string, string> = {
   linkedin_connect: 'LinkedIn connection note',
   email: 'Email',
   intro: 'Ask for an intro',
-  event: 'At an event',
+  event: 'In person, at the event',
   other: 'Message',
 };
 
 /**
- * What Dash suggests doing next: people to contact, with the message written,
- * and open postings it found. The daily run fills it (lib/jobs/suggest); the
+ * What Dash suggests doing next: people to meet who do the work you want, with
+ * the message written, and open postings it found. The daily run fills it (lib/jobs/suggest); the
  * two buttons ask for more now.
  */
 export function Suggestions({ suggestions }: { suggestions: OpenSuggestion[] }) {
@@ -65,9 +65,9 @@ export function Suggestions({ suggestions }: { suggestions: OpenSuggestion[] }) 
             disabled={pending}
             onClick={() => ask('people', suggestPeople)}
           >
-            {pending && which === 'people' ? 'Choosing…' : 'Who to contact'}
+            {pending && which === 'people' ? 'Searching…' : 'Find people to meet'}
           </Button>
-          <PaidHint action="app/jobs/(app)/today/actions.ts#suggestPeople" what="Cost of choosing people" />
+          <PaidHint action="app/jobs/(app)/today/actions.ts#suggestPeople" what="Cost of a search for people" />
           <Button
             type="button"
             size="sm"
@@ -83,8 +83,8 @@ export function Suggestions({ suggestions }: { suggestions: OpenSuggestion[] }) 
       </header>
       <p className="mb-2 text-small text-ink-muted">
         {suggestions.length > 0
-          ? 'People worth a message this week, with what to say, and open roles that fit what you wrote.'
-          : 'Dash checks every few days for people worth contacting and once a week for open roles that fit your career goals.'}
+          ? 'New people worth meeting for the work you want, with what to say, and open roles that fit.'
+          : 'Every few days Dash looks for people you have not met who do the work you want, and once a week for open roles that fit your career goals.'}
       </p>
       {notice && <p className="mb-2 text-small text-ink-muted">{notice}</p>}
 
@@ -136,6 +136,12 @@ function PersonRow({ suggestion }: { suggestion: OpenSuggestion }) {
     <li className="row-pad space-y-2">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="text-ui font-medium text-ink">{suggestion.headline}</span>
+        {suggestion.personName && (
+          <span className="text-small text-ink-muted">
+            {suggestion.personName}
+            {suggestion.personTitle ? `, ${suggestion.personTitle}` : ''}
+          </span>
+        )}
         {suggestion.companyName && (
           <span className="text-small text-ink-muted">
             {suggestion.companySlug ? (
@@ -178,6 +184,28 @@ function PersonRow({ suggestion }: { suggestion: OpenSuggestion }) {
           >
             <Mail className="size-3.5" strokeWidth={1.75} aria-hidden />
             Open in Gmail
+          </a>
+        )}
+        {suggestion.searchQuery && !suggestion.contact?.linkedinUrl && (
+          <a
+            href={linkedinSearchUrl(suggestion.searchQuery)}
+            target="_blank"
+            rel="noreferrer"
+            className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+          >
+            <Search className="size-3.5" strokeWidth={1.75} aria-hidden />
+            Find on LinkedIn
+          </a>
+        )}
+        {suggestion.sourceUrl && (
+          <a
+            href={suggestion.sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+          >
+            <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
+            {suggestion.personName ? 'Where Dash found them' : 'Details'}
           </a>
         )}
         {suggestion.contact?.linkedinUrl && (

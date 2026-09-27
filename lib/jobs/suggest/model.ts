@@ -1,28 +1,28 @@
 /**
  * The two model calls behind Dash's job search suggestions.
  *
- * `suggestOutreach` chooses up to three people from the candidates
- * (candidates.ts) and writes, for each, why now, what to do and the message to
- * send. `findOpenings` searches the web for open postings that fit what the
- * person wrote about the job they want, leaving out what they have already
- * applied for.
+ * `findPeople` searches the web for up to three people the person has not met
+ * who fit the work they want (or an event where they would meet them), and
+ * writes, for each, why, what to do and the message to send. `findOpenings`
+ * searches for open postings that fit, leaving out what they have already
+ * applied for. Both use the career goals, the target titles and the CV.
  *
  * Sonnet for both: the messages go out under the person's name, so they need
- * better writing than Haiku gives, and neither call needs Opus's judgement.
+ * better writing than Haiku gives, and the web search tool's dynamic filtering
+ * is not available on Haiku.
  */
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import type { Candidate } from './candidates';
 import {
   CHANNELS,
   MAX_OPENINGS,
   MAX_OUTREACH,
   parseOpeningsPayload,
-  parseOutreachPayload,
+  parsePeoplePayload,
   type OpeningSuggestion,
-  type OutreachSuggestion,
+  type PersonSuggestion,
 } from './payload';
 
 export const SUGGEST_MODEL = 'claude-sonnet-5';
@@ -93,103 +93,164 @@ function failure(error: unknown): { ok: false; error: string } {
 // People to contact
 // ---------------------------------------------------------------------------
 
-const OUTREACH_TOOL = 'suggest_outreach';
+const PEOPLE_TOOL = 'suggest_people';
 
-function outreachSystem(seeker: SeekerContext): string {
-  return `You help someone in a job search decide who to contact this week and
-exactly what to say. You are given a numbered list of candidates: people they
-already know of, and companies where they have applied but know nobody.
+function peopleSystem(seeker: SeekerContext): string {
+  return `You help someone in a job search build their network. Your job is to find
+people they have not met yet who are worth contacting this week, and to write
+exactly what to say. Not follow-ups on applications they already sent: new
+people, chosen because of the work they want next.
 
-Choose up to ${MAX_OUTREACH}, the ones where a message could change something
-now: someone at a company where an application is live, a recruiter who
-replied before and hires for other roles, a friend or former colleague who can
-refer them. Leave out anyone where a message now would be pointless or pushy.
-Fewer strong suggestions beat three weak ones.
+Search the web for up to ${MAX_OUTREACH} of the best of these:
+- A named person doing the job they want, or one level above it, at a company
+  that fits what they wrote: found on a company team page, a conference or
+  podcast speaker list, an article they wrote or were quoted in, or a public
+  profile. Someone who shares something with them is better: the same
+  university, a former employer in common, the same city.
+- A hiring manager or team lead for the kind of role they want, at a company
+  that is growing or hiring for it now.
+- An event, meetup or professional community for their field where they would
+  meet such people, in or near the place they live, happening soon. Only when
+  it is concrete: a named group or a dated event with a link.
+
+Mix them; do not return three of one kind unless the others are weak. Prefer
+reachable people (with a public profile or a way in) over famous ones.
 
 For each, give:
-- ref: the candidate's ref, exactly as given.
-- headline: who and what, in a few words. "Ask Priya Shah for a referral at
-  Acme", "Find the analytics lead at Globex".
-- why: one or two sentences on why this person and why now, from the facts.
-- move: what to do, as two to four short numbered steps. For a company with
-  nobody on file, name the title to look for and the LinkedIn search to run,
-  then what to send once found.
+- person_name and person_title as the source states them, and company. For an
+  event or group, person_name is null and company is the organiser.
+- source_url: the page where you found them.
+- search_query: a LinkedIn people search that finds this person, or people
+  like them if the name may be wrong. Short: name and company, or title,
+  company and school.
+- headline: who and what, in a few words. "Ask Dana Wu about strategic finance
+  at Ramp", "Go to the NYC FP&A meetup on 8 October".
+- why: one or two sentences on why this person and why now, naming the thing
+  they share with the job seeker or the reason they are worth their time.
+- move: two to four short numbered steps: how to find them, what to send,
+  and what to do if they reply.
 - channel: one of ${CHANNELS.join(', ')}. A LinkedIn connection note is
-  linkedin_connect and must be under 300 characters.
-- message: the message itself, ready to send, in their voice. Short: under 120
-  words for an email or DM. Specific to the person and the role, with one
-  clear ask (a referral, a 15-minute call, whether the role is still open, who
-  owns hiring for it). No flattery, no filler, no "I hope this finds you
-  well". Where a name is unknown, write [Name] for it. For an email, make the
-  first line "Subject: " and the subject, then a blank line, then the body.
+  linkedin_connect and must be under 300 characters. For an event, use event.
+- message: the message itself, ready to send, in their voice. Short: under 100
+  words, a connection note under 300 characters. Name the specific thing that
+  prompted it (their talk, their article, the school or employer in common).
+  One clear, small ask: a 15-minute call about how they got into the role, or
+  their view on one question. Never ask a stranger for a job or a referral in
+  the first message. No flattery, no filler. For an event, the message is what
+  to say when introducing themselves there. For an email, make the first line
+  "Subject: " and the subject, then a blank line, then the body.
 
-Write plainly. Do not use these anywhere: ${[...seeker.banned, '—'].map((b) => `"${b}"`).join(', ')}.${
+Never suggest anyone on the lists of people they already know or were already
+suggested. Write plainly. Do not use these anywhere: ${[...seeker.banned, '—'].map((b) => `"${b}"`).join(', ')}.${
     seeker.writingStyle ? `\n\nHow they like their writing to sound: ${seeker.writingStyle}` : ''
   }
 
-If no candidate is worth a message, return an empty list.`;
+If nothing worth their time turns up, report an empty list rather than a weak
+suggestion.`;
 }
 
-export async function suggestOutreach(
+export type PeopleInput = {
+  seeker: SeekerContext;
+  /** Friends, former colleagues and alumni already on file, who could introduce them. */
+  warm: readonly string[];
+  /** Everyone already a contact or already suggested, by name: not to be suggested. */
+  known: readonly string[];
+  /** personKey of every name in `known`, for the check after the call. */
+  taken: ReadonlySet<string>;
+};
+
+export async function findPeople(
   options: SuggestOptions,
-  input: { seeker: SeekerContext; candidates: readonly Candidate[] },
-): Promise<SuggestResult<OutreachSuggestion>> {
-  if (input.candidates.length === 0) return { ok: true, suggestions: [] };
+  input: PeopleInput,
+): Promise<SuggestResult<PersonSuggestion>> {
   const client = options.client ?? new Anthropic({ apiKey: options.apiKey });
+  const prompt =
+    seekerText(input.seeker) +
+    listed('People they know who could introduce them (a good way in, not a suggestion on their own)', input.warm, 30) +
+    listed('Already contacts or already suggested (do not suggest these)', input.known, 150) +
+    `\n\nSearch, then call ${PEOPLE_TOOL} once with every suggestion.`;
 
-  const prompt = [
-    seekerText(input.seeker),
-    '',
-    'Candidates:',
-    ...input.candidates.map((candidate) => `\n[${candidate.ref}]\n${candidate.facts.join('\n')}`),
-    '',
-    `Call ${OUTREACH_TOOL}.`,
-  ].join('\n');
-
-  let response;
-  try {
-    response = await client.messages.create({
-      model: SUGGEST_MODEL,
-      max_tokens: 4096,
-      system: outreachSystem(input.seeker),
-      tools: [
-        {
-          name: OUTREACH_TOOL,
-          description: 'Report the people to contact and what to send each.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              suggestions: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    ref: { type: 'string' },
-                    headline: { type: 'string' },
-                    why: { type: 'string' },
-                    move: { type: 'string' },
-                    channel: { type: 'string', enum: [...CHANNELS] },
-                    message: { type: 'string' },
-                  },
-                  required: ['ref', 'headline', 'why', 'move', 'channel', 'message'],
-                },
+  return searchThenReport(client, options, {
+    system: peopleSystem(input.seeker),
+    prompt,
+    tool: {
+      name: PEOPLE_TOOL,
+      description: 'Report the people and events to contact, and what to send each, all in one call.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          suggestions: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                person_name: { type: ['string', 'null'] },
+                person_title: { type: ['string', 'null'] },
+                company: { type: ['string', 'null'] },
+                source_url: { type: ['string', 'null'] },
+                search_query: { type: ['string', 'null'] },
+                headline: { type: 'string' },
+                why: { type: 'string' },
+                move: { type: 'string' },
+                channel: { type: 'string', enum: [...CHANNELS] },
+                message: { type: 'string' },
               },
+              required: ['headline', 'why', 'move', 'channel', 'message'],
             },
-            required: ['suggestions'],
           },
         },
-      ],
-      tool_choice: { type: 'tool', name: OUTREACH_TOOL },
-      messages: [{ role: 'user', content: prompt }],
-    });
+        required: ['suggestions'],
+      },
+    },
+    parse: (raw) => parsePeoplePayload(raw, { people: input.taken }),
+    empty: 'The search ran but reported no people.',
+  });
+}
+
+/**
+ * One web search conversation that ends in a forced report. A long search can
+ * pause the turn; sending it back as it is lets the server carry on.
+ */
+async function searchThenReport<T>(
+  client: Pick<Anthropic, 'messages'>,
+  options: SuggestOptions,
+  call: {
+    system: string;
+    prompt: string;
+    tool: Anthropic.Tool;
+    parse: (raw: unknown) => T[];
+    empty: string;
+  },
+): Promise<SuggestResult<T>> {
+  const messages: Anthropic.MessageParam[] = [{ role: 'user', content: call.prompt }];
+  try {
+    for (let turn = 0; turn <= MAX_CONTINUATIONS; turn += 1) {
+      const response = await client.messages.create({
+        model: SUGGEST_MODEL,
+        max_tokens: 8000,
+        system: call.system,
+        tools: [
+          { type: 'web_search_20260209', name: 'web_search', max_uses: MAX_SEARCHES } as unknown as Anthropic.Tool,
+          call.tool,
+        ],
+        messages,
+      });
+      options.onSpend?.({ model: SUGGEST_MODEL, usage: usageFrom(response.usage) });
+
+      const report = response.content.find((block) => block.type === 'tool_use' && block.name === call.tool.name);
+      if (report && report.type === 'tool_use') return { ok: true, suggestions: call.parse(report.input) };
+      // Widened: the installed SDK's type predates this reason.
+      const stop: string | null = response.stop_reason;
+      if (stop === 'pause_turn') {
+        messages.push({ role: 'assistant', content: response.content });
+        continue;
+      }
+      return { ok: false, error: call.empty };
+    }
   } catch (error) {
     return failure(error);
   }
-  options.onSpend?.({ model: SUGGEST_MODEL, usage: usageFrom(response.usage) });
-
-  const report = response.content.find((block) => block.type === 'tool_use' && block.name === OUTREACH_TOOL);
-  if (!report || report.type !== 'tool_use') return { ok: false, error: 'No suggestions came back.' };
-  return { ok: true, suggestions: parseOutreachPayload(report.input, input.candidates) };
+  return { ok: false, error: 'The search did not finish.' };
 }
 
 // ---------------------------------------------------------------------------
@@ -253,59 +314,35 @@ export async function findOpenings(
     listed('Where their recent roles were', input.locations, 8) +
     `\n\nSearch, then call ${OPENINGS_TOOL} once with every posting.`;
 
-  const messages: Anthropic.MessageParam[] = [{ role: 'user', content: prompt }];
-  try {
-    for (let turn = 0; turn <= MAX_CONTINUATIONS; turn += 1) {
-      const response = await client.messages.create({
-        model: SUGGEST_MODEL,
-        max_tokens: 8000,
-        system: OPENINGS_SYSTEM,
-        tools: [
-          { type: 'web_search_20260209', name: 'web_search', max_uses: MAX_SEARCHES } as unknown as Anthropic.Tool,
-          {
-            name: OPENINGS_TOOL,
-            description: 'Report the open postings found, all in one call.',
-            input_schema: {
+  return searchThenReport(client, options, {
+    system: OPENINGS_SYSTEM,
+    prompt,
+    tool: {
+      name: OPENINGS_TOOL,
+      description: 'Report the open postings found, all in one call.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          openings: {
+            type: 'array',
+            items: {
               type: 'object',
               properties: {
-                openings: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      company: { type: 'string' },
-                      title: { type: 'string' },
-                      url: { type: 'string' },
-                      location: { type: ['string', 'null'] },
-                      why: { type: 'string' },
-                      move: { type: 'string' },
-                    },
-                    required: ['company', 'title', 'url', 'why', 'move'],
-                  },
-                },
+                company: { type: 'string' },
+                title: { type: 'string' },
+                url: { type: 'string' },
+                location: { type: ['string', 'null'] },
+                why: { type: 'string' },
+                move: { type: 'string' },
               },
-              required: ['openings'],
+              required: ['company', 'title', 'url', 'why', 'move'],
             },
           },
-        ],
-        messages,
-      });
-      options.onSpend?.({ model: SUGGEST_MODEL, usage: usageFrom(response.usage) });
-
-      const report = response.content.find((block) => block.type === 'tool_use' && block.name === OPENINGS_TOOL);
-      if (report && report.type === 'tool_use') {
-        return { ok: true, suggestions: parseOpeningsPayload(report.input, input.taken) };
-      }
-      // Widened: the installed SDK's type predates this reason.
-      const stop: string | null = response.stop_reason;
-      if (stop === 'pause_turn') {
-        messages.push({ role: 'assistant', content: response.content });
-        continue;
-      }
-      return { ok: false, error: 'The search ran but reported no postings.' };
-    }
-  } catch (error) {
-    return failure(error);
-  }
-  return { ok: false, error: 'The search did not finish.' };
+        },
+        required: ['openings'],
+      },
+    },
+    parse: (raw) => parseOpeningsPayload(raw, input.taken),
+    empty: 'The search ran but reported no postings.',
+  });
 }

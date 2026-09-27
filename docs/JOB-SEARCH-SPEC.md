@@ -46,7 +46,7 @@ Listing these because Cursor will otherwise invent them.
 
 - No auto-apply. Never fills out and submits an application form on your behalf. It drafts, you paste.
 - No job board or aggregation. It does not scrape or mirror listings. Revised on 27 September 2026: Dash runs one web search a week for open postings that fit the career goals and suggests up to five on This week (`lib/jobs/suggest`). Nothing is saved to the pipeline until you press Save.
-- No scraping of anything behind a login, and no LinkedIn scraping. Contacts are entered manually or pasted.
+- No scraping of anything behind a login, and no LinkedIn scraping. Contacts are entered manually or pasted. The people Dash suggests come from public pages found with a web search (team pages, talks, articles); for LinkedIn it gives you a people search to open yourself.
 - No resume builder or ATS keyword scoring. Resume versions are stored and referenced, not generated.
 - No recruiter-side features. One candidate's view of one search.
 - No calendar write access in v1. Calendar *read* is a Phase 3 consideration and it is a separate Google grant with its own consent flow — but the invites themselves arrive as `text/calendar` parts on mail we already fetch, and those are parsed, so most of what the grant would buy is already here without one.
@@ -614,7 +614,7 @@ Same machinery, longer output, plus a structure derived from the requirement map
 
 **Company detail.** Research notes, all roles at that company across time, contacts, all touches, all linked email. The reason companies are a separate entity is that this page stays valuable after a specific role closes.
 
-**Contacts and outreach.** List, detail, touch log with response tracking. Follow-ups on a quiet application stay a deterministic template (`lib/jobs/followup/compose.ts`). First messages to people are drafted by Dash since 27 September 2026: the suggestion run picks up to three people worth contacting from the pipeline and the contact list, and writes why, what to do and the message, which you copy, edit and send yourself (`lib/jobs/suggest`). Pressing Sent records the touch. Recording sends is MVP, because the response rate is only computable if the sends are recorded from the start.
+**Contacts and outreach.** List, detail, touch log with response tracking. Follow-ups on a quiet application stay a deterministic template (`lib/jobs/followup/compose.ts`). First messages to people are drafted by Dash since 27 September 2026: the suggestion run searches the public web every few days for up to three people you have not met who do the work you want (or a dated event where you would meet them), and writes why, what to do and the message, which you copy, edit and send yourself (`lib/jobs/suggest`). Pressing Sent adds the person as a contact and records the touch. A first version chose from the pipeline instead, and every suggestion it made was a follow-up on an application that had already gone quiet. Recording sends is MVP, because the response rate is only computable if the sends are recorded from the start.
 
 **Interviews.** Scheduled and past. Prep notes before, debrief after. A prompt to write the debrief that evening while it is fresh, since a debrief written three days later is worth very little.
 

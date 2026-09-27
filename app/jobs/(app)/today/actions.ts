@@ -102,8 +102,8 @@ export async function snoozeWaiting(eventId: string): Promise<{ error: string | 
  * Dash's suggestions (job_search.suggestions, 0028).
  *
  * The two suggest presses run the same code as the daily cron, for the one
- * person and without waiting for the cadence. Sent logs the message in the
- * outreach log and marks the contact contacted; Save adds a posting to the
+ * person and without waiting for the cadence. Sent adds the person as a
+ * contact and logs the message in the outreach log; Save adds a posting to the
  * pipeline as a lead; Dismiss turns a suggestion down so it is not made again.
  */
 
@@ -181,9 +181,11 @@ export async function dismissSuggestion(id: string): Promise<{ error: string | n
 }
 
 /**
- * The message went out. Logged as a touch on the contact, with the text as
- * suggested, so the outreach log and response rates count it; a suggestion to
- * find someone new has no contact yet and is only marked done.
+ * The message went out. Logged as a touch in the outreach log, with the text
+ * as suggested, so response rates count it. Someone new becomes a contact
+ * first (cold, contacted, with where Dash found them in the notes); a
+ * suggestion to go to an event has nobody to log against and is only marked
+ * done.
  */
 // latency: pending -- should be optimistic: a tick that waits for the round trip
 export async function markSuggestionSent(id: string): Promise<{ error: string | null }> {
@@ -194,16 +196,39 @@ export async function markSuggestionSent(id: string): Promise<{ error: string | 
 
   const { data: row, error: readError } = await supabase
     .from('suggestions')
-    .select('contact_id, channel, message')
+    .select('contact_id, channel, message, person_name, person_title, company_name, source_url')
     .eq('id', parsed.data)
     .eq('user_id', user.id)
     .maybeSingle();
   if (readError || !row) return { error: readError?.message ?? 'That suggestion is gone.' };
 
-  if (row.contact_id) {
+  let contactId = (row.contact_id as string | null) ?? null;
+  if (!contactId && row.person_name) {
+    const company = row.company_name ? await ensureCompany(supabase, user.id, row.company_name as string) : null;
+    if (company?.error) return { error: company.error };
+    const source = (row.source_url as string | null) ?? null;
+    const { data: contact, error: contactError } = await supabase
+      .from('contacts')
+      .insert({
+        user_id: user.id,
+        company_id: company?.id ?? null,
+        full_name: row.person_name,
+        title: row.person_title,
+        linkedin_url: source && /linkedin\.com\/in\//.test(source) ? source : null,
+        relationship: 'cold',
+        status: 'contacted',
+        notes: source ? `Found by Dash: ${source}` : 'Found by Dash.',
+      })
+      .select('id')
+      .single();
+    if (contactError || !contact) return { error: contactError?.message ?? 'Could not add them as a contact.' };
+    contactId = contact.id as string;
+  }
+
+  if (contactId) {
     const { error: touchError } = await supabase.from('contact_touches').insert({
       user_id: user.id,
-      contact_id: row.contact_id,
+      contact_id: contactId,
       channel: row.channel ?? 'other',
       direction: 'outbound',
       message: row.message,
@@ -212,12 +237,12 @@ export async function markSuggestionSent(id: string): Promise<{ error: string | 
     await supabase
       .from('contacts')
       .update({ status: 'contacted' })
-      .eq('id', row.contact_id)
+      .eq('id', contactId)
       .eq('user_id', user.id)
       .in('status', ['to_contact', 'dormant']);
     revalidatePath('/jobs/contacts');
   }
-  return closeSuggestion(parsed.data, 'done');
+  return closeSuggestion(parsed.data, 'done', contactId ? { contact_id: contactId } : {});
 }
 
 /**

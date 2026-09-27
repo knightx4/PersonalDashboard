@@ -1,10 +1,10 @@
 /**
  * When the daily run writes new suggestions.
  *
- * The cron calls every day. People to contact are written every three days,
- * and only while fewer than three are open: a list the person has not got to
- * does not need more on top. Postings are written once a week, since each run
- * pays for web searches and good openings do not appear daily.
+ * The cron calls every day. People to meet are written every three days, and
+ * only while fewer than three are open: a list the person has not got to does
+ * not need more on top. Postings are written once a week. Both runs pay for
+ * web searches, which is what keeps them this infrequent.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;

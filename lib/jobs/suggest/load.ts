@@ -14,6 +14,10 @@ export type OpenSuggestion = {
   location: string | null;
   companyName: string | null;
   companySlug: string | null;
+  personName: string | null;
+  personTitle: string | null;
+  sourceUrl: string | null;
+  searchQuery: string | null;
   contact: { id: string; name: string; email: string | null; linkedinUrl: string | null } | null;
   createdAt: string;
 };
@@ -29,6 +33,10 @@ type Row = {
   url: string | null;
   location: string | null;
   company_name: string | null;
+  person_name: string | null;
+  person_title: string | null;
+  source_url: string | null;
+  search_query: string | null;
   created_at: string;
   contacts: { id: string; full_name: string; email: string | null; linkedin_url: string | null } | null;
   companies: { name: string; slug: string } | null;
@@ -46,7 +54,7 @@ export async function loadOpenSuggestions(
   const { data, error } = await supabase
     .from('suggestions')
     .select(
-      'id, kind, headline, why, move, channel, message, url, location, company_name, created_at, contacts ( id, full_name, email, linkedin_url ), companies ( name, slug )',
+      'id, kind, headline, why, move, channel, message, url, location, company_name, person_name, person_title, source_url, search_query, created_at, contacts ( id, full_name, email, linkedin_url ), companies ( name, slug )',
     )
     .eq('user_id', userId)
     .eq('status', 'open')
@@ -71,6 +79,10 @@ export async function loadOpenSuggestions(
         location: row.location,
         companyName: company?.name ?? row.company_name,
         companySlug: company?.slug ?? null,
+        personName: row.person_name,
+        personTitle: row.person_title,
+        sourceUrl: row.source_url,
+        searchQuery: row.search_query,
         contact: contact
           ? { id: contact.id, name: contact.full_name, email: contact.email, linkedinUrl: contact.linkedin_url }
           : null,

@@ -14,10 +14,9 @@ import 'server-only';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { formatDate } from '@/lib/jobs/applications/load';
-import { pickReachOutCandidates, type ApplicationFact, type ContactFact, type PastSuggestion } from './candidates';
 import { suggestionDue, type SuggestionKind } from './cadence';
-import { findOpenings, suggestOutreach, SUGGEST_MODEL, type SeekerContext } from './model';
-import { roleKey } from './payload';
+import { findOpenings, findPeople, SUGGEST_MODEL, type SeekerContext } from './model';
+import { personKey, roleKey } from './payload';
 
 export type KindOutcome = {
   /** False when the cadence said not yet and nothing was asked. */
@@ -75,55 +74,44 @@ async function loadSeeker(supabase: AppSupabaseClient, userId: string): Promise<
   };
 }
 
+/** An application as the postings search reads it. */
+type ApplicationFact = {
+  companyName: string;
+  roleTitle: string;
+  status: string;
+  respondedAt: string | null;
+  location: string | null;
+  url: string | null;
+};
+
 type AppRow = {
   id: string;
   status: string;
-  submitted_at: string | null;
   first_human_response_at: string | null;
   roles: {
     title: string;
     location: string | null;
     jd_url: string | null;
-    company_id: string;
     companies: { name: string } | { name: string }[] | null;
   } | null;
 };
 
-async function loadApplications(supabase: AppSupabaseClient, userId: string) {
-  const [apps, events] = await Promise.all([
-    supabase
-      .from('applications')
-      .select('id, status, submitted_at, first_human_response_at, roles ( title, location, jd_url, company_id, companies ( name ) )')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(500),
-    supabase
-      .from('application_events')
-      .select('application_id, occurred_at, summary')
-      .eq('user_id', userId)
-      .order('occurred_at', { ascending: false })
-      .limit(1500),
-  ]);
-  if (apps.error) throw new Error(`Reading the applications failed: ${apps.error.message}`);
-  const latest = new Map<string, { at: string; summary: string | null }>();
-  for (const event of (events.data ?? []) as Row[]) {
-    const id = event.application_id as string;
-    if (!latest.has(id)) latest.set(id, { at: event.occurred_at as string, summary: (event.summary as string | null) ?? null });
-  }
-  const rows = (apps.data ?? []) as unknown as AppRow[];
-  const facts: (ApplicationFact & { respondedAt: string | null; location: string | null; url: string | null })[] = [];
-  for (const row of rows) {
+async function loadApplications(supabase: AppSupabaseClient, userId: string): Promise<ApplicationFact[]> {
+  const { data, error } = await supabase
+    .from('applications')
+    .select('id, status, first_human_response_at, roles ( title, location, jd_url, companies ( name ) )')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(500);
+  if (error) throw new Error(`Reading the applications failed: ${error.message}`);
+  const facts: ApplicationFact[] = [];
+  for (const row of (data ?? []) as unknown as AppRow[]) {
     const role = one(row.roles);
     if (!role) continue;
-    const last = latest.get(row.id);
     facts.push({
-      companyId: role.company_id,
       companyName: one(role.companies)?.name ?? 'Unknown company',
       roleTitle: role.title,
       status: row.status,
-      submittedAt: row.submitted_at,
-      lastEventAt: last?.at ?? null,
-      lastEventSummary: last?.summary ?? null,
       respondedAt: row.first_human_response_at,
       location: role.location,
       url: role.jd_url,
@@ -135,7 +123,7 @@ async function loadApplications(supabase: AppSupabaseClient, userId: string) {
 async function loadPast(supabase: AppSupabaseClient, userId: string) {
   const { data, error } = await supabase
     .from('suggestions')
-    .select('kind, status, contact_id, company_id, url, created_at, acted_at')
+    .select('kind, status, contact_id, company_id, company_name, person_name, url, created_at, acted_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(500);
@@ -151,74 +139,60 @@ function kindState(past: Row[], kind: SuggestionKind) {
   };
 }
 
+/** Contacts who could introduce them: people they know, not recruiters or interviewers. */
+const WARM = new Set(['friend', 'former_colleague', 'alum', 'second_degree']);
+
 async function runReachOut(
   supabase: AppSupabaseClient,
   userId: string,
   apiKey: string,
   seeker: SeekerContext,
-  applications: ApplicationFact[],
   past: Row[],
 ): Promise<KindOutcome> {
   const spend: SpendReport[] = [];
-  const [contacts, touches] = await Promise.all([
-    supabase
-      .from('contacts')
-      .select('id, full_name, title, relationship, status, how_we_connect, notes, company_id, email, linkedin_url')
-      .eq('user_id', userId)
-      .limit(1000),
-    supabase
-      .from('contact_touches')
-      .select('contact_id, sent_at')
-      .eq('user_id', userId)
-      .eq('direction', 'outbound')
-      .order('sent_at', { ascending: false })
-      .limit(2000),
+  const { data, error } = await supabase
+    .from('contacts')
+    .select('full_name, title, relationship, how_we_connect, companies ( name )')
+    .eq('user_id', userId)
+    .limit(1000);
+  if (error) throw new Error(`Reading the contacts failed: ${error.message}`);
+  const contacts = (data ?? []) as Row[];
+
+  const describe = (row: Row) => {
+    const company = one(row.companies as { name: string } | { name: string }[] | null)?.name;
+    const how = row.how_we_connect ? ` (${row.how_we_connect as string})` : '';
+    return `${row.full_name as string}${row.title ? `, ${row.title as string}` : ''}${company ? ` at ${company}` : ''}${how}`;
+  };
+  const suggested = past
+    .filter((row) => row.kind === 'reach_out' && row.person_name)
+    .map((row) => `${row.person_name as string}${row.company_name ? ` at ${row.company_name as string}` : ''}`);
+  const known = [...contacts.map(describe), ...suggested];
+  const taken = new Set([
+    ...contacts.map((row) => personKey(row.full_name as string)),
+    ...past.filter((row) => row.person_name).map((row) => personKey(row.person_name as string)),
   ]);
-  if (contacts.error) throw new Error(`Reading the contacts failed: ${contacts.error.message}`);
-  const lastTouch = new Map<string, string>();
-  for (const touch of (touches.data ?? []) as Row[]) {
-    const id = touch.contact_id as string;
-    if (!lastTouch.has(id)) lastTouch.set(id, touch.sent_at as string);
-  }
-  const contactFacts: ContactFact[] = ((contacts.data ?? []) as Row[]).map((row) => ({
-    id: row.id as string,
-    name: row.full_name as string,
-    title: (row.title as string | null) ?? null,
-    relationship: row.relationship as string,
-    status: row.status as string,
-    howWeConnect: (row.how_we_connect as string | null) ?? null,
-    notes: (row.notes as string | null) ?? null,
-    companyId: (row.company_id as string | null) ?? null,
-    hasEmail: !!row.email,
-    hasLinkedin: !!row.linkedin_url,
-    lastTouchAt: lastTouch.get(row.id as string) ?? null,
-  }));
-  const pastFacts: PastSuggestion[] = past.map((row) => ({
-    kind: row.kind as string,
-    status: row.status as string,
-    contactId: (row.contact_id as string | null) ?? null,
-    companyId: (row.company_id as string | null) ?? null,
-    createdAt: row.created_at as string,
-    actedAt: (row.acted_at as string | null) ?? null,
-  }));
 
-  const candidates = pickReachOutCandidates({ contacts: contactFacts, applications, past: pastFacts });
-  if (candidates.length === 0) return { ran: true, written: 0, headlines: [], spend, error: null };
-
-  const result = await suggestOutreach(
+  const result = await findPeople(
     { apiKey, onSpend: (report) => spend.push(report) },
-    { seeker, candidates },
+    {
+      seeker,
+      warm: contacts.filter((row) => WARM.has(row.relationship as string)).map(describe),
+      known,
+      taken,
+    },
   );
   if (!result.ok) return { ran: true, written: 0, headlines: [], spend, error: result.error };
 
   const headlines: string[] = [];
   for (const suggestion of result.suggestions) {
-    const { error } = await supabase.from('suggestions').insert({
+    const { error: insertError } = await supabase.from('suggestions').insert({
       user_id: userId,
       kind: 'reach_out',
-      contact_id: suggestion.candidate.contactId,
-      company_id: suggestion.candidate.companyId,
-      company_name: suggestion.candidate.companyName,
+      company_name: suggestion.company,
+      person_name: suggestion.personName,
+      person_title: suggestion.personTitle,
+      source_url: suggestion.sourceUrl,
+      search_query: suggestion.searchQuery,
       headline: suggestion.headline,
       why: suggestion.why,
       move: suggestion.move,
@@ -226,8 +200,8 @@ async function runReachOut(
       message: suggestion.message,
       model: SUGGEST_MODEL,
     });
-    if (!error) headlines.push(suggestion.headline);
-    else if (error.code !== '23505') console.error('[jobs suggestions] reach_out insert', error.message);
+    if (!insertError) headlines.push(suggestion.headline);
+    else console.error('[jobs suggestions] reach_out insert', insertError.message);
   }
   return { ran: true, written: headlines.length, headlines, spend, error: null };
 }
@@ -237,7 +211,7 @@ async function runApply(
   userId: string,
   apiKey: string,
   seeker: SeekerContext,
-  applications: Awaited<ReturnType<typeof loadApplications>>,
+  applications: ApplicationFact[],
   past: Row[],
 ): Promise<KindOutcome> {
   const spend: SpendReport[] = [];
@@ -310,7 +284,7 @@ export async function runSuggestionsFor(
     return out;
   }
 
-  if (due('reach_out')) out.reach_out = await runReachOut(supabase, userId, options.apiKey, seeker, applications, past);
+  if (due('reach_out')) out.reach_out = await runReachOut(supabase, userId, options.apiKey, seeker, past);
   if (due('apply')) out.apply = await runApply(supabase, userId, options.apiKey, seeker, applications, past);
   return out;
 }
