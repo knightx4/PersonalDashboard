@@ -33,6 +33,9 @@ Rules:
 - It must rest on events from at least two areas, and cite them by their ids
   (E1, E2, ...) from the list: the events the number is counted from, up to
   ${MAX_EVIDENCE}. Cite only ids that appear in the list.
+- The ids go in evidence and nowhere else. Never write one in the sentence,
+  not even in brackets: the person reads the sentence and the ids mean
+  nothing to them. Name the thing instead, such as the Acme interview.
 - Say what happened together, not why. Do not guess at feelings or causes.
 - Skip anything a single area already shows, such as "you applied to 30
   roles". Skip patterns resting on one or two weeks of data.

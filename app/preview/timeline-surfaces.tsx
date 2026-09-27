@@ -1,7 +1,10 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { TimelineView } from '@/app/timeline/view';
+import { YearReviewView } from '@/app/timeline/year/[year]/view';
 import { groupByMonth } from '@/lib/timeline/months';
+import type { ShownObservation } from '@/lib/timeline/observations-view';
 import { TIMELINE_MODULES, type TimelineEvent } from '@/lib/timeline/timeline';
+import { yearTotals } from '@/lib/timeline/year-review';
 
 /**
  * The timeline page (plan #1118) in the surface gallery, from typed fixtures
@@ -54,6 +57,18 @@ const EVENTS: TimelineEvent[] = [
   row('2026-06-14T16:00:00Z', 'shopping', 'ordered', 'REI Co-op', 'R-88410', 21399),
 ];
 
+/** One observation the weekly run might write for these rows (plan #1120). */
+const OBSERVATIONS: ShownObservation[] = [
+  {
+    id: '00000000-0000-4000-8000-000000000001',
+    week: '2026-09-21',
+    sentence:
+      'In the 3 weeks after a rejection you placed 2 orders; in the 3 weeks after an application with no answer yet you placed none.',
+    modules: ['shopping', 'jobs'],
+    events: EVENTS.filter((event) => event.kind === 'rejected' || event.kind === 'ordered').slice(0, 5),
+  },
+];
+
 export function TimelineSurface() {
   const months = groupByMonth(EVENTS, 'America/New_York', { first: '2025-10', last: '2026-09' });
   return (
@@ -67,6 +82,54 @@ export function TimelineSurface() {
         earlier="2025-04"
         later={null}
         timezone="America/New_York"
+        observations={OBSERVATIONS}
+      />
+    </div>
+  );
+}
+
+/**
+ * The year in review (plan #1121) from the same rows: the counts are worked
+ * out from them as the page does, and the paragraphs are ones the checks
+ * would keep, each number in them shown further down.
+ */
+export function YearReviewSurface() {
+  const timezone = 'America/New_York';
+  const year = EVENTS.filter((event) => event.occurred_at >= '2026-01-01T05:00:00Z');
+  const totals = yearTotals(year, 2026, timezone, '2026-09');
+  const of = (...kinds: TimelineEvent['kind'][]) => year.filter((event) => kinds.includes(event.kind));
+  return (
+    <div className="mx-auto max-w-3xl">
+      <PageHeader title="2026 in review" description="What the year held, counted from the timeline and written up by Dash." />
+      <YearReviewView
+        year={2026}
+        writable
+        current
+        state={{
+          kind: 'written',
+          writtenAt: '2026-09-27T12:00:00Z',
+          through: '2026-09-27T12:00:00Z',
+          complete: false,
+          eventsThen: totals.events,
+          eventsSince: 0,
+        }}
+        totals={totals}
+        paragraphs={[
+          {
+            topic: 'shopping',
+            text: 'You placed 3 orders for $359.46, and $213.99 of it went to REI Co-op in June.',
+            events: of('ordered'),
+          },
+          {
+            topic: 'jobs',
+            text: 'You sent 4 applications and had 1 interview, at Array in September. 3 applications ended in a rejection and you withdrew from 1.',
+            events: of('applied', 'interviewed', 'rejected', 'withdrew'),
+          },
+        ]}
+        observations={OBSERVATIONS}
+        timezone={timezone}
+        earlier={2025}
+        later={null}
       />
     </div>
   );

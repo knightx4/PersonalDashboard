@@ -1,9 +1,11 @@
+import Link from 'next/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { isOwner } from '@/lib/dev/owner';
 import { switchableModules } from '@/lib/modules';
 import { latestEventBefore, readTimeline } from '@/lib/timeline/load';
+import { readObservations } from '@/lib/timeline/observations-load';
 import {
   groupByMonth,
   isMonthKey,
@@ -51,20 +53,36 @@ export default async function TimelinePage({
   const to = isMonthKey(params.to) && params.to < current ? params.to : null;
   const window = monthWindow(to ?? current, timezone);
 
-  const [events, before] =
+  const [events, before, noticed] =
     reading.length === 0
-      ? [[], null]
+      ? [[], null, []]
       : await Promise.all([
           readTimeline(client, { from: window.from, to: window.to, modules: reading, newestFirst: true }),
           latestEventBefore(client, window.from, reading),
+          // The weekly observations (plan #1120), by the month their week
+          // begins in. A failed read costs the page these, not the months.
+          readObservations(client, {
+            fromWeek: `${window.first}-01`,
+            toWeek: `${shiftMonth(window.last, 1)}-01`,
+          }).catch(() => []),
         ]);
+  // Narrowed to one workspace, only what that workspace is part of.
+  const observations = narrowed ? noticed.filter((observation) => observation.modules.includes(narrowed)) : noticed;
 
   const months = groupByMonth(events, timezone, window);
   const newerLast = to ? shiftMonth(to, MONTHS_PER_PAGE) : null;
 
   return (
     <>
-      <PageHeader title="Timeline" description="What you did across the app, month by month." />
+      <PageHeader
+        title="Timeline"
+        description="What you did across the app, month by month."
+        actions={
+          <Link href={`/timeline/year/${current.slice(0, 4)}`} className="text-ui text-accent hover:underline">
+            {`${current.slice(0, 4)} in review`}
+          </Link>
+        }
+      />
       <TimelineView
         months={months}
         modules={modules}
@@ -74,6 +92,7 @@ export default async function TimelinePage({
         earlier={before ? monthKeyOf(before, timezone) : null}
         later={newerLast === null ? null : newerLast >= current ? 'now' : newerLast}
         timezone={timezone}
+        observations={observations}
       />
     </>
   );

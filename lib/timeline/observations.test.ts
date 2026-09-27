@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
-const { checkObservations, observationWeek, overlap, parseEventRef, summariseTimeline, weekOf } = await import(
+const { checkObservations, observationWeek, overlap, parseEventRef, stripEventLabels, summariseTimeline, weekOf } =
+  await import(
   './observations'
 );
 const { observationsPrompt, writeObservations } = await import('./observations-model');
@@ -105,6 +106,37 @@ describe('the summary the model reads', () => {
   });
 });
 
+describe('taking event ids out of what the person reads', () => {
+  it('removes bracketed ids, ranges and lists with their brackets', () => {
+    expect(
+      stripEventLabels(
+        'The week of 2026-09-14 combined 4 interviews (including four Galaxy Digital onsites just after) with a burst of 71 notes, most being course notes (E317-E380) rather than job related notes.',
+      ),
+    ).toBe(
+      'The week of 2026-09-14 combined 4 interviews (including four Galaxy Digital onsites just after) with a burst of 71 notes, most being course notes rather than job related notes.',
+    );
+    expect(stripEventLabels('You wrote 3 notes [E1, E2 and E5], then 2 more (E7 to E8).')).toBe(
+      'You wrote 3 notes, then 2 more.',
+    );
+    expect(stripEventLabels('You placed 2 orders (E3–E4).')).toBe('You placed 2 orders.');
+  });
+
+  it('gives null when an id is left in the running text', () => {
+    expect(
+      stripEventLabels(
+        'Task completions and note writing only show up in the last three weeks of the period, alongside a run of four onsite interviews at Galaxy Digital on 2026-09-15 (E298-E301) and recruiter screens like E268 and E247.',
+      ),
+    ).toBeNull();
+    expect(stripEventLabels('You did 2 things (see E4).')).toBeNull();
+  });
+
+  it('leaves text with no ids alone, including words that start with E', () => {
+    expect(stripEventLabels('Every one of your 12 EU orders (E-commerce) arrived.')).toBe(
+      'Every one of your 12 EU orders (E-commerce) arrived.',
+    );
+  });
+});
+
 describe('the checks on what the model gave', () => {
   const window = observationWeek(MONDAY);
   const { events } = summariseTimeline([note, rejection, order, secondOrder], window);
@@ -153,6 +185,32 @@ describe('the checks on what the model gave', () => {
       [],
     );
     expect(dropped).toEqual(['no-number', 'no-sentence', 'no-sentence']);
+  });
+
+  it('takes bracketed event ids out of the sentence and keeps it', () => {
+    const { kept, dropped } = checkObservations(
+      [{ sentence: 'You placed 2 orders (E3, E4) in the three days after the Acme rejection (E2)', evidence: ['E2', 'E3', 'E4'] }],
+      events,
+      [],
+    );
+    expect(dropped).toEqual([]);
+    expect(kept[0]!.sentence).toBe('You placed 2 orders in the three days after the Acme rejection.');
+  });
+
+  it('drops one with an event id in its running text', () => {
+    const { kept, dropped } = checkObservations(
+      [
+        {
+          sentence: 'Task completions came alongside four onsite interviews (E2) and recruiter screens like E3 and E4.',
+          evidence: ['E2', 'E3', 'E4'],
+        },
+        { sentence: 'You placed 2 orders (E3 and a return) after the rejection.', evidence: ['E2', 'E3'] },
+      ],
+      events,
+      [],
+    );
+    expect(kept).toEqual([]);
+    expect(dropped).toEqual(['event-label', 'event-label']);
   });
 
   it('drops a rewording of one marked not useful', () => {
