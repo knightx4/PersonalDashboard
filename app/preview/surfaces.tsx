@@ -24,7 +24,7 @@ import type { ReviewRow, SearchableRole } from '@/lib/jobs/review/load';
 import { RolesTable } from '@/app/jobs/(app)/roles/roles-table';
 import { rolesDisplay } from '@/lib/jobs/roles-display';
 import { RoundsTable, type RoundView } from '@/app/jobs/(app)/interviews/rounds-table';
-import { TodayLists } from '@/app/jobs/(app)/today/lists';
+import { TodayLists } from '@/app/jobs/(app)/_home/this-week-lists';
 import type { TodayBoard } from '@/lib/jobs/today/load';
 import type { ModuleId } from '@/lib/modules';
 import { CalendarMonthGrid } from '@/components/todo/calendar-month';
@@ -1916,7 +1916,7 @@ const savedStories: SavedViewProps = {
 
 /** The job search's eleven sections, as its layout lists them. */
 const shellSections: NavSection[] = [
-  { href: '/jobs/today', label: 'This week', icon: 'week' },
+  { href: '/jobs', label: 'Home', icon: 'jobsHome', exact: true },
   { href: '/jobs/thoughts', label: 'Career goals', icon: 'careerGoals' },
   { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
   { href: '/jobs/roles', label: 'Roles', icon: 'roles' },

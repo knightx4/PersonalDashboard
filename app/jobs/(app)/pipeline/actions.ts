@@ -60,7 +60,7 @@ export async function moveApplication(
   // there appears to do nothing until something else forces a refresh.
   revalidatePath('/jobs/companies/[slug]', 'page');
   revalidatePath('/jobs/roles/[id]', 'page');
-  revalidatePath('/jobs/today');
+  revalidatePath('/jobs');
   return { error: null };
 }
 

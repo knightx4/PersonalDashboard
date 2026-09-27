@@ -87,7 +87,7 @@ export const draftsSource: AgendaSource = {
           ? `/shopping/orders/${row.about_id}`
           : roleId
             ? `/jobs/roles/${roleId}`
-            : '/jobs/today';
+            : '/jobs';
 
       return {
         key: `drafts:${row.id}`,

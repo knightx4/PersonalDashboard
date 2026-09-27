@@ -5,6 +5,7 @@ import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { createNewsClient } from '@/lib/news/auth/server';
+import { createGoalsClient } from '@/lib/goals/auth/server';
 import { TERMINAL_STATUSES } from '@/lib/jobs/pipeline';
 import { countOpenTasks } from '@/lib/todo/tasks/load';
 import { NOTES_WORK_KINDS, OUTSTANDING_STATUSES } from '@/lib/feedback/load';
@@ -22,7 +23,9 @@ import type { ModuleId } from '@/lib/modules';
  * caller can say "—" instead of silently claiming zero. Claiming zero when the
  * read failed is the exact failure the app spends most of its effort avoiding.
  */
-export type ModuleCounts = Partial<Record<ModuleId, { value: number | null; noun: string }>>;
+export type ModuleCounts = Partial<
+  Record<ModuleId, { value: number | null; noun: string; plural?: string }>
+>;
 
 async function safe<T>(query: PromiseLike<T>, fallback: T): Promise<T> {
   try {
@@ -33,15 +36,16 @@ async function safe<T>(query: PromiseLike<T>, fallback: T): Promise<T> {
 }
 
 export async function loadModuleCounts(userId: string): Promise<ModuleCounts> {
-  const [supabase, jobs, vault, learn, news] = await Promise.all([
+  const [supabase, jobs, vault, learn, news, goals] = await Promise.all([
     createClient(),
     createJobsClient(),
     createVaultClient(),
     createLearnClient(),
     createNewsClient(),
+    createGoalsClient(),
   ]);
 
-  const [items, pursuits, notes, tasks, toRead, unread, openNotes] = await Promise.all([
+  const [items, pursuits, notes, tasks, toRead, unread, openNotes, openGoals] = await Promise.all([
     safe(
       supabase
         .from('inventory_items')
@@ -103,15 +107,27 @@ export async function loadModuleCounts(userId: string): Promise<ModuleCounts> {
         .then((r) => r.count),
       null,
     ),
+    // Goals still being worked: not proposed, parked, done or dropped.
+    safe(
+      goals
+        .from('items')
+        .select('id', { count: 'exact', head: true })
+        .eq('level', 'goal')
+        .eq('status', 'open')
+        .is('archived_at', null)
+        .then((r) => r.count),
+      null,
+    ),
   ]);
 
   return {
     shopping: { value: items, noun: 'item' },
     jobs: { value: pursuits, noun: 'open pursuit' },
-    todo: { value: tasks, noun: 'thing to do' },
+    todo: { value: tasks, noun: 'thing to do', plural: 'things to do' },
     vault: { value: notes, noun: 'note' },
-    learn: { value: toRead, noun: 'thing to read' },
+    learn: { value: toRead, noun: 'thing to read', plural: 'things to read' },
     news: { value: unread, noun: 'unread newsletter' },
+    goals: { value: openGoals, noun: 'open goal' },
     dev: { value: openNotes, noun: 'open note' },
   };
 }
@@ -119,6 +135,6 @@ export async function loadModuleCounts(userId: string): Promise<ModuleCounts> {
 /** "6 open pursuits", "1 note", or "—" when the read failed. */
 export function describeCount(entry: ModuleCounts[ModuleId]): string {
   if (!entry || entry.value === null) return '—';
-  const plural = entry.value === 1 ? entry.noun : `${entry.noun}s`;
+  const plural = entry.value === 1 ? entry.noun : (entry.plural ?? `${entry.noun}s`);
   return `${entry.value} ${plural}`;
 }

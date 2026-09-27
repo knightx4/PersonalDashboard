@@ -155,7 +155,7 @@ export async function renameRole(roleId: string, title: string): Promise<{ error
   revalidatePath('/jobs/roles');
   revalidatePath('/jobs/pipeline');
   revalidatePath('/jobs/companies/[slug]', 'page');
-  revalidatePath('/jobs/today');
+  revalidatePath('/jobs');
   return { error: null };
 }
 
@@ -218,7 +218,7 @@ export async function moveRoleToCompany(
   revalidatePath('/jobs/pipeline');
   revalidatePath('/jobs/companies');
   revalidatePath('/jobs/companies/[slug]', 'page');
-  revalidatePath('/jobs/today');
+  revalidatePath('/jobs');
   return { error: null, slug: (moved?.slug as string) ?? null };
 }
 
@@ -331,7 +331,7 @@ export async function addReminder(input: {
   if (error) return { error: error.message };
 
   revalidatePath('/jobs/roles/[id]', 'page');
-  revalidatePath('/jobs/today');
+  revalidatePath('/jobs');
   // And on the company, which rolls up the to-dos of every role it has.
   revalidatePath('/jobs/companies/[slug]', 'page');
   return { error: null };
@@ -378,7 +378,7 @@ export async function updateReminder(input: {
   if (error) return { error: error.message };
 
   revalidatePath('/jobs/roles/[id]', 'page');
-  revalidatePath('/jobs/today');
+  revalidatePath('/jobs');
   revalidatePath('/jobs/companies/[slug]', 'page');
   return { error: null };
 }
@@ -430,7 +430,7 @@ export async function linkReminderMessage(input: {
   if (error) return { error: error.message };
 
   revalidatePath('/jobs/roles/[id]', 'page');
-  revalidatePath('/jobs/today');
+  revalidatePath('/jobs');
   return { error: null };
 }
 
@@ -511,7 +511,7 @@ export async function saveInterview(
   if (error) return { error: error.message };
   revalidatePath('/jobs/interviews');
   revalidatePath('/jobs/roles/[id]', 'page');
-  revalidatePath('/jobs/today');
+  revalidatePath('/jobs');
   return { error: null };
 }
 
@@ -620,7 +620,7 @@ export async function addInterview(input: {
   if (error) return { error: error.message };
   revalidatePath('/jobs/interviews');
   revalidatePath('/jobs/roles/[id]', 'page');
-  revalidatePath('/jobs/today');
+  revalidatePath('/jobs');
   return { error: null };
 }
 
@@ -1180,7 +1180,7 @@ export async function deleteInterview(interviewId: string): Promise<{ error: str
   if (error) return { error: error.message };
   revalidatePath('/jobs/interviews');
   revalidatePath('/jobs/roles/[id]', 'page');
-  revalidatePath('/jobs/today');
+  revalidatePath('/jobs');
   return { error: null };
 }
 
@@ -1829,6 +1829,6 @@ export async function writeRoundPrepNote(
 
   revalidatePath(`/jobs/roles/${application.role_id}`);
   revalidatePath('/jobs/interviews');
-  revalidatePath('/jobs/today');
+  revalidatePath('/jobs');
   return { note: result.note, error: null };
 }

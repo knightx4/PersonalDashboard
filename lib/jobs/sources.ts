@@ -147,7 +147,7 @@ export const jobsSources: ModuleSources = {
       weight: 'record',
       search: ['body'],
       title: 'body',
-      href: () => '/jobs/today',
+      href: () => '/jobs',
     },
   ],
   notSources: [

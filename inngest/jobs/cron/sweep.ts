@@ -6,7 +6,7 @@ import { DEBRIEF_NUDGE_WINDOW_DAYS } from '@/lib/jobs/pipeline';
  *
  * Two rules, both of them things a clock can see and a person cannot: an
  * interview that has happened and not been written up, and one about to happen
- * with no preparation. They surface on /jobs/today and on /todo.
+ * with no preparation. They surface on /jobs and on /todo.
  *
  * Ghosting is a view over silence, so it has to be re-derived on a clock
  * rather than only when something happens -- an application goes quiet
