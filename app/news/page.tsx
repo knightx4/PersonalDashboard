@@ -87,12 +87,25 @@ export default async function QuickReadPage({
     ? nextCard(issues, senders, [...passes, ...cardPasses(card)], filter, signals)
     : null;
   const page = quickPage(issues, senders, passes, filter, undefined, signals);
+  // The page after this one, drawn ahead so Next page does not wait (note 11ec91c5).
+  const nextPage = page.length
+    ? quickPage(
+        issues,
+        senders,
+        [...passes, ...page.flatMap(cardPasses)],
+        filter,
+        undefined,
+        signals,
+      )
+    : [];
   const wanted = params.pictures !== '0';
   const topics = quickTopics(issues, senders, passes, hidden, signals.groups);
   const progress = quickProgress(issues, senders, passes, filter, signals.groups);
 
   // The saved headlines of every newsletter on the page, read once each.
-  const issueIds = [...new Set([card, upNext, ...page].flatMap((c) => (c ? [c.issueId] : [])))];
+  const issueIds = [
+    ...new Set([card, upNext, ...page, ...nextPage].flatMap((c) => (c ? [c.issueId] : []))),
+  ];
   const [savedIn, reactions] = await Promise.all([
     Promise.all(
       issueIds.map(async (id) => [id, await loadSavedHeadlines(client, id)] as const),
@@ -106,7 +119,9 @@ export default async function QuickReadPage({
   const saved = card ? isSaved(card) : false;
 
   // Started, not awaited: RelatedNotes waits for it in its own Suspense.
-  const onPage = [card, upNext, ...page].flatMap((c) => (c?.kind === 'story' ? [c] : []));
+  const onPage = [card, upNext, ...page, ...nextPage].flatMap((c) =>
+    c?.kind === 'story' ? [c] : [],
+  );
   const related = relatedNotesForStories(client, vault, user.id, onPage);
   const relatedOf = (c: QuickCard): Promise<RelatedNoteLink[]> | null =>
     c.kind === 'story' ? related.then((found) => found.get(storyKey(c)) ?? []) : null;
@@ -126,6 +141,14 @@ export default async function QuickReadPage({
       issueHref={
         card ? issueHref(card.issueId, { original: false, pictures: wanted, from: null }) : null
       }
+      nextPage={nextPage.map((c) => ({
+        card: c,
+        arrived: formatArrival(c.receivedAt, settings.timezone),
+        saved: isSaved(c),
+        reaction: reactionOf(c),
+        related: relatedOf(c),
+        issueHref: issueHref(c.issueId, { original: false, pictures: wanted, from: null }),
+      }))}
       page={page.map((c) => ({
         card: c,
         arrived: formatArrival(c.receivedAt, settings.timezone),

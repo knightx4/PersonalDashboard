@@ -69,6 +69,12 @@ export type QuickReadViewProps = {
    * for the page to come back.
    */
   upNext?: QuickPageStory | null;
+  /**
+   * The laptop page Next page shows after this one, drawn ahead as `upNext`
+   * is for the phone, so the grid changes the moment Next page is pressed
+   * (note 11ec91c5). Left out or empty, Next page waits for the page.
+   */
+  nextPage?: readonly QuickPageStory[];
 };
 
 /** One story of the laptop page, with what the grid card needs beside the story. */
@@ -105,6 +111,7 @@ export function QuickReadView({
   topics,
   page = [],
   upNext = null,
+  nextPage = [],
 }: QuickReadViewProps) {
   const topic = topics.selected;
   // No description under the title, and the chips pulled up to it: the page is
@@ -239,21 +246,35 @@ export function QuickReadView({
 
       {grid && (
         <div className="hidden md:block">
-          <StoryGrid
-            stories={page.map((story) => gridStory(story, pictures))}
-            pictures={pictures}
-            compact
+          <QuickDeck
+            key={page.map(({ card: c }) => `${c.issueId}:${c.storyIndex}`).join(',')}
+            current={gridPage(page, pictures)}
+            next={nextPage.length > 0 ? gridPage(nextPage, pictures) : null}
+            nextImage={null}
           />
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-ui text-ink-muted">
-              Next page marks {page.length === 1 ? 'this story' : `all ${page.length} stories`} as
-              seen.
-            </p>
-            <QuickPageForm stories={page.flatMap(({ card: c }) => cardPasses(c))} />
-          </div>
         </div>
       )}
     </div>
+  );
+}
+
+/** One laptop page: the grid, and under it Next page with the stories it will pass. */
+function gridPage(stories: readonly QuickPageStory[], pictures: boolean) {
+  return (
+    <>
+      <StoryGrid
+        stories={stories.map((story) => gridStory(story, pictures))}
+        pictures={pictures}
+        compact
+      />
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-ui text-ink-muted">
+          Next page marks {stories.length === 1 ? 'this story' : `all ${stories.length} stories`} as
+          seen.
+        </p>
+        <QuickPageForm stories={stories.flatMap(({ card: c }) => cardPasses(c))} />
+      </div>
+    </>
   );
 }
 
