@@ -162,8 +162,17 @@ What waits on you:
   other status, opening one, or changing what a live step does.
 
 Claude may still not change a goal's done-when, drop one of your steps or
-answer a question for you. It asks those as a question step. A step that
-depends on an unanswered question is written live but waits on that question,
+answer a question for you. It asks those as a question step. The exception is
+a duplicate: when two of your steps ask for the same thing, Claude merges them,
+dropping one with `merged_into` naming the step that now carries its work
+(`migrations-goals/0048`). The merge is one line in the run's changes and on
+the Goals home, "Merged X into Y", and its Undo reopens the dropped step. A
+sub-step merged into its own phase leaves the phase open, and that phase then
+waits for you to tick it off rather than closing with its other sub-steps. A
+step that waited on the dropped one is made to wait on the survivor too
+(`migrations-goals/0049`).
+
+A step that depends on an unanswered question is written live but waits on that question,
 so it stays out of the runs until you answer.
 
 ## Where things live
@@ -770,7 +779,9 @@ A sketch for the migration, not the migration itself.
   below them, `level` (`goal` or `step`), `kind`, `status`, `title`, `detail`,
   `acceptance`, `fog`, `resolution`, `due_on`, `starts_on` (a step's first
   possible day, "Steps for later"), `on_todo`, `approved_at`,
-  `acts` (on a Claude step, what working it does outside the plan), `position`, and `rhythm_count` with `rhythm_period` for rhythms. A goal's
+  `acts` (on a Claude step, what working it does outside the plan),
+  `merged_into` (on a step dropped as a duplicate, the step that carries its
+  work; plan #1081), `position`, and `rhythm_count` with `rhythm_period` for rhythms. A goal's
   `help_kinds` lists the weekly help it asks for, each an entry of `kind`
   (events, volunteering, reading, courses or job_leads) and a `note` on what
   to look for (plan #1027). When Claude maps a goal it proposes kinds in
