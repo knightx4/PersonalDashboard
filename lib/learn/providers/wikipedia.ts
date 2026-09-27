@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { z } from 'zod';
+import { isSearchableSection } from '@/lib/learn/catalogue/searchable';
 import { fetchDocument } from './fetch';
 
 /**
@@ -45,6 +46,12 @@ export type WikipediaSection = {
   anchor: string | null;
   heading: string | null;
   text: string;
+  /**
+   * False for a stub under 300 characters or a link list such as See also.
+   * Stored all the same, so a reading queued on it still opens, but never
+   * embedded and never offered to a claim. The rule is `isSearchableSection`.
+   */
+  searchable: boolean;
 };
 
 export type WikipediaArticle = {
@@ -116,6 +123,9 @@ const HEADING = /^(={2,6})\s*(.+?)\s*\1\s*$/;
  * nothing under it either. Ordinals are assigned after that filter, so they
  * stay contiguous from 0 and the sweep can delete the tail of a re-swept
  * article by ordinal.
+ *
+ * Each section is marked searchable or not as it is cut, by the rule in
+ * lib/learn/catalogue/searchable.ts.
  */
 export function sectionsFromExtract(extract: string): WikipediaSection[] {
   const taken = new Set<string>();
@@ -129,7 +139,13 @@ export function sectionsFromExtract(extract: string): WikipediaSection[] {
     const text = buffer.join('\n').trim();
     buffer = [];
     if (!text) return;
-    sections.push({ ordinal: sections.length, anchor, heading, text });
+    sections.push({
+      ordinal: sections.length,
+      anchor,
+      heading,
+      text,
+      searchable: isSearchableSection({ heading, text }),
+    });
   };
 
   for (const line of extract.split('\n')) {

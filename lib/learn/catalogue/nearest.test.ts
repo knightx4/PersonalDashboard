@@ -61,7 +61,8 @@ function segment(heading: string, similarity: number, overrides: Partial<NearbyS
     sectionAnchor: heading.toLowerCase(),
     tStartSeconds: null,
     tEndSeconds: null,
-    text: `the ${heading} section`,
+    // Long enough to be a searchable section; a stub is dropped by rankNearest.
+    text: `the ${heading} section. `.repeat(20),
     embeddingModel: 'voyage-4-lite',
     similarity,
     item: { title: 'An article', kind: 'article', canonicalUrl: 'https://example.invalid/a' },
@@ -145,6 +146,37 @@ describe('the floor and the ordering', () => {
   });
 });
 
+describe('stub sections and link lists', () => {
+  it('drops an article section under 300 characters, however close it is', () => {
+    // Urban sprawl's "Characteristics" from the #760 trial: 150 characters
+    // that scored up to 0.62 against unrelated Tell claims.
+    const stub = segment('Characteristics', 0.62, { text: 'x'.repeat(150) });
+    const ranked = rankNearest([stub, segment('Near', 0.55)]);
+    expect(ranked.map((row) => row.heading)).toEqual(['Near']);
+  });
+
+  it('drops a See also or External links section whatever its length', () => {
+    const ranked = rankNearest([
+      segment('See also', 0.9),
+      segment('External links', 0.8),
+      segment('Near', 0.7),
+    ]);
+    expect(ranked.map((row) => row.heading)).toEqual(['Near']);
+  });
+
+  it('keeps a short timed segment from a lecture', () => {
+    const clip = segment('Clip', 0.7, {
+      heading: null,
+      sectionAnchor: null,
+      tStartSeconds: 60,
+      tEndSeconds: 90,
+      text: 'short',
+      item: { title: 'A lecture', kind: 'video', canonicalUrl: 'https://example.invalid/v' },
+    });
+    expect(rankNearest([clip])).toHaveLength(1);
+  });
+});
+
 describe('the segments nearest a claim', () => {
   it('returns them closest first, each with its similarity', async () => {
     const embed = fakeEmbed();
@@ -158,7 +190,7 @@ describe('the segments nearest a claim', () => {
     expect(outcome.segments.map((row) => row.heading)).toEqual(['Exact', 'Near']);
     expect(outcome.segments[0].similarity).toBeCloseTo(1, 10);
     expect(outcome.segments[1].similarity).toBeCloseTo(Math.SQRT1_2, 10);
-    expect(outcome.segments[0].text).toBe('the Exact section');
+    expect(outcome.segments[0].text).toBe('the Exact section. '.repeat(20));
     expect(outcome.model).toBe('voyage-4-lite');
     expect(outcome.tokens).toBe(12);
   });

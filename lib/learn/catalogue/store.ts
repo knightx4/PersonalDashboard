@@ -45,6 +45,12 @@ export type CatalogueSegmentInput = {
   sectionAnchor: string | null;
   heading: string | null;
   text: string;
+  /**
+   * False for an article section too short or too list-like to match a claim
+   * against (lib/learn/catalogue/searchable.ts). Absent means true, which is
+   * every lecture segment. Writing false clears any vector the row had.
+   */
+  searchable?: boolean;
 };
 
 /** One row of `catalogue_items`, before it has an id. */
@@ -144,27 +150,34 @@ async function upsertSegments(
     section_anchor: segment.sectionAnchor,
     heading: segment.heading,
     text: segment.text,
+    searchable: segment.searchable ?? true,
   }));
 
+  // A section that is not searchable loses its vector as well as one whose
+  // text changed: `catalogue_segments_searchable_ck` refuses the pair.
   await sql`
     insert into learn.catalogue_segments
       ${sql(rows, 'item_id', 'ordinal', 't_start_seconds', 't_end_seconds',
-            'section_anchor', 'heading', 'text')}
+            'section_anchor', 'heading', 'text', 'searchable')}
     on conflict (item_id, ordinal) do update
        set t_start_seconds = excluded.t_start_seconds,
            t_end_seconds = excluded.t_end_seconds,
            section_anchor = excluded.section_anchor,
            heading = excluded.heading,
            text = excluded.text,
+           searchable = excluded.searchable,
            embedding = case when catalogue_segments.text is distinct from excluded.text
+                                 or not excluded.searchable
                             then null else catalogue_segments.embedding end,
            embedding_model = case when catalogue_segments.text is distinct from excluded.text
+                                       or not excluded.searchable
                                   then null else catalogue_segments.embedding_model end,
            -- Goes null with the vector, which the check constraint requires and
            -- the repeat press relies on: the next embedding pass stamps a new
            -- time, and a rewritten section is offered again to claims searched
            -- before it changed.
            embedded_at = case when catalogue_segments.text is distinct from excluded.text
+                                   or not excluded.searchable
                               then null else catalogue_segments.embedded_at end`;
 }
 
@@ -202,6 +215,7 @@ export async function storeArticle(
         sectionAnchor: section.anchor,
         heading: section.heading,
         text: section.text,
+        searchable: section.searchable,
       })),
     );
     const removed = await deleteTrailingSegments(tx, itemId, article.sections.length);

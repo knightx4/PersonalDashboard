@@ -29,6 +29,7 @@ function sections(...headings: (string | null)[]): WikipediaSection[] {
     anchor: heading ? heading.replace(/ /g, '_') : null,
     heading,
     text: `Text of ${heading ?? 'the lead'}.`,
+    searchable: true,
   }));
 }
 
