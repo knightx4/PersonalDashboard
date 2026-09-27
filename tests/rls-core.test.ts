@@ -570,3 +570,54 @@ describe('core.account_settings', () => {
     expect(Number(row.n)).toBe(0);
   });
 });
+
+describe('push subscriptions', () => {
+  /**
+   * Where the morning brief is sent (plan #1124). The account page stores and
+   * removes this browser's row on the person's own session; the brief run
+   * reads them with the service role.
+   */
+  const endpoint = (name: string) => `https://push.example/${name}`;
+
+  it('lets the owner add, read and remove their own, and nobody else see them', async () => {
+    await asUser(
+      userA,
+      (tx) => tx`insert into core.push_subscriptions (user_id, endpoint, p256dh, auth)
+                 values (${userA}, ${endpoint('a-phone')}, 'key', 'secret')`,
+    );
+    expect(await asUser(userA, (tx) => tx`select id from core.push_subscriptions`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from core.push_subscriptions`)).toHaveLength(0);
+    expect(
+      await asUser(userB, (tx) => tx`delete from core.push_subscriptions returning id`),
+    ).toHaveLength(0);
+    expect(
+      await asUser(
+        userA,
+        (tx) => tx`delete from core.push_subscriptions where endpoint = ${endpoint('a-phone')} returning id`,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('refuses a row filed under someone else', async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into core.push_subscriptions (user_id, endpoint, p256dh, auth)
+                   values (${userA}, ${endpoint('planted')}, 'key', 'secret')`,
+      ),
+    ).rejects.toThrow(/row-level security/);
+  });
+
+  it('keeps one row per browser, and only https endpoints', async () => {
+    await admin`insert into core.push_subscriptions (user_id, endpoint, p256dh, auth)
+                values (${userA}, ${endpoint('shared')}, 'key', 'secret')`;
+    await expect(
+      admin`insert into core.push_subscriptions (user_id, endpoint, p256dh, auth)
+            values (${userB}, ${endpoint('shared')}, 'key', 'secret')`,
+    ).rejects.toThrow(/push_subscriptions_endpoint_uq/);
+    await expect(
+      admin`insert into core.push_subscriptions (user_id, endpoint, p256dh, auth)
+            values (${userA}, 'http://push.example/plain', 'key', 'secret')`,
+    ).rejects.toThrow(/push_subscriptions_endpoint_ck/);
+  });
+});

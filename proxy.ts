@@ -124,12 +124,14 @@ export default async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Everything except static assets, image files and the web app manifest,
-     * which the browser fetches without the session cookie and would otherwise
-     * be sent to /login for. The homepage and the
+     * Everything except static assets, image files, the web app manifest and
+     * the service worker (public/sw.js), which the browser may fetch without
+     * the session cookie and would otherwise be sent to /login for. A service
+     * worker script that redirects fails to register, and one that fails to
+     * update keeps the notifications from arriving. The homepage and the
      * auth pages are matched deliberately, so a signed-in user gets bounced
      * off all three.
      */
-    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 };

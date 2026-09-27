@@ -6,6 +6,7 @@ import { loadModuleCounts } from '@/lib/modules/counts';
 import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadMainCheck } from '@/lib/shell/main-check';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
+import { vapidPublicKey } from '@/lib/push/web-push';
 import { AccountView } from './view';
 
 export const metadata = { title: 'Account' };
@@ -66,6 +67,7 @@ export default async function AccountPage() {
               enabledModules: settings.enabledModules,
             }}
             isOwner={owner}
+            vapidPublicKey={vapidPublicKey()}
             />
           </div>
         </div>

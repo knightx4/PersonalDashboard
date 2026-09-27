@@ -17,6 +17,8 @@ import { agendaFacts, goalFact, learnFact, newsFact, type BriefFact } from '@/li
 import { BRIEF_MODEL, writeBrief } from '@/lib/day-brief/model';
 import { runDayBriefFor, type DayBriefPorts, type DayBriefResult } from '@/lib/day-brief/run';
 import { dailyView } from '@/lib/goals/daily';
+import { briefPayload, sendToPerson, type PushPorts, type PushSubscriptionRow } from '@/lib/push/send';
+import { sendWebPush, vapidKeys } from '@/lib/push/web-push';
 import { loadLiveTree } from '@/lib/goals/steps-store';
 import { readStories } from '@/lib/news/issues/stories';
 import type { AgendaClients } from '@/lib/todo/agenda/clients';
@@ -32,8 +34,9 @@ import { loadAgenda } from '@/lib/todo/agenda/load';
  * the agenda's loaders and sources all filter by user id or by ids taken
  * from the person's own rows (lib/todo/agenda/clients.ts).
  *
- * `written` in the ports is where the brief leaves the database: the phone
- * notification (plan #1124) goes there.
+ * `written` in the ports is where the brief leaves the database: it is sent
+ * as a phone notification (plan #1124) to every browser the person switched
+ * it on for on the account page (core.push_subscriptions).
  */
 
 const OPERATION: CoreOperation = 'write-day-brief';
@@ -153,6 +156,41 @@ async function gatherFacts(
   );
 }
 
+/**
+ * Where a person's notifications go: their rows in core.push_subscriptions,
+ * read and pruned with the service role, so every query names the person or
+ * the rows already read for them.
+ */
+export function pushPorts(core: CoreSupabaseClient, userId: string): PushPorts | null {
+  const keys = vapidKeys();
+  // Without the keys nothing can be signed; the brief is still on the home page.
+  if (!keys) return null;
+  return {
+    async subscriptions(user) {
+      const { data, error } = await core
+        .from('push_subscriptions')
+        .select('id, endpoint, p256dh, auth')
+        .eq('user_id', user);
+      if (error) throw new Error(`Reading the notification subscriptions failed: ${error.message}`);
+      return (data ?? []) as PushSubscriptionRow[];
+    },
+    send(subscription, payload) {
+      return sendWebPush(keys, subscription, payload);
+    },
+    async forget(ids) {
+      const { error } = await core.from('push_subscriptions').delete().eq('user_id', userId).in('id', ids);
+      if (error) throw new Error(`Removing a dropped subscription failed: ${error.message}`);
+    },
+    async sent(ids, at) {
+      await core
+        .from('push_subscriptions')
+        .update({ last_sent_at: at.toISOString() })
+        .eq('user_id', userId)
+        .in('id', ids);
+    },
+  };
+}
+
 export function dayBriefPorts(core: CoreSupabaseClient, clients: AgendaClients, now: Date): DayBriefPorts {
   const apiKey = process.env.ANTHROPIC_API_KEY ?? null;
 
@@ -194,6 +232,17 @@ export function dayBriefPorts(core: CoreSupabaseClient, clients: AgendaClients, 
         .select('id');
       if (error) throw new Error(`Saving today's brief failed: ${error.message}`);
       return (data ?? []).length > 0;
+    },
+
+    async written(row) {
+      const push = pushPorts(core, row.user_id);
+      if (!push) return;
+      // The brief is saved; a notification that fails costs the buzz, not the day.
+      try {
+        await sendToPerson(push, row.user_id, briefPayload(row.body, row.day), now);
+      } catch {
+        // Tried again tomorrow; the home page already shows today's.
+      }
     },
   };
 }
