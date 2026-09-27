@@ -16,6 +16,7 @@ import { formatInstant } from '@/lib/goals/dates';
 import { loadFileUses, type FileUse } from '@/lib/goals/files-store';
 import type { DevComment } from '@/lib/comments/load';
 import { FileThread } from './file-comments';
+import { MarkFileRead } from './mark-read';
 
 export const metadata = { title: 'File' };
 export const dynamic = 'force-dynamic';
@@ -86,6 +87,12 @@ export default async function FilePage({
         <Card padding="standard">
           <FileBody markdown={shown.body} />
         </Card>
+        {/* Reading the newest version is reading the results that link to it. */}
+        {!older && (
+          <MarkFileRead
+            stepIds={uses.filter((use) => use.level === 'step').map((use) => use.itemId)}
+          />
+        )}
 
         {/* Notes on the file (note 7a6a37aa), read by the goals run before it revises it. */}
         <section aria-label="Comments" className="px-1">

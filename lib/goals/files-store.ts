@@ -76,20 +76,27 @@ export async function loadFileUses(goals: GoalsSupabaseClient, fileId: string): 
     .is('items.archived_at', null)
     .order('created_at');
   if (error) throw new Error(`Could not read where the file is linked: ${error.message}`);
-  const items = ((data ?? []) as unknown as UseRow[]).flatMap((row) => (row.items ? [row.items] : []));
+  const items = ((data ?? []) as unknown as UseRow[]).flatMap((row) =>
+    row.items ? [row.items] : [],
+  );
 
   // Each step's goal, found by walking parent_id up a level per read.
   const parentOf = new Map<string, UseItem>(items.map((item) => [item.id, item]));
-  let missing = items.filter((item) => item.level === 'step' && item.parent_id).map((item) => item.parent_id!);
+  let missing = items
+    .filter((item) => item.level === 'step' && item.parent_id)
+    .map((item) => item.parent_id!);
   for (let depth = 0; depth < 8 && missing.length > 0; depth += 1) {
     const { data: parents, error: parentError } = await goals
       .from('items')
       .select('id, title, level, parent_id')
       .in('id', [...new Set(missing)]);
-    if (parentError) throw new Error(`Could not read where the file is linked: ${parentError.message}`);
+    if (parentError)
+      throw new Error(`Could not read where the file is linked: ${parentError.message}`);
     for (const parent of (parents ?? []) as UseItem[]) parentOf.set(parent.id, parent);
     missing = ((parents ?? []) as UseItem[])
-      .filter((parent) => parent.level === 'step' && parent.parent_id && !parentOf.has(parent.parent_id))
+      .filter(
+        (parent) => parent.level === 'step' && parent.parent_id && !parentOf.has(parent.parent_id),
+      )
       .map((parent) => parent.parent_id!);
   }
   const goalOf = (item: UseItem): string | null => {
@@ -104,6 +111,36 @@ export async function loadFileUses(goals: GoalsSupabaseClient, fileId: string): 
   return items.flatMap((item) => {
     const goalId = goalOf(item);
     if (!goalId) return [];
-    return [{ itemId: item.id, title: item.title, level: item.level === 'goal' ? 'goal' : 'step', goalId }];
+    return [
+      {
+        itemId: item.id,
+        title: item.title,
+        level: item.level === 'goal' ? 'goal' : 'step',
+        goalId,
+      },
+    ];
   });
+}
+
+/**
+ * Mark read the unread Dash results of the given steps (note be1ed0d3):
+ * opening a file a result links to is reading it. Only a Claude step with a
+ * result is touched, as with Mark read; how many were marked.
+ */
+export async function markStepsRead(
+  goals: GoalsSupabaseClient,
+  stepIds: string[],
+): Promise<number> {
+  const ids = [...new Set(stepIds)];
+  if (ids.length === 0) return 0;
+  const { data, error } = await goals
+    .from('items')
+    .update({ reviewed_at: new Date().toISOString() })
+    .in('id', ids)
+    .eq('kind', 'claude')
+    .is('reviewed_at', null)
+    .or('result.not.is.null,result_url.not.is.null')
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length;
 }
