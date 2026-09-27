@@ -46,7 +46,7 @@ describe('the job suggestions route', () => {
 });
 
 const migration = readFileSync(
-  join(import.meta.dirname, '..', 'supabase/migrations/0116_job_suggestions_tick_cron.sql'),
+  join(import.meta.dirname, '..', 'supabase/migrations/0117_job_suggestions_tick_cron.sql'),
   'utf8',
 );
 const statements = migration

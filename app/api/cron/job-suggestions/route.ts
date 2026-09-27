@@ -9,7 +9,7 @@ export const maxDuration = 300;
  * Dash's job search suggestions: people to contact and postings to apply for.
  *
  * Called daily by a pg_cron job through pg_net
- * (supabase/migrations/0116_job_suggestions_tick_cron.sql). Each person's
+ * (supabase/migrations/0117_job_suggestions_tick_cron.sql). Each person's
  * suggestions are written only when due (lib/jobs/suggest/cadence.ts). GET and
  * POST both; the body is ignored.
  *

@@ -8,7 +8,7 @@ import { runSuggestionsFor } from '@/lib/jobs/suggest/run';
 
 /**
  * Dash's job search suggestions, called daily by pg_cron through
- * /api/cron/job-suggestions (supabase/migrations/0116_job_suggestions_tick_cron.sql).
+ * /api/cron/job-suggestions (supabase/migrations/0117_job_suggestions_tick_cron.sql).
  *
  * Works every account with the job search switched on. Whether each kind is
  * due is decided per person (lib/jobs/suggest/cadence.ts), so most days most
