@@ -162,8 +162,8 @@ export async function commitOnMain(input: {
 }
 
 /**
- * Why closing a step against this commit is refused, or null when it may go
- * ahead.
+ * Why closing a step (or a note) against this commit is refused, or null
+ * when it may go ahead.
  *
  * A step carries the commit it shipped in, and that commit is what the plan
  * page, the CI mark and anybody reading back through the history trusts. A
@@ -179,14 +179,17 @@ export function closeRefusal(input: {
   sha: string;
   landing: CommitLanding;
   branches?: readonly string[];
+  /** What is being closed, as the sentence names it. A plan step by default. */
+  what?: string;
 }): string | null {
+  const what = input.what ?? 'the step';
   if (input.landing.onMain === true) return null;
 
   if (input.landing.onMain === null) {
     return (
       `Whether ${input.sha} is on ${REPO.branch} could not be read, so this close was refused. ` +
       `${input.landing.error ?? 'GitHub said nothing.'} ` +
-      `Close the step from somewhere that can reach GitHub, once the work is on ${REPO.branch}.`
+      `Close ${what} from somewhere that can reach GitHub, once the work is on ${REPO.branch}.`
     );
   }
 
@@ -200,6 +203,6 @@ export function closeRefusal(input: {
     branches.length > 0 ? `it is on ${branches.join(', ')}` : `no branch here carries it`;
   return (
     `${input.sha} is not on ${REPO.branch} — ${where}. ` +
-    `Merge the work to ${REPO.branch}, then close the step against what landed.`
+    `Merge the work to ${REPO.branch}, then close ${what} against what landed.`
   );
 }
