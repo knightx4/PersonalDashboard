@@ -167,6 +167,41 @@ export function readNextUnit(input: unknown, existingTitles: readonly string[]):
   return { ok: true, unit: { title, covers, outcome } };
 }
 
+/** What a unit the person named covers and its outcome (plan #1144). Its title is theirs. */
+export type UnitDescription = { ok: true; covers: string; outcome: string } | { ok: false; detail: string };
+
+const descriptionSchema = z.object({ covers: z.string(), outcome: z.string() });
+
+/** The covers and outcome written for a unit added by name, cleaned by the same rules as a unit's. */
+export function readUnitDescription(input: unknown): UnitDescription {
+  const parsed = descriptionSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, detail: 'The unit did not match its schema.' };
+  const covers = clean(parsed.data.covers);
+  const outcome = clean(parsed.data.outcome);
+  if (!covers || !outcome) return { ok: false, detail: 'The unit came back with a part missing.' };
+  if (covers.length > MAX_TEXT || outcome.length > MAX_TEXT) {
+    return { ok: false, detail: 'The unit came back too long.' };
+  }
+  return { ok: true, covers, outcome };
+}
+
+/**
+ * A unit title the person typed, cleaned: whitespace collapsed, and refused
+ * when empty, too long, or a title the track already has.
+ */
+export function readUnitTitle(
+  text: string,
+  existingTitles: readonly string[],
+): { ok: true; title: string } | { ok: false; detail: string } {
+  const title = clean(text);
+  if (!title) return { ok: false, detail: 'Give the unit a name.' };
+  if (title.length > MAX_TITLE) return { ok: false, detail: `Keep the name under ${MAX_TITLE} characters.` };
+  if (existingTitles.some((existing) => clean(existing).toLowerCase() === title.toLowerCase())) {
+    return { ok: false, detail: `The plan already has a unit called "${title}".` };
+  }
+  return { ok: true, title };
+}
+
 /**
  * The units a person wrote, one per line, as the form sends them. Bullets and
  * numbering are taken off, blank lines and repeats dropped.

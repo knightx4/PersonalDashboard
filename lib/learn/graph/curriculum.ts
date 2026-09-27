@@ -9,10 +9,12 @@ import {
   readCurriculum,
   readNextUnit,
   readOutline,
+  readUnitDescription,
   type CurriculumResult,
   type CurriculumUnit,
   type NextUnitResult,
   type OutlineResult,
+  type UnitDescription,
 } from './curriculum-payload';
 
 /**
@@ -367,4 +369,91 @@ export async function writeNextUnit(input: {
     block.input,
     input.units.map((unit) => unit.title),
   );
+}
+
+const DESCRIBE_TOOL_NAME = 'report_unit';
+
+const DESCRIBE_SYSTEM = `You describe one unit the person added by name to the outline of a track they are studying. They chose the unit and its title; you write what it covers and what they can do once it is learned.
+
+You are given the track's name, its other units in order with what each covers, and the title of the unit they added.
+
+- Keep to what the title names. Where it overlaps another unit, say what this one adds.
+- covers: one or two sentences naming the ideas the unit teaches.
+- outcome: one sentence saying what the person can do once they have learned it, starting with a verb.
+
+Plain sentences. No slogans, no "not X, but Y" contrasts, no dashes used for rhythm.
+
+Report through ${DESCRIBE_TOOL_NAME}.`;
+
+/** The prompt for a unit added by name. Exported so its content is tested without a model. */
+export function describeUnitPrompt(input: {
+  subject: string;
+  units: readonly CurriculumUnit[];
+  title: string;
+}): string {
+  return [
+    `The track: ${input.subject}`,
+    '',
+    ...(input.units.length > 0
+      ? [
+          'Its other units, in order:',
+          ...input.units.map(
+            (unit, index) => `${index + 1}. ${unit.title}${unit.covers ? `. Covers: ${unit.covers}` : ''}`,
+          ),
+        ]
+      : ['It has no other units.']),
+    '',
+    `The unit they added: ${input.title}`,
+    '',
+    `Call ${DESCRIBE_TOOL_NAME}.`,
+  ].join('\n');
+}
+
+/**
+ * What a unit the person added by name covers, and its outcome (plan #1144).
+ * The title stays theirs; one Sonnet call writes the other two lines, as the
+ * custom-track path does for units a person wrote.
+ */
+export async function describeUnit(input: {
+  subject: string;
+  units: readonly CurriculumUnit[];
+  title: string;
+  anthropicApiKey: string;
+  client?: Anthropic;
+  onSpend?: SpendSink;
+}): Promise<UnitDescription> {
+  const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
+
+  let response;
+  try {
+    response = await client.messages.create({
+      model: CURRICULUM_MODEL,
+      max_tokens: 600,
+      system: DESCRIBE_SYSTEM,
+      tools: [
+        {
+          name: DESCRIBE_TOOL_NAME,
+          description: 'Report what the unit covers and its outcome.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              covers: { type: 'string' },
+              outcome: { type: 'string' },
+            },
+            required: ['covers', 'outcome'],
+          },
+        },
+      ],
+      tool_choice: forceTool(DESCRIBE_TOOL_NAME),
+      messages: [{ role: 'user', content: describeUnitPrompt(input) }],
+    });
+  } catch (error) {
+    return { ok: false, detail: error instanceof Error ? error.message : 'The unit call failed.' };
+  }
+
+  input.onSpend?.({ model: CURRICULUM_MODEL, usage: usageFrom(response.usage) });
+
+  const block = response.content.find((part) => part.type === 'tool_use' && part.name === DESCRIBE_TOOL_NAME);
+  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
+  return readUnitDescription(block.input);
 }

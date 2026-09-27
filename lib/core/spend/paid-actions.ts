@@ -46,6 +46,7 @@ export const PAID_ACTIONS = {
   'app/learn/c/[id]/actions.ts#proposeBranch': ['branch-from-selection'],
   'app/learn/c/[id]/actions.ts#approveBranch': ['place-track'],
   'app/learn/s/[id]/actions.ts#writeTrackCurriculum': ['write-curriculum'],
+  'app/learn/s/[id]/actions.ts#addUnitToPlan': ['write-curriculum'],
   'app/learn/s/[id]/actions.ts#readAboutConcept': ['embed-claim', 'judge-segment'],
   'app/learn/s/[id]/actions.ts#pullWikipediaArticles': ['embed-catalogue'],
   'app/learn/s/[id]/actions.ts#pullLectureCourse': ['embed-catalogue'],

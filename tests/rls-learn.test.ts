@@ -15,7 +15,7 @@
  * it is asserted rather than assumed.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { admin, asUser, closeDb, createUser, truncateAll } from './helpers/db-learn';
+import { admin, asUser, closeDb, createUser, sql, truncateAll } from './helpers/db-learn';
 
 let userA = '';
 let userB = '';
@@ -627,8 +627,9 @@ describe('the cards behind Learn now', () => {
 });
 
 describe('the curriculum at the top of a track', () => {
-  // 0038_curriculum.sql. Units are written once when a track is made, so a
-  // signed-in user may add and read them and never change one; the composite
+  // 0038_curriculum.sql. A signed-in user may add and read units and never
+  // change one directly: a goal's plan moves and removes them only through
+  // the functions in 0076 (plan #1144), tested below. The composite
   // key to subjects is what stops a unit landing on someone else's track.
   let subjectA = '';
   let subjectB = '';
@@ -862,6 +863,113 @@ describe("the pieces a goal's unit is split into", () => {
     const [handIns] = await admin<{ count: number }[]>`
       select count(*)::int as count from piece_practice_handins where practice_id = ${practiceA}`;
     expect(handIns.count).toBe(0);
+  });
+});
+
+describe("changing a goal's plan (plan #1144)", () => {
+  // learn 0076_plan_unit_edits.sql. Units are moved, removed and added only
+  // through the three functions, which check the unit is the caller's and
+  // keep the ordinals running 1, 2, 3.
+  let subjectA = '';
+  let subjectB = '';
+  let units: string[] = [];
+  let goalA = '';
+
+  const order = async (subjectId: string) =>
+    (
+      await admin<{ id: string; ordinal: number }[]>`
+        select id, ordinal from curriculum_units where subject_id = ${subjectId} order by ordinal`
+    ).map((row) => [row.id, row.ordinal]);
+
+  beforeAll(async () => {
+    const [a] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Finance') returning id`;
+    const [b] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userB}, 'Bob finance') returning id`;
+    subjectA = a.id;
+    subjectB = b.id;
+    const rows = await admin<{ id: string }[]>`
+      insert into curriculum_units (user_id, subject_id, ordinal, title, covers, outcome)
+      values (${userA}, ${subjectA}, 1, 'Accounts', 'c', 'o'),
+             (${userA}, ${subjectA}, 2, 'Cash flow', 'c', 'o'),
+             (${userA}, ${subjectA}, 3, 'Valuation', 'c', 'o')
+      returning id`;
+    units = rows.map((row) => row.id);
+    const [goal] = await admin<{ id: string }[]>`
+      insert into goals (user_id, subject_id, asked, status, unit_id)
+      values (${userA}, ${subjectA}, 'Cash flow', 'active', ${units[1]}) returning id`;
+    goalA = goal.id;
+  });
+
+  it('moves a unit and renumbers the rest', async () => {
+    await asUser(userA, (tx) => tx`select move_curriculum_unit(${units[2]}, 1)`);
+    expect(await order(subjectA)).toEqual([
+      [units[2], 1],
+      [units[0], 2],
+      [units[1], 3],
+    ]);
+    await asUser(userA, (tx) => tx`select move_curriculum_unit(${units[2]}, 99)`);
+    expect(await order(subjectA)).toEqual([
+      [units[0], 1],
+      [units[1], 2],
+      [units[2], 3],
+    ]);
+  });
+
+  it("refuses to move or remove another user's unit", async () => {
+    await expect(asUser(userB, (tx) => tx`select move_curriculum_unit(${units[0]}, 3)`)).rejects.toThrow();
+    await expect(asUser(userB, (tx) => tx`select remove_curriculum_unit(${units[0]})`)).rejects.toThrow();
+    await expect(
+      asUser(userB, (tx) => tx`select add_curriculum_unit(${subjectA}, 'Smuggled', '', '', null)`),
+    ).rejects.toThrow();
+    expect(await order(subjectA)).toHaveLength(3);
+  });
+
+  it('refuses to remove a unit with a passed piece', async () => {
+    await admin`
+      insert into plan_pieces (user_id, subject_id, unit_id, ordinal, title, passed_at)
+      values (${userA}, ${subjectA}, ${units[0]}, 1, 'Reading a balance sheet', now())`;
+    await expect(asUser(userA, (tx) => tx`select remove_curriculum_unit(${units[0]})`)).rejects.toThrow(
+      /passed piece/,
+    );
+    expect(await order(subjectA)).toHaveLength(3);
+  });
+
+  it('removes a unit with its pieces, gives up its goal and closes the numbering', async () => {
+    await admin`
+      insert into plan_pieces (user_id, subject_id, unit_id, ordinal, title)
+      values (${userA}, ${subjectA}, ${units[1]}, 1, 'Operating cash flow')`;
+    await asUser(userA, (tx) => tx`select remove_curriculum_unit(${units[1]})`);
+    expect(await order(subjectA)).toEqual([
+      [units[0], 1],
+      [units[2], 2],
+    ]);
+    const [pieces] = await admin<{ count: number }[]>`
+      select count(*)::int as count from plan_pieces where unit_id = ${units[1]}`;
+    expect(pieces.count).toBe(0);
+    const [goal] = await admin<{ status: string; unit_id: string | null }[]>`
+      select status, unit_id from goals where id = ${goalA}`;
+    expect(goal).toEqual({ status: 'abandoned', unit_id: null });
+  });
+
+  it('adds a unit by name at the end of its track', async () => {
+    const [row] = await asUser(
+      userA,
+      (tx) => tx<{ id: string }[]>`select add_curriculum_unit(${subjectA}, '  Forecasting ', 'c', 'o', null) as id`,
+    );
+    const [unit] = await admin<{ title: string; ordinal: number; user_id: string }[]>`
+      select title, ordinal, user_id from curriculum_units where id = ${row.id}`;
+    expect(unit).toEqual({ title: 'Forecasting', ordinal: 3, user_id: userA });
+  });
+
+  it('is not callable by anyone signed out', async () => {
+    await expect(
+      sql.begin(async (tx) => {
+        await tx.unsafe('set local role anon');
+        return tx`select learn.move_curriculum_unit(${units[0]}, 2)`;
+      }),
+    ).rejects.toThrow();
+    expect(await order(subjectB)).toHaveLength(0);
   });
 });
 

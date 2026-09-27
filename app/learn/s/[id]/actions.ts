@@ -13,6 +13,8 @@ import {
 import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
 import { ensureCurriculum, fileGoalUnder } from '@/lib/learn/graph/curriculum-store';
 import { queueConcept } from '@/lib/learn/graph/to-queue';
+import { addUnit, moveUnit, removeUnit } from '@/lib/learn/lessons/plan-edit';
+import { planGoalFor } from '@/lib/learn/lessons/plan-store';
 import { recordLearnSpend } from '@/lib/learn/spend';
 import { catalogueSql } from '@/lib/learn/catalogue/connection';
 import { embedCatalogueSegments } from '@/lib/learn/catalogue/embed-sweep';
@@ -339,5 +341,68 @@ export async function writeTrackCurriculum(_prev: CurriculumState, formData: For
   if (result.goalUnitId && first && !first.unitId) await fileGoalUnder(supabase, first.id, result.goalUnitId);
 
   revalidatePath(`/learn/s/${subject.id}`);
+  return {};
+}
+
+/**
+ * Changing a goal's plan from its page (plan #1144): move a unit a place up
+ * or down, remove one with no passed piece, or add one by name. Each returns
+ * what went wrong rather than throwing, so the plan can say it in place. Only
+ * a track that is a learning goal's plan takes these; the checks on whose
+ * unit it is are in the database functions (learn 0076).
+ */
+export type PlanEditState = { error?: string };
+
+const planEditSchema = z.object({ subjectId: z.string().uuid() });
+
+async function planTrackFor(formData: FormData) {
+  const user = await requireUser();
+  const parsed = planEditSchema.safeParse({ subjectId: formData.get('subjectId') });
+  if (!parsed.success) return { error: 'That plan could not be found.' } as const;
+  const supabase = await createLearnClient();
+  const goal = await planGoalFor(supabase, user.id, parsed.data.subjectId);
+  if (!goal) return { error: 'Only a learning goal’s plan can be changed here.' } as const;
+  return { user, supabase, subjectId: parsed.data.subjectId } as const;
+}
+
+function afterPlanEdit(subjectId: string) {
+  revalidatePath(`/learn/s/${subjectId}`);
+  revalidatePath('/learn/now');
+}
+
+// latency: pending
+export async function moveUnitInPlan(formData: FormData): Promise<PlanEditState> {
+  const track = await planTrackFor(formData);
+  if ('error' in track) return { error: track.error };
+  const unitId = z.string().uuid().safeParse(formData.get('unitId'));
+  const direction = z.enum(['up', 'down']).safeParse(formData.get('direction'));
+  if (!unitId.success || !direction.success) return { error: 'That unit could not be found.' };
+  const result = await moveUnit(track.supabase, track.subjectId, unitId.data, direction.data);
+  if (!result.ok) return { error: result.detail };
+  afterPlanEdit(track.subjectId);
+  return {};
+}
+
+// latency: pending
+export async function removeUnitFromPlan(formData: FormData): Promise<PlanEditState> {
+  const track = await planTrackFor(formData);
+  if ('error' in track) return { error: track.error };
+  const unitId = z.string().uuid().safeParse(formData.get('unitId'));
+  if (!unitId.success) return { error: 'That unit could not be found.' };
+  const result = await removeUnit(track.supabase, unitId.data);
+  if (!result.ok) return { error: result.detail };
+  afterPlanEdit(track.subjectId);
+  return {};
+}
+
+// latency: pending
+export async function addUnitToPlan(_prev: PlanEditState, formData: FormData): Promise<PlanEditState> {
+  const track = await planTrackFor(formData);
+  if ('error' in track) return { error: track.error };
+  const subject = await loadSubject(track.supabase, track.subjectId);
+  if (!subject) return { error: 'That plan could not be found.' };
+  const result = await addUnit(track.supabase, track.user.id, subject, String(formData.get('title') ?? ''));
+  if (!result.ok) return { error: result.detail };
+  afterPlanEdit(track.subjectId);
   return {};
 }
