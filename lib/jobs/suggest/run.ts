@@ -23,6 +23,8 @@ export type KindOutcome = {
   /** False when the cadence said not yet and nothing was asked. */
   ran: boolean;
   written: number;
+  /** The headlines of what was written, for the notification. */
+  headlines: string[];
   spend: SpendReport[];
   error: string | null;
 };
@@ -201,15 +203,15 @@ async function runReachOut(
   }));
 
   const candidates = pickReachOutCandidates({ contacts: contactFacts, applications, past: pastFacts });
-  if (candidates.length === 0) return { ran: true, written: 0, spend, error: null };
+  if (candidates.length === 0) return { ran: true, written: 0, headlines: [], spend, error: null };
 
   const result = await suggestOutreach(
     { apiKey, onSpend: (report) => spend.push(report) },
     { seeker, candidates },
   );
-  if (!result.ok) return { ran: true, written: 0, spend, error: result.error };
+  if (!result.ok) return { ran: true, written: 0, headlines: [], spend, error: result.error };
 
-  let written = 0;
+  const headlines: string[] = [];
   for (const suggestion of result.suggestions) {
     const { error } = await supabase.from('suggestions').insert({
       user_id: userId,
@@ -224,10 +226,10 @@ async function runReachOut(
       message: suggestion.message,
       model: SUGGEST_MODEL,
     });
-    if (!error) written += 1;
+    if (!error) headlines.push(suggestion.headline);
     else if (error.code !== '23505') console.error('[jobs suggestions] reach_out insert', error.message);
   }
-  return { ran: true, written, spend, error: null };
+  return { ran: true, written: headlines.length, headlines, spend, error: null };
 }
 
 async function runApply(
@@ -262,9 +264,9 @@ async function runApply(
       },
     },
   );
-  if (!result.ok) return { ran: true, written: 0, spend, error: result.error };
+  if (!result.ok) return { ran: true, written: 0, headlines: [], spend, error: result.error };
 
-  let written = 0;
+  const headlines: string[] = [];
   for (const opening of result.suggestions) {
     const { error } = await supabase.from('suggestions').insert({
       user_id: userId,
@@ -277,13 +279,13 @@ async function runApply(
       location: opening.location,
       model: SUGGEST_MODEL,
     });
-    if (!error) written += 1;
+    if (!error) headlines.push(`${opening.title} at ${opening.company}`);
     else if (error.code !== '23505') console.error('[jobs suggestions] apply insert', error.message);
   }
-  return { ran: true, written, spend, error: null };
+  return { ran: true, written: headlines.length, headlines, spend, error: null };
 }
 
-const SKIPPED: KindOutcome = { ran: false, written: 0, spend: [], error: null };
+const SKIPPED: KindOutcome = { ran: false, written: 0, headlines: [], spend: [], error: null };
 
 /**
  * Run the kinds asked for. `force` skips the cadence, for a press of the

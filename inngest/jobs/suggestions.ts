@@ -1,10 +1,13 @@
 import 'server-only';
 
 import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
+import { pushPorts } from '@/inngest/core/day-brief';
 import { createServiceSupabase } from '@/inngest/jobs/supabase-admin';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { recordSpendReports } from '@/lib/core/spend/record';
+import { suggestionsPayload } from '@/lib/jobs/suggest/notify';
 import { runSuggestionsFor } from '@/lib/jobs/suggest/run';
+import { sendToPerson } from '@/lib/push/send';
 
 /**
  * Dash's job search suggestions, called daily by pg_cron through
@@ -13,6 +16,10 @@ import { runSuggestionsFor } from '@/lib/jobs/suggest/run';
  * Works every account with the job search switched on. Whether each kind is
  * due is decided per person (lib/jobs/suggest/cadence.ts), so most days most
  * accounts cost nothing. One person's failure is noted and the rest go on.
+ *
+ * A run that wrote something is sent as a phone notification to every browser
+ * the person switched notifications on for (core.push_subscriptions), the
+ * same way the morning brief is.
  */
 
 export type JobSuggestionsSummary = {
@@ -43,6 +50,19 @@ export async function runJobSuggestions(now: Date = new Date()): Promise<JobSugg
       summary.apply += result.apply.written;
       for (const outcome of [result.reach_out, result.apply]) {
         if (outcome.error) summary.failed.push(outcome.error);
+      }
+
+      const payload = suggestionsPayload(
+        { people: result.reach_out.headlines, roles: result.apply.headlines },
+        now.toISOString().slice(0, 10),
+      );
+      const push = payload ? pushPorts(core, userId) : null;
+      if (payload && push) {
+        // A notification that fails is not a failed run; the suggestions are
+        // on the page either way.
+        await sendToPerson(push, userId, payload, now).catch((err) =>
+          console.error('[jobs suggestions] push', err instanceof Error ? err.message : err),
+        );
       }
     } catch (err) {
       summary.failed.push(err instanceof Error ? err.message : String(err));
