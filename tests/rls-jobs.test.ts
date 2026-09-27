@@ -180,7 +180,7 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.message_link_dismissals = linkDismissal.id;
 
-  // The two /jobs/today dismissals: one keyed to an event, one to a pursuit.
+  // The two /jobs dismissals: one keyed to an event, one to a pursuit.
   const [waiting] = await admin<{ id: string }[]>`
     insert into waiting_dismissals (user_id, application_event_id)
     values (${userId}, ${event.id})

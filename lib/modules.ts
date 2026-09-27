@@ -139,7 +139,7 @@ export const MODULES: readonly AppModule[] = [
   {
     id: 'jobs',
     prefix: '/jobs',
-    home: '/jobs/today',
+    home: '/jobs',
     label: 'Job search',
     description: 'Pipeline, roles, companies and interviews',
     accent: '--color-w-jobs',
