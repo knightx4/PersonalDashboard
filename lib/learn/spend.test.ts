@@ -81,6 +81,7 @@ describe('the operation names', () => {
       'embed-map',
       'embed-notes',
       'embed-note-match',
+      'write-note-connections',
       'propose-theme-merges',
       'propose-position-merges',
       'link-positions',

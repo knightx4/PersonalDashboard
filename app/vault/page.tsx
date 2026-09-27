@@ -7,6 +7,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { groupByFolder, loadConnection, loadNotes } from '@/lib/vault/notes/load';
 import { VaultStatusBanner } from '@/components/vault/status-banner';
+import { NoteConnections } from '@/components/vault/note-connections';
+import { loadWeekConnections } from '@/lib/vault/notes/connections-load';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 
@@ -47,7 +49,11 @@ export default async function VaultPage({
     );
   }
 
-  const notes = await loadNotes(supabase, search ? { search } : {});
+  // This week's connections sit above the list, and only when not searching.
+  const [notes, connections] = await Promise.all([
+    loadNotes(supabase, search ? { search } : {}),
+    search ? Promise.resolve([]) : loadWeekConnections(supabase),
+  ]);
   const groups = groupByFolder(notes);
 
   return (
@@ -58,6 +64,8 @@ export default async function VaultPage({
       />
 
       <VaultStatusBanner connection={connection} />
+
+      <NoteConnections connections={connections} />
 
       <div className="mb-5 max-w-md">
         <SearchField placeholder="Search your notes" />

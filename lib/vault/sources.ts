@@ -43,6 +43,17 @@ export const vaultSources: ModuleSources = {
       note: 'position_sources (position_id, quote) gives the sentence in the note each one came from.',
     },
     {
+      table: 'obsidian.note_connections',
+      module: 'Vault',
+      holds: 'Each week, notes they wrote recently that come back to an older note of theirs, with a sentence on what they share.',
+      weight: 'intent',
+      search: ['sentence'],
+      title: 'sentence',
+      note:
+        'older_note_id and recent_note_ids point at obsidian.notes. week_ending is the day the week was read back from. ' +
+        'A row with dismissed_at set is one they hid as not useful.',
+    },
+    {
       table: 'obsidian.tensions',
       module: 'Vault',
       holds: 'Places where two of their positions pull against each other.',

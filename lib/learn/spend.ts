@@ -136,6 +136,10 @@ export const LEARN_OPERATIONS = [
   // the person's notes nearest it (plan #1112). Once per distinct text: the
   // vector is kept in obsidian.text_embeddings by the text's hash.
   'embed-note-match',
+  // Writing the sentence over each of the week's connections between new and
+  // older vault notes (plan #1115). One Haiku call a week per person, from
+  // the Monday cron, and none in a week with nothing to point out.
+  'write-note-connections',
   // Asking Haiku which vault themes are one subject under two names (plan
   // #811), twenty pairs a call. Recorded through the service role from the map
   // sweep's cron tick, against the account whose themes were judged.
