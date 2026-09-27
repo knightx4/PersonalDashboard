@@ -7,7 +7,9 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { SPECS, groupSpecs, type SpecDoc } from '@/lib/specs/registry';
 import { specCommentCounts } from '@/lib/specs/load';
 import { APP_VISION, loadModuleVisions } from '@/lib/specs/vision';
+import { loadPendingVisionEdits } from '@/lib/specs/vision-review';
 import { ModuleVisionPanel } from './vision-view';
+import { VisionEditPanel } from './vision-edit';
 import { cn } from '@/lib/cn';
 
 export const metadata = { title: 'Specs' };
@@ -62,9 +64,10 @@ function SpecRow({ spec, comments }: { spec: SpecDoc; comments: number }) {
 export default async function SpecsPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  const [counts, visions] = await Promise.all([
+  const [counts, visions, edits] = await Promise.all([
     specCommentCounts(supabase, user.id),
     loadModuleVisions(supabase, user.id),
+    loadPendingVisionEdits(supabase, user.id),
   ]);
   const groups = groupSpecs(SPECS, counts);
 
@@ -120,6 +123,16 @@ export default async function SpecsPage() {
                 label={group.module ? group.label : 'the app'}
                 vision={visions[group.module ?? APP_VISION] ?? null}
               />
+
+              {/* An edit the weekly review proposed, under the vision it would
+                  replace, until it is accepted or dismissed (plan #1106). */}
+              {edits[group.module ?? APP_VISION] && (
+                <VisionEditPanel
+                  edit={edits[group.module ?? APP_VISION]!}
+                  currentBody={visions[group.module ?? APP_VISION]?.body ?? null}
+                  label={group.module ? group.label : 'the app'}
+                />
+              )}
 
               {group.specs.length > 0 && (
                 <ul className="space-y-2">

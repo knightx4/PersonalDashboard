@@ -116,6 +116,48 @@ describe('a proposed vision edit', () => {
       asUser(userId, (tx) => tx`select decide_vision_edit(${pending.id}, false)`),
     ).rejects.toThrow(/No pending vision edit/);
   });
+
+  it('leaves the vision as it was when dismissed (plan #1106)', async () => {
+    const id = await insert(
+      visionReviewRow(userId, {
+        module: 'dev',
+        reviewId,
+        outcome: 'edit',
+        visionBody: 'Show what is next and what changed, so a session starts from the plan.',
+        proposedBody: 'A different vision nobody asked for.',
+        note: 'One note, read too far.',
+        evidenceIds: [],
+      }),
+    );
+    await asUser(userId, (tx) => tx`select decide_vision_edit(${id}, false)`);
+
+    const [vision] = await admin<{ body: string }[]>`
+      select body from module_visions where user_id = ${userId} and module = 'dev'`;
+    const [edit] = await admin<{ status: string }[]>`
+      select status from vision_reviews where id = ${id}`;
+    expect(vision.body).toBe('Show what is next and what changed, so a session starts from the plan.');
+    expect(edit.status).toBe('dismissed');
+  });
+
+  it('cannot be decided by anybody else', async () => {
+    const id = await insert(
+      visionReviewRow(userId, {
+        module: 'news',
+        reviewId,
+        outcome: 'edit',
+        visionBody: null,
+        proposedBody: 'Keep up with the stories you follow.',
+        note: 'A first draft.',
+        evidenceIds: [],
+      }),
+    );
+    await expect(
+      asUser(otherId, (tx) => tx`select decide_vision_edit(${id}, true)`),
+    ).rejects.toThrow(/No pending vision edit/);
+    const rows = await admin`
+      select 1 from module_visions where user_id = ${userId} and module = 'news'`;
+    expect(rows).toHaveLength(0);
+  });
 });
 
 describe('a "still holds"', () => {

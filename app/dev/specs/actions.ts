@@ -6,6 +6,7 @@ import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
 import { MODULE_IDS } from '@/lib/modules';
 import { APP_VISION } from '@/lib/specs/vision';
+import { decideVisionEdit } from '@/lib/specs/vision-review';
 
 /**
  * Writing the vision for a workspace.
@@ -77,4 +78,64 @@ export async function saveModuleVision(
 
   revalidatePath('/dev/specs');
   return { message: 'Vision saved.' };
+}
+
+/**
+ * Deciding an edit the weekly vision review proposed (plan #1106).
+ *
+ * Both go through `decide_vision_edit` (migration 0108), which marks the edit
+ * and, on accept, writes `module_visions` in the same transaction, so the page
+ * never shows a new vision beside an edit still pending. The edit keeps the
+ * vision as it stood, so an accepted one can still be read back.
+ *
+ * Accepting is its own action rather than a flag on one shared action, because
+ * #1137 hangs a re-shape of the workspace's open features off it: that fire
+ * goes after the decision has landed, in `acceptVisionEdit` only.
+ */
+
+export type VisionEditActionState = {
+  error?: string;
+  message?: string;
+};
+
+const editIdSchema = z.string().uuid('That edit is not one this page can find.');
+
+async function decide(formData: FormData, accept: boolean): Promise<VisionEditActionState> {
+  const supabase = await createClient();
+  await requireOwner({ supabase });
+
+  const id = editIdSchema.safeParse(String(formData.get('id') ?? ''));
+  if (!id.success) return { error: id.error.issues[0].message };
+
+  const { error } = await decideVisionEdit(supabase, id.data, accept);
+  if (error) {
+    // The function raises this when the edit is not pending any more: decided
+    // in another tab, or superseded by a later review.
+    if (error.includes('No pending vision edit')) {
+      revalidatePath('/dev/specs');
+      return { error: 'That edit has already been decided.' };
+    }
+    return { error };
+  }
+
+  revalidatePath('/dev/specs');
+  // The Dash tab counts the edits waiting.
+  revalidatePath('/dev/raised');
+  return { message: accept ? 'Vision replaced.' : 'Edit dismissed.' };
+}
+
+// latency: pending
+export async function acceptVisionEdit(
+  _prev: VisionEditActionState,
+  formData: FormData,
+): Promise<VisionEditActionState> {
+  return decide(formData, true);
+}
+
+// latency: pending
+export async function dismissVisionEdit(
+  _prev: VisionEditActionState,
+  formData: FormData,
+): Promise<VisionEditActionState> {
+  return decide(formData, false);
 }
