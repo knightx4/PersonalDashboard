@@ -28,7 +28,8 @@
  * `--embed` is the second pass over everything that still has one. That pass
  * is driven by the nulls rather than by what this run fetched, so it finishes
  * whatever an earlier run left behind, and stopping it halfway costs only the
- * chunk it was in.
+ * chunk it was in. It first cuts passages for any article section that has
+ * none (plan #1133), so those are embedded in the same pass.
  *
  * `--embed` spends money on somebody's behalf, and #741 settled whose: the
  * account running the sweep. `--user` names it by id or email, `CATALOGUE_USER`
@@ -54,6 +55,7 @@
  */
 import postgres from 'postgres';
 import { embedCatalogueSegments } from '../lib/learn/catalogue/embed-sweep';
+import { storeMissingPassages } from '../lib/learn/catalogue/store';
 import {
   DEFAULT_COURSE_PROVIDER,
   sweepWikipediaArticle,
@@ -176,6 +178,8 @@ async function main(): Promise<void> {
 
   if (embed) {
     const userId = await resolveUser(sql, user);
+    const cut = await storeMissingPassages(sql);
+    if (cut.items > 0) console.log(`Cut ${cut.written} passages for ${cut.items} articles that had none.`);
     const swept = await embedCatalogueSegments(sql, { userId, limit: limit ?? undefined });
 
     const model = swept.model ? ` by ${swept.model}` : '';

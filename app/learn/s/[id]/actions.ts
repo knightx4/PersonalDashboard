@@ -22,7 +22,7 @@ import {
   sweepWikipediaArticle,
   sweepYouTubeCourse,
 } from '@/lib/learn/catalogue/sweep';
-import { transcriptCutVideos } from '@/lib/learn/catalogue/store';
+import { storeMissingPassages, transcriptCutVideos } from '@/lib/learn/catalogue/store';
 import {
   EMBED_BUDGET_MS,
   TRANSCRIPT_BUDGET_MS,
@@ -172,7 +172,8 @@ export type PullState = { report?: PullReport; error?: string };
  *
  * The embedding pass is not limited to the articles this press fetched: it
  * gives a vector to every segment in the catalogue that has none, the same as
- * the script. Anything an earlier run left unembedded is finished here too,
+ * the script. Before it, any article section that has no passages yet is cut
+ * into them (storeMissingPassages, #1133), so those passages are embedded too. Anything an earlier run left unembedded is finished here too,
  * and billed to this account.
  *
  * Pulling an article that is already in the catalogue updates its sections in
@@ -205,7 +206,10 @@ export async function pullWikipediaArticles(
   const report = await pullArticles(
     {
       sweep: (title) => sweepWikipediaArticle(sql, title),
-      embed: (limit) => embedCatalogueSegments(sql, { userId: user.id, limit }),
+      embed: async (limit) => {
+        await storeMissingPassages(sql);
+        return embedCatalogueSegments(sql, { userId: user.id, limit });
+      },
     },
     parsed.titles,
   );
@@ -265,12 +269,14 @@ export async function pullLectureCourse(
         keep: (videoIds) => transcriptCutVideos(sql, DEFAULT_COURSE_PROVIDER, videoIds),
         deadline: startedAt + TRANSCRIPT_BUDGET_MS,
       }),
-    embed: (limit) =>
-      embedCatalogueSegments(sql, {
+    embed: async (limit) => {
+      await storeMissingPassages(sql);
+      return embedCatalogueSegments(sql, {
         userId: user.id,
         limit,
         deadline: startedAt + EMBED_BUDGET_MS,
-      }),
+      });
+    },
   });
 
   return { report };
