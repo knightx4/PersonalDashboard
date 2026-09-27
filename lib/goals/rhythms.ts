@@ -43,6 +43,26 @@ export type LiveRhythm = {
   period: RhythmPeriod;
   goalId: string;
   goalTitle: string;
+  /** Where its count comes from, when not from Log one (goals migration 0054). */
+  countsFrom?: RhythmSource | null;
+};
+
+/**
+ * What a rhythm can count itself from instead of Log one (goals migration
+ * 0054): `applications` is the job search's applications, by the day each
+ * was submitted. The database keeps the open period's count equal to it.
+ */
+export type RhythmSource = 'applications';
+
+export const RHYTHM_SOURCES: readonly RhythmSource[] = ['applications'];
+
+export function isRhythmSource(value: unknown): value is RhythmSource {
+  return typeof value === 'string' && (RHYTHM_SOURCES as readonly string[]).includes(value);
+}
+
+/** Where a counted rhythm's count is kept, and what its link says. */
+export const RHYTHM_SOURCE_LINKS: Record<RhythmSource, { href: string; label: string }> = {
+  applications: { href: '/jobs', label: 'Open job search' },
 };
 
 /**
@@ -90,6 +110,7 @@ export function liveRhythms(goals: Goal[], byGoal: Map<string, StepNode[]>): Liv
             period: node.rhythmPeriod,
             goalId: goal.id,
             goalTitle: goal.title,
+            ...(node.countsFrom ? { countsFrom: node.countsFrom } : {}),
           });
         }
         walk(node.children);

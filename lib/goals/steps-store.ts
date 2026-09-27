@@ -32,6 +32,7 @@ import {
 } from '@/lib/goals/steps';
 import {
   homeRhythms,
+  isRhythmSource,
   practices,
   type Practice,
   liveRhythms,
@@ -88,6 +89,7 @@ type ItemRow = {
   block_ask: string | null;
   block_kind: StepBlockKind | null;
   acts: string | null;
+  counts_from?: string | null;
   help_kinds: unknown;
   proposed_help_kinds: unknown;
   kept_open_at?: string | null;
@@ -120,7 +122,7 @@ const ITEM_COLUMNS =
   'resolution, ' +
   'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
   'unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds, ' +
-  'kept_open_at';
+  'kept_open_at, counts_from';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -148,6 +150,7 @@ const toStep = (row: ItemRow): Step => ({
   blockAsk: row.block_ask,
   blockKind: row.block_kind,
   acts: row.acts,
+  countsFrom: isRhythmSource(row.counts_from) ? row.counts_from : null,
 });
 
 const toGoal = (row: ItemRow): Goal => ({

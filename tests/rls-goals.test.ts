@@ -2394,3 +2394,65 @@ describe('help kinds Claude proposes when mapping (plan #1029)', () => {
     ).rejects.toThrow(/already settled this goal's weekly help/);
   });
 });
+
+describe('a rhythm that counts applications (migrations-goals/0054)', () => {
+  it('holds the job search’s count for the open period, whatever Log one writes', async () => {
+    const [company] = await admin<{ id: string }[]>`
+      insert into job_search.companies (user_id, name, slug)
+      values (${userA}, 'Counted Corp', 'counted-corp') returning id`;
+    const [role] = await admin<{ id: string }[]>`
+      insert into job_search.roles (user_id, company_id, title, source)
+      values (${userA}, ${company.id}, 'Planner', 'portal') returning id`;
+    const [rhythm] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, rhythm_count, rhythm_period, counts_from)
+      values (${userA}, 'step', ${goalA}, 'rhythm', 'Send 5 applications', 5, 'week', 'applications')
+      returning id`;
+    // A week that holds now in any zone the account could be in.
+    const [period] = await admin<{ id: string; count: number }[]>`
+      insert into periods (user_id, item_id, starts_on, ends_on, target)
+      values (${userA}, ${rhythm.id}, current_date - 3, current_date + 4, 5)
+      returning id, count`;
+    expect(period.count).toBe(0);
+
+    const countOf = async () =>
+      (await admin<{ count: number }[]>`select count from periods where id = ${period.id}`)[0].count;
+
+    const [application] = await admin<{ id: string }[]>`
+      insert into job_search.applications (user_id, role_id, attempt, source, submitted_at)
+      values (${userA}, ${role.id}, 1, 'portal', now()) returning id`;
+    expect(await countOf()).toBe(1);
+
+    // Log one on a counted rhythm changes nothing.
+    await asUser(userA, (tx) => tx`update periods set count = count + 1 where id = ${period.id}`);
+    expect(await countOf()).toBe(1);
+
+    // An application with no submitted_at has not been sent.
+    await admin`update job_search.applications set submitted_at = null where id = ${application.id}`;
+    expect(await countOf()).toBe(0);
+
+    // Another person's applications are not counted.
+    const [otherCompany] = await admin<{ id: string }[]>`
+      insert into job_search.companies (user_id, name, slug)
+      values (${userB}, 'Other Corp', 'other-corp') returning id`;
+    const [otherRole] = await admin<{ id: string }[]>`
+      insert into job_search.roles (user_id, company_id, title, source)
+      values (${userB}, ${otherCompany.id}, 'Planner', 'portal') returning id`;
+    await admin`
+      insert into job_search.applications (user_id, role_id, attempt, source, submitted_at)
+      values (${userB}, ${otherRole.id}, 1, 'portal', now())`;
+    expect(await countOf()).toBe(0);
+
+    // A rhythm counted by hand is left to Log one.
+    await admin`update items set counts_from = null where id = ${rhythm.id}`;
+    await asUser(userA, (tx) => tx`update periods set count = 3 where id = ${period.id}`);
+    expect(await countOf()).toBe(3);
+  });
+
+  it('refuses counts_from on anything but a rhythm', async () => {
+    await expect(admin`
+      insert into items (user_id, level, parent_id, kind, title, counts_from)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Apply somewhere', 'applications')`).rejects.toThrow(
+      /items_counts_from_ck/,
+    );
+  });
+});

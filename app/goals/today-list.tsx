@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { Input } from '@/components/ui/field';
 import { formatDay } from '@/lib/goals/dates';
+import { RHYTHM_SOURCE_LINKS } from '@/lib/goals/rhythms';
 import type { TodayItem, TodayKind } from '@/lib/goals/today';
 import { countRhythmAction, setStepStatusAction } from './[goalId]/actions';
 import { addGoalComment } from './[goalId]/comment-actions';
@@ -29,7 +30,8 @@ import { reactToSuggestionAction, recordAttendedAction } from './suggestion-acti
  *   run reads and unblocks the step from
  * - a flag: the answer, as the goal page's flag takes it
  * - "Did you go?": yes, with a quiet No beside it
- * - a rhythm behind for the period: one more logged against it
+ * - a rhythm behind for the period: one more logged against it, or, for one
+ *   that counts itself from the job search, a link to where it is counted
  * - a step of yours: done
  * - a suggestion: going, which puts it on Todo, with a quiet Not for me
  * - proposed steps or goals: a link to where they are approved
@@ -170,6 +172,7 @@ function TodayRow({ item, rank }: { item: TodayItem; rank: number | null }) {
   const second = SECOND[item.kind];
   const href = hrefFor(item);
   const meta = [item.on ? formatDay(item.on) : null, item.detail].filter(Boolean).join(' · ');
+  const counted = item.countsFrom ? RHYTHM_SOURCE_LINKS[item.countsFrom] : null;
 
   return (
     <li className="card-pad-x row-pad flex items-start gap-3">
@@ -213,9 +216,9 @@ function TodayRow({ item, rank }: { item: TodayItem; rank: number | null }) {
           <p className="text-small text-positive" role="status">
             {DONE_WORDS[item.kind] ?? state.message ?? 'Done.'}
           </p>
-        ) : item.kind === 'breakdown' || item.kind === 'plan' ? (
+        ) : counted || item.kind === 'breakdown' || item.kind === 'plan' ? (
           <div className="pt-1">
-            <Link href={href} className={buttonVariants({ variant: 'primary' })}>
+            <Link href={counted?.href ?? href} className={buttonVariants({ variant: 'primary' })}>
               {item.action}
             </Link>
           </div>

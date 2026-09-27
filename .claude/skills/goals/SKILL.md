@@ -349,10 +349,22 @@ Every step has a `kind`:
   `claude` step whenever you could produce it without the person's hands.** A
   map with every step marked `mine` hands the person work you could have done.
   The morning run works an open `claude` step once nothing beneath it is open.
-- `mine` for what only the person can do: log in, call, sign, pay, decide
-  something that is not a question you can put to them.
+  Finding and looking up are always yours: "Find your community board and its
+  next meeting" and "find people in the scene" are `claude` steps, even when
+  the title says "your". If you need one fact from the person to start (where
+  they live), block the step on that question; do not hand them the search.
+- `mine` for what only the person can do: log in, call, sign, pay, turn up,
+  speak, decide something that is not a question you can put to them.
+  A `mine` step whose done-when is something written down ("the names you
+  know are written down") has nowhere to write it: make it an information
+  step with a collection, or a `claude` step that drafts the list for them.
 - `rhythm` for a practice, with `rhythm_count` (1 to 100) and `rhythm_period`
   (`day`, `week` or `month`): log the balance monthly, review every quarter.
+  A rhythm another module already records counts itself: set
+  `counts_from = 'applications'` on a rhythm of job applications sent, and
+  the database keeps its count equal to the applications the job search has
+  submitted in the period (goals migration 0054). The person never presses
+  Log one on it. `applications` is the only source so far.
 - `decision` for a question (below).
 
 ### Information steps
@@ -727,6 +739,11 @@ Titles follow `.claude/skills/plan/reference/writing.md`: the title says what
 will be true when the step is done, in under about eight words. "Pick a gym
 within 15 minutes of home", not "Gym research". Write in plain words; the
 person reads these on a phone once a day.
+
+A title has to stand on its own. Today on the home shows a step with only its
+goal's name under it, so "Give it" under "Put something of your own into the
+conversation" reads as nothing. Name the thing: "Speak during public comment
+at a Community Board 2 meeting".
 
 ### A worked shape: Pay off student debt
 
@@ -1294,7 +1311,13 @@ where id = '<step id>' and user_id = '<user>' and level = 'step'
 
 Unblocking is setting it back to `open`; the database clears `block_ask` and
 `block_kind` itself. Unblock a step once what it asked for has arrived, in a
-comment, a record or an answer. `block_kind = 'steps'` is for a block that
+comment, a record or an answer. Every run starts by reading the thread of
+each step blocked on the person: one whose last comment is theirs has its
+answer, so write what it said into the step's `detail`, reply in one line
+saying what you took from it, unblock it, and work it in the same run if it
+is ready. Home leaves such a step off Today while it waits on you, so an
+answer left unread is a step nobody is looking at.
+`block_kind = 'steps'` is for a block that
 waits on the steps it depends on and clears itself once they all close; a
 plain dependency row is almost always the better way to say that.
 

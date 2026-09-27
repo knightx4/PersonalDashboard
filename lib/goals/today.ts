@@ -5,7 +5,10 @@
  * It draws from what the home already reads: questions, approvals, your
  * ready steps, rhythms behind for the period, flags, suggestions and "Did you
  * go?". A Claude step blocked on a question to you (its Needs line asks
- * something) is on you as well, since answering it is what frees the step.
+ * something) is on you as well, since answering it is what frees the step,
+ * until you have answered it: once its thread ends with your comment it waits
+ * on Dash's next run, not on you, and is left off. A step under another step
+ * names the one above it, since a title like "Give it" means nothing alone.
  * Results to read are left out: they are what Dash did, which the home lists
  * separately (plan #1076). A proposal to close a goal whose done-when is met,
  * or to park one nothing has moved on for three weeks, is on you too (plan
@@ -42,7 +45,7 @@ import {
   waitsOnNothing,
 } from '@/lib/goals/dependencies';
 import type { GoalProposal } from '@/lib/goals/goal-proposals';
-import type { HomeRhythm } from '@/lib/goals/rhythms';
+import { RHYTHM_SOURCE_LINKS, type HomeRhythm, type RhythmSource } from '@/lib/goals/rhythms';
 import type { StepNode } from '@/lib/goals/steps';
 import type { Suggestion } from '@/lib/goals/suggestions';
 import type { Goal } from '@/lib/goals/tree';
@@ -86,6 +89,12 @@ export type TodayItem = {
   on: string | null;
   /** For a rhythm: the current period's first day, which Log one counts against. */
   startsOn?: string;
+  /**
+   * For a rhythm that counts itself from another module (items.counts_from):
+   * where that count is kept. Its button opens there, since Log one would
+   * change nothing.
+   */
+  countsFrom?: RhythmSource;
   /** For a suggestion: the page it came from, when it has one. */
   url?: string;
 };
@@ -145,6 +154,12 @@ export type TodayInput = {
   didYouGo: readonly Suggestion[];
   /** Goals to close or park (goalProposals). */
   proposals?: readonly GoalProposal[];
+  /**
+   * Blocked Claude steps whose thread ends with your comment: you have
+   * answered what the step asks, and it waits on Dash's next run to read it,
+   * not on you.
+   */
+  answered?: ReadonlySet<string>;
 };
 
 type Candidate = TodayItem & {
@@ -253,7 +268,7 @@ export function todayCandidates(input: TodayInput): Candidate[] {
   for (const { goal } of goals) {
     if (goal.status !== 'open') continue;
     let plainTaken = false;
-    const walk = (list: StepNode[]) => {
+    const walk = (list: StepNode[], above: string | null) => {
       for (const node of list) {
         if (node.status === 'proposed' || node.waitsUntil) continue;
         const base = { id: node.id, goalId: goal.id, goalTitle: goal.title };
@@ -261,7 +276,7 @@ export function todayCandidates(input: TodayInput): Candidate[] {
           const unblocks = unblockedBy(node, nodes);
           add({ ...base, kind: 'question', title: node.title, detail: null, unblocks, on: null });
         } else if (node.kind === 'claude' && isStepBlocked(node) && node.blockKind === 'outside') {
-          const question = askedOfYou(node.blockAsk);
+          const question = input.answered?.has(node.id) ? null : askedOfYou(node.blockAsk);
           if (question) {
             const rest = node.blockAsk!.trim().slice(question.length).trim();
             add({
@@ -282,15 +297,15 @@ export function todayCandidates(input: TodayInput): Candidate[] {
           const on = node.dueOn === null ? null : node.dueOn < today ? today : node.dueOn;
           const plain = unblocks === 0 && on === null;
           if (!plain || !plainTaken) {
-            add({ ...base, kind: 'step', title: node.title, detail: null, unblocks, on });
+            add({ ...base, kind: 'step', title: node.title, detail: above && `Part of ${above}`, unblocks, on });
             if (plain) plainTaken = true;
           }
         }
         if (node.status !== 'open' && !isStaleStepBlock(node)) continue;
-        walk(node.children);
+        walk(node.children, node.title);
       }
     };
-    walk(byGoal.get(goal.id) ?? []);
+    walk(byGoal.get(goal.id) ?? [], null);
   }
 
   for (const item of daily.waiting) {
@@ -338,8 +353,13 @@ export function todayCandidates(input: TodayInput): Candidate[] {
         unblocks: 0,
         on: null,
         startsOn: rhythm.startsOn,
+        ...(rhythm.countsFrom ? { countsFrom: rhythm.countsFrom } : {}),
       },
-      { daysLeft: rhythm.daysLeft, short },
+      {
+        daysLeft: rhythm.daysLeft,
+        short,
+        ...(rhythm.countsFrom ? { action: RHYTHM_SOURCE_LINKS[rhythm.countsFrom].label } : {}),
+      },
     );
   }
 
@@ -462,6 +482,7 @@ export function rankToday(candidates: readonly Candidate[]): TodayItem[] {
       unblocks: c.unblocks,
       on: c.on,
       ...(c.startsOn ? { startsOn: c.startsOn } : {}),
+      ...(c.countsFrom ? { countsFrom: c.countsFrom } : {}),
       ...(c.url ? { url: c.url } : {}),
     }));
 }

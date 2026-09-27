@@ -429,17 +429,21 @@ describe('proposals to close or park a goal (plan #1084)', () => {
 
   it('puts a close with its summary early, and a park late, each with its own button', () => {
     const list = todayList(
-      input([debt, board], [step('first', 'board'), step('flagged', 'debt', { dueOn: '2026-09-30' })], {
-        proposals: [
-          { kind: 'park', goalId: 'board', goalTitle: board.goal.title, quietDays: 23 },
-          {
-            kind: 'close',
-            goalId: 'debt',
-            goalTitle: debt.goal.title,
-            summary: 'The last loan was paid off on 20 September.',
-          },
-        ],
-      }),
+      input(
+        [debt, board],
+        [step('first', 'board'), step('flagged', 'debt', { dueOn: '2026-09-30' })],
+        {
+          proposals: [
+            { kind: 'park', goalId: 'board', goalTitle: board.goal.title, quietDays: 23 },
+            {
+              kind: 'close',
+              goalId: 'debt',
+              goalTitle: debt.goal.title,
+              summary: 'The last loan was paid off on 20 September.',
+            },
+          ],
+        },
+      ),
     );
     expect(list.map((item) => [item.kind, item.id, item.action])).toEqual([
       ['step', 'flagged', 'Done'],
@@ -453,6 +457,56 @@ describe('proposals to close or park a goal (plan #1084)', () => {
       goalId: 'debt',
     });
     expect(list[3].title).toBe('Nothing done in 23 days: park the goal');
+  });
+});
+
+describe('what the home told you on 27 September', () => {
+  const board = goal('board', 'Put something of your own into the conversation', 'The city');
+  const jobs = goal('jobs', 'Land your next role', 'Work');
+  const ask = step('ask', 'board', {
+    kind: 'claude',
+    status: 'blocked',
+    blockKind: 'outside',
+    blockAsk: 'Which community board is yours? Tell me the neighborhood.',
+  });
+
+  it('leaves off a question to you once your answer is the last word on it', () => {
+    const asked = todayList(input([board], [ask]));
+    expect(asked.map((item) => item.kind)).toEqual(['ask']);
+    expect(todayList(input([board], [ask], { answered: new Set(['ask']) }))).toEqual([]);
+  });
+
+  it('opens the job search for a rhythm that counts applications, in place of Log one', () => {
+    const list = todayList(
+      input([jobs], [], {
+        rhythms: [
+          rhythm('apps', 'jobs', {
+            title: 'Send 5 applications',
+            target: 5,
+            count: 2,
+            daysLeft: 2,
+          }),
+          rhythm('events', 'jobs', { title: 'Go to one event', target: 3, count: 0, daysLeft: 2 }),
+        ].map((r, i) => (i === 0 ? { ...r, countsFrom: 'applications' as const } : r)),
+      }),
+    );
+    expect(list.map((item) => [item.id, item.action, item.countsFrom])).toEqual([
+      ['apps', 'Open job search', 'applications'],
+      ['events', 'Log one', undefined],
+    ]);
+  });
+
+  it('names the step above a step, so a short title still says what it is part of', () => {
+    const list = todayList(
+      input(
+        [board],
+        [
+          step('phase', 'board', { title: 'Get the testimony ready' }),
+          step('give', 'phase', { title: 'Give it' }),
+        ],
+      ),
+    );
+    expect(list.find((item) => item.id === 'give')?.detail).toBe('Part of Get the testimony ready');
   });
 });
 

@@ -7,6 +7,8 @@ import { goalProposals } from '@/lib/goals/goal-proposals';
 import type { GoalReview } from '@/lib/goals/reviews';
 import { loadGoalActivity, loadLatestReviews } from '@/lib/goals/reviews-store';
 import { loadGoalFlags } from '@/lib/goals/flags-store';
+import { loadThreads } from '@/lib/goals/comments-store';
+import { isStepBlocked } from '@/lib/goals/dependencies';
 import { homeRhythms, liveRhythms } from '@/lib/goals/rhythms';
 import { syncRhythms } from '@/lib/goals/rhythms-store';
 import type { StepNode } from '@/lib/goals/steps';
@@ -58,13 +60,14 @@ export async function loadTodayInput(
     goals.map((g) => g.goal),
     byGoal,
   );
-  const [flags, recent, going, records, reviews, activity] = await Promise.all([
+  const [flags, recent, going, records, reviews, activity, answered] = await Promise.all([
     loadGoalFlags(supabase, { userId }).catch(() => []),
     loadRecentSuggestions(client).catch(() => []),
     loadGoingSuggestions(client).catch(() => []),
     syncRhythms(client, userId, live, today),
     loadLatestReviews(client, { now }).catch(() => new Map<string, GoalReview>()),
     loadGoalActivity(client, userId).catch(() => null),
+    answeredAsks(client, byGoal).catch(() => new Set<string>()),
   ]);
   const titles = new Map(goals.map(({ goal }) => [goal.id, goal.title]));
   return {
@@ -79,5 +82,29 @@ export async function loadTodayInput(
       ? goalProposals({ goals: goals.map((g) => g.goal), reviews, activity, now })
       : [],
     reviews,
+    answered,
   };
+}
+
+/**
+ * The Claude steps blocked on a question to you whose thread ends with your
+ * comment: you have answered, and the step waits on Dash's next run to read
+ * it. A reply from Dash after yours puts it back on you.
+ */
+async function answeredAsks(
+  client: GoalsSupabaseClient,
+  byGoal: ReadonlyMap<string, StepNode[]>,
+): Promise<Set<string>> {
+  const asks: string[] = [];
+  const walk = (list: StepNode[]) => {
+    for (const node of list) {
+      if (node.kind === 'claude' && isStepBlocked(node) && node.blockKind === 'outside') {
+        asks.push(node.id);
+      }
+      walk(node.children);
+    }
+  };
+  for (const roots of byGoal.values()) walk(roots);
+  const threads = await loadThreads(client, asks);
+  return new Set(asks.filter((id) => threads[id]?.at(-1)?.author === 'me'));
 }

@@ -355,9 +355,10 @@ export function GoalRow({
         : [];
   // Counting is offered on a rhythm with a period open now; the period is
   // named in the form, so a press after the week has turned is refused
-  // rather than counted towards the new one.
+  // rather than counted towards the new one. A rhythm that counts itself
+  // from the job search is not counted by hand (goals migration 0054).
   const countOne = menuAction(countRhythmAction);
-  const rhythmItems: ActionMenuItem[] = current
+  const rhythmItems: ActionMenuItem[] = current && !step.countsFrom
     ? [
         {
           id: 'count',

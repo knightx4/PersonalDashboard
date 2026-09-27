@@ -14,6 +14,7 @@
 import type { StepQuestion } from '@/lib/goals/answers';
 import type { StepBlockKind, StepLink, StepRef } from '@/lib/goals/dependencies';
 import type { GoalStatus } from '@/lib/goals/tree';
+import type { RhythmSource } from '@/lib/goals/rhythms';
 
 /** The limits the table's checks set (supabase/migrations-goals/0001). */
 export const STEP_TITLE_MAX = 500;
@@ -100,6 +101,8 @@ export type Step = {
    * approval; one with none goes live without it.
    */
   acts?: string | null;
+  /** On a rhythm, where its count comes from instead of Log one (goals migration 0054). */
+  countsFrom?: RhythmSource | null;
 };
 
 /**
