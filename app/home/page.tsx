@@ -33,6 +33,9 @@ import {
 import { loadUpdates } from '@/lib/shell/updates';
 import { whenLabel } from '@/lib/shell/home-model';
 import { cn } from '@/lib/cn';
+import { observationWeek } from '@/lib/timeline/observations';
+import { readObservations } from '@/lib/timeline/observations-load';
+import { ObservationList } from '@/app/timeline/observations';
 
 export const metadata = { title: 'Home' };
 
@@ -66,7 +69,9 @@ function greeting(timezone: string, now: Date): string {
  * set large, then the one sentence each workspace would say if it could say
  * only one -- the same brief that sits in each workspace's top bar, gathered
  * here in one column. That is the question none of the modules can answer on
- * its own: what, across all of them, needs me today.
+ * its own: what, across all of them, needs me today. Under it, in a week
+ * the Monday run found something, up to three observations across the
+ * workspaces, each with the rows behind it.
  *
  * A quiet day looks quiet. When no workspace has anything to say, the column
  * is the day's sigil and one line, not five rows of "nothing". The agenda's
@@ -117,10 +122,15 @@ export default async function HomePage() {
     on('jobs') ? safe(countJobsReview(jobs, core, user.id), 0) : 0,
   ]);
 
-  const [loaded, updates] = await Promise.all([
+  // This week's observations (plan #1120): the rows the Monday run wrote.
+  const thisWeek = observationWeek(now).week;
+  const nextWeek = new Date(Date.parse(`${thisWeek}T00:00:00Z`) + 7 * 86_400_000).toISOString().slice(0, 10);
+
+  const [loaded, updates, observations] = await Promise.all([
     loadBriefs(),
     // The feed swallows its own failures per source, and this guards the rest.
     safe(loadUpdates(user.id, on, now), []),
+    safe(readObservations(shopping, { fromWeek: thisWeek, toWeek: nextWeek }), []),
   ]);
 
   async function loadBriefs() {
@@ -287,6 +297,26 @@ export default async function HomePage() {
               title="Nothing needs you."
               description="Every workspace is quiet. Whatever you do next is your choice, not the app's."
             />
+          )}
+
+          {/* What the weekly run noticed across the workspaces, under the
+              briefs because it is about the same question from further back.
+              A week it had nothing to say leaves no card, not an empty one. */}
+          {observations.length > 0 && (
+            <Card padding="standard" className="mt-4">
+              <div className="flex items-baseline justify-between gap-2">
+                <h2 className="text-ui font-semibold text-ink">What Dash noticed this week</h2>
+                <Link
+                  href="/timeline"
+                  className="text-small font-medium text-accent underline underline-offset-2"
+                >
+                  Timeline
+                </Link>
+              </div>
+              <div className="mt-2">
+                <ObservationList observations={observations} timezone={settings.timezone} />
+              </div>
+            </Card>
           )}
 
           {/* Nothing at all when there is nothing at all -- no "0 things due",
@@ -465,13 +495,16 @@ export default async function HomePage() {
           </nav>
 
           {/* Everything the workspaces hold, by month (plan #1118). A line
-              rather than a tile: it is not a workspace. */}
-          <p className="mt-4 text-small text-ink-muted">
-            <Link href="/timeline" className="font-medium text-accent hover:underline">
-              Timeline
-            </Link>
-            {': what you did across the app, month by month.'}
-          </p>
+              rather than a tile: it is not a workspace. In a week with
+              observations the link sits on their card instead. */}
+          {observations.length === 0 && (
+            <p className="mt-4 text-small text-ink-muted">
+              <Link href="/timeline" className="font-medium text-accent hover:underline">
+                Timeline
+              </Link>
+              {': what you did across the app, month by month.'}
+            </p>
+          )}
         </div>
       </AppShell>
     </div>

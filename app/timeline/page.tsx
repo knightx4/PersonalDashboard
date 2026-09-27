@@ -4,6 +4,7 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { isOwner } from '@/lib/dev/owner';
 import { switchableModules } from '@/lib/modules';
 import { latestEventBefore, readTimeline } from '@/lib/timeline/load';
+import { readObservations } from '@/lib/timeline/observations-load';
 import {
   groupByMonth,
   isMonthKey,
@@ -51,13 +52,21 @@ export default async function TimelinePage({
   const to = isMonthKey(params.to) && params.to < current ? params.to : null;
   const window = monthWindow(to ?? current, timezone);
 
-  const [events, before] =
+  const [events, before, noticed] =
     reading.length === 0
-      ? [[], null]
+      ? [[], null, []]
       : await Promise.all([
           readTimeline(client, { from: window.from, to: window.to, modules: reading, newestFirst: true }),
           latestEventBefore(client, window.from, reading),
+          // The weekly observations (plan #1120), by the month their week
+          // begins in. A failed read costs the page these, not the months.
+          readObservations(client, {
+            fromWeek: `${window.first}-01`,
+            toWeek: `${shiftMonth(window.last, 1)}-01`,
+          }).catch(() => []),
         ]);
+  // Narrowed to one workspace, only what that workspace is part of.
+  const observations = narrowed ? noticed.filter((observation) => observation.modules.includes(narrowed)) : noticed;
 
   const months = groupByMonth(events, timezone, window);
   const newerLast = to ? shiftMonth(to, MONTHS_PER_PAGE) : null;
@@ -74,6 +83,7 @@ export default async function TimelinePage({
         earlier={before ? monthKeyOf(before, timezone) : null}
         later={newerLast === null ? null : newerLast >= current ? 'now' : newerLast}
         timezone={timezone}
+        observations={observations}
       />
     </>
   );

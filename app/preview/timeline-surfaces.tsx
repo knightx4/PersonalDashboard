@@ -1,6 +1,7 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { TimelineView } from '@/app/timeline/view';
 import { groupByMonth } from '@/lib/timeline/months';
+import type { ShownObservation } from '@/lib/timeline/observations-view';
 import { TIMELINE_MODULES, type TimelineEvent } from '@/lib/timeline/timeline';
 
 /**
@@ -54,6 +55,18 @@ const EVENTS: TimelineEvent[] = [
   row('2026-06-14T16:00:00Z', 'shopping', 'ordered', 'REI Co-op', 'R-88410', 21399),
 ];
 
+/** One observation the weekly run might write for these rows (plan #1120). */
+const OBSERVATIONS: ShownObservation[] = [
+  {
+    id: '00000000-0000-4000-8000-000000000001',
+    week: '2026-09-21',
+    sentence:
+      'In the 3 weeks after a rejection you placed 2 orders; in the 3 weeks after an application with no answer yet you placed none.',
+    modules: ['shopping', 'jobs'],
+    events: EVENTS.filter((event) => event.kind === 'rejected' || event.kind === 'ordered').slice(0, 5),
+  },
+];
+
 export function TimelineSurface() {
   const months = groupByMonth(EVENTS, 'America/New_York', { first: '2025-10', last: '2026-09' });
   return (
@@ -67,6 +80,7 @@ export function TimelineSurface() {
         earlier="2025-04"
         later={null}
         timezone="America/New_York"
+        observations={OBSERVATIONS}
       />
     </div>
   );
