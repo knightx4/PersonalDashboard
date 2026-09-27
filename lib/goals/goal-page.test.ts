@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { firstSentence, goalFindings, goalStages, rhythmSteps, stageMeta } from './goal-page';
+import {
+  firstSentence,
+  goalFindings,
+  goalStages,
+  rhythmSteps,
+  stageMeta,
+  stagesLabel,
+} from './goal-page';
 import type { StepNode } from './steps';
 
 function node(id: string, extra: Partial<StepNode> = {}): StepNode {
@@ -60,14 +67,79 @@ describe('goalStages', () => {
     ])!;
     expect(stages[0].live).toBe(1);
   });
+
+  it('opens every stage with work started, not only the first', () => {
+    const stages = goalStages([
+      node('target', { children: [node('t1', { status: 'done' }), node('t2')] }),
+      node('resume', { children: [node('r1')] }),
+      node('network', { children: [node('n1', { result: 'Found three people.' }), node('n2')] }),
+    ])!;
+    expect(stages.map((s) => s.state)).toEqual(['current', 'later', 'current']);
+  });
+
+  it('reads a stage held by a step in another stage as waiting on it', () => {
+    const r1 = node('r1');
+    const stages = goalStages([
+      node('resume', { children: [r1] }),
+      node('apply', {
+        children: [
+          node('a1', { status: 'done' }),
+          node('a2', { waitingOn: [{ id: 'r1', title: 'r1', status: 'open' }] }),
+        ],
+      }),
+    ])!;
+    expect(stages.map((s) => [s.state, s.waitsOn])).toEqual([
+      ['current', []],
+      ['waiting', [1]],
+    ]);
+    expect(stageMeta(stages[1])).toBe('1 of 2 done · waiting on stage 1');
+  });
+
+  it('is not held while one open step in it is free to move', () => {
+    const stages = goalStages([
+      node('resume', { children: [node('r1')] }),
+      node('apply', {
+        children: [
+          node('a1', { waitingOn: [{ id: 'r1', title: 'r1', status: 'open' }] }),
+          node('a2', { status: 'done' }),
+          node('a3'),
+        ],
+      }),
+    ])!;
+    expect(stages[1].state).toBe('current');
+  });
+
+  it('opens the first held stage when every stage left is held', () => {
+    const outside = [{ id: 'elsewhere', title: 'x', status: 'open' as const }];
+    const stages = goalStages([
+      node('a', { waitingOn: outside, children: [node('a1', { waitingOn: outside })] }),
+      node('b', { waitingOn: outside, children: [node('b1', { waitingOn: outside })] }),
+    ])!;
+    expect(stages.map((s) => s.state)).toEqual(['current', 'waiting']);
+    expect(stages[1].waitsElsewhere).toBe(true);
+    expect(stageMeta(stages[1])).toBe('1 step · waiting on another step');
+  });
+});
+
+describe('stagesLabel', () => {
+  const at = (state: 'done' | 'current' | 'waiting' | 'later', index: number) => ({ state, index });
+  it('names the stages under way', () => {
+    expect(stagesLabel([at('current', 1), at('later', 2)])).toBe('Stage 1 of 2');
+    expect(stagesLabel([at('current', 1), at('waiting', 2), at('current', 3)])).toBe('Stages 1 and 3 of 3');
+    expect(stagesLabel([at('done', 1), at('done', 2)])).toBe('All 2 stages done');
+  });
 });
 
 describe('stageMeta', () => {
   it('says done, a count done, or how many steps', () => {
-    expect(stageMeta({ state: 'done', done: 3, live: 3 })).toBe('done');
-    expect(stageMeta({ state: 'current', done: 2, live: 5 })).toBe('2 of 5 done');
-    expect(stageMeta({ state: 'later', done: 0, live: 1 })).toBe('1 step');
-    expect(stageMeta({ state: 'later', done: 0, live: 4 })).toBe('4 steps');
+    const free = { waitsOn: [], waitsElsewhere: false };
+    expect(stageMeta({ state: 'done', done: 3, live: 3, ...free })).toBe('done');
+    expect(stageMeta({ state: 'current', done: 2, live: 5, ...free })).toBe('2 of 5 done');
+    expect(stageMeta({ state: 'later', done: 0, live: 1, ...free })).toBe('1 step');
+    expect(stageMeta({ state: 'later', done: 0, live: 4, ...free })).toBe('4 steps');
+    expect(stageMeta({ state: 'waiting', done: 0, live: 2, waitsOn: [2, 4], waitsElsewhere: false })).toBe(
+      '2 steps · waiting on stages 2 and 4',
+    );
   });
 });
 
