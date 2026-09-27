@@ -4,7 +4,8 @@
  *
  * Every write a run makes lands in goals.history with the run's id, so the
  * run's page reads those rows and says what each one did: "Added step Turn
- * on autopay", "Filed 4 loans", "Closed Check loan drafts". Each change that
+ * on autopay", "Filed 4 loans", "Closed Check loan drafts", "Merged Settle
+ * on your pay floor into Name your target role". Each change that
  * Claude made carries an Undo, which puts that row back as it was:
  *
  * - A row Claude added is archived, or deleted where the table keeps no
@@ -226,6 +227,9 @@ function itemSentence(row: HistoryRow, names: ChangeNames): string {
   if (row.action === 'archive') return `Archived ${title}`;
   if (row.action === 'unarchive') return `Restored ${title}`;
 
+  if (newV.status === 'dropped' && typeof newV.merged_into === 'string') {
+    return `Merged ${title} into ${itemTitle(newV.merged_into, names)}`;
+  }
   if ('status' in newV) {
     if (newV.status === 'done') return `Closed ${title}`;
     if (newV.status === 'dropped') return `Dropped ${title}`;
@@ -643,6 +647,7 @@ export function namesNeeded(rows: readonly HistoryRow[]): {
     add(items, v.item_id);
     add(items, v.goal_id);
     add(items, v.depends_on_id);
+    add(items, v.merged_into);
     add(collections, v.collection_id);
   }
   return { items: [...items], collections: [...collections], records: [...records] };

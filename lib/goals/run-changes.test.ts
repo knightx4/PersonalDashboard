@@ -347,6 +347,37 @@ describe('undo on records Claude filed', () => {
   });
 });
 
+describe('a merge of two steps (plan #1081)', () => {
+  function merged(): HistoryRow {
+    return row({
+      row_id: 'step-1',
+      action: 'update',
+      old_values: { status: 'open', merged_into: null, closed_at: null },
+      new_values: { status: 'dropped', merged_into: 'step-2', closed_at: 'x' },
+    });
+  }
+
+  it('reads as one line naming both steps, whose undo reopens the dropped one', () => {
+    const merge = merged();
+    const [line] = changeLines([merge], [], names());
+    expect(line.sentence).toBe('Merged Turn on autopay into Check loan drafts');
+    expect(line.state).toBe('undoable');
+    expect(line.targets).toEqual([
+      {
+        kind: 'revert',
+        table: 'items',
+        rowId: 'step-1',
+        historyId: merge.id,
+        values: { status: 'open', merged_into: null },
+      },
+    ]);
+  });
+
+  it('asks for the surviving step by name', () => {
+    expect(namesNeeded([merged()]).items).toEqual(['step-1', 'step-2']);
+  });
+});
+
 describe('undo on a change to a row', () => {
   it('puts back the old values, leaving what the database keeps', () => {
     const closed = row({
