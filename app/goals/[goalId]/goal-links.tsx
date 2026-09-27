@@ -97,7 +97,7 @@ export function GoalLinksSection({
               <LinkRow
                 linkId={links.jobSearch.linkId}
                 title="Job search"
-                href="/jobs/today"
+                href="/jobs"
                 line={links.jobSearch.week ? jobWeekLine(links.jobSearch.week) : ''}
                 what="job search"
               />

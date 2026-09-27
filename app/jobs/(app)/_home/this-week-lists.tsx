@@ -10,11 +10,12 @@ import { ReminderActions } from './reminder-actions';
 import { WaitingActions } from './waiting-actions';
 
 /**
- * The week itself, lifted out of the page so it can be photographed.
+ * The week itself, lifted out of the section so it can be photographed.
  *
- * The page still loads the board and decides whether the week is clear; this
- * is the three lists, unchanged on the way out. The preview gallery cannot
- * import a page whose first line asks for a signed-in user.
+ * ThisWeekSection loads the board and decides whether the week is clear; this
+ * is the three lists. Each list's heading is an h3, under the section's h2.
+ * The preview gallery cannot import a page whose first line asks for a
+ * signed-in user.
  */
 export function TodayLists({ board, timezone }: { board: TodayBoard; timezone: string }) {
   /**
@@ -217,7 +218,7 @@ function Section({
           strokeWidth={1.75}
           aria-hidden
         />
-        <h2 className="text-ui font-semibold text-ink">{title}</h2>
+        <h3 className="text-ui font-semibold text-ink">{title}</h3>
         <span className="w-full text-small text-ink-muted sm:w-auto">{hint}</span>
       </header>
       {children}

@@ -135,7 +135,7 @@ export async function loadJobsBrief(
   if (interviews > 0) {
     return {
       text: `${plural(interviews, 'interview')} in the next two days`,
-      href: '/jobs/today',
+      href: '/jobs',
       tone: 'caution',
     };
   }

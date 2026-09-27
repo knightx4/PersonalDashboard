@@ -17,7 +17,7 @@ import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/
  *
  * Nothing is copied. The rows are read where they live and written back where
  * they live: **finishing one sets `completed_at` on the job row and deferring
- * one moves its `due_at`.** One record, two views -- /jobs/today and /todo show
+ * one moves its `due_at`.** One record, two views -- /jobs and /todo show
  * the same reminder and cannot disagree about it.
  *
  * The alternative was a todo-side dismissal row for a deferred reminder, and it
@@ -112,7 +112,7 @@ export const jobRemindersSource: AgendaSource = {
               href: `/jobs/roles/${role.id as string}`,
               label: companyName ? `${companyName}${roleTitle ? ` · ${roleTitle}` : ''}` : (roleTitle ?? 'the role'),
             }
-          : { href: '/jobs/today', label: 'This week' },
+          : { href: '/jobs', label: 'Jobs home' },
         action: followUpFor({
           kind,
           applicationId: (row.application_id as string) ?? null,
@@ -163,7 +163,7 @@ export const jobRemindersSource: AgendaSource = {
    *
    * A reminder you have decided not to act on is a reminder that is finished
    * with, and the job side has exactly one way to say that. Inventing a second
-   * kind of "gone" -- a dismissal row here that /jobs/today cannot see -- is
+   * kind of "gone" -- a dismissal row here that /jobs cannot see -- is
    * the split this source exists to avoid.
    */
   async dismiss(ctx, key) {
