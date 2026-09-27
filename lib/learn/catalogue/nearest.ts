@@ -3,6 +3,7 @@ import 'server-only';
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { vectorLiteral } from '@/lib/learn/catalogue/embed-sweep';
+import { isSearchableSection } from '@/lib/learn/catalogue/searchable';
 import { embedOne } from '@/lib/learn/embed/embed';
 import {
   DEFAULT_EMBEDDING_MODEL,
@@ -68,6 +69,19 @@ export const DEFAULT_CANDIDATE_LIMIT = 40;
  * below so that moving it is a caller's change rather than a migration.
  */
 export const DEFAULT_MIN_SIMILARITY = 0.5;
+
+/**
+ * Which article sections are never candidates: under 300 characters, or a link
+ * list such as See also. Set from the section trial on #760 and defined in
+ * searchable.ts, which the Wikipedia cutter imports without this module's
+ * embedding client. Re-exported here so the thresholds that decide what a
+ * claim is matched against read in one place.
+ */
+export {
+  MIN_SEARCHABLE_SECTION_CHARS,
+  UNSEARCHABLE_SECTION_HEADINGS,
+  isSearchableSection,
+} from '@/lib/learn/catalogue/searchable';
 
 /** One candidate, with enough of its work to judge it and to show it. */
 export type NearbySegment = {
@@ -159,6 +173,11 @@ export type NearestOutcome =
  * closest first, a similarity on each, and an empty list rather than weak
  * matches. A row whose similarity is not a number is dropped rather than
  * sorted, since it cannot be compared against the floor either.
+ *
+ * An article section that is not searchable is dropped too. The database
+ * already leaves those out, since they hold no vector; this is the same rule
+ * applied to what came back, so a vector written before the rule existed
+ * still never reaches the judge.
  */
 export function rankNearest(
   segments: NearbySegment[],
@@ -169,6 +188,7 @@ export function rankNearest(
 
   return segments
     .filter((segment) => Number.isFinite(segment.similarity) && segment.similarity >= floor)
+    .filter((segment) => segment.item.kind !== 'article' || isSearchableSection(segment))
     .sort(
       (left, right) =>
         right.similarity - left.similarity ||

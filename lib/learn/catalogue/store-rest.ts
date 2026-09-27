@@ -19,7 +19,8 @@ import type { CatalogueSegmentInput, StoredArticle } from './store';
  * because a vector for text that is no longer there is worse than none.
  * PostgREST cannot express that `case when` in an upsert, so the stored text
  * is read first and only the sections that changed are written with their
- * embedding cleared.
+ * embedding cleared. A section cut as not searchable is written the same way,
+ * so it never keeps a vector.
  *
  * It is four requests, not one transaction. A failure part way leaves an item
  * with some of its sections updated, which the next sweep of the same article
@@ -77,6 +78,7 @@ export async function storeArticleOverRest(
     sectionAnchor: section.anchor,
     heading: section.heading,
     text: section.text,
+    searchable: section.searchable,
   }));
   const { removed, segments } = await writeSegmentsOverRest(learn, itemId, rows, article.title);
 
@@ -120,11 +122,16 @@ export async function writeSegmentsOverRest(
     section_anchor: segment.sectionAnchor,
     heading: segment.heading,
     text: segment.text,
+    searchable: segment.searchable ?? true,
   }));
+  // A section that is not searchable is written with its vector cleared too,
+  // because `catalogue_segments_searchable_ck` refuses one that keeps it.
+  const keepsVector = (row: (typeof rows)[number]): boolean =>
+    row.searchable && storedText.get(row.ordinal) === row.text;
   const changed = rows
-    .filter((row) => storedText.get(row.ordinal) !== row.text)
+    .filter((row) => !keepsVector(row))
     .map((row) => ({ ...row, embedding: null, embedding_model: null, embedded_at: null }));
-  const unchanged = rows.filter((row) => storedText.get(row.ordinal) === row.text);
+  const unchanged = rows.filter(keepsVector);
 
   for (const batch of [changed, unchanged]) {
     if (batch.length === 0) continue;

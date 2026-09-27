@@ -30,7 +30,7 @@ function claimed(title: string, daysAgo: number, overrides: Partial<Level3Claime
 }
 
 function sections(...headings: (string | null)[]): WikipediaSection[] {
-  return headings.map((heading, ordinal) => ({ ordinal, anchor: heading, heading, text: 'Text.' }));
+  return headings.map((heading, ordinal) => ({ ordinal, anchor: heading, heading, text: 'Text.', searchable: true }));
 }
 
 const depth = contextFor(NO_PROGRESS, { reason: 'goal', aimId: 'l3', start: 'working' });
