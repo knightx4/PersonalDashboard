@@ -203,6 +203,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'classify-job-email': background(unit(HAIKU, 1_500, 100)),
   'match-evidence': run(OPUS, 10_000, 3_000),
   'draft-answer': run(OPUS, 6_000, 800),
+  // The bank, the description and the thread in; a few sentences out, or a
+  // whole cover letter when one is asked for.
+  'reply-to-role-comment': run(SONNET, 10_000, 1_000),
   'propose-evidence': run(OPUS, 8_000, 3_000),
   'suggest-learning-tracks': run(OPUS, 4_000, 900),
   // The career goals, a CV excerpt and the names already known in, then up

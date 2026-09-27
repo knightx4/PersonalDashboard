@@ -29,8 +29,8 @@ type Turn = { author: CommentAuthor; body: string; createdAt: string };
 
 export function awaitingDash(
   thread: readonly Turn[],
-  /** A dev row's target, or 'goal' for a goal or step (plan #957). */
-  target: CommentTarget | 'goal',
+  /** A dev row's target, 'goal' for a goal or step (plan #957), or 'role' for a role in Jobs. */
+  target: CommentTarget | 'goal' | 'role',
   now: number,
 ): boolean {
   const last = thread[thread.length - 1];

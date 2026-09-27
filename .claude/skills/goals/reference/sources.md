@@ -192,7 +192,7 @@ Each time they reached out to a contact, and what came back.
 
 ### `job_search.notes` (Job search)
 
-Notes they wrote on roles, companies and applications.
+Notes they wrote on roles, companies and applications. On a role these are its comment thread, where author 'claude' marks Dash's replies.
 
 - Search: `body`
 - Name a row by `body`; link it by `id`
