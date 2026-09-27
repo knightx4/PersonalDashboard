@@ -14,7 +14,7 @@ import 'server-only';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { formatDate } from '@/lib/jobs/applications/load';
-import { suggestionDue, type SuggestionKind } from './cadence';
+import { cadenceState, suggestionDue, type SuggestionKind } from './cadence';
 import { findOpenings, findPeople, SUGGEST_MODEL, type SeekerContext } from './model';
 import { personKey, roleKey } from './payload';
 
@@ -131,13 +131,11 @@ async function loadPast(supabase: AppSupabaseClient, userId: string) {
   return (data ?? []) as Row[];
 }
 
-function kindState(past: Row[], kind: SuggestionKind) {
-  const rows = past.filter((row) => row.kind === kind);
-  return {
-    lastRunAt: (rows[0]?.created_at as string | undefined) ?? null,
-    open: rows.filter((row) => row.status === 'open').length,
-  };
-}
+const SEARCHED_AT: Record<SuggestionKind, 'people_searched_at' | 'roles_searched_at'> = {
+  reach_out: 'people_searched_at',
+  apply: 'roles_searched_at',
+};
+
 
 /** Contacts who could introduce them: people they know, not recruiters or interviewers. */
 const WARM = new Set(['friend', 'former_colleague', 'alum', 'second_degree']);
@@ -270,21 +268,51 @@ export async function runSuggestionsFor(
   userId: string,
   options: { apiKey: string; kinds: readonly SuggestionKind[]; force?: boolean; now?: Date },
 ): Promise<Record<SuggestionKind, KindOutcome>> {
-  const past = await loadPast(supabase, userId);
+  const [past, searched] = await Promise.all([
+    loadPast(supabase, userId),
+    supabase.from('profiles').select('people_searched_at, roles_searched_at').eq('id', userId).maybeSingle(),
+  ]);
+  const searchedRow = (searched.data ?? {}) as Row;
   const due = (kind: SuggestionKind) =>
-    options.kinds.includes(kind) && (options.force || suggestionDue(kind, kindState(past, kind), options.now));
+    options.kinds.includes(kind) &&
+    (options.force ||
+      suggestionDue(
+        kind,
+        cadenceState(
+          past
+            .filter((row) => row.kind === kind)
+            .map((row) => ({ status: row.status as string, createdAt: row.created_at as string })),
+          (searchedRow[SEARCHED_AT[kind]] as string | null) ?? null,
+        ),
+        options.now,
+      ));
 
   const out: Record<SuggestionKind, KindOutcome> = { reach_out: SKIPPED, apply: SKIPPED };
   if (!due('reach_out') && !due('apply')) return out;
 
   const [seeker, applications] = await Promise.all([loadSeeker(supabase, userId), loadApplications(supabase, userId)]);
-  // With nothing written about the job they want and nothing applied for,
-  // there is nothing to suggest from.
-  if (seeker.goals.length === 0 && seeker.targetTitles.length === 0 && applications.length === 0) {
-    return out;
-  }
+  // Both searches start from what they want: without career goals or target
+  // titles there is nothing to search for, and a pipeline alone would only
+  // bring back more of the same.
+  if (seeker.goals.length === 0 && seeker.targetTitles.length === 0) return out;
 
-  if (due('reach_out')) out.reach_out = await runReachOut(supabase, userId, options.apiKey, seeker, past);
-  if (due('apply')) out.apply = await runApply(supabase, userId, options.apiKey, seeker, applications, past);
+  const record = async (kind: SuggestionKind, outcome: KindOutcome) => {
+    // A failed call is retried on the next day; a run that finished, found
+    // something or not, waits its interval.
+    if (outcome.error) return;
+    await supabase
+      .from('profiles')
+      .update({ [SEARCHED_AT[kind]]: new Date().toISOString() })
+      .eq('id', userId);
+  };
+
+  if (due('reach_out')) {
+    out.reach_out = await runReachOut(supabase, userId, options.apiKey, seeker, past);
+    await record('reach_out', out.reach_out);
+  }
+  if (due('apply')) {
+    out.apply = await runApply(supabase, userId, options.apiKey, seeker, applications, past);
+    await record('apply', out.apply);
+  }
   return out;
 }
