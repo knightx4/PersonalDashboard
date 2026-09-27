@@ -9,10 +9,11 @@ import { readAboutConcept } from './actions';
  * Taking a gap to the reading queue.
  *
  * A gap is a better input to a search than a subject somebody typed, so this
- * sits next to the claim rather than on a form somewhere. Offered only where
- * it means something: a claim you are shaky on or actively wrong about.
+ * sits next to the claim rather than on a form somewhere. By default it is
+ * offered only where it means something: a claim you are shaky on or actively
+ * wrong about.
  *
- * The subject page shows it on a card and the concept page shows it on its
+ * The subject page shows it on a card and the claim's own page shows it on its
  * own, and both send the same two ids to the same action.
  *
  * The press searches the catalogue before it queues anything, which takes a
@@ -20,10 +21,11 @@ import { readAboutConcept } from './actions';
  * Without that it reads as a button that did nothing, and a second press is a
  * second search.
  *
- * `anyState` drops the gate, for the screen of what to learn next: there the
- * row is already something you could start on, and a claim nothing is known
- * about is the most ordinary thing on it. On a subject's chain the gate stays,
- * or every node in a long graph grows a button nobody asked for.
+ * `anyState` drops the gate. The claim's own page passes it: that page is
+ * about one claim, so asking for something to read on it makes sense whether
+ * you know it, are shaky on it or nobody has tested it. On a subject's chain
+ * the gate stays, or every node in a long graph grows a button nobody asked
+ * for.
  */
 export function ReadAbout({
   concept,
