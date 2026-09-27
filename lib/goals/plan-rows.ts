@@ -50,8 +50,15 @@ import {
   type PlanTally,
 } from '@/lib/plan/tree';
 
-/** What the health tooltip says about a Claude result waiting to be read. */
-export const REVIEW_ASK = 'Dash has finished this. Read what it produced and mark it read.';
+/** What the health tooltip and the Needs line say about a Claude result waiting to be read. */
+export const REVIEW_ASK = 'Read what Dash found and mark it read.';
+
+/**
+ * The health word for a Claude result waiting to be read. The plan's word for
+ * it, Waiting on you, sat on a finished row beside Needs you and read as if
+ * the step were stuck, when all it asks is to be read.
+ */
+export const REVIEW_WORD = 'To read';
 
 /** What a ready step of yours waits on you for. */
 export const YOURS_ASK = 'Yours to do. Do it and mark it done, or answer what is in the way.';
@@ -122,6 +129,8 @@ type Shadow = {
   blockAsk: string | null;
   /** A ready step of yours, read as blocked on you but worded Your move. */
   yours: boolean;
+  /** A Claude result to read, read as blocked on you but worded To read. */
+  review: boolean;
   dismissedAt: string | null;
   ready: boolean;
   dependsOn: { dependencyId: string; item: { id: string; status: PlanStatus } }[];
@@ -152,6 +161,7 @@ function shadowOf(
     blockKind: onYou ? 'outside' : (step.blockKind ?? null),
     blockAsk: review ? REVIEW_ASK : yours ? YOURS_ASK : (step.blockAsk ?? null),
     yours,
+    review,
     dismissedAt: step.dismissedAt ?? null,
     ready: ready.has(step.id),
     dependsOn: (step.dependsOn ?? []).map((link) => ({
@@ -181,10 +191,17 @@ function onlyYours(shadow: Shadow): boolean {
   return blocked.length > 0 && blocked.every((row) => row.yours);
 }
 
-/** The plan's health for a row, with a ready step of yours worded Your move. */
+/**
+ * The plan's health for a row, with a ready step of yours worded Your move
+ * and a result to read worded To read.
+ */
 function goalHealth(shadow: Shadow, facts: HealthFacts) {
   const health = healthWordsOf(planHealthOf(asPlan(shadow)), facts);
-  if (health.name !== 'blocked' || !onlyYours(shadow)) return health;
+  if (health.name !== 'blocked') return health;
+  if (shadow.status === 'blocked' && shadow.review) {
+    return { ...health, word: REVIEW_WORD, title: REVIEW_ASK };
+  }
+  if (!onlyYours(shadow)) return health;
   // A closed row keeps its tooltip, which names the open steps beneath it.
   const title = facts.closed ? health.title : shadow.yours ? YOURS_ASK : YOURS_BENEATH;
   return { ...health, word: YOURS_WORD, title };

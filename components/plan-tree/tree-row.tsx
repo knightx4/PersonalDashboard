@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useActionState, useState, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, useActionState, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { ChevronDown, HelpCircle, Wrench } from 'lucide-react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
@@ -292,6 +292,20 @@ export function TreeRow<E extends TreeCatalogEntry>({
       ) ?? '';
 
   const inset = rowInset(trail);
+
+  // A link to this row by its own id (a goal step from the Goals home, or
+  // from Go to the step under a finding) opens its panel as well as scrolling
+  // to it. Landing on a closed row that looks the same as before read as the
+  // link doing nothing.
+  useEffect(() => {
+    if (!anchorId) return;
+    const openIfNamed = () => {
+      if (window.location.hash === `#${anchorId}`) setOpen(true);
+    };
+    openIfNamed();
+    window.addEventListener('hashchange', openIfNamed);
+    return () => window.removeEventListener('hashchange', openIfNamed);
+  }, [anchorId, setOpen]);
 
   return (
     <>

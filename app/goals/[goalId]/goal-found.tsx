@@ -1,16 +1,15 @@
-import Link from 'next/link';
-import { ExternalLink } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Meter } from '@/components/ui/meter';
 import type { Finding } from '@/lib/goals/goal-page';
 import { missedLine, progressLine, type RhythmRecord } from '@/lib/goals/rhythms';
 import type { StepNode } from '@/lib/goals/steps';
+import { FindingRow } from './finding-row';
 
 /**
  * Two sections of the goal page (plan #1078): the rhythms the goal keeps,
  * each with this period against its target and the one before, and what Dash
- * found, each as one sentence beside the step it came from. The step holds
- * the whole of it, and the sentence opens there.
+ * found, each as one sentence beside the step it came from, which opens to
+ * the whole result (finding-row.tsx).
  */
 
 export function GoalRhythms({
@@ -77,28 +76,7 @@ export function GoalFindings({ findings }: { findings: Finding[] }) {
       <Card padding="none">
         <ul className="divide-y divide-border">
           {findings.map((finding) => (
-            <li
-              key={finding.stepId}
-              className="card-pad-x row-pad flex flex-col gap-x-4 gap-y-0.5 sm:flex-row sm:items-baseline sm:justify-between"
-            >
-              <p className="min-w-0 text-ui break-words text-ink">
-                <a href={`#step-${finding.stepId}`} className="underline-offset-2 hover:underline">
-                  {finding.fact}
-                </a>
-                {finding.url && (
-                  <Link
-                    href={finding.url}
-                    className="ml-1.5 inline-flex translate-y-0.5 text-ink-muted hover:text-ink"
-                    aria-label={`Open where “${finding.from}” lives`}
-                  >
-                    <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
-                  </Link>
-                )}
-              </p>
-              <span className="shrink-0 text-small text-ink-ghost sm:max-w-xs sm:truncate sm:text-right">
-                {finding.from}
-              </span>
-            </li>
+            <FindingRow key={finding.stepId} finding={finding} />
           ))}
         </ul>
       </Card>

@@ -494,7 +494,16 @@ export function GoalTopSurface() {
           briefWhen="today"
           current
           stages={[
-            { id: 's1', title: 'Know what you owe', index: 1, state: 'done', done: 3, live: 3 },
+            {
+              id: 's1',
+              title: 'Know what you owe',
+              index: 1,
+              state: 'done',
+              done: 3,
+              live: 3,
+              waitsOn: [],
+              waitsElsewhere: false,
+            },
             {
               id: 's2',
               title: 'Pay the dearest card first',
@@ -502,8 +511,19 @@ export function GoalTopSurface() {
               state: 'current',
               done: 1,
               live: 4,
+              waitsOn: [],
+              waitsElsewhere: false,
             },
-            { id: 's3', title: 'Both cards at zero', index: 3, state: 'later', done: 0, live: 2 },
+            {
+              id: 's3',
+              title: 'Both cards at zero',
+              index: 3,
+              state: 'waiting',
+              done: 0,
+              live: 2,
+              waitsOn: [2],
+              waitsElsewhere: false,
+            },
           ]}
           review={{
             id: 'rev-1',

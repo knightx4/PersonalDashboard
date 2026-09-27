@@ -3,6 +3,7 @@ import { HEALTH } from '@/lib/plan/health-words';
 import { attachDependencies, type DependencyRow } from './dependencies';
 import {
   REVIEW_ASK,
+  REVIEW_WORD,
   YOURS_ASK,
   YOURS_BENEATH,
   YOURS_WORD,
@@ -130,6 +131,7 @@ describe('goalRows', () => {
     expect(row.status).toBe('done');
     expect(row.health.name).toBe('blocked');
     expect(row.health.title).toBe(REVIEW_ASK);
+    expect(row.health.word).toBe(REVIEW_WORD);
     expect(row.move.word).toBe('Needs you');
     expect(row.blockAsk).toBeNull();
   });

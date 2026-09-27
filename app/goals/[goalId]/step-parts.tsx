@@ -14,6 +14,7 @@ import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import type { LinkedFile } from '@/lib/files/files';
+import { linkBareDomains } from '@/lib/goals/result-links';
 import { countProposed } from '@/lib/goals/shaping';
 import {
   RHYTHM_COUNT_MAX,
@@ -167,7 +168,7 @@ export function ClaudeResult({ node, files = [] }: { node: StepNode; files?: Lin
       <p className="text-small text-ink-muted">
         {prepared ? 'What Dash prepared for this' : unread ? 'Dash’s result, to read' : 'Dash’s result'}
       </p>
-      {node.result && <FileBody markdown={node.result} compact />}
+      {node.result && <FileBody markdown={linkBareDomains(node.result)} compact />}
       {files.length > 0 && (
         <FileLinks files={files} />
       )}
