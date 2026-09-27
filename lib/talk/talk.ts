@@ -1,7 +1,8 @@
 /**
- * A saved conversation with Dash about something you are reading (plan
- * #1053): a Learn now card, and later a news story. The tables are
- * core.conversations and core.conversation_turns (core migration 0104).
+ * A saved conversation with Dash (plan #1053): about a Learn now card or a
+ * news story, or a question asked from anywhere in the app (kind `ask`, plan
+ * #1086). The tables are core.conversations and core.conversation_turns (core
+ * migrations 0104 and 0108).
  *
  * This file is the shape and the rules that need no database, so the thread
  * component can import it. Reading and writing are in store.ts, the model
@@ -9,17 +10,19 @@
  */
 
 /**
- * What a conversation can be about. `news_story` is allowed by the table and
- * left for the News feature to use: a story's ref format is its to choose,
- * because a story is a position in an array that re-summarising rewrites.
+ * What a conversation can be about. `news_story` is a newsletter story, and
+ * its ref format is the News feature's (lib/news/saved/discussed-store.ts).
+ * `ask` is a question asked from anywhere: it is about nothing in particular,
+ * so its ref is the conversation's own id (the table checks this), and every
+ * new question starts one with startAsk in store.ts.
  */
-export const SUBJECT_KINDS = ['feed_card', 'news_story'] as const;
+export const SUBJECT_KINDS = ['feed_card', 'news_story', 'ask'] as const;
 export type SubjectKind = (typeof SUBJECT_KINDS)[number];
 
 /** What a conversation is about, as the table keys it. */
 export type TalkSubject = {
   kind: SubjectKind;
-  /** For `feed_card`, the learn.feed_cards id. */
+  /** For `feed_card`, the learn.feed_cards id; for `ask`, the conversation's own id. */
   ref: string;
   /** What the subject is called, kept on the conversation when it begins. */
   title?: string | null;
@@ -28,11 +31,26 @@ export type TalkSubject = {
 /** 'user' is the person, 'assistant' is Dash: the roles the model is sent. */
 export type TalkRole = 'user' | 'assistant';
 
+/**
+ * One lookup Dash made to write a turn (plan #1089): the tool, what it was
+ * asked, and what it gave back. Kept so a reopened answer can show its working.
+ */
+export type TalkToolCall = { name: string; input: unknown; result: unknown };
+
+/**
+ * A row a turn cites (plan #1089): which table, which row, and what the page
+ * shows and links to. Only rows a tool returned are ever stored.
+ */
+export type TalkCitation = { table: string; ref: string; title: string; href: string };
+
 export type TalkTurn = {
   id: string;
   role: TalkRole;
   body: string;
   createdAt: string;
+  /** Dash's turns in an `ask` conversation only; absent everywhere else. */
+  toolCalls?: TalkToolCall[];
+  citations?: TalkCitation[];
 };
 
 export type TalkTurnRow = {
@@ -40,20 +58,43 @@ export type TalkTurnRow = {
   role: string;
   body: string;
   created_at: string;
+  tool_calls?: TalkToolCall[] | null;
+  citations?: TalkCitation[] | null;
+};
+
+/** A turn as it is written: Dash's may carry what it looked up and cited. */
+export type NewTalkTurn = {
+  role: TalkRole;
+  body: string;
+  toolCalls?: readonly TalkToolCall[];
+  citations?: readonly TalkCitation[];
 };
 
 /** The longest turn the table takes (conversation_turns_body_ck). */
 export const MAX_TURN = 8000;
 
-export const TURN_SELECT = 'id, role, body, created_at';
+export const TURN_SELECT = 'id, role, body, created_at, tool_calls, citations';
 
 export function toTalkTurn(row: TalkTurnRow): TalkTurn {
-  return {
+  const turn: TalkTurn = {
     id: row.id,
     role: row.role === 'assistant' ? 'assistant' : 'user',
     body: row.body,
     createdAt: row.created_at,
   };
+  if (Array.isArray(row.tool_calls) && row.tool_calls.length > 0) turn.toolCalls = row.tool_calls;
+  if (Array.isArray(row.citations) && row.citations.length > 0) turn.citations = row.citations;
+  return turn;
+}
+
+/** A question as the title of the conversation it starts: one line, cut at a word. */
+export const MAX_ASK_TITLE = 120;
+export function askTitle(question: string): string {
+  const line = question.replace(/\s+/g, ' ').trim();
+  if (line.length <= MAX_ASK_TITLE) return line;
+  const cut = line.slice(0, MAX_ASK_TITLE - 1);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > MAX_ASK_TITLE / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
 }
 
 /** A turn's text, trimmed and checked against the table's limits. */

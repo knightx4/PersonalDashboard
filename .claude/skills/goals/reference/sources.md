@@ -129,7 +129,7 @@ What they asked or explained, and what Dash replied, turn by turn.
 
 - Search: `body`
 - Name a row by `body`; link it by `id`
-- role 'user' is theirs and 'assistant' is Dash's: read their turns as what they wanted to know, and Dash's only for context. conversation_id joins core.conversations, which says what the turn is about.
+- role 'user' is theirs and 'assistant' is Dash's: read their turns as what they wanted to know, and Dash's only for context. On Dash's answers to an 'ask', citations lists the rows it relied on. conversation_id joins core.conversations, which says what the turn is about.
 
 ## What they did or have (read for progress and facts)
 
@@ -347,11 +347,11 @@ Longer pieces written for them and kept as pages: research notes, breakdowns of 
 
 ### `core.conversations` (Learn)
 
-Conversations they had with Dash about a Learn card or a newsletter story, one per thing read.
+Conversations they had with Dash: about a Learn card or a newsletter story, one per thing read, or a question they asked from anywhere in the app.
 
 - Search: `title`
 - Name a row by `title`; link it by `id`
-- subject_kind says what it is about: 'feed_card' with subject_ref the learn.feed_cards id, or 'news_story'. The words are in core.conversation_turns, joined by conversation_id.
+- subject_kind says what it is about: 'feed_card' with subject_ref the learn.feed_cards id, 'news_story', or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id.
 
 ## Mentions (leads only)
 
