@@ -185,10 +185,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // The career goals, a CV excerpt and the names already known in, then up
   // to six searches whose results come back as input; three people with a
   // message each out.
-  'suggest-outreach': run(SONNET, 45_000, 3_000),
+  'suggest-outreach': run(SONNET, 50_000, 2_500),
   // The career goals and the companies already applied to, then up to six
   // searches whose results come back as input; five postings out.
-  'find-openings': run(SONNET, 45_000, 2_500),
+  'find-openings': run(SONNET, 50_000, 2_500),
 
   // Shopping. Reading order emails is per email: inbox sync does it in the
   // background, and the reparse and review buttons know how many they send.

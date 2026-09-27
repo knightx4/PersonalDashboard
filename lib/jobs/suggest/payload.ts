@@ -97,8 +97,7 @@ function webAddress(value: unknown): string | null {
 }
 
 export function parsePeoplePayload(raw: unknown, taken: { people: ReadonlySet<string> }): PersonSuggestion[] {
-  const list = (raw as { suggestions?: unknown } | null)?.suggestions;
-  if (!Array.isArray(list)) return [];
+  const list = listIn(raw, 'suggestions');
   const people = new Set(taken.people);
   const out: PersonSuggestion[] = [];
 
@@ -142,8 +141,7 @@ export function parseOpeningsPayload(
   raw: unknown,
   taken: { urls: ReadonlySet<string>; roles: ReadonlySet<string> },
 ): OpeningSuggestion[] {
-  const list = (raw as { openings?: unknown } | null)?.openings;
-  if (!Array.isArray(list)) return [];
+  const list = listIn(raw, 'openings');
   const urls = new Set(taken.urls);
   const roles = new Set(taken.roles);
   const out: OpeningSuggestion[] = [];
@@ -164,6 +162,28 @@ export function parseOpeningsPayload(
     out.push({ company, title, url, location: clean(item.location, 200), why, move });
   }
   return out;
+}
+
+/**
+ * The list under `key` in a report.
+ *
+ * Models sometimes hand a long nested array back as a JSON string rather than
+ * an array, and the first live runs of both searches were billed and stored
+ * nothing, with no error, which is what that looks like from here. So a string
+ * that parses to an array is read as one.
+ */
+export function listIn(raw: unknown, key: string): unknown[] {
+  const value = (raw as Record<string, unknown> | null)?.[key];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      return [];
+    }
+  }
+  return [];
 }
 
 /** An email message split into its subject line and body, as the prompt asks it written. */

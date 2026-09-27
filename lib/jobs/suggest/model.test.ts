@@ -43,7 +43,7 @@ const report = {
 const usage = { input_tokens: 100, output_tokens: 50 };
 
 describe('findPeople', () => {
-  it('carries on after a paused search, reports the cost of each round, and drops known people', async () => {
+  it('forces the report after a paused search, reports the cost of each call, and drops known people', async () => {
     const create = vi
       .fn()
       .mockResolvedValueOnce({ content: [{ type: 'text', text: 'searching' }], stop_reason: 'pause_turn', usage })
@@ -59,18 +59,36 @@ describe('findPeople', () => {
     expect(create).toHaveBeenCalledTimes(2);
     expect(spend).toHaveLength(2);
     const prompt = create.mock.calls[0][0];
-    expect(prompt.tools[0]).toMatchObject({ type: 'web_search_20260209', max_uses: 6 });
+    expect(prompt.tools[0]).toMatchObject({ type: 'web_search_20260209', max_uses: 5 });
+    expect(prompt.tool_choice).toBeUndefined();
+    const forced = create.mock.calls[1][0];
+    expect(forced.tool_choice).toEqual({ type: 'tool', name: 'suggest_people' });
+    // A paused turn goes back as it is, with no extra ask after it.
+    expect(forced.messages.at(-1).role).toBe('assistant');
     expect(prompt.system).toContain('"leverage"');
     expect(prompt.messages[0].content).toContain('Known Person');
     expect(prompt.messages[0].content).toContain('strategic finance');
   });
 
-  it('says so when the search ends without a report', async () => {
-    const create = vi.fn().mockResolvedValue({ content: [], stop_reason: 'end_turn', usage });
+  it('asks for the report when the search ends in prose, and says so when none comes', async () => {
+    const create = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'done' }], stop_reason: 'end_turn', usage });
     const result = await findPeople(
       { apiKey: 'k', client: { messages: { create } } as never },
       { seeker, warm: [], known: [], taken: new Set() },
     );
     expect(result).toEqual({ ok: false, error: 'The search ran but reported no people.' });
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create.mock.calls[1][0].messages.at(-1)).toEqual({ role: 'user', content: 'Call suggest_people now with what you found.' });
+  });
+
+  it('reads a list the model sent back as a JSON string', async () => {
+    const stringified = { ...report, input: { suggestions: JSON.stringify(report.input.suggestions) } };
+    const create = vi.fn().mockResolvedValue({ content: [stringified], stop_reason: 'tool_use', usage });
+    const result = await findPeople(
+      { apiKey: 'k', client: { messages: { create } } as never },
+      { seeker, warm: [], known: [], taken: new Set() },
+    );
+    expect(result).toMatchObject({ ok: true, suggestions: [{ personName: 'Dana Wu' }, { personName: 'Known Person' }] });
+    expect(create).toHaveBeenCalledTimes(1);
   });
 });

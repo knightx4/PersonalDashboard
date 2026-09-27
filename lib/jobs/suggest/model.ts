@@ -26,10 +26,8 @@ import {
 } from './payload';
 
 export const SUGGEST_MODEL = 'claude-sonnet-5';
-/** Each search is billed. Six covers a few titles in a couple of places. */
-const MAX_SEARCHES = 6;
-/** Rounds of searching the server may pause after before it is given up. */
-const MAX_CONTINUATIONS = 2;
+/** Each search is billed, and its results come back as input. */
+const MAX_SEARCHES = 5;
 const GOALS_MAX_CHARS = 8_000;
 const RESUME_MAX_CHARS = 5_000;
 
@@ -208,8 +206,14 @@ export async function findPeople(
 }
 
 /**
- * One web search conversation that ends in a forced report. A long search can
- * pause the turn; sending it back as it is lets the server carry on.
+ * One web search conversation that ends in a report.
+ *
+ * At most two calls. The first searches and, usually, reports. When it stops
+ * without a report (a long search pauses the turn, or the model ends with
+ * prose), the second call forces the report tool, so it writes up what the
+ * searches found instead of searching again. Letting a paused turn carry on
+ * as the server offers cost $1.11 for one press on the first day: every resume
+ * sends the whole conversation, search results included, back as input.
  */
 async function searchThenReport<T>(
   client: Pick<Anthropic, 'messages'>,
@@ -222,35 +226,65 @@ async function searchThenReport<T>(
     empty: string;
   },
 ): Promise<SuggestResult<T>> {
+  const tools = [
+    { type: 'web_search_20260209', name: 'web_search', max_uses: MAX_SEARCHES } as unknown as Anthropic.Tool,
+    call.tool,
+  ];
   const messages: Anthropic.MessageParam[] = [{ role: 'user', content: call.prompt }];
-  try {
-    for (let turn = 0; turn <= MAX_CONTINUATIONS; turn += 1) {
-      const response = await client.messages.create({
-        model: SUGGEST_MODEL,
-        max_tokens: 8000,
-        system: call.system,
-        tools: [
-          { type: 'web_search_20260209', name: 'web_search', max_uses: MAX_SEARCHES } as unknown as Anthropic.Tool,
-          call.tool,
-        ],
-        messages,
-      });
-      options.onSpend?.({ model: SUGGEST_MODEL, usage: usageFrom(response.usage) });
 
-      const report = response.content.find((block) => block.type === 'tool_use' && block.name === call.tool.name);
-      if (report && report.type === 'tool_use') return { ok: true, suggestions: call.parse(report.input) };
-      // Widened: the installed SDK's type predates this reason.
-      const stop: string | null = response.stop_reason;
-      if (stop === 'pause_turn') {
-        messages.push({ role: 'assistant', content: response.content });
-        continue;
-      }
-      return { ok: false, error: call.empty };
+  const read = (response: Anthropic.Message): SuggestResult<T> | null => {
+    const report = response.content.find((block) => block.type === 'tool_use' && block.name === call.tool.name);
+    if (!report || report.type !== 'tool_use') return null;
+    const suggestions = call.parse(report.input);
+    if (suggestions.length === 0) {
+      // The shape only, never the text: enough to see why a paid report kept
+      // nothing, without copying people's names into the logs.
+      const input = report.input as Record<string, unknown> | null;
+      const shape = Object.fromEntries(
+        Object.entries(input ?? {}).map(([key, value]) => [
+          key,
+          Array.isArray(value) ? `array(${value.length})` : typeof value,
+        ]),
+      );
+      console.warn(`[jobs suggestions] ${call.tool.name} kept nothing`, JSON.stringify(shape));
     }
+    return { ok: true, suggestions };
+  };
+
+  try {
+    const first = await client.messages.create({
+      model: SUGGEST_MODEL,
+      max_tokens: 8000,
+      system: call.system,
+      tools,
+      messages,
+    });
+    options.onSpend?.({ model: SUGGEST_MODEL, usage: usageFrom(first.usage) });
+    const reported = read(first);
+    if (reported) return reported;
+
+    // Widened: the installed SDK's type predates this reason.
+    const stop: string | null = first.stop_reason;
+    if (stop === 'refusal') return { ok: false, error: call.empty };
+    messages.push({ role: 'assistant', content: first.content });
+    // A paused turn is sent back as it is; a finished one gets the ask.
+    if (stop !== 'pause_turn') {
+      messages.push({ role: 'user', content: `Call ${call.tool.name} now with what you found.` });
+    }
+
+    const second = await client.messages.create({
+      model: SUGGEST_MODEL,
+      max_tokens: 8000,
+      system: call.system,
+      tools,
+      tool_choice: { type: 'tool', name: call.tool.name },
+      messages,
+    });
+    options.onSpend?.({ model: SUGGEST_MODEL, usage: usageFrom(second.usage) });
+    return read(second) ?? { ok: false, error: call.empty };
   } catch (error) {
     return failure(error);
   }
-  return { ok: false, error: 'The search did not finish.' };
 }
 
 // ---------------------------------------------------------------------------

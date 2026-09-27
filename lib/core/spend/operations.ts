@@ -32,11 +32,12 @@ export const SPEND_OPERATIONS = {
     'suggest-learning-tracks',
     // Finding people to meet for the work the person wants, with a web
     // search, and writing what to say to each. From the job suggestion cron
-    // and the search button on Contacts. Sonnet, up to six searches.
+    // and the search button on Contacts. Sonnet, up to five searches and
+    // two calls.
     'suggest-outreach',
     // Finding open postings worth applying for with a web search, from the
-    // job suggestion cron (weekly) and the search button on Roles. Sonnet, up to
-    // six searches.
+    // job suggestion cron (weekly) and the search button on Roles. Sonnet, up
+    // to five searches and two calls.
     'find-openings',
   ],
   shopping: [
