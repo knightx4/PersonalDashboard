@@ -34,9 +34,13 @@ const noteSchema = z
   })
   .refine(
     (value) =>
-      [value.companyId, value.roleId, value.applicationId, value.contactId, value.interviewId].filter(
-        Boolean,
-      ).length === 1,
+      [
+        value.companyId,
+        value.roleId,
+        value.applicationId,
+        value.contactId,
+        value.interviewId,
+      ].filter(Boolean).length === 1,
     { message: 'A note attaches to exactly one thing.' },
   );
 
@@ -116,6 +120,40 @@ export async function updateNote(input: {
     .from('notes')
     .update({ body: parsed.data.body })
     .eq('id', parsed.data.noteId)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/jobs/roles/${parsed.data.roleId}`);
+  return { error: null };
+}
+
+/**
+ * The cover letter under the application's answers (note b4cecf70), in
+ * applications.cover_letter. Not cover_letters.body, which is the shared case
+ * page's statement and public once shared. Saving it empty clears it.
+ */
+// latency: pending
+export async function saveCoverLetter(input: {
+  applicationId: string;
+  roleId: string;
+  body: string;
+}): Promise<{ error: string | null }> {
+  const parsed = z
+    .object({
+      applicationId: z.string().uuid(),
+      roleId: z.string().uuid(),
+      body: z.string().trim().max(20_000, 'A cover letter is at most 20,000 characters.'),
+    })
+    .safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('applications')
+    .update({ cover_letter: parsed.data.body || null })
+    .eq('id', parsed.data.applicationId)
     .eq('user_id', user.id);
   if (error) return { error: error.message };
 
@@ -561,10 +599,7 @@ async function roundForNewInterview(
 }
 
 /** The next free place inside a round, so a superday reads in order. */
-async function positionInRound(
-  supabase: AppSupabaseClient,
-  groupId: string,
-): Promise<number> {
+async function positionInRound(supabase: AppSupabaseClient, groupId: string): Promise<number> {
   const { count } = await supabase
     .from('interviews')
     .select('id', { count: 'exact', head: true })
@@ -890,11 +925,7 @@ async function deleteEmptyRounds(
       .eq('group_id', groupId);
     if (count) continue;
 
-    await supabase
-      .from('interview_groups')
-      .delete()
-      .eq('id', groupId)
-      .eq('user_id', opts.userId);
+    await supabase.from('interview_groups').delete().eq('id', groupId).eq('user_id', opts.userId);
   }
 }
 
@@ -1349,7 +1380,10 @@ export async function matchRoleRequirements(
 
   const requirements = (role.requirements as Requirement[] | null) ?? [];
   if (requirements.length === 0) {
-    return { matches: null, error: 'No requirements have been extracted from this description yet.' };
+    return {
+      matches: null,
+      error: 'No requirements have been extracted from this description yet.',
+    };
   }
 
   const { data: bank, error: bankError } = await supabase
@@ -1374,7 +1408,8 @@ export async function matchRoleRequirements(
   if (items.length === 0) {
     return {
       matches: null,
-      error: 'Your evidence bank is empty. Fill it in Settings first — the map is only as good as it is.',
+      error:
+        'Your evidence bank is empty. Fill it in Settings first — the map is only as good as it is.',
     };
   }
 
@@ -1434,7 +1469,8 @@ export async function shareCasePage(
   input: z.input<typeof shareSchema>,
 ): Promise<{ slug: string | null; expiresAt: string | null; error: string | null }> {
   const parsed = shareSchema.safeParse(input);
-  if (!parsed.success) return { slug: null, expiresAt: null, error: parsed.error.issues[0].message };
+  if (!parsed.success)
+    return { slug: null, expiresAt: null, error: parsed.error.issues[0].message };
 
   const user = await requireUser();
   const supabase = await createClient();
@@ -1452,9 +1488,10 @@ export async function shareCasePage(
   // A page with no matched requirements is a page with a paragraph on it. The
   // requirement map is the thing worth sending; refusing here is friendlier
   // than shipping an empty link to an employer.
-  const matches =
-    ((application.roles as unknown as { requirement_matches: RequirementMatch[] | null })
-      .requirement_matches ?? []).filter((match) => match.verdict !== 'gap');
+  const matches = (
+    (application.roles as unknown as { requirement_matches: RequirementMatch[] | null })
+      .requirement_matches ?? []
+  ).filter((match) => match.verdict !== 'gap');
   if (matches.length === 0) {
     return {
       slug: null,
@@ -1506,9 +1543,7 @@ export async function shareCasePage(
  * away from being public again.
  */
 // latency: pending
-export async function unshareCasePage(
-  applicationId: string,
-): Promise<{ error: string | null }> {
+export async function unshareCasePage(applicationId: string): Promise<{ error: string | null }> {
   const parsed = z.string().uuid().safeParse(applicationId);
   if (!parsed.success) return { error: 'That is not a pursuit.' };
 
