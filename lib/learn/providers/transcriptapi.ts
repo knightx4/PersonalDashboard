@@ -154,7 +154,9 @@ export function failureFromStatus(status: number, body: string): TranscriptFailu
   if (status === 402) return fail('out-of-credits', false, 'no TranscriptAPI credits left this month');
   if (status === 401) return fail('unauthorized', false, 'TRANSCRIPTAPI_KEY was refused');
   if (status === 429) return fail('rate-limited', true, 'rate limited');
-  if (status === 408) return fail('rate-limited', true, 'TranscriptAPI timed out on its side');
+  // A timeout on one video, not a limit on the key: that video is tried again
+  // later and the run moves on to the next (#1148).
+  if (status === 408) return fail('error', true, 'TranscriptAPI timed out on its side');
   if (status === 400 || status === 422) return fail('error', false, `refused the request (${status})`);
   return fail('error', status >= 500, `answered ${status}`);
 }

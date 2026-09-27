@@ -86,7 +86,7 @@ describe('failureFromStatus', () => {
     expect(failureFromStatus(402, '').outcome).toBe('out-of-credits');
     expect(failureFromStatus(401, '').outcome).toBe('unauthorized');
     expect(failureFromStatus(429, '').outcome).toBe('rate-limited');
-    expect(failureFromStatus(408, '').outcome).toBe('rate-limited');
+    expect(failureFromStatus(408, '').outcome).toBe('error');
     expect(failureFromStatus(500, '').outcome).toBe('error');
   });
 
