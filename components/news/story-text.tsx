@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { storyAddsToSummary, storyParagraphs } from '@/lib/news/issues/stories';
 
@@ -9,10 +10,32 @@ import { storyAddsToSummary, storyParagraphs } from '@/lib/news/issues/stories';
  * for a story with no text of its own, which is every story summarised before
  * the text was kept, and for one whose text is the summary shown above it
  * word for word (note 86b9c6d1).
+ *
+ * Given `href`, the story's own page, it is a link there instead of a fold
+ * (note a18729e3): the Quick read opens the story rather than growing the card.
  */
-export function StoryText({ text, summary }: { text: string | undefined; summary?: string }) {
+export function StoryText({
+  text,
+  summary,
+  href,
+}: {
+  text: string | undefined;
+  summary?: string;
+  href?: string;
+}) {
   const paragraphs = storyParagraphs(text);
   if (paragraphs.length === 0 || !storyAddsToSummary(text, summary)) return null;
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="mt-1.5 inline-flex items-center gap-1 text-ui text-accent hover:underline"
+      >
+        <ChevronRight className="size-3" strokeWidth={2} aria-hidden />
+        Read the full story
+      </Link>
+    );
+  }
   return (
     <details className="group mt-1.5">
       <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-ui text-accent hover:underline [&::-webkit-details-marker]:hidden">

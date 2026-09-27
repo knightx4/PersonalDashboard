@@ -197,7 +197,7 @@ export function PipelineBoard({
           onDragLeave={() => setOver((current) => (current === column.setStatus ? null : current))}
           onDrop={() => drop(column.setStatus)}
           className={cn(
-            'w-64 shrink-0 rounded-card bg-sunken p-2 transition-colors duration-150',
+            'w-72 shrink-0 rounded-card bg-sunken p-2 transition-colors duration-150',
             over === column.setStatus && 'bg-accent-tint',
           )}
           aria-label={column.label}
@@ -286,7 +286,10 @@ function PipelineCard({
       onDragEnd={onDragEnd}
       className={cn(
         cardVariants({ interactive: !muted }),
-        'group p-2.5',
+        // Tight at the left, with the grip laid over the edge rather than
+        // beside the logo, so the title starts as far left as it can (note
+        // 7e3a17d3).
+        'group relative py-2 pr-2 pl-1.5',
         !muted && 'cursor-grab',
         dragging && 'dragging',
         muted && 'opacity-70',
@@ -295,7 +298,7 @@ function PipelineCard({
       <div className="flex items-start gap-1.5">
         {!muted && (
           <GripVertical
-            className="mt-0.5 size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+            className="absolute top-1/2 -left-1 size-3 -translate-y-1/2 text-ink-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100"
             strokeWidth={1.75}
             aria-hidden
           />
@@ -312,7 +315,7 @@ function PipelineCard({
         <div className="min-w-0 flex-1">
           <Link
             href={`/jobs/roles/${row.roleId}`}
-            className="block truncate text-ui font-medium text-ink transition-colors duration-150 hover:text-accent"
+            className="block truncate text-small font-medium text-ink transition-colors duration-150 hover:text-accent"
           >
             {row.roleTitle}
           </Link>

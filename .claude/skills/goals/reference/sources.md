@@ -239,7 +239,7 @@ Follow-ups the job search is reminding them of.
 
 - Search: `body`
 - Name a row by `body`; link it by `id`
-- Opens at `/jobs/today`
+- Opens at `/jobs`
 
 ### `learn.tracks` (Learn)
 

@@ -679,7 +679,7 @@ export function formatDays(value: number | null): string {
 // Requirement coverage
 //
 // The map on the role page tells you what to fix; this number is what makes
-// you look. It is the same job /jobs/today does for time and the review queue
+// you look. It is the same job /jobs does for time and the review queue
 // does for trust: reduce a screenful to the one figure that changes what you
 // do next, and put it where the decision is made.
 //

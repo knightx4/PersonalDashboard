@@ -11,7 +11,7 @@ import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
  * distinction job_search.waiting_dismissals already draws, generalised.
  *
  * Not every source uses this. A job reminder is deferred by moving its own due
- * date, on its own row, so both /jobs/today and /todo agree without an overlay
+ * date, on its own row, so both /jobs and /todo agree without an overlay
  * at all -- see lib/todo/agenda/sources/. This is for the sources that have
  * nowhere else to put it.
  */

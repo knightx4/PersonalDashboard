@@ -75,7 +75,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
    * docs/DESIGN-UPDATE-PLAN.md.
    */
   const sections: NavSection[] = [
-    { href: '/jobs/today', label: 'This week', icon: 'week' },
+    { href: '/jobs', label: 'Home', icon: 'jobsHome', exact: true },
     { href: '/jobs/thoughts', label: 'Career goals', icon: 'careerGoals' },
     { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
     { href: '/jobs/roles', label: 'Roles', icon: 'roles' },

@@ -97,7 +97,7 @@ export default async function RoleDetailPage({
     .select(
       `id, attempt, status, source, submitted_at, confirmation_received_at,
        first_human_response_at, closed_at, outcome, rejection_stage, rejection_stage_override,
-       excitement, next_action, next_action_due, needs_review, created_by`,
+       excitement, next_action, next_action_due, needs_review, created_by, cover_letter`,
     )
     .eq('role_id', id)
     .eq('user_id', user.id)
@@ -505,6 +505,7 @@ export default async function RoleDetailPage({
             (role.requirement_matches_key as string | null) !== currentMatchKey
           }
           bankSize={evidence.length}
+          coverLetter={(current.cover_letter as string | null) ?? ''}
           caseStatement={(caseLetter?.body as string) ?? ''}
           // A slug with a live expiry is what the read function accepts, so a
           // slug alone is not "shared" and must not read as it.
