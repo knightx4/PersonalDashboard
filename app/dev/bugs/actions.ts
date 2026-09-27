@@ -6,7 +6,12 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { isOwner, requireOwner } from '@/lib/dev/owner';
 import { codeMatches } from '@/lib/feedback/code';
 import { notesRoutine } from '@/lib/feedback/routine';
-import { FEEDBACK_KINDS, OUTSTANDING_STATUSES, type FeedbackKind } from '@/lib/feedback/load';
+import {
+  FEEDBACK_KINDS,
+  NOTES_WORK_KINDS,
+  OUTSTANDING_STATUSES,
+  type FeedbackKind,
+} from '@/lib/feedback/load';
 import { startRoutineRun } from '@/lib/plan/runs';
 
 /** One queue, one page. The old per-workspace pages redirect to it. */
@@ -359,6 +364,8 @@ export async function routineRun(): Promise<RoutineRun | null> {
 
 /**
  * How many notes are still outstanding — open, in progress, blocked or planned.
+ * Likes are not counted: the number sits beside "Run Feature Routine", and a
+ * notes run never claims a like.
  *
  * Read when the capture panel opens rather than threaded down through the
  * shell's props: the number moves every time a note is filed or worked, and one
@@ -374,7 +381,8 @@ export async function openFeedbackCount(): Promise<number> {
     .from('feedback_items')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', user.id)
-    .in('status', [...OUTSTANDING_STATUSES]);
+    .in('status', [...OUTSTANDING_STATUSES])
+    .in('kind', [...NOTES_WORK_KINDS]);
   return count ?? 0;
 }
 

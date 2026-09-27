@@ -10,6 +10,7 @@ import { cn } from '@/lib/cn';
 import {
   FEEDBACK_KINDS,
   FEEDBACK_KIND_LABEL,
+  isNotesWork,
   queueOfKind,
   type FeedbackKind,
   type FeedbackQueue,
@@ -56,8 +57,12 @@ export function FeedbackQueueView({
           beside it already says what scrolling would have told you. */}
       <div className="mb-6">
         {/* The whole queue's count whatever the filter says: the button
-            works every outstanding note, not only the kind on screen. */}
-        <RunRoutineButton openCount={queue.outstanding.length} divider="bottom" />
+            works every outstanding note, not only the kind on screen. Likes
+            are left out because a notes run never claims one. */}
+        <RunRoutineButton
+          openCount={queue.outstanding.filter(isNotesWork).length}
+          divider="bottom"
+        />
       </div>
 
       <div className="mb-6">

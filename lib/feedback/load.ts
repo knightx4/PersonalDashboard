@@ -68,6 +68,18 @@ export function isOutstanding(row: FeedbackRow): boolean {
 }
 
 /**
+ * The kinds a notes run works. A like is left out because there is nothing
+ * in it to fix: it stays open until the weekly vision review reads it and
+ * closes it. Every count that sizes or invites a notes run reads this list,
+ * so a like never shows up as work waiting for the routine button.
+ */
+export const NOTES_WORK_KINDS = ['bug', 'feature'] as const satisfies readonly FeedbackKind[];
+
+export function isNotesWork(row: { kind: FeedbackKind }): boolean {
+  return (NOTES_WORK_KINDS as readonly string[]).includes(row.kind);
+}
+
+/**
  * Same order the notes loop works them in: blocked first because it needs you,
  * then bugs, then feature requests, then likes, then priority, then oldest.
  */
