@@ -45,6 +45,26 @@ export const MATCH_PER_CONCEPT = 3;
  */
 export const MATCH_QUEUE_TARGET = 60;
 
+/**
+ * The shortest time the scheduled run gives the title and description pass,
+ * counted from when the pass starts (plan #1147). It used to stop at a fixed
+ * 135 seconds into the run, so when channel listing ran to its own 115-second
+ * deadline the pass had about 20 seconds: two or three batches, against 16 to
+ * 19 when listing finished early. A batch takes about four seconds, so 60
+ * seconds is about fifteen batches, near 1,900 videos.
+ */
+export const METADATA_SLICE_MS = 60_000;
+
+/**
+ * When the scheduled run's title and description pass stops: a fixed point in
+ * the run (`earliestEnd`, counted from `started`) when listing leaves room,
+ * and never less than `METADATA_SLICE_MS` after the pass begins at `now`,
+ * however long listing took.
+ */
+export function metadataEmbedDeadline(started: number, earliestEnd: number, now: number): number {
+  return Math.max(started + earliestEnd, now + METADATA_SLICE_MS);
+}
+
 export type MetadataEmbedResult = {
   embedded: number;
   /** Why the pass stopped before the videos ran out, when it did. */

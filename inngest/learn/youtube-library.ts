@@ -11,6 +11,7 @@ import { scheduledRunAllowance } from '@/lib/learn/youtube/budget';
 import { addChannel, listChannel, loadChannels, type ListChannelResult } from '@/lib/learn/youtube/library';
 import {
   embedVideoMetadata,
+  metadataEmbedDeadline,
   queueMatchingVideos,
   type MatchQueueResult,
   type MetadataEmbedResult,
@@ -64,9 +65,14 @@ const TICK_SUMMARY_MS = 60_000;
  */
 const TICK_JUDGE_MS = 95_000;
 const TICK_LIST_MS = 115_000;
-/** Titles and descriptions are embedded until here, then the queue is topped up. */
-const TICK_METADATA_MS = 135_000;
-const TICK_TRANSCRIBE_MS = 210_000;
+/**
+ * Titles and descriptions are embedded until here, then the queue is topped
+ * up. The pass always gets at least METADATA_SLICE_MS (60 seconds) from when it
+ * starts, so a listing that runs to its deadline cannot eat it (plan #1147).
+ */
+const TICK_METADATA_MS = 175_000;
+/** Transcripts: up to 40 fetches, which took at most about 40 seconds in September. */
+const TICK_TRANSCRIBE_MS = 230_000;
 const TICK_EMBED_MS = 270_000;
 
 const ownerSchema = z.object({ userId: z.string() });
@@ -194,7 +200,7 @@ export async function runYouTubeLibraryTick(): Promise<TickReport> {
   const spendRows: Promise<void>[] = [];
   try {
     report.metadata = await embedVideoMetadata(learn, {
-      deadline: started + TICK_METADATA_MS,
+      deadline: metadataEmbedDeadline(started, TICK_METADATA_MS, Date.now()),
       onSpend: ledger ? (spend) => void spendRows.push(ledger(spend)) : undefined,
     });
     if (owner) report.matched = await queueMatchingVideos(learn, owner);
