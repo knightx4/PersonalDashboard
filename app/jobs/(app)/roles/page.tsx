@@ -29,8 +29,14 @@ import {
 } from '@/lib/list-display';
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
+import { loadOpenSuggestions } from '@/lib/jobs/suggest/load';
+import { RecommendedRoles } from '../recommend/sections';
 
 export const metadata = { title: 'Roles' };
+
+// Search now on the recommended roles runs a web search in this page's server
+// action, which can take a couple of minutes.
+export const maxDuration = 300;
 
 /**
  * The same data as the board, as a sortable table.
@@ -55,7 +61,10 @@ export default async function RolesPage({
   const supabase = await createClient();
   const params = await searchParams;
 
-  const rows = await loadPipeline(supabase, user.id);
+  const [rows, recommended] = await Promise.all([
+    loadPipeline(supabase, user.id),
+    loadOpenSuggestions(supabase, user.id, 'apply'),
+  ]);
 
   const displaySpec = rolesDisplay();
   const display = parseListDisplay(displaySpec, params);
@@ -93,6 +102,9 @@ export default async function RolesPage({
     return (
       <>
         <PageHeader title="Roles" description="Every role, as a table." />
+        <div className="mb-6">
+          <RecommendedRoles suggestions={recommended} />
+        </div>
         <EmptyState
           icon={Table2}
           title="No roles yet"
@@ -118,6 +130,12 @@ export default async function RolesPage({
           </>
         }
       />
+
+      {/* Above the table and its rail, full width: what Dash found is not
+          narrowed by the filters, which describe roles already on file. */}
+      <div className="mb-6">
+        <RecommendedRoles suggestions={recommended} />
+      </div>
 
       <div className="flex flex-col gap-4 xl:flex-row xl:gap-6">
         <LeftRail>

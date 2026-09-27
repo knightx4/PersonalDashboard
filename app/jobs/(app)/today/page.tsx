@@ -2,15 +2,9 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { loadToday, INTERVIEW_HORIZON_DAYS } from '@/lib/jobs/today/load';
-import { loadOpenSuggestions } from '@/lib/jobs/suggest/load';
 import { TodayLists } from './lists';
-import { Suggestions } from './suggestions';
 
 export const metadata = { title: 'This week' };
-
-// The Find roles press runs a web search from this page's server action, which
-// can take a couple of minutes with a few rounds of searching.
-export const maxDuration = 300;
 
 /**
  * What has to happen, and nothing else.
@@ -33,12 +27,9 @@ export default async function TodayPage() {
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
 
-  const [board, suggestions] = await Promise.all([
-    loadToday(supabase, user.id, {
-      senderName: (profile?.display_name as string) ?? null,
-    }),
-    loadOpenSuggestions(supabase, user.id),
-  ]);
+  const board = await loadToday(supabase, user.id, {
+    senderName: (profile?.display_name as string) ?? null,
+  });
 
   return (
     <>
@@ -63,12 +54,7 @@ export default async function TodayPage() {
         />
       )}
 
-      <div className="space-y-6">
-        <TodayLists board={board} timezone={timezone} />
-        {/* After the things with a clock on them: a suggestion is worth doing
-            this week, an interview tomorrow has to be. */}
-        <Suggestions suggestions={suggestions} />
-      </div>
+      <TodayLists board={board} timezone={timezone} />
     </>
   );
 }
