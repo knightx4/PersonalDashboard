@@ -27,7 +27,7 @@ export type UnitCheckDue = {
 };
 
 /** Every concept `ids` rest on, and `ids` themselves, whatever their state. */
-function beneath(ids: readonly string[], prerequisites: Map<string, string[]>): Set<string> {
+export function beneath(ids: readonly string[], prerequisites: Map<string, string[]>): Set<string> {
   const seen = new Set<string>();
   const queue = ids.filter((id) => prerequisites.has(id));
   for (const id of queue) seen.add(id);

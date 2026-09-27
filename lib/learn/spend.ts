@@ -181,6 +181,10 @@ export const LEARN_OPERATIONS = [
   // or one whose outline failed when the goal was saved. On a press the same
   // call records as 'write-curriculum'.
   'write-outline',
+  // Splitting a laid-out unit of a learning goal's track into pieces of about
+  // half an hour (plan #1140), from the background top-up. One Sonnet call
+  // per unit.
+  'write-plan-pieces',
   // Adding what a lesson rated too hard rests on, under its concept (plan
   // #970), from the background top-up. The same call as 'propose-floor',
   // which a press on the probe page records.

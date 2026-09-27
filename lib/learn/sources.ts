@@ -78,6 +78,14 @@ export const learnSources: ModuleSources = {
       title: 'title',
     },
     {
+      table: 'learn.plan_pieces',
+      module: 'Learn',
+      holds: 'Pieces of about half an hour each unit of a learning goal is split into, with when they passed each.',
+      weight: 'record',
+      search: ['title'],
+      title: 'title',
+    },
+    {
       table: 'learn.quizzes',
       module: 'Learn',
       holds: 'Quizzes they set themselves, and what each was preparing for.',

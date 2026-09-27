@@ -110,6 +110,8 @@ export type TopUpSummary = {
   lessons?: LessonTopUpSummary;
   /** Set when a teach-back was put into the deck after the cards (plan #1054). */
   teachBack?: boolean;
+  /** Goal-track units split into pieces this run, and what failed (plan #1140). */
+  pieces?: { written: number; failed: string[] };
 };
 
 export async function runTopUpFor(
