@@ -9,15 +9,21 @@
  * So the deck is dealt from a larger pool, one card at a time. The next card
  * is the first in the pool's own order (returning cards, then newest ready,
  * then skipped) that does not share an article with any of the last
- * `ARTICLE_GAP` cards dealt, and, where possible, is not for the same theme or
- * goal as the card before it. When every card left clashes, the one whose
- * article was seen longest ago goes next, so the deck never runs dry.
+ * `ARTICLE_GAP` cards dealt and, where the pool allows, is not for a theme,
+ * goal or track among the last `TARGET_GAP`. A top-up writes each target's
+ * picks together, so without the wider gap one theme came round every other
+ * card while its batch lasted. When every card left clashes, the one whose
+ * article, then target, was seen longest ago goes next, so the deck never
+ * runs dry.
  *
  * Pure, so the rule is tested directly.
  */
 
 /** Cards dealt between two from the same article, when the pool allows it. */
 export const ARTICLE_GAP = 4;
+
+/** Cards dealt between two for the same theme, goal or track, when the pool allows it. */
+export const TARGET_GAP = 3;
 
 /** How many times the page size is read from the database to deal a page from. */
 export const POOL_FACTOR = 4;
@@ -39,8 +45,15 @@ function clash(card: Spreadable, history: readonly Spreadable[]): number {
       break;
     }
   }
-  const previous = history[history.length - 1];
-  if (card.target && previous?.target === card.target) penalty += 1;
+  if (card.target) {
+    for (let back = 1; back <= Math.min(TARGET_GAP, history.length); back += 1) {
+      if (history[history.length - back]!.target === card.target) {
+        // Below any article clash, which is ten or more.
+        penalty += TARGET_GAP - back + 1;
+        break;
+      }
+    }
+  }
   return penalty;
 }
 

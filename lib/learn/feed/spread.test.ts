@@ -47,6 +47,20 @@ describe('dealing the deck', () => {
     expect(ids(spreadDeck(pool, [], 3))).toEqual(['m', 'r', 'b']);
   });
 
+  it("keeps one theme's batch apart when other themes are in the pool", () => {
+    const pool = [
+      card('m1', 'Carry', 'markets'),
+      card('m2', 'Active management', 'markets'),
+      card('m3', 'Index fund', 'markets'),
+      card('g1', 'Buffer state', 'geo'),
+      card('p1', 'Reciprocity', 'peers'),
+      card('a1', 'Chip shortage', 'ai'),
+      card('g2', 'Maginot Line', 'geo'),
+    ];
+    // Three other themes before the second markets card, TARGET_GAP apart.
+    expect(ids(spreadDeck(pool, [], pool.length))).toEqual(['m1', 'g1', 'p1', 'a1', 'm2', 'g2', 'm3']);
+  });
+
   it('still deals every card when all of them clash, oldest article first', () => {
     const pool = [card('x1', 'X'), card('y1', 'Y'), card('x2', 'X'), card('y2', 'Y')];
     expect(ids(spreadDeck(pool, [], 4))).toEqual(['x1', 'y1', 'x2', 'y2']);
