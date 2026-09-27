@@ -1,6 +1,6 @@
 ---
 name: goals
-description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, choices made with judgement and written on the steps they shape, a question with lettered options only for what Claude cannot settle itself, provisional steps for what hangs on one, and the kinds of weekly help that fit the goal as a proposal on its page. Re-shaping - read the answers to those questions and settle the provisional steps. Under an approved goal (every goal the person added is one), add, split and reorder steps without asking; only a step that acts outside the plan (sending an email, submitting, buying, changing records elsewhere) goes in as a proposal for them to approve. Morning run - close each step of the person's it can see has happened (in Jobs, Gmail, the calendar or Todo) with a note naming the evidence, then give each open goal its status for the day (on track, stalled, waiting on you, waiting on a date or waiting on another goal) with the next move and its date, adding that move as a step for a stalled goal, then work the ready Claude steps and store what each produced on the step. Weekly run - research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind, and leave a note on every open goal. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
+description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, choices made with judgement and written on the steps they shape, a question with lettered options only for what Claude cannot settle itself, provisional steps for what hangs on one, and the kinds of weekly help that fit the goal as a proposal on its page. Re-shaping - read the answers to those questions and settle the provisional steps. Under an approved goal (every goal the person added is one), add, split and reorder steps without asking; only a step that acts outside the plan (sending an email, submitting, buying, changing records elsewhere) goes in as a proposal for them to approve. Morning run - close each step of the person's it can see has happened (in Jobs, Gmail, the calendar or Todo) with a note naming the evidence, give each step of theirs untouched for a week a move (split it, prepare it, or ask whether they still want it), then give each open goal its status for the day (on track, stalled, waiting on you, waiting on a date or waiting on another goal) with the next move and its date, adding that move as a step for a stalled goal, then work the ready Claude steps and store what each produced on the step. Weekly run - research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind, and leave a note on every open goal. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
 ---
 
 # Working a goal
@@ -908,7 +908,9 @@ When questions under the goal have a `resolution`:
   answered, or one they put aside.
 - A provisional step of the person's kind (`mine` or `rhythm`) is not yours
   to drop: rewrite it to fit the answer and take the line off, and if the
-  answer makes it pointless, ask whether to drop it as a question.
+  answer makes it pointless, ask whether to drop it as a question that the
+  step waits on. Once they answer that they do not want it, drop it with
+  `dropped_on` (see "Moving a step that has sat for a week").
 
 ### The re-shape run
 
@@ -945,8 +947,10 @@ proposed under the goal at once.
 same goal, reorder by `position`, point a step at a collection, make a step
 wait on another, block a step on the person (see "Blocked and waiting
 steps"), merge two steps that ask for the same thing (see "Merging
-duplicate steps"), and close a step of the person's when you have seen that
-it happened (see "Closing a step from evidence"). Do these without asking.
+duplicate steps"), close a step of the person's when you have seen that
+it happened (see "Closing a step from evidence"), and give a step of theirs
+that has sat for a week a move (see "Moving a step that has sat for a
+week"). Do these without asking.
 
 **Collections, approved or not:** define one, add fields to one, serve one to
 the goal, and write draft records into one. Never confirm a record, and never
@@ -957,7 +961,8 @@ the plan. See "Steps that act outside the plan".
 
 **Never, approved or not:** add a goal except as a proposal; change a goal's
 `acceptance` (its done-when); close, drop or archive a goal; drop or archive a
-`mine` or `rhythm` step other than by merging it; close a `mine` step without
+`mine` or `rhythm` step other than by merging it or on the person's answer
+(`dropped_on`); close a `mine` step without
 evidence, or close a `rhythm` at all; answer a question; approve anything. When one of these
 seems right, ask it as a question step instead, with the change you would make
 as option A.
@@ -1121,6 +1126,81 @@ Reopening the step, by hand or by the Undo, clears the note.
 
 Name each close in the run summary ("Closed 2 steps from evidence on Land
 your next role").
+
+## Moving a step that has sat for a week
+
+No step of the person's should go eight days without a move from them or
+from you. The morning brief lists each open `mine` step that nothing has
+touched in seven days or more (`lib/goals/stale-steps.ts`): its own row has
+not changed, nothing beneath it has been added or changed, and the person
+has not commented on it. A step that is blocked, waits on another step or a
+question, has open sub-steps, or has a start date still ahead is not listed.
+Neither is a rhythm, which repeats.
+
+Give each listed step one move, after closing from evidence and merging (a
+step you just closed or merged needs none) and before the verdicts, so the
+verdict can name the move. Each move is an ordinary write under the run, so
+it appears on the Goals home with an Undo and needs no approval.
+
+**Which move.** Read the step, its done-when, the steps around it and the
+goal, then take the first that fits:
+
+1. **Split it** when the step is bigger than one sitting, or its first action
+   is unclear: "Build a network that can refer you", "Update your resume".
+   Add two to four `mine` sub-steps under it, each one sitting of work with
+   its own done-when, the first of them something they could do today. The
+   step becomes the phase that holds them, and closes itself when the last
+   one does. Where part of it is research or a draft, make that part a
+   `claude` sub-step instead, and the morning run will work it.
+2. **Prepare it** when the step is one clear action that needs something
+   written or looked up first: a call, an email, a form, an application.
+   Write what they need, as in "A step of yours to prepare", in the same
+   run. A step the brief marks "already prepared once" sat after being
+   prepared, so preparing it again is the weakest move: split it or ask.
+3. **Ask whether they still want it** when neither fits, or when the goal
+   has moved on and the step may no longer matter. Add a question beside it
+   (same parent, just before it) and make the step wait on the question:
+
+   ```sql
+   set local goals.actor = 'claude';
+   set local goals.run_id = '<the run id>';
+   with q as (
+     insert into goals.items (user_id, level, parent_id, kind, title, detail, status, position)
+     values ('<user>', 'step', '<the step''s parent>', 'decision',
+             'Do you still want to call the servicer about the rate?',
+             E'A — Keep it. I split it into smaller steps.\nB — Keep it for later. Give me a date and I set it to start then.\nC — Drop it.\nRecommend A: the rate is still 6.8% and the call is one of three left on this goal.',
+             'open', <the step''s position minus 1>)
+     returning id
+   )
+   insert into goals.dependencies (user_id, item_id, depends_on_id)
+   select '<user>', '<step id>', id from q;
+   ```
+
+   The question never goes beneath the step: answering it would close the
+   step's last sub-step, and the step would then close itself as done.
+
+**After the answer.** The re-shape run's brief lists the step under "Steps
+that wait on those questions". Do what the answer says: split it, set
+`starts_on`, leave it as it is, or drop it. Dropping one of the person's
+steps is refused except on their answer, with `dropped_on` naming the
+answered question the step waits on, in one update:
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+update goals.items
+set status = 'dropped', dropped_on = '<the question''s id>'
+where id = '<step id>' and user_id = '<user>';
+```
+
+The database holds the drop to the rules in `migrations-goals/0051`: the
+question is answered, belongs to the same goal, and the step waits on it,
+and the step has nothing open beneath it. The Goals home reads it as
+"Dropped X on your answer to Y", with an Undo that reopens the step.
+
+The brief lists at most ten a morning, longest untouched first; the rest
+come the next day. Name each move in the run summary ("Split Update your
+resume into 3 steps; asked about Call the servicer").
 
 ## Steps that act outside the plan
 
@@ -1306,8 +1386,10 @@ one. Read each goal's tree before judging it: what is done, what is open,
 what waits on the person, what waits on a date, and what waits on you.
 First close each step of the person's that you can see has happened (see
 "Closing a step from evidence"). Then merge any two steps that ask for the
-same thing (see "Merging duplicate steps"). Both come before the verdict, so
-the verdict counts what is really done and names the step that survived.
+same thing (see "Merging duplicate steps"). Then give each step the brief
+lists as untouched for a week its move (see "Moving a step that has sat for
+a week"). All three come before the verdict, so the verdict counts what is
+really done and names the step that survived or the move you made.
 
 While reading, look for what is new since yesterday (rows with `created_at`
 or `updated_at` after the last morning run) in the sources each goal draws
