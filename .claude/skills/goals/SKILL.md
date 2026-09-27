@@ -328,7 +328,8 @@ and reuse a step that already says what you were about to write.
    on track. A phase has `kind = 'mine'`, an `acceptance` saying what is true
    when the stage is over, and sub-steps. It reads Waiting while its sub-steps
    are open, and closes itself once they are all done or dropped (a trigger,
-   `migrations-goals/0040`); never close a phase yourself.
+   `migrations-goals/0040`); never close a phase yourself. A merge is the
+   exception to both halves: see "Merging duplicate steps".
 2. **Sub-steps under each phase.** Two to five, each one sitting of work, each
    with its own `acceptance`. A sub-step bigger than one sitting gets
    sub-steps of its own.
@@ -942,8 +943,9 @@ proposed under the goal at once.
 
 **After it is approved:** add steps as `open`, split one into sub-steps, move a step under another step of the
 same goal, reorder by `position`, point a step at a collection, make a step
-wait on another, and block a step on the person (see "Blocked and waiting
-steps"). Do these without asking.
+wait on another, block a step on the person (see "Blocked and waiting
+steps"), and merge two steps that ask for the same thing (see "Merging
+duplicate steps"). Do these without asking.
 
 **Collections, approved or not:** define one, add fields to one, serve one to
 the goal, and write draft records into one. Never confirm a record, and never
@@ -954,12 +956,78 @@ the plan. See "Steps that act outside the plan".
 
 **Never, approved or not:** add a goal except as a proposal; change a goal's
 `acceptance` (its done-when); close, drop or archive a goal; drop or archive a
-`mine` or `rhythm` step; answer a question; approve anything. When one of these
+`mine` or `rhythm` step other than by merging it; answer a question; approve
+anything. When one of these
 seems right, ask it as a question step instead, with the change you would make
 as option A.
 
 Nothing is deleted. Archive with `archived_at = now()` where you are allowed
 to, and delete only a row you wrote by mistake in this same run.
+
+## Merging duplicate steps
+
+Every run that reads a goal's tree looks for steps that ask for the same
+thing, and merges them without asking. The morning run does it while
+reviewing each goal; a mapping or re-shape run does it before adding a step,
+so it does not add a third. The merge is listed on the Goals home with an
+Undo, which is why it needs no approval.
+
+**Two steps are the same** when finishing one would leave nothing for the
+other to do: the same action on the same thing, whatever the wording. Read
+the `acceptance` of each, not just the title.
+
+- Same: "Set your pay floor", "Settle on your pay floor" and "Name your target
+  role and pay floor" all end with the person having picked one number and
+  written it on the target. A phase and its last sub-step of the person's when
+  the phase's done-when is that sub-step's done-when ("Give it" over "Sign up
+  to speak and give it", "Get the testimony ready" over "Put the draft in your
+  own words").
+- Not the same: a `claude` step and the person's step that uses what it
+  produced ("Draft the testimony" and "Put the draft in your own words"); two
+  steps on the same subject that end differently ("Research typical pay" and
+  "Set your pay floor"); the same action under two goals (merge only within a
+  goal); a rhythm and a one-off step. Leave these, however alike the titles.
+
+**Which one survives.** The one that carries more: an information step with
+answers or a collection over a plain one, a phase over its own sub-step, the
+one with a due date, a result or comments over the one without. Otherwise the
+one later in the path, where the work actually gets finished. When the
+dropped step says something the survivor does not (a tip, a date, a detail of
+its done-when), add that line to the survivor's `detail` in the same call.
+
+**How.** One update on the step you drop, setting both columns together:
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+update goals.items
+set status = 'dropped', merged_into = '<the survivor''s id>'
+where id = '<the duplicate''s id>' and user_id = '<user>';
+```
+
+The database holds a merge to these rules (`migrations-goals/0048`): the
+survivor is an open or blocked step of the same goal, and the step you drop
+has nothing open beneath it. Merge or move its open sub-steps first, deepest
+first. It is the one way you may drop one of the person's steps; a plain drop
+is still refused.
+
+Every step that waited on the dropped one is made to wait on the survivor as
+well, by the database in the same write (`migrations-goals/0049`); each shows
+as "Made X wait on Y" beside the merge. What the dropped step itself waited
+on is not carried: if the survivor should wait on the same step, add that
+dependency yourself.
+
+**Phases after a merge.** A merge never closes a phase by itself. A sub-step
+merged into its own phase leaves the phase as the step that carries the work,
+and that phase no longer closes when its other sub-steps close: the person
+ticks it off. A phase a merge elsewhere left with nothing open (its other
+sub-steps done) is itself a duplicate of the survivor: merge it into the
+same survivor. The pay floor goes from three steps to one that way: "Settle
+on your pay floor" into "Name your target role and pay floor", then the
+emptied "Set your pay floor" phase into the same step.
+
+Name each merge in the run's summary ("Merged 3 duplicate steps on Land your
+next role").
 
 ## Steps that act outside the plan
 
@@ -1143,6 +1211,9 @@ every open goal with its done-when, when anything was last done on it (a step
 closed as done, or a reading logged), and the last verdict when there was
 one. Read each goal's tree before judging it: what is done, what is open,
 what waits on the person, what waits on a date, and what waits on you.
+Merge any two steps that ask for the same thing while you read (see "Merging
+duplicate steps"), before the verdict, so the verdict names the step that
+survived.
 
 While reading, look for what is new since yesterday (rows with `created_at`
 or `updated_at` after the last morning run) in the sources each goal draws

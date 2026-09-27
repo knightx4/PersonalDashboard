@@ -1728,6 +1728,130 @@ describe('phases close themselves (0040)', () => {
   });
 });
 
+describe('Claude merges duplicate steps (plan #1081)', () => {
+  function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  async function step(parent: string, title: string, kind = 'mine'): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${parent}, ${kind}, ${title}) returning id`;
+    return row.id;
+  }
+
+  async function goal(title: string): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title, approved_at)
+      values (${userA}, 'goal', ${areaA}, ${title}, now()) returning id`;
+    return row.id;
+  }
+
+  async function row(id: string): Promise<{ status: string; merged_into: string | null }> {
+    const [r] = await admin<{ status: string; merged_into: string | null }[]>`
+      select status, merged_into from items where id = ${id}`;
+    return r;
+  }
+
+  it('drops one of your steps into another as one history row, and the undo restores it', async () => {
+    const g = await goal('Land a role');
+    const keep = await step(g, 'Name your target role and pay floor');
+    const dup = await step(g, 'Settle on your pay floor');
+
+    await expect(
+      asClaude((tx) => tx`update items set status = 'dropped' where id = ${dup}`),
+    ).rejects.toThrow(/except by merging/);
+
+    await asClaude((tx) => tx`
+      update items set status = 'dropped', merged_into = ${keep} where id = ${dup}`);
+    expect(await row(dup)).toEqual({ status: 'dropped', merged_into: keep });
+    const merge = (await historyOf(dup)).at(-1);
+    expect(merge?.new_values).toMatchObject({ status: 'dropped', merged_into: keep });
+    expect(merge?.old_values).toMatchObject({ status: 'open', merged_into: null });
+
+    // The run page's undo writes the old values back.
+    await asUser(userA, (tx) => tx`update items set status = 'open', merged_into = null where id = ${dup}`);
+    expect(await row(dup)).toEqual({ status: 'open', merged_into: null });
+
+    // Reopening by hand clears it too.
+    await asClaude((tx) => tx`
+      update items set status = 'dropped', merged_into = ${keep} where id = ${dup}`);
+    await asUser(userA, (tx) => tx`update items set status = 'open' where id = ${dup}`);
+    expect(await row(dup)).toEqual({ status: 'open', merged_into: null });
+  });
+
+  it('refuses a merge into another goal, a closed step, or with open work left beneath', async () => {
+    const g = await goal('Speak at the board');
+    const other = await goal('Pay off the loans');
+    const dup = await step(g, 'Give it');
+    const elsewhere = await step(other, 'Give it');
+    const closed = await step(g, 'Sign up');
+    await admin`update items set status = 'done' where id = ${closed}`;
+    const phase = await step(g, 'Get the testimony ready');
+    await step(phase, 'Put the draft in your own words');
+
+    await expect(
+      asClaude((tx) => tx`update items set status = 'dropped', merged_into = ${elsewhere} where id = ${dup}`),
+    ).rejects.toThrow(/same goal/);
+    await expect(
+      asClaude((tx) => tx`update items set status = 'dropped', merged_into = ${closed} where id = ${dup}`),
+    ).rejects.toThrow(/still open/);
+    await expect(
+      asClaude((tx) => tx`update items set status = 'dropped', merged_into = ${dup} where id = ${phase}`),
+    ).rejects.toThrow(/open sub-steps/);
+    await expect(
+      asClaude((tx) => tx`update items set archived_at = now(), merged_into = ${dup} where id = ${closed}`),
+    ).rejects.toThrow();
+  });
+
+  it('keeps a phase open when a sub-step merges into it, and leaves it for you to close', async () => {
+    const g = await goal('Put something of your own in');
+    const phase = await step(g, 'Get the testimony ready');
+    const draft = await step(phase, 'Draft a two-minute testimony', 'claude');
+    const own = await step(phase, 'Put the draft in your own words');
+
+    await asClaude((tx) => tx`update items set status = 'dropped', merged_into = ${phase} where id = ${own}`);
+    expect((await row(phase)).status).toBe('open');
+    await asClaude((tx) => tx`update items set status = 'done' where id = ${draft}`);
+    expect((await row(phase)).status).toBe('open');
+  });
+
+  it('makes a step that waited on the merged one wait on the survivor', async () => {
+    const g = await goal('Speak at the board');
+    const pick = await step(g, 'Pick the fight you will speak on');
+    const choose = await step(g, 'Choose the one you care about');
+    const draft = await step(g, 'Draft the testimony', 'claude');
+    await admin`insert into dependencies (user_id, item_id, depends_on_id) values (${userA}, ${draft}, ${choose})`;
+    await admin`insert into dependencies (user_id, item_id, depends_on_id) values (${userA}, ${pick}, ${choose})`;
+
+    await asClaude((tx) => tx`update items set status = 'dropped', merged_into = ${pick} where id = ${choose}`);
+    const waits = await admin<{ item_id: string }[]>`
+      select item_id from dependencies where depends_on_id = ${pick}`;
+    expect(waits.map((w) => w.item_id)).toEqual([draft]);
+    const [made] = await admin<{ actor: string }[]>`
+      select h.actor from history h join dependencies d on d.id = h.row_id
+      where d.item_id = ${draft} and d.depends_on_id = ${pick}`;
+    expect(made.actor).toBe('claude');
+  });
+
+  it('does not close a phase that a merge elsewhere emptied', async () => {
+    const g = await goal('Know the target');
+    const phase = await step(g, 'Set your pay floor');
+    const work = await step(phase, 'Work out the lowest pay', 'claude');
+    const settle = await step(phase, 'Settle on your pay floor');
+    await admin`update items set status = 'done' where id = ${work}`;
+    const target = await step(g, 'Name your target role and pay floor');
+
+    await asClaude((tx) => tx`update items set status = 'dropped', merged_into = ${target} where id = ${settle}`);
+    expect((await row(phase)).status).toBe('open');
+    await asClaude((tx) => tx`update items set status = 'dropped', merged_into = ${target} where id = ${phase}`);
+    expect(await row(phase)).toEqual({ status: 'dropped', merged_into: target });
+  });
+});
+
 describe('a goal is an outcome, not a practice (0041)', () => {
   function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
     return admin.begin(async (tx) => {
