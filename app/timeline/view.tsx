@@ -1,20 +1,14 @@
 import Link from 'next/link';
 import { SectionFold } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ModuleMark } from '@/components/ui/module-mark';
 import { segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
 import { moduleById } from '@/lib/modules';
-import { formatMoney } from '@/lib/money';
 import type { MonthKey, TimelineMonth } from '@/lib/timeline/months';
-import {
-  KIND_NOUNS,
-  eventRef,
-  kindCount,
-  timelineHref,
-  type TimelineEvent,
-  type TimelineModule,
-} from '@/lib/timeline/timeline';
+import { weekLabel, type ShownObservation } from '@/lib/timeline/observations-view';
+import { eventRef, kindCount, type TimelineModule } from '@/lib/timeline/timeline';
+import { EventRow } from './event-row';
+import { ObservationList } from './observations';
 
 /**
  * The timeline page's body (plan #1118), apart from the reads so the surface
@@ -36,6 +30,11 @@ export type TimelineViewProps = {
   /** The month to show from for "Later", or null when this page is the newest. */
   later: MonthKey | 'now' | null;
   timezone: string;
+  /**
+   * The weekly observations for the weeks on this page, not useful ones
+   * already left out. Each shows at the top of the month its week begins in.
+   */
+  observations?: ShownObservation[];
 };
 
 export function timelineUrl({ module, to }: { module: TimelineModule | null; to: MonthKey | null }): string {
@@ -46,7 +45,16 @@ export function timelineUrl({ module, to }: { module: TimelineModule | null; to:
   return query ? `/timeline?${query}` : '/timeline';
 }
 
-export function TimelineView({ months, modules, module, to, earlier, later, timezone }: TimelineViewProps) {
+export function TimelineView({
+  months,
+  modules,
+  module,
+  to,
+  earlier,
+  later,
+  timezone,
+  observations = [],
+}: TimelineViewProps) {
   return (
     <>
       {modules.length > 1 && <ModuleFilter modules={modules} module={module} to={to} />}
@@ -67,6 +75,10 @@ export function TimelineView({ months, modules, module, to, earlier, later, time
               // history, and their counts are on the closed line.
               defaultOpen={index === 0}
             >
+              <MonthObservations
+                observations={observations.filter((observation) => observation.week.slice(0, 7) === month.key)}
+                timezone={timezone}
+              />
               <ul className="divide-y divide-border border-y border-border">
                 {month.events.map((event) => (
                   <EventRow key={eventRef(event)} event={event} timezone={timezone} />
@@ -138,34 +150,27 @@ function ModuleFilter({
   );
 }
 
-function EventRow({ event, timezone }: { event: TimelineEvent; timezone: string }) {
-  const what = KIND_NOUNS[event.kind].one;
-  const second = [
-    what.charAt(0).toUpperCase() + what.slice(1),
-    event.amount_cents != null ? formatMoney(event.amount_cents, event.currency ?? 'USD') : null,
-    // An order's detail is its order number, which the amount says more usefully.
-    event.kind === 'ordered' ? null : event.detail,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+/**
+ * What the weekly run noticed in the weeks that begin in this month, one
+ * block per week above the month's events. Nothing when it noticed nothing.
+ */
+function MonthObservations({ observations, timezone }: { observations: ShownObservation[]; timezone: string }) {
+  const weeks = [...new Set(observations.map((observation) => observation.week))];
+  if (weeks.length === 0) return null;
   return (
-    <li>
-      <Link href={timelineHref(event)} className="flex items-center gap-3 px-1 py-2 hover:bg-sunken">
-        <span className="tabular w-12 shrink-0 text-small text-ink-muted">{dayLabel(event.occurred_at, timezone)}</span>
-        <ModuleMark module={event.module} size="sm" />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-ui text-ink">{event.title}</span>
-          <span className="block truncate text-small text-ink-muted">{second}</span>
-        </span>
-      </Link>
-    </li>
-  );
-}
-
-/** "Sat 26", on the person's calendar. */
-function dayLabel(iso: string, timezone: string): string {
-  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', timeZone: timezone }).format(
-    new Date(iso),
+    <div className="mb-3 space-y-3">
+      {weeks.map((week) => (
+        <section key={week} aria-label={`What Dash noticed, ${weekLabel(week).toLowerCase()}`}>
+          <h3 className="mb-1.5 text-small font-medium text-ink-muted">
+            {`Dash noticed · ${weekLabel(week).toLowerCase()}`}
+          </h3>
+          <ObservationList
+            observations={observations.filter((observation) => observation.week === week)}
+            timezone={timezone}
+          />
+        </section>
+      ))}
+    </div>
   );
 }
 
