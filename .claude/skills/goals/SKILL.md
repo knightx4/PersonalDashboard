@@ -1880,6 +1880,13 @@ returning target_id;
 the old one; you never write `version` or `core.file_versions`. Set
 `change_note` in the same update to one sentence on what changed.
 
+Read the file's thread first. Comments the person wrote on it are in
+`core.file_comments` (`select author, body, created_at from core.file_comments
+where file_id = '<file id>' order by created_at`), and what they ask for there
+is what this revision does. A file with comments newer than its `updated_at`
+is waiting on a revision: make it when the step it serves is next worked, and
+name the comment in `change_note`.
+
 ```sql
 update core.files
 set body = '<the new markdown>', summary = '<the new answer>',

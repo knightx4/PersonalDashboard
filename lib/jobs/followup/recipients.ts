@@ -3,7 +3,7 @@ import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 /**
  * Who a follow-up should be addressed to.
  *
- * Its own module because two pages need it now: /jobs/today, which has always
+ * Its own module because two pages need it now: /jobs, which has always
  * written the draft rather than the reminder to send one, and the todo
  * module's job source, which shows the same reminders on a merged agenda. A
  * merged agenda that degraded a follow-up into a line of text with a checkbox

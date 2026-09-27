@@ -122,7 +122,8 @@ function NextButton() {
 }
 
 /**
- * The phone card with the one after it already drawn (note 452a90d9).
+ * The phone card with the one after it already drawn (note 452a90d9), and
+ * the laptop page with the next page drawn the same way (note 11ec91c5).
  *
  * The page renders both on the server; `next` stays out of the DOM until Next
  * (or a swipe, which submits the same form) goes pending, and then shows at
@@ -238,6 +239,12 @@ function PreviousPageButton() {
 
 function NextPageButton() {
   const { pending } = useFormStatus();
+  const advance = useContext(AdvanceContext);
+  // As NextButton: the page drawn ahead shows the moment the pass is sent
+  // (note 11ec91c5).
+  useEffect(() => {
+    if (pending) advance?.();
+  }, [pending, advance]);
   return (
     <Button type="submit" size="lg" pending={pending}>
       {pending ? 'Loading…' : 'Next page'}

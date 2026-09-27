@@ -239,7 +239,7 @@ Follow-ups the job search is reminding them of.
 
 - Search: `body`
 - Name a row by `body`; link it by `id`
-- Opens at `/jobs/today`
+- Opens at `/jobs`
 
 ### `learn.tracks` (Learn)
 
@@ -406,7 +406,7 @@ Longer pieces written for them and kept as pages: research notes, breakdowns of 
 - Search: `title`, `summary`, `body`
 - Name a row by `title`; link it by `id`
 - Opens at `/goals/files/<id>`
-- Skip rows with archived_at set. made_by 'claude' is a run's work, 'you' is theirs. A goal or step links one through goals.links with kind 'file'. Read the file before redoing its work, and revise it rather than writing a second one on the same question.
+- Skip rows with archived_at set. made_by 'claude' is a run's work, 'you' is theirs. A goal or step links one through goals.links with kind 'file'. Read the file before redoing its work, and revise it rather than writing a second one on the same question. Before revising one, read its thread in core.file_comments (file_id): what they wrote there is what they want changed.
 
 ### `core.conversations` (Learn)
 

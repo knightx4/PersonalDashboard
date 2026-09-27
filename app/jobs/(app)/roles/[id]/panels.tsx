@@ -57,6 +57,7 @@ import {
   addInterviewerByName,
   addNote,
   addReminder,
+  saveCoverLetter,
   createInterviewRound,
   declineCandidateMessage,
   deleteInterview,
@@ -86,7 +87,7 @@ import {
   interviewKindLabel,
 } from '@/lib/jobs/interview-kinds';
 import { groupableDays, sectionInterviews } from '@/lib/jobs/interview-groups';
-import { ReminderActions } from '@/app/jobs/(app)/today/reminder-actions';
+import { ReminderActions } from '@/app/jobs/(app)/_home/reminder-actions';
 import { ChipInput, ComposeTitle, InlineInput, Input, Label, Select } from '@/components/ui/field';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { GmailAnchor } from '@/components/ui/gmail-anchor';
@@ -96,7 +97,9 @@ type Tab = 'timeline' | 'posting' | 'answers' | 'interviews' | 'notes' | 'mail';
 const TABS: Array<{ id: Tab; label: string; icon: typeof FileText }> = [
   { id: 'timeline', label: 'Timeline', icon: ListChecks },
   { id: 'posting', label: 'Posting', icon: FileText },
-  { id: 'answers', label: 'Answers', icon: MessageSquareText },
+  // Application, not Answers: the questions and the cover letter (note b4cecf70).
+  // The id stays, so ?tab=answers links still land here.
+  { id: 'answers', label: 'Application', icon: MessageSquareText },
   { id: 'interviews', label: 'Interviews', icon: CalendarClock },
   { id: 'notes', label: 'Notes', icon: StickyNote },
   { id: 'mail', label: 'Linked mail', icon: Mail },
@@ -121,6 +124,8 @@ export interface PanelProps {
   requirementMatchesStale: boolean;
   /** How many items the bank holds. Zero is why a match refuses to run. */
   bankSize: number;
+  /** The cover letter for this application, private; empty when none is written. */
+  coverLetter: string;
   /** The statement of interest on the shared case page. Written by hand. */
   caseStatement: string;
   /** The live share slug, or null when the page is not shared. */
@@ -1521,7 +1526,7 @@ function JobDescriptionCard({
   );
 }
 
-function Answers({ answers, applicationId, bankSize }: PanelProps) {
+function Answers({ answers, applicationId, bankSize, roleId, coverLetter }: PanelProps) {
   const [paste, setPaste] = useState('');
   const [pasting, setPasting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -1611,7 +1616,96 @@ function Answers({ answers, applicationId, bankSize }: PanelProps) {
           ))}
         </div>
       )}
+
+      <CoverLetter applicationId={applicationId} roleId={roleId} initial={coverLetter} />
     </div>
+  );
+}
+
+/**
+ * The cover letter sent with this application (note b4cecf70), under the
+ * answers because it is part of the same submission. Read as prose and edited
+ * in place, as an answer is.
+ */
+function CoverLetter({
+  applicationId,
+  roleId,
+  initial,
+}: {
+  applicationId: string;
+  roleId: string;
+  initial: string;
+}) {
+  const [text, setText] = useState(initial);
+  const [editing, setEditing] = useState(false);
+  const [saved, setSaved] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <CardSection title="Cover letter">
+      {editing ? (
+        <Textarea
+          rows={12}
+          value={text}
+          autoFocus
+          aria-label="Cover letter"
+          onChange={(event) => setText(event.target.value)}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          title="Edit the cover letter"
+          className="-mx-1.5 -my-1 block w-full rounded-card px-1.5 py-1 text-left transition-colors duration-150 hover:bg-sunken"
+        >
+          {text.trim() ? (
+            <span className="block max-w-prose whitespace-pre-wrap text-ui leading-relaxed text-ink">
+              {text}
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-ui text-ink-ghost">
+              <Pencil className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+              No cover letter yet.
+            </span>
+          )}
+        </button>
+      )}
+      {(editing || saved) && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {editing && (
+            <>
+              <Button
+                type="button"
+                size="sm"
+                disabled={pending}
+                onClick={() =>
+                  startTransition(async () => {
+                    const result = await saveCoverLetter({ applicationId, roleId, body: text });
+                    setSaved(result.error ?? 'Saved.');
+                    if (!result.error) setEditing(false);
+                  })
+                }
+              >
+                Save
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={pending}
+                onClick={() => {
+                  setText(initial);
+                  setEditing(false);
+                }}
+              >
+                Cancel
+              </Button>
+            </>
+          )}
+          {saved && <span className="text-small text-ink-muted">{saved}</span>}
+        </div>
+      )}
+    </CardSection>
   );
 }
 

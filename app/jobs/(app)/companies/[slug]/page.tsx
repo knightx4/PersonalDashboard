@@ -6,7 +6,7 @@ import { CardSection } from '@/components/ui/card';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { formatDate } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
-import { ReminderActions } from '@/app/jobs/(app)/today/reminder-actions';
+import { ReminderActions } from '@/app/jobs/(app)/_home/reminder-actions';
 import { CompanyName } from './company-name';
 import { CompanyPanels } from './panels';
 import { RolesList } from './roles-list';

@@ -49,8 +49,12 @@ export type CommentStore = {
   paid: PaidAction;
 };
 
-/** What a thread is on: a dev row, or a goal or step. */
-export type ThreadTarget = CommentTarget | 'goal';
+/**
+ * What a thread is on: a dev row, a goal or step, or a file. Dash does not
+ * answer in a file's thread; the goals run reads it before revising the file
+ * (note 7a6a37aa), so there is no tag and nothing waits on a reply.
+ */
+export type ThreadTarget = CommentTarget | 'goal' | 'file';
 
 function DeleteComment({
   id,
@@ -314,7 +318,8 @@ export function CommentThread({
   // A raise is a question put to you, so anything you write on one reaches
   // Dash whether or not it carries the tag -- #541. Everywhere else the tag is
   // what does it.
-  const reaches = (body: string) => target === 'raise' || mentionsDash(body);
+  const answers = target !== 'file';
+  const reaches = (body: string) => target === 'raise' || (answers && mentionsDash(body));
   // Nothing is coming back from an action of somebody else's, so the line
   // saying an answer is on its way would be describing a wait that is not
   // happening.
@@ -324,7 +329,8 @@ export function CommentThread({
   // to `pending` had it up for the wrong one of the two -- and gone entirely
   // after a reload. `awaitingDash` holds it until Dash answers or until the
   // wait has gone on longer than an answer ever takes.
-  const asking = awaitingReply || (!submit && awaitingDash(shown, target, now));
+  const asking =
+    awaitingReply || (!submit && target !== 'file' && awaitingDash(shown, target, now));
   /** Whether what is in the box right now would reach Dash. */
   const tagged = reaches(draft);
 
@@ -439,7 +445,7 @@ export function CommentThread({
                   addressed to somebody starts. Lit once the tag is in, so it
                   also says who will read this. Left off a box writing
                   somewhere else, where nothing reads the tag. */}
-              {!submit && (
+              {!submit && answers && (
                 <button
                   type="button"
                   // Keeps the caret where it is. Without this the box loses
@@ -518,9 +524,11 @@ export function CommentThread({
                 <p className="min-w-0 flex-1 text-small text-ink-muted">
                   {target === 'raise'
                     ? 'This is your answer. A session acts on it and replies in the thread.'
-                    : tagged
-                      ? 'Dash will read this and reply in the thread.'
-                      : 'A note on the row. Nothing reads it.'}
+                    : target === 'file'
+                      ? 'A note on the file. Dash reads it before revising the file.'
+                      : tagged
+                        ? 'Dash will read this and reply in the thread.'
+                        : 'A note on the row. Nothing reads it.'}
                 </p>
               )}
               {/* Only a tagged comment is answered by Dash; the rest are free. */}
