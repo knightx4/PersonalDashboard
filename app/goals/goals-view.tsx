@@ -328,21 +328,16 @@ function GoalRow({
         >
           {goal.title}
         </Link>
-        <form action={edit}>
-          <input type="hidden" name="id" value={goal.id} />
-          <InlineTextarea
-            name="acceptance"
-            maxLength={GOAL_ACCEPTANCE_MAX}
-            defaultValue={goal.acceptance ?? ''}
-            key={`acceptance-${goal.acceptance ?? ''}`}
-            placeholder="Done when…"
-            aria-label={`When ${goal.title} is done`}
-            disabled={editing}
-            onBlur={commitOnBlur(goal.acceptance ?? '')}
-            onKeyDown={revertOnEscape(goal.acceptance ?? '')}
-            className="text-ink-muted"
-          />
-        </form>
+        {/* The done-when opens the tree too, where it is edited beside the
+            name; editing it here took the click meant for opening the goal. */}
+        {goal.acceptance && (
+          <Link
+            href={`/goals/${goal.id}`}
+            className="block px-1 py-0.5 whitespace-pre-line text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+          >
+            {goal.acceptance}
+          </Link>
+        )}
         {showFog && (
           <form action={edit} className="flex items-start gap-1">
             <input type="hidden" name="id" value={goal.id} />
