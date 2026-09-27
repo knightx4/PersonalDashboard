@@ -140,6 +140,9 @@ export const PAID_ACTIONS = {
   // Dash: a question about anything in the app, from the sheet in the shell,
   // ⌘K or /ask (plan #1090)
   'app/ask/actions.ts#askDashQuestion': ['ask-dash'],
+
+  // Timeline: writing a year up, or the current year again (plan #1121)
+  'app/timeline/actions.ts#writeYearReview': ['write-year-review'],
 } as const satisfies Record<string, readonly OperationName[]>;
 
 export type PaidAction = keyof typeof PAID_ACTIONS;
@@ -169,6 +172,10 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'Fired on Mondays by pg_cron to write the week\'s observations across the modules; no press starts it.',
   'app/api/cron/observations/route.ts#POST':
     'Fired on Mondays by pg_cron to write the week\'s observations across the modules; no press starts it.',
+  'app/api/cron/year-review/route.ts#GET':
+    'Fired on 2 January by pg_cron to write the year just gone for everyone with events in it; no press starts it.',
+  'app/api/cron/year-review/route.ts#POST':
+    'Fired on 2 January by pg_cron to write the year just gone for everyone with events in it; no press starts it.',
   'app/api/cron/youtube-library/route.ts#GET':
     'Fired four times a day by pg_cron to fetch and embed the YouTube library\'s transcripts; no press starts it.',
   'app/api/cron/youtube-library/route.ts#POST':

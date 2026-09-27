@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
@@ -73,7 +74,15 @@ export default async function TimelinePage({
 
   return (
     <>
-      <PageHeader title="Timeline" description="What you did across the app, month by month." />
+      <PageHeader
+        title="Timeline"
+        description="What you did across the app, month by month."
+        actions={
+          <Link href={`/timeline/year/${current.slice(0, 4)}`} className="text-ui text-accent hover:underline">
+            {`${current.slice(0, 4)} in review`}
+          </Link>
+        }
+      />
       <TimelineView
         months={months}
         modules={modules}

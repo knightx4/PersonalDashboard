@@ -61,6 +61,10 @@ export const SPEND_OPERATIONS = {
     // The weekly observations across the modules (plan #1119). Sonnet, one
     // call per person a week, from the observations cron; background.
     'write-observations',
+    // The year in review (plan #1121). Sonnet, one call per press of "Write
+    // the review" on /timeline/year, and once a year per person from the
+    // year review cron.
+    'write-year-review',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one

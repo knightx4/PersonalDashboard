@@ -71,7 +71,7 @@ import { StoryText } from '@/components/news/story-text';
 import { PlanOpenedSurface, PlanTreeSurface } from './plan-surfaces';
 import { GoalOpenedSurface, GoalTreeSurface } from './goal-surfaces';
 import { AskDashSurface } from './ask-surfaces';
-import { TimelineSurface } from './timeline-surfaces';
+import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import {
   GoalBareSurface,
   GoalLinkingSurface,
@@ -2692,6 +2692,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <TimelineSurface />,
+  },
+  {
+    /* The year in review (plan #1121): what Dash wrote, each paragraph with
+     * its rows, then every number the paragraphs may use. Fixtures in
+     * timeline-surfaces.tsx. */
+    id: 'timeline-year',
+    label: 'Timeline · The year in review',
+    module: 'goals',
+    width: 'page',
+    render: () => <YearReviewSurface />,
   },
 
   {

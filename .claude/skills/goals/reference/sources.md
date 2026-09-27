@@ -395,3 +395,12 @@ What Dash noticed each week across their modules, with a number and the timeline
 - Search: `sentence`
 - Name a row by `sentence`; link it by `id`
 - The sentence is Dash's, not theirs: read it as a lead to check against the rows in evidence (core.timeline refs, `schema.table:id`). verdict 'not_useful' means they did not want it; 'useful' that they did. week is the Monday it was written for.
+
+### `core.year_reviews` (Home)
+
+What Dash wrote about each year from their timeline, with the year's counts and spend and the rows behind each paragraph.
+
+- Search: `paragraphs`
+- Name a row by `year`; link it by `year`
+- Opens at `/timeline/year/<year>`
+- The paragraphs are Dash's, not theirs: each is {topic, text, evidence}, with evidence as core.timeline refs (`schema.table:id`). totals holds the counts per kind, spend per currency, each month, the top shops and the goals with steps done. complete is false while the year was still going when it was written; through is how far it read.
