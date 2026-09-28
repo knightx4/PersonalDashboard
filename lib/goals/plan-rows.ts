@@ -394,10 +394,11 @@ export function goalCatalog(
 
 /**
  * The views over a goal's steps, as the dev plan has over the plan (note
- * 9b6eba99): everything, what is still open, what waits on you, and what is
- * ready for Dash to take.
+ * 9b6eba99): everything, what is still open, what waits on you, what is
+ * ready for Dash to take, and what Dash found that is still to read (note
+ * 704c8e3a).
  */
-export const GOAL_VIEWS = ['all', 'open', 'you', 'ready'] as const;
+export const GOAL_VIEWS = ['all', 'open', 'you', 'ready', 'read'] as const;
 export type GoalView = (typeof GOAL_VIEWS)[number];
 
 export const GOAL_VIEW_LABEL: Record<GoalView, string> = {
@@ -405,6 +406,7 @@ export const GOAL_VIEW_LABEL: Record<GoalView, string> = {
   open: 'Open',
   you: 'On you',
   ready: 'Ready',
+  read: REVIEW_WORD,
 };
 
 /** The healths the dev plan's "On you" view is made of (`needsThePerson` in lib/plan/tree.ts). */
@@ -421,6 +423,9 @@ function matchesGoalView(row: GoalRowNode, view: GoalView): boolean {
       return open && ON_YOU.has(row.health.name);
     case 'ready':
       return open && row.health.name === 'ready';
+    case 'read':
+      // Usually done, since a Dash step closes once its result is stored.
+      return awaitsReview(row.step);
   }
 }
 
