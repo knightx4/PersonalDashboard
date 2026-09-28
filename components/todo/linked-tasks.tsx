@@ -14,6 +14,7 @@ import { completeTask, reopenTask } from '@/app/todo/actions';
 import { addLinkedTask, detachTask, type LinkedTaskState } from '@/app/todo/link-actions';
 import type { LinkTarget } from '@/lib/todo/links/model';
 import type { Task, TaskStatus } from '@/lib/todo/tasks/model';
+import { formatClock } from '@/lib/clock';
 
 /**
  * The tasks attached to one thing, wherever that thing is rendered.
@@ -211,13 +212,7 @@ function LinkedRow({
 
 function formatDue(task: Task, timezone: string): string {
   if (task.dueAt) {
-    return new Intl.DateTimeFormat('en-GB', {
-      timeZone: timezone,
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(task.dueAt));
+    return formatClock(task.dueAt, { timeZone: timezone, day: 'numeric', month: 'short' });
   }
   return new Intl.DateTimeFormat('en-GB', {
     timeZone: 'UTC',

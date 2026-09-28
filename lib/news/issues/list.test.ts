@@ -81,12 +81,12 @@ describe('sortSenders', () => {
 
 describe('formatArrival', () => {
   it('says the day and the hour, in the account timezone', () => {
-    expect(formatArrival('2026-05-01T09:00:00Z', 'UTC')).toBe('1 May, 09:00');
-    expect(formatArrival('2026-05-01T09:00:00Z', 'America/New_York')).toBe('1 May, 05:00');
+    expect(formatArrival('2026-05-01T09:00:00Z', 'UTC')).toBe('1 May, 9:00\u00a0AM');
+    expect(formatArrival('2026-05-01T09:00:00Z', 'America/New_York')).toBe('1 May, 5:00\u00a0AM');
   });
 
   it('falls back to a dash rather than throwing on a zone nobody has', () => {
-    expect(formatArrival('2026-05-01T09:00:00Z', 'Mars/Olympus')).toBe('1 May, 09:00');
+    expect(formatArrival('2026-05-01T09:00:00Z', 'Mars/Olympus')).toBe('1 May, 9:00\u00a0AM');
     expect(formatArrival('not a date', 'UTC')).toBe('—');
   });
 });

@@ -1,6 +1,7 @@
 import { safeTimeZone } from '@/lib/core/timezone';
 import { readStories } from './stories';
 import { NEWS_TOPICS, type NewsTopic } from './topics';
+import { formatClock } from '@/lib/clock';
 
 /** One newsletter in the list. The body is not read until you open it. */
 export type NewsIssue = {
@@ -111,13 +112,7 @@ export function listHref({
 export function formatArrival(iso: string, timezone: string): string {
   const date = new Date(iso);
   if (!Number.isFinite(date.getTime())) return '—';
-  return new Intl.DateTimeFormat('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: safeTimeZone(timezone),
-  }).format(date);
+  return formatClock(date, { day: 'numeric', month: 'short', timeZone: safeTimeZone(timezone) });
 }
 
 /** "3 newsletters", and "1 newsletter" rather than "1 newsletters". */

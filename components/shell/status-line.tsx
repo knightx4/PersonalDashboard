@@ -18,6 +18,7 @@ import {
   type MainCheck,
   type MainDot,
 } from '@/lib/plan/main-check';
+import { formatClock } from '@/lib/clock';
 
 /**
  * The status line.
@@ -167,7 +168,7 @@ function useNow(): number | null {
 
 /** Local wall-clock time, in the reader's own format. */
 function clock(at: number): string {
-  return new Date(at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return formatClock(at, {}, undefined);
 }
 
 function Timestamp() {

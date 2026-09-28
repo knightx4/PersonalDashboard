@@ -89,8 +89,8 @@ describe('agendaFacts', () => {
     ];
     expect(agendaFacts(piles, TODAY, ZONE)).toEqual([
       { kind: 'booked', text: 'All day: Office closed' },
-      { kind: 'booked', text: '09:30: Interview with Acme (Round 2)' },
-      { kind: 'booked', text: '15:00: Dentist' },
+      { kind: 'booked', text: '9:30\u00a0AM: Interview with Acme (Round 2)' },
+      { kind: 'booked', text: '3:00\u00a0PM: Dentist' },
     ]);
   });
 

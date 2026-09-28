@@ -58,6 +58,10 @@ const EMPTY_VIEW: Record<Exclude<GoalView, 'all'>, { title: string; description:
     description:
       'Every open step is waiting on you or on another step. Settle one and the next becomes ready.',
   },
+  read: {
+    title: 'Nothing to read',
+    description: 'You have read everything Dash has found for this goal.',
+  },
 };
 
 /**
@@ -147,9 +151,11 @@ export function StepTree({
   const substeps = own.rows.filter((row) => row.kind !== 'decision');
 
   const shown = viewGoalRows(own.rows, view);
-  // Finished steps fold away under the open ones.
-  const shownOpen = shown.filter((row) => !isClosed(row));
-  const shownDone = shown.filter(isClosed);
+  // Finished steps fold away under the open ones, except under To read,
+  // where nearly every row is a finished Dash step (note 704c8e3a).
+  const folds = view !== 'read';
+  const shownOpen = folds ? shown.filter((row) => !isClosed(row)) : shown;
+  const shownDone = folds ? shown.filter(isClosed) : [];
   const shownLinked = linked.flatMap(({ entry, row }) => {
     const narrowed = row ? viewGoalRows([row], view)[0] : undefined;
     return narrowed ? [{ entry, row: narrowed }] : [];

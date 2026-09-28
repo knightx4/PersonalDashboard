@@ -9,6 +9,7 @@ import { formatMoneyOrBlank } from '@/lib/money';
 import { requestOrigin } from '@/lib/auth/origin';
 import { ShareControls, ShareLinkRow } from '../share-ui';
 import { ApplyDecision } from './apply-decision';
+import { formatClock } from '@/lib/clock';
 
 export const metadata = { title: 'Shared form' };
 
@@ -207,7 +208,7 @@ export default async function ShareDetailPage({ params }: { params: Promise<{ id
                 {(events ?? []).map((event) => (
                   <li key={event.id} className="text-small text-ink-muted">
                     <span className="text-ink-muted">
-                      {new Date(event.created_at).toLocaleString()}
+                      {formatClock(event.created_at, { day: 'numeric', month: 'short', year: 'numeric' }, undefined)}
                     </span>{' '}
                     {event.kind.replace(/_/g, ' ')}
                     {event.group_key && (

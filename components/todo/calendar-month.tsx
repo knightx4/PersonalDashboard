@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
 import type { CalendarDay, CalendarEntry } from '@/lib/todo/calendar/month';
+import { formatClock } from '@/lib/clock';
 
 /**
  * A month, drawn.
@@ -167,11 +168,7 @@ const DOT: Record<CalendarEntry['kind'], string> = {
  */
 export function Pill({ entry, timezone }: { entry: CalendarEntry; timezone: string }) {
   const time = entry.at
-    ? new Intl.DateTimeFormat('en-GB', {
-        timeZone: timezone,
-        hour: '2-digit',
-        minute: '2-digit',
-      }).format(new Date(entry.at))
+    ? formatClock(entry.at, { timeZone: timezone })
     : null;
 
   const body = (

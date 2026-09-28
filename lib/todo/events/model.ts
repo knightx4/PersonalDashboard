@@ -1,4 +1,5 @@
 import { addDays, todayIn } from '@/lib/todo/tasks/model';
+import { formatClock } from '@/lib/clock';
 
 /**
  * What an event is, and which days of the calendar it covers.
@@ -135,8 +136,8 @@ export function spanLabel(event: Event, timezone: string): string {
     return first === last ? `${dayLabel(first)}, all day` : `${dayLabel(first)} – ${dayLabel(last)}`;
   }
 
-  const from = clockIn(event.startsAt as string, timezone);
-  const to = clockIn(event.endsAt as string, timezone);
+  const from = formatClock(event.startsAt as string, { timeZone: timezone });
+  const to = formatClock(event.endsAt as string, { timeZone: timezone });
 
   return first === last
     ? `${dayLabel(first)}, ${from} – ${to}`

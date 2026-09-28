@@ -9,6 +9,7 @@ import { describeRun, syncProgress, type SyncProgress } from '@/lib/vault/sync/p
 import { ConnectVaultForm } from './connect-form';
 import { SyncNowButton } from './sync-now-button';
 import { disconnectVault, rescanVault } from './actions';
+import { formatClock } from '@/lib/clock';
 
 export const dynamic = 'force-dynamic';
 
@@ -248,10 +249,5 @@ function SyncProgressBar({ progress }: { progress: SyncProgress }) {
 }
 
 function formatWhen(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  return formatClock(iso, { day: 'numeric', month: 'short' }, undefined);
 }

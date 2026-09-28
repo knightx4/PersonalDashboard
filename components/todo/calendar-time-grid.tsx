@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Pill, opensAt } from '@/components/todo/calendar-month';
 import { blocksFor, hourIn, hourWindow, hoursOf } from '@/lib/todo/calendar/range';
 import type { CalendarDay } from '@/lib/todo/calendar/month';
+import { hourLabel } from '@/lib/clock';
 
 /**
  * A day or a week, on the clock.
@@ -25,7 +26,6 @@ import type { CalendarDay } from '@/lib/todo/calendar/month';
  * block span rows and still line up with every column beside it.
  */
 
-const HOUR_LABEL = (hour: number) => `${String(hour).padStart(2, '0')}:00`;
 
 export function CalendarTimeGrid({
   days,
@@ -103,7 +103,7 @@ export function CalendarTimeGrid({
                 style={{ gridRow: row + 1, gridColumn: 1 }}
                 className="tabular px-2 py-1.5 text-right text-small text-ink-ghost"
               >
-                {HOUR_LABEL(hour)}
+                {hourLabel(hour)}
               </span>
             ))}
 

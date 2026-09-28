@@ -139,8 +139,8 @@ describe('CalendarTimeGrid', () => {
       ]),
     ]);
 
-    expect(html).toContain('20:00');
-    expect(html).not.toContain('21:00');
+    expect(html).toContain('>8\u00a0PM<');
+    expect(html).not.toContain('>9\u00a0PM<');
     expect(blocks(html)).toEqual([{ row: '10 / 14', width: '100%', marginLeft: '0%' }]);
   });
 

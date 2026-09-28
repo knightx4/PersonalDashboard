@@ -9,6 +9,7 @@ import { Field, FieldError, Input } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import type { Feed } from '@/lib/todo/feeds/load';
 import { addFeed, refreshFeedNow, removeFeed, type AgendaSettingsState } from './actions';
+import { formatClock } from '@/lib/clock';
 
 /**
  * The calendars you keep somewhere else.
@@ -119,11 +120,5 @@ function FeedRow({ feed, timezone }: { feed: Feed; timezone: string }) {
 
 /** When it was last read, in the account's own zone. */
 function when(at: string, timezone: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(at));
+  return formatClock(at, { timeZone: timezone, day: 'numeric', month: 'short' });
 }

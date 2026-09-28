@@ -36,6 +36,7 @@ import { cn } from '@/lib/cn';
 import { observationWeek } from '@/lib/timeline/observations';
 import { readObservations } from '@/lib/timeline/observations-load';
 import { ObservationList } from '@/app/timeline/observations';
+import { formatClock } from '@/lib/clock';
 
 export const metadata = { title: 'Home' };
 
@@ -361,11 +362,7 @@ export default async function HomePage() {
                       />
                       {entry.at && (
                         <span className="tabular font-medium">
-                          {new Intl.DateTimeFormat('en-GB', {
-                            timeZone: settings.timezone,
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          }).format(new Date(entry.at))}
+                          {formatClock(entry.at, { timeZone: settings.timezone })}
                         </span>
                       )}
                       {entry.link ? (
@@ -536,11 +533,7 @@ function dayLabel(day: string): string {
 }
 
 function timeLabel(at: string, timezone: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(at));
+  return formatClock(at, { timeZone: timezone });
 }
 
 /**

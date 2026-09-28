@@ -1,4 +1,5 @@
 import { safeTimeZone } from '@/lib/core/timezone';
+import { formatClock } from '@/lib/clock';
 
 /**
  * Dates as the Goals pages print them: "3 Oct", "3 Oct 2026", "Thu 1 Oct,
@@ -45,12 +46,10 @@ export function formatInstant(
   timeZone: string,
   { weekday = true }: { weekday?: boolean } = {},
 ): string {
-  return new Intl.DateTimeFormat('en-GB', {
+  return formatClock(iso, {
     ...(weekday ? { weekday: 'short' } : {}),
     day: 'numeric',
     month: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
     timeZone: safeTimeZone(timeZone),
-  }).format(new Date(iso));
+  });
 }

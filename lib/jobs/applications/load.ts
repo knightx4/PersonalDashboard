@@ -10,6 +10,7 @@ import {
   type RequirementCoverage,
 } from '@/lib/jobs/pipeline';
 import { safeTimeZone } from '@/lib/core/timezone';
+import { formatClock } from '@/lib/clock';
 
 /**
  * Reading the pipeline.
@@ -261,12 +262,10 @@ export function formatDateTime(iso: string | null, timezone = 'UTC'): string {
   if (!iso) return '—';
   const date = new Date(iso);
   if (!Number.isFinite(date.getTime())) return '—';
-  return new Intl.DateTimeFormat('en-GB', {
+  return formatClock(date, {
     day: 'numeric',
     month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
     timeZone: safeTimeZone(timezone),
     timeZoneName: 'short',
-  }).format(date);
+  });
 }

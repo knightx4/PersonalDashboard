@@ -1,6 +1,7 @@
 import type { AgendaPile } from '@/lib/todo/agenda/merge';
 import type { DailyView } from '@/lib/goals/daily';
 import { addDays } from '@/lib/todo/tasks/model';
+import { formatClock } from '@/lib/clock';
 
 /**
  * The morning brief's facts (plan #1123): what today holds, as short lines,
@@ -72,11 +73,7 @@ export function briefDay(timezone: string, now: Date): string | null {
 }
 
 function clock(at: string, timezone: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(at));
+  return formatClock(at, { timeZone: timezone });
 }
 
 function weekday(day: string): string {

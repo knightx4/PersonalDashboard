@@ -313,4 +313,22 @@ describe('viewGoalRows', () => {
   it("keeps Dash's ready steps under Ready", () => {
     expect(ids(viewGoalRows(rows, 'ready'))).toEqual(['stage', 'claude']);
   });
+
+  it("keeps Dash's unread results under To read, finished or not", () => {
+    const withResults = tree([
+      step('stage', 'g'),
+      step('unread', 'stage', { kind: 'claude', status: 'done', result: 'Found three' }),
+      step('read', 'stage', {
+        kind: 'claude',
+        status: 'done',
+        result: 'Found two',
+        reviewedAt: '2026-09-01T00:00:00Z',
+      }),
+      step('dropped', 'stage', { kind: 'claude', status: 'dropped', result: 'Stale' }),
+      step('mine', 'g'),
+    ]);
+    const all = rowsOf(withResults).rows;
+    expect(ids(viewGoalRows(all, 'read'))).toEqual(['stage', 'unread']);
+    expect(countGoalView(all, 'read')).toBe(1);
+  });
 });
