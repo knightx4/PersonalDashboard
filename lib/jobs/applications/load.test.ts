@@ -10,7 +10,7 @@ import { formatInterviewWhen } from './load';
 describe('formatInterviewWhen', () => {
   it('gives the hour when the hour is known', () => {
     expect(formatInterviewWhen('2026-09-15T14:30:00.000Z', true, 'UTC')).toBe(
-      '15 Sept, 14:30 UTC',
+      '15 Sept, 2:30\u00a0PM UTC',
     );
   });
 

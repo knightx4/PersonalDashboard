@@ -8,6 +8,7 @@ import { disconnectInbox } from './actions';
 import { InboxSyncButton, type InboxSyncProgress } from './inbox-sync-button';
 import { InboxPerson } from './inbox-person';
 import type { Person } from '@/lib/people/load';
+import { formatClock } from '@/lib/clock';
 
 type Account = {
   id: string;
@@ -129,7 +130,7 @@ export function InboxSection({
                     <p className="text-small text-ink-muted">
                       {STATUS_LABEL[account.status] ?? account.status}
                       {account.last_synced_at
-                        ? ` · Last synced ${new Date(account.last_synced_at).toLocaleString()}`
+                        ? ` · Last synced ${formatClock(account.last_synced_at, { day: 'numeric', month: 'short', year: 'numeric' }, undefined)}`
                         : ' · Not synced yet'}
                     </p>
                   </div>

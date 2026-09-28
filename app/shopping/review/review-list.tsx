@@ -40,6 +40,7 @@ import { AttachChoices, useAttachEmail } from './attach-email';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { canReadAsOrder } from '@/lib/review/read-order';
 import { GmailAnchor } from '@/components/ui/gmail-anchor';
+import { formatClock } from '@/lib/clock';
 
 function classificationLabel(value: string): string {
   return value.replaceAll('_', ' ');
@@ -321,10 +322,11 @@ function EmailRow({
           </div>
           <p className="text-body text-ink-muted">
             {row.receivedAt
-              ? new Date(row.receivedAt).toLocaleString(undefined, {
-                  dateStyle: 'medium',
-                  timeStyle: 'short',
-                })
+              ? formatClock(
+                  row.receivedAt,
+                  { day: 'numeric', month: 'short', year: 'numeric' },
+                  undefined,
+                )
               : 'Unknown date'}
             {row.fromAddress ? ` · ${row.fromAddress}` : ''}
             {row.inboxEmail ? ` · via ${row.inboxEmail}` : ''}

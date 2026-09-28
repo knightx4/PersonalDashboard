@@ -43,6 +43,7 @@ import { clockIn, dayIn } from '@/lib/todo/time';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { TaskAbout } from './task-about';
 import { EditTask } from './task-form';
+import { formatClock } from '@/lib/clock';
 
 /**
  * One task, and what you can do to it without leaving the list.
@@ -985,13 +986,7 @@ function DueLabel({
   }
 
   const text = task.dueAt
-    ? new Intl.DateTimeFormat('en-GB', {
-        timeZone: timezone,
-        day: 'numeric',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-      }).format(new Date(task.dueAt))
+    ? formatClock(task.dueAt, { timeZone: timezone, day: 'numeric', month: 'short' })
     : new Intl.DateTimeFormat('en-GB', {
         timeZone: 'UTC',
         day: 'numeric',

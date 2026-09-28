@@ -4,6 +4,7 @@ import { Meter } from '@/components/ui/meter';
 import { cn } from '@/lib/cn';
 import { projectedMonthEnd } from '@/lib/learn/youtube/budget';
 import type { Usage } from '@/lib/learn/youtube/load';
+import { formatClock } from '@/lib/clock';
 
 /**
  * TranscriptAPI credits this month, against the plan.
@@ -32,13 +33,7 @@ function monthDay(date: Date): string {
 }
 
 function when(instant: string): string {
-  return new Date(instant).toLocaleString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'UTC',
-  });
+  return formatClock(instant, { day: 'numeric', month: 'short', timeZone: 'UTC' });
 }
 
 export function TranscriptCredits({ usage, now = new Date() }: { usage: Usage; now?: Date }) {

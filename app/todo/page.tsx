@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { AddTask } from '@/components/todo/task-form';
 import { TaskRow } from '@/components/todo/task-row';
 import { AgendaItemRow } from '@/components/todo/agenda-item-row';
+import { formatClock } from '@/lib/clock';
 
 export const metadata = { title: 'Agenda' };
 
@@ -98,12 +99,7 @@ export default async function TodoPage() {
                       <CalendarClock className="size-3.5 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
                       {entry.at && (
                         <span className="tabular font-medium">
-                          {new Intl.DateTimeFormat('en-GB', {
-                            timeZone: agenda.timezone,
-                            weekday: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          }).format(new Date(entry.at))}
+                          {formatClock(entry.at, { timeZone: agenda.timezone, weekday: 'short' })}
                         </span>
                       )}
                       <span className="font-medium">{entry.label}</span>

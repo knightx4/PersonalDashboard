@@ -6,6 +6,7 @@ import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { completeItem, deferItem, dismissItem } from '@/app/todo/source-actions';
 import type { AgendaItem } from '@/lib/todo/agenda/sources';
+import { formatClock } from '@/lib/clock';
 
 /** What the row has been asked to do, until the page is rebuilt without it. */
 type ItemState = 'open' | 'done' | 'deferred' | 'dismissed';
@@ -107,11 +108,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
 
           {item.at && (
             <span className="tabular text-small text-ink-muted">
-              {new Intl.DateTimeFormat('en-GB', {
-                timeZone: timezone,
-                hour: '2-digit',
-                minute: '2-digit',
-              }).format(new Date(item.at))}
+              {formatClock(item.at, { timeZone: timezone })}
             </span>
           )}
 
