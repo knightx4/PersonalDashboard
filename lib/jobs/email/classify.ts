@@ -151,14 +151,69 @@ const CONFIRMATION_BODY = [
 ];
 
 /**
- * A message that asks you to pick a time is an interview invitation, whatever
- * pleasantry it opened with.
+ * Two labels, split on whether the interview is booked yet.
  *
- * This exists because a great many invitations begin "Thank you for applying
- * to the X role at Y" and then ask for your availability. The confirmation
- * patterns matched that opening line, confirmation was tested first, and a
- * real interview invite was filed as an acknowledgement — so it never reached
- * the interviews board and the pursuit looked like it had gone quiet.
+ * `interview_invite` is an interview with a time: an invitation that gives
+ * the time, a confirmation, a reminder before it, a calendar invitation.
+ * eventKindFor makes it interview_scheduled, which moves the application to
+ * its interview stage. `scheduling` is finding a time that is not booked yet:
+ * a request for availability, a list of offered slots, a booking link. It
+ * becomes screen_scheduled, which only moves the application to in_process.
+ * These are the meanings Jev and Haiku are given (JOB_EMAIL_OPTIONS in
+ * jev-question.ts); until plan #1226 the rules had the two the other way
+ * round.
+ */
+
+/**
+ * An interview that was called off or moved. Nothing is booked, so it is
+ * scheduling, and it is tested before the booked patterns so that a
+ * cancellation never moves an application forward.
+ */
+const CALLED_OFF_SUBJECT = [
+  /\bcancel(l)?ed( event)?:/i,
+  /\breschedul(e|ed|ing):/i,
+  /\b(interview|event|meeting|call) (has been |was )?(cancel(l)?ed|rescheduled)\b/i,
+];
+
+const CALLED_OFF_BODY = [
+  // "Your interview on Tuesday has been cancelled": a few words may sit between.
+  /\b(interview|event|meeting|call)\b[^.]{0,40}\b(has been|was|is) (cancel(l)?ed|rescheduled)\b/i,
+];
+
+/**
+ * An interview with a time. Tested before the scheduling ask, because a
+ * confirmation's footer usually carries a Calendly or Ashby link to
+ * reschedule, and that link is one of the ask's patterns.
+ */
+const BOOKED_SUBJECT = [
+  // Google Calendar and Outlook: "Invitation: …", "Updated invitation: …",
+  // "Invitation from an unknown sender: …".
+  /^\s*(updated )?invit(ation|e)( from an unknown sender)?:/i,
+  /\bconfirmed:/i,
+  /\b(interview|conversation|call|screen|meeting|zoom) confirmation\b/i,
+  /\b(interview|meeting|call) (is )?(confirmed|booked)\b/i,
+  /\bcalendar invite\b/i,
+  /\bupcoming interview\b/i,
+  /\binterview reminder\b/i,
+  // "Reminder: Revin Screening Call @ …" -- but not "Reminder to book your
+  // next interview", which asks for a time.
+  /^\s*reminder:(?!.*\b(book|schedule|complete|finish)\b).*\b(interview|meet|meeting|call|screen|chat)\b/i,
+  /\byour interview with\b/i,
+];
+
+const BOOKED_BODY = [
+  /\b(your|the) (interview|call|meeting|event|screen) (is|has been) (confirmed|scheduled|booked)\b/i,
+  /\breminder (of|about|that) your (upcoming )?(interview|call|meeting)\b/i,
+];
+
+/**
+ * A message that asks you to pick a time is scheduling, whatever pleasantry
+ * it opened with.
+ *
+ * This is tested before the acknowledgement patterns because a great many of
+ * these begin "Thank you for applying to the X role at Y" and then ask for
+ * your availability. When confirmation was tested first, a real request was
+ * filed as an acknowledgement, so the pursuit looked like it had gone quiet.
  *
  * Kept narrow deliberately. Every one of these is an instruction to the
  * candidate to do something about a time, which an acknowledgement never is.
@@ -166,32 +221,44 @@ const CONFIRMATION_BODY = [
 const SCHEDULING_ASK = [
   /(find|pick|choose|select|book|grab|suggest|share|submit|send) (a |your |some |your )?(time|times|availability)/i,
   /schedul(e|ing) (a |your )?(call|chat|interview|screen|meeting|time)/i,
-  /would (like|love) to (set up|schedule|arrange|find a time)/i,
-  /invite you to (an? )?(interview|conversation|call|chat)/i,
+  /would (you )?(like|love) to (set up|schedule|arrange|find a time)/i,
   /(let us|let's) (find|set up) a time/i,
   /what (does your|is your) (availability|schedule)/i,
   /(times|slots) that work for you/i,
+  // A list of offered slots.
+  /(do|does|would|will) (any|one) of (these|the following|those)( times| slots| options)? work/i,
+  /(are you|would you be) (available|free) (on|at|for)\b/i,
+  /\b(a few|some|three|two|several) (times|slots|options) (that|below|for|to)\b/i,
+  /available (times|slots)/i,
   // The booking links themselves, which are unambiguous.
   /calendly\.com|ashbyhq\.com\/meeting|greenhouse\.io\/availability|savvycal\.com|cal\.com\/|modernloop|goodtime\.io|prelude\.co|hire\.withgoodtime/i,
 ];
 
-const INTERVIEW_SUBJECT = [
-  /\b(interview|phone screen|screening call|chat|conversation) (invit|request|schedul|with|for)/i,
-  // "Interview Availability Request" -- a word between the two, which the
-  // pattern above requires to be adjacent.
+/** Subjects that describe finding a time. */
+const SCHEDULING_SUBJECT = [
+  // "Interview Availability Request", "Interview Availability".
   /\binterview\b[^|]{0,20}\b(availability|request|scheduling)\b/i,
   /\bavailability (request|for)\b/i,
-  /\binvitation to interview\b/i,
   /\b(next|following) steps?\b/i,
   /\bschedul(e|ing) (a |your )?(call|chat|interview|screen)/i,
   /\blet(?:'| u)s (find a time|set up a time)/i,
+  /\breminder to (book|schedule)\b/i,
 ];
 
+/** An invitation to interview that neither gives a time nor asks for one. */
+const INTERVIEW_SUBJECT = [
+  /\b(interview|phone screen|screening call) invit/i,
+  /\binvitation to interview\b/i,
+  /\binvited to (an? )?interview\b/i,
+];
+
+/**
+ * An invitation to interview. Tested before the acknowledgement patterns for
+ * the same reason as the ask: it often opens by thanking you for applying.
+ */
+const INVITATION_BODY = [/invite you to (an? )?(interview|conversation|call|chat)/i];
+
 const INTERVIEW_BODY = [
-  /would (you )?(like|love) to (set up|schedule|arrange)/i,
-  /invite you to (an? )?(interview|conversation|call)/i,
-  /(book|pick|choose|select) a time/i,
-  /available (times|slots)/i,
   /moving (you )?(forward|to the next (round|stage))/i,
 ];
 
@@ -210,13 +277,6 @@ const OFFER_BODY = [
   /(pleased|thrilled|delighted|excited) to (extend|offer)/i,
   /offer of employment/i,
   /formal offer/i,
-];
-
-const SCHEDULING_SUBJECT = [
-  /\b(invitation|invite):/i,
-  /\b(confirmed|reschedul|cancel(l)?ed):/i,
-  /\bcalendar invite\b/i,
-  /\bmeeting (confirmed|scheduled)\b/i,
 ];
 
 const OUTREACH_SUBJECT = [
@@ -383,19 +443,35 @@ export function classifyMessage(input: ClassifyInput): ClassifyResult {
 
   if (any(ASSESSMENT_SUBJECT, blob)) return result('assessment');
 
-  // Before confirmation, not after: an invitation that opens by thanking you
-  // for applying is still an invitation, and it is the ask that says so.
-  if (any(SCHEDULING_ASK, blob)) return result('interview_invite');
+  // A cancelled or moved interview first, so it never reads as booked.
+  if (any(CALLED_OFF_SUBJECT, subject) || any(CALLED_OFF_BODY, body)) {
+    return result('scheduling');
+  }
+
+  // Booked before the ask: a confirmation's reschedule link is not an ask.
+  if (any(BOOKED_SUBJECT, subject) || any(BOOKED_BODY, body)) {
+    return result('interview_invite');
+  }
+
+  // Before confirmation, not after: a request for times that opens by thanking
+  // you for applying is still a request, and it is the ask that says so.
+  if (any(SCHEDULING_ASK, blob)) return result('scheduling');
+
+  if (any(INVITATION_BODY, body)) return result('interview_invite');
 
   if (any(CONFIRMATION_SUBJECT, subject) || any(CONFIRMATION_BODY, body)) {
     return result('application_confirmation');
   }
 
+  if (any(SCHEDULING_SUBJECT, subject)) return result('scheduling');
+
   if (any(INTERVIEW_SUBJECT, subject) || any(INTERVIEW_BODY, body)) {
     return result('interview_invite');
   }
 
-  if (scheduling || any(SCHEDULING_SUBJECT, subject)) return result('scheduling');
+  // What a scheduling tool sends that asks for nothing is a confirmation or a
+  // reminder of a time already booked.
+  if (scheduling) return result('interview_invite');
 
   // A reply is a reply because it continues a conversation, not because the
   // sender's domain happens to be one the user tracks.

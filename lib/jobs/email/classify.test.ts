@@ -201,3 +201,74 @@ describe('a known ATS domain never implies relevance on its own', () => {
     expect(result.classification).toBe('not_relevant');
   });
 });
+
+/**
+ * interview_invite is a booked interview and scheduling is finding a time
+ * (plan #1226). The pipeline moves an application to its interview stage on
+ * the first and only to in_process on the second, so the two must not swap.
+ * Each case names the fixtures that carry it, from the Jev trial where there
+ * is one.
+ */
+describe('a booked interview against finding a time', () => {
+  const byName = new Map(FIXTURES.map((f) => [f.name, f]));
+  const classifyFixture = (name: string) => {
+    const fixture = byName.get(name);
+    if (!fixture) throw new Error(`no fixture ${name}`);
+    return classifyMessage({
+      fromAddress: fixture.from,
+      replyToAddress: fixture.replyTo,
+      subject: fixture.subject,
+      bodyPreview: fixture.body.slice(0, 2000),
+      companies: COMPANIES,
+    }).classification;
+  };
+
+  const cases: [string, 'interview_invite' | 'scheduling', string[]][] = [
+    ['a calendar invitation', 'interview_invite', ['trial-campfire-calendar-invitation', 'rippling-scheduling']],
+    ['an interview confirmation', 'interview_invite', ['trial-eliseai-interview-confirmation', 'calendly-scheduling-confirmed']],
+    ['an interview reminder', 'interview_invite', ['trial-eliseai-interview-reminder']],
+    ['a request for availability', 'scheduling', ['real-galaxy-availability-request', 'trial-axial-interview-availability', 'trial-triomics-next-steps']],
+    ['a list of offered slots', 'scheduling', ['trial-respark-offered-slots']],
+    ['a booking link', 'scheduling', ['real-garage-ashby-intro-call', 'greenhouse-interview-invite']],
+    ['a reminder to book a time', 'scheduling', ['trial-tabs-reminder-to-book']],
+    ['a cancellation', 'scheduling', ['trial-mercor-cancelled-interview']],
+  ];
+
+  for (const [label, expected, names] of cases) {
+    it(`labels ${label} ${expected}`, () => {
+      for (const name of names) expect(classifyFixture(name), name).toBe(expected);
+    });
+  }
+
+  it('reads a confirmation as booked even when its footer carries a reschedule link', () => {
+    const result = classifyMessage({
+      fromAddress: 'recruiter@acme.com',
+      subject: 'Acme Interview Confirmation',
+      bodyPreview:
+        'Your interview is confirmed for Tuesday 12 May at 10:00am ET. ' +
+        'Need to change it? Reschedule here: https://calendly.com/acme-recruiting/reschedule/abc',
+      companies: COMPANIES,
+    });
+    expect(result.classification).toBe('interview_invite');
+  });
+
+  it('reads a cancelled interview as scheduling even with a confirmation subject', () => {
+    const result = classifyMessage({
+      fromAddress: 'recruiter@acme.com',
+      subject: 'Acme Interview Confirmation',
+      bodyPreview: 'Your interview on Tuesday has been cancelled. We will be in touch to find a new time.',
+      companies: COMPANIES,
+    });
+    expect(result.classification).toBe('scheduling');
+  });
+
+  it('reads plain mail from a scheduling tool as booked', () => {
+    const result = classifyMessage({
+      fromAddress: 'notifications@calendly.com',
+      subject: 'Meet with Sam Young at 09:30am on Monday, August 3, 2026',
+      bodyPreview: 'Sam Young, Monday, August 3, 2026, 09:30am Central Time.',
+      companies: COMPANIES,
+    });
+    expect(result.classification).toBe('interview_invite');
+  });
+});
