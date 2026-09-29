@@ -47,6 +47,7 @@ import {
 } from './actions';
 import { AreaPlanner } from './area-planner';
 import { GoalProgress } from './goal-progress';
+import { useMoveToItems, type Place } from './move-goal';
 
 /**
  * Areas and the goals under them (plan #924).
@@ -158,6 +159,8 @@ export function GoalsView({
 }) {
   const onYou = new Map(Object.entries(onYouCounts));
   const areas = areasInView(allAreas, view, onYou);
+  // Where a goal can be moved to: every live area, shown in this view or not.
+  const places = allAreas.map((area) => ({ id: area.id, name: area.name }));
   return (
     <div className="space-y-6">
       {allAreas.length > 0 && (
@@ -194,6 +197,7 @@ export function GoalsView({
             progress={progress}
             run={areaRuns[area.id] ?? null}
             canRun={canRun}
+            places={places}
           />
         ))
       )}
@@ -209,6 +213,7 @@ function AreaSection({
   progress,
   run,
   canRun,
+  places,
 }: {
   area: AreaInView;
   index: number;
@@ -216,6 +221,7 @@ function AreaSection({
   progress: Progress;
   run: AreaRunView | null;
   canRun: boolean;
+  places: Place[];
 }) {
   const [renameState, rename, renaming] = useActionState(renameAreaAction, initial);
   const [noteState, saveNote, savingNote] = useActionState(setAreaNoteAction, initial);
@@ -310,6 +316,7 @@ function AreaSection({
                 index={i}
                 count={goalCount}
                 steps={progress[goal.id]}
+                places={places}
               />
             ))}
           </ul>
@@ -326,11 +333,13 @@ function GoalRow({
   index,
   count,
   steps,
+  places,
 }: {
   goal: Goal;
   index: number;
   count: number;
   steps: GoalProgressData | undefined;
+  places: Place[];
 }) {
   const [editState, edit, editing] = useActionState(editGoal, initial);
   // Fog is shown when the goal has some, or once you choose to add it.
@@ -363,6 +372,8 @@ function GoalRow({
     if (result.error) toast({ text: result.error });
   }
 
+  const moveToItems = useMoveToItems(goal, places);
+
   // An archived goal, shown only under Everything, is restored or left be.
   const archived = Boolean(goal.archivedAt);
   const items: ActionMenuItem[] = archived
@@ -374,6 +385,7 @@ function GoalRow({
           : [
               { id: 'fog', label: 'Say what is not known yet', onSelect: () => setAddingFog(true) },
             ]),
+        ...moveToItems,
         {
           id: 'archive',
           label: 'Archive goal',

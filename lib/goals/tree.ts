@@ -126,12 +126,20 @@ export type GoalFields = {
   title?: string;
   acceptance?: string | null;
   fog?: string | null;
+  /**
+   * The area to move the goal to (plan #1160). The store checks it is one of
+   * your live areas; the goal's steps carry no area, so they go with it.
+   */
+  areaId?: string;
 };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * The goal fields present on a form. A field that is absent is left alone; a
  * done-when or fog sent empty is cleared, which is how a vague goal stops
- * being vague. The title is the one field that cannot be cleared.
+ * being vague. The title is the one field that cannot be cleared, and an
+ * area id moves the goal.
  */
 export function parseGoalFields(
   get: (key: string) => unknown,
@@ -169,6 +177,15 @@ export function parseGoalFields(
       return { ok: false, error: `Keep the note under ${GOAL_FOG_MAX} characters.` };
     }
     fields.fog = fog;
+  }
+
+  const rawAreaId = get('areaId');
+  if (rawAreaId !== null && rawAreaId !== undefined) {
+    const areaId = clean(rawAreaId);
+    if (!areaId || !UUID.test(areaId)) {
+      return { ok: false, error: 'Could not tell which area to move the goal to.' };
+    }
+    fields.areaId = areaId;
   }
 
   return { ok: true, value: fields };
