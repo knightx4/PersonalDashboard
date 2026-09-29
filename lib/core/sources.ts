@@ -50,6 +50,7 @@ export const coreSources: ModuleSources = {
   ],
   notSources: [
     { table: 'core.account_settings', reason: 'Settings.' },
+    { table: 'core.dash_changes', reason: 'Changes Dash proposed in Ask Dash and whether they were confirmed, declined or undone; the rows a confirm wrote are sources in their own modules.' },
     { table: 'core.day_briefs', reason: 'The morning brief, derived each day from the agenda, goals, news and Learn.' },
     { table: 'core.drafted_messages', reason: 'Follow-ups and return requests Dash wrote from the pipeline and orders, waiting to be sent.' },
     { table: 'core.email_accounts', reason: 'Mailbox connections and their tokens.' },
