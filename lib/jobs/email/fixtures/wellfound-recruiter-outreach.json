@@ -1,6 +1,6 @@
 {
-  "classification": "interview_invite",
+  "classification": "scheduling",
   "ats": "wellfound",
   "tier": "A",
-  "note": "Marketplace inbound. Reply-to is the real company, which is why reply-to is captured alongside from."
+  "note": "Marketplace inbound asking to set up a chat, so scheduling: no time is booked. Reply-to is the real company, which is why reply-to is captured alongside from."
 }

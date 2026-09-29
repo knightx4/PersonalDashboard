@@ -1,0 +1,6 @@
+{
+  "classification": "scheduling",
+  "ats": "unknown",
+  "tier": "subject_heuristic",
+  "note": "A cancelled interview. It stays scheduling so that a cancellation never moves an application to its interview stage. The envelope (sender domain and subject) is real, from the Jev trial (docs/trials/2026-09-29-jev-job-email.md, message bdd0832d), with names and addresses scrubbed. The body was not fetched: Gmail was not reachable from the session that wrote this, and the ledger never stores one, so the fixture holds only what the rules read from the envelope."
+}
