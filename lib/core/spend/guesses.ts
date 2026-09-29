@@ -199,6 +199,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'judge-video': background(unit(HAIKU, 12_000, 400)),
   // Web search results come back as input, so the input side is the large one.
   'find-channels': run(SONNET, 30_000, 1_500),
+  // Per channel: up to 200 titles in and three numbers out, then the profile,
+  // three verdicts and three 5,000-character excerpts in and a reason out.
+  'judge-channel': unit(HAIKU, 9_000, 200),
 
   // Jobs.
   'enrich-company': run(HAIKU, 10_000, 500),
