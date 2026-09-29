@@ -197,6 +197,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // characters, or its chapter titles.
   'screen-video': background(unit(HAIKU, 5_000, 700)),
   'judge-video': background(unit(HAIKU, 12_000, 400)),
+  // Web search results come back as input, so the input side is the large one.
+  'find-channels': run(SONNET, 30_000, 1_500),
 
   // Jobs.
   'enrich-company': run(HAIKU, 10_000, 500),
