@@ -42,7 +42,7 @@ export const SPEND_OPERATIONS = {
     // job suggestion cron (weekly) and the search button on Roles. Sonnet, up
     // to five searches and two calls.
     'find-openings',
-    // Jev's eight questions about each recommended opening (plan #1178),
+    // Jev's ten questions about each recommended opening (plans #1178, #1202),
     // after the job suggestion cron and after the search button on Roles.
     // One request per opening.
     'score-openings',

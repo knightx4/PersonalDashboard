@@ -22,7 +22,7 @@ export type OpenSuggestion = {
   /** Where it was found, when not by the suggestion run's own search. */
   foundIn: string | null;
   contact: { id: string; name: string; email: string | null; linkedinUrl: string | null } | null;
-  /** Jev's eight answers on an opening (plan #1178); null until it has been scored. */
+  /** Jev's answers on an opening (plans #1178, #1202); null until it has been scored. */
   scores: OpeningScores | null;
   createdAt: string;
 };
