@@ -127,6 +127,9 @@ export const SPEND_OPERATIONS = {
     // Filing a sentence from the capture box against open goals and steps
     // (plan #929). Haiku, one call per sentence.
     'file-capture',
+    // Guessing which move a sentence in the capture box is while it is typed
+    // (plan #1177). Jev, one call per pause in typing of 300 ms or more.
+    'sort-capture',
     // Reading pasted text or a document into an information step's form
     // (plan #955). Haiku, one call per paste or file.
     'read-into-form',

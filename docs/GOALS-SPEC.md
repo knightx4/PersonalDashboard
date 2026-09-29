@@ -324,6 +324,14 @@ happened in plain words:
 > went to the Van Alen talk, met someone from a transit nonprofit, want to
 > volunteer there
 
+While you type, the box guesses which of the five moves the sentence mainly
+is (plan #1177). When typing pauses for 300 ms, Jev reads the sentence
+against an outline of your open goals and steps, and the box shows its guess
+under the field. At 0.8 confidence or more it says what filing will do; below
+that it asks you to pick one of the five. The guess or your pick goes to the
+filing call as a hint, and you can file without picking. Accounts that have
+not turned Jev on see no guess.
+
 It is filed as follows:
 
 1. A direct model call reads the sentence against your open goals and steps

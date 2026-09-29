@@ -28,9 +28,23 @@ import {
 import { isCalendarDay, todoCaptureForm, type CaptureDay } from '@/lib/capture/todo';
 import type { PaidCosts } from '@/lib/core/spend/paid-actions';
 import { describeFiled, type FiledEntry } from '@/lib/goals/capture';
+import {
+  CAPTURE_MOVE_LABELS,
+  CAPTURE_MOVES,
+  CAPTURE_SORT_DEBOUNCE_MS,
+  CAPTURE_SORT_MIN_CHARS,
+  type CaptureGuess,
+  type CaptureMove,
+} from '@/lib/goals/capture-sort';
 import type { ModuleId } from '@/lib/modules';
 import { addTask, type TaskFormState } from '@/app/todo/actions';
-import { fileGoalCapture, goalCaptureCosts, undoGoalCapture } from '@/app/goals/capture-actions';
+import {
+  fileGoalCapture,
+  goalCaptureCosts,
+  sortGoalCapture,
+  undoGoalCapture,
+  type CaptureMoveHint,
+} from '@/app/goals/capture-actions';
 import type { RelativeDay } from '@/lib/todo/tasks/model';
 
 /**
@@ -188,12 +202,17 @@ type FileResult = TaskFormState & { filed?: Filed };
  * switch is exhaustive on purpose: the next action in the registry will not
  * compile until it says where what you typed goes.
  */
-async function file(action: CaptureAction, text: string, day: CaptureDay): Promise<FileResult> {
+async function file(
+  action: CaptureAction,
+  text: string,
+  day: CaptureDay,
+  hint: CaptureMoveHint,
+): Promise<FileResult> {
   switch (action.id) {
     case 'todo':
       return addTask({}, todoCaptureForm(text, day));
     case 'goals': {
-      const result = await fileGoalCapture(text);
+      const result = await fileGoalCapture(text, hint);
       if (result.error || !result.captureId) return { error: result.error ?? 'Nothing was filed.' };
       const entries = result.filed ?? [];
       return {
@@ -259,6 +278,9 @@ function CapturePanel({
   const [day, setDay] = useState<CaptureDay>('today');
   const [state, setState] = useState<FileResult>({});
   const [pending, start] = useTransition();
+  const sorting = useMoveGuess(action.id === 'goals' ? text : null);
+  /** The move the person picked when the guess was unsure, or to overrule it. */
+  const [picked, setPicked] = useState<CaptureMove | null>(null);
   const panelRef = useRef<HTMLFormElement>(null);
   const fieldRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
@@ -300,12 +322,18 @@ function CapturePanel({
     if (!text.trim()) return;
 
     start(async () => {
-      const result = await file(action, text, day);
+      const hint: CaptureMoveHint = picked
+        ? { move: picked, picked: true }
+        : sorting.guess?.sure
+          ? { move: sorting.guess.move, picked: false }
+          : null;
+      const result = await file(action, text, day, hint);
       setState(result);
       if (!result.message) return;
       const added = result.filed;
       if (added) setFiled((list) => [added, ...list]);
       setText('');
+      setPicked(null);
       // Back to the default rather than to blank: the panel stays open for
       // the next thing, and the next thing is a fresh answer to "when".
       setDay('today');
@@ -315,6 +343,8 @@ function CapturePanel({
 
   function retype(value: string) {
     setText(value);
+    // A pick was about the sentence as it stood; an emptied box starts over.
+    if (!value.trim()) setPicked(null);
     // The last result was about the last thing typed.
     if (state.error || state.message) setState({});
   }
@@ -414,6 +444,10 @@ function CapturePanel({
           />
         )}
 
+        {action.id === 'goals' && (
+          <MoveGuess guess={sorting.guess} picked={picked} onPick={setPicked} />
+        )}
+
         {/* The two days that are most of what anyone ever answers "when" with,
             one press each, and the same question asked in full beside them --
             the shape the add form on /todo already uses, so "when" is answered
@@ -477,6 +511,107 @@ function CapturePanel({
           </div>
         )}
       </form>
+    </div>
+  );
+}
+
+/**
+ * Jev's guess at what the sentence will do, for the text as it stands
+ * (plan #1177).
+ *
+ * Asked once typing has paused for CAPTURE_SORT_DEBOUNCE_MS, not on every
+ * keystroke: each pause is one call, and a sentence typed straight through is
+ * one or two. A guess is kept only for the text it was asked about, so an
+ * answer that arrives after more typing is dropped rather than shown against
+ * the wrong sentence, and going back to a sentence already asked about does
+ * not ask again. Null `text` (another action) asks nothing.
+ */
+function useMoveGuess(text: string | null): { guess: CaptureGuess | null } {
+  const [answers, setAnswers] = useState<ReadonlyMap<string, CaptureGuess | null>>(new Map());
+  const sentence = text?.trim() ?? '';
+  const ready = text !== null && sentence.length >= CAPTURE_SORT_MIN_CHARS;
+  const known = answers.has(sentence);
+
+  useEffect(() => {
+    if (!ready || known) return;
+    let live = true;
+    const timer = setTimeout(() => {
+      sortGoalCapture(sentence)
+        .catch(() => null)
+        .then((guess) => {
+          if (!live) return;
+          setAnswers((held) => new Map(held).set(sentence, guess));
+        });
+    }, CAPTURE_SORT_DEBOUNCE_MS);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [ready, known, sentence]);
+
+  return { guess: ready ? (answers.get(sentence) ?? null) : null };
+}
+
+/**
+ * The guess under the field. Sure: it says what filing will do. Unsure: it
+ * asks, with the five moves as chips. A pick overrules either, and pressing
+ * the picked chip again takes it back. Filing without a pick is always
+ * allowed; the sentence then goes to Haiku with no hint, as it did before.
+ */
+function MoveGuess({
+  guess,
+  picked,
+  onPick,
+}: {
+  guess: CaptureGuess | null;
+  picked: CaptureMove | null;
+  onPick: (move: CaptureMove | null) => void;
+}) {
+  if (!guess && !picked) return null;
+  const asking = !picked && guess && !guess.sure;
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 border-t border-border px-3 py-2 text-small">
+      {picked ? (
+        <span className="text-ink-muted">Filing as</span>
+      ) : guess?.sure ? (
+        <span className="text-ink-muted">
+          Dash reads this as{' '}
+          <span className="font-medium text-ink">{CAPTURE_MOVE_LABELS[guess.move]}</span>
+          <span className="tabular"> · {Math.round(guess.confidence * 100)}% sure</span>
+        </span>
+      ) : (
+        <span className="text-ink-muted">Dash is not sure what this does. Which is it?</span>
+      )}
+      {(asking || picked) &&
+        CAPTURE_MOVES.map((move) => {
+          const on = picked === move;
+          return (
+            <button
+              key={move}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onPick(on ? null : move)}
+              className={cn(
+                'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-150',
+                on
+                  ? 'bg-accent text-fill-ink'
+                  : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
+              )}
+            >
+              {CAPTURE_MOVE_LABELS[move]}
+            </button>
+          );
+        })}
+      {guess?.sure && !picked && (
+        <button
+          type="button"
+          onClick={() => onPick(guess.move)}
+          className="press ml-auto rounded-full px-2 py-1 text-small text-ink-muted hover:bg-accent-tint hover:text-accent"
+        >
+          Change
+        </button>
+      )}
     </div>
   );
 }
