@@ -894,7 +894,10 @@ A sketch for the migration, not the migration itself.
   Claude closed, what it saw and where; plan #1082), `dropped_on` (on a step
   of yours dropped on your answer, the question you answered; plan #1083),
   `kept_open_at` (on a goal, when you last kept it open against a proposal
-  to close or park it; plan #1084), `position`, and `rhythm_count` with
+  to close or park it; plan #1084), `prepares_id` (on a Claude step, the
+  step of yours it prepares, one live prep step per step and never a wait;
+  plan #1215), `prep_checked_at` (on a step of yours, when a run judged
+  whether it needs a prep step; plan #1215), `position`, and `rhythm_count` with
   `rhythm_period` for rhythms. A goal's status can also be `parked`. A goal's
   `help_kinds` lists the weekly help it asks for, each an entry of `kind`
   (events, volunteering, reading, courses or job_leads) and a `note` on what
