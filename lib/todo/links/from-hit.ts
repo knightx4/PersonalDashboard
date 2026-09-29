@@ -39,6 +39,7 @@ export const TARGET_FOR_HIT: Record<HitKind, LinkTarget | null> = {
   idea: null,
   feedback: null,
   raise: null,
+  vision: null,
   // A story lives inside a newsletter issue rather than in a row of its own,
   // and task_links has no column for a goal or a step.
   story: null,

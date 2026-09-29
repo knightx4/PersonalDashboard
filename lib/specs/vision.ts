@@ -36,6 +36,14 @@ export type ModuleVision = {
   updatedAt: string;
 };
 
+/**
+ * The element on the specs page a vision is drawn in, so a search hit on one
+ * can land at it (plan #1155).
+ */
+export function visionAnchor(scope: string): string {
+  return `vision-${scope}`;
+}
+
 /** Every vision this person has written, by workspace, with the app's under `app`. */
 export async function loadModuleVisions(
   supabase: SupabaseClient,

@@ -13,7 +13,15 @@ import {
   restoreRecord,
   updateRecord,
 } from '@/lib/goals/collections-store';
-import { checkRecord } from '@/lib/goals/collections';
+import { checkRecord, idField, type CollectionField, type RecordValues } from '@/lib/goals/collections';
+import {
+  findCorrections,
+  learnKind,
+  shownValue,
+  type KindRead,
+} from '@/lib/goals/document-kinds';
+import { loadKinds, writeKind } from '@/lib/goals/document-kinds-store';
+import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { matchRows, ownsDocumentPath, parseDate, previewRowPrefix } from '@/lib/goals/extract';
 import {
   MAX_QUESTIONS,
@@ -22,7 +30,7 @@ import {
   questionKey,
   type StepQuestion,
 } from '@/lib/goals/answers';
-import { formValues } from '@/lib/goals/information';
+import { documentName, formValues } from '@/lib/goals/information';
 import { loadInformationStep, setStepQuestions } from '@/lib/goals/steps-store';
 
 /**
@@ -111,7 +119,9 @@ export async function saveRecordAction(
  * whose collection has an ID field, a row with the ID of a saved record
  * updates that record instead of adding a copy (plan #985). Every record
  * written is dated by the document's as-of date, which dates the readings of
- * its tracked fields.
+ * its tracked fields. Once the rows are saved, what the read taught is kept
+ * as the collection's kind of document (plan #987); a failure there leaves
+ * the saved rows as they are.
  */
 // latency: pending
 export async function savePreviewAction(
@@ -180,10 +190,92 @@ export async function savePreviewAction(
         };
       }
     }
+    try {
+      await learnFromRead(client, user.id, {
+        collectionId: collection.id,
+        fields: collection.fields,
+        lesson: form.get('lesson'),
+        rows,
+        values,
+        starts: targets.map((t) => (t ? (byId.get(t)?.data ?? null) : null)),
+        fallbackName: ref ? documentName(ref) : 'Pasted text',
+      });
+    } catch {
+      // The rows are saved; the kind is learned again on the next read.
+    }
     return saved();
   } catch {
     return { error: 'Those could not be saved. Try again.' };
   }
+}
+
+const Lesson = z.object({
+  kind: z
+    .object({
+      knownId: z.string().uuid().nullable(),
+      name: z.string().max(200),
+      recognise: z.string().max(2000),
+      labels: z.record(z.string(), z.string().max(300)),
+    })
+    .nullable(),
+  read: z.record(z.string(), z.record(z.string(), z.string().max(5000))),
+  added: z.array(z.object({ key: z.string().max(40), from: z.string().max(300) })).max(60),
+  skipped: z.array(z.string().max(300)).max(60),
+  cautions: z
+    .array(z.object({ label: z.string().max(300), field: z.string().nullable(), note: z.string().max(600) }))
+    .max(20),
+});
+
+/**
+ * Keep what a saved read taught about its kind of document (plan #987). The
+ * preview sends what the reader gave for each row, the fields added from its
+ * suggestions and the ones left out, and the traps it warned of; the
+ * corrections are the saved values that differ from what the reader gave.
+ */
+async function learnFromRead(
+  client: GoalsSupabaseClient,
+  userId: string,
+  input: {
+    collectionId: string;
+    fields: CollectionField[];
+    lesson: FormDataEntryValue | null;
+    rows: number[];
+    values: Record<string, unknown>[];
+    starts: (RecordValues | null)[];
+    fallbackName: string;
+  },
+): Promise<void> {
+  if (typeof input.lesson !== 'string' || !input.lesson) return;
+  const parsed = Lesson.safeParse(JSON.parse(input.lesson));
+  if (!parsed.success) return;
+  const lesson = parsed.data;
+  const id = idField(input.fields);
+  const corrections = findCorrections(
+    input.fields,
+    input.rows.map((row, i) => {
+      const start: Record<string, string> = {};
+      const saved = input.starts[i];
+      if (saved) {
+        for (const field of input.fields) start[field.key] = shownValue(field, saved[field.key]);
+      }
+      return {
+        read: lesson.read[String(row)] ?? {},
+        start,
+        saved: input.values[i],
+        id: id ? shownValue(id, input.values[i][id.key]) || null : null,
+      };
+    }),
+  );
+  const kinds = await loadKinds(client, [input.collectionId]);
+  const write = learnKind(input.fields, kinds, {
+    read: lesson.kind as KindRead | null,
+    added: lesson.added,
+    skipped: lesson.skipped,
+    cautions: lesson.cautions,
+    corrections,
+    fallbackName: input.fallbackName,
+  });
+  if (write) await writeKind(client, userId, input.collectionId, write);
 }
 
 /** Confirm a draft as it stands. */

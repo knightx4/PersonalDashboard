@@ -8,6 +8,7 @@
  */
 
 import type { CollectionField, CollectionShape } from '@/lib/goals/collections';
+import type { LearnedKind } from '@/lib/goals/document-kinds';
 import { docxText } from '@/lib/goals/docx';
 import {
   DOCUMENT_MAX_BYTES,
@@ -24,6 +25,7 @@ export type ReadInput = { text: string } | { name: string; bytes: Uint8Array };
  * asOf is the date the document gives its figures as of, or null when it
  * gives none. suggestions are the fields it has and the form lacks, and
  * cautions the labels in it that do not mean what they say (plan #986).
+ * kind is the kind of document the reader took it for (plan #987).
  */
 export type ReadResult = ({ ok: true } & ReadAnswer) | { ok: false; error: string };
 
@@ -31,12 +33,14 @@ export async function readIntoForm(
   collection: { name: string; shape: CollectionShape; fields: CollectionField[] },
   input: ReadInput,
   ask: (source: ExtractSource) => Promise<ExtractResult>,
+  /** The kinds of document the collection has learned, which the ask was given too (plan #987). */
+  kinds: LearnedKind[] = [],
 ): Promise<ReadResult> {
   const source = toSource(input);
   if (!source.ok) return source;
   const answer = await ask(source.source);
   if (!answer.ok) return answer;
-  const read = readAnswer(collection.fields, collection.shape, answer.input);
+  const read = readAnswer(collection.fields, collection.shape, answer.input, kinds);
   if (read.rows.length === 0) {
     return { ok: false, error: `Nothing in that fits the ${collection.name} form.` };
   }

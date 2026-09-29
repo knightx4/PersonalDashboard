@@ -30,6 +30,7 @@ import {
   sourceLabel,
   unfinishedReason,
 } from '@/lib/goals/information';
+import type { LearnedKind } from '@/lib/goals/document-kinds';
 import type { StepNode } from '@/lib/goals/steps';
 import { setStepStatusAction } from './actions';
 import {
@@ -40,6 +41,7 @@ import {
   type InformationActionState,
 } from './information-actions';
 import { FieldInput } from './field-input';
+import { DocumentKinds } from './document-kinds';
 import { FillFromDocument } from './fill-from-document';
 import { RecordValue } from './record-value';
 
@@ -72,6 +74,7 @@ export function InformationStep({
   collection,
   records,
   answers,
+  kinds = [],
   seam,
 }: {
   node: StepNode;
@@ -79,6 +82,8 @@ export function InformationStep({
   records: CollectionRecord[];
   /** What the goals routine worked out from these records (plan #989). */
   answers: StepAnswer[];
+  /** The kinds of document the form has learned (plan #987). */
+  kinds?: LearnedKind[];
   seam?: InformationSeam;
 }) {
   const asked = askedFields(collection.fields, node.asksFor ?? null);
@@ -110,6 +115,7 @@ export function InformationStep({
           seam={seam}
         />
       )}
+      <DocumentKinds stepId={node.id} kinds={kinds} fields={collection.fields} />
     </div>
   );
 }

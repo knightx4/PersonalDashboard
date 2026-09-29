@@ -1,4 +1,6 @@
+import { MODULES } from '@/lib/modules';
 import type { SearchHit } from '@/lib/search/sources';
+import { APP_VISION, visionAnchor } from '@/lib/specs/vision';
 
 /**
  * Dev rows into hits, apart from the reads so the hrefs can be tested without
@@ -11,6 +13,9 @@ import type { SearchHit } from '@/lib/search/sources';
  * An open question and a raise land on the Dash tab at their card instead,
  * because that is where they are answered: the plan shows a question, but
  * answering it there means finding it again on Dash (plan #1154).
+ *
+ * A workspace's vision lands on the specs page at the head of that
+ * workspace's group, where it is read and edited (plan #1155).
  */
 
 export type DevRows = {
@@ -28,6 +33,8 @@ export type DevRows = {
     ask: string | null;
     status: string;
   }[];
+  /** The visions a query found: one per workspace, the app's under `app`. */
+  visions?: { module: string; body: string }[];
 };
 
 /**
@@ -54,6 +61,27 @@ export function matchWaiting(
       .slice(0, limit),
     raises: rows.raises.filter((row) => has(row.title, row.detail, row.ask)).slice(0, limit),
   };
+}
+
+/**
+ * The visions a query finds, matched on the text of each. There is at most one
+ * per workspace, so they are read whole and matched here like the questions.
+ */
+export function matchVisions(
+  visions: NonNullable<DevRows['visions']>,
+  query: string | undefined,
+  limit: number,
+): NonNullable<DevRows['visions']> {
+  const needle = query?.trim().toLowerCase();
+  return visions
+    .filter((row) => row.body.trim() && (!needle || row.body.toLowerCase().includes(needle)))
+    .slice(0, limit);
+}
+
+/** What a vision is called on the specs page: its workspace's name, or the app. */
+export function visionLabel(scope: string): string {
+  if (scope === APP_VISION) return 'the app';
+  return MODULES.find((module) => module.id === scope)?.label ?? scope;
 }
 
 /** The card on the Dash tab a plan row is drawn as, in "Waiting on you". */
@@ -130,6 +158,18 @@ export function devHits(rows: DevRows): SearchHit[] {
       subtitle: 'Spec',
       match: spec.blurb,
       href: `/dev/specs/${spec.slug}`,
+    });
+  }
+
+  for (const row of rows.visions ?? []) {
+    hits.push({
+      module: 'dev',
+      kind: 'vision',
+      id: row.module,
+      title: `Vision for ${visionLabel(row.module)}`,
+      subtitle: 'Vision · Specs',
+      match: row.body,
+      href: `/dev/specs#${visionAnchor(row.module)}`,
     });
   }
 

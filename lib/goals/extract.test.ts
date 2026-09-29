@@ -102,6 +102,7 @@ describe('readIntoForm, with the model stubbed', () => {
       asOf: null,
       suggestions: [],
       cautions: [],
+      kind: null,
     });
   });
 
@@ -345,7 +346,7 @@ describe('extractionTool', () => {
     const items = (tool.input_schema.properties as { records: { items: { properties: object; required: string[] } } })
       .records.items;
     expect(items.required).toEqual(['name', 'servicer', 'balance', 'rate', 'minimum', 'due_day']);
-    expect(tool.input_schema.required).toEqual(['as_of', 'records', 'extra', 'caution']);
+    expect(tool.input_schema.required).toEqual(['as_of', 'records', 'extra', 'caution', 'kind']);
     const caution = (tool.input_schema.properties as { caution: { items: { properties: { field: { enum: unknown[] } } } } })
       .caution.items.properties.field;
     expect(caution.enum).toEqual(['name', 'servicer', 'balance', 'rate', 'minimum', 'due_day', null]);
