@@ -11,6 +11,8 @@ import {
   type RecordValues,
 } from '@/lib/goals/collections';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
+import type { LearnedKind } from '@/lib/goals/document-kinds';
+import { loadKinds } from '@/lib/goals/document-kinds-store';
 
 /**
  * Reads and writes of goals.collections, goals.collection_goals and
@@ -162,16 +164,28 @@ export async function loadRecords(
 }
 
 /**
- * Live collections by id, each with its live records, for the information
- * steps on a page (plan #954). A collection that is gone is left out.
+ * A collection with its live records and the kinds of document it has
+ * learned (plan #987). The kinds are optional so a page built without them,
+ * as the previews are, still type-checks.
+ */
+export type CollectionInformation = {
+  collection: Collection;
+  records: CollectionRecord[];
+  kinds?: LearnedKind[];
+};
+
+/**
+ * Live collections by id, each with its live records and learned document
+ * kinds, for the information steps on a page (plan #954). A collection that
+ * is gone is left out.
  */
 export async function loadInformation(
   client: GoalsSupabaseClient,
   collectionIds: string[],
-): Promise<Record<string, { collection: Collection; records: CollectionRecord[] }>> {
+): Promise<Record<string, CollectionInformation>> {
   const ids = [...new Set(collectionIds)];
   if (ids.length === 0) return {};
-  const [collections, records] = await Promise.all([
+  const [collections, records, kinds] = await Promise.all([
     client.from('collections').select(COLLECTION_COLUMNS).in('id', ids).is('archived_at', null),
     client
       .from('records')
@@ -180,18 +194,20 @@ export async function loadInformation(
       .is('archived_at', null)
       .order('position')
       .order('created_at'),
+    loadKinds(client, ids),
   ]);
   if (collections.error) {
     throw new Error(`Could not read the collections: ${collections.error.message}`);
   }
   if (records.error) throw new Error(`Could not read the records: ${records.error.message}`);
-  const out: Record<string, { collection: Collection; records: CollectionRecord[] }> = {};
+  const out: Record<string, CollectionInformation> = {};
   for (const row of (collections.data ?? []) as CollectionRow[]) {
-    out[row.id] = { collection: toCollection(row), records: [] };
+    out[row.id] = { collection: toCollection(row), records: [], kinds: [] };
   }
   for (const row of (records.data ?? []) as RecordRow[]) {
     out[row.collection_id]?.records.push(toRecord(row));
   }
+  for (const kind of kinds) out[kind.collectionId]?.kinds?.push(kind);
   return out;
 }
 

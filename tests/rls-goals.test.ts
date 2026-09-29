@@ -2198,6 +2198,42 @@ describe('closing and parking a goal stays yours (plan #1084)', () => {
   });
 });
 
+describe('document kinds a form has learned (plan #987)', () => {
+  it('keeps each kind to its owner, one live kind per name, and checks its notes', async () => {
+    const [col] = await admin<{ id: string }[]>`
+      insert into collections (user_id, name, shape, fields)
+      values (${userA}, ${`kind loans ${Math.random()}`}, 'list',
+              '[{"key": "first_payment", "label": "First payment", "type": "date"}]'::jsonb)
+      returning id`;
+    const id = await asUser(userA, async (tx) => {
+      const [row] = await tx<{ id: string }[]>`
+        insert into document_kinds (user_id, collection_id, name, recognise, field_notes, skipped)
+        values (${userA}, ${col.id}, 'NSLDS loan export', 'Headed "File Request Date".',
+                '{"first_payment": "Filled from Repayment Begin Date."}'::jsonb,
+                '["Outstanding Principal"]'::jsonb)
+        returning id`;
+      return row.id;
+    });
+    expect(await asUser(userB, (tx) => tx`select id from document_kinds`)).toHaveLength(0);
+    await expect(
+      admin`insert into document_kinds (user_id, collection_id, name)
+            values (${userA}, ${col.id}, ' nslds LOAN export')`,
+    ).rejects.toThrow(/document_kinds_name_key/);
+    await expect(
+      admin`update document_kinds set field_notes = '{"Bad Key": "x"}'::jsonb where id = ${id}`,
+    ).rejects.toThrow(/document_kinds_notes_ck/);
+    await expect(
+      admin`update document_kinds set skipped = '[1]'::jsonb where id = ${id}`,
+    ).rejects.toThrow(/document_kinds_skipped_ck/);
+
+    await asUser(userA, (tx) => tx`update document_kinds set archived_at = now() where id = ${id}`);
+    const rows = await historyOf(id);
+    expect(rows.map((r) => r.action)).toEqual(['insert', 'archive']);
+    await admin`insert into document_kinds (user_id, collection_id, name)
+                values (${userA}, ${col.id}, 'NSLDS loan export')`;
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`
@@ -2237,6 +2273,7 @@ describe('RLS coverage', () => {
       'comments',
       'context',
       'dependencies',
+      'document_kinds',
       'item_goals',
       'items',
       'links',
