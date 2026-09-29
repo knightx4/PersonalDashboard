@@ -7,6 +7,12 @@ import type { RecurringEvent, RecurringKind, RecurringPeriod } from './extractio
  * explicitly, so a service-role client from a cron reads only that person's.
  */
 
+/**
+ * 'ignored' is a payment the person left out of the monthly total (plan
+ * #1213); new charges keep it (lib/recurring/store.ts).
+ */
+export type RecurringStatus = 'active' | 'cancelled' | 'ignored';
+
 export type RecurringCharge = {
   id: string;
   messageId: string | null;
@@ -28,7 +34,7 @@ export type RecurringPayment = {
   currency: string;
   period: RecurringPeriod | null;
   nextDate: string | null;
-  status: 'active' | 'cancelled';
+  status: RecurringStatus;
   lastChargedOn: string | null;
   charges: RecurringCharge[];
 };
@@ -42,7 +48,7 @@ type PaymentRow = {
   currency: string;
   period: RecurringPeriod | null;
   next_date: string | null;
-  status: 'active' | 'cancelled';
+  status: RecurringStatus;
   last_charged_on: string | null;
 };
 

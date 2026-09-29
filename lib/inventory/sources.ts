@@ -64,6 +64,10 @@ export const shoppingSources: ModuleSources = {
     { table: 'public.merchant_return_policies', reason: 'Return rules per shop.' },
     { table: 'public.ingested_messages', reason: 'Mail sync bookkeeping.' },
     { table: 'public.recurring_messages', reason: 'Mail sync bookkeeping for subscriptions and bills.' },
+    {
+      table: 'public.recurring_payee_aliases',
+      reason: 'Which payment a payee name from the mail files onto, after a correction.',
+    },
     { table: 'public.categories', reason: 'Labels for the inventory.' },
     { table: 'public.category_attribute_templates', reason: 'Field definitions for the inventory.' },
     { table: 'public.item_tags', reason: 'Labels for the inventory.' },
