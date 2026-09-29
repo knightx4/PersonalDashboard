@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { requireUser } from '@/lib/auth/server';
+import { executeProposal } from '@/lib/ask/propose';
 import { executeAskTool } from '@/lib/ask/tools';
 import { requestAskDb } from '@/lib/ask/clients';
 import { loadAccountSettings } from '@/lib/core/account/settings';
@@ -9,6 +10,7 @@ import { recordSpendReports } from '@/lib/core/spend/record';
 import { todayInTimezone } from '@/lib/money';
 import { allSearchSources } from '@/lib/search/registry';
 import { askDash, type AskDashResult } from './ask';
+import { attachProposals, discardProposals, insertProposal, loadChanges, type DashChange } from './changes';
 import { appendTurns, listConversations, loadConversation, startAsk, type ConversationSummary } from './store';
 import type { TalkTurn } from './talk';
 
@@ -46,6 +48,7 @@ export async function askDashInRequest(input: {
       conversationRef: input.conversationRef,
       today,
       execute: (name, args) => executeAskTool(name, args, ctx),
+      propose: (name, args, seen, save) => executeProposal(name, args, { ...ctx, seen, save }),
       anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     },
     {
@@ -54,6 +57,9 @@ export async function askDashInRequest(input: {
       append: (subject, turns) => appendTurns(core, user.id, subject, turns),
       recordSpend: (reports) =>
         recordSpendReports(core, user.id, { module: 'core', operation: 'ask-dash' }, reports),
+      saveProposal: (conversationId, change) => insertProposal(core, user.id, conversationId, change),
+      attachProposals: (ids, turnId) => attachProposals(core, ids, turnId),
+      discardProposals: (ids) => discardProposals(core, ids),
     },
   );
 }
@@ -68,4 +74,13 @@ export async function listAskConversations(limit = 50): Promise<ConversationSumm
 export async function loadAskConversation(ref: string): Promise<TalkTurn[]> {
   await requireUser();
   return loadConversation(await createCoreClient(), { kind: 'ask', ref });
+}
+
+/**
+ * The changes Dash proposed in one past question, in the order proposed, each
+ * with its turn and what became of it; empty when it is not theirs or not there.
+ */
+export async function loadAskChanges(ref: string): Promise<DashChange[]> {
+  await requireUser();
+  return loadChanges(await createCoreClient(), ref);
 }
