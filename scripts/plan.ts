@@ -618,7 +618,8 @@ async function main(): Promise<void> {
         const match = findDuplicateIdea(idea.body, filed);
         if (match) {
           refusals.push(
-            `"${ideaFirstLine(idea.body)}" — ${Math.round(match.score * 100)}% the same words as ` +
+            `"${ideaFirstLine(idea.body)}" — ${Math.round(match.score * 100)}% the same ` +
+              `${match.on === 'body' ? 'words' : 'first line'} as ` +
               `${match.idea.id.slice(0, 8)} "${ideaFirstLine(match.idea.body)}"`,
           );
           continue;
