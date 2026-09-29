@@ -30,6 +30,7 @@ export const HIT_KINDS = {
   spec: 'Spec',
   idea: 'Idea',
   feedback: 'Feedback',
+  raise: 'Raise',
   story: 'Story',
   goal: 'Goal',
   step: 'Step',

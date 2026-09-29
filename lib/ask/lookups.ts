@@ -65,6 +65,7 @@ export const HIT_TABLES: Record<HitKind, string> = {
   spec: 'docs.specs',
   idea: 'public.ideas',
   feedback: 'public.feedback_items',
+  raise: 'public.raised_items',
   // A story is one entry in an issue's list; its ref is `<issue id>:<index>`.
   story: 'news.issues',
   goal: 'goals.items',

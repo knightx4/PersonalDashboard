@@ -22,6 +22,7 @@ import { PLAN_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { WAITING_WORD } from '@/lib/dev/words';
 import { isJobForYou, type WaitingEntry, type WaitingRow } from '@/lib/plan/waiting';
 import { whereToDoIt } from '@/lib/plan/where';
+import { waitingAnchor } from '@/lib/search/sources/dev-map';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -87,7 +88,8 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
   const where = setup || blockedJob ? whereToDoIt(row.ask) : null;
 
   return (
-    <li className="space-y-1 p-3">
+    // The anchor a search hit on this row lands on (plan #1154).
+    <li id={waitingAnchor(row.id)} className="scroll-mt-20 space-y-1 p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         {/* The row itself, not the top of the plan. Every one of these is a
             discrete thing to go and settle, and landing on the plan page and

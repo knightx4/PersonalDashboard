@@ -7,6 +7,10 @@ import type { SearchHit } from '@/lib/search/sources';
  * Only a spec has a page of its own. A plan step lands on the plan with its
  * number already in the plan's own search box, which unfolds the feature it
  * sits under; an idea and a note land on their list at the row's anchor.
+ *
+ * An open question and a raise land on the Dash tab at their card instead,
+ * because that is where they are answered: the plan shows a question, but
+ * answering it there means finding it again on Dash (plan #1154).
  */
 
 export type DevRows = {
@@ -14,7 +18,53 @@ export type DevRows = {
   ideas: { id: string; body: string; module: string | null }[];
   notes: { id: string; body: string; kind: string; status: string }[];
   specs: readonly { slug: string; title: string; blurb: string }[];
+  /** Decisions still waiting on an answer, dismissed ones already left out. */
+  questions?: { id: string; number: number; title: string; detail: string | null }[];
+  /** Raises from the Dash tab's queue, dismissed ones already left out. */
+  raises?: {
+    id: string;
+    title: string;
+    detail: string | null;
+    ask: string | null;
+    status: string;
+  }[];
 };
+
+/**
+ * The open questions and raises a query finds, at most `limit` of each. They
+ * are read whole and matched here, so the words under the title count: a
+ * question's options, a raise's story and its ask. A query that is a step
+ * number ("#612" or "612") finds the question with that number.
+ */
+export function matchWaiting(
+  rows: Required<Pick<DevRows, 'questions' | 'raises'>>,
+  query: string | undefined,
+  limit: number,
+): Required<Pick<DevRows, 'questions' | 'raises'>> {
+  const needle = query?.trim().toLowerCase();
+  const number = needle?.match(/^#?(\d+)$/)?.[1];
+  const has = (...parts: (string | null)[]) =>
+    !needle || parts.join(' ').toLowerCase().includes(needle);
+
+  return {
+    questions: rows.questions
+      .filter((row) =>
+        number ? row.number === Number(number) : has(row.title, row.detail),
+      )
+      .slice(0, limit),
+    raises: rows.raises.filter((row) => has(row.title, row.detail, row.ask)).slice(0, limit),
+  };
+}
+
+/** The card on the Dash tab a plan row is drawn as, in "Waiting on you". */
+export function waitingAnchor(id: string): string {
+  return `waiting-${id}`;
+}
+
+/** The card on the Dash tab a raise is drawn as. */
+export function raiseAnchor(id: string): string {
+  return `raise-${id}`;
+}
 
 /** The first line of a body, short enough to be a title. */
 export function firstLine(body: string, max = 90): string {
@@ -42,6 +92,32 @@ export function devHits(rows: DevRows): SearchHit[] {
       subtitle: `${row.parent_id ? 'Step' : 'Feature'} #${row.number} · ${row.status.replace('_', ' ')}`,
       match: `#${row.number}`,
       href: planHref(row.number),
+    });
+  }
+
+  for (const row of rows.questions ?? []) {
+    hits.push({
+      module: 'dev',
+      kind: 'plan',
+      id: row.id,
+      title: row.title,
+      subtitle: `Question #${row.number} · waiting on you`,
+      // The number, as a step is quoted, and the options beneath the title:
+      // the word you remember from a question is as often in an option.
+      match: `#${row.number} ${row.detail ?? ''}`.trim(),
+      href: `/dev/raised#${waitingAnchor(row.id)}`,
+    });
+  }
+
+  for (const row of rows.raises ?? []) {
+    hits.push({
+      module: 'dev',
+      kind: 'raise',
+      id: row.id,
+      title: row.title,
+      subtitle: `Raised · ${row.status}`,
+      match: `${row.ask ?? ''} ${row.detail ?? ''}`.trim() || undefined,
+      href: `/dev/raised#${raiseAnchor(row.id)}`,
     });
   }
 
