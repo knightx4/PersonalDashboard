@@ -340,13 +340,14 @@ create table todo.task_links (
   reading_id        uuid references learn.readings (id) on delete cascade,
   track_id          uuid references learn.tracks (id) on delete cascade,
   subject_id        uuid references learn.subjects (id) on delete cascade,
+  goal_id           uuid references goals.items (id) on delete cascade,  -- goals/0062
 
   created_at timestamptz not null default now(),
 
   constraint task_links_exactly_one_ck check (
     num_nonnulls(application_id, role_id, company_id, contact_id, interview_id,
                  note_id, order_id, inventory_item_id, saved_item_id, reading_id,
-                 track_id, subject_id) = 1
+                 track_id, subject_id, goal_id) = 1
   )
 );
 
@@ -1015,6 +1016,15 @@ confident and the code disagreed.
 
   The archive is the one list that stays flat: it is a history, so an item
   there says which task it came out of instead of being nested under it.
+- **A task can be handed to Dash as an errand** (plan #1263). **Hand to Dash**
+  on a task's row, or in its menu on a phone, asks for the Goals area and the
+  due date (the task's own when it has one), makes an errand on Goals from the
+  title with the notes as its detail, starts Dash on it, and ticks the task
+  off. The task then links to the errand through a thirteenth link target,
+  `goal_id`, added by `migrations-goals/0062` because goals is applied after
+  todo. A task already about something keeps that link and gets a line in its
+  notes saying where it went instead. The search picker does not offer goals
+  as targets yet; only this action writes the column.
 
 ## What this unlocks (not v1)
 

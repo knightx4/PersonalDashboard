@@ -126,6 +126,8 @@ export type NightGoal = {
   createdAt: string;
   /** When its fog was last written or cleared by anyone but Claude, or null for never. */
   fogChangedAt: string | null;
+  /** The due date of an errand, so its map run is briefed as one (plan #1263). */
+  errandDueOn?: string | null;
 };
 
 /** Why a goal is mapped tonight: it has never been mapped, or its fog changed since it was. */

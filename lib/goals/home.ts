@@ -72,7 +72,7 @@ export function splitErrands(goals: readonly HomeGoal[]): {
  * area. Null when there are no areas.
  */
 export function errandAreaDefault(
-  errands: readonly HomeGoal[],
+  errands: readonly { goal: { areaId: string } }[],
   areas: readonly { id: string }[],
 ): string | null {
   const soonest = errands.find((line) => areas.some((area) => area.id === line.goal.areaId));

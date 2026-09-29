@@ -4,6 +4,7 @@ import { useOptimistic, useState, useTransition } from 'react';
 import {
   ArrowDown,
   ArrowUp,
+  Bot,
   ChevronDown,
   ChevronRight,
   Clock,
@@ -41,6 +42,7 @@ import { openCount, SNOOZE_DAYS, type Task, type TaskStatus } from '@/lib/todo/t
 import { InlineInput } from '@/components/ui/field';
 import { clockIn, dayIn } from '@/lib/todo/time';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
+import { HandToDash } from './hand-to-dash';
 import { TaskAbout } from './task-about';
 import { EditTask } from './task-form';
 import { formatClock } from '@/lib/clock';
@@ -153,6 +155,8 @@ export function TaskRow({
   const [adding, setAdding] = useState(false);
   /** The anchor finder on a narrow row, which has no button of its own. */
   const [aboutOpen, setAboutOpen] = useState(false);
+  /** Hand to Dash (plan #1263), which opens in place of the row like the editor. */
+  const [handing, setHanding] = useState(false);
   const [pending, start] = useTransition();
   const [grabbed, setGrabbed] = useState(false);
   /** Which edge of this row the dragged task would land on, while it is over. */
@@ -185,6 +189,9 @@ export function TaskRow({
   const index = siblings.indexOf(task.id);
 
   if (editing) return <EditTask task={task} onDone={() => setEditing(false)} />;
+  if (handing) {
+    return <HandToDash task={task} linked={Boolean(anchor)} onDone={() => setHanding(false)} />;
+  }
 
   const done = task.status === 'done';
   const dropped = task.status === 'dropped';
@@ -291,6 +298,7 @@ export function TaskRow({
           },
         ]
       : []),
+    { id: 'dash', label: 'Hand to Dash', onSelect: () => setHanding(true) },
   ];
 
   /** A row can be reordered when it is in a pile and still on the list. */
@@ -555,6 +563,12 @@ export function TaskRow({
                 page resolved, so the unlink half only appears where there is
                 a link to remove. */}
               <TaskAbout taskId={task.id} linked={Boolean(anchor)} />
+              {/* Makes the task an errand on Goals and starts Dash on it
+                (plan #1263). Opens a form in place of the row, like Edit
+                everything. */}
+              <IconButton label="Hand to Dash" onClick={() => setHanding(true)}>
+                <Bot className="size-3.5" strokeWidth={1.75} aria-hidden />
+              </IconButton>
             </span>
           )}
 

@@ -318,6 +318,7 @@ export async function loadGoalsNight(
         approvedAt: stamp.approvedAt,
         createdAt: stamp.createdAt,
         fogChangedAt: fog.get(goal.id) ?? null,
+        errandDueOn: goal.errand ? goal.dueOn : null,
       },
     ];
   });
@@ -371,7 +372,7 @@ export async function runGoalsNight(input: {
       const started = await startGoalRun({
         client: goals(),
         userId,
-        goal: { id: goal.id, title: goal.title },
+        goal: { id: goal.id, title: goal.title, errandDueOn: goal.errandDueOn },
         routine,
         fetch: input.fetch,
       });

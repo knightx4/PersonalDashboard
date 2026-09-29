@@ -225,13 +225,15 @@ export async function unarchiveArea(client: GoalsSupabaseClient, id: string): Pr
 
 /**
  * A new goal at the end of its area, and its id. Null when the area is not one
- * of yours and live.
+ * of yours and live. `detail` is for a goal made from something that already
+ * has notes, such as a Todo task handed to Dash (plan #1263); the form on the
+ * Goals home does not send one.
  */
 export async function insertGoal(
   client: GoalsSupabaseClient,
   userId: string,
   areaId: string,
-  fields: GoalFields & { title: string },
+  fields: GoalFields & { title: string; detail?: string | null },
 ): Promise<string | null> {
   const { data: area, error: areaError } = await client
     .from('areas')
@@ -259,6 +261,7 @@ export async function insertGoal(
       title: fields.title,
       acceptance: fields.acceptance ?? null,
       fog: fields.fog ?? null,
+      detail: fields.detail ?? null,
       errand: fields.errand ?? false,
       due_on: fields.dueOn ?? null,
       position: nextPosition((rows ?? []).map((row) => row.position as number)),

@@ -179,6 +179,28 @@ export async function rescheduleTask(
 }
 
 /**
+ * Replace a task's notes and nothing else. Hand to Dash writes where a task
+ * went into its notes when the task is already about something (plan #1263).
+ */
+export async function setTaskBody(
+  userId: string,
+  id: string,
+  body: string,
+): Promise<{ error: string | null }> {
+  const parsed = taskInput.shape.body.safeParse(body);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const supabase = await createTodoClient();
+  const { error } = await supabase
+    .from('tasks')
+    .update({ body: parsed.data })
+    .eq('id', id)
+    .eq('user_id', userId);
+
+  return { error: error?.message ?? null };
+}
+
+/**
  * Finish, drop, or reopen.
  *
  * `completed_at` and `dropped_at` are not set here. The database stamps them,
