@@ -662,6 +662,14 @@ describe('cross-user writes', () => {
     }
   });
 
+  it("does not let user B move user A's recurring charges", async () => {
+    const affected = await asUser(userB, (tx) =>
+      tx`update recurring_charges set payment_id = payment_id
+         where id = ${seedA.recurring_charges} returning id`,
+    );
+    expect(affected.length).toBe(0);
+  });
+
   it('does not let user B delete user A rows', async () => {
     for (const table of ['orders', 'inventory_items', 'saved_items']) {
       const affected = await asUser(userB, (tx) =>
