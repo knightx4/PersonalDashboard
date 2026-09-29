@@ -154,3 +154,39 @@ export async function loadChanges(core: CoreSupabaseClient, conversationId: stri
   if (error) throw new Error(`Reading the proposed changes failed: ${error.message}`);
   return ((data ?? []) as DashChangeRow[]).map(toDashChange);
 }
+
+/** A written change as the Ask page lists it: the change and the question it came from. */
+export type MadeChange = DashChange & {
+  /** The question the change was proposed under; null when it had no title. */
+  question: string | null;
+};
+
+/**
+ * The changes the person confirmed through Dash, still standing or taken
+ * back, newest first (plan #1191). Proposals never confirmed and declined
+ * ones are left out: nothing was written for them. RLS keeps it to the
+ * signed-in person's rows; the (user_id, created_at desc) index serves it.
+ */
+export async function loadMadeChanges(core: CoreSupabaseClient, limit = 200): Promise<MadeChange[]> {
+  const { data, error } = await core
+    .from('dash_changes')
+    .select(DASH_CHANGE_SELECT)
+    .in('status', ['confirmed', 'undone'])
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  assertSchemaExposed(error, CORE_SCHEMA);
+  if (error) throw new Error(`Reading the changes Dash made failed: ${error.message}`);
+  const changes = ((data ?? []) as DashChangeRow[]).map(toDashChange);
+  if (changes.length === 0) return [];
+
+  const ids = [...new Set(changes.map((change) => change.conversationId))];
+  const { data: conversations, error: titleError } = await core
+    .from('conversations')
+    .select('id, title')
+    .in('id', ids);
+  if (titleError) throw new Error(`Reading the questions behind the changes failed: ${titleError.message}`);
+  const titles = new Map(
+    ((conversations ?? []) as { id: string; title: string | null }[]).map((row) => [row.id, row.title]),
+  );
+  return changes.map((change) => ({ ...change, question: titles.get(change.conversationId) ?? null }));
+}

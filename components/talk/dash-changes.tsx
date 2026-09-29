@@ -73,11 +73,14 @@ export function DashChangeRow({
   presses,
   onChanged,
   today,
+  from,
 }: {
   change: DashChange;
   presses: ChangePresses;
   onChanged?: (change: DashChange) => void;
   today?: string;
+  /** Where the change came from, as a line under its sentence: the Ask page's list names the question. */
+  from?: React.ReactNode;
 }) {
   const [change, setChange] = useState(given);
   const [error, setError] = useState<string | null>(null);
@@ -128,6 +131,8 @@ export function DashChangeRow({
         )}
         {words.rest}
       </p>
+
+      {from && <p className="text-small text-ink-muted">{from}</p>}
 
       {change.status === 'proposed' && (
         <div className="flex flex-wrap items-center gap-2">

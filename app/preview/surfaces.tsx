@@ -70,7 +70,7 @@ import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
 import { PlanOpenedSurface, PlanTreeSurface } from './plan-surfaces';
 import { GoalOpenedSurface, GoalTreeSurface } from './goal-surfaces';
-import { AskChangesSurface, AskDashSurface } from './ask-surfaces';
+import { AskChangesSurface, AskDashSurface, AskMadeChangesSurface } from './ask-surfaces';
 import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import {
@@ -2713,6 +2713,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <AskChangesSurface />,
+  },
+  {
+    /* The Ask page's list of changes Dash made (plan #1191): one of each kind
+     * newest first, one undone, Undo on the step refused with its reason. */
+    id: 'ask-made-changes',
+    label: 'Ask · Changes Dash made',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskMadeChangesSurface />,
   },
 
   {

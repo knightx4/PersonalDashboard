@@ -3,7 +3,10 @@
 import { useEffect } from 'react';
 import { AskDashProvider, AskThread, useAskDash, type AskSource } from '@/components/shell/ask-dash';
 import type { ChangeOutcome } from '@/lib/ask/changes';
-import type { DashChange } from '@/lib/talk/changes';
+import { PageHeader } from '@/components/shell/page-header';
+import { MadeChanges } from '@/components/talk/made-changes';
+import { SectionFold } from '@/components/ui/disclosure';
+import type { DashChange, MadeChange } from '@/lib/talk/changes';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
 
@@ -272,5 +275,88 @@ export function AskChangesSurface() {
         />
       </div>
     </AskDashProvider>
+  );
+}
+
+/**
+ * The Ask page's list of the changes Dash made (plan #1191): one of each
+ * kind, newest first, with one already undone. Undo on the todo or the
+ * return puts it back; Undo on the step is refused, since it was worked on
+ * since, and the reason shows under its row.
+ */
+export function AskMadeChangesSurface() {
+  // Fixed times, so the server's render and the browser's agree.
+  const at = (hour: number) => `2026-09-28T${String(hour).padStart(2, '0')}:00:00Z`;
+  const made = (change: DashChange, hour: number, n: number, question: string | null): MadeChange => ({
+    ...change,
+    conversationId: `00000000-0000-4000-8000-00000000001${n}`,
+    status: 'confirmed',
+    writtenTable:
+      change.kind === 'add_todo' ? 'todo.tasks' : change.kind === 'add_goal_step' ? 'goals.items' : 'shopping.returns',
+    writtenRef: `${change.id}-row`,
+    createdAt: at(hour),
+    confirmedAt: at(hour),
+    question,
+  });
+  const todo = (id: string, title: string, dueOn: string | null): DashChange => ({
+    ...CHANGE_BASE,
+    id,
+    turnId: 'm',
+    status: 'proposed',
+    kind: 'add_todo',
+    input: { title, body: null, dueOn, dueTime: null, pinned: false },
+  });
+  const changes: MadeChange[] = [
+    made(
+      {
+        ...CHANGE_BASE,
+        id: 'm-ret',
+        turnId: 'm',
+        status: 'proposed',
+        kind: 'mark_returned',
+        input: { id: 'i1', itemTitle: 'Stanley flask, 1L' },
+      },
+      14,
+      1,
+      'I sent the flask back',
+    ),
+    made(todo('m-todo', 'Call the dentist', '2026-10-02'), 12, 2, 'Add a todo to call the dentist on Friday'),
+    made(proposals('m')[1], 11, 3, 'Add a step to my teeth goal to book the hygienist'),
+    { ...made(todo('m-old', 'Renew the car tax', null), 9, 4, null), status: 'undone', undoneAt: at(10) },
+  ];
+  const refuse = async (): Promise<ChangeOutcome> => ({ ok: false, error: 'You have already confirmed this change.', change: null });
+  const presses = {
+    confirm: refuse,
+    decline: refuse,
+    undo: async (id: string): Promise<ChangeOutcome> => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const change = changes.find((c) => c.id === id);
+      if (!change) return { ok: false, error: 'That change is not there any more.', change: null };
+      if (change.kind === 'add_goal_step') {
+        return { ok: false, error: 'That step has been worked on since, so Dash will not archive it.', change };
+      }
+      return { ok: true, change: { ...change, status: 'undone', undoneAt: new Date().toISOString() } };
+    },
+  };
+  return (
+    <div className="mx-auto max-w-3xl py-4">
+      <PageHeader title="Questions to Dash" />
+      <div className="space-y-6">
+        <SectionFold title="Changes Dash made" count={changes.length}>
+          <div className="mt-2">
+            <MadeChanges changes={changes} presses={presses} today="2026-09-28" />
+          </div>
+        </SectionFold>
+        <SectionFold title="Questions" count={RECENT.length}>
+          <ul className="mt-2 divide-y divide-border border-y border-border">
+            {RECENT.map((conversation) => (
+              <li key={conversation.id} className="px-1 py-2.5 text-body text-ink">
+                {conversation.title}
+              </li>
+            ))}
+          </ul>
+        </SectionFold>
+      </div>
+    </div>
   );
 }

@@ -4,10 +4,24 @@ import { Bot } from 'lucide-react';
 import { AskThread, useAskDash } from '@/components/shell/ask-dash';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
+import type { ChangePresses } from '@/components/talk/dash-changes';
+import { MadeChanges } from '@/components/talk/made-changes';
 import { commentWhen, exactTime } from '@/lib/comments/when';
-import type { DashChange } from '@/lib/talk/changes';
+import type { DashChange, MadeChange } from '@/lib/talk/changes';
 import type { TalkTurn } from '@/lib/talk/talk';
 import { useClockNow } from '@/lib/use-clock-now';
+import { confirmDashChange, declineDashChange, undoDashChange } from './actions';
+
+const PRESSES: ChangePresses = {
+  confirm: confirmDashChange,
+  decline: declineDashChange,
+  undo: undoDashChange,
+};
+
+/** The changes Dash made, with Undo bound to the server action (plan #1191). */
+export function AskMadeChanges({ changes, today }: { changes: MadeChange[]; today: string }) {
+  return <MadeChanges changes={changes} presses={PRESSES} today={today} />;
+}
 
 /** Opens the Dash sheet on a new question, from this page's header. */
 export function AskButton() {
