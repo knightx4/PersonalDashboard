@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import type { SpendReport } from '@/lib/core/spend/pricing';
-import { askJev, jevRequestBody, JEV_MODEL, parseJevAnswer, type JevQuestion } from './client';
+import { askJev, askJevAll, jevRequestBody, JEV_MODEL, parseJevAnswer, type JevQuestion } from './client';
 
 /**
  * The Jev client, against stubbed responses shaped like the examples in
@@ -223,5 +223,40 @@ describe('the wire format', () => {
     const body = { answers: { answer: { type: 'score', score: 4, confidence: 1 } } };
     const question = { type: 'score', question: 'q', levels: ['a', 'b'] } as const;
     expect(parseJevAnswer(body, question)).toMatchObject({ ok: false, reason: 'malformed' });
+  });
+});
+
+describe('askJevAll', () => {
+  const QUESTIONS = {
+    urgent: { type: 'yes-no', question: 'Is it urgent?' },
+    kind: { type: 'choice', question: 'Which kind?', options: { bill: null, order: null } },
+  } as const;
+
+  it('sends every question in one request and reads each answer by its name', async () => {
+    const fetch = respond({
+      model: JEV_MODEL,
+      answers: {
+        urgent: { type: 'noul', noul: 0.9 },
+        kind: { type: 'choice', choice: 'nonsense', confidence: 0.9 },
+      },
+      usage: { input_tokens: 400, output_tokens: 20 },
+    });
+    const spend = vi.fn();
+    const result = await askJevAll({ state: 'x', questions: QUESTIONS, apiKey: 'k', fetch, onSpend: spend });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const sent = JSON.parse(String(fetch.mock.calls[0][1].body));
+    expect(Object.keys(sent.questions)).toEqual(['urgent', 'kind']);
+    expect(sent.questions.urgent).toEqual({ type: 'noul', instructions: 'Is it urgent?' });
+    expect(spend).toHaveBeenCalledTimes(1);
+    if (!result.ok) throw new Error('expected answers');
+    expect(result.answers.urgent.ok && result.answers.urgent.answer.yes).toBe(true);
+    // One malformed answer does not lose the other.
+    expect(result.answers.kind.ok).toBe(false);
+  });
+
+  it('fails every question the same way when the request fails', async () => {
+    const fetch = respond({ error: 'busy' }, 529);
+    const result = await askJevAll({ state: 'x', questions: QUESTIONS, apiKey: 'k', fetch });
+    expect(result).toMatchObject({ ok: false, reason: 'overloaded' });
   });
 });

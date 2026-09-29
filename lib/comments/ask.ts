@@ -42,6 +42,7 @@ import { splitSections } from '@/lib/specs/sections';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { replyToComment } from './reply';
+import { checkReplyAfterResponse } from '@/lib/writing/reply-check';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, 'public'>;
@@ -308,6 +309,7 @@ async function produceReply(input: AskInput): Promise<AskOutcome> {
 
   if (reply.kind === 'answer') {
     await say(input, reply.body);
+    checkReplyAfterResponse(input.userId, reply.body, `${input.target} ${input.id}`);
     return { ok: true, message: 'Answered in the thread.' };
   }
 
