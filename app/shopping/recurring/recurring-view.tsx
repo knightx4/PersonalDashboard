@@ -7,7 +7,7 @@ import { formatDay } from '@/lib/goals/dates';
 import { formatMoney } from '@/lib/money';
 import type { RecurringPeriod } from '@/lib/recurring/extraction';
 import type { MonthlyTotal, RecurringRow, RecurringView } from '@/lib/recurring/view';
-import { PaymentRow } from './payment-row';
+import { PaymentRow, type PaymentChoice } from './payment-row';
 
 /**
  * Everything the person pays for regularly (plan #1126): what it comes to a
@@ -15,7 +15,7 @@ import { PaymentRow } from './payment-row';
  * charging and may have lapsed, then the cancelled.
  *
  * Presentational, so /preview photographs it with fixture rows; each row's
- * corrections (rename, and the ones feature #1193 adds) live in PaymentRow.
+ * corrections (rename, merge, and the ones feature #1193 adds) live in PaymentRow.
  */
 
 const PER: Record<RecurringPeriod, string> = {
@@ -70,15 +70,18 @@ function Row({
   row,
   today,
   when,
+  choices,
 }: {
   row: RecurringRow;
   today: string;
   when: string;
+  choices: readonly PaymentChoice[];
 }) {
   return (
     <PaymentRow
       id={row.id}
       payee={row.payee}
+      others={choices.filter((c) => c.id !== row.id)}
       details={
         <>
           <p className="text-ui text-ink-muted">
@@ -118,7 +121,9 @@ function Section({
         <h2 className="text-body font-semibold text-ink">{title}</h2>
         {note && <p className="text-ui text-ink-muted">{note}</p>}
       </div>
-      <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}>
+      <ul
+        className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}
+      >
         {children}
       </ul>
     </section>
@@ -137,6 +142,11 @@ export function RecurringPaymentsView({ view, today }: { view: RecurringView; to
       />
     );
   }
+
+  // Every payment, by name, for the merge picker on each row.
+  const choices: PaymentChoice[] = [...view.active, ...view.lapsed, ...view.cancelled]
+    .map((row) => ({ id: row.id, payee: row.payee }))
+    .sort((a, b) => a.payee.localeCompare(b.payee));
 
   const uncounted = view.total.reduce((sum, t) => sum + t.uncounted, 0);
   const rises = [...view.active, ...view.lapsed].filter((row) => row.rise).length;
@@ -161,7 +171,9 @@ export function RecurringPaymentsView({ view, today }: { view: RecurringView; to
           },
         ]
       : []),
-    ...(rises > 0 ? [{ value: String(rises), label: rises === 1 ? 'price went up' : 'prices went up' }] : []),
+    ...(rises > 0
+      ? [{ value: String(rises), label: rises === 1 ? 'price went up' : 'prices went up' }]
+      : []),
   ];
 
   return (
@@ -176,18 +188,27 @@ export function RecurringPaymentsView({ view, today }: { view: RecurringView; to
       {view.active.length > 0 && (
         <Section title="Coming up">
           {view.active.map((row) => (
-            <Row key={row.id} row={row} today={today} when={nextLabel(row, today, 'active')} />
+            <Row
+              key={row.id}
+              row={row}
+              today={today}
+              when={nextLabel(row, today, 'active')}
+              choices={choices}
+            />
           ))}
         </Section>
       )}
 
       {view.lapsed.length > 0 && (
-        <Section
-          title="May have lapsed"
-          note="A charge was expected and none has arrived since"
-        >
+        <Section title="May have lapsed" note="A charge was expected and none has arrived since">
           {view.lapsed.map((row) => (
-            <Row key={row.id} row={row} today={today} when={nextLabel(row, today, 'lapsed')} />
+            <Row
+              key={row.id}
+              row={row}
+              today={today}
+              when={nextLabel(row, today, 'lapsed')}
+              choices={choices}
+            />
           ))}
         </Section>
       )}
@@ -199,7 +220,10 @@ export function RecurringPaymentsView({ view, today }: { view: RecurringView; to
               key={row.id}
               row={row}
               today={today}
-              when={row.lastChargedOn ? `Last charged ${day(row.lastChargedOn, today)}` : 'Cancelled'}
+              when={
+                row.lastChargedOn ? `Last charged ${day(row.lastChargedOn, today)}` : 'Cancelled'
+              }
+              choices={choices}
             />
           ))}
         </Section>
