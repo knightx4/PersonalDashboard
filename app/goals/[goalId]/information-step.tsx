@@ -492,6 +492,21 @@ function RecordTable({
   const columnKeys = new Set(columns.map((f) => f.key));
   const rest = liveFields(collection.fields).filter((f) => !columnKeys.has(f.key));
   const openedRecord = records.find((r) => r.id === opened) ?? null;
+  // A draft with the ID of a saved row updates that row when confirmed
+  // (plan #1023), so its button says so.
+  const savedIds = new Set(
+    id
+      ? records
+          .filter((r) => !r.draft && r.data[id.key] !== null && r.data[id.key] !== undefined)
+          .map((r) => String(r.data[id.key]))
+      : [],
+  );
+  const updatesSaved = (record: CollectionRecord) =>
+    id !== null &&
+    record.draft &&
+    record.data[id.key] !== null &&
+    record.data[id.key] !== undefined &&
+    savedIds.has(String(record.data[id.key]));
 
   async function archive(record: CollectionRecord) {
     const form = new FormData();
@@ -571,7 +586,14 @@ function RecordTable({
                   <TD className="max-md:justify-end">
                     <div className="flex items-center justify-end gap-1">
                       {!record.draft && <SourceLink record={record} truncate />}
-                      {record.draft && <ConfirmButton stepId={node.id} record={record} compact />}
+                      {record.draft && (
+                        <ConfirmButton
+                          stepId={node.id}
+                          record={record}
+                          compact
+                          updates={updatesSaved(record)}
+                        />
+                      )}
                       <ActionMenu label={`Row ${rowName(columns, record)} actions`} items={menu} />
                     </div>
                   </TD>
@@ -701,10 +723,13 @@ function ConfirmButton({
   stepId,
   record,
   compact = false,
+  updates = false,
 }: {
   stepId: string;
   record: CollectionRecord;
   compact?: boolean;
+  /** Confirming updates the saved row with the same ID instead of adding this one. */
+  updates?: boolean;
 }) {
   const toast = useToast();
   const [, confirm, confirming] = useActionState(
@@ -725,11 +750,21 @@ function ConfirmButton({
         variant="secondary"
         pending={confirming}
         aria-label={
-          compact ? `Confirm draft ${SOURCE_LABELS[record.source].toLowerCase()}` : undefined
+          updates
+            ? `Update the saved row with this draft ${SOURCE_LABELS[record.source].toLowerCase()}`
+            : compact
+              ? `Confirm draft ${SOURCE_LABELS[record.source].toLowerCase()}`
+              : undefined
         }
-        title={compact ? `Draft, ${SOURCE_LABELS[record.source].toLowerCase()}` : undefined}
+        title={
+          updates
+            ? `Draft, ${SOURCE_LABELS[record.source].toLowerCase()}. Confirming puts these figures on the saved row with the same ID.`
+            : compact
+              ? `Draft, ${SOURCE_LABELS[record.source].toLowerCase()}`
+              : undefined
+        }
       >
-        Confirm
+        {updates ? 'Update row' : 'Confirm'}
       </Button>
     </form>
   );

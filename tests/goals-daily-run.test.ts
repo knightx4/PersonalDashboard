@@ -121,7 +121,7 @@ describe('runGoalsDaily', () => {
     const fetch = okFetch();
     const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
 
-    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 1, held: 0, answers: 0, stale: 0, evidence: null });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 1, held: 0, answers: 0, stale: 0, evidence: null, statements: 0 });
     expect(writes[0]).toMatchObject({
       table: 'runs',
       op: 'insert',
@@ -142,7 +142,7 @@ describe('runGoalsDaily', () => {
     const { client } = fakeClient({ items: [GOAL, worked] });
     const fetch = okFetch();
     const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
-    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 0, stale: 0, evidence: null });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 0, stale: 0, evidence: null, statements: 0 });
     const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     const text = (JSON.parse(init.body as string) as { text: string }).text;
     expect(text).toContain('goals.reviews');
@@ -163,6 +163,42 @@ describe('runGoalsDaily', () => {
     const text = (JSON.parse(init.body as string) as { text: string }).text;
     expect(text).toContain('Jev read the 3 new items since the last run.');
     expect(text).not.toContain('(in Jobs, Gmail, their calendar or Todo)');
+  });
+
+  it('asks for the new statements first when a collection has a sender to search (plan #1023)', async () => {
+    const { client } = fakeClient({ items: [GOAL, READY] });
+    const fetch = okFetch();
+    const statements = vi.fn(async () => [
+      {
+        collectionId: 'c1',
+        name: 'loans',
+        idKey: 'loan_id',
+        idLabel: 'Loan ID',
+        kinds: [{ id: 'k1', name: 'Edfinancial statement' }],
+        senders: ['Edfinancial'],
+        query: 'from:Edfinancial after:2026/09/17',
+        rows: [],
+      },
+    ]);
+    const result = await runGoalsDaily({ client, routine, now: NOW, fetch, statements });
+    expect(result).toMatchObject({ started: true, statements: 1 });
+    expect(statements).toHaveBeenCalledWith(client, USER, expect.any(String));
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    const text = (JSON.parse(init.body as string) as { text: string }).text;
+    expect(text).toContain('Search Gmail for: from:Edfinancial after:2026/09/17');
+    expect(text.indexOf('Reading new')).toBeLessThan(text.indexOf('goals.reviews'));
+  });
+
+  it('runs without the statements when they cannot be read', async () => {
+    const { client } = fakeClient({ items: [GOAL, READY] });
+    const fetch = okFetch();
+    const statements = vi.fn(async () => {
+      throw new Error('down');
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const result = await runGoalsDaily({ client, routine, now: NOW, fetch, statements });
+    warn.mockRestore();
+    expect(result).toMatchObject({ started: true, statements: 0 });
   });
 
   it('spends no run when no goal is open and nothing is ready', async () => {
@@ -198,7 +234,7 @@ describe('runGoalsDaily', () => {
     });
     const fetch = okFetch();
     const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
-    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 1, stale: 0, evidence: null });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 1, stale: 0, evidence: null, statements: 0 });
     const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     const text = (JSON.parse(init.body as string) as { text: string }).text;
     expect(text).toContain('"List the loans" (goals.items id s2)');

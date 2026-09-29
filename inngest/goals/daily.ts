@@ -18,6 +18,8 @@ import { reviewGoals } from '@/lib/goals/reviews';
 import { loadGoalActivity, loadLatestReviews } from '@/lib/goals/reviews-store';
 import { recordAndFire } from '@/lib/goals/shaping-store';
 import { STALE_STEP_LIMIT, staleSteps } from '@/lib/goals/stale-steps';
+import { statementLines, type StatementSource } from '@/lib/goals/statements';
+import { loadStatementSources } from '@/lib/goals/statements-store';
 import { loadStepTouches } from '@/lib/goals/stale-steps-store';
 import { accountToday, loadLiveTree } from '@/lib/goals/steps-store';
 import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
@@ -33,7 +35,9 @@ import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
  * steps that are ready and the information steps with an answer out of date
  * (plan #989). Before the brief is written, Jev reads everything that arrived
  * since the last run against the person's open steps, and the brief lists
- * only what bears on one (plan #1176). A status is never more than a day old because this run writes
+ * only what bears on one (plan #1176). Collections with a learned sender are
+ * listed first, with the Gmail search that finds their new statements (plan
+ * #1023). A status is never more than a day old because this run writes
  * one every day, so it no longer waits for a ready step. It starts nothing when the routine
  * is not set on the deployment, when a morning run already started in the
  * last twenty hours, or when there is no open goal and nothing to work,
@@ -61,6 +65,8 @@ export type GoalsDailyResult =
        * session searched for itself.
        */
       evidence: number | null;
+      /** Collections whose new Gmail statements the run was asked to read (plan #1023). */
+      statements: number;
     };
 
 export type GoalsDailyDeps = {
@@ -70,6 +76,12 @@ export type GoalsDailyDeps = {
   fetch?: typeof globalThis.fetch;
   /** Stands in for readEvidence, so a test need not answer every schema's reads. */
   evidence?: (input: EvidenceInput) => Promise<EvidenceBrief | null>;
+  /** Stands in for loadStatementSources, for the same reason. */
+  statements?: (
+    client: GoalsSupabaseClient,
+    userId: string,
+    today: string,
+  ) => Promise<StatementSource[]>;
 };
 
 type EvidenceInput = {
@@ -191,6 +203,17 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
         })
       : null;
 
+  // New statements are read first, so the review sees current figures. A
+  // failed read leaves them for tomorrow rather than holding up the run.
+  let statements: StatementSource[] = [];
+  try {
+    statements = await (deps?.statements ?? loadStatementSources)(client, userId, today);
+  } catch (error) {
+    console.warn(
+      `[goals] statement sources not read: ${error instanceof Error ? error.message : 'failed'}`,
+    );
+  }
+
   const result = await recordAndFire({
     client,
     userId,
@@ -205,6 +228,7 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
         review,
         stale: sitting,
         evidence: evidence?.lines ?? null,
+        statements: statementLines(statements),
       }),
     fetch: deps?.fetch,
   });
@@ -222,5 +246,6 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
     answers: answers.length,
     stale: sitting.length,
     evidence: evidence?.steps ?? null,
+    statements: statements.length,
   };
 }

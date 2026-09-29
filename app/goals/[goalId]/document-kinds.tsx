@@ -95,6 +95,11 @@ function KindRow({
       {kind.recognise && (
         <p className="text-small text-ink-muted">Recognised by: {kind.recognise}</p>
       )}
+      {kind.senders.length > 0 && (
+        <p className="text-small text-ink-muted">
+          Comes from: {kind.senders.join(', ')}. Dash looks for new ones in Gmail each morning.
+        </p>
+      )}
       {notes.length > 0 && (
         <ul className="space-y-0.5">
           {notes.map((field) => (
@@ -174,6 +179,18 @@ function KindForm({
           rows={2}
           defaultValue={kind.recognise}
           maxLength={RECOGNISE_MAX}
+        />
+      </Field>
+      <Field
+        id={`${formId}-senders`}
+        label="Who sends it"
+        hint="An address, a domain or a name, one a line. Dash searches Gmail for new ones from these each morning. Leave it empty for a document that is not emailed."
+      >
+        <Textarea
+          id={`${formId}-senders`}
+          name="senders"
+          rows={1}
+          defaultValue={kind.senders.join('\n')}
         />
       </Field>
       {fields.map((field) => (

@@ -1,6 +1,6 @@
 ---
 name: goals
-description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps that start from the questions later steps need, with a collection built from the first document and pre-filled as drafts, choices made with judgement and written on the steps they shape, a question with lettered options only for what Claude cannot settle itself, provisional steps for what hangs on one, and the kinds of weekly help that fit the goal as a proposal on its page. Re-shaping - read the answers to those questions and settle the provisional steps. Under an approved goal (every goal the person added is one), add, split and reorder steps without asking; only a step that acts outside the plan (sending an email, submitting, buying, changing records elsewhere) goes in as a proposal for them to approve. Morning run - close each step of the person's it can see has happened (in Jobs, Gmail, the calendar or Todo) with a note naming the evidence, give each step of theirs untouched for a week a move (split it, prepare it, or ask whether they still want it), then give each open goal its status for the day (on track, stalled, waiting on you, waiting on a date or waiting on another goal) with the next move and its date, adding that move as a step for a stalled goal, then work the ready Claude steps and store what each produced on the step. Weekly run - research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind, and leave a note on every open goal. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
+description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps that start from the questions later steps need, with a collection built from the first document and pre-filled as drafts, choices made with judgement and written on the steps they shape, a question with lettered options only for what Claude cannot settle itself, provisional steps for what hangs on one, and the kinds of weekly help that fit the goal as a proposal on its page. Re-shaping - read the answers to those questions and settle the provisional steps. Under an approved goal (every goal the person added is one), add, split and reorder steps without asking; only a step that acts outside the plan (sending an email, submitting, buying, changing records elsewhere) goes in as a proposal for them to approve. Morning run - read new statements from Gmail into their collections by ID (ordinary changes straight in, the rest as drafts), close each step of the person's it can see has happened (in Jobs, Gmail, the calendar or Todo) with a note naming the evidence, give each step of theirs untouched for a week a move (split it, prepare it, or ask whether they still want it), then give each open goal its status for the day (on track, stalled, waiting on you, waiting on a date or waiting on another goal) with the next move and its date, adding that move as a step for a stalled goal, then work the ready Claude steps and store what each produced on the step. Weekly run - research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind, and leave a note on every open goal. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
 ---
 
 # Working a goal
@@ -524,6 +524,11 @@ returning id;
      (`learnKind` in `lib/goals/document-kinds.ts`).
    - `skipped` lists the labels you chose to leave off the form, so the
      reader does not suggest them again.
+   - `senders` lists who sends documents of this kind, when they arrive by
+     email: an address, a domain or a name, up to ten, as Gmail's `from:`
+     takes them (`["Edfinancial", "edfinancial.com"]`). The morning run
+     searches Gmail for new ones from these ("Reading new statements from
+     Gmail"). Leave it `[]` for a document that is not emailed.
 
 ### Filing a document you were given
 
@@ -584,6 +589,9 @@ values ('<user>', '<collection id>',
 - Every record you write is a draft. The database refuses a record from you
   that is not, and refuses you confirming one. Confirming is the person's
   press on the step.
+- Write down the kind of statement it was (point 7 of "Information steps"),
+  with the sender in `senders`, so the morning run keeps the collection
+  current from new ones.
 - If the Gmail connector is not attached to this run, or finds nothing, write
   the information step without drafts and say which in the run summary.
 
@@ -1462,8 +1470,65 @@ The daily cron fires the routine each morning while there is an open goal
 (`inngest/goals/daily.ts`), with the `goals.runs` row it wrote with `job`
 `daily` and a brief listing every open goal to review, then the `claude`
 steps that are ready and the information steps with an answer out of date.
-Review first ("Reviewing each goal", below), then work only the steps it
-names.
+When a collection has a sender to search, the brief lists it first: read
+those statements before anything else ("Reading new statements from Gmail",
+below), so the review sees current figures. Then review ("Reviewing each
+goal"), then work only the steps it names.
+
+### Reading new statements from Gmail
+
+A collection whose documents arrive by email has a learned kind with
+`senders` (`goals.document_kinds.senders`). The brief lists each such
+collection with the Gmail search to run and every saved row by its ID: the
+tracked values as they stand, the date its figures are as of, and the most
+each money value may move and still go straight in. That figure is a
+month's payment plus a month's interest on the row
+(`ordinaryLimit` in `lib/goals/statements.ts`).
+
+1. Run the search through the **Gmail** connector and read every message
+   it finds. Skip a message that is not a statement of the listed kinds
+   (a marketing email, a password reset) and one whose figures are not newer
+   than the row's date.
+2. Match each loan or account the statement names to a row by the ID
+   field. A statement often masks an ID (`*****8042P25G01426001`, or the
+   last four digits): it matches when the characters it shows agree and
+   they name exactly one row.
+3. **Straight in** when the statement matches a saved row by its ID and
+   the change is ordinary (the person's answer on plan #1022): every value
+   that changed is a date, or a tracked money value that moved by no more
+   than the figure the brief gives for that row. Update the row in place.
+   The readings and the goal's number follow from the update, dated by
+   `as_of`:
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+update goals.records
+   set data = data || '{"balance": 80686.15, "interest": 12076.15, "next_due": "2027-01-18"}'::jsonb,
+       as_of = '<the statement date>', source = 'gmail', source_ref = '<the Gmail message id>'
+ where id = '<the row id from the brief>' and user_id = '<user>'
+   and not draft and archived_at is null;
+```
+
+4. **Anything else waits** as a draft: a balance that moved by more than
+   the figure, a new status, rate or payment amount, an ID that matches no
+   row or more than one. Insert it as "Pre-filling from Gmail" says, with
+   the row's ID in the ID field. On the step, a draft carrying a saved row's
+   ID shows **Update row**, and confirming it puts the draft's values on that
+   row (`confirmRecord` in `lib/goals/collections-store.ts`), so do not
+   leave out the ID to avoid a duplicate. Write one draft per row, and check
+   for a draft already waiting with that ID and date before writing another.
+   Name each held change and why it waited in the run summary ("Grad PLUS
+   2024–25: balance fell by $10,000, more than a month's payment and
+   interest").
+5. Only the values the statement gives go in. Leave a value it does not
+   give as it is; never carry a figure over from another loan.
+6. Date the kind: set its `last_read_at` to now. If the message came from
+   an address the kind's `senders` do not already cover, add it.
+
+With nothing new in the search, write nothing and say so in the summary in
+one line. If the Gmail connector is not attached to the run, say that
+instead: the rows stay as they are until the next morning.
 
 ### Working the ready steps
 

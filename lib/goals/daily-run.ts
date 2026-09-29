@@ -76,7 +76,9 @@ export function ranRecently(lastDailyRunAt: string | null, now: number): boolean
  * of the person's that have sat for a week and need a move (plan #1083),
  * then every open goal to give a status (plan #1074), then the steps to work
  * and the information steps whose answers are out of date (plan #989), so
- * the session does not have to decide what is ready or what has sat.
+ * the session does not have to decide what is ready or what has sat. When a
+ * collection has senders to search, the new statements come first (plan
+ * #1023), so the goals are reviewed on current figures.
  */
 export function dailyRunText(input: {
   userId: string;
@@ -91,6 +93,12 @@ export function dailyRunText(input: {
    * the session then searches Jobs, Gmail, the calendar and Todo itself.
    */
   evidence?: string[] | null;
+  /**
+   * The collections to read new Gmail statements into, first thing (plan
+   * #1023; statementLines in lib/goals/statements.ts). Absent or empty when
+   * no collection has a sender to search.
+   */
+  statements?: string[];
 }): string {
   const answers = input.answers ?? [];
   const review = input.review ?? [];
@@ -106,6 +114,7 @@ export function dailyRunText(input: {
   return [
     'The morning run.',
     '',
+    ...(input.statements ?? []),
     ...(review.length > 0
       ? [
           ...(input.evidence

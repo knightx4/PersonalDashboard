@@ -17,10 +17,11 @@ type KindRow = {
   recognise: string;
   field_notes: Record<string, string>;
   skipped: string[];
+  senders: string[] | null;
   last_read_at: string | null;
 };
 
-const COLUMNS = 'id, collection_id, name, recognise, field_notes, skipped, last_read_at';
+const COLUMNS = 'id, collection_id, name, recognise, field_notes, skipped, senders, last_read_at';
 
 const toKind = (row: KindRow): LearnedKind => ({
   id: row.id,
@@ -29,6 +30,7 @@ const toKind = (row: KindRow): LearnedKind => ({
   recognise: row.recognise,
   fieldNotes: row.field_notes ?? {},
   skipped: row.skipped ?? [],
+  senders: row.senders ?? [],
   lastReadAt: row.last_read_at,
 });
 
@@ -73,17 +75,27 @@ export async function writeKind(
 
 export type KindEditResult = { ok: true } | { ok: false; error: string };
 
-/** The person's edit of a kind on the step: its name, how to recognise it, its notes and what it leaves out. */
+/**
+ * The person's edit of a kind on the step: its name, how to recognise it,
+ * who sends it, its notes and what it leaves out.
+ */
 export async function editKind(
   client: GoalsSupabaseClient,
   id: string,
-  edit: { name: string; recognise: string; fieldNotes: Record<string, string>; skipped: string[] },
+  edit: {
+    name: string;
+    recognise: string;
+    senders: string[];
+    fieldNotes: Record<string, string>;
+    skipped: string[];
+  },
 ): Promise<KindEditResult> {
   const { data, error } = await client
     .from('document_kinds')
     .update({
       name: edit.name,
       recognise: edit.recognise,
+      senders: edit.senders,
       field_notes: edit.fieldNotes,
       skipped: edit.skipped,
     })
