@@ -121,7 +121,7 @@ describe('runGoalsDaily', () => {
     const fetch = okFetch();
     const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
 
-    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 1, held: 0, answers: 0, stale: 0, evidence: null, statements: 0 });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 1, held: 0, answers: 0, stale: 0, unjudged: 0, evidence: null, statements: 0 });
     expect(writes[0]).toMatchObject({
       table: 'runs',
       op: 'insert',
@@ -142,7 +142,7 @@ describe('runGoalsDaily', () => {
     const { client } = fakeClient({ items: [GOAL, worked] });
     const fetch = okFetch();
     const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
-    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 0, stale: 0, evidence: null, statements: 0 });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 0, stale: 0, unjudged: 0, evidence: null, statements: 0 });
     const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     const text = (JSON.parse(init.body as string) as { text: string }).text;
     expect(text).toContain('goals.reviews');
@@ -234,7 +234,7 @@ describe('runGoalsDaily', () => {
     });
     const fetch = okFetch();
     const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
-    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 1, stale: 0, evidence: null, statements: 0 });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 1, stale: 0, unjudged: 0, evidence: null, statements: 0 });
     const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     const text = (JSON.parse(init.body as string) as { text: string }).text;
     expect(text).toContain('"List the loans" (goals.items id s2)');
@@ -249,7 +249,7 @@ describe('runGoalsDaily', () => {
     });
     const fresh = item({
       id: 's4', level: 'step', parent_id: 'g', kind: 'mine', title: 'Pick a gym',
-      created_at: old, updated_at: old,
+      created_at: old, updated_at: old, prep_checked_at: old,
     });
     const worked = { ...READY, result: 'Gym A', status: 'done', created_at: old, updated_at: old };
     const { client } = fakeClient({
@@ -264,6 +264,33 @@ describe('runGoalsDaily', () => {
     expect(text).toContain('"Book a trial class" (goals.items id s3), under the goal "Get fit": untouched 14 days');
     expect(text).toContain('Moving a step');
     expect(text).not.toContain('Pick a gym');
+  });
+
+  it('lists steps of yours not judged for a prep step, leaving off the stale ones (plan #1217)', async () => {
+    const old = '2026-09-10T09:00:00Z';
+    const sat = item({
+      id: 's3', level: 'step', parent_id: 'g', kind: 'mine', title: 'Book a trial class',
+      created_at: old, updated_at: old,
+    });
+    const added = item({
+      id: 's5', level: 'step', parent_id: 'g', kind: 'mine', title: 'Apply to the climbing gym job',
+      created_at: '2026-09-23T09:00:00Z', updated_at: '2026-09-23T09:00:00Z',
+    });
+    const judged = item({
+      id: 's6', level: 'step', parent_id: 'g', kind: 'mine', title: 'Clear off the couch',
+      created_at: '2026-09-23T09:00:00Z', updated_at: '2026-09-23T09:00:00Z',
+      prep_checked_at: '2026-09-23T10:00:00Z',
+    });
+    const { client } = fakeClient({ items: [GOAL, sat, added, judged] });
+    const fetch = okFetch();
+    const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
+    expect(result).toMatchObject({ started: true, stale: 1, unjudged: 1 });
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    const text = (JSON.parse(init.body as string) as { text: string }).text;
+    expect(text).toContain('"Apply to the climbing gym job" (goals.items id s5), under the goal "Get fit"\n');
+    expect(text).toContain('"A Dash step before yours"');
+    expect(text.match(/Book a trial class/g)).toHaveLength(1);
+    expect(text).not.toContain('Clear off the couch');
   });
 
   it('runs once a morning, however often the cron fires', async () => {
