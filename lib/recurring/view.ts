@@ -131,6 +131,12 @@ export type RecurringView = {
   /** Past their next date with no charge since, longest gone first. */
   lapsed: RecurringRow[];
   cancelled: RecurringRow[];
+  /**
+   * Left out of the total by the person (plan #1213), by name. Kept off the
+   * agenda too, as decision #1219 settled: a card statement's due date is the
+   * bank's to show.
+   */
+  ignored: RecurringRow[];
   /** What the active payments come to a month, one line per currency. */
   total: MonthlyTotal[];
   /** What the lapsed ones would add, if they are in fact still running. */
@@ -173,7 +179,11 @@ function totals(rows: readonly RecurringRow[]): MonthlyTotal[] {
 
 function bySoonest(a: RecurringRow, b: RecurringRow): number {
   if (a.nextDate && b.nextDate) {
-    return a.nextDate === b.nextDate ? a.payee.localeCompare(b.payee) : a.nextDate < b.nextDate ? -1 : 1;
+    return a.nextDate === b.nextDate
+      ? a.payee.localeCompare(b.payee)
+      : a.nextDate < b.nextDate
+        ? -1
+        : 1;
   }
   if (a.nextDate) return -1;
   if (b.nextDate) return 1;
@@ -187,10 +197,12 @@ export function buildRecurringView(
   const active: RecurringRow[] = [];
   const lapsed: RecurringRow[] = [];
   const cancelled: RecurringRow[] = [];
+  const ignored: RecurringRow[] = [];
 
   for (const payment of payments) {
     const entry = row(payment, today);
-    if (payment.status === 'cancelled') cancelled.push(entry);
+    if (payment.status === 'ignored') ignored.push(entry);
+    else if (payment.status === 'cancelled') cancelled.push(entry);
     else if (mayHaveLapsed(payment, today)) lapsed.push(entry);
     else active.push(entry);
   }
@@ -198,11 +210,13 @@ export function buildRecurringView(
   active.sort(bySoonest);
   lapsed.sort(bySoonest);
   cancelled.sort((a, b) => a.payee.localeCompare(b.payee));
+  ignored.sort((a, b) => a.payee.localeCompare(b.payee));
 
   return {
     active,
     lapsed,
     cancelled,
+    ignored,
     total: totals(active),
     lapsedTotal: totals(lapsed),
   };

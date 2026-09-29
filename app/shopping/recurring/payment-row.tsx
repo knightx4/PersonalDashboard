@@ -4,11 +4,13 @@ import { useActionState, useRef, useState, type ReactNode } from 'react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
 import { InlineInput, Input, Select } from '@/components/ui/field';
+import { useToast } from '@/components/ui/toast';
 import { PAYEE_MAX } from '@/lib/recurring/limits';
 import {
   mergeRecurringPayment,
   moveRecurringCharges,
   renameRecurringPayment,
+  setRecurringCounted,
   type RecurringActionState,
 } from './actions';
 
@@ -25,6 +27,10 @@ import {
  * Move charges… opens the row's charges under it (plan #1211): tick one, or
  * every charge at one amount at once, and send them to another payment or to
  * a new one named there. Both payments are worked out again afterwards.
+ *
+ * Leave out of the total (plan #1213) moves the payment to the page's folded
+ * "Not counted" section and off the agenda; from there, Count in the total
+ * brings it back. A failure shows as a toast, since the menu has closed.
  *
  * The details under the name and the amount are drawn by the server view and
  * passed in, so the page stays presentational for /preview.
@@ -50,6 +56,7 @@ export function PaymentRow({
   amount,
   others,
   charges,
+  counted = true,
 }: {
   id: string;
   payee: string;
@@ -59,7 +66,10 @@ export function PaymentRow({
   others: readonly PaymentChoice[];
   /** Its charges, newest first, the ones that can be moved out of it. */
   charges: readonly ChargeChoice[];
+  /** False for a payment left out of the total; its menu then offers to count it. */
+  counted?: boolean;
 }) {
+  const toast = useToast();
   const [renameState, rename, renaming] = useActionState(renameRecurringPayment, initial);
   const [mergeState, merge, mergingNow] = useActionState(mergeRecurringPayment, initial);
   const [panel, setPanel] = useState<'merge' | 'move' | null>(null);
@@ -88,6 +98,29 @@ export function PaymentRow({
       label: 'Move charges…',
       disabled: charges.length === 0,
       onSelect: () => setPanel('move'),
+    },
+    {
+      id: 'counted',
+      label: counted ? 'Leave out of the total' : 'Count in the total',
+      formAction: async (form: FormData) => {
+        const result = await setRecurringCounted(initial, form);
+        if (result.error) {
+          toast({ text: result.error });
+          return;
+        }
+        // The row moves to the other section, so say where it went.
+        toast({
+          text: counted ? `${payee} left out of the total` : `${payee} counted in the total`,
+          undo: async () => {
+            const back = new FormData();
+            back.set('id', id);
+            back.set('counted', counted ? 'yes' : 'no');
+            const undone = await setRecurringCounted(initial, back);
+            if (undone.error) throw new Error(undone.error);
+          },
+        });
+      },
+      formFields: { id, counted: counted ? 'no' : 'yes' },
     },
   ];
 

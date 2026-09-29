@@ -1,6 +1,7 @@
 import { Repeat } from 'lucide-react';
 import { Figure } from '@/components/ui/figure';
 import { cardVariants } from '@/components/ui/card';
+import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
@@ -12,7 +13,8 @@ import { PaymentRow, type ChargeChoice, type PaymentChoice } from './payment-row
 /**
  * Everything the person pays for regularly (plan #1126): what it comes to a
  * month, then each payment by its next date, then the ones that stopped
- * charging and may have lapsed, then the cancelled.
+ * charging and may have lapsed, then the cancelled, then, folded, the ones
+ * the person left out of the total (plan #1213).
  *
  * Presentational, so /preview photographs it with fixture rows; each row's
  * corrections (rename, merge, move charges, and the ones feature #1193 adds)
@@ -89,16 +91,19 @@ function Row({
   today,
   when,
   choices,
+  counted = true,
 }: {
   row: RecurringRow;
   today: string;
   when: string;
   choices: readonly PaymentChoice[];
+  counted?: boolean;
 }) {
   return (
     <PaymentRow
       id={row.id}
       payee={row.payee}
+      counted={counted}
       others={choices.filter((c) => c.id !== row.id)}
       charges={chargeChoices(row, today)}
       details={
@@ -150,7 +155,8 @@ function Section({
 }
 
 export function RecurringPaymentsView({ view, today }: { view: RecurringView; today: string }) {
-  const count = view.active.length + view.lapsed.length + view.cancelled.length;
+  const count =
+    view.active.length + view.lapsed.length + view.cancelled.length + view.ignored.length;
   if (count === 0) {
     return (
       <EmptyState
@@ -163,7 +169,12 @@ export function RecurringPaymentsView({ view, today }: { view: RecurringView; to
   }
 
   // Every payment, by name, for the merge and move pickers on each row.
-  const choices: PaymentChoice[] = [...view.active, ...view.lapsed, ...view.cancelled]
+  const choices: PaymentChoice[] = [
+    ...view.active,
+    ...view.lapsed,
+    ...view.cancelled,
+    ...view.ignored,
+  ]
     .map((row) => ({ id: row.id, payee: row.payee }))
     .sort((a, b) => a.payee.localeCompare(b.payee));
 
@@ -177,6 +188,7 @@ export function RecurringPaymentsView({ view, today }: { view: RecurringView; to
     uncounted > 0
       ? `${uncounted} with no amount or no period ${uncounted === 1 ? 'is' : 'are'} left out`
       : null,
+    view.ignored.length > 0 ? `${view.ignored.length} you marked as not counted` : null,
   ]
     .filter(Boolean)
     .join('; ');
@@ -246,6 +258,35 @@ export function RecurringPaymentsView({ view, today }: { view: RecurringView; to
             />
           ))}
         </Section>
+      )}
+
+      {view.ignored.length > 0 && (
+        <Disclosure
+          title="Not counted"
+          meta={`${view.ignored.length} left out of the total and the agenda`}
+        >
+          <ul
+            className={cn(
+              cardVariants({ padding: 'none' }),
+              'divide-y divide-border overflow-hidden',
+            )}
+          >
+            {view.ignored.map((row) => (
+              <Row
+                key={row.id}
+                row={row}
+                today={today}
+                when={
+                  row.lastChargedOn
+                    ? `Last seen ${day(row.lastChargedOn, today)}`
+                    : 'Left out of the total'
+                }
+                choices={choices}
+                counted={false}
+              />
+            ))}
+          </ul>
+        </Disclosure>
       )}
     </div>
   );

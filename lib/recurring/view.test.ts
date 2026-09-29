@@ -6,7 +6,9 @@ import { buildRecurringView, mayHaveLapsed, monthlyCents, priceRise } from './vi
 
 const TODAY = '2026-09-27';
 
-function charge(over: Partial<RecurringCharge> & Pick<RecurringCharge, 'occurredOn'>): RecurringCharge {
+function charge(
+  over: Partial<RecurringCharge> & Pick<RecurringCharge, 'occurredOn'>,
+): RecurringCharge {
   return {
     id: `c-${over.occurredOn}`,
     messageId: null,
@@ -20,7 +22,9 @@ function charge(over: Partial<RecurringCharge> & Pick<RecurringCharge, 'occurred
   };
 }
 
-function payment(over: Partial<RecurringPayment> & Pick<RecurringPayment, 'payee'>): RecurringPayment {
+function payment(
+  over: Partial<RecurringPayment> & Pick<RecurringPayment, 'payee'>,
+): RecurringPayment {
   return {
     id: over.payee,
     kind: 'subscription',
@@ -61,7 +65,14 @@ describe('priceRise', () => {
   it('counts a price notice before any charge at the new price', () => {
     const p = payment({
       payee: 'Tool',
-      charges: [charge({ occurredOn: '2026-08-22', event: 'price_change', amountCents: 4828, previousAmountCents: 4409 })],
+      charges: [
+        charge({
+          occurredOn: '2026-08-22',
+          event: 'price_change',
+          amountCents: 4828,
+          previousAmountCents: 4409,
+        }),
+      ],
     });
     expect(priceRise(p, TODAY)?.toCents).toBe(4828);
   });
@@ -82,7 +93,12 @@ describe('priceRise', () => {
       payee: 'Cover',
       period: 'year',
       charges: [
-        charge({ occurredOn: '2026-04-03', amountCents: 7124, previousAmountCents: 1081, period: 'year' }),
+        charge({
+          occurredOn: '2026-04-03',
+          amountCents: 7124,
+          previousAmountCents: 1081,
+          period: 'year',
+        }),
         charge({ occurredOn: '2026-02-27', amountCents: 1081, period: 'month' }),
       ],
     });
@@ -106,7 +122,9 @@ describe('mayHaveLapsed', () => {
 
   it('never flags a payment with no next date, or one cancelled', () => {
     expect(mayHaveLapsed(payment({ payee: 'a', nextDate: null }), TODAY)).toBe(false);
-    expect(mayHaveLapsed(payment({ payee: 'b', nextDate: '2026-01-01', status: 'cancelled' }), TODAY)).toBe(false);
+    expect(
+      mayHaveLapsed(payment({ payee: 'b', nextDate: '2026-01-01', status: 'cancelled' }), TODAY),
+    ).toBe(false);
   });
 });
 
@@ -119,6 +137,7 @@ describe('buildRecurringView', () => {
       payment({ payee: 'Unknown', amountCents: null, nextDate: '2026-10-01' }),
       payment({ payee: 'Cable', kind: 'bill', amountCents: 9595, nextDate: '2026-07-21' }),
       payment({ payee: 'Gone', status: 'cancelled', nextDate: null }),
+      payment({ payee: 'Chase', kind: 'bill', status: 'ignored', amountCents: 2423300 }),
     ],
     TODAY,
   );
@@ -135,5 +154,11 @@ describe('buildRecurringView', () => {
     expect(view.lapsed.map((r) => r.payee)).toEqual(['Cable']);
     expect(view.lapsedTotal).toEqual([{ currency: 'USD', cents: 9595, uncounted: 0 }]);
     expect(view.cancelled.map((r) => r.payee)).toEqual(['Gone']);
+  });
+
+  it('keeps a payment left out of the total in its own list, out of every total', () => {
+    expect(view.ignored.map((r) => r.payee)).toEqual(['Chase']);
+    expect(view.active.map((r) => r.payee)).not.toContain('Chase');
+    expect(view.lapsedTotal[0]!.cents).toBe(9595);
   });
 });
