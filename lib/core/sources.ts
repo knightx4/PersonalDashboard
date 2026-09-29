@@ -47,6 +47,17 @@ export const coreSources: ModuleSources = {
       href: (year) => `/timeline/year/${year}`,
       note: "The paragraphs are Dash's, not theirs: each is {topic, text, evidence}, with evidence as core.timeline refs (`schema.table:id`). totals holds the counts per kind, spend per currency, each month, the top shops and the goals with steps done. complete is false while the year was still going when it was written; through is how far it read.",
     },
+    {
+      table: 'core.week_reviews',
+      module: 'Home',
+      holds: 'What Dash wrote about each week, Sunday to Saturday: the week\'s counted numbers per module, observations tied to their goals, and one thing to change next week.',
+      weight: 'incidental',
+      search: ['observations', 'change'],
+      title: 'week',
+      ref: 'week',
+      href: (week) => `/home/week/${week}`,
+      note: "The observations and the change are Dash's, not theirs: each observation is {text, goal_id, evidence}, with goal_id a goals.goals id or null and evidence as `schema.table:id` refs. facts holds the numbers counted for the week. week is the Sunday it starts on. change_kept says whether the previous week's change happened (null when unknown). source 'plain' means no model wrote it.",
+    },
   ],
   notSources: [
     { table: 'core.account_settings', reason: 'Settings.' },
