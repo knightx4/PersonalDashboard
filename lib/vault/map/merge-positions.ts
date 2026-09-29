@@ -5,8 +5,11 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
 import type { LearnOperation } from '@/lib/learn/spend';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
+import { POSITION_MERGE_QUESTION, positionState } from '@/lib/vault/map/pair-jev-question';
 import {
+  jevGate,
   judgePairs,
+  judgeWithJev,
   proposalRow as mergeProposalRow,
   runMergePass,
   spendLedger,
@@ -230,11 +233,23 @@ export async function proposePositionMerges(
   core: Pick<CoreSupabaseClient, 'from'> | null,
   options: PositionMergeOptions & { userId?: string | null; anthropicApiKey: string },
 ): Promise<PositionMergeResult> {
+  const jevFor = jevGate(core);
+  const haiku = (pairs: PositionPair[], onSpend: (report: SpendReport) => void) =>
+    judgePositionPairs({ pairs, anthropicApiKey: options.anthropicApiKey, onSpend });
   return runPositionMerges(
     {
       ...positionMergeStore(supabase, options.userId ?? null),
-      judge: (pairs, onSpend) =>
-        judgePositionPairs({ pairs, anthropicApiKey: options.anthropicApiKey, onSpend }),
+      // Jev first for an account that opted in, Haiku for what it cannot settle (plan #1169).
+      judge: async (pairs, onSpend) =>
+        judgeWithJev({
+          kind: 'position',
+          pairs,
+          question: POSITION_MERGE_QUESTION,
+          state: positionState,
+          haiku,
+          onSpend,
+          enabled: await jevFor(pairs[0].userId),
+        }),
       ledger: spendLedger(core, OPERATION),
     },
     options,
