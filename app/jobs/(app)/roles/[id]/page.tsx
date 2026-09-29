@@ -159,7 +159,7 @@ export default async function RoleDetailPage({
     supabase
       .from('application_answers')
       .select(
-        'id, answer, status, word_limit, evidence_item_ids, unsupported_claims, questions!inner ( id, text, kind, canonical_answer, times_seen )',
+        'id, answer, status, word_limit, evidence_item_ids, unsupported_claims, questions!application_answers_question_id_fkey!inner ( id, text, kind, canonical_answer, times_seen )',
       )
       .eq('application_id', current.id),
     // The comment thread (note 89ad8bef): your notes and Dash's replies,

@@ -183,7 +183,7 @@ export async function proposeEvidence(
     // that no requirement will ever match.
     const { data: rows, error } = await supabase
       .from('application_answers')
-      .select('answer, questions!inner (text, kind)')
+      .select('answer, questions!application_answers_question_id_fkey!inner (text, kind)')
       .eq('user_id', user.id)
       .eq('status', 'approved')
       .eq('questions.kind', 'behavioral')

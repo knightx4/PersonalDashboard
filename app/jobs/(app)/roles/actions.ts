@@ -497,7 +497,7 @@ export async function draftAnswerFromEvidence(
     .from('application_answers')
     .select(
       `id, word_limit,
-       questions!inner ( text, canonical_answer ),
+       questions!application_answers_question_id_fkey!inner ( text, canonical_answer ),
        applications!inner ( roles!inner ( title, requirement_matches, companies!inner ( name ) ) )`,
     )
     .eq('id', parsed.data.answerId)
