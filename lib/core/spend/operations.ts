@@ -95,6 +95,10 @@ export const SPEND_OPERATIONS = {
     // Sorting every ingested email into a pile, beside the linkers' rules
     // (plan #1173). Jev, one call per email; background, during inbox ingest.
     'sort-email',
+    // Scoring what Dash writes against the writing guide (plan #1175). Jev,
+    // six yes/no questions in one call per plan row a session writes or
+    // comment reply Dash saves; background, no button.
+    'check-writing',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one
