@@ -6,6 +6,7 @@ import { unwrapQuotedOriginal } from '@/lib/email/extract/forwarded';
 import { decideWithJev } from '@/lib/jev/decide';
 import {
   heuristicRecurring,
+  namesTheStore,
   parseRecurringExtraction,
   type RecurringEvent,
   type RecurringExtraction,
@@ -143,13 +144,20 @@ export async function extractRecurringFromEmail(input: {
 }): Promise<RecurringReading> {
   // A forwarded receipt is read as the original.
   const email = unwrapQuotedOriginal(input);
-  const readHaiku = () =>
-    (input.haiku ?? readRecurringWithHaiku)({
+  // A reading that files a store's receipt under the store is no reading:
+  // it falls to the heuristic, which refuses it too (plan #1212).
+  const readHaiku = async (): Promise<RecurringHaikuReading> => {
+    const read = await (input.haiku ?? readRecurringWithHaiku)({
       email,
       receivedOn: input.receivedOn,
       apiKey: input.apiKey,
       onSpend: input.onSpend,
     });
+    if (read?.ok && namesTheStore(read.value.payee, email.fromAddress)) {
+      return { ok: false, notRecurring: false };
+    }
+    return read;
+  };
   const heuristic = () =>
     heuristicRecurring({
       subject: email.subject,

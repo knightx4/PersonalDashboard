@@ -3,6 +3,7 @@ import { authorizeCron, requestOrigin } from '@/inngest/cron/authorize';
 import { runInboxIncrementalSync } from '@/inngest/cron/inbox';
 import { runJobSweep } from '@/inngest/jobs/cron/sweep';
 import { runJdBackfill } from '@/inngest/jobs/cron/jd-backfill';
+import { runRecurringReread } from '@/inngest/cron/recurring-reread';
 import { runVaultSyncForAll } from '@/inngest/vault/sync';
 import { runClaimSweep } from '@/inngest/dev/claims';
 import { runDevDigest } from '@/inngest/dev/digest';
@@ -61,6 +62,9 @@ export async function GET(request: NextRequest) {
   const origin = requestOrigin(request);
   const stages: Stage[] = [
     { name: 'inbox', run: () => runInboxIncrementalSync(origin) },
+    // After the inbox, so a receipt the sync just filed under a store is
+    // re-read the same morning (plan #1212).
+    { name: 'recurring-reread', run: () => runRecurringReread() },
     { name: 'jobs-sweep', run: () => runJobSweep() },
     { name: 'jd-backfill', run: () => runJdBackfill() },
     { name: 'vault', run: () => runVaultSyncForAll() },
