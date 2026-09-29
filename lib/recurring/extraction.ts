@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { extractCurrencyCode } from '@/lib/email/extract/currency';
 import { parseLooseCalendarDate } from '@/lib/email/extract/email-dates';
 import { displayNameFromAddress, parseMoneyToCents } from '@/lib/email/extract/heuristic';
+import { PAYEE_MAX } from './limits';
 import type { RecurringHint } from './rules';
 
 export const RECURRING_EVENTS = [
@@ -54,7 +55,7 @@ const ymd = z
 const cents = z.number().int().min(0).max(100_000_000).nullable().optional();
 
 const ModelAnswer = z.object({
-  payee: z.string().trim().min(1).max(200),
+  payee: z.string().trim().min(1).max(PAYEE_MAX),
   kind: z.enum(['subscription', 'bill']),
   event: z.enum(RECURRING_EVENTS),
   amountCents: cents,
