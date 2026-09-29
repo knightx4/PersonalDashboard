@@ -249,6 +249,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'write-draft': background(unit(SONNET, 1_500, 300)),
   // A sender and subject and the eight piles in, one label out.
   'sort-email': background(unit(JEV, 250, 0)),
+  // A plan row or a reply and the six questions in; six probabilities out.
+  'check-writing': background(unit(JEV, 900, 0)),
 
   // News. All but the last two from the digest cron or a script.
   'digest-issue': background(unit(HAIKU, 3_000, 300)),

@@ -101,6 +101,9 @@ import {
 import { CLAIM_WORD, type ClaimRun } from '../lib/plan/liveness';
 import { storedReading } from '../lib/plan/run-end';
 import { CONSEQUENCE_SHAPE, consequenceFrom, parseConsequenceArg } from '../lib/raised/consequence';
+import type { SpendReport } from '../lib/core/spend/pricing';
+import { checkWriting, writingNote, writingWarning, type WritingText } from '../lib/writing/check';
+import { writingSpendRow } from '../lib/writing/ledger';
 import {
   blockPatch,
   isClosed,
@@ -142,6 +145,52 @@ function connect() {
 }
 
 type Sql = ReturnType<typeof connect>;
+
+/**
+ * Score what was just written into a plan row against docs/WRITING-GUIDE.md
+ * (plan #1175): a warning printed to the session naming each pattern found,
+ * and at the higher score a one-line note on the row's comment. Nothing when
+ * the text is clean.
+ *
+ * Never refuses or undoes the write, and never fails the command: the row is
+ * already saved, and a check that could not run is the same as a clean one.
+ * Jev is asked only for an account with core.account_settings.jev_enabled on;
+ * any other account gets the rules for the guide's own examples.
+ */
+async function checkRowWriting(
+  sql: Sql,
+  userId: string,
+  row: { id: string; number: number },
+  text: WritingText,
+): Promise<void> {
+  try {
+    let enabled = false;
+    try {
+      const [settings] = await sql<{ jev_enabled: boolean | null }[]>`
+        select jev_enabled from core.account_settings where user_id = ${userId}`;
+      enabled = settings?.jev_enabled === true;
+    } catch {
+      // No core schema or no column: send nothing.
+    }
+
+    const reports: SpendReport[] = [];
+    const result = await checkWriting({ text, enabled, onSpend: (report) => reports.push(report) });
+    for (const report of reports) {
+      await sql`insert into core.model_spend ${sql(writingSpendRow(userId, report))}`.catch(() => {});
+    }
+
+    const warning = writingWarning(result);
+    if (warning) console.warn(`#${row.number} ${warning}`);
+    const note = writingNote(result, new Date().toISOString().slice(0, 10));
+    if (note) {
+      await sql`
+        update plan_items set comment = coalesce(comment || E'\n\n', '') || ${note}
+        where id = ${row.id} and user_id = ${userId}`;
+    }
+  } catch (error) {
+    console.warn(`Writing check did not run: ${error instanceof Error ? error.message : error}`);
+  }
+}
 
 const argv = process.argv.slice(2);
 
@@ -976,6 +1025,12 @@ async function main(): Promise<void> {
           parent ? ` under #${parent.number}` : ` at the top of ${moduleLabel(scope)}`
         }${ideaPrefix ? ` from idea ${ideaPrefix}` : ''}.`,
       );
+      await checkRowWriting(sql, userId, row, {
+        title,
+        detail: arg('--detail'),
+        done_when: arg('--done-when'),
+        fog: arg('--fog'),
+      });
       return;
     }
 
@@ -1064,6 +1119,7 @@ async function main(): Promise<void> {
       })) {
         console.log(line);
       }
+      await checkRowWriting(sql, userId, row, { title, detail });
       return;
     }
 
@@ -1218,6 +1274,7 @@ async function main(): Promise<void> {
       if (!clear && item.fog) {
         console.log(`Replaced the patch it had: ${item.fog.replace(/\s+/g, ' ')}`);
       }
+      if (note) await checkRowWriting(sql, userId, item, { fog: note });
       return;
     }
 
@@ -1300,6 +1357,7 @@ async function main(): Promise<void> {
         where id = ${item.id} and user_id = ${userId}`;
       console.log(`#${item.number} ${STATUS_WORD[status]}${commit ? ` (${commit})` : ''}: ${note}`);
       if (ask && ask !== note) console.log(`Needs: ${ask}`);
+      await checkRowWriting(sql, userId, item, ask && ask !== note ? { ask, note } : { note });
       if (status === 'blocked') {
         console.log(
           onSteps
