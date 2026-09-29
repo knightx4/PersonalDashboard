@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 /**
  * A Supabase client over arrays of rows, for the recurring tests: the query
  * chain supports the filters and writes lib/recurring's store and corrections
- * use, and nothing RLS or the constraints would do. An update answers with
+ * use, and nothing RLS, the constraints or a cascade would do. An update answers with
  * the rows it changed, as `.update().select()` does.
  */
 
@@ -14,14 +14,18 @@ export function memoryClient(tables: Record<string, Row[]>) {
   const client = {
     from(table: string) {
       const rows = (tables[table] ??= []);
-      const filters: [string, unknown][] = [];
-      let op: 'select' | 'insert' | 'upsert' | 'update' = 'select';
+      const filters: ((r: Row) => boolean)[] = [];
+      let op: 'select' | 'insert' | 'upsert' | 'update' | 'delete' = 'select';
       let payload: Row | null = null;
       let upsertKeys: string[] = [];
-      const matching = () => rows.filter((r) => filters.every(([k, v]) => r[k] === v));
+      const matching = () => rows.filter((r) => filters.every((f) => f(r)));
       const run = () => {
         if (op === 'insert') {
-          const row = { id: `${table}-${nextId++}`, created_at: '2026-09-29T00:00:00Z', ...payload };
+          const row = {
+            id: `${table}-${nextId++}`,
+            created_at: '2026-09-29T00:00:00Z',
+            ...payload,
+          };
           rows.push(row);
           return { data: [row], error: null };
         }
@@ -37,16 +41,26 @@ export function memoryClient(tables: Record<string, Row[]>) {
           for (const r of hit) Object.assign(r, payload);
           return { data: hit, error: null };
         }
+        if (op === 'delete') {
+          const hit = matching();
+          for (const r of hit) rows.splice(rows.indexOf(r), 1);
+          return { data: hit, error: null };
+        }
         return { data: matching(), error: null };
       };
       const chain = {
         select: () => chain,
-        eq: (k: string, v: unknown) => (filters.push([k, v]), chain),
+        eq: (k: string, v: unknown) => (filters.push((r) => r[k] === v), chain),
+        in: (k: string, vs: unknown[]) => (filters.push((r) => vs.includes(r[k])), chain),
         insert: (row: Row) => ((op = 'insert'), (payload = row), chain),
         upsert: (row: Row, o: { onConflict: string }) => (
-          (op = 'upsert'), (payload = row), (upsertKeys = o.onConflict.split(',')), chain
+          (op = 'upsert'),
+          (payload = row),
+          (upsertKeys = o.onConflict.split(',')),
+          chain
         ),
         update: (row: Row) => ((op = 'update'), (payload = row), chain),
+        delete: () => ((op = 'delete'), chain),
         maybeSingle: async () => ({ data: matching()[0] ?? null, error: null }),
         single: async () => ({ data: matching()[0] ?? null, error: null }),
         then: (resolve: (v: unknown) => void) => resolve(run()),
