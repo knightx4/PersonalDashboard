@@ -149,6 +149,7 @@ const FIELD_WORDS: Record<string, string> = {
   dropped_on: 'the answer it was dropped on',
   prepares_id: 'the step it prepares',
   prep_checked_at: 'whether it needs preparing',
+  errand: 'whether it is an errand',
   acts: 'what it does outside the plan',
   resolution: 'the answer',
   rhythm_count: 'the rhythm',

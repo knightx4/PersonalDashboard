@@ -33,6 +33,8 @@ type GoalRow = {
   position: number;
   unit: string | null;
   target: number | string | null;
+  due_on: string | null;
+  errand: boolean;
   archived_at?: string | null;
 };
 
@@ -53,6 +55,8 @@ const toGoal = (row: GoalRow): Goal => ({
   position: row.position,
   unit: row.unit,
   target: row.target === null ? null : Number(row.target),
+  dueOn: row.due_on,
+  errand: row.errand,
   archivedAt: row.archived_at ?? null,
 });
 
@@ -79,7 +83,7 @@ export async function loadGoals(
 ): Promise<Goal[]> {
   let query = client
     .from('items')
-    .select('id, area_id, title, acceptance, fog, status, position, unit, target, archived_at')
+    .select('id, area_id, title, acceptance, fog, status, position, unit, target, due_on, errand, archived_at')
     .eq('level', 'goal');
   if (!archived) query = query.is('archived_at', null);
   const { data, error } = await query.order('position').order('created_at');
@@ -250,6 +254,8 @@ export async function insertGoal(
     title: fields.title,
     acceptance: fields.acceptance ?? null,
     fog: fields.fog ?? null,
+    errand: fields.errand ?? false,
+    due_on: fields.dueOn ?? null,
     position: nextPosition((rows ?? []).map((row) => row.position as number)),
   });
   if (error) throw new Error(error.message);
@@ -267,8 +273,12 @@ export async function updateGoal(
   id: string,
   fields: GoalFields,
 ): Promise<boolean> {
-  const { areaId, ...rest } = fields;
+  const { areaId, errand, dueOn, ...rest } = fields;
   const change: Record<string, unknown> = { ...rest };
+  // An errand and its date go in one write, so the check that an errand has a
+  // due date (goals 0061) sees both at once.
+  if (errand !== undefined) change.errand = errand;
+  if (dueOn !== undefined) change.due_on = dueOn;
 
   if (areaId !== undefined) {
     const { data: area, error: areaError } = await client

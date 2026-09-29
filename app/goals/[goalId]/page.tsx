@@ -324,7 +324,13 @@ export default async function GoalMapPage({
         title={<GoalHeadingField goalId={map.goal.id} field="title" value={map.goal.title} />}
         actions={
           <GoalAreaMenu
-            goal={{ id: map.goal.id, title: map.goal.title, areaId: map.goal.areaId }}
+            goal={{
+              id: map.goal.id,
+              title: map.goal.title,
+              areaId: map.goal.areaId,
+              errand: map.goal.errand ?? false,
+              dueOn: map.goal.dueOn ?? null,
+            }}
             places={places}
           />
         }
