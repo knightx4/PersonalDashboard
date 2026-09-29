@@ -5,6 +5,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { attachDependencies, type DependencyRow } from '@/lib/goals/dependencies';
 import { buildForest, type Step } from '@/lib/goals/steps';
 import { REVIEW_ASK, YOURS_ASK } from '@/lib/goals/plan-rows';
 import type { GoalMap } from '@/lib/goals/steps-store';
@@ -41,8 +42,9 @@ function step(id: string, extra: Partial<Step> & { title: string }): Step {
   };
 }
 
-function render(steps: Step[]) {
+function render(steps: Step[], deps: DependencyRow[] = []) {
   const forest = buildForest([GOAL], steps);
+  attachDependencies(forest.byGoal, forest.nodes, deps);
   const map: GoalMap = {
     goal: {
       id: GOAL,
@@ -98,5 +100,28 @@ describe('the Needs line on a goal step', () => {
     const html = render([step('a', { title: 'List balances', kind: 'claude' })]);
     expect(html).not.toContain('Needs: ');
     expect(html).toContain('The detail line');
+  });
+
+  it('names the step a waiting step waits on (plan #1159)', () => {
+    const html = render(
+      [
+        step('a', { title: 'List balances', kind: 'claude' }),
+        step('b', { title: 'Refinance', position: 20 }),
+      ],
+      [{ id: 'd1', itemId: 'b', dependsOnId: 'a' }],
+    );
+    expect(html).toContain('Needs: </span>#1 List balances done first');
+  });
+});
+
+describe('whose a goal step is (plan #1159)', () => {
+  it('marks every open step as yours or Dash’s', () => {
+    const html = render([
+      step('a', { title: 'Turn on autopay' }),
+      step('b', { title: 'Log each loan balance', kind: 'rhythm', rhythmCount: 1, rhythmPeriod: 'month', position: 20 }),
+      step('c', { title: 'List balances', kind: 'claude', position: 30 }),
+    ]);
+    expect(html.match(/sr-only">Yours</g)).toHaveLength(2);
+    expect(html.match(/sr-only">Dash&#x27;s</g)).toHaveLength(1);
   });
 });

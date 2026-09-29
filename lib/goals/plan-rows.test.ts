@@ -186,9 +186,30 @@ describe('goalRows', () => {
       ),
     );
     expect(find(rows, 'b').health.name).toBe('waiting');
-    expect(find(rows, 'b').need).toBeNull();
+    expect(find(rows, 'b').need).toBe('#1 a done first');
     expect(find(rows, 'stage').need).toBeNull();
     expect(find(rows, 's1').health.name).toBe('ready');
+  });
+
+  it('names on the Needs line the steps and questions a step waits on, once (plan #1159)', () => {
+    const { rows } = rowsOf(
+      tree(
+        [
+          step('a', 'g', { title: 'List balances', kind: 'claude' }),
+          step('q', 'g', { title: 'Which lender?', kind: 'decision' }),
+          step('b', 'g', { title: 'Refinance' }),
+          step('stage', 'g'),
+          step('s1', 'stage'),
+          step('done', 'g', { status: 'done' }),
+        ],
+        [dep('d1', 'b', 'a'), dep('d2', 'b', 'q'), dep('d3', 'stage', 'a'), dep('d4', 'done', 'a')],
+      ),
+    );
+    expect(find(rows, 'b').need).toBe('#1 List balances done first, and your answer to #2 Which lender?');
+    expect(find(rows, 'stage').need).toBe('#1 List balances done first');
+    // Said on the stage above it, so not again on each step beneath.
+    expect(find(rows, 's1').need).toBeNull();
+    expect(find(rows, 'done').need).toBeNull();
   });
 
   it('reads a question as unanswered and an answered one as answered', () => {

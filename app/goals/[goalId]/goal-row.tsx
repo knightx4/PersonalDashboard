@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import Link from 'next/link';
-import { ClipboardList, Play, Repeat, Sparkles } from 'lucide-react';
+import { CircleUser, ClipboardList, Play, Repeat, Sparkles } from 'lucide-react';
 import { RowIconButton } from '@/app/dev/plan/plan-run-status';
 import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
 import type { TreeActionState, TreeActions, TreeCatalogEntry } from '@/components/plan-tree/types';
@@ -440,7 +440,12 @@ export function GoalRow({
     },
   ];
 
-  const KindIcon = step.kind === 'claude' ? Sparkles : step.kind === 'rhythm' ? Repeat : null;
+  // Whose the step is, on every row (plan #1159): Dash's sparkle, or the
+  // dev plan's Yours mark, by the same reading as the Who column, which is
+  // hidden below sm. A stage over both kinds carries both. A rhythm keeps its
+  // own mark beside the Yours one.
+  const yours = node.who.word !== 'Dash';
+  const dashes = node.who.word !== 'You';
   const onTodo = context.todoOn && step.onTodo && canShowOnTodo(step);
   const substeps = node.children.filter((child) => child.kind !== 'decision');
 
@@ -457,19 +462,40 @@ export function GoalRow({
       actions={GOAL_TREE_ACTIONS}
       anchorId={`step-${step.id}`}
       source={fromGoal ? `From ${fromGoal.title}` : undefined}
-      // What a step waiting on you is waiting for (note 5aa7216c), as the dev
-      // plan's Needs line says it.
+      // What a step waiting on you is waiting for (note 5aa7216c), or the
+      // steps and questions it waits on (plan #1159), as the dev plan's Needs
+      // line says it.
       need={node.need}
       comments={GOAL_COMMENTS}
       threadPlaceholder="A note on this step. Tag @dash to ask about it, or to give it figures to file."
       dependencies={{ catalog: context.catalog, groupOf: () => context.goalTitle }}
       marks={
-        KindIcon && (
-          <span title={STEP_KIND_LABELS[step.kind]} className="inline-flex shrink-0 text-ink-muted">
-            <KindIcon className="size-3" strokeWidth={1.75} aria-hidden />
-            <span className="sr-only">{STEP_KIND_LABELS[step.kind]}</span>
-          </span>
-        )
+        <>
+          {yours && (
+            <span
+              title={node.who.title}
+              className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1 py-0.5 text-accent"
+            >
+              <CircleUser className="size-3" strokeWidth={2} aria-hidden />
+              <span className="sr-only">Yours</span>
+            </span>
+          )}
+          {dashes && (
+            <span
+              title={step.kind === 'claude' ? STEP_KIND_LABELS.claude : node.who.title}
+              className="inline-flex shrink-0 text-ink-muted"
+            >
+              <Sparkles className="size-3" strokeWidth={1.75} aria-hidden />
+              <span className="sr-only">Dash&apos;s</span>
+            </span>
+          )}
+          {step.kind === 'rhythm' && (
+            <span title={STEP_KIND_LABELS.rhythm} className="inline-flex shrink-0 text-ink-muted">
+              <Repeat className="size-3" strokeWidth={1.75} aria-hidden />
+              <span className="sr-only">{STEP_KIND_LABELS.rhythm}</span>
+            </span>
+          )}
+        </>
       }
       priority={
         /* The shared cell truncates, which suits the plan's one word and
