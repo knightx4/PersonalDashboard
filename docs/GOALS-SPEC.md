@@ -761,6 +761,22 @@ then the person does.
    has none. The read also warns about labels that do not mean what they
    say, such as an NSLDS "Repayment Begin Date" that is the last
    disbursement date for a Grad PLUS loan; those are listed above the rows.
+
+   Saving a read teaches the collection that kind of document
+   (`goals.document_kinds`). The reader names the kind ("NSLDS loan
+   export") and says how to recognise another one, and the save keeps, for
+   each field, the label that filled it, the traps the reader warned of and
+   any value you corrected, along with the suggestions you left out. The
+   next read is given every kind the collection has learned. When the
+   reader judges the document to be one of them, the preview says so, the
+   read follows that kind's notes, and the fields you left out are not
+   suggested again. A new kind is only written when the read taught
+   something: a field added or left out, a trap, or a correction. The kinds
+   are listed on the step, where you can rename one, edit its notes or
+   forget it. Whether two documents are the same kind is the reader's
+   judgement against the name and recognise line, rather than a fixed rule
+   such as a header line or sender, because a pasted page has no sender and
+   each issuer would need a rule of its own.
 3. **Claude finds it first.** The goals routine has the Gmail connector. When
    it writes an information step it searches for what it can (loan
    statements, offer letters, receipts), fills in what it found as a draft,

@@ -551,6 +551,7 @@ export function GoalRow({
               collection={filled.collection}
               records={filled.records}
               answers={context.answers[step.id] ?? []}
+              kinds={filled.kinds}
               seam={context.informationSeam}
             />
           )}
