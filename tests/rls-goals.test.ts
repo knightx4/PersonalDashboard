@@ -2572,3 +2572,43 @@ describe('Dash prep steps before yours (plan #1215)', () => {
     ).rejects.toThrow(/items_prep_checked_ck/);
   });
 });
+
+describe('errands (plan #1261)', () => {
+  it('saves an errand only with a due date, and keeps the date while it is one', async () => {
+    await expect(
+      admin`
+        insert into items (user_id, level, area_id, title, errand)
+        values (${userA}, 'goal', ${areaA}, 'Find a birthday gift for Sam', true)`,
+    ).rejects.toThrow(/items_errand_due_ck/);
+
+    const [errand] = await asUser(userA, (tx) => tx<{ id: string; errand: boolean }[]>`
+      insert into items (user_id, level, area_id, title, errand, due_on)
+      values (${userA}, 'goal', ${areaA}, 'Find a birthday gift for Sam', true, '2026-10-12')
+      returning id, errand`);
+    expect(errand.errand).toBe(true);
+    expect((await historyOf(errand.id))[0].new_values).toMatchObject({ errand: true });
+
+    await expect(
+      admin`update items set due_on = null where id = ${errand.id}`,
+    ).rejects.toThrow(/items_errand_due_ck/);
+
+    // Back to a goal, the date may go.
+    await asUser(userA, (tx) => tx`update items set errand = false where id = ${errand.id}`);
+    await admin`update items set due_on = null where id = ${errand.id}`;
+    // And a goal turns into one when the date comes with the flag.
+    await asUser(userA, (tx) => tx`
+      update items set errand = true, due_on = '2026-10-20' where id = ${errand.id}`);
+  });
+
+  it('refuses the flag on a step, and a new goal is not an errand', async () => {
+    const [plain] = await admin<{ errand: boolean }[]>`
+      select errand from items where id = ${goalA}`;
+    expect(plain.errand).toBe(false);
+
+    await expect(
+      admin`
+        insert into items (user_id, level, parent_id, kind, title, errand, due_on)
+        values (${userA}, 'step', ${goalA}, 'mine', 'Wrap it', true, '2026-10-12')`,
+    ).rejects.toThrow(/items_errand_level_ck/);
+  });
+});

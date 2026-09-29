@@ -1,20 +1,87 @@
 'use client';
 
-import { ActionMenu } from '@/components/ui/action-menu';
+import { useState, useTransition } from 'react';
+import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
+import { Button } from '@/components/ui/button';
+import { ChipInput } from '@/components/ui/field';
+import { useToast } from '@/components/ui/toast';
+import { formatDay } from '@/lib/goals/dates';
+import { editGoal } from '../actions';
 import { useMoveToItems, type Place } from '../move-goal';
 
 /**
  * The goal's own menu beside its heading: move it to another area
- * (plan #1160). Drawn only when there is another live area to move it to.
+ * (plan #1160), and turn it into an errand or back (plan #1261). An errand
+ * always has a date it is due by, so turning a goal with no due date into
+ * one asks for the date first, in a line beside the menu.
  */
 export function GoalAreaMenu({
   goal,
   places,
 }: {
-  goal: { id: string; title: string; areaId: string };
+  goal: { id: string; title: string; areaId: string; errand: boolean; dueOn: string | null };
   places: Place[];
 }) {
-  const items = useMoveToItems(goal, places);
-  if (items.length === 0) return null;
-  return <ActionMenu label={`${goal.title} actions`} items={items} />;
+  const toast = useToast();
+  const moves = useMoveToItems(goal, places);
+  const [asking, setAsking] = useState(false);
+  const [due, setDue] = useState(goal.dueOn ?? '');
+  const [pending, startTransition] = useTransition();
+
+  async function setErrand(errand: boolean, dueOn: string | null) {
+    const form = new FormData();
+    form.set('id', goal.id);
+    form.set('errand', String(errand));
+    if (dueOn) form.set('due', dueOn);
+    const result = await editGoal({}, form);
+    if (result.error) {
+      toast({ text: result.error });
+      return false;
+    }
+    toast({ text: errand ? `${goal.title} is now an errand.` : `${goal.title} is a goal again.` });
+    return true;
+  }
+
+  const errandItem: ActionMenuItem = goal.errand
+    ? { id: 'errand-off', label: 'Make it a goal again', onSelect: () => void setErrand(false, null) }
+    : goal.dueOn
+      ? {
+          id: 'errand-on',
+          label: `Make it an errand, due ${formatDay(goal.dueOn)}`,
+          onSelect: () => void setErrand(true, goal.dueOn),
+        }
+      : { id: 'errand-on', label: 'Make it an errand…', onSelect: () => setAsking(true) };
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      {asking && (
+        <form
+          className="inline-flex items-center gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            startTransition(async () => {
+              if (await setErrand(true, due)) setAsking(false);
+            });
+          }}
+        >
+          <ChipInput
+            type="date"
+            icon="Due"
+            required
+            autoFocus
+            value={due}
+            onChange={(event) => setDue(event.target.value)}
+            aria-label={`When ${goal.title} is due`}
+          />
+          <Button type="submit" size="sm" pending={pending} disabled={!due}>
+            Make it an errand
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setAsking(false)}>
+            Cancel
+          </Button>
+        </form>
+      )}
+      <ActionMenu label={`${goal.title} actions`} items={[...moves, errandItem]} />
+    </span>
+  );
 }

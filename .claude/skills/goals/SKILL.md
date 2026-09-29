@@ -884,6 +884,42 @@ person reads these on a phone once a day.
 5. **Keep it on track** (phase): a monthly `rhythm` to log each balance, and a
    quarterly `claude` review of progress against the schedule.
 
+### An errand
+
+An errand is a goal with `errand = true` and a `due_on`: a one-off job with a
+date, such as finding a birthday gift or booking a car service (plan #1260).
+The brief says when the goal is one. It gets the same run as any goal, cut
+down to fit:
+
+- **Three to five steps directly under the goal, no stages.** Usually a
+  `claude` step that does the research or the draft, then the person's step
+  that acts on it, then anything after that (giving the gift, turning up).
+- **Work your own steps in this run.** The person handed it over to have the
+  research done, so do not leave the `claude` step for the morning run: work
+  it now as "Working the ready steps" in "The morning run" says, store its
+  result, and write the person's next step from it with the `Decided:` line
+  and the other options listed.
+- **At most one question**, and only for the choice that is the person's by
+  the test in "Decide first, ask last". A gift for someone else often passes
+  that test on the person it is for, but a stated budget and taste do not
+  need asking again.
+- **Date every step so it lands before `due_on`.** The person's step gets a
+  `due_on` a few days ahead of the errand's own, and `on_todo = true` so it
+  shows on Todo.
+- **Buying, booking or sending is still the person's step**, or a proposal
+  with `acts` if Dash would do it, as "Steps that act outside the plan" says.
+- **No weekly help.** Leave `proposed_help_kinds` empty; an errand is over
+  before a weekly run would help it.
+- Leave the goal's note as for any run. The errand closes as any goal does:
+  propose `met` in the morning review once its done-when holds.
+
+A worked shape, *Give Sam a live electronic show for her birthday*, due 9
+October: a `claude` step shortlisting live shows in New York from October to
+December (worked in the same run, written up as a file), *Buy two tickets
+to Madeon at Pacha, 14 Nov* (the person's, due 6 October, on Todo, with the
+runner-up shows listed under it), and *Give Sam the tickets on her
+birthday*, due 9 October.
+
 ## Planning an area
 
 The person pressed **Plan this area** on an area, or **Plan what is missing**
