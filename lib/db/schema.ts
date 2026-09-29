@@ -586,6 +586,8 @@ export const feedbackItems = pgTable(
     /** The commit that closed it. */
     commitSha: text('commit_sha'),
     completedAt: timestamp('completed_at', { withTimezone: true }),
+    /** Jev's triage when it was filed (0121, lib/feedback/triage.ts). */
+    triage: jsonb('triage'),
     ...timestamps,
   },
   (t) => [
@@ -610,6 +612,8 @@ export const ideas = pgTable(
     module: text('module'),
     /** The plan feature it was shaped into, once it has been. See 0053. */
     planItemId: uuid('plan_item_id'),
+    /** Jev's triage when it was filed (0121, lib/feedback/triage.ts). */
+    triage: jsonb('triage'),
     ...timestamps,
   },
   (t) => [index('ideas_user_created_idx').on(t.userId, t.createdAt)],

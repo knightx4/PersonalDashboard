@@ -256,6 +256,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'check-writing': background(unit(JEV, 900, 0)),
   // One blocked step's ask and the two options in; one label out.
   'sort-waiting': background(unit(JEV, 150, 0)),
+  // The note, the four questions, and the first line of every open note and
+  // idea as the duplicate question's options (about 130 today) in; four
+  // labels out.
+  'triage-note': run(JEV, 5_000, 0),
 
   // News. All but the last two from the digest cron or a script.
   'digest-issue': background(unit(HAIKU, 3_000, 300)),

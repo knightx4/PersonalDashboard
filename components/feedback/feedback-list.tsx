@@ -27,6 +27,8 @@ import {
 } from '@/lib/feedback/load';
 import { surfaceOf } from '@/lib/feedback/surfaces';
 import { KIND_TONE } from '@/components/feedback/kind-tone';
+import { TriageNote } from '@/components/feedback/triage-note';
+import { triageView } from '@/lib/feedback/triage';
 
 // Defined in lib/feedback so both workspaces' pages and this component agree
 // on one shape.
@@ -152,6 +154,7 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
         </span>
         <code className="text-small text-ink-muted">{row.id.slice(0, 8)}</code>
       </div>
+      <TriageNote view={triageView(row.triage ?? null)} />
 
       {editing ? (
         <form action={editAction} className="flex flex-col gap-2">

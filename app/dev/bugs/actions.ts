@@ -13,6 +13,12 @@ import {
   type FeedbackKind,
 } from '@/lib/feedback/load';
 import { startRoutineRun } from '@/lib/plan/runs';
+import { createCoreClient } from '@/lib/core/auth/server';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSessionSpend } from '@/lib/core/spend/session';
+import { triageView, type TriageTable, type TriageView } from '@/lib/feedback/triage';
+import { triageRow } from '@/lib/feedback/triage-run';
+import { jevEnabledFor } from '@/lib/jev/enabled';
 
 /** One queue, one page. The old per-workspace pages redirect to it. */
 function revalidateFeedback(): void {
@@ -22,6 +28,8 @@ function revalidateFeedback(): void {
 export type FeedbackActionState = {
   error?: string;
   message?: string;
+  /** The row just saved, so the panel can ask for its triage (plan #1179). */
+  filed?: { table: TriageTable; id: string };
 };
 
 const submitSchema = z.object({
@@ -76,17 +84,64 @@ export async function submitFeedback(
     return { error: 'Write a sentence or two describing it.' };
   }
 
-  const { error } = await supabase.from('feedback_items').insert({
-    user_id: user.id,
-    kind: parsed.data.kind,
-    body: parsed.data.body,
-    page_path: parsed.data.pagePath,
-    user_agent: String(formData.get('user_agent') ?? '').slice(0, 500) || null,
-  });
+  const { data, error } = await supabase
+    .from('feedback_items')
+    .insert({
+      user_id: user.id,
+      kind: parsed.data.kind,
+      body: parsed.data.body,
+      page_path: parsed.data.pagePath,
+      user_agent: String(formData.get('user_agent') ?? '').slice(0, 500) || null,
+    })
+    .select('id')
+    .single();
   if (error) return { error: error.message };
 
   revalidateFeedback();
-  return { message: SAVED[parsed.data.kind] };
+  return {
+    message: SAVED[parsed.data.kind],
+    filed: data?.id ? { table: 'feedback_items', id: String(data.id) } : undefined,
+  };
+}
+
+const triageSchema = z.object({
+  table: z.enum(['feedback_items', 'ideas']),
+  id: z.string().uuid(),
+});
+
+/**
+ * Triage what the header panel just saved (plan #1179): Jev reads it and says
+ * bug or request, which workspace, how soon, and whether an open note or idea
+ * already says the same. Stored on the row and handed back for the panel to
+ * show under "saved".
+ *
+ * Called by the panel once `submitFeedback` or `submitIdea` has returned, so
+ * saving never waits on Jev. Null when there is nothing to show: the account
+ * has not agreed to send text to Jev (every account but the owner, today),
+ * the row is not the caller's, it is a like, or Jev failed. The row is only
+ * ever the caller's own, matched on `user_id` as well as `id`.
+ */
+// latency: pending
+export async function triageFiled(input: {
+  table: TriageTable;
+  id: string;
+}): Promise<TriageView | null> {
+  const user = await requireUser();
+  const parsed = triageSchema.safeParse(input);
+  if (!parsed.success) return null;
+
+  const core = await createCoreClient();
+  if (!(await jevEnabledFor(core, user.id))) return null;
+
+  const supabase = await createClient();
+  const spend: SpendReport[] = [];
+  const triage = await triageRow(supabase, { userId: user.id, ...parsed.data, spend });
+  await recordSessionSpend(user.id, { module: 'core', operation: 'triage-note' }, spend);
+  if (!triage) return null;
+
+  if (parsed.data.table === 'ideas') revalidatePath('/dev/ideas');
+  else revalidateFeedback();
+  return triageView(triage);
 }
 
 const SAVED: Record<FeedbackKind, string> = {

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
+import { triageFrom, type Triage } from '@/lib/feedback/triage';
 
 /**
  * The feedback queue, loaded and ordered once for both workspaces.
@@ -53,6 +54,8 @@ export type FeedbackRow = {
   completedAt: string | null;
   /** What has been said under it since it was filed, oldest first. */
   thread: DevComment[];
+  /** Jev's triage when it was filed (plan #1179); null when it was not triaged. */
+  triage?: Triage | null;
 };
 
 /** Anything not finished — including blocked, the state most easily forgotten. */
@@ -117,7 +120,7 @@ export function queueOfKind(queue: FeedbackQueue, kind: FeedbackKind | null): Fe
 
 /** Every column the app reads off a note. Shared with the changelog. */
 export const FEEDBACK_COLUMNS =
-  'id, kind, body, page_path, status, priority, resolution_note, commit_sha, ' +
+  'id, kind, body, page_path, status, priority, resolution_note, commit_sha, triage, ' +
   `created_at, completed_at, thread:dev_comments(${COMMENT_COLUMNS})`;
 
 /** A row as the app reads it. One shape leaves here, whoever selected it. */
@@ -134,6 +137,7 @@ export function feedbackRowFrom(row: Record<string, unknown>): FeedbackRow {
     createdAt: row.created_at as string,
     completedAt: (row.completed_at as string | null) ?? null,
     thread: threadFrom(row.thread),
+    triage: triageFrom(row.triage),
   };
 }
 
