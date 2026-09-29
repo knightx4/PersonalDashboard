@@ -234,6 +234,32 @@ describe('askDash', () => {
     expect(answer).toMatchObject({ ok: true, stop: 'time', body: `So far, one order.\n\n${limitNote('time')}` });
   });
 
+  it('answers in prose when told to answer and it looks something up instead', async () => {
+    let clock = 0;
+    const { client, sent } = stubClient([
+      reply([use('u1', 'search', { query: 'interviews' })]),
+      reply([use('u2', 'search', { query: 'final round' })]),
+      reply([{ type: 'text', text: 'One order, from eBay.' }], 'end_turn'),
+    ]);
+    const { execute } = stubExecute();
+    const answer = await answerQuestion({
+      turns: [{ role: 'user', body: 'q' }],
+      today: '2026-09-27',
+      execute: async (name, input) => {
+        clock += TIME_BUDGET_MS;
+        return execute(name, input);
+      },
+      anthropicApiKey: 'k',
+      client,
+      now: () => clock,
+    });
+
+    expect(sent[2].tool_choice).toEqual({ type: 'none' });
+    const refused = sent[2].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+    expect(refused[0]).toMatchObject({ tool_use_id: 'u2', is_error: true });
+    expect(answer).toMatchObject({ ok: true, stop: 'time', body: `One order, from eBay.\n\n${limitNote('time')}` });
+  });
+
   it('sends a failed lookup back as an error result', async () => {
     const { client, sent } = stubClient([
       reply([use('u1', 'nope', {})]),
