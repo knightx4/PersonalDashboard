@@ -160,6 +160,7 @@ export const jobsSources: ModuleSources = {
     { table: 'job_search.suggestions', reason: 'What Dash suggested doing next (people to contact, postings to apply for); what was acted on is in contact_touches and roles.' },
     { table: 'job_search.learning_tracks', reason: 'Tracks Claude suggested from the career goals; the ones started are Learn goals in learn.aims.' },
     { table: 'job_search.interview_participants', reason: 'Join rows between interviews and contacts.' },
+    { table: 'job_search.jev_trial_answers', reason: 'A classifier trial\'s answers on mail already labelled; the labels are in ingested_messages.' },
     { table: 'job_search.message_link_dismissals', reason: 'Dismissed suggestions in the inbox.' },
     { table: 'job_search.quiet_dismissals', reason: 'Dismissed quiet-application nudges.' },
     { table: 'job_search.waiting_dismissals', reason: 'Dismissed waiting-on-reply nudges.' },

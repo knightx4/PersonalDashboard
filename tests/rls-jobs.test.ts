@@ -219,6 +219,13 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.home_visits = visit.id;
 
+  // A trial answer on that message (plan #1165); only the job writes these.
+  const [trialAnswer] = await admin<{ id: string }[]>`
+    insert into jev_trial_answers (user_id, trial, message_id, stored_label, jev_label, jev_confidence)
+    values (${userId}, 'test', ${ids.ingested_messages}, 'rejection', 'rejection', 0.9)
+    returning id`;
+  ids.jev_trial_answers = trialAnswer.id;
+
   return ids;
 }
 
