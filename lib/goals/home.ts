@@ -47,6 +47,39 @@ export function homeAreas(goals: readonly HomeGoal[]): HomeArea[] {
 }
 
 /**
+ * The open errands, soonest due first (plan #1262), and the other goals in
+ * page order. An errand is listed once, in Errands above the areas, rather
+ * than under its area as well. An errand always has a due date; one read
+ * without it sorts last.
+ */
+export function splitErrands(goals: readonly HomeGoal[]): {
+  errands: HomeGoal[];
+  others: HomeGoal[];
+} {
+  const errands = goals
+    .filter((line) => line.goal.errand)
+    .sort((a, b) => {
+      const x = a.goal.dueOn ?? '9999-12-31';
+      const y = b.goal.dueOn ?? '9999-12-31';
+      return x < y ? -1 : x > y ? 1 : 0;
+    });
+  return { errands, others: goals.filter((line) => !line.goal.errand) };
+}
+
+/**
+ * The area a new errand goes in unless you pick another: the area of the
+ * soonest errand, since errands tend to share one, and otherwise the first
+ * area. Null when there are no areas.
+ */
+export function errandAreaDefault(
+  errands: readonly HomeGoal[],
+  areas: readonly { id: string }[],
+): string | null {
+  const soonest = errands.find((line) => areas.some((area) => area.id === line.goal.areaId));
+  return soonest?.goal.areaId ?? areas[0]?.id ?? null;
+}
+
+/**
  * The next move a goal line shows, and its date: the status's when there is
  * one, since the run chose it with the whole goal in view, and otherwise the
  * goal's first next step. Null when there is neither.

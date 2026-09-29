@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  errandAreaDefault,
   homeAreas,
   homeSummary,
   nextMove,
   nextVisitDays,
+  splitErrands,
   stuckSteps,
   weekHealth,
   type HomeGoal,
@@ -92,6 +94,34 @@ describe('homeAreas', () => {
       ['X', ['a', 'c']],
       ['Y', ['b']],
     ]);
+  });
+});
+
+function errand(id: string, areaId: string, dueOn: string): HomeGoal {
+  const base = line(id, areaId);
+  return { ...base, goal: { ...base.goal, errand: true, dueOn } };
+}
+
+describe('splitErrands', () => {
+  it('lists open errands soonest due first and leaves them out of the areas', () => {
+    const { errands, others } = splitErrands([
+      line('a', 'x'),
+      errand('late', 'x', '2026-10-20'),
+      errand('soon', 'y', '2026-10-09'),
+      line('b', 'y'),
+    ]);
+    expect(errands.map((l) => l.goal.id)).toEqual(['soon', 'late']);
+    expect(others.map((l) => l.goal.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('errandAreaDefault', () => {
+  it('takes the soonest errand’s area, then the first area', () => {
+    const areas = [{ id: 'x' }, { id: 'y' }];
+    expect(errandAreaDefault([errand('soon', 'y', '2026-10-09')], areas)).toBe('y');
+    expect(errandAreaDefault([], areas)).toBe('x');
+    expect(errandAreaDefault([errand('gone', 'z', '2026-10-09')], areas)).toBe('x');
+    expect(errandAreaDefault([], [])).toBeNull();
   });
 });
 

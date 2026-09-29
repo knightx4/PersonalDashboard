@@ -41,6 +41,7 @@ import { writtenWhen, type Brief } from '@/lib/goals/briefs';
 import { loadBrief } from '@/lib/goals/briefs-store';
 import { loadFilesOf } from '@/lib/goals/files-store';
 import { flagsWaiting } from '@/lib/goals/flags';
+import { formatDay } from '@/lib/goals/dates';
 import { goalStatus } from '@/lib/goals/goal-status';
 import { isCurrent, type GoalReview } from '@/lib/goals/reviews';
 import { loadLatestReviews } from '@/lib/goals/reviews-store';
@@ -279,10 +280,13 @@ export default async function GoalMapPage({
   const linked = { goalId: map.goal.id, links, aimChoices, jobsOn };
   const numberEmpty = !number.unit && readings.length === 0;
   const helpEmpty = help.helpKinds.length === 0 && help.proposedHelpKinds.length === 0;
+  // An errand is a short job with a date (plan #1262): no stage track and no
+  // weekly help, and its due date beside the title.
+  const errand = map.goal.errand === true;
   const linksEmpty = links !== null && noLinks(links);
   const canLink = (aimChoices?.length ?? 0) > 0 || jobsOn;
 
-  const stages = goalStages(map.steps);
+  const stages = errand ? null : goalStages(map.steps);
   const shapingView = shapeable
     ? shapingLines(map.goal.status, map.steps, shaping.approvedAt, history, account.timezone)
     : null;
@@ -321,7 +325,18 @@ export default async function GoalMapPage({
         <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> {map.areaName}
       </Link>
       <PageHeader
-        title={<GoalHeadingField goalId={map.goal.id} field="title" value={map.goal.title} />}
+        title={
+          errand && map.goal.dueOn ? (
+            <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <GoalHeadingField goalId={map.goal.id} field="title" value={map.goal.title} />
+              <span className="tabular font-sans text-ui font-normal tracking-normal whitespace-nowrap text-ink-muted">
+                Due {formatDay(map.goal.dueOn)}
+              </span>
+            </span>
+          ) : (
+            <GoalHeadingField goalId={map.goal.id} field="title" value={map.goal.title} />
+          )
+        }
         actions={
           <GoalAreaMenu
             goal={{
@@ -377,7 +392,7 @@ export default async function GoalMapPage({
           <div className="space-y-6">
             {!shapingUp && shapingPanel}
             <GoalContext items={shownItems} />
-            {!helpEmpty && <GoalHelp {...help} />}
+            {!errand && !helpEmpty && <GoalHelp {...help} />}
             {!linksEmpty && <GoalLinksSection {...linked} />}
             {files.length > 0 && (
               <section aria-labelledby="files-heading" className="space-y-2">
@@ -389,7 +404,7 @@ export default async function GoalMapPage({
             )}
             <GoalAddRow
               number={numberEmpty ? number : null}
-              help={helpEmpty ? help : null}
+              help={!errand && helpEmpty ? help : null}
               links={linksEmpty && canLink ? linked : null}
             />
             {/* The goal's own thread (plan #957). Each step has its own, under its details. */}

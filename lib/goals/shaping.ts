@@ -157,10 +157,21 @@ export function goalRunText(input: {
   goalTitle: string;
   userId: string;
   runId: string;
+  /** The date an errand is due by (plan #1262); absent or null for an ordinary goal. */
+  errandDueOn?: string | null;
 }): string {
+  const errand = input.errandDueOn
+    ? [
+        `This goal is an errand, due on ${input.errandDueOn}. Map it as "An errand" under`,
+        '"Mapping a goal" says: a few steps, no stages, your own research worked in this',
+        'same run, and no weekly help.',
+        '',
+      ]
+    : [];
   return [
     `Work on one goal: "${input.goalTitle}" (goals.items id ${input.goalId}).`,
     '',
+    ...errand,
     'Follow .claude/skills/goals/SKILL.md. Read it first: it says how to map the whole path',
     'for a goal (phases, Claude steps, information steps pre-filled from Gmail, provisional',
     'steps, and the kinds of weekly help to propose), what you may change before and after',

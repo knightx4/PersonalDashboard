@@ -2,7 +2,8 @@
  * The Goals home (plan #1077): a sentence on where the goals stand, Today
  * with one button a row and the rest folded under it, one line per goal
  * under its area, and what Dash did since your last visit with Read and
- * Undo. None of the old home's sections are left.
+ * Undo. None of the old home's sections are left. Errands (plan #1262) sit
+ * above the areas, soonest due first, with Add an errand under them.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -23,6 +24,7 @@ vi.mock('@/app/goals/[goalId]/actions', () => ({
 vi.mock('@/app/goals/[goalId]/comment-actions', () => ({ addGoalComment: vi.fn() }));
 vi.mock('@/app/goals/[goalId]/flag-actions', () => ({ answerFlagAction: vi.fn() }));
 vi.mock('@/app/goals/[goalId]/tree-actions', () => ({ answerGoalQuestion: vi.fn() }));
+vi.mock('@/app/goals/actions', () => ({ addErrand: vi.fn() }));
 
 const { HomeView } = await import('@/app/goals/home-view');
 
@@ -195,6 +197,42 @@ describe('the Goals home', () => {
     expect(render({ done: { ...done, items: [] } })).toContain(
       'Nothing new since your last visit.',
     );
+  });
+
+  it('lists errands soonest first above the areas, each with its date, and not again under its area', () => {
+    const errand = (id: string, title: string, dueOn: string): HomeGoal => ({
+      ...goal,
+      goal: { ...goal.goal, id, title, errand: true, dueOn },
+      review: null,
+    });
+    const html = render({
+      goals: [
+        goal,
+        errand('e2', 'Book the car service', '2026-10-20'),
+        errand('e1', 'Give Sam a live electronic show for her birthday', '2026-10-09'),
+      ],
+      areas: [{ id: 'area', name: 'Money' }],
+    });
+    const order = [
+      'Errands',
+      'Give Sam a live electronic show',
+      'Due 9 Oct',
+      'Book the car service',
+      'Due 20 Oct',
+      'Add an errand',
+      'Your goals',
+    ];
+    const positions = order.map((text) => html.indexOf(text));
+    expect(positions.every((p) => p >= 0)).toBe(true);
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+    expect(html.slice(html.indexOf('Your goals'))).not.toContain('Book the car service');
+    expect(html).toContain('1 open');
+    expect(html).toContain('2 open');
+  });
+
+  it('offers Add an errand once there is an area to put it in', () => {
+    expect(render({ areas: [{ id: 'area', name: 'Money' }] })).toContain('Add an errand');
+    expect(render()).not.toContain('Errands');
   });
 
   it('offers to add a goal when there are none', () => {
