@@ -81,30 +81,85 @@ export interface ClassifyResult {
 /**
  * Euphemisms, in roughly descending frequency. Every one of these is a
  * rejection and only two of them contain a word a naive filter would look for.
+ *
+ * These are the strong ones: each says the decision has been made, so one of
+ * them decides the message alone. Said as a condition ("if we are not moving
+ * forward with your application, we will let you know") it is only as good as
+ * a soft phrase, because an acknowledgement says exactly that (see
+ * strongRejection).
  */
-const REJECTION_BODY = [
+const REJECTION_STRONG = [
   /mov(e|ing|ed) forward with other candidat/i,
   /decided to (move forward|proceed) with (other|another)/i,
   /pursu(e|ing) other candidat/i,
-  /not (be )?(moving|progressing|proceeding) (you )?forward/i,
+  /(not|won't|will not) (be )?(moving|progressing|proceeding) (you |your application )?forward/i,
   /will not be (moving|progressing|proceeding)/i,
-  /we (have )?(decided )?not to (move|proceed|continue|extend)/i,
-  /decided not to (extend|proceed with|move forward with)/i,
+  /we (have )?(decided )?not to (move|proceed|continue|extend|progress)/i,
+  /decided not to (extend|proceed with|move forward with|progress)/i,
   /not (selected|chosen) to (proceed|move forward|continue)/i,
   /(was|were) not selected/i,
   /other candidates whose (experience|background|qualifications)/i,
-  /more closely (align|match)/i,
-  /keep your (resume|cv|details|profile|application) on file/i,
   /(position|role|req(uisition)?) has been (filled|closed)/i,
   /we('| ha)ve (filled|closed) (the|this) (position|role)/i,
   /(pausing|placed on hold|put on hold|paused) (the|this) (search|role|position|req)/i,
   /no longer (moving forward|under consideration|being considered)/i,
+  /decided to go (in a different direction|with another candidate)/i,
+  /in a (different )?direction that (better )?(fits|suits|aligns)/i,
+  /will not be (extending|proceeding with) an offer/i,
+];
+
+/**
+ * Soft phrases: most rejections use one, and so do acknowledgements.
+ * "Unfortunately, we are unable to respond to every applicant", "if your
+ * experience more closely matches another role", "we will keep your resume on
+ * file" and "we wish you the best" all appear in thank-you-for-applying mail.
+ * When these decided alone, Cohere's acknowledgement was filed as a rejection
+ * (plan #1227), most likely on one of them, since its subject already read as
+ * an acknowledgement. So a soft phrase loses to ACKNOWLEDGEMENT_BODY,
+ * and a rejection resting on soft phrases alone is a guess the models may
+ * overrule, not tier A.
+ */
+const REJECTION_SOFT = [
+  /more closely (align|match)/i,
+  /keep your (resume|cv|details|profile|application) on file/i,
   /(unfortunately|regret(fully)?|regret to inform)/i,
   /not (a|the) (right|best) (fit|match) (at this time|for this role)/i,
   /wish you (the best|well|luck)/i,
-  /decided to go (in a different direction|with another candidate)/i,
-  /will not be (extending|proceeding with) an offer/i,
 ];
+
+/**
+ * What only an acknowledgement says: the application is still to be read.
+ * Narrower than CONFIRMATION_BODY on purpose. "Thank you for your interest"
+ * and "we received your application" open rejections as often as
+ * acknowledgements, so neither is here; a rejection never promises a review
+ * it has already done.
+ */
+const ACKNOWLEDGEMENT_BODY = [
+  /we(?:'| wi)ll (review|be reviewing|carefully review) your (application|materials|resume|candidacy)/i,
+  /(currently|actively) reviewing (all |the |your )?(applications?|candidates|submissions)/i,
+  /(our|the) (team|hiring team|recruiting team|talent team) (is|are|will) (be )?(review|reviewing|carefully review)/i,
+  /(will|to) review (it|your application) (shortly|soon|carefully|and)/i,
+  /if there (are|is) any next steps/i,
+];
+
+/** A conditional sentence: "if we are not moving forward, we will let you know". */
+const CONDITIONAL = /\b(if|in the event|should we|should you)\b/i;
+
+/**
+ * A strong phrase in a sentence that states it, not one that supposes it.
+ * The text is split on sentence ends, so the condition has to sit in the same
+ * sentence as the phrase for it to count.
+ */
+function strongRejection(text: string): boolean {
+  return text
+    .split(/(?<=[.!?])\s+/)
+    .some((sentence) => !CONDITIONAL.test(sentence) && any(REJECTION_STRONG, sentence));
+}
+
+/** Any rejection wording at all, strong, supposed or soft. */
+function anyRejection(text: string): boolean {
+  return any(REJECTION_STRONG, text) || any(REJECTION_SOFT, text);
+}
 
 const REJECTION_SUBJECT = [
   /\bupdate on your application\b/i,
@@ -121,6 +176,11 @@ const CONFIRMATION_SUBJECT = [
   /\bthank(s| you) for applying\b/i,
   /\byour application (was|has been) (received|submitted)\b/i,
   /\bapplication (submitted|confirmation)\b/i,
+  // "Thanks for your application to Spotify!", "Thank you for your interest in
+  // Kalshi". Rejections use these subjects too, but a rejection says so in the
+  // body, and the body is read first; with nothing there, it is an
+  // acknowledgement (plan #1227).
+  /\bthank(s| you) for your (application|interest)\b/i,
 ];
 
 /**
@@ -335,6 +395,16 @@ const NETWORKING_SUBJECT = [
   /\bcoffee chat\b/i,
 ];
 
+/**
+ * A one-time code for an application form. It carries the application's
+ * subject ("Security code for your application to Careers at KKR") and is
+ * never a rejection, whatever its body says, so it is tested before any
+ * rejection wording (plan #1227).
+ */
+const ACCOUNT_CODE_SUBJECT = [
+  /\b(security|verification|one[- ]time|access|login) (code|pass ?code)\b/i,
+];
+
 /** Marketing and product mail from the same vendors, which is not job search. */
 const NOT_RELEVANT_SUBJECT = [
   /\b(unsubscribe|newsletter|webinar|survey|feedback|product update|release notes)\b/i,
@@ -429,15 +499,26 @@ export function classifyMessage(input: ClassifyInput): ClassifyResult {
   // Board digests next: they match every other pattern below and mean nothing.
   if (any(JOB_ALERT_SUBJECT, subject)) return result('job_alert');
 
-  if (any(NOT_RELEVANT_SUBJECT, subject) && !any(REJECTION_BODY, blob)) {
+  if (any(ACCOUNT_CODE_SUBJECT, subject)) {
+    return { ...result('not_relevant'), tier: known ? 'A' : 'none' };
+  }
+
+  if (any(NOT_RELEVANT_SUBJECT, subject) && !anyRejection(blob)) {
     return { ...result('not_relevant'), tier: known ? 'A' : 'none' };
   }
 
   // Rejection before everything else: the subject of a rejection is usually
   // indistinguishable from a confirmation ("Your application to Acme"), so the
   // body is what decides, and a rejection read as a confirmation is the single
-  // most damaging error the classifier can make.
-  if (any(REJECTION_BODY, blob)) return result('rejection');
+  // most damaging error the classifier can make. A strong phrase decides
+  // alone. Soft phrases lose to an acknowledgement's promise of a review, and
+  // on their own they are a guess the models may overrule.
+  if (strongRejection(blob)) return result('rejection');
+  if (anyRejection(blob)) {
+    if (!any(ACKNOWLEDGEMENT_BODY, body)) {
+      return { ...result('rejection'), tier: 'subject_heuristic' };
+    }
+  }
 
   if (any(OFFER_SUBJECT, subject) || any(OFFER_BODY, body)) return result('offer');
 
@@ -486,9 +567,12 @@ export function classifyMessage(input: ClassifyInput): ClassifyResult {
   if (any(NETWORKING_SUBJECT, subject)) return result('networking');
 
   // A known ATS sender with an application-shaped subject is worth a second
-  // look even when nothing above matched.
+  // look even when nothing above matched. It is a guess from the subject, and
+  // acknowledgements use the same subjects ("Your application for <role> at
+  // Alvarez and Marsal"), so the models decide; at tier A it outranked both
+  // (plan #1227).
   if (known && any(REJECTION_SUBJECT, subject)) {
-    return { ...result('rejection'), tier: 'A' };
+    return { ...result('rejection'), tier: 'subject_heuristic' };
   }
 
   if (known || company) {

@@ -1,0 +1,6 @@
+{
+  "classification": "not_relevant",
+  "ats": "greenhouse",
+  "tier": "A",
+  "note": "A one-time code for the application form, which was filed as a rejection because its subject matches \"your application to\". Not job-search mail at all. The envelope (sender and subject) is real, from the Jev trial (docs/trials/2026-09-29-jev-job-email.md, message 73c19297). The body was not fetched: Gmail was not reachable from the session that wrote this (plan #1227), and the ledger never stores one, so the fixture holds only what the rules read from the envelope."
+}

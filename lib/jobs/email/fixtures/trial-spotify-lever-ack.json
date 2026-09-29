@@ -1,0 +1,6 @@
+{
+  "classification": "application_confirmation",
+  "ats": "lever",
+  "tier": "A",
+  "note": "Filed as a rejection; Jev said application_confirmation at 1.00 and Haiku's summary only repeats the subject. Read from the envelope it is an acknowledgement; whether the body carried rejection wording could not be checked. The envelope (sender and subject) is real, from the Jev trial (docs/trials/2026-09-29-jev-job-email.md, message 3488d5ea). The body was not fetched: Gmail was not reachable from the session that wrote this (plan #1227), and the ledger never stores one, so the fixture holds only what the rules read from the envelope."
+}
