@@ -65,8 +65,8 @@ export function holdsAt(probability: number): boolean {
  * One step's answer. `probability` is null when Jev could not be asked or did
  * not answer, and such a step is never held: an API error leaves it as it is.
  */
-export type ActsCheck = {
-  step: ActsCandidate;
+export type ActsCheck<S = ActsCandidate> = {
+  step: S;
   probability: number | null;
   held: boolean;
 };
@@ -74,14 +74,16 @@ export type ActsCheck = {
 /**
  * Ask about every step, a few at a time, and say which would be held. `ask`
  * returns Jev's probability of a yes, or null, and must not throw; one that
- * does is read as null.
+ * does is read as null. `holds` is the line, 0.3 unless a caller asking a
+ * different question draws its own (the check after a run, plan #1184).
  */
-export async function checkActs(
-  steps: readonly ActsCandidate[],
-  ask: (step: ActsCandidate) => Promise<number | null>,
+export async function checkActs<S = ActsCandidate>(
+  steps: readonly S[],
+  ask: (step: S) => Promise<number | null>,
   concurrency: number = HOLD_ACTS_CONCURRENCY,
-): Promise<ActsCheck[]> {
-  const out: ActsCheck[] = new Array(steps.length);
+  holds: (probability: number) => boolean = holdsAt,
+): Promise<ActsCheck<S>[]> {
+  const out: ActsCheck<S>[] = new Array(steps.length);
   let next = 0;
   const worker = async () => {
     while (next < steps.length) {
@@ -93,7 +95,7 @@ export async function checkActs(
       } catch {
         probability = null;
       }
-      out[index] = { step, probability, held: probability !== null && holdsAt(probability) };
+      out[index] = { step, probability, held: probability !== null && holds(probability) };
     }
   };
   await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrency, steps.length)) }, worker));

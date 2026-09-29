@@ -292,4 +292,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'check-step-acts': background(run(JEV, 12 * 150, 0)),
   // One held step in, one sentence out.
   'write-acts-sentence': background(unit(HAIKU, 450, 40)),
+  // A closed step's title and result, about three hundred tokens with the
+  // question, for the two or three Claude steps a run closes.
+  'check-run-acts': background(run(JEV, 3 * 300, 0)),
 };

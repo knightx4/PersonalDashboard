@@ -32,6 +32,10 @@ vi.mock('@/inngest/goals/quiet-runs', () => ({
   runGoalsQuietSweep: vi.fn(async () => ({ closed: [] })),
 }));
 
+vi.mock('@/inngest/goals/acted-runs', () => ({
+  runGoalsActedCheck: vi.fn(async () => ({ runs: 0, checked: 0, unanswered: 0, flagged: [] })),
+}));
+
 vi.mock('@/inngest/dev/check-backs', () => ({
   runCheckBackWake: vi.fn(async () => ({ woken: [] })),
 }));
@@ -40,6 +44,7 @@ const { GET, POST } = await import('@/app/api/cron/overnight/route');
 const { runOvernightTick } = await import('@/inngest/dev/overnight');
 const { runGoalsQuietSweep } = await import('@/inngest/goals/quiet-runs');
 const { runCheckBackWake } = await import('@/inngest/dev/check-backs');
+const { runGoalsActedCheck } = await import('@/inngest/goals/acted-runs');
 
 function tickRequest(token: string | null) {
   const headers = new Headers({ host: 'example.test', 'x-forwarded-proto': 'https' });
@@ -82,6 +87,7 @@ describe('the overnight tick route', () => {
       fired: 0,
       results: {},
       goalsQuiet: { closed: [] },
+      goalsActs: { runs: 0, checked: 0, unanswered: 0, flagged: [] },
       checkBackWake: { woken: [] },
     });
     expect(runOvernightTick).toHaveBeenCalled();
@@ -93,6 +99,14 @@ describe('the overnight tick route', () => {
     expect(response.status).toBe(200);
     expect((await response.json()).goalsQuiet).toEqual({ error: 'goals read failed' });
     expect(runGoalsQuietSweep).toHaveBeenCalled();
+    expect(runOvernightTick).toHaveBeenCalled();
+  });
+
+  it('flags goals runs that acted outside the plan on every tick, and still ticks when that fails (plan #1184)', async () => {
+    vi.mocked(runGoalsActedCheck).mockRejectedValueOnce(new Error('history read failed'));
+    const response = await POST(tickRequest('secret-token'));
+    expect(response.status).toBe(200);
+    expect((await response.json()).goalsActs).toEqual({ error: 'history read failed' });
     expect(runOvernightTick).toHaveBeenCalled();
   });
 });
