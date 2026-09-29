@@ -13,6 +13,7 @@ import {
   type SendMode,
   type SendTarget,
 } from '@/lib/goals/handover';
+import { holdActingSteps } from '@/lib/goals/hold-acts-store';
 import { recordAndFire } from '@/lib/goals/shaping-store';
 import { loadLiveTree } from '@/lib/goals/steps-store';
 
@@ -101,6 +102,10 @@ export async function sendGoalStep(input: {
 }): Promise<SendResult> {
   const { client, userId, stepId } = input;
   const now = input.now ?? Date.now();
+
+  // A Claude step that acts outside the plan becomes a proposal first
+  // (plan #1183), so sendRefusal below turns it away if it is this one.
+  await holdActingSteps({ client, userId });
 
   const target = await loadTarget(client, userId, stepId);
   if (!target) return { ok: false, error: 'That step is no longer on the page.', refused: true };
