@@ -4,8 +4,11 @@ import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { LearnOperation } from '@/lib/learn/spend';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
+import { THEME_MERGE_QUESTION, themeMergeState } from '@/lib/vault/map/pair-jev-question';
 import {
+  jevGate,
   judgePairs,
+  judgeWithJev,
   proposalRow as mergeProposalRow,
   runMergePass,
   spendLedger,
@@ -188,11 +191,23 @@ export async function proposeThemeMerges(
   core: Pick<CoreSupabaseClient, 'from'> | null,
   options: ThemeMergeOptions & { userId?: string | null; anthropicApiKey: string },
 ): Promise<ThemeMergeResult> {
+  const jevFor = jevGate(core);
+  const haiku = (pairs: ThemePair[], onSpend: (report: SpendReport) => void) =>
+    judgeThemePairs({ pairs, anthropicApiKey: options.anthropicApiKey, onSpend });
   return runThemeMerges(
     {
       ...themeMergeStore(supabase, options.userId ?? null),
-      judge: (pairs, onSpend) =>
-        judgeThemePairs({ pairs, anthropicApiKey: options.anthropicApiKey, onSpend }),
+      // Jev first for an account that opted in, Haiku for what it cannot settle (plan #1169).
+      judge: async (pairs, onSpend) =>
+        judgeWithJev({
+          kind: 'theme',
+          pairs,
+          question: THEME_MERGE_QUESTION,
+          state: themeMergeState,
+          haiku,
+          onSpend,
+          enabled: await jevFor(pairs[0].userId),
+        }),
       ledger: spendLedger(core, OPERATION),
     },
     options,

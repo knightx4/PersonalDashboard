@@ -13,7 +13,22 @@ import {
 import { forceTool, toolBlockIn, whyNoReport } from '@/lib/learn/graph/tool-call';
 import type { LearnOperation } from '@/lib/learn/spend';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
-import { MERGE_MODEL, PAIRS_PER_CALL, spendLedger } from '@/lib/vault/map/merge-pass';
+import { JEV_MODEL } from '@/lib/jev/client';
+import { decideWithJev } from '@/lib/jev/decide';
+import {
+  jevGate,
+  MERGE_MODEL,
+  PAIRS_PER_CALL,
+  spendLedger,
+  sumByModel,
+} from '@/lib/vault/map/merge-pass';
+import {
+  LINK_QUESTION,
+  MAP_PAIRS_JEV_FLOOR,
+  positionState,
+  readLinkAnswer,
+  type LinkRead,
+} from '@/lib/vault/map/pair-jev-question';
 
 /**
  * Linking positions across notes (plan #816).
@@ -31,6 +46,10 @@ import { MERGE_MODEL, PAIRS_PER_CALL, spendLedger } from '@/lib/vault/map/merge-
  * with pairs that have an unlinked side first. Every answer is recorded on the
  * pair, `none` included, through obsidian.record_position_links, which writes
  * the edges in the same statement, so a pair is paid for once.
+ *
+ * Since plan #1169, for an account that opted in to Jev, each pair goes to
+ * Jev as one question first (judgeLinksWithJev), and only the pairs Jev
+ * cannot answer go to Haiku. An edge Jev settled carries no description.
  *
  * The map sweep runs this after the position merge pass has no pairs left
  * (inngest/vault/map-sweep.ts), so it links positions as merged rather than
@@ -67,8 +86,11 @@ export type LinkVerdict = {
   relation: LinkRelation;
   /** Which side the edge runs from; null for `none`. */
   from: 'A' | 'B' | null;
-  reason: string;
+  /** Null when Jev settled the pair: it gives no reason, and the edge then has no description. */
+  reason: string | null;
   confidence: number;
+  /** The model that settled this pair, when it is not the call's (plan #1169). */
+  model?: string;
 };
 
 /** One row for obsidian.record_position_links. */
@@ -77,13 +99,19 @@ export type LinkRecordRow = {
   b_id: string;
   relation: LinkRelation;
   from_id: string | null;
-  reason: string;
+  reason: string | null;
   confidence: number;
   model: string;
 };
 
 export type LinkJudgeOutcome =
-  | { ok: true; verdicts: LinkVerdict[]; model: string }
+  | {
+      ok: true;
+      verdicts: LinkVerdict[];
+      model: string;
+      /** Some pairs judged and the rest not: write what there is, then stop. */
+      stopped?: { reason: string; detail: string };
+    }
   | { ok: false; reason: string; detail: string };
 
 export type LinkPassPorts = {
@@ -211,7 +239,7 @@ export function linkRecordRow(pair: LinkPair, verdict: LinkVerdict, model: strin
     from_id: fromSide?.id ?? null,
     reason: verdict.reason,
     confidence: verdict.confidence,
-    model,
+    model: verdict.model ?? model,
   };
 }
 
@@ -245,7 +273,7 @@ export async function runLinkPass(
     const reports: SpendReport[] = [];
     const outcome = await ports.judge(pairs, (report) => reports.push(report));
     result.calls += 1;
-    for (const report of reports) await ports.ledger?.(owner, report);
+    for (const report of sumByModel(reports)) await ports.ledger?.(owner, report);
 
     if (!outcome.ok) {
       result.stopped = { reason: outcome.reason, detail: outcome.detail };
@@ -258,6 +286,11 @@ export async function runLinkPass(
     const written = rows.length === 0 ? { recorded: 0, edges: 0 } : await ports.record(rows);
     result.judged += written.recorded;
     result.edges += written.edges;
+
+    if (outcome.stopped) {
+      result.stopped = outcome.stopped;
+      return result;
+    }
 
     if (written.recorded === 0) {
       result.stopped = {
@@ -337,6 +370,78 @@ export async function judgeLinkPairs(input: {
   }
 }
 
+/**
+ * Jev first, one question per pair, and the Haiku batch call for the pairs it
+ * could not settle (plan #1169).
+ *
+ * A pair Jev answers is recorded with its relation, direction and
+ * confidence, and no reason, so an edge it finds has no description. The
+ * pairs it fails on, and any under MAP_PAIRS_JEV_FLOOR, go to Haiku together
+ * in one call. An account that has not opted in sends the whole batch to
+ * Haiku and nothing to TypeSafe. Never throws.
+ */
+export async function judgeLinksWithJev(input: {
+  pairs: LinkPair[];
+  haiku: (pairs: LinkPair[], onSpend: (report: SpendReport) => void) => Promise<LinkJudgeOutcome>;
+  onSpend: (report: SpendReport) => void;
+  enabled: boolean;
+  floor?: number;
+  jevApiKey?: string | null;
+  jevFetch?: typeof fetch;
+}): Promise<LinkJudgeOutcome> {
+  if (!input.enabled) return input.haiku(input.pairs, input.onSpend);
+  const floor = input.floor ?? MAP_PAIRS_JEV_FLOOR;
+
+  type Settled = { by: 'jev'; read: LinkRead } | { by: 'haiku' };
+  const settled = await Promise.all(
+    input.pairs.map((pair) =>
+      decideWithJev<typeof LINK_QUESTION, Settled>({
+        state: positionState(pair),
+        question: LINK_QUESTION,
+        onSpend: input.onSpend,
+        apiKey: input.jevApiKey,
+        fetch: input.jevFetch,
+        // The floor is on the relation's summed probability, not the top option's.
+        floor: 0,
+        trust: (answer) => readLinkAnswer(answer).confidence >= floor,
+        read: (answer) => ({ by: 'jev', read: readLinkAnswer(answer) }),
+        fallback: async () => ({ by: 'haiku' }),
+      }),
+    ),
+  );
+
+  const verdicts: LinkVerdict[] = [];
+  const unsure: number[] = [];
+  settled.forEach((decided, index) => {
+    const value = decided.value;
+    if (value.by === 'haiku') {
+      unsure.push(index);
+      return;
+    }
+    verdicts.push({ pair: index, ...value.read, reason: null, model: JEV_MODEL });
+  });
+
+  if (unsure.length === 0) return { ok: true, verdicts, model: JEV_MODEL };
+
+  const second = await input.haiku(
+    unsure.map((index) => input.pairs[index]),
+    input.onSpend,
+  );
+  if (!second.ok) {
+    if (verdicts.length === 0) return second;
+    return {
+      ok: true,
+      verdicts,
+      model: JEV_MODEL,
+      stopped: { reason: second.reason, detail: second.detail },
+    };
+  }
+  for (const verdict of second.verdicts) {
+    verdicts.push({ ...verdict, pair: unsure[verdict.pair], model: verdict.model ?? second.model });
+  }
+  return { ok: true, verdicts, model: second.model };
+}
+
 type CandidateRpcRow = {
   user_id: string;
   a_id: string;
@@ -396,11 +501,15 @@ export async function linkPositions(
   core: Pick<CoreSupabaseClient, 'from'> | null,
   options: LinkPassOptions & { userId?: string | null; anthropicApiKey: string },
 ): Promise<LinkPassResult> {
+  const jevFor = jevGate(core);
+  const haiku = (pairs: LinkPair[], onSpend: (report: SpendReport) => void) =>
+    judgeLinkPairs({ pairs, anthropicApiKey: options.anthropicApiKey, onSpend });
   return runLinkPass(
     {
       ...linkStore(supabase, options.userId ?? null),
-      judge: (pairs, onSpend) =>
-        judgeLinkPairs({ pairs, anthropicApiKey: options.anthropicApiKey, onSpend }),
+      // Jev first for an account that opted in, Haiku for what it cannot settle (plan #1169).
+      judge: async (pairs, onSpend) =>
+        judgeLinksWithJev({ pairs, haiku, onSpend, enabled: await jevFor(pairs[0].userId) }),
       ledger: spendLedger(core, OPERATION),
     },
     options,
