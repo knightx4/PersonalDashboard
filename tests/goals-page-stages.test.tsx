@@ -109,15 +109,15 @@ describe('a goal in stages', () => {
 
   it('opens on Open, leaving the finished stage out until Everything is chosen', () => {
     expect(html).not.toContain('Walk into interviews ready');
-    const pressed = [
-      ...html.matchAll(/<button[^>]*aria-pressed="true"[^>]*>([\s\S]*?)<\/button>/g),
+    const current = [
+      ...html.matchAll(/<a[^>]*aria-current="page"[^>]*>([\s\S]*?)<\/a>/g),
     ].map((m) => m[1]!.replace(/<[^>]+>/g, '').trim());
-    expect(pressed).toEqual([expect.stringMatching(/^Open/)]);
+    expect(current).toEqual([expect.stringMatching(/^Open/)]);
   });
 });
 
 describe('a goal that is one list', () => {
-  it('folds its finished steps under the open ones', () => {
+  it('folds its finished steps under the open ones on Everything', () => {
     const html = renderToStaticMarkup(
       <StepTree
         map={mapOf([
@@ -125,9 +125,64 @@ describe('a goal that is one list', () => {
           step('call', { title: 'Call the card company', position: 20 }),
         ])}
         todoOn={false}
+        view="all"
       />,
     );
     expect(folds(html)).toContainEqual({ open: false, text: 'Finished 1' });
     expect(html.indexOf('Call the card company')).toBeLessThan(html.indexOf('List every balance'));
+  });
+});
+
+describe('the view chips on a goal (plan #1157)', () => {
+  const map = mapOf([
+    step('list', { title: 'List every balance', status: 'done', position: 10 }),
+    step('call', { title: 'Call the card company', position: 20 }),
+    step('research', {
+      title: 'Find the repayment plans',
+      kind: 'claude',
+      position: 30,
+    }),
+    step('plan', { title: 'Which plan suits you?', kind: 'decision', position: 40 }),
+  ]);
+  const titles = (html: string) =>
+    ['List every balance', 'Call the card company', 'Find the repayment plans', 'Which plan suits you?'].filter(
+      (title) => html.includes(title),
+    );
+  const chips = (html: string) =>
+    [...html.matchAll(/<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)]
+      .map((m) => [m[2]!.replace(/<[^>]+>/g, '').trim(), m[1]!] as const)
+      .filter(([label]) => /^(Open|On you|Everything)/.test(label));
+
+  it('draws Open, On you and Everything as links to ?view=, Open on the bare path', () => {
+    const html = renderToStaticMarkup(<StepTree map={map} todoOn={false} />);
+    expect(chips(html).map(([label, href]) => [label.replace(/ \d+$/, ''), href])).toEqual([
+      ['Open', '/goals/goal-role'],
+      ['On you', '/goals/goal-role?view=you'],
+      ['Everything', '/goals/goal-role?view=all'],
+    ]);
+  });
+
+  it('opens on Open, which leaves the done step out', () => {
+    const html = renderToStaticMarkup(<StepTree map={map} todoOn={false} />);
+    expect(titles(html)).toEqual([
+      'Call the card company',
+      'Find the repayment plans',
+      'Which plan suits you?',
+    ]);
+  });
+
+  it('On you shows only your step and the question, not the step for Dash', () => {
+    const html = renderToStaticMarkup(<StepTree map={map} todoOn={false} view="you" />);
+    expect(titles(html)).toEqual(['Call the card company', 'Which plan suits you?']);
+  });
+
+  it('Everything shows the done step too', () => {
+    const html = renderToStaticMarkup(<StepTree map={map} todoOn={false} view="all" />);
+    expect(titles(html)).toEqual([
+      'List every balance',
+      'Call the card company',
+      'Find the repayment plans',
+      'Which plan suits you?',
+    ]);
   });
 });

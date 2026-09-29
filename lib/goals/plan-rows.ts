@@ -433,6 +433,32 @@ export const GOAL_VIEW_LABEL: Record<GoalView, string> = {
   read: REVIEW_WORD,
 };
 
+/**
+ * The views drawn as chips on a goal's steps, in their order on the row, and
+ * the rest in the menu at its end (plan #1157). The three #1156 chose; Ready
+ * and To read stay a press away, since notes asked for both.
+ */
+export const GOAL_VIEW_CHIPS = ['open', 'you', 'all'] as const satisfies readonly GoalView[];
+export const GOAL_VIEW_MENU = ['ready', 'read'] as const satisfies readonly GoalView[];
+
+/** The view a page opens on: Open, which is what the goal page showed before it had chips. */
+export const DEFAULT_GOAL_VIEW: GoalView = 'open';
+
+export function isGoalView(value: string): value is GoalView {
+  return (GOAL_VIEWS as readonly string[]).includes(value);
+}
+
+/** The view a `?view=` search parameter asks for, or Open when it names none. */
+export function goalViewOf(param: string | string[] | undefined): GoalView {
+  const requested = Array.isArray(param) ? param[0] : param;
+  return requested && isGoalView(requested) ? requested : DEFAULT_GOAL_VIEW;
+}
+
+/** Where a view of the page at `path` lives. Open keeps the bare path, as /dev/plan's does. */
+export function goalViewHref(path: string, view: GoalView): string {
+  return view === DEFAULT_GOAL_VIEW ? path : `${path}?view=${view}`;
+}
+
 /** The healths the dev plan's "On you" view is made of (`needsThePerson` in lib/plan/tree.ts). */
 const ON_YOU: ReadonlySet<string> = new Set(['unanswered', 'proposed', 'blocked', 'setup']);
 
@@ -442,7 +468,11 @@ function matchesGoalView(row: GoalRowNode, view: GoalView): boolean {
     case 'all':
       return true;
     case 'open':
-      return open;
+      // A finished Dash step whose result you have not read is not finished
+      // with, so it stays in Open with the rest of what is outstanding. Open
+      // is the page's default, and a result hidden behind Everything would
+      // go unread.
+      return open || awaitsReview(row.step);
     case 'you':
       return open && ON_YOU.has(row.health.name);
     case 'ready':

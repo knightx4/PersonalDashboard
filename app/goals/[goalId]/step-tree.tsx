@@ -2,29 +2,32 @@
 
 import type { LinkedFile } from '@/lib/files/files';
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { ListFilter, ListTree } from 'lucide-react';
 import { Progress, SectionTally } from '@/components/plan-tree/counts';
 import { ColumnHeader } from '@/components/plan-tree/grid';
+import { ViewChips } from '@/components/plan-tree/view-chips';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Segmented } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
 import {
+  DEFAULT_GOAL_VIEW,
   GOAL_VIEWS,
+  GOAL_VIEW_CHIPS,
   GOAL_VIEW_LABEL,
+  GOAL_VIEW_MENU,
   countGoalView,
   goalCatalog,
   goalRows,
+  goalViewHref,
   numberSteps,
   outlineSteps,
   viewGoalRows,
   type GoalRowNode,
   type GoalView,
 } from '@/lib/goals/plan-rows';
-import { goalStages } from '@/lib/goals/goal-page';
 import { countAside, type StepRunView } from '@/lib/goals/shaping';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import { GoalRow, type GoalRowContext } from './goal-row';
@@ -87,8 +90,14 @@ export function StepTree({
   informationSeam,
   runs = NO_RUNS,
   files = NO_FILES,
+  view = DEFAULT_GOAL_VIEW,
 }: {
   map: GoalMap;
+  /**
+   * Which of the views to show: the page's `?view=` (plan #1157), so the
+   * choice is in the address and survives a reload. Open when none is named.
+   */
+  view?: GoalView;
   todoOn: boolean;
   /** The latest run on each step sent or prepared from its row, by step id (plan #1044). */
   runs?: Record<string, StepRunView>;
@@ -102,15 +111,11 @@ export function StepTree({
   informationSeam?: InformationSeam;
 }) {
   const [showAside, setShowAside] = useState(false);
-  // A goal in stages opens on what is left to do, as its folded stages used
-  // to; Everything is one press away.
-  const [view, setView] = useState<GoalView>(() =>
-    (goalStages(map.steps)?.length ?? 0) >= 2 ? 'open' : 'all',
-  );
   const aside = countAside(map.steps);
   // While a step's run is going, read the page again now and then, so its
   // row moves on to what the run is on now and then to how it ended.
   const router = useRouter();
+  const path = usePathname() ?? `/goals/${map.goal.id}`;
   const anyRunning = Object.values(runs).some((run) => run.running !== null);
   useEffect(() => {
     if (!anyRunning) return;
@@ -198,20 +203,19 @@ export function StepTree({
                 strokeWidth={1.75}
                 aria-hidden
               />
-              <Segmented
-                label="View"
-                value={view}
-                onChange={setView}
-                options={GOAL_VIEWS.map((candidate) => {
-                  const count = candidate === 'all' ? 0 : countGoalView(counts, candidate);
-                  return {
-                    value: candidate,
-                    label:
-                      count > 0
-                        ? `${GOAL_VIEW_LABEL[candidate]} ${count}`
-                        : GOAL_VIEW_LABEL[candidate],
-                  };
-                })}
+              <ViewChips
+                view={view}
+                chips={GOAL_VIEW_CHIPS}
+                menu={GOAL_VIEW_MENU}
+                labels={GOAL_VIEW_LABEL}
+                hrefOf={(candidate) => goalViewHref(path, candidate)}
+                counts={Object.fromEntries(
+                  GOAL_VIEWS.filter((candidate) => candidate !== 'all').map((candidate) => [
+                    candidate,
+                    countGoalView(counts, candidate),
+                  ]),
+                )}
+                scroll={false}
               />
             </div>
             {emptyView && (

@@ -61,6 +61,7 @@ import { GoalLinksSection } from './goal-links';
 import { GoalNumber } from './goal-number';
 import { GoalFog, GoalShaping } from './goal-shaping';
 import { StepTree } from './step-tree';
+import { goalViewOf } from '@/lib/goals/plan-rows';
 import { DashWork } from './dash-work';
 import { dashWork } from '@/lib/goals/dash-work';
 
@@ -171,8 +172,17 @@ function goalFiles(goalId: string, filesOf: Record<string, LinkedFile[]>): Linke
   return out;
 }
 
-export default async function GoalMapPage({ params }: { params: Promise<{ goalId: string }> }) {
+export default async function GoalMapPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ goalId: string }>;
+  searchParams: Promise<{ view?: string | string[] }>;
+}) {
   const { goalId } = await params;
+  // Which of the step views is showing (plan #1157): in the address, so it
+  // survives a reload. Open when none is named.
+  const view = goalViewOf((await searchParams).view);
   if (!/^[0-9a-f-]{36}$/i.test(goalId)) notFound();
 
   const user = await requireUser();
@@ -333,6 +343,7 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
         {!numberEmpty && <GoalNumber {...number} />}
         <StepTree
           map={map}
+          view={view}
           todoOn={moduleEnabled(account, 'todo')}
           runs={stepRunLines(stepRuns)}
           files={filesOf}
