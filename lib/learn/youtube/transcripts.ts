@@ -417,6 +417,23 @@ export async function transcribeVideos(
   return result;
 }
 
+/**
+ * Cut a transcript fetched earlier into the video's catalogue rows, for a row
+ * added after the fetch: a channel sample kept in Videos (#1197) gets its
+ * catalogue row only once it is judged. A video with no captions gets its
+ * chapter cut instead. Nothing is fetched, and a segment whose text is
+ * unchanged keeps its vector. Returns the segments written.
+ */
+export async function cutStoredTranscript(learn: LearnSupabaseClient, videoId: string): Promise<number> {
+  const { data, error } = await learn.from('video_transcripts').select('state').eq('video_id', videoId).maybeSingle();
+  if (error) throw new Error(`Reading ${videoId}'s transcript state failed: ${error.message}`);
+  const state = (data as { state: TranscriptState } | null)?.state ?? null;
+  if (state === 'none') return writeSegmentsFor(learn, videoId, null);
+  if (state !== 'fetched') return 0;
+  const stored = await loadTranscript(learn, videoId);
+  return stored && stored.cues.length > 0 ? writeSegmentsFor(learn, videoId, stored.cues) : 0;
+}
+
 /** A stored transcript, or null if there is none. */
 export async function loadTranscript(
   learn: LearnSupabaseClient,

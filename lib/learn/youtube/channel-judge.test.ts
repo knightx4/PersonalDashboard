@@ -16,6 +16,13 @@ vi.mock('@/lib/learn/graph/load', () => ({
   loadGraph: vi.fn(async () => ({ concepts: [], edges: [], mentions: [] })),
 }));
 
+// Keeping the good samples (#1197) has its own test; here it only has to be
+// handed each newly judged sample once, on the press and on the scheduled run.
+const keepGoodSamples = vi.fn(async (_learn: unknown, input: { subjectId: string; samples: { verdict: string }[] }) =>
+  input.samples.filter((sample) => sample.verdict !== 'skip').length,
+);
+vi.mock('./keep-samples', () => ({ keepGoodSamples }));
+
 const { encodeTranscript } = await import('./transcripts');
 const { judgeFoundChannels, pickCandidates, readPickReply, readVerdictReply, uploadsPlaylistFor, verdictPrompt, MAX_CREDITS_PER_SUBJECT } =
   await import('./channel-judge');
@@ -212,7 +219,11 @@ describe('judgeFoundChannels', () => {
       onSpend: (pass) => spent.push(pass),
     });
 
-    expect(result).toMatchObject({ ok: true, picked: 2, sampled: 4, waiting: 1, failed: 0, quotaUnits: 4 });
+    expect(result).toMatchObject({ ok: true, picked: 2, sampled: 4, kept: 4, waiting: 1, failed: 0, quotaUnits: 4 });
+    expect(keepGoodSamples.mock.calls.map(([, input]) => [input.subjectId, input.samples.length])).toEqual([
+      [SUBJECT, 3],
+      [SUBJECT, 1],
+    ]);
     expect(transcribe.mock.calls[0][2]).toMatchObject({ trigger: 'press', maxCredits: MAX_CREDITS_PER_SUBJECT });
     // Every pick was asked for under the new requested_by, whether fetched or not.
     expect(tables.video_transcripts).toHaveLength(6);
@@ -239,6 +250,7 @@ describe('judgeFoundChannels', () => {
     }
     create.mockClear();
     uploads.playlist.mockClear();
+    keepGoodSamples.mockClear();
     const later = await judgeFoundChannels({
       learn: fakeLearn(tables, stored),
       userId: USER,
@@ -250,7 +262,10 @@ describe('judgeFoundChannels', () => {
       uploads,
       transcribe,
     });
-    expect(later).toMatchObject({ ok: true, picked: 0, sampled: 2, waiting: 0, transcripts: null });
+    expect(later).toMatchObject({ ok: true, picked: 0, sampled: 2, kept: 2, waiting: 0, transcripts: null });
+    // Only B's two new samples are kept; its first was kept by the press.
+    expect(keepGoodSamples).toHaveBeenCalledTimes(1);
+    expect(keepGoodSamples.mock.calls[0][1].samples).toHaveLength(2);
     expect(uploads.playlist).not.toHaveBeenCalled();
     expect(transcribe).toHaveBeenCalledTimes(1);
     expect(tables.subject_channels[1]).toMatchObject({ verdict: 'follow' });

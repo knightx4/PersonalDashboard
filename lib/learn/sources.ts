@@ -167,11 +167,11 @@ export const learnSources: ModuleSources = {
     {
       table: 'learn.watch_list',
       module: 'Learn',
-      holds: 'YouTube videos they chose to watch, saved to their playlist, with a verdict on each once judged.',
+      holds: 'YouTube videos they chose to watch, saved to their playlist, or kept from a channel Dash judged for one of their subjects, with a verdict on each once judged.',
       weight: 'intent',
       search: ['why', 'summary'],
       title: 'video_id',
-      note: 'item_id is the catalogue_items row of kind video, which has the title and description. verdict is watch, card or skip, with why; watched_at is set when they watched it; left_playlist_at when they took it off the playlist.',
+      note: 'item_id is the catalogue_items row of kind video, which has the title and description. verdict is watch, card or skip, with why; watched_at is set when they watched it; left_playlist_at when they took it off the playlist. came_from is playlist, takeout or channel search; a channel search row names the subject it was found for in subject_id.',
     },
   ],
   notSources: [

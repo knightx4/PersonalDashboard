@@ -41,6 +41,8 @@ export type ListVideo = {
   screenedAt: string | null;
   /** Stretches the judge named: what a card-pile video's cards are written from (#1067). */
   stretchCount: number;
+  /** The subject a channel search found it for (#1197); null for a video you added. */
+  foundFor: string | null;
 };
 
 type ProviderJoin = { name: string; youtube_channel_id: string | null } | { name: string; youtube_channel_id: string | null }[] | null;
@@ -68,6 +70,7 @@ type ListRow = {
   screened_at: string | null;
   stretches: unknown;
   item: ItemJoin | ItemJoin[] | null;
+  subject: { name: string } | { name: string }[] | null;
 };
 
 const one = <T>(value: T | T[] | null): T | null => (Array.isArray(value) ? (value[0] ?? null) : value);
@@ -82,7 +85,7 @@ function channelOf(item: ItemJoin): string | null {
 }
 
 const LIST_COLUMNS =
-  'video_id, added_at, watched_at, verdict, verdict_by, judge_verdict, why, best_start_seconds, best_end_seconds, screened_at, stretches, item:catalogue_items!watch_list_item_id_fkey(id, title, author, description, duration_seconds, canonical_url, provider:catalogue_providers!catalogue_items_provider_id_fkey(name, youtube_channel_id))';
+  'video_id, added_at, watched_at, verdict, verdict_by, judge_verdict, why, best_start_seconds, best_end_seconds, screened_at, stretches, subject:subjects!watch_list_subject_id_fkey(name), item:catalogue_items!watch_list_item_id_fkey(id, title, author, description, duration_seconds, canonical_url, provider:catalogue_providers!catalogue_items_provider_id_fkey(name, youtube_channel_id))';
 
 function toListVideo(row: ListRow): ListVideo | null {
   const item = one(row.item);
@@ -102,6 +105,7 @@ function toListVideo(row: ListRow): ListVideo | null {
     bestEndSeconds: row.best_end_seconds,
     screenedAt: row.screened_at,
     stretchCount: readStretches(row.stretches).length,
+    foundFor: one(row.subject)?.name ?? null,
   };
 }
 
