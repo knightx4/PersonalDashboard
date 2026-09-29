@@ -29,6 +29,7 @@ import type { StepNode } from '@/lib/goals/steps';
 import type { GoalStatus } from '@/lib/goals/tree';
 import { loadShaping, loadStepRuns } from '@/lib/goals/shaping-store';
 import { loadGoalMap, type GoalMap } from '@/lib/goals/steps-store';
+import { loadAreas } from '@/lib/goals/store';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { todayIn } from '@/lib/todo/tasks/model';
@@ -52,6 +53,8 @@ import { RelatedNotes } from '@/components/vault/related-notes';
 import { GoalStatusCard } from './goal-status';
 import { GoalFindings, GoalRhythms } from './goal-found';
 import { GoalAddRow } from './goal-add-row';
+import { GoalAreaMenu } from './goal-area-menu';
+import type { Place } from '../move-goal';
 import { GoalContext } from './goal-context';
 import { GoalFlags } from './goal-flags';
 import { GoalHeadingField } from './goal-heading';
@@ -227,7 +230,7 @@ export default async function GoalMapPage({
     goalMatchText({ title: map.goal.title, acceptance: map.goal.acceptance }),
     { core },
   ).then((found) => found.map(toLink));
-  const [stepRuns, filesOf, brief, review] = await Promise.all([
+  const [stepRuns, filesOf, brief, review, places] = await Promise.all([
     loadStepRuns(client, stepIdsOn(map)).catch((): Record<string, GoalRun> => ({})),
     // The files the goal and its steps link to. A failed read leaves them
     // out rather than the page, as do the note and the verdict below.
@@ -238,6 +241,11 @@ export default async function GoalMapPage({
     loadLatestReviews(client)
       .then((reviews) => reviews.get(map.goal.id) ?? null)
       .catch((): GoalReview | null => null),
+    // The areas the goal can be moved to (plan #1160). A failed read leaves
+    // the menu out rather than the page.
+    loadAreas(client)
+      .then((areas) => areas.map((area) => ({ id: area.id, name: area.name })))
+      .catch((): Place[] => []),
   ]);
   const status = goalStatus(
     map.goal,
@@ -314,6 +322,12 @@ export default async function GoalMapPage({
       </Link>
       <PageHeader
         title={<GoalHeadingField goalId={map.goal.id} field="title" value={map.goal.title} />}
+        actions={
+          <GoalAreaMenu
+            goal={{ id: map.goal.id, title: map.goal.title, areaId: map.goal.areaId }}
+            places={places}
+          />
+        }
         description={
           <span className="block space-y-0.5">
             <span className="block text-small font-semibold text-ink-muted">Done when</span>

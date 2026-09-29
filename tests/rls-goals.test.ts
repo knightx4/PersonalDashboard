@@ -88,6 +88,32 @@ describe('goals history', () => {
     expect(Object.keys(edit.new_values ?? {}).sort()).toEqual(['closed_at', 'status', 'title']);
   });
 
+  it('records moving a goal to another area, and its steps go with it (plan #1160)', async () => {
+    const [from] = await admin<{ id: string }[]>`
+      insert into areas (user_id, name) values (${userA}, 'Career') returning id`;
+    const [to] = await admin<{ id: string }[]>`
+      insert into areas (user_id, name) values (${userA}, 'City') returning id`;
+    const [goal] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title)
+      values (${userA}, 'goal', ${from.id}, 'Know ten people in the scene') returning id`;
+    const [step] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goal.id}, 'mine', 'Go to the first meetup') returning id`;
+
+    await asUser(userA, (tx) => tx`
+      update items set area_id = ${to.id}, position = 10 where id = ${goal.id}`);
+
+    const rows = await historyOf(goal.id);
+    expect(rows.map((r) => r.action)).toEqual(['insert', 'update']);
+    expect(rows[1].old_values).toMatchObject({ area_id: from.id });
+    expect(rows[1].new_values).toMatchObject({ area_id: to.id });
+    // The step hangs from the goal, not the area, so nothing about it changed.
+    const [kept] = await admin<{ parent_id: string; area_id: string | null }[]>`
+      select parent_id, area_id from items where id = ${step.id}`;
+    expect(kept).toEqual({ parent_id: goal.id, area_id: null });
+    expect((await historyOf(step.id)).map((r) => r.action)).toEqual(['insert']);
+  });
+
   it('records archiving as its own action, and the row stays', async () => {
     const [area] = await admin<{ id: string }[]>`
       insert into areas (user_id, name) values (${userA}, 'Health') returning id`;

@@ -240,6 +240,7 @@ export async function addGoal(_prev: GoalsActionState, form: FormData): Promise<
   if (!areaId.success) return { error: 'Could not tell which area that goal is for.' };
   const parsed = parseGoalFields((key) => form.get(key), { requireTitle: true });
   if (!parsed.ok) return { error: parsed.error };
+  // insertGoal reads the area from its own argument, never from these fields.
   const { title, ...rest } = parsed.value;
   if (!title) return { error: 'Give the goal a title.' };
   try {
@@ -254,7 +255,10 @@ export async function addGoal(_prev: GoalsActionState, form: FormData): Promise<
   return saved();
 }
 
-/** An edit sends only the field that changed: the title, the done-when or the fog. */
+/**
+ * An edit sends only the field that changed: the title, the done-when, the
+ * fog, or the area it moves to (plan #1160).
+ */
 // latency: pending
 export async function editGoal(_prev: GoalsActionState, form: FormData): Promise<GoalsActionState> {
   await requireUser();
@@ -265,7 +269,13 @@ export async function editGoal(_prev: GoalsActionState, form: FormData): Promise
   if (Object.keys(parsed.value).length === 0) return {};
   try {
     const changed = await updateGoal(await createGoalsClient(), id.data, parsed.value);
-    if (!changed) return { error: 'That goal is no longer on the page.' };
+    if (!changed) {
+      return {
+        error: parsed.value.areaId
+          ? 'That goal or area is no longer on the page. Reload to see it.'
+          : 'That goal is no longer on the page.',
+      };
+    }
   } catch {
     return { error: 'The change could not be saved. Try again.' };
   }

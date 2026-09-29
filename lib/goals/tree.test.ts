@@ -108,6 +108,13 @@ describe('parseGoalFields', () => {
     expect(parseGoalFields(form({}))).toEqual({ ok: true, value: {} });
   });
 
+  it('takes an area to move the goal to, and refuses one that is not an id (plan #1160)', () => {
+    const areaId = '6bf06314-62d6-440b-ae8d-7bd51e738e0f';
+    expect(parseGoalFields(form({ areaId }))).toEqual({ ok: true, value: { areaId } });
+    expect(parseGoalFields(form({ areaId: 'Money' })).ok).toBe(false);
+    expect(parseGoalFields(form({ areaId: ' ' })).ok).toBe(false);
+  });
+
   it('refuses a title over the limit', () => {
     expect(parseGoalFields(form({ title: 'x'.repeat(GOAL_TITLE_MAX + 1) })).ok).toBe(false);
   });

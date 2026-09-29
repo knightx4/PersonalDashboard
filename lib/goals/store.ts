@@ -256,15 +256,58 @@ export async function insertGoal(
   return true;
 }
 
-/** False when no live goal has that id. */
+/**
+ * False when no live goal has that id, or when the area it is moved to is not
+ * one of your live areas. A move (plan #1160) puts the goal at the end of the
+ * new area's list; its steps hang from the goal rather than the area, so they
+ * go with it untouched, and the history trigger records the old and new area.
+ */
 export async function updateGoal(
   client: GoalsSupabaseClient,
   id: string,
   fields: GoalFields,
 ): Promise<boolean> {
+  const { areaId, ...rest } = fields;
+  const change: Record<string, unknown> = { ...rest };
+
+  if (areaId !== undefined) {
+    const { data: area, error: areaError } = await client
+      .from('areas')
+      .select('id')
+      .eq('id', areaId)
+      .is('archived_at', null)
+      .maybeSingle();
+    if (areaError) throw new Error(areaError.message);
+    if (!area) return false;
+
+    const { data: rows, error: readError } = await client
+      .from('items')
+      .select('id, position')
+      .eq('level', 'goal')
+      .eq('area_id', areaId)
+      .is('archived_at', null);
+    if (readError) throw new Error(readError.message);
+    // Already in that area: nothing to move, and the goal keeps its place.
+    if (!(rows ?? []).some((row) => row.id === id)) {
+      change.area_id = areaId;
+      change.position = nextPosition((rows ?? []).map((row) => row.position as number));
+    }
+  }
+
+  if (Object.keys(change).length === 0) {
+    const { data, error } = await client
+      .from('items')
+      .select('id')
+      .eq('id', id)
+      .eq('level', 'goal')
+      .is('archived_at', null);
+    if (error) throw new Error(error.message);
+    return (data ?? []).length > 0;
+  }
+
   const { data, error } = await client
     .from('items')
-    .update(fields)
+    .update(change)
     .eq('id', id)
     .eq('level', 'goal')
     .is('archived_at', null)
