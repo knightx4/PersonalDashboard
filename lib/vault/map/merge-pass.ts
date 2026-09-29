@@ -5,9 +5,20 @@ import { z } from 'zod';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
+import { JEV_MODEL, type JevState } from '@/lib/jev/client';
+import { decideWithJev } from '@/lib/jev/decide';
+import { jevEnabledFor } from '@/lib/jev/enabled';
 import { forceTool, toolBlockIn, whyNoReport } from '@/lib/learn/graph/tool-call';
 import type { LearnOperation } from '@/lib/learn/spend';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
+import {
+  jevMergeReason,
+  MAP_PAIRS_JEV_FLOOR,
+  MAP_PAIRS_ON_JEV,
+  readMergeAnswer,
+  type MergeLabel,
+  type MergeRead,
+} from '@/lib/vault/map/pair-jev-question';
 
 /**
  * What the theme merge pass (#811) and the position merge pass (#812) share.
@@ -18,6 +29,10 @@ import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
  * own `kind`. Neither changes a theme or a position. What differs is the
  * candidate function, the prompt and how a pair is shown to the model; the
  * loop, the verdict parsing, the proposal row and the store are here.
+ *
+ * Since plan #1169, for an account that opted in to Jev, each pair of a batch
+ * goes to Jev as one question first (judgeWithJev), and only the pairs Jev
+ * cannot answer go to Haiku, in one call as before.
  */
 
 export const MERGE_MODEL = 'claude-haiku-4-5';
@@ -48,6 +63,8 @@ export type MergeVerdict = {
   name: string | null;
   reason: string;
   confidence: number;
+  /** The model that settled this pair, when it is not the call's (plan #1169). */
+  model?: string;
 };
 
 export type MergeProposalRow = {
@@ -69,7 +86,16 @@ export type MergeProposalRow = {
 };
 
 export type JudgeOutcome =
-  | { ok: true; verdicts: MergeVerdict[]; model: string }
+  | {
+      ok: true;
+      verdicts: MergeVerdict[];
+      model: string;
+      /**
+       * Set when some pairs were judged and the rest could not be, so the
+       * loop writes what it has and then stops, as it does on a failed call.
+       */
+      stopped?: { reason: string; detail: string };
+    }
   | { ok: false; reason: string; detail: string };
 
 const verdictSchema = z.object({
@@ -161,7 +187,7 @@ export function proposalRow(
     survivor_name: survivor ? (verdict.name ?? survivor.name) : null,
     reason: verdict.reason,
     confidence: verdict.confidence,
-    model,
+    model: verdict.model ?? model,
   };
 }
 
@@ -220,7 +246,7 @@ export async function runMergePass<P extends MergePair>(
     const reports: SpendReport[] = [];
     const outcome = await ports.judge(pairs, (report) => reports.push(report));
     result.calls += 1;
-    for (const report of reports) await ports.ledger?.(owner, report);
+    for (const report of sumByModel(reports)) await ports.ledger?.(owner, report);
 
     if (!outcome.ok) {
       result.stopped = { reason: outcome.reason, detail: outcome.detail };
@@ -234,6 +260,11 @@ export async function runMergePass<P extends MergePair>(
     result.proposed += written;
     result.same += rows.filter((row) => row.verdict === 'same').length;
 
+    if (outcome.stopped) {
+      result.stopped = outcome.stopped;
+      return result;
+    }
+
     if (written === 0) {
       result.stopped = {
         reason: 'unanswered',
@@ -242,6 +273,136 @@ export async function runMergePass<P extends MergePair>(
       return result;
     }
   }
+}
+
+/**
+ * One report per model, so a batch Jev answered pair by pair records one
+ * spend row rather than twenty.
+ */
+export function sumByModel(reports: SpendReport[]): SpendReport[] {
+  const byModel = new Map<string, SpendReport>();
+  for (const report of reports) {
+    const seen = byModel.get(report.model);
+    if (!seen) {
+      byModel.set(report.model, { model: report.model, usage: { ...report.usage } });
+      continue;
+    }
+    seen.usage.inputTokens += report.usage.inputTokens;
+    seen.usage.cachedInputTokens += report.usage.cachedInputTokens;
+    seen.usage.cacheWriteTokens += report.usage.cacheWriteTokens;
+    seen.usage.outputTokens += report.usage.outputTokens;
+  }
+  return [...byModel.values()];
+}
+
+/** The shape both merge questions share (pair-jev-question.ts). */
+export type MergeQuestion = {
+  type: 'choice';
+  question: string;
+  options: Readonly<Record<MergeLabel, string>>;
+};
+
+/**
+ * Jev first, one question per pair, and the Haiku batch call for the pairs it
+ * could not settle (plan #1169).
+ *
+ * A pair Jev answers is written with Jev's verdict and confidence, the name of
+ * the side it chose for a `same`, and a reason saying how sure it was. The
+ * pairs it fails on, and any under MAP_PAIRS_JEV_FLOOR, go to Haiku together
+ * in one call, as the whole batch did before. An account that has not opted
+ * in sends the whole batch to Haiku and nothing to TypeSafe. Never throws.
+ */
+export async function judgeWithJev<P extends MergePair>(input: {
+  kind: MergeKind;
+  pairs: P[];
+  question: MergeQuestion;
+  state: (pair: P) => JevState;
+  haiku: (pairs: P[], onSpend: (report: SpendReport) => void) => Promise<JudgeOutcome>;
+  onSpend: (report: SpendReport) => void;
+  enabled: boolean;
+  floor?: number;
+  jevApiKey?: string | null;
+  jevFetch?: typeof fetch;
+}): Promise<JudgeOutcome> {
+  if (!input.enabled) return input.haiku(input.pairs, input.onSpend);
+  const floor = input.floor ?? MAP_PAIRS_JEV_FLOOR;
+
+  type Settled = { by: 'jev'; read: MergeRead } | { by: 'haiku' };
+  const settled = await Promise.all(
+    input.pairs.map((pair) =>
+      decideWithJev<MergeQuestion, Settled>({
+        state: input.state(pair),
+        question: input.question,
+        onSpend: input.onSpend,
+        apiKey: input.jevApiKey,
+        fetch: input.jevFetch,
+        // The floor is on the verdict's summed probability, not the top option's.
+        floor: 0,
+        trust: (answer) => readMergeAnswer(answer).confidence >= floor,
+        read: (answer) => ({ by: 'jev', read: readMergeAnswer(answer) }),
+        fallback: async () => ({ by: 'haiku' }),
+      }),
+    ),
+  );
+
+  const verdicts: MergeVerdict[] = [];
+  const unsure: number[] = [];
+  settled.forEach((decided, index) => {
+    const value = decided.value;
+    if (value.by === 'haiku') {
+      unsure.push(index);
+      return;
+    }
+    const pair = input.pairs[index];
+    const kept = value.read.keep === 'A' ? pair.a : value.read.keep === 'B' ? pair.b : null;
+    verdicts.push({
+      pair: index,
+      same: value.read.same,
+      name: kept?.name ?? null,
+      reason: jevMergeReason(input.kind, value.read),
+      confidence: value.read.confidence,
+      model: JEV_MODEL,
+    });
+  });
+
+  if (unsure.length === 0) return { ok: true, verdicts, model: JEV_MODEL };
+
+  const second = await input.haiku(
+    unsure.map((index) => input.pairs[index]),
+    input.onSpend,
+  );
+  if (!second.ok) {
+    if (verdicts.length === 0) return second;
+    return {
+      ok: true,
+      verdicts,
+      model: JEV_MODEL,
+      stopped: { reason: second.reason, detail: second.detail },
+    };
+  }
+  for (const verdict of second.verdicts) {
+    verdicts.push({ ...verdict, pair: unsure[verdict.pair], model: verdict.model ?? second.model });
+  }
+  return { ok: true, verdicts, model: second.model };
+}
+
+/**
+ * Whether each owner's pairs go to Jev: the switch, and the account's own
+ * opt-in, read once per owner per run. No core client reads as no.
+ */
+export function jevGate(
+  core: Pick<CoreSupabaseClient, 'from'> | null,
+): (userId: string) => Promise<boolean> {
+  const known = new Map<string, Promise<boolean>>();
+  return (userId) => {
+    if (!MAP_PAIRS_ON_JEV || !core) return Promise.resolve(false);
+    let answer = known.get(userId);
+    if (!answer) {
+      answer = jevEnabledFor(core, userId);
+      known.set(userId, answer);
+    }
+    return answer;
+  };
 }
 
 /** One Haiku call over a batch of pairs, already rendered. Never throws. */
