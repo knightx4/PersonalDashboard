@@ -61,6 +61,8 @@ import { GoalLinksSection } from './goal-links';
 import { GoalNumber } from './goal-number';
 import { GoalFog, GoalShaping } from './goal-shaping';
 import { StepTree } from './step-tree';
+import { DashWork } from './dash-work';
+import { dashWork } from '@/lib/goals/dash-work';
 
 export const metadata = { title: 'Goal' };
 export const dynamic = 'force-dynamic';
@@ -122,6 +124,20 @@ function stepIdsOn(map: GoalMap): string[] {
 /** Each sent step's run line (plan #1044). Outside the component because it reads the clock. */
 function stepRunLines(runs: Record<string, GoalRun>) {
   return stepRunViews(runs, Date.now());
+}
+
+/** Dash's work at the top of the page (note 03ce0cce). Outside the component because it reads the clock. */
+function dashWorkOn(map: GoalMap, runs: Record<string, GoalRun>) {
+  const titles = new Map<string, string>();
+  const walk = (nodes: StepNode[]) => {
+    for (const node of nodes) {
+      titles.set(node.id, node.title);
+      walk(node.children);
+    }
+  };
+  walk(map.steps);
+  walk(map.linked.map((entry) => entry.step));
+  return dashWork(runs, titles, Date.now());
 }
 
 /** Whether the status is today's. Outside the component because it reads the clock. */
@@ -311,6 +327,7 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
           current={review ? reviewCurrent(review) : false}
           stages={stages}
         />
+        <DashWork items={dashWorkOn(map, stepRuns)} />
         {flags.length > 0 && <GoalFlags flags={flags} />}
         {shapingUp && shapingPanel}
         {!numberEmpty && <GoalNumber {...number} />}
