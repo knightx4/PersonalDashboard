@@ -51,6 +51,12 @@ export type Goal = {
   target: number | null;
   /** When the goal is due, YYYY-MM-DD, or null (plan #1025). Read on the goal page only. */
   dueOn?: string | null;
+  /**
+   * Whether it is an errand: a one-off job with a date it is due by, which Dash
+   * maps short (plan #1261). An errand always has a dueOn; the database refuses
+   * one without (goals 0061).
+   */
+  errand?: boolean;
   /** The kinds of weekly help it asks for (plan #1027). Read on the goal page only. */
   helpKinds?: HelpKindChoice[];
   /** The kinds Claude proposed when it mapped the goal, waiting for you (plan #1029). Goal page only. */
@@ -131,6 +137,10 @@ export type GoalFields = {
    * your live areas; the goal's steps carry no area, so they go with it.
    */
   areaId?: string;
+  /** Turn the goal into an errand, or back into a goal (plan #1261). */
+  errand?: boolean;
+  /** The date it is due by, YYYY-MM-DD, or null to clear it. An errand needs one. */
+  dueOn?: string | null;
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -188,7 +198,35 @@ export function parseGoalFields(
     fields.areaId = areaId;
   }
 
+  const rawDue = get('due');
+  if (rawDue !== null && rawDue !== undefined) {
+    const due = clean(rawDue);
+    if (due && !isDate(due)) return { ok: false, error: 'That is not a date.' };
+    fields.dueOn = due;
+  }
+
+  const rawErrand = get('errand');
+  if (rawErrand !== null && rawErrand !== undefined) {
+    const errand = clean(rawErrand);
+    if (errand !== 'true' && errand !== 'false') {
+      return { ok: false, error: 'Could not tell whether that is an errand.' };
+    }
+    fields.errand = errand === 'true';
+    // The date comes with the flag, so an errand is never saved without one
+    // (goals 0061 refuses it too).
+    if (fields.errand && !fields.dueOn) {
+      return { ok: false, error: 'An errand needs a date it is due by.' };
+    }
+  }
+
   return { ok: true, value: fields };
+}
+
+/** A real calendar date in YYYY-MM-DD, which is what a date input sends. */
+function isDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
 /**

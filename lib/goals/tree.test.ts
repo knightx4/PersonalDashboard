@@ -155,3 +155,21 @@ describe('groupGoals', () => {
     ]);
   });
 });
+
+describe('parseGoalFields for errands (plan #1261)', () => {
+  it('takes the flag with its date, and the flag off alone', () => {
+    expect(parseGoalFields(form({ errand: 'true', due: '2026-10-12' }))).toEqual({
+      ok: true,
+      value: { errand: true, dueOn: '2026-10-12' },
+    });
+    expect(parseGoalFields(form({ errand: 'false' }))).toEqual({ ok: true, value: { errand: false } });
+    expect(parseGoalFields(form({ due: '' }))).toEqual({ ok: true, value: { dueOn: null } });
+  });
+
+  it('refuses an errand without a date, a date that is not one, and a flag it cannot read', () => {
+    const noDate = parseGoalFields(form({ errand: 'true' }));
+    expect(!noDate.ok && noDate.error).toMatch(/needs a date/);
+    expect(parseGoalFields(form({ errand: 'true', due: '2026-02-30' })).ok).toBe(false);
+    expect(parseGoalFields(form({ errand: 'yes', due: '2026-10-12' })).ok).toBe(false);
+  });
+});

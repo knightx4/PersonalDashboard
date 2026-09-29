@@ -914,7 +914,9 @@ A sketch for the migration, not the migration itself.
   to close or park it; plan #1084), `prepares_id` (on a Claude step, the
   step of yours it prepares, one live prep step per step and never a wait;
   plan #1215), `prep_checked_at` (on a step of yours, when a run judged
-  whether it needs a prep step; plan #1215), `position`, and `rhythm_count` with
+  whether it needs a prep step; plan #1215), `errand` (on a goal, that it
+  is a one-off job with a date it is due by; an errand always has `due_on`,
+  and a step is never one; plan #1261), `position`, and `rhythm_count` with
   `rhythm_period` for rhythms. A goal's status can also be `parked`. A goal's
   `help_kinds` lists the weekly help it asks for, each an entry of `kind`
   (events, volunteering, reading, courses or job_leads) and a `note` on what
