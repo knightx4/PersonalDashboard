@@ -304,6 +304,8 @@ export function GoalsAllSurface() {
       <PageHeader title="All goals" />
       <GoalsView
         areas={areas}
+        view="open"
+        onYou={{ [cards.id]: 1 }}
         progress={{
           [cards.id]: cardsProgress,
           [fund.id]: home.goals[1].progress!,

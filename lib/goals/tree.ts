@@ -43,6 +43,8 @@ export type Goal = {
   fogDismissedAt?: string | null;
   status: GoalStatus;
   position: number;
+  /** When it was archived; null or absent while it is live. Read on All goals only (plan #1158). */
+  archivedAt?: string | null;
   /** What the goal is measured in, such as "$" or "lb"; null when it is not (plan #930). */
   unit: string | null;
   /** The value it is aiming for, when it has a unit and one is set. */

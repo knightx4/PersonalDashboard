@@ -33,6 +33,7 @@ type GoalRow = {
   position: number;
   unit: string | null;
   target: number | string | null;
+  archived_at?: string | null;
 };
 
 const toArea = (row: AreaRow): Area => ({
@@ -52,6 +53,7 @@ const toGoal = (row: GoalRow): Goal => ({
   position: row.position,
   unit: row.unit,
   target: row.target === null ? null : Number(row.target),
+  archivedAt: row.archived_at ?? null,
 });
 
 export async function loadAreas(client: GoalsSupabaseClient): Promise<Area[]> {
@@ -67,14 +69,20 @@ export async function loadAreas(client: GoalsSupabaseClient): Promise<Area[]> {
   return (data as AreaRow[]).map(toArea);
 }
 
-export async function loadGoals(client: GoalsSupabaseClient): Promise<Goal[]> {
-  const { data, error } = await client
+/**
+ * The goals in page order. `archived` takes the archived ones too, for All
+ * goals' Everything view (plan #1158); every other read leaves them out.
+ */
+export async function loadGoals(
+  client: GoalsSupabaseClient,
+  { archived = false }: { archived?: boolean } = {},
+): Promise<Goal[]> {
+  let query = client
     .from('items')
-    .select('id, area_id, title, acceptance, fog, status, position, unit, target')
-    .eq('level', 'goal')
-    .is('archived_at', null)
-    .order('position')
-    .order('created_at');
+    .select('id, area_id, title, acceptance, fog, status, position, unit, target, archived_at')
+    .eq('level', 'goal');
+  if (!archived) query = query.is('archived_at', null);
+  const { data, error } = await query.order('position').order('created_at');
   assertSchemaExposed(error, GOALS_SCHEMA);
   if (error) throw new Error(`Could not read goals: ${error.message}`);
   return (data as GoalRow[]).map(toGoal);
@@ -87,7 +95,12 @@ async function writeOrder(
   order: string[],
 ): Promise<void> {
   const results = await Promise.all(
-    order.map((id, i) => client.from(table).update({ position: (i + 1) * 10 }).eq('id', id)),
+    order.map((id, i) =>
+      client
+        .from(table)
+        .update({ position: (i + 1) * 10 })
+        .eq('id', id),
+    ),
   );
   const failed = results.find((result) => result.error);
   if (failed?.error) throw new Error(failed.error.message);
