@@ -3,11 +3,14 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { unwrapQuotedOriginal } from '@/lib/email/extract/forwarded';
+import { decideWithJev } from '@/lib/jev/decide';
 import {
   heuristicRecurring,
   parseRecurringExtraction,
+  type RecurringEvent,
   type RecurringExtraction,
 } from './extraction';
+import { RECURRING_QUESTION, recurringState } from './jev-question';
 import type { RecurringHint } from './rules';
 
 /**
@@ -18,6 +21,10 @@ import type { RecurringHint } from './rules';
  * regularly; the model decides whether it really is and reads the numbers.
  * Without a key, or when its answer does not hold together, the heuristic
  * reads what it can.
+ *
+ * For an account that has opted in, Jev answers the gate first (plan #1167):
+ * whether the email is a recurring payment and which event it reports. See
+ * extractRecurringFromEmail.
  */
 
 const EXTRACT_MODEL = 'claude-haiku-4-5-20251001';
@@ -47,6 +54,77 @@ export type RecurringReading =
   | { ok: true; value: RecurringExtraction; source: 'llm' | 'heuristic' }
   | { ok: false; notRecurring: boolean; reason: string };
 
+type Email = { subject: string; text: string; fromAddress: string | null };
+
+export type RecurringHaikuInput = {
+  email: Email;
+  receivedOn: string;
+  apiKey?: string | null;
+  onSpend?: SpendSink;
+};
+
+/**
+ * Haiku's reading, checked. Null when there is no key, the call failed, or
+ * the answer had no JSON in it.
+ */
+export type RecurringHaikuReading = ReturnType<typeof parseRecurringExtraction> | null;
+
+export async function readRecurringWithHaiku(input: RecurringHaikuInput): Promise<RecurringHaikuReading> {
+  const apiKey = input.apiKey ?? process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+  const { email } = input;
+  try {
+    const client = new Anthropic({ apiKey });
+    const message = await client.messages.create({
+      model: EXTRACT_MODEL,
+      max_tokens: 400,
+      system: SYSTEM,
+      messages: [
+        {
+          role: 'user',
+          content: `Email date: ${input.receivedOn}\nFrom: ${email.fromAddress ?? ''}\nSubject: ${email.subject}\n\nBody:\n${email.text.slice(0, 10_000)}`,
+        },
+      ],
+    });
+    input.onSpend?.({ model: EXTRACT_MODEL, usage: usageFrom(message.usage) });
+    const block = message.content.find((b) => b.type === 'text');
+    const text = block && block.type === 'text' ? block.text : '';
+    const json = text.match(/\{[\s\S]*\}/);
+    if (!json) return null;
+    return parseRecurringExtraction(JSON.parse(json[0]) as unknown, input.receivedOn);
+  } catch (err) {
+    console.error('recurring extract failed', err);
+    return null;
+  }
+}
+
+/**
+ * A reading with the event Jev settled. Null when the result no longer holds
+ * together: a charge or a bill needs an amount, as parseRecurringExtraction
+ * requires of Haiku.
+ */
+function withEvent(value: RecurringExtraction, event: RecurringEvent): RecurringExtraction | null {
+  if ((event === 'charge' || event === 'bill') && value.amountCents == null) return null;
+  return { ...value, event };
+}
+
+/** What the gate gives back: Jev's event (null for "not one"), or the whole Haiku path. */
+type Gated = { by: 'jev'; event: RecurringEvent | null } | { by: 'haiku'; reading: RecurringReading };
+
+/**
+ * Reads one claimed email into a recurring payment.
+ *
+ * 1. Jev is asked whether the email is a recurring payment and which of the
+ *    six events it reports, unless the account has not opted in
+ *    (`jevEnabled`, from lib/jev/enabled.ts), in which case nothing is sent.
+ * 2. Its answer stands at 0.8 confidence or more. Otherwise, or when Jev
+ *    fails, this is the Haiku call it always was, with the heuristic behind it.
+ * 3. A sure "not recurring" ends it: Haiku is not called. A sure event still
+ *    needs Haiku for the payee, amount and dates; Jev's event replaces
+ *    Haiku's, and when Haiku cannot read the fields the heuristic does.
+ *
+ * Jev's spend goes to the same `onSpend` as Haiku's.
+ */
 export async function extractRecurringFromEmail(input: {
   subject: string;
   text: string;
@@ -56,48 +134,62 @@ export async function extractRecurringFromEmail(input: {
   hint: RecurringHint;
   apiKey?: string | null;
   onSpend?: SpendSink;
+  /** False, the default, for an account that has not opted in; Jev is then never called. */
+  jevEnabled?: boolean;
+  jevApiKey?: string | null;
+  jevFetch?: typeof fetch;
+  /** Haiku's reading; replaced in tests. */
+  haiku?: (input: RecurringHaikuInput) => Promise<RecurringHaikuReading>;
 }): Promise<RecurringReading> {
   // A forwarded receipt is read as the original.
   const email = unwrapQuotedOriginal(input);
-  const apiKey = input.apiKey ?? process.env.ANTHROPIC_API_KEY;
+  const readHaiku = () =>
+    (input.haiku ?? readRecurringWithHaiku)({
+      email,
+      receivedOn: input.receivedOn,
+      apiKey: input.apiKey,
+      onSpend: input.onSpend,
+    });
+  const heuristic = () =>
+    heuristicRecurring({
+      subject: email.subject,
+      text: email.text,
+      fromAddress: email.fromAddress,
+      receivedOn: input.receivedOn,
+      hint: input.hint,
+    });
 
-  if (apiKey) {
-    try {
-      const client = new Anthropic({ apiKey });
-      const message = await client.messages.create({
-        model: EXTRACT_MODEL,
-        max_tokens: 400,
-        system: SYSTEM,
-        messages: [
-          {
-            role: 'user',
-            content: `Email date: ${input.receivedOn}\nFrom: ${email.fromAddress ?? ''}\nSubject: ${email.subject}\n\nBody:\n${email.text.slice(0, 10_000)}`,
-          },
-        ],
-      });
-      input.onSpend?.({ model: EXTRACT_MODEL, usage: usageFrom(message.usage) });
-      const block = message.content.find((b) => b.type === 'text');
-      const text = block && block.type === 'text' ? block.text : '';
-      const json = text.match(/\{[\s\S]*\}/);
-      if (json) {
-        const parsed = parseRecurringExtraction(JSON.parse(json[0]) as unknown, input.receivedOn);
-        if (parsed.ok) return { ok: true, value: parsed.value, source: 'llm' };
-        if (parsed.notRecurring) {
-          return { ok: false, notRecurring: true, reason: 'not_recurring' };
-        }
-      }
-    } catch (err) {
-      console.error('recurring extract failed', err);
-    }
-  }
+  // The path every email took before Jev, and still takes when Jev is unsure.
+  const haikuPath = async (): Promise<RecurringReading> => {
+    const read = await readHaiku();
+    if (read?.ok) return { ok: true, value: read.value, source: 'llm' };
+    if (read?.notRecurring) return { ok: false, notRecurring: true, reason: 'not_recurring' };
+    const guessed = heuristic();
+    if (guessed) return { ok: true, value: guessed, source: 'heuristic' };
+    return { ok: false, notRecurring: false, reason: 'no_extraction' };
+  };
 
-  const heuristic = heuristicRecurring({
-    subject: email.subject,
-    text: email.text,
-    fromAddress: email.fromAddress,
-    receivedOn: input.receivedOn,
-    hint: input.hint,
+  const decided = await decideWithJev<typeof RECURRING_QUESTION, Gated>({
+    state: recurringState(email),
+    question: RECURRING_QUESTION,
+    enabled: input.jevEnabled ?? false,
+    read: (answer) => ({ by: 'jev', event: answer.choice === 'not_recurring' ? null : answer.choice }),
+    fallback: async () => ({ by: 'haiku', reading: await haikuPath() }),
+    onSpend: input.onSpend,
+    apiKey: input.jevApiKey,
+    fetch: input.jevFetch,
   });
-  if (heuristic) return { ok: true, value: heuristic, source: 'heuristic' };
+
+  if (decided.value.by === 'haiku') return decided.value.reading;
+
+  const { event } = decided.value;
+  if (!event) return { ok: false, notRecurring: true, reason: 'not_recurring' };
+
+  const read = await readHaiku();
+  const fromHaiku = read?.ok ? withEvent(read.value, event) : null;
+  if (fromHaiku) return { ok: true, value: fromHaiku, source: 'llm' };
+  const guessed = heuristic();
+  const fromHeuristic = guessed ? withEvent(guessed, event) : null;
+  if (fromHeuristic) return { ok: true, value: fromHeuristic, source: 'heuristic' };
   return { ok: false, notRecurring: false, reason: 'no_extraction' };
 }

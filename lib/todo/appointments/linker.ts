@@ -10,6 +10,7 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import { displayNameFromAddress } from '@/lib/email/extract/heuristic';
 import { gmailProvider } from '@/lib/email/providers/gmail';
+import { jevEnabledFor } from '@/lib/jev/enabled';
 import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { extractAppointmentFromEmail } from './extract';
 import {
@@ -116,6 +117,8 @@ export function appointmentLinker(
         // The person's zone turns "3:30 PM" into an instant. Read once per
         // page, and only when something was claimed.
         const { timezone } = await loadAccountSettings(userId, core);
+        // Whether Jev may read this account's mail (plan #1167), once per page.
+        const jevEnabled = await jevEnabledFor(core, userId);
 
         await mapPool(claimed, READ_CONCURRENCY, async ({ envelope, hint }) => {
           verdicts.push(
@@ -125,6 +128,7 @@ export function appointmentLinker(
               envelope,
               hint,
               timezone,
+              jevEnabled,
               onSpend: (report) => spend.push(report),
             }),
           );
@@ -165,6 +169,7 @@ async function readOne(
     envelope: MessageEnvelope;
     hint: AppointmentHint;
     timezone: string;
+    jevEnabled: boolean;
     onSpend: (report: SpendReport) => void;
   },
 ): Promise<VerdictRow> {
@@ -187,6 +192,7 @@ async function readOne(
       fromAddress: message.fromAddress ?? envelope.fromAddress,
       receivedOn: receivedAt.slice(0, 10),
       hint: opts.hint,
+      jevEnabled: opts.jevEnabled,
       onSpend: opts.onSpend,
     });
 

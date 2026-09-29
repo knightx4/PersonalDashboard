@@ -9,6 +9,7 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpendReports, type SpendClient } from '@/lib/core/spend/record';
 import { bareAddress, domainFromAddress } from '@/lib/email/extract/classify';
 import { gmailProvider } from '@/lib/email/providers/gmail';
+import { jevEnabledFor } from '@/lib/jev/enabled';
 import { extractRecurringFromEmail } from './extract';
 import {
   classifyRecurring,
@@ -101,6 +102,9 @@ export function recurringLinker(supabase: SupabaseClient, core?: SpendClient): D
       }
 
       const spend: SpendReport[] = [];
+      // Whether Jev may read this account's mail (plan #1167): once per page,
+      // and only when something was claimed.
+      const jevEnabled = claimed.length > 0 && core ? await jevEnabledFor(core, userId) : false;
 
       await mapPool(claimed, READ_CONCURRENCY, async ({ envelope, hint }) => {
         verdicts.push(
@@ -109,6 +113,7 @@ export function recurringLinker(supabase: SupabaseClient, core?: SpendClient): D
             accessToken,
             envelope,
             hint: hint!,
+            jevEnabled,
             onSpend: (report) => spend.push(report),
           }),
         );
@@ -155,6 +160,7 @@ async function readOne(
     accessToken: string;
     envelope: MessageEnvelope;
     hint: NonNullable<ReturnType<typeof classifyClaim>>;
+    jevEnabled: boolean;
     onSpend: (report: SpendReport) => void;
   },
 ): Promise<VerdictRow> {
@@ -177,6 +183,7 @@ async function readOne(
       fromAddress: message.fromAddress ?? envelope.fromAddress,
       receivedOn,
       hint: opts.hint,
+      jevEnabled: opts.jevEnabled,
       onSpend: opts.onSpend,
     });
 
