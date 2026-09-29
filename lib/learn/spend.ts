@@ -252,6 +252,11 @@ export const LEARN_OPERATIONS = [
   // Finding the YouTube channels people recommend for a subject (plan #1195):
   // one Sonnet call with web search per press of Find channels.
   'find-channels',
+  // Judging a found channel (plan #1196): one Haiku call picks three of its
+  // uploads by title, and one more reads the three videos' verdicts and
+  // transcript excerpts and marks the channel follow or pass. The three
+  // videos themselves are judged under 'judge-video'.
+  'judge-channel',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

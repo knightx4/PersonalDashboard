@@ -145,7 +145,7 @@ export function readRecommendations(input: unknown): RecommendedChannel[] | null
   return out;
 }
 
-function rootingLines(rooting: Rooting): string[] {
+export function rootingLines(rooting: Rooting): string[] {
   if (!isRooted(rooting)) {
     return [
       '',
