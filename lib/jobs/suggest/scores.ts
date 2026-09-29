@@ -8,14 +8,16 @@ import {
   type JevScoreAnswer,
   type JevYesNoAnswer,
 } from '@/lib/jev/wire';
+import { summariseHistory, type PastApplication } from './history';
 
 /**
- * Eight fixed questions about each opening Dash recommends (plan #1178).
+ * Ten fixed questions about each opening Dash recommends (plan #1178; fit
+ * and chance scores added by #1202).
  *
  * The openings on Roles come from a web search that writes a title, a
  * location, why it fits and how to go about it (job_search.suggestions, kind
  * `apply`). Jev reads that text, the person's evidence titles and the roles
- * they have applied to, and answers eight questions in one request, so the
+ * they have applied to, and answers ten questions in one request, so the
  * list can be sorted and filtered without a model reading every posting.
  *
  * The answers and Jev's confidence in each are kept on the suggestion row in
@@ -38,6 +40,14 @@ export type Fit = (typeof FITS)[number];
 
 /** Lowest to highest, as Jev's score levels. */
 export const CLOSENESS_LEVELS = ['unlike', 'somewhat', 'close', 'same'] as const;
+
+/** The score questions stored as a whole number from 0 to 100 rather than a level. */
+export const PERCENT_SCORES = ['fit_score', 'chance'] as const;
+export type PercentScore = (typeof PERCENT_SCORES)[number];
+
+/** How the chance score is named wherever it shows (decided on #1201). */
+export const CHANCE_LABEL = 'Chance of an interview';
+export const FIT_SCORE_LABEL = 'Fit';
 
 export const OPENING_QUESTIONS = {
   workplace: {
@@ -110,6 +120,34 @@ export const OPENING_QUESTIONS = {
       'Nearly the same as one of them',
     ],
   },
+  fit_score: {
+    type: 'score',
+    question:
+      'How much of what this opening asks for is covered by the person\'s evidence items (your_evidence) ' +
+      'and target titles (your_target_titles)?',
+    levels: [
+      'None of the evidence bears on the job',
+      'A little of the evidence bears on the job, and its core is new to them',
+      'Some of the core of the job is covered by evidence',
+      'Most of the core of the job is covered by direct evidence',
+      'All of the core of the job is covered by direct evidence, at the level asked for',
+    ],
+  },
+  chance: {
+    type: 'score',
+    question:
+      'How likely is an application from this person to this opening to reach an interview? ' +
+      'Read how their past applications to similar roles went (your_history_with_similar_roles) against ' +
+      'their record as a whole (your_history_overall), and weigh how well their evidence matches the opening. ' +
+      'Few past interviews for similar roles is a reason to score low whatever the text says.',
+    levels: [
+      'Almost no chance of an interview',
+      'Unlikely to reach an interview',
+      'About an even chance of an interview',
+      'Likely to reach an interview',
+      'Very likely to reach an interview',
+    ],
+  },
 } as const satisfies Record<string, JevQuestion>;
 
 export type OpeningQuestion = keyof typeof OPENING_QUESTIONS;
@@ -129,6 +167,10 @@ export type OpeningScores = {
   duplicate?: Scored<boolean>;
   /** The level index, 0 to 3, rounded from Jev's weighted score. */
   closeness?: Scored<number>;
+  /** How well the evidence and target titles match the job, 0 to 100 (see `scaleScore`). */
+  fit_score?: Scored<number>;
+  /** The chance of reaching an interview, 0 to 100 (see `scaleScore`). */
+  chance?: Scored<number>;
 };
 
 /** At or above this, an answer is shown plainly; below it, as unsure. */
@@ -151,6 +193,8 @@ export type ScoringContext = {
   applied: string[];
   /** Every role on file, for the duplicate question. */
   roles: { title: string; company: string | null; status: string }[];
+  /** Every application on file with how it went, newest first, for the chance question. */
+  history: PastApplication[];
 };
 
 /** How many applied roles Jev reads. Enough to show the pattern, cheap enough for a cent per hundred. */
@@ -206,7 +250,21 @@ export function openingState(opening: OpeningText, context: ScoringContext): Rec
     your_target_titles: context.targetTitles,
     roles_you_applied_to: context.applied.slice(0, APPLIED_LIMIT),
     your_roles_at_this_company: rolesAtCompany(opening, context).map((role) => `${role.title} (${role.status.replace(/_/g, ' ')})`),
+    ...historyState(opening.title, context.history),
   };
+}
+
+/**
+ * The history fields of the state, under the names the chance question
+ * reads. Exported for #1203, which asks the same question of an application.
+ */
+export function historyState(
+  title: string,
+  history: readonly PastApplication[],
+  options: { excludeId?: string } = {},
+): { your_history_with_similar_roles: unknown; your_history_overall: unknown } {
+  const summary = summariseHistory(title, history, options);
+  return { your_history_with_similar_roles: summary.similar, your_history_overall: summary.all_applications };
 }
 
 function choice<T extends string>(result: JevResult<JevChoiceAnswer>): Scored<T> | undefined {
@@ -224,6 +282,21 @@ function level(result: JevResult<JevScoreAnswer>): Scored<number> | undefined {
   return { value: result.answer.level, confidence: round(result.answer.confidence) };
 }
 
+/**
+ * A score question's answer as a whole number from 0 to 100: Jev's
+ * probability-weighted score (0 to levels - 1, and it can fall between
+ * levels) divided by the top level. Five levels put "even" at 50.
+ */
+export function scaleScore(score: number, levels: number): number {
+  if (levels < 2 || !Number.isFinite(score)) return 0;
+  return Math.round((Math.min(Math.max(score, 0), levels - 1) / (levels - 1)) * 100);
+}
+
+function percent(result: JevResult<JevScoreAnswer>, levels: number): Scored<number> | undefined {
+  if (!result.ok) return undefined;
+  return { value: scaleScore(result.answer.score, levels), confidence: round(result.answer.confidence) };
+}
+
 function round(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
@@ -238,7 +311,7 @@ export type ScoreOpeningInput = {
 };
 
 /**
- * Ask the eight questions about one opening. Never throws. A failed request
+ * Ask the ten questions about one opening. Never throws. A failed request
  * comes back as the failure; otherwise every readable answer is kept, so one
  * malformed answer costs that question only.
  */
@@ -264,6 +337,8 @@ export async function scoreOpening(
     cover_letter: yesNo(a.cover_letter),
     duplicate: duplicateByRule(input.opening, input.context) ?? yesNo(a.duplicate),
     closeness: level(a.closeness),
+    fit_score: percent(a.fit_score, OPENING_QUESTIONS.fit_score.levels.length),
+    chance: percent(a.chance, OPENING_QUESTIONS.chance.levels.length),
   };
   for (const key of OPENING_QUESTION_KEYS) if (scores[key] === undefined) delete scores[key];
   return { ok: true, scores };
@@ -304,6 +379,9 @@ export function parseOpeningScores(raw: unknown): OpeningScores | null {
   pick('closeness', (value): value is number =>
     typeof value === 'number' && Number.isInteger(value) && value >= 0 && value < CLOSENESS_LEVELS.length,
   );
+  const isPercent = (value: unknown): value is number =>
+    typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 100;
+  for (const key of PERCENT_SCORES) pick(key, isPercent);
   return out;
 }
 
@@ -337,7 +415,10 @@ export const CLOSENESS_LABELS: readonly string[] = [
 /** One answer as a row shows it. `unsure` when Jev's confidence was under the floor. */
 export type ScoreChip = { key: OpeningQuestion; label: string; unsure: boolean; tone: 'plain' | 'good' | 'warn' };
 
-/** The eight answers as short labels, in question order. A missing answer is left out. */
+/**
+ * The eight label answers as short labels, in question order. A missing
+ * answer is left out. Fit and chance are figures, shown by #1206.
+ */
 export function scoreChips(scores: OpeningScores): ScoreChip[] {
   const chips: ScoreChip[] = [];
   const add = (key: OpeningQuestion, scored: Scored<unknown> | undefined, label: string, tone: ScoreChip['tone'] = 'plain') => {

@@ -1,6 +1,7 @@
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { JEV_MODEL } from '@/lib/jev/wire';
+import type { PastApplication } from './history';
 import { scoreOpening, type ScoringContext } from './scores';
 
 /**
@@ -25,7 +26,13 @@ function one<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null;
 }
 
-/** What Jev is told about the person: evidence titles, target titles and the roles on file. */
+/**
+ * What Jev is told about the person: evidence titles, target titles, the
+ * roles on file, and how each application went (for the chance question,
+ * plan #1202). An application reached an interview when an interview row is
+ * on file for it or its rejection stage comes after the screen; see
+ * `reachedInterview` in history.ts.
+ */
 export async function loadScoringContext(supabase: AppSupabaseClient, userId: string): Promise<ScoringContext> {
   const [evidence, profile, applications] = await Promise.all([
     supabase
@@ -37,7 +44,9 @@ export async function loadScoringContext(supabase: AppSupabaseClient, userId: st
     supabase.from('profiles').select('target_titles').eq('id', userId).maybeSingle(),
     supabase
       .from('applications')
-      .select('status, created_at, roles ( title, companies ( name ) )')
+      .select(
+        'id, status, rejection_stage, rejection_stage_override, created_at, roles ( title, companies ( name ) ), interviews ( id )',
+      )
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(500),
@@ -45,6 +54,7 @@ export async function loadScoringContext(supabase: AppSupabaseClient, userId: st
   if (applications.error) throw new Error(`Reading the applications failed: ${applications.error.message}`);
 
   const roles: ScoringContext['roles'] = [];
+  const history: PastApplication[] = [];
   for (const row of (applications.data ?? []) as Row[]) {
     const role = one(row.roles as Row | Row[] | null);
     if (!role) continue;
@@ -54,6 +64,14 @@ export async function loadScoringContext(supabase: AppSupabaseClient, userId: st
       company: (company?.name as string | undefined) ?? null,
       status: row.status as string,
     });
+    history.push({
+      id: row.id as string,
+      title: role.title as string,
+      company: (company?.name as string | undefined) ?? null,
+      status: row.status as string,
+      rejectionStage: ((row.rejection_stage_override ?? row.rejection_stage) as string | null) ?? null,
+      hasInterview: ((row.interviews as Row[] | null) ?? []).length > 0,
+    });
   }
   return {
     evidence: ((evidence.data ?? []) as Row[]).map((row) => row.title as string),
@@ -62,6 +80,7 @@ export async function loadScoringContext(supabase: AppSupabaseClient, userId: st
       .filter((role) => role.status !== 'lead')
       .map((role) => `${role.title} at ${role.company ?? 'an unnamed company'}`),
     roles,
+    history,
   };
 }
 

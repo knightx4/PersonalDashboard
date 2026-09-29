@@ -72,7 +72,7 @@ export async function suggestOpenings(): Promise<SuggestState> {
     return { error: error instanceof Error ? error.message : 'The search could not be made.' };
   }
   await recordSessionSpend(user.id, { module: 'jobs', operation: 'find-openings' }, result.apply.spend);
-  // The new openings get Jev's eight answers now rather than on tomorrow's run.
+  // The new openings get Jev's answers now rather than on tomorrow's run.
   if (result.apply.written > 0 && (await jevEnabledFor(await createCoreClient(), user.id))) {
     const scoreSpend: SpendReport[] = [];
     await scoreOpeningsFor(supabase, user.id, { onSpend: (report) => scoreSpend.push(report) }).catch((err) =>
