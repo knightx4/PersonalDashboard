@@ -173,6 +173,13 @@ What waits on you:
   the sentence with Approve and Turn down, and no run works it until you
   approve that step. The database refuses Claude writing such a step in any
   other status, opening one, or changing what a live step does.
+  Dash may not notice that a step acts, so the app checks as well (plan
+  #1183): before a goals run starts, and when you press Work on this or Send,
+  Jev is asked about every open Claude step with no sentence. A step it gives
+  a yes of 0.3 or more goes back to proposed with a sentence Haiku writes,
+  through `goals.hold_acting_step` (`migrations-goals/0058`), which writes it
+  as the app rather than as Claude. The report-only trial is
+  `docs/trials/2026-09-29-goals-hold-acts.md`.
 
 Claude may still not change a goal's done-when, drop one of your steps or
 answer a question for you. It asks those as a question step. The exception is

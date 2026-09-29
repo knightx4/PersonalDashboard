@@ -13,6 +13,7 @@ import { evidenceLines, evidenceSteps, filterEvidence } from '@/lib/goals/eviden
 import { evidenceSince, loadEvidenceItems } from '@/lib/goals/evidence-store';
 import type { StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
+import { holdActingSteps } from '@/lib/goals/hold-acts-store';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 import { reviewGoals } from '@/lib/goals/reviews';
 import { loadGoalActivity, loadLatestReviews } from '@/lib/goals/reviews-store';
@@ -37,7 +38,8 @@ import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
  * since the last run against the person's open steps, and the brief lists
  * only what bears on one (plan #1176). Collections with a learned sender are
  * listed first, with the Gmail search that finds their new statements (plan
- * #1023). A status is never more than a day old because this run writes
+ * #1023). Before the tree is read, a Claude step that acts outside the plan
+ * is held as a proposal (plan #1183). A status is never more than a day old because this run writes
  * one every day, so it no longer waits for a ready step. It starts nothing when the routine
  * is not set on the deployment, when a morning run already started in the
  * last twenty hours, or when there is no open goal and nothing to work,
@@ -76,6 +78,8 @@ export type GoalsDailyDeps = {
   fetch?: typeof globalThis.fetch;
   /** Stands in for readEvidence, so a test need not answer every schema's reads. */
   evidence?: (input: EvidenceInput) => Promise<EvidenceBrief | null>;
+  /** Stands in for holdActingSteps (plan #1183). */
+  holdActs?: (input: { client: GoalsSupabaseClient; userId: string }) => Promise<unknown>;
   /** Stands in for loadStatementSources, for the same reason. */
   statements?: (
     client: GoalsSupabaseClient,
@@ -151,6 +155,10 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
   if (last.error) throw new Error(`Could not read goals runs: ${last.error.message}`);
   const lastAt = (last.data?.[0]?.created_at as string | undefined) ?? null;
   if (ranRecently(lastAt, now)) return { skipped: 'a morning run already started today' };
+
+  // A Claude step that acts outside the plan becomes a proposal before the
+  // tree is read, so it is not in the brief's ready steps (plan #1183).
+  await (deps?.holdActs ?? holdActingSteps)({ client, userId });
 
   // A step whose start date has not come is left for a later morning.
   const today = await accountToday(client, userId, now);

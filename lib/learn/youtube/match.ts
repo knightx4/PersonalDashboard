@@ -27,9 +27,14 @@ const EMBED_BATCH = 128;
  * about 71ms a row on 29 September 2026 with 8,704 vectors in it, so a whole
  * batch of 128 took about 9 seconds and PostgREST's 8-second statement
  * timeout cancelled it in every run on 28 September (plan #1171). Thirty-two
- * rows is about 2.3 seconds, which leaves room for the index to grow.
+ * rows was about 2.3 seconds at that size, and the 01:53 UTC run on 29
+ * September wrote 2,304 in chunks of 32. By 11,008 vectors a chunk of 32 was
+ * over 8 seconds, above 250ms a row, and the next three runs that day stored
+ * nothing (check-back 82ac33a9). Eight rows keeps a chunk near 2 seconds at
+ * that rate. The per-row cost is growing with the index, so this buys time
+ * rather than fixing it.
  */
-export const STORE_CHUNK = 32;
+export const STORE_CHUNK = 8;
 
 /**
  * How close a video's title and description has to be to one of your ideas
