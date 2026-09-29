@@ -5,9 +5,9 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
 import { formatMoney } from '@/lib/money';
-import type { RecurringPeriod } from '@/lib/recurring/extraction';
+import type { RecurringEvent, RecurringPeriod } from '@/lib/recurring/extraction';
 import type { MonthlyTotal, RecurringRow, RecurringView } from '@/lib/recurring/view';
-import { PaymentRow, type PaymentChoice } from './payment-row';
+import { PaymentRow, type ChargeChoice, type PaymentChoice } from './payment-row';
 
 /**
  * Everything the person pays for regularly (plan #1126): what it comes to a
@@ -15,7 +15,8 @@ import { PaymentRow, type PaymentChoice } from './payment-row';
  * charging and may have lapsed, then the cancelled.
  *
  * Presentational, so /preview photographs it with fixture rows; each row's
- * corrections (rename, merge, and the ones feature #1193 adds) live in PaymentRow.
+ * corrections (rename, merge, move charges, and the ones feature #1193 adds)
+ * live in PaymentRow.
  */
 
 const PER: Record<RecurringPeriod, string> = {
@@ -23,6 +24,15 @@ const PER: Record<RecurringPeriod, string> = {
   month: 'a month',
   quarter: 'a quarter',
   year: 'a year',
+};
+
+const EVENT: Record<RecurringEvent, string> = {
+  charge: 'Charge',
+  bill: 'Bill',
+  renewal_notice: 'Renewal notice',
+  price_change: 'Price change',
+  trial_ending: 'Trial ending',
+  cancelled: 'Cancellation',
 };
 
 function sameYear(a: string, b: string): boolean {
@@ -66,6 +76,14 @@ function Rise({ row, today }: { row: RecurringRow; today: string }) {
   );
 }
 
+function chargeChoices(row: RecurringRow, today: string): ChargeChoice[] {
+  return row.charges.map((c) => ({
+    id: c.id,
+    when: `${day(c.occurredOn, today)} · ${EVENT[c.event]}`,
+    amount: c.amountCents == null ? null : formatMoney(c.amountCents, c.currency),
+  }));
+}
+
 function Row({
   row,
   today,
@@ -82,6 +100,7 @@ function Row({
       id={row.id}
       payee={row.payee}
       others={choices.filter((c) => c.id !== row.id)}
+      charges={chargeChoices(row, today)}
       details={
         <>
           <p className="text-ui text-ink-muted">
@@ -143,7 +162,7 @@ export function RecurringPaymentsView({ view, today }: { view: RecurringView; to
     );
   }
 
-  // Every payment, by name, for the merge picker on each row.
+  // Every payment, by name, for the merge and move pickers on each row.
   const choices: PaymentChoice[] = [...view.active, ...view.lapsed, ...view.cancelled]
     .map((row) => ({ id: row.id, payee: row.payee }))
     .sort((a, b) => a.payee.localeCompare(b.payee));

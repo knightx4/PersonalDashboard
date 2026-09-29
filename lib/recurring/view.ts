@@ -6,7 +6,7 @@
  * is tested against payments written by hand.
  */
 
-import type { RecurringPayment } from './load';
+import type { RecurringCharge, RecurringPayment } from './load';
 import type { RecurringPeriod } from './extraction';
 
 /** How many months one period is, for putting every payment on one footing. */
@@ -114,6 +114,8 @@ export type RecurringRow = {
   nextDate: string | null;
   lastChargedOn: string | null;
   rise: PriceRise | null;
+  /** Every email read about it, newest first, for moving charges (plan #1211). */
+  charges: RecurringCharge[];
 };
 
 export type MonthlyTotal = {
@@ -150,6 +152,7 @@ function row(payment: RecurringPayment, today: string): RecurringRow {
     nextDate: payment.nextDate,
     lastChargedOn: payment.lastChargedOn,
     rise: priceRise(payment, today),
+    charges: payment.charges,
   };
 }
 
