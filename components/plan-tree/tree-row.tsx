@@ -293,6 +293,19 @@ export function TreeRow<E extends TreeCatalogEntry>({
 
   const inset = rowInset(trail);
 
+  // One fold for the whole row (note b6d9e10b). The arrow and the title used
+  // to open two different things -- the sub-steps, and the step's own panel --
+  // and a step read in full meant pressing both. Either now unfolds both, or
+  // folds everything when anything is showing; Hide details in the panel puts
+  // the panel away and leaves the sub-steps.
+  const foldable = hasChildren || foldableFog;
+  const expanded = open || (foldable && showChildren);
+  const toggle = () => {
+    const next = !expanded;
+    setOpen(next);
+    if (foldable) setShowChildren(next);
+  };
+
   // A link to this row by its own id (a goal step from the Goals home, or
   // from Go to the step under a finding) opens its panel as well as scrolling
   // to it. Landing on a closed row that looks the same as before read as the
@@ -324,31 +337,15 @@ export function TreeRow<E extends TreeCatalogEntry>({
         <div className="flex min-w-0 items-stretch">
           <TreeGuides trail={trail} />
 
-          {/* The fold for the sub-steps. A spacer where there are none, so the
-              titles at one depth line up. */}
+          {/* The fold, where there is something beneath to fold. A spacer
+              where there is not, so the titles at one depth line up. */}
           {hasChildren || foldableFog ? (
             <button
               type="button"
-              onClick={() => setShowChildren((value) => !value)}
-              aria-expanded={showChildren}
-              title={
-                hasChildren
-                  ? showChildren
-                    ? `Fold the ${substeps.length} sub-steps`
-                    : `Unfold the ${substeps.length} sub-steps`
-                  : showChildren
-                    ? 'Fold what is not yet specified'
-                    : 'Unfold what is not yet specified'
-              }
-              aria-label={
-                hasChildren
-                  ? showChildren
-                    ? 'Hide the sub-steps'
-                    : 'Show the sub-steps'
-                  : showChildren
-                    ? 'Hide what is not yet specified'
-                    : 'Show what is not yet specified'
-              }
+              onClick={toggle}
+              aria-expanded={expanded}
+              title={expanded ? `Fold #${handle}` : `Unfold #${handle}`}
+              aria-label={expanded ? `Fold #${handle}` : `Unfold #${handle}`}
               className={cn(
                 LEVEL,
                 'press flex shrink-0 items-center justify-center self-center rounded text-ink-muted hover:bg-accent-tint hover:text-accent',
@@ -358,7 +355,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
               <ChevronDown
                 className={cn(
                   'size-3.5 transition-transform duration-150',
-                  !showChildren && '-rotate-90',
+                  !expanded && '-rotate-90',
                 )}
                 strokeWidth={1.75}
                 aria-hidden
@@ -396,15 +393,13 @@ export function TreeRow<E extends TreeCatalogEntry>({
             <span className={cn(LEVEL, 'shrink-0')} aria-hidden />
           )}
 
-          {/* The title opens the step itself, which the chevron beside it
-              never does -- that one is the tree, and only the tree. The two
-              were told apart by nothing but position, so this one says what it
-              is, and what it opens is a panel rather than another level. */}
+          {/* The title and the chevron beside it are one fold: either opens
+              the step's panel and its sub-steps together. */}
           <button
             type="button"
-            onClick={() => setOpen((value) => !value)}
-            aria-expanded={open}
-            title={open ? `Close #${handle}` : `Open #${handle}`}
+            onClick={toggle}
+            aria-expanded={expanded}
+            title={expanded ? `Close #${handle}` : `Open #${handle}`}
             className="min-w-0 flex-1 self-center text-left hover:text-accent"
           >
             <span
@@ -694,6 +689,11 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   Add a sub-step
                 </Button>
                 {panelActions}
+                {hasChildren && showChildren && (
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
+                    Hide details
+                  </Button>
+                )}
               </div>
             </div>
           </li>

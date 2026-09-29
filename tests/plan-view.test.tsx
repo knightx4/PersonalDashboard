@@ -672,10 +672,10 @@ describe('PlanView', () => {
     // Unfolded to start, so scanning the plan still reads the fog without a
     // press -- the arrow is what is new, not the hiding.
     expect(html).toContain('The defence rung still cannot be written as steps.');
-    expect(html).toContain('Fold what is not yet specified');
-    // Exactly one control: the row with nothing under it gets no arrow, and
-    // the fog row gets one rather than two.
-    expect((html.match(/what is not yet specified/g) ?? []).length).toBe(2);
+    // Exactly one arrow: the row with nothing under it gets none, and the
+    // fog row gets one, which folds the row (title and aria-label).
+    expect((html.match(/aria-label="Fold #/g) ?? []).length).toBe(1);
+    expect((html.match(/aria-label="Unfold #/g) ?? []).length).toBe(0);
   });
 
   it('says nothing about a patch of fog that has been put aside', () => {
