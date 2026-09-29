@@ -126,6 +126,7 @@ describe('a kind of document learned on the first read and used on the second', 
       gone: 'A note for a field the form no longer has.',
     },
     skipped: ['Outstanding Principal'],
+    senders: [],
     lastReadAt: null,
   };
   const fields: CollectionField[] = [
@@ -220,7 +221,7 @@ describe('a kind of document learned on the first read and used on the second', 
 
 describe('readKind', () => {
   const kinds: LearnedKind[] = [
-    { id: KIND_ID, collectionId: COLLECTION_ID, name: 'Acme pay stub', recognise: 'Acme header', fieldNotes: {}, skipped: [], lastReadAt: null },
+    { id: KIND_ID, collectionId: COLLECTION_ID, name: 'Acme pay stub', recognise: 'Acme header', fieldNotes: {}, skipped: [], senders: [], lastReadAt: null },
   ];
   const pay: CollectionField[] = [{ key: 'net', label: 'Net pay', type: 'money' }];
 
@@ -290,7 +291,7 @@ describe('learnKind', () => {
     expect(write).toMatchObject({ id: null, name: 'stub.pdf', skipped: ['Employer address'] });
     const again = learnKind(
       fields,
-      [{ ...write!, id: KIND_ID, collectionId: COLLECTION_ID, lastReadAt: null, recognise: '' }],
+      [{ ...write!, id: KIND_ID, collectionId: COLLECTION_ID, senders: [], lastReadAt: null, recognise: '' }],
       { ...lesson, read: { knownId: KIND_ID, name: 'stub.pdf', recognise: '', labels: {} } },
     );
     expect(again?.fieldNotes.net).toBe(write?.fieldNotes.net);

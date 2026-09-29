@@ -37,6 +37,12 @@ export type LearnedKind = {
   fieldNotes: Record<string, string>;
   /** Suggested fields the person left out, by the label the reader gave them. */
   skipped: string[];
+  /**
+   * Gmail search terms for who sends documents of this kind: an address, a
+   * domain or a name (plan #1023; goals migration 0057). The morning run
+   * searches for new mail from them. Empty for a kind that is not emailed.
+   */
+  senders: string[];
   lastReadAt: string | null;
 };
 
@@ -46,6 +52,26 @@ export const RECOGNISE_MAX = 1000;
 export const FIELD_NOTE_MAX = 1000;
 export const SKIPPED_LABEL_MAX = 200;
 export const SKIPPED_MAX = 60;
+export const SENDER_MAX = 200;
+export const SENDERS_MAX = 10;
+
+/**
+ * The senders typed on the step, one a line or split by commas, as the
+ * database keeps them (migration 0057): trimmed, without the quotes and
+ * brackets that would break a Gmail search, each once, at most ten.
+ */
+export function parseSenders(text: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of text.split(/[\n,]/)) {
+    const term = part.replace(/["(){}]/g, '').trim().slice(0, SENDER_MAX).trim();
+    if (!term || seen.has(term.toLowerCase())) continue;
+    seen.add(term.toLowerCase());
+    out.push(term);
+    if (out.length === SENDERS_MAX) break;
+  }
+  return out;
+}
 
 /** The prefix a field note's input carries on the step's edit form, before the field's key. */
 export const KIND_NOTE_PREFIX = 'note:';

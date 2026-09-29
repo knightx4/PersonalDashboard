@@ -105,6 +105,25 @@ describe('changeLines sentences', () => {
     ]);
   });
 
+  it('names a saved row a Gmail statement updated in place (plan #1023)', () => {
+    const update = (newValues: Record<string, unknown>) =>
+      row({
+        table_name: 'records',
+        row_id: 'r1',
+        action: 'update',
+        old_values: { data: { name: 'Grad PLUS', balance: 80080.21 }, source: 'pasted' },
+        new_values: { data: { name: 'Grad PLUS', balance: 80686.15 }, ...newValues },
+      });
+    const n = names();
+    n.records.set('r1', 'loans-id');
+    const first = changeLines([update({ source: 'gmail', source_ref: '19a2b3c4d5e6f' })], [], n);
+    expect(first.map((l) => l.sentence)).toEqual(['Updated Grad PLUS in loans from Gmail']);
+    const next = changeLines([update({ source_ref: '19a2b3c4d5e70' })], [], n);
+    expect(next.map((l) => l.sentence)).toEqual(['Updated Grad PLUS in loans from Gmail']);
+    const typed = changeLines([update({})], [], n);
+    expect(typed.map((l) => l.sentence)).toEqual(['Edited a record in loans']);
+  });
+
   it('gives each field a change added to a collection a line of its own', () => {
     const lines = changeLines([addedField()], [], names());
     expect(lines.map((l) => l.sentence)).toEqual(['Added field Loan originated to loans']);

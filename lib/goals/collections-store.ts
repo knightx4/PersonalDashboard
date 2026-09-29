@@ -2,6 +2,7 @@ import 'server-only';
 
 import {
   checkRecord,
+  idField,
   fieldsError,
   revisionError,
   type CollectionDefinition,
@@ -392,8 +393,15 @@ export async function archiveRecord(client: GoalsSupabaseClient, recordId: strin
 /**
  * Confirm a draft as it stands: it keeps its values and where they came from,
  * and stops being a draft. False when it was not a live draft.
+ *
+ * A draft with the ID of one saved row is a newer statement for that row
+ * that waited for you (plan #1023), so confirming it puts its values, date
+ * and source on the saved row and archives the draft, rather than adding the
+ * same loan twice.
  */
 export async function confirmRecord(client: GoalsSupabaseClient, recordId: string): Promise<boolean> {
+  const merged = await mergeIntoSaved(client, recordId);
+  if (merged !== null) return merged;
   const { data, error } = await client
     .from('records')
     .update({ draft: false })
@@ -403,6 +411,59 @@ export async function confirmRecord(client: GoalsSupabaseClient, recordId: strin
     .select('id');
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;
+}
+
+/**
+ * Put a draft's values on the saved row with its ID and archive the draft.
+ * True when it did, false when the draft is gone, and null when there is no
+ * one saved row to put it on, so the draft is confirmed as a row of its own.
+ */
+async function mergeIntoSaved(
+  client: GoalsSupabaseClient,
+  recordId: string,
+): Promise<boolean | null> {
+  const { data: row, error } = await client
+    .from('records')
+    .select(RECORD_COLUMNS)
+    .eq('id', recordId)
+    .eq('draft', true)
+    .is('archived_at', null)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!row) return false;
+  const draft = toRecord(row as RecordRow);
+  const collection = await loadCollection(client, draft.collectionId);
+  const id = collection ? idField(collection.fields) : null;
+  const idValue = id ? draft.data[id.key] : null;
+  if (!id || idValue === null || idValue === undefined || idValue === '') return null;
+
+  const { data: matches, error: matchError } = await client
+    .from('records')
+    .select(RECORD_COLUMNS)
+    .eq('collection_id', draft.collectionId)
+    .eq('draft', false)
+    .is('archived_at', null)
+    .eq(`data->>${id.key}`, String(idValue))
+    .limit(2);
+  if (matchError) throw new Error(matchError.message);
+  if (!matches || matches.length !== 1) return null;
+  const saved = toRecord(matches[0] as RecordRow);
+
+  const values: RecordValues = { ...saved.data };
+  for (const [key, value] of Object.entries(draft.data)) {
+    if (value !== null && value !== undefined) values[key] = value;
+  }
+  const { error: updateError } = await client
+    .from('records')
+    .update({
+      data: values,
+      as_of: draft.asOf ?? saved.asOf,
+      source: draft.source,
+      source_ref: draft.sourceRef,
+    })
+    .eq('id', saved.id);
+  if (updateError) throw new Error(updateError.message);
+  return archiveRecord(client, draft.id);
 }
 
 /** Bring back an archived record, for Undo. False when it was not archived. */

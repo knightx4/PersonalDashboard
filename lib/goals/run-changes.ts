@@ -280,6 +280,18 @@ function recordSentence(row: HistoryRow, names: ChangeNames): string {
   if (row.action === 'delete') return `Deleted a record in ${where}`;
   if (newV.draft === false && row.old_values?.draft === true)
     return `Confirmed a record in ${where}`;
+  // A saved row a new statement updated in place (plan #1023). History keeps
+  // only the columns that changed, so a row already from Gmail shows it by a
+  // new message id alone.
+  const fromGmail =
+    newV.source === 'gmail' ||
+    (!('source' in newV) &&
+      typeof newV.source_ref === 'string' &&
+      /^[A-Za-z0-9_-]{1,200}$/.test(newV.source_ref));
+  if ('data' in newV && fromGmail)
+    return label
+      ? `Updated ${label} in ${where} from Gmail`
+      : `Updated a record in ${where} from Gmail`;
   return `Edited a record in ${where}`;
 }
 

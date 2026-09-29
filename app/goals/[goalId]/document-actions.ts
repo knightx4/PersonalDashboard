@@ -30,6 +30,7 @@ import {
   SKIPPED_MAX,
   KIND_NOTE_PREFIX,
   editedNotes,
+  parseSenders,
   type KindRead,
 } from '@/lib/goals/document-kinds';
 import { editKind, forgetKind, loadKinds } from '@/lib/goals/document-kinds-store';
@@ -218,8 +219,8 @@ export type KindActionState = { error?: string; done?: number };
 
 /**
  * Save the person's edit of a kind of document on a step (plan #987): its
- * name, how to recognise it, the note for each field, and the labels it
- * leaves out, one per line. Clearing a note drops it.
+ * name, how to recognise it, who sends it, the note for each field, and
+ * the labels it leaves out, one per line. Clearing a note drops it.
  */
 // latency: pending
 export async function saveDocumentKindAction(
@@ -237,6 +238,7 @@ export async function saveDocumentKindAction(
   if (recognise.length > RECOGNISE_MAX) {
     return { error: `How to recognise it can be at most ${RECOGNISE_MAX} characters.` };
   }
+  const senders = parseSenders(String(form.get('senders') ?? ''));
   const skipped = [
     ...new Set(
       String(form.get('skipped') ?? '')
@@ -253,7 +255,13 @@ export async function saveDocumentKindAction(
     const collection = await loadCollection(client, step.collectionId);
     if (!collection) return { error: 'The collection behind that step is gone.' };
     const fieldNotes = editedNotes(collection.fields, (key) => form.get(`${KIND_NOTE_PREFIX}${key}`));
-    const result = await editKind(client, kindId.data, { name, recognise, fieldNotes, skipped });
+    const result = await editKind(client, kindId.data, {
+      name,
+      recognise,
+      senders,
+      fieldNotes,
+      skipped,
+    });
     if (!result.ok) return { error: result.error };
     revalidatePath('/goals', 'layout');
     return { done: Date.now() };

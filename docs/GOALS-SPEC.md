@@ -795,6 +795,22 @@ then the person does.
    status and dates, and what the document taught written as a kind on the
    collection. A file you give it is filed as drafts named after the file
    (plan #990).
+
+   After that, new statements keep the rows current (plan #1023). A kind
+   can name who sends it (`goals.document_kinds.senders`: an address, a
+   domain or a name), written by Claude when it reads a statement from
+   Gmail and editable on the step as "Who sends it". Each morning the run
+   searches Gmail for new mail from those senders, reads each statement and
+   matches it to rows by the ID field. As decided on #1022, a change goes
+   straight in when the statement names a saved row by its ID and the
+   change is ordinary: only dates changed, or tracked money values that
+   moved by no more than a month's payment plus a month's interest on that
+   row. The row is updated in place with source Gmail and the message
+   linked, so its readings and any goal number worked out from the
+   collection move with it, dated by the statement. Anything else waits as
+   a draft. A draft carrying a saved row's ID shows "Update row", and
+   confirming it puts its values on that row instead of adding a second
+   one.
 4. **Say it** in a comment on the step or in the capture box, and it is filed
    into the same collection.
 
