@@ -2483,3 +2483,92 @@ describe('help kinds Claude proposes when mapping (plan #1029)', () => {
     ).rejects.toThrow(/already settled this goal's weekly help/);
   });
 });
+
+describe('Dash prep steps before yours (plan #1215)', () => {
+  function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+    return admin.begin(async (tx) => {
+      await tx.unsafe(`set local goals.actor = 'claude'`);
+      return fn(tx);
+    }) as Promise<T>;
+  }
+
+  async function goal(title: string): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title, approved_at)
+      values (${userA}, 'goal', ${areaA}, ${title}, now()) returning id`;
+    return row.id;
+  }
+
+  async function step(parent: string, title: string, kind = 'mine'): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${parent}, ${kind}, ${title}) returning id`;
+    return row.id;
+  }
+
+  function prep(parent: string, prepares: string, title = 'Shortlist staffing firms') {
+    return asClaude((tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, prepares_id)
+      values (${userA}, 'step', ${parent}, 'claude', ${title}, ${prepares}) returning id`);
+  }
+
+  it('lets Claude add one live prep step for a step of yours, with history, and no wait', async () => {
+    const g = await goal('Find temp work');
+    const call = await step(g, 'Call three staffing firms');
+
+    const [first] = await prep(g, call);
+    const [row] = await admin<{ prepares_id: string }[]>`
+      select prepares_id from items where id = ${first.id}`;
+    expect(row.prepares_id).toBe(call);
+    expect((await historyOf(first.id))[0].new_values).toMatchObject({ prepares_id: call });
+    const waits = await admin`select 1 from dependencies where item_id = ${call}`;
+    expect(waits).toHaveLength(0);
+
+    // A second live one for the same step is refused, a finished one still counts.
+    await expect(prep(g, call, 'Another shortlist')).rejects.toThrow(/items_one_live_prep_uq/);
+    await admin`update items set status = 'done' where id = ${first.id}`;
+    await expect(prep(g, call, 'Another shortlist')).rejects.toThrow(/items_one_live_prep_uq/);
+
+    // Dropped, it frees the step for another.
+    await admin`update items set status = 'dropped' where id = ${first.id}`;
+    await expect(prep(g, call, 'Another shortlist')).resolves.toHaveLength(1);
+  });
+
+  it('refuses a prep step for a Claude step, for another goal\'s step, or on a step of yours', async () => {
+    const g = await goal('Know your worth');
+    const other = await goal('Clear the flat');
+    const research = await step(g, 'Research pay bands', 'claude');
+    const elsewhere = await step(other, 'Book the van');
+    const mine = await step(g, 'Say a number');
+
+    await expect(prep(g, research)).rejects.toThrow(/one of your own steps/);
+    await expect(prep(g, elsewhere)).rejects.toThrow(/same goal/);
+    await expect(
+      admin`
+        insert into items (user_id, level, parent_id, kind, title, prepares_id)
+        values (${userA}, 'step', ${g}, 'mine', 'Mine', ${mine})`,
+    ).rejects.toThrow(/items_prepares_ck/);
+
+    // Moving a prep step to another goal is refused the same way.
+    const [ok] = await prep(g, mine);
+    await expect(
+      asClaude((tx) => tx`update items set parent_id = ${other} where id = ${ok.id}`),
+    ).rejects.toThrow(/same goal/);
+  });
+
+  it('lets Claude mark a step of yours judged, and only a step of yours', async () => {
+    const g = await goal('Settle into the flat');
+    const couch = await step(g, 'Clear off the couch');
+    const note = await step(g, 'Write up the lease terms', 'claude');
+
+    await asClaude((tx) => tx`update items set prep_checked_at = now() where id = ${couch}`);
+    const [row] = await admin<{ prep_checked_at: string | null }[]>`
+      select prep_checked_at from items where id = ${couch}`;
+    expect(row.prep_checked_at).not.toBeNull();
+    expect((await historyOf(couch)).at(-1)?.new_values).toHaveProperty('prep_checked_at');
+
+    await expect(
+      asClaude((tx) => tx`update items set prep_checked_at = now() where id = ${note}`),
+    ).rejects.toThrow(/items_prep_checked_ck/);
+  });
+});

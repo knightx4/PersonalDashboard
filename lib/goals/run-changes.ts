@@ -147,6 +147,8 @@ const FIELD_WORDS: Record<string, string> = {
   evidence: 'what Dash saw',
   evidence_source: 'what Dash saw',
   dropped_on: 'the answer it was dropped on',
+  prepares_id: 'the step it prepares',
+  prep_checked_at: 'whether it needs preparing',
   acts: 'what it does outside the plan',
   resolution: 'the answer',
   rhythm_count: 'the rhythm',
