@@ -3,7 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
-import { mergePayments, renamePayment, type CorrectionResult } from '@/lib/recurring/corrections';
+import {
+  mergePayments,
+  moveCharges,
+  renamePayment,
+  type CorrectionResult,
+} from '@/lib/recurring/corrections';
 
 /**
  * The Recurring page's row actions (feature #1193). Each returns
@@ -58,4 +63,38 @@ export async function mergeRecurringPayment(
   });
   if (!result.error) refresh();
   return result;
+}
+
+// latency: pending
+export async function moveRecurringCharges(
+  _prev: RecurringActionState,
+  formData: FormData,
+): Promise<RecurringActionState> {
+  const user = await requireUser();
+  const parsed = z
+    .object({
+      id: z.string().uuid(),
+      charges: z.array(z.string().uuid()).min(1).max(500),
+      into: z.union([z.literal('new'), z.string().uuid()]),
+      payee: z.string().optional(),
+    })
+    .safeParse({
+      id: formData.get('id'),
+      charges: formData.getAll('charge'),
+      into: formData.get('into'),
+      payee: formData.get('payee') ?? undefined,
+    });
+  if (!parsed.success) return { error: 'Pick the charges to move and where they go.' };
+
+  const { id, charges, into, payee } = parsed.data;
+  const supabase = await createClient();
+  const result = await moveCharges(supabase, {
+    userId: user.id,
+    paymentId: id,
+    chargeIds: charges,
+    to: into === 'new' ? { payee: payee ?? '' } : { paymentId: into },
+  });
+  if (result.error) return { error: result.error };
+  refresh();
+  return {};
 }
