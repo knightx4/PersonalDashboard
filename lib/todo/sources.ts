@@ -50,6 +50,7 @@ export const todoSources: ModuleSources = {
     { table: 'todo.appointment_messages', reason: 'Mail sync bookkeeping for appointments.' },
     { table: 'todo.calendar_feeds', reason: 'Feed addresses.' },
     { table: 'todo.dismissals', reason: 'Dismissed agenda items.' },
+    { table: 'todo.reply_threads', reason: 'Mail sync bookkeeping: which threads were judged for a reply task.' },
     { table: 'todo.task_links', reason: 'Links from tasks to other rows; read through tasks.' },
   ],
 };

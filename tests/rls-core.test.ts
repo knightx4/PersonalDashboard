@@ -787,3 +787,93 @@ describe('mail piles (plan #1173)', () => {
     ).rejects.toThrow(/permission denied/);
   });
 });
+
+describe('reply threads (plan #1180)', () => {
+  /**
+   * A thread Jev is sure needs a reply becomes one Todo task. The candidates
+   * and the filing are the service role's; the person reads their own rows.
+   */
+  let userD = '';
+  let accountD = '';
+
+  async function seedThreadMessage(providerId: string, thread: string, subject: string, daysAgo: number) {
+    const [row] = await admin<{ id: string }[]>`
+      insert into ingested_messages (email_account_id, provider_message_id, thread_id, received_at, subject, from_address)
+      values (${accountD}, ${providerId}, ${thread}, now() - make_interval(days => ${daysAgo}), ${subject}, 'Jane <jane@example.com>')
+      returning id`;
+    return row.id;
+  }
+
+  async function sortInto(id: string, pile: string, confidence: number): Promise<void> {
+    await admin`
+      insert into core.mail_piles (id, user_id, pile, confidence, model)
+      values (${id}, ${userD}, ${pile}, ${confidence}, 'jev-1.13.0')`;
+  }
+
+  const candidates = () =>
+    admin<{ message_id: string; thread_id: string }[]>`
+      select message_id, thread_id from todo.reply_candidates(${userD}, 0.8, now() - interval '14 days', 20)`;
+
+  beforeAll(async () => {
+    userD = await createUser('core-d@example.com');
+    const [account] = await admin<{ id: string }[]>`
+      insert into email_accounts (user_id, provider, email_address, oauth_refresh_token)
+      values (${userD}, 'gmail', 'core-d@example.com', 'encrypted-token')
+      returning id`;
+    accountD = account.id;
+  });
+
+  it('offers the newest sure message of each recent thread', async () => {
+    const first = await seedThreadMessage('reply-1', 'thread-a', 'Lunch?', 2);
+    const second = await seedThreadMessage('reply-2', 'thread-a', 'Re: Lunch?', 1);
+    const unsure = await seedThreadMessage('reply-3', 'thread-b', 'Hello', 1);
+    const old = await seedThreadMessage('reply-4', 'thread-c', 'Last month', 30);
+    await sortInto(first, 'needs_reply', 0.9);
+    await sortInto(second, 'needs_reply', 0.95);
+    await sortInto(unsure, 'needs_reply', 0.5);
+    await sortInto(old, 'needs_reply', 0.99);
+
+    expect(await candidates()).toEqual([{ message_id: second, thread_id: 'thread-a' }]);
+  });
+
+  it('files one task per thread and remembers a thread it skipped', async () => {
+    const [{ message_id }] = await candidates();
+    const [filed] = await admin<{ task: string | null }[]>`
+      select todo.file_reply_task(${userD}, ${message_id}, 'Reply to Jane: Lunch?', 'body') as task`;
+    expect(filed.task).not.toBeNull();
+    const [again] = await admin<{ task: string | null }[]>`
+      select todo.file_reply_task(${userD}, ${message_id}, 'Reply to Jane: Lunch?', 'body') as task`;
+    expect(again.task).toBeNull();
+    expect(await candidates()).toEqual([]);
+    const tasks = await admin`select id from todo.tasks where user_id = ${userD}`;
+    expect(tasks).toHaveLength(1);
+
+    const later = await seedThreadMessage('reply-5', 'thread-a', 'Re: Lunch?', 0);
+    await sortInto(later, 'needs_reply', 0.9);
+    expect(await candidates()).toEqual([]);
+
+    const automated = await seedThreadMessage('reply-6', 'thread-d', 'Your code', 0);
+    await sortInto(automated, 'needs_reply', 0.9);
+    const [skipped] = await admin<{ task: string | null }[]>`
+      select todo.file_reply_task(${userD}, ${automated}, null, null) as task`;
+    expect(skipped.task).toBeNull();
+    expect(await candidates()).toEqual([]);
+  });
+
+  it('files nothing for a message that is not the user\'s', async () => {
+    const [{ id }] = await admin<{ id: string }[]>`
+      insert into ingested_messages (email_account_id, provider_message_id, thread_id, subject)
+      values (${accountA}, 'reply-other', 'thread-z', 'Hi') returning id`;
+    const [row] = await admin<{ task: string | null }[]>`
+      select todo.file_reply_task(${userD}, ${id}, 'Reply', null) as task`;
+    expect(row.task).toBeNull();
+  });
+
+  it('shows the owner their threads and keeps the functions from a signed-in user', async () => {
+    expect(await asUser(userD, (tx) => tx`select id from todo.reply_threads`)).toHaveLength(2);
+    expect(await asUser(userA, (tx) => tx`select id from todo.reply_threads`)).toHaveLength(0);
+    await expect(
+      asUser(userD, (tx) => tx`select * from todo.reply_candidates(${userD}, 0.8, now(), 5)`),
+    ).rejects.toThrow(/permission denied/);
+  });
+});
