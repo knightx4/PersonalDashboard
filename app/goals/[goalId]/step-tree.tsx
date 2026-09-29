@@ -28,6 +28,7 @@ import {
   type GoalRowNode,
   type GoalView,
 } from '@/lib/goals/plan-rows';
+import { stepPreps } from '@/lib/goals/goal-page';
 import { countAside, type StepRunView } from '@/lib/goals/shaping';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import { GoalRow, type GoalRowContext } from './goal-row';
@@ -142,6 +143,7 @@ export function StepTree({
       informationSeam,
       runs,
       files,
+      ...stepPreps(trees),
     };
     return {
       own: goalRows(map.steps, options),

@@ -274,3 +274,64 @@ export function goalFindings(steps: readonly StepNode[]): Finding[] {
   walk(steps);
   return out;
 }
+
+/**
+ * A Dash prep step as the step it serves shows it (plan #1218, under #1207):
+ * "Dash is preparing: <title>" while it is open, and "Dash prepared: <first
+ * sentence>" once it is done, linked to the prep step's row, where the whole
+ * result is.
+ */
+export type StepPrep = {
+  /** The prep step, whose row the note links to. */
+  id: string;
+  title: string;
+  done: boolean;
+  /** The first sentence of what it produced, once done; null before, or when it wrote none. */
+  line: string | null;
+};
+
+/** The step a prep step is for, which the prep step's own row names. */
+export type PrepTarget = { id: string; title: string };
+
+/**
+ * Each step's live prep step, by the id of the step it serves, and each prep
+ * step's target, by the prep step's id, read from `prepares_id` on the goal's
+ * trees (its own steps and any linked in).
+ *
+ * A live prep step is a `claude` step naming the step it prepares that is
+ * not dropped; a done one counts. Archived rows are already missing from the
+ * loaded trees, so a dropped or archived prep step shows nothing. There is at
+ * most one per step; should there be two, the first in map order is shown.
+ */
+export function stepPreps(trees: readonly (readonly StepNode[])[]): {
+  prepFor: Record<string, StepPrep>;
+  targetOf: Record<string, PrepTarget>;
+} {
+  const titles = new Map<string, string>();
+  const preps: StepNode[] = [];
+  const walk = (nodes: readonly StepNode[]) => {
+    for (const node of nodes) {
+      titles.set(node.id, node.title);
+      if (node.kind === 'claude' && node.preparesId && node.status !== 'dropped') preps.push(node);
+      walk(node.children);
+    }
+  };
+  for (const tree of trees) walk(tree);
+
+  const prepFor: Record<string, StepPrep> = {};
+  const targetOf: Record<string, PrepTarget> = {};
+  for (const prep of preps) {
+    const target = prep.preparesId!;
+    const title = titles.get(target);
+    if (title !== undefined) targetOf[prep.id] = { id: target, title };
+    if (prepFor[target]) continue;
+    const done = prep.status === 'done';
+    prepFor[target] = {
+      id: prep.id,
+      title: prep.title,
+      done,
+      line: done && prep.result?.trim() ? firstSentence(prep.result) || null : null,
+    };
+  }
+  return { prepFor, targetOf };
+}

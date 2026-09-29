@@ -14,6 +14,7 @@ import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import type { LinkedFile } from '@/lib/files/files';
+import type { StepPrep } from '@/lib/goals/goal-page';
 import { linkBareDomains } from '@/lib/goals/result-links';
 import { countProposed } from '@/lib/goals/shaping';
 import {
@@ -194,6 +195,36 @@ export function ClaudeResult({ node, files = [] }: { node: StepNode; files?: Lin
     </div>
   );
 }
+
+/**
+ * The Dash step that prepares one of yours, said on your step (plan #1218):
+ * "Dash is preparing" with the prep step's title while it is open, "Dash
+ * prepared" with the first sentence of its result once done. Either links to
+ * the prep step's row, which opens on the link and holds the whole result.
+ * Prepare (the button) writes onto the step itself and shows in ClaudeResult;
+ * this is what Dash does unasked, as a step of its own.
+ */
+export function PrepNote({ prep }: { prep: StepPrep }) {
+  const href = `#step-${prep.id}`;
+  return (
+    <p className="mt-1 px-1 text-small text-ink-muted">
+      {prep.done ? 'Dash prepared: ' : 'Dash is preparing: '}
+      {prep.done && prep.line ? (
+        <>
+          <span className="text-ink">{prep.line}</span>{' '}
+          <a href={href} className="underline underline-offset-2">
+            Read it
+          </a>
+        </>
+      ) : (
+        <a href={href} className="text-ink underline underline-offset-2">
+          {prep.title}
+        </a>
+      )}
+    </p>
+  );
+}
+
 const PERIOD_PLURAL = { day: 'days', week: 'weeks', month: 'months' } as const;
 
 /**
