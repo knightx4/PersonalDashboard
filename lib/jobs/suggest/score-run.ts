@@ -1,6 +1,9 @@
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { JEV_MODEL } from '@/lib/jev/wire';
+import type { RequirementMatch } from '../evidence/match-payload';
+import type { Requirement } from '../jd/requirements';
+import { CLOSED_APPLICATION_STATUSES, scoreApplication } from './application-scores';
 import type { PastApplication } from './history';
 import { scoreOpening, type ScoringContext } from './scores';
 
@@ -140,6 +143,81 @@ export async function scoreOpeningsFor(
     }
     const { error: writeError } = await supabase
       .from('suggestions')
+      .update({ scores: result.scores, scored_at: new Date().toISOString(), score_model: JEV_MODEL })
+      .eq('id', row.id as string)
+      .eq('user_id', userId);
+    if (writeError) outcome.failed += 1;
+    else outcome.scored += 1;
+  }
+  return outcome;
+}
+
+/**
+ * Score the open applications that have not been scored yet (plan #1203):
+ * fit and the chance of an interview, the two numbers an opening carries.
+ * Closed applications (rejected, withdrawn, ghosted, role closed) are never
+ * read. A role whose description or requirement match changes has its
+ * applications' `scored_at` cleared by a trigger (migration job_search 0038),
+ * so they come back here on the next run. `rescore` scores every open one.
+ */
+export async function scoreApplicationsFor(
+  supabase: AppSupabaseClient,
+  userId: string,
+  options: { onSpend?: SpendSink; rescore?: boolean; limit?: number; apiKey?: string | null; fetch?: typeof fetch } = {},
+): Promise<ScoreRunOutcome> {
+  const outcome: ScoreRunOutcome = { scored: 0, failed: 0, stopped: null };
+  let query = supabase
+    .from('applications')
+    .select(
+      'id, status, roles ( title, seniority, location, work_mode, comp_min_cents, comp_max_cents, requirements, requirement_matches, jd_text, companies ( name ) )',
+    )
+    .eq('user_id', userId)
+    .not('status', 'in', `(${CLOSED_APPLICATION_STATUSES.join(',')})`);
+  if (!options.rescore) query = query.is('scored_at', null);
+  const { data, error } = await query
+    .order('created_at', { ascending: false })
+    .limit(options.limit ?? SCORE_LIMIT);
+  if (error) throw new Error(`Reading the open applications failed: ${error.message}`);
+  const applications = (data ?? []) as Row[];
+  if (applications.length === 0) return outcome;
+
+  const context = await loadScoringContext(supabase, userId);
+  for (const row of applications) {
+    const role = one(row.roles as Row | Row[] | null);
+    if (!role) continue;
+    const company = one(role.companies as Row | Row[] | null);
+    const result = await scoreApplication({
+      application: {
+        id: row.id as string,
+        status: row.status as string,
+        title: role.title as string,
+        company: (company?.name as string | undefined) ?? null,
+        seniority: role.seniority as string | null,
+        location: role.location as string | null,
+        workMode: role.work_mode as string | null,
+        compMinCents: role.comp_min_cents as number | null,
+        compMaxCents: role.comp_max_cents as number | null,
+        requirements: Array.isArray(role.requirements) ? (role.requirements as Requirement[]) : null,
+        requirementMatches: Array.isArray(role.requirement_matches)
+          ? (role.requirement_matches as RequirementMatch[])
+          : null,
+        jdText: role.jd_text as string | null,
+      },
+      context,
+      onSpend: options.onSpend,
+      apiKey: options.apiKey,
+      fetch: options.fetch,
+    });
+    if (!result.ok) {
+      outcome.failed += 1;
+      if (['no-key', 'refused', 'rate-limited', 'overloaded'].includes(result.reason)) {
+        outcome.stopped = result.reason;
+        break;
+      }
+      continue;
+    }
+    const { error: writeError } = await supabase
+      .from('applications')
       .update({ scores: result.scores, scored_at: new Date().toISOString(), score_model: JEV_MODEL })
       .eq('id', row.id as string)
       .eq('user_id', userId);

@@ -46,6 +46,10 @@ export const SPEND_OPERATIONS = {
     // after the job suggestion cron and after the search button on Roles.
     // One request per opening.
     'score-openings',
+    // Jev's fit and chance scores on each open application (plan #1203),
+    // after the job suggestion cron. One request per application not yet
+    // scored or whose role changed.
+    'score-applications',
   ],
   shopping: [
     // Reading an order confirmation email into an order: from inbox ingest,

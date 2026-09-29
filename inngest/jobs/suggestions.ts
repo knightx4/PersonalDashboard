@@ -9,7 +9,7 @@ import { recordSpendReports } from '@/lib/core/spend/record';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 import { suggestionsPayload } from '@/lib/jobs/suggest/notify';
 import { runSuggestionsFor } from '@/lib/jobs/suggest/run';
-import { scoreOpeningsFor } from '@/lib/jobs/suggest/score-run';
+import { scoreApplicationsFor, scoreOpeningsFor } from '@/lib/jobs/suggest/score-run';
 import { sendToPerson } from '@/lib/push/send';
 
 /**
@@ -22,7 +22,9 @@ import { sendToPerson } from '@/lib/push/send';
  *
  * Then any open opening not yet scored is put to Jev's eight questions
  * (plan #1178), for accounts that agreed to send text to TypeSafe. That
- * includes openings a goals run wrote since yesterday.
+ * includes openings a goals run wrote since yesterday. Open applications not
+ * yet scored, or whose role changed since, get fit and chance the same way
+ * (plan #1203).
  *
  * A run that wrote something is sent as a phone notification to every browser
  * the person switched notifications on for (core.push_subscriptions), the
@@ -57,6 +59,9 @@ export async function runJobSuggestions(now: Date = new Date()): Promise<JobSugg
         const scoreSpend: SpendReport[] = [];
         await scoreOpeningsFor(jobs, userId, { onSpend: (report) => scoreSpend.push(report) });
         await recordSpendReports(core, userId, { module: 'jobs', operation: 'score-openings' }, scoreSpend);
+        const applicationSpend: SpendReport[] = [];
+        await scoreApplicationsFor(jobs, userId, { onSpend: (report) => applicationSpend.push(report) });
+        await recordSpendReports(core, userId, { module: 'jobs', operation: 'score-applications' }, applicationSpend);
       }
       summary.reachOut += result.reach_out.written;
       summary.apply += result.apply.written;

@@ -225,6 +225,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // similar-application history and ten questions in; ten answers out.
   // 1,805 tokens a request on the trial with eight questions.
   'score-openings': unit(JEV, 1_800, 0),
+  // One role's requirements with their verdicts, 2,000 characters of the
+  // description, the evidence titles and the history in; two answers out.
+  'score-applications': unit(JEV, 3_000, 0),
 
   // Shopping. Reading order emails is per email: inbox sync does it in the
   // background, and the reparse and review buttons know how many they send.
