@@ -1,8 +1,8 @@
 {
-  "classification": "interview_invite",
+  "classification": "scheduling",
   "ats": "greenhouse",
   "tier": "A",
   "company": "Ramp",
   "role": "Strategic Finance Analyst",
-  "note": "This is a human response. first_human_response_at reads it; the confirmation from the same address does not."
+  "note": "A booking link for a recruiter screen, so scheduling: nothing is booked yet. This is a human response. first_human_response_at reads it (screen_scheduled counts); the confirmation from the same address does not."
 }

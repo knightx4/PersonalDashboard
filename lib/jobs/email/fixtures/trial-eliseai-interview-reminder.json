@@ -1,0 +1,6 @@
+{
+  "classification": "interview_invite",
+  "ats": "ashby",
+  "tier": "A",
+  "note": "A reminder before a booked interview. Ashby sends these, and their footers can carry a reschedule link, which is why the booked patterns run before the scheduling ask. The envelope (sender domain and subject) is real, from the Jev trial (docs/trials/2026-09-29-jev-job-email.md, message 87c27fd9), with names and addresses scrubbed. The body was not fetched: Gmail was not reachable from the session that wrote this, and the ledger never stores one, so the fixture holds only what the rules read from the envelope."
+}
