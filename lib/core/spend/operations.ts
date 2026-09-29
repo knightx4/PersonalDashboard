@@ -99,6 +99,10 @@ export const SPEND_OPERATIONS = {
     // six yes/no questions in one call per plan row a session writes or
     // comment reply Dash saves; background, no button.
     'check-writing',
+    // Sorting each blocked step's ask on Dash into a job for you or a
+    // question (plan #1176). Jev, one call per ask not seen before; from the
+    // Dash page, no button.
+    'sort-waiting',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one
@@ -129,6 +133,11 @@ export const SPEND_OPERATIONS = {
     // Dash replying to a comment tagged @dash on a goal or a step, and filing
     // any facts it gives into a collection (plan #957). Haiku.
     'reply-to-goal-comment',
+    // Reading what arrived since the last morning run against every open
+    // step of the person's, so the run sees only what bears on one (plan
+    // #1176). Jev, one call per item and forty steps; background, from the
+    // daily cron.
+    'filter-evidence',
   ],
 } as const;
 

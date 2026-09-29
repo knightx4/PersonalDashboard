@@ -1,11 +1,19 @@
 import 'server-only';
 
 import { z } from 'zod';
+import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSpendReports } from '@/lib/core/spend/record';
 import { goalsRoutine, type RoutineTarget } from '@/lib/feedback/routine';
 import { outOfDateSteps } from '@/lib/goals/answers';
 import { loadOutOfDateAnswers } from '@/lib/goals/answers-store';
 import { DAILY_STEP_LIMIT, dailyRunText, ranRecently, readyClaudeSteps } from '@/lib/goals/daily-run';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
+import { evidenceLines, evidenceSteps, filterEvidence } from '@/lib/goals/evidence';
+import { evidenceSince, loadEvidenceItems } from '@/lib/goals/evidence-store';
+import type { StepNode } from '@/lib/goals/steps';
+import type { Goal } from '@/lib/goals/tree';
+import { jevEnabledFor } from '@/lib/jev/enabled';
 import { reviewGoals } from '@/lib/goals/reviews';
 import { loadGoalActivity, loadLatestReviews } from '@/lib/goals/reviews-store';
 import { recordAndFire } from '@/lib/goals/shaping-store';
@@ -23,7 +31,9 @@ import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
  * to give its status for the day (plan #1074), the steps of the owner's that
  * have sat untouched for a week and need a move (plan #1083), then the Claude
  * steps that are ready and the information steps with an answer out of date
- * (plan #989). A status is never more than a day old because this run writes
+ * (plan #989). Before the brief is written, Jev reads everything that arrived
+ * since the last run against the person's open steps, and the brief lists
+ * only what bears on one (plan #1176). A status is never more than a day old because this run writes
  * one every day, so it no longer waits for a ready step. It starts nothing when the routine
  * is not set on the deployment, when a morning run already started in the
  * last twenty hours, or when there is no open goal and nothing to work,
@@ -46,6 +56,11 @@ export type GoalsDailyResult =
       answers: number;
       /** Steps of the person's that have sat for a week, listed for a move. */
       stale: number;
+      /**
+       * Steps with evidence Jev kept, or null when Jev did not filter and the
+       * session searched for itself.
+       */
+      evidence: number | null;
     };
 
 export type GoalsDailyDeps = {
@@ -53,7 +68,53 @@ export type GoalsDailyDeps = {
   routine: RoutineTarget;
   now: number;
   fetch?: typeof globalThis.fetch;
+  /** Stands in for readEvidence, so a test need not answer every schema's reads. */
+  evidence?: (input: EvidenceInput) => Promise<EvidenceBrief | null>;
 };
+
+type EvidenceInput = {
+  client: GoalsSupabaseClient;
+  userId: string;
+  lastRunAt: string | null;
+  today: string;
+  now: number;
+  goals: Goal[];
+  byGoal: Map<string, StepNode[]>;
+};
+
+type EvidenceBrief = { lines: string[]; steps: number };
+
+/**
+ * The evidence for the brief, filtered by Jev (plan #1176), or null to leave
+ * the session searching for itself as before: when the owner has not agreed
+ * to send text to TypeSafe, when a read fails, and when Jev fails. Never
+ * throws, because the run is still worth firing without it.
+ */
+async function readEvidence(input: EvidenceInput): Promise<EvidenceBrief | null> {
+  const core = input.client.schema('core') as unknown as CoreSupabaseClient;
+  try {
+    if (!(await jevEnabledFor(core, input.userId))) return null;
+    const steps = evidenceSteps(input.goals, input.byGoal);
+    const items = await loadEvidenceItems(input.client, {
+      userId: input.userId,
+      since: evidenceSince(input.lastRunAt, input.now),
+      today: input.today,
+    });
+    const spend: SpendReport[] = [];
+    const filtered = await filterEvidence({ steps, items, onSpend: (report) => spend.push(report) });
+    await recordSpendReports(core, input.userId, { module: 'goals', operation: 'filter-evidence' }, spend);
+    if (!filtered.ok) {
+      if (filtered.failure.reason !== 'no-key') {
+        console.warn(`[goals] evidence filter fell back: ${filtered.failure.reason}`);
+      }
+      return null;
+    }
+    return { lines: evidenceLines(filtered.matches, filtered.items), steps: filtered.matches.length };
+  } catch (error) {
+    console.warn(`[goals] evidence filter fell back: ${error instanceof Error ? error.message : 'failed'}`);
+    return null;
+  }
+}
 
 const ownerSchema = z.object({ userId: z.string().uuid() });
 
@@ -116,13 +177,35 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
     now,
   ).slice(0, STALE_STEP_LIMIT);
 
+  // Only the review closes steps from evidence, so only a run with one reads it.
+  const evidence =
+    review.length > 0
+      ? await (deps?.evidence ?? readEvidence)({
+          client,
+          userId,
+          lastRunAt: lastAt,
+          today,
+          now,
+          goals: goals.map((g) => g.goal),
+          byGoal,
+        })
+      : null;
+
   const result = await recordAndFire({
     client,
     userId,
     job: 'daily',
     itemId: null,
     routine,
-    text: (runId) => dailyRunText({ userId, runId, steps, answers, review, stale: sitting }),
+    text: (runId) => dailyRunText({
+        userId,
+        runId,
+        steps,
+        answers,
+        review,
+        stale: sitting,
+        evidence: evidence?.lines ?? null,
+      }),
     fetch: deps?.fetch,
   });
   // Thrown so the cron reports the stage as failed. The run row, when there
@@ -138,5 +221,6 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
     held: ready.length - steps.length,
     answers: answers.length,
     stale: sitting.length,
+    evidence: evidence?.steps ?? null,
   };
 }

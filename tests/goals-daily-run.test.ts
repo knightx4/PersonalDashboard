@@ -121,7 +121,7 @@ describe('runGoalsDaily', () => {
     const fetch = okFetch();
     const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
 
-    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 1, held: 0, answers: 0, stale: 0 });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 1, held: 0, answers: 0, stale: 0, evidence: null });
     expect(writes[0]).toMatchObject({
       table: 'runs',
       op: 'insert',
@@ -142,12 +142,27 @@ describe('runGoalsDaily', () => {
     const { client } = fakeClient({ items: [GOAL, worked] });
     const fetch = okFetch();
     const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
-    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 0, stale: 0 });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 0, stale: 0, evidence: null });
     const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     const text = (JSON.parse(init.body as string) as { text: string }).text;
     expect(text).toContain('goals.reviews');
     expect(text).toContain('Goal "Get fit" (goals.items id g)');
     expect(text).toContain('No Claude step is ready today.');
+  });
+
+  it('hands the session only the evidence Jev kept, reading from the last run (plan #1176)', async () => {
+    const { client } = fakeClient({ items: [GOAL, READY], lastDailyRun: '2026-09-23T08:00:00Z' });
+    const fetch = okFetch();
+    const evidence = vi.fn(async () => ({ lines: ['Jev read the 3 new items since the last run.'], steps: 1 }));
+    const result = await runGoalsDaily({ client, routine, now: NOW, fetch, evidence });
+    expect(result).toMatchObject({ started: true, evidence: 1 });
+    expect(evidence).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: USER, lastRunAt: '2026-09-23T08:00:00Z' }),
+    );
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    const text = (JSON.parse(init.body as string) as { text: string }).text;
+    expect(text).toContain('Jev read the 3 new items since the last run.');
+    expect(text).not.toContain('(in Jobs, Gmail, their calendar or Todo)');
   });
 
   it('spends no run when no goal is open and nothing is ready', async () => {
@@ -183,7 +198,7 @@ describe('runGoalsDaily', () => {
     });
     const fetch = okFetch();
     const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
-    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 1, stale: 0 });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 1, stale: 0, evidence: null });
     const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     const text = (JSON.parse(init.body as string) as { text: string }).text;
     expect(text).toContain('"List the loans" (goals.items id s2)');

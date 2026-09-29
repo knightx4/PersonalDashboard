@@ -10,7 +10,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { raisedQueueFrom, raisedRowFrom, type RaisedRow } from '@/lib/raised/load';
-import type { WaitingGroup, WaitingGroupKey, WaitingRow } from '@/lib/plan/waiting';
+import { isJobForYou, type WaitingGroup, type WaitingGroupKey, type WaitingRow } from '@/lib/plan/waiting';
 
 // The server actions pull in the session client, which has no business in a
 // render test; the view only needs them to exist to hand to its forms.
@@ -101,7 +101,7 @@ const QUESTION_DETAIL = [
 ].join('\n');
 
 function waitingRow(over: Partial<WaitingRow> = {}): WaitingRow {
-  return {
+  const row: Omit<WaitingRow, 'job'> & { job?: boolean } = {
     id: 'p1',
     number: 610,
     title: 'Put the Resend API key in Vercel',
@@ -114,6 +114,8 @@ function waitingRow(over: Partial<WaitingRow> = {}): WaitingRow {
     thread: [],
     ...over,
   };
+  // What waitingOnYou sets before Jev has been asked, unless the test says.
+  return { ...row, job: row.job ?? (row.health === 'blocked' && isJobForYou(row.ask)) };
 }
 
 describe('a raise on the page', () => {

@@ -85,6 +85,12 @@ export function dailyRunText(input: {
   answers?: OutOfDateStep[];
   review?: ReviewGoal[];
   stale?: StaleStep[];
+  /**
+   * The evidence Jev kept for the person's steps (plan #1176; evidenceLines
+   * in lib/goals/evidence.ts). Null or absent when Jev could not filter, and
+   * the session then searches Jobs, Gmail, the calendar and Todo itself.
+   */
+  evidence?: string[] | null;
 }): string {
   const answers = input.answers ?? [];
   const review = input.review ?? [];
@@ -102,10 +108,21 @@ export function dailyRunText(input: {
     '',
     ...(review.length > 0
       ? [
-          'First, close each step of the person\'s under these goals that you can see has happened',
-          '(in Jobs, Gmail, their calendar or Todo), setting evidence and evidence_source with the',
-          'close. Follow .claude/skills/goals/SKILL.md, "Closing a step from evidence".',
-          '',
+          ...(input.evidence
+            ? [
+                'First, close each step of the person\'s under these goals that the evidence below',
+                'shows has happened, setting evidence and evidence_source with the close. Follow',
+                '.claude/skills/goals/SKILL.md, "Closing a step from evidence".',
+                '',
+                ...input.evidence,
+                '',
+              ]
+            : [
+                'First, close each step of the person\'s under these goals that you can see has happened',
+                '(in Jobs, Gmail, their calendar or Todo), setting evidence and evidence_source with the',
+                'close. Follow .claude/skills/goals/SKILL.md, "Closing a step from evidence".',
+                '',
+              ]),
           ...(sitting.length > 0
             ? [
                 'Then give each of these steps of the person\'s a move. Nothing has touched them in a',
