@@ -116,6 +116,11 @@ export function serverEnv() {
        * filled but not embedded, so nothing in it can be searched.
        */
       EMBEDDING_API_KEY: z.string().min(1).optional(),
+      /**
+       * Optional. TypeSafe, for Jev (feature #1161). Without it every Jev
+       * question goes to its Haiku fallback.
+       */
+      TYPESAFE_API_KEY: z.string().min(1).optional(),
       GOOGLE_GMAIL_CLIENT_ID: z.string().min(1).optional(),
       GOOGLE_GMAIL_CLIENT_SECRET: z.string().min(1).optional(),
       /** Optional. Raises Google Books quota above the shared courtesy limit. */
