@@ -66,6 +66,7 @@ export default async function ListVideoRoute({
   const meta = [
     video.channel,
     durationLabel(video.durationSeconds),
+    video.foundFor ? `found for ${video.foundFor}` : null,
     `added ${addedLabel(video.addedAt)}`,
     video.leftPlaylistAt ? 'no longer on the playlist' : null,
   ].filter(Boolean);

@@ -29,6 +29,7 @@ import {
   type Verdict,
 } from './judge-video';
 import { loadLearnerProfile } from './judging';
+import { keepGoodSamples } from './keep-samples';
 import {
   loadTranscript,
   MAX_ATTEMPTS,
@@ -55,6 +56,8 @@ import {
  * 3. Each pick whose transcript is in (or that will be read from its
  *    chapters, having no captions) goes through the video judge from #1066
  *    against the learner profile, and the result is added to `samples`.
+ *    A sample judged watch or card is kept in the Videos section (#1197,
+ *    keep-samples.ts) as it is judged, on a press and on the scheduled run.
  * 4. Once every pick has a sample, one more Haiku call reads the three
  *    verdicts and an excerpt of each transcript and marks the channel follow
  *    or pass, with a reason about the person's level in the subject.
@@ -346,6 +349,8 @@ export type JudgeChannelsResult =
       transcripts: TranscribeResult | null;
       /** Picks judged this run. */
       sampled: number;
+      /** Samples judged watch or card that went into the Videos section (#1197). */
+      kept: number;
       judged: JudgedChannel[];
       /** Channels still waiting on a transcript, for the next run. */
       waiting: number;
@@ -416,6 +421,7 @@ export async function judgeFoundChannels(input: {
     picked: 0,
     transcripts: null as TranscribeResult | null,
     sampled: 0,
+    kept: 0,
     judged: [] as JudgedChannel[],
     waiting: 0,
     failed: 0,
@@ -559,6 +565,17 @@ export async function judgeFoundChannels(input: {
     // In the order they were picked, so the page lists them the same way every time.
     const ordered = channel.picks.flatMap((pick) => samples.find((sample) => sample.video_id === pick.video_id) ?? []);
     if (added > 0) {
+      // Kept before the samples are stored, so a keep that fails is tried
+      // again by the next run rather than lost behind a stored sample.
+      const fresh = ordered.filter((sample) => !channel.samples.some((known) => known.video_id === sample.video_id));
+      result.kept += await keepGoodSamples(learn, {
+        userId,
+        subjectId,
+        channel,
+        picks: channel.picks,
+        samples: fresh,
+        now: now(),
+      });
       await write(channel, { samples: ordered });
       channel.samples = ordered;
       result.sampled += added;
@@ -636,8 +653,8 @@ export async function judgePendingChannels(
     client?: Anthropic;
     onSpend?: (userId: string, pass: ChannelJudgePass, report: SpendReport) => void;
   },
-): Promise<{ subjects: number; judged: number; waiting: number; failed: number; stopped: string | null }> {
-  const out = { subjects: 0, judged: 0, waiting: 0, failed: 0, stopped: null as string | null };
+): Promise<{ subjects: number; judged: number; kept: number; waiting: number; failed: number; stopped: string | null }> {
+  const out = { subjects: 0, judged: 0, kept: 0, waiting: 0, failed: 0, stopped: null as string | null };
   const { data, error } = await learn.from('subject_channels').select('user_id, subject_id').is('verdict', null);
   if (error) throw new Error(`Reading the channels waiting to be judged failed: ${error.message}`);
   const pairs = new Map<string, { user_id: string; subject_id: string }>();
@@ -662,6 +679,7 @@ export async function judgePendingChannels(
     out.subjects += 1;
     if (!run.ok) continue;
     out.judged += run.judged.length;
+    out.kept += run.kept;
     out.waiting += run.waiting;
     out.failed += run.failed;
     if (run.stopped) out.stopped = run.stopped;

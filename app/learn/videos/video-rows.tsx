@@ -67,9 +67,12 @@ export function VideoRows({
     <ol className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
       {videos.map((video) => {
         const href = videoHref(video);
-        const meta = [video.channel, durationLabel(video.durationSeconds), `added ${addedLabel(video.addedAt)}`].filter(
-          Boolean,
-        );
+        const meta = [
+          video.channel,
+          durationLabel(video.durationSeconds),
+          video.foundFor ? `found for ${video.foundFor}` : null,
+          `added ${addedLabel(video.addedAt)}`,
+        ].filter(Boolean);
         const cards = cardCounts.get(video.videoId) ?? 0;
         const detail = pileDetail(video, cards);
         const pile = PILE_LABEL[video.verdict ?? 'unjudged'];
