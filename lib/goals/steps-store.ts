@@ -2,11 +2,7 @@ import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { normalizeTimeZone } from '@/lib/core/timezone';
-import {
-  loadInformation,
-  type Collection,
-  type CollectionRecord,
-} from '@/lib/goals/collections-store';
+import { loadInformation, type CollectionInformation } from '@/lib/goals/collections-store';
 import { readQuestions, type StepAnswer, type StepQuestion } from '@/lib/goals/answers';
 import { loadAnswers } from '@/lib/goals/answers-store';
 import type { DevComment } from '@/lib/comments/load';
@@ -181,7 +177,7 @@ export type GoalMap = {
   /** Each rhythm step's current period and the closed ones before it (plan #928). */
   rhythms: Record<string, RhythmRecord>;
   /** The collections the information steps shown fill, with their records (plan #954). */
-  information: Record<string, { collection: Collection; records: CollectionRecord[] }>;
+  information: Record<string, CollectionInformation>;
   /** The worked-out answers on each information step shown, keyed by step id (plan #989). */
   answers: Record<string, StepAnswer[]>;
   /** The comments on the goal and on each step shown, keyed by item id (plan #957). */

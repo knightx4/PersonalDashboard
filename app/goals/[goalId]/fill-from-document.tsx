@@ -24,6 +24,7 @@ import {
   type PreviewRow,
   type SuggestedField,
 } from '@/lib/goals/extract';
+import type { KindRead } from '@/lib/goals/document-kinds';
 import { displayValue, documentName, inputValue } from '@/lib/goals/information';
 import {
   addSuggestedFieldAction,
@@ -55,6 +56,11 @@ import { savePreviewAction, type InformationActionState } from './information-ac
  * with an Add field button (plan #986). Adding one changes the collection
  * straight away and fills the new field in on every row. Labels the reader
  * warned do not mean what they say are listed above the rows.
+ *
+ * The preview names the kind of document the reader took it for (plan #987).
+ * Saving sends what the read was, beside what was saved, so the collection
+ * keeps what it taught: the fields added and left out, the traps, and the
+ * values corrected.
  */
 
 const ACCEPT = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.docx,.txt,.csv,.html,.htm';
@@ -69,6 +75,7 @@ type Preview = {
   before: (RecordValues | null)[];
   suggestions: SuggestedField[];
   cautions: Caution[];
+  kind: KindRead | null;
 };
 
 export function FillFromDocument({
@@ -126,6 +133,7 @@ function ReadForm({
         before: result.before ?? [],
         suggestions: result.suggestions ?? [],
         cautions: result.cautions ?? [],
+        kind: result.kind ?? null,
       });
     }
     return result;
@@ -207,15 +215,18 @@ function PreviewForm({
 }) {
   const toast = useToast();
   const formId = useId();
-  const [added, setAdded] = useState<CollectionField[]>([]);
+  const [added, setAdded] = useState<{ field: CollectionField; from: string }[]>([]);
   const [found, setFound] = useState(preview.rows);
   const [suggestions, setSuggestions] = useState(preview.suggestions);
   const shown = liveFields(collection.fields);
   // Fields added here show at once, before the page's own copy of the collection catches up.
-  const fields = [...shown, ...added.filter((a) => !shown.some((f) => f.key === a.key))];
+  const fields = [
+    ...shown,
+    ...added.map((a) => a.field).filter((a) => !shown.some((f) => f.key === a.key)),
+  ];
   const [kept, setKept] = useState(() => preview.rows.map((_, i) => i));
   const addField = (suggestion: SuggestedField, field: CollectionField) => {
-    setAdded((list) => [...list, field]);
+    setAdded((list) => [...list, { field, from: suggestion.from }]);
     setFound((rows) => rows.map((row, i) => ({ ...row, [field.key]: suggestion.values[i] ?? '' })));
     setSuggestions((list) => list.filter((s) => s !== suggestion));
   };
@@ -269,6 +280,19 @@ function PreviewForm({
             : `Every row matches a saved row by ${by}, so saving updates them rather than adding copies.`
           : `${updating} of ${preview.rows.length} rows match a saved row by ${by} and update it; the rest are added.`;
   const matchLine = matched && `${matched} Where a value changes, the saved one is shown beneath it.`;
+  const kindLine = !preview.kind
+    ? null
+    : preview.kind.knownId
+      ? `Recognised as ${preview.kind.name}, so it was read with what this form learned from one before.`
+      : `Read as a new kind of document: ${preview.kind.name}. Fields you add or leave out and values you correct are kept for the next one.`;
+  // What the read was, beside what is saved, so the form keeps what it taught (plan #987).
+  const lesson = JSON.stringify({
+    kind: preview.kind,
+    read: Object.fromEntries(kept.map((i) => [String(i), found[i]])),
+    added: added.map((a) => ({ key: a.field.key, from: a.from })),
+    skipped: suggestions.map((s) => s.from),
+    cautions: preview.cautions,
+  });
 
   return (
     <form action={save} className="space-y-3 rounded-control bg-sunken p-3">
@@ -276,10 +300,12 @@ function PreviewForm({
       <input type="hidden" name="source" value={preview.source} />
       {preview.ref && <input type="hidden" name="ref" value={preview.ref} />}
       <input type="hidden" name="rows" value={kept.join(',')} />
+      <input type="hidden" name="lesson" value={lesson} />
       <p className="text-small text-ink-muted">
         {from} Check {many ? 'each row' : 'it'} and correct anything wrong. Nothing is saved until
         you press Save.
       </p>
+      {kindLine && <p className="text-small text-ink-muted">{kindLine}</p>}
       {matchLine && <p className="text-small text-ink-muted">{matchLine}</p>}
       <Field
         id={`${formId}-as-of`}

@@ -25,6 +25,14 @@ import {
   type RecordValues,
 } from '@/lib/goals/collections';
 import { inputValue } from '@/lib/goals/information';
+import {
+  kindSchema,
+  kindsPrompt,
+  readKind,
+  sameLabel,
+  type KindRead,
+  type LearnedKind,
+} from '@/lib/goals/document-kinds';
 
 /** The private bucket documents are kept in (goals migration 0011). */
 export const DOCUMENT_BUCKET = 'goals-documents';
@@ -152,8 +160,14 @@ function valueSchema(field: CollectionField): JsonSchema {
   }
 }
 
-/** The tool definition, drawn from the fields the form shows. */
-export function extractionTool(fields: CollectionField[]): {
+/**
+ * The tool definition, drawn from the fields the form shows and the kinds of
+ * document the collection has learned (plan #987).
+ */
+export function extractionTool(
+  fields: CollectionField[],
+  kinds: LearnedKind[] = [],
+): {
   name: string;
   description: string;
   input_schema: JsonSchema;
@@ -183,6 +197,7 @@ export function extractionTool(fields: CollectionField[]): {
             type: 'object',
             properties: {
               label: { type: 'string', description: 'A short name for the field, as a form would label it.' },
+              from: { type: 'string', description: 'The label in the document, exactly as it writes it.' },
               type: { type: 'string', enum: [...FIELD_TYPES] },
               options: {
                 type: ['array', 'null'],
@@ -201,7 +216,7 @@ export function extractionTool(fields: CollectionField[]): {
               },
               why: { type: 'string', description: 'One line on what someone tracking this could use it for.' },
             },
-            required: ['label', 'type', 'options', 'identifies', 'values', 'why'],
+            required: ['label', 'from', 'type', 'options', 'identifies', 'values', 'why'],
           },
         },
         caution: {
@@ -217,19 +232,33 @@ export function extractionTool(fields: CollectionField[]): {
                 enum: [...Object.keys(properties), null],
                 description: 'The key of the form field that label would seem to fill, or null when it fills none.',
               },
-              note: { type: 'string', description: 'One line on what the value really is, and for which items.' },
+              note: {
+                type: 'string',
+                description:
+                  'One line on what the value really is, for which items, and where in the document the value its name promises can be found, if anywhere.',
+              },
             },
             required: ['label', 'field', 'note'],
           },
         },
+        kind: kindSchema(kinds, Object.keys(properties)),
       },
-      required: ['as_of', 'records', 'extra', 'caution'],
+      required: ['as_of', 'records', 'extra', 'caution', 'kind'],
     },
   };
 }
 
-/** The instructions for one read, naming the collection and whether it is one record or a list. */
-export function extractionPrompt(name: string, shape: CollectionShape): string {
+/**
+ * The instructions for one read, naming the collection and whether it is one
+ * record or a list, and listing the kinds of document it has learned (plan
+ * #987).
+ */
+export function extractionPrompt(
+  name: string,
+  shape: CollectionShape,
+  kinds: LearnedKind[] = [],
+  fields: CollectionField[] = [],
+): string {
   const what =
     shape === 'one'
       ? `It is a single record, so return at most one.`
@@ -249,13 +278,15 @@ Rules:
 
 The form may not have a place for everything useful in the document. In extra, list each other fact the document gives about its items that someone tracking them could use, such as a status and the date it began, a next due date, the principal and interest a balance is made of, or a number that identifies each item:
 
-- Give it a short label and the type that fits: text, long_text, number, money, percent, date, day_of_month, yes_no, choice (with its options) or link.
+- Give it a short label, the label the document gives it in from, and the type that fits: text, long_text, number, money, percent, date, day_of_month, yes_no, choice (with its options) or link.
 - values holds one value for each entry in records, in the same order, null where that item has none.
 - Mark identifies for a number or code that names each item, such as a loan or account number.
 - why is one line on what a goal might use it for.
 - Leave out anything a form field already holds, totals across items, contact details, addresses, and the document's own headings and page furniture.
 
-In caution, list any label whose value does not mean what its name says, for all items or for some. Check each date against the item's type, status and other dates before trusting its label: a field called a start date that, for some kinds of item, holds when the money was paid out rather than when payments begin is one to list. Name the label as the document writes it, the form field it would seem to fill (null when none does), and one line on what the value really is and which items it applies to.`;
+In caution, list any label whose value does not mean what its name says, for all items or for some. Check each date against the item's type, status and other dates before trusting its label: a field called a start date that, for some kinds of item, holds when the money was paid out rather than when payments begin is one to list. Name the label as the document writes it, the form field it would seem to fill (null when none does), and one line on what the value really is, which items it applies to, and where the document gives the value the label promises, if it does.
+
+${kindsPrompt(kinds, fields)}`;
 }
 
 /** What the form starts from: each row's values as their inputs show them. */
@@ -319,6 +350,8 @@ export type SuggestedField = {
   field: CollectionField;
   values: string[];
   why: string;
+  /** The label the document gives it, which the kind's note records (plan #987). */
+  from: string;
 };
 
 /**
@@ -328,25 +361,37 @@ export type SuggestedField = {
  */
 export type Caution = { label: string; field: string | null; note: string };
 
-/** Everything one read hands back: the rows, their date, and what the form has no place for. */
+/**
+ * Everything one read hands back: the rows, their date, what the form has no
+ * place for, and the kind of document the reader took it for (plan #987).
+ */
 export type ReadAnswer = {
   rows: PreviewRow[];
   asOf: string | null;
   suggestions: SuggestedField[];
   cautions: Caution[];
+  kind: KindRead | null;
 };
 
+/**
+ * A read of a document the collection has learned leaves out the fields
+ * that kind's reads were told to skip, whatever the reader says.
+ */
 export function readAnswer(
   fields: CollectionField[],
   shape: CollectionShape,
   input: unknown,
+  kinds: LearnedKind[] = [],
 ): ReadAnswer {
   const { rows, from } = extractRows(fields, shape, input);
+  const kind = readKind(input, kinds, fields);
+  const known = kind?.knownId ? kinds.find((k) => k.id === kind.knownId) : undefined;
   return {
     rows,
     asOf: readAsOf(input),
-    suggestions: readSuggestions(fields, input, from),
+    suggestions: readSuggestions(fields, input, from, known?.skipped ?? []),
     cautions: readCautions(fields, input),
+    kind,
   };
 }
 
@@ -363,9 +408,11 @@ export function readSuggestions(
   fields: CollectionField[],
   input: unknown,
   from: number[],
+  skipped: string[] = [],
 ): SuggestedField[] {
   const live = liveFields(fields);
   const shown = new Set(live.flatMap((f) => [sameLabel(f.label), sameLabel(f.key)]));
+  const left = new Set(skipped.map(sameLabel));
   const taken = new Set(fields.map((f) => f.key));
   let hasId = idField(fields) !== null;
   const out: SuggestedField[] = [];
@@ -375,6 +422,8 @@ export function readSuggestions(
     const e = entry as Record<string, unknown>;
     const label = typeof e.label === 'string' ? e.label.trim().slice(0, LABEL_MAX) : '';
     if (!label || shown.has(sameLabel(label))) continue;
+    const said = typeof e.from === 'string' ? e.from.trim().slice(0, LABEL_MAX) : '';
+    if (left.has(sameLabel(label)) || (said && left.has(sameLabel(said)))) continue;
     let type = FIELD_TYPES.find((t) => t === e.type);
     if (!type) continue;
     const options = type === 'choice' ? choiceOptions(e.options) : null;
@@ -393,7 +442,7 @@ export function readSuggestions(
     taken.add(key);
     if (field.id) hasId = true;
     const why = typeof e.why === 'string' ? e.why.trim().slice(0, NOTE_MAX) : '';
-    out.push({ field, values, why });
+    out.push({ field, values, why, from: said || label });
   }
   return out;
 }
@@ -413,10 +462,6 @@ export function readCautions(fields: CollectionField[], input: unknown): Caution
     out.push({ label, field, note });
   }
   return out;
-}
-
-function sameLabel(label: string): string {
-  return label.toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
 function choiceOptions(raw: unknown): string[] | null {
