@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
-import type { AskToolResult } from '@/lib/ask/db';
+import type { AskContext, AskToolResult, SchemaClient } from '@/lib/ask/db';
+import { executeProposal } from '@/lib/ask/propose';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import {
   answerQuestion,
@@ -11,6 +12,7 @@ import {
   TIME_BUDGET_MS,
   type AskStores,
 } from './ask';
+import type { DashChange, NewDashChange } from './changes';
 import type { NewTalkTurn, TalkSubject, TalkTurn } from './talk';
 
 /**
@@ -75,6 +77,7 @@ function stubExecute(): { execute: (name: string, input: unknown) => Promise<Ask
 function memoryStores(existing: TalkTurn[] = []) {
   const written: { subject: TalkSubject; turns: NewTalkTurn[] }[] = [];
   const spend: SpendReport[] = [];
+  const changes: DashChange[] = [];
   let n = 0;
   const stores: AskStores = {
     start: async (question) => ({ kind: 'ask', ref: 'conv-new', title: question }),
@@ -93,8 +96,32 @@ function memoryStores(existing: TalkTurn[] = []) {
     recordSpend: async (reports) => {
       spend.push(...reports);
     },
+    saveProposal: async (conversationId, change: NewDashChange) => {
+      const kept = {
+        ...change,
+        id: `c${changes.length + 1}`,
+        conversationId,
+        turnId: null,
+        status: 'proposed',
+        writtenTable: null,
+        writtenRef: null,
+        undo: null,
+        createdAt: '2026-09-27T10:00:00Z',
+        confirmedAt: null,
+        declinedAt: null,
+        undoneAt: null,
+      } as DashChange;
+      changes.push(kept);
+      return kept;
+    },
+    attachProposals: async (ids, turnId) => {
+      for (const c of changes) if (ids.includes(c.id) && c.turnId === null) c.turnId = turnId;
+    },
+    discardProposals: async (ids) => {
+      for (let i = changes.length - 1; i >= 0; i--) if (ids.includes(changes[i].id)) changes.splice(i, 1);
+    },
   };
-  return { stores, written, spend };
+  return { stores, written, spend, changes };
 }
 
 describe('askDash', () => {
@@ -345,5 +372,212 @@ describe('askDash', () => {
     );
     expect(written).toHaveLength(1);
     expect(result.error).toContain('ANTHROPIC_API_KEY');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Proposals (plan #1188)
+// ---------------------------------------------------------------------------
+
+const ME = '00000000-0000-4000-8000-00000000000a';
+const THEM = '00000000-0000-4000-8000-00000000000b';
+const GOAL_ID = '00000000-0000-4000-8000-0000000000a1';
+const THEIR_GOAL_ID = '00000000-0000-4000-8000-0000000000b2';
+const GOAL = { table: 'goals.items', ref: GOAL_ID, title: 'Find a new job', href: `/goals/${GOAL_ID}` };
+
+type Row = Record<string, unknown>;
+
+/** A goals client over fixed rows that applies eq/is filters and records any write. */
+function goalsDb(rows: Row[]) {
+  const writes: { table: string; op: string }[] = [];
+  const client = {
+    from: (table: string) => {
+      const filters: ((row: Row) => boolean)[] = [];
+      const write = (op: string) => () => {
+        writes.push({ table, op });
+        return query;
+      };
+      const query = {
+        select: () => query,
+        eq: (column: string, value: unknown) => (filters.push((row) => row[column] === value), query),
+        is: (column: string, value: null) => (filters.push((row) => (row[column] ?? null) === value), query),
+        limit: () => query,
+        insert: write('insert'),
+        update: write('update'),
+        delete: write('delete'),
+        then: (resolve: (value: unknown) => void) =>
+          resolve({ data: table === 'items' ? rows.filter((row) => filters.every((f) => f(row))) : [], error: null }),
+      };
+      return query;
+    },
+  } as unknown as SchemaClient;
+  const ctx: AskContext = {
+    userId: ME,
+    today: '2026-09-27',
+    enabledModules: ['goals', 'todo', 'shopping'],
+    db: async () => client,
+    searchSources: [],
+  };
+  return { ctx, writes };
+}
+
+const GOAL_ROWS: Row[] = [
+  { id: GOAL_ID, user_id: ME, title: 'Find a new job', level: 'goal', status: 'open', archived_at: null },
+  { id: THEIR_GOAL_ID, user_id: THEM, title: 'Their goal', level: 'goal', status: 'open', archived_at: null },
+];
+
+describe('askDash proposals', () => {
+  function goalExecute() {
+    return async (name: string): Promise<AskToolResult> =>
+      name === 'goal_status' ? { ok: true, rows: [GOAL] } : { ok: false, error: `There is no tool called ${name}.` };
+  }
+
+  it('looks up a goal, proposes a step under it, keeps one proposed change tied to the answer, and writes nothing to goals.items', async () => {
+    const { client, sent } = stubClient([
+      reply([use('u1', 'goal_status', {})]),
+      reply([use('u2', 'propose_goal_step', { goal_ref: GOAL_ID, title: 'Update my CV' })]),
+      reply([use('u3', 'answer', { answer: 'I have proposed the step "Update my CV" under Find a new job.', cited: [GOAL] })]),
+    ]);
+    const { ctx, writes } = goalsDb(GOAL_ROWS);
+    const { stores, written, changes } = memoryStores();
+
+    const result = await askDash(
+      {
+        question: 'Add a step to my job goal to update my CV',
+        today: '2026-09-27',
+        execute: goalExecute(),
+        propose: (name, args, seen, save) => executeProposal(name, args, { ...ctx, seen, save }),
+        anthropicApiKey: 'k',
+        client,
+      },
+      stores,
+    );
+
+    // The proposal tools are offered, and the prompt no longer says Dash only reads.
+    expect(sent[0].tools.map((t) => t.name)).toEqual(
+      expect.arrayContaining(['propose_todo', 'propose_goal_step', 'propose_returned', 'answer']),
+    );
+    expect(sent[0].system[0].text).toContain('YOU CAN PROPOSE THREE CHANGES');
+    expect(sent[0].system[0].text).not.toContain('You only read');
+
+    // One proposed change, in this conversation, in the shape insertStep takes.
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({
+      kind: 'add_goal_step',
+      conversationId: 'conv-new',
+      status: 'proposed',
+      input: { parentId: GOAL_ID, goalTitle: 'Find a new job', title: 'Update my CV', kind: 'mine' },
+    });
+
+    // The answer turn names it: its tool calls carry the proposal's id, and the
+    // change hangs from that turn.
+    const answerTurn = written[1].turns[0];
+    const call = answerTurn.toolCalls?.find((c) => c.name === 'propose_goal_step');
+    expect(call?.result).toMatchObject({ ok: true, totals: { proposal: { id: 'c1', kind: 'add_goal_step' } } });
+    const turnId = result.turns[1].id;
+    expect(changes[0].turnId).toBe(turnId);
+    expect(result.changes).toEqual([{ ...changes[0], turnId }]);
+
+    // Nothing was written anywhere but the proposal.
+    expect(writes).toEqual([]);
+  });
+
+  it('refuses a goal ref no lookup returned, and keeps nothing', async () => {
+    const { client, sent } = stubClient([
+      reply([use('u1', 'propose_goal_step', { goal_ref: GOAL_ID, title: 'Update my CV' })]),
+      reply([use('u2', 'answer', { answer: 'I could not find that goal.', cited: [] })]),
+    ]);
+    const { ctx } = goalsDb(GOAL_ROWS);
+    const { stores, changes } = memoryStores();
+    const result = await askDash(
+      {
+        question: 'Add a step to my job goal',
+        today: '2026-09-27',
+        execute: goalExecute(),
+        propose: (name, args, seen, save) => executeProposal(name, args, { ...ctx, seen, save }),
+        anthropicApiKey: 'k',
+        client,
+      },
+      stores,
+    );
+    const back = sent[1].messages[sent[1].messages.length - 1].content as Anthropic.ToolResultBlockParam[];
+    expect(back[0].is_error).toBe(true);
+    expect(back[0].content).toContain('No lookup in this conversation returned goals.items');
+    expect(changes).toEqual([]);
+    expect(result.changes).toBeUndefined();
+  });
+
+  it('sends a made-up proposal kind to the proposer, which refuses it', async () => {
+    const { client, sent } = stubClient([
+      reply([use('u1', 'propose_delete_todo', { ref: 'x' })]),
+      reply([use('u2', 'answer', { answer: 'I cannot delete todos.', cited: [] })]),
+    ]);
+    const { ctx } = goalsDb(GOAL_ROWS);
+    const { stores, changes } = memoryStores();
+    const executed: string[] = [];
+    await askDash(
+      {
+        question: 'Delete my dentist todo',
+        today: '2026-09-27',
+        execute: async (name) => (executed.push(name), { ok: false, error: 'no' }),
+        propose: (name, args, seen, save) => executeProposal(name, args, { ...ctx, seen, save }),
+        anthropicApiKey: 'k',
+        client,
+      },
+      stores,
+    );
+    const back = sent[1].messages[sent[1].messages.length - 1].content as Anthropic.ToolResultBlockParam[];
+    expect(back[0].content).toContain('You can propose only a todo, a goal step or a return');
+    expect(executed).toEqual([]);
+    expect(changes).toEqual([]);
+  });
+
+  it('refuses every proposal when none can be kept, and counts proposals toward the cap', async () => {
+    const many = Array.from({ length: MAX_LOOKUPS + 1 }, (_, i) => use(`u${i}`, 'propose_todo', { title: `t${i}` }));
+    const { client } = stubClient([reply(many), reply([use('a', 'answer', { answer: 'Done.', cited: [] })])]);
+    const answer = await answerQuestion({
+      turns: [{ role: 'user', body: 'add lots' }],
+      today: '2026-09-27',
+      execute: stubExecute().execute,
+      anthropicApiKey: 'k',
+      client,
+    });
+    if (!answer.ok) throw new Error(answer.detail);
+    const results = answer.toolCalls.map((c) => c.result as { ok: boolean; error?: string });
+    expect(results.slice(0, MAX_LOOKUPS).every((r) => r.error === 'Changes cannot be proposed here. Answer in words.')).toBe(true);
+    expect(results[MAX_LOOKUPS].error).toMatch(/No lookups are left/);
+  });
+
+  it('removes the proposals of an answer that failed', async () => {
+    const { client } = stubClient([
+      reply([use('u1', 'propose_todo', { title: 'Call the dentist', due_on: '2026-10-02' })]),
+      reply([{ type: 'text', text: 'Hmm' }], 'max_tokens'),
+    ]);
+    const { ctx } = goalsDb(GOAL_ROWS);
+    const { stores, changes } = memoryStores();
+    const saved: string[] = [];
+    const result = await askDash(
+      {
+        question: 'Add a todo to call the dentist on Friday',
+        today: '2026-09-27',
+        execute: stubExecute().execute,
+        propose: (name, args, seen, save) =>
+          executeProposal(name, args, {
+            ...ctx,
+            seen,
+            save: async (c) => {
+              const kept = await save(c);
+              saved.push(kept.id);
+              return kept;
+            },
+          }),
+        anthropicApiKey: 'k',
+        client,
+      },
+      stores,
+    );
+    expect(saved).toEqual(['c1']);
+    expect(result.error).toMatch(/^Dash could not answer/);
+    expect(changes).toEqual([]);
   });
 });
