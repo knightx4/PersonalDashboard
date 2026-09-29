@@ -1,8 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { ASK_TOOLS } from '@/lib/ask/tools';
+import { PROPOSAL_TOOLS } from '@/lib/ask/propose';
 import { citationsOf, toolResultText, type AskToolResult } from '@/lib/ask/db';
 import { whyNoReport } from '@/lib/learn/graph/tool-call';
+import type { DashChange, NewDashChange } from './changes';
 import { TALK_MODEL } from './reply';
 import {
   askTitle,
@@ -25,6 +27,12 @@ import {
  * in this conversation are kept as citations; anything else it names is
  * dropped.
  *
+ * Beside the lookups it has three proposal tools (lib/ask/propose.ts, plan
+ * #1188): add a todo, add a goal step, mark an item returned. A proposal is
+ * kept as a proposed row in core.dash_changes and nothing else is written;
+ * the person confirms each on its own. Proposals count toward the lookup cap,
+ * and one naming a row can only name a row a lookup returned, as citations do.
+ *
  * Three limits stop the looking, and when one is reached the next call is
  * made to answer with what it has: eight lookups, an input token budget, and
  * a time budget that keeps the whole answer near twenty seconds. An answer
@@ -37,7 +45,7 @@ import {
 
 export const ASK_MODEL = TALK_MODEL;
 
-/** The most lookups one answer may make. */
+/** The most lookups and proposals one answer may make. */
 export const MAX_LOOKUPS = 8;
 /** Input tokens across the calls of one answer, cached and not, before it must answer. */
 export const INPUT_BUDGET = 150_000;
@@ -79,7 +87,11 @@ const ANSWER: Anthropic.Tool = {
  * the same order every time, with the cache breakpoint on the last, so the
  * prefix is cached across rounds and across questions.
  */
-const TOOLS: Anthropic.Tool[] = [...ASK_TOOLS, { ...ANSWER, cache_control: { type: 'ephemeral' } }];
+const TOOLS: Anthropic.Tool[] = [
+  ...ASK_TOOLS,
+  ...PROPOSAL_TOOLS,
+  { ...ANSWER, cache_control: { type: 'ephemeral' } },
+];
 
 const SYSTEM = `You are Dash, the assistant inside somebody's personal dashboard. It holds their
 shopping orders, job applications, notes, todos, reading, newsletters, goals
@@ -101,8 +113,17 @@ them, with their currency. Name each order, application, note, step or other
 row you used by its title, and list each in cited by the table and ref the
 lookup returned for it. Cite only rows a lookup returned.
 
-You only read. You cannot change, send or create anything; if they ask you
-to, say that you can only look things up.`;
+YOU CAN PROPOSE THREE CHANGES, AND ONLY WHEN ASKED. When they ask you to add
+a todo, add a step under one of their goals, or say they sent an item back,
+call propose_todo, propose_goal_step or propose_returned. A goal or an item is
+named by the ref a lookup returned for it, so look it up first. Nothing is
+written when you propose: each proposal shows as a card under your answer and
+they confirm or decline it. Say in your answer what you proposed. You may
+propose several in one answer.
+
+Anything else, you cannot do. You cannot delete, complete, edit, send or
+change anything else; if they ask you to, say so in a sentence and do not
+propose something near it instead.`;
 
 /** What the model is told the date is: after the cache breakpoint, since it changes daily. */
 function dateLine(today: string): string {
@@ -133,6 +154,23 @@ export type AskAnswer =
 
 /** Runs one lookup. Never throws; executeAskTool in lib/ask/tools.ts with its context bound. */
 export type AskExecutor = (name: string, input: unknown) => Promise<AskToolResult>;
+
+/**
+ * Checks and keeps one proposal. Never throws; executeProposal in
+ * lib/ask/propose.ts with its context bound. `seen` says whether a lookup in
+ * this conversation returned a row.
+ */
+export type AskProposer = (
+  name: string,
+  input: unknown,
+  seen: (table: string, ref: string) => boolean,
+) => Promise<AskToolResult>;
+
+/** Said to the model when a proposal is made where none can be kept. */
+const NO_PROPOSALS = 'Changes cannot be proposed here. Answer in words.';
+
+/** A proposal tool, or a name the model made up in their shape: both go to the proposer, which refuses any but the three. */
+const isProposal = (name: string) => name.startsWith('propose_');
 
 const citationKey = (c: { table: string; ref: string }) => `${c.table}\u0000${c.ref}`;
 
@@ -200,6 +238,8 @@ export async function answerQuestion(input: {
   /** YYYY-MM-DD in the person's timezone. */
   today: string;
   execute: AskExecutor;
+  /** Absent: every proposal is refused. */
+  propose?: AskProposer;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
@@ -336,6 +376,10 @@ export async function answerQuestion(input: {
     const results = await Promise.all(
       uses.map(async (use, i): Promise<AskToolResult> => {
         if (lookups + i >= MAX_LOOKUPS) return { ok: false, error: LIMIT_REACHED };
+        if (isProposal(use.name)) {
+          if (!input.propose) return { ok: false, error: NO_PROPOSALS };
+          return input.propose(use.name, use.input, (table, ref) => known.has(citationKey({ table, ref })));
+        }
         return input.execute(use.name, use.input);
       }),
     );
@@ -369,7 +413,21 @@ export type AskStores = {
   append: (subject: TalkSubject, turns: readonly NewTalkTurn[]) => Promise<TalkTurn[]>;
   /** Writes what the calls cost, under the operation 'ask-dash'. Never throws. */
   recordSpend: (reports: Parameters<SpendSink>[0][]) => Promise<void>;
+  /** Keeps a proposal in the conversation (changes.ts insertProposal). */
+  saveProposal: (conversationId: string, change: NewDashChange) => Promise<DashChange>;
+  /** Ties the answer's proposals to its turn once that is written. */
+  attachProposals: (ids: readonly string[], turnId: string) => Promise<void>;
+  /** Removes the proposals of an answer that was not kept. */
+  discardProposals: (ids: readonly string[]) => Promise<void>;
 };
+
+/** Checks a proposal against the person's rows and keeps it; lib/ask/propose.ts bound to a request. */
+export type AskProposalRunner = (
+  name: string,
+  input: unknown,
+  seen: (table: string, ref: string) => boolean,
+  save: (change: NewDashChange) => Promise<DashChange>,
+) => Promise<AskToolResult>;
 
 export type AskDashResult = {
   /** The conversation, to reopen or continue; absent only when nothing was kept. */
@@ -380,6 +438,8 @@ export type AskDashResult = {
   error?: string;
   /** Why the answer stopped: 'answered', or the limit it was written under. */
   stop?: AskStop;
+  /** The changes the answer proposed, each tied to its turn, in the order proposed. */
+  changes?: DashChange[];
 };
 
 /**
@@ -395,6 +455,8 @@ export async function askDash(
     conversationRef?: string | null;
     today: string;
     execute: AskExecutor;
+    /** Absent: every proposal is refused. */
+    propose?: AskProposalRunner;
     anthropicApiKey: string | null | undefined;
     client?: Anthropic;
     now?: () => number;
@@ -429,24 +491,58 @@ export async function askDash(
   }
 
   const spent: Parameters<SpendSink>[0][] = [];
+  // An ask conversation's id is its ref (conversations_ask_ref_ck).
+  const proposed: DashChange[] = [];
+  const propose = input.propose;
+  const save = async (change: NewDashChange) => {
+    const kept = await stores.saveProposal(subject.ref, change);
+    proposed.push(kept);
+    return kept;
+  };
+  const discard = async () => {
+    try {
+      await stores.discardProposals(proposed.map((c) => c.id));
+    } catch (error) {
+      console.error('ask proposals were not removed', error);
+    }
+  };
   const answer = await answerQuestion({
     turns: [...earlier, ...asked],
     today: input.today,
     execute: input.execute,
+    propose: propose ? (name, args, seen) => propose(name, args, seen, save) : undefined,
     anthropicApiKey: input.anthropicApiKey,
     client: input.client,
     now: input.now,
     onSpend: (report) => spent.push(report),
   });
   await stores.recordSpend(spent);
-  if (!answer.ok) return { conversation, turns: asked, error: `Dash could not answer: ${answer.detail}` };
+  if (!answer.ok) {
+    await discard();
+    return { conversation, turns: asked, error: `Dash could not answer: ${answer.detail}` };
+  }
 
+  let answered: TalkTurn[];
   try {
-    const answered = await stores.append(subject, [
+    answered = await stores.append(subject, [
       { role: 'assistant', body: answer.body, toolCalls: answer.toolCalls, citations: answer.citations },
     ]);
-    return { conversation, turns: [...asked, ...answered], stop: answer.stop };
   } catch {
+    await discard();
     return { conversation, turns: asked, error: 'Dash answered, but the answer was not kept. Try again.' };
   }
+  if (proposed.length === 0) return { conversation, turns: [...asked, ...answered], stop: answer.stop };
+
+  // The answer is kept; its proposals now hang from it. Should tying them
+  // fail, they stay in the conversation with no turn, and the answer's
+  // tool calls still name each by id.
+  const turnId = answered[answered.length - 1].id;
+  let changes = proposed;
+  try {
+    await stores.attachProposals(proposed.map((c) => c.id), turnId);
+    changes = proposed.map((c) => ({ ...c, turnId }));
+  } catch (error) {
+    console.error('ask proposals were not tied to the answer', error);
+  }
+  return { conversation, turns: [...asked, ...answered], stop: answer.stop, changes };
 }

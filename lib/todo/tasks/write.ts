@@ -2,6 +2,7 @@ import 'server-only';
 
 import { z } from 'zod';
 import { createTodoClient } from '@/lib/todo/auth/server';
+import { taskInput, type TaskInput } from '@/lib/todo/tasks/input';
 import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
 import { wallClockToInstant } from '@/lib/todo/time';
 
@@ -14,32 +15,7 @@ import { wallClockToInstant } from '@/lib/todo/time';
  * and an optional time, and which column that lands in is decided once.
  */
 
-/** A date field left blank arrives as ''. Treat it as absent, not as invalid. */
-const optionalDate = z
-  .string()
-  .trim()
-  .transform((value) => value || null)
-  .pipe(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a date like 2026-03-10').nullable());
-
-const optionalTime = z
-  .string()
-  .trim()
-  .transform((value) => value || null)
-  .pipe(z.string().regex(/^\d{2}:\d{2}$/, 'Use a time like 14:30').nullable());
-
-export const taskInput = z.object({
-  title: z.string().trim().min(1, 'Give it a title.').max(500, 'That title is too long.'),
-  body: z
-    .string()
-    .trim()
-    .max(20_000)
-    .transform((value) => value || null),
-  dueOn: optionalDate,
-  dueTime: optionalTime,
-  pinned: z.boolean().default(false),
-});
-
-export type TaskInput = z.infer<typeof taskInput>;
+export { taskInput, type TaskInput } from '@/lib/todo/tasks/input';
 
 /**
  * What an item under a task needs, which is a title and nothing else.
