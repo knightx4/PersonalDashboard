@@ -148,6 +148,14 @@ export const SPEND_OPERATIONS = {
     // #1176). Jev, one call per item and forty steps; background, from the
     // daily cron.
     'filter-evidence',
+    // Asking whether each open Claude step with no acts sentence would send,
+    // submit, buy or change records outside the plan, before a goals run
+    // starts or a step is sent (plan #1183). Jev, one call per step;
+    // background, since no button of its own starts it.
+    'check-step-acts',
+    // Writing the acts sentence for a step that check held (plan #1183).
+    // Haiku, one call per held step; background.
+    'write-acts-sentence',
   ],
 } as const;
 
