@@ -1,6 +1,13 @@
 /**
- * Which goal steps are on Todo (docs/GOALS-SPEC.md, "Todo"; plan #927).
+ * Which goal steps are on Todo (docs/GOALS-SPEC.md, "Todo"; plans #927 and
+ * #1266).
  *
+ * Two ways in. Each open goal's next step of yours is on Todo with nothing
+ * pressed: the first of the next steps the Goals home shows for it (dailyView
+ * in lib/goals/daily.ts), so a parked goal, a step that waits on another and
+ * a step for later put nothing there. And any step you pressed Show on Todo on
+ * is there too, as below. A step that is both is listed once.
+ * *
  * A step is on Todo while you have pressed Show on Todo on it and it is still
  * something to do: yours, open, and reachable through open steps from an open
  * goal. A step under a dropped branch or a goal you have not taken on yet
@@ -13,6 +20,7 @@
  * lib/goals/steps-store.ts and the agenda source that shows the result is
  * lib/todo/agenda/sources/goal-steps.ts.
  */
+import { dailyView } from '@/lib/goals/daily';
 import type { Step, StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
 
@@ -25,6 +33,11 @@ export type TodoStep = {
   startsOn: string | null;
   goalId: string;
   goalTitle: string;
+  /**
+   * Set when this is its goal's next step, which is on Todo without a press
+   * and shows today when it has no date. Absent on a step only flagged.
+   */
+  next?: true;
 };
 
 /** Whether Show on Todo means anything for this step. */
@@ -54,5 +67,52 @@ export function todoSteps(goals: Goal[], byGoal: Map<string, StepNode[]>): TodoS
     };
     walk(byGoal.get(goal.id) ?? []);
   }
+  return out;
+}
+
+/**
+ * Everything Goals puts on Todo as steps: each open goal's next step of yours
+ * (plan #1266) and the steps flagged with Show on Todo, one row per step.
+ *
+ * The pick is dailyView's first next item for the goal, so Todo and the Goals
+ * home never disagree about what is next. dailyView blanks an overdue due
+ * date for the home; here the step keeps its own, so Todo can show it late.
+ */
+export function goalTodoSteps(
+  goals: { goal: Goal; areaName: string }[],
+  byGoal: Map<string, StepNode[]>,
+  today: string,
+): TodoStep[] {
+  const flagged = todoSteps(
+    goals.map((g) => g.goal),
+    byGoal,
+  );
+  const nodes = new Map<string, StepNode>();
+  const index = (list: StepNode[]) => {
+    for (const node of list) {
+      nodes.set(node.id, node);
+      index(node.children);
+    }
+  };
+  for (const roots of byGoal.values()) index(roots);
+
+  const picks = new Map<string, TodoStep>();
+  for (const { goal, next } of dailyView(goals, byGoal, today).goals) {
+    const node = next[0] && nodes.get(next[0].id);
+    if (!node) continue;
+    picks.set(node.id, {
+      id: node.id,
+      title: node.title,
+      dueOn: node.dueOn,
+      startsOn: null,
+      goalId: goal.id,
+      goalTitle: goal.title,
+      next: true,
+    });
+  }
+
+  const out = flagged.map((step) => (picks.has(step.id) ? { ...step, next: true as const } : step));
+  const listed = new Set(out.map((step) => step.id));
+  for (const pick of picks.values()) if (!listed.has(pick.id)) out.push(pick);
   return out;
 }
