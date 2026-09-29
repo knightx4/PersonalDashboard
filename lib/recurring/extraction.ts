@@ -44,6 +44,11 @@ export type RecurringExtraction = {
   occurredOn: string;
   /** YYYY-MM-DD: the renewal, due or effective date the email names. */
   dueOn: string | null;
+  /**
+   * A credit card statement: a card's balance, not a payment of its own. A
+   * new payment filed from one starts out of the monthly total (plan #1214).
+   */
+  cardStatement?: boolean;
 };
 
 const ymd = z
@@ -68,6 +73,7 @@ const ModelAnswer = z.object({
   period: z.enum(RECURRING_PERIODS).nullable().optional(),
   occurredOn: ymd,
   dueOn: ymd,
+  cardStatement: z.boolean().nullable().optional(),
 });
 
 /**
@@ -100,8 +106,22 @@ export function parseRecurringExtraction(
       period: a.period ?? null,
       occurredOn: a.occurredOn ?? fallbackDate,
       dueOn: a.dueOn ?? null,
+      cardStatement: a.cardStatement === true,
     },
   };
+}
+
+/**
+ * Whether the email is a credit card statement: it says so, or it carries
+ * both a statement balance and a minimum payment, which only a card
+ * statement does. Read from the text, so a model that misses it is caught.
+ */
+export function looksLikeCardStatement(email: { subject: string; text: string }): boolean {
+  const blob = `${email.subject}\n${email.text}`;
+  if (/\bcredit card (?:e-?)?statement\b/i.test(blob)) return true;
+  return (
+    /\bstatement balance\b/i.test(blob) && /\bminimum (?:payment|amount)(?: due)?\b/i.test(blob)
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -223,6 +243,7 @@ export function heuristicRecurring(input: {
         period,
         occurredOn: input.receivedOn,
         dueOn: due,
+        cardStatement: false,
       };
     }
   }
@@ -237,6 +258,7 @@ export function heuristicRecurring(input: {
     period,
     occurredOn: event === 'charge' || event === 'bill' ? charged : input.receivedOn,
     dueOn: due,
+    cardStatement: looksLikeCardStatement(input),
   };
 }
 
