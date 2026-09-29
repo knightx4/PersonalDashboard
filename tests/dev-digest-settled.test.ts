@@ -40,6 +40,7 @@ function stubClient(tables: Record<string, Row[]>) {
     const self = {
       select: () => self,
       eq: () => self,
+      in: () => self,
       is: () => self,
       order: () => self,
       range: () => self,
@@ -192,5 +193,65 @@ describe('writeDigestFor on 29 September', () => {
     expect(context.unshapedIdeas.join('\n')).toContain('#1100 (blocked)');
     expect(context.unshapedIdeas.join('\n')).toContain('#1048 (answered)');
     expect(context.blockedSteps[0]).toContain('#985 (done)');
+  });
+});
+
+describe('writeDigestFor with a block the run thinks is stale (#1224)', () => {
+  const staleBlock = {
+    title: 'Gmail statements look clear to move (#1100)',
+    detail: 'What it waited on has shipped.',
+    step: 1100,
+    kind: 'stale_block' as const,
+  };
+
+  it('writes one waiting check-back on the blocked step and no idea', async () => {
+    reading.next = { summary: null, suggestions: [staleBlock] };
+    const { supabase, inserted } = stubClient({ plan_items: september29() });
+
+    await writeDigestFor(supabase, 'user-1', NOW);
+
+    expect(inserted.filter((row) => row.table === 'ideas')).toEqual([]);
+    const checkBacks = inserted.filter((row) => row.table === 'check_backs');
+    expect(checkBacks).toHaveLength(1);
+    expect(checkBacks[0]!.row).toMatchObject({
+      user_id: 'user-1',
+      plan_item_id: 'p1100',
+      due_at: NOW.toISOString(),
+      wake: true,
+      source: 'morning run',
+    });
+    expect(inserted.find((row) => row.table === 'dev_digests')?.row.ideas_filed).toBe(0);
+  });
+
+  it('writes nothing new the next morning while that check-back is waiting', async () => {
+    reading.next = { summary: null, suggestions: [staleBlock] };
+    const { supabase, inserted } = stubClient({
+      plan_items: september29(),
+      check_backs: [{ plan_item_id: 'p1100', status: 'waiting' }],
+    });
+
+    await writeDigestFor(supabase, 'user-1', new Date('2026-09-30T12:34:00Z'));
+
+    expect(inserted.filter((row) => row.table === 'check_backs')).toEqual([]);
+    expect(inserted.filter((row) => row.table === 'ideas')).toEqual([]);
+  });
+
+  it('files a stale-block suggestion about a step that is not blocked as an idea, as before', async () => {
+    reading.next = {
+      summary: null,
+      suggestions: [{ ...staleBlock, title: 'Gmail statements look clear to move (#1101)', step: 1101 }],
+    };
+    const rows = [
+      ...september29(),
+      planRow({ number: 1101, status: 'not_started', completed_at: null }),
+    ];
+    const { supabase, inserted } = stubClient({ plan_items: rows });
+
+    await writeDigestFor(supabase, 'user-1', NOW);
+
+    expect(inserted.filter((row) => row.table === 'check_backs')).toEqual([]);
+    expect(inserted.filter((row) => row.table === 'ideas').map((row) => row.row.body)).toEqual([
+      'Gmail statements look clear to move (#1101)\n\nWhat it waited on has shipped.',
+    ]);
   });
 });

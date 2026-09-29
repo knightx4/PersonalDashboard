@@ -30,12 +30,27 @@ const morningSchema = z.object({
       z.object({
         title: z.string().min(1).max(200),
         detail: z.string().max(600).nullish(),
+        step: z.number().int().positive().nullish(),
+        kind: z.enum(['stale_block', 'other']).nullish(),
       }),
     )
     .max(10),
 });
 
-export type DigestSuggestion = { title: string; detail: string | null };
+/**
+ * `stale_block` is a step the model thinks is blocked on something that has
+ * since happened. Those go to a session as a check-back rather than onto the
+ * ideas page (#1224, lib/digest/stale.ts), so they name the step they mean.
+ */
+export type SuggestionKind = 'stale_block' | 'other';
+
+export type DigestSuggestion = {
+  title: string;
+  detail: string | null;
+  /** The one plan step the suggestion is about, when it is about one. */
+  step?: number | null;
+  kind?: SuggestionKind;
+};
 
 export type DigestReading = {
   /** Two or three sentences on the day. Null when the call produced none. */
@@ -94,6 +109,12 @@ question nobody has answered (#341)", never "#341". The detail says what to do
 about it, in one sentence. Do not recommend building anything specific -- that
 is what the plan is for. Do not speculate about what the code does; you have
 not seen it.
+
+Give each one a kind. "stale_block" is a step under "Steps blocked" that you
+think is blocked on something that has since happened; put that step's number
+in step, and a session will read the block and the code and settle it. You
+never settle it yourself, and a question is never a stale block. Everything
+else is "other", with step set only when it is about one step.
 
 Write plainly. No stock phrases, no "consider whether", no claims that
 something matters.`;
@@ -172,6 +193,8 @@ export async function suggestForDigest(input: {
                   properties: {
                     title: { type: 'string' },
                     detail: { type: ['string', 'null'] },
+                    step: { type: ['integer', 'null'] },
+                    kind: { type: 'string', enum: ['stale_block', 'other'] },
                   },
                   required: ['title'],
                 },
@@ -201,6 +224,8 @@ export async function suggestForDigest(input: {
     suggestions: safe.data.suggestions.map((suggestion) => ({
       title: suggestion.title,
       detail: suggestion.detail ?? null,
+      step: suggestion.step ?? null,
+      kind: suggestion.kind ?? 'other',
     })),
   };
 }
