@@ -586,6 +586,7 @@ const settings = {
   appOrigin: 'https://example.com',
   profile: {
     targetTitles: 'Quantitative Developer, Backend Engineer, Platform Engineer',
+    excludedIndustries: 'Crypto, Healthcare, Defense',
     searchStartedOn: '2026-07-06',
     ghostThresholdDays: 21,
     writingStyleNotes: 'Plain sentences. No "passionate", no "excited to".',

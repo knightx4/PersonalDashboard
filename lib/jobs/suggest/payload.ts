@@ -5,12 +5,21 @@
  * already suggested or already a contact, and a posting must carry a link that
  * is a web address and not one already suggested or applied for. Text is
  * trimmed to the column limits and has the person's banned constructions taken
- * out where that can be done without rewriting (the em dash, above all).
+ * out where that can be done without rewriting (the em dash, above all). A
+ * suggestion in an industry the person excluded is dropped, whatever the model
+ * made of the rule.
  */
 export const MAX_OUTREACH = 3;
 export const MAX_OPENINGS = 5;
 
-export const CHANNELS = ['linkedin_dm', 'linkedin_connect', 'email', 'intro', 'event', 'other'] as const;
+export const CHANNELS = [
+  'linkedin_dm',
+  'linkedin_connect',
+  'email',
+  'intro',
+  'event',
+  'other',
+] as const;
 export type Channel = (typeof CHANNELS)[number];
 
 export type PersonSuggestion = {
@@ -18,6 +27,7 @@ export type PersonSuggestion = {
   personName: string | null;
   personTitle: string | null;
   company: string | null;
+  industry: string | null;
   /** Where the person was found. */
   sourceUrl: string | null;
   /** A LinkedIn people search that finds them or people like them. */
@@ -31,6 +41,7 @@ export type PersonSuggestion = {
 
 export type OpeningSuggestion = {
   company: string;
+  industry: string | null;
   title: string;
   url: string;
   location: string | null;
@@ -96,7 +107,72 @@ function webAddress(value: unknown): string | null {
   }
 }
 
-export function parsePeoplePayload(raw: unknown, taken: { people: ReadonlySet<string> }): PersonSuggestion[] {
+/**
+ * Other words for an excluded industry, so "crypto" also catches a company the
+ * model filed under "digital assets". Only the ones a person is likely to
+ * write; anything else matches as written.
+ */
+const INDUSTRY_WORDS: Record<string, readonly string[]> = {
+  crypto: [
+    'crypto',
+    'cryptocurrency',
+    'cryptocurrencies',
+    'web3',
+    'blockchain',
+    'digital asset',
+    'defi',
+    'bitcoin',
+    'ethereum',
+    'stablecoin',
+    'nft',
+    'token',
+  ],
+  healthcare: [
+    'healthcare',
+    'health care',
+    'health',
+    'medical',
+    'hospital',
+    'pharma',
+    'pharmaceutical',
+    'biotech',
+    'biotechnology',
+    'clinical',
+    'life sciences',
+  ],
+  defense: ['defense', 'defence', 'military', 'weapons', 'munitions', 'national security'],
+};
+
+/** Every word that marks one of the excluded industries, lower-cased. */
+export function exclusionWords(excluded: readonly string[]): string[] {
+  const words = new Set<string>();
+  for (const raw of excluded) {
+    const entry = raw.trim().toLowerCase();
+    if (!entry) continue;
+    words.add(entry);
+    const key = Object.keys(INDUSTRY_WORDS).find(
+      (name) => entry === name || entry.startsWith(name),
+    );
+    for (const word of key ? INDUSTRY_WORDS[key] : []) words.add(word);
+  }
+  return [...words];
+}
+
+/** True when any of the texts names an excluded industry as a whole word (or its plural). */
+export function isExcluded(words: readonly string[], ...texts: (string | null)[]): boolean {
+  if (words.length === 0) return false;
+  const haystack = texts.filter(Boolean).join(' ').toLowerCase();
+  return words.some((word) =>
+    new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s?\\b`).test(haystack),
+  );
+}
+
+export function parsePeoplePayload(
+  raw: unknown,
+  taken: { people: ReadonlySet<string> },
+  excluded: readonly string[] = [],
+): PersonSuggestion[] {
+  const words = exclusionWords(excluded);
   const list = listIn(raw, 'suggestions');
   const people = new Set(taken.people);
   const out: PersonSuggestion[] = [];
@@ -109,17 +185,24 @@ export function parsePeoplePayload(raw: unknown, taken: { people: ReadonlySet<st
     const move = clean(item.move, 1500);
     const message = clean(item.message, 4000);
     if (!headline || !why || !move || !message) continue;
+    const industry = clean(item.industry, 200);
+    const company = clean(item.company, 200);
+    const personTitle = clean(item.person_title, 300);
+    if (isExcluded(words, industry, company, personTitle, headline)) continue;
     const personName = clean(item.person_name, 200);
     if (personName) {
       const key = personKey(personName);
       if (people.has(key)) continue;
       people.add(key);
     }
-    const channel = CHANNELS.includes(item.channel as Channel) ? (item.channel as Channel) : 'other';
+    const channel = CHANNELS.includes(item.channel as Channel)
+      ? (item.channel as Channel)
+      : 'other';
     out.push({
       personName,
-      personTitle: clean(item.person_title, 300),
-      company: clean(item.company, 200),
+      personTitle,
+      company,
+      industry,
       sourceUrl: webAddress(item.source_url),
       searchQuery: clean(item.search_query, 300),
       headline,
@@ -140,7 +223,9 @@ export function linkedinSearchUrl(query: string): string {
 export function parseOpeningsPayload(
   raw: unknown,
   taken: { urls: ReadonlySet<string>; roles: ReadonlySet<string> },
+  excluded: readonly string[] = [],
 ): OpeningSuggestion[] {
+  const words = exclusionWords(excluded);
   const list = listIn(raw, 'openings');
   const urls = new Set(taken.urls);
   const roles = new Set(taken.roles);
@@ -155,11 +240,13 @@ export function parseOpeningsPayload(
     const why = clean(item.why, 1000);
     const move = clean(item.move, 1500);
     if (!company || !title || !url || !why || !move) continue;
+    const industry = clean(item.industry, 200);
+    if (isExcluded(words, industry, company, title)) continue;
     const key = roleKey(company, title);
     if (urls.has(url) || roles.has(key)) continue;
     urls.add(url);
     roles.add(key);
-    out.push({ company, title, url, location: clean(item.location, 200), why, move });
+    out.push({ company, industry, title, url, location: clean(item.location, 200), why, move });
   }
   return out;
 }

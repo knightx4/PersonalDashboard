@@ -39,7 +39,7 @@ async function loadSeeker(supabase: AppSupabaseClient, userId: string): Promise<
   const [profile, thoughts, resume] = await Promise.all([
     supabase
       .from('profiles')
-      .select('display_name, timezone, target_titles, writing_style_notes, banned_constructions')
+      .select('display_name, timezone, target_titles, writing_style_notes, banned_constructions, excluded_industries')
       .eq('id', userId)
       .maybeSingle(),
     supabase
@@ -71,6 +71,7 @@ async function loadSeeker(supabase: AppSupabaseClient, userId: string): Promise<
     resume: ((resume.data as Row | null)?.text_content as string | null) ?? null,
     writingStyle: (p.writing_style_notes as string | null) ?? null,
     banned: (p.banned_constructions as string[] | undefined) ?? [],
+    excludedIndustries: (p.excluded_industries as string[] | undefined) ?? [],
   };
 }
 
