@@ -249,6 +249,9 @@ export const LEARN_OPERATIONS = [
   // cheap pass can be read against the one that reads whole transcripts.
   'screen-video',
   'judge-video',
+  // Finding the YouTube channels people recommend for a subject (plan #1195):
+  // one Sonnet call with web search per press of Find channels.
+  'find-channels',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

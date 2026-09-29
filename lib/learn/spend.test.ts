@@ -111,6 +111,7 @@ describe('the operation names', () => {
       'summarise-video',
       'screen-video',
       'judge-video',
+      'find-channels',
     ]);
   });
 });
