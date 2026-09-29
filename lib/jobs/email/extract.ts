@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { MessageClassification } from './classify';
 import { CLASSIFICATIONS } from './classify';
+import { JOB_EMAIL_OPTIONS } from './jev-question';
 
 /**
  * Tier B: structured extraction from recruiting mail.
@@ -114,6 +115,9 @@ Classification rules:
   position has been filled", "we decided to go in a different direction" are ALL rejections.
 - An automated "we received your application" is application_confirmation, not recruiter_reply.
   This distinction decides whether the candidate's response rate is real, so be strict.
+- interview_invite: ${JOB_EMAIL_OPTIONS.interview_invite}
+- scheduling: ${JOB_EMAIL_OPTIONS.scheduling}
+  A cancelled or moved interview is scheduling too.
 - A digest of many jobs from a board is job_alert, whatever else it mentions.
 - Vendor marketing, newsletters, receipts and security mail are not_relevant.
 

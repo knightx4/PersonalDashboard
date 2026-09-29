@@ -1,0 +1,6 @@
+{
+  "classification": "scheduling",
+  "ats": "unknown",
+  "tier": "subject_heuristic",
+  "note": "A list of offered slots, so nothing is booked. The envelope is real, from the Jev trial (message 25695518), scrubbed. The body was not fetched (Gmail was not reachable from the session that wrote this); it is rebuilt from what the ledger kept of the original, Haiku's summary ('offering three time slots for 30-minute intro call') and the three slot labels it extracted, so the wording of the ask is not the original's."
+}
