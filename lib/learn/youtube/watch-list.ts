@@ -89,7 +89,7 @@ async function playlistsToRead(learn: LearnSupabaseClient): Promise<SettingsRow[
 }
 
 /** The catalogue rows of kind video these ids already have, one per id. */
-async function catalogueItems(learn: LearnSupabaseClient, videoIds: string[]): Promise<Map<string, string>> {
+export async function catalogueItems(learn: LearnSupabaseClient, videoIds: string[]): Promise<Map<string, string>> {
   const found = new Map<string, string>();
   for (let from = 0; from < videoIds.length; from += BATCH) {
     const { data, error } = await learn
@@ -122,7 +122,7 @@ async function providers(learn: LearnSupabaseClient): Promise<{ byChannel: Map<s
 }
 
 /** Store videos the catalogue does not have, and return their item ids. */
-async function storeNewVideos(learn: LearnSupabaseClient, videos: YouTubeVideo[]): Promise<Map<string, string>> {
+export async function storeNewVideos(learn: LearnSupabaseClient, videos: YouTubeVideo[]): Promise<Map<string, string>> {
   const ids = new Map<string, string>();
   if (videos.length === 0) return ids;
   const { byChannel, list } = await providers(learn);
