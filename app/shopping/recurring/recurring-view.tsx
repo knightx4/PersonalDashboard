@@ -7,13 +7,15 @@ import { formatDay } from '@/lib/goals/dates';
 import { formatMoney } from '@/lib/money';
 import type { RecurringPeriod } from '@/lib/recurring/extraction';
 import type { MonthlyTotal, RecurringRow, RecurringView } from '@/lib/recurring/view';
+import { PaymentRow } from './payment-row';
 
 /**
  * Everything the person pays for regularly (plan #1126): what it comes to a
  * month, then each payment by its next date, then the ones that stopped
  * charging and may have lapsed, then the cancelled.
  *
- * Presentational, so /preview photographs it with fixture rows.
+ * Presentational, so /preview photographs it with fixture rows; each row's
+ * corrections (rename, and the ones feature #1193 adds) live in PaymentRow.
  */
 
 const PER: Record<RecurringPeriod, string> = {
@@ -74,16 +76,19 @@ function Row({
   when: string;
 }) {
   return (
-    <li className="row-pad flex items-start gap-3 px-4">
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-medium text-ink">{row.payee}</p>
-        <p className="text-ui text-ink-muted">
-          {row.kind === 'bill' ? 'Bill' : 'Subscription'} · {when}
-        </p>
-        <Rise row={row} today={today} />
-      </div>
-      <Amount row={row} />
-    </li>
+    <PaymentRow
+      id={row.id}
+      payee={row.payee}
+      details={
+        <>
+          <p className="text-ui text-ink-muted">
+            {row.kind === 'bill' ? 'Bill' : 'Subscription'} · {when}
+          </p>
+          <Rise row={row} today={today} />
+        </>
+      }
+      amount={<Amount row={row} />}
+    />
   );
 }
 
