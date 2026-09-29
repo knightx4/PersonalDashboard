@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { devHits, firstLine, matchWaiting, planHref } from './dev-map';
+import { rankHits } from '@/lib/search/rank';
+import { devHits, firstLine, matchVisions, matchWaiting, planHref } from './dev-map';
 
 describe('dev search hits', () => {
   it('lands a step on the plan with its number in the search box', () => {
@@ -99,5 +100,22 @@ describe('dev search hits', () => {
       questions: [rows.questions[0]],
       raises: [rows.raises[0]],
     });
+  });
+
+  it('finds a vision by a word only in its text and opens the specs page at it', () => {
+    const visions = [
+      { module: 'jobs', body: 'A calm place to track the search.' },
+      { module: 'app', body: 'One dashboard for a whole life.' },
+      { module: 'news', body: '   ' },
+    ];
+    expect(matchVisions(visions, 'CALM', 10).map((row) => row.module)).toEqual(['jobs']);
+    expect(matchVisions(visions, undefined, 10).map((row) => row.module)).toEqual(['jobs', 'app']);
+
+    const hits = devHits({ plan: [], specs: [], ideas: [], notes: [], visions: visions.slice(0, 2) });
+    expect(hits.map((hit) => [hit.kind, hit.title, hit.href])).toEqual([
+      ['vision', 'Vision for Job search', '/dev/specs#vision-jobs'],
+      ['vision', 'Vision for the app', '/dev/specs#vision-app'],
+    ]);
+    expect(rankHits(hits, 'calm').map((hit) => hit.id)).toEqual(['jobs']);
   });
 });

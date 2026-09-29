@@ -6,7 +6,7 @@ import { cardVariants } from '@/components/ui/card';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { SPECS, groupSpecs, type SpecDoc } from '@/lib/specs/registry';
 import { specCommentCounts } from '@/lib/specs/load';
-import { APP_VISION, loadModuleVisions } from '@/lib/specs/vision';
+import { APP_VISION, loadModuleVisions, visionAnchor } from '@/lib/specs/vision';
 import { loadPendingVisionEdits } from '@/lib/specs/vision-review';
 import { ModuleVisionPanel } from './vision-view';
 import { VisionEditPanel } from './vision-edit';
@@ -114,25 +114,29 @@ export default async function SpecsPage() {
             }
           >
             <div className="pt-2">
-              {/* Above the documents rather than among them, because it is the
+              {/* The anchor a search hit on this vision lands at (plan #1155),
+                  around the vision and any edit proposed to it. */}
+              <div id={visionAnchor(group.module ?? APP_VISION)} className="scroll-mt-20">
+                {/* Above the documents rather than among them, because it is the
                   layer above them. The app-wide group has one too: what the
                   app as a whole is for, which a step with no workspace is
                   briefed with. */}
-              <ModuleVisionPanel
-                module={group.module ?? APP_VISION}
-                label={group.module ? group.label : 'the app'}
-                vision={visions[group.module ?? APP_VISION] ?? null}
-              />
-
-              {/* An edit the weekly review proposed, under the vision it would
-                  replace, until it is accepted or dismissed (plan #1106). */}
-              {edits[group.module ?? APP_VISION] && (
-                <VisionEditPanel
-                  edit={edits[group.module ?? APP_VISION]!}
-                  currentBody={visions[group.module ?? APP_VISION]?.body ?? null}
+                <ModuleVisionPanel
+                  module={group.module ?? APP_VISION}
                   label={group.module ? group.label : 'the app'}
+                  vision={visions[group.module ?? APP_VISION] ?? null}
                 />
-              )}
+
+                {/* An edit the weekly review proposed, under the vision it would
+                  replace, until it is accepted or dismissed (plan #1106). */}
+                {edits[group.module ?? APP_VISION] && (
+                  <VisionEditPanel
+                    edit={edits[group.module ?? APP_VISION]!}
+                    currentBody={visions[group.module ?? APP_VISION]?.body ?? null}
+                    label={group.module ? group.label : 'the app'}
+                  />
+                )}
+              </div>
 
               {group.specs.length > 0 && (
                 <ul className="space-y-2">
