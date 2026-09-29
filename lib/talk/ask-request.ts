@@ -13,7 +13,15 @@ import { todayInTimezone } from '@/lib/money';
 import { allSearchSources } from '@/lib/search/registry';
 import { createTask } from '@/lib/todo/tasks/write';
 import { askDash, type AskDashResult } from './ask';
-import { attachProposals, discardProposals, insertProposal, loadChanges, type DashChange } from './changes';
+import {
+  attachProposals,
+  discardProposals,
+  insertProposal,
+  loadChanges,
+  loadMadeChanges,
+  type DashChange,
+  type MadeChange,
+} from './changes';
 import { appendTurns, listConversations, loadConversation, startAsk, type ConversationSummary } from './store';
 import type { TalkTurn } from './talk';
 
@@ -86,6 +94,15 @@ export async function loadAskConversation(ref: string): Promise<TalkTurn[]> {
 export async function loadAskChanges(ref: string): Promise<DashChange[]> {
   await requireUser();
   return loadChanges(await createCoreClient(), ref);
+}
+
+/**
+ * Every change the person confirmed through Dash, newest first, whether it
+ * still stands or was undone (plan #1191), each with the question it came from.
+ */
+export async function loadAskMadeChanges(limit = 200): Promise<MadeChange[]> {
+  await requireUser();
+  return loadMadeChanges(await createCoreClient(), limit);
 }
 
 /**

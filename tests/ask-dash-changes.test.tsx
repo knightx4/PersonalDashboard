@@ -7,8 +7,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AskDashProvider, AskThread, type AskSource } from '@/components/shell/ask-dash';
 import { DashChanges } from '@/components/talk/dash-changes';
+import { MadeChanges } from '@/components/talk/made-changes';
 import { changeHref, changeSentence, dueDay } from '@/lib/ask/change-view';
-import type { DashChange } from '@/lib/talk/changes';
+import type { DashChange, MadeChange } from '@/lib/talk/changes';
 import type { TalkTurn } from '@/lib/talk/talk';
 
 vi.mock('next/navigation', () => ({
@@ -148,5 +149,53 @@ describe('a reopened conversation', () => {
     expect(declined).toBeGreaterThan(first);
     expect(second).toBeGreaterThan(declined);
     expect(step).toBeGreaterThan(second);
+  });
+});
+
+describe('the changes Dash made, on the Ask page', () => {
+  const made = (change: DashChange, question: string | null, at: string): MadeChange => ({
+    ...change,
+    status: 'confirmed',
+    writtenTable: 'x',
+    writtenRef: `${change.id}-row`,
+    createdAt: at,
+    confirmedAt: at,
+    question,
+  });
+  const list: MadeChange[] = [
+    { ...made(RETURN, 'I sent the kettle back', '2026-09-29T12:00:00Z'), conversationId: 'c3' },
+    { ...made(STEP, null, '2026-09-29T11:00:00Z'), conversationId: 'c2', status: 'undone' },
+    { ...made(TODO, 'Add a todo to call the dentist', '2026-09-29T10:00:00Z'), conversationId: 'c1' },
+  ];
+  const html = renderToStaticMarkup(<MadeChanges changes={list} presses={SOURCE} today="2026-09-29" />);
+
+  it('lists every kind in the order given, newest first', () => {
+    const at = (text: string) => html.indexOf(text);
+    expect(at('Blue kettle')).toBeGreaterThan(-1);
+    expect(at('Blue kettle')).toBeLessThan(at('Book a class'));
+    expect(at('Book a class')).toBeLessThan(at('Call the dentist'));
+  });
+
+  it('links each standing change to its row, and each to the question it came from', () => {
+    expect(html).toContain('href="/shopping/inventory/i1"');
+    expect(html).toContain('href="/todo/all?status=all&amp;focus=todo-row"');
+    expect(html).toContain('href="/ask/c3"');
+    expect(html).toContain('>I sent the kettle back</a>');
+    expect(html).toContain('href="/ask/c2"');
+    expect(html).toContain('>a question</a>');
+  });
+
+  it('offers Undo on a standing change only, and says an undone one was taken back', () => {
+    expect(html.match(/Undo<\/button>/g) ?? []).toHaveLength(2);
+    expect(html).toContain('It was taken back.');
+    expect(html).not.toContain('href="/goals/g1');
+  });
+
+  it('draws nothing when there are none', () => {
+    expect(renderToStaticMarkup(<MadeChanges changes={[]} presses={SOURCE} />)).toBe('');
+  });
+
+  it('never names the assistant anything but Dash', () => {
+    expect(html).not.toMatch(/claude/i);
   });
 });
