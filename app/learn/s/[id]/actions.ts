@@ -4,6 +4,14 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
+import { requireOwner } from '@/lib/dev/owner';
+import { judgeSubjectChannelsNow } from '@/inngest/learn/youtube-library';
+import { findChannelsForSubject } from '@/lib/learn/youtube/channel-search';
+import {
+  channelsPressLines,
+  judgeAfterSearch,
+  type ChannelsPressState,
+} from '@/lib/learn/youtube/subject-channels';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import {
   recordClaimSearched,
@@ -15,7 +23,7 @@ import { ensureCurriculum, fileGoalUnder } from '@/lib/learn/graph/curriculum-st
 import { queueConcept } from '@/lib/learn/graph/to-queue';
 import { addUnit, moveUnit, removeUnit } from '@/lib/learn/lessons/plan-edit';
 import { planGoalFor } from '@/lib/learn/lessons/plan-store';
-import { recordLearnSpend } from '@/lib/learn/spend';
+import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { catalogueSql } from '@/lib/learn/catalogue/connection';
 import { embedCatalogueSegments } from '@/lib/learn/catalogue/embed-sweep';
 import { parseTitles, pullArticles, type PullReport } from '@/lib/learn/catalogue/pull';
@@ -282,6 +290,79 @@ export async function pullLectureCourse(
   });
 
   return { report };
+}
+
+/**
+ * How long a Find channels press leaves the judging, counted from the press.
+ * The page allows 300 seconds; this leaves a minute for the search to have
+ * run past its usual length and for the reply to go back.
+ */
+const CHANNELS_JUDGE_BUDGET_MS = 240_000;
+
+/**
+ * Finding YouTube channels for a subject and judging them (plan #1199, under
+ * #1185), from the Channels section of its page.
+ *
+ * The search asks for up to five channels the subject does not have yet and
+ * stores the ones YouTube can find. Judging then picks three videos from each
+ * unjudged channel, fetches their transcripts inside the month's credits,
+ * judges them, and follows the channels worth following into the YouTube
+ * library. A channel whose transcripts did not arrive in time is left for the
+ * scheduled run, and the page shows it as still being judged.
+ *
+ * Owner-only, as the YouTube library is, because it spends the owner's
+ * YouTube quota and transcript credits. Pressing again searches only for
+ * channels not already stored, and judges whatever an earlier press left.
+ */
+// latency: pending
+export async function findSubjectChannels(
+  _previous: ChannelsPressState,
+  formData: FormData,
+): Promise<ChannelsPressState> {
+  const startedAt = Date.now();
+  let owner;
+  try {
+    owner = await requireOwner();
+  } catch (error) {
+    if (error instanceof Error && error.name === 'NotTheOwnerError') {
+      return { error: 'Only the owner of this app can find channels, since it spends their YouTube quota and transcript credits.' };
+    }
+    return { error: 'Sign in again.' };
+  }
+
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
+  if (!subjectId.success) return { error: 'Could not work out which subject this was.' };
+
+  const learn = await createLearnClient();
+  const subject = await loadSubject(learn, subjectId.data);
+  if (!subject) return { error: 'That subject is gone.' };
+
+  const spend = collectSpend();
+  let search;
+  try {
+    search = await findChannelsForSubject({ learn, userId: owner.id, subjectId: subject.id, onSpend: spend.sink });
+  } catch (error) {
+    return { error: `The search failed: ${error instanceof Error ? error.message : String(error)}` };
+  } finally {
+    await recordLearnSpend(owner.id, 'find-channels', spend.reports);
+  }
+
+  let judge = null;
+  let judgeError: string | null = null;
+  if (judgeAfterSearch(search)) {
+    try {
+      judge = await judgeSubjectChannelsNow(owner.id, subject.id, { deadline: startedAt + CHANNELS_JUDGE_BUDGET_MS });
+    } catch (error) {
+      judgeError = `Judging failed partway: ${error instanceof Error ? error.message : String(error)}. What was judged before it is kept.`;
+    }
+  }
+
+  revalidatePath(`/learn/s/${subject.id}`);
+  revalidatePath('/learn/youtube', 'layout');
+  revalidatePath('/learn/videos', 'layout');
+
+  const report = channelsPressLines(search, judge);
+  return judgeError ? { ...report, error: [report.error, judgeError].filter(Boolean).join(' ') } : report;
 }
 
 /**

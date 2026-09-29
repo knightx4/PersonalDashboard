@@ -365,9 +365,14 @@ export async function transcribeNow(videoIds: string[], requestedBy: RequestedBy
  * most 15 for the subject), judge what arrived and give each channel whose
  * samples are all in its verdict. What the press could not fetch stays
  * queued, and the scheduled run finishes it. The caller checks the person
- * owns the subject; every call is recorded against them.
+ * owns the subject; every call is recorded against them. `deadline` lets a
+ * press that has already spent time searching stop sooner.
  */
-export async function judgeSubjectChannelsNow(userId: string, subjectId: string): Promise<JudgeChannelsResult> {
+export async function judgeSubjectChannelsNow(
+  userId: string,
+  subjectId: string,
+  options: { deadline?: number } = {},
+): Promise<JudgeChannelsResult> {
   const started = Date.now();
   const learn = createLearnServiceSupabase();
   const core = createCoreServiceSupabase();
@@ -380,10 +385,14 @@ export async function judgeSubjectChannelsNow(userId: string, subjectId: string)
       subjectId,
       trigger: 'press',
       maxCredits: credits.remaining,
-      deadline: started + PRESS_EMBED_MS,
+      deadline: Math.min(started + PRESS_EMBED_MS, options.deadline ?? Infinity),
+      // Two literal calls rather than channelOperation(pass), so the $ hint's
+      // check (lib/core/spend/action-graph.ts) can read what a press records.
       onSpend: (pass, report) =>
         void rows.push(
-          recordSpend(core, userId, { module: 'learn', operation: channelOperation(pass), model: report.model, usage: report.usage }),
+          pass === 'sample'
+            ? recordSpend(core, userId, { module: 'learn', operation: 'judge-video', model: report.model, usage: report.usage })
+            : recordSpend(core, userId, { module: 'learn', operation: 'judge-channel', model: report.model, usage: report.usage }),
         ),
     });
   } finally {
