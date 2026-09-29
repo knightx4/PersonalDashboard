@@ -780,7 +780,13 @@ then the person does.
 3. **Claude finds it first.** The goals routine has the Gmail connector. When
    it writes an information step it searches for what it can (loan
    statements, offer letters, receipts), fills in what it found as a draft,
-   and names the email each value came from. You confirm it.
+   and names the email each value came from. You confirm it. It sets the
+   step up from the questions the later steps need, then reads the first
+   document it has (a file you gave it, a statement in Gmail) before settling
+   the fields: an ID field on a list, each label checked against the row's
+   status and dates, and what the document taught written as a kind on the
+   collection. A file you give it is filed as drafts named after the file
+   (plan #990).
 4. **Say it** in a comment on the step or in the capture box, and it is filed
    into the same collection.
 

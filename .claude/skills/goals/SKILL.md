@@ -1,6 +1,6 @@
 ---
 name: goals
-description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps with a collection definition pre-filled as drafts from Gmail, choices made with judgement and written on the steps they shape, a question with lettered options only for what Claude cannot settle itself, provisional steps for what hangs on one, and the kinds of weekly help that fit the goal as a proposal on its page. Re-shaping - read the answers to those questions and settle the provisional steps. Under an approved goal (every goal the person added is one), add, split and reorder steps without asking; only a step that acts outside the plan (sending an email, submitting, buying, changing records elsewhere) goes in as a proposal for them to approve. Morning run - close each step of the person's it can see has happened (in Jobs, Gmail, the calendar or Todo) with a note naming the evidence, give each step of theirs untouched for a week a move (split it, prepare it, or ask whether they still want it), then give each open goal its status for the day (on track, stalled, waiting on you, waiting on a date or waiting on another goal) with the next move and its date, adding that move as a step for a stalled goal, then work the ready Claude steps and store what each produced on the step. Weekly run - research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind, and leave a note on every open goal. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
+description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps that start from the questions later steps need, with a collection built from the first document and pre-filled as drafts, choices made with judgement and written on the steps they shape, a question with lettered options only for what Claude cannot settle itself, provisional steps for what hangs on one, and the kinds of weekly help that fit the goal as a proposal on its page. Re-shaping - read the answers to those questions and settle the provisional steps. Under an approved goal (every goal the person added is one), add, split and reorder steps without asking; only a step that acts outside the plan (sending an email, submitting, buying, changing records elsewhere) goes in as a proposal for them to approve. Morning run - close each step of the person's it can see has happened (in Jobs, Gmail, the calendar or Todo) with a note naming the evidence, give each step of theirs untouched for a week a move (split it, prepare it, or ask whether they still want it), then give each open goal its status for the day (on track, stalled, waiting on you, waiting on a date or waiting on another goal) with the next move and its date, adding that move as a step for a stalled goal, then work the ready Claude steps and store what each produced on the step. Weekly run - research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind, and leave a note on every open goal. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
 ---
 
 # Working a goal
@@ -362,16 +362,59 @@ names) is an information step: it points at a **collection**, and the page
 draws a form or a table from the collection's fields. "List your loan
 balances" with nowhere to list them is the gap these close.
 
-1. **Reuse before you define.** Read the account's collections (the query
+Set one up in this order: the questions, then the sources, then the fields.
+A form settled before anyone has read a document leaves out what the
+document holds, and a field named from memory can mean something different
+in the document that fills it. The examples below are student loans, but the
+order is the same for any goal and any kind of document: a pay stub for a
+budget, a lease for a move, a benefits summary for a job offer, a lab report
+for a health goal.
+
+1. **Write the questions first.** Read the later steps on the map and ask
+   what each needs to know from this one. A payoff schedule needs the date
+   the first payment falls due and what the payments come to a month; a move
+   needs the date the lease ends and how much notice it asks for. Each
+   becomes a question on the step (point 6). A field belongs on the form when
+   a question needs it, when it names the row (the ID, point 5), or when it
+   says what state the row is in; leave out the rest.
+2. **Reuse before you define.** Read the account's collections (the query
    above). If one already holds these facts, use it: serve it to this goal
    and, if it lacks a field you need, add the field. Make a new collection
    only when none fits. Names are one per account, case-insensitive, so
    "loans" means one thing.
-2. **Define it from the field types.** You never write a table or a
+3. **Read a source before settling the fields.** Look for a document that
+   holds the facts, and read all of it before you write the definition:
+   - a file the person gave you in this conversation, or one the brief or a
+     comment on the step names;
+   - the collection's records and the kinds of document it has already
+     learned (`goals.document_kinds`, point 7);
+   - a statement, notice or export in Gmail, searched for as "Pre-filling
+     from Gmail" says (search now, and write the drafts once the collection
+     exists);
+   - the context kept for the goal ("Pulling in from the other modules").
+
+   Build the fields from what the document holds: each label that answers a
+   question, the label that names each row, and the status and dates that
+   say what state each row is in. The date the figures are as of goes in the
+   record's `as_of`, not a field. When no document exists yet, define the
+   fields from the questions alone; the first document the person reads into
+   the form on the step suggests the fields it has and the form lacks.
+4. **Never trust a field name without checking it.** Before a label fills a
+   field, check what it says against the row's status and its other dates.
+   A start date that falls before the status began, or a due date on a row
+   whose status says nothing is due yet, means the label names something
+   else. In an NSLDS loan export, "Repayment Begin Date" on a Grad PLUS loan
+   is the date of its last disbursement: the loan's status is still in
+   school or in grace, and the first payment is the next due date. Name the
+   field for what it holds, not for the label, and write what you found in
+   the kind's field notes (point 7) so the in-app reader avoids the same
+   trap. Where you cannot settle what a label means, leave the value out and
+   say so in the run summary.
+5. **Define it from the field types.** You never write a table or a
    migration; a collection is a row. `shape` is `list` for one row per thing
    (loans, accounts) and `one` for a single set of facts (a budget, a
    profile). Each field is `{"key", "label", "type"}` with, where it applies,
-   `"tracked": true` or `"options": [...]`:
+   `"tracked": true`, `"id": true` or `"options": [...]`:
 
    | type | stores | use for |
    |---|---|---|
@@ -393,9 +436,17 @@ balances" with nowhere to list them is the gap these close.
    out of the array; set `"removed": true` to hide one. Its type never
    changes; add a new field instead. The database refuses a definition that
    breaks any of this and names the field.
-3. **Serve it to the goal and point the step at it.** `asks_for` lists the
+
+   **Mark the ID field on a list.** One `text` or `number` field carries
+   `"id": true`: the value the documents use to name each row, such as a
+   loan ID, an account number or a policy number (the last four digits when
+   that is all a document gives). Reading a newer document then updates the
+   row with the same ID instead of adding a copy. A list has at most one ID
+   field; a `one` collection needs none. An existing list without one gets
+   it as an added field.
+6. **Serve it to the goal and point the step at it.** `asks_for` lists the
    field keys the step needs; leave it null when it needs every field.
-   `questions` lists what the step has to answer, in order, as
+   `questions` lists the questions from point 1, in order, as
    `[{"key": "first_payment", "question": "When does my first payment fall
    due?"}]`: keys are lower case, digits and `_`, unique on the step, and
    they are the keys the answers carry (see "Answers on an information
@@ -408,13 +459,14 @@ set local goals.run_id = '<the run id>';
 with c as (
   insert into goals.collections (user_id, name, shape, fields)
   values ('<user>', 'loans', 'list', '[
+    {"key": "loan_id", "label": "Loan ID", "type": "text", "id": true},
     {"key": "name", "label": "Loan", "type": "text"},
     {"key": "servicer", "label": "Servicer", "type": "text"},
-    {"key": "kind", "label": "Federal or private", "type": "choice", "options": ["Federal", "Private"]},
+    {"key": "status", "label": "Status", "type": "choice", "options": ["In school", "Grace period", "Repayment", "Deferred", "Forbearance", "Paid off"]},
     {"key": "balance", "label": "Balance", "type": "money", "tracked": true},
     {"key": "rate", "label": "Interest rate", "type": "percent"},
-    {"key": "minimum", "label": "Minimum payment", "type": "money"},
-    {"key": "due_day", "label": "Due day", "type": "day_of_month"}
+    {"key": "next_due", "label": "Next payment due", "type": "date"},
+    {"key": "minimum", "label": "Minimum payment", "type": "money"}
   ]'::jsonb)
   returning id
 ), served as (
@@ -424,9 +476,9 @@ with c as (
 insert into goals.items (user_id, level, parent_id, kind, title, acceptance,
                          collection_id, asks_for, questions, status, position)
 select '<user>', 'step', '<phase id>', 'mine',
-       'Every loan listed with balance, rate and minimum',
-       'Each loan has a confirmed row with its balance, rate and minimum payment.',
-       id, array['name', 'balance', 'rate', 'minimum'],
+       'Know when loan payments start and what they total',
+       'Both questions have an answer that names the loans it was worked out from.',
+       id, null,
        '[{"key": "first_payment", "question": "When does my first payment fall due?"},
          {"key": "monthly_total", "question": "What is the monthly total?"}]'::jsonb,
        'open', 10
@@ -439,6 +491,69 @@ balances, rates and minimum payments") is pointed at the collection with an
 update of `collection_id`, `asks_for` and `questions`, rather than written
 again.
 
+7. **Write down what the document taught.** When you built or extended the
+   form from a document, write the kind of document it was to
+   `goals.document_kinds`, the same row the step writes when the person
+   saves a read (plan #987). The next document of that kind read on the step
+   is then recognised and filled in without suggestions:
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+insert into goals.document_kinds (user_id, collection_id, name, recognise,
+                                  field_notes, skipped, last_read_at)
+values ('<user>', '<collection id>', 'NSLDS loan export',
+        'A text export from studentaid.gov headed "File Request Date", one block per loan.',
+        '{"next_due": "Filled from \"Next Payment Due Date\". Trap: \"Repayment Begin Date\": for Grad PLUS loans this is the last disbursement date; the first payment falls on the Next Payment Due Date."}'::jsonb,
+        '[]'::jsonb, now())
+returning id;
+```
+
+   - `name` is what a person would call the kind, up to 120 characters,
+     one per name among the collection's live kinds. If the collection has a
+     kind of this name already, update that row instead: keep the notes as
+     they stand, since the person may have edited them, and add yours after.
+   - `recognise` says how to tell another document is of this kind: its
+     title or header line, who issues it, its layout. Never the person's own
+     values.
+   - `field_notes` has one note per field the document filled, keyed by the
+     field: `Filled from "<label>".`, and for a label that means something
+     other than it says, `Trap: "<label>": <what it holds, and where the
+     value is instead>.` This is where a field meaning you checked in point 4
+     goes. The wording matches what the app writes
+     (`learnKind` in `lib/goals/document-kinds.ts`).
+   - `skipped` lists the labels you chose to leave off the form, so the
+     reader does not suggest them again.
+
+### Filing a document you were given
+
+The facts in a file the person gave you in the conversation, or pasted into
+a comment, go into the collection as **draft** records, one per row, with
+the file named, as the Gmail drafts below are:
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+insert into goals.records (user_id, collection_id, data, draft, source, source_ref,
+                           as_of, position)
+values ('<user>', '<collection id>',
+        '{"loan_id": "<the loan ID>", "name": "Grad PLUS", "status": "Grace period",
+          "balance": 20512.40, "next_due": "2026-12-18"}'::jsonb,
+        true, 'pasted', 'MyStudentData.txt, given to Dash on 2026-09-24', '2026-09-02', 10);
+```
+
+- `source` is `pasted` for a file you were given (`document` is only for a
+  file uploaded on the step, whose `source_ref` is its storage path), and
+  `comment` with the comment's id for facts given in a comment.
+- `source_ref` names the file and the day it was given, in under 200
+  characters. The step shows it beside the row as "From …".
+- `as_of` is the date the document gives its figures as of (a statement
+  date, the date an export was requested), so the readings are dated by the
+  document rather than the day you filed it.
+- Match each row by the ID field first. A row whose ID is already in the
+  collection gets no second record; name what changed in the run summary.
+- Fill each field the way point 4 checked it, never by the label alone.
+
 ### Pre-filling from Gmail
 
 When you write or find an information step, search the person's Gmail through
@@ -450,19 +565,21 @@ thing, with the message named:
 ```sql
 set local goals.actor = 'claude';
 set local goals.run_id = '<the run id>';
-insert into goals.records (user_id, collection_id, data, draft, source, source_ref, position)
+insert into goals.records (user_id, collection_id, data, draft, source, source_ref,
+                           as_of, position)
 values ('<user>', '<collection id>',
-        '{"name": "Direct Loan, subsidized", "servicer": "Nelnet", "balance": 12480.22,
-          "rate": 4.99, "minimum": 132.00, "due_day": 21}'::jsonb,
-        true, 'gmail', '<the Gmail message id>', 10);
+        '{"loan_id": "<the loan ID>", "name": "Direct Loan, subsidized", "servicer": "Nelnet",
+          "balance": 12480.22, "rate": 4.99, "minimum": 132.00}'::jsonb,
+        true, 'gmail', '<the Gmail message id>', '<the statement date>', 10);
 ```
 
 - `source_ref` is the message's id as the connector gives it. The page turns
   it into a link to that email beside the draft.
 - Values are stored in the forms in the table above. Leave out a value you
   did not find; do not guess one. Use the newest statement for each loan.
-- Check what is already there first. A loan that already has a row gets no
-  second draft; if a newer email shows a changed balance, say so in the run
+- `as_of` is the date the statement gives its figures as of.
+- Check what is already there first. A loan that already has a row (the
+  same value in the ID field) gets no second draft; if a newer email shows a changed balance, say so in the run
   summary rather than writing over what the person confirmed.
 - Every record you write is a draft. The database refuses a record from you
   that is not, and refuses you confirming one. Confirming is the person's
@@ -506,9 +623,10 @@ are yours to write and keep current.
   The database refuses a date or amount without its value. The value is what
   a later rewrite is compared on, so a reworded sentence with the same value
   is not a change.
-- Read the figures the way the step's notes explain them, not by the field
-  name alone: a Grad PLUS "repayment begin date" is its last disbursement,
-  and the first payment is the next due date.
+- Read the figures the way the collection's field notes explain them
+  (`goals.document_kinds`), and check each against the row's status and
+  dates, never by the field name alone: a Grad PLUS "repayment begin date"
+  is its last disbursement, and the first payment is the next due date.
 
 ```sql
 set local goals.actor = 'claude';
@@ -730,9 +848,16 @@ person reads these on a phone once a day.
 
 ### A worked shape: Pay off student debt
 
-1. **Get the numbers** (phase): the loans information step, pointed at the
-   `loans` collection and pre-filled from servicer emails; a `claude` step
-   checking the drafts against the servicer's own figures once confirmed.
+1. **Get the numbers** (phase): the loans information step, with the
+   questions the later phases need ("When does my first payment fall due?",
+   "What is the monthly total?"). Its `loans` collection is built from the
+   first document there is (an NSLDS export the person gave, or a servicer
+   statement in Gmail): a loan ID marked as the ID field, the status and
+   next due date beside the balance and rate, and each label checked against
+   the loan's status before it fills a field. The run writes what the
+   document taught as a kind on the collection, and files its loans as
+   drafts dated by the document. A `claude` step then checks the drafts
+   against the servicer's own figures once confirmed.
 2. **Choose the payoff order** (phase): the question "Avalanche or
    snowball?" with lettered options; a `claude` step checking whether
    refinancing, income-driven repayment or forgiveness applies to these
