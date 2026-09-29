@@ -1716,8 +1716,10 @@ First close each step of the person's that you can see has happened (see
 "Closing a step from evidence"). Then merge any two steps that ask for the
 same thing (see "Merging duplicate steps"). Then give each step the brief
 lists as untouched for a week its move (see "Moving a step that has sat for
-a week"). All three come before the verdict, so the verdict counts what is
-really done and names the step that survived or the move you made.
+a week"). Then judge each step the brief lists as not judged yet for a Dash
+step before it (see "A Dash step before yours"). All four come before the
+verdict, so the verdict counts what is really done and names the step that
+survived or the move you made.
 
 While reading, look for what is new since yesterday (rows with `created_at`
 or `updated_at` after the last morning run) in the sources each goal draws
@@ -1999,6 +2001,15 @@ where kind = 'mine' and status in ('open', 'blocked') and prep_checked_at is nul
 
 A step the person adds on the page is not judged when they add it. It waits
 for the next morning run, which judges it with the rest of the day's work.
+
+**The morning list.** The morning brief lists up to ten of the person's
+steps not judged yet, newest first (`lib/goals/prep-candidates.ts`): open
+`mine` steps with nothing open beneath them, a start date that has come, no
+`result` and no live prep step. Judge each one it lists, whichever way it
+goes, and set `prep_checked_at` on every one. The steps that were open before
+this list existed work through it over the first mornings. A step the brief
+lists as untouched for a week is left off, since preparing it is one of the
+moves that section offers.
 
 Name each prep step added in the run summary, with the step it serves, and
 give the count of steps judged to need nothing.

@@ -14,6 +14,7 @@
  */
 import type { OutOfDateStep } from '@/lib/goals/answers';
 import { isStaleStepBlock, waitsOnNothing } from '@/lib/goals/dependencies';
+import { prepLine, type PrepCandidate } from '@/lib/goals/prep-candidates';
 import { reviewLines, type ReviewGoal } from '@/lib/goals/reviews';
 import { staleLine, type StaleStep } from '@/lib/goals/stale-steps';
 import type { StepNode } from '@/lib/goals/steps';
@@ -74,6 +75,7 @@ export function ranRecently(lastDailyRunAt: string | null, now: number): boolean
  * The turn appended to the goals routine's standing prompt for the morning
  * run. It names the account and the run row already written, then the steps
  * of the person's that have sat for a week and need a move (plan #1083),
+ * then the steps of theirs not yet judged for a Dash prep step (plan #1217),
  * then every open goal to give a status (plan #1074), then the steps to work
  * and the information steps whose answers are out of date (plan #989), so
  * the session does not have to decide what is ready or what has sat. When a
@@ -87,6 +89,12 @@ export function dailyRunText(input: {
   answers?: OutOfDateStep[];
   review?: ReviewGoal[];
   stale?: StaleStep[];
+  /**
+   * The steps of the person's not judged yet for a Dash prep step, at most
+   * ten, newest first (plan #1217; prepCandidates in
+   * lib/goals/prep-candidates.ts).
+   */
+  unjudged?: PrepCandidate[];
   /**
    * The evidence Jev kept for the person's steps (plan #1176; evidenceLines
    * in lib/goals/evidence.ts). Null or absent when Jev could not filter, and
@@ -103,6 +111,7 @@ export function dailyRunText(input: {
   const answers = input.answers ?? [];
   const review = input.review ?? [];
   const sitting = input.stale ?? [];
+  const unjudged = input.unjudged ?? [];
   const lines = input.steps.map(
     (step) => `- "${step.title}" (goals.items id ${step.id}), under the goal "${step.goalTitle}"`,
   );
@@ -141,6 +150,18 @@ export function dailyRunText(input: {
                 'that has sat for a week".',
                 '',
                 ...sitting.map(staleLine),
+                '',
+              ]
+            : []),
+          ...(unjudged.length > 0
+            ? [
+                'Then judge each of these steps of the person\'s for a Dash step before it. None has',
+                'been judged yet. Where a draft, research or a list would help them do it, add a',
+                'claude step just before it with prepares_id set to it. Set prep_checked_at on each',
+                'one either way, so it is not listed again. Follow .claude/skills/goals/SKILL.md,',
+                '"A Dash step before yours".',
+                '',
+                ...unjudged.map(prepLine),
                 '',
               ]
             : []),

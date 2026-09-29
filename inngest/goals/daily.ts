@@ -17,6 +17,7 @@ import { holdActingSteps } from '@/lib/goals/hold-acts-store';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 import { reviewGoals } from '@/lib/goals/reviews';
 import { loadGoalActivity, loadLatestReviews } from '@/lib/goals/reviews-store';
+import { prepCandidates } from '@/lib/goals/prep-candidates';
 import { recordAndFire } from '@/lib/goals/shaping-store';
 import { STALE_STEP_LIMIT, staleSteps } from '@/lib/goals/stale-steps';
 import { statementLines, type StatementSource } from '@/lib/goals/statements';
@@ -32,7 +33,8 @@ import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
  * Fires the goals routine once for the owner each morning while there is an
  * open goal, with the run row written first. The brief lists every open goal
  * to give its status for the day (plan #1074), the steps of the owner's that
- * have sat untouched for a week and need a move (plan #1083), then the Claude
+ * have sat untouched for a week and need a move (plan #1083), those not yet
+ * judged for a Dash prep step (plan #1217), then the Claude
  * steps that are ready and the information steps with an answer out of date
  * (plan #989). Before the brief is written, Jev reads everything that arrived
  * since the last run against the person's open steps, and the brief lists
@@ -62,6 +64,8 @@ export type GoalsDailyResult =
       answers: number;
       /** Steps of the person's that have sat for a week, listed for a move. */
       stale: number;
+      /** Steps of the person's not judged yet for a Dash prep step (plan #1217). */
+      unjudged: number;
       /**
        * Steps with evidence Jev kept, or null when Jev did not filter and the
        * session searched for itself.
@@ -196,6 +200,14 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
     touched,
     now,
   ).slice(0, STALE_STEP_LIMIT);
+  // A step of the person's not judged yet for a Dash prep step, ten a morning,
+  // newest first (plan #1217). One listed above as stale gets only that move,
+  // since preparing it is one of those moves.
+  const unjudged = prepCandidates(
+    goals.map((g) => g.goal),
+    byGoal,
+    new Set(sitting.map((s) => s.id)),
+  );
 
   // Only the review closes steps from evidence, so only a run with one reads it.
   const evidence =
@@ -235,6 +247,7 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
         answers,
         review,
         stale: sitting,
+        unjudged,
         evidence: evidence?.lines ?? null,
         statements: statementLines(statements),
       }),
@@ -253,6 +266,7 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
     held: ready.length - steps.length,
     answers: answers.length,
     stale: sitting.length,
+    unjudged: unjudged.length,
     evidence: evidence?.steps ?? null,
     statements: statements.length,
   };
