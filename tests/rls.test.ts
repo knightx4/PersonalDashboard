@@ -670,6 +670,15 @@ describe('cross-user writes', () => {
     expect(affected.length).toBe(0);
   });
 
+  it('does not let user B create a recurring payment for user A', async () => {
+    await expect(
+      asUser(userB, (tx) =>
+        tx`insert into recurring_payments (user_id, payee, payee_key)
+           values (${userA}, 'Not yours', 'notyours')`,
+      ),
+    ).rejects.toThrow(/row-level security/i);
+  });
+
   it('does not let user B delete user A rows', async () => {
     for (const table of ['orders', 'inventory_items', 'saved_items']) {
       const affected = await asUser(userB, (tx) =>

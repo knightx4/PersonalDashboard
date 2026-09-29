@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { billTitle } from '@/lib/todo/agenda/sources/bills';
-import { mergePayments, renamePayment } from './corrections';
+import { mergePayments, moveCharges, renamePayment } from './corrections';
+import type { RecurringPayment } from './load';
 import { memoryClient, type Row } from './memory-client';
-import { fileRecurringReading } from './store';
+import { fileRecurringReading, resummarisePayment } from './store';
+import { priceRise } from './view';
 
 const USER = 'user-1';
 
@@ -220,5 +222,227 @@ describe('mergePayments', () => {
     expect(result.error).toBeTruthy();
     expect(tables.recurring_payments).toHaveLength(2);
     expect(tables.recurring_charges.filter((c) => c.payment_id === 'plain')).toHaveLength(3);
+  });
+});
+
+/**
+ * One "Apple" row holding two subscriptions: a $9.99 one on the 5th and a
+ * $3.99 one on the 2nd. Worked out together, the $9.99 charges read as rises
+ * from $3.99.
+ */
+async function tablesWithApple(): Promise<Record<string, Row[]>> {
+  const charge = (id: string, day: string, cents: number): Row => ({
+    id,
+    user_id: USER,
+    payment_id: 'apple',
+    message_id: `m-${id}`,
+    event: 'charge',
+    amount_cents: cents,
+    previous_amount_cents: null,
+    currency: 'USD',
+    period: null,
+    occurred_on: day,
+    due_on: null,
+    created_at: `${day}T09:00:00Z`,
+  });
+  const tables: Record<string, Row[]> = {
+    recurring_payments: [
+      {
+        id: 'apple',
+        user_id: USER,
+        payee: 'Apple',
+        payee_key: 'apple',
+        kind: 'subscription',
+        sender_domain: 'apple.com',
+        status: 'active',
+        currency: 'USD',
+      },
+      {
+        id: 'icloud',
+        user_id: USER,
+        payee: 'iCloud+',
+        payee_key: 'icloud',
+        kind: 'subscription',
+        status: 'active',
+        currency: 'USD',
+      },
+    ],
+    recurring_payee_aliases: [],
+    recurring_charges: [
+      charge('a-jul', '2026-07-05', 999),
+      charge('b-aug', '2026-08-02', 399),
+      charge('a-aug', '2026-08-05', 999),
+      charge('b-sep', '2026-09-02', 399),
+      charge('a-sep', '2026-09-05', 999),
+    ],
+  };
+  await resummarisePayment(memoryClient(tables), { userId: USER, paymentId: 'apple' });
+  return tables;
+}
+
+/** A payment as the loader returns it, read back from the fake's rows. */
+function loaded(tables: Record<string, Row[]>, id: string): RecurringPayment {
+  const p = tables.recurring_payments.find((r) => r.id === id)!;
+  return {
+    id,
+    payee: p.payee as string,
+    kind: p.kind as RecurringPayment['kind'],
+    senderDomain: (p.sender_domain as string | null) ?? null,
+    amountCents: (p.amount_cents as number | null) ?? null,
+    currency: p.currency as string,
+    period: (p.period as RecurringPayment['period']) ?? null,
+    nextDate: (p.next_date as string | null) ?? null,
+    status: p.status as RecurringPayment['status'],
+    lastChargedOn: (p.last_charged_on as string | null) ?? null,
+    charges: tables.recurring_charges
+      .filter((c) => c.payment_id === id)
+      .sort((a, b) => ((a.occurred_on as string) < (b.occurred_on as string) ? 1 : -1))
+      .map((c) => ({
+        id: c.id as string,
+        messageId: c.message_id as string,
+        event: c.event as RecurringPayment['charges'][number]['event'],
+        amountCents: c.amount_cents as number,
+        previousAmountCents: (c.previous_amount_cents as number | null) ?? null,
+        currency: c.currency as string,
+        period: null,
+        occurredOn: c.occurred_on as string,
+        dueOn: null,
+      })),
+  };
+}
+
+const TODAY = '2026-09-29';
+
+describe('moveCharges', () => {
+  it('splits the $3.99 charges into a new payment, and neither row shows the other as a rise', async () => {
+    const tables = await tablesWithApple();
+    expect(priceRise(loaded(tables, 'apple'), TODAY)).toMatchObject({ fromCents: 399 });
+
+    const result = await moveCharges(memoryClient(tables), {
+      userId: USER,
+      paymentId: 'apple',
+      chargeIds: ['b-aug', 'b-sep'],
+      to: { payee: '  Apple   TV+ ' },
+    });
+
+    expect(result.error).toBeUndefined();
+    const created = tables.recurring_payments.find((r) => r.payee === 'Apple TV+')!;
+    expect(result.paymentId).toBe(created.id);
+    expect(created).toMatchObject({
+      payee_key: 'appletv',
+      kind: 'subscription',
+      sender_domain: 'apple.com',
+      amount_cents: 399,
+      period: 'month',
+      next_date: '2026-10-02',
+    });
+    expect(tables.recurring_payments.find((r) => r.id === 'apple')).toMatchObject({
+      amount_cents: 999,
+      period: 'month',
+      next_date: '2026-10-05',
+    });
+    expect(priceRise(loaded(tables, 'apple'), TODAY)).toBeNull();
+    expect(priceRise(loaded(tables, created.id as string), TODAY)).toBeNull();
+    expect(tables.recurring_payee_aliases).toHaveLength(0);
+  });
+
+  it('moves one charge to a payment already there', async () => {
+    const tables = await tablesWithApple();
+    const result = await moveCharges(memoryClient(tables), {
+      userId: USER,
+      paymentId: 'apple',
+      chargeIds: ['b-sep'],
+      to: { paymentId: 'icloud' },
+    });
+    expect(result).toEqual({ paymentId: 'icloud' });
+    expect(tables.recurring_charges.find((c) => c.id === 'b-sep')!.payment_id).toBe('icloud');
+    expect(tables.recurring_payments.find((r) => r.id === 'icloud')).toMatchObject({
+      amount_cents: 399,
+      last_charged_on: '2026-09-02',
+    });
+  });
+
+  it('files onto the payment a typed name already belongs to rather than making a second', async () => {
+    const tables = await tablesWithApple();
+    const result = await moveCharges(memoryClient(tables), {
+      userId: USER,
+      paymentId: 'apple',
+      chargeIds: ['b-aug'],
+      to: { payee: 'iCloud' },
+    });
+    expect(result).toEqual({ paymentId: 'icloud' });
+    expect(tables.recurring_payments).toHaveLength(2);
+  });
+
+  it('removes a payment left with no charges', async () => {
+    const tables = await tablesWithApple();
+    const result = await moveCharges(memoryClient(tables), {
+      userId: USER,
+      paymentId: 'apple',
+      chargeIds: ['a-jul', 'b-aug', 'a-aug', 'b-sep', 'a-sep'],
+      to: { paymentId: 'icloud' },
+    });
+    expect(result).toEqual({ paymentId: 'icloud' });
+    expect(tables.recurring_payments.map((r) => r.id)).toEqual(['icloud']);
+  });
+
+  it('adds no alias, so the next receipt from the store still lands on the store row', async () => {
+    const tables = await tablesWithApple();
+    const client = memoryClient(tables);
+    await moveCharges(client, {
+      userId: USER,
+      paymentId: 'apple',
+      chargeIds: ['b-aug', 'b-sep'],
+      to: { payee: 'Apple TV+' },
+    });
+    const { paymentId } = await fileRecurringReading(client, {
+      userId: USER,
+      messageId: 'm-oct',
+      senderDomain: 'apple.com',
+      reading: {
+        payee: 'Apple',
+        kind: 'subscription',
+        event: 'charge',
+        amountCents: 399,
+        previousAmountCents: null,
+        currency: 'USD',
+        period: null,
+        occurredOn: '2026-10-02',
+        dueOn: null,
+      },
+    });
+    expect(paymentId).toBe('apple');
+  });
+
+  it("refuses charges that are not on the payment, or not the person's", async () => {
+    const tables = await tablesWithApple();
+    const client = memoryClient(tables);
+    const wrongRow = await moveCharges(client, {
+      userId: USER,
+      paymentId: 'icloud',
+      chargeIds: ['b-sep'],
+      to: { payee: 'Apple TV+' },
+    });
+    const wrongUser = await moveCharges(client, {
+      userId: 'someone-else',
+      paymentId: 'apple',
+      chargeIds: ['b-sep'],
+      to: { paymentId: 'icloud' },
+    });
+    expect(wrongRow.error).toBeTruthy();
+    expect(wrongUser.error).toBeTruthy();
+    expect(tables.recurring_charges.every((c) => c.payment_id === 'apple')).toBe(true);
+    expect(tables.recurring_payments).toHaveLength(2);
+  });
+
+  it('refuses to move charges onto the payment they are on', async () => {
+    const tables = await tablesWithApple();
+    const result = await moveCharges(memoryClient(tables), {
+      userId: USER,
+      paymentId: 'apple',
+      chargeIds: ['b-sep'],
+      to: { payee: 'Apple' },
+    });
+    expect(result.error).toBeTruthy();
   });
 });
