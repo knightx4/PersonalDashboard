@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   cleanText,
+  exclusionWords,
+  isExcluded,
   linkedinSearchUrl,
   parseOpeningsPayload,
   parsePeoplePayload,
@@ -101,5 +103,53 @@ describe('text helpers', () => {
   it('splits an email into subject and body', () => {
     expect(splitSubject('Subject: Hello\n\nBody here')).toEqual({ subject: 'Hello', body: 'Body here' });
     expect(splitSubject('No subject')).toEqual({ subject: null, body: 'No subject' });
+  });
+});
+
+describe('excluded industries', () => {
+  const words = exclusionWords(['Crypto', 'Healthcare', 'Defense']);
+
+  it('matches an industry by its other names, and leaves near words alone', () => {
+    expect(isExcluded(words, 'Blockchain analytics')).toBe(true);
+    expect(isExcluded(words, 'Digital assets', 'Bitwise Asset Management')).toBe(true);
+    expect(isExcluded(words, 'Aerospace and defence')).toBe(true);
+    expect(isExcluded(words, 'Pharmaceuticals')).toBe(true);
+    expect(isExcluded(words, 'AI software for finance', 'Hebbia', 'Forward Deployed Investor')).toBe(false);
+    expect(isExcluded(words, 'Definitive financial data')).toBe(false);
+    expect(isExcluded([], 'Crypto exchange')).toBe(false);
+  });
+
+  it('drops an opening or a person at an excluded company, whatever the role', () => {
+    const opening = (company: string, industry: string, n: number) => ({
+      company,
+      industry,
+      title: 'Controller',
+      url: `https://jobs.example/${n}`,
+      why: 'Fits.',
+      move: '1. Apply.',
+    });
+    const openings = parseOpeningsPayload(
+      { openings: [opening('Chainalysis', 'Blockchain analytics', 1), opening('Hebbia', 'AI for finance', 2)] },
+      { urls: new Set(), roles: new Set() },
+      ['crypto'],
+    );
+    expect(openings.map((o) => o.company)).toEqual(['Hebbia']);
+
+    const person = (company: string, industry: string, name: string) => ({
+      person_name: name,
+      company,
+      industry,
+      headline: `Ask ${name}`,
+      why: 'Shares a school.',
+      move: '1. Send it.',
+      channel: 'linkedin_connect',
+      message: 'Hi.',
+    });
+    const people = parsePeoplePayload(
+      { suggestions: [person('Anduril', 'Defense technology', 'Ann Lee'), person('Ramp', 'Fintech', 'Bo Chen')] },
+      { people: new Set() },
+      ['defense'],
+    );
+    expect(people.map((p) => p.personName)).toEqual(['Bo Chen']);
   });
 });

@@ -9,6 +9,7 @@ const seeker: SeekerContext = {
   resume: 'FP&A analyst at Acme. BA, State University.',
   writingStyle: null,
   banned: ['leverage'],
+  excludedIndustries: [],
 };
 
 const report = {
