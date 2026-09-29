@@ -192,3 +192,27 @@ describe('sorting and filtering', () => {
     expect(keep({ workplace: 'remote' })).toEqual(['a', 'b', 'c', 'd']);
   });
 });
+
+describe('fit and chance on the openings (plan #1206)', () => {
+  const row = (id: string, createdAt: string, scores: OpeningScores | null) => ({ id, createdAt, scores });
+  const rows = [
+    row('a', '2026-09-01', { fit_score: { value: 70, confidence: 0.5 }, chance: { value: 20, confidence: 0.9 } }),
+    row('b', '2026-09-02', { fit_score: { value: 45, confidence: 0.9 }, chance: { value: 40, confidence: 0.9 } }),
+    row('c', '2026-09-03', null),
+    row('d', '2026-09-04', { fit: { value: 'strong', confidence: 0.9 } }),
+  ];
+
+  it('sorts by fit or by chance, highest first, with rows lacking the figure last', () => {
+    expect(sortOpenings(rows, 'fit_score').map((r) => r.id)).toEqual(['a', 'b', 'd', 'c']);
+    expect(sortOpenings(rows, 'chance').map((r) => r.id)).toEqual(['b', 'a', 'd', 'c']);
+  });
+
+  it('hides rows under a minimum and lets rows without the figure through', () => {
+    const keep = (patch: Partial<typeof NO_OPENING_FILTER>) =>
+      rows.filter((r) => passesFilter(r, { ...NO_OPENING_FILTER, ...patch })).map((r) => r.id);
+    expect(keep({ minFit: 60 })).toEqual(['a', 'c', 'd']);
+    // Chance is chosen by band: 20 is low, 40 is high on the #1204 edges.
+    expect(keep({ minChance: 'medium' })).toEqual(['b', 'c', 'd']);
+    expect(keep({ minChance: 'high' })).toEqual(['b', 'c', 'd']);
+  });
+});

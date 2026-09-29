@@ -8,6 +8,9 @@ import { Card } from '@/components/ui/card';
 import { ChipSelect } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { PaidHint } from '@/components/ui/paid-hint';
+import { ScoreChips, ScoreReasons } from '@/components/jobs/ui/score-figures';
+import { CHANCE_BAND_LABELS } from '@/lib/jobs/suggest/chance-check';
+import { FIT_MINIMUMS } from '@/lib/jobs/suggest/score-notes';
 import { gmailComposeUrl } from '@/lib/jobs/followup/compose';
 import type { OpenSuggestion } from '@/lib/jobs/suggest/load';
 import { linkedinSearchUrl, splitSubject } from '@/lib/jobs/suggest/payload';
@@ -280,6 +283,29 @@ function OpeningControls({
         <option value="no">No cover letter</option>
       </ChipSelect>
       <ChipSelect
+        aria-label="Lowest fit to show"
+        placeholderValue="0"
+        value={String(filter.minFit)}
+        onChange={(e) => set({ minFit: Number(e.target.value) })}
+      >
+        <option value="0">Any fit</option>
+        {FIT_MINIMUMS.map((value) => (
+          <option key={value} value={value}>
+            Fit {value} and up
+          </option>
+        ))}
+      </ChipSelect>
+      <ChipSelect
+        aria-label="Lowest chance of an interview to show"
+        placeholderValue="any"
+        value={filter.minChance}
+        onChange={(e) => set({ minChance: e.target.value as OpeningFilter['minChance'] })}
+      >
+        <option value="any">Any chance of an interview</option>
+        <option value="medium">{CHANCE_BAND_LABELS.medium} chance of an interview or better</option>
+        <option value="high">{CHANCE_BAND_LABELS.high} chance of an interview</option>
+      </ChipSelect>
+      <ChipSelect
         aria-label="Red flags"
         placeholderValue="show"
         value={filter.hideRedFlags ? 'hide' : 'show'}
@@ -482,7 +508,9 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
           {suggestion.headline}
         </span>
         {suggestion.location && <span className="text-small text-ink-muted">{suggestion.location}</span>}
+        <ScoreChips note={suggestion.scoreNote} />
       </div>
+      <ScoreReasons note={suggestion.scoreNote} />
       <OpeningAnswers suggestion={suggestion} />
       <p className="text-small text-ink-muted">{suggestion.why}</p>
       {suggestion.foundIn && <p className="text-small text-ink-muted">{suggestion.foundIn}</p>}

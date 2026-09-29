@@ -5,6 +5,8 @@ import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { formatCompBand, formatDate, shortAge, type PipelineRow } from '@/lib/jobs/applications/load';
 import type { DisplayChoice } from '@/lib/list-display';
+import { ScoreReasons, chanceFigureText, fitText } from '@/components/jobs/ui/score-figures';
+import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
 
 /**
  * The roles table, lifted out of the page so it can be photographed.
@@ -74,6 +76,7 @@ export function RolesTable({
                   attempt {row.attempt}
                 </span>
               )}
+              {(showing('fit') || showing('chance')) && <ScoreReasons note={row.scoreNote} className="mt-0.5" />}
             </TD>
             {showing('company') && (
             <TD label="Company">
@@ -116,6 +119,16 @@ export function RolesTable({
             {showing('excitement') && (
             <TD label="Excitement" muted className="tabular">
               {row.excitement ? '★'.repeat(row.excitement) : '—'}
+            </TD>
+            )}
+            {showing('fit') && (
+            <TD label={FIT_SCORE_LABEL} muted className="tabular" title={row.scoreNote?.fit?.unsure ? 'Dash is not sure of this one' : undefined}>
+              {row.scoreNote ? (fitText(row.scoreNote) ?? '') : ''}
+            </TD>
+            )}
+            {showing('chance') && (
+            <TD label={CHANCE_LABEL} muted title={row.scoreNote?.chance?.unsure ? 'Dash is not sure of this one' : undefined}>
+              {row.scoreNote ? (chanceFigureText(row.scoreNote) ?? '') : ''}
             </TD>
             )}
             {showing('comp') && (

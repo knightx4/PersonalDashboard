@@ -9,6 +9,7 @@ import {
   type JevYesNoAnswer,
 } from '@/lib/jev/wire';
 import { summariseHistory, type PastApplication } from './history';
+import { CHANCE_DISPLAY, chanceBand, type ChanceBand } from './chance-check';
 
 /**
  * Ten fixed questions about each opening Dash recommends (plan #1178; fit
@@ -437,11 +438,13 @@ export function scoreChips(scores: OpeningScores): ScoreChip[] {
   return chips;
 }
 
-export const OPENING_SORTS = ['newest', 'fit', 'closeness', 'seniority'] as const;
+export const OPENING_SORTS = ['newest', 'fit_score', 'chance', 'fit', 'closeness', 'seniority'] as const;
 export type OpeningSort = (typeof OPENING_SORTS)[number];
 
 export const OPENING_SORT_LABELS: Record<OpeningSort, string> = {
   newest: 'Newest first',
+  fit_score: 'Best fit',
+  chance: 'Best chance',
   fit: 'Best match first',
   closeness: 'Most like your applications',
   seniority: 'Most senior first',
@@ -454,6 +457,10 @@ export type OpeningFilter = {
   hideRedFlags: boolean;
   hideDuplicates: boolean;
   coverLetter: 'any' | 'yes' | 'no';
+  /** The fit figure an opening must reach; 0 for any (plan #1206). */
+  minFit: number;
+  /** The chance band an opening must reach, chosen by band while chance shows as one. */
+  minChance: ChanceBand | 'any';
 };
 
 export const NO_OPENING_FILTER: OpeningFilter = {
@@ -463,7 +470,21 @@ export const NO_OPENING_FILTER: OpeningFilter = {
   hideRedFlags: false,
   hideDuplicates: false,
   coverLetter: 'any',
+  minFit: 0,
+  minChance: 'any',
 };
+
+const BAND_RANK: Record<ChanceBand, number> = { low: 0, medium: 1, high: 2 };
+
+/** The band a stored chance falls in, on CHANCE_DISPLAY's edges (the #1204 terciles when it shows the number). */
+export function chanceBandOf(value: number): ChanceBand {
+  return chanceBand(value, CHANCE_DISPLAY.kind === 'band' ? CHANCE_DISPLAY.edges : { medium: 27, high: 38 });
+}
+
+/** Whether a chance clears a minimum band. */
+export function reachesBand(value: number, minimum: ChanceBand | 'any'): boolean {
+  return minimum === 'any' || BAND_RANK[chanceBandOf(value)] >= BAND_RANK[minimum];
+}
 
 type Sortable = { scores: OpeningScores | null; createdAt: string };
 
@@ -482,6 +503,8 @@ export function passesFilter(opening: Sortable, filter: OpeningFilter): boolean 
   if (filter.hideDuplicates && s.duplicate?.value) return false;
   if (filter.coverLetter === 'yes' && s.cover_letter && !s.cover_letter.value) return false;
   if (filter.coverLetter === 'no' && s.cover_letter?.value) return false;
+  if (filter.minFit > 0 && s.fit_score && s.fit_score.value < filter.minFit) return false;
+  if (s.chance && !reachesBand(s.chance.value, filter.minChance)) return false;
   return true;
 }
 
@@ -491,6 +514,10 @@ const SENIORITY_RANK: Record<Seniority, number> = { entry: 0, mid: 1, senior: 2,
 function rankFor(opening: Sortable, sort: OpeningSort): number {
   const s = opening.scores;
   switch (sort) {
+    case 'fit_score':
+      return s?.fit_score ? s.fit_score.value : -1;
+    case 'chance':
+      return s?.chance ? s.chance.value : -1;
     case 'fit':
       return s?.fit ? FIT_RANK[s.fit.value] : -1;
     case 'closeness':
