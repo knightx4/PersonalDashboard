@@ -27,6 +27,11 @@ export type PastApplication = {
 /** Statuses that mean nothing was sent, so they are not history. */
 const NOT_SENT = new Set(['lead', 'drafting']);
 
+/** Whether the application was sent, so it counts as history. */
+export function wasSent(app: Pick<PastApplication, 'status'>): boolean {
+  return !NOT_SENT.has(app.status);
+}
+
 /** Statuses that mean the application got past the screen. */
 const INTERVIEW_STATUSES = new Set(['in_process', 'final_round', 'offer']);
 
@@ -134,7 +139,7 @@ export function summariseHistory(
   history: readonly PastApplication[],
   options: { excludeId?: string } = {},
 ): HistorySummary {
-  const sent = history.filter((app) => !NOT_SENT.has(app.status) && app.id !== options.excludeId);
+  const sent = history.filter((app) => wasSent(app) && app.id !== options.excludeId);
   const similar = sent.filter((app) => isSimilarTitle(title, app.title));
   const ordered = [...similar.filter(reachedInterview), ...similar.filter((app) => !reachedInterview(app))];
   return {
