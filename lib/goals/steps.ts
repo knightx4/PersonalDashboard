@@ -100,6 +100,16 @@ export type Step = {
    * approval; one with none goes live without it.
    */
   acts?: string | null;
+  /**
+   * On a `claude` step, the id of the step of yours it prepares (goals
+   * migration 0060, plan #1215). The prep step does not make that step wait.
+   */
+  preparesId?: string | null;
+  /**
+   * On a step of yours, when a run judged whether it needs a Dash prep step;
+   * null until one has (plan #1215).
+   */
+  prepCheckedAt?: string | null;
 };
 
 /**
