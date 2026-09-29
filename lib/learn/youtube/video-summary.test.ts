@@ -14,7 +14,7 @@ function stubClient(input: unknown) {
   return { client: { messages: { create } } as unknown as Anthropic, create };
 }
 
-const video = { title: 'How tides work', channel: 'Sixty Symbols', description: 'The Moon pulls on both sides of the Earth.', transcript: null };
+const video = { title: 'How tides work', channel: 'Sixty Symbols', durationSeconds: 600, transcript: 'The Moon pulls on both sides of the Earth.' };
 
 describe('transcriptText', () => {
   it('joins the cues into one text', () => {
@@ -28,65 +28,58 @@ describe('transcriptText', () => {
 });
 
 describe('summaryPrompt', () => {
-  it('says there is no transcript when it sends the description', () => {
-    expect(summaryPrompt(video)).toContain('Description (there is no transcript yet):');
-  });
-
-  it('sends the transcript and not the description when there is one', () => {
+  it('sends the transcript and the length, never a description', () => {
     const prompt = summaryPrompt({ ...video, transcript: 'Tides are two bulges.' });
     expect(prompt).toContain('Transcript:\nTides are two bulges.');
+    expect(prompt).toContain('Length: 10 minutes');
     expect(prompt).not.toContain('Description');
   });
 });
 
 describe('readSummaryReply', () => {
-  it('keeps at most five points and drops blank ones', () => {
-    const reply = readSummaryReply({ summary: ' S. ', key_points: ['a', ' ', 'b', 'c', 'd', 'e', 'f'] }, 'transcript');
-    expect(reply).toEqual({ outcome: 'written', from: 'transcript', summary: 'S.', keyPoints: ['a', 'b', 'c', 'd', 'e'] });
+  it('keeps at most twelve takeaways and drops blank ones', () => {
+    const points = Array.from({ length: 14 }, (_, i) => `p${i}`);
+    const reply = readSummaryReply({ summary: ' S. ', key_points: [' ', ...points] });
+    expect(reply).toEqual({ outcome: 'written', summary: 'S.', keyPoints: points.slice(0, 12) });
   });
 
-  it('takes too_little only for a description', () => {
-    expect(readSummaryReply({ summary: '', key_points: [], too_little: true }, 'description').outcome).toBe('too-little');
-    expect(readSummaryReply({ summary: '', key_points: [], too_little: true }, 'transcript').outcome).toBe('failed');
+  it('takes too_little for a transcript with nothing to say', () => {
+    expect(readSummaryReply({ summary: '', key_points: [], too_little: true }).outcome).toBe('too-little');
   });
 });
 
 describe('writeVideoSummary', () => {
-  it('writes from the description and reports the spend', async () => {
+  it('writes from the transcript and reports the spend', async () => {
     const { client, create } = stubClient({ summary: 'The Moon raises two bulges.', key_points: ['Two tides a day.'] });
     const onSpend = vi.fn();
     const result = await writeVideoSummary({ video, anthropicApiKey: 'k', client, onSpend });
-    expect(result).toEqual({ outcome: 'written', from: 'description', summary: 'The Moon raises two bulges.', keyPoints: ['Two tides a day.'] });
+    expect(result).toEqual({ outcome: 'written', summary: 'The Moon raises two bulges.', keyPoints: ['Two tides a day.'] });
     expect(create.mock.calls[0][0].model).toBe(VIDEO_SUMMARY_MODEL);
     expect(onSpend).toHaveBeenCalledWith(expect.objectContaining({ model: VIDEO_SUMMARY_MODEL }));
   });
 
-  it('marks it written from the transcript when there is one', async () => {
-    const { client } = stubClient({ summary: 'S.', key_points: [] });
-    const result = await writeVideoSummary({ video: { ...video, transcript: 'T.' }, anthropicApiKey: 'k', client });
-    expect(result).toMatchObject({ outcome: 'written', from: 'transcript' });
-  });
-
-  it('makes no call for an empty description and no transcript', async () => {
+  it('makes no call for an empty transcript', async () => {
     const { client, create } = stubClient({});
-    const result = await writeVideoSummary({ video: { ...video, description: '  ' }, anthropicApiKey: 'k', client });
-    expect(result).toEqual({ outcome: 'too-little', from: 'description' });
+    const result = await writeVideoSummary({ video: { ...video, transcript: '  ' }, anthropicApiKey: 'k', client });
+    expect(result).toEqual({ outcome: 'too-little' });
     expect(create).not.toHaveBeenCalled();
   });
 });
 
 describe('needsSummary', () => {
-  it('asks for one when there is none yet', () => {
-    expect(needsSummary({ summary_from: null, summarised_at: null }, false)).toBe(true);
+  const since = '2026-09-29T21:00:00Z';
+
+  it('never asks without a transcript', () => {
+    expect(needsSummary({ summary_from: null, summarised_at: null }, false, since)).toBe(false);
   });
 
-  it('asks again from the transcript once one is stored', () => {
-    expect(needsSummary({ summary_from: 'description', summarised_at: '2026-09-26' }, true)).toBe(true);
-    expect(needsSummary({ summary_from: null, summarised_at: '2026-09-26' }, true)).toBe(true);
+  it('asks once a transcript is stored and there is none, or one from the description', () => {
+    expect(needsSummary({ summary_from: null, summarised_at: null }, true, since)).toBe(true);
+    expect(needsSummary({ summary_from: 'description', summarised_at: '2026-09-30' }, true, since)).toBe(true);
   });
 
-  it('leaves a description summary alone while there is no transcript, and a transcript one always', () => {
-    expect(needsSummary({ summary_from: 'description', summarised_at: '2026-09-26' }, false)).toBe(false);
-    expect(needsSummary({ summary_from: 'transcript', summarised_at: '2026-09-26' }, true)).toBe(false);
+  it('rewrites a transcript summary written to an older prompt, and leaves a current one', () => {
+    expect(needsSummary({ summary_from: 'transcript', summarised_at: '2026-09-26' }, true, since)).toBe(true);
+    expect(needsSummary({ summary_from: 'transcript', summarised_at: '2026-09-30' }, true, since)).toBe(false);
   });
 });

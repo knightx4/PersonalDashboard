@@ -7,18 +7,26 @@ import type { TranscriptCue } from '@/lib/learn/catalogue/segment';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 
 /**
- * The short summary and key points shown for a video on your list (plan
- * #1069).
+ * The gist and takeaways shown for a video on your list (plan #1069).
  *
- * One Haiku call per video. It is written from the video's description when
- * there is no transcript, and written again from the transcript once one is
- * stored; `summary_from` on learn.watch_list says which, and the page says so
- * when it is the description. Haiku because it is one text in and a paragraph
- * out, run in the background for every video on the list.
+ * One Haiku call per video, and only from its transcript. The aim is that
+ * reading the takeaways gives most of what watching would, in a small share
+ * of the time, so they carry the practical detail: the steps, numbers,
+ * examples and wording the video gives, not a description of its topics. A
+ * description says what a video is about, never what it says, so a video with
+ * no transcript gets no summary. How many takeaways scales with the video's
+ * length.
  */
 
 export const VIDEO_SUMMARY_MODEL = 'claude-haiku-4-5';
 const TOOL = 'report_summary';
+
+/**
+ * When the current prompt was written. A transcript summary stamped before
+ * this was written to an older brief and is rewritten; move it forward
+ * whenever SYSTEM changes enough to be worth paying for again.
+ */
+export const SUMMARY_PROMPT_SINCE = '2026-09-29T21:00:00Z';
 
 /**
  * How much of a transcript is sent. About 10,000 tokens: an hour of speech is
@@ -26,40 +34,53 @@ const TOOL = 'report_summary';
  * hour or so, which keeps one call near a cent.
  */
 export const TRANSCRIPT_CHARS = 40_000;
-/** A description is sent whole up to this, which covers all but link dumps. */
-const DESCRIPTION_CHARS = 5_000;
+
+/** Takeaways kept at most, for a long video. */
+export const MAX_POINTS = 12;
 
 export type VideoForSummary = {
   title: string;
   channel: string | null;
-  description: string | null;
-  /** The transcript as one text, or null when there is none yet. */
-  transcript: string | null;
+  durationSeconds: number | null;
+  /** The transcript as one text. */
+  transcript: string;
 };
 
 export type VideoSummary =
-  | { outcome: 'written'; from: 'description' | 'transcript'; summary: string; keyPoints: string[] }
-  /** The description says too little to summarise and there is no transcript. */
-  | { outcome: 'too-little'; from: 'description' }
+  | { outcome: 'written'; summary: string; keyPoints: string[] }
+  /** The transcript has nothing to summarise: music, silence, a trailer. */
+  | { outcome: 'too-little' }
   | { outcome: 'failed'; detail: string };
 
-const SYSTEM = `You summarise a video for the person who saved it to watch later, so they can
-decide what it is worth and remember what it said.
+const SYSTEM = `You condense a video for the person who saved it, so they get most of what
+watching it would give them in a minute or two of reading. They will often
+read this instead of watching, so what you leave out is lost to them.
 
-WRITE THREE OR FOUR SENTENCES saying what the video argues or shows, in plain
-words. Say what it claims, not that it "discusses" or "explores" something.
+THE GIST: one or two sentences giving the video's main answer or claim, the
+thing someone would say if asked "so what did it say?". Not what it is about.
 
-THEN THREE TO FIVE KEY POINTS, each one sentence a person could repeat to
-somebody else. No point restates the summary's first sentence.
+THE TAKEAWAYS carry the value. Each is one to three sentences a person can act
+on or repeat without having seen the video:
+- Where the video teaches how to do something, write the how: the steps in
+  order, the exact phrasing or question it suggests, the rule of thumb, the
+  numbers, the example it uses to show it. "Ask 'is that what you mean?' before
+  answering" beats "check your understanding".
+- Where it argues a point, give the claim and the reason or evidence it gives,
+  with the figures and names it cites.
+- Keep a named framework or list whole (all its parts, in its order) rather
+  than naming it.
+- Follow the video's order. Skip the intro, the sponsor, the calls to
+  subscribe and anything said only to fill time.
+- Plain, direct words. No "the speaker explains", "the video discusses", "in
+  this video". Say the thing itself.
 
-IF YOU HAVE ONLY THE DESCRIPTION, summarise what the description says the video
-covers and do not invent what is said in it. Links, sponsor lines, social
-handles and chapter timestamps are not content.
+HOW MANY: about one takeaway per two minutes of video, at least three and at
+most ${MAX_POINTS}. Fewer when the video repeats itself; never pad.
 
-IF THE TEXT SAYS TOO LITTLE TO SUMMARISE (a description that is only links or
-a line of promotion), set too_little true and leave the rest empty.
+IF THE TRANSCRIPT HAS NOTHING TO SUMMARISE (music, no speech, a trailer), set
+too_little true and leave the rest empty.
 
-No hype, no "in this video", no em dashes.`;
+No hype and no em dashes.`;
 
 const replySchema = z.object({
   summary: z.string().default(''),
@@ -80,31 +101,29 @@ export function transcriptText(cues: readonly TranscriptCue[], limit: number = T
   return stop > limit * 0.8 ? cut.slice(0, stop + 1) : cut;
 }
 
+function minutes(seconds: number): string {
+  const whole = Math.max(1, Math.round(seconds / 60));
+  return `${whole} minute${whole === 1 ? '' : 's'}`;
+}
+
 /** What the model is given about the video. */
 export function summaryPrompt(video: VideoForSummary): string {
   const lines = [`Title: ${video.title}`];
   if (video.channel) lines.push(`Channel: ${video.channel}`);
-  if (video.transcript) {
-    lines.push('', 'Transcript:', video.transcript);
-  } else {
-    lines.push('', 'Description (there is no transcript yet):', (video.description ?? '').slice(0, DESCRIPTION_CHARS));
-  }
-  lines.push('', `Call ${TOOL}.`);
+  if (video.durationSeconds) lines.push(`Length: ${minutes(video.durationSeconds)}`);
+  lines.push('', 'Transcript:', video.transcript, '', `Call ${TOOL}.`);
   return lines.join('\n');
 }
 
-/** The model's reply, checked: 3-4 sentences, three to five points. */
-export function readSummaryReply(
-  input: unknown,
-  from: 'description' | 'transcript',
-): VideoSummary {
+/** The model's reply, checked: a gist and at most MAX_POINTS takeaways. */
+export function readSummaryReply(input: unknown): VideoSummary {
   const parsed = replySchema.safeParse(input);
   if (!parsed.success) return { outcome: 'failed', detail: 'The summary came back malformed.' };
-  if (parsed.data.too_little && from === 'description') return { outcome: 'too-little', from };
+  if (parsed.data.too_little) return { outcome: 'too-little' };
   const summary = parsed.data.summary.trim();
-  const keyPoints = parsed.data.key_points.map((point) => point.trim()).filter(Boolean).slice(0, 5);
+  const keyPoints = parsed.data.key_points.map((point) => point.trim()).filter(Boolean).slice(0, MAX_POINTS);
   if (!summary) return { outcome: 'failed', detail: 'The summary came back empty.' };
-  return { outcome: 'written', from, summary, keyPoints };
+  return { outcome: 'written', summary, keyPoints };
 }
 
 /** Write one video's summary. Never throws. */
@@ -114,20 +133,19 @@ export async function writeVideoSummary(input: {
   client?: Anthropic;
   onSpend?: SpendSink;
 }): Promise<VideoSummary> {
-  const from = input.video.transcript ? 'transcript' : 'description';
-  if (from === 'description' && !input.video.description?.trim()) return { outcome: 'too-little', from };
+  if (!input.video.transcript.trim()) return { outcome: 'too-little' };
 
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
   let response;
   try {
     response = await client.messages.create({
       model: VIDEO_SUMMARY_MODEL,
-      max_tokens: 1024,
+      max_tokens: 2048,
       system: SYSTEM,
       tools: [
         {
           name: TOOL,
-          description: 'Report the summary and the key points.',
+          description: 'Report the gist and the takeaways.',
           input_schema: {
             type: 'object',
             properties: {
@@ -150,5 +168,5 @@ export async function writeVideoSummary(input: {
 
   const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL);
   if (!block || block.type !== 'tool_use') return { outcome: 'failed', detail: whyNoReport(response) };
-  return readSummaryReply(block.input, from);
+  return readSummaryReply(block.input);
 }

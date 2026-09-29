@@ -4,16 +4,16 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { loadTranscript } from './transcripts';
-import { transcriptText, writeVideoSummary } from './video-summary';
+import { SUMMARY_PROMPT_SINCE, transcriptText, writeVideoSummary } from './video-summary';
 
 /**
  * Writing the summaries on your list, from the library run (plan #1069).
  *
- * A video gets a summary from its description as soon as it is on the list,
- * and a second one from its transcript once the transcript is stored, which
- * replaces the first. A description too thin to summarise is recorded with
- * `summarised_at` set and no summary, so the run does not ask again until a
- * transcript arrives.
+ * A video is summarised once its transcript is stored, and not before: the
+ * run never writes one from the description. It is summarised again when the
+ * summary it has predates SUMMARY_PROMPT_SINCE. A transcript with nothing to
+ * summarise is recorded with `summarised_at` set and no summary, so the run
+ * does not ask again.
  *
  * Runs with the service client, so every read and write names the person.
  */
@@ -27,17 +27,26 @@ type Row = {
   video_id: string;
   summary_from: string | null;
   summarised_at: string | null;
-  item: { title: string; author: string | null; description: string | null; provider: { name: string } | { name: string }[] | null } | null;
+  item: { title: string; author: string | null; duration_seconds: number | null; provider: { name: string } | { name: string }[] | null } | null;
 };
 
-type Candidate = { userId: string; videoId: string; title: string; channel: string | null; description: string | null; transcript: boolean };
+type Candidate = { userId: string; videoId: string; title: string; channel: string | null; durationSeconds: number | null };
 
 export type SummaryPassResult = { written: number; tooLittle: number; failed: number; stopped: string | null };
 
-/** Which rows need a summary: none yet, or one from the description when a transcript now exists. */
-export function needsSummary(row: { summary_from: string | null; summarised_at: string | null }, hasTranscript: boolean): boolean {
-  if (row.summarised_at === null) return true;
-  return hasTranscript && row.summary_from !== 'transcript';
+/**
+ * Which rows need a summary: only those with a transcript, and then when there
+ * is none yet, it was written from the description, or it predates the
+ * current prompt.
+ */
+export function needsSummary(
+  row: { summary_from: string | null; summarised_at: string | null },
+  hasTranscript: boolean,
+  promptSince: string = SUMMARY_PROMPT_SINCE,
+): boolean {
+  if (!hasTranscript) return false;
+  if (row.summarised_at === null || row.summary_from !== 'transcript') return true;
+  return Date.parse(row.summarised_at) < Date.parse(promptSince);
 }
 
 async function fetchedTranscripts(learn: LearnSupabaseClient, videoIds: string[]): Promise<Set<string>> {
@@ -59,10 +68,9 @@ async function candidates(learn: LearnSupabaseClient): Promise<Candidate[]> {
   const { data, error } = await learn
     .from('watch_list')
     .select(
-      'user_id, video_id, summary_from, summarised_at, item:catalogue_items!watch_list_item_id_fkey(title, author, description, provider:catalogue_providers!catalogue_items_provider_id_fkey(name))',
+      'user_id, video_id, summary_from, summarised_at, item:catalogue_items!watch_list_item_id_fkey(title, author, duration_seconds, provider:catalogue_providers!catalogue_items_provider_id_fkey(name))',
     )
     .is('left_playlist_at', null)
-    .or('summarised_at.is.null,summary_from.is.null,summary_from.eq.description')
     .order('added_at', { ascending: false });
   if (error) throw new Error(`Reading the list to summarise failed: ${error.message}`);
   const rows = ((data ?? []) as unknown as Row[]).filter((row) => row.item);
@@ -78,8 +86,7 @@ async function candidates(learn: LearnSupabaseClient): Promise<Candidate[]> {
         title: item.title,
         // Under youtube-list the channel is the author; under a followed channel it is the provider.
         channel: item.author ?? provider?.name ?? null,
-        description: item.description,
-        transcript: fetched.has(row.video_id),
+        durationSeconds: item.duration_seconds,
       };
     });
 }
@@ -101,13 +108,13 @@ export async function summariseWatchLists(
   const now = options.now ?? (() => new Date());
 
   const one = async (video: Candidate) => {
-    const cues = video.transcript ? (await loadTranscript(learn, video.videoId))?.cues ?? null : null;
+    const cues = (await loadTranscript(learn, video.videoId))?.cues ?? [];
     const written = await writeVideoSummary({
       video: {
         title: video.title,
         channel: video.channel,
-        description: video.description,
-        transcript: cues && cues.length > 0 ? transcriptText(cues) : null,
+        durationSeconds: video.durationSeconds,
+        transcript: transcriptText(cues),
       },
       anthropicApiKey: options.anthropicApiKey,
       client: options.client,
@@ -121,8 +128,8 @@ export async function summariseWatchLists(
     const stamp = now().toISOString();
     const update =
       written.outcome === 'written'
-        ? { summary: written.summary, key_points: written.keyPoints, summary_from: written.from, summarised_at: stamp, updated_at: stamp }
-        : { summarised_at: stamp, updated_at: stamp };
+        ? { summary: written.summary, key_points: written.keyPoints, summary_from: 'transcript', summarised_at: stamp, updated_at: stamp }
+        : { summary: null, key_points: null, summary_from: 'transcript', summarised_at: stamp, updated_at: stamp };
     const { error } = await learn
       .from('watch_list')
       .update(update)

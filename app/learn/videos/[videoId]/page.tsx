@@ -151,12 +151,21 @@ export default async function ListVideoRoute({
   );
 }
 
-/** Where the summary came from, said whenever it was not the transcript (law 2). */
-function summaryNote(video: ListVideoPage): string | null {
-  if (video.summaryFrom !== 'description') return null;
-  return video.transcriptState === 'fetched'
-    ? 'Written from the description. The transcript is in, and the next scheduled run rewrites this from it.'
-    : 'Written from the description, because the transcript has not been fetched.';
+/** Why there is no summary yet. It is only ever written from the transcript. */
+function noSummary(video: ListVideoPage): string {
+  if (video.summarisedAt) return 'The transcript has nothing to summarise.';
+  switch (video.transcriptState) {
+    case 'fetched':
+      return 'Not summarised yet. The next scheduled run writes it from the transcript.';
+    case 'queued':
+      return 'The transcript is queued. The summary is written once it arrives.';
+    case 'none':
+      return 'This video has no captions, so there is no transcript to summarise.';
+    case 'failed':
+      return 'Fetching the transcript failed, so there is nothing to summarise yet.';
+    default:
+      return 'No summary, because no transcript has been fetched for this video.';
+  }
 }
 
 function Summary({ video }: { video: ListVideoPage }) {
@@ -164,23 +173,17 @@ function Summary({ video }: { video: ListVideoPage }) {
     return (
       <section>
         <h2 className="mb-1 text-ui font-semibold text-ink-muted">Summary</h2>
-        <p className="text-ui text-ink-muted">
-          {video.summarisedAt
-            ? 'The description says too little to summarise, and there is no transcript yet.'
-            : 'Not summarised yet. The next scheduled run writes it.'}
-        </p>
+        <p className="text-ui text-ink-muted">{noSummary(video)}</p>
       </section>
     );
   }
-  const note = summaryNote(video);
   return (
     <section>
       <h2 className="mb-1 text-ui font-semibold text-ink-muted">Summary</h2>
       <p className="text-body text-ink">{video.summary}</p>
-      {note && <p className="mt-1 text-small text-ink-muted">{note}</p>}
       {video.keyPoints.length > 0 && (
         <>
-          <h2 className="mb-1 mt-4 text-ui font-semibold text-ink-muted">Key points</h2>
+          <h2 className="mb-1 mt-4 text-ui font-semibold text-ink-muted">Takeaways</h2>
           <ul className="list-disc space-y-1 pl-5 text-body text-ink">
             {video.keyPoints.map((point) => (
               <li key={point}>{point}</li>

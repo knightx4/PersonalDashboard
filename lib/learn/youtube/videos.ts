@@ -196,7 +196,6 @@ export type ListVideoPage = ListVideo & {
   chapters: YouTubeChapter[];
   summary: string | null;
   keyPoints: string[];
-  summaryFrom: 'description' | 'transcript' | null;
   summarisedAt: string | null;
   transcriptState: TranscriptState | null;
   leftPlaylistAt: string | null;
@@ -210,7 +209,7 @@ export async function loadListVideo(
 ): Promise<ListVideoPage | null> {
   const { data, error } = await learn
     .from('watch_list')
-    .select(`${LIST_COLUMNS}, left_playlist_at, summary, key_points, summary_from, summarised_at`)
+    .select(`${LIST_COLUMNS}, left_playlist_at, summary, key_points, summarised_at`)
     .eq('user_id', userId)
     .eq('video_id', videoId)
     .maybeSingle();
@@ -220,7 +219,6 @@ export async function loadListVideo(
     left_playlist_at: string | null;
     summary: string | null;
     key_points: string[] | null;
-    summary_from: 'description' | 'transcript' | null;
     summarised_at: string | null;
   };
   const video = toListVideo(row);
@@ -238,7 +236,6 @@ export async function loadListVideo(
     chapters: item.description ? chaptersFromDescription(item.description) : [],
     summary: row.summary,
     keyPoints: row.key_points ?? [],
-    summaryFrom: row.summary_from,
     summarisedAt: row.summarised_at,
     transcriptState: (transcript.data as { state: TranscriptState } | null)?.state ?? null,
     leftPlaylistAt: row.left_playlist_at,
