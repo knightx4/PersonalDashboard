@@ -140,6 +140,7 @@ describe('RLS coverage', () => {
       'review_questions',
       'settings',
       'sources',
+      'subject_channels',
       'subjects',
       'theme_fields',
       'track_offers',
@@ -1849,11 +1850,86 @@ describe('your list of videos', () => {
     ).rejects.toThrow();
   });
 
+  it('takes a video kept from a channel Learn found, and no other origin', async () => {
+    await admin`insert into watch_list (user_id, video_id, came_from) values (${userA}, 'bbbbbbbbbbb', 'channel search')`;
+    await expect(
+      admin`insert into watch_list (user_id, video_id, came_from) values (${userA}, 'ccccccccccc', 'somewhere')`,
+    ).rejects.toThrow();
+  });
+
   it('keeps the playlist in settings, and only as an id', async () => {
     await admin`update settings set youtube_playlist_id = 'PLabcdefghij1234' where user_id = ${userA}`;
     await expect(
       admin`update settings set youtube_playlist_id = 'https://youtube.com/x' where user_id = ${userA}`,
     ).rejects.toThrow();
+  });
+});
+
+describe('the channels found for a subject', () => {
+  // 0080_subject_channels.sql (plan #1194). One row per subject and channel,
+  // written by the channel search and the judge, and theirs alone.
+  const channel = 'UCYO_jab_esuFRV4b17AJtAw';
+  let subjectA = '';
+
+  beforeAll(async () => {
+    const [a] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Linear algebra') returning id`;
+    subjectA = a.id;
+    await asUser(
+      userA,
+      (tx) => tx`insert into subject_channels (user_id, subject_id, youtube_channel_id, title, handle, found_why)
+                 values (${userA}, ${subjectA}, ${channel}, '3Blue1Brown', '@3blue1brown', 'Recommended for intuition.')`,
+    );
+  });
+
+  it('shows the owner their channels and another user none', async () => {
+    const own = await asUser(userA, (tx) => tx`select title, verdict, samples from subject_channels`);
+    const other = await asUser(userB, (tx) => tx`select id from subject_channels`);
+    expect(own).toEqual([{ title: '3Blue1Brown', verdict: null, samples: [] }]);
+    expect(other).toHaveLength(0);
+  });
+
+  it("does not let a user file a channel on another account's subject", async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into subject_channels (user_id, subject_id, youtube_channel_id, title)
+                   values (${userB}, ${subjectA}, ${channel}, 'Stolen')`,
+      ),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`update subject_channels set decided = 'passed', decided_at = now()`);
+    const [row] = await admin<{ decided: string | null }[]>`
+      select decided from subject_channels where subject_id = ${subjectA}`;
+    expect(row.decided).toBeNull();
+  });
+
+  it('holds a channel once per subject, and refuses a verdict or decision that cannot be', async () => {
+    await expect(
+      admin`insert into subject_channels (user_id, subject_id, youtube_channel_id, title)
+            values (${userA}, ${subjectA}, ${channel}, 'Again')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into subject_channels (user_id, subject_id, youtube_channel_id, title)
+            values (${userA}, ${subjectA}, 'not-a-channel', 'Bad id')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`update subject_channels set verdict = 'follow' where subject_id = ${subjectA}`,
+    ).rejects.toThrow();
+    await expect(
+      admin`update subject_channels set decided = 'maybe', decided_at = now() where subject_id = ${subjectA}`,
+    ).rejects.toThrow();
+    await admin`
+      update subject_channels
+      set verdict = 'follow', why = 'Builds each idea from pictures, at your level.', judged_at = now(),
+          samples = '[{"video_id": "fNk_zzaMoSs", "title": "Vectors", "verdict": "card", "line": "Clear."}]'::jsonb,
+          decided = 'followed', decided_at = now()
+      where subject_id = ${subjectA}`;
+  });
+
+  it('goes with the subject', async () => {
+    await admin`delete from subjects where id = ${subjectA}`;
+    const left = await admin`select id from subject_channels where subject_id = ${subjectA}`;
+    expect(left).toHaveLength(0);
   });
 });
 
