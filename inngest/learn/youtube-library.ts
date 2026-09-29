@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { createLearnServiceSupabase } from '@/inngest/learn/supabase-admin';
 import { recordSpend } from '@/lib/core/spend/record';
+import { jevEnabledFor } from '@/lib/jev/enabled';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { embedVideoSegmentsOverRest, restLedger } from '@/lib/learn/catalogue/embed-rest';
 import type { EmbedSweepResult } from '@/lib/learn/catalogue/embed-sweep';
@@ -129,6 +130,7 @@ async function judgeLists(learn: LearnSupabaseClient, deadline: number): Promise
     return await judgeWatchLists(learn, {
       anthropicApiKey,
       deadline,
+      jevEnabled: (userId) => jevEnabledFor(core, userId),
       onSpend: (userId, pass, report) =>
         void rows.push(
           recordSpend(core, userId, {

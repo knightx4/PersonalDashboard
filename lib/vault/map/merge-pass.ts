@@ -3,7 +3,7 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
-import { usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
+import { sumByModel, usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
 import { JEV_MODEL, type JevState } from '@/lib/jev/client';
 import { decideWithJev } from '@/lib/jev/decide';
@@ -275,25 +275,7 @@ export async function runMergePass<P extends MergePair>(
   }
 }
 
-/**
- * One report per model, so a batch Jev answered pair by pair records one
- * spend row rather than twenty.
- */
-export function sumByModel(reports: SpendReport[]): SpendReport[] {
-  const byModel = new Map<string, SpendReport>();
-  for (const report of reports) {
-    const seen = byModel.get(report.model);
-    if (!seen) {
-      byModel.set(report.model, { model: report.model, usage: { ...report.usage } });
-      continue;
-    }
-    seen.usage.inputTokens += report.usage.inputTokens;
-    seen.usage.cachedInputTokens += report.usage.cachedInputTokens;
-    seen.usage.cacheWriteTokens += report.usage.cacheWriteTokens;
-    seen.usage.outputTokens += report.usage.outputTokens;
-  }
-  return [...byModel.values()];
-}
+export { sumByModel };
 
 /** The shape both merge questions share (pair-jev-question.ts). */
 export type MergeQuestion = {
