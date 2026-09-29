@@ -156,6 +156,10 @@ export const SPEND_OPERATIONS = {
     // Writing the acts sentence for a step that check held (plan #1183).
     // Haiku, one call per held step; background.
     'write-acts-sentence',
+    // Reading what a finished goals run wrote on the Claude steps it closed,
+    // for an action outside the plan (plan #1184). Jev, one call per step;
+    // background, run by the overnight tick.
+    'check-run-acts',
   ],
 } as const;
 

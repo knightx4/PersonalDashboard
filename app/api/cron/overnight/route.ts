@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { authorizeCron } from '@/inngest/cron/authorize';
 import { runCheckBackWake } from '@/inngest/dev/check-backs';
 import { runOvernightTick } from '@/inngest/dev/overnight';
+import { runGoalsActedCheck } from '@/inngest/goals/acted-runs';
 import { runGoalsQuietSweep } from '@/inngest/goals/quiet-runs';
 
 // One tick sends one feature per account. The listing of pushes and the fire
@@ -39,6 +40,19 @@ async function goalsQuietRuns() {
 }
 
 /**
+ * Flags a finished goals run that acted outside the plan (plan #1184). After
+ * the sweep, so a run it has just closed is read on the same tick, and with
+ * the same rule: a failure is reported beside the tick.
+ */
+async function goalsActed() {
+  try {
+    return await runGoalsActedCheck();
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'failed' };
+  }
+}
+
+/**
  * Wakes Dash for check-backs an hour past due that no session has picked up
  * (supabase/migrations/0103). Same clock for the same reason as the sweep
  * above, and the same rule: a failure is reported beside the tick.
@@ -56,9 +70,10 @@ async function tick(request: NextRequest) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const goalsQuiet = await goalsQuietRuns();
+  const goalsActs = await goalsActed();
   const checkBackWake = await checkBacks();
   try {
-    return NextResponse.json({ ok: true, ...(await runOvernightTick()), goalsQuiet, checkBackWake });
+    return NextResponse.json({ ok: true, ...(await runOvernightTick()), goalsQuiet, goalsActs, checkBackWake });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'failed' },
