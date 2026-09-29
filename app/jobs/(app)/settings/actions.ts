@@ -18,6 +18,7 @@ export interface SettingsState {
 // one from here would be a second writer of a value this page does not own.
 const profileSchema = z.object({
   targetTitles: z.string().trim().optional(),
+  excludedIndustries: z.string().trim().optional(),
   searchStartedOn: z.string().optional(),
   ghostThresholdDays: z.coerce.number().int().min(7).max(180).optional(),
   writingStyleNotes: z.string().trim().max(4000).optional(),
@@ -31,6 +32,7 @@ export async function updateProfile(
 ): Promise<SettingsState> {
   const parsed = profileSchema.safeParse({
     targetTitles: formData.get('targetTitles') ?? '',
+    excludedIndustries: formData.get('excludedIndustries') ?? '',
     searchStartedOn: formData.get('searchStartedOn') ?? '',
     ghostThresholdDays: formData.get('ghostThresholdDays') || undefined,
     writingStyleNotes: formData.get('writingStyleNotes') ?? '',
@@ -50,6 +52,12 @@ export async function updateProfile(
   }
   if (parsed.data.targetTitles !== undefined) {
     patch.target_titles = parsed.data.targetTitles
+      .split(/[,\n]/)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+  if (parsed.data.excludedIndustries !== undefined) {
+    patch.excluded_industries = parsed.data.excludedIndustries
       .split(/[,\n]/)
       .map((entry) => entry.trim())
       .filter(Boolean);
