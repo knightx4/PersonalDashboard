@@ -80,6 +80,10 @@ but which is still open itself, a step blocked on something that has since
 been answered, a fog note that has sat unresolved while the feature under it
 was built.
 
+Every #number below is followed by that row's status now, in brackets. A row
+marked done, answered, dropped or dismissed is settled: nothing about it is
+worth a look, whatever an older line says about it.
+
 At most ${MAX_SUGGESTIONS}, and fewer is better. An empty list is a good
 answer and a common one -- most mornings there is nothing to notice, and a
 list padded to three teaches them to stop reading it.

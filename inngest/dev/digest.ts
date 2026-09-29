@@ -15,6 +15,7 @@ import {
   type DigestEvent,
 } from '@/lib/digest/build';
 import { nightFrom } from '@/lib/digest/night';
+import { isRunObservation, withoutSettled, withStatuses } from '@/lib/digest/settled';
 import { loadFeedbackQueue } from '@/lib/feedback/load';
 import { fileNightIdeas } from '@/lib/ideas/file';
 import { loadIdeas } from '@/lib/ideas/load';
@@ -95,6 +96,10 @@ function daysAgo(at: string, now: Date): number {
  * -- that is what dismissing it was for. `workOrder` already drops them from
  * the ready list; these lists are read straight off the rows, so they say so
  * themselves.
+ *
+ * Every #number in the lines carries the row's status now (#1222), so a line
+ * that names a step which has since closed says so where it names it. The
+ * closed-overnight lines are left alone: they say they closed already.
  */
 async function contextFor(input: {
   supabase: SupabaseClient;
@@ -112,6 +117,7 @@ async function contextFor(input: {
   const open = plan.items.filter(
     (item) => item.status !== 'done' && item.status !== 'dropped' && !isDismissed(item),
   );
+  const stated = (line: string) => withStatuses(line, plan.items);
 
   return {
     openDecisions: open
@@ -121,23 +127,32 @@ async function contextFor(input: {
     blockedSteps: open
       .filter((item) => item.status === 'blocked')
       .slice(0, CONTEXT_LIMIT)
-      .map((item) => `${ref(item)} — ${oneLine(item.comment ?? 'no reason recorded', 200)}`),
+      .map((item) =>
+        stated(`${ref(item)} — ${oneLine(item.comment ?? 'no reason recorded', 200)}`),
+      ),
     fogPatches: open
       .filter((item) => hasLiveFog(item))
       .slice(0, CONTEXT_LIMIT)
-      .map((item) => `${ref(item)}: ${oneLine(item.fog as string, 300)}`),
+      .map((item) => stated(`${ref(item)}: ${oneLine(item.fog as string, 300)}`)),
     inProgress: open
       .filter((item) => item.status === 'in_progress')
       .slice(0, CONTEXT_LIMIT)
       .map(ref),
     // Yours and a session's own follow-ons, both unshaped and neither
-    // dismissed -- which is what `mine` and `suggested` already mean.
-    unshapedIdeas: [...ideas.mine, ...ideas.suggested]
+    // dismissed -- which is what `mine` and `suggested` already mean. The
+    // run's own earlier observations are left out: shown them, it rewrote
+    // them from its own text every morning, whatever had happened to the
+    // rows they named (#1222).
+    unshapedIdeas: [...ideas.mine, ...ideas.suggested.filter((idea) => !isRunObservation(idea))]
       .slice(0, CONTEXT_LIMIT)
-      .map((idea) => `${oneLine(idea.body)} (filed ${daysAgo(idea.createdAt, now)} days ago)`),
+      .map((idea) =>
+        stated(`${oneLine(idea.body)} (filed ${daysAgo(idea.createdAt, now)} days ago)`),
+      ),
     openRaises: raised.open
       .slice(0, CONTEXT_LIMIT)
-      .map((row) => `${oneLine(row.title)} — ${oneLine(row.ask ?? 'no ask recorded', 200)}`),
+      .map((row) =>
+        stated(`${oneLine(row.title)} — ${oneLine(row.ask ?? 'no ask recorded', 200)}`),
+      ),
     shipped: [...input.shipped],
   };
 }
@@ -197,6 +212,11 @@ export async function writeDigestFor(
         }),
       })
     : { summary: null, suggestions: [] };
+
+  // A suggestion about rows that have all closed is not worth anybody's
+  // morning, however the model came to write it (#1222). Dropped here, so it
+  // is neither filed below nor printed on the summary.
+  const suggestions = withoutSettled(reading.suggestions, plan.items);
   if (spend.length > 0) {
     await recordSpendReports(
       createCoreServiceSupabase(),
@@ -219,11 +239,7 @@ export async function writeDigestFor(
   // filing ten ideas in one night is what that cap is against.
   let ideasFiled = 0;
   try {
-    ideasFiled = await fileNightIdeas(
-      supabase,
-      userId,
-      reading.suggestions.slice(0, MAX_SUGGESTIONS),
-    );
+    ideasFiled = await fileNightIdeas(supabase, userId, suggestions.slice(0, MAX_SUGGESTIONS));
   } catch (error) {
     console.error('[dev digest] ideas', error instanceof Error ? error.message : error);
   }
@@ -234,7 +250,7 @@ export async function writeDigestFor(
     since,
     summary: reading.summary,
     happened,
-    attention: withSuggestions(ready, reading.suggestions),
+    attention: withSuggestions(ready, suggestions),
     ideas_filed: ideasFiled,
     night,
   });
