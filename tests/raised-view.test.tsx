@@ -542,3 +542,16 @@ describe('commenting on a plan row', () => {
     expect(html).not.toContain('<textarea');
   });
 });
+
+describe('where a search hit lands', () => {
+  // A Dev search hit on a raise or an open question links to its card here by
+  // these anchors (plan #1154, lib/search/sources/dev-map.ts).
+  it('gives a raise and a waiting plan row the anchors search links to', () => {
+    const html = render(
+      [raise()],
+      [waitingRow({ id: 'q9', health: 'unanswered', detail: QUESTION_DETAIL })],
+    );
+    expect(html).toContain('id="raise-r1"');
+    expect(html).toContain('id="waiting-q9"');
+  });
+});

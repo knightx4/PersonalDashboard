@@ -24,6 +24,7 @@ import type { PlanRefTitles } from '@/lib/comments/refs';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { Disclosure, Group, SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
+import { raiseAnchor } from '@/lib/search/sources/dev-map';
 import { raisedHealth, type RaisedHealth } from '@/lib/dev/health';
 import { RAISED_HEALTH_WORD } from '@/lib/dev/words';
 import { RAISED_HEALTH_GLYPHS } from '@/lib/status-glyphs';
@@ -236,7 +237,8 @@ function RaiseCard({ row, titles }: { row: RaisedRow; titles?: PlanRefTitles }) 
   const canClose = row.status === 'answered' && Boolean(row.outcome);
 
   return (
-    <li className="flex flex-col gap-2 px-4 py-3">
+    // The anchor a search hit on this raise lands on (plan #1154).
+    <li id={raiseAnchor(row.id)} className="flex scroll-mt-20 flex-col gap-2 px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="rounded-full bg-accent-tint px-2 py-0.5 text-micro font-semibold uppercase tracking-wide text-accent">
           {scopeLabel(row.module)}
