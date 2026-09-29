@@ -40,8 +40,9 @@ export const TARGET_FOR_HIT: Record<HitKind, LinkTarget | null> = {
   feedback: null,
   raise: null,
   vision: null,
-  // A story lives inside a newsletter issue rather than in a row of its own,
-  // and task_links has no column for a goal or a step.
+  // A story lives inside a newsletter issue rather than in a row of its own.
+  // task_links has a goal column, but only Hand to Dash writes it (plan
+  // #1263): the picker does not offer goals yet, and has no column for a step.
   story: null,
   goal: null,
   step: null,

@@ -301,6 +301,33 @@ describe('todo.task_links', () => {
     ).rejects.toThrow(/must point at something/);
   });
 
+  it('links a task to a goal its owner owns, and refuses another account\'s (plan #1263)', async () => {
+    // Hand to Dash points a task at the errand it became. The column lives in
+    // migrations-goals/0062 and is held to the same ownership rule.
+    const goalOf = async (user: string) => {
+      const [area] = await admin<{ id: string }[]>`
+        insert into goals.areas (user_id, name) values (${user}, 'People') returning id`;
+      const [goal] = await admin<{ id: string }[]>`
+        insert into goals.items (user_id, level, area_id, title)
+        values (${user}, 'goal', ${area.id}, 'Find a present for Sam') returning id`;
+      return goal.id;
+    };
+    const mine = await goalOf(userA);
+    const theirs = await goalOf(userB);
+    const [task] = await admin<{ id: string }[]>`
+      insert into tasks (user_id, title) values (${userA}, 'Present for Sam') returning id`;
+
+    await asUser(userA, (tx) => tx`insert into task_links (task_id, relation, goal_id)
+                                   values (${task.id}, 'about', ${mine})`);
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into task_links (task_id, relation, goal_id)
+                   values (${taskA}, 'source', ${theirs})`,
+      ),
+    ).rejects.toThrow(/must point at something/);
+  });
+
   it('drops the link when the role goes, and keeps the task', async () => {
     await admin`delete from job_search.roles where id = ${roleA}`;
 

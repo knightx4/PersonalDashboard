@@ -3,8 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import { createGoalsClient } from '@/lib/goals/auth/server';
+import { loadErrandAreas, saveErrandAndStart } from '@/lib/goals/errand-store';
 import { isLinkTarget } from '@/lib/todo/links/model';
+import { loadLinksForTasks } from '@/lib/todo/links/load';
 import { clearTaskAbout, linkTask, setTaskAbout } from '@/lib/todo/links/write';
+import { loadTask } from '@/lib/todo/tasks/load';
 import { resolveRelativeDay, todayIn } from '@/lib/todo/tasks/model';
 import {
   completeTaskWithItems,
@@ -16,6 +20,7 @@ import {
   reopenTaskWithItems,
   reorderTasks,
   rescheduleTask,
+  setTaskBody,
   setTaskPinned,
   setTaskStatus,
   snoozeTask,
@@ -409,4 +414,85 @@ export async function removeTask(id: string): Promise<{ error: string | null }> 
 
   revalidateTodo();
   return { error: null };
+}
+
+/**
+ * The Goals areas an errand can go in, for Hand to Dash (plan #1263). Read
+ * when the form opens rather than with every row, since most rows never
+ * open it.
+ */
+// latency: pending
+export async function errandAreas(): Promise<{
+  areas: { id: string; name: string }[];
+  defaultAreaId: string | null;
+  error: string | null;
+}> {
+  await requireUser();
+  try {
+    return { ...(await loadErrandAreas(await createGoalsClient())), error: null };
+  } catch {
+    return { areas: [], defaultAreaId: null, error: 'Could not read your Goals areas. Try again.' };
+  }
+}
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Hand a task to Dash as an errand (plan #1263): the task's title becomes the
+ * errand, its notes the errand's detail, and Dash starts on it in the same
+ * press (saveErrandAndStart, the same one Add an errand on Goals uses). The
+ * task is then closed, pointing at the errand when it is not already about
+ * something; when it is, that link is kept and a line in its notes says where
+ * it went instead. The errand is the person's own goal, so it goes in open.
+ *
+ * The errand is the part that matters. Once it is saved, a task that fails to
+ * close or link is said in the message rather than returned as an error, so
+ * a second press does not make a second errand.
+ */
+// latency: pending
+export async function handTaskToDash(
+  taskId: string,
+  areaId: string,
+  dueOn: string,
+): Promise<{ error: string | null; message?: string; goalId?: string }> {
+  const user = await requireUser();
+  if (!areaId) return { error: 'Choose which area the errand is for.' };
+  if (!DAY.test(dueOn)) return { error: 'An errand needs a date it is due by.' };
+
+  const task = await loadTask(user.id, taskId);
+  if (!task) return { error: 'That task is no longer on the list.' };
+  if (task.status !== 'open') return { error: 'Only an open task can be handed to Dash.' };
+
+  const errand = await saveErrandAndStart({
+    client: await createGoalsClient(),
+    user,
+    areaId,
+    title: task.title,
+    dueOn,
+    detail: task.body,
+  });
+  if (!errand.ok) return { error: errand.error };
+
+  const problems: string[] = [];
+  const links = await loadLinksForTasks([task.id]).catch(() => null);
+  const about = links?.some((link) => link.relation === 'about') ?? true;
+  if (!about) {
+    const { error } = await setTaskAbout(task.id, 'goal', errand.goalId);
+    if (error) problems.push('the task could not be pointed at the errand');
+  } else {
+    const line = `Handed to Dash as an errand on Goals: /goals/${errand.goalId}`;
+    const body = task.body ? `${task.body}\n\n${line}` : line;
+    const { error } = await setTaskBody(user.id, task.id, body);
+    if (error) problems.push('the note saying where it went could not be added');
+  }
+  const closed = await completeTaskWithItems(user.id, task.id);
+  if (closed.error) problems.push('the task could not be ticked off');
+
+  revalidateTodo();
+  revalidatePath('/goals', 'layout');
+  const message =
+    problems.length === 0
+      ? errand.message
+      : `${errand.message} But ${problems.join(', and ')}.`;
+  return { error: null, message, goalId: errand.goalId };
 }

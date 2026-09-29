@@ -132,7 +132,7 @@ export async function answerGoalFlag(input: {
 
   const [{ lastRun }, goal] = await Promise.all([
     loadShaping(input.client, flag.goalId),
-    input.client.from('items').select('title').eq('id', flag.goalId).maybeSingle(),
+    input.client.from('items').select('title, errand, due_on').eq('id', flag.goalId).maybeSingle(),
   ]);
   if (runInFlight(lastRun, Date.now())) {
     return unsaid('Dash is already working on this goal. Say more once that run finishes.');
@@ -148,7 +148,13 @@ export async function answerGoalFlag(input: {
     fetch: input.fetch,
     text: (runId) =>
       flagRunText({
-        runText: goalRunText({ goalId: flag.goalId, goalTitle, userId, runId }),
+        runText: goalRunText({
+          goalId: flag.goalId,
+          goalTitle,
+          userId,
+          runId,
+          errandDueOn: goal.data?.errand ? (goal.data.due_on as string | null) : null,
+        }),
         userId,
         flag,
         history: flag.thread,

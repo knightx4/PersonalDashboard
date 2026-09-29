@@ -161,6 +161,19 @@ async function lookup(
       return;
     }
 
+    if (target === 'goal') {
+      // A task handed to Dash as an errand points at the errand (plan #1263).
+      const supabase = await clients.goals();
+      const { data } = await supabase.from('items').select('id, title').in('id', ids);
+      for (const row of (data ?? []) as Row[]) {
+        into.set(`goal:${row.id as string}`, {
+          label: row.title as string,
+          href: `/goals/${row.id as string}`,
+        });
+      }
+      return;
+    }
+
     if (target === 'note') {
       const supabase = await clients.vault();
       const { data } = await supabase.from('notes').select('id, title, path').in('id', ids);

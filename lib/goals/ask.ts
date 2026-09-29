@@ -295,10 +295,12 @@ async function handToRoutine(
 
   const { data: goal } = await input.client
     .from('items')
-    .select('title')
+    .select('title, errand, due_on')
     .eq('id', input.goalId)
     .maybeSingle();
   const goalTitle = (goal?.title as string | undefined) ?? input.itemTitle;
+  // An errand is briefed as one on every run, a comment's included (plan #1263).
+  const errandDueOn = goal?.errand ? (goal.due_on as string | null) : null;
 
   const started = await recordAndFire({
     client: input.client,
@@ -308,7 +310,13 @@ async function handToRoutine(
     routine: input.routine,
     text: (runId) =>
       commentRunText({
-        runText: goalRunText({ goalId: input.goalId, goalTitle, userId: input.userId, runId }),
+        runText: goalRunText({
+          goalId: input.goalId,
+          goalTitle,
+          userId: input.userId,
+          runId,
+          errandDueOn,
+        }),
         userId: input.userId,
         itemId: input.itemId,
         itemTitle: input.itemTitle,

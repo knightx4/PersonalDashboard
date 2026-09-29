@@ -173,6 +173,14 @@ first, each with its date. An errand is not listed under its area as well.
 Its own page shows the due date beside the title and leaves out the stage
 track and weekly help. The goal's menu turns any goal into an errand or back.
 
+**Hand to Dash** on a Todo task makes the same errand from the task (plan
+#1263): its title, its notes as the errand's detail, the area you pick and the
+due date, which starts on the task's own. The save and the run are one helper,
+`saveErrandAndStart` in `lib/goals/errand-store.ts`, which Add an errand calls
+too, so the two cannot drift. The task is ticked off and links to the errand.
+Every other start of a goal run (Work on this, the overnight map, an answered
+flag and a comment to Dash) briefs an errand as an errand.
+
 ## Approval
 
 You approve what Claude does outside the plan, and the goals it proposes. You

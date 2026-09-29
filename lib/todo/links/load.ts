@@ -107,7 +107,7 @@ export async function loadLinksForTasks(
     // lib/todo/links/load.test.ts instead, so the two cannot drift apart
     // silently.
     // prettier-ignore
-    .select('task_id, relation, application_id, role_id, company_id, contact_id, interview_id, note_id, order_id, inventory_item_id, saved_item_id, reading_id, track_id, subject_id')
+    .select('task_id, relation, application_id, role_id, company_id, contact_id, interview_id, note_id, order_id, inventory_item_id, saved_item_id, reading_id, track_id, subject_id, goal_id')
     .in('task_id', taskIds);
 
   assertSchemaExposed(error, TODO_SCHEMA);
