@@ -160,9 +160,14 @@ export function documentName(path: string): string {
   return last.replace(/^[0-9a-f-]{36}-/, '') || 'a document';
 }
 
-/** Where a record came from, naming the file when it came from one. */
+/**
+ * Where a record came from, naming the file when it came from one. A pasted
+ * record's ref, when it is not a link, names the file the goals routine was
+ * given it in ("MyStudentData.txt, given to Dash on 2026-09-24"; plan #990).
+ */
 export function sourceLabel(source: RecordSource, ref: string | null): string {
   if (source === 'document' && ref) return `From ${documentName(ref)}`;
+  if (source === 'pasted' && ref?.trim() && !/^https?:\/\//.test(ref)) return `From ${ref.trim()}`;
   const app = source === 'app' ? appSource(ref) : null;
   if (app) return `From ${sourceModule(app.table)}`;
   return SOURCE_LABELS[source];

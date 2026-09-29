@@ -179,5 +179,9 @@ describe('sourceLabel', () => {
     ).toBe('From May-statement.pdf');
     expect(sourceLabel('document', null)).toBe('From a document');
     expect(sourceLabel('pasted', null)).toBe('From pasted text');
+    expect(sourceLabel('pasted', 'MyStudentData.txt, given to Dash on 2026-09-24')).toBe(
+      'From MyStudentData.txt, given to Dash on 2026-09-24',
+    );
+    expect(sourceLabel('pasted', 'https://servicer.example/loans')).toBe('From pasted text');
   });
 });
