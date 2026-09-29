@@ -7,6 +7,7 @@ import {
   passesFilter,
   scoreChips,
   scoreOpening,
+  scaleScore,
   sortOpenings,
   type OpeningScores,
   type OpeningText,
@@ -29,13 +30,23 @@ const CONTEXT: ScoringContext = {
     { title: 'Associate, Strategic Finance', company: 'Ramp Business Corp', status: 'rejected' },
     { title: 'AI Strategist', company: 'Hebbia', status: 'drafting' },
   ],
+  history: [
+    {
+      id: 'h1',
+      title: 'Associate, Strategic Finance',
+      company: 'Ramp Business Corp',
+      status: 'rejected',
+      rejectionStage: 'resume_review',
+      hasInterview: false,
+    },
+  ],
 };
 
-/** A stubbed Jev answering all eight questions. */
+/** A stubbed Jev answering all ten questions. */
 function jev() {
   return vi.fn(async (_url: string, init: RequestInit) => {
     const body = JSON.parse(String(init.body)) as { questions: Record<string, unknown> };
-    expect(Object.keys(body.questions)).toHaveLength(8);
+    expect(Object.keys(body.questions)).toHaveLength(10);
     return new Response(
       JSON.stringify({
         model: 'jev-1.13.0',
@@ -49,6 +60,8 @@ function jev() {
           duplicate: { noul: 0.7 },
           // Out of range: this one answer is lost, the rest are kept.
           closeness: { score: 9, confidence: 0.5 },
+          fit_score: { score: 2.6, confidence: 0.7 },
+          chance: { score: 1, confidence: 0.9 },
         },
         usage: { input_tokens: 1800, output_tokens: 0 },
       }),
@@ -61,6 +74,16 @@ describe('openingState', () => {
     const state = openingState(OPENING, CONTEXT);
     expect(state.your_roles_at_this_company).toEqual(['Associate, Strategic Finance (rejected)']);
     expect(state.roles_you_applied_to).toEqual(CONTEXT.applied);
+  });
+  it('carries the history of similar applications for the chance question', () => {
+    const state = openingState({ ...OPENING, title: 'Strategic Finance Associate' }, CONTEXT);
+    expect(state.your_history_with_similar_roles).toEqual({
+      applied: 1,
+      reached_an_interview: 0,
+      still_waiting: 0,
+      examples: ['Associate, Strategic Finance at Ramp Business Corp: rejected at resume review'],
+    });
+    expect(state.your_history_overall).toEqual({ applied: 1, reached_an_interview: 0, still_waiting: 0 });
   });
 });
 
@@ -80,7 +103,7 @@ describe('duplicateByRule', () => {
 });
 
 describe('scoreOpening', () => {
-  it('asks the eight questions in one request and keeps every readable answer', async () => {
+  it('asks the ten questions in one request and keeps every readable answer', async () => {
     const spend = vi.fn();
     const result = await scoreOpening({ opening: OPENING, context: CONTEXT, apiKey: 'k', fetch: jev(), onSpend: spend });
     expect(result.ok).toBe(true);
@@ -89,6 +112,8 @@ describe('scoreOpening', () => {
     expect(result.scores.salary?.value).toBe(true);
     expect(result.scores.duplicate).toEqual({ value: true, confidence: 0.4 });
     expect(result.scores.closeness).toBeUndefined();
+    expect(result.scores.fit_score).toEqual({ value: 65, confidence: 0.7 });
+    expect(result.scores.chance).toEqual({ value: 25, confidence: 0.9 });
     expect(spend).toHaveBeenCalledTimes(1);
   });
 
@@ -96,6 +121,21 @@ describe('scoreOpening', () => {
     const down = vi.fn(async () => new Response('down', { status: 529 })) as unknown as typeof fetch;
     const result = await scoreOpening({ opening: OPENING, context: CONTEXT, apiKey: 'k', fetch: down });
     expect(result).toMatchObject({ ok: false, reason: 'overloaded' });
+  });
+});
+
+describe('scaleScore', () => {
+  it('puts the weighted score on 0 to 100 by the top level', () => {
+    expect(scaleScore(0, 5)).toBe(0);
+    expect(scaleScore(2, 5)).toBe(50);
+    expect(scaleScore(4, 5)).toBe(100);
+    expect(scaleScore(1.3, 5)).toBe(33);
+    expect(scaleScore(2, 4)).toBe(67);
+  });
+  it('holds a score outside the levels to the ends', () => {
+    expect(scaleScore(-1, 5)).toBe(0);
+    expect(scaleScore(7, 5)).toBe(100);
+    expect(scaleScore(Number.NaN, 5)).toBe(0);
   });
 });
 
@@ -107,8 +147,10 @@ describe('parseOpeningScores', () => {
         fit: { value: 'strong', confidence: 0.9 },
         salary: { value: 'yes', confidence: 0.9 },
         closeness: { value: 2, confidence: 1.5 },
+        fit_score: { value: 140, confidence: 0.9 },
+        chance: { value: 40, confidence: 0.6 },
       }),
-    ).toEqual({ fit: { value: 'strong', confidence: 0.9 } });
+    ).toEqual({ fit: { value: 'strong', confidence: 0.9 }, chance: { value: 40, confidence: 0.6 } });
     expect(parseOpeningScores(null)).toBeNull();
     expect(parseOpeningScores([])).toBeNull();
   });
