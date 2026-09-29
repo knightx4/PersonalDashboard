@@ -90,8 +90,22 @@ export type MapVerdict = {
   noteClass: MapNoteClass;
   /** The note evidences what somebody was taught. It is still read. */
   isEvidence: boolean;
-  reason: string;
+  /**
+   * One sentence on why, shown to the person. Haiku writes it; Jev gives
+   * none, so a verdict Jev was sure of has null here (plan #1168).
+   */
+  reason: string | null;
+  /** Jev's confidence in the class, when Jev's answer is the one used. */
+  confidence?: number;
 };
+
+/** What the sweep records for a note it did not read, from the verdict. */
+export function notReadDetail(verdict: MapVerdict): string {
+  if (verdict.reason) return `Not read: ${verdict.reason}`;
+  const sure =
+    verdict.confidence === undefined ? '' : ` (${Math.round(verdict.confidence * 100)}% sure)`;
+  return `Not read: judged a record with nothing argued${sure}.`;
+}
 
 export function readsForMap(noteClass: MapNoteClass): boolean {
   return noteClass !== 'operational';

@@ -15,6 +15,8 @@ import { applyMergeProposals, type ApplyResult } from '@/lib/vault/map/merge-app
 import { proposePositionMerges, type PositionMergeResult } from '@/lib/vault/map/merge-positions';
 import { proposeThemeMerges, type ThemeMergeResult } from '@/lib/vault/map/merge-themes';
 import { proposeNoteMap, type MapNote } from '@/lib/vault/map/extract';
+import { jevEnabledFor } from '@/lib/jev/enabled';
+import { VAULT_CLASS_ON_JEV } from '@/lib/vault/map/jev-question';
 import { runSweepSlice, type SweepNoteRow, type SweepPorts } from '@/lib/vault/map/sweep';
 import { loadNearestThemeNames, loadThemeNames } from '@/lib/vault/map/themes';
 
@@ -364,6 +366,9 @@ async function workSweep(supabase: VaultSupabaseClient, sweep: SweepRow) {
   // Embedding each note to find its nearest themes, recorded as embed-map.
   let embedSpend: SpendReport[] = [];
   const core = createCoreServiceSupabase();
+  // Jev classifies the notes only once the switch is on and for an account
+  // that agreed to send its notes to TypeSafe (plan #1168).
+  const jevEnabled = VAULT_CLASS_ON_JEV && (await jevEnabledFor(core, userId));
 
   const ports: SweepPorts = {
     async notesAfter(afterPath, limit) {
@@ -427,6 +432,7 @@ async function workSweep(supabase: VaultSupabaseClient, sweep: SweepRow) {
         existingThemes,
         anthropicApiKey: apiKey,
         onSpend: (report) => spend.push(report),
+        jevEnabled,
       }),
 
     accept: (proposal) =>
