@@ -1,6 +1,8 @@
 import { NO_GROUP, type ListDisplaySpec } from '@/lib/list-display';
 import { APPLICATION_STATUSES, SOURCE_LABELS } from '@/lib/jobs/pipeline';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
+import { noteRank } from '@/lib/jobs/suggest/score-notes';
+import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
 
 /**
  * What the roles table offers: the six sorts it already had, three groupings
@@ -18,7 +20,9 @@ export type RolesSortKey =
   | 'title'
   | 'status'
   | 'applied'
-  | 'excitement';
+  | 'excitement'
+  | 'fit'
+  | 'chance';
 
 /** The role title is the only cell that says which row this is, so it stays. */
 export const ROLE_PROPERTIES = [
@@ -28,6 +32,8 @@ export const ROLE_PROPERTIES = [
   { id: 'activity', label: 'Last activity' },
   { id: 'applied', label: 'Date applied' },
   { id: 'excitement', label: 'Excitement' },
+  { id: 'fit', label: FIT_SCORE_LABEL },
+  { id: 'chance', label: CHANCE_LABEL },
   { id: 'comp', label: 'Comp' },
 ] as const;
 
@@ -60,6 +66,17 @@ export function rolesDisplay(): ListDisplaySpec<PipelineRow> {
         id: 'excitement',
         label: 'Excitement',
         compare: (a, b) => (b.excitement ?? 0) - (a.excitement ?? 0),
+      },
+      // Jev's two figures (plan #1206), highest first; a row not scored sorts last.
+      {
+        id: 'fit',
+        label: FIT_SCORE_LABEL,
+        compare: (a, b) => noteRank(b.scoreNote, 'fit') - noteRank(a.scoreNote, 'fit'),
+      },
+      {
+        id: 'chance',
+        label: CHANCE_LABEL,
+        compare: (a, b) => noteRank(b.scoreNote, 'chance') - noteRank(a.scoreNote, 'chance'),
       },
     ],
     groups: [
