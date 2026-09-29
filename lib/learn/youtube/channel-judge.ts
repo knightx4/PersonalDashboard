@@ -29,6 +29,7 @@ import {
   type Verdict,
 } from './judge-video';
 import { loadLearnerProfile } from './judging';
+import { settleJudgedChannels, type LibraryWrites, type SettleResult } from './follow-channel';
 import { keepGoodSamples } from './keep-samples';
 import {
   loadTranscript,
@@ -61,6 +62,9 @@ import {
  * 4. Once every pick has a sample, one more Haiku call reads the three
  *    verdicts and an excerpt of each transcript and marks the channel follow
  *    or pass, with a reason about the person's level in the subject.
+ * 5. Every channel of the subject with a verdict and no decision is then
+ *    followed into the YouTube library or marked passed (#1198,
+ *    follow-channel.ts), on a press and on the scheduled run alike.
  *
  * A channel whose samples are not all in stays unjudged; the next press or
  * scheduled run carries on from where this one stopped. Database errors
@@ -352,6 +356,8 @@ export type JudgeChannelsResult =
       /** Samples judged watch or card that went into the Videos section (#1197). */
       kept: number;
       judged: JudgedChannel[];
+      /** Channels followed into the library or marked passed this run (#1198), or null when none were due. */
+      settled: SettleResult | null;
       /** Channels still waiting on a transcript, for the next run. */
       waiting: number;
       /** Model calls that failed, left for the next run. */
@@ -383,6 +389,7 @@ export async function judgeFoundChannels(input: {
   profile?: LearnerProfile;
   uploads?: UploadsSource;
   transcribe?: typeof transcribeVideos;
+  library?: LibraryWrites;
   onSpend?: (pass: ChannelJudgePass, report: SpendReport) => void;
   now?: () => Date;
 }): Promise<JudgeChannelsResult> {
@@ -423,12 +430,12 @@ export async function judgeFoundChannels(input: {
     sampled: 0,
     kept: 0,
     judged: [] as JudgedChannel[],
+    settled: null as SettleResult | null,
     waiting: 0,
     failed: 0,
     quotaUnits: 0,
     stopped: null as string | null,
   };
-  if (channels.length === 0) return result;
 
   const outOfTime = () => {
     if (input.deadline === undefined || Date.now() < input.deadline) return false;
@@ -620,6 +627,19 @@ export async function judgeFoundChannels(input: {
     result.judged.push({ id: channel.id, title: channel.title, ...verdict });
   }
 
+  // 5. Follow or pass what has a verdict, including channels judged by an
+  // earlier run whose following YouTube refused.
+  if (!outOfTime()) {
+    const settled = await settleJudgedChannels(learn, {
+      userId,
+      subjectId,
+      deadline: input.deadline,
+      now,
+      library: input.library,
+    });
+    if (settled.followed.length + settled.passed + settled.failed.length > 0) result.settled = settled;
+  }
+
   return result;
 }
 
@@ -641,8 +661,8 @@ async function transcriptStatuses(learn: LearnSupabaseClient, videoIds: string[]
 }
 
 /**
- * The scheduled run's pass: every subject with a channel still unjudged, for
- * everybody, with no transcript fetching of its own. Channels picked here are
+ * The scheduled run's pass: every subject with a channel still unjudged, or
+ * judged and not yet followed or passed, for everybody, with no transcript fetching of its own. Channels picked here are
  * judged on a later run, once their transcripts are in.
  */
 export async function judgePendingChannels(
@@ -653,9 +673,19 @@ export async function judgePendingChannels(
     client?: Anthropic;
     onSpend?: (userId: string, pass: ChannelJudgePass, report: SpendReport) => void;
   },
-): Promise<{ subjects: number; judged: number; kept: number; waiting: number; failed: number; stopped: string | null }> {
-  const out = { subjects: 0, judged: 0, kept: 0, waiting: 0, failed: 0, stopped: null as string | null };
-  const { data, error } = await learn.from('subject_channels').select('user_id, subject_id').is('verdict', null);
+): Promise<{
+  subjects: number;
+  judged: number;
+  kept: number;
+  followed: number;
+  waiting: number;
+  failed: number;
+  stopped: string | null;
+}> {
+  const out = { subjects: 0, judged: 0, kept: 0, followed: 0, waiting: 0, failed: 0, stopped: null as string | null };
+  // No decision covers the unjudged channels and the judged ones not yet
+  // followed or passed (#1198).
+  const { data, error } = await learn.from('subject_channels').select('user_id, subject_id').is('decided', null);
   if (error) throw new Error(`Reading the channels waiting to be judged failed: ${error.message}`);
   const pairs = new Map<string, { user_id: string; subject_id: string }>();
   for (const row of (data ?? []) as { user_id: string; subject_id: string }[]) pairs.set(`${row.user_id}:${row.subject_id}`, row);
@@ -680,8 +710,9 @@ export async function judgePendingChannels(
     if (!run.ok) continue;
     out.judged += run.judged.length;
     out.kept += run.kept;
+    out.followed += run.settled?.followed.length ?? 0;
     out.waiting += run.waiting;
-    out.failed += run.failed;
+    out.failed += run.failed + (run.settled?.failed.length ?? 0);
     if (run.stopped) out.stopped = run.stopped;
   }
   return out;

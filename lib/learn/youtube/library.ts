@@ -483,3 +483,35 @@ export async function loadChannels(learn: LearnSupabaseClient): Promise<ChannelR
   if (error) throw new Error(`Reading channels failed: ${error.message}`);
   return (data ?? []) as ChannelRow[];
 }
+
+/**
+ * Take a channel out of the library. A channel added here loses its provider
+ * row; a seeded provider keeps its row and loses the channel.
+ */
+export async function removeChannelFromLibrary(learn: LearnSupabaseClient, providerId: string): Promise<void> {
+  // Only channels added here. The seeded providers keep their row and lose
+  // the channel, so the OCW transcript adapter and anything pointing at them
+  // keep working.
+  const { data, error } = await learn
+    .from('catalogue_providers')
+    .select('slug, ingest_note')
+    .eq('id', providerId)
+    .maybeSingle();
+  if (error) throw new Error(`Reading the channel failed: ${error.message}`);
+  if (!data) return;
+
+  const addedHere = (data as { ingest_note: string }).ingest_note.startsWith('Videos and playlists listed');
+  const result = addedHere
+    ? await learn.from('catalogue_providers').delete().eq('id', providerId)
+    : await learn
+        .from('catalogue_providers')
+        .update({
+          youtube_channel_id: null,
+          youtube_handle: null,
+          youtube_uploads_playlist_id: null,
+          youtube_listed_at: null,
+          auto_transcribe: false,
+        })
+        .eq('id', providerId);
+  if (result.error) throw new Error(`Removing the channel failed: ${result.error.message}`);
+}
