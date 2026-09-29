@@ -1191,8 +1191,9 @@ describe('a setup step on the plan', () => {
     const html = drawSetup('done');
     expect(html).not.toContain('I have set this up');
     expect(html).not.toContain('What to set up');
-    // The detail comes back as an ordinary step's does.
-    expect(html).toContain('Make a key at resend.com');
+    // The detail comes back as an ordinary step's does, its domain a link.
+    expect(html).toContain('Make a key at <a');
+    expect(html).toContain('href="https://resend.com"');
   });
 });
 

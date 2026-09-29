@@ -4,6 +4,7 @@ import { Fragment, useActionState, useEffect, useState, type CSSProperties, type
 import { ChevronDown, HelpCircle, Wrench } from 'lucide-react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
+import { LinkedText } from '@/components/ui/linked-text';
 import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { FogNote } from '@/components/dev/fog-note';
@@ -624,14 +625,16 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   Nor on an open setup job, where the detail is the
                   instructions and is drawn inside the box that closes them. */}
               {node.detail && !isDecision && !setupOpen && (
-                <p className="whitespace-pre-wrap text-ui text-ink-muted">{node.detail}</p>
+                <p className="whitespace-pre-wrap text-ui text-ink-muted"><LinkedText text={node.detail} /></p>
               )}
               {node.acceptance && (
                 <div>
                   <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">
                     Done when
                   </p>
-                  <p className="whitespace-pre-wrap text-ui text-ink">{node.acceptance}</p>
+                  <p className="whitespace-pre-wrap text-ui text-ink">
+                    <LinkedText text={node.acceptance} />
+                  </p>
                 </div>
               )}
               {/* What it needs, in its own line above the history. The comment
@@ -642,12 +645,14 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">
                     Needs
                   </p>
-                  <p className="whitespace-pre-wrap text-ui text-ink">{node.blockAsk}</p>
+                  <p className="whitespace-pre-wrap text-ui text-ink">
+                    <LinkedText text={node.blockAsk} />
+                  </p>
                 </div>
               )}
               {node.comment && (
                 <p className="whitespace-pre-wrap rounded-lg bg-canvas px-3 py-2 text-ui text-ink">
-                  {node.comment}
+                  <LinkedText text={node.comment} />
                 </p>
               )}
 
