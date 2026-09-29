@@ -1,5 +1,6 @@
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { SuggestionKind } from './cadence';
+import { parseOpeningScores, type OpeningScores } from './scores';
 
 /** One open suggestion as Roles or Contacts shows it. */
 export type OpenSuggestion = {
@@ -21,6 +22,8 @@ export type OpenSuggestion = {
   /** Where it was found, when not by the suggestion run's own search. */
   foundIn: string | null;
   contact: { id: string; name: string; email: string | null; linkedinUrl: string | null } | null;
+  /** Jev's eight answers on an opening (plan #1178); null until it has been scored. */
+  scores: OpeningScores | null;
   createdAt: string;
 };
 
@@ -40,6 +43,7 @@ type Row = {
   source_url: string | null;
   search_query: string | null;
   found_in: string | null;
+  scores: unknown;
   created_at: string;
   contacts: { id: string; full_name: string; email: string | null; linkedin_url: string | null } | null;
   companies: { name: string; slug: string } | null;
@@ -58,7 +62,7 @@ export async function loadOpenSuggestions(
   const { data, error } = await supabase
     .from('suggestions')
     .select(
-      'id, kind, headline, why, move, channel, message, url, location, company_name, person_name, person_title, source_url, search_query, found_in, created_at, contacts ( id, full_name, email, linkedin_url ), companies ( name, slug )',
+      'id, kind, headline, why, move, channel, message, url, location, company_name, person_name, person_title, source_url, search_query, found_in, scores, created_at, contacts ( id, full_name, email, linkedin_url ), companies ( name, slug )',
     )
     .eq('user_id', userId)
     .eq('status', 'open')
@@ -92,6 +96,7 @@ export async function loadOpenSuggestions(
         contact: contact
           ? { id: contact.id, name: contact.full_name, email: contact.email, linkedinUrl: contact.linkedin_url }
           : null,
+        scores: parseOpeningScores(row.scores),
         createdAt: row.created_at,
       };
     });

@@ -4,9 +4,12 @@ import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { pushPorts } from '@/inngest/core/day-brief';
 import { createServiceSupabase } from '@/inngest/jobs/supabase-admin';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
+import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpendReports } from '@/lib/core/spend/record';
+import { jevEnabledFor } from '@/lib/jev/enabled';
 import { suggestionsPayload } from '@/lib/jobs/suggest/notify';
 import { runSuggestionsFor } from '@/lib/jobs/suggest/run';
+import { scoreOpeningsFor } from '@/lib/jobs/suggest/score-run';
 import { sendToPerson } from '@/lib/push/send';
 
 /**
@@ -16,6 +19,10 @@ import { sendToPerson } from '@/lib/push/send';
  * Works every account with the job search switched on. Whether each kind is
  * due is decided per person (lib/jobs/suggest/cadence.ts), so most days most
  * accounts cost nothing. One person's failure is noted and the rest go on.
+ *
+ * Then any open opening not yet scored is put to Jev's eight questions
+ * (plan #1178), for accounts that agreed to send text to TypeSafe. That
+ * includes openings a goals run wrote since yesterday.
  *
  * A run that wrote something is sent as a phone notification to every browser
  * the person switched notifications on for (core.push_subscriptions), the
@@ -46,6 +53,11 @@ export async function runJobSuggestions(now: Date = new Date()): Promise<JobSugg
       const result = await runSuggestionsFor(jobs, userId, { apiKey, kinds: ['reach_out', 'apply'], now });
       await recordSpendReports(core, userId, { module: 'jobs', operation: 'suggest-outreach' }, result.reach_out.spend);
       await recordSpendReports(core, userId, { module: 'jobs', operation: 'find-openings' }, result.apply.spend);
+      if (await jevEnabledFor(core, userId)) {
+        const scoreSpend: SpendReport[] = [];
+        await scoreOpeningsFor(jobs, userId, { onSpend: (report) => scoreSpend.push(report) });
+        await recordSpendReports(core, userId, { module: 'jobs', operation: 'score-openings' }, scoreSpend);
+      }
       summary.reachOut += result.reach_out.written;
       summary.apply += result.apply.written;
       for (const outcome of [result.reach_out, result.apply]) {

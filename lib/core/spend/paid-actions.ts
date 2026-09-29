@@ -111,7 +111,7 @@ export const PAID_ACTIONS = {
   // Starting a suggested track adds a Learn goal, as the Learn Goals page does.
   'app/jobs/(app)/thoughts/actions.ts#startTrack': ['place-aim', 'write-curriculum'],
   'app/jobs/(app)/recommend/actions.ts#suggestPeople': ['suggest-outreach'],
-  'app/jobs/(app)/recommend/actions.ts#suggestOpenings': ['find-openings'],
+  'app/jobs/(app)/recommend/actions.ts#suggestOpenings': ['find-openings', 'score-openings'],
 
   // Shopping
   'app/shopping/inventory/add/actions.ts#previewPasteBookList': ['parse-paste-list'],

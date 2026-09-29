@@ -1,15 +1,28 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { ChevronDown, Copy, ExternalLink, Mail, Search, Sparkles } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { ChipSelect } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { gmailComposeUrl } from '@/lib/jobs/followup/compose';
 import type { OpenSuggestion } from '@/lib/jobs/suggest/load';
 import { linkedinSearchUrl, splitSubject } from '@/lib/jobs/suggest/payload';
+import {
+  NO_OPENING_FILTER,
+  OPENING_SORT_LABELS,
+  OPENING_SORTS,
+  passesFilter,
+  scoreChips,
+  sortOpenings,
+  WORKPLACE_LABELS,
+  type OpeningFilter,
+  type OpeningSort,
+  type Workplace,
+} from '@/lib/jobs/suggest/scores';
 import {
   dismissSuggestion,
   markSuggestionSent,
@@ -43,6 +56,7 @@ function RecommendedSection({
   paidHint,
   action,
   count,
+  toolbar,
   children,
 }: {
   title: string;
@@ -54,6 +68,8 @@ function RecommendedSection({
   paidHint: React.ReactNode;
   action: () => Promise<SuggestState>;
   count: number;
+  /** Sort and filter controls, shown under the hint while the list is open. */
+  toolbar?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [pending, run] = useTransition();
@@ -118,6 +134,7 @@ function RecommendedSection({
         <>
           <p className="mb-2 text-small text-ink-muted">{count > 0 ? hint : empty}</p>
           {notice && <p className="mb-2 text-small text-ink-muted">{notice}</p>}
+          {count > 0 && toolbar}
           {count > 0 && <ul className="divide-y divide-border">{children}</ul>}
         </>
       )}
@@ -148,6 +165,14 @@ export function RecommendedPeople({ suggestions }: { suggestions: OpenSuggestion
 }
 
 export function RecommendedRoles({ suggestions }: { suggestions: OpenSuggestion[] }) {
+  const [sort, setSort] = useState<OpeningSort>('newest');
+  const [filter, setFilter] = useState<OpeningFilter>(NO_OPENING_FILTER);
+  const shown = useMemo(
+    () => sortOpenings(suggestions.filter((s) => passesFilter(s, filter)), sort),
+    [suggestions, filter, sort],
+  );
+  const scored = suggestions.some((s) => s.scores);
+
   return (
     <RecommendedSection
       title="Recommended roles"
@@ -160,11 +185,158 @@ export function RecommendedRoles({ suggestions }: { suggestions: OpenSuggestion[
       }
       action={suggestOpenings}
       count={suggestions.length}
+      toolbar={
+        scored ? (
+          <OpeningControls
+            sort={sort}
+            onSort={setSort}
+            filter={filter}
+            onFilter={setFilter}
+            shown={shown.length}
+            total={suggestions.length}
+          />
+        ) : null
+      }
     >
-      {suggestions.map((suggestion) => (
+      {shown.map((suggestion) => (
         <RoleRow key={suggestion.id} suggestion={suggestion} />
       ))}
     </RecommendedSection>
+  );
+}
+
+/**
+ * Sort and filter the recommended roles by Jev's answers (plan #1178). Held
+ * in the page rather than the URL: the table below owns the URL's filters,
+ * and these narrow only the list above it. An opening not yet scored passes
+ * every filter.
+ */
+function OpeningControls({
+  sort,
+  onSort,
+  filter,
+  onFilter,
+  shown,
+  total,
+}: {
+  sort: OpeningSort;
+  onSort: (sort: OpeningSort) => void;
+  filter: OpeningFilter;
+  onFilter: (filter: OpeningFilter) => void;
+  shown: number;
+  total: number;
+}) {
+  const set = (patch: Partial<OpeningFilter>) => onFilter({ ...filter, ...patch });
+  const narrowed = JSON.stringify(filter) !== JSON.stringify(NO_OPENING_FILTER);
+  return (
+    <div className="mb-2 flex flex-wrap items-center gap-x-1 gap-y-1 text-small">
+      <ChipSelect aria-label="Sort recommended roles" value={sort} onChange={(e) => onSort(e.target.value as OpeningSort)}>
+        {OPENING_SORTS.map((value) => (
+          <option key={value} value={value}>
+            {OPENING_SORT_LABELS[value]}
+          </option>
+        ))}
+      </ChipSelect>
+      <ChipSelect
+        aria-label="Filter by workplace"
+        placeholderValue="any"
+        value={filter.workplace}
+        onChange={(e) => set({ workplace: e.target.value as Workplace | 'any' })}
+      >
+        <option value="any">Any workplace</option>
+        {(['remote', 'hybrid', 'on_site'] as const).map((value) => (
+          <option key={value} value={value}>
+            {WORKPLACE_LABELS[value]}
+          </option>
+        ))}
+      </ChipSelect>
+      <ChipSelect
+        aria-label="Filter by match to your evidence"
+        placeholderValue="any"
+        value={filter.fit}
+        onChange={(e) => set({ fit: e.target.value as OpeningFilter['fit'] })}
+      >
+        <option value="any">Any match</option>
+        <option value="strong">Strong match</option>
+        <option value="partial_up">Partial or strong match</option>
+      </ChipSelect>
+      <ChipSelect
+        aria-label="Filter by salary"
+        placeholderValue="any"
+        value={filter.salary ? 'shown' : 'any'}
+        onChange={(e) => set({ salary: e.target.value === 'shown' })}
+      >
+        <option value="any">Any pay</option>
+        <option value="shown">Salary shown</option>
+      </ChipSelect>
+      <ChipSelect
+        aria-label="Filter by cover letter"
+        placeholderValue="any"
+        value={filter.coverLetter}
+        onChange={(e) => set({ coverLetter: e.target.value as OpeningFilter['coverLetter'] })}
+      >
+        <option value="any">Cover letter or not</option>
+        <option value="yes">Asks for a cover letter</option>
+        <option value="no">No cover letter</option>
+      </ChipSelect>
+      <ChipSelect
+        aria-label="Red flags"
+        placeholderValue="show"
+        value={filter.hideRedFlags ? 'hide' : 'show'}
+        onChange={(e) => set({ hideRedFlags: e.target.value === 'hide' })}
+      >
+        <option value="show">With red flags</option>
+        <option value="hide">Without red flags</option>
+      </ChipSelect>
+      <ChipSelect
+        aria-label="Roles already on file"
+        placeholderValue="show"
+        value={filter.hideDuplicates ? 'hide' : 'show'}
+        onChange={(e) => set({ hideDuplicates: e.target.value === 'hide' })}
+      >
+        <option value="show">With ones on file</option>
+        <option value="hide">New to you only</option>
+      </ChipSelect>
+      {narrowed && (
+        <>
+          <span className="tabular ml-1 text-ink-muted">
+            {shown} of {total}
+          </span>
+          <button
+            type="button"
+            onClick={() => onFilter(NO_OPENING_FILTER)}
+            className="ml-1 font-medium text-ink-muted underline underline-offset-2 hover:text-ink"
+          >
+            Clear
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Jev's eight answers as a line of short labels; an unsure one carries a question mark. */
+function OpeningAnswers({ suggestion }: { suggestion: OpenSuggestion }) {
+  if (!suggestion.scores) return <p className="text-small text-ink-ghost">Not scored yet</p>;
+  const chips = scoreChips(suggestion.scores);
+  if (chips.length === 0) return null;
+  return (
+    <ul className="flex flex-wrap gap-1.5" aria-label="Dash's answers about this opening">
+      {chips.map((chip) => (
+        <li
+          key={chip.key}
+          title={chip.unsure ? 'Dash is not sure of this one' : undefined}
+          className={cn(
+            'rounded-control px-1.5 py-0.5 text-small',
+            chip.tone === 'warn' ? 'bg-caution-tint text-caution' : chip.tone === 'good' ? 'bg-accent-tint text-accent' : 'bg-sunken text-ink-muted',
+            chip.unsure && 'opacity-70',
+          )}
+        >
+          {chip.label}
+          {chip.unsure ? '?' : ''}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -311,6 +483,7 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
         </span>
         {suggestion.location && <span className="text-small text-ink-muted">{suggestion.location}</span>}
       </div>
+      <OpeningAnswers suggestion={suggestion} />
       <p className="text-small text-ink-muted">{suggestion.why}</p>
       {suggestion.foundIn && <p className="text-small text-ink-muted">{suggestion.foundIn}</p>}
       <p className="whitespace-pre-line text-ui text-ink">{suggestion.move}</p>

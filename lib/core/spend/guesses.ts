@@ -216,6 +216,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // The career goals and the companies already applied to, then up to six
   // searches whose results come back as input; five postings out.
   'find-openings': run(SONNET, 50_000, 2_500),
+  // One opening's text, the evidence titles, thirty applied roles and the
+  // eight questions in; eight answers out. 1,805 tokens a request on the trial.
+  'score-openings': unit(JEV, 1_800, 0),
 
   // Shopping. Reading order emails is per email: inbox sync does it in the
   // background, and the reparse and review buttons know how many they send.
