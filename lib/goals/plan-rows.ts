@@ -71,6 +71,32 @@ export const YOURS_ASK = 'Yours to do. Do it and mark it done, or answer what is
  */
 export const YOURS_WORD = 'Your move';
 
+/**
+ * What an open step waiting on other steps needs, for its Needs line (plan
+ * #1159): the steps it waits on, by number as the health tooltip names them,
+ * and an answer where one of them is a question. Only its own waits: one it
+ * shares with the step above it is said on that step's row.
+ */
+export function waitLine(
+  waits: readonly Ref[],
+  isQuestion: (id: string) => boolean,
+): string | null {
+  if (waits.length === 0) return null;
+  const named = (ref: Ref) => `#${ref.outline ?? ref.number} ${ref.title}`;
+  const list = (refs: readonly Ref[]) =>
+    refs.length <= 2
+      ? refs.map(named).join(' and ')
+      : `${refs.slice(0, -1).map(named).join(', ')} and ${named(refs[refs.length - 1])}`;
+  const steps = waits.filter((ref) => !isQuestion(ref.id));
+  const questions = waits.filter((ref) => isQuestion(ref.id));
+  return [
+    steps.length > 0 ? `${list(steps)} done first` : null,
+    questions.length > 0 ? `your answer to ${list(questions)}` : null,
+  ]
+    .filter(Boolean)
+    .join(', and ');
+}
+
 /** The tooltip on a stage whose only open work is steps of yours. */
 export const YOURS_BENEATH = 'A step beneath this one is yours to do.';
 
@@ -113,7 +139,10 @@ export type GoalRowNode = {
   children: GoalRowNode[];
   /** The goal step this row draws. */
   step: StepNode;
-  /** What the step waits on you for, when it does: the row's Needs line (note 5aa7216c). */
+  /**
+   * The row's Needs line: what the step waits on you for (note 5aa7216c), or
+   * the steps and questions it waits on (plan #1159).
+   */
   need: string | null;
   health: ReturnType<typeof healthWordsOf>;
   move: ReturnType<typeof moveWordsFor>;
@@ -313,10 +342,24 @@ export function goalRows(
     outline: outlines.get(step.id),
     title: titles.get(step.id) ?? step.title,
   });
+  const questions = new Set(all.filter((step) => step.kind === 'decision').map((step) => step.id));
   const ready = readySteps(roots);
   const shadows = roots.map((root) => shadowOf(root, ready, ref));
 
-  function toRow(step: StepNode, shadow: Shadow): GoalRowNode {
+  function toRow(
+    step: StepNode,
+    shadow: Shadow,
+    inherited: ReadonlySet<string> = new Set(),
+  ): GoalRowNode {
+    const open = step.status === 'open' || step.status === 'blocked';
+    const waits = open
+      ? waitLine(
+          shadow.waitingOn.filter((ref) => !inherited.has(ref.id)),
+          (id) => questions.has(id),
+        )
+      : null;
+    const onYou = shadow.status === 'blocked' && shadow.blockKind !== 'steps';
+    const below = new Set(shadow.waitingOn.map((ref) => ref.id));
     const number = numbers.get(step.id) ?? 0;
     const pairs = step.children
       .map((child, index) => [child, shadow.children[index]] as const)
@@ -357,9 +400,9 @@ export function goalRows(
       })),
       waitingOn: shadow.waitingOn,
       blocks: (step.blocks ?? []).map(ref),
-      children: pairs.map(([child, childShadow]) => toRow(child, childShadow)),
+      children: pairs.map(([child, childShadow]) => toRow(child, childShadow, below)),
       step,
-      need: shadow.status === 'blocked' && shadow.blockKind !== 'steps' ? shadow.blockAsk : null,
+      need: (onYou ? shadow.blockAsk : null) ?? waits,
       health: goalHealth(shadow, facts),
       move: moveWordsFor(
         planMoveOf(asPlan(shadow)),
