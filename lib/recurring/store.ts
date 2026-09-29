@@ -43,6 +43,7 @@ export async function fileRecurringReading(
     kind: reading.kind,
     senderDomain: opts.senderDomain,
     currency: reading.currency,
+    cardStatement: reading.cardStatement === true,
   });
 
   // One row per email (recurring_charges_message_uq). A message read twice,
@@ -81,6 +82,7 @@ async function ensurePayment(
     kind: RecurringKind;
     senderDomain: string | null;
     currency: string;
+    cardStatement: boolean;
   },
 ): Promise<string> {
   // A key the person corrected (renamed, merged or moved on the Recurring
@@ -106,6 +108,10 @@ async function ensurePayment(
 
   // Two readings of the same new payee in one page race here; the unique key
   // makes the loser read the winner's row instead of failing.
+  //
+  // A card statement is the card's balance, and what it paid for is counted
+  // already, so a new card starts out of the monthly total. Only a new row:
+  // a payment already there keeps the status the person gave it (plan #1214).
   const { data: created, error: createError } = await supabase
     .from('recurring_payments')
     .upsert(
@@ -116,6 +122,7 @@ async function ensurePayment(
         kind: opts.kind,
         sender_domain: opts.senderDomain,
         currency: opts.currency,
+        ...(opts.cardStatement ? { status: 'ignored' } : {}),
       },
       { onConflict: 'user_id,payee_key', ignoreDuplicates: true },
     )

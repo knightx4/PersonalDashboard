@@ -6,6 +6,7 @@ import { unwrapQuotedOriginal } from '@/lib/email/extract/forwarded';
 import { decideWithJev } from '@/lib/jev/decide';
 import {
   heuristicRecurring,
+  looksLikeCardStatement,
   namesTheStore,
   parseRecurringExtraction,
   type RecurringEvent,
@@ -47,6 +48,7 @@ Return ONLY a JSON object with these fields:
 - period: "week", "month", "quarter" or "year" when the email says how often; else null.
 - occurredOn: YYYY-MM-DD of the charge or bill; for a notice, the email's date.
 - dueOn: YYYY-MM-DD the email names for the next renewal, the due date, the trial end, or when a new price starts; else null.
+- cardStatement: true when the email is a credit card statement ("Your credit card statement is available", a statement balance and a minimum payment due); else false. For a card statement, payee is the card as the person would name it ("Chase Sapphire", "Amex Gold"), kind is "bill", event is "bill", and amountCents is the statement balance.
 
 Money is integer cents only (15.49 becomes 1549).
 If the email is a one-off purchase or order, a refund, a newsletter or marketing with no payment of theirs in it, a job application, or anything else that is not about a payment they make regularly, return {"error":"not_recurring"}.`;
@@ -70,7 +72,9 @@ export type RecurringHaikuInput = {
  */
 export type RecurringHaikuReading = ReturnType<typeof parseRecurringExtraction> | null;
 
-export async function readRecurringWithHaiku(input: RecurringHaikuInput): Promise<RecurringHaikuReading> {
+export async function readRecurringWithHaiku(
+  input: RecurringHaikuInput,
+): Promise<RecurringHaikuReading> {
   const apiKey = input.apiKey ?? process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
   const { email } = input;
@@ -126,7 +130,18 @@ type Gated = { by: 'jev'; event: RecurringEvent | null } | { by: 'haiku'; readin
  *
  * Jev's spend goes to the same `onSpend` as Haiku's.
  */
-export async function extractRecurringFromEmail(input: {
+export async function extractRecurringFromEmail(input: ExtractInput): Promise<RecurringReading> {
+  const reading = await readRecurring(input);
+  if (!reading.ok || reading.value.cardStatement) return reading;
+  // The text decides too: a card statement the model did not flag is still
+  // one, and files as not counted (plan #1214).
+  const email = unwrapQuotedOriginal(input);
+  return looksLikeCardStatement(email)
+    ? { ...reading, value: { ...reading.value, cardStatement: true } }
+    : reading;
+}
+
+type ExtractInput = {
   subject: string;
   text: string;
   fromAddress: string | null;
@@ -141,7 +156,9 @@ export async function extractRecurringFromEmail(input: {
   jevFetch?: typeof fetch;
   /** Haiku's reading; replaced in tests. */
   haiku?: (input: RecurringHaikuInput) => Promise<RecurringHaikuReading>;
-}): Promise<RecurringReading> {
+};
+
+async function readRecurring(input: ExtractInput): Promise<RecurringReading> {
   // A forwarded receipt is read as the original.
   const email = unwrapQuotedOriginal(input);
   // A reading that files a store's receipt under the store is no reading:
