@@ -153,6 +153,26 @@ missing** and proposes only what the existing goals leave out, never
 something you turned down. The rules for the run are in
 `.claude/skills/goals`, "Planning an area".
 
+### Errands
+
+An errand is a one-off job with a date, such as finding a birthday present or
+booking a car service. It is a goal with `errand` set and a `due_on`, and the
+database refuses an errand without the date.
+
+**Add an errand** on the Goals home takes what the job is, the date it is due
+by and the area it goes in, which starts on the area of the soonest errand
+(or the first area). One press saves it and starts a goal run whose brief says
+it is an errand and when it is due, so Dash maps it as the goals skill's "An
+errand" says: three to five steps with no stages, its own research worked in
+the same run, and no weekly help. If the run cannot start, because no goals
+routine is set or the fire fails, the errand is still saved and the message
+says why Dash did not start; **Work on this** on its page tries again.
+
+The home lists open errands under **Errands**, above the areas, soonest due
+first, each with its date. An errand is not listed under its area as well.
+Its own page shows the due date beside the title and leaves out the stage
+track and weekly help. The goal's menu turns any goal into an errand or back.
+
 ## Approval
 
 You approve what Claude does outside the plan, and the goals it proposes. You

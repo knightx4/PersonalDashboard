@@ -223,13 +223,16 @@ export async function unarchiveArea(client: GoalsSupabaseClient, id: string): Pr
   return true;
 }
 
-/** A new goal at the end of its area. The area must be one of yours and live. */
+/**
+ * A new goal at the end of its area, and its id. Null when the area is not one
+ * of yours and live.
+ */
 export async function insertGoal(
   client: GoalsSupabaseClient,
   userId: string,
   areaId: string,
   fields: GoalFields & { title: string },
-): Promise<boolean> {
+): Promise<string | null> {
   const { data: area, error: areaError } = await client
     .from('areas')
     .select('id')
@@ -237,7 +240,7 @@ export async function insertGoal(
     .is('archived_at', null)
     .maybeSingle();
   if (areaError) throw new Error(areaError.message);
-  if (!area) return false;
+  if (!area) return null;
 
   const { data: rows, error: readError } = await client
     .from('items')
@@ -247,19 +250,23 @@ export async function insertGoal(
     .is('archived_at', null);
   if (readError) throw new Error(readError.message);
 
-  const { error } = await client.from('items').insert({
-    user_id: userId,
-    level: 'goal',
-    area_id: areaId,
-    title: fields.title,
-    acceptance: fields.acceptance ?? null,
-    fog: fields.fog ?? null,
-    errand: fields.errand ?? false,
-    due_on: fields.dueOn ?? null,
-    position: nextPosition((rows ?? []).map((row) => row.position as number)),
-  });
+  const { data: inserted, error } = await client
+    .from('items')
+    .insert({
+      user_id: userId,
+      level: 'goal',
+      area_id: areaId,
+      title: fields.title,
+      acceptance: fields.acceptance ?? null,
+      fog: fields.fog ?? null,
+      errand: fields.errand ?? false,
+      due_on: fields.dueOn ?? null,
+      position: nextPosition((rows ?? []).map((row) => row.position as number)),
+    })
+    .select('id')
+    .single();
   if (error) throw new Error(error.message);
-  return true;
+  return inserted.id as string;
 }
 
 /**

@@ -72,7 +72,8 @@ export async function loadShaping(
 export async function startGoalRun(input: {
   client: GoalsSupabaseClient;
   userId: string;
-  goal: { id: string; title: string };
+  /** `errandDueOn` is set for an errand, so the brief says to map it short (plan #1262). */
+  goal: { id: string; title: string; errandDueOn?: string | null };
   routine: RoutineTarget;
   fetch?: typeof globalThis.fetch;
 }): Promise<{ ok: true; detail: string; runId: string } | { ok: false; error: string }> {
@@ -84,7 +85,14 @@ export async function startGoalRun(input: {
     ...input,
     job: 'goal',
     itemId: goal.id,
-    text: (runId) => goalRunText({ goalId: goal.id, goalTitle: goal.title, userId, runId }),
+    text: (runId) =>
+      goalRunText({
+        goalId: goal.id,
+        goalTitle: goal.title,
+        userId,
+        runId,
+        errandDueOn: goal.errandDueOn,
+      }),
   });
   return result.ok
     ? { ok: true, detail: result.detail, runId: result.runId }
