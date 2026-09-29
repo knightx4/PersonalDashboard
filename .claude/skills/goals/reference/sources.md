@@ -389,7 +389,7 @@ Subscriptions and bills they pay regularly, found in their mail, with the latest
 
 - Search: `payee`
 - Name a row by `payee`; link it by `id`
-- amount_cents is in currency, per period (week, month, quarter, year). status 'cancelled' means a cancellation email came after the last charge; a next_date in the past means a charge that never arrived.
+- amount_cents is in currency, per period (week, month, quarter, year). status 'cancelled' means a cancellation email came after the last charge; a next_date in the past means a charge that never arrived. status 'ignored' means the person marked it as not a regular payment (a credit card statement, say): it is left out of what they pay each month and off the agenda, so leave it out of spending too.
 
 ### `public.recurring_charges` (Shopping)
 

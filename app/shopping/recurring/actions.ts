@@ -7,6 +7,7 @@ import {
   mergePayments,
   moveCharges,
   renamePayment,
+  setPaymentCounted,
   type CorrectionResult,
 } from '@/lib/recurring/corrections';
 
@@ -97,4 +98,25 @@ export async function moveRecurringCharges(
   if (result.error) return { error: result.error };
   refresh();
   return {};
+}
+
+// latency: pending
+export async function setRecurringCounted(
+  _prev: RecurringActionState,
+  formData: FormData,
+): Promise<RecurringActionState> {
+  const user = await requireUser();
+  const parsed = z
+    .object({ id: z.string().uuid(), counted: z.enum(['yes', 'no']) })
+    .safeParse({ id: formData.get('id'), counted: formData.get('counted') });
+  if (!parsed.success) return { error: 'That payment could not be found.' };
+
+  const supabase = await createClient();
+  const result = await setPaymentCounted(supabase, {
+    userId: user.id,
+    paymentId: parsed.data.id,
+    counted: parsed.data.counted === 'yes',
+  });
+  if (!result.error) refresh();
+  return result;
 }
