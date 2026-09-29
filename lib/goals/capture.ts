@@ -125,8 +125,16 @@ export function captureContext(
   return out;
 }
 
-/** The goals and steps written out, then the sentence. */
-export function captureMessage(context: CaptureContext, body: string, today: string): string {
+/**
+ * The goals and steps written out, then the sentence. `hint` is the move the
+ * capture box already settled on (lib/goals/capture-sort.ts), when it did.
+ */
+export function captureMessage(
+  context: CaptureContext,
+  body: string,
+  today: string,
+  hint?: string | null,
+): string {
   const lines: string[] = [`Today is ${today}.`, '', 'Open goals and their open steps:'];
   if (context.goals.length === 0) lines.push('(none)');
   for (const goal of context.goals) {
@@ -146,6 +154,7 @@ export function captureMessage(context: CaptureContext, body: string, today: str
       lines.push(`${indent}${step.ref} [${shape}]: ${step.title}`);
     }
   }
+  if (hint) lines.push('', hint);
   lines.push('', 'What happened, as the person wrote it:', body);
   return lines.join('\n');
 }
@@ -376,6 +385,7 @@ export async function fileCapture(
   body: string,
   today: string,
   deps: FilingDeps,
+  hint?: string | null,
 ): Promise<FilingResult> {
   const trimmed = body.trim();
   if (!trimmed) return { ok: false, error: 'Write what happened first.', captureId: null };
@@ -389,7 +399,7 @@ export async function fileCapture(
 
   const [captureId, context] = await Promise.all([deps.keep(body), deps.context()]);
 
-  const reply = await deps.ask(captureMessage(context, trimmed, today));
+  const reply = await deps.ask(captureMessage(context, trimmed, today, hint));
   if (!reply.ok) return { ok: false, error: `${reply.error} What you wrote is kept.`, captureId };
 
   const filed: FiledEntry[] = [];
