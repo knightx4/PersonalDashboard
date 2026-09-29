@@ -48,6 +48,12 @@ describe('pickTrialSample', () => {
     expect(first).toHaveLength(7);
     expect(first.map((r) => r.id)).toEqual(second.map((r) => r.id));
   });
+
+  it('narrows to the stored labels asked for, with no extra not-relevant mail', () => {
+    const mixed = [...rows, ledger('i', 'interview_invite'), ledger('s', 'scheduling')];
+    const ids = pickTrialSample(mixed, { labels: ['interview_invite', 'scheduling'] }).map((r) => r.id);
+    expect(ids.sort()).toEqual(['i', 's']);
+  });
 });
 
 describe('handLabelFor', () => {

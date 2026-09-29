@@ -13,6 +13,7 @@ import { loadCompanies, loadExcludedDomains, loadLinkCandidates } from '@/lib/jo
 import { normalizeTimeZone } from '@/lib/core/timezone';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpendReports, type SpendClient } from '@/lib/core/spend/record';
+import { jevEnabledFor } from '@/lib/jev/enabled';
 
 /**
  * The job search workspace, as something the shared sync can hand mail to.
@@ -33,6 +34,9 @@ export function jobLinker(
     if (!core) return;
     await recordSpendReports(core, userId, { module: 'jobs', operation: 'classify-job-email' }, spend);
   };
+  // Read once per sweep or batch, never per message. Without the core client
+  // there is no way to know, and not knowing means no text goes to TypeSafe.
+  const jevEnabled = (userId: string) => (core ? jevEnabledFor(core, userId) : Promise.resolve(false));
 
   return {
     domain: 'jobs',
@@ -48,11 +52,12 @@ export function jobLinker(
      */
     async sweep({ userId, accountId, accountEmail, accessToken, budgetMs }) {
       const spend: SpendReport[] = [];
-      const [companies, candidates, excludedDomains, profile] = await Promise.all([
+      const [companies, candidates, excludedDomains, profile, jev] = await Promise.all([
         loadCompanies(supabase, userId),
         loadLinkCandidates(supabase, userId),
         loadExcludedDomains(supabase, userId),
         supabase.from('profiles').select('timezone').eq('id', userId).maybeSingle(),
+        jevEnabled(userId),
       ]);
 
       await reprocessHeldMessages(
@@ -73,6 +78,7 @@ export function jobLinker(
           timezone: normalizeTimeZone(profile.data?.timezone as string | undefined),
           counters: emptyCounters(),
           onSpend: (report) => spend.push(report),
+          jevEnabled: jev,
         },
         { budgetMs },
       );
@@ -88,12 +94,13 @@ export function jobLinker(
       // calls whether or not this batch had anything in it.
       if (envelopes.length === 0) return counters;
 
-      const [companies, candidates, excludedDomains, profile] = await Promise.all([
+      const [companies, candidates, excludedDomains, profile, jev] = await Promise.all([
         loadCompanies(supabase, userId),
         loadLinkCandidates(supabase, userId),
         loadExcludedDomains(supabase, userId),
         // Only for invites that state a wall-clock time with no zone at all.
         supabase.from('profiles').select('timezone').eq('id', userId).maybeSingle(),
+        jevEnabled(userId),
       ]);
 
       const ingest = emptyCounters();
@@ -118,6 +125,7 @@ export function jobLinker(
         timezone: normalizeTimeZone(profile.data?.timezone as string | undefined),
         counters: ingest,
         onSpend: (report: SpendReport) => spend.push(report),
+        jevEnabled: jev,
       };
 
       if (envelopes.length > 0) await linkEnvelopes(supabase, ctx, envelopes);

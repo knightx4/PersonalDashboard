@@ -45,14 +45,22 @@ function sampleKey(trial: string, id: string): string {
  *
  * Every message with a job label. Every not-relevant one Haiku read (it has a
  * confidence) or the person relabelled. Then NOT_RELEVANT_SAMPLE of the rest.
+ *
+ * `labels` narrows a re-run to the messages stored under those labels, all of
+ * them, with no extra not-relevant sample: the second pass on
+ * interview_invite and scheduling after their options were reworded (#1166).
  */
 export function pickTrialSample<R extends LedgerRow>(
   rows: readonly R[],
-  opts: { trial?: string; notRelevantSample?: number } = {},
+  opts: { trial?: string; notRelevantSample?: number; labels?: readonly string[] } = {},
 ): R[] {
   const trial = opts.trial ?? JEV_JOB_EMAIL_TRIAL;
-  const extra = opts.notRelevantSample ?? NOT_RELEVANT_SAMPLE;
   const byKey = (a: R, b: R) => sampleKey(trial, a.id).localeCompare(sampleKey(trial, b.id));
+  if (opts.labels && opts.labels.length > 0) {
+    const labels = new Set(opts.labels);
+    return rows.filter((row) => labels.has(row.classification)).sort(byKey);
+  }
+  const extra = opts.notRelevantSample ?? NOT_RELEVANT_SAMPLE;
 
   const kept: R[] = [];
   const rest: R[] = [];

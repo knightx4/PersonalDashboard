@@ -12,6 +12,13 @@ import { CLASSIFICATIONS, type MessageClassification } from './classify';
  *
  * Jev reads the same text Haiku reads: sender, reply-to, subject and the
  * first 6,000 characters of the body.
+ *
+ * `interview_invite` and `scheduling` follow the stored labels and the
+ * pipeline: a booked interview is `interview_invite`, which moves the
+ * application to its interview stage (eventKindFor gives interview_scheduled),
+ * and finding a time is `scheduling`, which only moves it to in_process. The
+ * pilot's first wording had them nearly the other way round
+ * (docs/trials/2026-09-29-jev-job-email.md).
  */
 
 export type JevJobEmailLabel = MessageClassification | 'other';
@@ -25,9 +32,10 @@ export const JOB_EMAIL_OPTIONS: Readonly<Record<JevJobEmailLabel, string>> = {
     'A recruiter or hiring person contacting the candidate first, about a role the candidate has not applied for.',
   recruiter_reply:
     'A person at the employer or an agency writing back about an application or conversation already under way, not to invite, schedule, assess, offer or reject.',
-  interview_invite: 'An invitation to interview, or to book an interview slot.',
+  interview_invite:
+    'An interview that is booked: an invitation that gives the time, a confirmation of the time, a reminder before it, or a calendar invite for it.',
   scheduling:
-    'Arranging, confirming, moving or cancelling the time of an interview or call already agreed, including calendar and booking tool notices.',
+    'Finding a time for an interview or call that is not booked yet: a request for availability, a list of offered slots, or a link to a booking page.',
   assessment: 'A take-home task, coding test, questionnaire or other assessment to complete.',
   offer: 'A job offer, or the paperwork for one.',
   networking:
@@ -60,6 +68,14 @@ export function jobEmailState(input: {
     body: input.body.slice(0, JEV_BODY_CHARS),
   };
 }
+
+/**
+ * Labels Jev's answer is never used for, however sure it is: the trial found
+ * `recruiter_reply` unreliable (2 of 7 confident answers agreed, and the label
+ * feeds the response rate), `offer` is rare and costly to get wrong, and
+ * `other` has no classification to store. Haiku decides these.
+ */
+export const JEV_UNTRUSTED_LABELS: ReadonlySet<JevJobEmailLabel> = new Set(['recruiter_reply', 'offer', 'other']);
 
 export function isJobEmailLabel(value: string): value is JevJobEmailLabel {
   return value === 'other' || (CLASSIFICATIONS as readonly string[]).includes(value);
