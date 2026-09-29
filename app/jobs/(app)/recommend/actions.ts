@@ -8,6 +8,10 @@ import { recordSessionSpend } from '@/lib/core/spend/session';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { detectPosting } from '@/lib/jobs/ats';
 import { runSuggestionsFor } from '@/lib/jobs/suggest/run';
+import { scoreOpeningsFor } from '@/lib/jobs/suggest/score-run';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { jevEnabledFor } from '@/lib/jev/enabled';
+import type { SpendReport } from '@/lib/core/spend/pricing';
 
 /**
  * Dash's recommendations (job_search.suggestions, 0028), shown at the top of
@@ -68,6 +72,14 @@ export async function suggestOpenings(): Promise<SuggestState> {
     return { error: error instanceof Error ? error.message : 'The search could not be made.' };
   }
   await recordSessionSpend(user.id, { module: 'jobs', operation: 'find-openings' }, result.apply.spend);
+  // The new openings get Jev's eight answers now rather than on tomorrow's run.
+  if (result.apply.written > 0 && (await jevEnabledFor(await createCoreClient(), user.id))) {
+    const scoreSpend: SpendReport[] = [];
+    await scoreOpeningsFor(supabase, user.id, { onSpend: (report) => scoreSpend.push(report) }).catch((err) =>
+      console.error('[jobs suggestions] score', err instanceof Error ? err.message : err),
+    );
+    await recordSessionSpend(user.id, { module: 'jobs', operation: 'score-openings' }, scoreSpend);
+  }
   revalidatePaths();
   if (result.apply.error) return { error: result.apply.error };
   if (!result.apply.ran) return { error: null, message: 'Write a career goals entry or add a role first.' };
