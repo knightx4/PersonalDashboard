@@ -23,7 +23,10 @@ import { loadPlan, planGoalFor } from '@/lib/learn/lessons/plan-store';
 import type { PlanUnit } from '@/lib/learn/lessons/plan-view';
 import type { ProjectView } from '@/lib/learn/lessons/project';
 import { loadProjectView } from '@/lib/learn/lessons/project-store';
+import { isOwner } from '@/lib/dev/owner';
+import { loadSubjectChannels, type SubjectChannels } from '@/lib/learn/youtube/subject-channels';
 import { deleteSubject } from './actions';
+import { ChannelsSection } from './channels';
 import { WriteCurriculum } from './curriculum';
 import { PlanSection } from './plan';
 import { PullArticles } from './pull-articles';
@@ -62,7 +65,8 @@ export const maxDuration = 300;
  *
  * Writes from here: opening a unit or naming another goal, which saves nothing
  * until the chain is approved; writing a curriculum for a track that has
- * none; deleting the track; and naming Wikipedia articles at the foot of the
+ * none; deleting the track; finding YouTube channels for it and unfollowing
+ * one (the owner only); and naming Wikipedia articles at the foot of the
  * page, which stores them in the shared catalogue.
  *
  * Four states and three ways of establishing them, and the screen shows both.
@@ -280,6 +284,12 @@ export default async function SubjectPage({
         loadProjectView(supabase, user.id, id).catch(() => null),
       ])
     : [null, null];
+  // The Channels section is the owner's alone (plan #1199): finding channels
+  // spends their YouTube quota and transcript credits. Channels that cannot
+  // be read leave the section showing none, with the button to find some.
+  const channels: SubjectChannels | null = (await isOwner({ user }))
+    ? await loadSubjectChannels(supabase, user.id, id).catch(() => ({ channels: [], kept: new Set<string>() }))
+    : null;
   const counts = countStates(graph);
   const { rows: unitRows, outside } = curriculumRows(units, goals, graph);
   const live =
@@ -484,6 +494,8 @@ export default async function SubjectPage({
       {/* A second goal in a subject you already have is the cheap case: the
           generator is told what is here and proposes only what is missing. */}
       <GoalForm subjectId={subject.id} />
+
+      {channels && <ChannelsSection subjectId={id} channels={channels.channels} kept={channels.kept} />}
 
       <PullArticles />
       <PullCourse />
