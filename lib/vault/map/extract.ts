@@ -19,6 +19,7 @@ import {
 } from '@/lib/vault/map/proposal';
 import {
   isGenerated,
+  notReadDetail,
   readsForMap,
   whyNotRead,
   type MapVerdict,
@@ -212,6 +213,8 @@ export async function proposeNoteMap(input: {
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
+  /** Classify on Jev first (plan #1168); see classifyForMap. */
+  jevEnabled?: boolean;
 }): Promise<ProposeResult> {
   const { note } = input;
 
@@ -228,6 +231,7 @@ export async function proposeNoteMap(input: {
       anthropicApiKey: input.anthropicApiKey,
       client,
       onSpend: input.onSpend,
+      jevEnabled: input.jevEnabled,
     });
   } catch (error) {
     return {
@@ -238,7 +242,7 @@ export async function proposeNoteMap(input: {
   }
 
   if (!readsForMap(verdict.noteClass)) {
-    return { ok: false, reason: 'operational', verdict, detail: `Not read: ${verdict.reason}` };
+    return { ok: false, reason: 'operational', verdict, detail: notReadDetail(verdict) };
   }
 
   const { chunks, skipped } = chunkNote(note.body);

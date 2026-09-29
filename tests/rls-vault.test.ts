@@ -121,6 +121,11 @@ beforeAll(async () => {
     values (${userA}, ${sweepA}, ${noteA}, 'sha-Journal/2019-04-02.md', 'journal',
             'Not read: notes in Me/ are journals.')`;
 
+  // A map trial answer on that note (plan #1168); only the trial job writes these.
+  await admin`
+    insert into jev_trial_answers (user_id, trial, note_id, blob_sha, not_sent)
+    values (${userA}, 'test', ${noteA}, 'sha-Journal/2019-04-02.md', 'journal')`;
+
   // A merge proposal (plan #811). The pair carries no foreign key, so any two
   // of A's ids stand in for two themes without adding a theme the map counts
   // above would see.
@@ -200,6 +205,7 @@ describe('RLS coverage', () => {
       where n.nspname = 'obsidian' and c.relkind = 'r'
       order by 1`;
     expect(rows.map((r) => r.tablename)).toEqual([
+      'jev_trial_answers',
       'map_merge_proposals',
       'map_merge_resets',
       'map_merges',
@@ -227,6 +233,13 @@ describe('RLS coverage', () => {
 });
 
 describe('cross-user reads', () => {
+  it('shows a map trial answer to its owner only', async () => {
+    const count = (user: string) =>
+      asUser(user, async (tx) => (await tx`select id from jev_trial_answers`).length);
+    expect(await count(userA)).toBe(1);
+    expect(await count(userB)).toBe(0);
+  });
+
   it('shows the owner their vault, its notes and its runs', async () => {
     const seen = await asUser(userA, async (tx) => ({
       connections: (await tx`select id from vault_connections`).length,
