@@ -321,7 +321,9 @@ Rules:
   unclear, look it up before reporting the posting.
 - Match the location and seniority their writing and past roles point to.
 - Weigh the newest career goals entry most. When it names the kind of work or
-  company they want most, fill the list with that first.
+  company they want most, fill the list with that first. When it asks for
+  fewer of a kind of role without ruling it out, include at most one of that
+  kind, and only when it is a strong match.
 - Up to ${MAX_OPENINGS}. Fewer, well matched, beat a padded list.
 
 For each, give:
