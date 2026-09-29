@@ -2,6 +2,7 @@ import 'server-only';
 
 import { fireFeatureRoutine, resolveRoutineId, type RoutineTarget } from '@/lib/feedback/routine';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
+import { holdActingSteps } from '@/lib/goals/hold-acts-store';
 import type { RunJob } from '@/lib/goals/runs';
 import { areaRunText, goalRunText, type GoalRun } from '@/lib/goals/shaping';
 
@@ -76,6 +77,9 @@ export async function startGoalRun(input: {
   fetch?: typeof globalThis.fetch;
 }): Promise<{ ok: true; detail: string; runId: string } | { ok: false; error: string }> {
   const { goal, userId } = input;
+  // Before the run reads the tree, a Claude step that acts outside the plan
+  // becomes a proposal it will not work (plan #1183).
+  await holdActingSteps({ client: input.client, userId });
   const result = await recordAndFire({
     ...input,
     job: 'goal',

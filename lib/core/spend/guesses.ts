@@ -287,4 +287,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // A morning's thirty-odd items, each read against eighty steps in two
   // requests of about three thousand tokens.
   'filter-evidence': background(run(JEV, 180_000, 0)),
+  // A step's title, detail and done-when, about a hundred and fifty tokens
+  // with the question, for each of a dozen open Claude steps.
+  'check-step-acts': background(run(JEV, 12 * 150, 0)),
+  // One held step in, one sentence out.
+  'write-acts-sentence': background(unit(HAIKU, 450, 40)),
 };
