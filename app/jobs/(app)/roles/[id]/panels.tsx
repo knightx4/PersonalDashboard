@@ -22,6 +22,7 @@ import { Card, CardSection, cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { EditableProse } from '@/components/ui/editable-prose';
+import { FoldingMarkdown } from '@/components/ui/folding-markdown';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { Field, FieldError, FieldHint, Textarea } from '@/components/ui/field';
@@ -3076,6 +3077,8 @@ function InterviewCard({
               <CollapsibleField label="Prep" defaultOpen>
                 <EditableProse
                   label="Prep for this round"
+                  markdown
+                  expandable
                   value={prep}
                   startEditing={prep.trim() === ''}
                   placeholder="What to go in knowing, and what to ask."
@@ -3092,6 +3095,8 @@ function InterviewCard({
               <CollapsibleField label="Interview notes" defaultOpen>
                 <EditableProse
                   label="Notes on this interview"
+                  markdown
+                  expandable
                   value={notes}
                   startEditing={notes.trim() === ''}
                   placeholder="How it went, who was in it, what they pressed on."
@@ -3106,7 +3111,7 @@ function InterviewCard({
             )}
             {interview.customNotes.map((note) => (
               <article key={note.id} className="rounded-lg bg-sunken px-3 py-2">
-                <p className="whitespace-pre-wrap text-ui text-ink">{note.body}</p>
+                <FoldingMarkdown markdown={note.body} className="text-ui text-ink" />
                 <p className="tabular mt-1 text-small text-ink-muted">
                   {formatDate(note.createdAt, timezone)}
                 </p>

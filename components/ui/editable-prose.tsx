@@ -5,6 +5,7 @@ import { Maximize2, Pencil, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { FieldError, Textarea } from '@/components/ui/field';
+import { FoldingMarkdown } from '@/components/ui/folding-markdown';
 import { popoverSurface, scrim } from '@/components/ui/popover';
 
 /**
@@ -43,6 +44,7 @@ export function EditableProse({
   placeholder,
   expandable = false,
   startEditing = false,
+  markdown = false,
   className,
 }: {
   value: string;
@@ -69,6 +71,14 @@ export function EditableProse({
    * a card is the wrong shape to read or write them in.
    */
   expandable?: boolean;
+  /**
+   * Read the value as markdown, each heading folding what sits under it.
+   *
+   * The read state can no longer be one big button then, because a fold
+   * inside a button cannot be opened: the note is set as a block and a small
+   * Edit beside it opens the editor.
+   */
+  markdown?: boolean;
   className?: string;
 }) {
   const [editing, setEditing] = useState(startEditing);
@@ -153,6 +163,19 @@ export function EditableProse({
             <FieldError>{error}</FieldError>
           </div>
         </>
+      ) : markdown && value.trim() ? (
+        <div className="group/prose relative">
+          <FoldingMarkdown markdown={value} className="max-w-prose pr-12 text-ui text-ink" />
+          <button
+            type="button"
+            onClick={begin}
+            title={editLabel ?? `Edit ${label.toLowerCase()}`}
+            className="press absolute right-0 top-0 inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-small text-ink-ghost transition-colors duration-150 hover:bg-sunken hover:text-ink-muted"
+          >
+            <Pencil className="size-3" strokeWidth={1.75} aria-hidden />
+            Edit
+          </button>
+        </div>
       ) : (
         <button
           type="button"

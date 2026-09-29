@@ -1925,6 +1925,50 @@ form[data-auto-submit] [data-fallback-submit] {
   padding: 0.1em 0.35em;
 }
 
+.jobs-prose table {
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+
+.jobs-prose th,
+.jobs-prose td {
+  border: 1px solid var(--c-border);
+  padding: 0.25em 0.5em;
+  text-align: left;
+  vertical-align: top;
+}
+
+.jobs-prose blockquote {
+  border-left: 2px solid var(--c-border);
+  color: var(--c-ink-muted);
+  padding-left: 0.75em;
+}
+
+/* A heading in a folding note (components/ui/folding-markdown.tsx). The
+   summary is the heading, so the level is carried by weight and size here
+   rather than by an <h2> that would sit outside the fold. */
+.jobs-prose .fold-title {
+  color: var(--c-ink);
+  font-weight: 600;
+}
+
+.jobs-prose .fold-section[data-level='1'] > summary .fold-title,
+.jobs-prose .fold-section[data-level='2'] > summary .fold-title {
+  font-size: 1.05em;
+}
+
+.jobs-prose .fold-body {
+  border-left: 1px solid var(--c-border);
+  margin-left: 0.4rem;
+  margin-top: 0.3em;
+  padding-bottom: 0.2em;
+  padding-left: 0.9rem;
+}
+
+.jobs-prose .fold-body > * + * {
+  margin-top: 0.6em;
+}
+
 /* ---------------------------------------------------------------------------
  * Comment prose.
  *

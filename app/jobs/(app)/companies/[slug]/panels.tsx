@@ -7,6 +7,7 @@ import { CardSection } from '@/components/ui/card';
 import { Field, FieldError, Input, Select, Textarea } from '@/components/ui/field';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { EditableProse } from '@/components/ui/editable-prose';
+import { FoldingMarkdown } from '@/components/ui/folding-markdown';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { addNote } from '@/app/jobs/(app)/roles/[id]/actions';
@@ -121,6 +122,7 @@ function Research({ companyId, research }: { companyId: string; research: string
           label="What you know about this place"
           value={text}
           expandable
+          markdown
           empty="Nothing on this company yet."
           placeholder="Funding, who runs the team, what the last two people you spoke to said, why you would or would not go."
           onSave={async (next) => {
@@ -774,7 +776,7 @@ function Notes({
       <ul className="mt-3 space-y-2">
         {notes.map((note) => (
           <li key={note.id} className="rounded-lg bg-canvas p-2.5">
-            <p className="whitespace-pre-wrap text-ui text-ink">{note.body}</p>
+            <FoldingMarkdown markdown={note.body} className="text-ui text-ink" />
             <p className="tabular mt-1 text-small text-ink-muted">
               {formatDate(note.createdAt, timezone)}
             </p>
