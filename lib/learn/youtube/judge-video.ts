@@ -10,7 +10,8 @@ import { clockTime } from './format';
 /**
  * Judging the videos on your list against what you are learning (plan #1066).
  *
- * Two passes, both Haiku. The screen reads a batch of videos by title,
+ * Two passes, both Haiku, or Jev first for an account that opted in
+ * (judging.ts, plan #1170). The screen reads a batch of videos by title,
  * channel, length and description (or the summary already written from it)
  * and throws out the clear skips, so a video that is plainly not for you
  * never costs a transcript credit. Everything it lets through is judged a
@@ -339,9 +340,26 @@ export function judgePrompt(profile: LearnerProfile, video: VideoToJudge): strin
   return lines.join('\n');
 }
 
+/**
+ * A verdict Jev has already given (plan #1170), for which Haiku only names
+ * the windows: the stretch for a watch, the points for a card. `line` is
+ * the reason stored for a card, which Haiku is not asked to write, and for a
+ * watch whose reason comes back empty.
+ */
+export type SettledVerdict = { verdict: 'watch' | 'card'; line: string };
+
+/** What the system prompt gains when the verdict is already settled. */
+export function settledRules(settled: SettledVerdict): string {
+  return settled.verdict === 'watch'
+    ? `THE VERDICT IS SETTLED: WATCH. Report WATCH, name the best stretch, list
+its windows, and write the reason.`
+    : `THE VERDICT IS SETTLED: CARD. Report CARD and list the windows worth a
+card, each with its point. Leave the reason empty.`;
+}
+
 const judgeReplySchema = z.object({
   verdict: z.enum(['watch', 'card', 'skip']),
-  why: z.string(),
+  why: z.string().optional().default(''),
   best_from: z.coerce.number().int().optional().nullable(),
   best_to: z.coerce.number().int().optional().nullable(),
   windows: z
@@ -370,11 +388,17 @@ export type Judged =
  * end. Card windows outside the list are dropped, and a card verdict left with
  * none is refused for the same reason: #1067 has nothing to write from.
  */
-export function readJudgeReply(input: unknown, windows: readonly JudgeWindow[], durationSeconds: number | null): Judged {
+export function readJudgeReply(
+  input: unknown,
+  windows: readonly JudgeWindow[],
+  durationSeconds: number | null,
+  settled?: SettledVerdict,
+): Judged {
   const parsed = judgeReplySchema.safeParse(input);
   if (!parsed.success) return { outcome: 'failed', detail: 'The verdict came back malformed.' };
-  const reply = parsed.data;
-  const why = reply.why.trim();
+  const reply = settled ? { ...parsed.data, verdict: settled.verdict } : parsed.data;
+  // A settled card's reason is Jev's line, whatever Haiku wrote (the step's own rule).
+  const why = settled?.verdict === 'card' ? settled.line : reply.why.trim() || settled?.line || '';
   if (!why) return { outcome: 'failed', detail: 'The verdict came back with no reason.' };
 
   const at = (n: number | null | undefined) => (n && n >= 1 && n <= windows.length ? windows[n - 1] : null);
@@ -414,13 +438,14 @@ export function readJudgeReply(input: unknown, windows: readonly JudgeWindow[], 
   };
 }
 
-/** Judge one video. Never throws. */
+/** Judge one video, or name the windows for a verdict Jev settled. Never throws. */
 export async function judgeVideo(input: {
   profile: LearnerProfile;
   video: VideoToJudge;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
+  settled?: SettledVerdict;
 }): Promise<Judged> {
   if (input.video.windows.length === 0) return { outcome: 'failed', detail: 'Nothing to judge the video from.' };
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
@@ -429,7 +454,7 @@ export async function judgeVideo(input: {
     response = await client.messages.create({
       model: JUDGE_VIDEO_MODEL,
       max_tokens: 1024,
-      system: JUDGE_SYSTEM,
+      system: input.settled ? `${JUDGE_SYSTEM}\n\n${settledRules(input.settled)}` : JUDGE_SYSTEM,
       tools: [
         {
           name: JUDGE_TOOL,
@@ -451,7 +476,7 @@ export async function judgeVideo(input: {
                 },
               },
             },
-            required: ['verdict', 'why'],
+            required: input.settled?.verdict === 'card' ? ['verdict'] : ['verdict', 'why'],
           },
         },
       ],
@@ -464,7 +489,7 @@ export async function judgeVideo(input: {
   input.onSpend?.({ model: JUDGE_VIDEO_MODEL, usage: usageFrom(response.usage) });
   const block = response.content.find((part) => part.type === 'tool_use' && part.name === JUDGE_TOOL);
   if (!block || block.type !== 'tool_use') return { outcome: 'failed', detail: whyNoReport(response) };
-  return readJudgeReply(block.input, input.video.windows, input.video.durationSeconds);
+  return readJudgeReply(block.input, input.video.windows, input.video.durationSeconds, input.settled);
 }
 
 // ---------------------------------------------------------------------------

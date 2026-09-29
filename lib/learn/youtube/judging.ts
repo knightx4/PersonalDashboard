@@ -1,7 +1,8 @@
 import 'server-only';
 
 import type Anthropic from '@anthropic-ai/sdk';
-import type { SpendReport } from '@/lib/core/spend/pricing';
+import { sumByModel, type SpendReport } from '@/lib/core/spend/pricing';
+import { decideWithJev } from '@/lib/jev/decide';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { loadGraph, loadSubjects } from '@/lib/learn/graph/load';
 import { rootingFor } from '@/lib/learn/graph/rooting';
@@ -17,8 +18,19 @@ import {
   type LearnerProfile,
   type Verdict,
   type TranscriptStatus,
+  type SettledVerdict,
+  type VideoToJudge,
   type VideoToScreen,
 } from './judge-video';
+import {
+  JUDGE_QUESTION,
+  judgeState,
+  jevLine,
+  overrideFor,
+  SCREEN_QUESTION,
+  screenState,
+  VIDEO_JUDGE_ON_JEV,
+} from './judge-jev-question';
 import { loadTranscript, MAX_ATTEMPTS, queueTranscripts } from './transcripts';
 
 /**
@@ -38,6 +50,16 @@ import { loadTranscript, MAX_ATTEMPTS, queueTranscripts } from './transcripts';
  * are read, though, as examples in the profile both passes are sent. The
  * judge's own answer goes in judge_verdict beside the verdict, so a move keeps
  * what it disagreed with.
+ *
+ * For an account that opted in to Jev (plan #1170), both passes ask Jev one
+ * question per video first (judge-jev-question.ts). The screen skips what Jev
+ * is at least 0.8 sure is a clear skip and lets everything else through,
+ * because the screen's own rule is to look when in doubt; Haiku screens only
+ * what Jev could not answer. The second pass settles a skip Jev is 0.8 sure
+ * of with no Haiku call, and for a watch or card Jev is that sure of asks
+ * Haiku only to name the windows; below 0.8, Haiku judges it as before. A
+ * video on a channel or topic you filed against the judge is never settled
+ * by Jev: Haiku judges it, reading your filings as examples.
  *
  * Runs with the service client, so every read and write names the person.
  */
@@ -215,6 +237,49 @@ async function writeRow(learn: LearnSupabaseClient, video: ListVideo, update: Re
   if (error) throw new Error(`Storing the verdict failed: ${error.message}`);
 }
 
+type ScreenRow = { videoId: string; decision: 'skip' | 'look'; why: string | null };
+
+/**
+ * One screening batch put to Jev, a question per video. `settled` is what
+ * Jev decided: a skip it is 0.8 sure of, and a look at any confidence, since
+ * the screen looks when in doubt. `rest` goes to Haiku: the videos Jev
+ * could not answer and the ones your filings override. Jev's spend is
+ * reported once per model for the batch.
+ */
+async function screenWithJev(
+  batch: ListVideo[],
+  profile: LearnerProfile,
+  enabled: boolean,
+  onSpend: (report: SpendReport) => void,
+  jev: { apiKey?: string | null; fetch?: typeof fetch } = {},
+): Promise<{ settled: ScreenRow[]; rest: ListVideo[] }> {
+  if (!enabled) return { settled: [], rest: batch };
+  type Route = ScreenRow | { by: 'haiku' };
+  const reports: SpendReport[] = [];
+  const routes = await Promise.all(
+    batch.map(async (video): Promise<Route> => {
+      if (overrideFor(video, profile.filed)) return { by: 'haiku' };
+      const look: ScreenRow = { videoId: video.videoId, decision: 'look', why: null };
+      const decided = await decideWithJev<typeof SCREEN_QUESTION, Route>({
+        state: screenState(profile, video),
+        question: SCREEN_QUESTION,
+        read: (answer) =>
+          answer.choice === 'skip' ? { videoId: video.videoId, decision: 'skip', why: jevLine('screen', answer) } : look,
+        fallback: async (reason) => (reason.why === 'low-confidence' ? look : { by: 'haiku' }),
+        onSpend: (report) => reports.push(report),
+        apiKey: jev.apiKey,
+        fetch: jev.fetch,
+      });
+      return decided.value;
+    }),
+  );
+  for (const report of sumByModel(reports)) onSpend(report);
+  const settled: ScreenRow[] = [];
+  const rest: ListVideo[] = [];
+  routes.forEach((route, index) => ('by' in route ? rest.push(batch[index]) : settled.push(route)));
+  return { settled, rest };
+}
+
 /** Screen and judge until the list or the time runs out. */
 export async function judgeWatchLists(
   learn: LearnSupabaseClient,
@@ -227,6 +292,10 @@ export async function judgeWatchLists(
     now?: () => Date;
     /** Stands in for loadLearnerProfile, for tests. */
     profileFor?: (userId: string) => Promise<LearnerProfile>;
+    /** Whether this person's videos may go to Jev (jevEnabledFor). Without it, none do. */
+    jevEnabled?: (userId: string) => Promise<boolean>;
+    jevApiKey?: string | null;
+    jevFetch?: typeof fetch;
   },
 ): Promise<JudgePassResult> {
   const result: JudgePassResult = { skipped: 0, passed: 0, queued: 0, judged: 0, failed: 0, stopped: null };
@@ -239,6 +308,13 @@ export async function judgeWatchLists(
       profiles.set(userId, profile);
     }
     return profile;
+  };
+  const jevOn = new Map<string, Promise<boolean>>();
+  const onJev = (userId: string) => {
+    if (!VIDEO_JUDGE_ON_JEV || !options.jevEnabled) return Promise.resolve(false);
+    let on = jevOn.get(userId);
+    if (!on) jevOn.set(userId, (on = options.jevEnabled(userId)));
+    return on;
   };
   const outOfTime = () => {
     if (Date.now() < options.deadline) return false;
@@ -255,20 +331,31 @@ export async function judgeWatchLists(
     for (let from = 0; from < videos.length; from += SCREEN_BATCH) {
       if (outOfTime()) break screening;
       const batch = videos.slice(from, from + SCREEN_BATCH);
-      const screened = await screenVideos({
+      const { settled, rest } = await screenWithJev(
+        batch,
         profile,
-        videos: batch,
-        anthropicApiKey: options.anthropicApiKey,
-        client: options.client,
-        onSpend: options.onSpend ? (report) => options.onSpend!(userId, 'screen', report) : undefined,
-      });
-      if (!screened.ok) {
-        result.failed += batch.length;
-        console.error('[video judge] screening', screened.detail);
-        continue;
+        await onJev(userId),
+        (report) => options.onSpend?.(userId, 'screen', report),
+        { apiKey: options.jevApiKey, fetch: options.jevFetch },
+      );
+      const rows: { videoId: string; decision: 'skip' | 'look'; why: string | null }[] = [...settled];
+      if (rest.length > 0) {
+        const screened = await screenVideos({
+          profile,
+          videos: rest,
+          anthropicApiKey: options.anthropicApiKey,
+          client: options.client,
+          onSpend: options.onSpend ? (report) => options.onSpend!(userId, 'screen', report) : undefined,
+        });
+        if (!screened.ok) {
+          result.failed += rest.length;
+          console.error('[video judge] screening', screened.detail);
+        } else {
+          result.failed += rest.length - screened.screened.length;
+          rows.push(...screened.screened);
+        }
       }
-      result.failed += batch.length - screened.screened.length;
-      for (const row of screened.screened) {
+      for (const row of rows) {
         const video = batch.find((candidate) => candidate.videoId === row.videoId)!;
         const stamp = now().toISOString();
         if (row.decision === 'skip') {
@@ -310,22 +397,60 @@ export async function judgeWatchLists(
     const cues = from === 'transcript' ? (await loadTranscript(learn, video.videoId))?.cues ?? [] : [];
     const windows = cues.length > 0 ? transcriptWindows(cues, video.durationSeconds) : [];
     const judgedFrom = windows.length > 0 ? 'transcript' : 'chapters';
+    const profile = await profileOf(video.userId);
+    const toJudge: VideoToJudge = {
+      title: video.title,
+      channel: video.channel,
+      durationSeconds: video.durationSeconds,
+      description: video.description,
+      summary: video.summary,
+      keyPoints: video.keyPoints,
+      from: judgedFrom,
+      windows:
+        judgedFrom === 'transcript' ? windows : chapterWindows(chaptersFromDescription(video.description ?? ''), video.durationSeconds),
+    };
+    const onSpend = options.onSpend ? (report: SpendReport) => options.onSpend!(video.userId, 'judge', report) : undefined;
+
+    let settled: SettledVerdict | undefined;
+    if ((await onJev(video.userId)) && !overrideFor(video, profile.filed)) {
+      type Route = { by: 'jev'; verdict: Verdict; line: string } | { by: 'haiku' };
+      const decided = await decideWithJev<typeof JUDGE_QUESTION, Route>({
+        state: judgeState(profile, toJudge),
+        question: JUDGE_QUESTION,
+        read: (answer) => ({ by: 'jev', verdict: answer.choice, line: jevLine('judge', answer) }),
+        fallback: async () => ({ by: 'haiku' }),
+        onSpend,
+        apiKey: options.jevApiKey,
+        fetch: options.jevFetch,
+      });
+      const route = decided.value;
+      if (route.by === 'jev' && route.verdict === 'skip') {
+        const stamp = now().toISOString();
+        await writeRow(learn, video, {
+          verdict: 'skip',
+          judge_verdict: 'skip',
+          verdict_by: 'judge',
+          why: route.line,
+          judged_from: judgedFrom,
+          best_start_seconds: null,
+          best_end_seconds: null,
+          stretches: [],
+          judged_at: stamp,
+          updated_at: stamp,
+        });
+        result.judged += 1;
+        return;
+      }
+      if (route.by === 'jev' && route.verdict !== 'skip') settled = { verdict: route.verdict, line: route.line };
+    }
+
     const judged = await judgeVideo({
-      profile: await profileOf(video.userId),
-      video: {
-        title: video.title,
-        channel: video.channel,
-        durationSeconds: video.durationSeconds,
-        description: video.description,
-        summary: video.summary,
-        keyPoints: video.keyPoints,
-        from: judgedFrom,
-        windows:
-          judgedFrom === 'transcript' ? windows : chapterWindows(chaptersFromDescription(video.description ?? ''), video.durationSeconds),
-      },
+      profile,
+      video: toJudge,
       anthropicApiKey: options.anthropicApiKey,
       client: options.client,
-      onSpend: options.onSpend ? (report) => options.onSpend!(video.userId, 'judge', report) : undefined,
+      onSpend,
+      settled,
     });
     if (judged.outcome === 'failed') {
       result.failed += 1;
