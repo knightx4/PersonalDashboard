@@ -16,13 +16,13 @@ import type { MapNoteClass } from '@/lib/vault/map/rules';
  */
 
 /**
- * Whether the sweep asks Jev at all. Off until the map trial
- * (docs/trials/2026-09-19-map-75-notes.md, re-run through
- * /api/cron/jev-vault-trial) shows Jev routes the trial's notes at least as
- * well as Haiku. Turning it on is changing this to true; an account also has
- * to have opted in (lib/jev/enabled.ts).
+ * Whether the sweep asks Jev at all. On since the map trial re-run
+ * (docs/trials/2026-09-29-jev-vault-map.md) found the rollout reads as many of
+ * the trial's notes as Haiku. An account also has to have opted in
+ * (lib/jev/enabled.ts). Setting this to false puts every account back on
+ * Haiku alone.
  */
-export const VAULT_CLASS_ON_JEV = false;
+export const VAULT_CLASS_ON_JEV = true;
 
 export const MAP_CLASS_OPTIONS: Readonly<Record<MapNoteClass, string>> = {
   knowledge:
