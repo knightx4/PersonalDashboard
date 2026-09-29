@@ -17,6 +17,7 @@ import { commerceLinker } from '@/lib/inbox/linker';
 import { jobLinker } from '@/lib/jobs/inbox/linker';
 import { recurringLinker } from '@/lib/recurring/linker';
 import { appointmentLinker } from '@/lib/todo/appointments/linker';
+import { replyLinker } from '@/lib/todo/replies/linker';
 import { mailroomLinker } from '@/lib/core/mailroom/linker';
 import { createTodoServiceSupabase } from '@/inngest/todo/supabase-admin';
 import type { DomainLinker } from '@/lib/core/inbox/fan-out';
@@ -195,7 +196,12 @@ async function continueFetch(
 function buildLinkers(): DomainLinker[] {
   // The core client is where each linker writes what its model calls cost.
   const core = createCoreServiceSupabase();
+  const todo = createTodoServiceSupabase();
   return [
+    // Jev's pile for every email (plan #1173). First, so the pile is stored
+    // before the linkers below read it: recurring routes by it once handed
+    // over (plan #1180), and replies files tasks from it.
+    mailroomLinker(core),
     commerceLinker(createServiceSupabase(), core),
     jobLinker(createJobServiceSupabase(), core),
     // Subscriptions and bills (plan #1125). Its tables are in public beside
@@ -204,11 +210,10 @@ function buildLinkers(): DomainLinker[] {
     // Appointments and reservations for the agenda (plan #1127), in the todo
     // schema. Last, and its rules leave order, job and bill mail to the three
     // above; it reads the person's zone through the core client.
-    appointmentLinker(createTodoServiceSupabase(), core),
-    // Jev's pile for every email, stored beside the four above and acting on
-    // nothing yet (plan #1173). Last, so their verdicts on the page exist
-    // when core.mail_pile_agreement compares the two.
-    mailroomLinker(core),
+    appointmentLinker(todo, core),
+    // Emails waiting on an answer, filed in Todo from the mailroom's
+    // needs_reply pile (plan #1180).
+    replyLinker(todo, core),
   ];
 }
 

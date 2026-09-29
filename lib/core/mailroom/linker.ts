@@ -14,11 +14,12 @@ import { MAIL_PILE_QUESTION, mailState, type MailPile } from './question';
  * The mailroom: Jev sorts every email into a pile, beside the linkers that
  * route it (plan #1173).
  *
- * Offered every envelope like the other linkers, and last among them. It
+ * Offered every envelope like the other linkers, and first among them. It
  * asks Jev which pile each email belongs in and writes the answer to
- * core.mail_piles. Nothing reads the pile to route mail yet: the four
- * linkers' rules stay in charge, and core.mail_pile_agreement compares the
- * two so the rules are retired only where the numbers support it (#1174).
+ * core.mail_piles, where the linkers after it read it: the recurring linker
+ * routes by it once core.mail_pile_agreement shows Jev catching what its
+ * rules catch (route.ts, handover.ts), and the Todo reply linker files a
+ * task for mail in the needs_reply pile (plan #1180).
  *
  * The pile is stored at any confidence. Whoever acts on it applies the 0.8
  * floor (JEV_CONFIDENCE_FLOOR) and its own fallback; here the fallback is the

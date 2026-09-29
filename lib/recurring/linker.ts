@@ -2,11 +2,13 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { mapPool } from '@/lib/async/map-pool';
+import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { DomainLinker } from '@/lib/core/inbox/fan-out';
 import { emptyLinkerCounters } from '@/lib/core/inbox/fan-out';
 import type { MessageEnvelope } from '@/lib/core/inbox/envelopes';
 import type { SpendReport } from '@/lib/core/spend/pricing';
-import { recordSpendReports, type SpendClient } from '@/lib/core/spend/record';
+import { jevRouting, routeClaim } from '@/lib/core/mailroom/route';
+import { recordSpendReports } from '@/lib/core/spend/record';
 import { bareAddress, domainFromAddress } from '@/lib/email/extract/classify';
 import { gmailProvider } from '@/lib/email/providers/gmail';
 import { jevEnabledFor } from '@/lib/jev/enabled';
@@ -15,6 +17,7 @@ import {
   classifyRecurring,
   recurringCatchUpQuery,
   RECURRING_CATCH_UP_VERSION,
+  type RecurringHint,
 } from './rules';
 import { fileRecurringReading } from './store';
 
@@ -30,6 +33,10 @@ import { fileRecurringReading } from './store';
  * Mail read before this linker existed is reached through `catchUp`: the sync
  * pages through a Gmail search of its own and offers what it finds to every
  * linker, this one included.
+ *
+ * Once the agreement report shows Jev catching the bills these rules catch
+ * (lib/core/mailroom/handover.ts), Jev's bill pile decides the claim at 0.8
+ * or more and the rules decide only the rest (plan #1180).
  */
 
 /** Bodies fetched and read at once. Gmail and Haiku both rate-limit. */
@@ -45,7 +52,13 @@ type VerdictRow = {
   updated_at: string;
 };
 
-export function recurringLinker(supabase: SupabaseClient, core?: SpendClient): DomainLinker {
+/** Jev's pile has no event in it, and every bill-pile email is about a regular payment. */
+const JEV_HINT: RecurringHint = 'subscription';
+
+export function recurringLinker(
+  supabase: SupabaseClient,
+  core?: Pick<CoreSupabaseClient, 'from' | 'rpc'>,
+): DomainLinker {
   return {
     domain: 'recurring',
 
@@ -78,13 +91,29 @@ export function recurringLinker(supabase: SupabaseClient, core?: SpendClient): D
       const claimed: { envelope: MessageEnvelope; hint: ReturnType<typeof classifyClaim> }[] = [];
       const now = new Date().toISOString();
 
+      const routing = core
+        ? await jevRouting(core, {
+            userId,
+            linker: 'recurring',
+            ids: envelopes.filter((e) => !settled.has(e.id)).map((e) => e.id),
+          })
+        : null;
+
       for (const envelope of envelopes) {
         if (settled.has(envelope.id)) {
           counters.alreadyJudged += 1;
           continue;
         }
         counters.classified += 1;
-        const hint = classifyClaim(envelope);
+        const byRules = classifyClaim(envelope);
+        const hint = routing
+          ? routeClaim({
+              rules: byRules,
+              pile: routing.piles.get(envelope.id),
+              own: 'bill',
+              fromJev: JEV_HINT,
+            }).claim
+          : byRules;
         if (!hint) {
           verdicts.push({
             id: envelope.id,

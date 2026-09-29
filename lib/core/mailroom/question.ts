@@ -5,8 +5,10 @@ import type { MessageEnvelope } from '@/lib/core/inbox/envelopes';
  *
  * Each linker in lib/core/inbox claims its own mail with sender and subject
  * rules. Feature #1172 replaces those with this question, asked of every
- * email. For now it runs beside the rules and its answer is only stored
- * (core.mail_piles), so the two can be compared before any rule is retired.
+ * email. It runs beside the rules and its answer is stored (core.mail_piles),
+ * so the two can be compared before any rule is retired. A linker routes by
+ * it only once that comparison supports it (handover.ts), and the
+ * needs_reply pile becomes Todo tasks (lib/todo/replies).
  *
  * Four piles belong to a linker and match its verdict in
  * core.mail_pile_comparison: job (jobs), order (commerce), bill (recurring)
