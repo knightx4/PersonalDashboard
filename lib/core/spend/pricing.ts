@@ -148,3 +148,23 @@ export type SpendReport = { model: string; usage: TokenUsage };
  * case you would want to see.
  */
 export type SpendSink = (report: SpendReport) => void;
+
+/**
+ * One report per model, so a batch Jev answered item by item records one
+ * spend row rather than twenty.
+ */
+export function sumByModel(reports: SpendReport[]): SpendReport[] {
+  const byModel = new Map<string, SpendReport>();
+  for (const report of reports) {
+    const seen = byModel.get(report.model);
+    if (!seen) {
+      byModel.set(report.model, { model: report.model, usage: { ...report.usage } });
+      continue;
+    }
+    seen.usage.inputTokens += report.usage.inputTokens;
+    seen.usage.cachedInputTokens += report.usage.cachedInputTokens;
+    seen.usage.cacheWriteTokens += report.usage.cacheWriteTokens;
+    seen.usage.outputTokens += report.usage.outputTokens;
+  }
+  return [...byModel.values()];
+}
