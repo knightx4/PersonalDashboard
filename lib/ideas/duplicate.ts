@@ -17,6 +17,19 @@
 export const IDEA_DUPLICATE_MIN = 0.7;
 
 /**
+ * Two first lines at or above this name the same idea, whatever the
+ * paragraph beneath says.
+ *
+ * The morning run filed the same two observations five times between 25 and
+ * 29 September (lib/ideas/fixtures/morning-repeats.ts): the headline came back
+ * nearly word for word and the paragraph under it was written fresh each
+ * morning, which pulled the whole bodies down to 0.41-0.58 while the first
+ * lines scored 0.80-1.00. Higher than the whole-body bar because a headline
+ * is short, so each shared word counts for more.
+ */
+export const IDEA_FIRST_LINE_MIN = 0.8;
+
+/**
  * Fewer content words than this on either side and overlap carries no signal
  * — "Sort the ideas page" and "Group the ideas page" share two words out of
  * three. A short idea has to match word for word to be refused.
@@ -76,22 +89,42 @@ export interface FiledIdea {
 
 export interface IdeaMatch {
   idea: FiledIdea;
+  /** The score that crossed its bar: the whole body's, or else the first line's. */
   score: number;
+  /** Which comparison caught it, so a refusal can say what was the same. */
+  on: 'body' | 'first line';
+}
+
+/** The first line of an idea, whole, for comparing. */
+function headline(body: string): string {
+  return body.split('\n')[0].trim();
 }
 
 /**
  * The idea this one is a rewrite of, or null if it is new.
  *
+ * Two ways to be the same idea: most of the whole body shared, or the first
+ * line shared under a reworded paragraph. Shared #numbers alone are not one:
+ * the follow-ons sessions filed from #669 on 19 September name the same rows
+ * and are different ideas.
+ *
  * The best match wins, so the refusal names the closest thing on the list
- * rather than the first row that crossed the line.
+ * rather than the first row that crossed the line. Closest is by the whole
+ * body first, and the first line only breaks a tie.
  */
 export function findDuplicateIdea(body: string, filed: readonly FiledIdea[]): IdeaMatch | null {
-  let best: IdeaMatch | null = null;
+  const line = headline(body);
+  let best: (IdeaMatch & { whole: number; firstLine: number }) | null = null;
   for (const idea of filed) {
-    const score = ideaSimilarity(body, idea.body);
-    if (score >= IDEA_DUPLICATE_MIN && (!best || score > best.score)) best = { idea, score };
+    const whole = ideaSimilarity(body, idea.body);
+    const firstLine = ideaSimilarity(line, headline(idea.body));
+    const on = whole >= IDEA_DUPLICATE_MIN ? 'body' : firstLine >= IDEA_FIRST_LINE_MIN ? 'first line' : null;
+    if (!on) continue;
+    const closer =
+      !best || whole > best.whole || (whole === best.whole && firstLine > best.firstLine);
+    if (closer) best = { idea, score: on === 'body' ? whole : firstLine, on, whole, firstLine };
   }
-  return best;
+  return best && { idea: best.idea, score: best.score, on: best.on };
 }
 
 /** The first line of an idea, which is how one is named in a refusal. */
