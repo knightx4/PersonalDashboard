@@ -251,6 +251,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'sort-email': background(unit(JEV, 250, 0)),
   // A plan row or a reply and the six questions in; six probabilities out.
   'check-writing': background(unit(JEV, 900, 0)),
+  // One blocked step's ask and the two options in; one label out.
+  'sort-waiting': background(unit(JEV, 150, 0)),
 
   // News. All but the last two from the digest cron or a script.
   'digest-issue': background(unit(HAIKU, 3_000, 300)),
@@ -272,4 +274,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'read-into-form': run(HAIKU, 8_000, 800),
   // A comment on a goal, with the goal's steps and collections written out.
   'reply-to-goal-comment': run(HAIKU, 6_000, 400),
+  // A morning's thirty-odd items, each read against eighty steps in two
+  // requests of about three thousand tokens.
+  'filter-evidence': background(run(JEV, 180_000, 0)),
 };

@@ -20,7 +20,7 @@ import { planRefHref, type PlanRefTitles } from '@/lib/comments/refs';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { PLAN_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { WAITING_WORD } from '@/lib/dev/words';
-import { isJobForYou, type WaitingEntry, type WaitingRow } from '@/lib/plan/waiting';
+import type { WaitingEntry, WaitingRow } from '@/lib/plan/waiting';
 import { whereToDoIt } from '@/lib/plan/where';
 import { waitingAnchor } from '@/lib/search/sources/dev-map';
 
@@ -77,7 +77,7 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
   const blocked = row.health === 'blocked';
   // The same test that put it under Your actions or Questions for you, so the
   // press matches the heading it is drawn under (note e663940b).
-  const blockedJob = blocked && isJobForYou(row.ask);
+  const blockedJob = blocked && row.job;
   const proposed = row.health === 'proposed';
   // Held here rather than in the answering box, so the press that opens the
   // box can sit bottom right with the card's other presses (note fdf6bc83).

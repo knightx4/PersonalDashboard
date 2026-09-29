@@ -1210,6 +1210,16 @@ with confirmed, not something that only mentions the subject. Read the
   the person's own draft, and a confirmation for a different account or
   amount than the step names.
 
+**When the brief lists the evidence.** Before the morning run starts, Jev
+reads every email, job event, ticked task and past calendar event since the
+last run against each open step of the person's, and the brief lists only
+the items that bear on a step, under that step. Check each listed item
+against the step's done-when where it lives, as above, and do not search for
+more: everything else was read and matched no open step. Jev keeps a pair
+when it is unsure, so most listed items will not be enough to close on. When
+the brief says to look in Jobs, Gmail, the calendar and Todo instead, Jev
+could not read them that morning, and you search as before.
+
 When the evidence is older than the step, it still counts if it shows the
 done-when is met now (autopay turned on before the step was written). When
 you are unsure, leave the step open: a missed close costs the person one

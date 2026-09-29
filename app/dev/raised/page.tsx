@@ -4,7 +4,12 @@ import { loadRaised } from '@/lib/raised/load';
 import { planRefTitles } from '@/lib/plan/load';
 import { loadPlanForRequest } from '@/lib/plan/request-plan';
 import { buildPlanTree, flattenSections } from '@/lib/plan/tree';
-import { waitingGroups } from '@/lib/plan/waiting';
+import { sortAsksWithJev, waitingGroups, waitingOnYou } from '@/lib/plan/waiting';
+import { createCoreClient } from '@/lib/core/auth/server';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSpendReports } from '@/lib/core/spend/record';
+import { jevEnabledFor } from '@/lib/jev/enabled';
+import type { PlanSection } from '@/lib/plan/tree';
 import { loadDigest } from '@/lib/digest/load';
 import { loadConversations } from '@/lib/comments/recent';
 import { loadFeatureFires, loadLastRuns, loadStartedRuns } from '@/lib/plan/runs';
@@ -44,6 +49,29 @@ async function readGoals(userId: string) {
   } catch (error) {
     console.error(`Dash could not read the goal runs: ${(error as Error).message}`);
     return null;
+  }
+}
+
+/**
+ * The plan's rows waiting on you, with each blocked step's ask sorted into a
+ * job or a question by Jev (plan #1176). Falls back to the regex's guess, row
+ * by row inside sortAsksWithJev and wholesale here if the account setting or
+ * the ledger cannot be reached.
+ */
+async function readWaitingRows(sections: readonly PlanSection[], userId: string) {
+  const rows = waitingOnYou(sections);
+  try {
+    const core = await createCoreClient();
+    const spend: SpendReport[] = [];
+    const sorted = await sortAsksWithJev(rows, {
+      enabled: await jevEnabledFor(core, userId),
+      onSpend: (report) => spend.push(report),
+    });
+    await recordSpendReports(core, userId, { module: 'core', operation: 'sort-waiting' }, spend);
+    return sorted;
+  } catch (error) {
+    console.error(`Dash could not sort the asks with Jev: ${(error as Error).message}`);
+    return rows;
   }
 }
 
@@ -132,7 +160,7 @@ export default async function DevRaisedPage() {
   // The tree once, for the two things below that read it: what is waiting, and
   // how many features the runner could pick up.
   const sections = buildPlanTree(plan);
-  const groups = waitingGroups(sections, queue);
+  const groups = waitingGroups(sections, queue, await readWaitingRows(sections, user.id));
 
   // The runner's card, read by the same function the plan page reads it with.
   const card = runnerCard({

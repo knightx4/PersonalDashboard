@@ -25,6 +25,8 @@ import {
   type PlanSection,
 } from './tree';
 import type { DevComment } from '@/lib/comments/load';
+import type { SpendSink } from '@/lib/core/spend/pricing';
+import { decideWithJev } from '@/lib/jev/decide';
 import type { RaisedQueue, RaisedRow } from '@/lib/raised/load';
 
 /** One row of the section, flattened out of the tree it came from. */
@@ -39,6 +41,12 @@ export type WaitingRow = {
    * deciding again.
    */
   health: 'unanswered' | 'proposed' | 'blocked' | 'setup';
+  /**
+   * A blocked step whose ask is a job for you rather than a question, which
+   * puts it under Your actions. The regex's guess (`isJobForYou`) until
+   * `sortAsksWithJev` has asked Jev; false on anything not blocked.
+   */
+  job: boolean;
   /**
    * The one thing it needs, where the row says. A blocked step's ask; a
    * decision's own detail, which is the question; a setup step's own detail,
@@ -147,6 +155,12 @@ export function waitingOnYou(sections: readonly PlanSection[]): WaitingRow[] {
       continue;
     }
 
+    const ask =
+      health === 'blocked'
+        ? (node.blockAsk?.trim() || latestBlockNote(node.comment))
+        : health === 'unanswered' || health === 'setup'
+          ? (node.detail?.trim() || null)
+          : null;
     rows.push({
       id: node.id,
       number: node.number,
@@ -162,12 +176,8 @@ export function waitingOnYou(sections: readonly PlanSection[]): WaitingRow[] {
         (step) => step.id !== node.id && step.status === 'proposed',
       ).length,
       thread: node.thread,
-      ask:
-        health === 'blocked'
-          ? (node.blockAsk?.trim() || latestBlockNote(node.comment))
-          : health === 'unanswered' || health === 'setup'
-            ? (node.detail?.trim() || null)
-            : null,
+      ask,
+      job: health === 'blocked' && isJobForYou(ask),
     });
   }
 
@@ -243,14 +253,77 @@ const NAMES_A_JOB =
  * Note 09ca992e: a step stopped on the Anthropic usage limit (#811, #812) was
  * drawn as a question. Raising a limit is a job like adding a token, so the
  * account limits are named here alongside it.
+ *
+ * Plan #1176 puts the same question to Jev (`sortAsksWithJev`), and this is
+ * what answers when Jev is off, unreachable or unsure, and before it has been
+ * asked.
  */
 export function isJobForYou(ask: string | null): boolean {
   if (!ask) return false;
   return NAMES_A_JOB.test(ask.trim()) && !WANTS_AN_ANSWER.test(ask);
 }
 
+/**
+ * The question `isJobForYou` guesses at, put to Jev (plan #1176). The two
+ * options are the note's two headings in plain words.
+ */
+export const WAITING_ASK_QUESTION = {
+  type: 'choice',
+  question:
+    'A build step is stopped until the person does something. This is what it says it needs. ' +
+    'Is that a job they go and do, or a question they answer?',
+  options: {
+    job: 'A job, finished by doing it: supply a key or token, set a value somewhere, raise a limit, create an account, allow a site, run something only they can run.',
+    question:
+      'A question, finished by saying something: a decision, a choice between options, a read and a yes or no, whether to go on, or a report that asks what to do next.',
+  },
+} as const;
+
+/**
+ * Jev's answers by ask, for as long as the server stays up. An ask is
+ * rewritten when a step is blocked again, so a new one is asked about and an
+ * old one is not asked twice.
+ */
+const JEV_JOB_ANSWERS = new Map<string, boolean>();
+
+/** A page waits this long for Jev before using the regex's guess. */
+const WAITING_JEV_TIMEOUT_MS = 3_000;
+
+/**
+ * Ask Jev, for each blocked row, whether its ask is a job or a question, with
+ * `isJobForYou` as the fallback when Jev is off, unreachable or below 0.8
+ * confidence (plan #1176). Never throws. Only blocked rows are asked; every
+ * other row keeps the `job` it came with.
+ */
+export async function sortAsksWithJev(
+  rows: WaitingRow[],
+  opts: { enabled: boolean; onSpend?: SpendSink; apiKey?: string | null; fetch?: typeof fetch },
+): Promise<WaitingRow[]> {
+  return Promise.all(
+    rows.map(async (row) => {
+      if (row.health !== 'blocked' || !row.ask) return row;
+      const ask = row.ask;
+      const cached = opts.enabled ? JEV_JOB_ANSWERS.get(ask) : undefined;
+      if (cached !== undefined) return { ...row, job: cached };
+      const decided = await decideWithJev({
+        state: { ask },
+        question: WAITING_ASK_QUESTION,
+        read: (answer) => answer.choice === 'job',
+        fallback: async () => isJobForYou(ask),
+        enabled: opts.enabled,
+        onSpend: opts.onSpend,
+        apiKey: opts.apiKey,
+        fetch: opts.fetch,
+        timeoutMs: WAITING_JEV_TIMEOUT_MS,
+      });
+      if (decided.by === 'jev') JEV_JOB_ANSWERS.set(ask, decided.value);
+      return { ...row, job: decided.value };
+    }),
+  );
+}
+
 function planGroupOf(row: WaitingRow): WaitingGroupKey {
-  if (row.health === 'blocked' && isJobForYou(row.ask)) return 'actions';
+  if (row.health === 'blocked' && row.job) return 'actions';
   return PLAN_GROUP[row.health];
 }
 
@@ -283,6 +356,8 @@ function groupOf(raise: RaisedRow): WaitingGroupKey {
 export function waitingGroups(
   sections: readonly PlanSection[],
   queue: Pick<RaisedQueue, 'open'>,
+  /** The plan's rows, when they have been through `sortAsksWithJev` first. */
+  rows: WaitingRow[] = waitingOnYou(sections),
 ): WaitingGroup[] {
   const entries: Record<WaitingGroupKey, WaitingEntry[]> = {
     actions: [],
@@ -290,7 +365,7 @@ export function waitingGroups(
     approve: [],
   };
 
-  for (const row of waitingOnYou(sections)) {
+  for (const row of rows) {
     entries[planGroupOf(row)].push({ kind: 'plan', id: row.id, row });
   }
   // In the order the queue reads them, newest first, which is the order they

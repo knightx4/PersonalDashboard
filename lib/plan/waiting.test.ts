@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { PlanItem } from '@/lib/plan/load';
 import { buildPlanTree } from '@/lib/plan/tree';
-import { isJobForYou, latestBlockNote, waitingGroups, waitingOnYou } from '@/lib/plan/waiting';
+import {
+  isJobForYou,
+  latestBlockNote,
+  sortAsksWithJev,
+  waitingGroups,
+  waitingOnYou,
+} from '@/lib/plan/waiting';
 import { raisedQueueFrom, type RaisedRow } from '@/lib/raised/load';
 
 let counter = 0;
@@ -372,5 +378,72 @@ describe('waitingGroups', () => {
     );
 
     expect(found['Questions for you']).toEqual(['#9', 'A question with no action on it']);
+  });
+});
+
+describe('sortAsksWithJev (plan #1176)', () => {
+  /** TypeSafe answering every ask with one label at one confidence. */
+  function jev(choice: 'job' | 'question', confidence: number) {
+    return vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            model: 'jev-1.13.0',
+            answers: { answer: { choice, confidence, probabilities: { [choice]: confidence } } },
+            usage: { input_tokens: 150, output_tokens: 0 },
+          }),
+        ),
+    ) as unknown as typeof fetch & ReturnType<typeof vi.fn>;
+  }
+
+  const blocked = (id: string, blockAsk: string) =>
+    item({ id, status: 'blocked', blockAsk, blockKind: 'outside' });
+
+  it('takes Jev\'s answer at 0.8 or more, over the regex, and groups the row by it', async () => {
+    // The regex reads no job in "Open … on the deployed site"; Jev does.
+    const ask = 'Open /news/all?view=recommended once on the deployed site, then close it.';
+    expect(isJobForYou(ask)).toBe(false);
+    const items = [blocked('a', ask)];
+    const fetch = jev('job', 0.98);
+    const spend: unknown[] = [];
+    const sorted = await sortAsksWithJev(rows(items), {
+      enabled: true,
+      apiKey: 'key',
+      fetch,
+      onSpend: (report) => spend.push(report),
+    });
+    expect(sorted[0].job).toBe(true);
+    expect(spend).toHaveLength(1);
+    const laid = waitingGroups(buildPlanTree({ items, dependencies: [] }), raisedQueueFrom([]), sorted);
+    expect(laid.find((g) => g.key === 'actions')?.entries.map((e) => e.id)).toEqual(['a']);
+  });
+
+  it('keeps the regex\'s guess when Jev is unsure, off, or not asked', async () => {
+    const job = 'Add the Resend API key to the Vercel project, unsure edition.';
+    const unsure = await sortAsksWithJev(rows([blocked('a', job)]), {
+      enabled: true,
+      apiKey: 'key',
+      fetch: jev('question', 0.6),
+    });
+    expect(unsure[0].job).toBe(true);
+
+    const fetch = jev('question', 0.99);
+    const off = await sortAsksWithJev(rows([blocked('b', job)]), { enabled: false, apiKey: 'key', fetch });
+    expect(off[0].job).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('asks only about blocked rows, and each ask once', async () => {
+    const ask = 'Say which of the two layouts you want, asked once.';
+    const items = [
+      blocked('a', ask),
+      item({ id: 'q', kind: 'decision', status: 'not_started', detail: 'Which one?' }),
+    ];
+    const fetch = jev('question', 0.95);
+    const first = await sortAsksWithJev(rows(items), { enabled: true, apiKey: 'key', fetch });
+    const second = await sortAsksWithJev(rows(items), { enabled: true, apiKey: 'key', fetch });
+    expect(first.map((r) => r.job)).toEqual([false, false]);
+    expect(second.map((r) => r.job)).toEqual([false, false]);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
