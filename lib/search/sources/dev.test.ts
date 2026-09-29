@@ -84,4 +84,15 @@ describe('dev search: questions and raises', () => {
       '/dev/raised#raise-r1',
     ]);
   });
+
+  it('lists a workspace vision found by a word only in its text', async () => {
+    rows.module_visions = [
+      { module: 'jobs', body: 'A calm place to track the search.' },
+      { module: 'app', body: 'One dashboard for a whole life.' },
+    ];
+
+    const hits = await devSearchSource.find({ userId: 'u', query: 'calm', limit: 10 });
+    expect(filters.get('module_visions')).toEqual([['eq', 'user_id', 'u']]);
+    expect(hits.map((hit) => hit.href)).toEqual(['/dev/specs#vision-jobs']);
+  });
 });
