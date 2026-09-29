@@ -99,7 +99,31 @@ export const KNOWN_BILLER_DOMAINS: readonly string[] = [
  * Google bill every app's subscription). Their receipts are claimed and the
  * model names the actual service.
  */
-const STORE_BILLER_DOMAINS: readonly string[] = ['apple.com', 'google.com', 'amazon.com'];
+export const STORE_BILLER_DOMAINS: readonly string[] = ['apple.com', 'google.com', 'amazon.com'];
+
+/**
+ * The payee keys (payeeKey in extraction.ts) that name a store rather than
+ * anything it sells: "Apple", "Google Play", "Amazon.com". A store biller's
+ * receipt filed under one of these is a misreading, since the store bills for
+ * many subscriptions at once (plan #1212). "Apple TV", "AppleCare+" and
+ * "Amazon Prime" are real services and have keys of their own.
+ */
+export const STORE_PAYEE_KEYS: readonly string[] = [
+  'apple',
+  'appstore',
+  'itunes',
+  'google',
+  'googleplay',
+  'amazon',
+];
+
+/** Whether the sender is one of the stores above, by domain or subdomain. */
+export function isStoreBiller(fromAddress: string | null): boolean {
+  return matchesDomain(
+    domainFromAddress(bareAddress(fromAddress) ?? fromAddress),
+    STORE_BILLER_DOMAINS,
+  );
+}
 
 /**
  * Subjects about something paid for repeatedly. The money words alone

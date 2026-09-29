@@ -125,3 +125,18 @@ describe('extractRecurringFromEmail with Jev', () => {
     expect(result).toEqual({ ok: false, notRecurring: false, reason: 'no_extraction' });
   });
 });
+
+describe('extractRecurringFromEmail on a store receipt (plan #1212)', () => {
+  it('does not take "Apple" from the model for a receipt Apple sent', async () => {
+    const haiku = haikuSays({ ok: true, value: { ...netflix, payee: 'Apple', event: 'charge' } });
+    const result = await extractRecurringFromEmail({
+      subject: 'Your receipt from Apple.',
+      text: 'Apple Account\nTotal $22.72',
+      fromAddress: 'Apple <no_reply@email.apple.com>',
+      receivedOn: '2026-09-21',
+      hint: 'subscription',
+      haiku,
+    });
+    expect(result).toEqual({ ok: false, notRecurring: false, reason: 'no_extraction' });
+  });
+});
