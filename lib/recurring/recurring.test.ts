@@ -50,6 +50,7 @@ describe('classifyRecurring on saved mail', () => {
     ['nytimes-renewal.txt', 'subscription'],
     ['spotify-price-change.txt', 'price_change'],
     ['coned-bill.txt', 'bill'],
+    ['chase-card-statement.txt', 'bill'],
   ])('claims %s as %s', (name, hint) => {
     const verdict = classifyRecurring(load(`recurring/${name}`));
     expect(verdict).toMatchObject({ claim: true, hint });
@@ -124,7 +125,21 @@ describe('heuristicRecurring on saved mail', () => {
       period: 'month',
       occurredOn: '2026-09-03',
       dueOn: '2026-10-03',
+      cardStatement: false,
     });
+  });
+
+  it('reads a credit card statement as one, and a utility bill as not one', () => {
+    expect(read('chase-card-statement.txt', '2026-09-28')).toMatchObject({
+      payee: 'Chase',
+      kind: 'bill',
+      event: 'bill',
+      amountCents: 181200,
+      occurredOn: '2026-09-28',
+      dueOn: '2026-10-25',
+      cardStatement: true,
+    });
+    expect(read('coned-bill.txt', '2026-09-18')).toMatchObject({ cardStatement: false });
   });
 
   it('reads a price change as the new price with the old one kept', () => {
@@ -184,6 +199,20 @@ describe('parseRecurringExtraction', () => {
     expect(parsed).toEqual({
       ok: true,
       value: expect.objectContaining({ currency: 'USD', occurredOn: '2026-09-03', dueOn: null }),
+    });
+  });
+
+  it("keeps the model's card statement flag, and reads a missing one as false", () => {
+    const answer = { payee: 'Chase Sapphire', kind: 'bill', event: 'bill', amountCents: 181200 };
+    expect(
+      parseRecurringExtraction({ ...answer, cardStatement: true }, '2026-09-28'),
+    ).toMatchObject({
+      ok: true,
+      value: { cardStatement: true },
+    });
+    expect(parseRecurringExtraction(answer, '2026-09-28')).toMatchObject({
+      ok: true,
+      value: { cardStatement: false },
     });
   });
 

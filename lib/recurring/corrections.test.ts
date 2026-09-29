@@ -1,5 +1,9 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { billTitle } from '@/lib/todo/agenda/sources/bills';
+import { extractRecurringFromEmail } from './extract';
+import { classifyRecurring } from './rules';
 import { mergePayments, moveCharges, renamePayment, setPaymentCounted } from './corrections';
 import type { RecurringPayment } from './load';
 import { memoryClient, type Row } from './memory-client';
@@ -554,5 +558,132 @@ describe('setPaymentCounted', () => {
     });
     expect(result.error).toBeTruthy();
     expect(tables.recurring_payments[0]!.status).toBe('active');
+  });
+});
+
+/** The saved Chase statement, claimed by the rules and read without a model. */
+async function chaseStatement() {
+  const raw = readFileSync(
+    resolve(__dirname, '../../fixtures/emails/recurring/chase-card-statement.txt'),
+    'utf8',
+  );
+  const subject = raw.match(/^Subject: (.*)$/m)![1]!;
+  const fromAddress = raw.match(/^From: (.*)$/m)![1]!;
+  const text = raw.replace(/^(?:Subject|From): .*\n/gm, '').trim();
+  const verdict = classifyRecurring({ subject, fromAddress });
+  if (!verdict.claim) throw new Error('the Chase statement was not claimed');
+  const reading = await extractRecurringFromEmail({
+    subject,
+    text,
+    fromAddress,
+    receivedOn: '2026-09-28',
+    hint: verdict.hint,
+    haiku: async () => null,
+  });
+  if (!reading.ok) throw new Error(`the Chase statement was not read: ${reading.reason}`);
+  return reading.value;
+}
+
+describe('a new credit card statement', () => {
+  it('files a card nobody has marked yet as not counted', async () => {
+    const tables: Record<string, Row[]> = {
+      recurring_payments: [
+        {
+          id: 'netflix',
+          user_id: USER,
+          payee: 'Netflix',
+          payee_key: 'netflix',
+          kind: 'subscription',
+          status: 'active',
+          amount_cents: 1549,
+          currency: 'USD',
+          period: 'month',
+        },
+      ],
+      recurring_payee_aliases: [],
+      recurring_charges: [],
+    };
+    const reading = await chaseStatement();
+    expect(reading).toMatchObject({
+      kind: 'bill',
+      event: 'bill',
+      amountCents: 181200,
+      cardStatement: true,
+    });
+
+    const { paymentId } = await fileRecurringReading(memoryClient(tables), {
+      userId: USER,
+      messageId: 'm-chase-sep',
+      senderDomain: 'chase.com',
+      reading,
+    });
+
+    expect(tables.recurring_payments.find((p) => p.id === paymentId)).toMatchObject({
+      payee: 'Chase',
+      status: 'ignored',
+      amount_cents: 181200,
+    });
+    const { view, cents } = monthly(tables);
+    expect(cents).toBe(1549);
+    expect(view.ignored.map((r) => r.payee)).toEqual(['Chase']);
+  });
+
+  it('keeps a card the person put back into the total counted', async () => {
+    const tables = tablesWithChase();
+    const client = memoryClient(tables);
+    await setPaymentCounted(client, { userId: USER, paymentId: 'chase', counted: false });
+    await setPaymentCounted(client, { userId: USER, paymentId: 'chase', counted: true });
+
+    const { paymentId } = await fileRecurringReading(client, {
+      userId: USER,
+      messageId: 'm-chase-sep',
+      senderDomain: 'chase.com',
+      reading: await chaseStatement(),
+    });
+
+    expect(paymentId).toBe('chase');
+    expect(tables.recurring_payments.find((p) => p.id === 'chase')).toMatchObject({
+      status: 'active',
+      amount_cents: 181200,
+    });
+    expect(monthly(tables).view.ignored).toEqual([]);
+  });
+
+  it('flags a statement the model read without saying it was a card', async () => {
+    const raw = readFileSync(
+      resolve(__dirname, '../../fixtures/emails/recurring/chase-card-statement.txt'),
+      'utf8',
+    );
+    const reading = await extractRecurringFromEmail({
+      subject: 'Your credit card statement is available',
+      text: raw,
+      fromAddress: 'Chase <no.reply.alerts@chase.com>',
+      receivedOn: '2026-09-28',
+      hint: 'bill',
+      haiku: async () => ({
+        ok: true,
+        value: { ...statement('Chase Sapphire', 181200), cardStatement: false },
+      }),
+    });
+    expect(reading).toMatchObject({
+      ok: true,
+      source: 'llm',
+      value: { payee: 'Chase Sapphire', cardStatement: true },
+    });
+  });
+
+  it('files an ordinary bill as counted', async () => {
+    const tables: Record<string, Row[]> = {
+      recurring_payments: [],
+      recurring_payee_aliases: [],
+      recurring_charges: [],
+    };
+    await fileRecurringReading(memoryClient(tables), {
+      userId: USER,
+      messageId: 'm-coned',
+      senderDomain: 'coned.com',
+      reading: statement('Con Edison', 8412),
+    });
+    expect(tables.recurring_payments).toMatchObject([{ payee: 'Con Edison', status: 'active' }]);
   });
 });
