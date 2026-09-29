@@ -110,6 +110,8 @@ export type Step = {
    * null until one has (plan #1215).
    */
   prepCheckedAt?: string | null;
+  /** When the step was added; the morning brief lists unjudged steps newest first (plan #1217). */
+  createdAt?: string | null;
 };
 
 /**
