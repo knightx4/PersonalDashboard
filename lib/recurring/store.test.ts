@@ -1,62 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import type { RecurringExtraction } from './extraction';
 import { fileRecurringReading } from './store';
+import { memoryClient, type Row } from './memory-client';
 
 /**
- * Filing a reading against an in-memory client: tables are arrays of rows,
- * and the query chain supports the filters the store uses. What RLS and the
- * constraints do is the migration's (0122_recurring_payee_aliases.sql).
+ * Filing a reading against an in-memory client. What RLS and the constraints
+ * do is the migration's (0122_recurring_payee_aliases.sql).
  */
-
-type Row = Record<string, unknown>;
-
-function memoryClient(tables: Record<string, Row[]>) {
-  let nextId = 1;
-  const client = {
-    from(table: string) {
-      const rows = (tables[table] ??= []);
-      const filters: [string, unknown][] = [];
-      let op: 'select' | 'insert' | 'upsert' | 'update' = 'select';
-      let payload: Row | null = null;
-      let upsertKeys: string[] = [];
-      const matching = () => rows.filter((r) => filters.every(([k, v]) => r[k] === v));
-      const run = () => {
-        if (op === 'insert') {
-          const row = { id: `${table}-${nextId++}`, created_at: '2026-09-29T00:00:00Z', ...payload };
-          rows.push(row);
-          return { data: [row], error: null };
-        }
-        if (op === 'upsert') {
-          const clash = rows.find((r) => upsertKeys.every((k) => r[k] === payload![k]));
-          if (clash) return { data: [], error: null };
-          const row = { id: `${table}-${nextId++}`, status: 'active', ...payload };
-          rows.push(row);
-          return { data: [row], error: null };
-        }
-        if (op === 'update') {
-          for (const r of matching()) Object.assign(r, payload);
-          return { data: null, error: null };
-        }
-        return { data: matching(), error: null };
-      };
-      const chain = {
-        select: () => chain,
-        eq: (k: string, v: unknown) => (filters.push([k, v]), chain),
-        insert: (row: Row) => ((op = 'insert'), (payload = row), chain),
-        upsert: (row: Row, o: { onConflict: string }) => (
-          (op = 'upsert'), (payload = row), (upsertKeys = o.onConflict.split(',')), chain
-        ),
-        update: (row: Row) => ((op = 'update'), (payload = row), chain),
-        maybeSingle: async () => ({ data: matching()[0] ?? null, error: null }),
-        single: async () => ({ data: matching()[0] ?? null, error: null }),
-        then: (resolve: (v: unknown) => void) => resolve(run()),
-      };
-      return chain;
-    },
-  } as unknown as SupabaseClient;
-  return client;
-}
 
 const USER = 'user-1';
 
