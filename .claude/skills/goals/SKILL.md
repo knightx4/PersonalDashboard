@@ -355,6 +355,11 @@ Every step has a `kind`:
   (`day`, `week` or `month`): log the balance monthly, review every quarter.
 - `decision` for a question (below).
 
+For every `mine` step you write, and every open one already on the goal that
+no run has judged (`prep_checked_at` is null), decide whether a Dash step
+just before it would help, and add it or mark the step as needing nothing:
+see "A Dash step before yours".
+
 ### Information steps
 
 A step that needs facts from the person (balances, rates, dates, account
@@ -1067,7 +1072,8 @@ Do what "Re-shaping after answers" says for those answers, and nothing else:
   missed because its line names the question in other words.
 - Write anything new as you would on a mapping run: `open` under an approved
   goal, `proposed` under one that is not, and `proposed` with `acts` for a
-  step that acts outside the plan.
+  step that acts outside the plan. Judge each `mine` step you write or
+  rewrite as in "A Dash step before yours".
 - Do not map the goal again, do not work `claude` steps (that is the morning
   run), and do not search Gmail unless an answer asks for facts you now need.
 
@@ -1308,6 +1314,11 @@ goal, then take the first that fits:
    Write what they need, as in "A step of yours to prepare", in the same
    run. A step the brief marks "already prepared once" sat after being
    prepared, so preparing it again is the weakest move: split it or ask.
+   A step with a finished Dash step before it counts as prepared too, even
+   though the brief does not mark it: a `claude` step whose `prepares_id`
+   names it is done and carries a `result`. While that `claude` step is still
+   open, the prep is on its way: split the step or ask, rather than
+   preparing it a second time.
 3. **Ask whether they still want it** when neither fits, or when the goal
    has moved on and the step may no longer matter. Add a question beside it
    (same parent, just before it) and make the step wait on the question:
@@ -1532,6 +1543,14 @@ instead: the rows stay as they are until the next morning.
 
 ### Working the ready steps
 
+The brief names the ready steps as they stood when the run was fired, so it
+cannot name a prep step this run added while reviewing ("A Dash step before
+yours"). Work those too, after the steps the brief names, so the draft is on
+the goal the same day: in the order you added them, and only while the steps
+worked this run number fewer than ten (`DAILY_STEP_LIMIT` in
+`lib/goals/daily-run.ts`). The rest stay open, and the next morning's brief
+lists them as ready.
+
 Before each step, report it on the run row with `now_on` the step's title
 ("Reporting progress"). For each one:
 
@@ -1583,6 +1602,9 @@ Before each step, report it on the run row with `now_on` the step's title
    "Mapping a goal": usually the person's, with the link, the date and what
    to say or bring in its `detail`, and a `due_on` or `starts_on` when the
    result names a date. Do not add one when an open step already says it.
+   A step of the person's added here is judged for a Dash step before it, as
+   in "A Dash step before yours"; this step's own result often is that prep,
+   in which case the new step needs nothing.
 
    **A result that compares options ends in a pick and the others kept.**
    Decide the plain first move as in "Decide first, ask last" and write it as
@@ -1864,6 +1886,122 @@ step's brief does. They will do the step; you write what they need to do it.
    "People and roles you find go to Jobs".
 4. Close the run row with a summary that says what you prepared and anything
    you could not find.
+
+## A Dash step before yours
+
+A step of the person's often goes faster with something written or looked up
+first: a cover letter for an application, a shortlist before a round of
+calls, a pay range before an offer. When it does, put a `claude` step just
+before it that produces that thing, and the morning run works it (plan
+#1207). Every run that writes a `mine` step judges it this way, and so does a
+mapping run for every open `mine` step on the goal that has not been judged
+yet. Each step is judged once.
+
+**The test.** Add a prep step when both hold:
+
+- a draft, research, a shortlist or a list would help the person do the step;
+- producing it is one sitting of your work, from what you can read or find.
+
+Examples that get one, from the live goals as they stood before any
+research was done on them:
+
+- "Apply to Coinbase's Assistant Controller role": **Draft a cover letter for
+  Coinbase's Assistant Controller role**, tailored to the posting.
+- "Call three staffing firms", with no list of firms on the goal yet:
+  **List staffing firms that place CPAs in New
+  York**, with a contact and phone number for each.
+- "Know your worth before you say yes", written as a single step: **Research
+  the pay range for the roles you are interviewing for**, with sources.
+- "Get a pantry": **Shortlist three pantries that fit the kitchen wall**, with
+  sizes, prices and links.
+
+Examples that get none:
+
+- "Clear off the couch", "move skis under bed", "Put the rugs down", "Break
+  down the empty boxes and mailers": physical work that nothing written would
+  speed up.
+- "Read the ULURP primer and try explaining it": the reading is the step.
+- "Recall last names for Chad, Nicole, Kate and Neil": only the person knows.
+
+Where the line falls is a judgement, so read the step's detail and the steps
+around it. "Get and build the bookshelf" goes either way: when the bookshelf
+is not chosen yet, a shortlist of models that fit the measured wall helps and
+earns a prep step; when it is bought and waiting in its box, building it is
+physical and gets none. "Go to the October 7 Land Use committee meeting" gets
+one when the agenda is posted and a note on the items would help the person
+follow them, and none when it is a first visit just to see the room.
+
+**Never a prep step for:**
+
+- a phase: a `mine` step with sub-steps. Mark it judged and judge its
+  sub-steps instead.
+- a step already prepared: `result` or `result_url` is set on it, from
+  **Prepare** or an earlier run.
+- a step a `claude` step beside it already covers, open or done: the staffing
+  firm list is already on the goal, so "Call three staffing firms" needs
+  nothing more.
+- a step whose own `detail` already carries what the prep would produce:
+  "Ask Kroll and Hebbia recruiters for base pay" has the question to ask
+  written in it.
+- a step that is only a send of something already written: "Send the
+  fractional offer to George Parkhurst" when the offer is on the goal.
+- a step that already has a live prep step: one whose `prepares_id` names it
+  and that is neither dropped nor archived. A done one counts, since what it
+  produced is the prep. The database allows one live prep step per step.
+
+**A prep step only writes.** It produces a draft or a list and stores it as its `result`, like any `claude` step. Anything that would send,
+submit, book or buy stays under "Steps that act outside the plan": a separate
+step, proposed with `acts`, after the draft.
+
+**How it goes in.** A `claude` step under the same parent as the person's
+step, just before it (the step's `position` minus 1), with `prepares_id` set
+to the person's step, and a done-when that names the step it serves. It gets
+no row in `goals.dependencies`: the person's step does not wait on it, and
+they can do their step without it. Under an approved goal it goes in `open`;
+under one that is not approved, `proposed`, as for anything you write there.
+The database refuses a `prepares_id` that is not a `mine` step of the same
+goal.
+
+**Mark the step judged either way.** Set `prep_checked_at` on the person's
+step whether or not you added one. A judged step with no live prep step reads
+as needing nothing, and no run judges it again.
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+insert into goals.items (user_id, level, parent_id, kind, title, acceptance,
+                         prepares_id, status, position)
+values ('<user>', 'step', '<the step''s parent>', 'claude',
+        'Draft a cover letter for Coinbase''s Assistant Controller role',
+        'A cover letter tailored to the posting is on this step, ready for "Apply to Coinbase''s Assistant Controller role".',
+        '<step id>', 'open', <the step''s position minus 1>)
+returning id;
+update goals.items set prep_checked_at = now()
+where id = '<step id>' and user_id = '<user>' and kind = 'mine';
+
+-- steps judged to need nothing
+update goals.items set prep_checked_at = now()
+where id in ('<step id>', '<step id>') and user_id = '<user>' and kind = 'mine'
+  and prep_checked_at is null;
+
+-- the person's steps on a goal not judged yet
+with recursive tree as (
+  select i.* from goals.items i
+  where i.parent_id = '<goal id>' and i.user_id = '<user>' and i.archived_at is null
+  union all
+  select c.* from goals.items c join tree t on c.parent_id = t.id
+  where c.archived_at is null
+)
+select id, parent_id, title, position, result is not null or result_url is not null as prepared
+from tree
+where kind = 'mine' and status in ('open', 'blocked') and prep_checked_at is null;
+```
+
+A step the person adds on the page is not judged when they add it. It waits
+for the next morning run, which judges it with the rest of the day's work.
+
+Name each prep step added in the run summary, with the step it serves, and
+give the count of steps judged to need nothing.
 
 ## The weekly run
 

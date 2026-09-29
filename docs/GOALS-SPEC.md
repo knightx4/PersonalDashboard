@@ -447,6 +447,23 @@ preparing it again replaces the text.
 The refusals are the same as for a send, except that a step may be prepared
 before the steps it waits on have closed.
 
+### A Dash step before yours
+
+Runs also prepare your steps without being asked (plan #1207). When a goal
+is mapped, re-shaped or given a new step of yours, the run judges each of
+your steps once: if a draft, research, a shortlist or a list would help you
+do it, and producing it is one sitting of Claude's work, a Claude step goes
+in just before it with `prepares_id` naming your step. A cover letter comes
+before an application and a shortlist of firms before a round of calls;
+clearing the couch gets nothing. The prep step is not a dependency, so your
+step never waits on it. Your step's `prep_checked_at` records that it was
+judged, whether or not a prep step went in. A phase, a step already prepared
+with **Prepare**, and a step whose Claude sibling already covers it get
+none. A step you add on the page is judged by the next morning run, and the
+morning run works the prep steps it added that same morning within its ten
+steps. The rules and examples are in the goals skill, "A Dash step before
+yours".
+
 ### From a comment
 
 The quick `@dash` reply on a step (`lib/goals/comment-model.ts`) has four
