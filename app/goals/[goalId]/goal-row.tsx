@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/toast';
 import { awaitsSeenIt } from '@/lib/goals/answer-change';
 import type { LinkedFile } from '@/lib/files/files';
 import { awaitsReview } from '@/lib/goals/daily';
+import type { PrepTarget, StepPrep } from '@/lib/goals/goal-page';
 import { offersPrepare, offersSend, sendJob } from '@/lib/goals/handover';
 import type { GoalRowNode } from '@/lib/goals/plan-rows';
 import { progressLine } from '@/lib/goals/rhythms';
@@ -44,6 +45,7 @@ import {
 } from './shaping-actions';
 import {
   ClaudeResult,
+  PrepNote,
   PastPeriods,
   ProposalButtons,
   Question,
@@ -103,6 +105,10 @@ export type GoalRowContext = {
   runs: Record<string, StepRunView>;
   /** The files each step links to, by step id (core.files through goals.links). */
   files?: Record<string, LinkedFile[]>;
+  /** Each step's live Dash prep step, by the id of the step it serves (plan #1218). */
+  prepFor?: Record<string, StepPrep>;
+  /** The step each prep step is for, by the prep step's id. */
+  targetOf?: Record<string, PrepTarget>;
 };
 
 /**
@@ -390,6 +396,8 @@ export function GoalRow({
   const handedOver = (sendState.error ?? sendState.message) ? sendState : prepareState;
   const run = context.runs[step.id];
   const stepFiles = context.files?.[step.id] ?? NO_FILES;
+  const prep = context.prepFor?.[step.id];
+  const prepares = step.kind === 'claude' ? context.targetOf?.[step.id] : undefined;
   // Once the page holds the run a press started, its line says what the
   // press's message said and more, so the message gives way to it. A refusal
   // is still said: it started nothing.
@@ -569,6 +577,7 @@ export function GoalRow({
           {step.kind === 'mine' && (step.result || step.resultUrl || stepFiles.length > 0) && (
             <ClaudeResult node={step} files={stepFiles} />
           )}
+          {prep && <PrepNote prep={prep} />}
           {rhythm && rhythm.past.length > 0 && step.rhythmPeriod && (
             <PastPeriods past={rhythm.past} period={step.rhythmPeriod} />
           )}
@@ -600,6 +609,11 @@ export function GoalRow({
           )}
           {step.waitsUntil && <span>Starts {formatDate(step.waitsUntil)}</span>}
           {step.dueOn && <span>Due {formatDate(step.dueOn)}</span>}
+          {prepares && (
+            <a href={`#step-${prepares.id}`} className="underline">
+              For {prepares.title}
+            </a>
+          )}
           {onTodo && <span>On Todo</span>}
           {links.map((link) => (
             <Link key={link.linkId} href={`/goals/${link.goalId}`} className="underline">

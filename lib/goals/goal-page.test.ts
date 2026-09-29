@@ -6,6 +6,7 @@ import {
   rhythmSteps,
   stageMeta,
   stagesLabel,
+  stepPreps,
 } from './goal-page';
 import type { StepNode } from './steps';
 
@@ -218,5 +219,39 @@ describe('goalFindings', () => {
     ]);
     expect(finding.url).toBe('https://transalt.org/volunteer');
     expect(finding.unread).toBe(false);
+  });
+});
+
+describe('stepPreps', () => {
+  const apply = node('apply', { title: 'Apply to Kroll' });
+  const prep = (extra: Partial<StepNode> = {}) =>
+    node('prep', { kind: 'claude', title: 'Draft the Kroll cover letter', preparesId: 'apply', ...extra });
+
+  it('says an open prep step is preparing, by its title, and names the step it is for', () => {
+    const { prepFor, targetOf } = stepPreps([[prep(), apply]]);
+    expect(prepFor.apply).toEqual({ id: 'prep', title: 'Draft the Kroll cover letter', done: false, line: null });
+    expect(targetOf.prep).toEqual({ id: 'apply', title: 'Apply to Kroll' });
+  });
+
+  it('gives a done prep step the first sentence of what it produced', () => {
+    const { prepFor } = stepPreps([
+      [prep({ status: 'done', result: '## Draft\n\nA letter leading on the fraud work. Second sentence.' }), apply],
+    ]);
+    expect(prepFor.apply).toMatchObject({ done: true, line: 'A letter leading on the fraud work.' });
+  });
+
+  it('shows nothing for a dropped prep step, or on a step with none', () => {
+    const { prepFor, targetOf } = stepPreps([[prep({ status: 'dropped' }), apply, node('other')]]);
+    expect(prepFor).toEqual({});
+    expect(targetOf).toEqual({});
+  });
+
+  it('finds a prep step nested under a stage and a target in a linked tree', () => {
+    const { prepFor } = stepPreps([[node('stage', { children: [prep()] })], [apply]]);
+    expect(prepFor.apply?.id).toBe('prep');
+  });
+
+  it('ignores prepares_id on a step that is not Dash\'s', () => {
+    expect(stepPreps([[node('x', { preparesId: 'apply' }), apply]]).prepFor).toEqual({});
   });
 });
