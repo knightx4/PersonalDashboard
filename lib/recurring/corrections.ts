@@ -288,3 +288,38 @@ async function paymentByKey(
   if (error) return { error: `Could not move them: ${error.message}` };
   return { id: (data?.id as string | undefined) ?? null };
 }
+
+/**
+ * Leave a payment out of the monthly total, or put it back (plan #1213). Left
+ * out, it is status 'ignored': off the total, in the page's "Not counted"
+ * section, and off the agenda, which reads only active payments.
+ * resummarisePayment keeps 'ignored', so a new statement filed onto the
+ * payment does not count it again.
+ *
+ * Put back, it is worked out again from its charges, so a payment whose latest
+ * email was a cancellation comes back as cancelled rather than active.
+ */
+export async function setPaymentCounted(
+  supabase: SupabaseClient,
+  opts: { userId: string; paymentId: string; counted: boolean },
+): Promise<CorrectionResult> {
+  const { userId, paymentId, counted } = opts;
+  const { data, error } = await supabase
+    .from('recurring_payments')
+    .update({ status: counted ? 'active' : 'ignored', updated_at: new Date().toISOString() })
+    .eq('id', paymentId)
+    .eq('user_id', userId)
+    .select('id');
+  const verb = counted ? 'count it' : 'leave it out';
+  if (error) return { error: `Could not ${verb}: ${error.message}` };
+  if (!data || data.length === 0) return { error: 'That payment is no longer there.' };
+
+  if (counted) {
+    try {
+      await resummarisePayment(supabase, { userId, paymentId });
+    } catch (e) {
+      return { error: `Could not ${verb}: ${(e as Error).message}` };
+    }
+  }
+  return {};
+}

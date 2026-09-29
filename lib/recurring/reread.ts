@@ -22,6 +22,9 @@ import { classifyRecurring, STORE_PAYEE_KEYS } from './rules';
  * the pass fetching it again every night, and what a person reads to find the
  * ones that are left. Once nothing is filed under a store's name, the pass
  * reads one table and stops.
+ *
+ * A store row the person left out of the total (status 'ignored', plan #1213)
+ * is theirs to sort out and is not re-read.
  */
 
 export const REREAD_ERROR_PREFIX = 'reread:';
@@ -69,7 +72,7 @@ export async function rereadStoreReceipts(
 
   const { data: payments, error: paymentsError } = await supabase
     .from('recurring_payments')
-    .select('id, payee_key')
+    .select('id, payee_key, status')
     .eq('user_id', userId)
     .in('payee_key', [...STORE_PAYEE_KEYS]);
   if (paymentsError) throw new Error(`reread payments failed: ${paymentsError.message}`);
@@ -77,6 +80,7 @@ export async function rereadStoreReceipts(
   let budget = limit;
   for (const payment of payments ?? []) {
     if (budget <= 0) break;
+    if (payment.status === 'ignored') continue;
     const paymentId = payment.id as string;
 
     const { data: charges, error: chargesError } = await supabase

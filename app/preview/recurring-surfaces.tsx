@@ -5,7 +5,8 @@ import { buildRecurringView } from '@/lib/recurring/view';
 /**
  * Shopping's Recurring page (plan #1126) with an ordinary mix: monthly and
  * yearly subscriptions, one with a price rise, one with no next date, a bill
- * and a rent reminder that stopped arriving, and one cancelled.
+ * and a rent reminder that stopped arriving, one cancelled, and a card
+ * statement left out of the total (plan #1213).
  */
 
 const TODAY = '2026-09-27';
@@ -30,10 +31,7 @@ function charge(
   };
 }
 
-function payment(
-  payee: string,
-  over: Partial<RecurringPayment>,
-): RecurringPayment {
+function payment(payee: string, over: Partial<RecurringPayment>): RecurringPayment {
   return {
     id: payee,
     payee,
@@ -57,7 +55,11 @@ const payments: RecurringPayment[] = [
     lastChargedOn: '2026-09-21',
     charges: [charge('s1', '2026-09-21', 2272), charge('s2', '2026-08-21', 2272, 2099)],
   }),
-  payment('Cloud storage', { amountCents: 999, nextDate: '2026-09-30', lastChargedOn: '2026-08-30' }),
+  payment('Cloud storage', {
+    amountCents: 999,
+    nextDate: '2026-09-30',
+    lastChargedOn: '2026-08-30',
+  }),
   payment('Photo backup', { amountCents: 10824, period: 'year', nextDate: '2027-01-15' }),
   payment('Online courses', { amountCents: 18000, period: 'year', nextDate: '2027-01-31' }),
   payment('Design tool', {
@@ -72,6 +74,13 @@ const payments: RecurringPayment[] = [
   }),
   payment('Property management', { kind: 'bill', amountCents: 132500, nextDate: '2026-06-01' }),
   payment('Language app', { status: 'cancelled', amountCents: 1299, lastChargedOn: '2026-03-12' }),
+  payment('Card statement', {
+    kind: 'bill',
+    status: 'ignored',
+    amountCents: 181200,
+    nextDate: '2026-10-25',
+    lastChargedOn: '2026-09-28',
+  }),
 ];
 
 export function RecurringSurface() {
