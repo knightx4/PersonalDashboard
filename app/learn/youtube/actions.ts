@@ -10,6 +10,7 @@ import {
   setChannelAutoTranscribe,
   setWatchListPlaylist,
   transcribeNow,
+  unfollowSubjectChannelNow,
   type TranscribeReport,
 } from '@/inngest/learn/youtube-library';
 import type { ListChannelResult } from '@/lib/learn/youtube/library';
@@ -97,6 +98,30 @@ export async function removeChannelAction(formData: FormData): Promise<void> {
   await requireOwner();
   await removeChannel(String(formData.get('providerId') ?? ''));
   revalidatePath('/learn/youtube', 'layout');
+}
+
+/**
+ * Unfollow a channel Learn followed for a subject (plan #1198), from the
+ * button beside it on the subject page. Takes the subject_channels row id as
+ * `channelId`.
+ */
+// latency: pending
+export async function unfollowSubjectChannelAction(_prev: PressState, formData: FormData): Promise<PressState> {
+  try {
+    const owner = await requireOwner();
+    const result = await unfollowSubjectChannelNow(owner.id, String(formData.get('channelId') ?? ''));
+    if (!result.ok) return { error: result.error };
+    revalidatePath('/learn/youtube', 'layout');
+    revalidatePath('/learn/s', 'layout');
+    return {
+      message:
+        result.library === 'kept'
+          ? `${result.title} unfollowed for this subject. Another subject still follows it, so it stays in your library.`
+          : `${result.title} unfollowed and out of your YouTube library.`,
+    };
+  } catch (error) {
+    return failed(error);
+  }
 }
 
 function transcribeLine(report: TranscribeReport): PressState {
