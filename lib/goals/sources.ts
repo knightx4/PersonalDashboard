@@ -31,5 +31,6 @@ export const goalsSources: ModuleSources = {
     'goals.history',
     'goals.visits',
     'goals.answers',
+    'goals.document_kinds',
   ].map((table) => ({ table, reason: OWN })),
 };

@@ -13,6 +13,7 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { CollectionField, CollectionShape } from '@/lib/goals/collections';
+import type { LearnedKind } from '@/lib/goals/document-kinds';
 import { EXTRACT_TOOL, extractionPrompt, extractionTool } from '@/lib/goals/extract';
 
 export const EXTRACT_MODEL = 'claude-haiku-4-5';
@@ -42,9 +43,11 @@ export async function askExtractModel(
   options: ExtractModelOptions,
   collection: { name: string; shape: CollectionShape; fields: CollectionField[] },
   source: ExtractSource,
+  /** The kinds of document the collection has learned (plan #987). */
+  kinds: LearnedKind[] = [],
 ): Promise<ExtractResult> {
   const client = options.client ?? new Anthropic({ apiKey: options.apiKey });
-  const tool = extractionTool(collection.fields);
+  const tool = extractionTool(collection.fields, kinds);
 
   const given: Anthropic.ContentBlockParam =
     source.kind === 'text'
@@ -58,7 +61,7 @@ export async function askExtractModel(
     response = await client.messages.create({
       model: EXTRACT_MODEL,
       max_tokens: 8192,
-      system: extractionPrompt(collection.name, collection.shape),
+      system: extractionPrompt(collection.name, collection.shape, kinds, collection.fields),
       tools: [tool as Anthropic.Tool],
       tool_choice: { type: 'tool', name: EXTRACT_TOOL },
       messages: [
