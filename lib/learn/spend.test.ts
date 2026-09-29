@@ -112,6 +112,7 @@ describe('the operation names', () => {
       'screen-video',
       'judge-video',
       'find-channels',
+      'judge-channel',
     ]);
   });
 });

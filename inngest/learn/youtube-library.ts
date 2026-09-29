@@ -35,6 +35,12 @@ import {
 } from '@/lib/learn/youtube/watch-list';
 import { summariseWatchLists, type SummaryPassResult } from '@/lib/learn/youtube/summaries';
 import { judgeWatchLists, type JudgePassResult } from '@/lib/learn/youtube/judging';
+import {
+  judgeFoundChannels,
+  judgePendingChannels,
+  type ChannelJudgePass,
+  type JudgeChannelsResult,
+} from '@/lib/learn/youtube/channel-judge';
 
 /**
  * The YouTube library's work, run with the service-role client.
@@ -74,6 +80,12 @@ const TICK_LIST_MS = 115_000;
 const TICK_METADATA_MS = 175_000;
 /** Transcripts: up to 40 fetches, which took at most about 40 seconds in September. */
 const TICK_TRANSCRIBE_MS = 230_000;
+/**
+ * Then the channels found for a subject (plan #1196): their samples whose
+ * transcripts this run fetched are judged, and a channel whose three are all
+ * in gets its verdict.
+ */
+const TICK_CHANNELS_MS = 250_000;
 const TICK_EMBED_MS = 270_000;
 
 const ownerSchema = z.object({ userId: z.string() });
@@ -149,6 +161,34 @@ async function judgeLists(learn: LearnSupabaseClient, deadline: number): Promise
   }
 }
 
+/** The operation a channel-judging call is recorded under. */
+function channelOperation(pass: ChannelJudgePass): 'judge-video' | 'judge-channel' {
+  return pass === 'sample' ? 'judge-video' : 'judge-channel';
+}
+
+/** Judge the channels found for everybody's subjects, from what the queue has fetched. */
+async function judgeChannels(learn: LearnSupabaseClient, deadline: number): Promise<TickReport['foundChannels']> {
+  const anthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!anthropicApiKey) return null;
+  const core = createCoreServiceSupabase();
+  const rows: Promise<unknown>[] = [];
+  try {
+    return await judgePendingChannels(learn, {
+      anthropicApiKey,
+      deadline,
+      onSpend: (userId, pass, report) =>
+        void rows.push(
+          recordSpend(core, userId, { module: 'learn', operation: channelOperation(pass), model: report.model, usage: report.usage }),
+        ),
+    });
+  } catch (error) {
+    console.error('[youtube-library] judging found channels', error instanceof Error ? error.message : error);
+    return null;
+  } finally {
+    await Promise.all(rows);
+  }
+}
+
 export type TickReport = {
   channels: { name: string; result: ListChannelResult }[];
   transcripts: TranscribeResult | null;
@@ -164,6 +204,8 @@ export type TickReport = {
   summaries?: SummaryPassResult | null;
   /** Verdicts written and transcripts asked for on those lists (plan #1066). */
   judging?: JudgePassResult | null;
+  /** Channels found for a subject and judged on their samples (plan #1196). */
+  foundChannels?: Awaited<ReturnType<typeof judgePendingChannels>> | null;
 };
 
 /**
@@ -222,6 +264,7 @@ export async function runYouTubeLibraryTick(): Promise<TickReport> {
       deadline: started + TICK_TRANSCRIBE_MS,
     });
   }
+  report.foundChannels = await judgeChannels(learn, started + TICK_CHANNELS_MS);
 
   report.embedding = await embedNew(learn, started + TICK_EMBED_MS);
   return report;
@@ -324,6 +367,38 @@ export async function transcribeNow(videoIds: string[], requestedBy: RequestedBy
 
   const embedding = transcripts.segments > 0 ? await embedNew(learn, started + PRESS_EMBED_MS) : null;
   return { transcripts, queued: count ?? 0, embedding };
+}
+
+/**
+ * Judge the channels found for one subject now (plan #1196): pick three
+ * videos from each, fetch their transcripts inside the month's credits (at
+ * most 15 for the subject), judge what arrived and give each channel whose
+ * samples are all in its verdict. What the press could not fetch stays
+ * queued, and the scheduled run finishes it. The caller checks the person
+ * owns the subject; every call is recorded against them.
+ */
+export async function judgeSubjectChannelsNow(userId: string, subjectId: string): Promise<JudgeChannelsResult> {
+  const started = Date.now();
+  const learn = createLearnServiceSupabase();
+  const core = createCoreServiceSupabase();
+  const rows: Promise<unknown>[] = [];
+  const credits = await loadCreditState(learn);
+  try {
+    return await judgeFoundChannels({
+      learn,
+      userId,
+      subjectId,
+      trigger: 'press',
+      maxCredits: credits.remaining,
+      deadline: started + PRESS_EMBED_MS,
+      onSpend: (pass, report) =>
+        void rows.push(
+          recordSpend(core, userId, { module: 'learn', operation: channelOperation(pass), model: report.model, usage: report.usage }),
+        ),
+    });
+  } finally {
+    await Promise.all(rows);
+  }
 }
 
 export type WatchListPlaylistReport =
