@@ -22,6 +22,16 @@ import { queueTranscripts } from './transcripts';
 const EMBED_BATCH = 128;
 
 /**
+ * Vectors written per call to store_video_metadata_embeddings. Each row
+ * written also goes into the HNSW index on metadata_embedding, which cost
+ * about 71ms a row on 29 September 2026 with 8,704 vectors in it, so a whole
+ * batch of 128 took about 9 seconds and PostgREST's 8-second statement
+ * timeout cancelled it in every run on 28 September (plan #1171). Thirty-two
+ * rows is about 2.3 seconds, which leaves room for the index to grow.
+ */
+export const STORE_CHUNK = 32;
+
+/**
  * How close a video's title and description has to be to one of your ideas
  * to be worth a credit. Set at 0.45 before any video had a vector, then raised
  * after the first run on 26 September 2026: of the 28 picks between 0.45 and
@@ -74,8 +84,9 @@ export type MetadataEmbedResult = {
 /**
  * Embed titles and descriptions until the videos or the time run out.
  *
- * A batch that fails to embed stops the pass and is picked up by the next
- * run: nothing is written for it, so it is still unembedded.
+ * A batch that fails to embed or to store stops the pass, with the reason in
+ * `stopped`, and is picked up by the next run: what was not written is still
+ * unembedded. Stopping rather than throwing keeps the match queue running.
  */
 export async function embedVideoMetadata(
   learn: LearnSupabaseClient,
@@ -103,13 +114,15 @@ export async function embedVideoMetadata(
     });
     if (!embedded.ok) return { ...result, stopped: `${embedded.reason}: ${embedded.detail}` };
 
-    const stored = await learn.rpc('store_video_metadata_embeddings', {
-      item_ids: rows.map((row) => row.id),
-      vectors: embedded.vectors.map(vectorLiteral),
-      model: embedded.model,
-    });
-    if (stored.error) throw new Error(`Storing video vectors failed: ${stored.error.message}`);
-    result.embedded += Number(stored.data ?? 0);
+    for (let at = 0; at < rows.length; at += STORE_CHUNK) {
+      const stored = await learn.rpc('store_video_metadata_embeddings', {
+        item_ids: rows.slice(at, at + STORE_CHUNK).map((row) => row.id),
+        vectors: embedded.vectors.slice(at, at + STORE_CHUNK).map(vectorLiteral),
+        model: embedded.model,
+      });
+      if (stored.error) return { ...result, stopped: `storing video vectors: ${stored.error.message}` };
+      result.embedded += Number(stored.data ?? 0);
+    }
   }
 
   return { ...result, stopped: 'time' };
