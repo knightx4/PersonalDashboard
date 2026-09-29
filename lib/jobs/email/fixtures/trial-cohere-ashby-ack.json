@@ -1,0 +1,6 @@
+{
+  "classification": "application_confirmation",
+  "ats": "ashby",
+  "tier": "A",
+  "note": "An acknowledgement filed as a rejection (Haiku's summary: \"Application confirmation for Assistant Controller role at Cohere\"; Jev: application_confirmation at 1.00). The subject already reads as one, so a soft rejection phrase in the body is what outranked it; which one is not known without the body. The envelope (sender and subject) is real, from the Jev trial (docs/trials/2026-09-29-jev-job-email.md, message 6c8a6d8c). The body was not fetched: Gmail was not reachable from the session that wrote this (plan #1227), and the ledger never stores one, so the fixture holds only what the rules read from the envelope."
+}
