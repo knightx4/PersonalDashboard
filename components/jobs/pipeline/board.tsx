@@ -9,6 +9,7 @@ import { Card, cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
+import { ScoreLine } from '@/components/jobs/ui/score-figures';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import { shortAge } from '@/lib/jobs/applications/load';
 import { formatCoverage, type ApplicationStatus } from '@/lib/jobs/pipeline';
@@ -363,6 +364,7 @@ function PipelineCard({
               </span>
             </div>
           </div>
+          <ScoreLine note={row.scoreNote} />
         </div>
         {row.excitement !== null && (
           <span className="tabular shrink-0 text-small text-ink-muted" title="Excitement">

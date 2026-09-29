@@ -314,6 +314,8 @@ const pipelineRows: PipelineRow[] = [
     daysSinceActivity: 3,
     lastActivityAt: '2026-09-06T11:00:00.000Z',
     coverage: { covered: 5, total: 5, gaps: 0, rate: 1 },
+    // Already interviewing, so chance is left off and only fit shows.
+    scoreNote: { fit: { value: 73, unsure: false, reason: '5 of 5 must-haves met by your evidence' }, chance: null },
   }),
   pipelineRow({
     applicationId: 'p3',
@@ -321,6 +323,10 @@ const pipelineRows: PipelineRow[] = [
     roleTitle: 'Backend Engineer, Payments',
     status: 'acknowledged',
     source: 'referral',
+    scoreNote: {
+      fit: { value: 56, unsure: true, reason: 'Read from the title and level only, no description on file' },
+      chance: { value: 36, band: 'medium', unsure: true, reason: '2 of 14 similar reached an interview, 3 still waiting' },
+    },
     daysSinceActivity: 9,
     lastActivityAt: '2026-08-31T09:00:00.000Z',
   }),
