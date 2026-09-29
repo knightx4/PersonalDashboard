@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { todayInTimezone } from '@/lib/money';
+import { markReturned, unmarkReturned } from '@/lib/returns/mark';
 
 export type ActionState = {
   error?: string;
@@ -147,47 +148,12 @@ export async function markItemReturned(
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing item.' };
 
-  const { data: item, error: itemError } = await supabase
-    .from('inventory_items')
-    .select('id, cost_cents, status, order_item_id')
-    .eq('id', id.data)
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  if (itemError || !item) return { error: 'That item could not be found.' };
-  if (item.status !== 'owned') return { error: 'Only owned items can be marked returned.' };
-  if (!item.order_item_id) {
-    return { error: 'This item is not linked to an order, so it cannot be returned.' };
-  }
-
-  const { data: orderItem, error: orderItemError } = await supabase
-    .from('order_items')
-    .select('order_id')
-    .eq('id', item.order_item_id)
-    .maybeSingle();
-  if (orderItemError || !orderItem) return { error: 'Could not find the parent order.' };
-
   const timezone = await userTimezone(supabase, user.id);
-  const today = todayInTimezone(timezone);
+  const marked = await markReturned(supabase, user.id, id.data, todayInTimezone(timezone));
+  if (!marked.ok) return { error: marked.error };
 
-  const { data: inserted, error } = await supabase
-    .from('returns')
-    .insert({
-      user_id: user.id,
-      order_id: orderItem.order_id,
-      inventory_item_id: item.id,
-      initiated_at: today,
-      refund_amount_cents: item.cost_cents,
-      status: 'refunded',
-      refunded_at: today,
-    })
-    .select('id')
-    .single();
-
-  if (error) return { error: error.message };
-
-  revalidateReturnSurfaces(item.id, orderItem.order_id);
-  return { message: 'Marked as returned.', returnId: inserted?.id as string | undefined };
+  revalidateReturnSurfaces(id.data, marked.orderId);
+  return { message: 'Marked as returned.', returnId: marked.returnId };
 }
 
 /**
@@ -213,42 +179,10 @@ export async function undoItemReturned(
 
   if (!parsed.success) return { error: 'Missing return.' };
 
-  const { data: item, error: itemError } = await supabase
-    .from('inventory_items')
-    .select('id, status, order_item_id')
-    .eq('id', parsed.data.id)
-    .eq('user_id', user.id)
-    .maybeSingle();
+  const undone = await unmarkReturned(supabase, user.id, parsed.data.id, parsed.data.returnId);
+  if (!undone.ok) return { error: undone.error };
 
-  if (itemError || !item) return { error: 'That item could not be found.' };
-  if (item.status !== 'returned') {
-    return { error: 'Only returned items can be restored.' };
-  }
-
-  const { data: ret, error: retError } = await supabase
-    .from('returns')
-    .select('id, order_id, inventory_item_id, status')
-    .eq('id', parsed.data.returnId)
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  if (retError || !ret) return { error: 'That return could not be found.' };
-  if (ret.inventory_item_id !== item.id) {
-    return { error: 'That return does not match this item.' };
-  }
-  if (ret.status !== 'refunded') {
-    return { error: 'Only completed returns can be undone.' };
-  }
-
-  const { error } = await supabase
-    .from('returns')
-    .delete()
-    .eq('id', ret.id)
-    .eq('user_id', user.id);
-
-  if (error) return { error: error.message };
-
-  revalidateReturnSurfaces(item.id, ret.order_id as string);
+  revalidateReturnSurfaces(parsed.data.id, undone.orderId);
   return { message: 'Restored to inventory.' };
 }
 

@@ -5,10 +5,14 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { estimatePaidActions, type PaidCosts } from '@/lib/core/spend/paid-actions';
+import { changePaths, type ChangeOutcome } from '@/lib/ask/changes';
 import {
   askDashInRequest,
+  confirmAskChange,
+  declineAskChange,
   listAskConversations,
   loadAskConversation,
+  undoAskChange,
 } from '@/lib/talk/ask-request';
 import type { AskDashResult } from '@/lib/talk/ask';
 import type { ConversationSummary } from '@/lib/talk/store';
@@ -92,4 +96,48 @@ export async function askDashCosts(): Promise<PaidCosts> {
   } catch {
     return {};
   }
+}
+
+/**
+ * Confirm, decline or undo one change Dash proposed (plan #1189). Each takes
+ * the change's id and never throws: the result is the change as it now
+ * stands, or a sentence saying why not, with the change as it stands when it
+ * could be read. Confirm and undo revalidate the pages the change lands on,
+ * and all three the Ask page, whose list of changes reads the table.
+ */
+async function pressChange(
+  id: string,
+  press: (id: string) => Promise<ChangeOutcome>,
+  failed: string,
+): Promise<ChangeOutcome> {
+  const parsed = Ref.safeParse(id);
+  if (!parsed.success) return { ok: false, error: 'That change is not there any more.', change: null };
+  try {
+    const outcome = await press(parsed.data);
+    if (outcome.ok) {
+      if (outcome.change.status !== 'declined') {
+        for (const path of changePaths(outcome.change)) revalidatePath(path);
+      }
+      revalidatePath('/ask');
+    }
+    return outcome;
+  } catch (error) {
+    console.error('ask change failed', error);
+    return { ok: false, error: failed, change: null };
+  }
+}
+
+// latency: pending
+export async function confirmDashChange(id: string): Promise<ChangeOutcome> {
+  return pressChange(id, confirmAskChange, 'The change could not be written. Check your connection and try again.');
+}
+
+// latency: pending
+export async function declineDashChange(id: string): Promise<ChangeOutcome> {
+  return pressChange(id, declineAskChange, 'The change could not be declined. Try again.');
+}
+
+// latency: pending
+export async function undoDashChange(id: string): Promise<ChangeOutcome> {
+  return pressChange(id, undoAskChange, 'The change could not be undone. Check your connection and try again.');
 }
