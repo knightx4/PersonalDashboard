@@ -66,6 +66,8 @@ export const HIT_TABLES: Record<HitKind, string> = {
   idea: 'public.ideas',
   feedback: 'public.feedback_items',
   raise: 'public.raised_items',
+  // A vision's ref is its workspace id, or `app` for the app as a whole.
+  vision: 'public.module_visions',
   // A story is one entry in an issue's list; its ref is `<issue id>:<index>`.
   story: 'news.issues',
   goal: 'goals.items',
