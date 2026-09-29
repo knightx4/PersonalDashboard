@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { findDuplicateIdea, ideaFirstLine, ideaSimilarity, ideaWords } from './duplicate';
+import {
+  IDEA_DUPLICATE_MIN,
+  findDuplicateIdea,
+  ideaFirstLine,
+  ideaSimilarity,
+  ideaWords,
+} from './duplicate';
+import { MORNING_REPEATS } from './fixtures/morning-repeats';
 
 /**
  * Both halves of the check matter and they pull against each other: the same
@@ -89,6 +96,57 @@ describe('findDuplicateIdea', () => {
 
   it('finds nothing when the list is empty', () => {
     expect(findDuplicateIdea(FILED[0].body, [])).toBeNull();
+  });
+});
+
+describe('findDuplicateIdea on a reworded paragraph (plan #1223)', () => {
+  const repeat = (id: string) => {
+    const idea = MORNING_REPEATS.find((row) => row.id === id);
+    if (!idea) throw new Error(`no repeat ${id}`);
+    return idea;
+  };
+
+  // The pairs the morning run filed twice between 25 and 29 September, the
+  // later one first. Each scores under the whole-body bar, which is why the
+  // run filed it again.
+  const PAIRS = [
+    ['1e5937f9', '00e42a11'],
+    ['3a8f1038', '636a8233'],
+    ['d6d28a49', '636a8233'],
+  ] as const;
+
+  it.each(PAIRS)('refuses %s as a repeat of %s', (later, earlier) => {
+    const body = repeat(later).body;
+    const filed = repeat(earlier);
+    expect(ideaSimilarity(body, filed.body)).toBeLessThan(IDEA_DUPLICATE_MIN);
+
+    const match = findDuplicateIdea(body, [filed]);
+    expect(match?.idea.id).toBe(earlier);
+    expect(match?.on).toBe('first line');
+    expect(match?.score).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it('files each of the seven once when they arrive in order', () => {
+    const filed: { id: string; body: string }[] = [];
+    const written: string[] = [];
+    for (const idea of MORNING_REPEATS) {
+      if (findDuplicateIdea(idea.body, filed)) continue;
+      filed.push(idea);
+      written.push(idea.id);
+    }
+    expect(written).toEqual(['b26258a6', '00e42a11', '636a8233', 'd14f85e8']);
+  });
+
+  it('lets two short, different headlines through', () => {
+    expect(
+      findDuplicateIdea('Sort the ideas page\n\nNewest first, so the morning run is on top.', [
+        { id: 'aaaa', body: 'Group the ideas page\n\nOne heading per workspace, in the sidebar order.' },
+      ]),
+    ).toBeNull();
+  });
+
+  it('says the whole body matched when it did', () => {
+    expect(findDuplicateIdea(FILED[0].body, FILED)?.on).toBe('body');
   });
 });
 
