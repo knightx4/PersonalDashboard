@@ -117,7 +117,30 @@ export type GoalRowNode = {
   need: string | null;
   health: ReturnType<typeof healthWordsOf>;
   move: ReturnType<typeof moveWordsFor>;
+  /** Who the step is on, for the row's second column: you, Dash, or both beneath it. */
+  who: { word: string; tone: 'quiet' | 'accent'; title: string };
 };
+
+/**
+ * Who a step is on (note 6d242e62): Dash for a Dash step, you for every other
+ * kind -- yours, a question, a rhythm. A step with steps beneath it is on
+ * whoever its open steps are on, or all of them once none is open.
+ */
+export function whoIsOn(step: StepNode): GoalRowNode['who'] {
+  const on = new Set<'you' | 'dash'>();
+  const walk = (node: StepNode, openOnly: boolean) => {
+    if (node.children.length === 0) {
+      if (!openOnly || node.status === 'open' || node.status === 'blocked') on.add(node.kind === 'claude' ? 'dash' : 'you');
+      return;
+    }
+    for (const child of node.children) walk(child, openOnly);
+  };
+  walk(step, true);
+  if (on.size === 0) walk(step, false);
+  if (on.size === 2) return { word: 'You and Dash', tone: 'accent', title: 'Some steps beneath are yours and some are Dash’s.' };
+  if (on.has('dash')) return { word: 'Dash', tone: 'accent', title: 'Dash does this step.' };
+  return { word: 'You', tone: 'quiet', title: 'This step is yours to do.' };
+}
 
 /** The step as the plan's rules read it: enough of a `PlanNode` for them. */
 type Shadow = {
@@ -342,6 +365,7 @@ export function goalRows(
         planMoveOf(asPlan(shadow)),
         planMoveOf(asPlan({ ...shadow, children: [] })),
       ),
+      who: whoIsOn(step),
     };
   }
 

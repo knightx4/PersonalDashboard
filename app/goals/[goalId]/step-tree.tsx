@@ -225,7 +225,7 @@ export function StepTree({
             )}
             {shownOpen.length > 0 && (
               <ul className="divide-y divide-border">
-                <ColumnHeader priority="When" />
+                <ColumnHeader status="Who" priority="When" />
                 {shownOpen.map(rowOf)}
               </ul>
             )}

@@ -13,6 +13,7 @@ import {
   numberSteps,
   outlineSteps,
   viewGoalRows,
+  whoIsOn,
   type GoalRowNode,
 } from './plan-rows';
 import { buildForest, type Step, type StepNode } from './steps';
@@ -330,5 +331,34 @@ describe('viewGoalRows', () => {
     const all = rowsOf(withResults).rows;
     expect(ids(viewGoalRows(all, 'read'))).toEqual(['stage', 'unread']);
     expect(countGoalView(all, 'read')).toBe(1);
+  });
+});
+
+describe('whoIsOn', () => {
+  it('names Dash for a Dash step, you for the rest, and both over a mix of open steps', () => {
+    const [stage] = buildForest(['g'], [
+      step('stage', 'g'),
+      step('dash', 'stage', { kind: 'claude' }),
+      step('mine', 'stage'),
+      step('done-mine', 'stage', { status: 'done' }),
+    ]).byGoal.get('g')!;
+    expect(whoIsOn(stage.children[0]).word).toBe('Dash');
+    expect(whoIsOn(stage.children[1]).word).toBe('You');
+    expect(whoIsOn(stage).word).toBe('You and Dash');
+  });
+
+  it('reads a stage by its open steps, and by all of them once none is open', () => {
+    const [open] = buildForest(['g'], [
+      step('stage', 'g'),
+      step('dash', 'stage', { kind: 'claude' }),
+      step('mine', 'stage', { status: 'done' }),
+    ]).byGoal.get('g')!;
+    expect(whoIsOn(open).word).toBe('Dash');
+    const [closed] = buildForest(['g'], [
+      step('stage', 'g'),
+      step('dash', 'stage', { kind: 'claude', status: 'done' }),
+      step('mine', 'stage', { status: 'done' }),
+    ]).byGoal.get('g')!;
+    expect(whoIsOn(closed).word).toBe('You and Dash');
   });
 });

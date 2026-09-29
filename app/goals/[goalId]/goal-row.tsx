@@ -450,7 +450,8 @@ export function GoalRow({
       trail={trail}
       row={row}
       health={node.health}
-      move={node.move}
+      // Who the step is on, where the plan says whose move it is (note 6d242e62).
+      move={node.who}
       statusMenu={statusMenu}
       menu={menu}
       actions={GOAL_TREE_ACTIONS}
