@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from 'react';
 import Link from 'next/link';
-import { CloudFog, Flag, ListTree } from 'lucide-react';
+import { Archive, CloudFog, Flag, ListFilter, ListTree } from 'lucide-react';
+import { ViewChips } from '@/components/plan-tree/view-chips';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,14 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ComposeBody, ComposeTitle, InlineInput, InlineTextarea } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
+import {
+  ALL_GOALS_VIEWS,
+  areasInView,
+  countAllGoalsView,
+  type AllGoalsView,
+  type AreaInView,
+} from '@/lib/goals/all-goals';
+import { GOAL_VIEW_LABEL, goalViewHref } from '@/lib/goals/plan-rows';
 import type { AreaRunView } from '@/lib/goals/shaping';
 import type { GoalProgress as GoalProgressData } from '@/lib/goals/status';
 import {
@@ -50,6 +59,10 @@ import { GoalProgress } from './goal-progress';
  * renamed. Reordering and archiving sit in each
  * row's menu, which works the same with a thumb as with a mouse. Archiving
  * offers an undo, and the record of it stays in the history either way.
+ *
+ * Open, On you and Everything narrow the goals (plan #1158), with the chips a
+ * goal's steps have. Everything is the one view with finished and archived
+ * goals in it, and an archived goal there can be restored from its menu.
  */
 
 const initial: GoalsActionState = {};
@@ -111,27 +124,66 @@ function moveItems(
   ];
 }
 
+/** What each view says when it has no goal to show. */
+const EMPTY_VIEW: Record<AllGoalsView, { title: string; description: string }> = {
+  open: {
+    title: 'No open goals',
+    description: 'Every goal is finished or archived. Everything shows them all.',
+  },
+  you: {
+    title: 'Nothing is waiting on you',
+    description: 'No goal has a step, question or approval of yours right now.',
+  },
+  all: { title: 'No goals yet', description: 'Add a goal under an area.' },
+};
+
 export function GoalsView({
-  areas,
+  areas: allAreas,
+  view,
+  onYou: onYouCounts,
   progress,
   areaRuns,
   canRun,
 }: {
   areas: AreaWithGoals[];
+  /** Which goals show (plan #1158); in the address as `?view=`. */
+  view: AllGoalsView;
+  /** How many things on you each goal holds, keyed by goal id, from the Today list. */
+  onYou: Record<string, number>;
   progress: Progress;
   /** Each area's latest Plan this area run, keyed by area id. */
   areaRuns: Record<string, AreaRunView>;
   /** Whether this account can start a Claude run (the owner's only). */
   canRun: boolean;
 }) {
+  const onYou = new Map(Object.entries(onYouCounts));
+  const areas = areasInView(allAreas, view, onYou);
   return (
     <div className="space-y-6">
-      {areas.length === 0 ? (
+      {allAreas.length > 0 && (
+        <div className="flex items-center gap-2">
+          <ListFilter className="size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+          <ViewChips
+            view={view}
+            chips={ALL_GOALS_VIEWS}
+            labels={GOAL_VIEW_LABEL}
+            hrefOf={(candidate) => goalViewHref('/goals/all', candidate)}
+            counts={{
+              open: countAllGoalsView(allAreas, 'open', onYou),
+              you: countAllGoalsView(allAreas, 'you', onYou),
+            }}
+            scroll={false}
+          />
+        </div>
+      )}
+      {allAreas.length === 0 ? (
         <EmptyState
           icon={Flag}
           title="No areas yet"
           description="Start with the directions you care about, such as money, career or the city, then put goals under each."
         />
+      ) : areas.length === 0 ? (
+        <EmptyState icon={Flag} {...EMPTY_VIEW[view]} />
       ) : (
         areas.map((area, index) => (
           <AreaSection
@@ -158,7 +210,7 @@ function AreaSection({
   run,
   canRun,
 }: {
-  area: AreaWithGoals;
+  area: AreaInView;
   index: number;
   count: number;
   progress: Progress;
@@ -189,6 +241,8 @@ function AreaSection({
   }
 
   const goalCount = area.goals.length;
+  // The confirm counts every live goal the archive takes, shown in this view or not.
+  const liveCount = area.liveCount;
   const items: ActionMenuItem[] = [
     { id: 'open', label: 'Open the area', href: `/goals/area/${area.id}` },
     ...moveItems(menuAction(moveAreaAction), area.id, index, count),
@@ -199,9 +253,9 @@ function AreaSection({
       formAction: archive,
       formFields: { id: area.id },
       confirm:
-        goalCount === 0
+        liveCount === 0
           ? `Archive ${area.name}?`
-          : `Archive ${area.name} and its ${goalCount === 1 ? 'goal' : `${goalCount} goals`}?`,
+          : `Archive ${area.name} and its ${liveCount === 1 ? 'goal' : `${liveCount} goals`}?`,
     },
   ];
 
@@ -261,7 +315,7 @@ function AreaSection({
           </ul>
         </Card>
       )}
-      <AreaPlanner areaId={area.id} hasGoals={goalCount > 0} run={run} canRun={canRun} />
+      <AreaPlanner areaId={area.id} hasGoals={liveCount > 0} run={run} canRun={canRun} />
       <GoalComposer areaId={area.id} areaName={area.name} />
     </section>
   );
@@ -303,19 +357,31 @@ function GoalRow({
     });
   }
 
-  const items: ActionMenuItem[] = [
-    ...moveItems(menuAction(moveGoalAction), goal.id, index, count),
-    ...(showFog
-      ? []
-      : [{ id: 'fog', label: 'Say what is not known yet', onSelect: () => setAddingFog(true) }]),
-    {
-      id: 'archive',
-      label: 'Archive goal',
-      destructive: true,
-      formAction: archive,
-      formFields: { id: goal.id },
-    },
-  ];
+  async function restore(form: FormData) {
+    form.set('restore', 'true');
+    const result = await archiveGoalAction(form);
+    if (result.error) toast({ text: result.error });
+  }
+
+  // An archived goal, shown only under Everything, is restored or left be.
+  const archived = Boolean(goal.archivedAt);
+  const items: ActionMenuItem[] = archived
+    ? [{ id: 'restore', label: 'Restore goal', formAction: restore, formFields: { id: goal.id } }]
+    : [
+        ...moveItems(menuAction(moveGoalAction), goal.id, index, count),
+        ...(showFog
+          ? []
+          : [
+              { id: 'fog', label: 'Say what is not known yet', onSelect: () => setAddingFog(true) },
+            ]),
+        {
+          id: 'archive',
+          label: 'Archive goal',
+          destructive: true,
+          formAction: archive,
+          formFields: { id: goal.id },
+        },
+      ];
 
   return (
     <li className="card-pad-x row-pad flex items-start gap-2">
@@ -373,11 +439,23 @@ function GoalRow({
             className="inline-flex items-center gap-1 text-small text-ink-muted underline-offset-2 hover:text-ink hover:underline"
           >
             <ListTree className="size-3" strokeWidth={1.75} aria-hidden />
-            {goal.status === 'proposed' ? 'See what Dash proposed' : steps ? 'Full tree' : 'Break into steps'}
+            {goal.status === 'proposed'
+              ? 'See what Dash proposed'
+              : steps
+                ? 'Full tree'
+                : 'Break into steps'}
           </Link>
         </div>
-        {goal.status === 'proposed' && <SettleProposedGoal goalId={goal.id} onTurnDown={archive} />}
-        {(goal.status === 'parked' || goal.status === 'done') && (
+        {archived && (
+          <p className="flex items-center gap-1 px-1 pt-0.5 text-small text-ink-muted">
+            <Archive className="size-3" strokeWidth={1.75} aria-hidden />
+            Archived. Restore it from its menu to work on it again.
+          </p>
+        )}
+        {!archived && goal.status === 'proposed' && (
+          <SettleProposedGoal goalId={goal.id} onTurnDown={archive} />
+        )}
+        {!archived && (goal.status === 'parked' || goal.status === 'done') && (
           <TakeBackUp goalId={goal.id} status={goal.status} />
         )}
         {editState.error && <p className="px-1 text-small text-danger">{editState.error}</p>}
@@ -430,7 +508,14 @@ function TakeBackUp({ goalId, status }: { goalId: string; status: 'parked' | 'do
     <form action={reopen} className="flex flex-wrap items-center gap-2 px-1 pt-1">
       <input type="hidden" name="id" value={goalId} />
       <span className="text-small text-ink-muted">{status === 'parked' ? 'Parked' : 'Closed'}</span>
-      <Button type="submit" name="move" value="reopen" size="sm" variant="ghost" pending={reopening}>
+      <Button
+        type="submit"
+        name="move"
+        value="reopen"
+        size="sm"
+        variant="ghost"
+        pending={reopening}
+      >
         {status === 'parked' ? 'Take it back up' : 'Reopen'}
       </Button>
       {state.error && <span className="text-small text-danger">{state.error}</span>}
@@ -463,17 +548,14 @@ export function ApproveArea({ areaId, count }: { areaId: string; count: number }
 function GoalComposer({ areaId, areaName }: { areaId: string; areaName: string }) {
   const [open, setOpen] = useState(false);
   const [vague, setVague] = useState(false);
-  const [state, add, adding] = useActionState(
-    async (prev: GoalsActionState, form: FormData) => {
-      const next = await addGoal(prev, form);
-      if (next.done) {
-        setOpen(false);
-        setVague(false);
-      }
-      return next;
-    },
-    initial,
-  );
+  const [state, add, adding] = useActionState(async (prev: GoalsActionState, form: FormData) => {
+    const next = await addGoal(prev, form);
+    if (next.done) {
+      setOpen(false);
+      setVague(false);
+    }
+    return next;
+  }, initial);
 
   if (!open) return <AddTrigger label="New goal" onClick={() => setOpen(true)} />;
 
@@ -542,14 +624,11 @@ function GoalComposer({ areaId, areaName }: { areaId: string; areaName: string }
 
 function AreaComposer() {
   const [open, setOpen] = useState(false);
-  const [state, add, adding] = useActionState(
-    async (prev: GoalsActionState, form: FormData) => {
-      const next = await addArea(prev, form);
-      if (next.done) setOpen(false);
-      return next;
-    },
-    initial,
-  );
+  const [state, add, adding] = useActionState(async (prev: GoalsActionState, form: FormData) => {
+    const next = await addArea(prev, form);
+    if (next.done) setOpen(false);
+    return next;
+  }, initial);
 
   if (!open) return <AddTrigger label="New area" onClick={() => setOpen(true)} />;
 
