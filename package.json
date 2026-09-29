@@ -21,6 +21,7 @@
     "catalogue": "tsx --conditions=react-server scripts/learn-catalogue.ts",
     "news:digest": "tsx --conditions=react-server scripts/news-digest.ts",
     "news:repeats": "tsx --conditions=react-server scripts/news-repeats.ts",
+    "mail:piles": "tsx --conditions=react-server scripts/mail-piles.ts",
     "gate": "./scripts/gate.sh"
   },
   "dependencies": {

@@ -92,6 +92,9 @@ export const SPEND_OPERATIONS = {
     // wait on the agenda (plan #1129). Sonnet, one call per draft, at most
     // six a person a morning from the hourly day-brief cron; background.
     'write-draft',
+    // Sorting every ingested email into a pile, beside the linkers' rules
+    // (plan #1173). Jev, one call per email; background, during inbox ingest.
+    'sort-email',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one

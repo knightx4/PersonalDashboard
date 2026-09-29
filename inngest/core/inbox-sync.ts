@@ -17,6 +17,7 @@ import { commerceLinker } from '@/lib/inbox/linker';
 import { jobLinker } from '@/lib/jobs/inbox/linker';
 import { recurringLinker } from '@/lib/recurring/linker';
 import { appointmentLinker } from '@/lib/todo/appointments/linker';
+import { mailroomLinker } from '@/lib/core/mailroom/linker';
 import { createTodoServiceSupabase } from '@/inngest/todo/supabase-admin';
 import type { DomainLinker } from '@/lib/core/inbox/fan-out';
 import { canStartAnotherBatch } from '@/lib/core/inbox/pump-budget';
@@ -204,6 +205,10 @@ function buildLinkers(): DomainLinker[] {
     // schema. Last, and its rules leave order, job and bill mail to the three
     // above; it reads the person's zone through the core client.
     appointmentLinker(createTodoServiceSupabase(), core),
+    // Jev's pile for every email, stored beside the four above and acting on
+    // nothing yet (plan #1173). Last, so their verdicts on the page exist
+    // when core.mail_pile_agreement compares the two.
+    mailroomLinker(core),
   ];
 }
 
