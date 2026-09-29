@@ -16,6 +16,7 @@ import {
 } from '@/lib/digest/build';
 import { nightFrom } from '@/lib/digest/night';
 import { isRunObservation, withoutSettled, withStatuses } from '@/lib/digest/settled';
+import { fileStaleCheckBacks, splitStaleBlocks } from '@/lib/digest/stale';
 import { loadFeedbackQueue } from '@/lib/feedback/load';
 import { fileNightIdeas } from '@/lib/ideas/file';
 import { loadIdeas } from '@/lib/ideas/load';
@@ -128,7 +129,7 @@ async function contextFor(input: {
       .filter((item) => item.status === 'blocked')
       .slice(0, CONTEXT_LIMIT)
       .map((item) =>
-        stated(`${ref(item)} — ${oneLine(item.comment ?? 'no reason recorded', 200)}`),
+        stated(`${ref(item)} — ${oneLine(item.blockAsk ?? item.comment ?? 'no reason recorded', 200)}`),
       ),
     fogPatches: open
       .filter((item) => hasLiveFog(item))
@@ -237,9 +238,20 @@ export async function writeDigestFor(
   // The same lines the stored attention list carries, cut to the same three:
   // the model is asked for at most three and the schema would take ten, and
   // filing ten ideas in one night is what that cap is against.
+  //
+  // A step the run thinks is blocked on something that has since happened is
+  // not an idea: it goes to a session as a check-back, which reads the block
+  // and the code and settles it (#1224). The run never moves the row itself.
+  const { handoffs, rest } = splitStaleBlocks(suggestions.slice(0, MAX_SUGGESTIONS), plan.items);
+  try {
+    await fileStaleCheckBacks(supabase, userId, handoffs, now);
+  } catch (error) {
+    console.error('[dev digest] check-backs', error instanceof Error ? error.message : error);
+  }
+
   let ideasFiled = 0;
   try {
-    ideasFiled = await fileNightIdeas(supabase, userId, suggestions.slice(0, MAX_SUGGESTIONS));
+    ideasFiled = await fileNightIdeas(supabase, userId, rest);
   } catch (error) {
     console.error('[dev digest] ideas', error instanceof Error ? error.message : error);
   }
