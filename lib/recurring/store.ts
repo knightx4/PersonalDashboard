@@ -83,6 +83,18 @@ async function ensurePayment(
     currency: string;
   },
 ): Promise<string> {
+  // A key the person corrected (renamed, merged or moved on the Recurring
+  // page) files onto the payment they chose, not a new row under the name the
+  // mail gives (plan #1208).
+  const { data: alias, error: aliasError } = await supabase
+    .from('recurring_payee_aliases')
+    .select('payment_id')
+    .eq('user_id', opts.userId)
+    .eq('payee_key', opts.key)
+    .maybeSingle();
+  if (aliasError) throw new Error(`recurring alias lookup failed: ${aliasError.message}`);
+  if (alias) return alias.payment_id as string;
+
   const { data: existing, error } = await supabase
     .from('recurring_payments')
     .select('id')
@@ -120,7 +132,10 @@ async function ensurePayment(
   return again!.id as string;
 }
 
-/** Set the payment's amount, period, next date and status from its charges. */
+/**
+ * Set the payment's amount, period, next date and status from its charges.
+ * An 'ignored' payment stays ignored.
+ */
 export async function resummarisePayment(
   supabase: SupabaseClient,
   opts: { userId: string; paymentId: string },
@@ -128,7 +143,7 @@ export async function resummarisePayment(
   const [{ data: payment }, { data: rows, error }] = await Promise.all([
     supabase
       .from('recurring_payments')
-      .select('kind')
+      .select('kind, status')
       .eq('id', opts.paymentId)
       .eq('user_id', opts.userId)
       .single(),
@@ -155,6 +170,9 @@ export async function resummarisePayment(
   }));
 
   const summary = summariseCharges((payment?.kind as RecurringKind) ?? 'subscription', charges);
+  // 'ignored' is the person's (left out of the total, plan #1213), and no
+  // charge overrides it; the charges only decide between active and cancelled.
+  const status = payment?.status === 'ignored' ? 'ignored' : summary.status;
 
   for (const [chargeId, previous] of summary.previousAmounts) {
     await supabase
@@ -171,7 +189,7 @@ export async function resummarisePayment(
       currency: summary.currency,
       period: summary.period,
       next_date: summary.nextDate,
-      status: summary.status,
+      status,
       last_charged_on: summary.lastChargedOn,
       updated_at: new Date().toISOString(),
     })

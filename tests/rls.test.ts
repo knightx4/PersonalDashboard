@@ -445,6 +445,12 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.recurring_payments = payment.id;
 
+  const [payeeAlias] = await admin<{ id: string }[]>`
+    insert into recurring_payee_aliases (user_id, payee_key, payment_id)
+    values (${userId}, ${`${tag}streamingplus`}, ${payment.id})
+    returning id`;
+  ids.recurring_payee_aliases = payeeAlias.id;
+
   const [billMessage] = await admin<{ id: string }[]>`
     insert into core.ingested_messages (email_account_id, provider_message_id, subject)
     values (${account.id}, ${`${tag}-bill-1`}, 'Your receipt')
