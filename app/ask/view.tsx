@@ -1,11 +1,11 @@
 'use client';
 
 import { Bot } from 'lucide-react';
-import { useAskDash, useAskSend, ASK_WAITING } from '@/components/shell/ask-dash';
-import { TalkThread } from '@/components/talk/talk-thread';
+import { AskThread, useAskDash } from '@/components/shell/ask-dash';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { commentWhen, exactTime } from '@/lib/comments/when';
+import type { DashChange } from '@/lib/talk/changes';
 import type { TalkTurn } from '@/lib/talk/talk';
 import { useClockNow } from '@/lib/use-clock-now';
 
@@ -31,23 +31,24 @@ export function AskedWhen({ at }: { at: string }) {
   );
 }
 
-/** A reopened question: its turns, and the box to carry it on. */
+/** A reopened question: its turns, the changes Dash proposed in it, and the box to carry it on. */
 export function AskConversation({
   conversationRef,
   turns,
+  changes,
 }: {
   conversationRef: string;
   turns: TalkTurn[];
+  changes: DashChange[];
 }) {
-  const send = useAskSend(conversationRef);
   return (
-    <TalkThread
+    <AskThread
       id={`ask-${conversationRef}`}
+      conversationRef={conversationRef}
       turns={turns}
-      send={send}
+      changes={changes}
       label="Ask a follow-up"
       placeholder="Ask more about this"
-      waiting={ASK_WAITING}
       hint={<PaidHint action="app/ask/actions.ts#askDashQuestion" what="Cost of each answer from Dash" />}
     />
   );

@@ -13,19 +13,25 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Bot, SquarePen, X } from 'lucide-react';
+import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { TalkThread, type TalkSend } from '@/components/talk/talk-thread';
 import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
 import { scrim } from '@/components/ui/popover';
 import { commentWhen } from '@/lib/comments/when';
 import type { PaidCosts } from '@/lib/core/spend/paid-actions';
+import type { DashChange } from '@/lib/talk/changes';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
 import { useClockNow } from '@/lib/use-clock-now';
 import {
+  type OpenedAsk,
   askDashCosts,
   askDashQuestion,
+  confirmDashChange,
+  declineDashChange,
   openAskQuestion,
   recentAskQuestions,
+  undoDashChange,
 } from '@/app/ask/actions';
 
 /**
@@ -52,7 +58,7 @@ import {
  * Where the sheet reads and writes: the server actions in app/ask/actions.ts,
  * or typed fixtures in the surface gallery, which cannot sign in.
  */
-export type AskSource = {
+export type AskSource = ChangePresses & {
   ask: typeof askDashQuestion;
   recent: typeof recentAskQuestions;
   open: typeof openAskQuestion;
@@ -64,6 +70,9 @@ const ACTIONS: AskSource = {
   recent: recentAskQuestions,
   open: openAskQuestion,
   costs: askDashCosts,
+  confirm: confirmDashChange,
+  decline: declineDashChange,
+  undo: undoDashChange,
 };
 
 type AskDashHandle = {
@@ -155,26 +164,103 @@ export function AskDashButton() {
 /**
  * Sends a question and keeps the conversation it started, so the next one in
  * the same thread continues it. `onConversation` hears the ref once there is
- * one. Shared with the /ask page's thread.
+ * one, and `onChanges` the changes Dash proposed in each answer.
  */
-export function useAskSend(
+function useAskSend(
   initialRef: string | null,
   onConversation?: (ref: string) => void,
+  onChanges?: (changes: DashChange[]) => void,
 ): TalkSend {
   const source = useAskDash()?.source ?? ACTIONS;
   const ref = useRef(initialRef);
-  const heard = useRef(onConversation);
+  const heard = useRef({ onConversation, onChanges });
   useEffect(() => {
-    heard.current = onConversation;
+    heard.current = { onConversation, onChanges };
   });
   return useCallback<TalkSend>(async (body) => {
     const result = await source.ask(body, ref.current);
     if (result.conversation && result.conversation.ref !== ref.current) {
       ref.current = result.conversation.ref;
-      heard.current?.(result.conversation.ref);
+      heard.current.onConversation?.(result.conversation.ref);
     }
+    if (result.changes && result.changes.length > 0) heard.current.onChanges?.(result.changes);
     return { turns: result.turns, error: result.error };
   }, [source]);
+}
+
+/** Today as YYYY-MM-DD on this device, so a due date this year leaves the year off. */
+function localToday(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/**
+ * A question to Dash and its answers, with the changes each answer proposed
+ * drawn under it as cards (plan #1190). The sheet and the /ask page both draw
+ * this. `changes` are the ones already kept for the conversation, each tied
+ * to its answer by turnId; an answer that proposes more adds them here.
+ */
+export function AskThread({
+  id,
+  conversationRef,
+  turns,
+  changes: initialChanges = [],
+  onConversation,
+  onSend,
+  ...thread
+}: {
+  id: string;
+  conversationRef: string | null;
+  turns: readonly TalkTurn[];
+  changes?: readonly DashChange[];
+  onConversation?: (ref: string) => void;
+  /** Heard on every question sent, before the answer comes. */
+  onSend?: () => void;
+  label: string;
+  placeholder?: string;
+  hint?: React.ReactNode;
+  startWriting?: boolean;
+  ask?: string;
+}) {
+  const source = useAskDash()?.source ?? ACTIONS;
+  const [changes, setChanges] = useState<DashChange[]>([...initialChanges]);
+  const send = useAskSend(conversationRef, onConversation, (added) =>
+    setChanges((current) => [...current.filter((c) => !added.some((a) => a.id === c.id)), ...added]),
+  );
+  const onChanged = useCallback(
+    (next: DashChange) => setChanges((current) => current.map((c) => (c.id === next.id ? next : c))),
+    [],
+  );
+  const [today] = useState(localToday);
+
+  const byTurn = useMemo(() => {
+    const map = new Map<string, DashChange[]>();
+    for (const change of changes) {
+      if (!change.turnId) continue;
+      map.set(change.turnId, [...(map.get(change.turnId) ?? []), change]);
+    }
+    return map;
+  }, [changes]);
+
+  return (
+    <TalkThread
+      id={id}
+      turns={turns}
+      send={(body) => {
+        onSend?.();
+        return send(body);
+      }}
+      waiting={ASK_WAITING}
+      below={(turn) => {
+        const mine = turn.role === 'assistant' ? byTurn.get(turn.id) : undefined;
+        return mine ? (
+          <DashChanges changes={mine} presses={source} onChanged={onChanged} today={today} />
+        ) : null;
+      }}
+      {...thread}
+    />
+  );
 }
 
 /** What Dash says while it looks: long enough that the wait needs a reason. */
@@ -325,7 +411,6 @@ function NewQuestion({
   onStarted: () => void;
   onReopen: (conversation: ConversationSummary) => void;
 }) {
-  const send = useAskSend(null, onStarted);
   const [asked, setAsked] = useState(Boolean(ask));
   const [recent, setRecent] = useState<{ conversations: ConversationSummary[]; error?: string } | null>(
     null,
@@ -357,26 +442,25 @@ function NewQuestion({
             <span className="text-small font-semibold text-ink">Dash</span>
             <p className="text-body text-ink">
               Ask me about anything in here: what you spent, who has not replied, what you wrote
-              about something. I look it up in your own things and link what I used. I only read,
-              so I cannot change anything.
+              about something. I look it up in your own things and link what I used. I can also add
+              a todo, add a step to a goal or mark a return sent back, and nothing is written until
+              you confirm it.
             </p>
           </div>
         </div>
       )}
 
-      <TalkThread
+      <AskThread
         id="ask-dash"
+        conversationRef={null}
         turns={[]}
-        send={async (body) => {
-          setAsked(true);
-          return send(body);
-        }}
+        onConversation={onStarted}
         label={asked ? 'Ask a follow-up' : 'Ask a question'}
         placeholder="What did I spend on eBay this month?"
-        waiting={ASK_WAITING}
         startWriting
         ask={ask}
         hint={hint}
+        onSend={() => setAsked(true)}
       />
 
       {!asked && <Earlier recent={recent} onReopen={onReopen} />}
@@ -438,14 +522,13 @@ function EarlierQuestion({
   source: AskSource;
   hint: React.ReactNode;
 }) {
-  const send = useAskSend(conversationRef);
-  const [loaded, setLoaded] = useState<{ turns: TalkTurn[]; error?: string } | null>(null);
+  const [loaded, setLoaded] = useState<OpenedAsk | null>(null);
 
   useEffect(() => {
     let live = true;
     source
       .open(conversationRef)
-      .catch(() => ({ turns: [], error: 'That conversation could not be read. Try again.' }))
+      .catch((): OpenedAsk => ({ turns: [], changes: [], error: 'That conversation could not be read. Try again.' }))
       .then((found) => {
         if (live) setLoaded(found);
       });
@@ -463,14 +546,17 @@ function EarlierQuestion({
   }
   if (loaded.error) return <p className="text-ui text-danger">{loaded.error}</p>;
   return (
-    <TalkThread
-      id={`ask-${conversationRef}`}
-      turns={loaded.turns}
-      send={send}
-      label="Ask a follow-up"
-      placeholder="Ask more about this"
-      waiting={ASK_WAITING}
-      hint={hint}
-    />
+    <>
+      {loaded.changesError && <p className="text-ui text-danger">{loaded.changesError}</p>}
+      <AskThread
+        id={`ask-${conversationRef}`}
+        conversationRef={conversationRef}
+        turns={loaded.turns}
+        changes={loaded.changes}
+        label="Ask a follow-up"
+        placeholder="Ask more about this"
+        hint={hint}
+      />
+    </>
   );
 }

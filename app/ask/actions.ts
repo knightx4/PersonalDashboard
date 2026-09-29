@@ -11,10 +11,12 @@ import {
   confirmAskChange,
   declineAskChange,
   listAskConversations,
+  loadAskChanges,
   loadAskConversation,
   undoAskChange,
 } from '@/lib/talk/ask-request';
 import type { AskDashResult } from '@/lib/talk/ask';
+import type { DashChange } from '@/lib/talk/changes';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
 
@@ -69,18 +71,43 @@ export async function recentAskQuestions(): Promise<{
   }
 }
 
-/** One earlier question's turns, to reopen it in the sheet. */
+/** An earlier question reopened: its turns, and the changes Dash proposed in it. */
+export type OpenedAsk = {
+  turns: TalkTurn[];
+  /** Oldest first, each tied to its answer by turnId (plan #1190). */
+  changes: DashChange[];
+  error?: string;
+  /** Set when the turns were read and the changes were not. */
+  changesError?: string;
+};
+
+/** One earlier question's turns and changes, to reopen it in the sheet. */
 // latency: pending
-export async function openAskQuestion(ref: string): Promise<{ turns: TalkTurn[]; error?: string }> {
+export async function openAskQuestion(ref: string): Promise<OpenedAsk> {
   const parsed = Ref.safeParse(ref);
-  if (!parsed.success) return { turns: [], error: 'That conversation is not there any more.' };
+  if (!parsed.success) return { turns: [], changes: [], error: 'That conversation is not there any more.' };
   try {
-    const turns = await loadAskConversation(parsed.data);
-    return turns.length > 0 ? { turns } : { turns, error: 'That conversation is not there any more.' };
+    const [turns, changes] = await Promise.all([
+      loadAskConversation(parsed.data),
+      loadAskChanges(parsed.data).then(
+        (found) => ({ found }),
+        (error: unknown) => {
+          console.error('ask changes were not read', error);
+          return { found: [] as DashChange[], failed: true };
+        },
+      ),
+    ]);
+    if (turns.length === 0) return { turns, changes: [], error: 'That conversation is not there any more.' };
+    return 'failed' in changes
+      ? { turns, changes: [], changesError: CHANGES_UNREAD }
+      : { turns, changes: changes.found };
   } catch {
-    return { turns: [], error: 'That conversation could not be read. Try again.' };
+    return { turns: [], changes: [], error: 'That conversation could not be read. Try again.' };
   }
 }
+
+/** Said above a reopened thread whose changes could not be read. */
+const CHANGES_UNREAD = 'The changes Dash proposed here could not be read, so their cards are missing. Reopen it to try again.';
 
 /**
  * The $ figure for asking. The sheet lives in the shell, under no module's

@@ -70,7 +70,7 @@ import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
 import { PlanOpenedSurface, PlanTreeSurface } from './plan-surfaces';
 import { GoalOpenedSurface, GoalTreeSurface } from './goal-surfaces';
-import { AskDashSurface } from './ask-surfaces';
+import { AskChangesSurface, AskDashSurface } from './ask-surfaces';
 import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import {
@@ -2690,6 +2690,29 @@ export const SURFACES: readonly Surface[] = [
         <PreviewShell />
       </AskDashSurface>
     ),
+  },
+  {
+    /* A change Dash proposes (plan #1190): asked to add something, the answer
+     * carries a card per change with Confirm and Decline, and nothing is
+     * written until one is pressed. */
+    id: 'ask-dash-proposal',
+    label: 'Ask Dash · Changes to confirm',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashSurface open question="Add a todo to call the dentist on Friday, and a step to book the hygienist">
+        <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
+    /* The same cards reopened later, as /ask/<ref> and the sheet draw them:
+     * done with a link and Undo, declined, undone, and one still waiting. */
+    id: 'ask-dash-changes',
+    label: 'Ask Dash · Changes reopened',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskChangesSurface />,
   },
 
   {
