@@ -1,14 +1,17 @@
 import 'server-only';
 
 import { requireUser } from '@/lib/auth/server';
+import { confirmChange, declineChange, undoChange, type ChangeDeps, type ChangeOutcome } from '@/lib/ask/changes';
 import { executeProposal } from '@/lib/ask/propose';
 import { executeAskTool } from '@/lib/ask/tools';
 import { requestAskDb } from '@/lib/ask/clients';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
+import { createGoalsClient } from '@/lib/goals/auth/server';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import { todayInTimezone } from '@/lib/money';
 import { allSearchSources } from '@/lib/search/registry';
+import { createTask } from '@/lib/todo/tasks/write';
 import { askDash, type AskDashResult } from './ask';
 import { attachProposals, discardProposals, insertProposal, loadChanges, type DashChange } from './changes';
 import { appendTurns, listConversations, loadConversation, startAsk, type ConversationSummary } from './store';
@@ -83,4 +86,39 @@ export async function loadAskConversation(ref: string): Promise<TalkTurn[]> {
 export async function loadAskChanges(ref: string): Promise<DashChange[]> {
   await requireUser();
   return loadChanges(await createCoreClient(), ref);
+}
+
+/**
+ * What confirming, declining and undoing a change needs (plan #1189): the
+ * signed-in person, their settings, and their own clients, so every write
+ * goes through row level security as theirs.
+ */
+async function changeDeps(): Promise<ChangeDeps> {
+  const user = await requireUser();
+  const [settings, core] = await Promise.all([loadAccountSettings(user.id), createCoreClient()]);
+  return {
+    userId: user.id,
+    timezone: settings.timezone,
+    today: todayInTimezone(settings.timezone),
+    enabledModules: settings.enabledModules,
+    core,
+    db: requestAskDb(),
+    goals: (history) => createGoalsClient(history),
+    createTask,
+  };
+}
+
+/** Write a proposed change and mark it confirmed, or say why not. */
+export async function confirmAskChange(id: string): Promise<ChangeOutcome> {
+  return confirmChange(await changeDeps(), id);
+}
+
+/** Mark a proposed change declined, or say why not. */
+export async function declineAskChange(id: string): Promise<ChangeOutcome> {
+  return declineChange(await changeDeps(), id);
+}
+
+/** Take a confirmed change back and mark it undone, or say why not. */
+export async function undoAskChange(id: string): Promise<ChangeOutcome> {
+  return undoChange(await changeDeps(), id);
 }
