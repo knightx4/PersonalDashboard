@@ -10,6 +10,8 @@ import {
   countGoalView,
   goalCatalog,
   goalRows,
+  goalViewHref,
+  goalViewOf,
   numberSteps,
   outlineSteps,
   viewGoalRows,
@@ -360,5 +362,19 @@ describe('whoIsOn', () => {
       step('mine', 'stage', { status: 'done' }),
     ]).byGoal.get('g')!;
     expect(whoIsOn(closed).word).toBe('You and Dash');
+  });
+});
+
+describe('goalViewOf and goalViewHref', () => {
+  it('reads ?view= and falls back to Open', () => {
+    expect(goalViewOf('you')).toBe('you');
+    expect(goalViewOf(['all', 'you'])).toBe('all');
+    expect(goalViewOf(undefined)).toBe('open');
+    expect(goalViewOf('fog')).toBe('open');
+  });
+
+  it('keeps Open on the bare path', () => {
+    expect(goalViewHref('/goals/g', 'open')).toBe('/goals/g');
+    expect(goalViewHref('/goals/g', 'you')).toBe('/goals/g?view=you');
   });
 });
