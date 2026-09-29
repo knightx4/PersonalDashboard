@@ -63,6 +63,8 @@ export interface PipelineRow {
    * for the same reason `daysSinceActivity` is.
    */
   coverage: RequirementCoverage;
+  /** The kind of every interview logged, which is what the funnel's high-water mark reads. */
+  interviewKinds?: string[];
 }
 
 const SELECT = `
@@ -72,7 +74,8 @@ const SELECT = `
   roles!inner (
     id, title, location, work_mode, comp_min_cents, comp_max_cents, requirement_matches,
     companies!inner ( id, name, slug, logo_url, domains, website )
-  )
+  ),
+  interviews ( kind )
 `;
 
 type RawRow = {
@@ -110,6 +113,7 @@ type RawRow = {
       website: string | null;
     };
   };
+  interviews: { kind: string }[] | null;
 };
 
 export async function loadPipeline(
@@ -170,13 +174,18 @@ export async function loadPipeline(
     compMinCents: row.roles.comp_min_cents,
     compMaxCents: row.roles.comp_max_cents,
     coverage: requirementCoverage(row.roles.requirement_matches),
+    interviewKinds: (row.interviews ?? []).map((interview) => interview.kind),
   }));
 }
 
 /** Flatten to the shape lib/pipeline.ts computes from. */
 export function toFunnelApplications(rows: readonly PipelineRow[]): FunnelApplication[] {
   return rows.map((row) => {
-    const submittedAt = row.submittedAt ? new Date(row.submittedAt) : null;
+    // A recruiter who wrote first leaves nothing to submit, so the pursuit
+    // enters the funnel on the first human reply. Without this, sixteen
+    // inbound pursuits with interviews behind them were left out entirely.
+    const enteredAt = row.submittedAt ?? (row.source === 'recruiter_inbound' ? row.firstHumanResponseAt : null);
+    const submittedAt = enteredAt ? new Date(enteredAt) : null;
     const confirmationReceivedAt = row.confirmationReceivedAt
       ? new Date(row.confirmationReceivedAt)
       : null;
@@ -198,6 +207,7 @@ export function toFunnelApplications(rows: readonly PipelineRow[]): FunnelApplic
         submittedAt,
         confirmationReceivedAt,
         firstHumanResponseAt,
+        row.interviewKinds,
       ),
     };
   });
