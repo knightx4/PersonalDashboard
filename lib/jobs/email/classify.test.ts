@@ -272,3 +272,117 @@ describe('a booked interview against finding a time', () => {
     expect(result.classification).toBe('interview_invite');
   });
 });
+
+/**
+ * Acknowledgements that were filed as rejections (plan #1227). The trial
+ * fixtures hold only real envelopes, so the body wording here is written for
+ * the test: the sentences acknowledgements use that share a soft phrase with
+ * rejections.
+ */
+describe('an acknowledgement is not a rejection', () => {
+  const byName = new Map(FIXTURES.map((f) => [f.name, f]));
+  const classifyFixture = (name: string) => {
+    const fixture = byName.get(name);
+    if (!fixture) throw new Error(`no fixture ${name}`);
+    return classifyMessage({
+      fromAddress: fixture.from,
+      replyToAddress: fixture.replyTo,
+      subject: fixture.subject,
+      bodyPreview: fixture.body.slice(0, 2000),
+      companies: COMPANIES,
+    });
+  };
+
+  it('labels the Cohere and Kalshi acknowledgements as confirmations', () => {
+    for (const name of ['trial-cohere-ashby-ack', 'trial-kalshi-ashby-ack']) {
+      expect(classifyFixture(name).classification, name).toBe('application_confirmation');
+    }
+  });
+
+  it('labels the KKR security code not relevant', () => {
+    const result = classifyFixture('trial-kkr-greenhouse-security-code');
+    expect(result.classification).toBe('not_relevant');
+    expect(result.tier).toBe('A');
+  });
+
+  it('keeps a security code out of rejections whatever its body says', () => {
+    const result = classifyMessage({
+      fromAddress: 'Greenhouse <no-reply@us.greenhouse-mail.io>',
+      subject: 'Security code for your application to Careers at Acme',
+      bodyPreview:
+        'Copy and paste this code into the security code field on your application: X7K2P. ' +
+        'Unfortunately, this code expires in 10 minutes.',
+    });
+    expect(result.classification).toBe('not_relevant');
+  });
+
+  const acknowledgements: [string, string][] = [
+    [
+      'unfortunately about not replying to everyone',
+      'Thanks for applying to Acme! Our team will review your application and reach out if it is a match. ' +
+        'Unfortunately, due to the volume of applications, we are unable to respond to every applicant individually.',
+    ],
+    [
+      'more closely matching another role',
+      'Thank you for your interest in Acme. We are currently reviewing applications for this role. ' +
+        'If your experience more closely matches another opening, we will keep your resume on file.',
+    ],
+    [
+      'a supposed decision',
+      'Thank you for your interest in Acme. We will review your application over the next two weeks. ' +
+        'If we are not moving forward with your application, we will let you know. We wish you the best in the meantime.',
+    ],
+  ];
+
+  for (const [label, body] of acknowledgements) {
+    it(`reads an acknowledgement with ${label} as a confirmation`, () => {
+      const result = classifyMessage({
+        fromAddress: 'Acme Hiring Team <no-reply@ashbyhq.com>',
+        subject: 'Thank you for your interest in Acme',
+        bodyPreview: body,
+      });
+      expect(result.classification).toBe('application_confirmation');
+    });
+  }
+
+  it('still decides on a strong phrase even when the message also promises a review', () => {
+    const result = classifyMessage({
+      fromAddress: 'Acme Hiring Team <no-reply@ashbyhq.com>',
+      subject: 'Thank you for your interest in Acme',
+      bodyPreview:
+        'Our team is reviewing applications for other roles. For this one, we have decided to move forward with other candidates.',
+    });
+    expect(result.classification).toBe('rejection');
+    expect(result.tier).toBe('A');
+  });
+
+  it('leaves a rejection on soft phrases alone to the models to confirm', () => {
+    const result = classifyMessage({
+      fromAddress: 'Acme Hiring Team <no-reply@ashbyhq.com>',
+      subject: 'Thank you for your interest in Acme',
+      bodyPreview: 'Unfortunately we are unable to offer you a role at this time. We wish you the best.',
+    });
+    expect(result.classification).toBe('rejection');
+    expect(result.tier).toBe('subject_heuristic');
+  });
+
+  it('decides every rejection fixture from a known sender on a strong phrase, so none is left to a guess', () => {
+    const fromKnown = FIXTURES.filter(
+      (f) => f.expected.classification === 'rejection' && f.expected.tier === 'A',
+    );
+    for (const fixture of fromKnown) {
+      expect(classifyFixture(fixture.name).tier, fixture.name).toBe('A');
+    }
+  });
+
+  it('does not let an application subject alone outrank the models', () => {
+    // Alvarez and Marsal's acknowledgement (trial message 4991a350): Jobvite
+    // uses this subject for acknowledgements and rejections alike.
+    const result = classifyMessage({
+      fromAddress: 'Alvarez and Marsal Recruiting Team <notification@jobvite.com>',
+      subject: 'Your application for PEPI: Associate - Commercial Due Diligence at Alvarez and Marsal',
+      bodyPreview: '',
+    });
+    expect(result.tier).not.toBe('A');
+  });
+});
