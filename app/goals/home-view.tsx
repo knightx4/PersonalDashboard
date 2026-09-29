@@ -6,9 +6,17 @@ import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatInstant } from '@/lib/goals/dates';
 import type { DoneSince } from '@/lib/goals/done-since';
-import { homeAreas, homeSummary, type HomeGoal, type WeekHealth } from '@/lib/goals/home';
+import {
+  errandAreaDefault,
+  homeAreas,
+  homeSummary,
+  splitErrands,
+  type HomeGoal,
+  type WeekHealth,
+} from '@/lib/goals/home';
 import type { TodayItem } from '@/lib/goals/today';
 import { DoneSinceList } from './done-since-list';
+import { ErrandComposer } from './errand-composer';
 import { GoalLine } from './goal-line';
 import { TodayList } from './today-list';
 
@@ -21,9 +29,12 @@ import { TodayList } from './today-list';
  *    latest note folded under it when there is one.
  * 2. Today: at most five things, each with one button, and the rest folded
  *    under them (today-list.tsx).
- * 3. Your goals, one line each under their area: progress, status, and the
+ * 3. Errands (plan #1262): the open errands, soonest due first, and Add an
+ *    errand, which saves one and starts Dash on it in the same press
+ *    (errand-composer.tsx). An errand is listed here and not under its area.
+ * 4. Your goals, one line each under their area: progress, status, and the
  *    next move with its date (goal-line.tsx).
- * 4. What Dash did since your last visit, with Read and Undo
+ * 5. What Dash did since your last visit, with Read and Undo
  *    (done-since-list.tsx).
  *
  * What the old home listed in its own sections is reached from these: the
@@ -32,7 +43,7 @@ import { TodayList } from './today-list';
  * Dash found, and the Claude steps waiting on an approval are on each goal's
  * page; the runs going now are on the Runs tab.
  *
- * 5. This week: four numbers that say whether Goals is working (plan #1079),
+ * 6. This week: four numbers that say whether Goals is working (plan #1079),
  *    counted by weekHealth in lib/goals/home.ts.
  */
 
@@ -48,9 +59,20 @@ export type HomeViewProps = {
   timeZone: string;
   /** The week's four numbers; null when they could not be read. */
   health: WeekHealth | null;
+  /** Your live areas, for the area an errand goes in; none when they could not be read. */
+  areas?: { id: string; name: string }[];
 };
 
-export function HomeView({ goals, today, later, done, brief, timeZone, health }: HomeViewProps) {
+export function HomeView({
+  goals,
+  today,
+  later,
+  done,
+  brief,
+  timeZone,
+  health,
+  areas = [],
+}: HomeViewProps) {
   if (goals.length === 0 && today.length === 0 && later.length === 0) {
     return (
       <EmptyState
@@ -63,6 +85,8 @@ export function HomeView({ goals, today, later, done, brief, timeZone, health }:
   }
 
   const summary = homeSummary(goals);
+  const { errands, others } = splitErrands(goals);
+  const errandArea = errandAreaDefault(errands, areas);
   return (
     <div className="space-y-8">
       {(summary || brief) && (
@@ -78,7 +102,11 @@ export function HomeView({ goals, today, later, done, brief, timeZone, health }:
 
       <TodayList today={today} later={later} />
 
-      {goals.length > 0 && <GoalLines goals={goals} />}
+      {(errands.length > 0 || errandArea) && (
+        <ErrandLines errands={errands} areas={areas} defaultAreaId={errandArea} />
+      )}
+
+      {others.length > 0 && <GoalLines goals={others} />}
 
       <DoneSection done={done} timeZone={timeZone} />
 
@@ -117,6 +145,39 @@ function GoalLines({ goals }: { goals: HomeGoal[] }) {
           </div>
         ))}
       </div>
+    </section>
+  );
+}
+
+function ErrandLines({
+  errands,
+  areas,
+  defaultAreaId,
+}: {
+  errands: HomeGoal[];
+  areas: { id: string; name: string }[];
+  defaultAreaId: string | null;
+}) {
+  return (
+    <section aria-labelledby="errands-heading" className="space-y-2">
+      <div className="flex items-baseline justify-between gap-3 px-1">
+        <h2 id="errands-heading" className="text-ui font-semibold text-ink">
+          Errands
+        </h2>
+        {errands.length > 0 && (
+          <span className="tabular text-small text-ink-muted">{errands.length} open</span>
+        )}
+      </div>
+      {errands.length > 0 && (
+        <Card>
+          <ul className="divide-y divide-border">
+            {errands.map((line) => (
+              <GoalLine key={line.goal.id} line={line} />
+            ))}
+          </ul>
+        </Card>
+      )}
+      {defaultAreaId && <ErrandComposer areas={areas} defaultAreaId={defaultAreaId} />}
     </section>
   );
 }

@@ -7,8 +7,9 @@ import { VERDICT_LABELS, type GoalReview, type Verdict } from '@/lib/goals/revie
 
 /**
  * One open goal on the Goals home (plan #1077): its title, how far through
- * it is, Dash's status for the day, and the next move with its date. The
- * whole goal is one tap away on its page.
+ * it is, Dash's status for the day, and the next move with its date. An
+ * errand also says the date it is due by (plan #1262). The whole goal is one
+ * tap away on its page.
  */
 
 export const VERDICT_TONES: Record<Verdict, DevTone> = {
@@ -55,6 +56,11 @@ export function GoalLine({ line }: { line: HomeGoal }) {
           {goal.title}
         </Link>
         <span className="flex items-center gap-3">
+          {goal.errand && goal.dueOn && (
+            <span className="tabular text-small whitespace-nowrap text-ink-muted">
+              Due {formatDay(goal.dueOn)}
+            </span>
+          )}
           {progress.live > 0 && (
             <span className="flex items-center gap-2">
               <Meter

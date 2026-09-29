@@ -7,7 +7,7 @@ import { isOwner } from '@/lib/dev/owner';
 import { goalsRoutine } from '@/lib/feedback/routine';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { runInFlight } from '@/lib/goals/shaping';
-import { approveGoal, loadAreaRuns, startAreaRun } from '@/lib/goals/shaping-store';
+import { approveGoal, loadAreaRuns, startAreaRun, startGoalRun } from '@/lib/goals/shaping-store';
 import {
   archiveArea,
   insertArea,
@@ -253,6 +253,77 @@ export async function addGoal(_prev: GoalsActionState, form: FormData): Promise<
     return { error: 'The goal could not be saved. Try again.' };
   }
   return saved();
+}
+
+/**
+ * Add an errand from the Goals home and start Dash on it in the same press
+ * (plan #1262): a goal with `errand` set and the date it is due by, then a
+ * goal run whose brief says it is an errand. The errand is kept when the run
+ * cannot start, and the message says why nothing started, so the one press
+ * never loses what was typed.
+ */
+// latency: pending
+export async function addErrand(
+  _prev: GoalsActionState,
+  form: FormData,
+): Promise<GoalsActionState> {
+  const user = await requireUser();
+  const areaId = Id.safeParse(form.get('areaId'));
+  if (!areaId.success) return { error: 'Choose which area the errand is for.' };
+  const parsed = parseGoalFields(
+    (key) => (key === 'errand' ? 'true' : key === 'title' || key === 'due' ? form.get(key) : null),
+    { requireTitle: true },
+  );
+  if (!parsed.ok) return { error: parsed.error };
+  const { title, ...rest } = parsed.value;
+  if (!title) return { error: 'Say what the errand is.' };
+  if (!rest.dueOn) return { error: 'An errand needs a date it is due by.' };
+
+  const client = await createGoalsClient();
+  let goalId: string | null;
+  try {
+    goalId = await insertGoal(client, user.id, areaId.data, { title, ...rest });
+  } catch {
+    return { error: 'The errand could not be saved. Try again.' };
+  }
+  if (!goalId) return { error: 'That area is no longer on the page.' };
+
+  const kept = 'The errand is saved.';
+  if (!(await isOwner({ user }))) {
+    return {
+      ...saved(),
+      message: `${kept} Only the account that owns this app can start Dash on it.`,
+    };
+  }
+  const routine = goalsRoutine();
+  if (!routine.id) {
+    return {
+      ...saved(),
+      message:
+        `${kept} Dash did not start: no goals routine is set on this deployment. Set ` +
+        'CLAUDE_GOALS_ROUTINE_ID and CLAUDE_GOALS_ROUTINE_TOKEN, then press Work on this on its page.',
+    };
+  }
+  try {
+    const started = await startGoalRun({
+      client,
+      userId: user.id,
+      goal: { id: goalId, title, errandDueOn: rest.dueOn },
+      routine,
+    });
+    if (!started.ok) {
+      return {
+        ...saved(),
+        message: `${kept} Dash could not start (${started.error.replace(/\.$/, '')}). Press Work on this on its page to try again.`,
+      };
+    }
+  } catch {
+    return {
+      ...saved(),
+      message: `${kept} Dash could not start. Press Work on this on its page to try again.`,
+    };
+  }
+  return { ...saved(), message: 'Errand saved. Dash is on it.' };
 }
 
 /**

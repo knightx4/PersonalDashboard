@@ -138,6 +138,19 @@ describe('runs', () => {
     expect(text).toContain('reference/sources.md');
     expect(text).toContain('"Information steps"');
     expect(text).toContain('the questions the later steps');
+    expect(text).not.toContain('errand');
+  });
+
+  it('says when the goal is an errand, and its date', () => {
+    const text = goalRunText({
+      goalId: 'g-1',
+      goalTitle: 'Find a present for Sam',
+      userId: 'u-1',
+      runId: 'r-1',
+      errandDueOn: '2026-10-09',
+    });
+    expect(text).toContain('This goal is an errand, due on 2026-10-09.');
+    expect(text).toContain('"An errand" under');
   });
 });
 

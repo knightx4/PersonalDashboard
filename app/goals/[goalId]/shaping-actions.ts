@@ -66,7 +66,7 @@ export async function workOnGoalAction(
   const client = await createGoalsClient();
   const { data: goal, error } = await client
     .from('items')
-    .select('id, title')
+    .select('id, title, errand, due_on')
     .eq('id', goalId.data)
     .eq('level', 'goal')
     .is('archived_at', null)
@@ -81,7 +81,11 @@ export async function workOnGoalAction(
   const result = await startGoalRun({
     client,
     userId: user.id,
-    goal: { id: goal.id as string, title: goal.title as string },
+    goal: {
+      id: goal.id as string,
+      title: goal.title as string,
+      errandDueOn: goal.errand ? (goal.due_on as string | null) : null,
+    },
     routine,
   });
   if (!result.ok) {
