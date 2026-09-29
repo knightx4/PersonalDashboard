@@ -23,7 +23,15 @@ vi.mock('next/navigation', () => ({
 }));
 
 const never = () => new Promise<never>(() => {});
-const SOURCE: AskSource = { ask: never, recent: never, open: never, costs: never };
+const SOURCE: AskSource = {
+  ask: never,
+  recent: never,
+  open: never,
+  costs: never,
+  confirm: never,
+  decline: never,
+  undo: never,
+};
 
 function Probe({ query }: { query: string }) {
   const { rows } = useSearchRows({

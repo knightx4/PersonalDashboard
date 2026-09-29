@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { askTitle } from '@/lib/talk/talk';
-import { loadAskConversation } from '@/lib/talk/ask-request';
+import { loadAskChanges, loadAskConversation } from '@/lib/talk/ask-request';
 import { AskConversation } from '../view';
 
 export const metadata = { title: 'Question to Dash' };
@@ -12,7 +12,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * One question asked of Dash, reopened (plan #1090): the answer with the rows
- * it used, and the box to ask a follow-up in the same conversation.
+ * it used, the changes it proposed as cards in their current state (#1190),
+ * and the box to ask a follow-up in the same conversation.
  */
 export default async function AskConversationPage({
   params,
@@ -21,7 +22,7 @@ export default async function AskConversationPage({
 }) {
   const { ref } = await params;
   if (!UUID.test(ref)) notFound();
-  const turns = await loadAskConversation(ref);
+  const [turns, changes] = await Promise.all([loadAskConversation(ref), loadAskChanges(ref)]);
   // Not there, or not theirs: RLS answers both with nothing.
   if (turns.length === 0) notFound();
   const first = turns.find((turn) => turn.role === 'user') ?? turns[0];
@@ -36,7 +37,7 @@ export default async function AskConversationPage({
         Questions to Dash
       </Link>
       <PageHeader title={askTitle(first.body)} />
-      <AskConversation conversationRef={ref} turns={turns} />
+      <AskConversation conversationRef={ref} turns={turns} changes={changes} />
     </>
   );
 }
