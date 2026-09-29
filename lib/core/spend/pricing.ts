@@ -56,6 +56,12 @@ export const MODEL_PRICES: Record<string, ModelPrice> = {
   'voyage-4-lite': { input: 0.02, cachedInput: 0, cacheWrite: 0, output: 0 },
   'voyage-4': { input: 0.06, cachedInput: 0, cacheWrite: 0, output: 0 },
   'voyage-4-large': { input: 0.12, cachedInput: 0, cacheWrite: 0, output: 0 },
+
+  // Jev, TypeSafe's classifier (feature #1161). Charged per input token only:
+  // output is free and there is no prompt cache, so those rates are zero as a
+  // fact about the call. Only the pinned version is listed; a call answered
+  // by a newer one records its tokens unpriced until its rate is added here.
+  'jev-1.13.0': { input: 0.042, cachedInput: 0, cacheWrite: 0, output: 0 },
 };
 
 /** Tokens as the API reports them. */
