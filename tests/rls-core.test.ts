@@ -705,3 +705,85 @@ describe('push subscriptions', () => {
     ).rejects.toThrow(/push_subscriptions_endpoint_ck/);
   });
 });
+
+describe('mail piles (plan #1173)', () => {
+  /**
+   * Jev's pile for each email, stored beside the linkers' own verdicts. The
+   * sync writes it with the service role; the person reads their own. The
+   * comparison and agreement functions read across three schemas under
+   * security definer, so they are the service role's alone.
+   */
+  let userC = '';
+  let accountC = '';
+
+  async function sortInto(id: string, pile: string, confidence: number): Promise<void> {
+    await admin`
+      insert into core.mail_piles (id, user_id, pile, confidence, model)
+      values (${id}, ${userC}, ${pile}, ${confidence}, 'jev-1.13.0')`;
+  }
+
+  beforeAll(async () => {
+    userC = await createUser('core-c@example.com');
+    const [account] = await admin<{ id: string }[]>`
+      insert into email_accounts (user_id, provider, email_address, oauth_refresh_token)
+      values (${userC}, 'gmail', 'core-c@example.com', 'encrypted-token')
+      returning id`;
+    accountC = account.id;
+  });
+
+  it('shows the owner their piles and another user none', async () => {
+    const id = await seedMessage(accountC, 'pile-own', 'Your statement is ready');
+    await sortInto(id, 'bill', 0.93);
+    expect(await asUser(userC, (tx) => tx`select id from core.mail_piles where id = ${id}`)).toHaveLength(1);
+    expect(await asUser(userA, (tx) => tx`select id from core.mail_piles where id = ${id}`)).toHaveLength(0);
+    await expect(
+      asUser(userC, (tx) => tx`update core.mail_piles set pile = 'other' where id = ${id}`),
+    ).rejects.toThrow(/permission denied/);
+  });
+
+  it('refuses a pile outside the eight', async () => {
+    const id = await seedMessage(accountC, 'pile-bad', 'Hello');
+    await expect(sortInto(id, 'spam', 0.9)).rejects.toThrow(/mail_piles_pile_ck/);
+  });
+
+  it('lists unsorted mail that still has a sender or subject', async () => {
+    const unsorted = await seedMessage(accountC, 'pile-unsorted', 'Can we talk on Friday?');
+    const scrubbed = await seedMessage(accountC, 'pile-scrubbed', 'Gone');
+    await admin`update ingested_messages set subject = null, from_address = null, scrubbed_at = now() where id = ${scrubbed}`;
+    const rows = await admin<{ id: string }[]>`select id from core.mail_piles_unsorted(${accountC}, 100)`;
+    const ids = rows.map((row) => row.id);
+    expect(ids).toContain(unsorted);
+    expect(ids).not.toContain(scrubbed);
+  });
+
+  it('puts each linker\'s verdict beside Jev\'s pile and counts agreement', async () => {
+    const order = await seedMessage(accountC, 'pile-order', 'Your order has shipped');
+    await admin`insert into public.ingested_messages (id, classification) values (${order}, 'shipping')`;
+    await sortInto(order, 'order', 0.97);
+
+    const turnedDown = await seedMessage(accountC, 'pile-turned-down', 'Your Amazon order');
+    await admin`
+      insert into public.recurring_messages (id, user_id, claimed, parse_status)
+      values (${turnedDown}, ${userC}, true, 'not_recurring')`;
+    await sortInto(turnedDown, 'bill', 0.6);
+
+    const [row] = await admin<{ rule_piles: string[] }[]>`
+      select rule_piles from core.mail_pile_comparison(${userC}) where message_id = ${order}`;
+    expect(row.rule_piles).toEqual(['order']);
+
+    const report = await admin<{ linker: string | null; pile: string; rules: number; jev: number; jev_sure: number; agree: number; jev_only: number; agreement: string | null }[]>`
+      select * from core.mail_pile_agreement(${userC})`;
+    const byPile = Object.fromEntries(report.map((line) => [line.pile, line]));
+    expect(byPile.order).toMatchObject({ linker: 'commerce', rules: 1, jev: 1, agree: 1, agreement: '1.000' });
+    // The statement from the first test and the Amazon order: Jev said bill
+    // twice, once sure, and the recurring reading turned both down or never saw them.
+    expect(byPile.bill).toMatchObject({ linker: 'recurring', rules: 0, jev: 2, jev_sure: 1, jev_only: 2, agreement: '0.000' });
+    expect(byPile.newsletter).toMatchObject({ linker: null, jev: 0, agreement: null });
+  });
+
+  it('keeps the comparison from a signed-in user', async () => {
+    await expect(
+      asUser(userC, (tx) => tx`select * from core.mail_pile_agreement(${userC})`),
+    ).rejects.toThrow(/permission denied/);
+  });
+});

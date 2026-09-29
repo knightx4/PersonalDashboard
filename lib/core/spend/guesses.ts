@@ -61,6 +61,7 @@ const HAIKU = 'claude-haiku-4-5';
 const SONNET = 'claude-sonnet-5';
 const OPUS = 'claude-opus-5';
 const VOYAGE_LITE = 'voyage-4-lite';
+const JEV = 'jev-1.13.0';
 
 function run(model: string, inputTokens: number, outputTokens: number): OperationGuess {
   return { model, inputTokens, outputTokens, per: 'run', background: false };
@@ -246,6 +247,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'read-appointment-email': background(unit(HAIKU, 2_500, 150)),
   // The record, up to eight events and eight subject lines in; a short email out.
   'write-draft': background(unit(SONNET, 1_500, 300)),
+  // A sender and subject and the eight piles in, one label out.
+  'sort-email': background(unit(JEV, 250, 0)),
 
   // News. All but the last two from the digest cron or a script.
   'digest-issue': background(unit(HAIKU, 3_000, 300)),
