@@ -55,6 +55,7 @@ export const coreSources: ModuleSources = {
     { table: 'core.email_accounts', reason: 'Mailbox connections and their tokens.' },
     { table: 'core.inbox_catch_ups', reason: 'Sync bookkeeping.' },
     { table: 'core.ingested_messages', reason: 'Mail sync bookkeeping; the Gmail connector reads mail.' },
+    { table: 'core.mail_piles', reason: 'The pile Jev sorted each ingested email into, compared with the linkers\' rules.' },
     { table: 'core.model_spend', reason: 'Model cost accounting.' },
     { table: 'core.people', reason: 'Who a shopping order was for.' },
     { table: 'core.push_subscriptions', reason: 'Browsers that accepted notifications, for sending the morning brief.' },
