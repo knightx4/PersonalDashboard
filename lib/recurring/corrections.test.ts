@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { billTitle } from '@/lib/todo/agenda/sources/bills';
-import { mergePayments, moveCharges, renamePayment } from './corrections';
+import { mergePayments, moveCharges, renamePayment, setPaymentCounted } from './corrections';
 import type { RecurringPayment } from './load';
 import { memoryClient, type Row } from './memory-client';
 import { fileRecurringReading, resummarisePayment } from './store';
-import { priceRise } from './view';
+import { buildRecurringView, priceRise } from './view';
 
 const USER = 'user-1';
 
@@ -444,5 +444,115 @@ describe('moveCharges', () => {
       to: { payee: 'Apple' },
     });
     expect(result.error).toBeTruthy();
+  });
+});
+
+function tablesWithChase(): Record<string, Row[]> {
+  const payment = (id: string, payee: string, key: string, cents: number) => ({
+    id,
+    user_id: USER,
+    payee,
+    payee_key: key,
+    kind: 'bill',
+    sender_domain: 'chase.com',
+    status: 'active',
+    amount_cents: cents,
+    currency: 'USD',
+    period: 'month',
+    next_date: '2026-10-20',
+  });
+  return {
+    recurring_payments: [
+      payment('chase', 'Chase', 'chase', 2423300),
+      payment('chase-card', 'Chase Credit Card', 'chasecreditcard', 181200),
+      payment('netflix', 'Netflix', 'netflix', 1549),
+    ],
+    recurring_payee_aliases: [],
+    recurring_charges: [],
+  };
+}
+
+function statement(payee: string, amountCents: number) {
+  return {
+    payee,
+    kind: 'bill' as const,
+    event: 'bill' as const,
+    amountCents,
+    previousAmountCents: null,
+    currency: 'USD',
+    period: 'month' as const,
+    occurredOn: '2026-10-01',
+    dueOn: '2026-10-25',
+  };
+}
+
+function monthly(tables: Record<string, Row[]>) {
+  const view = buildRecurringView(
+    tables.recurring_payments.map((p) => loaded(tables, p.id as string)),
+    TODAY,
+  );
+  return { view, cents: view.total.reduce((sum, t) => sum + t.cents, 0) };
+}
+
+describe('setPaymentCounted', () => {
+  it('takes both Chase rows out of the monthly total, and the next statement does not add them back', async () => {
+    const tables = tablesWithChase();
+    const client = memoryClient(tables);
+    expect(monthly(tables).cents).toBe(2423300 + 181200 + 1549);
+
+    for (const id of ['chase', 'chase-card']) {
+      expect(
+        await setPaymentCounted(client, { userId: USER, paymentId: id, counted: false }),
+      ).toEqual({});
+    }
+    const after = monthly(tables);
+    expect(after.cents).toBe(1549);
+    expect(after.view.active.map((r) => r.payee)).toEqual(['Netflix']);
+    expect(after.view.ignored.map((r) => r.payee)).toEqual(['Chase', 'Chase Credit Card']);
+
+    const { paymentId } = await fileRecurringReading(client, {
+      userId: USER,
+      messageId: 'm-chase-oct',
+      senderDomain: 'chase.com',
+      reading: statement('Chase', 312000),
+    });
+    expect(paymentId).toBe('chase');
+    expect(tables.recurring_payments.find((p) => p.id === 'chase')).toMatchObject({
+      status: 'ignored',
+      amount_cents: 312000,
+    });
+    expect(monthly(tables).cents).toBe(1549);
+  });
+
+  it('brings a payment back into the total, worked out again from its charges', async () => {
+    const tables = tablesWithChase();
+    const client = memoryClient(tables);
+    await setPaymentCounted(client, { userId: USER, paymentId: 'chase', counted: false });
+    await fileRecurringReading(client, {
+      userId: USER,
+      messageId: 'm-chase-oct',
+      senderDomain: 'chase.com',
+      reading: statement('Chase', 90000),
+    });
+
+    expect(
+      await setPaymentCounted(client, { userId: USER, paymentId: 'chase', counted: true }),
+    ).toEqual({});
+    expect(tables.recurring_payments.find((p) => p.id === 'chase')).toMatchObject({
+      status: 'active',
+      amount_cents: 90000,
+    });
+    expect(monthly(tables).cents).toBe(90000 + 181200 + 1549);
+  });
+
+  it("does not change another person's payment", async () => {
+    const tables = tablesWithChase();
+    const result = await setPaymentCounted(memoryClient(tables), {
+      userId: 'someone-else',
+      paymentId: 'chase',
+      counted: false,
+    });
+    expect(result.error).toBeTruthy();
+    expect(tables.recurring_payments[0]!.status).toBe('active');
   });
 });
