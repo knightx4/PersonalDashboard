@@ -9,7 +9,14 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { embedVideoSegmentsOverRest, restLedger } from '@/lib/learn/catalogue/embed-rest';
 import type { EmbedSweepResult } from '@/lib/learn/catalogue/embed-sweep';
 import { scheduledRunAllowance } from '@/lib/learn/youtube/budget';
-import { addChannel, listChannel, loadChannels, type ListChannelResult } from '@/lib/learn/youtube/library';
+import {
+  addChannel,
+  listChannel,
+  loadChannels,
+  removeChannelFromLibrary,
+  type ListChannelResult,
+} from '@/lib/learn/youtube/library';
+import { unfollowSubjectChannel, type UnfollowResult } from '@/lib/learn/youtube/follow-channel';
 import {
   embedVideoMetadata,
   metadataEmbedDeadline,
@@ -308,32 +315,15 @@ export async function setChannelAutoTranscribe(providerId: string, on: boolean):
 }
 
 export async function removeChannel(providerId: string): Promise<void> {
-  const learn = createLearnServiceSupabase();
-  // Only channels added here. The seeded providers keep their row and lose
-  // the channel, so the OCW transcript adapter and anything pointing at them
-  // keep working.
-  const { data, error } = await learn
-    .from('catalogue_providers')
-    .select('slug, ingest_note')
-    .eq('id', providerId)
-    .maybeSingle();
-  if (error) throw new Error(`Reading the channel failed: ${error.message}`);
-  if (!data) return;
+  await removeChannelFromLibrary(createLearnServiceSupabase(), providerId);
+}
 
-  const addedHere = (data as { ingest_note: string }).ingest_note.startsWith('Videos and playlists listed');
-  const result = addedHere
-    ? await learn.from('catalogue_providers').delete().eq('id', providerId)
-    : await learn
-        .from('catalogue_providers')
-        .update({
-          youtube_channel_id: null,
-          youtube_handle: null,
-          youtube_uploads_playlist_id: null,
-          youtube_listed_at: null,
-          auto_transcribe: false,
-        })
-        .eq('id', providerId);
-  if (result.error) throw new Error(`Removing the channel failed: ${result.error.message}`);
+/**
+ * Take a channel Learn followed for a subject back out of the library (plan
+ * #1198). The caller checks the person pressed it; the row must be theirs.
+ */
+export async function unfollowSubjectChannelNow(userId: string, channelRowId: string): Promise<UnfollowResult> {
+  return unfollowSubjectChannel(createLearnServiceSupabase(), { userId, channelRowId });
 }
 
 export type TranscribeReport = {

@@ -168,13 +168,10 @@ describe('heuristicRecurring on saved mail', () => {
     });
   });
 
-  it('reads the Apple receipt total and renewal date', () => {
-    expect(read('apple-icloud-receipt.txt', '2026-09-20')).toMatchObject({
-      event: 'charge',
-      amountCents: 299,
-      period: 'month',
-      dueOn: '2026-10-20',
-    });
+  it('gives up on an Apple receipt rather than filing it under "Apple"', () => {
+    // The service is named only in the body, so the heuristic has nothing but
+    // the store's name; the reading fails and the linker tries again (plan #1212).
+    expect(read('apple-icloud-receipt.txt', '2026-09-20')).toBeNull();
   });
 });
 

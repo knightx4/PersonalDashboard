@@ -23,6 +23,13 @@ const keepGoodSamples = vi.fn(async (_learn: unknown, input: { subjectId: string
 );
 vi.mock('./keep-samples', () => ({ keepGoodSamples }));
 
+// Following and passing (#1198) has its own test; here it only has to run at
+// the end of every run over a subject, with that subject.
+const settleJudgedChannels = vi.fn<(learn: unknown, input: { userId: string; subjectId: string }) => Promise<unknown>>(
+  async () => ({ followed: [], passed: 0, failed: [] }),
+);
+vi.mock('./follow-channel', () => ({ settleJudgedChannels }));
+
 const { encodeTranscript } = await import('./transcripts');
 const { judgeFoundChannels, pickCandidates, readPickReply, readVerdictReply, uploadsPlaylistFor, verdictPrompt, MAX_CREDITS_PER_SUBJECT } =
   await import('./channel-judge');
@@ -219,7 +226,8 @@ describe('judgeFoundChannels', () => {
       onSpend: (pass) => spent.push(pass),
     });
 
-    expect(result).toMatchObject({ ok: true, picked: 2, sampled: 4, kept: 4, waiting: 1, failed: 0, quotaUnits: 4 });
+    expect(result).toMatchObject({ ok: true, picked: 2, sampled: 4, kept: 4, waiting: 1, failed: 0, quotaUnits: 4, settled: null });
+    expect(settleJudgedChannels).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ userId: USER, subjectId: SUBJECT }));
     expect(keepGoodSamples.mock.calls.map(([, input]) => [input.subjectId, input.samples.length])).toEqual([
       [SUBJECT, 3],
       [SUBJECT, 1],

@@ -13,7 +13,7 @@ import { extractCurrencyCode } from '@/lib/email/extract/currency';
 import { parseLooseCalendarDate } from '@/lib/email/extract/email-dates';
 import { displayNameFromAddress, parseMoneyToCents } from '@/lib/email/extract/heuristic';
 import { PAYEE_MAX } from './limits';
-import type { RecurringHint } from './rules';
+import { isStoreBiller, STORE_PAYEE_KEYS, type RecurringHint } from './rules';
 
 export const RECURRING_EVENTS = [
   'charge',
@@ -176,7 +176,11 @@ export function heuristicRecurring(input: {
   const blob = `${input.subject}\n${input.text}`;
   const year = Number(input.receivedOn.slice(0, 4));
   const payee = payeeFrom(input);
-  if (!payee) return null;
+  // A store's receipt names the store in its subject and sender ("Your
+  // receipt from Apple."), and the service only in the body. Filing it under
+  // the store would lump every subscription it bills into one row, so the
+  // heuristic gives up and the linker tries the message again (plan #1212).
+  if (!payee || namesTheStore(payee, input.fromAddress)) return null;
 
   const amount = findAmount(input.text) ?? findAmount(input.subject);
   const period = findPeriod(blob);
@@ -256,6 +260,15 @@ export function payeeFrom(input: { fromAddress: string | null; subject: string }
   const domain = input.fromAddress?.toLowerCase().match(/@([a-z0-9-]+\.)*?([a-z0-9-]+)\.[a-z]{2,}>?$/);
   if (domain?.[2]) return domain[2].charAt(0).toUpperCase() + domain[2].slice(1);
   return null;
+}
+
+/**
+ * Whether a reading's payee is the store that sent the receipt rather than
+ * the service it billed: "Apple" on mail from apple.com. Applies to the
+ * model's answer as much as to the heuristic's.
+ */
+export function namesTheStore(payee: string, fromAddress: string | null): boolean {
+  return isStoreBiller(fromAddress) && STORE_PAYEE_KEYS.includes(payeeKey(payee));
 }
 
 /**

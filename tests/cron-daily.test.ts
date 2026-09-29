@@ -101,6 +101,9 @@ vi.mock('@/inngest/cron/inbox', () => ({
     throw new Error('inbox exploded');
   }),
 }));
+vi.mock('@/inngest/cron/recurring-reread', () => ({
+  runRecurringReread: vi.fn(async () => ({ accounts: 1 })),
+}));
 vi.mock('@/inngest/jobs/cron/sweep', () => ({
   runJobSweep: vi.fn(async () => ({ ghosted: 3, reminders: 2 })),
 }));
@@ -134,6 +137,7 @@ vi.mock('@/inngest/dev/digest', () => ({
 
 const { GET } = await import('@/app/api/cron/daily/route');
 const { runJobSweep } = await import('@/inngest/jobs/cron/sweep');
+const { runRecurringReread } = await import('@/inngest/cron/recurring-reread');
 const { runJdBackfill } = await import('@/inngest/jobs/cron/jd-backfill');
 const { runVaultSyncForAll } = await import('@/inngest/vault/sync');
 const { runClaimSweep } = await import('@/inngest/dev/claims');
@@ -178,6 +182,7 @@ describe('the daily cron route', () => {
     // Every stage after the failure still ran. That is the property that
     // matters: a broken sync must not also cost the job workspace its nightly
     // sweep, nor the job descriptions the sweep never needed in the first place.
+    expect(runRecurringReread).toHaveBeenCalled();
     expect(runJobSweep).toHaveBeenCalled();
     expect(runJdBackfill).toHaveBeenCalled();
     expect(body.results['jobs-sweep']).toEqual({ ghosted: 3, reminders: 2 });
