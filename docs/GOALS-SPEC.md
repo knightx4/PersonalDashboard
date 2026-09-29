@@ -337,12 +337,27 @@ This follows the rule in [TODO-SPEC.md](TODO-SPEC.md): an obligation is shown
 by whoever needs to show it and written by whoever owns it. A goal step is
 owned by Goals and is never copied into `todo.tasks`.
 
-- Each `mine` step has a **Show on Todo** button. Pressing it sets a flag on
-  the step, and a new agenda source (`lib/todo/agenda/sources/goal-steps.ts`,
-  beside `job-reminders.ts`) reads flagged steps at query time.
+- Each open goal's **next step of yours** is on Todo with nothing pressed
+  (plan #1266). It is one step per goal, the first of the next steps the
+  Goals home shows for it: open, nothing it waits on and nothing open under
+  it, its start date come, soonest due first and then tree order. So twelve
+  goals add at most twelve lines, and a parked or proposed goal, a step that
+  waits on another and a step for later put nothing there. A next step keeps
+  its own due date on Todo, overdue or not, and one with no date shows today.
+  The rule is `goalTodoSteps` in `lib/goals/todo.ts`.
+- Each `mine` step also has a **Show on Todo** button, for any step beyond
+  the next one. Pressing it sets a flag on the step, and it stays on Todo
+  until it is closed; an undated one goes in Someday. A step that is both
+  flagged and a goal's next step is listed once, and shows today when it has
+  no date. The agenda source (`lib/todo/agenda/sources/goal-steps.ts`,
+  beside `job-reminders.ts`) reads both at query time.
 - Ticking the item on Todo closes the step in Goals, because it is the same
-  row. Dismissing or deferring it on Todo writes only a dismissal, as for every
-  other foreign source.
+  row, and the goal's next step after it takes its place. Dismissing or
+  deferring it on Todo writes only a dismissal, as for every other foreign
+  source. The dismissal is keyed by the step, so **Not this one** on a next
+  step hides that step only: the goal has no line on Todo until its next step
+  is a different one, because that one was closed, reordered or given a later
+  date.
 - Rhythms for the current period appear on Todo on their own until the count
   is met. There is no flag to set for those.
 - Dated items, such as an event you said you would attend, show on their date.

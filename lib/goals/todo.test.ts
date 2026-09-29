@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { attachDependencies } from './dependencies';
 import { buildForest, markStartDates, type Step } from './steps';
-import { canShowOnTodo, todoSteps } from './todo';
+import { canShowOnTodo, goalTodoSteps, todoSteps } from './todo';
 import type { Goal } from './tree';
 
 function goal(id: string, extra: Partial<Goal> = {}): Goal {
@@ -129,5 +130,101 @@ describe('canShowOnTodo', () => {
     expect(canShowOnTodo({ kind: 'mine', status: 'done' })).toBe(false);
     expect(canShowOnTodo({ kind: 'claude', status: 'open' })).toBe(false);
     expect(canShowOnTodo({ kind: 'decision', status: 'open' })).toBe(false);
+  });
+});
+
+describe('goalTodoSteps', () => {
+  const today = '2026-09-29';
+
+  function pick(goals: Goal[], steps: Step[]) {
+    const { byGoal } = buildForest(
+      goals.map((g) => g.id),
+      steps,
+    );
+    markStartDates(byGoal, today);
+    return goalTodoSteps(
+      goals.map((g) => ({ goal: g, areaName: 'Area' })),
+      byGoal,
+      today,
+    );
+  }
+
+  it("puts each open goal's next step of yours on Todo with nothing pressed, one per goal", () => {
+    const out = pick(
+      [goal('a'), goal('b')],
+      [
+        step('a1', 'a'),
+        step('a2', 'a'),
+        step('b1', 'b', { dueOn: '2026-10-20' }),
+        step('b2', 'b', { dueOn: '2026-10-05' }),
+      ],
+    );
+    expect(out).toEqual([
+      { id: 'a1', title: 'a1', dueOn: null, startsOn: null, goalId: 'a', goalTitle: 'Goal a', next: true },
+      { id: 'b2', title: 'b2', dueOn: '2026-10-05', startsOn: null, goalId: 'b', goalTitle: 'Goal b', next: true },
+    ]);
+  });
+
+  it('keeps an overdue next step at its own due date, which the Goals home blanks', () => {
+    const out = pick([goal('g')], [step('late', 'g', { dueOn: '2026-09-01' })]);
+    expect(out.map((s) => [s.id, s.dueOn])).toEqual([['late', '2026-09-01']]);
+  });
+
+  it('puts nothing there for a parked or proposed goal', () => {
+    const out = pick(
+      [goal('parked', { status: 'parked' }), goal('proposed', { status: 'proposed' })],
+      [step('p1', 'parked'), step('q1', 'proposed')],
+    );
+    expect(out).toEqual([]);
+  });
+
+  it('skips a step for later and a step with open steps under it, taking the next one', () => {
+    const out = pick(
+      [goal('g')],
+      [
+        step('later', 'g', { startsOn: '2026-11-01' }),
+        step('parent', 'g'),
+        step('child', 'parent'),
+      ],
+    );
+    expect(out.map((s) => s.id)).toEqual(['child']);
+  });
+
+  it('puts nothing there for a step that waits on another, which Todo shows instead', () => {
+    const goals = [goal('g'), goal('h')];
+    const { byGoal, nodes } = buildForest(
+      goals.map((g) => g.id),
+      [step('waits', 'g'), step('first', 'h')],
+    );
+    attachDependencies(byGoal, nodes, [{ id: 'd', itemId: 'waits', dependsOnId: 'first' }]);
+    const out = goalTodoSteps(
+      goals.map((g) => ({ goal: g, areaName: 'Area' })),
+      byGoal,
+      today,
+    );
+    expect(out.map((s) => s.id)).toEqual(['first']);
+  });
+
+  it("puts nothing there when the only steps are Claude's, a question or a rhythm", () => {
+    const out = pick(
+      [goal('g')],
+      [
+        step('claude', 'g', { kind: 'claude' }),
+        step('question', 'g', { kind: 'decision' }),
+        step('rhythm', 'g', { kind: 'rhythm', rhythmCount: 2, rhythmPeriod: 'week' }),
+      ],
+    );
+    expect(out).toEqual([]);
+  });
+
+  it('lists a flagged step that is also the next step once, and keeps other flagged steps', () => {
+    const out = pick(
+      [goal('g')],
+      [step('first', 'g', { onTodo: true }), step('second', 'g', { onTodo: true })],
+    );
+    expect(out.map((s) => [s.id, s.next ?? false])).toEqual([
+      ['first', true],
+      ['second', false],
+    ]);
   });
 });

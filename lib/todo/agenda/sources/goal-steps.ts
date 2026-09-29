@@ -13,8 +13,13 @@ import { SNOOZE_DAYS, todayIn } from '@/lib/todo/tasks/model';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
 
 /**
- * Goal steps you pressed Show on Todo on, from goals.items (docs/GOALS-SPEC.md,
- * "Todo"; plan #927).
+ * Each open goal's next step of yours, and the goal steps you pressed Show on
+ * Todo on, from goals.items (docs/GOALS-SPEC.md, "Todo"; plans #927, #1266).
+ *
+ * The next step needs no press (plan #1266): it is the first next step the
+ * Goals home shows for the goal, one per goal, and it shows today when it has
+ * no date. "Not this one" hides that step only, since the dismissal is keyed
+ * by the step; the goal is back on Todo once its next step is a different one.
  *
  * Read where they live and never copied into todo.tasks. **Ticking one closes
  * the step in Goals**, because it is the same row, and the goals history
@@ -22,10 +27,10 @@ import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/
  * step has nothing that means "not on my list this week" without changing
  * the step itself, which is the return deadline's position too.
  *
- * Always on. Each item was asked for one at a time with the button on the
- * step, so a switch on the Todo settings page could only hide what you had
- * just asked to see. Turning the Goals workspace off still takes them away,
- * as it does for every source.
+ * Always on. A flagged step was asked for one at a time with the button on
+ * the step, and a goal's next step is what Todo is for, so a switch on the
+ * Todo settings page could only hide what you need to see. Turning the Goals
+ * workspace off still takes them away, as it does for every source.
  *
  * **Rhythms come here too, with no button** (plan #928): each live rhythm is
  * an item for its current period until the period's count is met. Its key
@@ -52,7 +57,7 @@ export const goalStepsSource: AgendaSource = {
   module: 'goals',
   alwaysOn: true,
   description:
-    'Steps from your goals that you chose to show on Todo, and your rhythms until each is met.',
+    "Each goal's next step, steps you chose to show on Todo, and your rhythms until each is met.",
 
   async fetch(ctx: SourceContext): Promise<AgendaItem[]> {
     const today = todayIn(ctx.timezone, ctx.now);
@@ -94,10 +99,11 @@ export const goalStepsSource: AgendaSource = {
       ...rhythmItems,
       ...suggestionItems,
       ...steps
-        // An undated step is always in the window: it goes in "Someday", as an
-        // undated task does. A dated one waits until the horizon reaches it,
-        // and so does one that cannot start yet, which shows on the day it
-        // starts when it has no due date.
+        // An undated step is always in the window: a goal's next step shows
+        // today, and one only flagged goes in "Someday", as an undated task
+        // does. A dated one waits until the horizon reaches it, and so does
+        // one that cannot start yet, which shows on the day it starts when it
+        // has no due date.
         .filter((step) => step.startsOn === null || step.startsOn <= ctx.to)
         .filter((step) => step.dueOn === null || step.dueOn <= ctx.to)
         .map(
@@ -105,7 +111,7 @@ export const goalStepsSource: AgendaSource = {
             key: `${PREFIX}${step.id}`,
             source: 'goal_steps',
             title: step.title,
-            day: step.dueOn ?? step.startsOn,
+            day: step.dueOn ?? step.startsOn ?? (step.next ? today : null),
             at: null,
             link: { href: `/goals/${step.goalId}`, label: step.goalTitle },
             action: null,
