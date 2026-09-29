@@ -13,6 +13,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { loadPipeline, type PipelineRow } from '@/lib/jobs/applications/load';
 import { matchesSearch, searchTerms } from '@/lib/jobs/search';
+import { withApplicationNotes } from '@/lib/jobs/suggest/score-notes-load';
 import {
   APPLICATION_SOURCES,
   SOURCE_LABELS,
@@ -54,11 +55,14 @@ export default async function PipelinePage({
   const core = await createCoreClient();
   const params = await searchParams;
 
-  const [rows, inboxCount, { data: profile }] = await Promise.all([
+  const [pipeline, inboxCount, { data: profile }] = await Promise.all([
     loadPipeline(supabase, user.id),
     countConnectedInboxes(core, user.id),
     supabase.from('profiles').select('pipeline_view').eq('id', user.id).maybeSingle(),
   ]);
+
+  // Fit and chance on each card (plan #1206).
+  const rows = await withApplicationNotes(supabase, user.id, pipeline);
 
   const view: PipelineView = profile?.pipeline_view === 'list' ? 'list' : 'board';
 

@@ -30,6 +30,10 @@ import {
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
 import { loadOpenSuggestions } from '@/lib/jobs/suggest/load';
+import { historyFromPipeline, withApplicationNotes, withOpeningNotes } from '@/lib/jobs/suggest/score-notes-load';
+import { CHANCE_BAND_LABELS } from '@/lib/jobs/suggest/chance-check';
+import { FIT_MINIMUMS, parseScoreMinimum, passesMinimum } from '@/lib/jobs/suggest/score-notes';
+import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
 import { RecommendedRoles } from '../recommend/sections';
 
 export const metadata = { title: 'Roles' };
@@ -55,16 +59,21 @@ export default async function RolesPage({
     q?: string;
     group?: string;
     hide?: string | string[];
+    minfit?: string;
+    minchance?: string;
   }>;
 }) {
   const user = await requireUser();
   const supabase = await createClient();
   const params = await searchParams;
 
-  const [rows, recommended] = await Promise.all([
+  const [pipeline, openings] = await Promise.all([
     loadPipeline(supabase, user.id),
     loadOpenSuggestions(supabase, user.id, 'apply'),
   ]);
+  // Fit and chance with their reasons (plan #1206), read against the pipeline as history.
+  const rows = await withApplicationNotes(supabase, user.id, pipeline);
+  const recommended = withOpeningNotes(openings, historyFromPipeline(pipeline));
 
   const displaySpec = rolesDisplay();
   const display = parseListDisplay(displaySpec, params);
@@ -77,23 +86,30 @@ export default async function RolesPage({
   const source = APPLICATION_SOURCES.find((s) => s === params.source);
 
   const terms = searchTerms(params.q);
+  const minimum = parseScoreMinimum(params);
 
   let filtered = rows;
   if (status) filtered = filtered.filter((row) => row.status === status);
   if (source) filtered = filtered.filter((row) => row.source === source);
+  // A row not scored passes, as an unscored opening passes the openings' filters.
+  filtered = filtered.filter((row) => passesMinimum(row.scoreNote, minimum));
   if (terms.length)
     filtered = filtered.filter((row) => matchesSearch([row.companyName, row.roleTitle], terms));
   const sections = groupRows(sortRows(filtered, display), display.groupBy);
 
   /** A filter link that keeps the arrangement: narrowing is not rearranging. */
-  const railHref = (opts: { status?: string; source?: string }) =>
+  const railHref = (opts: { status?: string; source?: string; minfit?: string; minchance?: string }) =>
     hrefFor({
       q: params.q,
+      minfit: 'minfit' in opts ? opts.minfit : minimum.fit > 0 ? String(minimum.fit) : undefined,
+      minchance: 'minchance' in opts ? opts.minchance : minimum.chance !== 'any' ? minimum.chance : undefined,
       sort: display.sort === displaySpec.defaultSort ? undefined : display.sort,
       group: display.group === NO_GROUP ? undefined : display.group,
       hide: display.hidden.length > 0 ? display.hidden.join(',') : undefined,
       ...opts,
     });
+
+  const scored = rows.some((row) => row.scoreNote);
 
   const statusCounts = new Map<ApplicationStatus, number>();
   for (const row of rows) statusCounts.set(row.status, (statusCounts.get(row.status) ?? 0) + 1);
@@ -172,6 +188,44 @@ export default async function RolesPage({
               />
             ))}
           </RailGroup>
+
+          {scored && (
+            <RailGroup label={FIT_SCORE_LABEL}>
+              <RailItem
+                label="Any"
+                href={railHref({ status: params.status, source: params.source, minfit: undefined })}
+                active={minimum.fit === 0}
+              />
+              {FIT_MINIMUMS.map((value) => (
+                <RailItem
+                  key={value}
+                  label={`${value} and up`}
+                  href={railHref({ status: params.status, source: params.source, minfit: String(value) })}
+                  active={minimum.fit === value}
+                />
+              ))}
+            </RailGroup>
+          )}
+
+          {scored && (
+            <RailGroup label={CHANCE_LABEL}>
+              <RailItem
+                label="Any"
+                href={railHref({ status: params.status, source: params.source, minchance: undefined })}
+                active={minimum.chance === 'any'}
+              />
+              <RailItem
+                label={`${CHANCE_BAND_LABELS.medium} or better`}
+                href={railHref({ status: params.status, source: params.source, minchance: 'medium' })}
+                active={minimum.chance === 'medium'}
+              />
+              <RailItem
+                label={CHANCE_BAND_LABELS.high}
+                href={railHref({ status: params.status, source: params.source, minchance: 'high' })}
+                active={minimum.chance === 'high'}
+              />
+            </RailGroup>
+          )}
         </LeftRail>
 
         <div className="min-w-0 flex-1 space-y-5">

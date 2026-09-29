@@ -11,6 +11,7 @@ import {
 } from '@/lib/jobs/pipeline';
 import { safeTimeZone } from '@/lib/core/timezone';
 import { formatClock } from '@/lib/clock';
+import type { ScoreNote } from '@/lib/jobs/suggest/score-notes';
 
 /**
  * Reading the pipeline.
@@ -65,6 +66,11 @@ export interface PipelineRow {
   coverage: RequirementCoverage;
   /** The kind of every interview logged, which is what the funnel's high-water mark reads. */
   interviewKinds?: string[];
+  /**
+   * Fit and chance with their reasons (plan #1206), attached by the pages that
+   * show them (`withApplicationNotes`); absent or null when not scored.
+   */
+  scoreNote?: ScoreNote | null;
 }
 
 const SELECT = `
