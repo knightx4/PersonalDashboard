@@ -7,15 +7,18 @@ import { MessageSquarePlus } from 'lucide-react';
 import {
   openFeedbackCount,
   submitFeedback,
+  triageFiled,
   type FeedbackActionState,
 } from '@/app/dev/bugs/actions';
 import { submitIdea, type IdeaActionState } from '@/app/dev/ideas/actions';
 import { Button } from '@/components/ui/button';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
+import { TriageNote } from '@/components/feedback/triage-note';
 import { FieldError, Input, Label, Select, Textarea } from '@/components/ui/field';
 import { Popover } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
 import { FEEDBACK_KIND_LABEL, type FeedbackKind } from '@/lib/feedback/load';
+import type { TriageView } from '@/lib/feedback/triage';
 import { MODULES, moduleForPath } from '@/lib/modules';
 import { usePopover } from '@/lib/use-popover';
 
@@ -137,6 +140,30 @@ export function FeedbackButton({
   const pending = idea ? ideaPending : notePending;
 
   usePopover({ open, onClose: () => setOpen(false), panelRef, triggerRef });
+
+  // What Jev made of the row just saved (plan #1179), asked for once the save
+  // has returned so Send never waits on it. Keyed on the row's id: a second
+  // note replaces the first one's triage, and switching tabs shows the triage
+  // of whatever that tab last saved.
+  const filedId = state.filed?.id ?? null;
+  const filedTable = state.filed?.table ?? null;
+  const [triage, setTriage] = useState<{ id: string; view: TriageView | null } | null>(null);
+  useEffect(() => {
+    if (!filedId || !filedTable) return;
+    let cancelled = false;
+    void triageFiled({ table: filedTable, id: filedId })
+      .then((view) => {
+        if (!cancelled) setTriage({ id: filedId, view });
+      })
+      .catch(() => {
+        if (!cancelled) setTriage({ id: filedId, view: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [filedId, filedTable]);
+  const triaged = filedId !== null && triage?.id === filedId ? triage.view : null;
+  const triaging = Boolean(filedId && triage?.id !== filedId);
 
   // Counted when the panel opens, and again after a note is filed from it, so
   // the number beside "Run Feature Routine" is the queue as it stands rather
@@ -289,6 +316,8 @@ export function FeedbackButton({
             {state.message && (
               <p className="text-ui text-accent">{state.message}</p>
             )}
+            {triaging && <p className="text-small text-ink-muted">Sorting it…</p>}
+            <TriageNote view={triaged} onNavigate={() => setOpen(false)} />
           </form>
 
           {/* Its own section below the form, not a link on the Send row: it is

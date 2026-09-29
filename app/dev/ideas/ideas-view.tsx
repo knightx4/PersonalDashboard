@@ -37,6 +37,8 @@ import { IDEA_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
+import { TriageNote } from '@/components/feedback/triage-note';
+import { triageView } from '@/lib/feedback/triage';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -234,6 +236,7 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
             row's state to be worked out from which fold it is in. */}
         <IdeaState idea={idea} />
       </div>
+      <TriageNote view={triageView(idea.triage ?? null)} />
 
       {/* Which feature the session was working on when it wrote this. On its
           own line rather than in the badge's tooltip: a suggestion with no

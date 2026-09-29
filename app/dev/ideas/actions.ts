@@ -16,6 +16,8 @@ import { loadVisionBodies } from '@/lib/specs/vision';
 export type IdeaActionState = {
   error?: string;
   message?: string;
+  /** The idea just saved, so the panel can ask for its triage (plan #1179). */
+  filed?: { table: 'ideas'; id: string };
 };
 
 /**
@@ -46,15 +48,22 @@ export async function addIdea(
   if (!body.success) return { error: body.error.issues[0].message };
   if (!scope.success) return { error: scope.error.issues[0].message };
 
-  const { error } = await supabase.from('ideas').insert({
-    user_id: user.id,
-    body: body.data,
-    module: scope.data,
-  });
+  const { data, error } = await supabase
+    .from('ideas')
+    .insert({
+      user_id: user.id,
+      body: body.data,
+      module: scope.data,
+    })
+    .select('id')
+    .single();
   if (error) return { error: error.message };
 
   revalidatePath('/dev/ideas');
-  return { message: 'Idea saved.' };
+  return {
+    message: 'Idea saved.',
+    filed: data?.id ? { table: 'ideas', id: String(data.id) } : undefined,
+  };
 }
 
 /**

@@ -107,6 +107,9 @@ export const SPEND_OPERATIONS = {
     // question (plan #1176). Jev, one call per ask not seen before; from the
     // Dash page, no button.
     'sort-waiting',
+    // Triaging a note or an idea as it is filed from the header panel (plan
+    // #1179). Jev, four questions in one call per note or idea filed.
+    'triage-note',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one
