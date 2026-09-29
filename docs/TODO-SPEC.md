@@ -164,6 +164,7 @@ Listing these because they will otherwise get invented.
 | A job reminder | `job_search.reminders` | nothing new | `completed_at` on the job row | `due_at` on the job row, moved forward |
 | A return deadline | `public.orders` (derived) | nothing | not possible -- it is a date, not a task | a row in `todo.dismissals` |
 | A note checkbox | your vault | **nothing, ever** | not possible | deferred entirely; see below |
+| A goal's next step, or a step flagged Show on Todo | `goals.items` | nothing new | `status` on the step, set to done | a row in `todo.dismissals` |
 
 The second row is the one exception to "never write to another schema", and it
 is not really an exception: `/jobs/today` and `/todo` are two views of one row,
@@ -1025,6 +1026,15 @@ confident and the code disagreed.
   todo. A task already about something keeps that link and gets a line in its
   notes saying where it went instead. The search picker does not offer goals
   as targets yet; only this action writes the column.
+- **Each goal's next step comes onto Todo by itself** (plan #1266). The
+  goal-steps source used to list only steps you pressed Show on Todo on, which
+  left Goals as a second list to check every day. It now also lists each open
+  goal's next step of yours, one per goal, picked as the Goals home picks
+  them (`goalTodoSteps` in `lib/goals/todo.ts`). A next step with no date
+  shows today. Flagged steps still show, and a step that is both is listed
+  once. Ticking, Later and Not this one work as for a flagged step, on the
+  same `goal_steps:<id>` key, so Not this one hides that step and not the
+  goal: the goal is back once its next step is a different one.
 
 ## What this unlocks (not v1)
 
