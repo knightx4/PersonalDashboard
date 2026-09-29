@@ -19,6 +19,8 @@ import { fetchDocument } from './fetch';
  * `playlistItems.list` and `videos.list` cost 1 each, and a playlist is where
  * the published order lives anyway. Walking one course of forty lectures is
  * three calls.
+ * The one exception is finding a recommended channel that came without a
+ * handle, at the bottom of this file, and its caller caps how often it runs.
  *
  * Everything the API answers is parsed by a pure function below, so the
  * shapes that matter -- a playlist that does not exist, a lecture deleted out
@@ -788,4 +790,76 @@ export async function fetchChannelPlaylists(
     pageToken = parsed.nextPageToken;
   }
   return { ok: true, playlists };
+}
+
+// ---------------------------------------------------------------------------
+// Searching for a channel by name.
+//
+// The one place this module uses `search.list`, at 100 quota units a call. A
+// channel recommended for a subject usually comes with its @handle, which
+// `channels.list` resolves for one unit; this is for the one named without a
+// handle that works, and the caller caps how many it makes (plan #1195).
+// ---------------------------------------------------------------------------
+
+/** What `search.list` costs against the 10,000-unit daily quota. */
+export const SEARCH_QUOTA_UNITS = 100;
+
+export function searchChannelsRequestUrl(query: string, key: string, maxResults = 5): string {
+  const url = new URL('search', API_BASE);
+  url.searchParams.set('part', 'snippet');
+  url.searchParams.set('type', 'channel');
+  url.searchParams.set('q', query);
+  url.searchParams.set('maxResults', String(maxResults));
+  url.searchParams.set('key', key);
+  return url.toString();
+}
+
+export type YouTubeChannelHit = { channelId: string; title: string };
+
+const SearchResponse = z.object({
+  error: z.object({ message: z.string() }).optional(),
+  items: z
+    .array(
+      z.object({
+        id: z.object({ kind: z.string().optional(), channelId: z.string().optional() }).optional(),
+        snippet: z.object({ title: z.string().optional(), channelTitle: z.string().optional() }).optional(),
+      }),
+    )
+    .optional(),
+});
+
+export function parseSearchChannelsResponse(
+  body: string,
+): ({ ok: true; channels: YouTubeChannelHit[] }) | YouTubeFailure {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    return fail('error', 'the API answered with something that is not JSON');
+  }
+
+  const parsed = SearchResponse.safeParse(payload);
+  if (!parsed.success) return fail('error', 'the API answered in an unexpected shape');
+  if (parsed.data.error) return fail('error', parsed.data.error.message);
+
+  const channels: YouTubeChannelHit[] = [];
+  for (const item of parsed.data.items ?? []) {
+    const channelId = item.id?.channelId;
+    const title = (item.snippet?.channelTitle || item.snippet?.title || '').trim();
+    if (!channelId || !CHANNEL_ID.test(channelId) || !title) continue;
+    channels.push({ channelId, title });
+  }
+  return { ok: true, channels };
+}
+
+/** Channels whose name matches `query`, best first. 100 units. */
+export async function searchYouTubeChannels(
+  query: string,
+): Promise<({ ok: true; channels: YouTubeChannelHit[] }) | YouTubeFailure> {
+  const key = youTubeKey();
+  if (typeof key !== 'string') return key;
+
+  const body = await getJson(searchChannelsRequestUrl(query, key));
+  if (!body.ok) return body;
+  return parseSearchChannelsResponse(body.text);
 }
