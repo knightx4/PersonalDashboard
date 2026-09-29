@@ -40,6 +40,8 @@ export type SeekerContext = {
   resume: string | null;
   writingStyle: string | null;
   banned: readonly string[];
+  /** Industries never to suggest; checked again after the call. */
+  excludedIndustries: readonly string[];
 };
 
 export type SuggestOptions = {
@@ -70,6 +72,9 @@ function seekerText(seeker: SeekerContext): string {
   const lines: string[] = [];
   if (seeker.name) lines.push(`Their name: ${seeker.name}`);
   if (seeker.targetTitles.length > 0) lines.push(`Titles they are targeting: ${seeker.targetTitles.join(', ')}`);
+  if (seeker.excludedIndustries.length > 0) {
+    lines.push(`Industries they will not work in: ${seeker.excludedIndustries.join(', ')}`);
+  }
   if (seeker.goals.length > 0) {
     lines.push('', 'What they wrote about the job they want, newest first (the newer entry wins):', '', goalsText(seeker.goals));
   }
@@ -117,6 +122,8 @@ reachable people (with a public profile or a way in) over famous ones.
 For each, give:
 - person_name and person_title as the source states them, and company. For an
   event or group, person_name is null and company is the organiser.
+- industry: the company's industry in a few words ("AI software for
+  finance", "investment bank"). For an event, the field it serves.
 - source_url: the page where you found them.
 - search_query: a LinkedIn people search that finds this person, or people
   like them if the name may be wrong. Short: name and company, or title,
@@ -139,7 +146,9 @@ For each, give:
   "Subject: " and the subject, then a blank line, then the body.
 
 Never suggest anyone on the lists of people they already know or were already
-suggested. Write plainly. Do not use these anywhere: ${[...seeker.banned, '—'].map((b) => `"${b}"`).join(', ')}.${
+suggested, and never anyone whose company works in an industry they will not
+work in${seeker.excludedIndustries.length > 0 ? ` (${seeker.excludedIndustries.join(', ')})` : ''}, even as a
+finance role there. Write plainly. Do not use these anywhere: ${[...seeker.banned, '—'].map((b) => `"${b}"`).join(', ')}.${
     seeker.writingStyle ? `\n\nHow they like their writing to sound: ${seeker.writingStyle}` : ''
   }
 
@@ -185,6 +194,7 @@ export async function findPeople(
                 person_name: { type: ['string', 'null'] },
                 person_title: { type: ['string', 'null'] },
                 company: { type: ['string', 'null'] },
+                industry: { type: ['string', 'null'] },
                 source_url: { type: ['string', 'null'] },
                 search_query: { type: ['string', 'null'] },
                 headline: { type: 'string' },
@@ -200,7 +210,7 @@ export async function findPeople(
         required: ['suggestions'],
       },
     },
-    parse: (raw) => parsePeoplePayload(raw, { people: input.taken }),
+    parse: (raw) => parsePeoplePayload(raw, { people: input.taken }, input.seeker.excludedIndustries),
     empty: 'The search ran but reported no people.',
   });
 }
@@ -306,11 +316,18 @@ Rules:
 - Never a role they have already applied for; the list is given. Companies
   they have applied to before are fine for a different role, but prefer new
   ones.
+- Never a company in an industry they will not work in, whatever the role:
+  a finance job at a crypto firm is still a crypto job. When the industry is
+  unclear, look it up before reporting the posting.
 - Match the location and seniority their writing and past roles point to.
+- Weigh the newest career goals entry most. When it names the kind of work or
+  company they want most, fill the list with that first.
 - Up to ${MAX_OPENINGS}. Fewer, well matched, beat a padded list.
 
 For each, give:
 - company, title, url, location (as the posting states it, or null).
+- industry: the company's industry in a few words ("AI software for
+  finance", "payments", "investment bank").
 - why: one or two sentences on why it fits them, from what they wrote.
 - move: how to go about it, as two or three short numbered steps: what to
   lead with in the application, and who to look for at the company for a
@@ -363,20 +380,21 @@ export async function findOpenings(
               type: 'object',
               properties: {
                 company: { type: 'string' },
+                industry: { type: 'string' },
                 title: { type: 'string' },
                 url: { type: 'string' },
                 location: { type: ['string', 'null'] },
                 why: { type: 'string' },
                 move: { type: 'string' },
               },
-              required: ['company', 'title', 'url', 'why', 'move'],
+              required: ['company', 'industry', 'title', 'url', 'why', 'move'],
             },
           },
         },
         required: ['openings'],
       },
     },
-    parse: (raw) => parseOpeningsPayload(raw, input.taken),
+    parse: (raw) => parseOpeningsPayload(raw, input.taken, input.seeker.excludedIndustries),
     empty: 'The search ran but reported no postings.',
   });
 }

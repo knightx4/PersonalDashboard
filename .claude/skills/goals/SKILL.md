@@ -1440,6 +1440,11 @@ prepared, and the mapping and area runs.
 - **A role** is a specific posting, title and company, that is open now,
   with its own link. Not a company with "nothing open", and not a role
   already in `job_search.applications`.
+- **Neither** is at a company in an industry listed in
+  `job_search.profiles.excluded_industries`, whatever the role: a finance
+  job at a crypto firm is still a crypto job. Read the list before writing
+  and leave such finds out of Jobs. The Jobs search drops them in code; this
+  insert has no such check.
 
 One row each. `found_in` names the step (`Goal step: <title>`), or the file
 when no step holds it (`Research file: <title>`), and `goal_item_id` is that

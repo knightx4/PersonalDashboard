@@ -35,6 +35,7 @@ export function SettingsView(props: {
   appOrigin: string;
   profile: {
     targetTitles: string;
+    excludedIndustries: string;
     searchStartedOn: string;
     ghostThresholdDays: number;
     writingStyleNotes: string;
@@ -112,6 +113,7 @@ function ProfileSection({
 }: {
   profile: {
     targetTitles: string;
+    excludedIndustries: string;
     searchStartedOn: string;
     ghostThresholdDays: number;
     writingStyleNotes: string;
@@ -149,6 +151,7 @@ function ProfileSection({
             <ValueRow label="Search started" value={profile.searchStartedOn} />
             <ValueRow label="Ghost after" value={`${profile.ghostThresholdDays} days of silence`} />
             <ValueRow label="Target titles" value={profile.targetTitles} />
+            <ValueRow label="Never suggest" value={profile.excludedIndustries} />
             <ValueRow label="How you want to sound" value={profile.writingStyleNotes} />
             <ValueRow
               label="Never write these"
@@ -201,6 +204,19 @@ function ProfileSection({
             />
             <p className="mt-1 text-small text-ink-muted">
               Seeds relevance scoring when mail is classified.
+            </p>
+          </div>
+
+          <div>
+            <Label htmlFor="excludedIndustries">Never suggest</Label>
+            <Input
+              id="excludedIndustries"
+              name="excludedIndustries"
+              defaultValue={profile.excludedIndustries}
+              placeholder="Crypto, Healthcare, Defense"
+            />
+            <p className="mt-1 text-small text-ink-muted">
+              Industries Dash leaves out of the roles and people it recommends, whatever the role.
             </p>
           </div>
 
