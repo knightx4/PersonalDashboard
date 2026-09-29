@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useTransition } from 'react';
-import { Copy, ExternalLink, Mail, Search, Sparkles } from 'lucide-react';
+import { useEffect, useState, useTransition } from 'react';
+import { ChevronDown, Copy, ExternalLink, Mail, Search, Sparkles } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { gmailComposeUrl } from '@/lib/jobs/followup/compose';
 import type { OpenSuggestion } from '@/lib/jobs/suggest/load';
@@ -57,6 +58,27 @@ function RecommendedSection({
 }) {
   const [pending, run] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
+  // Folds to its header (note b4a23b56), and stays folded on this device.
+  // Read after mounting, so the server and the first paint agree.
+  const foldKey = `jobs.fold.${title}`;
+  const [folded, setFolded] = useState(false);
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the stored choice exists only in the browser
+      setFolded(window.localStorage.getItem(foldKey) === '1');
+    } catch {
+      // Storage refused: the section starts open, as it always did.
+    }
+  }, [foldKey]);
+  const fold = () => {
+    const next = !folded;
+    setFolded(next);
+    try {
+      window.localStorage.setItem(foldKey, next ? '1' : '0');
+    } catch {
+      // Not remembered, which only costs the next visit a press.
+    }
+  };
 
   const ask = () => {
     setNotice(null);
@@ -68,12 +90,23 @@ function RecommendedSection({
 
   return (
     <Card padding="dense">
-      <header className="mb-1 flex flex-wrap items-center justify-between gap-2">
-        <span className="flex items-baseline gap-2">
+      <header className={cn('flex flex-wrap items-center justify-between gap-2', !folded && 'mb-1')}>
+        <button
+          type="button"
+          onClick={fold}
+          aria-expanded={!folded}
+          title={folded ? `Show ${title.toLowerCase()}` : `Fold ${title.toLowerCase()}`}
+          className="press flex items-baseline gap-2 rounded-control text-left"
+        >
+          <ChevronDown
+            className={cn('size-3.5 self-center text-ink-muted transition-transform duration-150', folded && '-rotate-90')}
+            strokeWidth={1.75}
+            aria-hidden
+          />
           <Sparkles className="size-4 self-center text-accent" strokeWidth={1.75} aria-hidden />
           <h2 className="text-ui font-semibold text-ink">{title}</h2>
           {count > 0 && <span className="tabular text-small text-ink-muted">{count}</span>}
-        </span>
+        </button>
         <span className="flex items-center gap-2">
           <Button type="button" size="sm" variant="ghost" pending={pending} onClick={ask}>
             {pending ? searching : button}
@@ -81,9 +114,14 @@ function RecommendedSection({
           {paidHint}
         </span>
       </header>
-      <p className="mb-2 text-small text-ink-muted">{count > 0 ? hint : empty}</p>
-      {notice && <p className="mb-2 text-small text-ink-muted">{notice}</p>}
-      {count > 0 && <ul className="divide-y divide-border">{children}</ul>}
+      {!folded && (
+        <>
+          <p className="mb-2 text-small text-ink-muted">{count > 0 ? hint : empty}</p>
+          {notice && <p className="mb-2 text-small text-ink-muted">{notice}</p>}
+          {count > 0 && <ul className="divide-y divide-border">{children}</ul>}
+        </>
+      )}
+      {folded && notice && <p className="mt-1 text-small text-ink-muted">{notice}</p>}
     </Card>
   );
 }

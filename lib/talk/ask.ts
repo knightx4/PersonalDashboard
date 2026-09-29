@@ -292,6 +292,43 @@ export async function answerQuestion(input: {
       if (text && response.stop_reason !== 'max_tokens') {
         return { ok: true, body: text.slice(0, MAX_TURN), toolCalls, citations: [], stop: limit ?? 'answered' };
       }
+      // Told to answer and made more lookups instead, which is how a jobs
+      // question failed after five rounds of lookups ("stopped: tool_use").
+      // Refuse those lookups and ask once more with no tool allowed, so what
+      // was already looked up still becomes an answer.
+      if (uses.length > 0) {
+        messages.push(
+          { role: 'assistant', content: response.content },
+          {
+            role: 'user',
+            content: uses.map((use) => {
+              toolCalls.push({ name: use.name, input: use.input, result: keptResult({ ok: false, error: LIMIT_REACHED }) });
+              return { type: 'tool_result', tool_use_id: use.id, content: LIMIT_REACHED, is_error: true };
+            }),
+          },
+        );
+        let prose: Anthropic.Message;
+        try {
+          prose = await client.messages.create({
+            model: ASK_MODEL,
+            max_tokens: 2000,
+            system,
+            tools: TOOLS,
+            tool_choice: { type: 'none' },
+            messages: withRollingBreakpoint(messages),
+          });
+        } catch (error) {
+          return { ok: false, detail: error instanceof Error ? error.message : 'The answer failed.', toolCalls };
+        }
+        input.onSpend?.({ model: ASK_MODEL, usage: usageFrom(prose.usage) });
+        const said = prose.content.find((c): c is Anthropic.TextBlock => c.type === 'text')?.text.trim();
+        if (said && prose.stop_reason !== 'max_tokens') {
+          const stop: AskStop = limit ?? 'lookups';
+          const note = `\n\n${limitNote(stop)}`;
+          return { ok: true, body: `${said.slice(0, MAX_TURN - note.length)}${note}`, toolCalls, citations: [], stop };
+        }
+        return { ok: false, detail: whyNoReport(prose), toolCalls };
+      }
       return { ok: false, detail: whyNoReport(response), toolCalls };
     }
 

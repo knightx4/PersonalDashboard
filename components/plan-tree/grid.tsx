@@ -26,10 +26,13 @@ export const ROW_GRID =
 export const LEVEL = 'w-5';
 
 /**
- * The labels over the columns. `priority` names the fourth column, which a
- * page other than the plan may fill with something of its own.
+ * The labels over the columns. `status` and `priority` name the third and
+ * fourth, which a page other than the plan may fill with something of its own.
  */
-export function ColumnHeader({ priority = 'Priority' }: { priority?: string } = {}) {
+export function ColumnHeader({
+  priority = 'Priority',
+  status = 'Status',
+}: { priority?: string; status?: string } = {}) {
   return (
     <li
       aria-hidden
@@ -41,7 +44,7 @@ export function ColumnHeader({ priority = 'Priority' }: { priority?: string } = 
       <span>Step</span>
       <span className="hidden sm:block">Health</span>
       <span className="sm:hidden" />
-      <span className="hidden sm:block">Status</span>
+      <span className="hidden sm:block">{status}</span>
       <span className="hidden sm:block">{priority}</span>
       <span className="hidden sm:block">Steps</span>
       <span />

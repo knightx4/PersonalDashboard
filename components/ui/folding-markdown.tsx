@@ -1,5 +1,6 @@
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { linkBareDomains } from '@/lib/goals/result-links';
 import { ChevronRight } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
@@ -135,7 +136,9 @@ function Fold({ section }: { section: Section }) {
 }
 
 export function FoldingMarkdown({ markdown, className }: { markdown: string; className?: string }) {
-  const { preamble, sections } = splitSections(markdown);
+  // Markdown only links a full https:// address, and notes name places as
+  // bare domains ("Sources: respark.com") as often as not (note 28d33a48).
+  const { preamble, sections } = splitSections(linkBareDomains(markdown));
   return (
     <div className={cn('jobs-prose', className)}>
       <Prose>{preamble}</Prose>

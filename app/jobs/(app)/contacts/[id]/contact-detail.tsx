@@ -1,6 +1,6 @@
 'use client';
 
-import { Pencil } from 'lucide-react';
+import { Pencil, Plus } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -19,6 +19,7 @@ const CHANNELS = ['linkedin_dm', 'linkedin_connect', 'email', 'intro', 'event', 
 export function ContactDetail({ contact: initial, timezone }: { contact: ContactRow; timezone: string }) {
   const [contact, setContact] = useState(initial);
   const [editing, setEditing] = useState(false);
+  const [logging, setLogging] = useState(false);
   const [channel, setChannel] = useState<(typeof CHANNELS)[number]>('linkedin_dm');
   const [message, setMessage] = useState('');
   const [note, setNote] = useState<string | null>(null);
@@ -82,46 +83,72 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
         </>
       )}
 
+      {/* The send form stays closed until asked for, so the page opens on
+          the person and their log rather than an empty form (law 14). */}
       <div className="mt-4 flex flex-wrap items-end gap-2 border-t border-border pt-3">
-        <Field id={`channel-${contact.id}`} label="Log a send" className="w-40">
-          <Select
-            id={`channel-${contact.id}`}
-            value={channel}
-            onChange={(event) => setChannel(event.target.value as (typeof CHANNELS)[number])}
+        {logging ? (
+          <>
+            <Field id={`channel-${contact.id}`} label="Log a send" className="w-40">
+              <Select
+                id={`channel-${contact.id}`}
+                value={channel}
+                onChange={(event) => setChannel(event.target.value as (typeof CHANNELS)[number])}
+              >
+                {CHANNELS.map((entry) => (
+                  <option key={entry} value={entry}>
+                    {entry.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Input
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              placeholder="What you said, roughly"
+              className="min-w-48 flex-1"
+              autoFocus
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  const result = await logTouch({
+                    contactId: contact.id,
+                    channel,
+                    direction: 'outbound',
+                    message,
+                  });
+                  setNote(result.error ?? 'Logged.');
+                  if (!result.error) {
+                    setMessage('');
+                    setLogging(false);
+                  }
+                })
+              }
+            >
+              Log
+            </Button>
+            <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setLogging(false)}>
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              setNote(null);
+              setLogging(true);
+            }}
           >
-            {CHANNELS.map((entry) => (
-              <option key={entry} value={entry}>
-                {entry.replace(/_/g, ' ')}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Input
-          value={message}
-          onChange={(event) => setMessage(event.target.value)}
-          placeholder="What you said, roughly"
-          className="min-w-48 flex-1"
-        />
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          disabled={pending}
-          onClick={() =>
-            startTransition(async () => {
-              const result = await logTouch({
-                contactId: contact.id,
-                channel,
-                direction: 'outbound',
-                message,
-              });
-              setNote(result.error ?? 'Logged.');
-              if (!result.error) setMessage('');
-            })
-          }
-        >
-          Log
-        </Button>
+            <Plus className="size-4" strokeWidth={1.75} aria-hidden />
+            Log a send
+          </Button>
+        )}
         {note && <span className="text-small text-ink-muted">{note}</span>}
       </div>
 

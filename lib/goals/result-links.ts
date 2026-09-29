@@ -60,3 +60,38 @@ export function firstLink(markdown: string): string | null {
   if (!match) return null;
   return (match[1] ?? match[2] ?? match[3]).replace(TRAILING, '');
 }
+
+/**
+ * A markdown link, or a full address. Bare domains are written as markdown
+ * links by `linkBareDomains` first, so this is all there is left to find.
+ */
+const LINK = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|<(https?:\/\/[^>\s]+)>|(https?:\/\/[^\s)<>\]]+)/gi;
+
+export type TextPart = { text: string } | { text: string; href: string };
+
+/**
+ * Plain text split into what is written and what is a link: markdown links,
+ * full addresses and bare domains such as ikea.com/us. Pure, for the tests.
+ */
+export function linkParts(text: string): TextPart[] {
+  const source = linkBareDomains(text);
+  const parts: TextPart[] = [];
+  let last = 0;
+  for (const match of source.matchAll(LINK)) {
+    const [whole, label, target, angled, bare] = match;
+    let href = target ?? angled ?? bare;
+    let shown = label ?? href;
+    let used = whole;
+    if (bare) {
+      const tail = TRAILING.exec(bare)?.[0] ?? '';
+      href = tail ? bare.slice(0, -tail.length) : bare;
+      shown = href;
+      used = href;
+    }
+    if (match.index > last) parts.push({ text: source.slice(last, match.index) });
+    parts.push({ text: shown, href });
+    last = match.index + used.length;
+  }
+  if (last < source.length) parts.push({ text: source.slice(last) });
+  return parts;
+}

@@ -444,6 +444,31 @@ export function highWaterFromRejectionStage(
   submittedAt: Date | null,
   confirmationReceivedAt: Date | null,
   firstHumanResponseAt: Date | null,
+  interviewKinds: readonly string[] = [],
+): ApplicationStatus {
+  const recorded = highWaterFromRecord(status, rejectionStage, submittedAt, confirmationReceivedAt, firstHumanResponseAt);
+  const interviewed = highWaterFromInterviews(interviewKinds);
+  return interviewed && statusRank(interviewed) > statusRank(recorded) ? interviewed : recorded;
+}
+
+/**
+ * The rung the logged interviews prove. An application closed as ghosted or
+ * rejected often has no rejection stage, and without this its onsite rounds
+ * counted as nothing: Galaxy, Campfire and EliseAI all read as zero final
+ * rounds. A panel counts with onsite and final, as the rejection stage already
+ * files a panel under onsite.
+ */
+function highWaterFromInterviews(kinds: readonly string[]): ApplicationStatus | null {
+  if (kinds.length === 0) return null;
+  return kinds.some((kind) => kind === 'final' || kind === 'onsite' || kind === 'panel') ? 'final_round' : 'in_process';
+}
+
+function highWaterFromRecord(
+  status: ApplicationStatus,
+  rejectionStage: RejectionStage | null,
+  submittedAt: Date | null,
+  confirmationReceivedAt: Date | null,
+  firstHumanResponseAt: Date | null,
 ): ApplicationStatus {
   if (!isTerminal(status)) return status;
   if (firstHumanResponseAt) {

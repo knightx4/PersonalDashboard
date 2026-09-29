@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { firstLink, linkBareDomains } from './result-links';
+import { firstLink, linkBareDomains, linkParts } from './result-links';
 
 describe('linkBareDomains', () => {
   it('turns a bare domain and its path into a link, leaving the full stop outside', () => {
@@ -51,5 +51,32 @@ describe('firstLink', () => {
 
   it('is null when the result names no place', () => {
     expect(firstLink('Call them on Monday; email hello@openplans.org.')).toBeNull();
+  });
+});
+
+
+describe('linkParts', () => {
+  it('turns a markdown link into its label, linked', () => {
+    expect(
+      linkParts('Order on [ikea.com/us/en/spare-parts](https://www.ikea.com/us/en/spare-parts/). Then wait.'),
+    ).toEqual([
+      { text: 'Order on ' },
+      { text: 'ikea.com/us/en/spare-parts', href: 'https://www.ikea.com/us/en/spare-parts/' },
+      { text: '. Then wait.' },
+    ]);
+  });
+
+  it('links a full address and a bare domain, leaving the full stop after them', () => {
+    expect(linkParts('See https://example.com/a. Or respark.com.')).toEqual([
+      { text: 'See ' },
+      { text: 'https://example.com/a', href: 'https://example.com/a' },
+      { text: '. Or ' },
+      { text: 'respark.com', href: 'https://respark.com' },
+      { text: '.' },
+    ]);
+  });
+
+  it('leaves text with no link alone', () => {
+    expect(linkParts('Measure the wall')).toEqual([{ text: 'Measure the wall' }]);
   });
 });

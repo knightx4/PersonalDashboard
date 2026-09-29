@@ -32,7 +32,7 @@ export const metadata = { title: 'Analytics' };
 const LADDER: Array<{ stage: ApplicationStatus; label: string }> = [
   { stage: 'submitted', label: 'Sent' },
   { stage: 'acknowledged', label: 'Acknowledged' },
-  { stage: 'in_process', label: 'Reached a human' },
+  { stage: 'in_process', label: 'Screener interview' },
   { stage: 'final_round', label: 'Final round' },
   { stage: 'offer', label: 'Offer' },
 ];
