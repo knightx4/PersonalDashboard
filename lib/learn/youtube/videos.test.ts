@@ -16,6 +16,7 @@ const video = (videoId: string, title: string, channel: string | null, verdict: 
   bestEndSeconds: null,
   screenedAt: null,
   stretchCount: 0,
+  foundFor: null,
 });
 
 const list = [
