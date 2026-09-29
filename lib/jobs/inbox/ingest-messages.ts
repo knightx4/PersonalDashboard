@@ -23,7 +23,7 @@ import {
 import { gmailProvider } from '@/lib/email/providers/gmail';
 import { isTerminal, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
-import { extractWithModel, reconcileClassification } from '@/lib/jobs/inbox/tier-b';
+import { LABEL_ENDS_INGEST, reconcileClassification, triageWithModels } from '@/lib/jobs/inbox/tier-b';
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import {
   inboundMayMove,
@@ -1028,6 +1028,11 @@ export interface IngestContext {
   counters: IngestCounters;
   /** What each Tier B call cost; the linker records it as 'classify-job-email'. */
   onSpend?: SpendSink;
+  /**
+   * Whether this account agreed to send its mail to TypeSafe's Jev
+   * (lib/jev/enabled.ts). When false or absent, Tier B is Haiku alone.
+   */
+  jevEnabled?: boolean;
 }
 
 /**
@@ -1179,25 +1184,29 @@ async function handleMessage(
   // Tier B only for what Tier A could not place, or where the body carries
   // structure Tier A cannot see (dates, job ids, interviewer names).
   const needsModel = tierA.tier !== 'A' || ACTIONABLE.has(tierA.classification);
+  // Jev picks the label where the account allows it and Haiku reads the facts;
+  // see triageWithModels for which of them runs when.
   const tierB = needsModel
-    ? await extractWithModel({
+    ? await triageWithModels({
         subject: message.subject,
         fromAddress: message.fromAddress,
         replyToAddress: message.replyToAddress,
         body: message.text,
         tierA,
         onSpend: ctx.onSpend,
+        jevEnabled: ctx.jevEnabled ?? false,
       })
     : { extracted: null, parserVersion: PARSER_VERSION };
 
   const classification = reconcileClassification(tierA, tierB.extracted);
 
-  if (classification === 'not_relevant' || classification === 'job_alert') {
+  if (LABEL_ENDS_INGEST.has(classification)) {
     await writeLedger(supabase, {
       coreId,
       providerMessageId: message.id,
       classification,
       parseStatus: 'skipped',
+      parseConfidence: tierB.extracted?.confidence ?? null,
     });
     ctx.counters.skipped += 1;
     return;

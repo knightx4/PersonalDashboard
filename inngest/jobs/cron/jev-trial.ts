@@ -9,6 +9,7 @@ import { ensureAccessToken, loadAccount } from '@/lib/core/inbox/sync-account';
 import { gmailOAuthEnv, isGmailOAuthConfigured } from '@/lib/email/gmail-env';
 import { gmailProvider } from '@/lib/email/providers/gmail';
 import { askJev, jevApiKey } from '@/lib/jev/client';
+import { jevEnabledFor } from '@/lib/jev/enabled';
 import { classifyMessage } from '@/lib/jobs/email/classify';
 import { JOB_EMAIL_QUESTION, jobEmailState } from '@/lib/jobs/email/jev-question';
 import { loadCompanies, loadExcludedDomains } from '@/lib/jobs/inbox/link-candidates';
@@ -70,7 +71,15 @@ export type JevTrialResult = {
 };
 
 export async function runJevTrial(
-  opts: { userId?: string; limit?: number; budgetMs?: number; trial?: string } = {},
+  opts: {
+    userId?: string;
+    limit?: number;
+    budgetMs?: number;
+    /** A new name runs a new trial; the default is the first one's. */
+    trial?: string;
+    /** Only the messages stored under these labels (pickTrialSample). */
+    labels?: string[];
+  } = {},
 ): Promise<JevTrialResult[]> {
   if (!jevApiKey()) throw new Error('TYPESAFE_API_KEY is not set on this deployment.');
   if (!isGmailOAuthConfigured()) throw new Error('Gmail is not configured on this deployment.');
@@ -83,13 +92,17 @@ export async function runJevTrial(
 
   const userIds = [...new Set((data ?? []).map((row) => row.user_id as string))];
   const results: JevTrialResult[] = [];
-  for (const userId of userIds) results.push(await runForUser(userId, opts));
+  for (const userId of userIds) {
+    // Only an account that agreed to send its mail to TypeSafe (#1163).
+    if (!(await jevEnabledFor(core, userId))) continue;
+    results.push(await runForUser(userId, opts));
+  }
   return results;
 }
 
 async function runForUser(
   userId: string,
-  opts: { limit?: number; budgetMs?: number; trial?: string },
+  opts: { limit?: number; budgetMs?: number; trial?: string; labels?: string[] },
 ): Promise<JevTrialResult> {
   const supabase = createServiceSupabase();
   const core = createCoreServiceSupabase();
@@ -113,7 +126,7 @@ async function runForUser(
     if (!data || data.length < PAGE) break;
   }
 
-  const sample = pickTrialSample(ledger, { trial });
+  const sample = pickTrialSample(ledger, { trial, labels: opts.labels });
   const answered = await answeredIds(supabase, userId, trial);
   const pending = sample.filter((row) => !answered.has(row.id)).slice(0, opts.limit ?? DEFAULT_LIMIT);
 

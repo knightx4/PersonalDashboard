@@ -114,4 +114,33 @@ describe('deciding with Jev', () => {
     });
     expect(decided.by).toBe('fallback');
   });
+  it('never calls Jev for an account that has not opted in', async () => {
+    const fetch = jevAnswering('bill', 0.99);
+    const fallback = haiku('from haiku');
+    const decided = await decideWithJev({
+      state: 'text',
+      question: QUESTION,
+      read: (answer) => answer.choice,
+      fallback,
+      enabled: false,
+      apiKey: 'key-1',
+      fetch,
+    });
+    expect(decided).toMatchObject({ value: 'from haiku', by: 'fallback', why: 'not-enabled' });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(fallback).toHaveBeenCalledWith({ why: 'not-enabled' });
+  });
+
+  it('sends an answer the caller does not trust to the fallback, however sure Jev is', async () => {
+    const decided = await decideWithJev({
+      state: 'text',
+      question: QUESTION,
+      read: (answer) => answer.choice,
+      fallback: haiku('from haiku'),
+      trust: (answer) => answer.choice !== 'other',
+      apiKey: 'key-1',
+      fetch: jevAnswering('other', 0.99),
+    });
+    expect(decided).toMatchObject({ value: 'from haiku', why: 'not-trusted', confidence: 0.99 });
+  });
 });

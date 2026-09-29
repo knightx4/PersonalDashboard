@@ -2,8 +2,15 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
+import { decideWithJev } from '@/lib/jev/decide';
 import { applyExtraction, buildSystemPrompt, PARSER_VERSION, type ExtractedMessage } from '@/lib/jobs/email/extract';
-import type { ClassifyResult } from '@/lib/jobs/email/classify';
+import type { ClassifyResult, MessageClassification } from '@/lib/jobs/email/classify';
+import {
+  isJobEmailLabel,
+  JEV_UNTRUSTED_LABELS,
+  JOB_EMAIL_QUESTION,
+  jobEmailState,
+} from '@/lib/jobs/email/jev-question';
 
 /**
  * Tier B: the model pass, for anything Tier A could not place confidently.
@@ -81,6 +88,115 @@ export async function extractWithModel(input: {
     });
     return { extracted: null, parserVersion: PARSER_VERSION, error: 'model_error' };
   }
+}
+
+/**
+ * Where the ingest stops after the label: nothing is linked or written beyond
+ * the ledger's verdict, so no fact Haiku could extract would be used.
+ */
+export const LABEL_ENDS_INGEST: ReadonlySet<MessageClassification> = new Set(['not_relevant', 'job_alert']);
+
+export type TriageResult = TierBResult & {
+  /**
+   * Who settled the label reconcileClassification sees: Jev when it was sure
+   * of a label it is trusted with, otherwise Haiku. `extracted.confidence` is
+   * that model's, so the ledger's parse_confidence is Jev's calibrated value
+   * whenever Jev settled it.
+   */
+  labelBy: 'jev' | 'haiku';
+};
+
+type ExtractInput = Parameters<typeof extractWithModel>[0];
+
+/** What deciding the label gives back: Jev's label, or the whole Haiku call. */
+type Labelled =
+  | { by: 'jev'; label: MessageClassification; confidence: number }
+  | { by: 'haiku'; result: TierBResult };
+
+/**
+ * Tier B with Jev in front (plan #1166): Jev picks the label, Haiku reads the
+ * facts.
+ *
+ * 1. Jev is asked which of the eleven classifications the message is, unless
+ *    the account has not agreed to send its text to TypeSafe (`jevEnabled`,
+ *    from lib/jev/enabled.ts), in which case nothing is sent.
+ * 2. Its answer stands at 0.8 confidence or more, except `recruiter_reply`,
+ *    `offer` and `other`, which Haiku decides whatever Jev says
+ *    (JEV_UNTRUSTED_LABELS). Otherwise, or when Jev fails, this is the Haiku
+ *    call it always was, and Haiku's label is used.
+ * 3. When Jev's label stands, Haiku still runs if the message goes on into
+ *    the pipeline, because only Haiku returns the company, role, dates and
+ *    interviewers the linker needs. Jev's label replaces Haiku's. The Haiku
+ *    call is saved only where the label ends the ingest (LABEL_ENDS_INGEST).
+ *
+ * Tier A's authority is unchanged: the caller still passes the result through
+ * reconcileClassification, so a confident rule beats Jev as it beat Haiku,
+ * with the one rejection exception. Jev's spend goes to the same `onSpend`
+ * as Haiku's, and so to `classify-job-email`.
+ */
+export async function triageWithModels(
+  input: ExtractInput & {
+    /** False for an account that has not opted in; Jev is then never called. */
+    jevEnabled: boolean;
+    jevApiKey?: string | null;
+    jevFetch?: typeof fetch;
+    /** Haiku's extraction; replaced in tests. */
+    extract?: (input: ExtractInput) => Promise<TierBResult>;
+  },
+): Promise<TriageResult> {
+  const extract = input.extract ?? extractWithModel;
+  const haiku = () =>
+    extract({
+      subject: input.subject,
+      fromAddress: input.fromAddress,
+      replyToAddress: input.replyToAddress,
+      body: input.body,
+      tierA: input.tierA,
+      apiKey: input.apiKey,
+      onSpend: input.onSpend,
+    });
+
+  const decided = await decideWithJev<typeof JOB_EMAIL_QUESTION, Labelled>({
+    state: jobEmailState(input),
+    question: JOB_EMAIL_QUESTION,
+    enabled: input.jevEnabled,
+    trust: (answer) => isJobEmailLabel(answer.choice) && !JEV_UNTRUSTED_LABELS.has(answer.choice),
+    read: (answer) => ({
+      by: 'jev',
+      // `trust` has already turned away `other`, the one option that is not a classification.
+      label: answer.choice as MessageClassification,
+      confidence: answer.confidence,
+    }),
+    fallback: async () => ({ by: 'haiku', result: await haiku() }),
+    onSpend: input.onSpend,
+    apiKey: input.jevApiKey,
+    fetch: input.jevFetch,
+  });
+
+  if (decided.value.by === 'haiku') return { ...decided.value.result, labelBy: 'haiku' };
+
+  const { label, confidence } = decided.value;
+  const labelled: ExtractedMessage = {
+    classification: label,
+    dates: [],
+    interviewerNames: [],
+    actionRequired: false,
+    summary: 'The details of this email could not be read.',
+    confidence,
+  };
+
+  if (LABEL_ENDS_INGEST.has(reconcileClassification(input.tierA, labelled))) {
+    return { extracted: labelled, parserVersion: PARSER_VERSION, labelBy: 'jev' };
+  }
+
+  const facts = await haiku();
+  return {
+    ...facts,
+    // A failed extraction still leaves Jev's label, which is better than the
+    // guess Tier A fell back to before.
+    extracted: facts.extracted ? { ...facts.extracted, classification: label, confidence } : labelled,
+    labelBy: 'jev',
+  };
 }
 
 /**

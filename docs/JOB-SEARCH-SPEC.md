@@ -446,6 +446,7 @@ Do not exclude `category:promotions`, for the same reason as last time: legitima
 
 - Tier A resolves the ATS from the sender domain and, when the vendor puts it there reliably, the company from a subject pattern. Free, and it correctly labels most of the automated volume.
 - Tier B sends subject, sender, reply-to, and the first ~2000 characters of plaintext body to a small model and returns a label plus extracted company name, role title, and any dates mentioned.
+- For an account that has agreed to send its mail to TypeSafe (`core.account_settings.jev_enabled`), Jev picks Tier B's label first (`triageWithModels` in `lib/jobs/inbox/tier-b.ts`, plan #1166). Its label stands at 0.8 confidence or more, except `recruiter_reply`, `offer` and `other`, which Haiku always decides. Haiku still reads every message that goes on into the pipeline, for the facts; the only Haiku call saved is on mail Jev is sure is `not_relevant` or `job_alert`. The stored `parse_confidence` is the confidence of whichever model settled the label.
 
 Classification enum: `application_confirmation`, `rejection`, `recruiter_outreach`, `recruiter_reply`, `interview_invite`, `scheduling`, `assessment`, `offer`, `networking`, `job_alert`, `not_relevant`.
 
