@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
-import { AskDashProvider, useAskDash, type AskSource } from '@/components/shell/ask-dash';
+import { AskDashProvider, AskThread, useAskDash, type AskSource } from '@/components/shell/ask-dash';
+import type { ChangeOutcome } from '@/lib/ask/changes';
+import type { DashChange } from '@/lib/talk/changes';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
 
@@ -45,6 +47,91 @@ const RECENT: ConversationSummary[] = [
   },
 ];
 
+/** The coming Friday, as the todo's own YYYY-MM-DD, so the card agrees with the answer. */
+function nextFriday(): string {
+  const now = new Date();
+  const at = new Date(Date.now() + (((5 - now.getDay() + 7) % 7) || 7) * DAY);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+}
+
+const CHANGE_BASE = {
+  conversationId: '00000000-0000-4000-8000-000000000009',
+  writtenTable: null,
+  writtenRef: null,
+  undo: null,
+  createdAt: ago(0),
+  confirmedAt: null,
+  declinedAt: null,
+  undoneAt: null,
+} as const;
+
+/** The two changes an "add these" question proposes: a todo and a goal step. */
+function proposals(turnId: string): DashChange[] {
+  return [
+    {
+      ...CHANGE_BASE,
+      id: `${turnId}-todo`,
+      turnId,
+      status: 'proposed',
+      kind: 'add_todo',
+      input: { title: 'Call the dentist', body: null, dueOn: nextFriday(), dueTime: null, pinned: false },
+    },
+    {
+      ...CHANGE_BASE,
+      id: `${turnId}-step`,
+      turnId,
+      status: 'proposed',
+      kind: 'add_goal_step',
+      input: {
+        parentId: 'g1',
+        goalTitle: 'Get my teeth sorted before the new job',
+        title: 'Book the hygienist',
+        kind: 'mine',
+      },
+    },
+  ];
+}
+
+/** The gallery's answer to asking for a change: said in words, with its cards. */
+function proposalTo(question: string): { turns: TalkTurn[]; changes: DashChange[] } {
+  return {
+    turns: [
+      { id: 'pq', role: 'user', body: question, createdAt: new Date().toISOString() },
+      {
+        id: 'pa',
+        role: 'assistant',
+        body:
+          'I can add the todo "Call the dentist" due on Friday, and a step "Book the hygienist" under your goal to get your teeth sorted. Confirm each one below and I will write it.',
+        createdAt: new Date().toISOString(),
+      },
+    ],
+    changes: proposals('pa'),
+  };
+}
+
+/** What a press does in the gallery: the change moved on, as the server would move it. */
+function pressed(status: DashChange['status']) {
+  return async (id: string): Promise<ChangeOutcome> => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const kind = id.endsWith('-step') ? 'step' : 'todo';
+    const base = proposals(id.replace(/-(todo|step)$/, ''))[kind === 'step' ? 1 : 0];
+    const at = new Date().toISOString();
+    return {
+      ok: true,
+      change: {
+        ...base,
+        status,
+        writtenTable: status === 'declined' ? null : kind === 'step' ? 'goals.items' : 'todo.tasks',
+        writtenRef: status === 'declined' ? null : `${kind}-written`,
+        confirmedAt: status === 'declined' ? null : at,
+        declinedAt: status === 'declined' ? at : null,
+        undoneAt: status === 'undone' ? at : null,
+      },
+    };
+  };
+}
+
 function answerTo(question: string): TalkTurn[] {
   return [
     { id: 'q', role: 'user', body: question, createdAt: new Date().toISOString() },
@@ -67,14 +154,17 @@ function answerTo(question: string): TalkTurn[] {
 const FIXTURES: AskSource = {
   ask: async (question) => {
     await new Promise((resolve) => setTimeout(resolve, 600));
-    return {
-      conversation: { ref: '00000000-0000-4000-8000-000000000009', title: question },
-      turns: answerTo(question),
-      stop: 'answered',
-    };
+    const conversation = { ref: '00000000-0000-4000-8000-000000000009', title: question };
+    if (/^(add|remind)/i.test(question)) {
+      return { conversation, ...proposalTo(question), stop: 'answered' };
+    }
+    return { conversation, turns: answerTo(question), stop: 'answered' };
   },
   recent: async () => ({ conversations: RECENT }),
-  open: async () => ({ turns: answerTo(RECENT[0].title ?? '') }),
+  open: async () => ({ turns: answerTo(RECENT[0].title ?? ''), changes: [] }),
+  confirm: pressed('confirmed'),
+  decline: pressed('declined'),
+  undo: pressed('undone'),
   costs: async () => ({
     'app/ask/actions.ts#askDashQuestion': {
       lowMicros: 20_000,
@@ -111,6 +201,76 @@ export function AskDashSurface({
     <AskDashProvider source={FIXTURES}>
       {children}
       {open && <OpenOnArrival question={question} />}
+    </AskDashProvider>
+  );
+}
+
+/**
+ * A reopened question whose answers proposed changes (plan #1190), each card
+ * in a state it can end in: done with its link and Undo, declined, undone,
+ * and one still waiting. The /ask page and the sheet draw the same thread.
+ */
+export function AskChangesSurface() {
+  // Fixed times, so the server's render and the browser's agree.
+  const at = (hour: number) => `2026-09-28T${String(hour).padStart(2, '0')}:00:00Z`;
+  const done = (change: DashChange, status: DashChange['status']): DashChange => ({
+    ...change,
+    createdAt: at(9),
+    status,
+    writtenTable: status === 'declined' ? null : change.kind === 'add_todo' ? 'todo.tasks' : 'goals.items',
+    writtenRef: status === 'declined' ? null : 'written',
+    confirmedAt: status === 'declined' ? null : at(9),
+    declinedAt: status === 'declined' ? at(9) : null,
+    undoneAt: status === 'undone' ? at(11) : null,
+  });
+  const todo = (turnId: string): DashChange => ({
+    ...CHANGE_BASE,
+    id: `${turnId}-todo`,
+    turnId,
+    status: 'proposed',
+    kind: 'add_todo',
+    input: { title: 'Call the dentist', body: null, dueOn: '2026-10-02', dueTime: null, pinned: false },
+  });
+  const step = (turnId: string) => proposals(turnId)[1];
+  const turns: TalkTurn[] = [
+    {
+      id: 'pa',
+      role: 'user',
+      body: 'Add a todo to call the dentist on Friday, and a step to book the hygienist',
+      createdAt: at(9),
+    },
+    {
+      id: 'ra',
+      role: 'assistant',
+      body:
+        'I can add the todo "Call the dentist" due on Friday, and a step "Book the hygienist" under your goal to get your teeth sorted. Confirm each one below and I will write it.',
+      createdAt: at(9),
+    },
+    { id: 'pb', role: 'user', body: 'Add the same again for Sam', createdAt: at(10) },
+    {
+      id: 'rb',
+      role: 'assistant',
+      body: 'I can add the todo and the step again. Confirm each one below.',
+      createdAt: at(10),
+    },
+  ];
+  return (
+    <AskDashProvider source={FIXTURES}>
+      <div className="mx-auto max-w-3xl py-4">
+        <AskThread
+          id="ask-changes-preview"
+          conversationRef="00000000-0000-4000-8000-000000000009"
+          turns={turns}
+          changes={[
+            done(todo('ra'), 'confirmed'),
+            done(step('ra'), 'declined'),
+            done(todo('rb'), 'undone'),
+            { ...step('rb'), createdAt: at(10) },
+          ]}
+          label="Ask a follow-up"
+          placeholder="Ask more about this"
+        />
+      </div>
     </AskDashProvider>
   );
 }

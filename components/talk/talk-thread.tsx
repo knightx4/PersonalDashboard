@@ -41,7 +41,17 @@ function AuthorMark({ role }: { role: TalkRole }) {
   return <Glyph className="size-3.5 text-ink-ghost" strokeWidth={2} aria-hidden />;
 }
 
-function Turn({ turn, grouped, now }: { turn: TalkTurn; grouped: boolean; now: number }) {
+function Turn({
+  turn,
+  grouped,
+  now,
+  below,
+}: {
+  turn: TalkTurn;
+  grouped: boolean;
+  now: number;
+  below?: React.ReactNode;
+}) {
   return (
     <li className="flex gap-2">
       <div className="flex w-4 shrink-0 justify-center pt-1">
@@ -64,6 +74,7 @@ function Turn({ turn, grouped, now }: { turn: TalkTurn; grouped: boolean; now: n
         )}
         <p className="text-body whitespace-pre-wrap text-ink">{turn.body}</p>
         {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} />}
+        {below}
       </div>
     </li>
   );
@@ -107,6 +118,7 @@ export function TalkThread({
   hint,
   startWriting = false,
   ask,
+  below,
 }: {
   /** Unique on the page: the textarea's id is built from it. */
   id: string;
@@ -136,6 +148,11 @@ export function TalkThread({
    * chosen as a question for Dash (plan #1090). Sent once per mount.
    */
   ask?: string;
+  /**
+   * What to draw under a turn, after the rows it used: the changes Dash
+   * proposed in an Ask Dash answer (plan #1190). Left out, nothing is.
+   */
+  below?: (turn: TalkTurn) => React.ReactNode;
 }) {
   const [turns, setTurns] = useState<TalkTurn[]>([...initial]);
   const [writing, setWriting] = useState(startWriting && !ask);
@@ -197,6 +214,7 @@ export function TalkThread({
               turn={turn}
               grouped={turns[index - 1]?.role === turn.role}
               now={now}
+              below={turn.id === PENDING ? undefined : below?.(turn)}
             />
           ))}
           {sending && (

@@ -69,19 +69,8 @@ export type ChangeOutcome =
   | { ok: true; change: DashChange }
   | { ok: false; error: string; change: DashChange | null };
 
-/** Where each kind's row is shown, for the card and the list to link to. */
-export function changeHref(change: DashChange): string {
-  switch (change.kind) {
-    case 'add_todo':
-      return change.writtenRef ? `/todo/all?status=all&focus=${change.writtenRef}` : '/todo';
-    case 'add_goal_step':
-      return change.writtenRef
-        ? `/goals/${change.input.parentId}#step-${change.writtenRef}`
-        : `/goals/${change.input.parentId}`;
-    case 'mark_returned':
-      return `/shopping/inventory/${change.input.id}`;
-  }
-}
+/** Where each kind's row is shown; in change-view.ts so the client cards can read it. */
+export { changeHref } from './change-view';
 
 /** The pages a change lands on, to revalidate after a confirm or an undo. */
 export function changePaths(change: DashChange): string[] {
