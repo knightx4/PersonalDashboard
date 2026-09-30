@@ -40,8 +40,12 @@ export function vaultAttachmentFolder(userId: string, connectionId?: string): st
 }
 
 /** Every object under a folder, however deep. A folder lists with a null id. */
-async function listObjects(client: AttachmentStorage, folder: string): Promise<string[]> {
-  const bucket = client.storage.from(VAULT_ATTACHMENTS_BUCKET);
+async function listObjects(
+  client: AttachmentStorage,
+  folder: string,
+  bucketName: string,
+): Promise<string[]> {
+  const bucket = client.storage.from(bucketName);
   const found: string[] = [];
 
   for (let offset = 0; ; offset += PAGE) {
@@ -51,7 +55,7 @@ async function listObjects(client: AttachmentStorage, folder: string): Promise<s
 
     for (const entry of entries) {
       const path = `${folder}/${entry.name}`;
-      if (entry.id === null) found.push(...(await listObjects(client, path)));
+      if (entry.id === null) found.push(...(await listObjects(client, path, bucketName)));
       else found.push(path);
     }
 
@@ -64,14 +68,16 @@ async function listObjects(client: AttachmentStorage, folder: string): Promise<s
 /**
  * Remove every copy under a folder. Everything is listed before anything is
  * removed, so paging by offset is not thrown off by the removals. Returns the
- * paths it removed.
+ * paths it removed. The bucket defaults to vault-attachments; the account
+ * deletion also clears vault-transcripts through it (plan #1306).
  */
 export async function removeAttachmentFolder(
   client: AttachmentStorage,
   folder: string,
+  bucketName: string = VAULT_ATTACHMENTS_BUCKET,
 ): Promise<string[]> {
-  const paths = await listObjects(client, folder);
-  const bucket = client.storage.from(VAULT_ATTACHMENTS_BUCKET);
+  const paths = await listObjects(client, folder, bucketName);
+  const bucket = client.storage.from(bucketName);
 
   for (let i = 0; i < paths.length; i += PAGE) {
     const { error } = await bucket.remove(paths.slice(i, i + PAGE));

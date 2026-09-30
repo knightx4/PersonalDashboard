@@ -70,17 +70,19 @@ beforeEach(() => {
       'user-1/conn-2/ccc',
       'user-2/conn-9/ddd',
     ],
+    'vault-transcripts': ['user-1/t1-record.pdf', 'user-2/t2-theirs.pdf'],
   });
 });
 
 describe('POST /api/account/delete', () => {
-  it('removes the vault attachments folder and the goals documents folder', async () => {
+  it('removes the vault attachments, transcripts and goals documents folders', async () => {
     const res = await POST(request('delete everything'));
 
     expect(res.status).toBe(200);
     expect(state.deleted).toEqual(['user-1']);
     expect(state.store!.left('vault-attachments')).toEqual(['user-2/conn-9/ddd']);
     expect(state.store!.left('goals-documents')).toEqual(['user-2/theirs.pdf']);
+    expect(state.store!.left('vault-transcripts')).toEqual(['user-2/t2-theirs.pdf']);
   });
 
   it('removes nothing without the confirmation', async () => {
