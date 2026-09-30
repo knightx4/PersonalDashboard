@@ -116,6 +116,7 @@ export function TalkThread({
   waiting = 'Dash is replying…',
   closed,
   hint,
+  above,
   startWriting = false,
   ask,
   below,
@@ -137,6 +138,8 @@ export function TalkThread({
   closed?: (turns: readonly TalkTurn[]) => string | null;
   /** Beside the button that opens the box: the $ hint for what a reply costs. */
   hint?: React.ReactNode;
+  /** Just above the box, or the button that opens it: what goes with a question. */
+  above?: React.ReactNode;
   /**
    * Open with the box already up and the cursor in it. For a surface opened
    * in order to write, such as the Ask Dash sheet, where the button first
@@ -227,6 +230,8 @@ export function TalkThread({
           )}
         </ul>
       )}
+
+      {!ended && above}
 
       {ended ? (
         <p className="text-ui text-ink-muted">{ended}</p>

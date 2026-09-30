@@ -2,7 +2,10 @@ import { MODULES, type ModuleId } from '@/lib/modules';
 import type { Source } from '@/lib/sources/types';
 import { clip, isUuid, type AskContext } from './db';
 import { OPENABLE } from './lookups';
+import { pathOf } from './page-name';
 import { executeAskTool } from './tools';
+
+export { pathOf };
 
 /**
  * Which page an address is, and which row it shows (plan #1270), so Ask Dash
@@ -115,19 +118,6 @@ export type PageMatch = {
   /** The row the page shows, when it shows one. */
   row: { table: string; ref: string } | null;
 };
-
-/** The path of an address, without its query, fragment or trailing slash. */
-export function pathOf(address: string): string {
-  let path = address.split(/[?#]/)[0] || '/';
-  try {
-    // A full URL, as the sheet might pass location.href.
-    if (/^https?:\/\//.test(path)) path = new URL(path).pathname;
-  } catch {
-    // Not a URL after all; read it as a path.
-  }
-  if (!path.startsWith('/')) path = `/${path}`;
-  return path.length > 1 ? path.replace(/\/+$/, '') : path;
-}
 
 function matchRow(path: string, patterns: readonly RowPattern[]): { table: string; ref: string; noun: string } | null {
   for (const pattern of patterns) {

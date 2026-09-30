@@ -24,6 +24,7 @@ const SOURCE: AskSource = {
   recent: never,
   open: never,
   costs: never,
+  label: never,
   confirm: never,
   decline: never,
   undo: never,
