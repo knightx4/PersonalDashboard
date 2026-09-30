@@ -19,7 +19,7 @@ import type { LearnOperation } from '@/lib/learn/spend';
  * 2026, the tokens were set so the guess lands near them.
  *
  * **Web search fees are not in these figures.** `enrich-company`, `find-openings`, `suggest-outreach`,
- * `resolve-reference`, `estimate-resale-price` and `recommend-newsletters` call
+ * `resolve-reference`, `estimate-resale-price`, `recommend-newsletters` and `write-maya-thought` call
  * the web search tool, which bills $10 per thousand searches on top of tokens. The ledger records
  * tokens only (lib/core/spend/pricing.ts), so a guess that added the fee would
  * disagree with the measured figure that later replaces it, and with the spend
@@ -127,6 +127,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'embed-notes': background(unit(VOYAGE_LITE, 1_500, 0)),
   'embed-note-match': unit(VOYAGE_LITE, 300, 0),
   'write-note-connections': background(run(HAIKU, 1_800, 250)),
+  // A note, its eight nearest notes cut to 3,000 characters, and up to
+  // sixteen positions with quotes, plus the search results read back.
+  'write-maya-thought': run(OPUS, 25_000, 2_500),
   'map-sweep': background(unit(HAIKU, 4_000, 400)),
   'propose-theme-merges': background(unit(HAIKU, 8_000, 300)),
   'propose-position-merges': background(unit(HAIKU, 9_000, 300)),
