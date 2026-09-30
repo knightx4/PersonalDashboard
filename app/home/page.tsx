@@ -37,6 +37,8 @@ import { observationWeek } from '@/lib/timeline/observations';
 import { readObservations } from '@/lib/timeline/observations-load';
 import { ObservationList } from '@/app/timeline/observations';
 import { formatClock } from '@/lib/clock';
+import { shownBrief } from '@/lib/day-brief/shown';
+import { DayBrief } from './day-brief';
 
 export const metadata = { title: 'Home' };
 
@@ -135,15 +137,20 @@ export default async function HomePage() {
     safe(readObservations(shopping, { fromWeek: thisWeek, toWeek: nextWeek }), []),
     // This morning's brief (plan #1123), written by the hourly day-brief cron
     // from six in the person's zone. Before then there is none, and the page
-    // opens on the date as it always did.
+    // opens on the date as it always did. Since #1241 it is the picks, with
+    // an older row shown by its body (lib/day-brief/shown.ts).
     safe(
       core
         .from('day_briefs')
-        .select('body')
+        .select('body, picks')
         .eq('user_id', user.id)
         .eq('day', today)
         .maybeSingle()
-        .then((result) => (result.data?.body as string | undefined) ?? null),
+        .then((result) =>
+          shownBrief(
+            result.data ? { body: result.data.body as string | null, picks: result.data.picks } : null,
+          ),
+        ),
       null,
     ),
   ]);
@@ -252,7 +259,7 @@ export default async function HomePage() {
             <h1 className="font-display mt-1 text-figure-lg font-semibold tracking-[-0.04em] text-ink sm:text-figure-xl">
               {date}
             </h1>
-            {dayBrief && <p className="mt-3 max-w-prose text-body text-ink">{dayBrief}</p>}
+            {dayBrief && <DayBrief brief={dayBrief} />}
           </header>
 
           {/* The doors, as marks, right under the date.
