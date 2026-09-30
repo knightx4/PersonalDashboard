@@ -5,11 +5,13 @@ import { createGoalsClient } from '@/lib/goals/auth/server';
 import { sessionClients } from '@/lib/todo/agenda/clients';
 import { countTowards } from '@/lib/goals/rhythms-store';
 import { progressLine } from '@/lib/goals/rhythms';
+import { answerQuestion } from '@/lib/goals/shaping-store';
 import { loadTodoGoals, setStepStatus } from '@/lib/goals/steps-store';
 import { todoSuggestions } from '@/lib/goals/suggestions';
 import { loadGoingSuggestions, recordAttended } from '@/lib/goals/suggestions-store';
 import { dismiss, undismiss } from '@/lib/todo/agenda/dismissals';
 import { SNOOZE_DAYS, todayIn } from '@/lib/todo/tasks/model';
+import { optionAnswer, planOptions, recommendedLetter } from '@/lib/plan/options';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
 
 /**
@@ -50,6 +52,10 @@ import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/
 const PREFIX = 'goal_steps:';
 const RHYTHM_PREFIX = 'goal_rhythms:';
 const SUGGESTION_PREFIX = 'goal_suggestions:';
+const QUESTION_PREFIX = 'goal_questions:';
+
+/** The longest answer the goal page accepts, which an option's never nears. */
+const ANSWER_MAX = 20000;
 
 export const goalStepsSource: AgendaSource = {
   id: 'goal_steps',
@@ -62,7 +68,7 @@ export const goalStepsSource: AgendaSource = {
   async fetch(ctx: SourceContext): Promise<AgendaItem[]> {
     const today = todayIn(ctx.timezone, ctx.now);
     const client = await (ctx.clients ?? sessionClients).goals();
-    const [{ steps, rhythms }, going] = await Promise.all([
+    const [{ steps, questions, rhythms }, going] = await Promise.all([
       loadTodoGoals(client, { userId: ctx.userId, today }),
       loadGoingSuggestions(client, ctx.userId),
     ]);
@@ -95,7 +101,33 @@ export const goalStepsSource: AgendaSource = {
       completable: true,
     }));
 
+    const questionItems: AgendaItem[] = questions.map((question) => {
+      const options = planOptions(question.detail);
+      const recommended = recommendedLetter(question.detail, options);
+      return {
+        key: `${QUESTION_PREFIX}${question.id}`,
+        source: 'goal_steps',
+        title: question.title,
+        // Today: a question holds up whatever sits above it on the goal.
+        day: today,
+        at: null,
+        link: { href: `/goals/${question.goalId}#step-${question.id}`, label: question.goalTitle },
+        action: null,
+        detail: options.length > 0 ? 'Waiting on your answer' : 'Answer it on the goal',
+        completable: false,
+        ...(options.length > 0 && {
+          options: options.map((option) => ({
+            letter: option.letter,
+            label: option.label,
+            answer: optionAnswer(option),
+            recommended: option.letter === recommended,
+          })),
+        }),
+      };
+    });
+
     return [
+      ...questionItems,
       ...rhythmItems,
       ...suggestionItems,
       ...steps
@@ -123,6 +155,7 @@ export const goalStepsSource: AgendaSource = {
   },
 
   async complete(ctx, key) {
+    if (key.startsWith(QUESTION_PREFIX)) throw new Error('A question is answered, not ticked.');
     const client = await createGoalsClient();
     const rhythm = rhythmOf(key);
     if (rhythm) await countTowards(client, rhythm.itemId, rhythm.startsOn, 1);
@@ -130,6 +163,25 @@ export const goalStepsSource: AgendaSource = {
       await recordAttended(client, key.slice(SUGGESTION_PREFIX.length), true, todayIn(ctx.timezone, ctx.now));
     } else await setStepStatus(client, idOf(key), 'done');
     revalidatePath('/goals', 'layout');
+  },
+
+  async answer(_ctx, key, answer) {
+    if (!key.startsWith(QUESTION_PREFIX)) return { error: 'Only a question can be answered.' };
+    const text = answer.trim();
+    if (!text) return { error: 'Choose an answer first.' };
+    if (text.length > ANSWER_MAX) return { error: 'That answer is too long.' };
+    try {
+      const answered = await answerQuestion(
+        await createGoalsClient(),
+        key.slice(QUESTION_PREFIX.length),
+        text,
+      );
+      if (!answered) return { error: 'That question was withdrawn or is gone.' };
+    } catch {
+      return { error: 'The answer could not be saved. Try again.' };
+    }
+    revalidatePath('/goals', 'layout');
+    return { error: null };
   },
 
   async defer(ctx, key) {

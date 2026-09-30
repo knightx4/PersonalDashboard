@@ -165,6 +165,7 @@ Listing these because they will otherwise get invented.
 | A return deadline | `public.orders` (derived) | nothing | not possible -- it is a date, not a task | a row in `todo.dismissals` |
 | A note checkbox | your vault | **nothing, ever** | not possible | deferred entirely; see below |
 | A goal's next step, or a step flagged Show on Todo | `goals.items` | nothing new | `status` on the step, set to done | a row in `todo.dismissals` |
+| An open question on a goal | `goals.items` | nothing new | answered, not finished: the option pressed goes in `resolution` | a row in `todo.dismissals` |
 
 The second row is the one exception to "never write to another schema", and it
 is not really an exception: `/jobs/today` and `/todo` are two views of one row,
@@ -1035,6 +1036,18 @@ confident and the code disagreed.
   once. Ticking, Later and Not this one work as for a flagged step, on the
   same `goal_steps:<id>` key, so Not this one hides that step and not the
   goal: the goal is back once its next step is a different one.
+- **Questions on your goals are answered from Todo** (plan #1267). Each open
+  question the Goals home lists as waiting on you shows today under the key
+  `goal_questions:<id>`, with a button per lettered option and the
+  recommended one ringed. The options are parsed by `planOptions` in
+  `lib/plan/options.ts`, and an agenda item carries them in its new optional
+  `options` field. Pressing one calls the new `answerItem` source action,
+  which reaches the source's new `answer` verb; the goal-steps source records
+  it with `answerQuestion`, the write the goal page's option button makes. The
+  question closes and leaves Todo, and the re-shape tick picks the goal up as
+  it does for an answer given on Goals. A question whose detail has no
+  lettered set shows as a link to the question on its goal. A question has no
+  tick. Later and Not this one write a dismissal, as for a step.
 
 ## What this unlocks (not v1)
 

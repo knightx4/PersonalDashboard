@@ -46,6 +46,19 @@ export interface AgendaItemLink {
 }
 
 /**
+ * One answer an item offers as a button (plan #1267): a lettered option of a
+ * question Dash asked on a goal. `answer` is what pressing it records, the
+ * same text the goal page's option button writes.
+ */
+export interface AgendaItemOption {
+  letter: string;
+  label: string;
+  answer: string;
+  /** The option the question recommends, marked on its button. */
+  recommended: boolean;
+}
+
+/**
  * One thing on the agenda that came from a source.
  *
  * Deliberately not a Task. A return deadline cannot be completed, a reminder
@@ -76,6 +89,12 @@ export interface AgendaItem {
    * neither of those is a button.
    */
   completable: boolean;
+  /**
+   * Answers to choose between, for an item that is a question rather than a
+   * task. Pressing one goes through the source's `answer`; absent on
+   * everything else.
+   */
+  options?: AgendaItemOption[];
 }
 
 /**
@@ -138,6 +157,11 @@ export interface AgendaSource {
   context?(ctx: SourceContext): Promise<DayContext[]>;
   /** "Done", where the source can express it. */
   complete?(ctx: SourceContext, key: string): Promise<void>;
+  /**
+   * Record one of an item's `options` as its answer. Null error when it was
+   * recorded, otherwise why not, in words the row can show.
+   */
+  answer?(ctx: SourceContext, key: string, answer: string): Promise<{ error: string | null }>;
   /**
    * "Later" and "Not this one".
    *
