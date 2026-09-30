@@ -13,6 +13,7 @@ import { HIT_KINDS, type HitKind } from '@/lib/search/sources';
 import { SOURCES } from '@/lib/sources/catalogue';
 import type { Source } from '@/lib/sources/types';
 import { noteHref } from '@/lib/vault/paths';
+import { transcriptHref } from '@/lib/vault/education';
 import { recordSpend, type SpendClient } from '@/lib/core/spend/record';
 import { fileHref } from '@/lib/files/files';
 import type { Author } from '@/lib/memory/passages';
@@ -70,6 +71,7 @@ export const HIT_TABLES: Record<HitKind, string> = {
   saved: 'public.saved_items',
   task: 'todo.tasks',
   note: 'obsidian.notes',
+  course: 'obsidian.courses',
   reading: 'learn.readings',
   track: 'learn.tracks',
   subject: 'learn.subjects',
@@ -790,6 +792,7 @@ const RECALL_LANDING: Record<string, string> = {
 /** What kind of thing each source is, for the model reading the result. */
 const RECALL_KINDS: Record<string, string> = {
   'obsidian.notes': 'Vault note',
+  'obsidian.transcripts': 'Transcript (courses taken)',
   'job_search.thoughts': 'Job search thoughts',
   'job_search.notes': 'Job search note',
   'job_search.profiles': 'Job search profile',
@@ -825,7 +828,9 @@ async function recallHrefs(ctx: AskContext, hits: readonly MemoryRowHit[]): Prom
         ? noteHref(hit.sourceRef)
         : hit.sourceTable === 'core.files'
           ? fileHref(hit.sourceRef)
-          : RECALL_LANDING[hit.sourceTable];
+          : hit.sourceTable === 'obsidian.transcripts'
+            ? transcriptHref(hit.sourceRef)
+            : RECALL_LANDING[hit.sourceTable];
     if (direct) out.set(key(hit.sourceTable, hit.sourceRef), direct);
   }
 
