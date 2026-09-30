@@ -310,9 +310,25 @@ export function FeedbackButton({
               </div>
             )}
 
-            <Button type="submit" size="sm" disabled={pending} className="self-start">
-              {pending ? 'Saving…' : 'Send'}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="submit" size="sm" disabled={pending}>
+                {pending ? 'Saving…' : 'Send'}
+              </Button>
+              {/* Saves the idea and hands it straight to Dash to shape into
+                  the plan, the same as Shape on the ideas page. */}
+              {idea && (
+                <Button
+                  type="submit"
+                  name="then"
+                  value="shape"
+                  size="sm"
+                  variant="secondary"
+                  disabled={pending}
+                >
+                  Send and shape
+                </Button>
+              )}
+            </div>
 
             <FieldError>{state.error}</FieldError>
             {state.message && <p className="text-ui text-accent">{state.message}</p>}
