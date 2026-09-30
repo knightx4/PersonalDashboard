@@ -1,6 +1,15 @@
 import { SPECS, readSpec as readSpecFile, specBySlug, type SpecDoc } from '@/lib/specs/registry';
 import { splitSections, type SpecSection } from '@/lib/specs/sections';
-import { AskInputError, clip, optionalString, type AskContext, type AskRow, type AskToolResult } from './db';
+import { firstLine, planHref, raiseAnchor, waitingAnchor } from '@/lib/search/sources/dev-map';
+import {
+  AskInputError,
+  clip,
+  optionalString,
+  type AskContext,
+  type AskRow,
+  type AskToolResult,
+  type SchemaClient,
+} from './db';
 
 /**
  * Dash reading the Dev workspace (feature #1319): the specs in full, by
@@ -193,4 +202,335 @@ export async function readSpecLookup(ctx: AskContext, input: Input): Promise<Ask
 /** For the tool's description: the specs Dash can read, by slug. */
 export function specList(): string {
   return SPECS.map((spec) => `${spec.slug} (${clip(spec.title, 60)})`).join('; ');
+}
+
+// ---------------------------------------------------------------------------
+// read_dev_row: one idea, note, plan step or raise, with its comments (#1329)
+// ---------------------------------------------------------------------------
+
+/** What read_dev_row takes as a kind, and the table each is cited under (search's HIT_TABLES). */
+export const DEV_ROW_KINDS = ['idea', 'note', 'step', 'raise'] as const;
+export type DevRowKind = (typeof DEV_ROW_KINDS)[number];
+
+export const DEV_ROW_TABLES: Record<DevRowKind, string> = {
+  idea: 'public.ideas',
+  note: 'public.feedback_items',
+  step: 'public.plan_items',
+  raise: 'public.raised_items',
+};
+
+/** Other names a kind arrives under: the table search cited, or search's own kind. */
+const KIND_ALIASES: Record<string, DevRowKind> = {
+  ...Object.fromEntries(Object.entries(DEV_ROW_TABLES).map(([kind, table]) => [table, kind])),
+  feedback: 'note',
+  plan: 'step',
+  question: 'step',
+  decision: 'step',
+};
+
+/** The dev_comments column that ties a comment to each kind of row. */
+const COMMENT_COLUMN: Record<DevRowKind, string> = {
+  idea: 'idea_id',
+  note: 'feedback_item_id',
+  step: 'plan_item_id',
+  raise: 'raised_item_id',
+};
+
+/** The most comments one read returns: the newest, still oldest first. */
+export const MAX_DEV_COMMENTS = 40;
+
+/** The most characters of one comment a read returns. */
+export const DEV_COMMENT_CHARS = 2000;
+
+/** Who wrote a comment or filed an idea, as the model is to name them. */
+function writer(author: string | null | undefined): string {
+  if (author === 'claude') return 'Dash';
+  if (author === 'me') return 'me';
+  return author ?? 'unknown';
+}
+
+/** Long text for the model, newlines kept, cut at `max`. */
+function longText(text: string | null | undefined, max = SECTION_CHARS): string | null {
+  const trimmed = text?.trim();
+  if (!trimmed) return null;
+  return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max).trimEnd()} …`;
+}
+
+const UUID_IN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+function devKind(input: Input): DevRowKind {
+  const kind = optionalString(input, 'kind');
+  const resolved = kind && ((DEV_ROW_KINDS as readonly string[]).includes(kind) ? (kind as DevRowKind) : KIND_ALIASES[kind]);
+  if (!resolved) throw new AskInputError(`kind must be one of ${DEV_ROW_KINDS.join(', ')}.`);
+  return resolved;
+}
+
+/** A step by its number ("#1248", "1248") or id; anything else by the id in the ref, a link included. */
+function devRef(kind: DevRowKind, input: Input): { column: 'id' | 'number'; value: string | number } {
+  const ref = optionalString(input, 'ref');
+  if (!ref) throw new AskInputError('Give the ref: the row\'s id, or a step\'s number.');
+  const number = ref.match(/^#?(\d+)$/)?.[1];
+  if (kind === 'step' && number) return { column: 'number', value: Number(number) };
+  const id = ref.match(UUID_IN)?.[0];
+  if (!id) {
+    throw new AskInputError(
+      kind === 'step' ? `${ref} is neither a step number nor an id.` : `${ref} is not an id; search returns one for each row.`,
+    );
+  }
+  return { column: 'id', value: id.toLowerCase() };
+}
+
+type DevComment = { author: string | null; body: string | null; created_at: string };
+
+/** The thread under a row as one block of text, each comment headed by its day and writer. */
+function thread(comments: DevComment[]): { text: string | null; count: number; dropped: number } {
+  const dropped = Math.max(0, comments.length - MAX_DEV_COMMENTS);
+  const text = comments
+    .slice(dropped)
+    .map((c) => `[${c.created_at.slice(0, 10)}, ${writer(c.author)}] ${longText(c.body, DEV_COMMENT_CHARS) ?? ''}`)
+    .join('\n\n');
+  return { text: text || null, count: comments.length, dropped };
+}
+
+/** An idea's or note's triage, which Dash wrote: "kind feature, module app, priority 3". */
+function triageText(triage: unknown): string | null {
+  if (!triage || typeof triage !== 'object') return null;
+  const parts: string[] = [];
+  for (const [key, field] of Object.entries(triage as Record<string, unknown>)) {
+    if (!field || typeof field !== 'object' || !('value' in field)) continue;
+    const value = (field as { value: unknown }).value;
+    if (value !== null && value !== undefined) parts.push(`${key} ${String(value)}`);
+  }
+  return parts.length > 0 ? parts.join(', ') : null;
+}
+
+type Detail = NonNullable<AskRow['detail']>;
+type Found = { id: string; title: string; href: string; detail: Detail };
+
+async function readIdea(client: SchemaClient, ctx: AskContext, id: string): Promise<Found | null> {
+  const { data, error } = await client
+    .from('ideas')
+    .select('id, body, module, source, triage, created_at, plan_item_id')
+    .eq('user_id', ctx.userId)
+    .eq('id', id)
+    .is('dismissed_at', null)
+    .limit(1);
+  if (error) throw new Error(`ideas: ${error.message}`);
+  const row = (data ?? [])[0] as
+    | { id: string; body: string; module: string | null; source: string | null; triage: unknown; created_at: string; plan_item_id: string | null }
+    | undefined;
+  if (!row) return null;
+  return {
+    id: row.id,
+    title: firstLine(row.body),
+    href: `/dev/ideas#idea-${row.id}`,
+    detail: {
+      filed_by: writer(row.source),
+      filed_on: row.created_at.slice(0, 10),
+      workspace: row.module,
+      body: longText(row.body),
+      triage_by_dash: triageText(row.triage),
+      shaped_into_plan: row.plan_item_id !== null,
+    },
+  };
+}
+
+async function readNote(client: SchemaClient, ctx: AskContext, id: string): Promise<Found | null> {
+  const { data, error } = await client
+    .from('feedback_items')
+    .select('id, body, kind, status, page_path, resolution_note, triage, created_at')
+    .eq('user_id', ctx.userId)
+    .eq('id', id)
+    .limit(1);
+  if (error) throw new Error(`feedback_items: ${error.message}`);
+  const row = (data ?? [])[0] as
+    | { id: string; body: string; kind: string; status: string; page_path: string | null; resolution_note: string | null; triage: unknown; created_at: string }
+    | undefined;
+  if (!row) return null;
+  return {
+    id: row.id,
+    title: firstLine(row.body),
+    href: `/dev/bugs#note-${row.id}`,
+    detail: {
+      filed_by: 'me',
+      filed_on: row.created_at.slice(0, 10),
+      kind: row.kind,
+      status: row.status,
+      page: row.page_path,
+      body: longText(row.body),
+      triage_by_dash: triageText(row.triage),
+      resolution_by_dash: longText(row.resolution_note),
+    },
+  };
+}
+
+type PlanRow = {
+  id: string;
+  number: number;
+  title: string;
+  kind: string;
+  status: string;
+  detail: string | null;
+  acceptance: string | null;
+  comment: string | null;
+  resolution: string | null;
+  fog: string | null;
+  fog_dismissed_at: string | null;
+  block_ask: string | null;
+  parent_id: string | null;
+};
+
+async function readStep(
+  client: SchemaClient,
+  ctx: AskContext,
+  ref: { column: 'id' | 'number'; value: string | number },
+): Promise<Found | null> {
+  const { data, error } = await client
+    .from('plan_items')
+    .select('id, number, title, kind, status, detail, acceptance, comment, resolution, fog, fog_dismissed_at, block_ask, parent_id')
+    .eq('user_id', ctx.userId)
+    .eq(ref.column, ref.value)
+    .is('dismissed_at', null)
+    .limit(1);
+  if (error) throw new Error(`plan_items: ${error.message}`);
+  const row = (data ?? [])[0] as PlanRow | undefined;
+  if (!row) return null;
+
+  // The questions put beneath it, which is where "what is decided so far" is
+  // written: each answered one with its answer, each open one as waiting.
+  const [below, above] = await Promise.all([
+    client
+      .from('plan_items')
+      .select('number, title, status, resolution')
+      .eq('user_id', ctx.userId)
+      .eq('parent_id', row.id)
+      .eq('kind', 'decision')
+      .is('dismissed_at', null)
+      .order('position', { ascending: true }),
+    row.parent_id
+      ? client.from('plan_items').select('number, title').eq('user_id', ctx.userId).eq('id', row.parent_id).limit(1)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (below.error) throw new Error(`plan_items: ${below.error.message}`);
+  if (above.error) throw new Error(`plan_items: ${above.error.message}`);
+  const decisions = ((below.data ?? []) as { number: number; title: string; status: string; resolution: string | null }[])
+    .filter((d) => d.status !== 'dropped')
+    .map((d) =>
+      d.status === 'done' && d.resolution
+        ? `#${d.number} ${d.title} Answered: ${longText(d.resolution, DEV_COMMENT_CHARS)}`
+        : `#${d.number} ${d.title} Not answered yet.`,
+    );
+  const parent = ((above.data ?? []) as { number: number; title: string }[])[0];
+
+  // An open question is answered on the Dash tab, so it links there, as search does.
+  const waiting = row.kind === 'decision' && row.status !== 'done' && row.status !== 'dropped';
+  return {
+    id: row.id,
+    title: `#${row.number} ${row.title}`,
+    href: waiting ? `/dev/raised#${waitingAnchor(row.id)}` : planHref(row.number),
+    detail: {
+      number: row.number,
+      kind: row.kind,
+      status: row.status,
+      under: parent ? `#${parent.number} ${parent.title}` : null,
+      detail: longText(row.detail),
+      done_when: longText(row.acceptance),
+      resolution: longText(row.resolution),
+      fog: row.fog_dismissed_at ? null : longText(row.fog),
+      blocked_on: row.block_ask,
+      // Mostly dated lines sessions wrote as they started, blocked and closed it.
+      history: longText(row.comment),
+      decisions: decisions.length > 0 ? decisions.join('\n') : null,
+    },
+  };
+}
+
+async function readRaise(client: SchemaClient, ctx: AskContext, id: string): Promise<Found | null> {
+  // Not dismissed, and not a goal's flag, which lives on the Goals pages: the
+  // raises the Dash tab draws and search finds.
+  const { data, error } = await client
+    .from('raised_items')
+    .select('id, title, detail, ask, status, source, outcome, module, created_at')
+    .eq('user_id', ctx.userId)
+    .eq('id', id)
+    .neq('status', 'dismissed')
+    .is('goal_id', null)
+    .limit(1);
+  if (error) throw new Error(`raised_items: ${error.message}`);
+  const row = (data ?? [])[0] as
+    | { id: string; title: string; detail: string | null; ask: string | null; status: string; source: string | null; outcome: string | null; module: string | null; created_at: string }
+    | undefined;
+  if (!row) return null;
+  return {
+    id: row.id,
+    title: row.title,
+    href: `/dev/raised#${raiseAnchor(row.id)}`,
+    detail: {
+      raised_by: 'Dash',
+      raised_on: row.created_at.slice(0, 10),
+      from_run: row.source,
+      workspace: row.module,
+      status: row.status,
+      detail: longText(row.detail),
+      ask: row.ask,
+      outcome: longText(row.outcome),
+    },
+  };
+}
+
+/**
+ * read_dev_row: one idea, note, plan step or raise, in full, with the thread
+ * of comments under it oldest first, each comment labelled with who wrote it.
+ *
+ * A dismissed idea, step or raise reads as not there, the way search leaves it
+ * out: putting a row aside is saying you do not want it put in front of you.
+ * Notes have no dismissal. What Dash wrote is named as Dash's: a
+ * session-filed idea, a raise, triage, a note's resolution and the comments
+ * whose author is `claude`.
+ */
+export async function readDevRowLookup(ctx: AskContext, input: Input): Promise<AskToolResult> {
+  const access = await devAccess(ctx);
+  if (!access.ok) return access;
+
+  const kind = devKind(input);
+  const ref = devRef(kind, input);
+  const client = await ctx.db('public');
+
+  const found =
+    kind === 'step'
+      ? await readStep(client, ctx, ref)
+      : kind === 'idea'
+        ? await readIdea(client, ctx, String(ref.value))
+        : kind === 'note'
+          ? await readNote(client, ctx, String(ref.value))
+          : await readRaise(client, ctx, String(ref.value));
+  if (!found) {
+    return { ok: true, rows: [], note: `There is no ${kind} ${ref.value} to read: none of theirs has it, or it was dismissed.` };
+  }
+
+  const { data, error } = await client
+    .from('dev_comments')
+    .select('author, body, created_at')
+    .eq('user_id', ctx.userId)
+    .eq(COMMENT_COLUMN[kind], found.id)
+    .order('created_at', { ascending: true });
+  if (error) throw new Error(`dev_comments: ${error.message}`);
+  const comments = thread((data ?? []) as DevComment[]);
+
+  return {
+    ok: true,
+    rows: [
+      {
+        table: DEV_ROW_TABLES[kind],
+        ref: found.id,
+        title: clip(found.title, 200) ?? found.id,
+        href: found.href,
+        detail: { ...found.detail, comment_count: comments.count, comments: comments.text },
+      },
+    ],
+    note:
+      comments.dropped > 0
+        ? `The thread has ${comments.count} comments; the oldest ${comments.dropped} are left out.`
+        : undefined,
+  };
 }
