@@ -1,13 +1,16 @@
 import 'server-only';
 
+import { pushPorts } from '@/inngest/core/day-brief';
 import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { CoreOperation } from '@/lib/core/spend/operations';
 import { recordSpend } from '@/lib/core/spend/record';
 import { addDays } from '@/lib/todo/tasks/model';
+import { sendToPerson } from '@/lib/push/send';
 import { loadWeekFacts } from '@/lib/week-review/load';
 import { WEEK_REVIEW_MODEL, writeWeekReview } from '@/lib/week-review/model';
+import { weekReviewPayload } from '@/lib/week-review/notify';
 import { reviewWeekDue } from '@/lib/week-review/review';
 import {
   runWeekReviewFor,
@@ -24,14 +27,18 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * and week.
  *
  * The service clients bypass RLS, so every read and write names the person.
- * `written` in the ports is where the stored review leaves the database; the
- * phone notification (plan #1234) goes there, with its own tag, and sets
- * notified_at.
+ * `written` in the ports is where the stored review leaves the database: the
+ * phone notification (plan #1234) goes out from there under its own tag, and
+ * notified_at is set once a phone has taken it.
  */
 
 const OPERATION: CoreOperation = 'write-week-review';
 
-export function weekReviewPorts(core: CoreSupabaseClient, db: SupabaseClient): WeekReviewPorts {
+export function weekReviewPorts(
+  core: CoreSupabaseClient,
+  db: SupabaseClient,
+  now: Date = new Date(),
+): WeekReviewPorts {
   const apiKey = process.env.ANTHROPIC_API_KEY ?? null;
 
   return {
@@ -107,8 +114,26 @@ export function weekReviewPorts(core: CoreSupabaseClient, db: SupabaseClient): W
       return (data ?? []).length > 0;
     },
 
-    // No `written` yet: plan #1234 adds it here, sending the phone
-    // notification and setting notified_at on the stored row.
+    async written(row) {
+      const payload = weekReviewPayload(row);
+      // A quiet week has nothing to say on the lock screen (lib/week-review/notify.ts).
+      if (!payload) return;
+      const push = pushPorts(core, row.user_id);
+      if (!push) return;
+      // The review is stored; a notification that fails costs the buzz, not the review.
+      try {
+        const result = await sendToPerson(push, row.user_id, payload, now);
+        if (result.sent === 0) return;
+        // WeekReviewRow carries no id: (user_id, week) is the row's unique key.
+        await core
+          .from('week_reviews')
+          .update({ notified_at: now.toISOString() })
+          .eq('user_id', row.user_id)
+          .eq('week', row.week);
+      } catch {
+        // The Week page shows it either way.
+      }
+    },
   };
 }
 
@@ -129,7 +154,7 @@ export async function runWeekReviews(now: Date = new Date()): Promise<WeekReview
   if (error) throw new Error(`Reading the accounts failed: ${error.message}`);
   const people = ((data ?? []) as { user_id: string }[]).map((row) => row.user_id);
 
-  const ports = weekReviewPorts(core, createServiceSupabase());
+  const ports = weekReviewPorts(core, createServiceSupabase(), now);
   const summary: WeekReviewsSummary = { week, people: people.length, results: [], failed: [] };
   for (const userId of people) {
     try {
