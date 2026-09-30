@@ -619,7 +619,7 @@ function MoveGuess({
 /**
  * What one sentence was filed as, each line with its own Undo.
  *
- * The model will sometimes put a note against the wrong goal, so every line
+ * The model will sometimes log progress on the wrong step, so every line
  * can be reversed on its own, in one press, without touching the others. An
  * undone line stays in the list, marked, because the capture keeps it too.
  */

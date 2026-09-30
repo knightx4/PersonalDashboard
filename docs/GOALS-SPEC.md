@@ -400,11 +400,12 @@ not turned Jev on see no guess.
 It is filed as follows:
 
 1. A direct model call reads the sentence against your open goals and steps
-   and returns what to do: close a step, log progress against one or more
-   goals, add a follow-up step. This takes seconds, the same fast path `@dash`
+   and returns what to do, as any of five moves: close a step, count one
+   towards a rhythm, log progress, record a reading of a goal's number, or
+   add a follow-up step. This takes seconds, the same fast path `@dash`
    replies use.
 2. The page shows what was filed, as a short list, each line with **Undo**.
-   It will sometimes attach a note to the wrong goal, so seeing the result and
+   It will sometimes log progress on the wrong step, so seeing the result and
    reversing it in one tap is required.
 3. Anything that needs research, such as finding that nonprofit's volunteer
    sign-up, becomes a `claude` step for the next scheduled run. Capture does
@@ -421,6 +422,25 @@ carry the total its entries count towards, such as 12 bags, so the page can
 say roughly how much is left. Undo marks an entry undone and leaves the row.
 The rules are in `lib/goals/progress.ts` and the reads and writes in
 `lib/goals/progress-store.ts`.
+
+Capture writes these entries through its progress move (plan #1275). The move
+names the deepest step the sentence fits, or the goal when no step fits, with
+a short text, an amount and unit when the sentence gave one, and the day when
+it named another one ("yesterday"). A day in the future or more than 60 days
+back is ignored and the entry is dated today. A move naming a step it was not
+shown, an amount of zero or less, or a unit with no amount is dropped. The
+filed line reads `Logged 2 bags on "Move the bags to their spot" in Make the
+apartment clean and livable`, or `Logged progress on …: <text>` without an
+amount, and Undo marks the entry undone.
+
+A sentence about part of a step's work is progress on that step and never
+closes it. "I just moved two bags from the living room to the office" logs
+2 bags on the bags step and leaves the step open. Capture closes a step only
+when the sentence says the whole of it is finished. The filing prompt, Jev's
+description of each move, and the hint line passed on from Jev's guess or
+your pick each state this rule, and a confident "close" guess cannot turn
+partial work into a close. Lists filed before this, with a goal-only note kept on the
+capture, are still shown and undone.
 
 On the goal page an open step with entries reads as under way (plan #1276):
 a line under its row gives the summed amount per unit ("7 bags so far") and
