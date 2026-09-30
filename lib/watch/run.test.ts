@@ -11,6 +11,7 @@ import {
   type WatchReadingRow,
   type WatchRow,
 } from './run';
+import { buildReport, reportSlot } from './report';
 
 const NOW = new Date('2026-10-01T14:23:00Z');
 
@@ -81,6 +82,17 @@ function fakeDb(rows: WatchRow[], reads: PriceReading[]) {
       const row = rows.find((r) => r.id === w.id)!;
       row.fired_value = value;
       row.fired_at = at.toISOString();
+    },
+    async timezone() {
+      return 'America/New_York';
+    },
+    async values(w) {
+      return readings
+        .filter((r) => r.watch_id === w.id && r.value !== null)
+        .map((r) => ({ value: r.value!, taken_at: r.taken_at }));
+    },
+    async reported(w, at) {
+      rows.find((r) => r.id === w.id)!.reported_at = at.toISOString();
     },
     async end(w) {
       const row = rows.find((r) => r.id === w.id)!;
@@ -203,5 +215,98 @@ describe('runWatches', () => {
     const summary = await runWatches(db.ports, NOW);
     expect(summary.errors).toEqual(['w1: insert refused']);
     expect(summary.outcomes.read).toBe(1);
+  });
+});
+
+describe('the trend report', () => {
+  // NOW is 10:23 in New York.
+  const hour = (n: number) => new Date(NOW.getTime() + n * 3600_000);
+
+  it('sends a report within the hour after a report time, even when nothing fired', async () => {
+    const db = fakeDb([watch({ condition: {}, report_times: ['11:00:00'] })], [ok(250), ok(240), ok(230)]);
+    await runWatches(db.ports, NOW);
+    expect(db.pushes).toHaveLength(0);
+    const summary = await runWatches(db.ports, hour(1));
+    expect(summary.reports).toBe(1);
+    expect(db.pushes).toHaveLength(1);
+    expect(db.pushes[0].payload).toEqual({
+      title: 'Down $10: Jamie xx at Nowadays',
+      body: 'Cheapest is $240, from $250 when the watch started. 6 listings, top offer $150. Still at its low, so waiting has paid so far.',
+      url: '/home#watching',
+      tag: 'watch-w1-report',
+    });
+    expect(db.readings[1].detail).toMatchObject({ report: { title: 'Down $10: Jamie xx at Nowadays' } });
+    expect(db.rows[0].reported_at).toBe(hour(1).toISOString());
+
+    // The next hour is still inside the window, and sends nothing again.
+    await runWatches(db.ports, hour(2));
+    expect(db.pushes).toHaveLength(1);
+    expect(db.readings[2].detail).not.toHaveProperty('report');
+  });
+
+  it('sends the report alongside a fired push', async () => {
+    const db = fakeDb([watch({ report_times: ['10:00'] })], [ok(186)]);
+    const summary = await runWatches(db.ports, NOW);
+    expect(summary.outcomes.fired).toBe(1);
+    expect(summary.pushes).toBe(2);
+    expect(db.pushes.map((p) => p.payload.tag)).toEqual(['watch-w1', 'watch-w1-report']);
+    expect(db.pushes[1].payload.body).toContain('Too early to say');
+  });
+
+  it('reports from past values when this hour could not read the page', async () => {
+    const db = fakeDb([watch({ condition: {}, report_times: ['11:00'] })], [ok(200), broken]);
+    await runWatches(db.ports, NOW);
+    await runWatches(db.ports, hour(1));
+    expect(db.pushes).toHaveLength(1);
+    expect(db.pushes[0].payload.title).toBe('No change: Jamie xx at Nowadays');
+    expect(db.pushes[0].payload.body).toContain('The latest check could not read the page.');
+    expect(db.readings[1]).toMatchObject({ value: null, error: broken.error });
+  });
+
+  it('sends nothing for a watch that has never read a value', async () => {
+    const db = fakeDb([watch({ condition: {}, report_times: ['10:00'] })], [broken]);
+    await runWatches(db.ports, NOW);
+    expect(db.pushes).toHaveLength(0);
+    expect(db.rows[0].reported_at).toBeNull();
+  });
+});
+
+describe('reportSlot', () => {
+  const zone = 'America/New_York';
+
+  it('is due inside the window after a time, and not before it or long after', () => {
+    expect(reportSlot({ report_times: ['10:00:00'], reported_at: null }, zone, NOW)?.toISOString()).toBe(
+      '2026-10-01T14:00:00.000Z',
+    );
+    expect(reportSlot({ report_times: ['10:30'], reported_at: null }, zone, NOW)).toBeNull();
+    expect(reportSlot({ report_times: ['08:30'], reported_at: null }, zone, NOW)).toBeNull();
+  });
+
+  it('is not due again once reported', () => {
+    expect(reportSlot({ report_times: ['10:00'], reported_at: '2026-10-01T14:05:00Z' }, zone, NOW)).toBeNull();
+    expect(reportSlot({ report_times: ['10:00'], reported_at: '2026-09-30T14:05:00Z' }, zone, NOW)).not.toBeNull();
+  });
+
+  it('counts a time just before midnight from the day before', () => {
+    const early = new Date('2026-10-02T04:10:00Z'); // 00:10 in New York
+    expect(reportSlot({ report_times: ['23:45'], reported_at: null }, zone, early)?.toISOString()).toBe(
+      '2026-10-02T03:45:00.000Z',
+    );
+  });
+});
+
+describe('buildReport', () => {
+  const points = (...values: number[]) => values.map((value, i) => ({ value, taken_at: `2026-10-0${i + 1}T00:00:00Z` }));
+  const latest = { detail: (ok(0) as Extract<PriceReading, { ok: true }>).detail };
+
+  it('says when the price has gone up and waiting has not paid', () => {
+    expect(buildReport(watch(), points(200, 180, 220), latest)).toEqual({
+      title: 'Up $20: Jamie xx at Nowadays',
+      body: 'Cheapest is $220, from $200 when the watch started. Low so far $180. 6 listings, top offer $150. Waiting has not paid so far.',
+    });
+  });
+
+  it('is null with no values', () => {
+    expect(buildReport(watch(), [], latest)).toBeNull();
   });
 });
