@@ -15,7 +15,7 @@ import type { UiReview } from '@/lib/ui-review/load';
 // render test; the view only needs them to exist to hand to its forms.
 vi.mock('@/app/dev/ui/review/actions', () => {
   const noop = async () => ({});
-  return { decideUiFinding: noop, startUiReview: noop };
+  return { confirmAllUiFindings: noop, decideUiFinding: noop, startUiReview: noop };
 });
 
 const { ReviewView } = await import('@/app/dev/ui/review/review-view');
@@ -61,9 +61,7 @@ describe('the review page', () => {
   it('draws no findings section and no zero when nothing is recorded', () => {
     const html = renderToStaticMarkup(
       <ReviewView
-        standings={[
-          { scope: 'todo', label: 'Todo', violations: 0, surfaces: 0, lastReview: null },
-        ]}
+        standings={[{ scope: 'todo', label: 'Todo', violations: 0, surfaces: 0, lastReview: null }]}
         only={null}
       />,
     );
@@ -92,5 +90,33 @@ describe('the review page', () => {
     expect(html).toContain('To decide');
     expect(html).toContain('app/vault/page.tsx:101');
     expect(html).toContain('/preview?s=vault-note');
+  });
+
+  it('offers Confirm all only when there is more than one finding to decide', () => {
+    const one = renderToStaticMarkup(
+      <ReviewView
+        standings={[
+          { scope: 'vault', label: 'Vault', violations: 0, surfaces: 1, lastReview: reviewed },
+        ]}
+        only="vault"
+      />,
+    );
+    expect(one).not.toContain('Confirm all');
+
+    const two: UiReview = {
+      ...reviewed,
+      findings: [...reviewed.findings, { ...reviewed.findings[0], id: 'f2', line: 140 }],
+    };
+    const html = renderToStaticMarkup(
+      <ReviewView
+        standings={[
+          { scope: 'vault', label: 'Vault', violations: 0, surfaces: 1, lastReview: two },
+        ]}
+        only="vault"
+      />,
+    );
+    expect(html).toContain('Confirm all');
+    expect(html).toContain('value="f1"');
+    expect(html).toContain('value="f2"');
   });
 });

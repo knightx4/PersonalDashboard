@@ -121,3 +121,36 @@ export async function decideUiFinding(
           : 'Back on the list.',
   };
 }
+
+/**
+ * Confirm every finding on the page in one press.
+ *
+ * It takes the ids the page drew rather than "everything open", so a finding
+ * filed after the page loaded is not agreed to unseen, and the module filter
+ * still means what it says. Only rows still open are touched: one decided in
+ * another tab keeps the answer it was given there.
+ */
+// latency: pending
+export async function confirmAllUiFindings(
+  _prev: UiReviewActionState,
+  formData: FormData,
+): Promise<UiReviewActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const ids = z.array(idSchema).min(1).safeParse(formData.getAll('id'));
+  if (!ids.success) return { error: 'No findings to confirm.' };
+
+  const { data, error } = await supabase
+    .from('ui_findings')
+    .update({ status: 'confirmed', decided_at: new Date().toISOString() })
+    .in('id', ids.data)
+    .eq('user_id', user.id)
+    .eq('status', 'open')
+    .select('id');
+  if (error) return { error: error.message };
+
+  revalidatePath('/dev/ui/review');
+  const count = data?.length ?? 0;
+  return { message: `Confirmed ${count} finding${count === 1 ? '' : 's'}.` };
+}

@@ -13,7 +13,12 @@ import { FINDING_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { StateLabel } from '@/components/dev/state-label';
 import type { UiFinding, UiReview } from '@/lib/ui-review/load';
 import { UI_SCOPES, type UiScope } from '@/lib/ui-review/scope';
-import { decideUiFinding, startUiReview, type UiReviewActionState } from './actions';
+import {
+  confirmAllUiFindings,
+  decideUiFinding,
+  startUiReview,
+  type UiReviewActionState,
+} from './actions';
 
 /** One module's standing: the gate, the surfaces, and the last pass. */
 export type Standing = {
@@ -101,6 +106,27 @@ function StandingRow({ standing }: { standing: Standing }) {
   );
 }
 
+/**
+ * Agree to every finding on the list at once. Only drawn when there are two or
+ * more: with one, the row's own Confirm is the same press.
+ */
+function ConfirmAll({ ids }: { ids: string[] }) {
+  const [state, action, pending] = useActionState(confirmAllUiFindings, {} as UiReviewActionState);
+
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-2">
+      {ids.map((id) => (
+        <input key={id} type="hidden" name="id" value={id} />
+      ))}
+      <Button type="submit" size="sm" variant="secondary" pending={pending}>
+        Confirm all
+      </Button>
+      {state.message && <p className="text-small text-ink-muted">{state.message}</p>}
+      <FieldError>{state.error}</FieldError>
+    </form>
+  );
+}
+
 /** One thing a pass found, with the two answers it is waiting for. */
 function FindingRow({ finding }: { finding: UiFinding }) {
   const [state, action, pending] = useActionState(decideUiFinding, {} as UiReviewActionState);
@@ -181,13 +207,7 @@ function FindingRow({ finding }: { finding: UiFinding }) {
  * the module you came for. Only findings still waiting on you are shown --
  * confirmed and dismissed ones are kept for the next pass, not for re-reading.
  */
-export function ReviewView({
-  standings,
-  only,
-}: {
-  standings: Standing[];
-  only: UiScope | null;
-}) {
+export function ReviewView({ standings, only }: { standings: Standing[]; only: UiScope | null }) {
   const undecided = standings.flatMap((standing) =>
     (standing.lastReview?.findings ?? [])
       .filter((finding) => finding.status === 'open')
@@ -236,9 +256,14 @@ export function ReviewView({
           heading saying "0 findings" is law 1 twice over. */}
       {undecided.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-body font-semibold text-ink">
-            To decide <span className="font-normal text-ink-muted">({undecided.length})</span>
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-body font-semibold text-ink">
+              To decide <span className="font-normal text-ink-muted">({undecided.length})</span>
+            </h2>
+            {undecided.length > 1 && (
+              <ConfirmAll ids={undecided.map(({ finding }) => finding.id)} />
+            )}
+          </div>
           <ul className={cn(cardVariants(), 'divide-y divide-border')}>
             {undecided.map(({ finding }) => (
               <FindingRow key={finding.id} finding={finding} />
