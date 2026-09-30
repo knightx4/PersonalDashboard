@@ -14,12 +14,15 @@ import { modulesFor, type ModuleId } from '@/lib/modules';
 import { updateAccountSettings, updateEnabledModules, type AccountState } from './actions';
 import { cardVariants } from '@/components/ui/card';
 import { NotificationsSection } from './notifications';
+import { ConnectedAppsSection } from './connected-apps';
+import type { ConnectedApp } from '@/lib/connector/apps';
 
 export function AccountView({
   email,
   settings,
   isOwner,
   vapidPublicKey,
+  connected,
 }: {
   email: string;
   settings: {
@@ -32,12 +35,15 @@ export function AccountView({
   isOwner: boolean;
   /** The key browsers subscribe to push with; null when the server has none. */
   vapidPublicKey: string | null;
+  /** The Connected apps section's data, read on the server (plan #1258). */
+  connected: { apps: ConnectedApp[]; failed: string | null; connectorAddress: string };
 }) {
   return (
     <div className="space-y-6">
       <YouSection email={email} settings={settings} />
       <ModulesSection enabled={settings.enabledModules} isOwner={isOwner} />
       <NotificationsSection publicKey={vapidPublicKey} />
+      <ConnectedAppsSection {...connected} timezone={settings.timezone} />
       <ModuleSettingsSection enabled={settings.enabledModules} />
       <TimelineSection />
       <SpendSection />
