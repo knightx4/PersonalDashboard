@@ -37,6 +37,12 @@ const MAX_SEARCHES = 5;
  * the result. A fixed 110 seconds stopped searches that needed two minutes.
  */
 const DEFAULT_CALL_MS = 240_000;
+/**
+ * Room for the reply. Thinking is on by default on this model and counts
+ * against it: the search of 30 September spent 13,041 output tokens against
+ * a cap of 8,000, was cut off inside the report, and stored nothing.
+ */
+const MAX_TOKENS = 32_000;
 /** Kept back from the deadline for parsing and storing what was found. */
 const RESERVE_MS = 15_000;
 /** A call started with less time than this would only be stopped. */
@@ -246,9 +252,9 @@ export async function findPeople(
  * One web search conversation that ends in a report.
  *
  * At most two calls. The first searches and, usually, reports. When it stops
- * without a report (a long search pauses the turn, or the model ends with
- * prose), the second call forces the report tool, so it writes up what the
- * searches found instead of searching again. Letting a paused turn carry on
+ * without a report (a long search pauses the turn, the model ends with prose,
+ * or the report is cut off at the token cap), the second call asks for the
+ * report, so it writes up what the searches found instead of searching again. Letting a paused turn carry on
  * as the server offers cost $1.11 for one press on the first day: every resume
  * sends the whole conversation, search results included, back as input.
  *
@@ -274,7 +280,7 @@ async function searchThenReport<T>(
   ];
   const first: SearchRequest = {
     model: SUGGEST_MODEL,
-    max_tokens: 8000,
+    max_tokens: MAX_TOKENS,
     system: call.system,
     tools,
     messages: [{ role: 'user', content: call.prompt }],
@@ -324,8 +330,14 @@ export function searchStep<T>(
   toolName: string,
   parse: (raw: unknown) => T[],
 ): SearchStep<T> {
+  // Widened: the installed SDK's type predates some reasons.
+  const stop: string | null = response.stop_reason;
   const report = response.content.find((block) => block.type === 'tool_use' && block.name === toolName);
-  if (report && report.type === 'tool_use') {
+  // A report cut off by the token cap arrives as a call with an empty or
+  // partial input. Reading it would store nothing and call that a result,
+  // which is what the search of 30 September did.
+  const cutOff = stop === 'max_tokens';
+  if (report && report.type === 'tool_use' && !cutOff) {
     const suggestions = parse(report.input);
     if (suggestions.length === 0) {
       // The shape only, never the text: enough to see why a paid report kept
@@ -337,17 +349,33 @@ export function searchStep<T>(
           Array.isArray(value) ? `array(${value.length})` : typeof value,
         ]),
       );
-      console.warn(`[jobs suggestions] ${toolName} kept nothing`, JSON.stringify(shape));
+      console.warn(`[jobs suggestions] ${toolName} kept nothing`, JSON.stringify({ stop, shape }));
     }
     return { kind: 'report', suggestions };
   }
-  // Widened: the installed SDK's type predates this reason.
-  const stop: string | null = response.stop_reason;
   if (stop === 'refusal') return { kind: 'refused' };
-  const messages: Anthropic.MessageParam[] = [...request.messages, { role: 'assistant', content: response.content }];
-  // A paused turn is sent back as it is; a finished one gets the ask.
-  if (stop !== 'pause_turn') messages.push({ role: 'user', content: `Call ${toolName} now with what you found.` });
-  return { kind: 'next', next: { ...request, messages, tool_choice: { type: 'tool', name: toolName } } };
+
+  // The report is asked for in words rather than forced: this model thinks by
+  // default, forcing a tool is not allowed alongside thinking, and newer
+  // models reject it outright. A cut-off report is left out of what goes
+  // back, since a tool call without its result cannot be sent on.
+  const content = cutOff
+    ? response.content.filter((block) => !(block.type === 'tool_use' && block.name === toolName))
+    : response.content;
+  const messages: Anthropic.MessageParam[] = [...request.messages];
+  if (content.length > 0) messages.push({ role: 'assistant', content });
+  if (cutOff) {
+    messages.push({
+      role: 'user',
+      content: `Your report was cut off before it finished. Call ${toolName} again now with what you found, keeping each field short.`,
+    });
+  } else if (stop !== 'pause_turn') {
+    // A paused turn is sent back as it is; a finished one gets the ask.
+    messages.push({ role: 'user', content: `Call ${toolName} now with what you found.` });
+  }
+  const next: SearchRequest = { ...request, messages };
+  delete next.tool_choice;
+  return { kind: 'next', next };
 }
 
 // ---------------------------------------------------------------------------

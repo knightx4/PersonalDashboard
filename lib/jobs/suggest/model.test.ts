@@ -91,7 +91,9 @@ describe('the time a search is given', () => {
     );
     spy.mockRestore();
     expect(create).toHaveBeenCalledTimes(1);
-    expect(late).toMatchObject({ ok: false, queue: { tool_choice: { type: 'tool', name: 'suggest_people' } } });
+    expect(late.ok).toBe(false);
+    if (late.ok) return;
+    expect(late.queue?.messages.at(-1)?.role).toBe('assistant');
   });
 });
 
@@ -115,7 +117,8 @@ describe('findPeople', () => {
     expect(prompt.tools[0]).toMatchObject({ type: 'web_search_20260209', max_uses: 5 });
     expect(prompt.tool_choice).toBeUndefined();
     const forced = create.mock.calls[1][0];
-    expect(forced.tool_choice).toEqual({ type: 'tool', name: 'suggest_people' });
+    // Asked for, not forced: the model thinks, and forcing a tool is not allowed alongside thinking.
+    expect(forced.tool_choice).toBeUndefined();
     // A paused turn goes back as it is, with no extra ask after it.
     expect(forced.messages.at(-1).role).toBe('assistant');
     expect(prompt.system).toContain('"leverage"');
@@ -132,6 +135,24 @@ describe('findPeople', () => {
     expect(result).toEqual({ ok: false, error: 'The search ran but reported no people.' });
     expect(create).toHaveBeenCalledTimes(2);
     expect(create.mock.calls[1][0].messages.at(-1)).toEqual({ role: 'user', content: 'Call suggest_people now with what you found.' });
+  });
+
+  it('asks again when the report is cut off at the token cap, rather than storing nothing', async () => {
+    const cut = { ...report, input: {} };
+    const create = vi
+      .fn()
+      .mockResolvedValueOnce({ content: [{ type: 'text', text: 'found some' }, cut], stop_reason: 'max_tokens', usage })
+      .mockResolvedValueOnce({ content: [report], stop_reason: 'tool_use', usage });
+    const result = await findPeople(
+      { apiKey: 'k', client: { messages: { create } } as never },
+      { seeker, warm: [], known: [], taken: new Set() },
+    );
+    expect(result.ok && result.suggestions[0].personName).toBe('Dana Wu');
+    const second = create.mock.calls[1][0];
+    // The cut-off call is not sent back, and the ask says why.
+    expect(second.messages.at(-2).content).toEqual([{ type: 'text', text: 'found some' }]);
+    expect(second.messages.at(-1).content).toContain('cut off');
+    expect(create.mock.calls[0][0].max_tokens).toBe(32_000);
   });
 
   it('reads a list the model sent back as a JSON string', async () => {
