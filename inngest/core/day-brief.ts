@@ -37,7 +37,7 @@ import {
 import { addDays } from '@/lib/todo/tasks/model';
 import { runDraftsFor, type DraftsResult } from '@/lib/drafts/run';
 import { draftPorts } from '@/inngest/core/drafts';
-import { BRIEF_MODEL, writeBrief } from '@/lib/day-brief/model';
+import { BRIEF_MODEL, choosePicks, writeBrief } from '@/lib/day-brief/model';
 import { runDayBriefFor, type DayBriefPorts, type DayBriefResult } from '@/lib/day-brief/run';
 import { dailyView } from '@/lib/goals/daily';
 import { briefPayload, sendToPerson, type PushPorts, type PushSubscriptionRow } from '@/lib/push/send';
@@ -424,6 +424,12 @@ export function dayBriefPorts(core: CoreSupabaseClient, clients: AgendaClients, 
       // Without a key the plain brief is stored instead.
       if (!apiKey) return null;
       return { model: BRIEF_MODEL, text: await writeBrief(day, facts, { apiKey, onSpend }) };
+    },
+
+    async choose(day, list, onSpend) {
+      // Without a key the shortlist's first three are the picks.
+      if (!apiKey) return null;
+      return { model: BRIEF_MODEL, keys: await choosePicks(day, list, { apiKey, onSpend }) };
     },
 
     async ledger(userId, report) {
