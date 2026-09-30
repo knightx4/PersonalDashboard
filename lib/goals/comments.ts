@@ -29,6 +29,7 @@ import {
   type FieldValue,
   type RecordValues,
 } from '@/lib/goals/collections';
+import { isDate } from '@/lib/ask/db';
 import { displayValue } from '@/lib/goals/information';
 import { STEP_KIND_LABELS, STEP_STATUS_LABELS, type StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
@@ -58,7 +59,15 @@ export type GoalReplyContext = {
   collections: ReplyCollection[];
   /** The goal or step the comment was written on. */
   itemId: string;
+  /** YYYY-MM-DD, so "Oct 4" and "next Friday" can be turned into a date. */
+  today?: string;
 };
+
+/**
+ * A change of date or of Todo the comment asks for, on the step it is on.
+ * Either part may be absent; `dueOn: null` clears the date.
+ */
+export type Schedule = { dueOn?: string | null; onTodo?: boolean };
 
 /** Refs the model answers with, so it never handles an id. */
 export type ReplyRefs = { collections: Map<string, ReplyCollection> };
@@ -84,6 +93,11 @@ function stepLines(nodes: StepNode[], itemId: string, depth: number, out: string
     out.push(
       `${pad}- ${node.title} (${STEP_KIND_LABELS[node.kind]}, ${STEP_STATUS_LABELS[node.status].toLowerCase()})${here}`,
     );
+    if (node.dueOn || node.onTodo) {
+      out.push(
+        `${pad}  ${[node.dueOn ? `Due ${node.dueOn}` : 'No due date', node.onTodo ? 'on Todo' : 'not on Todo'].join(', ')}`,
+      );
+    }
     if (node.acceptance) out.push(`${pad}  Done when: ${node.acceptance}`);
     if (node.detail) out.push(`${pad}  Detail: ${node.detail.replace(/\s+/g, ' ').slice(0, 600)}`);
     if (node.resolution) out.push(`${pad}  Answered: ${node.resolution}`);
@@ -146,6 +160,7 @@ export function goalContext(context: GoalReplyContext): { text: string; refs: Re
   const out = [
     `# A goal: ${goal.title}`,
     '',
+    ...(context.today ? [`Today is ${context.today}.`, ''] : []),
     `Status: ${goal.status === 'parked' ? 'parked' : STEP_STATUS_LABELS[goal.status].toLowerCase()}`,
   ];
   if (goal.acceptance) out.push(`Done when: ${goal.acceptance}`);
@@ -192,7 +207,7 @@ export type Filing = { collection: ReplyCollection; values: Record<string, unkno
 
 export type GoalReply =
   /** Answered, and possibly with facts to file. `body` may be empty when all it did was file. */
-  | { kind: 'answer'; body: string; filings: Filing[] }
+  | { kind: 'answer'; body: string; filings: Filing[]; schedule: Schedule | null }
   /** Needs the goals routine: research, several steps changed, anything beyond one reply. */
   | { kind: 'routine'; why: string }
   /** Hand the step the comment is on to Claude, to work or to prepare (plan #1003). */
@@ -239,9 +254,23 @@ export function parseGoalReply(raw: unknown, refs: ReplyRefs): GoalReply {
     if (Object.keys(kept).length > 0) filings.push({ collection, values: kept });
   }
 
+  const schedule = readSchedule(input.schedule);
   const body = asText(input.answer);
-  if (!body && filings.length === 0) return { kind: 'error', error: 'Nothing usable came back.' };
-  return { kind: 'answer', body: fit(body), filings };
+  if (!body && filings.length === 0 && !schedule) {
+    return { kind: 'error', error: 'Nothing usable came back.' };
+  }
+  return { kind: 'answer', body: fit(body), filings, schedule };
+}
+
+/** The date and Todo change the model asked for, or null when it asked for none that is usable. */
+function readSchedule(raw: unknown): Schedule | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const { due_on: due, on_todo: todo } = raw as Record<string, unknown>;
+  const schedule: Schedule = {};
+  if (due === null) schedule.dueOn = null;
+  else if (isDate(due)) schedule.dueOn = due;
+  if (typeof todo === 'boolean') schedule.onTodo = todo;
+  return Object.keys(schedule).length > 0 ? schedule : null;
 }
 
 /** What happened to one filing, for the reply to say. */
@@ -263,9 +292,10 @@ function filedValues(collection: ReplyCollection, data: RecordValues): string {
  * record filed or refused. Filed records are drafts, so the line says where to
  * confirm them.
  */
-export function replyBody(answer: string, outcomes: FilingOutcome[]): string {
+export function replyBody(answer: string, outcomes: FilingOutcome[], scheduled?: string): string {
   const lines: string[] = [];
   if (answer) lines.push(answer);
+  if (scheduled) lines.push(scheduled);
   const filed = outcomes.filter((o) => o.ok);
   if (filed.length > 0) {
     lines.push(
@@ -281,6 +311,40 @@ export function replyBody(answer: string, outcomes: FilingOutcome[]): string {
     lines.push(`Not filed into ${refused.collection.name}: ${refused.error}`);
   }
   return fit(lines.join('\n\n'));
+}
+
+/** "Mon 5 Oct" for 2026-10-05, with the weekday so a wrong year shows. */
+function dateWords(iso: string): string {
+  return new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+/**
+ * What a date and Todo change did, for the thread. `dated` and `todo` are what
+ * the writes reported: true when the row changed, false when it did not (the
+ * step already said so, or cannot), null when that part was not asked for.
+ */
+export function scheduleSaid(
+  schedule: Schedule,
+  done: { dated: boolean | null; todo: boolean | null },
+): string {
+  const parts: string[] = [];
+  if (schedule.dueOn !== undefined && done.dated !== null) {
+    if (!done.dated) parts.push('I could not change the date, the step is not open to change.');
+    else parts.push(schedule.dueOn ? `Set the due date to ${dateWords(schedule.dueOn)}.` : 'Cleared the due date.');
+  }
+  if (schedule.onTodo !== undefined && done.todo !== null) {
+    if (done.todo) parts.push(schedule.onTodo ? 'Put it on your Todo.' : 'Took it off your Todo.');
+    else if (schedule.onTodo) {
+      parts.push('It did not go on Todo: only an open step of yours can, and it is either already there or not that.');
+    } else parts.push('It was not on your Todo.');
+  }
+  return parts.join(' ');
 }
 
 /** Trimmed to what the column holds, marked so a cut reply does not read as a finished one. */

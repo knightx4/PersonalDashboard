@@ -24,7 +24,7 @@ the row so far, and the comment.
 You have nothing else: no web, no email, no database. Everything you may use
 is in the message.
 
-Four things you can do, through the reply tool:
+Five things you can do, through the reply tool:
 
 - Answer. A question about the goal, a step, an option or what to do next is
   answered in "answer", in two to four plain sentences, as you would say it to
@@ -37,6 +37,14 @@ Four things you can do, through the reply tool:
   collection that holds a single record and already has one cannot take
   another. Also write a one-line "answer" saying what you filed, or leave it
   empty if filing was all that was asked.
+- Set the date. A comment on a step that gives it a due date, or asks for it
+  to be on their todo list, is done by you now, through "schedule": "due_on"
+  as YYYY-MM-DD (work the year out from today's date, and pick the next
+  occurrence of a date with no year), "on_todo" true or false. "due_on": null
+  clears the date. Putting a step on Todo works only for a step of theirs that
+  is open. Do not tell them to set a date or a Todo flag themselves: it is
+  yours to do, and the reply says what changed. Leave "answer" empty unless
+  there is more to say. On the goal itself there is no step to date, so say so.
 - Pass it on. Set needs_routine true, with one sentence in "why", when the
   comment needs more than one reply from what is here: research on the web,
   reading their email, or changing the steps (adding, splitting, dropping,
@@ -89,7 +97,7 @@ export async function askGoalReplyModel(
         {
           name: TOOL_NAME,
           description:
-            'Answer the comment, file facts it gives, pass it to the goals routine, or take the step it is on.',
+            'Answer the comment, file facts it gives, date the step, pass it to the goals routine, or take the step it is on.',
           input_schema: {
             type: 'object',
             properties: {
@@ -107,6 +115,14 @@ export async function askGoalReplyModel(
                     },
                   },
                   required: ['collection', 'values'],
+                },
+              },
+              schedule: {
+                type: ['object', 'null'],
+                description: 'A due date and Todo change for the step the comment is on.',
+                properties: {
+                  due_on: { type: ['string', 'null'], description: 'YYYY-MM-DD, or null to clear.' },
+                  on_todo: { type: 'boolean' },
                 },
               },
               needs_routine: { type: 'boolean' },
