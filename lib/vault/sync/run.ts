@@ -12,6 +12,12 @@ import {
   type FetchTask,
   type KnownNotes,
 } from '@/lib/vault/sync/plan';
+import {
+  planAttachmentDiff,
+  planAttachmentSnapshot,
+  type AttachmentPlan,
+  type KnownAttachments,
+} from '@/lib/vault/sync/attachments';
 import type { VaultSource } from '@/lib/vault/providers/types';
 
 /**
@@ -55,6 +61,13 @@ const BACKFILL_FETCH_LIMIT = 2_000;
 /** Wall clock a single run may spend, leaving room for the write after it. */
 export const RUN_BUDGET_MS = 240_000;
 
+/**
+ * Hard cap on attachments copied in one run, for the same reason as
+ * BACKFILL_FETCH_LIMIT: each copy is one request against the token's hourly
+ * allowance, and the notes' tree and compare calls must still fit beside it.
+ */
+const ATTACHMENT_COPY_LIMIT = 500;
+
 export type VaultConnectionRow = {
   id: string;
   user_id: string;
@@ -79,9 +92,25 @@ export type NoteWrite = {
   previousPath?: string;
 };
 
+/** The attachment table and bucket (plan #1301). */
+export type VaultAttachmentPorts = {
+  /** Every attachment row of the connection, keyed by vault path. */
+  load(): Promise<KnownAttachments>;
+  /** Moves, then removes, then upserts, as the plan lists them. */
+  applyRows(plan: AttachmentPlan): Promise<void>;
+  /** Remove objects from the bucket that no row points at any more. */
+  removeObjects(storagePaths: string[]): Promise<void>;
+  /** Put one file's bytes in the bucket. */
+  upload(copy: { storagePath: string; mimeType: string; bytes: ArrayBuffer }): Promise<void>;
+  /** Record the copy on every row holding that file. */
+  markCopied(blobSha: string, storagePath: string): Promise<void>;
+};
+
 /** Everything the runner needs from the outside world, so tests need none of it. */
 export type VaultSyncPorts = {
   source: VaultSource;
+  /** Absent in tests that are only about notes. */
+  attachments?: VaultAttachmentPorts;
   /** Current mirror state, keyed by vault path. */
   loadKnownNotes(connectionId: string): Promise<KnownNotes>;
   /** Upsert notes by (user, path). Renames must move the row, not clone it. */
@@ -109,7 +138,103 @@ export type VaultSyncSummary = {
   notesSkipped: number;
   /** False when the run stopped early and another is needed to finish. */
   complete: boolean;
+  attachments: AttachmentSummary;
 };
+
+export type AttachmentSummary = {
+  /** Files copied into the bucket this run. */
+  copied: number;
+  /** Rows removed because the file left the vault. */
+  removed: number;
+  /** Files still waiting for a copy: out of time, over the cap, or failed. */
+  pending: number;
+  /** Copies that failed this run; retried by the next. */
+  failed: number;
+  /** Rows kept without a copy because the file is over 50 MB. */
+  tooLarge: number;
+  /** False when the rows could not be brought level with the commit. */
+  rowsOk: boolean;
+};
+
+const NO_ATTACHMENTS: AttachmentSummary = {
+  copied: 0,
+  removed: 0,
+  pending: 0,
+  failed: 0,
+  tooLarge: 0,
+  rowsOk: true,
+};
+
+/**
+ * Bring the attachment rows level with the commit, then copy what lacks a copy
+ * for as long as the budget allows.
+ *
+ * Runs after the notes and never throws: a file that will not copy is left
+ * without a storage_path and the next run tries it again. The one thing that
+ * does count against the run is failing to write the rows, because a diff the
+ * cursor moves past is never read again. The caller holds the cursor back when
+ * rowsOk is false.
+ */
+async function syncAttachments(opts: {
+  ports: VaultSyncPorts;
+  plan: (known: KnownAttachments) => AttachmentPlan;
+  deadline: number;
+  now: () => number;
+}): Promise<AttachmentSummary> {
+  const { ports, deadline, now } = opts;
+  const store = ports.attachments;
+  if (!store) return NO_ATTACHMENTS;
+
+  let plan: AttachmentPlan;
+  try {
+    plan = opts.plan(await store.load());
+    await store.applyRows(plan);
+  } catch (error) {
+    console.error('[vault sync] attachment rows', error instanceof Error ? error.message : error);
+    return { ...NO_ATTACHMENTS, rowsOk: false };
+  }
+
+  if (plan.orphans.length) {
+    try {
+      await store.removeObjects(plan.orphans);
+    } catch (error) {
+      // A leftover object costs storage, not correctness: nothing points at it.
+      console.error('[vault sync] attachment cleanup', error instanceof Error ? error.message : error);
+    }
+  }
+
+  let copied = 0;
+  let failed = 0;
+  let slowestMs = 0;
+
+  for (const copy of plan.copies.slice(0, ATTACHMENT_COPY_LIMIT)) {
+    if (!canStartAnotherBatch({ remainingMs: deadline - now(), slowestBatchMs: slowestMs })) break;
+    const startedAt = now();
+    try {
+      const bytes = await ports.source.readBlobBytes(copy.blobSha);
+      await store.upload({ storagePath: copy.storagePath, mimeType: copy.mimeType, bytes });
+      await store.markCopied(copy.blobSha, copy.storagePath);
+      copied += 1;
+    } catch (error) {
+      failed += 1;
+      console.error(
+        '[vault sync] attachment copy',
+        copy.blobSha,
+        error instanceof Error ? error.message : error,
+      );
+    }
+    slowestMs = Math.max(slowestMs, now() - startedAt);
+  }
+
+  return {
+    copied,
+    removed: plan.removes.length,
+    pending: plan.copies.length - copied,
+    failed,
+    tooLarge: plan.tooLarge,
+    rowsOk: true,
+  };
+}
 
 /**
  * Fetch and parse a batch, stopping when the budget runs out.
@@ -221,7 +346,22 @@ export async function runVaultSync(opts: {
   if (writes.length) await ports.writeNotes(writes);
   if (plan.remove.length) await ports.softDelete(plan.remove);
 
-  const advance = mayAdvanceCursor({ backfillDone: complete, fetchFailures: failures });
+  const attachments = await syncAttachments({
+    ports,
+    plan: (knownAttachments) =>
+      planAttachmentDiff({
+        changes: diff.attachments,
+        known: knownAttachments,
+        subpath,
+        userId: connection.user_id,
+        connectionId: connection.id,
+      }),
+    deadline,
+    now,
+  });
+
+  const advance =
+    attachments.rowsOk && mayAdvanceCursor({ backfillDone: complete, fetchFailures: failures });
   await ports.saveProgress({
     ...(advance ? { syncCursor: head } : {}),
     lastSyncedAt: new Date().toISOString(),
@@ -236,6 +376,7 @@ export async function runVaultSync(opts: {
     notesDeleted: plan.remove.length,
     notesSkipped: plan.skipped.length,
     complete: advance,
+    attachments,
   };
 }
 
@@ -287,11 +428,28 @@ async function runBackfill(opts: {
 
   const finished = complete && batch.done;
 
+  // The whole tree is in hand whichever way the notes went, so the rows are
+  // reconciled on every backfill run and the copies continue where they got to.
+  const attachments = await syncAttachments({
+    ports,
+    plan: (knownAttachments) =>
+      planAttachmentSnapshot({
+        attachments: snapshot.attachments,
+        known: knownAttachments,
+        subpath,
+        userId: connection.user_id,
+        connectionId: connection.id,
+      }),
+    deadline,
+    now,
+  });
+
   if (finished) {
     const gone = deletionsFromSnapshot({ notes, known });
     if (gone.length) await ports.softDelete(gone);
 
-    const advance = mayAdvanceCursor({ backfillDone: true, fetchFailures: failures });
+    const advance =
+      attachments.rowsOk && mayAdvanceCursor({ backfillDone: true, fetchFailures: failures });
     await ports.saveProgress({
       ...(advance
         ? {
@@ -313,6 +471,7 @@ async function runBackfill(opts: {
       notesDeleted: gone.length,
       notesSkipped: batch.skipped.length,
       complete: advance,
+      attachments,
     };
   }
 
@@ -340,6 +499,7 @@ async function runBackfill(opts: {
     notesDeleted: 0,
     notesSkipped: batch.skipped.length,
     complete: false,
+    attachments,
   };
 }
 
@@ -391,7 +551,23 @@ async function runSnapshotRepair(opts: {
   const gone = swept ? deletionsFromSnapshot({ notes, known }) : [];
   if (gone.length) await ports.softDelete(gone);
 
-  const advance = mayAdvanceCursor({ backfillDone: swept, fetchFailures: failures });
+  // The diff's attachment list is empty here; the tree carries them instead.
+  const attachments = await syncAttachments({
+    ports,
+    plan: (knownAttachments) =>
+      planAttachmentSnapshot({
+        attachments: snapshot.attachments,
+        known: knownAttachments,
+        subpath,
+        userId: connection.user_id,
+        connectionId: connection.id,
+      }),
+    deadline,
+    now,
+  });
+
+  const advance =
+    attachments.rowsOk && mayAdvanceCursor({ backfillDone: swept, fetchFailures: failures });
   await ports.saveProgress({
     ...(advance ? { syncCursor: head } : {}),
     lastSyncedAt: new Date().toISOString(),
@@ -406,5 +582,6 @@ async function runSnapshotRepair(opts: {
     notesDeleted: gone.length,
     notesSkipped: batch.skipped.length,
     complete: advance,
+    attachments,
   };
 }

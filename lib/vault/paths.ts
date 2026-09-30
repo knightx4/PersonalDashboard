@@ -74,6 +74,17 @@ export type AttachmentMimeType =
  */
 export const ATTACHMENT_MAX_BYTES = 52_428_800;
 
+/** The private bucket attachment copies are kept in (plan #1299). */
+export const VAULT_ATTACHMENTS_BUCKET = 'vault-attachments';
+
+/**
+ * Where an attachment's copy is kept: by content, so a renamed file needs no
+ * new copy and two paths holding the same file share one object.
+ */
+export function attachmentStoragePath(userId: string, connectionId: string, blobSha: string): string {
+  return `${userId}/${connectionId}/${blobSha}`;
+}
+
 /** The MIME type a path is stored under, or null when it is not an attachment. */
 export function attachmentMimeType(path: string): AttachmentMimeType | null {
   if (!path || path.startsWith('/')) return null;
