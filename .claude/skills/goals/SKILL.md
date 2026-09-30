@@ -267,6 +267,55 @@ notes again, and searches only for what has changed since
 (`updated_at > <the last run on the goal>`). Report progress on the run row
 while you search ("Reading the vault for job notes").
 
+### Search by meaning from a row you found
+
+A word search misses whatever the person wrote in other words: a note on
+gentrification never says "zoning", yet it holds their view on the fights a
+rezoning starts. So once the word and theme searches have turned up a row
+that plainly bears on the goal, ask for the passages nearest to it. Every
+note, thought, goal step, file, Learn card and purchase the person has is cut
+into passages in `core.memory_chunks`, each with a vector, and
+`core.search_memory_from` scores every other passage by how close it comes
+to any passage of the row you give it:
+
+```sql
+select source_table, source_ref, max(similarity) as best,
+       (array_agg(left(body, 300) order by similarity desc))[1] as passage
+from core.search_memory_from(
+  '<user>',                -- the owner, always
+  'obsidian.notes',        -- the row you found: its table, schema and all
+  'Bulk/Strong Towns Housing Course.md',  -- and its ref (below)
+  null,                    -- or '{obsidian.notes,job_search.thoughts}' to narrow
+  50,                      -- passages back, at most 50
+  0.53                     -- the floor
+)
+group by source_table, source_ref
+order by best desc;
+```
+
+- **The ref** is how the catalogue links the row: a vault note's `path`,
+  `job_search.profiles` by the owner's id, every other table by its `id` as
+  text.
+- **Group by row.** A long note can return several passages; the row is what
+  you read and cite.
+- **The floor is 0.53.** Passages above it have been on topic in every test
+  on the person's data; below it they drift. Treat anything from 0.53 to
+  about 0.6 as a lead to check, not a find.
+- **Your own writing or Dash's.** `author` on each passage is `me` or
+  `dash`. Pass `'{me}'` as the seventh argument when you want only what the
+  person wrote, which is the only kind that can say what they want.
+- **It needs a row to start from.** A row with no passages yet (written in
+  the last few minutes) returns nothing, and no topic can be searched without
+  a row. Start from the one or two best rows the word search found, not from
+  every hit.
+
+Rows found this way are read and judged the same as any other: read the
+note in full before relying on it, and keep it only if it changes the map.
+When you keep one, say in its `why` that the meaning search found it ("Found
+by meaning from Strong Towns Housing Course: says the real problem is
+displacement."), so the person can see what the word search would have
+missed.
+
 ### What is already on the goal
 
 ```sql

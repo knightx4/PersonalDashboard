@@ -165,6 +165,10 @@ export function catalogueMarkdown(): string {
     'says about what the person wants. Each is scoped to the person by `user_id` unless it says',
     'otherwise. The goals skill, "Pulling in from the other modules", says how to use it.',
     '',
+    'The columns listed under Search find rows by their words. To find rows that say the same',
+    'thing in other words, give a row you have already found to `core.search_memory_from`; the',
+    'goals skill, "Search by meaning from a row you found", shows the call.',
+    '',
   ];
   for (const weight of SOURCE_WEIGHTS) {
     const sources = SOURCES.filter((s) => s.weight === weight);
