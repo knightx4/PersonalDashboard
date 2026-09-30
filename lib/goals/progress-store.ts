@@ -116,3 +116,46 @@ export async function undoProgressEntry(client: GoalsSupabaseClient, id: string)
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;
 }
+
+/**
+ * Give a step an estimated total when it has none (plan #1277), as filing
+ * does from a number in its done-when. False when the step is gone or
+ * already has one: a total the person set is never overwritten this way.
+ */
+export async function setTotalIfNone(
+  client: GoalsSupabaseClient,
+  stepId: string,
+  total: number,
+  unit: string,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('items')
+    .update({ estimated_total: total, total_unit: unit })
+    .eq('id', stepId)
+    .eq('level', 'step')
+    .is('archived_at', null)
+    .is('estimated_total', null)
+    .select('id');
+  if (error) throw new Error(`Could not set the total: ${error.message}`);
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Take back a total filing set, when it still stands as it was set. One the
+ * person changed since is theirs and stays.
+ */
+export async function clearTotalIfUnchanged(
+  client: GoalsSupabaseClient,
+  stepId: string,
+  total: number,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('items')
+    .update({ estimated_total: null, total_unit: null })
+    .eq('id', stepId)
+    .eq('level', 'step')
+    .eq('estimated_total', total)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}

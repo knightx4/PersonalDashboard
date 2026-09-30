@@ -99,6 +99,20 @@ describe('describeRhythm', () => {
 });
 
 describe('parseStepFields', () => {
+  it('sets an estimated total with what it counts, and clears both together (plan #1277)', () => {
+    expect(parseStepFields(form({ estimatedTotal: ' 100 ', totalUnit: ' bags ' }))).toEqual({
+      ok: true,
+      value: { estimated_total: 100, total_unit: 'bags' },
+    });
+    expect(parseStepFields(form({ estimatedTotal: '', totalUnit: 'bags' }))).toEqual({
+      ok: true,
+      value: { estimated_total: null, total_unit: null },
+    });
+    expect(parseStepFields(form({ estimatedTotal: '100', totalUnit: '' })).ok).toBe(false);
+    expect(parseStepFields(form({ estimatedTotal: '0', totalUnit: 'bags' })).ok).toBe(false);
+    expect(parseStepFields(form({ estimatedTotal: 'lots', totalUnit: 'bags' })).ok).toBe(false);
+  });
+
   it('requires a title for a new step and leaves absent fields alone', () => {
     expect(parseStepFields(form({}), { requireTitle: true })).toMatchObject({ ok: false });
     expect(parseStepFields(form({ title: '  Call the bank ' }))).toEqual({

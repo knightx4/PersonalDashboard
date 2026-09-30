@@ -13,6 +13,8 @@
  */
 import type { StepQuestion } from '@/lib/goals/answers';
 import type { StepBlockKind, StepLink, StepRef } from '@/lib/goals/dependencies';
+import { PROGRESS_UNIT_MAX } from '@/lib/goals/progress';
+import { parseNumber } from '@/lib/goals/readings';
 import type { GoalStatus } from '@/lib/goals/tree';
 
 /** The limits the table's checks set (supabase/migrations-goals/0001). */
@@ -112,6 +114,12 @@ export type Step = {
   prepCheckedAt?: string | null;
   /** When the step was added; the morning brief lists unjudged steps newest first (plan #1217). */
   createdAt?: string | null;
+  /**
+   * How many in all its progress entries count towards, as an estimate
+   * (plan #1277), and what it counts. Both or neither.
+   */
+  estimatedTotal?: number | null;
+  totalUnit?: string | null;
 };
 
 /**
@@ -243,6 +251,8 @@ export type StepFields = {
   starts_on?: string | null;
   rhythm_count?: number | null;
   rhythm_period?: RhythmPeriod | null;
+  estimated_total?: number | null;
+  total_unit?: string | null;
 };
 
 function clean(raw: unknown): string | null {
@@ -321,6 +331,29 @@ export function parseStepFields(
   }
   if (fields.starts_on && fields.due_on && fields.starts_on > fields.due_on) {
     return { ok: false, error: 'A step has to start on or before the day it is due.' };
+  }
+
+  // The estimated total and its unit go together (plan #1277): a number
+  // with no unit counts nothing, and a total sent empty clears both.
+  const rawTotal = get('estimatedTotal');
+  if (present(rawTotal)) {
+    const text = clean(rawTotal);
+    if (text === null) {
+      fields.estimated_total = null;
+      fields.total_unit = null;
+    } else {
+      const total = parseNumber(text);
+      if (total === null || !(total > 0)) {
+        return { ok: false, error: 'The total has to be a number more than nothing.' };
+      }
+      const unit = clean(get('totalUnit'));
+      if (!unit) return { ok: false, error: 'Say what the total counts, such as bags.' };
+      if (unit.length > PROGRESS_UNIT_MAX) {
+        return { ok: false, error: `Keep what it counts under ${PROGRESS_UNIT_MAX} characters.` };
+      }
+      fields.estimated_total = total;
+      fields.total_unit = unit;
+    }
   }
 
   const rawKind = get('kind');

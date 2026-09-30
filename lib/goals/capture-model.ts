@@ -19,7 +19,8 @@ const TOOL_NAME = 'file';
 const SYSTEM = `You file a sentence the owner of a personal goals tracker wrote
 about something that happened. You are given their open goals, each with a ref
 like g1, and the open steps under each goal, each with a ref like s4, then the
-sentence.
+sentence. A step may have a line in brackets under it with its done-when, its
+total and how much is logged so far, and what Dash prepared for it.
 
 Decide what the sentence means for those goals, using only these five moves:
 
@@ -36,6 +37,9 @@ Decide what the sentence means for those goals, using only these five moves:
   ("moved two bags" is quantity 2, unit bags). "day" is the date it happened
   as YYYY-MM-DD, only when the sentence names another day than today, such as
   yesterday; work it out from today's date.
+  "total" is how many there are in all, in the same unit, and only for a
+  step shown with "no total" whose done-when or what Dash prepared for it
+  says the number ("all 100 bags", "about 100 bags"). Never guess one.
 - reading: the sentence gives the current value of a goal's number, such as a
   balance or a weight. "goal" is its ref and "value" is the number alone, in
   the goal's unit. Only for goals marked "measured in".
@@ -105,6 +109,7 @@ export async function askCaptureModel(
                     quantity: { type: ['number', 'null'] },
                     unit: { type: ['string', 'null'] },
                     day: { type: ['string', 'null'] },
+                    total: { type: ['number', 'null'] },
                   },
                   required: ['type'],
                 },

@@ -15,6 +15,7 @@ import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import type { LinkedFile } from '@/lib/files/files';
 import type { StepPrep } from '@/lib/goals/goal-page';
+import { PROGRESS_UNIT_MAX } from '@/lib/goals/progress';
 import { linkBareDomains } from '@/lib/goals/result-links';
 import { countProposed } from '@/lib/goals/shaping';
 import {
@@ -299,14 +300,22 @@ function onlyChanged(form: FormData, node: StepNode): FormData {
     acceptance: node.acceptance ?? '',
     dueOn: node.dueOn ?? '',
     startsOn: node.startsOn ?? '',
+    estimatedTotal: node.estimatedTotal ? String(node.estimatedTotal) : '',
+    totalUnit: node.totalUnit ?? '',
   };
   // The two dates go together when either changed, so the start can be
   // checked against the due date the form shows.
   const datesChanged = ['dueOn', 'startsOn'].some(
     (key) => String(form.get(key) ?? '').trim() !== before[key],
   );
+  // The total and what it counts go together too, since one means nothing
+  // without the other (plan #1277).
+  const totalChanged = ['estimatedTotal', 'totalUnit'].some(
+    (key) => String(form.get(key) ?? '').trim() !== before[key],
+  );
   for (const [key, value] of Object.entries(before)) {
     if (datesChanged && (key === 'dueOn' || key === 'startsOn')) continue;
+    if (totalChanged && (key === 'estimatedTotal' || key === 'totalUnit')) continue;
     if (String(form.get(key) ?? '').trim() === value) form.delete(key);
   }
   if (form.get('kind') === node.kind) {
@@ -397,6 +406,30 @@ export function StepEditForm({
           />
           {kind === 'rhythm' && (
             <RhythmFields count={node.rhythmCount} period={node.rhythmPeriod} />
+          )}
+          {(kind === 'mine' || kind === 'claude') && (
+            <span className="inline-flex items-center">
+              <ChipInput
+                type="text"
+                inputMode="decimal"
+                name="estimatedTotal"
+                icon="About"
+                defaultValue={node.estimatedTotal ?? ''}
+                placeholder="how many"
+                size={8}
+                aria-label={`About how many in all for ${node.title}`}
+                title="An estimate: the step says roughly how much is left from it"
+              />
+              <ChipInput
+                type="text"
+                name="totalUnit"
+                maxLength={PROGRESS_UNIT_MAX}
+                defaultValue={node.totalUnit ?? ''}
+                placeholder="bags"
+                size={8}
+                aria-label={`What the total for ${node.title} counts`}
+              />
+            </span>
           )}
         </div>
         {state.error && <p className="px-1 text-small text-danger">{state.error}</p>}

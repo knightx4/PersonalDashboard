@@ -450,6 +450,19 @@ the step still means done. A step whose progress is all on steps beneath it
 says when and on which one, and the Steps heading says when anything on the
 goal last moved. A step with no entries looks as it did before.
 
+A step with an estimated total says roughly how much is left (plan #1277).
+Its line reads "7 of about 100 bags, about 93 to go", and at or past the total
+"the estimate reached", never a percentage. Its details say "About 100 bags in
+all", and Edit has the total and what it counts side by side; clearing the
+number clears both. Entries count towards the total when their unit matches
+it, ignoring case and a plural "s", so "1 bag" counts towards 100 bags.
+Filing is shown each open step's done-when, its total and its tally so far,
+and the start of what Dash prepared for it. When a step has no total and one
+of those names the number ("all 100 bags"), the progress move may set it in
+the entry's unit. It is never set over a total already there, and Undo on
+that line clears it again unless it has been changed since. The filed line
+then reads `Logged 2 bags on "…" in …, about 93 to go of roughly 100`.
+
 ## What Claude does, and when
 
 Every automated job is a routine run. Runs count against the Claude plan's

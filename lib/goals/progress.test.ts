@@ -8,6 +8,9 @@ import {
   summariseProgress,
   tallyProgress,
   tallyWords,
+  talliesBesideTotal,
+  towardsTotal,
+  towardsTotalWords,
   type ProgressEntry,
 } from './progress';
 
@@ -176,5 +179,35 @@ describe('latestBeneath', () => {
     expect(beneath.lone).toBeUndefined();
     expect(lastProgressOn(progress)).toBe('2026-09-30');
     expect(lastProgressOn({})).toBeNull();
+  });
+});
+
+describe('roughly how much is left (plan #1277)', () => {
+  it('says about 93 to go when entries add to 7 of an estimated 100 bags', () => {
+    const { tallies } = summariseProgress([
+      entry('a', { quantity: 5, unit: 'bags' }),
+      entry('b', { quantity: 2, unit: 'Bags' }),
+    ])['step-1']!;
+    const towards = towardsTotal(100, 'bags', tallies)!;
+    expect(towards).toEqual({ done: 7, total: 100, left: 93, unit: 'bags' });
+    expect(towardsTotalWords(towards)).toBe('7 of about 100 bags, about 93 to go');
+  });
+
+  it('counts one bag towards a total of bags, and keeps other units beside it', () => {
+    const tallies = [
+      { quantity: 1, unit: 'bag' },
+      { quantity: 3, unit: 'boxes' },
+    ];
+    expect(towardsTotal(10, 'bags', tallies)?.done).toBe(1);
+    expect(talliesBesideTotal(tallies, 'bags')).toEqual([{ quantity: 3, unit: 'boxes' }]);
+  });
+
+  it('says the estimate is reached rather than a negative, and nothing without a total', () => {
+    expect(towardsTotalWords(towardsTotal(100, 'bags', [{ quantity: 104, unit: 'bags' }])!)).toBe(
+      '104 of about 100 bags, the estimate reached',
+    );
+    expect(towardsTotal(null, 'bags', [])).toBeNull();
+    expect(towardsTotal(100, null, [])).toBeNull();
+    expect(towardsTotal(100, 'bags', [])).toMatchObject({ done: 0, left: 100 });
   });
 });
