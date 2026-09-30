@@ -54,8 +54,11 @@ export function checkBackFrom(row: Record<string, unknown>): CheckBack {
  */
 export const WAKE_GRACE_MS = 60 * 60 * 1000;
 
-/** Sessions the tick may start for check-backs in one UTC day, per account. */
-export const WAKES_PER_DAY = 3;
+/** Sessions the tick may start for check-backs in one `WAKE_WINDOW_MS`, per account. */
+export const WAKES_PER_WINDOW = 3;
+
+/** The rolling window `WAKES_PER_WINDOW` is counted over. */
+export const WAKE_WINDOW_MS = 6 * 60 * 60 * 1000;
 
 /** The furthest ahead a check-back may be set. */
 export const MAX_DELAY_MS = 30 * 24 * 60 * 60 * 1000;
@@ -84,10 +87,9 @@ export function isDue(checkBack: Pick<CheckBack, 'status' | 'dueAt'>, now: numbe
   return checkBack.status === 'waiting' && new Date(checkBack.dueAt).getTime() <= now;
 }
 
-/** Midnight UTC of the day `now` falls in: where the daily wake count starts. */
-export function wakeDayStart(now: number): number {
-  const day = new Date(now);
-  return Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate());
+/** Where the wake count starts: the last `WAKE_WINDOW_MS` up to `now`. */
+export function wakeWindowStart(now: number): number {
+  return now - WAKE_WINDOW_MS;
 }
 
 /**
@@ -95,14 +97,14 @@ export function wakeDayStart(now: number): number {
  *
  * All of them go to one session: a session handed three things to look at
  * costs one start rather than three. None when the account has used its
- * wakes for the day, and none that a session was already woken for.
+ * wakes for the window, and none that a session was already woken for.
  */
 export function chooseWake(
   waiting: readonly CheckBack[],
-  wokenToday: number,
+  wokenInWindow: number,
   now: number,
 ): CheckBack[] {
-  if (wokenToday >= WAKES_PER_DAY) return [];
+  if (wokenInWindow >= WAKES_PER_WINDOW) return [];
   return waiting
     .filter(
       (row) =>
