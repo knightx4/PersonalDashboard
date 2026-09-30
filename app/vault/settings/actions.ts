@@ -4,7 +4,9 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { encryptToken } from '@/lib/crypto/tokens';
+import { createServiceSupabase } from '@/inngest/jobs/supabase-admin';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { removeAttachmentFolder, vaultAttachmentFolder } from '@/lib/vault/attachment-storage';
 import { normaliseSubpath } from '@/lib/vault/paths';
 import { parseRepoInput } from '@/lib/vault/repo-input';
 
@@ -86,6 +88,12 @@ export async function connectVault(
  * the vault itself is untouched and reconnecting rebuilds them. Keeping a
  * mirror of someone's private notes around after they asked to disconnect
  * would be the wrong default by a wide margin.
+ *
+ * The attachment rows cascade too, but their copies in storage do not, so the
+ * connection's folder in the vault-attachments bucket is cleared after the row
+ * has gone (plan #1303). Only a row this user actually deleted gets its folder
+ * cleared, and the folder is built from the session's user id. Only the service
+ * role can delete in that bucket.
  */
 // latency: pending
 export async function disconnectVault(formData: FormData): Promise<void> {
@@ -94,11 +102,28 @@ export async function disconnectVault(formData: FormData): Promise<void> {
   if (!parsed.success) return;
 
   const supabase = await createVaultClient();
-  await supabase
+  const { data: deleted } = await supabase
     .from('vault_connections')
     .delete()
     .eq('id', parsed.data.id)
-    .eq('user_id', user.id);
+    .eq('user_id', user.id)
+    .select('id');
+
+  if (deleted?.length) {
+    try {
+      await removeAttachmentFolder(
+        createServiceSupabase(),
+        vaultAttachmentFolder(user.id, parsed.data.id),
+      );
+    } catch (error) {
+      // The rows are gone and the page is right; a copy left behind is found
+      // again by the account deletion, which clears the whole account folder.
+      console.error('vault attachment cleanup failed', {
+        connectionId: parsed.data.id,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
   revalidatePath('/vault');
   revalidatePath('/vault/settings');
