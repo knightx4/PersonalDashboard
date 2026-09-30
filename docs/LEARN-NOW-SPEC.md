@@ -1,6 +1,6 @@
 # Learn now
 
-What Learn opens on: an endless deck of things to learn next, one card at a
+The tab after Home: an endless deck of things to learn next, one card at a
 time, chosen from what you write about and from the fields you have never
 touched. You read a card and swipe it away, saying whether you know it. Since
 "Cards after the first week" below, each card carries a question to try, but
@@ -17,9 +17,10 @@ by the owner on 23 September 2026.
 
 ## What changes in Learn
 
-- **Learn now is what Learn opens on**, at `/learn/now`. It was the first tab
-  until plan #1310 put Home, at `/learn/home`, before it; your study plans are
-  listed there and not on Learn now. It replaces the Read now tab. The readings you queued yourself are still
+- **Learn now is the tab after Home**, at `/learn/now`. It was the first tab,
+  and what Learn opened on, until plan #1310 put Home at `/learn/home` before
+  it and plan #1313 made Learn open there; your study plans are listed on Home
+  and not on Learn now. It replaces the Read now tab. The readings you queued yourself are still
   there: they come first in the feed, ahead of anything the app picked.
 - **Practice Flow is questions only.** The readings #773 folded into the flow
   after an answer move to Learn now. The new-track card stays in the flow,

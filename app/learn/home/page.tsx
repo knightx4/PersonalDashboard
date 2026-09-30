@@ -33,7 +33,8 @@ const REVIEWS_COUNTED = 200;
  * next piece. The plans used to sit above the deck on Learn now (plan #1143)
  * and moved here so that Learn now is only for reading.
  *
- * Learn still opens on Learn now; where it opens is plan #1313's.
+ * Opening Learn lands here (plan #1313): the switcher's home for Learn, and
+ * the redirect at /learn.
  */
 export default async function LearnHomePage() {
   const user = await requireUser();

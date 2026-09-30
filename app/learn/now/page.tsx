@@ -30,8 +30,9 @@ export const metadata = { title: 'Learn now' };
 export const maxDuration = 300;
 
 /**
- * Learn now, what opening Learn lands on (plan #805) and the tab after Home
- * (plan #1310), as the endless feed of docs/LEARN-NOW-SPEC.md (plan #808).
+ * Learn now, the tab after Home (plan #1310), as the endless feed of
+ * docs/LEARN-NOW-SPEC.md (plan #808). Opening Learn landed here from plan
+ * #805 until #1313 moved that to Home.
  *
  * The readings you queued come first, in the order you queued them, as the
  * thin shelf they always were: what it is, why you put it there, Open, and

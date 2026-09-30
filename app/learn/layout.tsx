@@ -51,8 +51,9 @@ export default async function LearnLayout({ children }: { children: React.ReactN
   const brief = await loadLearnBrief();
 
   /**
-   * Home first (plan #1310), with each learning goal's plan, then Learn now,
-   * which is still what Learn opens on (plan #805), then Practice Flow, then the subjects the flow asks about, then the rest. A
+   * Home first (plan #1310), with each learning goal's plan and what Learn
+   * opens on (plan #1313), then Learn now, then Practice Flow, then the
+   * subjects the flow asks about, then the rest. A
    * subject and a single idea are reached through Tracks, and a reading list
    * and a reading through Reading lists, so they are `alsoMatches` rather than
    * tabs of their own -- a nav that grows an entry per depth level stops being

@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { rememberedPath } from '@/components/shell/workspace-switcher';
+import { moduleById } from '@/lib/modules';
 
 /**
  * Where switching to a workspace lands (plan #773): where you last were in
- * it, except Learn, which always opens on its home, Learn now (plan #805).
+ * it, except Learn, which always opens on its home, Home (plan #1313). It
+ * opened on Learn now from plan #805 until then.
  */
 
 function rememberLastPaths(paths: Record<string, string>) {
@@ -22,9 +24,11 @@ describe('rememberedPath', () => {
     expect(rememberedPath('jobs', '/jobs')).toBe('/jobs/pipeline');
   });
 
-  it('lands Learn on its home whatever page you left it on', () => {
+  it('lands Learn on Home whatever page you left it on', () => {
     rememberLastPaths({ learn: '/learn/lists' });
-    expect(rememberedPath('learn', '/learn/now')).toBe('/learn/now');
+    const home = moduleById('learn')?.home;
+    expect(home).toBe('/learn/home');
+    expect(rememberedPath('learn', home!)).toBe('/learn/home');
   });
 
   it('lands on the home when nothing is remembered', () => {
