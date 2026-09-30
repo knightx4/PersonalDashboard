@@ -165,3 +165,19 @@ describe('a step with an estimated total (plan #1277)', () => {
     expect(html).toMatch(/name="totalUnit"[^>]*value="bags"|value="bags"[^>]*name="totalUnit"/);
   });
 });
+
+describe('a step with a rough answer to how far along (plan #1280)', () => {
+  const answered = [entry('e3', { text: 'moved some bags', estimate: 'half' })];
+  const onLine = /Under way<\/span><span class="tabular"> · (<!-- -->)?about half done/;
+
+  it('says it on the row when the step has no total', () => {
+    expect(render([phase, bags, shelf], answered)).toMatch(onLine);
+  });
+
+  it('gives way to a real total once there is one', () => {
+    const counted = { ...bags, estimatedTotal: 100, totalUnit: 'bags' };
+    const html = render([phase, counted, shelf], [...entries, ...answered]);
+    expect(html).toContain('7 of about 100 bags, about 93 to go');
+    expect(html).not.toMatch(onLine);
+  });
+});

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   addedProgress,
+  asksEstimate,
   captureContext,
   captureMessage,
   describeFiled,
+  estimateAsked,
   fileCapture,
   markUndone,
   MAX_FILED,
@@ -11,6 +13,7 @@ import {
   progressTotal,
   readFiled,
   undoMove,
+  withEstimate,
   type CaptureContext,
   type FiledEntry,
   type FilingDeps,
@@ -273,6 +276,7 @@ function stubs(input: unknown, overrides: Partial<FilingDeps> = {}) {
             unit: action.unit,
             happened_on: action.happenedOn ?? '2026-09-30',
             ...(progressTotal(action) ?? {}),
+            ...(asksEstimate(action, progressTotal(action)) ? { ask_estimate: true } : {}),
             undone_at: null,
           };
         case 'add': {
@@ -293,6 +297,9 @@ function stubs(input: unknown, overrides: Partial<FilingDeps> = {}) {
                     unit: progress.unit,
                     happened_on: progress.happenedOn ?? '2026-09-30',
                     ...(progressTotal(progress) ?? {}),
+                    ...(asksEstimate(progress, progressTotal(progress))
+                      ? { ask_estimate: true }
+                      : {}),
                   },
                 }
               : {}),
@@ -770,6 +777,7 @@ describe('adding a step already under way (plan #1278)', () => {
         quantity: 2,
         unit: 'bags',
         happened_on: '2026-09-30',
+        ask_estimate: true,
       },
       undone_at: null,
     });
@@ -971,5 +979,115 @@ describe('counting several at once, on the day they happened (plan #1279)', () =
     );
     await fileCapture('rewrote the about page yesterday', '2026-09-30', deps);
     expect(saved[0]![0]).toMatchObject({ kind: 'progress', item_id: 'portfolio', happened_on: '2026-09-29' });
+  });
+});
+
+describe('asking once how far along a step is (plan #1280)', () => {
+  const entry = (id: string): ProgressEntry => ({
+    id,
+    itemId: 'bags',
+    captureId: null,
+    happenedOn: '2026-09-29',
+    text: 'moved some bags',
+    quantity: null,
+    unit: null,
+    estimate: null,
+    createdAt: '2026-09-29T10:00:00Z',
+  });
+  const tree = (bagsStep: Partial<Step>, entries: ProgressEntry[] = []) =>
+    contextOf(
+      [goal('apartment', { title: 'Apartment' })],
+      [
+        step('living', 'apartment', { title: 'Living room' }),
+        step('bags', 'living', { title: 'Move the bags', ...bagsStep }),
+      ],
+      new Map(),
+      entries,
+    );
+  const fileOn = async (context: CaptureContext, move: Record<string, unknown>) => {
+    const { deps, saved } = stubs({ actions: [move] }, { context: async () => context });
+    await fileCapture('moved two bags', '2026-09-30', deps);
+    return saved[0]![0]!;
+  };
+
+  it('asks after the first entry on a step with no total, and a tap keeps the answer', async () => {
+    const context = tree({});
+    const bags = context.steps.find((s) => s.id === 'bags')!;
+    expect(bags.logged).toBe(0);
+    const filed = await fileOn(context, { type: 'progress', step: bags.ref, text: 'moved two bags', quantity: 2, unit: 'bags' });
+    expect(filed).toMatchObject({ kind: 'progress', ask_estimate: true });
+    expect(estimateAsked(filed)).toBe('entry-1');
+
+    const answered = withEstimate([filed], 0, 'half');
+    expect(answered![0]).toMatchObject({ estimate: 'half' });
+    // Answered, the chips go and a second tap is refused.
+    expect(estimateAsked(answered![0]!)).toBeNull();
+    expect(withEstimate(answered!, 0, 'nearly')).toBeNull();
+    // Undone, it is not asking either.
+    expect(estimateAsked({ ...filed, undone_at: '2026-09-30T10:00:00Z' })).toBeNull();
+  });
+
+  it('does not come back for a step that already has an entry, answered or not', async () => {
+    const context = tree({}, [entry('a')]);
+    const bags = context.steps.find((s) => s.id === 'bags')!;
+    expect(bags.logged).toBe(1);
+    const filed = await fileOn(context, { type: 'progress', step: bags.ref, text: 'moved two more' });
+    expect(filed).not.toHaveProperty('ask_estimate');
+    expect(estimateAsked(filed)).toBeNull();
+  });
+
+  it('does not ask on a step with a total, one this line sets, or the goal itself', async () => {
+    const withTotal = tree({ estimatedTotal: 100, totalUnit: 'bags' });
+    const bags = withTotal.steps.find((s) => s.id === 'bags')!;
+    expect(
+      estimateAsked(await fileOn(withTotal, { type: 'progress', step: bags.ref, text: 'moved two', quantity: 2, unit: 'bags' })),
+    ).toBeNull();
+
+    const settingOne = tree({ acceptance: 'All 100 bags are in the office' });
+    expect(
+      estimateAsked(
+        await fileOn(settingOne, { type: 'progress', step: bags.ref, text: 'moved two', quantity: 2, unit: 'bags', total: 100 }),
+      ),
+    ).toBeNull();
+
+    expect(estimateAsked(await fileOn(tree({}), { type: 'progress', goal: 'g1', text: 'tidied up' }))).toBeNull();
+  });
+
+  it('asks on a step added already under way, and keeps the answer on its progress', async () => {
+    const context = tree({});
+    const living = context.steps.find((s) => s.id === 'living')!;
+    const filed = await fileOn(context, {
+      type: 'add',
+      parent: living.ref,
+      title: 'Move the bags to the office',
+      text: 'moved two bags',
+      quantity: 2,
+      unit: 'bags',
+    });
+    expect(estimateAsked(filed)).toBe('entry-1');
+    const [answered] = withEstimate([filed], 0, 'started')!;
+    expect(answered).toMatchObject({ kind: 'add', progress: { entry_id: 'entry-1', estimate: 'started' } });
+    expect(estimateAsked(answered!)).toBeNull();
+
+    // A plain add has nothing to ask about.
+    const plain = await fileOn(context, { type: 'add', parent: living.ref, title: 'Sweep' });
+    expect(estimateAsked(plain)).toBeNull();
+  });
+
+  it('never asks on a line filed before', () => {
+    const old: FiledEntry = {
+      kind: 'progress',
+      entry_id: 'e',
+      item_id: 'bags',
+      step_title: 'Move the bags',
+      goal_title: 'Apartment',
+      text: 'moved two',
+      quantity: 2,
+      unit: 'bags',
+      happened_on: '2026-09-29',
+      undone_at: null,
+    };
+    expect(estimateAsked(old)).toBeNull();
+    expect(withEstimate([old], 0, 'half')).toBeNull();
   });
 });

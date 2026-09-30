@@ -31,7 +31,9 @@ import {
 import { askJev } from '@/lib/jev/client';
 import { JEV_CONFIDENCE_FLOOR } from '@/lib/jev/decide';
 import { jevEnabledFor } from '@/lib/jev/enabled';
+import { PROGRESS_ESTIMATES, type ProgressEstimate } from '@/lib/goals/progress';
 import {
+  answerFiledEstimate,
   applyCaptureAction,
   keepCapture,
   loadCaptureContext,
@@ -196,6 +198,37 @@ export async function undoGoalCapture(captureId: string, index: number): Promise
     return { captureId: parsed.data.captureId, filed: result.filed };
   } catch {
     return { error: 'That could not be undone. Try again.' };
+  }
+}
+
+const Estimate = Undo.extend({ estimate: z.enum(PROGRESS_ESTIMATES) });
+
+/**
+ * Keep the tapped answer to "Roughly how far along?" on the progress a line
+ * filed (plan #1280), and on the line so it is not asked again.
+ */
+// latency: pending
+export async function estimateGoalCapture(
+  captureId: string,
+  index: number,
+  estimate: ProgressEstimate,
+): Promise<GoalCaptureState> {
+  await requireUser();
+  const parsed = Estimate.safeParse({ captureId, index, estimate });
+  if (!parsed.success) return { error: 'Could not tell which line that was.' };
+  try {
+    const client = await createGoalsClient({ actor: 'capture', captureId: parsed.data.captureId });
+    const result = await answerFiledEstimate(
+      client,
+      parsed.data.captureId,
+      parsed.data.index,
+      parsed.data.estimate,
+    );
+    if (!result.ok) return { error: result.error };
+    refresh();
+    return { captureId: parsed.data.captureId, filed: result.filed };
+  } catch {
+    return { error: 'That could not be kept. Try again.' };
   }
 }
 

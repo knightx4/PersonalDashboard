@@ -21,6 +21,24 @@ export const PROGRESS_UNIT_MAX = 40;
 export const PROGRESS_ESTIMATES = ['started', 'half', 'nearly'] as const;
 export type ProgressEstimate = (typeof PROGRESS_ESTIMATES)[number];
 
+/** How far along, as the step and its progress list say a rough answer. */
+export const PROGRESS_ESTIMATE_WORDS: Record<ProgressEstimate, string> = {
+  started: 'just started',
+  half: 'about half done',
+  nearly: 'nearly done',
+};
+
+/**
+ * The question asked once after the first entry on a step with no total
+ * (plan #1280), and its three answers as chips.
+ */
+export const ESTIMATE_QUESTION = 'Roughly how far along?';
+export const ESTIMATE_CHIPS: Record<ProgressEstimate, string> = {
+  started: 'Just started',
+  half: 'About half',
+  nearly: 'Nearly done',
+};
+
 export type ProgressEntry = {
   id: string;
   /** The step or goal the entry sits on. */
@@ -142,6 +160,12 @@ export type ItemProgress = {
   tallies: ProgressTally[];
   /** YYYY-MM-DD: the day of the newest entry. */
   lastOn: string;
+  /**
+   * The newest rough answer to how far along (plan #1280), or null when no
+   * entry carries one. A known total says more, so the step shows this only
+   * when it has none.
+   */
+  estimate: ProgressEstimate | null;
 };
 
 /** The unit a tally is kept under: case and surrounding space ignored. */
@@ -170,7 +194,12 @@ export function summariseProgress(
       if (tally) tally.quantity += entry.quantity;
       else tallies.set(key, { quantity: entry.quantity, unit: entry.unit?.trim() || null });
     }
-    out[itemId] = { entries: list, tallies: [...tallies.values()], lastOn: list[0].happenedOn };
+    out[itemId] = {
+      entries: list,
+      tallies: [...tallies.values()],
+      lastOn: list[0].happenedOn,
+      estimate: list.find((entry) => entry.estimate !== null)?.estimate ?? null,
+    };
   }
   return out;
 }

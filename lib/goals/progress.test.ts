@@ -133,6 +133,17 @@ describe('summariseProgress', () => {
     expect(summary['step-2'].tallies).toEqual([]);
     expect(summary['step-3']).toBeUndefined();
   });
+
+  it('keeps the newest rough answer to how far along (plan #1280)', () => {
+    const summary = summariseProgress([
+      entry('a', { estimate: 'started', happenedOn: '2026-09-26' }),
+      entry('b', { estimate: 'half', happenedOn: '2026-09-28' }),
+      entry('c', { quantity: 2, unit: 'bags', happenedOn: '2026-09-29' }),
+      entry('d', { itemId: 'step-2', quantity: 1, unit: 'bags' }),
+    ]);
+    expect(summary['step-1'].estimate).toBe('half');
+    expect(summary['step-2'].estimate).toBeNull();
+  });
 });
 
 describe('tallyWords', () => {

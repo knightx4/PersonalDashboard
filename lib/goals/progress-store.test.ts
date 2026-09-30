@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
-import { addProgressEntry, loadProgressEntries, undoProgressEntry } from '@/lib/goals/progress-store';
+import {
+  addProgressEntry,
+  loadProgressEntries,
+  setProgressEstimate,
+  undoProgressEntry,
+} from '@/lib/goals/progress-store';
 
 type Call = { table: string; op: string; args: unknown[] };
 
@@ -170,5 +175,20 @@ describe('undoProgressEntry', () => {
   it('says so when there was nothing left to undo', async () => {
     const { client } = fakeClient({ progress_entries: { data: [], error: null } });
     expect(await undoProgressEntry(client, 'e1')).toBe(false);
+  });
+});
+
+describe('setProgressEstimate (plan #1280)', () => {
+  it('keeps the answer on a live entry', async () => {
+    const { client, calls } = fakeClient({ progress_entries: { data: [{ id: 'e1' }], error: null } });
+    expect(await setProgressEstimate(client, 'e1', 'half')).toBe(true);
+    expect(calls).toContainEqual({ table: 'progress_entries', op: 'update', args: [{ estimate: 'half' }] });
+    expect(calls).toContainEqual({ table: 'progress_entries', op: 'is', args: ['undone_at', null] });
+  });
+
+  it('says so when the entry was undone, and refuses an answer that is not one', async () => {
+    const { client } = fakeClient({ progress_entries: { data: [], error: null } });
+    expect(await setProgressEstimate(client, 'e1', 'nearly')).toBe(false);
+    await expect(setProgressEstimate(client, 'e1', 'most' as never)).rejects.toThrow();
   });
 });

@@ -17,6 +17,7 @@ import type { PrepTarget, StepPrep } from '@/lib/goals/goal-page';
 import { offersPrepare, offersSend, sendJob } from '@/lib/goals/handover';
 import type { GoalRowNode } from '@/lib/goals/plan-rows';
 import {
+  PROGRESS_ESTIMATE_WORDS,
   amountWords,
   talliesBesideTotal,
   tallyWords,
@@ -24,7 +25,6 @@ import {
   towardsTotalWords,
   type ItemProgress,
   type LatestBeneath,
-  type ProgressEstimate,
 } from '@/lib/goals/progress';
 import { progressLine } from '@/lib/goals/rhythms';
 import { countProposed, type StepRunView } from '@/lib/goals/shaping';
@@ -125,19 +125,13 @@ export type GoalRowContext = {
   progressBeneath?: Record<string, LatestBeneath>;
 };
 
-/** How far along, as the progress list says a rough answer. */
-const ESTIMATE_WORDS: Record<ProgressEstimate, string> = {
-  started: 'just started',
-  half: 'about half done',
-  nearly: 'nearly done',
-};
-
 /**
  * An open step with progress on it (plan #1276): under way, its running
  * tally and the day it was last touched. With an estimated total the tally
  * says roughly how much is left (plan #1277): "7 of about 100 bags, about 93
- * to go". A parent with progress only beneath it says when and on which step
- * instead.
+ * to go". Without a total it says the rough answer to how far along, when
+ * one was given (plan #1280): "Under way · about half done". A parent with
+ * progress only beneath it says when and on which step instead.
  */
 function ProgressLine({
   progress,
@@ -156,7 +150,12 @@ function ProgressLine({
       ? [towardsTotalWords(towards), tallyWords(talliesBesideTotal(progress.tallies, total.unit))]
           .filter(Boolean)
           .join(' · ')
-      : tallyWords(progress.tallies);
+      : [
+          tallyWords(progress.tallies),
+          progress.estimate ? PROGRESS_ESTIMATE_WORDS[progress.estimate] : null,
+        ]
+          .filter(Boolean)
+          .join(' · ');
     return (
       <li style={inset} className="flex items-center gap-1.5 pb-1.5 pr-3 text-small text-ink-muted">
         <span className="size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
@@ -199,7 +198,7 @@ function ProgressList({ progress }: { progress: ItemProgress }) {
                 </span>
               )}
               {entry.estimate && (
-                <span className="text-ink-muted"> · {ESTIMATE_WORDS[entry.estimate]}</span>
+                <span className="text-ink-muted"> · {PROGRESS_ESTIMATE_WORDS[entry.estimate]}</span>
               )}
             </span>
           </li>

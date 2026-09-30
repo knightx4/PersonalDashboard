@@ -4,21 +4,25 @@ import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
   MAX_CONTEXT_STEPS,
   addedProgress,
+  asksEstimate,
   captureContext,
+  estimateAsked,
   markUndone,
   progressTotal,
   readFiled,
   undoMove,
+  withEstimate,
   type AddedFiledProgress,
   type CaptureContext,
   type FiledEntry,
   type PlannedAction,
 } from '@/lib/goals/capture';
-import { summariseProgress } from '@/lib/goals/progress';
+import { summariseProgress, type ProgressEstimate } from '@/lib/goals/progress';
 import {
   addProgressEntry,
   clearTotalIfUnchanged,
   loadProgressEntries,
+  setProgressEstimate,
   setTotalIfNone,
   undoProgressEntry,
 } from '@/lib/goals/progress-store';
@@ -162,6 +166,7 @@ export async function applyCaptureAction(
         unit: action.unit,
         happened_on: happenedOn,
         ...(total ?? {}),
+        ...(asksEstimate(action, total) ? { ask_estimate: true } : {}),
         undone_at: null,
       };
     }
@@ -217,6 +222,7 @@ export async function applyCaptureAction(
             unit: progress.unit,
             happened_on: happenedOn,
             ...(total ?? {}),
+            ...(asksEstimate(progress, total) ? { ask_estimate: true } : {}),
           };
         }
       }
@@ -323,6 +329,37 @@ export async function undoFiled(
 
   const next = markUndone(filed, index, new Date().toISOString());
   if (!next) return { ok: true, filed };
+  await saveFiled(client, captureId, next);
+  return { ok: true, filed: next };
+}
+
+/**
+ * Keep the answer to "Roughly how far along?" (plan #1280) on the entry the
+ * line filed, and on the line so the question is not shown again. Refused
+ * when the line is not asking: answered already, undone, or never asked.
+ */
+export async function answerFiledEstimate(
+  client: GoalsSupabaseClient,
+  captureId: string,
+  index: number,
+  estimate: ProgressEstimate,
+): Promise<UndoResult> {
+  const { data, error } = await client
+    .from('captures')
+    .select('filed')
+    .eq('id', captureId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return { ok: false, error: 'That capture is no longer there.' };
+
+  const filed = readFiled(data.filed);
+  const entry = filed[index];
+  const entryId = entry ? estimateAsked(entry) : null;
+  const next = entryId ? withEstimate(filed, index, estimate) : null;
+  if (!entryId || !next) return { ok: false, error: 'That line is no longer asking.' };
+
+  const kept = await setProgressEstimate(client, entryId, estimate);
+  if (!kept) return { ok: false, error: 'That progress was taken back, so there is nothing to keep it on.' };
   await saveFiled(client, captureId, next);
   return { ok: true, filed: next };
 }
