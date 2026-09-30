@@ -64,6 +64,7 @@ const TOOL_LABELS: Record<string, string> = {
   todos: 'Read todos',
   goal_status: 'Read goals',
   vault_notes: 'Read vault notes',
+  read_dev_row: 'Read a Dev row',
 };
 
 export function toolLabel(tool: string): string {

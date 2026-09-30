@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Banner } from '@/components/ui/banner';
 
 type JobProgress = {
@@ -24,6 +25,7 @@ export function InboxSyncBanner({
   accountIds: string[];
   initialJob?: JobProgress | null;
 }) {
+  const router = useRouter();
   const [job, setJob] = useState<JobProgress | null>(initialJob);
   const idsKey = useMemo(() => accountIds.join(','), [accountIds]);
 
@@ -54,6 +56,16 @@ export function InboxSyncBanner({
       window.clearInterval(id);
     };
   }, [idsKey]);
+
+  // A run this banner was showing has ended, whoever started it (the hourly
+  // cron, another tab). Re-read the page underneath so what it imported shows
+  // without a reload.
+  const wasRunning = useRef(Boolean(initialJob && !initialJob.done));
+  const running = Boolean(job && !job.done);
+  useEffect(() => {
+    if (wasRunning.current && !running) router.refresh();
+    wasRunning.current = running;
+  }, [running, router]);
 
   if (!job || job.done) return null;
 
