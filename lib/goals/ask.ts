@@ -20,6 +20,7 @@
  */
 import 'server-only';
 
+import type { Schedule } from '@/lib/goals/comments';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { resolveRoutineId, type RoutineTarget } from '@/lib/feedback/routine';
@@ -30,6 +31,7 @@ import {
   goalReplyMessage,
   parseGoalReply,
   replyBody,
+  scheduleSaid,
   type FilingOutcome,
   type ReplyCollection,
 } from '@/lib/goals/comments';
@@ -40,7 +42,7 @@ import { commentMode, hasClaudeWork, jobFor, locateStep } from '@/lib/goals/hand
 import { sendGoalStep } from '@/lib/goals/handover-store';
 import { goalRunText, runInFlight } from '@/lib/goals/shaping';
 import { loadShaping, recordAndFire } from '@/lib/goals/shaping-store';
-import { loadGoalMap } from '@/lib/goals/steps-store';
+import { loadGoalMap, setStepOnTodo, updateStep } from '@/lib/goals/steps-store';
 
 export type GoalAskInput = {
   /** Your own client: reads, and the run row. */
@@ -115,7 +117,7 @@ async function produceReply(input: GoalAskInput): Promise<GoalAskOutcome> {
   const threads = await loadThreads(input.client, [input.itemId]);
   const history = (threads[input.itemId] ?? []).filter((c) => c.id !== input.commentId);
   const { message, refs } = goalReplyMessage(
-    { goal: map.goal, steps: map.steps, collections, itemId: input.itemId },
+    { goal: map.goal, steps: map.steps, collections, itemId: input.itemId, today: input.today },
     history,
     input.question,
   );
@@ -205,13 +207,50 @@ async function produceReply(input: GoalAskInput): Promise<GoalAskOutcome> {
     }
   }
 
-  await say(input, replyBody(reply.body, outcomes));
+  const scheduled = reply.schedule ? await applySchedule(input, reply.schedule) : null;
+  await say(input, replyBody(reply.body, outcomes, scheduled?.said));
   return {
     ok: true,
-    message: outcomes.some((o) => o.ok)
+    message: outcomes.some((o) => o.ok) || scheduled?.changed
       ? 'Answered, and filed as drafts.'
       : 'Answered in the thread.',
   };
+}
+
+/**
+ * Date the step the comment is on, and put it on Todo or take it off.
+ *
+ * Both are the person's own settings on their own step, one write each through
+ * the same functions the row's date field and Show on Todo use, so a step that
+ * cannot go on Todo (it is Dash's, or closed) is refused here as it is there.
+ * The sentence says what changed, and what did not.
+ */
+async function applySchedule(
+  input: GoalAskInput,
+  schedule: Schedule,
+): Promise<{ said: string; changed: boolean }> {
+  if (input.itemId === input.goalId) {
+    return {
+      said: 'Dates and Todo belong to a step, and this comment is on the goal. Write it on the step.',
+      changed: false,
+    };
+  }
+  let dated: boolean | null = null;
+  let todo: boolean | null = null;
+  try {
+    if (schedule.dueOn !== undefined) {
+      dated = await updateStep(input.client, input.itemId, { due_on: schedule.dueOn });
+    }
+    if (schedule.onTodo !== undefined) {
+      todo = await setStepOnTodo(input.client, input.itemId, schedule.onTodo);
+    }
+  } catch (error) {
+    return {
+      said: `I could not change it: ${error instanceof Error ? error.message : 'no reason given'}.`,
+      changed: false,
+    };
+  }
+  return { said: scheduleSaid(schedule, { dated, todo }), changed: dated === true || todo === true };
 }
 
 /** Why the goals routine cannot be started from here, or null when it can. */

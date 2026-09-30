@@ -135,7 +135,18 @@ describe('reading the reply', () => {
       kind: 'answer',
       body: 'Avalanche saves more.',
       filings: [],
+      schedule: null,
     });
+  });
+
+  it('reads a date and Todo change, dropping a malformed date', () => {
+    const read = (schedule: unknown) =>
+      parseGoalReply({ needs_routine: false, schedule }, refs);
+    expect(read({ due_on: '2026-10-04', on_todo: true })).toMatchObject({
+      schedule: { dueOn: '2026-10-04', onTodo: true },
+    });
+    expect(read({ due_on: null })).toMatchObject({ schedule: { dueOn: null } });
+    expect(read({ due_on: 'October 4th' }).kind).toBe('error');
   });
 
   it('reads filings by collection ref, dropping unknown refs and empty values', () => {
