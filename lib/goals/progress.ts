@@ -126,3 +126,115 @@ export function tallyProgress(entries: readonly ProgressEntry[], unit: string | 
     return has === want ? sum + entry.quantity : sum;
   }, 0);
 }
+
+/**
+ * One unit's running tally on a step (plan #1276): the summed quantity and
+ * the unit as the newest entry spelled it. A unit of null sums the entries
+ * that gave an amount with no unit.
+ */
+export type ProgressTally = { quantity: number; unit: string | null };
+
+/** What the goal page shows for one step or goal with entries on it. */
+export type ItemProgress = {
+  /** Newest first. */
+  entries: ProgressEntry[];
+  /** One per unit, in the order the units were last used, newest first. */
+  tallies: ProgressTally[];
+  /** YYYY-MM-DD: the day of the newest entry. */
+  lastOn: string;
+};
+
+/** The unit a tally is kept under: case and surrounding space ignored. */
+const unitKey = (unit: string | null): string => unit?.trim().toLowerCase() ?? '';
+
+/**
+ * Each item's entries, tallies and last-touched day, by item id. An item with
+ * no entries is not in the result, so a step without any reads as before.
+ */
+export function summariseProgress(
+  entries: readonly ProgressEntry[],
+): Record<string, ItemProgress> {
+  const byItem = new Map<string, ProgressEntry[]>();
+  for (const entry of sortProgressEntries(entries)) {
+    const list = byItem.get(entry.itemId) ?? [];
+    list.push(entry);
+    byItem.set(entry.itemId, list);
+  }
+  const out: Record<string, ItemProgress> = {};
+  for (const [itemId, list] of byItem) {
+    const tallies = new Map<string, ProgressTally>();
+    for (const entry of list) {
+      if (entry.quantity === null) continue;
+      const key = unitKey(entry.unit);
+      const tally = tallies.get(key);
+      if (tally) tally.quantity += entry.quantity;
+      else tallies.set(key, { quantity: entry.quantity, unit: entry.unit?.trim() || null });
+    }
+    out[itemId] = { entries: list, tallies: [...tallies.values()], lastOn: list[0].happenedOn };
+  }
+  return out;
+}
+
+/** An amount as a person writes it: 7, 2.5, never 2.4999999. */
+export function formatQuantity(quantity: number): string {
+  return String(Math.round(quantity * 100) / 100);
+}
+
+/** "2 bags", or "2" when the amount has no unit. */
+export function amountWords(quantity: number, unit: string | null): string {
+  return unit ? `${formatQuantity(quantity)} ${unit}` : formatQuantity(quantity);
+}
+
+/**
+ * The running tally as a phrase: "7 bags so far", "7 bags and 3 boxes so
+ * far". Null when no entry gave an amount.
+ */
+export function tallyWords(tallies: readonly ProgressTally[]): string | null {
+  if (tallies.length === 0) return null;
+  const parts = tallies.map((tally) => amountWords(tally.quantity, tally.unit));
+  const joined =
+    parts.length === 1
+      ? parts[0]
+      : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+  return `${joined} so far`;
+}
+
+/** The latest progress somewhere beneath a step: the day and the step it was on. */
+export type LatestBeneath = { on: string; stepId: string; title: string };
+
+type ProgressTreeNode = { id: string; title: string; children: readonly ProgressTreeNode[] };
+
+/**
+ * For each step with sub-steps, the newest entry on any step beneath it, so
+ * a parent reads as touched when its child was. Steps with nothing beneath
+ * them are not in the result.
+ */
+export function latestBeneath(
+  nodes: readonly ProgressTreeNode[],
+  progress: Readonly<Record<string, ItemProgress>>,
+): Record<string, LatestBeneath> {
+  const out: Record<string, LatestBeneath> = {};
+  // The newest of a node's own entries and everything under it.
+  const walk = (node: ProgressTreeNode): LatestBeneath | null => {
+    let best: LatestBeneath | null = null;
+    for (const child of node.children) {
+      const found = walk(child);
+      if (found && (!best || found.on > best.on)) best = found;
+    }
+    if (best) out[node.id] = best;
+    const own = progress[node.id];
+    if (own && (!best || own.lastOn >= best.on)) {
+      return { on: own.lastOn, stepId: node.id, title: node.title };
+    }
+    return best;
+  };
+  for (const node of nodes) walk(node);
+  return out;
+}
+
+/** The newest day of any entry in the summary, or null when there is none. */
+export function lastProgressOn(progress: Readonly<Record<string, ItemProgress>>): string | null {
+  let last: string | null = null;
+  for (const item of Object.values(progress)) if (!last || item.lastOn > last) last = item.lastOn;
+  return last;
+}

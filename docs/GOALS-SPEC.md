@@ -422,6 +422,14 @@ say roughly how much is left. Undo marks an entry undone and leaves the row.
 The rules are in `lib/goals/progress.ts` and the reads and writes in
 `lib/goals/progress-store.ts`.
 
+On the goal page an open step with entries reads as under way (plan #1276):
+a line under its row gives the summed amount per unit ("7 bags so far") and
+the day it was last touched, and its opened panel lists the entries newest
+first. Under way is read from the entries, not stored as a status, so closing
+the step still means done. A step whose progress is all on steps beneath it
+says when and on which one, and the Steps heading says when anything on the
+goal last moved. A step with no entries looks as it did before.
+
 ## What Claude does, and when
 
 Every automated job is a routine run. Runs count against the Claude plan's

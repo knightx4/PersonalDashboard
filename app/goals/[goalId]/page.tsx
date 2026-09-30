@@ -12,6 +12,8 @@ import { loadCollectionsForGoal } from '@/lib/goals/collections-store';
 import { shownContext, type ContextItem } from '@/lib/goals/context';
 import { loadContext } from '@/lib/goals/context-store';
 import { loadGoalFlags } from '@/lib/goals/flags-store';
+import { summariseProgress, type ProgressEntry } from '@/lib/goals/progress';
+import { loadProgressEntries } from '@/lib/goals/progress-store';
 import { loadNumberFrom, loadReadings } from '@/lib/goals/readings-store';
 import { goalRunRows, type RunListing } from '@/lib/goals/runs';
 import { loadGoalRuns } from '@/lib/goals/runs-store';
@@ -231,7 +233,7 @@ export default async function GoalMapPage({
     goalMatchText({ title: map.goal.title, acceptance: map.goal.acceptance }),
     { core },
   ).then((found) => found.map(toLink));
-  const [stepRuns, filesOf, brief, review, places] = await Promise.all([
+  const [stepRuns, filesOf, brief, review, places, progressEntries] = await Promise.all([
     loadStepRuns(client, stepIdsOn(map)).catch((): Record<string, GoalRun> => ({})),
     // The files the goal and its steps link to. A failed read leaves them
     // out rather than the page, as do the note and the verdict below.
@@ -247,6 +249,11 @@ export default async function GoalMapPage({
     loadAreas(client)
       .then((areas) => areas.map((area) => ({ id: area.id, name: area.name })))
       .catch((): Place[] => []),
+    // The partial progress logged on the goal and its steps (plan #1276). A
+    // failed read leaves the steps as they were rather than the page.
+    loadProgressEntries(client, [map.goal.id, ...stepIdsOn(map)]).catch(
+      (): ProgressEntry[] => [],
+    ),
   ]);
   const status = goalStatus(
     map.goal,
@@ -382,6 +389,7 @@ export default async function GoalMapPage({
           todoOn={moduleEnabled(account, 'todo')}
           runs={stepRunLines(stepRuns)}
           files={filesOf}
+          progress={summariseProgress(progressEntries)}
         />
         <GoalRhythms steps={rhythmSteps(map.steps)} records={map.rhythms} />
         <GoalFindings findings={goalFindings(map.steps)} />

@@ -29,6 +29,8 @@ import {
   type GoalView,
 } from '@/lib/goals/plan-rows';
 import { stepPreps } from '@/lib/goals/goal-page';
+import { lastProgressOn, latestBeneath, type ItemProgress } from '@/lib/goals/progress';
+import { formatDay } from '@/lib/goals/dates';
 import { countAside, type StepRunView } from '@/lib/goals/shaping';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import { GoalRow, type GoalRowContext } from './goal-row';
@@ -40,6 +42,7 @@ const RUN_POLL_MS = 15_000;
 
 const NO_RUNS: Record<string, StepRunView> = {};
 const NO_FILES: Record<string, LinkedFile[]> = {};
+const NO_PROGRESS: Record<string, ItemProgress> = {};
 
 /** A step that is finished or dropped, which folds away under the open ones. */
 function isClosed(row: GoalRowNode): boolean {
@@ -91,6 +94,7 @@ export function StepTree({
   informationSeam,
   runs = NO_RUNS,
   files = NO_FILES,
+  progress = NO_PROGRESS,
   view = DEFAULT_GOAL_VIEW,
 }: {
   map: GoalMap;
@@ -104,6 +108,11 @@ export function StepTree({
   runs?: Record<string, StepRunView>;
   /** The files each step links to, by step id. */
   files?: Record<string, LinkedFile[]>;
+  /**
+   * The progress logged on the goal and each step, by item id (plan #1276).
+   * A step with none is not in it and reads as it always has.
+   */
+  progress?: Record<string, ItemProgress>;
   /** Start with every step's sub-steps showing. */
   unfolded?: boolean;
   /** Start with every step opened. A seam for the gallery; nothing in the app passes it. */
@@ -143,6 +152,8 @@ export function StepTree({
       informationSeam,
       runs,
       files,
+      progress,
+      progressBeneath: latestBeneath(trees.flat(), progress),
       ...stepPreps(trees),
     };
     return {
@@ -153,7 +164,9 @@ export function StepTree({
       })),
       context,
     };
-  }, [map, todoOn, showAside, unfolded, opened, informationSeam, runs, files]);
+  }, [map, todoOn, showAside, unfolded, opened, informationSeam, runs, files, progress]);
+  // When anything on the goal last moved, its own entries included.
+  const lastOn = lastProgressOn(progress);
 
   const substeps = own.rows.filter((row) => row.kind !== 'decision');
 
@@ -195,6 +208,11 @@ export function StepTree({
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2.5">
               <h2 className="text-body font-semibold text-ink">Steps</h2>
               <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                {lastOn && (
+                  <span className="tabular text-small text-ink-muted">
+                    Last progress {formatDay(lastOn)}
+                  </span>
+                )}
                 <SectionTally tally={own.tally} label={map.goal.title} />
                 <Progress label={map.goal.title} progress={own.progress} bands={own.bands} />
               </span>

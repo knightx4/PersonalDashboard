@@ -16,6 +16,13 @@ import { awaitsReview } from '@/lib/goals/daily';
 import type { PrepTarget, StepPrep } from '@/lib/goals/goal-page';
 import { offersPrepare, offersSend, sendJob } from '@/lib/goals/handover';
 import type { GoalRowNode } from '@/lib/goals/plan-rows';
+import {
+  amountWords,
+  tallyWords,
+  type ItemProgress,
+  type LatestBeneath,
+  type ProgressEstimate,
+} from '@/lib/goals/progress';
 import { progressLine } from '@/lib/goals/rhythms';
 import { countProposed, type StepRunView } from '@/lib/goals/shaping';
 import { STEP_KIND_LABELS, countSteps, describeRhythm } from '@/lib/goals/steps';
@@ -109,7 +116,86 @@ export type GoalRowContext = {
   prepFor?: Record<string, StepPrep>;
   /** The step each prep step is for, by the prep step's id. */
   targetOf?: Record<string, PrepTarget>;
+  /** The progress logged on each step, by step id (plan #1276). */
+  progress?: Record<string, ItemProgress>;
+  /** The newest progress beneath each step with sub-steps, by step id. */
+  progressBeneath?: Record<string, LatestBeneath>;
 };
+
+/** How far along, as the progress list says a rough answer. */
+const ESTIMATE_WORDS: Record<ProgressEstimate, string> = {
+  started: 'just started',
+  half: 'about half done',
+  nearly: 'nearly done',
+};
+
+/**
+ * An open step with progress on it (plan #1276): under way, its running
+ * tally and the day it was last touched. A parent with progress only beneath
+ * it says when and on which step instead.
+ */
+function ProgressLine({
+  progress,
+  beneath,
+  inset,
+}: {
+  progress: ItemProgress | undefined;
+  beneath: LatestBeneath | undefined;
+  inset: React.CSSProperties;
+}) {
+  if (progress) {
+    const tally = tallyWords(progress.tallies);
+    return (
+      <li style={inset} className="flex items-center gap-1.5 pb-1.5 pr-3 text-small text-ink-muted">
+        <span className="size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
+        <span>
+          <span className="font-medium text-ink">Under way</span>
+          {tally && <span className="tabular"> · {tally}</span>}
+          <span className="tabular"> · last {formatDate(progress.lastOn)}</span>
+        </span>
+      </li>
+    );
+  }
+  if (!beneath) return null;
+  return (
+    <li style={inset} className="pb-1.5 pr-3 text-small text-ink-muted">
+      Last progress {formatDate(beneath.on)} on{' '}
+      <a href={`#step-${beneath.stepId}`} className="underline-offset-2 hover:underline">
+        {beneath.title}
+      </a>
+    </li>
+  );
+}
+
+/** A step's progress entries, newest first, in the opened panel. */
+function ProgressList({ progress }: { progress: ItemProgress }) {
+  return (
+    <section aria-label="Progress" className="space-y-1 px-1">
+      <h3 className="text-small font-semibold text-ink-muted">Progress</h3>
+      <ul className="space-y-0.5 text-small">
+        {progress.entries.map((entry) => (
+          <li key={entry.id} className="flex gap-3">
+            <span className="tabular w-14 shrink-0 text-ink-muted">
+              {formatDate(entry.happenedOn)}
+            </span>
+            <span className="min-w-0 text-ink">
+              {entry.text}
+              {entry.quantity !== null && (
+                <span className="tabular text-ink-muted">
+                  {' '}
+                  · {amountWords(entry.quantity, entry.unit)}
+                </span>
+              )}
+              {entry.estimate && (
+                <span className="text-ink-muted"> · {ESTIMATE_WORDS[entry.estimate]}</span>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 /**
  * A sent or prepared step's latest run on its row (plan #1044): what it is on
@@ -397,6 +483,10 @@ export function GoalRow({
   const run = context.runs[step.id];
   const stepFiles = context.files?.[step.id] ?? NO_FILES;
   const prep = context.prepFor?.[step.id];
+  const progress = context.progress?.[step.id];
+  // Under way is a reading of an open step, never a status: a closed step
+  // keeps its entries in the panel and says nothing on the row.
+  const stepOpen = step.status !== 'done' && step.status !== 'dropped';
   const prepares = step.kind === 'claude' ? context.targetOf?.[step.id] : undefined;
   // Once the page holds the run a press started, its line says what the
   // press's message said and more, so the message gives way to it. A refusal
@@ -555,6 +645,13 @@ export function GoalRow({
           )}
           {/* The step's own latest run, read with the page (plan #1044). */}
           {run && <StepRunLine run={run} inset={rowInset(trail)} />}
+          {stepOpen && (
+            <ProgressLine
+              progress={progress}
+              beneath={context.progressBeneath?.[step.id]}
+              inset={rowInset(trail)}
+            />
+          )}
         </>
       }
       edit={
@@ -578,6 +675,7 @@ export function GoalRow({
             <ClaudeResult node={step} files={stepFiles} />
           )}
           {prep && <PrepNote prep={prep} />}
+          {progress && <ProgressList progress={progress} />}
           {rhythm && rhythm.past.length > 0 && step.rhythmPeriod && (
             <PastPeriods past={rhythm.past} period={step.rhythmPeriod} />
           )}
