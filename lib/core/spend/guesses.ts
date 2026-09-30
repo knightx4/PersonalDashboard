@@ -136,6 +136,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // The note, Maya's thought, the thread so far and the summary, answered
   // with a reply and a new summary.
   'reply-to-maya': run(SONNET, 8_000, 900),
+  // A transcript of three or four pages as PDF text and images, and about
+  // fifty courses back at forty tokens each.
+  'read-transcript': run(HAIKU, 10_000, 2_500),
   'map-sweep': background(unit(HAIKU, 4_000, 400)),
   'propose-theme-merges': background(unit(HAIKU, 8_000, 300)),
   'propose-position-merges': background(unit(HAIKU, 9_000, 300)),

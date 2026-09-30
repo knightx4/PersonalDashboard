@@ -258,6 +258,22 @@ Follow-ups the job search is reminding them of.
 - Name a row by `body`; link it by `id`
 - Opens at `/jobs`
 
+### `obsidian.courses` (Vault)
+
+Every course on their academic transcripts: the school, code, title, term, credits and grade, as written.
+
+- Search: `title`, `code`, `school`, `term`
+- Name a row by `title`; link it by `id`
+- transcript_id points at obsidian.transcripts. year is the year of the term where the transcript gives one. grade is null for a course with no grade, such as transfer credit.
+
+### `obsidian.transcripts` (Vault)
+
+The academic transcripts they have uploaded, one per school record, with the original file kept.
+
+- Search: `school`, `file_name`
+- Name a row by `school`; link it by `id`
+- The courses on each are in obsidian.courses. The file is in the private vault-transcripts bucket at storage_path.
+
 ### `learn.tracks` (Learn)
 
 Reading tracks, each answering one question.

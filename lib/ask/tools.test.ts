@@ -99,9 +99,10 @@ type RpcCall = { fn: string; args: Record<string, unknown> };
  * no vector to compare). Applies the owner, source, author, limit and floor
  * arguments the way the SQL does.
  */
-function fakeRpc(tables: Tables, calls: RpcCall[]) {
+function fakeRpc(tables: Tables, calls: RpcCall[], owner = false) {
   return (fn: string, args: Record<string, unknown>) => {
     calls.push({ fn, args });
+    if (fn === 'is_owner' && owner) return Promise.resolve({ data: true, error: null });
     if (fn !== 'search_memory') return Promise.resolve({ data: null, error: { message: `no ${fn}` } });
     const sources = args.p_sources as string[] | null;
     const authors = args.p_authors as string[] | null;
@@ -116,11 +117,11 @@ function fakeRpc(tables: Tables, calls: RpcCall[]) {
   };
 }
 
-function fakeDb(tables: Tables, calls: RpcCall[] = []): AskDb {
+function fakeDb(tables: Tables, calls: RpcCall[] = [], owner = false): AskDb {
   return async (schema: AskSchema) =>
     ({
       from: (table: string) => new FakeQuery(tables[`${schema}.${table}`] ?? []),
-      rpc: fakeRpc(tables, calls),
+      rpc: fakeRpc(tables, calls, owner),
     }) as unknown as SchemaClient;
 }
 
@@ -578,19 +579,79 @@ describe('recall', () => {
     'public.order_items': [{ id: 'd0000000-0000-4000-8000-000000000001', order_id: 'o1' }],
   };
 
+  // The owner's Dev passages (plan #1321): an idea and a comment that say the
+  // ideas list should change without the question's words, a step, a spec section.
+  const IDEA = 'e0000000-0000-4000-8000-000000000001';
+  const STEP = 'e0000000-0000-4000-8000-000000000002';
+  const QUESTION = 'e0000000-0000-4000-8000-000000000003';
+  const devTables: Tables = {
+    ...tables,
+    'core.memory_chunks': [
+      ...(tables['core.memory_chunks'] ?? []),
+      passage(ME, 'public.ideas', IDEA, 0,
+        'Idea: Suggestions should be grouped by workspace\n\nSuggestions should be grouped by workspace, not one long column.', 0.66),
+      passage(ME, 'public.ideas', IDEA, 1,
+        'Idea: Suggestions should be grouped by workspace\n\nComment, 3 September 2026: Grouping is in plan #12.', 0.52, 'dash'),
+      passage(ME, 'public.plan_items', STEP, 0, '#12 Group the suggestions\n\nDone when: grouped.', 0.6),
+      passage(ME, 'public.plan_items', QUESTION, 0, '#13 Which grouping?\n\nA or B.', 0.57),
+      passage(ME, 'docs.specs', 'plan#ideas', 0, 'The plan: Ideas\n\nThe tab lists what sessions suggest.', 0.59),
+    ],
+    'public.plan_items': [
+      { id: STEP, user_id: ME, number: 12, title: 'Group the suggestions', kind: 'build', status: 'done' },
+      { id: QUESTION, user_id: ME, number: 13, title: 'Which grouping?', kind: 'decision', status: 'not_started' },
+    ],
+  };
+
+  async function devRecall(extra: Partial<AskContext>, owner: boolean) {
+    const all: RpcCall[] = [];
+    const result = await executeAskTool('recall', { question: 'where did I say the ideas list should work differently' }, {
+      ...context(devTables, { embedQuestion, ...extra }),
+      db: fakeDb(devTables, all, owner),
+    });
+    return { result, search: all.find((call) => call.fn === 'search_memory')! };
+  }
+
+  it("finds the owner's Dev text by meaning, each row linked where find_dev_text links it", async () => {
+    const { result, search } = await devRecall({}, true);
+    expect(search.args.p_sources).toEqual(expect.arrayContaining(['public.ideas', 'public.plan_items', 'docs.specs']));
+    const rows = expectLinkedRows(result);
+    const byRef = new Map(rows.map((r) => [r.ref, r]));
+    expect(rows[0].ref).toBe(IDEA);
+    expect(byRef.get(IDEA)?.href).toBe(`/dev/ideas#idea-${IDEA}`);
+    expect(byRef.get(IDEA)?.detail?.passage_2_by).toBe('Dash');
+    expect(byRef.get(STEP)?.href).toBe('/dev/plan?view=all&q=%2312');
+    expect(byRef.get(QUESTION)?.href).toBe(`/dev/raised#waiting-${QUESTION}`);
+    expect(byRef.get('plan#ideas')?.href).toBe('/dev/specs/plan#ideas');
+  });
+
+  it('never asks for Dev passages for someone who is not the owner, or with Dev off', async () => {
+    const notOwner = await devRecall({}, false);
+    const devOff = await devRecall({ enabledModules: ['shopping', 'jobs', 'vault', 'todo', 'learn', 'news', 'goals'] }, true);
+    for (const { result, search } of [notOwner, devOff]) {
+      const asked = search.args.p_sources as string[];
+      for (const table of ['public.ideas', 'public.feedback_items', 'public.plan_items', 'public.raised_items', 'docs.specs']) {
+        expect(asked).not.toContain(table);
+      }
+      expect(asked).toContain('obsidian.notes');
+      expect(expectLinkedRows(result).some((r) => r.table.startsWith('public.') && r.table !== 'public.order_items')).toBe(false);
+    }
+  });
+
   const asked: string[] = [];
   const embedQuestion: AskContext['embedQuestion'] = async (question) => {
     asked.push(question);
     return { ok: true, vector: new Array(1024).fill(0.01), model: 'voyage-4-lite' };
   };
 
-  async function recall(input: Record<string, unknown>, extra: Partial<AskContext> = {}) {
-    const calls: RpcCall[] = [];
+  async function recall(input: Record<string, unknown>, extra: Partial<AskContext> = {}, owner = false) {
+    const all: RpcCall[] = [];
     const result = await executeAskTool('recall', input, {
       ...context(tables, { embedQuestion, ...extra }),
-      db: fakeDb(tables, calls),
+      db: fakeDb(tables, all, owner),
     });
-    return { result, calls };
+    // The owner check (Dev is on in these contexts) is not the search.
+    const calls = all.filter((call) => call.fn !== 'is_owner');
+    return { result, calls, all };
   }
 
   it('answers from passages across workspaces, one row each, closest first, each linked to its page', async () => {

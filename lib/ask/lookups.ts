@@ -17,6 +17,7 @@ import { recordSpend, type SpendClient } from '@/lib/core/spend/record';
 import { fileHref } from '@/lib/files/files';
 import type { Author } from '@/lib/memory/passages';
 import {
+  DEV_MEMORY_SOURCES,
   RECALL_OPERATION,
   groupByRow,
   memorySourcesFor,
@@ -38,6 +39,7 @@ import {
   type AskSchema,
   type AskToolResult,
 } from './db';
+import { devAccess, devRecallHrefs } from './dev';
 
 /**
  * Each of Dash's read tools (plan #1088), as a function of its input and the
@@ -782,6 +784,7 @@ const RECALL_LANDING: Record<string, string> = {
   'learn.card_notes': '/learn/now',
   'learn.feed_cards': '/learn/now',
   'public.order_items': '/shopping/orders',
+  'public.plan_items': '/dev/plan',
 };
 
 /** What kind of thing each source is, for the model reading the result. */
@@ -797,6 +800,11 @@ const RECALL_KINDS: Record<string, string> = {
   'learn.card_notes': 'Learn note',
   'learn.feed_cards': 'Learn card',
   'public.order_items': 'Purchase',
+  'public.ideas': 'Idea (Dev)',
+  'public.feedback_items': 'Bug or request (Dev)',
+  'public.plan_items': 'Plan step (Dev)',
+  'public.raised_items': 'Raise (Dev)',
+  'docs.specs': 'Spec section (Dev)',
 };
 
 const key = (table: string, ref: string) => `${table}\u0000${ref}`;
@@ -923,6 +931,13 @@ async function recallHrefs(ctx: AskContext, hits: readonly MemoryRowHit[]): Prom
     });
   }
 
+  const dev = hits.filter((h) => DEV_MEMORY_SOURCES.includes(h.sourceTable));
+  if (dev.length > 0) {
+    attempt('dev', async () => {
+      for (const [table, ref, href] of await devRecallHrefs(ctx, dev)) out.set(key(table, ref), href);
+    });
+  }
+
   await Promise.all(reads);
   return out;
 }
@@ -937,11 +952,18 @@ export async function recallLookup(ctx: AskContext, input: Input): Promise<AskTo
   }
   const onlyMine = input.only_mine === true;
 
+  // Dev passages exist only under the owner's id, and are asked for only when
+  // the asker is the owner with the workspace on (plan #1321).
+  let sources = memorySourcesFor(ctx.enabledModules);
+  if (sources.some((table) => DEV_MEMORY_SOURCES.includes(table)) && !(await devAccess(ctx)).ok) {
+    sources = sources.filter((table) => !DEV_MEMORY_SOURCES.includes(table));
+  }
+
   const core = await ctx.db('core');
   const searched = await searchMemory(core, {
     userId: ctx.userId,
     question,
-    sources: memorySourcesFor(ctx.enabledModules),
+    sources,
     authors: onlyMine ? ['me'] : undefined,
     embed: ctx.embedQuestion,
     onSpend: (report) => {

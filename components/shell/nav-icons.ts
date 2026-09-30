@@ -120,6 +120,9 @@ export const NAV_ICONS = {
   maya: OwlIcon,
 
   // Learn
+  // Home: your study plans and what is waiting (plan #1310). The house Jobs'
+  // home uses, since both tabs are the workspace's front page.
+  learnHome: House,
   tracks: BookOpen,
   readNow: BookOpenCheck,
   know: Network,

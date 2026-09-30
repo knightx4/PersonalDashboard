@@ -896,3 +896,37 @@ export async function findDevTextLookup(ctx: AskContext, input: Input): Promise<
         : undefined,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Links for Dev passages recall found (plan #1321)
+// ---------------------------------------------------------------------------
+
+/**
+ * The page each Dev row recall found opens on, as `[table, ref, href]`: the
+ * same places find_dev_text links to. An idea, note, raise or spec section is
+ * its ref run through a pattern; a step needs its number, and a question
+ * still waiting lands on its card on the Dash tab, so steps take one read.
+ */
+export async function devRecallHrefs(
+  ctx: AskContext,
+  hits: readonly { sourceTable: string; sourceRef: string }[],
+): Promise<[string, string, string][]> {
+  const out: [string, string, string][] = [];
+  const steps: string[] = [];
+  for (const { sourceTable: table, sourceRef: ref } of hits) {
+    if (table === 'public.ideas') out.push([table, ref, `/dev/ideas#idea-${ref}`]);
+    else if (table === 'public.feedback_items') out.push([table, ref, `/dev/bugs#note-${ref}`]);
+    else if (table === 'public.raised_items') out.push([table, ref, `/dev/raised#${raiseAnchor(ref)}`]);
+    else if (table === SPEC_TABLE) {
+      const [slug, anchor] = ref.split('#');
+      out.push([table, ref, `/dev/specs/${slug}${anchor ? `#${anchor}` : ''}`]);
+    } else if (table === 'public.plan_items' && UUID_IN.test(ref)) steps.push(ref);
+  }
+  if (steps.length > 0) {
+    const client = await ctx.db('public');
+    const { data, error } = await (start(client, ctx, 'plan_items', STEP_SELECT) as unknown as Filter).in('id', steps);
+    if (error) throw new Error(`plan_items: ${error.message}`);
+    for (const row of (data ?? []) as unknown as Row[]) out.push(['public.plan_items', row.id, stepHit(row).href]);
+  }
+  return out;
+}
