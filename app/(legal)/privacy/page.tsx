@@ -134,17 +134,19 @@ export default function PrivacyPage() {
         (proposeFromNote) and lib/learn/graph/from-brief.ts, and lib/vault/map
         (classify.ts, extract.ts, rules.ts) with app/vault/n/[...path]/actions.ts
         (proposeMap), and the sweep over the whole vault in lib/vault/map/sweep.ts
-        with inngest/vault/map-sweep.ts (plan #757). The sweep skips what
+        with inngest/vault/map-sweep.ts (plan #757), and Maya in lib/vault/maya
+        (retrieve.ts, thought-model.ts) with app/vault/n/[...path]/actions.ts
+        (askMaya, plan #1285). The sweep skips what
         rules.ts skips (the Me folder and notes with API keys), notes under 80
         characters, and text past MAX_NOTE_READ_CHARS in
         lib/learn/graph/note-chunks.ts. Any new path that sends note text to a
         model has to be added here before it ships, along with what it skips.
       */}
       <p>
-        Three features send the text of your notes to Anthropic&rsquo;s Claude models: writing a
-        quiz, reading a note for Learn, and reading notes for the map of what you write about.
-        Writing a quiz and reading for Learn run when you press their button, on the notes you
-        picked. The map can also be filled by a sweep, which you start from the map page. The
+        Four features send the text of your notes to Anthropic&rsquo;s Claude models: writing a
+        quiz, reading a note for Learn, reading notes for the map of what you write about, and
+        asking Maya for its thoughts on a note. Writing a quiz, reading for Learn and asking Maya
+        run when you press their button, on the note or notes you picked. The map can also be filled by a sweep, which you start from the map page. The
         sweep sends every note in your vault, apart from those listed below, without you picking
         them. It runs in the background a few minutes at a time until it has reached every note or
         you stop it.
@@ -172,6 +174,15 @@ export default function PrivacyPage() {
           names of the themes already on your map. This happens to one note when you use its Map
           section, and to every note in turn while a sweep runs.
         </li>
+        <li>
+          <strong>Asking Maya about a note.</strong> The note&rsquo;s title and its first 12,000
+          characters; the titles and first 3,000 characters of up to eight of your other notes
+          whose meaning is closest to it; and the names and statements of up to sixteen positions
+          from your map that come from those notes or share the note&rsquo;s themes, each with up
+          to two sentences quoted from the notes they were read from. The model may also search
+          the web for what others have written on the same question. Its searches are its own
+          words, written from what it was sent, and go to Anthropic&rsquo;s web search.
+        </li>
       </ul>
       <p>What is never sent:</p>
       <ul>
@@ -192,6 +203,12 @@ export default function PrivacyPage() {
           under 80 characters. These are turned away before anything is sent.
         </li>
         <li>For the map, the part of a note past its first 400,000 characters.</li>
+        <li>
+          When asking Maya: any part of a note in your Me folder, of a note in Career/Job
+          Applications, or of a note that contains what looks like an API key, whether it is the
+          note you asked about or one of your other notes. Such a note shows no way to ask Maya
+          at all.
+        </li>
       </ul>
       <p>
         Nothing sent from your notes is used to train a model. Anthropic&rsquo;s{' '}
