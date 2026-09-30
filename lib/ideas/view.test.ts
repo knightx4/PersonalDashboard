@@ -40,12 +40,13 @@ describe('parseIdeaGrouping', () => {
 });
 
 describe('parseIdeaSort', () => {
-  it('defaults to newest', () => {
-    expect(parseIdeaSort(undefined)).toBe('newest');
-    expect(parseIdeaSort('sideways')).toBe('newest');
+  it('defaults to highest score first', () => {
+    expect(parseIdeaSort(undefined)).toBe('score');
+    expect(parseIdeaSort('sideways')).toBe('score');
   });
 
   it('accepts the ones it knows', () => {
+    expect(parseIdeaSort('score')).toBe('score');
     expect(parseIdeaSort('oldest')).toBe('oldest');
     expect(parseIdeaSort('newest')).toBe('newest');
   });
@@ -58,7 +59,7 @@ describe('sortIdeas', () => {
     idea({ id: 'newest', createdAt: '2026-03-01T00:00:00Z' }),
   ];
 
-  it('puts the newest first by default', () => {
+  it('puts the newest first when asked', () => {
     expect(sortIdeas(rows, 'newest').map((row) => row.id)).toEqual([
       'newest',
       'middle',
@@ -80,6 +81,48 @@ describe('sortIdeas', () => {
     const before = rows.map((row) => row.id);
     sortIdeas(rows, 'oldest');
     expect(rows.map((row) => row.id)).toEqual(before);
+  });
+});
+
+describe('sortIdeas by score', () => {
+  const scored = (value: number, confidence = 0.6) => ({ value, confidence, at: '2026-09-30T00:00:00Z' });
+
+  it('puts the highest score first, whatever the confidence', () => {
+    const rows = [
+      idea({ id: 'low-sure', score: scored(30, 0.95) }),
+      idea({ id: 'high-unsure', score: scored(88, 0.4) }),
+      idea({ id: 'middle', score: scored(56) }),
+    ];
+    expect(sortIdeas(rows, 'score').map((row) => row.id)).toEqual([
+      'high-unsure',
+      'middle',
+      'low-sure',
+    ]);
+  });
+
+  it('breaks a tie newest first', () => {
+    const rows = [
+      idea({ id: 'older', createdAt: '2026-01-01T00:00:00Z', score: scored(50) }),
+      idea({ id: 'newer', createdAt: '2026-03-01T00:00:00Z', score: scored(50) }),
+    ];
+    expect(sortIdeas(rows, 'score').map((row) => row.id)).toEqual(['newer', 'older']);
+  });
+
+  // An idea filed since the last scoring run has no score yet: it goes after
+  // every scored idea, however low, and the unscored ones go newest first.
+  it('puts unscored ideas last, newest first among them', () => {
+    const rows = [
+      idea({ id: 'unscored-old', createdAt: '2026-01-01T00:00:00Z', score: null }),
+      idea({ id: 'zero', createdAt: '2026-01-01T00:00:00Z', score: scored(0) }),
+      idea({ id: 'unscored-new', createdAt: '2026-03-01T00:00:00Z' }),
+      idea({ id: 'top', createdAt: '2026-01-01T00:00:00Z', score: scored(72) }),
+    ];
+    expect(sortIdeas(rows, 'score').map((row) => row.id)).toEqual([
+      'top',
+      'zero',
+      'unscored-new',
+      'unscored-old',
+    ]);
   });
 });
 

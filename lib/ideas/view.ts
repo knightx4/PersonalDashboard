@@ -18,7 +18,7 @@ import type { IdeaRow } from '@/lib/ideas/load';
 export const IDEA_GROUPINGS = ['workspace', 'none'] as const;
 export type IdeaGrouping = (typeof IDEA_GROUPINGS)[number];
 
-export const IDEA_SORTS = ['newest', 'oldest'] as const;
+export const IDEA_SORTS = ['score', 'newest', 'oldest'] as const;
 export type IdeaSort = (typeof IDEA_SORTS)[number];
 
 export const IDEA_GROUPING_LABEL: Record<IdeaGrouping, string> = {
@@ -27,6 +27,7 @@ export const IDEA_GROUPING_LABEL: Record<IdeaGrouping, string> = {
 };
 
 export const IDEA_SORT_LABEL: Record<IdeaSort, string> = {
+  score: 'Highest score first',
   newest: 'Newest first',
   oldest: 'Oldest first',
 };
@@ -40,10 +41,26 @@ export function parseIdeaGrouping(value: string | string[] | undefined): IdeaGro
     : 'workspace';
 }
 
+/** Highest score first is the default (plan #1328): the ideas most worth
+ *  shaping at the top, rather than whatever a session filed last night. */
+export const DEFAULT_IDEA_SORT: IdeaSort = 'score';
+
 export function parseIdeaSort(value: string | string[] | undefined): IdeaSort {
   const one = Array.isArray(value) ? value[0] : value;
-  return (IDEA_SORTS as readonly string[]).includes(one ?? '') ? (one as IdeaSort) : 'newest';
+  return (IDEA_SORTS as readonly string[]).includes(one ?? '')
+    ? (one as IdeaSort)
+    : DEFAULT_IDEA_SORT;
 }
+
+/**
+ * How the ranking works, in the one line the page shows above the lists.
+ * Kept here as text so Ask Dash can read the rule rather than work it out
+ * (plan #1319). What the score measures is decision #1325.
+ */
+export const IDEA_RANKING_RULE =
+  "Highest score first ranks ideas by Jev's score out of 100 for how much each would help what " +
+  'its workspace is for, leaving out how hard it would be to build. Equal scores go newest first, ' +
+  'unscored ideas go last, and a grey score is one Jev was unsure of.';
 
 /**
  * The list in the order asked for.
@@ -52,17 +69,27 @@ export function parseIdeaSort(value: string | string[] | undefined): IdeaSort {
  * array the caller handed over would reorder every other section reading the
  * same one.
  *
- * "Oldest first" is the one worth having beside the default. An idea that has
- * sat untouched for four months is either the best thing on the list or ready
- * to be put aside, and newest-first is exactly the order that keeps it out of
+ * "Oldest first" is worth keeping beside the score. An idea that has sat
+ * untouched for four months is either the best thing on the list or ready to
+ * be put aside, and newest-first is exactly the order that keeps it out of
  * sight.
  */
 export function sortIdeas(rows: readonly IdeaRow[], sort: IdeaSort): IdeaRow[] {
-  return [...rows].sort((a, b) =>
-    sort === 'oldest'
-      ? a.createdAt.localeCompare(b.createdAt)
-      : b.createdAt.localeCompare(a.createdAt),
-  );
+  const newest = (a: IdeaRow, b: IdeaRow) => b.createdAt.localeCompare(a.createdAt);
+  if (sort === 'oldest') return [...rows].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  if (sort === 'newest') return [...rows].sort(newest);
+  // By score: the value alone, whatever Jev's confidence, since nearly every
+  // score is under the 0.8 floor and leaving those out would leave the order
+  // to the date. Ties and unscored ideas fall back to newest first, with every
+  // unscored idea after every scored one.
+  return [...rows].sort((a, b) => {
+    const left = a.score?.value ?? null;
+    const right = b.score?.value ?? null;
+    if (left !== null && right !== null && left !== right) return right - left;
+    if (left === null && right !== null) return 1;
+    if (left !== null && right === null) return -1;
+    return newest(a, b);
+  });
 }
 
 export type IdeaGroup = {
