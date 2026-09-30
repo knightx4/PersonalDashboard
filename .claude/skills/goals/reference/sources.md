@@ -60,6 +60,23 @@ Each week, notes they wrote recently that come back to an older note of theirs, 
 - Name a row by `sentence`; link it by `id`
 - older_note_id and recent_note_ids point at obsidian.notes. week_ending is the day the week was read back from. A row with dismissed_at set is one they hid as not useful.
 
+### `obsidian.maya_threads` (Vault)
+
+The questions they are working through with Maya, one per note, and where they have got to on each.
+
+- Search: `question`, `summary`
+- Name a row by `question`; link it by `id`
+- Opens at `/vault/maya/<id>`
+- note_id points at obsidian.notes. summary is where they have got to, rewritten after each exchange. origin is 'asked' when they asked Maya and 'automatic' when Maya wrote unasked.
+
+### `obsidian.maya_messages` (Vault)
+
+Their exchanges with Maya about their notes.
+
+- Search: `body`
+- Name a row by `body`; link it by `id`
+- Read their turns (role = 'person') as intent and Maya's (role = 'maya') only as context for them, like core.conversation_turns. thread_id points at maya_threads.
+
 ### `obsidian.tensions` (Vault)
 
 Places where two of their positions pull against each other.

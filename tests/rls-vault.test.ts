@@ -33,6 +33,7 @@ let positionB = '';
 let sweepA = '';
 let proposalA = '';
 let mergeA = '';
+let threadA = '';
 
 async function seedConnection(userId: string, tag: string): Promise<string> {
   const [row] = await admin<{ id: string }[]>`
@@ -173,6 +174,21 @@ beforeAll(async () => {
     insert into map_merge_resets (user_id, reset, kind, merge_id, outcome, detail)
     values (${userA}, 'plan #879', 'theme', ${mergeA}, 'failed', 'name-taken: taken')`;
 
+  // Maya (plan #1283): a thread on A's note, its thought, and the gate check
+  // that looked at the note first.
+  const [thread] = await admin<{ id: string }[]>`
+    insert into maya_threads (user_id, note_id, question, origin)
+    values (${userA}, ${noteA}, 'Should I quit?', 'asked')
+    returning id`;
+  threadA = thread.id;
+  await admin`
+    insert into maya_messages (thread_id, user_id, role, kind, body, points, note_blob_sha, model)
+    values (${threadA}, ${userA}, 'maya', 'thought', 'Three things bear on this.', '[]'::jsonb,
+            'sha-Journal/2019-04-02.md', 'claude-opus')`;
+  await admin`
+    insert into maya_gate_checks (user_id, note_id, blob_sha, probability, outcome, jev_model)
+    values (${userA}, ${noteA}, 'sha-Journal/2019-04-02.md', 0.9, 'thought', 'jev')`;
+
   // A note's vector (plan #1111), written through the function the sync uses
   // so the hash is the one it would store.
   await admin`
@@ -211,6 +227,9 @@ describe('RLS coverage', () => {
       'map_merges',
       'map_sweep_notes',
       'map_sweeps',
+      'maya_gate_checks',
+      'maya_messages',
+      'maya_threads',
       'note_connections',
       'note_embeddings',
       'notes',
@@ -1020,5 +1039,77 @@ describe('weekly connections (plan #1115)', () => {
 
     await admin`update notes set body = body || ${' ' + 'Another sentence about the plan. '.repeat(10)} where id = ${olderA}`;
     expect(await writtenAt()).toBeGreaterThan(before);
+  });
+});
+
+describe('Maya, across users (plan #1283)', () => {
+  it('shows threads, messages and gate checks to their owner only', async () => {
+    const seen = (user: string) =>
+      asUser(user, async (tx) => ({
+        threads: (await tx`select id from maya_threads`).length,
+        messages: (await tx`select id from maya_messages`).length,
+        checks: (await tx`select id from maya_gate_checks`).length,
+      }));
+    expect(await seen(userA)).toEqual({ threads: 1, messages: 1, checks: 1 });
+    expect(await seen(userB)).toEqual({ threads: 0, messages: 0, checks: 0 });
+  });
+
+  it('lets the owner rewrite the question and nobody else', async () => {
+    const byB = await asUser(userB, (tx) => tx`
+      update maya_threads set question = 'hijacked' where id = ${threadA} returning id`);
+    expect(byB).toEqual([]);
+    const byA = await asUser(userA, (tx) => tx`
+      update maya_threads set question = 'Is it time to leave?' where id = ${threadA} returning id`);
+    expect(byA.length).toBe(1);
+    await expect(
+      asUser(userA, (tx) => tx`update maya_threads set origin = 'automatic' where id = ${threadA}`),
+    ).rejects.toThrow();
+  });
+
+  it('lets the owner add to their own thread and nobody else to it', async () => {
+    const own = await asUser(userA, (tx) => tx`
+      insert into maya_messages (thread_id, user_id, role, kind, body)
+      values (${threadA}, ${userA}, 'person', 'reply', 'I think so.') returning id`);
+    expect(own.length).toBe(1);
+
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into maya_messages (thread_id, user_id, role, kind, body)
+        values (${threadA}, ${userA}, 'person', 'reply', 'planted')`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into maya_messages (thread_id, user_id, role, kind, body)
+        values (${threadA}, ${userB}, 'person', 'reply', 'planted')`),
+    ).rejects.toThrow();
+    await admin`delete from maya_messages where role = 'person'`;
+  });
+
+  it('refuses a thread on someone else\'s note, a second thread on a note, and a person\'s thought', async () => {
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into maya_threads (user_id, note_id, question, origin)
+        values (${userB}, ${noteA}, 'Whose note?', 'asked')`),
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into maya_threads (user_id, note_id, question, origin)
+            values (${userA}, ${noteA}, 'Again', 'automatic')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into maya_messages (thread_id, user_id, role, kind, body)
+            values (${threadA}, ${userA}, 'person', 'thought', 'not mine to write')`,
+    ).rejects.toThrow();
+  });
+
+  it('keeps gate checks to the job: the owner writes none', async () => {
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into maya_gate_checks (user_id, note_id, blob_sha, outcome)
+        values (${userA}, ${noteA}, 'sha-other', 'skip')`),
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into maya_gate_checks (user_id, note_id, blob_sha, outcome)
+            values (${userA}, ${noteA}, 'sha-Journal/2019-04-02.md', 'skip')`,
+    ).rejects.toThrow();
   });
 });

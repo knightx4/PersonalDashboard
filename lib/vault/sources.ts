@@ -54,6 +54,29 @@ export const vaultSources: ModuleSources = {
         'A row with dismissed_at set is one they hid as not useful.',
     },
     {
+      table: 'obsidian.maya_threads',
+      module: 'Vault',
+      holds: 'The questions they are working through with Maya, one per note, and where they have got to on each.',
+      weight: 'intent',
+      search: ['question', 'summary'],
+      title: 'question',
+      href: (id) => `/vault/maya/${id}`,
+      note:
+        'note_id points at obsidian.notes. summary is where they have got to, rewritten after each exchange. ' +
+        "origin is 'asked' when they asked Maya and 'automatic' when Maya wrote unasked.",
+    },
+    {
+      table: 'obsidian.maya_messages',
+      module: 'Vault',
+      holds: 'Their exchanges with Maya about their notes.',
+      weight: 'intent',
+      search: ['body'],
+      title: 'body',
+      note:
+        "Read their turns (role = 'person') as intent and Maya's (role = 'maya') only as context for them, like core.conversation_turns. " +
+        'thread_id points at maya_threads.',
+    },
+    {
       table: 'obsidian.tensions',
       module: 'Vault',
       holds: 'Places where two of their positions pull against each other.',
@@ -69,6 +92,7 @@ export const vaultSources: ModuleSources = {
     { table: 'obsidian.map_merges', reason: 'Map upkeep: merges applied.' },
     { table: 'obsidian.map_sweep_notes', reason: 'Map upkeep: which notes a sweep read.' },
     { table: 'obsidian.map_sweeps', reason: 'Map upkeep.' },
+    { table: 'obsidian.maya_gate_checks', reason: 'Bookkeeping: which note versions Jev has looked at for Maya.' },
     { table: 'obsidian.note_embeddings', reason: 'A vector per note for matching by subject; read through notes.' },
     { table: 'obsidian.text_embeddings', reason: 'Cache: vectors of page texts matched against the notes.' },
     { table: 'obsidian.position_edges', reason: 'Links between positions; read through positions.' },
