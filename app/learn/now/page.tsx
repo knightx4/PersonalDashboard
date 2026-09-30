@@ -12,8 +12,6 @@ import { countReadyCards, loadFeedPage } from '@/lib/learn/feed/load';
 import { relatedNotesForCards } from '@/lib/learn/feed/related-notes';
 import { READY_LOW } from '@/lib/learn/feed/top-up';
 import { loadReadNow } from '@/lib/learn/tracks/load';
-import { loadPlans, type PlanSummary } from '@/lib/learn/lessons/plan-store';
-import { PlansShelf } from '@/components/learn/plans-shelf';
 import { REVIEWS_IN_LEARN_NOW, type DueReview } from '@/lib/learn/lessons/review';
 import { loadDueReviews } from '@/lib/learn/lessons/review-store';
 import { ReviewList } from '../review/review-list';
@@ -32,8 +30,8 @@ export const metadata = { title: 'Learn now' };
 export const maxDuration = 300;
 
 /**
- * Learn now, the first tab and what opening Learn lands on (plan #805), as the
- * endless feed of docs/LEARN-NOW-SPEC.md (plan #808).
+ * Learn now, what opening Learn lands on (plan #805) and the tab after Home
+ * (plan #1310), as the endless feed of docs/LEARN-NOW-SPEC.md (plan #808).
  *
  * The readings you queued come first, in the order you queued them, as the
  * thin shelf they always were: what it is, why you put it there, Open, and
@@ -46,10 +44,9 @@ export const maxDuration = 300;
  * Track offers, a new theme or a resting track, are on Tracks rather than
  * here (note 8a1789df): the deck is for reading.
  *
- * Each learning goal's plan is listed above the deck with its progress (plan
- * #1143), since a goal's lessons are on its plan and no longer in the deck.
- * Above the plans, the ideas of passed pieces that are due for review (plan
- * #1145), up to five, most overdue first.
+ * Above the deck, the ideas of passed pieces that are due for review (plan
+ * #1145), up to five, most overdue first. Each learning goal's plan, where a
+ * goal's lessons are, is on the Home tab (plan #1310) rather than here.
  *
  * A card shows up to two of your own notes on its idea (plan #1113). For the
  * first cards the lookup is started here and passed down unawaited, one
@@ -59,13 +56,11 @@ export const maxDuration = 300;
 export default async function LearnNowPage() {
   const user = await requireUser();
   const supabase = await createLearnClient();
-  const [readings, cards, ready, plans, reviews] = await Promise.all([
+  const [readings, cards, ready, reviews] = await Promise.all([
     loadReadNow(supabase),
     loadFeedPage(supabase, []),
     countReadyCards(supabase),
-    // Plans that cannot be read leave the shelf off rather than the page.
-    loadPlans(supabase, user.id).catch((): PlanSummary[] => []),
-    // So does a review list that cannot be read.
+    // A review list that cannot be read leaves the list off rather than the page.
     loadDueReviews(supabase, user.id, { limit: REVIEWS_IN_LEARN_NOW }).catch((): DueReview[] => []),
   ]);
   // Opening the page counts as a response: when seven or fewer are ready,
@@ -161,8 +156,6 @@ export default async function LearnNowPage() {
         description="Ideas from pieces you passed. A right answer brings the next question later; a miss brings it back tomorrow."
         showPlan
       />
-
-      <PlansShelf plans={plans} />
 
       <LearnNowFeed first={cards} firstRelated={firstRelated} ready={ready} low={READY_LOW} />
     </div>
