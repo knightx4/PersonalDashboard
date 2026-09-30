@@ -955,3 +955,68 @@ describe('reply threads (plan #1180)', () => {
     ).rejects.toThrow(/permission denied/);
   });
 });
+
+describe('watches and their readings', () => {
+  /**
+   * What Dash watches outside the app and every reading it took (plan #1291).
+   * The person starts, edits and stops their own watches; the hourly run
+   * writes readings with the service role, and the owner may only read them.
+   */
+  it('lets the owner write a watch and read it back, and shows another user none', async () => {
+    const [watch] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into core.watches (user_id, title, url, condition, report_times, ends_at)
+      values (${userA}, 'Jamie xx at Nowadays', 'https://www.crowdvolt.com/event/jamie-xx',
+              ${tx.json({ below: 200, currency: 'USD' })}, '{09:00,18:00}', now() + interval '3 days')
+      returning id`);
+    const mine = await asUser(userA, (tx) => tx<{ title: string; status: string; condition: { below: number } }[]>`
+      select title, status, condition from core.watches where id = ${watch.id}`);
+    expect(mine).toEqual([{ title: 'Jamie xx at Nowadays', status: 'running', condition: { below: 200, currency: 'USD' } }]);
+    expect(await asUser(userB, (tx) => tx`select id from core.watches`)).toHaveLength(0);
+
+    await asUser(userA, (tx) => tx`update core.watches set status = 'stopped' where id = ${watch.id}`);
+    await expect(
+      asUser(userA, (tx) => tx`update core.watches set fired_value = 1, fired_at = now() where id = ${watch.id}`),
+    ).rejects.toThrow(/permission denied/);
+  });
+
+  it('refuses a watch written for someone else, and a plain http page', async () => {
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into core.watches (user_id, title, url, ends_at)
+        values (${userA}, 'X', 'https://example.com', now())`),
+    ).rejects.toThrow(/row-level security/);
+    await expect(admin`
+      insert into core.watches (user_id, title, url, ends_at)
+      values (${userA}, 'X', 'http://example.com', now())`).rejects.toThrow(/watches_url_ck/);
+  });
+
+  it('keeps readings to the run, the owner and the watch they belong to', async () => {
+    const [watch] = await admin<{ id: string }[]>`
+      insert into core.watches (user_id, title, url, ends_at)
+      values (${userA}, 'Readings', 'https://example.com/r', now() + interval '1 day')
+      returning id`;
+    await admin`
+      insert into core.watch_readings (user_id, watch_id, value, detail)
+      values (${userA}, ${watch.id}, 185, ${admin.json({ currency: 'USD', count: 4 })})`;
+    await admin`
+      insert into core.watch_readings (user_id, watch_id, error)
+      values (${userA}, ${watch.id}, 'No prices found on the page')`;
+
+    expect(await asUser(userA, (tx) => tx`select id from core.watch_readings where watch_id = ${watch.id}`)).toHaveLength(2);
+    expect(await asUser(userB, (tx) => tx`select id from core.watch_readings`)).toHaveLength(0);
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into core.watch_readings (user_id, watch_id, value) values (${userA}, ${watch.id}, 1)`),
+    ).rejects.toThrow(/permission denied/);
+
+    // A read that found nothing is an error, never a zero, and never both.
+    await expect(admin`
+      insert into core.watch_readings (user_id, watch_id) values (${userA}, ${watch.id})`).rejects.toThrow(/watch_readings_outcome_ck/);
+    await expect(admin`
+      insert into core.watch_readings (user_id, watch_id, value, error)
+      values (${userA}, ${watch.id}, 1, 'no')`).rejects.toThrow(/watch_readings_outcome_ck/);
+    // A reading cannot be filed under another person's watch.
+    await expect(admin`
+      insert into core.watch_readings (user_id, watch_id, value) values (${userB}, ${watch.id}, 1)`).rejects.toThrow(/watch_readings_watch_fk/);
+  });
+});

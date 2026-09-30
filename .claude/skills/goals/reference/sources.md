@@ -148,6 +148,14 @@ What they asked or explained, and what Dash replied, turn by turn.
 - Name a row by `body`; link it by `id`
 - role 'user' is theirs and 'assistant' is Dash's: read their turns as what they wanted to know, and Dash's only for context. On Dash's answers to an 'ask', citations lists the rows it relied on. conversation_id joins core.conversations, which says what the turn is about.
 
+### `core.watches` (Home)
+
+Things they asked Dash to watch outside the app, such as a resale ticket price, with the price that should alert them and when the watch ends.
+
+- Search: `title`, `url`
+- Name a row by `title`; link it by `id`
+- condition is what they are waiting for: {"below": 200} means they want to hear when the reading drops under 200 (in currency when set); {} means reports only. goal_item_id is the goals.items step it serves, when started from one. status 'running', 'ended' (ends_at passed) or 'stopped' (they stopped it). The readings are in core.watch_readings, joined by watch_id.
+
 ## What they did or have (read for progress and facts)
 
 ### `job_search.roles` (Job search)

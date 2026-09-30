@@ -58,6 +58,15 @@ export const coreSources: ModuleSources = {
       href: (week) => `/home/week/${week}`,
       note: "The observations and the change are Dash's, not theirs: each observation is {text, goal_id, evidence}, with goal_id a goals.goals id or null and evidence as `schema.table:id` refs. facts holds the numbers counted for the week. week is the Sunday it starts on. change_kept says whether the previous week's change happened (null when unknown). source 'plain' means no model wrote it.",
     },
+    {
+      table: 'core.watches',
+      module: 'Home',
+      holds: 'Things they asked Dash to watch outside the app, such as a resale ticket price, with the price that should alert them and when the watch ends.',
+      weight: 'intent',
+      search: ['title', 'url'],
+      title: 'title',
+      note: "condition is what they are waiting for: {\"below\": 200} means they want to hear when the reading drops under 200 (in currency when set); {} means reports only. goal_item_id is the goals.items step it serves, when started from one. status 'running', 'ended' (ends_at passed) or 'stopped' (they stopped it). The readings are in core.watch_readings, joined by watch_id.",
+    },
   ],
   notSources: [
     { table: 'core.account_settings', reason: 'Settings.' },
@@ -77,6 +86,7 @@ export const coreSources: ModuleSources = {
     { table: 'core.push_subscriptions', reason: 'Browsers that accepted notifications, for sending the morning brief.' },
     { table: 'core.saved_views', reason: 'Saved list filters.' },
     { table: 'core.sync_jobs', reason: 'Sync bookkeeping.' },
+    { table: 'core.watch_readings', reason: 'Each reading a watch took, for its trend and alerts; the watch itself is the source.' },
     { table: 'public.profiles', reason: 'Display name and settings.' },
   ],
 };
