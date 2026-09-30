@@ -4,12 +4,12 @@ import { Clock, ExternalLink, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
-import { completeItem, deferItem, dismissItem } from '@/app/todo/source-actions';
-import type { AgendaItem } from '@/lib/todo/agenda/sources';
+import { answerItem, completeItem, deferItem, dismissItem } from '@/app/todo/source-actions';
+import type { AgendaItem, AgendaItemOption } from '@/lib/todo/agenda/sources';
 import { formatClock } from '@/lib/clock';
 
 /** What the row has been asked to do, until the page is rebuilt without it. */
-type ItemState = 'open' | 'done' | 'deferred' | 'dismissed';
+type ItemState = 'open' | 'done' | 'answered' | 'deferred' | 'dismissed';
 
 /**
  * One thing the agenda found somewhere else.
@@ -140,6 +140,19 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
             </a>
           )}
         </div>
+
+        {item.options && item.options.length > 0 && (
+          <ItemOptions
+            options={item.options}
+            disabled={acted}
+            onChoose={(option) =>
+              run({
+                state: 'answered',
+                write: () => answerItem(item.source, item.key, option.answer),
+              })
+            }
+          />
+        )}
       </div>
 
       <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
@@ -167,5 +180,55 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * A question's lettered options as buttons (plan #1267), drawn the way the
+ * goal page draws them (TheOptions in components/dev/question.tsx): the
+ * letter in a badge, the option's name beside it, and a soft green ring on
+ * the one the question recommends. Here a press answers at once, since the
+ * row has no box to fill; saying it differently is the goal page's job, which
+ * the title links to.
+ */
+function ItemOptions({
+  options,
+  disabled,
+  onChoose,
+}: {
+  options: AgendaItemOption[];
+  disabled: boolean;
+  onChoose: (option: AgendaItemOption) => void;
+}) {
+  return (
+    <ul className="mt-1 flex flex-wrap gap-1" aria-label="Answer with">
+      {options.map((option) => (
+        <li key={option.letter}>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onChoose(option)}
+            title={`Answer ${option.letter}: ${option.label}${option.recommended ? ' (recommended)' : ''}`}
+            className="press flex items-start gap-1.5 rounded-control bg-sunken px-1.5 py-1 text-left transition-colors duration-150 hover:bg-accent-tint disabled:pointer-events-none"
+          >
+            <span
+              aria-hidden
+              className={cn(
+                'flex size-5 shrink-0 items-center justify-center rounded-control text-micro font-semibold uppercase',
+                option.recommended
+                  ? 'bg-positive-tint text-positive ring-2 ring-positive/50'
+                  : 'bg-surface text-ink',
+              )}
+            >
+              {option.letter}
+            </span>
+            <span className="text-small text-ink">
+              {option.label}
+              {option.recommended && <span className="sr-only"> (recommended)</span>}
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }

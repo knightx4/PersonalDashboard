@@ -86,3 +86,23 @@ export async function dismissItem(sourceId: string, key: string): Promise<{ erro
   done();
   return { error: null };
 }
+
+/**
+ * Answer a question on the agenda with one of its options (plan #1267). The
+ * source records it where the question lives; the row marks itself answered
+ * at once and the rebuilt page leaves the question out.
+ */
+// latency: optimistic -- the agenda row marks itself answered at once
+export async function answerItem(
+  sourceId: string,
+  key: string,
+  answer: string,
+): Promise<{ error: string | null }> {
+  const source = isSourceId(sourceId) ? sourceById(sourceId) : undefined;
+  if (!source?.answer) return refuse(sourceId, 'answer');
+
+  const result = await source.answer(await context(), key, answer);
+  if (result.error) return result;
+  done();
+  return { error: null };
+}

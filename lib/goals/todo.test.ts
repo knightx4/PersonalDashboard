@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { attachDependencies } from './dependencies';
 import { buildForest, markStartDates, type Step } from './steps';
-import { canShowOnTodo, goalTodoSteps, todoSteps } from './todo';
+import { dailyView } from './daily';
+import { canShowOnTodo, goalsForTodo, goalTodoSteps, todoSteps, unreadDashResults } from './todo';
 import type { Goal } from './tree';
 
 function goal(id: string, extra: Partial<Goal> = {}): Goal {
@@ -226,5 +227,96 @@ describe('goalTodoSteps', () => {
       ['first', true],
       ['second', false],
     ]);
+  });
+});
+
+describe('goalsForTodo questions', () => {
+  const today = '2026-09-29';
+
+  function questions(goals: Goal[], steps: Step[]) {
+    const { byGoal } = buildForest(
+      goals.map((g) => g.id),
+      steps,
+    );
+    markStartDates(byGoal, today);
+    return goalsForTodo(
+      goals.map((g) => ({ goal: g, areaName: 'Area' })),
+      byGoal,
+      today,
+    ).questions;
+  }
+
+  it('lists each open question on an open goal with its detail and goal', () => {
+    const detail = 'A — Ship it. Fast.\nB — Wait. Safer.\nRecommend A.';
+    const out = questions(
+      [goal('g')],
+      [step('parent', 'g'), step('q', 'parent', { kind: 'decision', title: 'Which?', detail })],
+    );
+    expect(out).toEqual([{ id: 'q', title: 'Which?', detail, goalId: 'g', goalTitle: 'Goal g' }]);
+  });
+
+  it('leaves out an answered question, one put aside, one for later and one on a goal not open', () => {
+    const out = questions(
+      [goal('g'), goal('parked', { status: 'parked' })],
+      [
+        step('answered', 'g', { kind: 'decision', resolution: 'A', status: 'done' }),
+        step('aside', 'g', { kind: 'decision', dismissedAt: '2026-09-20T00:00:00Z' }),
+        step('later', 'g', { startsOn: '2026-11-01' }),
+        step('under-later', 'later', { kind: 'decision' }),
+        step('parked-q', 'parked', { kind: 'decision' }),
+        step('open', 'g', { kind: 'decision' }),
+      ],
+    );
+    expect(out.map((q) => q.id)).toEqual(['open']);
+  });
+
+  it('still picks the next step from the same pass', () => {
+    const out = goalsForTodo(
+      [{ goal: goal('g'), areaName: 'Area' }],
+      buildForest(['g'], [step('q', 'g', { kind: 'decision' }), step('mine', 'g')]).byGoal,
+      today,
+    );
+    expect(out.steps.map((s) => s.id)).toEqual(['mine']);
+    expect(out.questions.map((q) => q.id)).toEqual(['q']);
+  });
+});
+
+describe('unreadDashResults', () => {
+  const today = '2026-09-29';
+
+  function count(goals: Goal[], steps: Step[]) {
+    const { byGoal } = buildForest(
+      goals.map((g) => g.id),
+      steps,
+    );
+    return unreadDashResults(
+      dailyView(
+        goals.map((g) => ({ goal: g, areaName: 'Area' })),
+        byGoal,
+        today,
+      ),
+    );
+  }
+
+  it("counts Dash's results not yet read, and nothing read, empty or dropped", () => {
+    expect(
+      count(
+        [goal('g')],
+        [
+          step('a', 'g', { kind: 'claude', status: 'done', result: 'Found three.' }),
+          step('b', 'g', { kind: 'claude', status: 'done', resultUrl: 'https://example.com' }),
+          step('read', 'g', { kind: 'claude', status: 'done', result: 'x', reviewedAt: '2026-09-28T00:00:00Z' }),
+          step('empty', 'g', { kind: 'claude' }),
+          step('dropped', 'g', { kind: 'claude', status: 'dropped', result: 'x' }),
+        ],
+      ),
+    ).toBe(2);
+  });
+
+  it('is zero with nothing waiting, and on a goal that is not open', () => {
+    expect(count([goal('g')], [step('mine', 'g')])).toBe(0);
+    expect(
+      count([goal('p', { status: 'parked' })], [step('a', 'p', { kind: 'claude', status: 'done', result: 'x' })]),
+    ).toBe(0);
   });
 });

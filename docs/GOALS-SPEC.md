@@ -358,6 +358,21 @@ owned by Goals and is never copied into `todo.tasks`.
   step hides that step only: the goal has no line on Todo until its next step
   is a different one, because that one was closed, reordered or given a later
   date.
+- Each **open question** the Goals home lists as waiting on you is on Todo
+  too, today (plan #1267): unanswered, not put aside, not under a step for
+  later, on an open goal. It has a button per lettered option, the
+  recommended one marked, and pressing one records that option as the answer
+  exactly as the option button on the goal page does. The question then
+  leaves Todo, and the re-shape run fires from the answer as it does for one
+  given here. A question whose options cannot be read shows as a link to it
+  on its goal. The rule is `todoQuestions` in `lib/goals/todo.ts`, from the
+  same pass of `dailyView` that picks the next steps.
+- When Dash has **finished work you have not read**, Todo shows one line
+  such as "Dash finished 2 things for you", linking to "What Dash did" on
+  the Goals home (plan #1268). The count is the home's results to read, Dash
+  steps with a result and no `reviewed_at` (`unreadDashResults` in
+  `lib/goals/todo.ts`), so marking a result read takes it off the count. At
+  zero the line is not there.
 - Rhythms for the current period appear on Todo on their own until the count
   is met. There is no flag to set for those.
 - Dated items, such as an event you said you would attend, show on their date.

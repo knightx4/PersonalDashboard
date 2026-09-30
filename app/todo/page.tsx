@@ -2,6 +2,7 @@ import { CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { requireUser } from '@/lib/auth/server';
 import { loadAgenda } from '@/lib/todo/agenda/load';
+import { loadDashResultsCount } from '@/lib/todo/agenda/dash-results';
 import { BUCKET_LABELS, todayIn } from '@/lib/todo/tasks/model';
 import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
@@ -10,6 +11,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { AddTask } from '@/components/todo/task-form';
 import { TaskRow } from '@/components/todo/task-row';
 import { AgendaItemRow } from '@/components/todo/agenda-item-row';
+import { DashResultsLine } from '@/components/todo/dash-results-line';
 import { formatClock } from '@/lib/clock';
 
 export const metadata = { title: 'Agenda' };
@@ -27,7 +29,10 @@ export const metadata = { title: 'Agenda' };
  */
 export default async function TodoPage() {
   const user = await requireUser();
-  const agenda = await loadAgenda(user.id);
+  const [agenda, dashResults] = await Promise.all([
+    loadAgenda(user.id),
+    loadDashResultsCount(user.id),
+  ]);
 
   const empty = agenda.piles.length === 0;
 
@@ -51,6 +56,10 @@ export default async function TodoPage() {
           {agenda.failed.length > 1 ? 'them' : 'it'} is missing from this page.
         </Banner>
       )}
+
+      {/* Dash's finished work you have not read, as one line to where it is
+          read on the Goals home (plan #1268). Absent at zero. */}
+      <DashResultsLine count={dashResults} className="mt-4 px-1" />
 
       {empty ? (
         <EmptyState
