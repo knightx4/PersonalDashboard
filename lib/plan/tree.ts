@@ -1,4 +1,3 @@
-import { MODULES, type ModuleId } from '@/lib/modules';
 import {
   DEFAULT_BLOCK_KIND,
   hasLiveFog,
@@ -10,6 +9,7 @@ import {
   type PlanStatus,
 } from './load';
 import { claimLiveness, type ClaimLiveness, type ClaimRun, type ClaimStep } from './liveness';
+import { PLAN_SCOPES, planScopeLabel, type PlanScope } from '@/lib/plan/projects';
 
 /**
  * The plan, read.
@@ -46,7 +46,7 @@ export type PlanRef = {
   outline?: string;
   title: string;
   status: PlanStatus;
-  module: ModuleId | null;
+  module: PlanScope | null;
 };
 
 /** One "cannot start until" edge, with the row it is stored as. */
@@ -98,7 +98,7 @@ export type PlanNode = PlanItem & {
 
 /** One module's plan, and how far through it is. */
 export type PlanSection = {
-  module: ModuleId | null;
+  module: PlanScope | null;
   label: string;
   nodes: PlanNode[];
   /**
@@ -470,7 +470,7 @@ export function buildPlanTree(data: PlanData, liveness?: PlanLiveness): PlanSect
   };
   roots.forEach(placeAll);
 
-  const scopes: Array<ModuleId | null> = [...MODULES.map((module) => module.id), null];
+  const scopes: Array<PlanScope | null> = [...PLAN_SCOPES, null];
   return scopes
     .map((scope) => {
       const nodes = roots.filter((node) => node.module === scope);
@@ -485,7 +485,7 @@ export function buildPlanTree(data: PlanData, liveness?: PlanLiveness): PlanSect
       const working = nodes.filter((node) => !isFinishedFeature(node));
       return {
         module: scope,
-        label: scope ? (MODULES.find((m) => m.id === scope)?.label ?? scope) : 'The app as a whole',
+        label: planScopeLabel(scope),
         nodes,
         progress: planProgress(leavesOf(working)),
         tally: tallyHealth(working, liveness),

@@ -23,6 +23,7 @@
  * is the whole failure this shape exists to prevent.
  */
 import 'server-only';
+import { PROJECTS, type DevProject } from '@/lib/plan/projects';
 
 export const DEFAULT_FEATURE_ROUTINE_ID = 'trig_018TQKkc6qbGLmP1Y7AKWn4N';
 
@@ -106,6 +107,31 @@ export function visionRoutine(): RoutineTarget {
     id: firstSet(process.env.CLAUDE_VISION_ROUTINE_ID),
     token: firstSet(process.env.CLAUDE_VISION_ROUTINE_TOKEN, process.env.CLAUDE_API_KEY),
   };
+}
+
+/**
+ * The routine that builds a project's steps (lib/plan/projects) -- "Send to
+ * Dash" on a row in that project's section of /dev/plan.
+ *
+ * No fallback to the plan routine: that one checks out this repository, and a
+ * step for another repository built here would be built in the wrong place.
+ */
+export function projectRoutine(project: DevProject): RoutineTarget {
+  return {
+    id: firstSet(process.env[project.routineEnv.id]),
+    token: firstSet(process.env[project.routineEnv.token], process.env.CLAUDE_API_KEY),
+  };
+}
+
+/**
+ * The routine ids that build projects, for the sweeps that judge a run by
+ * what it pushed here: a project's run pushes to its own repository, so the
+ * silence here says nothing about it.
+ */
+export function projectRoutineIds(): ReadonlySet<string> {
+  return new Set(
+    PROJECTS.map((project) => projectRoutine(project).id).filter((id): id is string => !!id),
+  );
 }
 
 /** The beta header the routine API requires, as documented. */

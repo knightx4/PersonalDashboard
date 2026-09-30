@@ -30,6 +30,7 @@ import {
   countMatches,
 } from '@/lib/plan/tree';
 import { MODULES } from '@/lib/modules';
+import { PROJECTS } from '@/lib/plan/projects';
 
 let counter = 0;
 
@@ -143,8 +144,22 @@ describe('planProgress', () => {
 describe('buildPlanTree', () => {
   it('gives every module a section, even one with no steps yet', () => {
     const sections = tree([item({ id: 'a', module: 'jobs' })]);
-    expect(sections.map((section) => section.module)).toEqual(MODULES.map((m) => m.id));
+    expect(sections.map((section) => section.module)).toEqual([
+      ...MODULES.map((m) => m.id),
+      ...PROJECTS.map((p) => p.id),
+    ]);
     expect(sections.find((section) => section.module === 'vault')?.nodes).toEqual([]);
+  });
+
+  it('files a project\'s steps in its own section, after the workspaces', () => {
+    const sections = tree([
+      item({ id: 'site', module: 'website' }),
+      item({ id: 'copy', module: 'website', parentId: 'site' }),
+    ]);
+    const website = sections.find((section) => section.module === 'website');
+    expect(website?.label).toBe('selveyknight.com');
+    expect(website?.nodes.map((node) => node.id)).toEqual(['site']);
+    expect(website?.nodes[0].children.map((node) => node.id)).toEqual(['copy']);
   });
 
   it('shows the app-wide section only once something is in it', () => {

@@ -3,6 +3,7 @@ import type { FeedbackRow } from '@/lib/feedback/load';
 import type { ModuleId } from '@/lib/modules';
 import type { PlanData, PlanItem } from '@/lib/plan/load';
 import { buildPlanTree, workOrder } from '@/lib/plan/tree';
+import { isAppScope } from '@/lib/plan/projects';
 
 /**
  * The morning summary, built from the rows the app already holds.
@@ -130,7 +131,8 @@ function answeredDecisions(
 ): DigestEvent[] {
   return items
     .filter(
-      (item) =>
+      (item): item is PlanItem & { module: ModuleId | null } =>
+        isAppScope(item.module) &&
         item.kind === 'decision' &&
         item.status === 'done' &&
         item.completedAt !== null &&
@@ -193,7 +195,12 @@ export function whatHappened(input: {
   notes: readonly FeedbackRow[];
   since: string;
 }): DigestEvent[] {
-  const moduleById = new Map(input.plan.items.map((item) => [item.id, item.module]));
+  // Only this app's rows: a project's work (lib/plan/projects) is not news here.
+  const moduleById = new Map(
+    input.plan.items.flatMap((item) =>
+      isAppScope(item.module) ? [[item.id, item.module] as const] : [],
+    ),
+  );
 
   const shipped = changelogEntries({
     plan: input.plan.items,
@@ -214,10 +221,9 @@ export function whatHappened(input: {
 
   const byId = new Map(parentsOf(input.plan.items).map((row) => [row.id, row]));
 
-  return [
-    ...shipped,
-    ...answeredDecisions(input.plan.items, input.since, byId, moduleById),
-  ].sort((a, b) => b.at.localeCompare(a.at));
+  return [...shipped, ...answeredDecisions(input.plan.items, input.since, byId, moduleById)].sort(
+    (a, b) => b.at.localeCompare(a.at),
+  );
 }
 
 /**

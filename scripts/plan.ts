@@ -74,7 +74,8 @@ import postgres from 'postgres';
 import { findDuplicateIdea, ideaFirstLine } from '../lib/ideas/duplicate';
 import { FILED_IDEAS_SQL } from '../lib/ideas/load';
 import { IDEA_WINDOW_MINUTES, ideaAllowance, ideaCapRefusal } from '../lib/ideas/rate';
-import { MODULES, isModuleId } from '../lib/modules';
+import { isModuleId } from '../lib/modules';
+import { isPlanScope, planScopeLabel, planScopeOf } from '../lib/plan/projects';
 import { planBrief, STATUS_WORD } from '../lib/plan/brief';
 import type { VisionBodies } from '../lib/specs/vision';
 import { closeRefusal, commitOnMain } from '../lib/plan/github';
@@ -418,7 +419,7 @@ function ideasFromFile(path: string): { body: string; module: PlanItem['module']
 }
 
 function moduleLabel(module: PlanItem['module']): string {
-  return module ? (MODULES.find((m) => m.id === module)?.label ?? module) : 'The app as a whole';
+  return planScopeLabel(module);
 }
 
 /** Keep only the steps a predicate wants, and the way down to them. */
@@ -915,8 +916,9 @@ async function main(): Promise<void> {
       const parentNumber = arg('--parent');
       const parent = parentNumber ? await byNumber(sql, userId, parentNumber) : null;
       const moduleArg = arg('--module');
-      if (moduleArg && !isModuleId(moduleArg)) fail(`"${moduleArg}" is not a module.`);
-      const scope = parent ? parent.module : moduleArg && isModuleId(moduleArg) ? moduleArg : null;
+      // A plan step may belong to a project built elsewhere (lib/plan/projects).
+      if (moduleArg && !isPlanScope(moduleArg)) fail(`"${moduleArg}" is not a module or project.`);
+      const scope = parent ? parent.module : planScopeOf(moduleArg);
       const priority = Number(arg('--priority') ?? 2);
       if (!isPlanPriority(priority)) fail('Priority is 1 (next), 2 (normal) or 3 (someday).');
       const size = arg('--size');

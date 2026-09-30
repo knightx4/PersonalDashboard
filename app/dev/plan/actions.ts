@@ -6,7 +6,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { loadVisionBodies } from '@/lib/specs/vision';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
-import { isModuleId, type ModuleId } from '@/lib/modules';
 import { planRoutine, type FireRoutineResult } from '@/lib/feedback/routine';
 import {
   DISMISSAL_RULE,
@@ -55,6 +54,7 @@ import {
   type PlanNode,
   type PlanSection,
 } from '@/lib/plan/tree';
+import { planScopeOf, type PlanScope } from '@/lib/plan/projects';
 
 export type PlanActionState = {
   error?: string;
@@ -83,7 +83,7 @@ function revalidatePlan(): void {
 const moduleField = z
   .string()
   .max(40)
-  .transform((value) => (value && isModuleId(value) ? value : null));
+  .transform((value) => planScopeOf(value));
 
 const statusField = z.enum(PLAN_STATUSES);
 
@@ -140,7 +140,7 @@ async function parentModule(
   supabase: Db,
   userId: string,
   parentId: string,
-): Promise<{ ok: true; module: ModuleId | null } | { ok: false; error: string }> {
+): Promise<{ ok: true; module: PlanScope | null } | { ok: false; error: string }> {
   const { data } = await supabase
     .from('plan_items')
     .select('module')
@@ -149,7 +149,7 @@ async function parentModule(
     .maybeSingle();
   if (!data) return { ok: false, error: 'That parent step does not exist.' };
   const scope = data.module as string | null;
-  return { ok: true, module: scope && isModuleId(scope) ? scope : null };
+  return { ok: true, module: planScopeOf(scope) };
 }
 
 const addSchema = z.object({
@@ -320,7 +320,7 @@ export async function updatePlanItem(
       return { error: 'A step cannot be its own parent.' };
     }
     const stored = current.module as string | null;
-    let scope: ModuleId | null = stored && isModuleId(stored) ? stored : null;
+    let scope: PlanScope | null = planScopeOf(stored);
     if (parsed.data.parent) {
       const parent = await parentModule(supabase, user.id, parsed.data.parent);
       if (!parent.ok) return { error: parent.error };
