@@ -46,7 +46,8 @@ export type RunJob =
   | 'raise'
   | 'check_back'
   | 'vision'
-  | 'vision_reshape';
+  | 'vision_reshape'
+  | 'ci_fix';
 
 /**
  * What to call the press, where the page names the run behind a step.
@@ -69,6 +70,7 @@ export const RUN_JOB_LABEL: Record<RunJob, string> = {
   check_back: 'A check-back',
   vision: 'A vision review',
   vision_reshape: 'A re-shape after a vision edit',
+  ci_fix: 'A fix for red CI',
 };
 
 /**
@@ -92,6 +94,7 @@ export const RUN_JOB_NOUN: Record<RunJob, string> = {
   check_back: 'check-back',
   vision: 'vision review',
   vision_reshape: 'vision re-shape',
+  ci_fix: 'CI fix',
 };
 
 /**
