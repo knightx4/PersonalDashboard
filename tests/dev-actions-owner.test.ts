@@ -239,6 +239,11 @@ const LOCKED: ReadonlyArray<{ file: string; name: string; run: () => Promise<unk
     name: 'startUiReview',
     run: () => (review.startUiReview as Action)({}, form({ module: 'vault' })),
   },
+  {
+    file: 'app/dev/ui/review/actions.ts',
+    name: 'confirmAllUiFindings',
+    run: () => (review.confirmAllUiFindings as Action)({}, form({ id: SOME_UUID })),
+  },
 ];
 
 beforeEach(() => {
