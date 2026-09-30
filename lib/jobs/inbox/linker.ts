@@ -14,6 +14,26 @@ import { normalizeTimeZone } from '@/lib/core/timezone';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpendReports, type SpendClient } from '@/lib/core/spend/record';
 import { jevEnabledFor } from '@/lib/jev/enabled';
+import {
+  companyLookbackQuery,
+  companyLookbackVersion,
+  recruitingCandidateQuery,
+} from '@/lib/jobs/email/providers/gmail-query';
+
+/**
+ * Bumped whenever the recruiting search widens, so mail from before the
+ * mailbox was connected is listed again under the new terms. 1: "thanks for
+ * your interest" and "applying", which the Keystone acknowledgement needed.
+ */
+export const JOBS_CATCH_UP_VERSION = 1;
+
+/**
+ * The catch-up key for one company's lookback. core.inbox_catch_ups allows
+ * 41 characters of [a-z0-9_-], so the id goes in without its dashes.
+ */
+export function companyCatchUpKey(companyId: string): string {
+  return `jobs-co-${companyId.replace(/-/g, '').toLowerCase()}`;
+}
 
 /**
  * The job search workspace, as something the shared sync can hand mail to.
@@ -40,6 +60,32 @@ export function jobLinker(
 
   return {
     domain: 'jobs',
+
+    /**
+     * The recruiting search over the whole backfill window again. The backfill
+     * only ran it once, when the mailbox was connected, so a term added since
+     * never reached anything older than that day.
+     */
+    catchUp: {
+      version: JOBS_CATCH_UP_VERSION,
+      query: ({ backfillWindowDays }) => recruitingCandidateQuery(backfillWindowDays),
+    },
+
+    /** One lookback per tracked company, run again when its domains change. */
+    async catchUps({ userId, backfillWindowDays }) {
+      const companies = await loadCompanies(supabase, userId);
+      return companies.flatMap((company) => {
+        const query = companyLookbackQuery(company.domains, backfillWindowDays);
+        if (!query) return [];
+        return [
+          {
+            key: companyCatchUpKey(company.id),
+            version: companyLookbackVersion(company.domains),
+            query,
+          },
+        ];
+      });
+    },
 
     /**
      * Mail held on an earlier pass, looked at again.

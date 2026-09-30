@@ -30,7 +30,7 @@ export type WikiLink = {
  *
  * The negative lookbehind on `!` is what separates a link from an embed, and
  * the two are handled very differently -- one is a link, the other is usually
- * an attachment this app deliberately does not have.
+ * an attachment, shown from its private copy on the note page.
  */
 const WIKILINK = /(!)?\[\[([^\]\n]+)\]\]/g;
 
@@ -45,7 +45,7 @@ const COMMENT = /%%[\s\S]*?%%/g;
  */
 const CALLOUT = /^([ \t]*>)[ \t]*\[!([A-Za-z-]+)\]([+-]?)[ \t]*(.*)$/gm;
 
-/** Extensions that are attachments rather than notes. */
+/** A note's extension; any other extension on an embed is a file. */
 const NOTE_EXTENSION = /\.md$/i;
 const HAS_EXTENSION = /\.[A-Za-z0-9]{1,8}$/;
 
@@ -151,9 +151,15 @@ export function toStandardMarkdown(source: string, options: RewriteOptions): str
       const link = parseWikiLink(inner, bang === '!');
 
       if (link.embed && isAttachmentEmbed(link)) {
-        // The bytes were never fetched -- by design, not by accident -- so say
-        // that, rather than rendering a broken image.
-        return `*(attachment not synced: ${link.target})*`;
+        // Into the form a hand-written embed already has, `![alt](src)`, so the
+        // renderer resolves both against the attachment rows in one place
+        // (lib/vault/markdown/attachments.ts). Obsidian's `|300` size is kept
+        // in the alt, where its own markdown syntax puts it too; the angle
+        // brackets let a filename with spaces stay one destination.
+        const size = inner.includes('|') ? `|${inner.slice(inner.lastIndexOf('|') + 1).trim()}` : '';
+        const name = link.target.slice(link.target.lastIndexOf('/') + 1);
+        const src = link.target.replace(/([<>\\])/g, '\\$1');
+        return `![${escapeLabel(name + size)}](<${src}>)`;
       }
 
       const path = resolveWikiLink(link, index);

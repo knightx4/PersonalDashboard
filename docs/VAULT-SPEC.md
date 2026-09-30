@@ -57,9 +57,11 @@ Listing these because they will otherwise get invented.
   writer, the vault is the master copy, and sync is one-way, always. If app-authored
   notes ever happen they go in an `outbox/` folder the app owns exclusively, and
   that is a separate decision, not this one.
-- **No attachments.** Markdown only. Images, PDFs, audio and canvas files are
-  never fetched, never stored, never transferred. See "Only `.md`" below — this
-  is enforced at the transport layer, not by filtering after download.
+- **No attachments beyond images, PDFs and audio.** Those three are copied into
+  a private bucket and shown on the note page (plan #1298). SVG, video, canvas
+  files and anything over 50 MB are never fetched, never stored and never
+  transferred. See "Only `.md` and kept attachments" below: the filter runs on
+  the tree listing, before any download.
 - **No semantic search, no embeddings, no pgvector in v1.** The extension is not
   installed and this spec does not install it. Postgres full-text is enough for
   a viewer and defers a real decision until there is a real consumer.
@@ -118,8 +120,9 @@ with the existing `TOKEN_ENCRYPTION_KEY` through `lib/crypto/tokens.ts`, exactly
 as Gmail refresh tokens already are.
 
 Gitignoring attachments in the vault is **optional**. It halves the repo and
-speeds up the human's own pushes, but the app never requests a non-`.md` blob,
-so leaving them in costs the app nothing.
+speeds up your own pushes. The app requests only notes and the images, PDFs
+and audio it keeps, so an attachment you gitignore simply shows on the note
+page as not in the vault.
 
 ### Why git and not an upload, a folder picker, or Drive
 
@@ -263,32 +266,37 @@ outside `lib/vault/providers/` imports a GitHub client** — the same containmen
 rule as `lib/email/providers/`, enforced the same way. A local-folder or GitLab
 source later costs one file and no changes anywhere else.
 
-### Only `.md`
+### Only `.md` and kept attachments
 
-The filter happens **before any content is requested**, which is what makes the
-"no attachments" non-goal real rather than aspirational:
+The filter happens **before any content is requested**:
 
 ```
 GET /repos/{owner}/{repo}/git/trees/{sha}?recursive=1
-  → entries; keep type === 'blob' && path.endsWith('.md') && !path.startsWith('.')
+  → entries; keep type === 'blob' && (isNotePath(path) || isAttachmentPath(path))
   → then, and only then, fetch those blobs
 ```
 
-A photo's bytes never cross the network, never reach the server, and never reach
-Postgres. This is also why the tarball endpoint is rejected despite being one
-request instead of thousands: it would transfer the entire vault, attachments
-included, to filter afterwards.
+A file of any other type never crosses the network, never reaches the server,
+and never reaches Postgres or storage. This is also why the tarball endpoint is
+rejected despite being one request instead of thousands: it would transfer the
+entire vault to filter afterwards.
 
 `.obsidian/` and any dotfile directory are excluded — plugin config is not a note.
 
-**Attachments (plan #1298).** The "no attachments" non-goal above has since
-been narrowed. The same tree listing now also returns images (png, jpg, jpeg,
-gif, webp), PDFs and audio (mp3, m4a, wav, ogg), with their size and blob SHA,
-from `isAttachmentPath` in `lib/vault/paths.ts`. SVG, video and `.canvas` are
-still dropped, as is anything in a dotfile directory. A file over 50 MB is
-listed with `tooLarge` set and is never copied. Listing costs no request per
-file; the bytes are copied into the private `vault-attachments` bucket by the
-sync, and nothing else in the vault is fetched.
+**Attachments (plan #1298).** Images (png, jpg, jpeg, gif, webp), PDFs and
+audio (mp3, m4a, wav, ogg) are listed with their size and blob SHA by
+`isAttachmentPath` in `lib/vault/paths.ts`, one row each in
+`obsidian.attachments`. SVG is left out because it can carry script; video and
+`.canvas` are left out by the feature's brief; anything in a dotfile directory
+is dropped as notes are. The sync copies each file into the private
+`vault-attachments` bucket under `<user_id>/<connection_id>/<blob sha>`, so a
+rename needs no new copy. A file over 50 MB keeps its row and is never copied.
+
+The bucket is never public. The note page links each file to
+`/vault/attachment/<id>`, which reads the row on your session and redirects to a
+link signed for an hour. The link is signed on each request, so nothing signed
+is written into the page, and an hour rather than a minute because a recording
+keeps requesting the signed address as it plays and seeks.
 
 ### Backfill
 
@@ -385,7 +393,8 @@ broken on the web.
 | Syntax | Treatment |
 |---|---|
 | `[[Note]]`, `[[Note\|alias]]`, `[[Note#Heading]]` | resolved by basename against `vault.notes`; links to `/vault/n/<path>`. Ambiguous → first match. Unresolved → plain text, muted, not a dead link |
-| `![[image.png]]` | a muted "attachment not synced" placeholder. Honest, and by design — those bytes were never fetched |
+| `![[image.png]]`, `![[image.png\|300]]`, `![alt](path/image.png)` | resolved against `obsidian.attachments` by vault path, by path relative to the note, or by filename (shortest path wins). An image is drawn, at the given width if there is one; a PDF is a link that opens in the browser; audio plays in place. A file that is not in the vault, is over 50 MB, is not copied yet, or is of a type never kept shows as a muted label naming which (`lib/vault/markdown/attachments.ts`) |
+| `![alt](https://…)` | a muted label with the alt text. An image on another host is never loaded, so opening a note tells nobody else that you did |
 | `![[Note]]` (note embed) | rendered as a link in v1, not inlined. Transclusion is a recursion problem and v1 does not need it |
 | `#tag` | plain text in v1. Frontmatter `tags` are shown in the properties strip |
 | `%%comment%%` | stripped |

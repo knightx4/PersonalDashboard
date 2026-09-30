@@ -6,7 +6,14 @@ import { NoteProperties } from '@/components/vault/note-properties';
 import { VaultPanel } from '@/components/vault/vault-panel';
 import { VaultSheet } from '@/components/vault/vault-sheet';
 import { createVaultClient } from '@/lib/vault/auth/server';
-import { groupByFolder, loadLinkTargets, loadNote, loadNotes } from '@/lib/vault/notes/load';
+import {
+  groupByFolder,
+  loadAttachments,
+  loadLinkTargets,
+  loadNote,
+  loadNotes,
+} from '@/lib/vault/notes/load';
+import { buildAttachmentIndex } from '@/lib/vault/markdown/attachments';
 import { buildLinkIndex, toStandardMarkdown } from '@/lib/vault/markdown/obsidian';
 import { folderOf, noteHref } from '@/lib/vault/paths';
 import { requireUser } from '@/lib/auth/server';
@@ -69,9 +76,12 @@ export default async function NotePage({
   // first 500 by path; that cap is filed as an idea of its own. A search
   // narrows that second read and nothing else: the wikilinks in the note you
   // are reading still have to resolve against the whole vault.
-  const [targets, notes] = await Promise.all([
+  // The attachment rows come with them: an embedded image or recording is
+  // resolved by name the way a wikilink is, so it needs the vault's list.
+  const [targets, notes, attachments] = await Promise.all([
     loadLinkTargets(supabase),
     loadNotes(supabase, search ? { search } : {}),
+    loadAttachments(supabase),
   ]);
   const index = buildLinkIndex(targets);
   const markdown = toStandardMarkdown(note.body, { index, hrefFor: noteHref });
@@ -135,7 +145,11 @@ export default async function NotePage({
 
         <NoteProperties frontmatter={note.frontmatter} />
 
-        <NoteBody markdown={markdown} />
+        <NoteBody
+          markdown={markdown}
+          notePath={note.path}
+          attachments={buildAttachmentIndex(attachments)}
+        />
 
         {/* Tasks ABOUT this note, which is not the same thing as the checkboxes
           inside it -- those belong to Obsidian and are not read here at all.
