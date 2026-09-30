@@ -394,7 +394,7 @@ describe('undo', () => {
   it('reverses only the row that line changed', () => {
     expect(filed.map(undoMove)).toEqual([
       { move: 'reopen', stepId: 'a' },
-      { move: 'uncount', stepId: 'r', startsOn: '2026-09-21' },
+      { move: 'uncount', stepId: 'r', startsOn: '2026-09-21', amount: 1 },
       { move: 'archive', stepId: 'n' },
       { move: 'none' },
     ]);
@@ -851,5 +851,125 @@ describe('adding a step already under way (plan #1278)', () => {
         undone_at: null,
       }),
     ).toBe('Added a step in Apartment: "Clear the hallway", under way: started on the hallway');
+  });
+});
+
+describe('counting several at once, on the day they happened (plan #1279)', () => {
+  // A weekly rhythm whose open period is the week of Monday 28 September.
+  const jobs = contextOf(
+    [goal('jobs', { title: 'Find a job' })],
+    [
+      step('apply', 'jobs', {
+        title: 'Send applications',
+        kind: 'rhythm',
+        rhythmCount: 5,
+        rhythmPeriod: 'week',
+      }),
+      step('portfolio', 'jobs', { title: 'Update the portfolio' }),
+    ],
+    new Map([
+      [
+        'apply',
+        {
+          current: period('apply', { startsOn: '2026-09-28', endsOn: '2026-10-05', target: 5 }),
+          past: [],
+          missed: 0,
+        },
+      ],
+    ]),
+  );
+  const count = (fields: Record<string, unknown>, today = '2026-09-30') =>
+    parseFiling({ actions: [{ type: 'count', step: 's1', ...fields }] }, jobs, today) as Extract<
+      PlannedAction,
+      { kind: 'count' }
+    >[];
+
+  it('takes an amount, one by default, and drops one that is not a whole number in range', () => {
+    expect(count({})[0]).toMatchObject({ amount: 1, happenedOn: null, startsOn: '2026-09-28' });
+    expect(count({ quantity: 3 })[0]!.amount).toBe(3);
+    expect(count({ quantity: '3' })[0]!.amount).toBe(3);
+    expect(count({ quantity: 2.5 })).toEqual([]);
+    expect(count({ quantity: 0 })).toEqual([]);
+    expect(count({ quantity: 101 })).toEqual([]);
+    expect(count({ quantity: 'a few' })).toEqual([]);
+  });
+
+  it('counts towards the period the day falls in, and today’s for a day it cannot use', () => {
+    expect(count({ day: '2026-09-29' })[0]!.startsOn).toBe('2026-09-28');
+    // Yesterday from a Monday is last week.
+    expect(count({ day: '2026-09-27' }, '2026-09-28')[0]).toMatchObject({
+      happenedOn: '2026-09-27',
+      startsOn: '2026-09-21',
+    });
+    expect(count({ day: '2026-10-02' })[0]).toMatchObject({ happenedOn: null, startsOn: '2026-09-28' });
+    expect(count({ day: '2026-06-01' })[0]).toMatchObject({ happenedOn: null, startsOn: '2026-09-28' });
+  });
+
+  it('files "sent three applications yesterday" as 3 in yesterday’s period, and Undo takes 3 back', async () => {
+    // The periods as the store keeps them, by start day: last week closed, this week open.
+    const periods = new Map([
+      ['2026-09-21', 4],
+      ['2026-09-28', 1],
+    ]);
+    const { deps, saved } = stubs(
+      { actions: [{ type: 'count', step: 's1', quantity: 3, day: '2026-09-27' }] },
+      {
+        context: async () => jobs,
+        apply: async (_id, action) => {
+          if (action.kind !== 'count') return null;
+          periods.set(action.startsOn, (periods.get(action.startsOn) ?? 0) + action.amount);
+          return {
+            kind: 'count',
+            step_id: action.step.id,
+            title: action.step.title,
+            goal_title: action.step.goalTitle,
+            starts_on: action.startsOn,
+            amount: action.amount,
+            counted_on: action.happenedOn ?? '2026-09-28',
+            undone_at: null,
+          };
+        },
+      },
+    );
+    const result = await fileCapture('sent three applications yesterday', '2026-09-28', deps);
+    expect(result.ok).toBe(true);
+    expect([...periods]).toEqual([
+      ['2026-09-21', 7],
+      ['2026-09-28', 1],
+    ]);
+    const [line] = saved[0]!;
+    expect(describeFiled(line!)).toBe('Counted 3 towards "Send applications" in Find a job');
+
+    const undo = undoMove(line!);
+    expect(undo).toEqual({ move: 'uncount', stepId: 'apply', startsOn: '2026-09-21', amount: 3 });
+    if (undo.move !== 'uncount') throw new Error('expected an uncount');
+    periods.set(undo.startsOn, Math.max(0, periods.get(undo.startsOn)! - undo.amount));
+    expect(periods.get('2026-09-21')).toBe(4);
+  });
+
+  it('takes back one from a line filed before counts had an amount', () => {
+    const old: FiledEntry = {
+      kind: 'count',
+      step_id: 'apply',
+      title: 'Send applications',
+      goal_title: 'Find a job',
+      starts_on: '2026-09-21',
+      undone_at: null,
+    };
+    expect(undoMove(old)).toEqual({ move: 'uncount', stepId: 'apply', startsOn: '2026-09-21', amount: 1 });
+    expect(describeFiled(old)).toBe('Counted one towards "Send applications" in Find a job');
+  });
+
+  it('stores yesterday’s date on a progress entry filed as yesterday', async () => {
+    const { deps, saved } = stubs(
+      {
+        actions: [
+          { type: 'progress', step: 's2', text: 'rewrote the about page', day: '2026-09-29' },
+        ],
+      },
+      { context: async () => jobs },
+    );
+    await fileCapture('rewrote the about page yesterday', '2026-09-30', deps);
+    expect(saved[0]![0]).toMatchObject({ kind: 'progress', item_id: 'portfolio', happened_on: '2026-09-29' });
   });
 });

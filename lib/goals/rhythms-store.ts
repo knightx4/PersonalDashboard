@@ -113,40 +113,50 @@ export async function syncRhythms(
 }
 
 /**
- * Count one towards a rhythm's open period starting on `startsOn`, or take
- * one back (`by` of -1). The count never goes below nothing. False when that
- * period is not open, or the count moved underneath and did not settle.
+ * Count `by` towards a rhythm's open period starting on `startsOn`, or take
+ * back with a negative `by`. The count never goes below nothing. False when
+ * that period is not there (or not open, unless `closed` allows it), when
+ * there was nothing to take back, or when the count moved underneath and did
+ * not settle.
+ *
+ * `closed` lets capture count towards a period that has already closed,
+ * such as last week's for something done yesterday on a Monday (plan #1279).
+ * The period's kept is then worked out again from its new count.
  */
 export async function countTowards(
   client: GoalsSupabaseClient,
   itemId: string,
   startsOn: string,
-  by: 1 | -1,
+  by: number,
+  { closed = false }: { closed?: boolean } = {},
 ): Promise<boolean> {
   // Read then write on the count read, so two ticks at once are both counted
   // rather than one overwriting the other: the loser sees nothing updated and
   // reads again.
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const { data: row, error } = await client
+    const read = client
       .from('periods')
-      .select('id, count')
+      .select('id, count, target, closed_at')
       .eq('item_id', itemId)
-      .eq('starts_on', startsOn)
-      .is('closed_at', null)
-      .maybeSingle();
+      .eq('starts_on', startsOn);
+    const { data: row, error } = await (closed ? read : read.is('closed_at', null)).maybeSingle();
     if (error) throw new Error(error.message);
     if (!row) return false;
     const count = row.count as number;
     const next = Math.max(0, count + by);
     if (next === count) return false;
 
-    const { data, error: writeError } = await client
+    // A closed period is written only while still closed, and an open one
+    // only while still open, so a close landing in between is read again.
+    const wasClosed = row.closed_at !== null;
+    const write = client
       .from('periods')
-      .update({ count: next })
+      .update(wasClosed ? { count: next, kept: next >= (row.target as number) } : { count: next })
       .eq('id', row.id as string)
-      .eq('count', count)
-      .is('closed_at', null)
-      .select('id');
+      .eq('count', count);
+    const { data, error: writeError } = await (
+      wasClosed ? write.not('closed_at', 'is', null) : write.is('closed_at', null)
+    ).select('id');
     if (writeError) throw new Error(writeError.message);
     if ((data ?? []).length > 0) return true;
   }

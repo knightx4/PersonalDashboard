@@ -27,7 +27,7 @@ export const CAPTURE_MOVE_OPTIONS: Readonly<Record<CaptureMove, string>> = {
   close:
     'It says the whole of an existing one-off step or task is now finished, with nothing of it left to do.',
   count:
-    'It reports one more occurrence of something done repeatedly on a rhythm, such as attending an event, sending applications, posting, or doing a routine reset.',
+    'It reports one or more occurrences of something done repeatedly on a rhythm, such as attending an event, sending applications, posting, or doing a routine reset.',
   progress:
     'It reports part of the work on a step or goal without finishing it, such as some of the bags moved or one of several rooms done, or news, a lead or a result towards a goal.',
   reading:
@@ -52,7 +52,7 @@ export const CAPTURE_SORT_QUESTION = {
 /** How the box names each move: the guess, and the chips when it asks. */
 export const CAPTURE_MOVE_LABELS: Readonly<Record<CaptureMove, string>> = {
   close: 'Close a step',
-  count: 'Count one',
+  count: 'Count towards a rhythm',
   progress: 'Log progress',
   reading: 'Record a number',
   add: 'Add a step',
