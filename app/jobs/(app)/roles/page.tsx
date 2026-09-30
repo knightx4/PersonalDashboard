@@ -37,6 +37,7 @@ import {
 } from '@/lib/jobs/suggest/load';
 import { loadOperationCost } from '@/lib/core/spend/load';
 import { describeRun, loadLatestRun } from '@/lib/jobs/suggest/search-runs';
+import { otherParams, parseOpeningView } from '@/lib/jobs/suggest/opening-view';
 import { historyFromPipeline, withApplicationNotes, withOpeningNotes } from '@/lib/jobs/suggest/score-notes-load';
 import { CHANCE_BAND_LABELS } from '@/lib/jobs/suggest/chance-check';
 import { FIT_MINIMUMS, parseScoreMinimum, passesMinimum } from '@/lib/jobs/suggest/score-notes';
@@ -68,6 +69,8 @@ export default async function RolesPage({
     hide?: string | string[];
     minfit?: string;
     minchance?: string;
+    // The recommended roles' own sort and filters (opening-view.ts).
+    [key: `r${string}`]: string | string[] | undefined;
   }>;
 }) {
   const user = await requireUser();
@@ -91,6 +94,9 @@ export default async function RolesPage({
     stats: sourceStats,
     searchCostMicros: searchCost,
     searchLine: describeRun(latestRun),
+    view: parseOpeningView(params),
+    keep: otherParams(params),
+    pathname: '/jobs/roles',
   };
 
   const displaySpec = rolesDisplay();

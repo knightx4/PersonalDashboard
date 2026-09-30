@@ -1,18 +1,18 @@
 'use client';
 
-import { useActionState, useEffect, useState, useTransition } from 'react';
-import { Copy, Mail, Trash2 } from 'lucide-react';
+import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
+import { Check, Copy, Mail, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Banner } from '@/components/ui/banner';
 import { Group } from '@/components/ui/disclosure';
-import { Input, Label, Select, Textarea } from '@/components/ui/field';
+import { InlineInput, Input, Label, Select, Textarea } from '@/components/ui/field';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { backfillResumable, scanButtonLabel } from '@/lib/core/inbox/resume';
 import { SyncProgressBar, useInboxSync } from '@/components/jobs/inbox/sync-run';
-import { disconnectInbox, updateProfile, type SettingsState } from './actions';
+import { disconnectInbox, savePreference, updateProfile, type SettingsState } from './actions';
 import {
   acceptEvidence,
   addEvidence,
@@ -163,19 +163,7 @@ function ProfileSection({
             <ValueRow label="Ghost after" value={`${profile.ghostThresholdDays} days of silence`} />
             <ValueRow label="Target titles" value={profile.targetTitles} />
             <ValueRow label="Never suggest" value={profile.excludedIndustries} />
-            <ValueRow label="Where you live" value={prefs.homeLocation ?? ''} />
-            <ValueRow
-              label="How you will work"
-              value={prefs.workplaces.map((w) => WORKPLACE_PREFERENCE_LABELS[w]).join(', ')}
-            />
-            <ValueRow
-              label="Lowest base pay"
-              value={prefs.salaryFloorCents ? `${formatPay(prefs.salaryFloorCents)} a year` : ''}
-            />
-            <ValueRow
-              label="Company stages"
-              value={prefs.companyStages.map((stage) => COMPANY_STAGE_LABELS[stage]).join(', ')}
-            />
+            <PreferenceRows prefs={prefs} />
             <ValueRow label="How you want to sound" value={profile.writingStyleNotes} />
             <ValueRow
               label="Never write these"
@@ -244,45 +232,6 @@ function ProfileSection({
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="homeLocation">Where you live</Label>
-              <Input
-                id="homeLocation"
-                name="homeLocation"
-                defaultValue={prefs.homeLocation ?? ''}
-                placeholder="New York, NY"
-              />
-            </div>
-            <div>
-              <Label htmlFor="salaryFloor">Lowest base pay, per year</Label>
-              <Input
-                id="salaryFloor"
-                name="salaryFloor"
-                inputMode="numeric"
-                defaultValue={prefs.salaryFloorCents ? formatPay(prefs.salaryFloorCents) : ''}
-                placeholder="120,000"
-              />
-            </div>
-          </div>
-
-          <CheckGroup
-            legend="How you will work"
-            name="workplaces"
-            options={WORKPLACE_PREFERENCES.map((value) => ({ value, label: WORKPLACE_PREFERENCE_LABELS[value] }))}
-            checked={prefs.workplaces}
-          />
-          <CheckGroup
-            legend="Company stages"
-            name="companyStages"
-            options={COMPANY_STAGES.map((value) => ({ value, label: COMPANY_STAGE_LABELS[value] }))}
-            checked={prefs.companyStages}
-          />
-          <p className="-mt-2 text-small text-ink-muted">
-            Rules for the roles Dash recommends. A posting that states pay below your floor, or a
-            workplace you did not tick, is left out. Leave a group unticked for any.
-          </p>
-
           <div>
             <Label htmlFor="writingStyleNotes">How you want to sound</Label>
             <Textarea
@@ -334,36 +283,153 @@ function ProfileSection({
   );
 }
 
-/** A row of checkboxes for a multi-choice preference; none ticked means any. */
-function CheckGroup({
-  legend,
-  name,
-  options,
-  checked,
-}: {
-  legend: string;
-  name: string;
-  options: { value: string; label: string }[];
-  checked: readonly string[];
-}) {
+/**
+ * The four job preferences, each edited where it is read (law 12): where you
+ * live and the pay floor are inline fields that save on leaving them, and the
+ * workplaces and company stages are choices that save when pressed. Rules for
+ * the roles Dash recommends: a posting that states pay below the floor, or a
+ * workplace not chosen, is left out; none chosen means any.
+ */
+function PreferenceRows({ prefs }: { prefs: JobPreferences }) {
   return (
-    <fieldset>
-      <legend className="mb-1 block text-small font-medium text-ink-muted">{legend}</legend>
-      <div className="flex flex-wrap gap-x-4 gap-y-2">
-        {options.map((option) => (
-          <label key={option.value} className="flex cursor-pointer items-center gap-2 text-ui text-ink">
-            <input
-              type="checkbox"
-              name={name}
-              value={option.value}
-              defaultChecked={checked.includes(option.value)}
-              className="size-4 rounded border-border text-accent focus:ring-accent/30"
-            />
-            {option.label}
-          </label>
-        ))}
-      </div>
-    </fieldset>
+    <>
+      <PreferenceText
+        field="homeLocation"
+        label="Where you live"
+        value={prefs.homeLocation ?? ''}
+        placeholder="New York, NY"
+      />
+      <PreferenceText
+        field="salaryFloor"
+        label="Lowest base pay"
+        value={prefs.salaryFloorCents ? formatPay(prefs.salaryFloorCents) : ''}
+        placeholder="120,000 a year"
+        inputMode="numeric"
+      />
+      <PreferenceChoices
+        field="workplaces"
+        label="How you will work"
+        options={WORKPLACE_PREFERENCES.map((value) => ({
+          value,
+          label: WORKPLACE_PREFERENCE_LABELS[value],
+        }))}
+        chosen={prefs.workplaces}
+      />
+      <PreferenceChoices
+        field="companyStages"
+        label="Company stages"
+        options={COMPANY_STAGES.map((value) => ({ value, label: COMPANY_STAGE_LABELS[value] }))}
+        chosen={prefs.companyStages}
+      />
+    </>
+  );
+}
+
+/** A one-line preference: the value is the field, saved on Enter or on leaving it; Escape puts it back. */
+function PreferenceText({
+  field,
+  label,
+  value,
+  placeholder,
+  inputMode,
+}: {
+  field: 'homeLocation' | 'salaryFloor';
+  label: string;
+  value: string;
+  placeholder: string;
+  inputMode?: 'numeric';
+}) {
+  const [state, action] = useActionState<SettingsState, FormData>(savePreference, {});
+  const formRef = useRef<HTMLFormElement>(null);
+  return (
+    <ValueRow
+      label={label}
+      value={
+        <form ref={formRef} action={action} className="-mx-1">
+          <input type="hidden" name="field" value={field} />
+          <InlineInput
+            name="value"
+            aria-label={label}
+            defaultValue={value}
+            placeholder={placeholder}
+            inputMode={inputMode}
+            aria-invalid={state.error ? true : undefined}
+            onBlur={(event) => {
+              if (event.currentTarget.value.trim() !== value) formRef.current?.requestSubmit();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                event.currentTarget.blur();
+              }
+              if (event.key === 'Escape') {
+                event.currentTarget.value = value;
+                event.currentTarget.blur();
+              }
+            }}
+          />
+          {state.error && <p className="mt-1 px-1 text-small text-danger">{state.error}</p>}
+        </form>
+      }
+    />
+  );
+}
+
+/**
+ * A multi-choice preference as a row of choices. Each is a submit button that
+ * sends the current set and itself, so it works before JavaScript; a chosen
+ * one is set in ink with a tick, the rest stay quiet (law 17).
+ */
+function PreferenceChoices({
+  field,
+  label,
+  options,
+  chosen,
+}: {
+  field: 'workplaces' | 'companyStages';
+  label: string;
+  options: { value: string; label: string }[];
+  chosen: readonly string[];
+}) {
+  const [state, action, pending] = useActionState<SettingsState, FormData>(savePreference, {});
+  return (
+    <ValueRow
+      label={label}
+      value={
+        <form action={action} className="flex flex-wrap gap-x-1 gap-y-1">
+          <input type="hidden" name="field" value={field} />
+          {chosen.map((value) => (
+            <input key={value} type="hidden" name="current" value={value} />
+          ))}
+          {options.map((option) => {
+            const on = chosen.includes(option.value);
+            return (
+              <button
+                key={option.value}
+                type="submit"
+                name="toggle"
+                value={option.value}
+                aria-pressed={on}
+                disabled={pending}
+                className={cn(
+                  'press inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-ui',
+                  on
+                    ? 'bg-sunken font-medium text-ink'
+                    : 'text-ink-muted hover:bg-sunken hover:text-ink',
+                )}
+              >
+                {on && <Check className="size-3.5" strokeWidth={2} aria-hidden />}
+                {option.label}
+              </button>
+            );
+          })}
+          {chosen.length === 0 && (
+            <span className="self-center px-1 text-small text-ink-ghost">Any</span>
+          )}
+          {state.error && <p className="basis-full text-small text-danger">{state.error}</p>}
+        </form>
+      }
+    />
   );
 }
 
