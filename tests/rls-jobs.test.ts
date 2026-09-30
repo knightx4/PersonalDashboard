@@ -226,6 +226,13 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.jev_trial_answers = trialAnswer.id;
 
+  // A roles search that finished (job_search 0040).
+  const [searchRun] = await admin<{ id: string }[]>`
+    insert into search_runs (user_id, kind, trigger, stage, finished_at, written)
+    values (${userId}, 'apply', 'button', 'done', now(), 2)
+    returning id`;
+  ids.search_runs = searchRun.id;
+
   return ids;
 }
 

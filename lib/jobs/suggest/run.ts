@@ -21,6 +21,7 @@ import { openingFeedback } from './feedback';
 import { pickBoardCandidates } from './board-pick';
 import { loadFollowedBoardPostings } from './boards';
 import { readPreferences } from './preferences';
+import type { SearchProgress } from './search-runs';
 
 export type KindOutcome = {
   /** False when the cadence said not yet and nothing was asked. */
@@ -154,8 +155,10 @@ async function runReachOut(
   apiKey: string,
   seeker: SeekerContext,
   past: Row[],
+  progress?: SearchProgress,
 ): Promise<KindOutcome> {
   const spend: SpendReport[] = [];
+  await progress?.stage('reach_out', 'searching');
   const { data, error } = await supabase
     .from('contacts')
     .select('full_name, title, relationship, how_we_connect, companies ( name )')
@@ -221,8 +224,10 @@ async function runApply(
   seeker: SeekerContext,
   applications: ApplicationFact[],
   past: Row[],
+  progress?: SearchProgress,
 ): Promise<KindOutcome> {
   const spend: SpendReport[] = [];
+  await progress?.stage('apply', 'boards');
   const label = (app: ApplicationFact) => `${app.roleTitle} at ${app.companyName}`;
   const pastOpenings = past.filter((row) => row.kind === 'apply');
   const feedback = openingFeedback(
@@ -243,7 +248,8 @@ async function runApply(
     companies: feedback.companies,
   };
   const responded = applications.filter((app) => app.respondedAt);
-  const boardOpenings = pickBoardCandidates(await loadFollowedBoardPostings(supabase, userId), {
+  const boards = await loadFollowedBoardPostings(supabase, userId);
+  const boardOpenings = pickBoardCandidates(boards.postings, {
     targetTitles: seeker.targetTitles,
     likedTitles: [
       ...pastOpenings.filter((row) => row.status === 'done' && row.headline).map((row) => row.headline as string),
@@ -253,6 +259,7 @@ async function runApply(
     excludedWords: exclusionWords(seeker.excludedIndustries),
   });
   const fromBoard = new Map(boardOpenings.map((posting) => [posting.url, posting]));
+  await progress?.stage('apply', 'searching', { boards_read: boards.boardsRead, candidates: boardOpenings.length });
   const locations = new Map<string, number>();
   for (const app of applications.slice(0, 80)) {
     if (app.location) locations.set(app.location, (locations.get(app.location) ?? 0) + 1);
@@ -272,6 +279,7 @@ async function runApply(
   );
   if (!result.ok) return { ran: true, written: 0, headlines: [], spend, error: result.error };
 
+  await progress?.stage('apply', 'saving');
   const headlines: string[] = [];
   for (const opening of result.suggestions) {
     const board = fromBoard.get(opening.url);
@@ -321,7 +329,14 @@ const SKIPPED: KindOutcome = { ran: false, written: 0, headlines: [], spend: [],
 export async function runSuggestionsFor(
   supabase: AppSupabaseClient,
   userId: string,
-  options: { apiKey: string; kinds: readonly SuggestionKind[]; force?: boolean; now?: Date },
+  options: {
+    apiKey: string;
+    kinds: readonly SuggestionKind[];
+    force?: boolean;
+    now?: Date;
+    /** Where each kind's run reports its stage (search-runs.ts); only kinds that run report. */
+    progress?: SearchProgress;
+  },
 ): Promise<Record<SuggestionKind, KindOutcome>> {
   if (options.kinds.includes('apply')) await expireStaleOpenings(supabase, userId, options.now);
   const [past, searched] = await Promise.all([
@@ -365,11 +380,11 @@ export async function runSuggestionsFor(
   };
 
   if (due('reach_out')) {
-    out.reach_out = await runReachOut(supabase, userId, options.apiKey, seeker, past);
+    out.reach_out = await runReachOut(supabase, userId, options.apiKey, seeker, past, options.progress);
     await record('reach_out', out.reach_out);
   }
   if (due('apply')) {
-    out.apply = await runApply(supabase, userId, options.apiKey, seeker, applications, past);
+    out.apply = await runApply(supabase, userId, options.apiKey, seeker, applications, past, options.progress);
     await record('apply', out.apply);
   }
   return out;

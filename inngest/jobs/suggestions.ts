@@ -10,6 +10,7 @@ import { jevEnabledFor } from '@/lib/jev/enabled';
 import { suggestionsPayload } from '@/lib/jobs/suggest/notify';
 import { runSuggestionsFor } from '@/lib/jobs/suggest/run';
 import { checkOpeningPostings } from '@/lib/jobs/suggest/posting';
+import { recordRuns } from '@/lib/jobs/suggest/search-runs';
 import { scoreApplicationsFor, scoreOpeningsFor } from '@/lib/jobs/suggest/score-run';
 import { sendToPerson } from '@/lib/push/send';
 
@@ -21,13 +22,13 @@ import { sendToPerson } from '@/lib/push/send';
  * due is decided per person (lib/jobs/suggest/cadence.ts), so most days most
  * accounts cost nothing. One person's failure is noted and the rest go on.
  *
- * Then every open opening not read in three days is read from its link
- * (lib/jobs/suggest/posting.ts), which takes a closed posting off the list
- * and gives Jev the posting's text. Then any open opening not yet scored is
- * put to Jev's questions (plan #1178), for accounts that agreed to send text
- * to TypeSafe. That includes openings a goals run wrote since yesterday.
- * Open applications not yet scored, or whose role changed since, get fit and
- * chance the same way (plan #1203).
+ * Each search that runs is logged in job_search.search_runs with its stage,
+ * so Roles can say how the last one went (lib/jobs/suggest/search-runs.ts).
+ *
+ * Reading the postings and scoring them is a separate daily call
+ * (runOpeningUpkeep below, /api/cron/job-openings): the searches alone can
+ * take most of a request's five minutes, and one cut off there saves
+ * nothing.
  *
  * A run that wrote something is sent as a phone notification to every browser
  * the person switched notifications on for (core.push_subscriptions), the
@@ -55,18 +56,14 @@ export async function runJobSuggestions(now: Date = new Date()): Promise<JobSugg
     try {
       if (!moduleEnabled(await loadAccountSettings(userId, core), 'jobs')) continue;
       summary.people += 1;
-      const result = await runSuggestionsFor(jobs, userId, { apiKey, kinds: ['reach_out', 'apply'], now });
+      const progress = recordRuns(jobs, userId, 'daily');
+      const result = await runSuggestionsFor(jobs, userId, { apiKey, kinds: ['reach_out', 'apply'], now, progress });
+      for (const kind of ['reach_out', 'apply'] as const) {
+        const outcome = result[kind];
+        if (outcome.ran) await progress.finish(kind, { written: outcome.written, error: outcome.error });
+      }
       await recordSpendReports(core, userId, { module: 'jobs', operation: 'suggest-outreach' }, result.reach_out.spend);
       await recordSpendReports(core, userId, { module: 'jobs', operation: 'find-openings' }, result.apply.spend);
-      await checkOpeningPostings(jobs, userId, { now });
-      if (await jevEnabledFor(core, userId)) {
-        const scoreSpend: SpendReport[] = [];
-        await scoreOpeningsFor(jobs, userId, { onSpend: (report) => scoreSpend.push(report) });
-        await recordSpendReports(core, userId, { module: 'jobs', operation: 'score-openings' }, scoreSpend);
-        const applicationSpend: SpendReport[] = [];
-        await scoreApplicationsFor(jobs, userId, { onSpend: (report) => applicationSpend.push(report) });
-        await recordSpendReports(core, userId, { module: 'jobs', operation: 'score-applications' }, applicationSpend);
-      }
       summary.reachOut += result.reach_out.written;
       summary.apply += result.apply.written;
       for (const outcome of [result.reach_out, result.apply]) {
@@ -84,6 +81,56 @@ export async function runJobSuggestions(now: Date = new Date()): Promise<JobSugg
         await sendToPerson(push, userId, payload, now).catch((err) =>
           console.error('[jobs suggestions] push', err instanceof Error ? err.message : err),
         );
+      }
+    } catch (err) {
+      summary.failed.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+  return summary;
+}
+
+export type OpeningUpkeepSummary = { people: number; read: number; closed: number; scored: number; failed: string[] };
+
+/** Everything the upkeep may take, inside its route's five minutes. */
+const UPKEEP_BUDGET_MS = 250_000;
+
+/**
+ * The daily upkeep of what the searches found, called by pg_cron through
+ * /api/cron/job-openings (supabase/migrations/0132_job_openings_cron.sql).
+ *
+ * For every account with the job search on: read each open opening not read
+ * in three days from its link (lib/jobs/suggest/posting.ts), which takes a
+ * closed posting off the list and gives Jev the posting's text; then, for
+ * accounts that agreed to send text to TypeSafe, score the open openings not
+ * yet scored (plan #1178), including ones a goals run wrote, and the open
+ * applications not yet scored or whose role changed (plan #1203). What does
+ * not fit in the time is left for the next day.
+ */
+export async function runOpeningUpkeep(now: Date = new Date()): Promise<OpeningUpkeepSummary> {
+  const core = createCoreServiceSupabase();
+  const jobs = createServiceSupabase();
+  const { data, error } = await core.from('account_settings').select('user_id');
+  if (error) throw new Error(`Reading the accounts failed: ${error.message}`);
+
+  const began = Date.now();
+  const left = () => UPKEEP_BUDGET_MS - (Date.now() - began);
+  const summary: OpeningUpkeepSummary = { people: 0, read: 0, closed: 0, scored: 0, failed: [] };
+  for (const { user_id: userId } of (data ?? []) as { user_id: string }[]) {
+    if (left() < 30_000) break;
+    try {
+      if (!moduleEnabled(await loadAccountSettings(userId, core), 'jobs')) continue;
+      summary.people += 1;
+      const checked = await checkOpeningPostings(jobs, userId, { now, budgetMs: Math.min(90_000, left() - 60_000) });
+      summary.read += checked.read;
+      summary.closed += checked.closed;
+      if (left() > 30_000 && (await jevEnabledFor(core, userId))) {
+        const scoreSpend: SpendReport[] = [];
+        const openings = await scoreOpeningsFor(jobs, userId, { onSpend: (report) => scoreSpend.push(report) });
+        summary.scored += openings.scored;
+        await recordSpendReports(core, userId, { module: 'jobs', operation: 'score-openings' }, scoreSpend);
+        const applicationSpend: SpendReport[] = [];
+        await scoreApplicationsFor(jobs, userId, { onSpend: (report) => applicationSpend.push(report) });
+        await recordSpendReports(core, userId, { module: 'jobs', operation: 'score-applications' }, applicationSpend);
       }
     } catch (err) {
       summary.failed.push(err instanceof Error ? err.message : String(err));

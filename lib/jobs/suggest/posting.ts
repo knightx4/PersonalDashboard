@@ -86,7 +86,7 @@ async function readPosting(url: string, boards: Map<string, Promise<FetchedPosti
 export async function checkOpeningPostings(
   supabase: AppSupabaseClient,
   userId: string,
-  options: { now?: Date; limit?: number } = {},
+  options: { now?: Date; limit?: number; budgetMs?: number } = {},
 ): Promise<PostingCheckOutcome> {
   const now = options.now ?? new Date();
   const outcome: PostingCheckOutcome = { read: 0, closed: 0, unreadable: 0 };
@@ -109,7 +109,8 @@ export async function checkOpeningPostings(
   const boards = new Map<string, Promise<FetchedPosting[] | null>>();
   const rows = (data ?? []) as Row[];
   const began = Date.now();
-  for (let i = 0; i < rows.length && Date.now() - began < BUDGET_MS; i += PARALLEL) {
+  const budget = options.budgetMs ?? BUDGET_MS;
+  for (let i = 0; i < rows.length && Date.now() - began < budget; i += PARALLEL) {
     await Promise.all(rows.slice(i, i + PARALLEL).map((row) => checkOne(supabase, userId, row, boards, now, outcome)));
   }
   return outcome;

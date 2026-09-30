@@ -36,6 +36,7 @@ import {
   withPreferenceMisses,
 } from '@/lib/jobs/suggest/load';
 import { loadOperationCost } from '@/lib/core/spend/load';
+import { describeRun, loadLatestRun } from '@/lib/jobs/suggest/search-runs';
 import { historyFromPipeline, withApplicationNotes, withOpeningNotes } from '@/lib/jobs/suggest/score-notes-load';
 import { CHANCE_BAND_LABELS } from '@/lib/jobs/suggest/chance-check';
 import { FIT_MINIMUMS, parseScoreMinimum, passesMinimum } from '@/lib/jobs/suggest/score-notes';
@@ -74,17 +75,23 @@ export default async function RolesPage({
   const params = await searchParams;
 
   const core = await createCoreClient();
-  const [pipeline, openings, preferences, sourceStats, searchCost] = await Promise.all([
+  const [pipeline, openings, preferences, sourceStats, searchCost, latestRun] = await Promise.all([
     loadPipeline(supabase, user.id),
     loadOpenSuggestions(supabase, user.id, 'apply'),
     loadJobPreferences(supabase, user.id),
     loadOpeningStats(supabase, user.id),
     loadOperationCost(core, 'jobs', 'find-openings'),
+    loadLatestRun(supabase, user.id, 'apply'),
   ]);
   // Fit and chance with their reasons (plan #1206), read against the pipeline as history.
   const rows = await withApplicationNotes(supabase, user.id, pipeline);
   const recommended = withPreferenceMisses(withOpeningNotes(openings, historyFromPipeline(pipeline)), preferences);
-  const recommendedProps = { suggestions: recommended, stats: sourceStats, searchCostMicros: searchCost };
+  const recommendedProps = {
+    suggestions: recommended,
+    stats: sourceStats,
+    searchCostMicros: searchCost,
+    searchLine: describeRun(latestRun),
+  };
 
   const displaySpec = rolesDisplay();
   const display = parseListDisplay(displaySpec, params);
