@@ -369,7 +369,11 @@ const DEV_QUEUE_STATES = [
   [
     'Bugs and requests',
     [
-      [FEEDBACK_HEALTH_GLYPHS.ready, 'Ready', 'Filed, nobody on it. Half filled, like a ready step.'],
+      [
+        FEEDBACK_HEALTH_GLYPHS.ready,
+        'Ready',
+        'Filed, nobody on it. Half filled, like a ready step.',
+      ],
       [
         FEEDBACK_HEALTH_GLYPHS.planned,
         'Planned',
@@ -411,7 +415,11 @@ const DEV_QUEUE_STATES = [
   [
     'UI findings',
     [
-      [FINDING_HEALTH_GLYPHS.waiting, 'Waiting on you', 'A pass proposed it. Confirm it or dismiss it.'],
+      [
+        FINDING_HEALTH_GLYPHS.waiting,
+        'Waiting on you',
+        'A pass proposed it. Confirm it or dismiss it.',
+      ],
       [FINDING_HEALTH_GLYPHS.ready, 'Confirmed', 'You agreed it is real, and nobody is on it yet.'],
       [FINDING_HEALTH_GLYPHS.dropped, 'Dropped', 'You looked and left it alone.'],
     ],
@@ -590,7 +598,10 @@ export default function DevUiPage() {
           /* Where the standard gets held against the app, one module at a
              time. It is a different question from what the standard is, which
              is why it is a page rather than a section here. */
-          <Link href="/dev/ui/review" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+          <Link
+            href="/dev/ui/review"
+            className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+          >
             Review
           </Link>
         }
@@ -631,7 +642,7 @@ export default function DevUiPage() {
       <Section
         id="laws"
         title="The laws"
-        lead="Sixteen, grouped by what they govern. Everything else on this page is one of these applied to a surface. The numbers are fixed for life: they are cited in code and in commits."
+        lead="Nineteen, grouped by what they govern. Everything else on this page is one of these applied to a surface. The numbers are fixed for life: they are cited in code and in commits."
       >
         {/* One surface. The groups are told apart by a heading and air, and
          * the laws inside each by hairlines -- law 11 and law 13 applied to
@@ -941,6 +952,117 @@ export default function DevUiPage() {
                   <span className="tabular text-small font-normal text-ink-ghost">14</span>
                 </p>
               </Card>
+            </div>
+          </div>
+        </Group>
+
+        <Group title="17 — The same chips, twice">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <p className="text-small text-ink-muted">
+                Every chip is on its default and every chip is accent. Nothing stands out because
+                everything does.
+              </p>
+              <Card padding="dense" className="flex flex-wrap gap-2">
+                {/* ui-ok: accent on defaults is the demonstration. */}
+                {['Status: any', 'Sort: newest', 'Group: none', 'Window: 30 days'].map((chip) => (
+                  <span
+                    key={chip}
+                    className="rounded-control bg-accent px-2 text-small text-accent-ink"
+                  >
+                    {chip}
+                  </span>
+                ))}
+              </Card>
+            </div>
+            <div className="space-y-2">
+              <p className="text-small text-ink">
+                Defaults in gray. The one the person changed is the only one with weight, without
+                being made any louder.
+              </p>
+              <Card padding="dense" className="flex flex-wrap gap-2">
+                {['Status: any', 'Sort: newest', 'Group: none', 'Window: 30 days'].map(
+                  (chip, i) => (
+                    <span
+                      key={chip}
+                      className={
+                        i === 2
+                          ? 'px-2 text-small font-semibold text-ink'
+                          : 'px-2 text-small text-ink-ghost'
+                      }
+                    >
+                      {i === 2 ? 'Group: due date' : chip}
+                    </span>
+                  ),
+                )}
+              </Card>
+            </div>
+          </div>
+        </Group>
+
+        <Group title="18 — The same row, twice">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <p className="text-small text-ink-muted">
+                Centred text and a value that floats after the label. Nothing lines up with anything
+                above or below it.
+              </p>
+              <ul className="space-y-1 text-center">
+                {SHAPE_DEMO.slice(0, 4).map((row) => (
+                  <li key={row.role} className="text-ui text-ink">
+                    {row.role} <span className="text-ink-muted">{row.age}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="space-y-2">
+              <p className="text-small text-ink">
+                Label on the left edge, value on the right, figures in columns. The eye runs down
+                one edge to find a name and down the other to compare.
+              </p>
+              <ul className="divide-y divide-border">
+                {SHAPE_DEMO.slice(0, 4).map((row) => (
+                  <li key={row.role} className="flex items-baseline justify-between gap-3 py-1.5">
+                    <span className="min-w-0 truncate text-ui text-ink">{row.role}</span>
+                    <span className="tabular shrink-0 text-micro text-ink-ghost">{row.age}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </Group>
+
+        <Group title="19 — The same list, grouped">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <p className="text-small text-ink-muted">
+                One run of identical lines, with more space added to make it breathe. It is longer
+                and no easier to search.
+              </p>
+              <ul className="space-y-3">
+                {SHAPE_DEMO.map((row) => (
+                  <li key={row.role} className="truncate text-ui text-ink">
+                    {row.role}, {row.company}, {row.age}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="space-y-2">
+              <p className="text-small text-ink">
+                The same lines with the company as a mark and the age as the group. Any row is found
+                by its place before it is read.
+              </p>
+              <ul className="divide-y divide-border">
+                {SHAPE_DEMO.map((row) => (
+                  <li key={row.role} className="flex items-baseline gap-2 py-1.5">
+                    <span className="grid size-4 shrink-0 place-items-center text-micro text-ink-ghost">
+                      {row.mark}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-ui text-ink">{row.role}</span>
+                    <span className="tabular shrink-0 text-micro text-ink-ghost">{row.age}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </Group>
@@ -1461,7 +1583,10 @@ export default function DevUiPage() {
             declarations the pages pass to the shared display module rather
             than typed here a second time. */}
         <Group title="Lists with display options">
-          <Rows rows={LISTS_WITH_DISPLAY.map(displaySummary)} labelWidth="sm:grid-cols-[9rem_1fr]" />
+          <Rows
+            rows={LISTS_WITH_DISPLAY.map(displaySummary)}
+            labelWidth="sm:grid-cols-[9rem_1fr]"
+          />
         </Group>
       </Section>
 

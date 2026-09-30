@@ -33,9 +33,9 @@ git log --oneline -15 -- app/<id> components/<id>
 
 Then read, in this order:
 
-1. `app/dev/ui/laws.ts` — the sixteen laws. Laws 1 to 3 and 16 are what a surface
+1. `app/dev/ui/laws.ts` — the nineteen laws. Laws 1 to 3 and 16 are what a surface
    claims; 9 to 12 are how much of itself it shows. Those are the two halves of
-   the reading.
+   the reading. 17 to 19 ask whether the eye can find one thing on the surface.
 2. Every page and view under the module's own prefixes — `app/<id>/**` and the
    component directories `scope.ts` maps to it.
 3. The module's spec in `docs/`, where it has one. A surface that is honest

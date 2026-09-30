@@ -1,5 +1,5 @@
 /**
- * The sixteen laws, as data.
+ * The nineteen laws, as data.
  *
  * They live in a module rather than in the page's JSX so that the page is a
  * layout and this is the content, and so that anything else that needs to
@@ -111,7 +111,32 @@ export const SHAPE_LAWS: readonly Law[] = [
   {
     n: 15,
     title: 'Do not explain a heading underneath the heading.',
-    body: 'A sentence restating the heading above it is read once and skipped forever after. "Submitted — sent, and landed somewhere real" teaches nothing on the second visit. Name the thing correctly instead, and put the explanation in the empty state, where someone seeing it for the first time actually is. Never put a caption above a box whose placeholder says the same words.',
+    body: 'A sentence restating the heading above it is read once and skipped forever after. "Submitted — sent, and landed somewhere real" teaches nothing on the second visit. Name the thing correctly instead, and put the explanation in the empty state, where someone seeing it for the first time actually is. Never put a caption above a box whose placeholder says the same words. The same goes for a label or tooltip added to rescue a control that is unclear: change the control to something recognisable, and keep its accessible name.',
+  },
+];
+
+/**
+ * The scan laws. Written after a review of why some dense screens read at a
+ * glance and others feel like a chore with identical content. Nobody reads a
+ * screen: they arrive with a question and hunt for one thing, so a surface is
+ * good to the degree that the eye can find it. Laws 9 to 15 say what to take
+ * out; these three say what to do with what is left.
+ */
+export const SCAN_LAWS: readonly Law[] = [
+  {
+    n: 17,
+    title: 'Defaults are quiet.',
+    body: 'A control showing its default value is set in plain ink and gray. Only a value the person changed, or a state that needs attention, gets weight or colour. A row of chips that all say "default" and are all blue leaves nothing to find. Emphasis is the difference between an element and its neighbours, so quiet the neighbours before making the exception loud.',
+  },
+  {
+    n: 18,
+    title: 'Everything sits on an edge.',
+    body: 'Text starts on the left edge and values end on the right, in tabular figures. Centre only what nobody is meant to read, such as a mark or an empty-state picture. Each element lines up with an edge of its surface or of the element above it. When something has no edge to sit against, add one, with a rule or a subline, rather than filling the space with more content. Rules between rows stop at the content column and do not run to the edge of the screen.',
+  },
+  {
+    n: 19,
+    title: 'Differentiate before you add space.',
+    body: 'A dense list that is hard to scan is usually undifferentiated, not too long. Give it variety the eye can use: an avatar for a person, a chip for a category, a group header for a date, an icon in place of a phrase. Extra whitespace makes the same list longer and no easier to search.',
   },
 ];
 
@@ -131,7 +156,13 @@ export const SPEND_LAWS: readonly Law[] = [
 ];
 
 /** Every law, in the order written. */
-export const ALL_LAWS: readonly Law[] = [...LAWS, ...RESTRAINT_LAWS, ...SHAPE_LAWS, ...SPEND_LAWS];
+export const ALL_LAWS: readonly Law[] = [
+  ...LAWS,
+  ...RESTRAINT_LAWS,
+  ...SHAPE_LAWS,
+  ...SPEND_LAWS,
+  ...SCAN_LAWS,
+];
 
 /** Kept for the page that renders the ninth on its own. */
 export const DENSITY_LAW: Law = RESTRAINT_LAWS[0];
@@ -180,5 +211,10 @@ export const LAW_GROUPS: readonly LawGroup[] = [
     title: 'Restraint and shape',
     lead: 'How much of itself the interface shows, and what shape a page is.',
     laws: byNumber(9, 10, 11, 12, 13, 14, 15),
+  },
+  {
+    title: 'Scanning',
+    lead: 'Nobody reads a screen. They hunt for one thing, and the surface either lets them find it or does not.',
+    laws: byNumber(17, 18, 19),
   },
 ];
