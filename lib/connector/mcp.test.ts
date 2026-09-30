@@ -112,7 +112,7 @@ describe('a request without a usable token', () => {
 });
 
 describe('the tool list', () => {
-  it('offers the seven Ask Dash lookups with their own descriptions and schemas, read only', async () => {
+  it('offers every Ask Dash lookup with their own descriptions and schemas, read only', async () => {
     await call('initialize', {
       protocolVersion: '2025-06-18',
       capabilities: {},

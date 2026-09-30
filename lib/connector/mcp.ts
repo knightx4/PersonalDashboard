@@ -7,7 +7,7 @@ import { checkConnectorRate, recordConnectorCall, type ConnectorCall } from './c
 import type { ConnectorRefusal } from './token';
 
 /**
- * The connector's MCP server (plan #1256): Dash's seven read lookups offered
+ * The connector's MCP server (plan #1256): Dash's read lookups offered
  * to a Claude app over Streamable HTTP at /api/mcp, stateless, one server per
  * request. The route verifies the token with connectorAccess() and hands the
  * result in here; every tool call is then capped, run and logged as the
@@ -147,7 +147,7 @@ function sessionOf(extra: Record<string, unknown> | undefined): ConnectorSession
   return session;
 }
 
-/** The seven lookups as MCP tools, with Ask Dash's own descriptions and input schemas. */
+/** The lookups as MCP tools, with Ask Dash's own descriptions and input schemas. */
 export function registerAskTools(server: McpServer): void {
   for (const tool of ASK_TOOLS) {
     server.registerTool(
@@ -168,7 +168,7 @@ export function registerAskTools(server: McpServer): void {
 const handler = createMcpHandler(registerAskTools, {
   serverInfo: { name: 'Dash', version: '1.0.0' },
   instructions:
-    "Read-only lookups over the person's own dashboard: their orders and spending, job applications, todos, goals and Obsidian vault notes. Every row comes back with a link to its page in the dashboard.",
+    "Read-only lookups over the person's own dashboard: their orders and spending, job applications, todos, goals, Obsidian vault notes, and what they have written about a topic anywhere in it. Every row comes back with a link to its page in the dashboard.",
 });
 
 /**
