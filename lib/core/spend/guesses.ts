@@ -255,6 +255,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // The day's facts under their headings, at most about forty short lines;
   // three or four sentences out.
   'write-day-brief': background(run(HAIKU, 1_500, 200)),
+  // The week's facts with both weeks' figures, the open goals, last week's
+  // review and the home page's observations; up to five observations and a
+  // change out. The brief's own estimate for a heavy week.
+  'write-week-review': background(run(SONNET, 20_000, 2_000)),
   // One booking email in, the day, time and place out.
   'read-appointment-email': background(unit(HAIKU, 2_500, 150)),
   // The record, up to eight events and eight subject lines in; a short email out.
