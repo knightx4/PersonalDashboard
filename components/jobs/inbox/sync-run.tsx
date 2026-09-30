@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/cn';
 import { syncProgress, type SyncPhase } from '@/lib/core/inbox/progress';
 
@@ -29,6 +30,7 @@ export const SYNC_POLL_MS = 2000;
  * "read 4 messages, linked 1" saying the same thing in both.
  */
 export function useInboxSync() {
+  const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [jobs, setJobs] = useState<Record<string, SyncJob>>({});
@@ -48,7 +50,14 @@ export function useInboxSync() {
         const data = (await res.json()) as { job: SyncJob | null };
         if (cancelled || !data.job) return;
         setJobs((current) => ({ ...current, [watching!]: data.job! }));
-        if (data.job.done) setWatching(null);
+        if (data.job.done) {
+          setWatching(null);
+          // The run has written what it found. Re-render the server parts of
+          // the page (the counts, the activity list, "last checked") so the
+          // result shows without a reload. The bar itself is client state and
+          // survives the refresh.
+          router.refresh();
+        }
       } catch {
         // A dropped poll is not worth saying anything about; the next one is
         // two seconds away, and the run is unaffected either way.
@@ -61,7 +70,7 @@ export function useInboxSync() {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [watching]);
+  }, [watching, router]);
 
   async function startSync(accountId: string, mode: 'backfill' | 'incremental') {
     setBusy(accountId);
