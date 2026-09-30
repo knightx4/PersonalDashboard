@@ -134,6 +134,9 @@ vi.mock('@/inngest/dev/claims', () => ({
 vi.mock('@/inngest/dev/digest', () => ({
   runDevDigest: vi.fn(async () => ({ written: 1, skipped: 0 })),
 }));
+vi.mock('@/inngest/dev/idea-scores', () => ({
+  runIdeaScoreCatchUp: vi.fn(async () => [{ userId: 'u', scored: 3, failed: 0, left: 0 }]),
+}));
 
 const { GET } = await import('@/app/api/cron/daily/route');
 const { runJobSweep } = await import('@/inngest/jobs/cron/sweep');
@@ -145,6 +148,7 @@ const { runGoalsDaily } = await import('@/inngest/goals/daily');
 const { runGoalsWeekly } = await import('@/inngest/goals/weekly');
 const { runGoalsQuietSweep } = await import('@/inngest/goals/quiet-runs');
 const { runDevDigest } = await import('@/inngest/dev/digest');
+const { runIdeaScoreCatchUp } = await import('@/inngest/dev/idea-scores');
 
 function cronRequest(token: string | null) {
   const headers = new Headers({ host: 'example.test', 'x-forwarded-proto': 'https' });
@@ -214,9 +218,14 @@ describe('the daily cron route', () => {
     expect(runClaimSweep).toHaveBeenCalled();
     expect(body.results['plan-claims']).toEqual({ released: 2, steps: [42, 43] });
 
-    // Same again for the digest, which is last and therefore the stage most
-    // easily lost to an earlier failure.
+    // Same again for the digest, which is last but one and so among the
+    // stages most easily lost to an earlier failure.
     expect(runDevDigest).toHaveBeenCalled();
     expect(body.results['dev-digest']).toEqual({ written: 1, skipped: 0 });
+
+    // The idea-score catch-up follows the digest, which files ideas without
+    // triage or a score (plan #1327).
+    expect(runIdeaScoreCatchUp).toHaveBeenCalled();
+    expect(body.results['idea-scores']).toEqual([{ userId: 'u', scored: 3, failed: 0, left: 0 }]);
   });
 });
