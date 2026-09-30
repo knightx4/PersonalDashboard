@@ -114,6 +114,10 @@ export const SPEND_OPERATIONS = {
     // Triaging a note or an idea as it is filed from the header panel (plan
     // #1179). Jev, four questions in one call per note or idea filed.
     'triage-note',
+    // The weekly review of the week just gone (plan #1232). Sonnet, one call
+    // per person a week from the Sunday week-review cron, none on a week with
+    // nothing counted; background.
+    'write-week-review',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one
