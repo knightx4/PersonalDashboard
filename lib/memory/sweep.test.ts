@@ -73,6 +73,42 @@ function fakePorts(rows: StaleSource[], options: { failEmbed?: boolean } = {}) {
 const long = (n: number) => Array.from({ length: n }, (_, i) => `Paragraph ${i}. `.repeat(60)).join('\n\n');
 
 describe('runMemorySweep', () => {
+  it('copies the specs before reading anything, and carries on when the copy fails', async () => {
+    const order: string[] = [];
+    const fake = fakePorts([row('a.md', 'One.')]);
+    const prune = fake.ports.prune;
+    const ports: MemorySweepPorts = {
+      ...fake.ports,
+      documents: async () => {
+        order.push('documents');
+        return 3;
+      },
+      prune: async () => {
+        order.push('prune');
+        return prune();
+      },
+    };
+    const result = await runMemorySweep(ports);
+    expect(order).toEqual(['documents', 'prune']);
+    expect(result.documents).toBe(3);
+
+    const failing = fakePorts([row('b.md', 'Two.')]);
+    const quiet = console.error;
+    console.error = () => {};
+    try {
+      const after = await runMemorySweep({
+        ...failing.ports,
+        documents: async () => {
+          throw new Error('docs/ is missing');
+        },
+      });
+      expect(after.documents).toBeNull();
+      expect(after.rows).toBe(1);
+    } finally {
+      console.error = quiet;
+    }
+  });
+
   it('embeds every stale row and then finds nothing left', async () => {
     const fake = fakePorts([row('a.md', 'One.'), row('b.md', 'Two.'), row('c.md', long(4))]);
     const result = await runMemorySweep(fake.ports);
