@@ -8,6 +8,7 @@ import { estimatePaidActions, type PaidCosts } from '@/lib/core/spend/paid-actio
 import { changePaths, type ChangeOutcome } from '@/lib/ask/changes';
 import {
   askDashInRequest,
+  askPageLabel,
   confirmAskChange,
   declineAskChange,
   listAskConversations,
@@ -72,6 +73,22 @@ export async function askDashQuestion(
     return result;
   } catch {
     return { turns: [], error: 'Dash could not be asked. Check your connection and try again.' };
+  }
+}
+
+/**
+ * The page the sheet is open over, named for its chip (plan #1272): the
+ * row's title, or the page's name. Null on the Ask page, for an address that
+ * is not one, and on any failure, when the sheet keeps its own rough name.
+ */
+// latency: pending
+export async function askDashPageLabel(page: string): Promise<string | null> {
+  const parsed = PagePath.safeParse(page);
+  if (!parsed.success) return null;
+  try {
+    return await askPageLabel(parsed.data);
+  } catch {
+    return null;
   }
 }
 
