@@ -5,9 +5,9 @@ import { progressLine } from '@/lib/learn/lessons/plan-view';
 import type { PlanSummary } from '@/lib/learn/lessons/plan-store';
 
 /**
- * Each learning goal's plan with its progress, on Learn now (plan #1143). A
- * goal's lessons left the deck for its plan, so this is the way to them from
- * the page Learn opens on: the plan's name opens the plan, and Next up opens
+ * Each learning goal's plan with its progress (plan #1143), on Learn's Home
+ * tab since plan #1310. A goal's lessons left the deck for its plan, so this
+ * is the way to them: the plan's name opens the plan, and Next up opens
  * the piece that is next in its suggested order. A plan with its final project
  * and every piece passed says it is finished (plan #1146).
  */

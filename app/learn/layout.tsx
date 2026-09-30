@@ -51,8 +51,8 @@ export default async function LearnLayout({ children }: { children: React.ReactN
   const brief = await loadLearnBrief();
 
   /**
-   * Learn now first, because it is what Learn opens on (plan #805), then
-   * Practice Flow, then the subjects the flow asks about, then the rest. A
+   * Home first (plan #1310), with each learning goal's plan, then Learn now,
+   * which is still what Learn opens on (plan #805), then Practice Flow, then the subjects the flow asks about, then the rest. A
    * subject and a single idea are reached through Tracks, and a reading list
    * and a reading through Reading lists, so they are `alsoMatches` rather than
    * tabs of their own -- a nav that grows an entry per depth level stops being
@@ -65,6 +65,12 @@ export default async function LearnLayout({ children }: { children: React.ReactN
   const readNow = await countReadNow(learnClient);
 
   const sections: NavSection[] = [
+    {
+      href: '/learn/home',
+      label: 'Home',
+      icon: 'learnHome',
+      exact: true,
+    },
     // Learn now replaced the Read now tab (plan #805). The badge counts the
     // readings you queued, which the feed shows first, and not the cards it
     // wrote: there are always about twenty of those, and a number that never
