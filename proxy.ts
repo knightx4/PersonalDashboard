@@ -57,6 +57,13 @@ const PUBLIC_PATHS = [
   // supabase/migrations/0042_share_rpcs.sql. Its writes are a server action,
   // which POSTs back to this same path, so nothing else needs opening.
   '/s',
+  // The connector's MCP endpoint and the metadata that says where it signs in
+  // (plan #1256). A Claude app carries a bearer token, never the cookie, and
+  // a redirect to /login leaves it unable to find the sign-in at all. The
+  // route checks the token itself and answers 401 without one. The prefix
+  // match covers /.well-known/oauth-protected-resource/api/mcp too.
+  '/api/mcp',
+  '/.well-known/oauth-protected-resource',
 ];
 
 function isPublic(pathname: string): boolean {
