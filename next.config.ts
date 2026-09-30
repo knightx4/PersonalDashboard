@@ -33,6 +33,12 @@ const nextConfig: NextConfig = {
    */
   outputFileTracingIncludes: {
     '/dev/specs/[slug]': ['./docs/**/*.md'],
+    // The memory sweep copies the specs into search by meaning (plan #1321),
+    // and Ask Dash reads them in the app and over MCP (read_spec, find_dev_text).
+    '/api/cron/memory-sweep': ['./docs/**/*.md'],
+    '/ask': ['./docs/**/*.md'],
+    '/ask/*': ['./docs/**/*.md'],
+    '/api/mcp': ['./docs/**/*.md'],
   },
 
   async redirects() {
