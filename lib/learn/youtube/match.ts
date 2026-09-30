@@ -30,11 +30,16 @@ const EMBED_BATCH = 128;
  * rows was about 2.3 seconds at that size, and the 01:53 UTC run on 29
  * September wrote 2,304 in chunks of 32. By 11,008 vectors a chunk of 32 was
  * over 8 seconds, above 250ms a row, and the next three runs that day stored
- * nothing (check-back 82ac33a9). Eight rows keeps a chunk near 2 seconds at
- * that rate. The per-row cost is growing with the index, so this buys time
- * rather than fixing it.
+ * nothing (check-back 82ac33a9), and a stopgap cut chunks to 8 rows.
+ *
+ * The cost was the index outgrowing memory: 118MB of single-precision graph
+ * against 224MB of shared_buffers, so every insert read pages from disk. Learn
+ * migration 0083 rebuilt it on a halfvec cast at 39MB (plan #1243). On 30
+ * September 2026, with 15,048 vectors, a chunk of 32 took 14.9 seconds before
+ * the rebuild and 84 to 190ms after it, or 4 seconds on the first write while
+ * the new index was not yet cached. So chunks are back to 32.
  */
-export const STORE_CHUNK = 8;
+export const STORE_CHUNK = 32;
 
 /**
  * How close a video's title and description has to be to one of your ideas
