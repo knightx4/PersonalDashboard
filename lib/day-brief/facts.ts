@@ -19,8 +19,10 @@ import { isInterviewContext } from '@/lib/todo/agenda/sources';
  * - News gives one story and Learn the check question on the next card.
  *
  * Pure, and it takes the day and zone rather than reading the clock, so what
- * the brief says about a day is tested against rows written by hand. The
- * model only turns these lines into sentences; what they say is decided here.
+ * the brief says about a day is tested against rows written by hand. Since
+ * plan #1240 the facts are stored with the brief as a record of the day but
+ * no longer written up: the notification is written from the picks
+ * (lib/day-brief/notification.ts), which come from the candidates below.
  */
 
 export type BriefFactKind = 'booked' | 'overdue' | 'today' | 'week' | 'goal' | 'news' | 'learn';
@@ -41,14 +43,8 @@ export const BRIEF_HOUR = 6;
  */
 export const BRIEF_LAST_HOUR = 11;
 
-/** How many lines of one kind the model is shown before the rest are counted. */
+/** How many lines of one kind are kept before the rest are counted. */
 export const PER_KIND = 5;
-
-/** What a day with nothing on says, in full. */
-export const QUIET_LINE = 'Nothing is booked or due today.';
-
-/** The kinds that make a day not quiet. A news story alone is not a day's plan. */
-const ON: ReadonlySet<BriefFactKind> = new Set(['booked', 'overdue', 'today', 'week', 'goal']);
 
 function partsIn(timezone: string, now: Date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -155,64 +151,6 @@ export function newsFact(story: { headline: string; sender: string | null } | nu
 export function learnFact(question: string | null): BriefFact | null {
   const text = question?.trim();
   return text ? { kind: 'learn', text } : null;
-}
-
-/** Whether the day has nothing on: nothing booked, due, closing or waiting. */
-export function isQuiet(facts: readonly BriefFact[]): boolean {
-  return !facts.some((fact) => ON.has(fact.kind));
-}
-
-const HEADINGS: Record<BriefFactKind, string> = {
-  booked: 'Booked today',
-  overdue: 'Overdue',
-  today: 'Due today',
-  week: 'Closing this week',
-  goal: 'Waiting on you in Goals',
-  news: 'One news story',
-  learn: "Today's Learn question",
-};
-
-/** The facts under their headings, for the model's user turn. */
-export function factsPrompt(day: string, facts: readonly BriefFact[]): string {
-  const lines = [`Today is ${weekday(day)} ${day}.`];
-  for (const kind of Object.keys(HEADINGS) as BriefFactKind[]) {
-    const ofKind = facts.filter((fact) => fact.kind === kind);
-    if (ofKind.length === 0) continue;
-    lines.push('', `${HEADINGS[kind]}:`, ...ofKind.map((fact) => `- ${fact.text}`));
-  }
-  return lines.join('\n');
-}
-
-/**
- * The brief without a model: one plain sentence per heading. Written when
- * there is no API key or the call fails, so the home page still opens on the
- * day rather than on nothing.
- */
-export function plainBrief(facts: readonly BriefFact[]): string {
-  if (isQuiet(facts)) return QUIET_LINE;
-  const sentences: string[] = [];
-  for (const kind of Object.keys(HEADINGS) as BriefFactKind[]) {
-    const ofKind = facts.filter((fact) => fact.kind === kind).map((fact) => fact.text);
-    if (ofKind.length > 0) sentences.push(`${HEADINGS[kind]}: ${ofKind.join('; ')}.`);
-  }
-  return sentences.join(' ');
-}
-
-/** The longest brief kept. Three or four sentences fit well inside it. */
-export const MAX_BRIEF_CHARS = 900;
-
-/**
- * The model's brief as the page may show it, or null when it is unusable:
- * empty, or too long to be the short account asked for. Dashes the model
- * used for rhythm become commas, as the writing guide asks.
- */
-export function checkBrief(text: string): string | null {
-  const cleaned = text
-    .replace(/\s*[—–]\s*/g, ', ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (!cleaned || cleaned.length > MAX_BRIEF_CHARS) return null;
-  return cleaned;
 }
 
 /*

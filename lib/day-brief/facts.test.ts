@@ -17,16 +17,10 @@ import {
   type Candidate,
   type ChargeCandidateRow,
   type GoalCandidateItem,
-  checkBrief,
-  factsPrompt,
   goalFact,
-  isQuiet,
   learnFact,
   newsFact,
   PER_KIND,
-  plainBrief,
-  QUIET_LINE,
-  type BriefFact,
 } from './facts';
 
 const ZONE = 'America/New_York';
@@ -178,67 +172,6 @@ describe('news and Learn', () => {
       kind: 'learn',
       text: 'What does a bond yield measure?',
     });
-  });
-});
-
-describe('a quiet day', () => {
-  it('is one line, even with a news story and a Learn question', () => {
-    const facts: BriefFact[] = [
-      { kind: 'news', text: 'Rates held' },
-      { kind: 'learn', text: 'What is a yield?' },
-    ];
-    expect(isQuiet(facts)).toBe(true);
-    expect(plainBrief(facts)).toBe(QUIET_LINE);
-  });
-
-  it('is not quiet when anything is booked, due, closing or waiting', () => {
-    expect(isQuiet([{ kind: 'week', text: 'Thursday: Return window closes, Zara' }])).toBe(false);
-    expect(isQuiet([{ kind: 'goal', text: 'Your next step' }])).toBe(false);
-  });
-});
-
-describe('plainBrief', () => {
-  it('gives one sentence per heading, in the order the model is asked for', () => {
-    expect(
-      plainBrief([
-        { kind: 'overdue', text: 'Renew passport' },
-        { kind: 'booked', text: '09:30: Interview with Acme' },
-        { kind: 'overdue', text: 'Call the bank' },
-      ]),
-    ).toBe('Booked today: 09:30: Interview with Acme. Overdue: Renew passport; Call the bank.');
-  });
-});
-
-describe('factsPrompt', () => {
-  it('opens on the day and lists only the headings that have lines', () => {
-    const prompt = factsPrompt(TODAY, [
-      { kind: 'booked', text: '09:30: Interview with Acme' },
-      { kind: 'learn', text: 'What is a yield?' },
-    ]);
-    expect(prompt).toBe(
-      [
-        'Today is Monday 2026-09-28.',
-        '',
-        'Booked today:',
-        '- 09:30: Interview with Acme',
-        '',
-        "Today's Learn question:",
-        '- What is a yield?',
-      ].join('\n'),
-    );
-  });
-});
-
-describe('checkBrief', () => {
-  it('turns dashes into commas and collapses whitespace', () => {
-    expect(checkBrief('  You have the Acme interview at 09:30 — then\n the dentist.  ')).toBe(
-      'You have the Acme interview at 09:30, then the dentist.',
-    );
-  });
-
-  it('refuses an empty or overlong brief', () => {
-    expect(checkBrief('   ')).toBeNull();
-    expect(checkBrief('word '.repeat(300))).toBeNull();
   });
 });
 

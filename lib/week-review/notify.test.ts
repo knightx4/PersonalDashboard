@@ -19,7 +19,7 @@ describe('weekReviewPayload', () => {
   });
 
   it('uses a tag the morning brief never uses, so neither replaces the other', () => {
-    const brief = briefPayload('Three meetings today.', '2026-09-27');
+    const brief = briefPayload({ day: '2026-09-27', title: 'Respark hiring screen', body: 'Interview today at 10:30 AM.' });
     expect(brief.tag).not.toBe(WEEK_REVIEW_TAG);
   });
 

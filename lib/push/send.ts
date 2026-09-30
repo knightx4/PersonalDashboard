@@ -12,6 +12,8 @@
  * adapters are in lib/push/web-push.ts and inngest/core/day-brief.ts.
  */
 
+import { BODY_MAX, clip, TITLE_MAX } from '@/lib/day-brief/notification';
+
 export type PushSubscriptionRow = {
   id: string;
   endpoint: string;
@@ -43,19 +45,17 @@ export type PushResult = { sent: number; forgotten: number; failed: number };
 export const BRIEF_URL = '/home';
 
 /**
- * Longer than any lock screen shows, short enough to stay well inside the
- * 4 KB a push service carries once encrypted. The brief is at most 1,000
- * characters (core.day_briefs), so this trims only in theory.
+ * The brief as a notification: the title and body stored with the day
+ * (plan #1240; lib/day-brief/notification.ts), which the run keeps within
+ * what a lock screen shows. Clipped here as well, so a row written some other
+ * way cannot send more. A row without a title is one written before #1240.
  */
-const BODY_LIMIT = 1000;
-
-export function briefPayload(body: string, day: string): PushPayload {
-  const text = body.trim();
+export function briefPayload(brief: { day: string; title: string | null; body: string }): PushPayload {
   return {
-    title: 'Your day',
-    body: text.length > BODY_LIMIT ? `${text.slice(0, BODY_LIMIT - 1)}…` : text,
+    title: clip(brief.title ?? 'Your day', TITLE_MAX),
+    body: clip(brief.body, BODY_MAX),
     url: BRIEF_URL,
-    tag: `day-brief-${day}`,
+    tag: `day-brief-${brief.day}`,
   };
 }
 

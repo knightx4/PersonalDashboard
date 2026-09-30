@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SpendReport } from '@/lib/core/spend/pricing';
-import { QUIET_LINE, type BriefFact, type Candidate } from './facts';
+import type { BriefFact, Candidate } from './facts';
+import { BODY_MAX, NO_PICKS, TITLE_MAX } from './notification';
 import { runDayBriefFor, type DayBriefPorts, type DayBriefRow } from './run';
 
 const PERSON = { userId: 'u1', timezone: 'America/New_York' };
@@ -44,15 +45,18 @@ const TODO: Candidate = {
   createdAt: '2026-09-01T00:00:00Z',
 };
 
+const DASH_NOTE = { title: 'Reply to Maya about the offer', body: 'Maya has waited 2 days for your reply on the offer.' };
+
 function ports(overrides: Partial<DayBriefPorts> = {}) {
   const saved: DayBriefRow[] = [];
   const events: string[] = [];
   const base: DayBriefPorts = {
     hasBrief: vi.fn(async () => false),
     facts: vi.fn(async () => BUSY),
-    write: vi.fn(async (_day, _facts, onSpend) => {
+    candidates: vi.fn(async () => [REPLY]),
+    write: vi.fn(async (_day, _picks, onSpend) => {
       onSpend(REPORT);
-      return { model: 'claude-haiku-4-5', text: 'You have the Acme interview at 09:30, and the passport is overdue.' };
+      return { model: 'claude-haiku-4-5', reply: DASH_NOTE };
     }),
     ledger: vi.fn(async () => undefined),
     save: vi.fn(async (row) => {
@@ -80,7 +84,7 @@ describe('runDayBriefFor', () => {
     expect(p.facts).not.toHaveBeenCalled();
   });
 
-  it('stores the model brief with its facts, records the spend, then hands the row on', async () => {
+  it("stores Dash's notification with its picks and facts, records the spend, then hands the row on", async () => {
     const { ports: p, saved, events } = ports();
     const result = await runDayBriefFor(p, PERSON, MORNING);
     expect(result).toEqual({
@@ -89,62 +93,95 @@ describe('runDayBriefFor', () => {
       quiet: false,
       model: 'claude-haiku-4-5',
       facts: 2,
-      candidates: 0,
-      picks: 0,
+      candidates: 1,
+      picks: 1,
     });
     expect(saved).toEqual([
       {
         user_id: 'u1',
         day: '2026-09-28',
-        body: 'You have the Acme interview at 09:30, and the passport is overdue.',
+        title: 'Reply to Maya about the offer',
+        body: 'Maya has waited 2 days for your reply on the offer.',
         facts: BUSY,
         model: 'claude-haiku-4-5',
-        picks: [],
+        picks: [
+          {
+            key: 'task:t1',
+            kind: 'reply',
+            title: 'Reply to Maya: Offer',
+            reason: 'Waiting on your reply for 2 days',
+            href: '/todo/all?status=all&focus=t1',
+          },
+        ],
       },
     ]);
+    expect(p.write).toHaveBeenCalledWith('2026-09-28', saved[0]?.picks, expect.any(Function));
     expect(p.ledger).toHaveBeenCalledWith('u1', REPORT);
     expect(events).toEqual(['save', 'written']);
   });
 
-  it('writes a quiet day as one line without asking the model', async () => {
-    const { ports: p, saved } = ports({ facts: vi.fn(async () => [{ kind: 'news', text: 'Rates held' }] as BriefFact[]) });
+  it('stores a day with no picks without asking Dash, and sends nothing', async () => {
+    const { ports: p, saved, events } = ports({ candidates: vi.fn(async () => []) });
     const result = await runDayBriefFor(p, PERSON, MORNING);
-    expect(result).toMatchObject({ status: 'written', quiet: true, model: null });
+    expect(result).toMatchObject({ status: 'written', quiet: true, model: null, picks: 0 });
     expect(p.write).not.toHaveBeenCalled();
-    expect(saved[0]?.body).toBe(QUIET_LINE);
+    expect(saved[0]).toMatchObject({ title: NO_PICKS.title, body: NO_PICKS.body, picks: [], facts: BUSY });
+    expect(p.written).not.toHaveBeenCalled();
+    expect(events).toEqual(['save']);
   });
 
-  it('falls back to the plain brief when the call fails, still recording what it cost', async () => {
-    const { ports: p, saved } = ports({
-      write: vi.fn(async (_day, _facts, onSpend) => {
+  it('builds the notification from the picks when the call fails, still recording what it cost', async () => {
+    const { ports: p, saved, events } = ports({
+      write: vi.fn(async (_day, _picks, onSpend) => {
         onSpend(REPORT);
         throw new Error('overloaded');
       }),
     });
     const result = await runDayBriefFor(p, PERSON, MORNING);
     expect(result).toMatchObject({ status: 'written', model: null });
-    expect(saved[0]?.body).toBe('Booked today: 09:30: Interview with Acme. Overdue: Renew passport.');
+    expect(saved[0]).toMatchObject({ title: 'Reply to Maya: Offer', body: 'Waiting on your reply for 2 days.' });
     expect(p.ledger).toHaveBeenCalledTimes(1);
+    expect(events).toEqual(['save', 'written']);
   });
 
-  it('falls back to the plain brief without a key', async () => {
+  it('builds the notification from the picks without a key', async () => {
     const { ports: p, saved } = ports({ write: vi.fn(async () => null) });
     await runDayBriefFor(p, PERSON, MORNING);
     expect(saved[0]?.model).toBeNull();
-    expect(saved[0]?.body).toContain('Interview with Acme');
+    expect(saved[0]?.title).toBe('Reply to Maya: Offer');
+  });
+
+  it("refuses Dash's notification when it is longer than a lock screen or names what the picks do not", async () => {
+    const replies = [
+      { title: 'Reply to Maya, who has been waiting on you about the offer', body: 'Two days now.' },
+      { title: 'Reply to Maya', body: 'Maya has waited 2 days. '.repeat(10) },
+      { title: 'Reply to Maya', body: 'Maya has waited 2 days, and the dentist is at 16:00.' },
+    ];
+    for (const reply of replies) {
+      const { ports: p, saved } = ports({ write: vi.fn(async () => ({ model: 'claude-haiku-4-5', reply })) });
+      await runDayBriefFor(p, PERSON, MORNING);
+      expect(saved[0]).toMatchObject({ title: 'Reply to Maya: Offer', model: null });
+    }
+  });
+
+  it('keeps the title and body within a lock screen and about the picks alone', async () => {
+    const long: Candidate = { ...RESULT, title: 'Price the sofa, the rug and the lamp for the new flat on Elm Street' };
+    const { ports: p, saved } = ports({
+      candidates: vi.fn(async () => [REPLY, long, TODO]),
+      write: vi.fn(async () => null),
+    });
+    await runDayBriefFor(p, PERSON, MORNING);
+    const row = saved[0]!;
+    expect(row.title.length).toBeLessThanOrEqual(TITLE_MAX);
+    expect(row.body.length).toBeLessThanOrEqual(BODY_MAX);
+    expect(row.title).toBe('Reply to Maya: Offer');
+    expect(row.body).toContain('Price the sofa');
+    expect(row.body).not.toContain('Check mailbox');
+    expect(row.body).not.toContain('Acme');
   });
 
   it('counts the candidates, and a failure gathering them costs only them', async () => {
-    const reply: Candidate = {
-      kind: 'reply',
-      key: 'task:t1',
-      taskId: 't1',
-      title: 'Reply to Maya: Offer',
-      href: '/todo/all?status=all&focus=t1',
-      receivedAt: '2026-09-25T15:00:00Z',
-      daysWaiting: 2,
-    };
-    const counted = ports({ candidates: vi.fn(async () => [reply]) });
+    const counted = ports();
     expect(await runDayBriefFor(counted.ports, PERSON, MORNING)).toMatchObject({ status: 'written', candidates: 1 });
 
     const failing = ports({
@@ -152,7 +189,11 @@ describe('runDayBriefFor', () => {
         throw new Error('down');
       }),
     });
-    expect(await runDayBriefFor(failing.ports, PERSON, MORNING)).toMatchObject({ status: 'written', candidates: 0 });
+    expect(await runDayBriefFor(failing.ports, PERSON, MORNING)).toMatchObject({
+      status: 'written',
+      candidates: 0,
+      quiet: true,
+    });
     expect(failing.saved).toHaveLength(1);
   });
 
