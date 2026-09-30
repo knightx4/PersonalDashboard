@@ -86,6 +86,10 @@ export const vaultSources: ModuleSources = {
     },
   ],
   notSources: [
+    {
+      table: 'obsidian.attachments',
+      reason: 'Sync bookkeeping: which images, PDFs and audio files are in the vault and where their copies are kept.',
+    },
     { table: 'obsidian.jev_trial_answers', reason: 'Trial bookkeeping: Jev and Haiku on the map trial notes.' },
     { table: 'obsidian.map_merge_proposals', reason: 'Map upkeep: merges the sweep proposed.' },
     { table: 'obsidian.map_merge_resets', reason: 'Map upkeep.' },
