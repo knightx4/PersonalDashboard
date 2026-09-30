@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GithubVaultSource } from '@/lib/vault/providers/github';
 import { VaultAuthError, VaultSourceError } from '@/lib/vault/providers/types';
 
@@ -24,8 +24,15 @@ function stubFetch(handler: (url: string) => StubResponse) {
   return calls;
 }
 
+let info: ReturnType<typeof vi.spyOn>;
+
+beforeEach(() => {
+  info = vi.spyOn(console, 'info').mockImplementation(() => {});
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('snapshot', () => {
@@ -56,6 +63,45 @@ describe('snapshot', () => {
     expect(calls[0]).toContain('/git/trees/head?recursive=1');
     expect(calls.join(' ')).not.toContain('sha-jpg');
     expect(calls.join(' ')).not.toContain('sha-pdf');
+  });
+
+  it('lists exactly the allowed attachments beside the notes, from the same request', async () => {
+    const calls = stubFetch(() => ({
+      body: {
+        sha: 'head',
+        tree: [
+          { path: 'Ideas.md', type: 'blob', sha: 'sha-ideas', size: 120 },
+          { path: 'Attachments/holiday.JPG', type: 'blob', sha: 'sha-jpg', size: 4_000_000 },
+          { path: 'Attachments/diagram.png', type: 'blob', sha: 'sha-png', size: 20_000 },
+          { path: 'Attachments/lease.pdf', type: 'blob', sha: 'sha-pdf', size: 900_000 },
+          { path: 'Attachments/memo.m4a', type: 'blob', sha: 'sha-m4a', size: 2_000_000 },
+          { path: 'Attachments/lecture.mp3', type: 'blob', sha: 'sha-big', size: 60_000_000 },
+          { path: 'Attachments/logo.svg', type: 'blob', sha: 'sha-svg', size: 3_000 },
+          { path: 'Attachments/clip.mp4', type: 'blob', sha: 'sha-mp4', size: 9_000_000 },
+          { path: 'Board.canvas', type: 'blob', sha: 'sha-canvas', size: 500 },
+          { path: 'Attachments', type: 'tree', sha: 'sha-dir' },
+          { path: '.trash/old.png', type: 'blob', sha: 'sha-trash', size: 1_000 },
+          { path: '.obsidian/icon.png', type: 'blob', sha: 'sha-icon', size: 1_000 },
+        ],
+      },
+    }));
+
+    const snapshot = await new GithubVaultSource(config).snapshot('head');
+
+    expect(snapshot.entries.map((e) => e.path)).toEqual(['Ideas.md']);
+    expect(snapshot.attachments).toEqual([
+      { path: 'Attachments/holiday.JPG', blobSha: 'sha-jpg', sizeBytes: 4_000_000, mimeType: 'image/jpeg', tooLarge: false },
+      { path: 'Attachments/diagram.png', blobSha: 'sha-png', sizeBytes: 20_000, mimeType: 'image/png', tooLarge: false },
+      { path: 'Attachments/lease.pdf', blobSha: 'sha-pdf', sizeBytes: 900_000, mimeType: 'application/pdf', tooLarge: false },
+      { path: 'Attachments/memo.m4a', blobSha: 'sha-m4a', sizeBytes: 2_000_000, mimeType: 'audio/mp4', tooLarge: false },
+      // Listed so the note page can say it is too large; never copied.
+      { path: 'Attachments/lecture.mp3', blobSha: 'sha-big', sizeBytes: 60_000_000, mimeType: 'audio/mpeg', tooLarge: true },
+    ]);
+    // Listing is all this does: one request and no content fetched.
+    expect(calls).toHaveLength(1);
+    expect(info).toHaveBeenCalledWith(
+      'vault: 5 attachments listed, 6920000 bytes to copy, 1 over the size limit',
+    );
   });
 
   it('reports a truncated tree rather than pretending the vault is small', async () => {
@@ -92,6 +138,7 @@ describe('diff', () => {
     const diff = await new GithubVaultSource(config).diff('base', 'head');
 
     expect(diff.complete).toBe(true);
+    expect(diff.attachments).toEqual([]);
     expect(diff.headCommittedAt).toBe('2024-05-02T10:00:00Z');
     expect(diff.changes).toEqual([
       { kind: 'upsert', path: 'New.md', blobSha: 'sha-new', sizeBytes: 10 },
@@ -101,13 +148,55 @@ describe('diff', () => {
     ]);
   });
 
+  it('carries attachment adds, deletes and renames, and nothing else', async () => {
+    stubFetch(() => ({
+      body: {
+        files: [
+          { filename: 'Note.md', status: 'modified', sha: 'sha-note', size: 10 },
+          { filename: 'img/new.webp', status: 'added', sha: 'sha-webp', size: 500 },
+          { filename: 'img/gone.gif', status: 'removed' },
+          {
+            filename: 'img/after.png',
+            previous_filename: 'img/before.png',
+            status: 'renamed',
+            sha: 'sha-png',
+            size: 700,
+          },
+          // Renamed into the allowed types: new to the vault as far as we know.
+          { filename: 'rec.ogg', previous_filename: 'rec.tmp', status: 'renamed', sha: 'sha-ogg', size: 80 },
+          // Renamed into a hidden folder: the old path leaves the vault.
+          { filename: '.trash/scan.pdf', previous_filename: 'scan.pdf', status: 'renamed', sha: 'sha-scan', size: 90 },
+          { filename: 'clip.mp4', status: 'added', sha: 'sha-mp4', size: 90 },
+        ],
+      },
+    }));
+
+    const diff = await new GithubVaultSource(config).diff('base', 'head');
+
+    expect(diff.attachments).toEqual([
+      { kind: 'upsert', path: 'img/new.webp', blobSha: 'sha-webp', sizeBytes: 500, mimeType: 'image/webp', tooLarge: false },
+      { kind: 'delete', path: 'img/gone.gif' },
+      {
+        kind: 'upsert',
+        path: 'img/after.png',
+        blobSha: 'sha-png',
+        sizeBytes: 700,
+        mimeType: 'image/png',
+        tooLarge: false,
+        previousPath: 'img/before.png',
+      },
+      { kind: 'upsert', path: 'rec.ogg', blobSha: 'sha-ogg', sizeBytes: 80, mimeType: 'audio/ogg', tooLarge: false },
+      { kind: 'delete', path: 'scan.pdf' },
+    ]);
+  });
+
   it('gives up on a rewritten history rather than throwing', async () => {
     // A force push makes the stored cursor unreachable. `complete: false` sends
     // the caller to a full tree comparison, which converges on the same state --
     // the same shape as Gmail's expired-historyId catch-up.
     stubFetch(() => ({ status: 404, body: {} }));
     const diff = await new GithubVaultSource(config).diff('missing', 'head');
-    expect(diff).toEqual({ changes: [], complete: false, headCommittedAt: null });
+    expect(diff).toEqual({ changes: [], complete: false, attachments: [], headCommittedAt: null });
   });
 
   it('gives up when the diff is too large for one response', async () => {

@@ -40,8 +40,8 @@ function harness(opts: {
   const source: VaultSource = {
     provider: 'github',
     headCommit: async () => opts.head ?? 'head-sha',
-    snapshot: async () => ({ entries: opts.entries ?? [], truncated: opts.truncated ?? false }),
-    diff: async () => opts.diff ?? { changes: [], complete: true, headCommittedAt: null },
+    snapshot: async () => ({ entries: opts.entries ?? [], truncated: opts.truncated ?? false, attachments: [] }),
+    diff: async () => ({ attachments: [], ...(opts.diff ?? { changes: [], complete: true, headCommittedAt: null }) }),
     readBlob: async (sha) => {
       recorded.blobReads.push(sha);
       return opts.blob ? opts.blob(sha) : `# Note ${sha}`;
