@@ -44,6 +44,7 @@ import {
   Users,
   Waypoints,
 } from 'lucide-react';
+import { OwlIcon } from '@/components/shell/owl-icon';
 
 /**
  * The sidebar's icons, named rather than passed.
@@ -111,6 +112,9 @@ export const NAV_ICONS = {
   // Not Map, which is the plan's, and not Network, which is Learn's knowledge
   // graph -- the map claims nothing about what you know.
   vaultMap: Waypoints,
+  // Maya, the vault's thought partner (plan #1286). An owl, drawn in
+  // owl-icon.tsx because lucide has none, and never Bot, which is Dash.
+  maya: OwlIcon,
 
   // Learn
   tracks: BookOpen,

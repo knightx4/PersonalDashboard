@@ -144,6 +144,10 @@ export const LEARN_OPERATIONS = [
   // search for a source's exact words, and one more when it stops without
   // reporting. Recorded against the note's owner.
   'write-maya-thought',
+  // Maya's answer to a reply in one of its threads (plan #1286): one Sonnet
+  // call that also rewrites where the person has got to. Recorded against the
+  // thread's owner.
+  'reply-to-maya',
   // Asking Haiku which vault themes are one subject under two names (plan
   // #811), twenty pairs a call. Recorded through the service role from the map
   // sweep's cron tick, against the account whose themes were judged.

@@ -34,10 +34,20 @@ export type TalkSend = (body: string) => Promise<{ turns?: TalkTurn[]; error?: s
 
 const PENDING = 'pending';
 
-const AUTHOR_NAME: Record<TalkRole, string> = { user: 'You', assistant: 'Dash' };
+/**
+ * Who answers in the thread: Dash unless the caller says otherwise. Maya's
+ * threads in the vault (plan #1286) pass Maya's name and its owl, so the
+ * thread never names Dash for words Maya wrote.
+ */
+export type TalkAssistant = {
+  name: string;
+  Mark: React.ComponentType<{ className?: string; strokeWidth?: number; 'aria-hidden'?: boolean }>;
+};
 
-function AuthorMark({ role }: { role: TalkRole }) {
-  const Glyph = role === 'assistant' ? Bot : CircleUser;
+const DASH: TalkAssistant = { name: 'Dash', Mark: Bot };
+
+function AuthorMark({ role, assistant }: { role: TalkRole; assistant: TalkAssistant }) {
+  const Glyph = role === 'assistant' ? assistant.Mark : CircleUser;
   return <Glyph className="size-3.5 text-ink-ghost" strokeWidth={2} aria-hidden />;
 }
 
@@ -46,21 +56,25 @@ function Turn({
   grouped,
   now,
   below,
+  assistant,
 }: {
   turn: TalkTurn;
   grouped: boolean;
   now: number;
   below?: React.ReactNode;
+  assistant: TalkAssistant;
 }) {
   return (
     <li className="flex gap-2">
       <div className="flex w-4 shrink-0 justify-center pt-1">
-        {!grouped && <AuthorMark role={turn.role} />}
+        {!grouped && <AuthorMark role={turn.role} assistant={assistant} />}
       </div>
       <div className="min-w-0 flex-1 space-y-0.5">
         {!grouped && (
           <div className="flex flex-wrap items-baseline gap-2">
-            <span className="text-small font-semibold text-ink">{AUTHOR_NAME[turn.role]}</span>
+            <span className="text-small font-semibold text-ink">
+              {turn.role === 'assistant' ? assistant.name : 'You'}
+            </span>
             {turn.id !== PENDING && (
               <time
                 dateTime={turn.createdAt}
@@ -113,13 +127,14 @@ export function TalkThread({
   send,
   label,
   placeholder,
-  waiting = 'Dash is replying…',
+  waiting,
   closed,
   hint,
   above,
   startWriting = false,
   ask,
   below,
+  assistant = DASH,
 }: {
   /** Unique on the page: the textarea's id is built from it. */
   id: string;
@@ -128,7 +143,7 @@ export function TalkThread({
   /** What the button that opens the box says. */
   label: string;
   placeholder?: string;
-  /** The line shown while the reply is being written. */
+  /** The line shown while the reply is being written. Defaults to "<name> is replying…". */
   waiting?: string;
   /**
    * Whether the thread has ended, given its turns: the line to show in place
@@ -156,6 +171,8 @@ export function TalkThread({
    * proposed in an Ask Dash answer (plan #1190). Left out, nothing is.
    */
   below?: (turn: TalkTurn) => React.ReactNode;
+  /** Who answers: Dash when left out. */
+  assistant?: TalkAssistant;
 }) {
   const [turns, setTurns] = useState<TalkTurn[]>([...initial]);
   const [writing, setWriting] = useState(startWriting && !ask);
@@ -218,14 +235,17 @@ export function TalkThread({
               grouped={turns[index - 1]?.role === turn.role}
               now={now}
               below={turn.id === PENDING ? undefined : below?.(turn)}
+              assistant={assistant}
             />
           ))}
           {sending && (
             <li className="flex gap-2" aria-live="polite">
               <div className="flex w-4 shrink-0 justify-center pt-1">
-                <AuthorMark role="assistant" />
+                <AuthorMark role="assistant" assistant={assistant} />
               </div>
-              <p className="min-w-0 flex-1 text-body text-ink-muted">{waiting}</p>
+              <p className="min-w-0 flex-1 text-body text-ink-muted">
+                {waiting ?? `${assistant.name} is replying…`}
+              </p>
             </li>
           )}
         </ul>
