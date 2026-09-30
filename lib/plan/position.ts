@@ -9,7 +9,7 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ModuleId } from '@/lib/modules';
+import type { PlanScope } from '@/lib/plan/projects';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, 'public'>;
@@ -31,7 +31,7 @@ type Db = SupabaseClient<any, 'public'>;
 export async function nextPlanPosition(
   supabase: Db,
   userId: string,
-  module: ModuleId | null,
+  module: PlanScope | null,
   parentId: string | null,
 ): Promise<number> {
   let query = supabase.from('plan_items').select('position').eq('user_id', userId);

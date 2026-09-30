@@ -1,5 +1,4 @@
 import { commentLine } from '@/lib/comments/context';
-import { MODULES } from '@/lib/modules';
 import { APP_VISION, type VisionBodies } from '@/lib/specs/vision';
 import { hasLiveFog, isClosed, isDismissed, type PlanStatus } from './load';
 import { reshapeOrigin } from './origin';
@@ -10,6 +9,7 @@ import {
   type PlanNode,
   type PlanSection,
 } from './tree';
+import { isAppScope, planScopeLabel } from '@/lib/plan/projects';
 
 /**
  * A step written out for whoever is about to build it.
@@ -139,7 +139,7 @@ export const STATUS_WORD: Record<PlanStatus, string> = {
 const PRIORITY_WORD = { 1: 'next', 2: 'normal', 3: 'someday' } as const;
 
 function moduleLabel(module: PlanNode['module']): string {
-  return module ? (MODULES.find((m) => m.id === module)?.label ?? module) : 'The app as a whole';
+  return planScopeLabel(module);
 }
 
 /**
@@ -278,6 +278,8 @@ export function visionFor(
   root: Pick<PlanNode, 'module'>,
   visions: VisionBodies | undefined,
 ): string | null {
+  // A project (lib/plan/projects) has no vision here; its repository is its brief.
+  if (!isAppScope(root.module)) return null;
   return visions?.[root.module ?? APP_VISION]?.trim() || null;
 }
 
