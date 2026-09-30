@@ -90,6 +90,12 @@ describe('matchPage', () => {
     expect(patternOf(tasks.table, tasks.href!)).toBeNull();
   });
 
+  it('finds no pattern in an href whose ref is only in the fragment', () => {
+    const courses = SOURCES.find((s) => s.table === 'obsidian.courses')!;
+    expect(patternOf(courses.table, courses.href!)).toBeNull();
+    expect(matchPage('/vault/education#course-abc').row).toBeNull();
+  });
+
   it('keeps the query and fragment off the path', () => {
     expect(pathOf('/learn/now?x=1#y')).toBe('/learn/now');
   });

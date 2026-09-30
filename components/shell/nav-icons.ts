@@ -18,6 +18,7 @@ import {
   Compass,
   ClipboardCheck,
   Frame,
+  GraduationCap,
   History,
   House,
   KanbanSquare,
@@ -118,6 +119,8 @@ export const NAV_ICONS = {
   // Maya, the vault's thought partner (plan #1286). An owl, drawn in
   // owl-icon.tsx because lucide has none, and never Bot, which is Dash.
   maya: OwlIcon,
+  // Education: your transcripts and the courses on them (plan #1308).
+  education: GraduationCap,
 
   // Learn
   // Home: your study plans and what is waiting (plan #1310). The house Jobs'
