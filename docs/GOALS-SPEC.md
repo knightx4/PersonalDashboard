@@ -485,6 +485,17 @@ The filed line reads `Counted 3 towards "Send applications" in …`, and Undo
 takes the same 3 back from the same period. An amount that is not a whole
 number from 1 to 100 drops the move.
 
+The first entry on a step with no total asks once how far along it is (plan
+#1280). Under its filed line, whether a progress line or an add that carries
+work, the list shows "Roughly how far along?" with three chips: Just started,
+About half and Nearly done. A tap keeps the answer on that entry and on the
+line, and the chips go. The step's line then reads "Under way · about half
+done", from the newest entry that carries an answer, until the step gets a
+total, which says more and takes its place. The question is asked only on a
+step's first entry, so it does not come back for that step whether it was
+answered or left. A step that has a total, or gets one from that same line,
+is not asked, and neither is progress on the goal itself.
+
 ## What Claude does, and when
 
 Every automated job is a routine run. Runs count against the Claude plan's

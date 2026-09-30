@@ -37,6 +37,7 @@ import {
   tallyWords,
   towardsTotal,
   type ItemProgress,
+  type ProgressEstimate,
   type ProgressTally,
 } from '@/lib/goals/progress';
 import { formatReading, parseNumber } from '@/lib/goals/readings';
@@ -90,6 +91,8 @@ export type CaptureStep = {
   total?: { quantity: number; unit: string } | null;
   /** The running tallies of its progress so far, one per unit. */
   tallies?: ProgressTally[];
+  /** How many progress entries it has so far (plan #1280), undone ones left out. */
+  logged?: number;
   /**
    * The start of what Dash prepared for it, when it has no total yet: a
    * result such as "about 100 bags" is where a total can come from.
@@ -166,6 +169,7 @@ export function captureContext(
                 ? { quantity: node.estimatedTotal, unit: node.totalUnit }
                 : null,
             tallies: progress[node.id]?.tallies ?? [],
+            logged: progress[node.id]?.entries.length ?? 0,
             prepared: node.estimatedTotal ? null : (preparedFor.get(node.id) ?? null),
           });
         }
@@ -321,6 +325,7 @@ export function addedProgress(action: AddAction, stepId: string): ProgressAction
     rhythm: null,
     total: null,
     tallies: [],
+    logged: 0,
   };
   return { kind: 'progress', goal: action.goal, step, ...action.progress };
 }
@@ -414,6 +419,18 @@ export function progressTotal(
     done: towards.done,
     total_set: setTotal !== null,
   };
+}
+
+/**
+ * Whether the filed line should ask once how far along the step is (plan
+ * #1280): the entry is the first on a step, and the step has no total and
+ * this line set none. Asked only then, so once the first entry is filed the
+ * question does not come back for that step, answered or not.
+ */
+export function asksEstimate(action: ProgressAction, total: ProgressTotal | null): boolean {
+  const step = action.step;
+  if (!step || step.total || total) return false;
+  return (step.logged ?? 0) === 0;
 }
 
 /**
@@ -636,6 +653,10 @@ export type FiledEntry =
       done?: number | null;
       /** Whether this line set the total, so Undo clears it again. */
       total_set?: boolean;
+      /** Whether the line asks how far along the step is (plan #1280). */
+      ask_estimate?: boolean;
+      /** The answer tapped, kept on the entry too. */
+      estimate?: ProgressEstimate | null;
       undone_at: string | null;
     }
   | {
@@ -675,6 +696,8 @@ export type AddedFiledProgress = {
   total_unit?: string | null;
   done?: number | null;
   total_set?: boolean;
+  ask_estimate?: boolean;
+  estimate?: ProgressEstimate | null;
 };
 
 /** What a line says about an amount towards a total, when it has both. */
@@ -727,6 +750,38 @@ export function describeFiled(entry: FiledEntry): string {
       return left ? `${logged}, ${left}` : logged;
     }
   }
+}
+
+/**
+ * The progress entry a line is asking about (plan #1280): the line asks, has
+ * not been answered and has not been undone. Null otherwise, and on every
+ * line filed before.
+ */
+export function estimateAsked(entry: FiledEntry): string | null {
+  if (entry.undone_at) return null;
+  const progress =
+    entry.kind === 'progress' ? entry : entry.kind === 'add' ? (entry.progress ?? null) : null;
+  if (!progress?.ask_estimate || progress.estimate) return null;
+  return progress.entry_id;
+}
+
+/**
+ * The list with one line's answer kept on it, or null when that line is not
+ * asking. The rows are written by the store; this is what the capture keeps.
+ */
+export function withEstimate(
+  filed: FiledEntry[],
+  index: number,
+  estimate: ProgressEstimate,
+): FiledEntry[] | null {
+  const entry = filed[index];
+  if (!entry || !estimateAsked(entry)) return null;
+  return filed.map((e, i) => {
+    if (i !== index) return e;
+    if (e.kind === 'progress') return { ...e, estimate };
+    if (e.kind === 'add' && e.progress) return { ...e, progress: { ...e.progress, estimate } };
+    return e;
+  });
 }
 
 /** Read a stored `filed` array back, skipping anything that is not an entry. */

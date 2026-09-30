@@ -6,6 +6,7 @@ import {
   isProgressEstimate,
   type NewProgressEntry,
   type ProgressEntry,
+  type ProgressEstimate,
 } from '@/lib/goals/progress';
 
 /**
@@ -114,6 +115,26 @@ export async function undoProgressEntry(client: GoalsSupabaseClient, id: string)
     .is('undone_at', null)
     .select('id');
   if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Keep a rough answer to how far along on an entry (plan #1280). False when
+ * the entry is gone or undone.
+ */
+export async function setProgressEstimate(
+  client: GoalsSupabaseClient,
+  id: string,
+  estimate: ProgressEstimate,
+): Promise<boolean> {
+  if (!isProgressEstimate(estimate)) throw new Error('How far along is started, half or nearly.');
+  const { data, error } = await client
+    .from('progress_entries')
+    .update({ estimate })
+    .eq('id', id)
+    .is('undone_at', null)
+    .select('id');
+  if (error) throw new Error(`Could not keep how far along: ${error.message}`);
   return (data ?? []).length > 0;
 }
 

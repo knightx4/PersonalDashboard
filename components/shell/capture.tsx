@@ -27,7 +27,13 @@ import {
 } from '@/lib/capture/actions';
 import { isCalendarDay, todoCaptureForm, type CaptureDay } from '@/lib/capture/todo';
 import type { PaidCosts } from '@/lib/core/spend/paid-actions';
-import { describeFiled, type FiledEntry } from '@/lib/goals/capture';
+import { describeFiled, estimateAsked, type FiledEntry } from '@/lib/goals/capture';
+import {
+  ESTIMATE_CHIPS,
+  ESTIMATE_QUESTION,
+  PROGRESS_ESTIMATES,
+  type ProgressEstimate,
+} from '@/lib/goals/progress';
 import {
   CAPTURE_MOVE_LABELS,
   CAPTURE_MOVES,
@@ -41,6 +47,7 @@ import { addTask, type TaskFormState } from '@/app/todo/actions';
 import {
   fileGoalCapture,
   goalCaptureCosts,
+  estimateGoalCapture,
   sortGoalCapture,
   undoGoalCapture,
   type CaptureMoveHint,
@@ -349,7 +356,7 @@ function CapturePanel({
     if (state.error || state.message) setState({});
   }
 
-  function undone(captureId: string, entries: FiledEntry[]) {
+  function changed(captureId: string, entries: FiledEntry[]) {
     setFiled((list) =>
       list.map((item) => (item.captureId === captureId ? { captureId, entries } : item)),
     );
@@ -506,7 +513,7 @@ function CapturePanel({
         {filed.length > 0 && (
           <div className="max-h-[40vh] overflow-y-auto border-t border-border">
             {filed.map((item) => (
-              <FiledLines key={item.captureId} filed={item} onUndone={undone} />
+              <FiledLines key={item.captureId} filed={item} onChanged={changed} />
             ))}
           </div>
         )}
@@ -622,15 +629,21 @@ function MoveGuess({
  * The model will sometimes log progress on the wrong step, so every line
  * can be reversed on its own, in one press, without touching the others. An
  * undone line stays in the list, marked, because the capture keeps it too.
+ *
+ * The first progress on a step with no total also asks once how far along
+ * it is (plan #1280), as three chips under the line. A tap keeps the answer
+ * and the chips go; leaving them is a fine answer too, and the question is
+ * not asked again for that step.
  */
 function FiledLines({
   filed,
-  onUndone,
+  onChanged,
 }: {
   filed: Filed;
-  onUndone: (captureId: string, entries: FiledEntry[]) => void;
+  onChanged: (captureId: string, entries: FiledEntry[]) => void;
 }) {
   const [busy, setBusy] = useState<number | null>(null);
+  const [answering, setAnswering] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, start] = useTransition();
 
@@ -644,7 +657,21 @@ function FiledLines({
         setError(result.error ?? 'That could not be undone.');
         return;
       }
-      onUndone(filed.captureId, result.filed);
+      onChanged(filed.captureId, result.filed);
+    });
+  }
+
+  function answer(index: number, estimate: ProgressEstimate) {
+    setAnswering(index);
+    setError(null);
+    start(async () => {
+      const result = await estimateGoalCapture(filed.captureId, index, estimate);
+      setAnswering(null);
+      if (result.error || !result.filed) {
+        setError(result.error ?? 'That could not be kept.');
+        return;
+      }
+      onChanged(filed.captureId, result.filed);
     });
   }
 
@@ -654,28 +681,50 @@ function FiledLines({
     <div className="px-3 py-2">
       <ul className="space-y-1">
         {filed.entries.map((entry, index) => (
-          <li key={index} className="flex items-start gap-2 text-small">
-            <span
-              className={cn(
-                'min-w-0 flex-1 py-1',
-                entry.undone_at ? 'text-ink-muted line-through' : 'text-ink',
-              )}
-            >
-              {describeFiled(entry)}
-            </span>
-            {entry.undone_at ? (
-              <span className="shrink-0 py-1 text-ink-muted">Undone</span>
-            ) : (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                pending={busy === index}
-                onClick={() => undo(index)}
+          <li key={index} className="text-small">
+            <div className="flex items-start gap-2">
+              <span
+                className={cn(
+                  'min-w-0 flex-1 py-1',
+                  entry.undone_at ? 'text-ink-muted line-through' : 'text-ink',
+                )}
               >
-                <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
-                Undo
-              </Button>
+                {describeFiled(entry)}
+              </span>
+              {entry.undone_at ? (
+                <span className="shrink-0 py-1 text-ink-muted">Undone</span>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  pending={busy === index}
+                  onClick={() => undo(index)}
+                >
+                  <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  Undo
+                </Button>
+              )}
+            </div>
+            {estimateAsked(entry) && (
+              <div
+                role="group"
+                aria-label={ESTIMATE_QUESTION}
+                className="flex flex-wrap items-center gap-x-1.5 gap-y-1 pb-1"
+              >
+                <span className="text-ink-muted">{ESTIMATE_QUESTION}</span>
+                {PROGRESS_ESTIMATES.map((estimate) => (
+                  <button
+                    key={estimate}
+                    type="button"
+                    disabled={answering !== null}
+                    onClick={() => answer(index, estimate)}
+                    className="press rounded-full px-2.5 py-1 text-small font-medium text-ink-muted transition-colors duration-150 hover:bg-accent-tint hover:text-accent disabled:opacity-50"
+                  >
+                    {ESTIMATE_CHIPS[estimate]}
+                  </button>
+                ))}
+              </div>
             )}
           </li>
         ))}
