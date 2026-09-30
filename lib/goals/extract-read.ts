@@ -36,7 +36,7 @@ export async function readIntoForm(
   /** The kinds of document the collection has learned, which the ask was given too (plan #987). */
   kinds: LearnedKind[] = [],
 ): Promise<ReadResult> {
-  const source = toSource(input);
+  const source = extractSource(input);
   if (!source.ok) return source;
   const answer = await ask(source.source);
   if (!answer.ok) return answer;
@@ -47,7 +47,13 @@ export async function readIntoForm(
   return { ok: true, ...read };
 }
 
-function toSource(input: ReadInput): { ok: true; source: ExtractSource } | { ok: false; error: string } {
+/**
+ * Put pasted text or a file in the shape the model takes, or say why it
+ * cannot be read. Also used by the vault's transcript reader (plan #1307).
+ */
+export function extractSource(
+  input: ReadInput,
+): { ok: true; source: ExtractSource } | { ok: false; error: string } {
   if ('text' in input) {
     const text = input.text.trim().slice(0, PASTE_MAX);
     if (!text) return { ok: false, error: 'Paste some text first.' };

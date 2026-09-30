@@ -153,6 +153,10 @@ export const LEARN_OPERATIONS = [
   // call that also rewrites where the person has got to. Recorded against the
   // thread's owner.
   'reply-to-maya',
+  // Reading the courses off an uploaded transcript for the vault's Education
+  // tab (plan #1307). One Haiku call per transcript, from the read button;
+  // nothing is saved until the person checks the list.
+  'read-transcript',
   // Asking Haiku which vault themes are one subject under two names (plan
   // #811), twenty pairs a call. Recorded through the service role from the map
   // sweep's cron tick, against the account whose themes were judged.
