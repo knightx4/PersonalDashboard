@@ -31,12 +31,16 @@ export const SUGGEST_MODEL = 'claude-sonnet-5';
 /** Each search is billed, and its results come back as input. */
 const MAX_SEARCHES = 5;
 /**
- * Each of the (at most two) calls gives up after this long, without retrying,
- * so a search and the board reads before it finish inside the five minutes
- * the request that runs them is allowed. A search that ran past the limit
- * used to be cut off with nothing saved and nothing said.
+ * How long a call may run when the caller sets no deadline. With a deadline
+ * (the button and the cron both set one, inside their five-minute requests)
+ * a call gets the time left before it instead, less RESERVE_MS for storing
+ * the result. A fixed 110 seconds stopped searches that needed two minutes.
  */
-const CALL_TIMEOUT_MS = 110_000;
+const DEFAULT_CALL_MS = 240_000;
+/** Kept back from the deadline for parsing and storing what was found. */
+const RESERVE_MS = 15_000;
+/** A call started with less time than this would only be stopped. */
+const MIN_CALL_MS = 45_000;
 const GOALS_MAX_CHARS = 8_000;
 const RESUME_MAX_CHARS = 5_000;
 
@@ -60,9 +64,16 @@ export type SuggestOptions = {
   /** Overridable for tests. */
   client?: Pick<Anthropic, 'messages'>;
   onSpend?: SpendSink;
+  /** Epoch milliseconds by which the calls must be done; see DEFAULT_CALL_MS. */
+  deadline?: number;
 };
 
-export type SuggestResult<T> = { ok: true; suggestions: T[] } | { ok: false; error: string };
+/** A Messages request that ran out of time, to finish as a batch (search-batch.ts). */
+export type SearchRequest = Anthropic.MessageCreateParamsNonStreaming;
+
+export type SuggestResult<T> =
+  | { ok: true; suggestions: T[] }
+  | { ok: false; error: string; queue?: SearchRequest };
 
 function goalsText(goals: SeekerContext['goals']): string {
   const parts: string[] = [];
@@ -112,7 +123,7 @@ function failure(error: unknown): { ok: false; error: string } {
 // People to contact
 // ---------------------------------------------------------------------------
 
-const PEOPLE_TOOL = 'suggest_people';
+export const PEOPLE_TOOL = 'suggest_people';
 
 function peopleSystem(seeker: SeekerContext): string {
   return `You help someone in a job search build their network. Your job is to find
@@ -186,7 +197,7 @@ export async function findPeople(
   options: SuggestOptions,
   input: PeopleInput,
 ): Promise<SuggestResult<PersonSuggestion>> {
-  const client = options.client ?? new Anthropic({ apiKey: options.apiKey, timeout: CALL_TIMEOUT_MS, maxRetries: 0 });
+  const client = options.client ?? new Anthropic({ apiKey: options.apiKey });
   const prompt =
     seekerText(input.seeker) +
     listed('People they know who could introduce them (a good way in, not a suggestion on their own)', input.warm, 30) +
@@ -240,6 +251,11 @@ export async function findPeople(
  * searches found instead of searching again. Letting a paused turn carry on
  * as the server offers cost $1.11 for one press on the first day: every resume
  * sends the whole conversation, search results included, back as input.
+ *
+ * Each call runs until the deadline (see DEFAULT_CALL_MS). A call that would
+ * start too close to it, or that runs out of time, is not lost: the result
+ * carries the request as `queue`, and the caller finishes it as a Message
+ * Batch in the background (search-batch.ts), which has no time limit.
  */
 async function searchThenReport<T>(
   client: Pick<Anthropic, 'messages'>,
@@ -256,12 +272,61 @@ async function searchThenReport<T>(
     { type: 'web_search_20260209', name: 'web_search', max_uses: MAX_SEARCHES } as unknown as Anthropic.Tool,
     call.tool,
   ];
-  const messages: Anthropic.MessageParam[] = [{ role: 'user', content: call.prompt }];
+  const first: SearchRequest = {
+    model: SUGGEST_MODEL,
+    max_tokens: 8000,
+    system: call.system,
+    tools,
+    messages: [{ role: 'user', content: call.prompt }],
+  };
+  const timeLeft = () =>
+    options.deadline ? options.deadline - Date.now() - RESERVE_MS : DEFAULT_CALL_MS;
+  const outOfTime = (request: SearchRequest): SuggestResult<T> => ({
+    ok: false,
+    error: 'The web search needed more time than the page allows, so it carries on in the background.',
+    queue: request,
+  });
 
-  const read = (response: Anthropic.Message): SuggestResult<T> | null => {
-    const report = response.content.find((block) => block.type === 'tool_use' && block.name === call.tool.name);
-    if (!report || report.type !== 'tool_use') return null;
-    const suggestions = call.parse(report.input);
+  let request = first;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const budget = timeLeft();
+    if (budget < MIN_CALL_MS) return outOfTime(request);
+    let response: Anthropic.Message;
+    try {
+      response = await client.messages.create(request, { timeout: budget, maxRetries: 0 });
+    } catch (error) {
+      if (error instanceof Anthropic.APIConnectionTimeoutError) return outOfTime(request);
+      return failure(error);
+    }
+    options.onSpend?.({ model: SUGGEST_MODEL, usage: usageFrom(response.usage) });
+    const step = searchStep(request, response, call.tool.name, call.parse);
+    if (step.kind === 'report') return { ok: true, suggestions: step.suggestions };
+    if (step.kind === 'refused' || attempt === 1) return { ok: false, error: call.empty };
+    request = step.next;
+  }
+  return { ok: false, error: call.empty };
+}
+
+/** What one response means for the search: a report, a refusal, or the next request to make. */
+export type SearchStep<T> =
+  | { kind: 'report'; suggestions: T[] }
+  | { kind: 'refused' }
+  | { kind: 'next'; next: SearchRequest };
+
+/**
+ * Read one response of a search. Shared by the live calls above and the
+ * batch collector, so a search finished in the background is read exactly
+ * as one finished on the press.
+ */
+export function searchStep<T>(
+  request: SearchRequest,
+  response: Pick<Anthropic.Message, 'content' | 'stop_reason'>,
+  toolName: string,
+  parse: (raw: unknown) => T[],
+): SearchStep<T> {
+  const report = response.content.find((block) => block.type === 'tool_use' && block.name === toolName);
+  if (report && report.type === 'tool_use') {
+    const suggestions = parse(report.input);
     if (suggestions.length === 0) {
       // The shape only, never the text: enough to see why a paid report kept
       // nothing, without copying people's names into the logs.
@@ -272,52 +337,24 @@ async function searchThenReport<T>(
           Array.isArray(value) ? `array(${value.length})` : typeof value,
         ]),
       );
-      console.warn(`[jobs suggestions] ${call.tool.name} kept nothing`, JSON.stringify(shape));
+      console.warn(`[jobs suggestions] ${toolName} kept nothing`, JSON.stringify(shape));
     }
-    return { ok: true, suggestions };
-  };
-
-  try {
-    const first = await client.messages.create({
-      model: SUGGEST_MODEL,
-      max_tokens: 8000,
-      system: call.system,
-      tools,
-      messages,
-    });
-    options.onSpend?.({ model: SUGGEST_MODEL, usage: usageFrom(first.usage) });
-    const reported = read(first);
-    if (reported) return reported;
-
-    // Widened: the installed SDK's type predates this reason.
-    const stop: string | null = first.stop_reason;
-    if (stop === 'refusal') return { ok: false, error: call.empty };
-    messages.push({ role: 'assistant', content: first.content });
-    // A paused turn is sent back as it is; a finished one gets the ask.
-    if (stop !== 'pause_turn') {
-      messages.push({ role: 'user', content: `Call ${call.tool.name} now with what you found.` });
-    }
-
-    const second = await client.messages.create({
-      model: SUGGEST_MODEL,
-      max_tokens: 8000,
-      system: call.system,
-      tools,
-      tool_choice: { type: 'tool', name: call.tool.name },
-      messages,
-    });
-    options.onSpend?.({ model: SUGGEST_MODEL, usage: usageFrom(second.usage) });
-    return read(second) ?? { ok: false, error: call.empty };
-  } catch (error) {
-    return failure(error);
+    return { kind: 'report', suggestions };
   }
+  // Widened: the installed SDK's type predates this reason.
+  const stop: string | null = response.stop_reason;
+  if (stop === 'refusal') return { kind: 'refused' };
+  const messages: Anthropic.MessageParam[] = [...request.messages, { role: 'assistant', content: response.content }];
+  // A paused turn is sent back as it is; a finished one gets the ask.
+  if (stop !== 'pause_turn') messages.push({ role: 'user', content: `Call ${toolName} now with what you found.` });
+  return { kind: 'next', next: { ...request, messages, tool_choice: { type: 'tool', name: toolName } } };
 }
 
 // ---------------------------------------------------------------------------
 // Postings to apply for
 // ---------------------------------------------------------------------------
 
-const OPENINGS_TOOL = 'report_openings';
+export const OPENINGS_TOOL = 'report_openings';
 
 const OPENINGS_SYSTEM = `You find open job postings worth applying for, for someone in a job
 search. Search the web for current openings that fit what they wrote about the
@@ -394,7 +431,7 @@ export async function findOpenings(
   options: SuggestOptions,
   input: OpeningsInput,
 ): Promise<SuggestResult<OpeningSuggestion>> {
-  const client = options.client ?? new Anthropic({ apiKey: options.apiKey, timeout: CALL_TIMEOUT_MS, maxRetries: 0 });
+  const client = options.client ?? new Anthropic({ apiKey: options.apiKey });
   const prompt =
     seekerText(input.seeker) +
     listed('Applications that got a reply from a person', input.responded, 20) +

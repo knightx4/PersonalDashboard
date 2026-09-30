@@ -49,6 +49,19 @@ describe('describeRun', () => {
   });
 });
 
+describe('a search carried on as a batch', () => {
+  it('reads as running, and waiting, for up to a day', () => {
+    const queued = viewRun(row({ stage: 'queued', started_at: '2026-09-30T16:00:00Z' }), NOW);
+    expect(queued.state).toBe('running');
+    expect(describeRun(queued, NOW)).toMatchObject({ running: true, waiting: true, tone: 'plain' });
+    expect(describeRun(queued, NOW)?.text).toContain('Still searching in the background');
+  });
+
+  it('reads as stopped past a day', () => {
+    expect(viewRun(row({ stage: 'queued', started_at: '2026-09-29T12:00:00Z' }), NOW).state).toBe('stopped');
+  });
+});
+
 describe('agoText', () => {
   it('rounds down to the largest whole unit', () => {
     expect(agoText('2026-09-30T17:59:40Z', NOW)).toBe('just now');

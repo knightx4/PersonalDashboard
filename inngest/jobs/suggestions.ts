@@ -11,6 +11,7 @@ import { suggestionsPayload } from '@/lib/jobs/suggest/notify';
 import { runSuggestionsFor } from '@/lib/jobs/suggest/run';
 import { checkOpeningPostings } from '@/lib/jobs/suggest/posting';
 import { recordRuns } from '@/lib/jobs/suggest/search-runs';
+import { collectSearchBatches } from '@/lib/jobs/suggest/search-batch';
 import { scoreApplicationsFor, scoreOpeningsFor } from '@/lib/jobs/suggest/score-run';
 import { sendToPerson } from '@/lib/push/send';
 
@@ -42,6 +43,9 @@ export type JobSuggestionsSummary = {
   failed: string[];
 };
 
+/** How long one account's searches may run before going on as batches. */
+const DAILY_SEARCH_BUDGET_MS = 150_000;
+
 export async function runJobSuggestions(now: Date = new Date()): Promise<JobSuggestionsSummary> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set.');
@@ -57,10 +61,18 @@ export async function runJobSuggestions(now: Date = new Date()): Promise<JobSugg
       if (!moduleEnabled(await loadAccountSettings(userId, core), 'jobs')) continue;
       summary.people += 1;
       const progress = recordRuns(jobs, userId, 'daily');
-      const result = await runSuggestionsFor(jobs, userId, { apiKey, kinds: ['reach_out', 'apply'], now, progress });
+      const result = await runSuggestionsFor(jobs, userId, {
+        apiKey,
+        kinds: ['reach_out', 'apply'],
+        now,
+        progress,
+        // Past this the searches go on as Message Batches (search-batch.ts),
+        // so one slow search cannot take the route's five minutes with it.
+        deadline: Date.now() + DAILY_SEARCH_BUDGET_MS,
+      });
       for (const kind of ['reach_out', 'apply'] as const) {
         const outcome = result[kind];
-        if (outcome.ran) await progress.finish(kind, { written: outcome.written, error: outcome.error });
+        if (outcome.ran && !outcome.queued) await progress.finish(kind, { written: outcome.written, error: outcome.error });
       }
       await recordSpendReports(core, userId, { module: 'jobs', operation: 'suggest-outreach' }, result.reach_out.spend);
       await recordSpendReports(core, userId, { module: 'jobs', operation: 'find-openings' }, result.apply.spend);
@@ -134,6 +146,70 @@ export async function runOpeningUpkeep(now: Date = new Date()): Promise<OpeningU
       }
     } catch (err) {
       summary.failed.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+  return summary;
+}
+
+export type SearchBatchesSummary = { checked: number; finished: number; failed: number; pending: number };
+
+/** Everything the collector may take, inside its route's five minutes. */
+const BATCHES_BUDGET_MS = 240_000;
+
+/**
+ * Finish the searches that went on as Message Batches (lib/jobs/suggest/
+ * search-batch.ts), called every ten minutes by pg_cron through
+ * /api/cron/job-search-batches (supabase/migrations/0133_job_search_batches_cron.sql).
+ *
+ * A batch that ended is read and stored as a live search is, and its run is
+ * closed. New roles are then read from their links and scored, as after a
+ * press of Search now, and a batch that found something is sent as a phone
+ * notification, since nobody is watching the page an hour later. Most calls
+ * find nothing queued and cost one read.
+ */
+export async function runSearchBatches(now: Date = new Date()): Promise<SearchBatchesSummary> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set.');
+  const began = Date.now();
+  const core = createCoreServiceSupabase();
+  const jobs = createServiceSupabase();
+
+  const runs = await collectSearchBatches(jobs, apiKey, { deadline: began + BATCHES_BUDGET_MS - 90_000, now });
+  const summary: SearchBatchesSummary = { checked: runs.length, finished: 0, failed: 0, pending: 0 };
+  for (const run of runs) {
+    if (run.state === 'pending' || run.state === 'follow_up') summary.pending += 1;
+    if (run.state === 'failed') summary.failed += 1;
+    if (run.spend.length > 0) {
+      const operation = run.kind === 'apply' ? 'find-openings' : 'suggest-outreach';
+      await recordSpendReports(core, run.userId, { module: 'jobs', operation }, run.spend);
+    }
+    if (run.state !== 'done') continue;
+    summary.finished += 1;
+    if (run.written === 0) continue;
+
+    const left = BATCHES_BUDGET_MS - (Date.now() - began);
+    if (run.kind === 'apply' && left > 60_000) {
+      await checkOpeningPostings(jobs, run.userId, { now, budgetMs: Math.min(60_000, left - 45_000) }).catch((err) =>
+        console.error('[jobs suggestions] posting check', err instanceof Error ? err.message : err),
+      );
+      if (BATCHES_BUDGET_MS - (Date.now() - began) > 30_000 && (await jevEnabledFor(core, run.userId))) {
+        const scoreSpend: SpendReport[] = [];
+        await scoreOpeningsFor(jobs, run.userId, { onSpend: (report) => scoreSpend.push(report), limit: 20 }).catch(
+          (err) => console.error('[jobs suggestions] score', err instanceof Error ? err.message : err),
+        );
+        await recordSpendReports(core, run.userId, { module: 'jobs', operation: 'score-openings' }, scoreSpend);
+      }
+    }
+
+    const payload = suggestionsPayload(
+      run.kind === 'apply' ? { people: [], roles: run.headlines } : { people: run.headlines, roles: [] },
+      now.toISOString().slice(0, 10),
+    );
+    const push = payload ? pushPorts(core, run.userId) : null;
+    if (payload && push) {
+      await sendToPerson(push, run.userId, payload, now).catch((err) =>
+        console.error('[jobs suggestions] push', err instanceof Error ? err.message : err),
+      );
     }
   }
   return summary;
