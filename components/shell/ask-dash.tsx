@@ -19,6 +19,7 @@ import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
 import { scrim } from '@/components/ui/popover';
 import { commentWhen } from '@/lib/comments/when';
 import type { PaidCosts } from '@/lib/core/spend/paid-actions';
+import { isAskPath, roughPageName } from '@/lib/ask/page-name';
 import type { DashChange } from '@/lib/talk/changes';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
@@ -26,6 +27,7 @@ import { useClockNow } from '@/lib/use-clock-now';
 import {
   type OpenedAsk,
   askDashCosts,
+  askDashPageLabel,
   askDashQuestion,
   confirmDashChange,
   declineDashChange,
@@ -63,6 +65,7 @@ export type AskSource = ChangePresses & {
   recent: typeof recentAskQuestions;
   open: typeof openAskQuestion;
   costs: typeof askDashCosts;
+  label: typeof askDashPageLabel;
 };
 
 const ACTIONS: AskSource = {
@@ -70,6 +73,7 @@ const ACTIONS: AskSource = {
   recent: recentAskQuestions,
   open: openAskQuestion,
   costs: askDashCosts,
+  label: askDashPageLabel,
   confirm: confirmDashChange,
   decline: declineDashChange,
   undo: undoDashChange,
@@ -103,17 +107,32 @@ type Session = { key: number; ask?: string };
  */
 export function AskDashProvider({
   source,
+  page,
   children,
 }: {
   source?: AskSource;
+  /** The address the sheet treats as the page, for the gallery; the real one otherwise. */
+  page?: string;
   children: React.ReactNode;
 }) {
   const outer = useContext(AskDashContext);
   if (outer) return <>{children}</>;
-  return <AskDashRoot source={source ?? ACTIONS}>{children}</AskDashRoot>;
+  return (
+    <AskDashRoot source={source ?? ACTIONS} page={page}>
+      {children}
+    </AskDashRoot>
+  );
 }
 
-function AskDashRoot({ source, children }: { source: AskSource; children: React.ReactNode }) {
+function AskDashRoot({
+  source,
+  page,
+  children,
+}: {
+  source: AskSource;
+  page?: string;
+  children: React.ReactNode;
+}) {
   const [session, setSession] = useState<Session | null>(null);
   const opened = useRef(0);
   const open = useCallback((question?: string) => {
@@ -141,7 +160,7 @@ function AskDashRoot({ source, children }: { source: AskSource; children: React.
         <AskDashSheet
           key={session.key}
           ask={session.ask}
-          page={pathname}
+          page={page ?? pathname}
           source={source}
           onClose={close}
         />
@@ -173,7 +192,7 @@ export function AskDashButton() {
  * one, and `onChanges` the changes Dash proposed in each answer. `page` is
  * the address sent with every question, read when it is sent (plan #1271).
  */
-function useAskSend(
+export function useAskSend(
   initialRef: string | null,
   page: string | null,
   onConversation?: (ref: string) => void,
@@ -231,6 +250,8 @@ export function AskThread({
   label: string;
   placeholder?: string;
   hint?: React.ReactNode;
+  /** Just above the question box: the page Dash will be told (plan #1272). */
+  above?: React.ReactNode;
   startWriting?: boolean;
   ask?: string;
 }) {
@@ -282,19 +303,32 @@ type View =
   | { kind: 'new'; ask?: string }
   | { kind: 'earlier'; ref: string; title: string | null };
 
-function AskDashSheet({
-  ask,
-  page,
-  source,
-  onClose,
-}: {
+type SheetProps = {
   ask?: string;
   /** The page the sheet was opened over, told to Dash with each question. */
   page: string | null;
   source: AskSource;
   onClose: () => void;
-}) {
+};
+
+/** The sheet, over the page. */
+function AskDashSheet(props: SheetProps) {
+  return createPortal(<AskDashPanel {...props} />, document.body);
+}
+
+/** What the sheet draws, apart from the portal it is drawn through; exported for tests. */
+export function AskDashPanel({
+  ask,
+  page: opened,
+  source,
+  onClose,
+}: SheetProps) {
   const [view, setView] = useState<View>({ kind: 'new', ask });
+  // The page told to Dash with each question until the chip's × drops it,
+  // which lasts for the rest of this sheet (plan #1272). The Ask page tells
+  // Dash nothing, so it starts dropped there.
+  const [page, setPage] = useState(() => (opened && !isAskPath(opened) ? opened : null));
+  const [pageLabel, setPageLabel] = useState<string | null>(null);
   // Bumped on every change of view, so the thread below starts afresh.
   const [threadKey, setThreadKey] = useState(0);
   // Whether the question on screen has become a conversation, which is when
@@ -313,6 +347,23 @@ function AskDashSheet({
     return () => {
       live = false;
     };
+  }, [source]);
+
+  // The row's title, or the page's name, in place of the rough name the chip
+  // starts with. Asked once, for the page the sheet opened over.
+  useEffect(() => {
+    if (!page) return;
+    let live = true;
+    source
+      .label(page)
+      .then((found) => {
+        if (live && found) setPageLabel(found);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per sheet; dropping the page must not ask again
   }, [source]);
 
   useEffect(() => {
@@ -336,8 +387,11 @@ function AskDashSheet({
   }
 
   const hint = <PaidHint action={ACTION} what="Cost of each answer from Dash" />;
+  const lookingAt = page ? (
+    <LookingAt label={pageLabel ?? roughPageName(page)} onDrop={() => setPage(null)} />
+  ) : null;
 
-  return createPortal(
+  return (
     <div className="fixed inset-0 z-overlay">
       <button type="button" aria-label="Close Dash" onClick={onClose} className={scrim} />
       <aside
@@ -392,6 +446,7 @@ function AskDashSheet({
                 page={page}
                 source={source}
                 hint={hint}
+                lookingAt={lookingAt}
                 onStarted={() => setStarted(true)}
                 onReopen={(conversation) =>
                   show({ kind: 'earlier', ref: conversation.ref, title: conversation.title })
@@ -404,13 +459,13 @@ function AskDashSheet({
                 page={page}
                 source={source}
                 hint={hint}
+                lookingAt={lookingAt}
               />
             )}
           </div>
         </PaidCostsProvider>
       </aside>
-    </div>,
-    document.body,
+    </div>
   );
 }
 
@@ -419,6 +474,7 @@ function NewQuestion({
   page,
   source,
   hint,
+  lookingAt,
   onStarted,
   onReopen,
 }: {
@@ -426,6 +482,7 @@ function NewQuestion({
   page: string | null;
   source: AskSource;
   hint: React.ReactNode;
+  lookingAt: React.ReactNode;
   onStarted: () => void;
   onReopen: (conversation: ConversationSummary) => void;
 }) {
@@ -479,6 +536,7 @@ function NewQuestion({
         startWriting
         ask={ask}
         hint={hint}
+        above={lookingAt}
         onSend={() => setAsked(true)}
       />
 
@@ -537,11 +595,13 @@ function EarlierQuestion({
   page,
   source,
   hint,
+  lookingAt,
 }: {
   conversationRef: string;
   page: string | null;
   source: AskSource;
   hint: React.ReactNode;
+  lookingAt: React.ReactNode;
 }) {
   const [loaded, setLoaded] = useState<OpenedAsk | null>(null);
 
@@ -578,7 +638,31 @@ function EarlierQuestion({
         label="Ask a follow-up"
         placeholder="Ask more about this"
         hint={hint}
+        above={lookingAt}
       />
     </>
+  );
+}
+
+/**
+ * The page Dash will be told about, above the question box (plan #1272),
+ * with an × that stops it being sent for the rest of the sheet.
+ */
+export function LookingAt({ label, onDrop }: { label: string; onDrop: () => void }) {
+  return (
+    <p className="flex w-fit max-w-full items-center gap-0.5 rounded-control bg-sunken py-0.5 pl-2 pr-0.5 text-small text-ink-muted">
+      <span className="min-w-0 truncate">
+        Looking at: <span className="text-ink">{label}</span>
+      </span>
+      <button
+        type="button"
+        onClick={onDrop}
+        title="Do not tell Dash about this page"
+        className="press flex size-6 shrink-0 items-center justify-center rounded-control hover:bg-surface hover:text-ink"
+      >
+        <X className="size-3.5" strokeWidth={2} aria-hidden />
+        <span className="sr-only">Do not tell Dash about this page</span>
+      </button>
+    </p>
   );
 }

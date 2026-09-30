@@ -70,7 +70,7 @@ import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
 import { PlanOpenedSurface, PlanTreeSurface } from './plan-surfaces';
 import { GoalOpenedSurface, GoalTreeSurface } from './goal-surfaces';
-import { AskChangesSurface, AskDashSurface, AskMadeChangesSurface } from './ask-surfaces';
+import { AskChangesSurface, AskDashSurface, AskMadeChangesSurface, TRIP_GOAL } from './ask-surfaces';
 import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import {
@@ -2687,6 +2687,19 @@ export const SURFACES: readonly Surface[] = [
     width: 'page',
     render: () => (
       <AskDashSurface open question="What did I spend on eBay flips this quarter?">
+        <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
+    /* The page Dash will be told (plan #1272): opened over a goal, the chip
+     * above the question box names the goal, with an × to leave it out. */
+    id: 'ask-dash-page',
+    label: 'Ask Dash · The page it will be told',
+    module: 'goals',
+    width: 'page',
+    render: () => (
+      <AskDashSurface open page={TRIP_GOAL}>
         <PreviewShell />
       </AskDashSurface>
     ),

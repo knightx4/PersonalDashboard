@@ -154,6 +154,9 @@ function answerTo(question: string): TalkTurn[] {
   ];
 }
 
+/** A goal's page, which the sheet names by the goal's title (plan #1272). */
+export const TRIP_GOAL = '/goals/00000000-0000-4000-8000-0000000000a1';
+
 const FIXTURES: AskSource = {
   ask: async (question) => {
     await new Promise((resolve) => setTimeout(resolve, 600));
@@ -164,6 +167,12 @@ const FIXTURES: AskSource = {
     return { conversation, turns: answerTo(question), stop: 'answered' };
   },
   recent: async () => ({ conversations: RECENT }),
+  // A goal's page names the goal; every other page keeps the sheet's own
+  // name for it, the workspace.
+  label: async (page) => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return page === TRIP_GOAL ? 'Trip ideas' : null;
+  },
   open: async () => ({ turns: answerTo(RECENT[0].title ?? ''), changes: [] }),
   confirm: pressed('confirmed'),
   decline: pressed('declined'),
@@ -194,14 +203,17 @@ function OpenOnArrival({ question }: { question?: string }) {
 export function AskDashSurface({
   open = false,
   question,
+  page = '/jobs',
   children,
 }: {
   open?: boolean;
   question?: string;
+  /** The page the sheet opens over; the gallery's own address says nothing. */
+  page?: string;
   children: React.ReactNode;
 }) {
   return (
-    <AskDashProvider source={FIXTURES}>
+    <AskDashProvider source={FIXTURES} page={page}>
       {children}
       {open && <OpenOnArrival question={question} />}
     </AskDashProvider>

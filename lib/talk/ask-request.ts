@@ -5,7 +5,8 @@ import { confirmChange, declineChange, undoChange, type ChangeDeps, type ChangeO
 import { executeProposal } from '@/lib/ask/propose';
 import { executeAskTool } from '@/lib/ask/tools';
 import { requestAskDb } from '@/lib/ask/clients';
-import { pathOf, resolvePage, type PageContext } from '@/lib/ask/page';
+import { resolvePage, type PageContext } from '@/lib/ask/page';
+import { isAskPath } from '@/lib/ask/page-name';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
@@ -48,13 +49,7 @@ export async function askDashInRequest(input: {
   const user = await requireUser();
   const [settings, core] = await Promise.all([loadAccountSettings(user.id), createCoreClient()]);
   const today = todayInTimezone(settings.timezone);
-  const ctx = {
-    userId: user.id,
-    today,
-    enabledModules: settings.enabledModules,
-    db: requestAskDb(),
-    searchSources: allSearchSources(),
-  };
+  const ctx = askContext(user.id, settings);
 
   const page = input.page ? await pageFor(ctx, input.page) : null;
 
@@ -87,13 +82,38 @@ export async function askDashInRequest(input: {
  * the question and no page is told.
  */
 async function pageFor(ctx: Parameters<typeof resolvePage>[0], address: string): Promise<PageContext | null> {
-  const path = pathOf(address);
-  if (path === '/ask' || path.startsWith('/ask/')) return null;
+  if (isAskPath(address)) return null;
   try {
     return await resolvePage(ctx, address);
   } catch {
     return null;
   }
+}
+
+/**
+ * What the sheet shows as the page Dash will be told (plan #1272): the row's
+ * title when the page shows one of theirs, the page's name otherwise, and
+ * null on the Ask page or when it could not be worked out.
+ */
+export async function askPageLabel(address: string): Promise<string | null> {
+  const user = await requireUser();
+  const settings = await loadAccountSettings(user.id);
+  const page = await pageFor(askContext(user.id, settings), address);
+  return page ? (page.row?.title ?? page.page) : null;
+}
+
+/** Everything a lookup needs, as the signed-in person. */
+function askContext(
+  userId: string,
+  settings: Awaited<ReturnType<typeof loadAccountSettings>>,
+): Parameters<typeof resolvePage>[0] {
+  return {
+    userId,
+    today: todayInTimezone(settings.timezone),
+    enabledModules: settings.enabledModules,
+    db: requestAskDb(),
+    searchSources: allSearchSources(),
+  };
 }
 
 /** The person's past questions, most recently added to first. */
