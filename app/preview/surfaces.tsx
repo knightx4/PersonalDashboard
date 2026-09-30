@@ -19,6 +19,9 @@ import { SettingsView } from '@/app/jobs/(app)/settings/view';
 import { ContactsView, type ContactListRow, type ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
 import { RoleForm } from '@/app/jobs/(app)/roles/new/role-form';
+import { RecommendedRoles } from '@/app/jobs/(app)/recommend/sections';
+import type { OpenSuggestion } from '@/lib/jobs/suggest/load';
+import type { OriginStats } from '@/lib/jobs/suggest/stats';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import type { ReviewRow, SearchableRole } from '@/lib/jobs/review/load';
 import { RolesTable } from '@/app/jobs/(app)/roles/roles-table';
@@ -2157,6 +2160,115 @@ function PreviewShell() {
   );
 }
 
+/** Recommended roles on an ordinary day: two scored, one short of the preferences, one not yet read. */
+const recommendedOpening = (over: Partial<OpenSuggestion>): OpenSuggestion => ({
+  id: 'op-1',
+  kind: 'apply',
+  headline: 'Deployment Strategist',
+  why: "Own onboarding, workflow design and renewals for private equity and banking deal teams using Mosaic's AI deal models. The $10B take-private work gives you standing with those users.",
+  move: "1. Lead with the take-private and acquisition work at EY. 2. Say you want the strategy side of deployment. 3. Find someone on Mosaic's deployment team for a referral.",
+  channel: null,
+  message: null,
+  url: 'https://jobs.ashbyhq.com/mosaic/1',
+  location: 'New York City, on-site',
+  companyName: 'Mosaic',
+  companySlug: 'mosaic',
+  personName: null,
+  personTitle: null,
+  sourceUrl: null,
+  searchQuery: null,
+  foundIn: "Search for roles like Concourse's, on request",
+  contact: null,
+  scores: {
+    workplace: { value: 'on_site', confidence: 0.95 },
+    seniority: { value: 'mid', confidence: 0.6 },
+    salary: { value: false, confidence: 0.9 },
+    fit: { value: 'partial', confidence: 0.6 },
+    red_flags: { value: false, confidence: 0.7 },
+    cover_letter: { value: false, confidence: 0.9 },
+    duplicate: { value: false, confidence: 1 },
+    closeness: { value: 2, confidence: 0.6 },
+  },
+  scoreNote: {
+    fit: { value: 53, unsure: true, reason: "Probably a partial match, from Dash's short summary alone" },
+    chance: { value: 30, band: 'medium', unsure: true, reason: '4 of 78 similar reached an interview, 5 still waiting' },
+  },
+  origin: 'goal',
+  postingRead: false,
+  compMaxCents: null,
+  workMode: 'onsite',
+  misses: [],
+  createdAt: '2026-09-29T05:02:03Z',
+  ...over,
+});
+
+const recommendedRoles: OpenSuggestion[] = [
+  recommendedOpening({}),
+  recommendedOpening({
+    id: 'op-2',
+    companyName: 'Moment',
+    companySlug: null,
+    location: 'New York, on-site',
+    why: 'Act as the general manager of each customer, from first demo to expansion, with large investment and wealth firms. Strategic and ownership-heavy. Posted at $200K to $300K plus equity and bonus.',
+    move: '1. Frame your MBA and startup advising as running an engagement end to end. 2. Show one thing you built. 3. Look for a Yale SOM alum at Moment or its investors.',
+    scores: {
+      workplace: { value: 'on_site', confidence: 0.95 },
+      seniority: { value: 'senior', confidence: 0.6 },
+      salary: { value: true, confidence: 0.95 },
+      fit: { value: 'partial', confidence: 0.6 },
+      red_flags: { value: false, confidence: 0.7 },
+      cover_letter: { value: false, confidence: 0.9 },
+      duplicate: { value: false, confidence: 1 },
+    },
+    scoreNote: {
+      fit: { value: 56, unsure: true, reason: "Probably a partial match, from Dash's short summary alone" },
+      chance: { value: 31, band: 'medium', unsure: true, reason: '4 of 78 similar reached an interview, 5 still waiting' },
+    },
+    misses: ['On-site, not how you want to work'],
+  }),
+  recommendedOpening({
+    id: 'op-3',
+    companyName: 'OpenAI',
+    companySlug: 'openai',
+    headline: 'Deployment Lead, Financial Services',
+    location: 'New York City, hybrid',
+    why: 'Work inside banks, asset managers and private capital firms to map workflows and lead AI rollouts. A stretch on seniority, but the same work as Concourse at a larger scale. Posted at $230K to $294K.',
+    foundIn: "On OpenAI's own job board",
+    origin: 'board',
+    postingRead: true,
+    scores: {
+      workplace: { value: 'hybrid', confidence: 0.95 },
+      seniority: { value: 'senior', confidence: 0.9 },
+      salary: { value: true, confidence: 0.95 },
+      fit: { value: 'partial', confidence: 0.7 },
+      red_flags: { value: false, confidence: 0.7 },
+      cover_letter: { value: false, confidence: 0.9 },
+      duplicate: { value: false, confidence: 1 },
+    },
+    scoreNote: {
+      fit: { value: 41, unsure: true, reason: 'Senior level, above most of your applications' },
+      chance: { value: 20, band: 'low', unsure: false, reason: 'Above your usual level, 5 of 88 similar reached an interview' },
+    },
+  }),
+  recommendedOpening({
+    id: 'op-4',
+    companyName: 'Clay',
+    companySlug: 'clay',
+    headline: 'Strategic Finance',
+    location: 'New York',
+    why: 'A strategic finance seat at a growing data company, close to the founders. Matches the FP&A-to-strategy move you wrote about.',
+    foundIn: "On Clay's own job board",
+    origin: 'board',
+    scores: null,
+    scoreNote: null,
+  }),
+];
+
+const recommendedStats: OriginStats[] = [
+  { origin: 'search', found: 8, saved: 5, applied: 2, interviews: 0, dismissed: 3, expired: 0 },
+  { origin: 'goal', found: 41, saved: 4, applied: 1, interviews: 0, dismissed: 23, expired: 0 },
+];
+
 export const SURFACES: readonly Surface[] = [
   {
     id: 'jobs-role-timeline',
@@ -2538,6 +2650,20 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <RoleForm companies={knownCompanies} />,
+  },
+  {
+    id: 'jobs-recommended-roles',
+    label: 'Roles · Recommended roles',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <RecommendedRoles
+        suggestions={recommendedRoles}
+        stats={recommendedStats}
+        searchCostMicros={4_200_000}
+        searchLine={{ running: false, tone: 'plain', text: 'The search 2 hours ago found 3 new roles. Read 58 job boards, 12 postings worth a look.' }}
+      />
+    ),
   },
   {
     id: 'jobs-roles-table',
