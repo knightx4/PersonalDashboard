@@ -96,7 +96,7 @@ function decodeHtmlEntities(value: string): string {
     .replace(/&#x27;/g, "'");
 }
 
-function extractJsonLdBlocks(html: string): unknown[] {
+export function extractJsonLdBlocks(html: string): unknown[] {
   const blocks: unknown[] = [];
   const re =
     /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
@@ -129,7 +129,7 @@ function nodeTypes(node: Record<string, unknown>): string[] {
   return [];
 }
 
-function walkJsonLd(node: unknown, visit: (obj: Record<string, unknown>) => void): void {
+export function walkJsonLd(node: unknown, visit: (obj: Record<string, unknown>) => void): void {
   if (node == null) return;
   if (Array.isArray(node)) {
     for (const entry of node) walkJsonLd(entry, visit);

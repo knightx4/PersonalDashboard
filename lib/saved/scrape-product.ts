@@ -27,7 +27,7 @@ export class ScrapeUrlError extends Error {
   }
 }
 
-async function assertPublicUrl(rawUrl: string): Promise<URL> {
+export async function assertPublicUrl(rawUrl: string): Promise<URL> {
   let url: URL;
   try {
     url = new URL(rawUrl);
