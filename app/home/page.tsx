@@ -38,6 +38,7 @@ import { readObservations } from '@/lib/timeline/observations-load';
 import { ObservationList } from '@/app/timeline/observations';
 import { formatClock } from '@/lib/clock';
 import { shownBrief } from '@/lib/day-brief/shown';
+import { openedFromPush } from '@/lib/day-brief/opens';
 import { DayBrief } from './day-brief';
 
 export const metadata = { title: 'Home' };
@@ -89,7 +90,11 @@ function greeting(timezone: string, now: Date): string {
  * A module switched off under Account is not listed anywhere here. That is
  * what the switch means.
  */
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await requireUser();
   const settings = await loadAccountSettings(user.id);
   const now = new Date();
@@ -130,6 +135,10 @@ export default async function HomePage() {
   const thisWeek = observationWeek(now).week;
   const nextWeek = new Date(Date.parse(`${thisWeek}T00:00:00Z`) + 7 * 86_400_000).toISOString().slice(0, 10);
 
+  // Opened from the morning notification (plan #1242): stamp that day's brief
+  // as opened, once. Any other visit carries no from=push and records nothing.
+  const openedDay = openedFromPush(await searchParams, today);
+
   const [loaded, updates, observations, dayBrief] = await Promise.all([
     loadBriefs(),
     // The feed swallows its own failures per source, and this guards the rest.
@@ -153,6 +162,7 @@ export default async function HomePage() {
         ),
       null,
     ),
+    openedDay ? safe(core.rpc('open_day_brief', { p_day: openedDay }), null) : null,
   ]);
 
   async function loadBriefs() {
@@ -259,7 +269,7 @@ export default async function HomePage() {
             <h1 className="font-display mt-1 text-figure-lg font-semibold tracking-[-0.04em] text-ink sm:text-figure-xl">
               {date}
             </h1>
-            {dayBrief && <DayBrief brief={dayBrief} />}
+            {dayBrief && <DayBrief brief={dayBrief} day={today} />}
           </header>
 
           {/* The doors, as marks, right under the date.

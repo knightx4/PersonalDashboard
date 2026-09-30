@@ -13,7 +13,7 @@
  */
 
 import { BODY_MAX, clip, TITLE_MAX } from '@/lib/day-brief/notification';
-import { BRIEF_ANCHOR } from '@/lib/day-brief/shown';
+import { briefUrl } from '@/lib/day-brief/opens';
 
 export type PushSubscriptionRow = {
   id: string;
@@ -42,9 +42,6 @@ export type PushPorts = {
 
 export type PushResult = { sent: number; forgotten: number; failed: number };
 
-/** Where the brief is shown: the picks under the date on the home page (plan #1241). */
-export const BRIEF_URL = `/home#${BRIEF_ANCHOR}`;
-
 /**
  * The brief as a notification: the title and body stored with the day
  * (plan #1240; lib/day-brief/notification.ts), which the run keeps within
@@ -55,7 +52,9 @@ export function briefPayload(brief: { day: string; title: string | null; body: s
   return {
     title: clip(brief.title ?? 'Your day', TITLE_MAX),
     body: clip(brief.body, BODY_MAX),
-    url: BRIEF_URL,
+    // The picks under the date on the home page (plan #1241), marked with the
+    // day so opening it can be recorded against that day's brief (#1242).
+    url: briefUrl(brief.day),
     tag: `day-brief-${brief.day}`,
   };
 }

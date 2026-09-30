@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BRIEF_URL, briefPayload, sendToPerson, type PushPorts, type PushSubscriptionRow } from './send';
+import { briefPayload, sendToPerson, type PushPorts, type PushSubscriptionRow } from './send';
 
 const NOW = new Date('2026-09-28T06:05:00Z');
 const BRIEF = { day: '2026-09-28', title: 'Respark hiring screen', body: 'Interview today at 10:30 AM.' };
@@ -28,10 +28,9 @@ describe('the brief notification', () => {
     ).toEqual({
       title: 'Respark hiring screen',
       body: 'Interview today at 10:30 AM (with Dana). Reply to Maya: waiting on your reply for 3 days.',
-      url: BRIEF_URL,
+      url: '/home?brief=2026-09-28#brief',
       tag: 'day-brief-2026-09-28',
     });
-    expect(BRIEF_URL).toBe('/home#brief');
   });
 
   it('says "Your day" for a row written before titles, and never sends past a lock screen', () => {
