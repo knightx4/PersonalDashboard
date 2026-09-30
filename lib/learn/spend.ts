@@ -140,6 +140,10 @@ export const LEARN_OPERATIONS = [
   // older vault notes (plan #1115). One Haiku call a week per person, from
   // the Monday cron, and none in a week with nothing to point out.
   'write-note-connections',
+  // Maya's thought on one vault note (plan #1284): one Opus call with web
+  // search for a source's exact words, and one more when it stops without
+  // reporting. Recorded against the note's owner.
+  'write-maya-thought',
   // Asking Haiku which vault themes are one subject under two names (plan
   // #811), twenty pairs a call. Recorded through the service role from the map
   // sweep's cron tick, against the account whose themes were judged.
