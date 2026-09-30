@@ -594,7 +594,10 @@ export async function linkEnvelopes(
       (classified.classification !== 'order_confirmation' &&
         !LIFECYCLE.has(classified.classification))
     ) {
-      if (!item.existing) {
+      // A shipping or return email waiting in review is re-read on every sync
+      // (retryLifecycle). When the classifier now calls it not relevant, the
+      // verdict has to be written over the old one, or it stays in review.
+      if (!item.existing || retryLifecycle) {
         await supabase.from('ingested_messages').upsert({
           id: item.envelope.id,
           classification: classified.classification,
