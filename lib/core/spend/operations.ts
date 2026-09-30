@@ -118,6 +118,11 @@ export const SPEND_OPERATIONS = {
     // per person a week from the Sunday week-review cron, none on a week with
     // nothing counted; background.
     'write-week-review',
+    // Embedding passages of what the person wrote or did across the modules,
+    // so Dash can find them by meaning (plan #1247). Voyage; background, from
+    // the five-minute memory sweep, which is also the backfill. A row is
+    // embedded again only when its text changes.
+    'embed-memory',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one

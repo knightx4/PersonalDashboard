@@ -282,6 +282,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // idea as the duplicate question's options (about 130 today) in; four
   // labels out.
   'triage-note': run(JEV, 5_000, 0),
+  // One passage of about 1,500 characters and its row's title.
+  'embed-memory': background(unit(VOYAGE_LITE, 450, 0)),
 
   // News. All but the last two from the digest cron or a script.
   'digest-issue': background(unit(HAIKU, 3_000, 300)),

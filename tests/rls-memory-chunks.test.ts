@@ -29,9 +29,9 @@ async function seedChunk(
   author: 'me' | 'dash' = 'me',
 ): Promise<void> {
   await admin`
-    insert into memory_chunks (user_id, source_table, source_ref, chunk_index, author, body,
-                               source_hash, embedding, embedding_model)
-    values (${userId}, ${sourceTable}, ${sourceRef}, ${chunkIndex}, ${author}, ${body},
+    insert into memory_chunks (user_id, source_table, source_ref, chunk_index, chunk_count, author,
+                               body, source_hash, embedding, embedding_model)
+    values (${userId}, ${sourceTable}, ${sourceRef}, ${chunkIndex}, 2, ${author}, ${body},
             ${`hash-${sourceRef}`}, ${vector}::extensions.vector, ${MODEL})`;
 }
 
@@ -72,9 +72,9 @@ describe('memory chunks table', () => {
   it('refuses a passage written for someone else', async () => {
     await expect(
       asUser(userB, (tx) => tx`
-        insert into memory_chunks (user_id, source_table, source_ref, chunk_index, author, body,
-                                   source_hash, embedding, embedding_model)
-        values (${userA}, 'obsidian.notes', 'planted', 0, 'me', 'planted',
+        insert into memory_chunks (user_id, source_table, source_ref, chunk_index, chunk_count,
+                                   author, body, source_hash, embedding, embedding_model)
+        values (${userA}, 'obsidian.notes', 'planted', 0, 1, 'me', 'planted',
                 'h', ${VECTOR}::extensions.vector, ${MODEL})`),
     ).rejects.toThrow(/row-level security/);
   });
