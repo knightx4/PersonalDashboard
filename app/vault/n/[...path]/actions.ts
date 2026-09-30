@@ -13,6 +13,10 @@ import { noteMapSchema, type NoteMapProposal } from '@/lib/vault/map/proposal';
 import { quoteInNote } from '@/lib/vault/map/rules';
 import { loadNearestThemeNames, loadThemeNames, offerThemes } from '@/lib/vault/map/themes';
 import { loadNote } from '@/lib/vault/notes/load';
+import { loadNoteThread, saveThought } from '@/lib/vault/maya/store';
+import { MAYA_THOUGHT_OPERATION, writeThought } from '@/lib/vault/maya/thought';
+import { revalidatePath } from 'next/cache';
+import { mayaThreadHref, noteHref } from '@/lib/vault/paths';
 
 /**
  * Reading one note for the map, and writing what the person keeps.
@@ -162,4 +166,69 @@ function addedSentence(counts: {
       ? ` ${n(joined, 'position was', 'positions were')} already on the map, so this note was added as a source.`
       : '';
   return `Added ${parts.join(', ')} to the map.${tail}`;
+}
+
+export type AskMayaState = {
+  /** The thread the thought went into, once there is one. */
+  threadHref?: string;
+  /** Said plainly: Maya looked and had nothing worth saying. */
+  message?: string;
+  error?: string;
+};
+
+/**
+ * Ask Maya for its thoughts on this note (plan #1285).
+ *
+ * The note is read again on the session client, as the map's actions do, so
+ * RLS decides whether it is yours. A note that already has a thread is not
+ * sent again: the press answers with the thread. A thought with no points is
+ * not stored, so the note can be asked about again once the vault around it
+ * has grown.
+ */
+// latency: pending
+export async function askMaya(_prev: AskMayaState, formData: FormData): Promise<AskMayaState> {
+  const user = await requireUser();
+
+  const path = notePath.safeParse(formData.get('notePath') ?? '');
+  if (!path.success) return { error: path.error.issues[0]?.message ?? 'Which note?' };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'Asking Maya needs ANTHROPIC_API_KEY to be set.' };
+
+  const vault = await createVaultClient();
+  const note = await loadNote(vault, path.data);
+  if (!note) return { error: 'That note is not in the vault any more.' };
+
+  const existing = await loadNoteThread(vault, note.id);
+  if (existing) return { threadHref: mayaThreadHref(existing.id) };
+
+  const spend = collectSpend();
+  const written = await writeThought({
+    vault,
+    userId: user.id,
+    noteId: note.id,
+    anthropicApiKey: apiKey,
+    onSpend: spend.sink,
+  });
+  await recordLearnSpend(user.id, MAYA_THOUGHT_OPERATION, spend.reports);
+
+  if (!written.ok) {
+    return written.reason === 'error' || written.reason === 'no-key'
+      ? { error: written.detail }
+      : { message: written.detail };
+  }
+  if (written.points.length === 0) {
+    return { message: 'Maya read this note and had nothing worth saying about it yet.' };
+  }
+
+  const saved = await saveThought(vault, {
+    userId: user.id,
+    noteId: note.id,
+    origin: 'asked',
+    written,
+  });
+  if (!saved.ok) return { error: saved.detail };
+
+  revalidatePath(noteHref(note.path));
+  return { threadHref: mayaThreadHref(saved.threadId) };
 }

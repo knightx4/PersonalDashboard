@@ -14,7 +14,9 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { loadTasksFor } from '@/lib/todo/links/load';
 import { whyNotRead } from '@/lib/vault/map/rules';
+import { loadNoteThread } from '@/lib/vault/maya/store';
 import { MapReview } from './map-review';
+import { MayaAsk } from './maya-ask';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,9 +85,10 @@ export default async function NotePage({
   const notRead = whyNotRead(note);
 
   const user = await requireUser();
-  const [{ timezone }, linkedTasks] = await Promise.all([
+  const [{ timezone }, linkedTasks, mayaThread] = await Promise.all([
     loadAccountSettings(user.id),
     loadTasksFor(user.id, 'note', note.id),
+    notRead ? null : loadNoteThread(supabase, note.id),
   ]);
 
   return (
@@ -155,7 +158,12 @@ export default async function NotePage({
         {notRead ? (
           <p className="mt-10 text-ui text-ink-muted">{notRead.detail}</p>
         ) : (
-          <MapReview notePath={note.path} />
+          <>
+            {/* Maya reads what the map reads and nothing else (#1285): a note
+                the map turns away shows no way to ask either. */}
+            <MayaAsk notePath={note.path} thread={mayaThread} />
+            <MapReview notePath={note.path} />
+          </>
         )}
       </article>
     </div>

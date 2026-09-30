@@ -133,6 +133,7 @@ export const PAID_ACTIONS = {
   // Vault
   'app/vault/n/[...path]/actions.ts#proposeMap': ['map-note', 'embed-map'],
   'app/vault/n/[...path]/actions.ts#acceptMap': ['embed-map'],
+  'app/vault/n/[...path]/actions.ts#askMaya': ['write-maya-thought'],
 
   // Dev: Dash's reply to a comment that tags it
   'app/dev/comment-actions.ts#addComment': ['reply-to-comment'],

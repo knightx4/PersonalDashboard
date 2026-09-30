@@ -89,3 +89,8 @@ export function basenameOf(vaultPath: string): string {
   const file = vaultPath.slice(vaultPath.lastIndexOf('/') + 1);
   return file.replace(MARKDOWN, '');
 }
+
+/** Where a thread with Maya lives: the Maya tab's page for it (plan #1286). */
+export function mayaThreadHref(threadId: string): string {
+  return `/vault/maya/${threadId}`;
+}
