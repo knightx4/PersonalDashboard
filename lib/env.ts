@@ -149,6 +149,10 @@ export function serverEnv() {
       CLAUDE_VISION_ROUTINE_ID: z.string().min(1).optional(),
       /** Bearer for the vision review routine. Scoped to it, not to the account. */
       CLAUDE_VISION_ROUTINE_TOKEN: z.string().min(1).optional(),
+      /** The routine that builds selveyknight.com's plan steps (lib/plan/projects). No fallback. */
+      CLAUDE_WEBSITE_ROUTINE_ID: z.string().min(1).optional(),
+      /** Bearer for the website routine. Scoped to it, not to the account. */
+      CLAUDE_WEBSITE_ROUTINE_TOKEN: z.string().min(1).optional(),
       /** BoardGameGeek approved-application token (bearer). */
       BGG_API_TOKEN: z.string().min(1).optional(),
       /** Optional. UPCitemdb paid key; the trial endpoint works without it. */

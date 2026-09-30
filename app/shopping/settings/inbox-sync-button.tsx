@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { reparseInboxOrders, resetInboxImport } from './actions';
@@ -34,6 +35,7 @@ export function InboxSyncButton({
   /** True once the initial Gmail import finished — enables Sync now. */
   backfillCompleted?: boolean;
 }) {
+  const router = useRouter();
   const [progress, setProgress] = useState<InboxSyncProgress | null>(initialJob);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -61,6 +63,14 @@ export function InboxSyncButton({
     }, 2500);
     return () => window.clearInterval(id);
   }, [refresh]);
+
+  // When a run ends, re-read the server parts of the page (the inbox's "last
+  // synced", the orders it imported) so they show without a reload.
+  const wasActive = useRef(active);
+  useEffect(() => {
+    if (wasActive.current && !active) router.refresh();
+    wasActive.current = active;
+  }, [active, router]);
 
   async function startMode(mode: 'backfill' | 'incremental') {
     setError(null);

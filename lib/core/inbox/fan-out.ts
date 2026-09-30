@@ -33,6 +33,13 @@ export function emptyLinkerCounters(): LinkerCounters {
   return { offered: 0, alreadyJudged: 0, classified: 0, claimed: 0, linked: 0, failed: 0 };
 }
 
+/** One Gmail search a catch-up pages through. See `catchUps` on DomainLinker. */
+export type CatchUpSearch = {
+  key: string;
+  version: number;
+  query: string;
+};
+
 export interface DomainLinker {
   /** Short name, used in logs and in the sync summary. */
   readonly domain: string;
@@ -68,8 +75,18 @@ export interface DomainLinker {
    */
   readonly catchUp?: {
     version: number;
-    query: () => string;
+    query: (opts: { backfillWindowDays: number }) => string;
   };
+  /**
+   * Further catch-up searches that depend on what the workspace holds, each
+   * run to the end once per `version` under its own `key`.
+   *
+   * The job side asks for one per tracked company: a company first tracked
+   * today (because its recruiter wrote today) still has its acknowledgement
+   * from a month ago sitting in the mailbox, and nothing else would list it.
+   * Keys must match core.inbox_catch_ups' linker check.
+   */
+  catchUps?(opts: { userId: string; backfillWindowDays: number }): Promise<readonly CatchUpSearch[]>;
   link(opts: {
     userId: string;
     accountId: string;

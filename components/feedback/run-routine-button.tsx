@@ -1,7 +1,8 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Loader2, Play, TriangleAlert } from 'lucide-react';
 import {
   routineRun,
@@ -130,6 +131,15 @@ export function RunRoutineButton({
   }, [justFired]);
 
   const running = run !== null && !run.stale;
+
+  // A run this page saw going has stopped. Re-read the server parts of the
+  // page, so the notes it closed drop off the queue without a reload.
+  const router = useRouter();
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (wasRunning.current && !running) router.refresh();
+    wasRunning.current = running;
+  }, [running, router]);
 
   return (
     <form

@@ -25,6 +25,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   fireFeatureRoutine,
+  projectRoutineIds,
   resolveRoutineId,
   type FireRoutineResult,
   type RoutineTarget,
@@ -199,7 +200,7 @@ export async function endQuietRuns(input: {
 
   const { data: rows, error } = await input.supabase
     .from('plan_runs')
-    .select('id, plan_item_id, created_at')
+    .select('id, plan_item_id, created_at, routine_id')
     .eq('user_id', input.userId)
     .eq('status', 'started');
   if (error) {
@@ -211,6 +212,7 @@ export async function endQuietRuns(input: {
     id: string;
     plan_item_id: string | null;
     created_at: string;
+    routine_id: string | null;
   }>;
   if (started.length === 0) return { ...nothing, error: null };
 
@@ -234,6 +236,9 @@ export async function endQuietRuns(input: {
   }
 
   const pushes = input.pushes ?? null;
+  // A project's run pushes to its own repository, so this one's pushes say
+  // nothing about it: it is judged on the clock, as an unread listing is.
+  const elsewhere = projectRoutineIds();
   const finished: string[] = [];
   const ended: Array<{ id: string; note: string }> = [];
   for (const row of started) {
@@ -243,7 +248,7 @@ export async function endQuietRuns(input: {
     };
     const listed =
       input.pushesSince === undefined || new Date(row.created_at).getTime() >= input.pushesSince;
-    if (!pushes || !listed) {
+    if (!pushes || !listed || (row.routine_id !== null && elsewhere.has(row.routine_id))) {
       const end = runEnd({ status: 'started', createdAt: row.created_at }, step, now);
       if (end === 'finished') finished.push(row.id);
       if (end === 'failed') ended.push({ id: row.id, note: runQuietNote(row.created_at, now) });
@@ -378,7 +383,7 @@ export async function readRunLiveness(input: {
 
   const { data: runRows, error: runsError } = await input.supabase
     .from('plan_runs')
-    .select('id, plan_item_id, created_at')
+    .select('id, plan_item_id, created_at, routine_id')
     .eq('user_id', input.userId)
     .in(
       'plan_item_id',
@@ -388,11 +393,12 @@ export async function readRunLiveness(input: {
   if (runsError) return { steps: {}, pushes: [], since: null, error: runsError.message };
 
   // Newest first, so the first row seen for a step is the run that holds it.
-  const latest = new Map<string, { id: string; created_at: string }>();
+  const latest = new Map<string, { id: string; created_at: string; routine_id: string | null }>();
   for (const row of (runRows ?? []) as Array<{
     id: string;
     plan_item_id: string;
     created_at: string;
+    routine_id: string | null;
   }>) {
     if (!latest.has(row.plan_item_id)) latest.set(row.plan_item_id, row);
   }
@@ -401,19 +407,23 @@ export async function readRunLiveness(input: {
   const oldest = Math.min(...[...latest.values()].map((run) => new Date(run.created_at).getTime()));
   const { pushes, error: pushError } = await listPushes({ since: oldest, fetch: input.fetch });
 
+  const elsewhere = projectRoutineIds();
   const readings: Record<string, StepRunReading> = {};
   for (const step of steps) {
     const run = latest.get(step.id);
     if (!run) continue;
+    // A project's run (lib/plan/projects) pushes to another repository, so the
+    // listing here cannot speak for it either way.
+    const readable = !pushError && !(run.routine_id !== null && elsewhere.has(run.routine_id));
     const evidence: RunEvidence = {
       startedAt: run.created_at,
-      lastPush: pushError ? null : lastPushSince(pushes, run.created_at),
+      lastPush: readable ? lastPushSince(pushes, run.created_at) : null,
       stepClosedAt: step.completed_at,
       // Every step here is `in_progress`, and the trigger clears `blocked_at`
       // the moment a row stops being blocked, so a claimed step never carries
       // one. A block under it is the sweep's question, not this one's.
       stepBlockedAt: null,
-      read: !pushError,
+      read: readable,
     };
     const liveness = runLiveness(evidence, now);
     readings[step.id] = {

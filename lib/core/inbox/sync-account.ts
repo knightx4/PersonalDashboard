@@ -3,7 +3,7 @@ import 'server-only';
 import { decryptToken, encryptToken } from '@/lib/crypto/tokens';
 import { gmailOAuthEnv } from '@/lib/email/gmail-env';
 import { gmailProvider, isGmailHistoryExpiredError } from '@/lib/email/providers/gmail';
-import { candidateQuery, companyDomainQuery, incrementalFallbackQuery } from '@/lib/core/email/gmail-query';
+import { candidateQuery, incrementalFallbackQuery } from '@/lib/core/email/gmail-query';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import {
   fetchEnvelopes,
@@ -14,6 +14,7 @@ import {
 import {
   fanOut,
   sweepLinkers,
+  type CatchUpSearch,
   type DomainLinker,
   type FanOutResult,
 } from '@/lib/core/inbox/fan-out';
@@ -268,11 +269,12 @@ async function processPage(
 /**
  * One page of the initial backfill.
  *
- * Two Gmail list calls per page. The first is the union query -- order-shaped
- * subjects and recruiting senders together, because one pass over the mailbox
- * has to satisfy both workspaces. The second is the direct-outreach pass over
- * the domains of companies the job side already tracks, which catches the
- * recruiter mailing from their own address that no keyword query can.
+ * One Gmail list call per page, over the union query: order-shaped subjects
+ * and recruiting senders together, because one pass over the mailbox has to
+ * satisfy every workspace. The recruiter mailing from their own address, which
+ * no keyword query can find, is reached afterwards by the job side's catch-up
+ * over each tracked company's domains (catchUpAccount). That search pages to
+ * the end; the pass it replaces here read one page of fifteen and stopped.
  */
 export async function syncEmailAccountBatch(
   supabase: CoreSupabaseClient,
@@ -280,7 +282,6 @@ export async function syncEmailAccountBatch(
     userId: string;
     accountId: string;
     linkers: readonly DomainLinker[];
-    companyDomains?: readonly string[];
     maxMessages?: number;
     jobId?: string;
     pageToken?: string | null;
@@ -309,22 +310,6 @@ export async function syncEmailAccountBatch(
     });
 
     const messageIds = listed.messages.map((m) => m.id);
-
-    // The outreach pass only runs on the first page: it is a separate, smaller
-    // result set, and re-running it for every page of the main query would
-    // fetch the same ids over and over.
-    if (!opts.pageToken && opts.companyDomains?.length) {
-      const outreach = companyDomainQuery(opts.companyDomains, account.backfill_window_days);
-      if (outreach) {
-        const extra = await gmailProvider.listMessages(accessToken, {
-          query: outreach,
-          maxResults: maxMessages,
-        });
-        for (const m of extra.messages) {
-          if (!messageIds.includes(m.id)) messageIds.push(m.id);
-        }
-      }
-    }
 
     console.info('core sync list', {
       accountId: account.id,
@@ -543,13 +528,43 @@ export async function sweepAccount(
 const CATCH_UP_PAGE_SIZE = 40;
 
 export type CatchUpResult = {
-  /** Per linker domain: pages read this call and whether its search is done. */
-  [domain: string]: { pages: number; messages: number; done: boolean; error?: string };
+  /** Per search key: pages read this call and whether its search is done. */
+  [key: string]: { pages: number; messages: number; done: boolean; error?: string };
 };
 
 /**
- * Page through each linker's own search of older mail, as far as the budget
- * allows. See `catchUp` on DomainLinker.
+ * Every catch-up search the linkers ask for: each one's own `catchUp`, keyed
+ * by its domain, then whatever `catchUps` it derives from its data. A linker
+ * whose list cannot be read loses its extra searches for this call only.
+ */
+async function catchUpSearches(
+  linkers: readonly DomainLinker[],
+  opts: { userId: string; backfillWindowDays: number },
+): Promise<CatchUpSearch[]> {
+  const searches: CatchUpSearch[] = [];
+  for (const linker of linkers) {
+    if (linker.catchUp) {
+      searches.push({
+        key: linker.domain,
+        version: linker.catchUp.version,
+        query: linker.catchUp.query({ backfillWindowDays: opts.backfillWindowDays }),
+      });
+    }
+  }
+  for (const linker of linkers) {
+    if (!linker.catchUps) continue;
+    try {
+      searches.push(...(await linker.catchUps(opts)));
+    } catch (err) {
+      console.error('inbox catch-up searches failed', linker.domain, err);
+    }
+  }
+  return searches;
+}
+
+/**
+ * Page through each linker's own searches of older mail, as far as the budget
+ * allows. See `catchUp` and `catchUps` on DomainLinker.
  *
  * Each page goes through processPage exactly as a backfill page does: every
  * linker is offered it, scrubbed envelopes are read again so a workspace that
@@ -569,8 +584,9 @@ export async function catchUpAccount(
   },
 ): Promise<CatchUpResult> {
   const result: CatchUpResult = {};
-  const searching = opts.linkers.filter((linker) => linker.catchUp);
-  if (searching.length === 0 || opts.budgetMs <= 0) return result;
+  if (!opts.linkers.some((linker) => linker.catchUp || linker.catchUps) || opts.budgetMs <= 0) {
+    return result;
+  }
 
   const deadline = Date.now() + opts.budgetMs;
   const fits =
@@ -579,27 +595,41 @@ export async function catchUpAccount(
   const encryptionKey = gmailOAuthEnv().TOKEN_ENCRYPTION_KEY;
   const account = await loadAccount(supabase, opts.userId, opts.accountId);
   if (account.status !== 'active') return result;
+
+  const searches = await catchUpSearches(opts.linkers, {
+    userId: opts.userId,
+    backfillWindowDays: account.backfill_window_days,
+  });
+  if (searches.length === 0) return result;
+
+  const { data: states } = await supabase
+    .from('inbox_catch_ups')
+    .select('linker, query_version, page_token, completed_at, messages_seen')
+    .eq('email_account_id', account.id);
+  const stateByKey = new Map((states ?? []).map((row) => [row.linker as string, row]));
+
+  // Nothing to do is the usual case once every search has run: say so without
+  // refreshing a token.
+  const pending = searches.filter((search) => {
+    const state = stateByKey.get(search.key);
+    return !(state?.query_version === search.version && state?.completed_at);
+  });
+  for (const search of searches) {
+    if (!pending.includes(search)) result[search.key] = { pages: 0, messages: 0, done: true };
+  }
+  if (pending.length === 0) return result;
+
   const accessToken = await ensureAccessToken(supabase, account, encryptionKey);
 
   let slowestPageMs = 0;
 
-  for (const linker of searching) {
-    const search = linker.catchUp!;
+  for (const search of pending) {
+    if (!fits(deadline - Date.now(), slowestPageMs)) break;
     const entry = { pages: 0, messages: 0, done: false } as CatchUpResult[string];
-    result[linker.domain] = entry;
+    result[search.key] = entry;
 
-    const { data: state } = await supabase
-      .from('inbox_catch_ups')
-      .select('query_version, page_token, completed_at, messages_seen')
-      .eq('email_account_id', account.id)
-      .eq('linker', linker.domain)
-      .maybeSingle();
-
+    const state = stateByKey.get(search.key);
     const sameVersion = state?.query_version === search.version;
-    if (sameVersion && state?.completed_at) {
-      entry.done = true;
-      continue;
-    }
     let pageToken: string | null = sameVersion ? ((state?.page_token as string | null) ?? null) : null;
     let seen = sameVersion ? Number(state?.messages_seen ?? 0) : 0;
 
@@ -607,7 +637,7 @@ export async function catchUpAccount(
       while (fits(deadline - Date.now(), slowestPageMs)) {
         const startedAt = Date.now();
         const listed = await gmailProvider.listMessages(accessToken, {
-          query: search.query(),
+          query: search.query,
           maxResults: CATCH_UP_PAGE_SIZE,
           pageToken: pageToken ?? undefined,
         });
@@ -639,7 +669,7 @@ export async function catchUpAccount(
         await supabase.from('inbox_catch_ups').upsert(
           {
             email_account_id: account.id,
-            linker: linker.domain,
+            linker: search.key,
             query_version: search.version,
             page_token: entry.done ? null : pageToken,
             messages_seen: seen,
@@ -655,7 +685,7 @@ export async function catchUpAccount(
     } catch (err) {
       // Never fatal: the cursor is saved per page, and the next sync resumes.
       entry.error = err instanceof Error ? err.message : String(err);
-      console.error('inbox catch-up failed', linker.domain, entry.error);
+      console.error('inbox catch-up failed', search.key, entry.error);
     }
   }
 

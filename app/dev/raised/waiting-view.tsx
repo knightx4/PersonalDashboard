@@ -17,16 +17,13 @@ import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { FieldError } from '@/components/ui/field';
 import { RefText } from '@/components/dev/ref-text';
 import { planRefHref, type PlanRefTitles } from '@/lib/comments/refs';
-import { MODULES, type ModuleId } from '@/lib/modules';
 import { PLAN_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { WAITING_WORD } from '@/lib/dev/words';
 import type { WaitingEntry, WaitingRow } from '@/lib/plan/waiting';
 import { whereToDoIt } from '@/lib/plan/where';
 import { waitingAnchor } from '@/lib/search/sources/dev-map';
+import { planScopeLabel } from '@/lib/plan/projects';
 
-const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
-  MODULES.map((module) => [module.id, module.label]),
-) as Record<ModuleId, string>;
 
 /**
  * Stopped is the one that costs something. A question can sit a day and
@@ -150,7 +147,7 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
 
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-micro text-ink-ghost">
-          {row.module ? MODULE_LABEL[row.module] : 'Everything'}
+          {row.module ? planScopeLabel(row.module) : 'Everything'}
         </p>
         {(setup || blockedJob) && (
           <div className="flex flex-wrap items-center gap-2">

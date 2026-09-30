@@ -7,12 +7,14 @@ import { vectorLiteral } from '@/lib/learn/catalogue/embed-sweep';
 import { embedTexts, type EmbedOutcome } from '@/lib/learn/embed/embed';
 import { DEFAULT_EMBEDDING_MODEL, type EmbeddingModel } from '@/lib/learn/embed/voyage';
 import { cutPassages, type Author } from '@/lib/memory/passages';
+import { syncSpecDocuments } from '@/lib/memory/specs';
 
 /**
  * Keeping core.memory_chunks current (plan #1247).
  *
  * Every five minutes /api/cron/memory-sweep runs this for every account. It
- * first removes the passages of rows that are no longer live
+ * first copies the specs in docs/ into core.memory_documents
+ * (lib/memory/specs.ts, plan #1321), since SQL cannot read files, then removes the passages of rows that are no longer live
  * (core.prune_memory_chunks), then embeds the rows whose passages are
  * missing, out of date or incomplete (core.stale_memory_sources), cutting
  * each into passages here (lib/memory/passages.ts) and writing them back with
@@ -68,6 +70,12 @@ export type ChunkWrite = {
 };
 
 export type MemorySweepPorts = {
+  /**
+   * Copy file-backed sources (the specs) into core.memory_documents before
+   * anything is read, returning the rows changed. Optional: only the sweep
+   * over every account, which runs as the service role, has it.
+   */
+  documents?(): Promise<number>;
   prune(): Promise<number>;
   stale(limit: number): Promise<StaleSource[]>;
   store(rows: ChunkWrite[]): Promise<number>;
@@ -90,6 +98,8 @@ export type MemorySweepOptions = {
 };
 
 export type MemorySweepResult = {
+  /** Spec sections copied in or removed (plan #1321); null when the copy failed. */
+  documents: number | null;
   pruned: number;
   rows: number;
   passages: number;
@@ -183,7 +193,20 @@ export async function runMemorySweep(
   const now = options.now ?? Date.now;
   const late = () => options.deadline !== undefined && now() >= options.deadline;
 
+  // A spec copy that fails leaves the specs' passages as they were; the rest
+  // of the sweep does not depend on it.
+  let documents: number | null = 0;
+  if (ports.documents) {
+    try {
+      documents = await ports.documents();
+    } catch (error) {
+      console.error('memory sweep: spec copy', error instanceof Error ? error.message : error);
+      documents = null;
+    }
+  }
+
   const result: MemorySweepResult = {
+    documents,
     pruned: await ports.prune(),
     rows: 0,
     passages: 0,
@@ -316,16 +339,20 @@ export function memorySweepStore(
 }
 
 /**
- * Prune and embed. `userId` null means every account, which only a service
- * client can see. Spend rows go through the same client.
+ * Copy the specs, prune and embed. `userId` null means every account, which
+ * only a service client can see. Spend rows go through the same client.
  */
 export async function sweepMemory(
   core: Pick<CoreSupabaseClient, 'rpc' | 'from'>,
   options: MemorySweepOptions & { userId?: string | null; apiKey?: string | null } = {},
 ): Promise<MemorySweepResult> {
+  const everyone = (options.userId ?? null) === null;
   return runMemorySweep(
     {
       ...memorySweepStore(core, options.userId ?? null),
+      // The specs belong to the owner, and only the service role may write
+      // them (0137), so they are copied on the sweep over every account.
+      ...(everyone ? { documents: () => syncSpecDocuments(core) } : {}),
       embed: ({ texts, model, onSpend }) =>
         embedTexts({ texts, model, inputType: 'document', apiKey: options.apiKey, onSpend }),
       ledger: async (owner, report) => {

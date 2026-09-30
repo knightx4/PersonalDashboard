@@ -9,6 +9,8 @@ import { createGoalsClient } from '@/lib/goals/auth/server';
 import { DOCUMENT_BUCKET } from '@/lib/goals/extract';
 import { decryptToken } from '@/lib/crypto/tokens';
 import { gmailProvider } from '@/lib/email/providers/gmail';
+import { removeAttachmentFolder, vaultAttachmentFolder } from '@/lib/vault/attachment-storage';
+import { VAULT_TRANSCRIPTS_BUCKET } from '@/lib/vault/transcripts';
 
 export const maxDuration = 60;
 
@@ -29,7 +31,8 @@ export const maxDuration = 60;
  *      only they can delete it. The account page says so rather than implying
  *      this reaches further than it does.
  *   2. Delete the storage objects, which do not cascade with database rows --
- *      and only from this app's bucket, since buckets are shared project-wide.
+ *      and only from this app's own buckets (job search, goals documents and
+ *      vault attachments), since buckets are shared project-wide.
  *   3. Delete the auth.users row. Every table that names a user cascades from
  *      it, in all six schemas -- public, core, job_search, obsidian, todo and
  *      learn -- which is why one delete is enough, and why
@@ -85,8 +88,8 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 2. Storage. Both tables live in the job search schema, which is also the
-  //    only workspace that stores files at all -- everything else is rows.
+  // 2. Storage. Both tables live in the job search schema; goals and the
+  //    vault keep their files in buckets of their own, cleared below.
   const [{ data: attachments }, { data: resumes }] = await Promise.all([
     jobs.from('attachments').select('storage_path').eq('user_id', user.id),
     jobs.from('resume_versions').select('storage_path').eq('user_id', user.id),
@@ -116,7 +119,6 @@ export async function POST(request: NextRequest) {
     // A file left behind is not a reason to refuse the deletion.
   }
 
-  // 3. The row everything else hangs off.
   let admin: ReturnType<typeof createServiceSupabase>;
   try {
     admin = createServiceSupabase();
@@ -127,6 +129,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  //    The vault keeps copies of the images, PDFs and audio its notes embed
+  //    (plan #1299), one folder per account with one per connection inside
+  //    it. Only the service role can delete there, so the admin client clears
+  //    the account's folder.
+  try {
+    await removeAttachmentFolder(admin, vaultAttachmentFolder(user.id));
+  } catch {
+    // As above: a file left behind does not stop the deletion.
+  }
+
+  //    And the transcripts the Education tab keeps (plan #1306), in a bucket
+  //    of their own with one folder per account.
+  try {
+    await removeAttachmentFolder(admin, user.id, VAULT_TRANSCRIPTS_BUCKET);
+  } catch {
+    // As above.
+  }
+
+  // 3. The row everything else hangs off.
   const { error } = await admin.auth.admin.deleteUser(user.id);
   if (error) {
     console.error('account delete failed', { userId: user.id, message: error.message });

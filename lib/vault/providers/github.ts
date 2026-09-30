@@ -251,6 +251,14 @@ export class GithubVaultSource implements VaultSource {
   }
 
   async readBlob(blobSha: string): Promise<string> {
+    return (await this.rawBlob(blobSha, 'a note')).text();
+  }
+
+  async readBlobBytes(blobSha: string): Promise<ArrayBuffer> {
+    return (await this.rawBlob(blobSha, 'an attachment')).arrayBuffer();
+  }
+
+  private async rawBlob(blobSha: string, what: string): Promise<Response> {
     // The raw media type returns the file's bytes rather than a base64 field,
     // and lifts the 1MB ceiling the JSON representation has.
     const res = await fetch(`${API}${this.base}/git/blobs/${encodeURIComponent(blobSha)}`, {
@@ -264,12 +272,12 @@ export class GithubVaultSource implements VaultSource {
     });
 
     if (res.status === 401) {
-      throw new VaultAuthError('GitHub rejected the access token while reading a note.');
+      throw new VaultAuthError(`GitHub rejected the access token while reading ${what}.`);
     }
     if (!res.ok) {
       throw new VaultSourceError(`GitHub ${res.status} reading blob ${blobSha}`, res.status);
     }
 
-    return res.text();
+    return res;
   }
 }

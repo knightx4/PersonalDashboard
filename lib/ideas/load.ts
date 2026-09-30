@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
 import { triageFrom, type Triage } from '@/lib/feedback/triage';
+import { scoreFrom, type IdeaScore } from '@/lib/ideas/score';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 
 /**
@@ -37,6 +38,8 @@ export type IdeaRow = {
   thread: DevComment[];
   /** Jev's triage when it was filed (plan #1179); null when it was not triaged. */
   triage?: Triage | null;
+  /** Jev's score of how much it helps its workspace (plan #1326); null until scored. */
+  score?: IdeaScore | null;
 };
 
 /**
@@ -57,7 +60,7 @@ export interface IdeaList {
 
 /** Every column the app reads off an idea, and the two plan items it points at. */
 export const IDEA_COLUMNS =
-  'id, body, module, created_at, source, dismissed_at, triage, ' +
+  'id, body, module, created_at, source, dismissed_at, triage, score, ' +
   // Two foreign keys point at plan_items, so both joins name theirs.
   'plan_item:plan_items!ideas_plan_item_id_fkey(id, number, title, status), ' +
   'from_plan_item:plan_items!ideas_from_plan_item_id_fkey(number, title), ' +
@@ -92,6 +95,7 @@ export function ideaRowFrom(row: Record<string, unknown>): IdeaRow {
     dismissedAt: (row.dismissed_at as string | null) ?? null,
     thread: threadFrom(row.thread),
     triage: triageFrom(row.triage),
+    score: scoreFrom(row.score),
   };
 }
 

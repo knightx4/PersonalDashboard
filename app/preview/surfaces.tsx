@@ -39,6 +39,9 @@ import {
 } from '@/lib/todo/calendar/month';
 import { NoteProperties } from '@/components/vault/note-properties';
 import { NoteBody } from '@/components/vault/note-body';
+import { buildAttachmentIndex, type AttachmentEntry } from '@/lib/vault/markdown/attachments';
+import { buildLinkIndex, toStandardMarkdown } from '@/lib/vault/markdown/obsidian';
+import { noteHref } from '@/lib/vault/paths';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { LearnNowFeed } from '@/app/learn/now/feed';
 import type { FeedCard } from '@/lib/learn/feed/card';
@@ -1108,6 +1111,54 @@ const calendarDays: CalendarDay[] = monthDays(CALENDAR_MONTH).map((day) => ({
  * styles are the whole surface -- there is no chrome here to look at. A note
  * of three paragraphs would say nothing about the ones that carry structure.
  */
+/**
+ * A note that embeds one of everything the note page tells apart (plan #1302).
+ * The pictures are drawn as SVG data URLs so the gallery needs no storage.
+ */
+const attachmentRows: AttachmentEntry[] = [
+  { id: 'beach', path: 'Attachments/Beach day.png', sizeBytes: 812_000, mimeType: 'image/png', storagePath: 'u/c/beach' },
+  { id: 'plan', path: 'Attachments/floor-plan.jpg', sizeBytes: 240_000, mimeType: 'image/jpeg', storagePath: 'u/c/plan' },
+  { id: 'lease', path: 'Money/lease.pdf', sizeBytes: 380_000, mimeType: 'application/pdf', storagePath: 'u/c/lease' },
+  { id: 'memo', path: 'Audio/voice memo.m4a', sizeBytes: 2_100_000, mimeType: 'audio/mp4', storagePath: 'u/c/memo' },
+  { id: 'scan', path: 'Scans/tax-return.pdf', sizeBytes: 61_000_000, mimeType: 'application/pdf', storagePath: null },
+  { id: 'receipt', path: 'Attachments/receipt.webp', sizeBytes: 90_000, mimeType: 'image/webp', storagePath: null },
+];
+
+function pictureUrl(width: number, height: number, sky: string, ground: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="${sky}"/><rect y="${Math.round(height * 0.62)}" width="100%" height="100%" fill="${ground}"/></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+const attachmentPictures: Record<string, string> = {
+  beach: pictureUrl(1600, 900, '#9cc7e4', '#e8d3a3'), /* ui-ok: the photo's own colours, not the app's */
+  plan: pictureUrl(1200, 800, '#f2f2ee', '#c9c9c2'), /* ui-ok: the floor plan's own colours, not the app's */
+  lease: '#',
+  memo: '#',
+};
+
+const attachmentNote = `The flat on Harbour Road, from the viewing on Saturday.
+
+![[Beach day.png]]
+
+The floor plan the agent sent, at the size I keep it in Obsidian:
+
+![[floor-plan.jpg|300]]
+
+The lease to sign: ![[lease.pdf]]
+
+What the landlord said about the deposit:
+
+![[voice memo.m4a]]
+
+![[gone.png]]
+
+![[tax-return.pdf]]
+
+![[receipt.webp]]
+
+![[sketch.svg]]
+`;
+
 const noteFrontmatter: Record<string, unknown> = {
   tags: ['postgres', 'ops'],
   status: 'in progress',
@@ -2708,6 +2759,24 @@ export const SURFACES: readonly Surface[] = [
         <NoteProperties frontmatter={noteFrontmatter} />
         <NoteBody markdown={noteMarkdown} />
       </>
+    ),
+  },
+  {
+    /* A note's embedded files (plan #1302): an image, a sized one, a PDF, a
+     * recording, and the four ways a file can be unavailable. The images are
+     * drawn from data URLs here; on the page they come through the signed
+     * /vault/attachment route. */
+    id: 'vault-note-attachments',
+    label: 'Note · Embedded files',
+    module: 'vault',
+    width: 'narrow',
+    render: () => (
+      <NoteBody
+        markdown={toStandardMarkdown(attachmentNote, { index: buildLinkIndex([]), hrefFor: noteHref })}
+        notePath="Home/Moving flat.md"
+        attachments={buildAttachmentIndex(attachmentRows)}
+        hrefForAttachment={(entry) => attachmentPictures[entry.id] ?? '#'}
+      />
     ),
   },
   {
