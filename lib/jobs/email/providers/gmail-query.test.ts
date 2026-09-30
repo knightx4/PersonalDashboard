@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   companyDomainQuery,
+  companyLookbackQuery,
+  companyLookbackVersion,
   incrementalFallbackQuery,
   recruitingCandidateQuery,
 } from '@/lib/jobs/email/providers/gmail-query';
@@ -53,5 +55,49 @@ describe('incrementalFallbackQuery', () => {
 
   it('does not shrink below the floor for a very recent sync', () => {
     expect(incrementalFallbackQuery('2026-04-14T00:00:00Z', now)).toContain('newer_than:30d');
+  });
+});
+
+describe('the subjects a company sends from its own address', () => {
+  it('lists "thanks for your interest", which the Keystone acknowledgement needed', () => {
+    const query = recruitingCandidateQuery(180);
+    expect(query).toContain('"thanks for your interest"');
+    expect(query).toContain('"thank you for your interest"');
+    expect(query).toContain('"applying"');
+  });
+});
+
+describe('companyLookbackQuery', () => {
+  it('searches the company its own domains', () => {
+    expect(companyLookbackQuery(['keystone.com'], 180)).toBe('newer_than:180d from:(keystone.com)');
+  });
+
+  it('leaves out domains many senders share', () => {
+    expect(
+      companyLookbackQuery(['jobs.ashbyhq.com', 'gmail.com', 'match.indeed.com', 'ramp.com'], 180),
+    ).toBe('newer_than:180d from:(ramp.com)');
+  });
+
+  it('returns null when nothing is left to search', () => {
+    expect(companyLookbackQuery(['jobs.lever.co', 'job-boards.greenhouse.io'], 180)).toBeNull();
+    expect(companyLookbackQuery([], 180)).toBeNull();
+  });
+});
+
+describe('companyLookbackVersion', () => {
+  it('ignores order and case', () => {
+    expect(companyLookbackVersion(['b.com', 'A.com'])).toBe(companyLookbackVersion(['a.com', 'b.com']));
+  });
+
+  it('changes when a domain is added', () => {
+    expect(companyLookbackVersion(['a.com', 'b.com'])).not.toBe(companyLookbackVersion(['a.com']));
+  });
+
+  it('fits a positive Postgres integer', () => {
+    for (const domains of [[], ['a.com'], ['keystone.com', 'keystonestrategy.com']]) {
+      const version = companyLookbackVersion(domains);
+      expect(version).toBeGreaterThan(0);
+      expect(version).toBeLessThanOrEqual(2_147_483_647);
+    }
   });
 });

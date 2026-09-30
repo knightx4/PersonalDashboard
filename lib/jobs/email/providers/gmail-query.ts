@@ -1,4 +1,5 @@
-import { ATS_DOMAINS } from '@/lib/jobs/email/ats-senders';
+import { ATS_DOMAINS, isIgnoredSender, isKnownAtsSender } from '@/lib/jobs/email/ats-senders';
+import { isPersonalMailboxDomain } from '@/lib/merchants/platform';
 
 /**
  * Gmail search for likely recruiting mail within the backfill window.
@@ -28,6 +29,12 @@ export const RECRUITING_SUBJECT_TERMS: readonly string[] = [
   'your application',
   'application received',
   'thank you for applying',
+  // A company mailing from its own address often thanks you for your
+  // interest rather than your application ("Thanks for your interest in
+  // Keystone"), and that subject matched nothing here.
+  'thanks for your interest',
+  'thank you for your interest',
+  'applying',
   'application to',
   'we received your application',
   'interview',
@@ -68,6 +75,49 @@ export function companyDomainQuery(
   // Gmail's query length is finite; the most recently added companies matter most.
   const capped = cleaned.slice(0, 60);
   return `newer_than:${clampDays(backfillWindowDays)}d from:(${capped.join(' OR ')})`;
+}
+
+/**
+ * The lookback over one tracked company's own domains, or null when it has
+ * none worth searching.
+ *
+ * A company is often first tracked because its recruiter has just written,
+ * and its acknowledgement from weeks earlier is already in the mailbox under
+ * a subject no keyword query matches. This search finds it. A domain many
+ * senders share is left out: a company whose domains include
+ * jobs.ashbyhq.com or gmail.com would otherwise list every Ashby email or the
+ * whole personal mailbox.
+ */
+export function companyLookbackQuery(
+  domains: readonly string[],
+  backfillWindowDays: number,
+): string | null {
+  const own = domains.filter((raw) => {
+    const domain = raw.trim().toLowerCase();
+    return (
+      domain.length > 0 &&
+      !isKnownAtsSender(domain) &&
+      !isIgnoredSender(domain) &&
+      !isPersonalMailboxDomain(domain)
+    );
+  });
+  return companyDomainQuery(own, backfillWindowDays);
+}
+
+/**
+ * A version for a company's lookback that changes when its domains do, so a
+ * domain added later is searched too. Order and case do not count.
+ */
+export function companyLookbackVersion(domains: readonly string[]): number {
+  const text = [...new Set(domains.map((d) => d.trim().toLowerCase()).filter(Boolean))]
+    .sort()
+    .join(' ');
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (Math.imul(hash, 31) + text.charCodeAt(i)) | 0;
+  }
+  // query_version is an integer column; keep it positive and in range.
+  return (hash >>> 2) + 1;
 }
 
 /** Bounded catch-up when the Gmail historyId cursor has expired. */
