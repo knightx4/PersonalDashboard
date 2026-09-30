@@ -10,6 +10,7 @@ import { DOCUMENT_BUCKET } from '@/lib/goals/extract';
 import { decryptToken } from '@/lib/crypto/tokens';
 import { gmailProvider } from '@/lib/email/providers/gmail';
 import { removeAttachmentFolder, vaultAttachmentFolder } from '@/lib/vault/attachment-storage';
+import { VAULT_TRANSCRIPTS_BUCKET } from '@/lib/vault/transcripts';
 
 export const maxDuration = 60;
 
@@ -136,6 +137,14 @@ export async function POST(request: NextRequest) {
     await removeAttachmentFolder(admin, vaultAttachmentFolder(user.id));
   } catch {
     // As above: a file left behind does not stop the deletion.
+  }
+
+  //    And the transcripts the Education tab keeps (plan #1306), in a bucket
+  //    of their own with one folder per account.
+  try {
+    await removeAttachmentFolder(admin, user.id, VAULT_TRANSCRIPTS_BUCKET);
+  } catch {
+    // As above.
   }
 
   // 3. The row everything else hangs off.
