@@ -11,3 +11,15 @@ export function safeAppPath(value: string | null | undefined, fallback: string):
   if (value.includes('\\') || value.includes('\n') || value.includes('\r')) return fallback;
   return value;
 }
+
+/**
+ * Where a signed-out visit is sent: the sign-in page, with the whole address
+ * it asked for as ?next=, query included. The query matters for the OAuth
+ * consent page, whose authorization_id is the request itself; with only the
+ * pathname kept, signing in lands on a consent page with nothing to consent to.
+ */
+export function signInRedirect(requested: URL): URL {
+  const url = new URL('/login', requested);
+  url.searchParams.set('next', `${requested.pathname}${requested.search}`);
+  return url;
+}
