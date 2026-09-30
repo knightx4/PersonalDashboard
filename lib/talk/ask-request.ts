@@ -5,6 +5,7 @@ import { confirmChange, declineChange, undoChange, type ChangeDeps, type ChangeO
 import { executeProposal } from '@/lib/ask/propose';
 import { executeAskTool } from '@/lib/ask/tools';
 import { requestAskDb } from '@/lib/ask/clients';
+import { pathOf, resolvePage, type PageContext } from '@/lib/ask/page';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
@@ -41,6 +42,8 @@ import type { TalkTurn } from './talk';
 export async function askDashInRequest(input: {
   question: string;
   conversationRef?: string | null;
+  /** The app address it was asked from, already checked; null when dropped. */
+  page?: string | null;
 }): Promise<AskDashResult> {
   const user = await requireUser();
   const [settings, core] = await Promise.all([loadAccountSettings(user.id), createCoreClient()]);
@@ -53,10 +56,13 @@ export async function askDashInRequest(input: {
     searchSources: allSearchSources(),
   };
 
+  const page = input.page ? await pageFor(ctx, input.page) : null;
+
   return askDash(
     {
       question: input.question,
       conversationRef: input.conversationRef,
+      page,
       today,
       execute: (name, args) => executeAskTool(name, args, ctx),
       propose: (name, args, seen, save) => executeProposal(name, args, { ...ctx, seen, save }),
@@ -73,6 +79,21 @@ export async function askDashInRequest(input: {
       discardProposals: (ids) => discardProposals(core, ids),
     },
   );
+}
+
+/**
+ * The page a question was asked from, resolved (plan #1271). The Ask page is
+ * where earlier questions are carried on, so being on it says nothing about
+ * the question and no page is told.
+ */
+async function pageFor(ctx: Parameters<typeof resolvePage>[0], address: string): Promise<PageContext | null> {
+  const path = pathOf(address);
+  if (path === '/ask' || path.startsWith('/ask/')) return null;
+  try {
+    return await resolvePage(ctx, address);
+  } catch {
+    return null;
+  }
 }
 
 /** The person's past questions, most recently added to first. */
