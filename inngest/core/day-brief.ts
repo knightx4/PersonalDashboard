@@ -420,10 +420,10 @@ export function dayBriefPorts(core: CoreSupabaseClient, clients: AgendaClients, 
       return (await gather(userId, day)).candidates;
     },
 
-    async write(day, facts, onSpend) {
-      // Without a key the plain brief is stored instead.
+    async write(day, picks, onSpend) {
+      // Without a key the plain notification, built from the picks, is stored instead.
       if (!apiKey) return null;
-      return { model: BRIEF_MODEL, text: await writeBrief(day, facts, { apiKey, onSpend }) };
+      return { model: BRIEF_MODEL, reply: await writeBrief(day, picks, { apiKey, onSpend }) };
     },
 
     async choose(day, list, onSpend) {
@@ -455,7 +455,7 @@ export function dayBriefPorts(core: CoreSupabaseClient, clients: AgendaClients, 
       if (!push) return;
       // The brief is saved; a notification that fails costs the buzz, not the day.
       try {
-        await sendToPerson(push, row.user_id, briefPayload(row.body, row.day), now);
+        await sendToPerson(push, row.user_id, briefPayload(row), now);
       } catch {
         // Tried again tomorrow; the home page already shows today's.
       }
