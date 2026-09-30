@@ -181,7 +181,7 @@ export default function PrivacyPage() {
         </li>
         <li>
           <strong>Asking Maya about a note.</strong> The note&rsquo;s title and its first 12,000
-          characters; the titles and first 3,000 characters of up to eight of your other notes
+          characters; the titles and first 1,500 characters of up to eight of your other notes
           whose meaning is closest to it; and the names and statements of up to sixteen positions
           from your map that come from those notes or share the note&rsquo;s themes, each with up
           to two sentences quoted from the notes they were read from. The model may also search

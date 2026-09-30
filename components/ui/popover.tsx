@@ -81,7 +81,7 @@ const popover = cva(`${popoverSurface} z-overlay`, {
      */
     anchor: {
       'trigger-right':
-        'fixed inset-x-4 top-16 sm:absolute sm:inset-x-auto sm:right-0 sm:top-10',
+        'fixed inset-x-4 top-[calc(4.5rem+env(safe-area-inset-top))] sm:absolute sm:inset-x-auto sm:right-0 sm:top-10',
       'trigger-below': 'absolute left-0 top-full mt-1.5',
       /**
        * The same drop, hung from the trigger's right edge instead of its

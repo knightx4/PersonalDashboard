@@ -34,10 +34,19 @@ export const MAYA_QUESTION_MAX = 200;
 /** Characters of the note itself in the prompt. */
 export const SUBJECT_CHARS = 12_000;
 
-/** Characters of each related note in the prompt. */
-export const RELATED_CHARS = 3_000;
+/**
+ * Characters of each related note in the prompt. Cut from 3,000 on
+ * 30 September 2026: the first two thoughts read 70,000 tokens each, about
+ * $0.55, and the quotes a point cites are a sentence or two.
+ */
+export const RELATED_CHARS = 1_500;
 
-const MAX_SEARCHES = 5;
+/**
+ * Searches are for a source's exact wording; the sources themselves come from
+ * what the model already knows. Each result is read back as input on every
+ * later round, so this was cut from 5 with RELATED_CHARS.
+ */
+export const MAX_SEARCHES = 2;
 const MAX_CONTINUATIONS = 3;
 
 export const MAYA_SYSTEM = `You are Maya, a thought partner for one person who keeps their notes in
@@ -348,7 +357,14 @@ export async function callThoughtModel(
   if (!options.client && !options.anthropicApiKey) return { ok: false, detail: 'ANTHROPIC_API_KEY is not set.' };
   const client = options.client ?? new Anthropic({ apiKey: options.anthropicApiKey });
   const { prompt, labels } = buildThoughtPrompt(material);
-  const messages: Anthropic.MessageParam[] = [{ role: 'user', content: prompt }];
+  // Cached: every search round and the forced follow-up resend the system
+  // prompt and the material, which then cost a tenth as much after the first.
+  const system: Anthropic.TextBlockParam[] = [
+    { type: 'text', text: MAYA_SYSTEM, cache_control: { type: 'ephemeral' } },
+  ];
+  const messages: Anthropic.MessageParam[] = [
+    { role: 'user', content: [{ type: 'text', text: prompt, cache_control: { type: 'ephemeral' } }] },
+  ];
   const searchText: string[] = [];
   let forced = false;
 
@@ -357,7 +373,7 @@ export async function callThoughtModel(
       const response = await client.messages.create({
         model: THOUGHT_MODEL,
         max_tokens: 6_000,
-        system: MAYA_SYSTEM,
+        system,
         tools: TOOLS,
         ...(forced ? { tool_choice: forceTool(TOOL_NAME) } : {}),
         messages,

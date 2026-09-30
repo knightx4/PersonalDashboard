@@ -41,11 +41,12 @@ export const TARGET_FOR_HIT: Record<HitKind, LinkTarget | null> = {
   raise: null,
   vision: null,
   // A story lives inside a newsletter issue rather than in a row of its own.
-  // task_links has a goal column, but only Hand to Dash writes it (plan
-  // #1263): the picker does not offer goals yet, and has no column for a step.
   story: null,
-  goal: null,
-  step: null,
+  // Goals and steps are both rows of goals.items, which is what goal_id
+  // references, so a step is linked through the goal column too (note
+  // fa4800bc).
+  goal: 'goal',
+  step: 'goal',
 };
 
 /** What a task would point at if it were pointed at this hit. */

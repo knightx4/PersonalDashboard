@@ -127,14 +127,29 @@ describe('Maya hourly gate', () => {
 
   it('writes at most the daily cap, highest probability first, and records the rest as skip', async () => {
     const fake = fakePorts({
-      notes: [note('a'), note('b'), note('c')],
-      probabilities: { a: 0.96, b: 0.99, c: 0.97 },
-      automatic: MAYA_DAILY_THOUGHTS - 2,
+      notes: [note('a'), note('b'), note('c'), note('d')],
+      probabilities: { a: 0.96, b: 0.99, c: 0.97, d: 0.98 },
+      automatic: 0,
     });
     const result = await runMayaGateFor(fake.ports, USER, NOW);
-    expect(fake.thought).toEqual(['b', 'c']);
-    expect(fake.recorded.find((row) => row.noteId === 'a')).toMatchObject({ outcome: 'skip', probability: 0.96 });
-    expect(result.thoughts).toBe(2);
+    const byProbability = ['b', 'd', 'c', 'a'];
+    expect(MAYA_DAILY_THOUGHTS).toBeLessThan(byProbability.length);
+    expect(fake.thought).toEqual(byProbability.slice(0, MAYA_DAILY_THOUGHTS));
+    for (const id of byProbability.slice(MAYA_DAILY_THOUGHTS)) {
+      expect(fake.recorded.find((row) => row.noteId === id)).toMatchObject({ outcome: 'skip' });
+    }
+    expect(result.thoughts).toBe(MAYA_DAILY_THOUGHTS);
+  });
+
+  it('counts what the day has already written against the cap', async () => {
+    const fake = fakePorts({
+      notes: [note('a'), note('b')],
+      probabilities: { a: 0.96, b: 0.99 },
+      automatic: MAYA_DAILY_THOUGHTS - 1,
+    });
+    const result = await runMayaGateFor(fake.ports, USER, NOW);
+    expect(fake.thought).toEqual(['b']);
+    expect(result.thoughts).toBe(1);
   });
 
   it('writes nothing once the day already has its cap', async () => {

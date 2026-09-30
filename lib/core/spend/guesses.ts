@@ -127,8 +127,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'embed-notes': background(unit(VOYAGE_LITE, 1_500, 0)),
   'embed-note-match': unit(VOYAGE_LITE, 300, 0),
   'write-note-connections': background(run(HAIKU, 1_800, 250)),
-  // A note, its eight nearest notes cut to 3,000 characters, and up to
-  // sixteen positions with quotes, plus the search results read back.
+  // A note, its eight nearest notes cut to 1,500 characters, and up to
+  // sixteen positions with quotes, plus up to two searches read back. The
+  // material is cached, so the rounds after the first read it at a tenth.
   'write-maya-thought': run(OPUS, 25_000, 2_500),
   // The title and up to 4,000 characters of one note, from the hourly job.
   'gate-maya-note': background(unit(JEV, 1_200, 0)),

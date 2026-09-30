@@ -40,6 +40,20 @@ export function goalOf(
   return null;
 }
 
+/**
+ * Where an item opens: a goal on its own page, a step as a row on its goal's.
+ * A step whose goal is not among the rows read falls back to its parent's
+ * page, which is the goal for every step that is not a sub-step.
+ */
+export function goalItemHref(
+  item: GoalItemRow,
+  byId: ReadonlyMap<string, GoalItemRow>,
+): string {
+  if (item.level === 'goal') return `/goals/${item.id}`;
+  const goalId = goalOf(item, byId)?.id ?? item.parent_id;
+  return goalId ? `/goals/${goalId}#step-${item.id}` : `/goals/${item.id}`;
+}
+
 const FINISHED = new Set(['done']);
 
 export function goalHits(
@@ -79,7 +93,7 @@ export function goalHits(
           id: row.id,
           title: row.title,
           subtitle: `Step · ${goal.title}`,
-          href: `/goals/${goal.id}#step-${row.id}`,
+          href: goalItemHref(row, byId),
         },
       });
     }

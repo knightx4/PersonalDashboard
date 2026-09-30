@@ -1,6 +1,13 @@
 'use client';
 
-import { Fragment, useActionState, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  Fragment,
+  useActionState,
+  useEffect,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { ChevronDown, HelpCircle, Wrench } from 'lucide-react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
@@ -297,8 +304,8 @@ export function TreeRow<E extends TreeCatalogEntry>({
   // One fold for the whole row (note b6d9e10b). The arrow and the title used
   // to open two different things -- the sub-steps, and the step's own panel --
   // and a step read in full meant pressing both. Either now unfolds both, or
-  // folds everything when anything is showing; Hide details in the panel puts
-  // the panel away and leaves the sub-steps.
+  // folds everything when anything is showing; the arrow at the top of the
+  // panel condenses the panel and leaves the sub-steps.
   const foldable = hasChildren || foldableFog;
   const expanded = open || (foldable && showChildren);
   const toggle = () => {
@@ -307,6 +314,15 @@ export function TreeRow<E extends TreeCatalogEntry>({
     if (foldable) setShowChildren(next);
   };
 
+  // A feature's panel sits above its sub-steps, and opening the row showed
+  // both in full: the detail pushed the steps a screen down. So on a row with
+  // sub-steps showing, the panel starts condensed to one arrow at its top that
+  // says Show details (note c588f394). A leaf has nothing else to show, and
+  // opens straight to its panel. A row that starts open, or is opened by a
+  // link to it, shows its details, since that is what was asked for.
+  const [detailsShown, setDetailsShown] = useState(open);
+  const condensable = hasChildren && showChildren;
+
   // A link to this row by its own id (a goal step from the Goals home, or
   // from Go to the step under a finding) opens its panel as well as scrolling
   // to it. Landing on a closed row that looks the same as before read as the
@@ -314,7 +330,10 @@ export function TreeRow<E extends TreeCatalogEntry>({
   useEffect(() => {
     if (!anchorId) return;
     const openIfNamed = () => {
-      if (window.location.hash === `#${anchorId}`) setOpen(true);
+      if (window.location.hash === `#${anchorId}`) {
+        setOpen(true);
+        setDetailsShown(true);
+      }
     };
     openIfNamed();
     window.addEventListener('hashchange', openIfNamed);
@@ -474,9 +493,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                 Added by Dash on {addedBy.date}
               </span>
             )}
-            {source && (
-              <span className="block truncate text-small text-ink-ghost">{source}</span>
-            )}
+            {source && <span className="block truncate text-small text-ink-ghost">{source}</span>}
             {need && !open && (
               <span className="block truncate text-small text-ink">
                 <span className="font-medium text-caution">Needs: </span>
@@ -620,86 +637,105 @@ export function TreeRow<E extends TreeCatalogEntry>({
           // same shape for two different meanings.
           <li style={inset} className="pb-3 pr-3">
             <div className="space-y-3 border-l-2 border-accent bg-canvas px-3 py-2.5">
-              {/* Not on a decision: there the detail is the options, and it is
+              {condensable && (
+                <button
+                  type="button"
+                  onClick={() => setDetailsShown(!detailsShown)}
+                  aria-expanded={detailsShown}
+                  className="press -mx-1 flex items-center gap-1 rounded px-1 text-small font-semibold text-ink-muted hover:bg-accent-tint hover:text-accent"
+                >
+                  <ChevronDown
+                    className={cn(
+                      'size-3.5 transition-transform duration-150',
+                      !detailsShown && '-rotate-90',
+                    )}
+                    strokeWidth={1.75}
+                    aria-hidden
+                  />
+                  {detailsShown ? 'Hide details' : 'Show details'}
+                </button>
+              )}
+              {(!condensable || detailsShown) && (
+                <>
+                  {/* Not on a decision: there the detail is the options, and it is
                   shown as options inside the question block rather than twice.
                   Nor on an open setup job, where the detail is the
                   instructions and is drawn inside the box that closes them. */}
-              {node.detail && !isDecision && !setupOpen && (
-                <p className="whitespace-pre-wrap text-ui text-ink-muted"><LinkedText text={node.detail} /></p>
-              )}
-              {node.acceptance && (
-                <div>
-                  <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">
-                    Done when
-                  </p>
-                  <p className="whitespace-pre-wrap text-ui text-ink">
-                    <LinkedText text={node.acceptance} />
-                  </p>
-                </div>
-              )}
-              {/* What it needs, in its own line above the history. The comment
+                  {node.detail && !isDecision && !setupOpen && (
+                    <p className="whitespace-pre-wrap text-ui text-ink-muted">
+                      <LinkedText text={node.detail} />
+                    </p>
+                  )}
+                  {node.acceptance && (
+                    <div>
+                      <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">
+                        Done when
+                      </p>
+                      <p className="whitespace-pre-wrap text-ui text-ink">
+                        <LinkedText text={node.acceptance} />
+                      </p>
+                    </div>
+                  )}
+                  {/* What it needs, in its own line above the history. The comment
                   below is every block this step has had, dated; this is the one
                   sentence that still stands. */}
-              {node.blockAsk && (
-                <div>
-                  <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">
-                    Needs
-                  </p>
-                  <p className="whitespace-pre-wrap text-ui text-ink">
-                    <LinkedText text={node.blockAsk} />
-                  </p>
-                </div>
+                  {node.blockAsk && (
+                    <div>
+                      <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">
+                        Needs
+                      </p>
+                      <p className="whitespace-pre-wrap text-ui text-ink">
+                        <LinkedText text={node.blockAsk} />
+                      </p>
+                    </div>
+                  )}
+                  {node.comment && (
+                    <p className="whitespace-pre-wrap rounded-lg bg-canvas px-3 py-2 text-ui text-ink">
+                      <LinkedText text={node.comment} />
+                    </p>
+                  )}
+
+                  {body}
+
+                  <Questions node={node} titles={titles} actions={actions} comments={comments} />
+
+                  {dependencies && (
+                    <Dependencies
+                      node={node}
+                      catalog={dependencies.catalog}
+                      groupOf={dependencies.groupOf}
+                      actions={actions}
+                      closed={closed}
+                    />
+                  )}
+
+                  <CommentThread
+                    target={comments.target}
+                    store={comments.store}
+                    id={node.id}
+                    thread={node.thread}
+                    titles={titles}
+                    placeholder={threadPlaceholder}
+                  />
+
+                  {meta}
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => row.setEditing(true)}
+                    >
+                      Edit
+                    </Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={row.addChild}>
+                      Add a sub-step
+                    </Button>
+                    {panelActions}
+                  </div>
+                </>
               )}
-              {node.comment && (
-                <p className="whitespace-pre-wrap rounded-lg bg-canvas px-3 py-2 text-ui text-ink">
-                  <LinkedText text={node.comment} />
-                </p>
-              )}
-
-              {body}
-
-              <Questions node={node} titles={titles} actions={actions} comments={comments} />
-
-              {dependencies && (
-                <Dependencies
-                  node={node}
-                  catalog={dependencies.catalog}
-                  groupOf={dependencies.groupOf}
-                  actions={actions}
-                  closed={closed}
-                />
-              )}
-
-              <CommentThread
-                target={comments.target}
-                store={comments.store}
-                id={node.id}
-                thread={node.thread}
-                titles={titles}
-                placeholder={threadPlaceholder}
-              />
-
-              {meta}
-
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => row.setEditing(true)}
-                >
-                  Edit
-                </Button>
-                <Button type="button" size="sm" variant="ghost" onClick={row.addChild}>
-                  Add a sub-step
-                </Button>
-                {panelActions}
-                {hasChildren && showChildren && (
-                  <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
-                    Hide details
-                  </Button>
-                )}
-              </div>
             </div>
           </li>
         )
