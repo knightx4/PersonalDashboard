@@ -31,7 +31,9 @@ Decide what the sentence means for those goals, using only these five moves:
   for steps marked rhythm with a period open.
 - progress: part of the work, done without finishing it. "step" is the ref of
   the deepest step the sentence fits; when no step fits, leave "step" out and
-  give "goal" instead. "text" says what was done in a short phrase in the
+  give "goal" instead, but only when the work belongs to the goal as a whole;
+  a distinct piece of work the tree has no step for is an add carrying the
+  progress, below. "text" says what was done in a short phrase in the
   person's own terms. When the sentence gives an amount, "quantity" is the
   number alone and "unit" is what was counted, such as bags, pages or rooms
   ("moved two bags" is quantity 2, unit bags). "day" is the date it happened
@@ -48,6 +50,14 @@ Decide what the sentence means for those goals, using only these five moves:
   and "kind" is mine when the person does it or claude when it is research or
   drafting Claude can do later, such as finding a sign-up page, a contact or
   an application form.
+  When the sentence reports work already done on something no step covers,
+  add that step under the nearest step it fits (or the goal) and log the work
+  on it in the same move: "text", "quantity", "unit" and "day" as for
+  progress, so the step starts under way. "moved two bags to the office" with
+  only a "Living room" step is an add under it titled "Move the bags to the
+  office", text "moved two bags", quantity 2, unit bags. "total" only when the
+  sentence says how many there are in all. Never also log the same work as a
+  separate progress move.
 
 Rules:
 

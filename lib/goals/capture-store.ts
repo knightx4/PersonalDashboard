@@ -3,11 +3,13 @@ import 'server-only';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
   MAX_CONTEXT_STEPS,
+  addedProgress,
   captureContext,
   markUndone,
   progressTotal,
   readFiled,
   undoMove,
+  type AddedFiledProgress,
   type CaptureContext,
   type FiledEntry,
   type PlannedAction,
@@ -175,12 +177,44 @@ export async function applyCaptureAction(
         kind: action.stepKind,
       });
       if (!id) return null;
+      // Work already done on it is logged at once, so it starts under way
+      // (plan #1278). If the entry cannot be written the step still stands
+      // and the line says only that it was added.
+      const progress = addedProgress(action, id);
+      let logged: AddedFiledProgress | undefined;
+      if (progress) {
+        const happenedOn = progress.happenedOn ?? today;
+        const entryId = await addProgressEntry(client, userId, {
+          itemId: id,
+          text: progress.text,
+          happenedOn,
+          quantity: progress.quantity,
+          unit: progress.unit,
+          captureId,
+        });
+        if (entryId) {
+          let total = progressTotal(progress);
+          if (total?.total_set) {
+            const set = await setTotalIfNone(client, id, total.total, total.total_unit);
+            if (!set) total = null;
+          }
+          logged = {
+            entry_id: entryId,
+            text: progress.text,
+            quantity: progress.quantity,
+            unit: progress.unit,
+            happened_on: happenedOn,
+            ...(total ?? {}),
+          };
+        }
+      }
       return {
         kind: 'add',
         step_id: id,
         title: action.title,
         step_kind: action.stepKind,
         goal_title: action.goal.title,
+        ...(logged ? { progress: logged } : {}),
         undone_at: null,
       };
     }
@@ -204,7 +238,8 @@ export type UndoResult =
 /**
  * Reverse one line of a capture and mark it undone. Only that line's row is
  * touched: a reopened step goes back to open, a count is taken back from the
- * period it was added to, an added step is archived, a recorded reading is
+ * period it was added to, an added step is archived with any progress filed
+ * on it, a recorded reading is
  * deleted, a progress entry is marked undone. A note from before plan #1275
  * changes no row.
  */
@@ -244,6 +279,17 @@ export async function undoFiled(
     }
     case 'archive':
       await setStepArchived(client, move.stepId, true);
+      // The entry filed on the new step goes with it, so nothing counts it.
+      if (move.progress) {
+        await undoProgressEntry(client, move.progress.entryId);
+        if (move.progress.clearTotal) {
+          await clearTotalIfUnchanged(
+            client,
+            move.progress.clearTotal.stepId,
+            move.progress.clearTotal.total,
+          );
+        }
+      }
       break;
     case 'delete-reading':
       // False when it was already deleted by hand; either way it is gone.
