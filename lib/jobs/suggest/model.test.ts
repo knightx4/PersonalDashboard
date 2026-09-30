@@ -46,13 +46,23 @@ const report = {
 
 const usage = { input_tokens: 100, output_tokens: 50 };
 
+/**
+ * A client whose stream().finalMessage() answers with what `create` returns,
+ * so each test states its responses once and reads the requests off `create`.
+ */
+function streaming(create: (...args: unknown[]) => unknown) {
+  return {
+    messages: { stream: (request: unknown, options: unknown) => ({ finalMessage: () => create(request, options) }) },
+  } as never;
+}
+
 describe('the time a search is given', () => {
   const input = { seeker, warm: [], known: [], taken: new Set<string>() };
 
   it('gives the call the time left before the deadline, without retries', async () => {
     const create = vi.fn().mockResolvedValue({ content: [report], stop_reason: 'tool_use', usage });
     const deadline = Date.now() + 200_000;
-    await findPeople({ apiKey: 'k', client: { messages: { create } } as never, deadline }, input);
+    await findPeople({ apiKey: 'k', client: streaming(create), deadline }, input);
     const options = create.mock.calls[0][1];
     expect(options.maxRetries).toBe(0);
     expect(options.timeout).toBeGreaterThan(180_000);
@@ -62,7 +72,7 @@ describe('the time a search is given', () => {
   it('hands back the request to queue when the call runs out of time', async () => {
     const create = vi.fn().mockRejectedValue(new Anthropic.APIConnectionTimeoutError());
     const result = await findPeople(
-      { apiKey: 'k', client: { messages: { create } } as never, deadline: Date.now() + 200_000 },
+      { apiKey: 'k', client: streaming(create), deadline: Date.now() + 200_000 },
       input,
     );
     expect(result.ok).toBe(false);
@@ -73,7 +83,7 @@ describe('the time a search is given', () => {
   it('queues without calling when too little time is left, and queues the forced report the same way', async () => {
     const none = vi.fn();
     const early = await findPeople(
-      { apiKey: 'k', client: { messages: { create: none } } as never, deadline: Date.now() + 30_000 },
+      { apiKey: 'k', client: streaming(none), deadline: Date.now() + 30_000 },
       input,
     );
     expect(none).not.toHaveBeenCalled();
@@ -86,7 +96,7 @@ describe('the time a search is given', () => {
       return { content: [{ type: 'text', text: 'searching' }], stop_reason: 'pause_turn', usage };
     });
     const late = await findPeople(
-      { apiKey: 'k', client: { messages: { create } } as never, deadline: clock + 200_000 },
+      { apiKey: 'k', client: streaming(create), deadline: clock + 200_000 },
       input,
     );
     spy.mockRestore();
@@ -106,7 +116,7 @@ describe('findPeople', () => {
     const spend: unknown[] = [];
 
     const result = await findPeople(
-      { apiKey: 'k', client: { messages: { create } } as never, onSpend: (r) => spend.push(r) },
+      { apiKey: 'k', client: streaming(create), onSpend: (r) => spend.push(r) },
       { seeker, warm: [], known: ['Known Person'], taken: new Set([personKey('Known Person')]) },
     );
 
@@ -129,7 +139,7 @@ describe('findPeople', () => {
   it('asks for the report when the search ends in prose, and says so when none comes', async () => {
     const create = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'done' }], stop_reason: 'end_turn', usage });
     const result = await findPeople(
-      { apiKey: 'k', client: { messages: { create } } as never },
+      { apiKey: 'k', client: streaming(create) },
       { seeker, warm: [], known: [], taken: new Set() },
     );
     expect(result).toEqual({ ok: false, error: 'The search ran but reported no people.' });
@@ -144,7 +154,7 @@ describe('findPeople', () => {
       .mockResolvedValueOnce({ content: [{ type: 'text', text: 'found some' }, cut], stop_reason: 'max_tokens', usage })
       .mockResolvedValueOnce({ content: [report], stop_reason: 'tool_use', usage });
     const result = await findPeople(
-      { apiKey: 'k', client: { messages: { create } } as never },
+      { apiKey: 'k', client: streaming(create) },
       { seeker, warm: [], known: [], taken: new Set() },
     );
     expect(result.ok && result.suggestions[0].personName).toBe('Dana Wu');
@@ -159,7 +169,7 @@ describe('findPeople', () => {
     const stringified = { ...report, input: { suggestions: JSON.stringify(report.input.suggestions) } };
     const create = vi.fn().mockResolvedValue({ content: [stringified], stop_reason: 'tool_use', usage });
     const result = await findPeople(
-      { apiKey: 'k', client: { messages: { create } } as never },
+      { apiKey: 'k', client: streaming(create) },
       { seeker, warm: [], known: [], taken: new Set() },
     );
     expect(result).toMatchObject({ ok: true, suggestions: [{ personName: 'Dana Wu' }, { personName: 'Known Person' }] });
