@@ -4,10 +4,10 @@ import {
   dueWords,
   isDue,
   parseDelay,
-  wakeDayStart,
+  wakeWindowStart,
   wakeTurn,
   WAKE_GRACE_MS,
-  WAKES_PER_DAY,
+  WAKES_PER_WINDOW,
   type CheckBack,
 } from '@/lib/plan/check-backs';
 
@@ -69,17 +69,17 @@ describe('chooseWake', () => {
     expect(chooseWake([justDue], 0, NOW)).toEqual([]);
   });
 
-  it('never wakes twice, never for one that asked not to be, and not past the daily cap', () => {
+  it('never wakes twice, never for one that asked not to be, and not past the cap for the window', () => {
     expect(chooseWake([row({ wokeAt: '2026-09-26T03:25:00Z' })], 0, NOW)).toEqual([]);
     expect(chooseWake([row({ wake: false })], 0, NOW)).toEqual([]);
     expect(chooseWake([row({ status: 'dropped' })], 0, NOW)).toEqual([]);
-    expect(chooseWake([row()], WAKES_PER_DAY, NOW)).toEqual([]);
+    expect(chooseWake([row()], WAKES_PER_WINDOW, NOW)).toEqual([]);
   });
 });
 
-describe('wakeDayStart', () => {
-  it('is midnight UTC of the same day', () => {
-    expect(new Date(wakeDayStart(NOW)).toISOString()).toBe('2026-09-26T00:00:00.000Z');
+describe('wakeWindowStart', () => {
+  it('is six hours before now', () => {
+    expect(new Date(wakeWindowStart(NOW)).toISOString()).toBe('2026-09-25T22:00:00.000Z');
   });
 });
 

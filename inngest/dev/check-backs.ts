@@ -6,7 +6,7 @@ import {
   CHECK_BACK_COLUMNS,
   checkBackFrom,
   chooseWake,
-  wakeDayStart,
+  wakeWindowStart,
   wakeTurn,
   WAKE_GRACE_MS,
 } from '@/lib/plan/check-backs';
@@ -20,7 +20,7 @@ import { createServiceSupabase } from '@/inngest/supabase-admin';
  * nothing: a check-back is usually closed by whichever Dash session runs next,
  * which reads the due ones before anything else. This is for the ones still
  * waiting an hour past due. One session per account takes every one that is
- * due, at most `WAKES_PER_DAY` sessions a day.
+ * due, at most `WAKES_PER_WINDOW` sessions in any six hours.
  *
  * `woke_at` is claimed before the routine is fired, so two ticks that overlap
  * cannot both start a session for one check-back. A fire that fails is not
@@ -65,7 +65,7 @@ export async function runCheckBackWake(deps?: { supabase?: Db; now?: number }): 
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('job', 'check_back')
-      .gte('created_at', new Date(wakeDayStart(now)).toISOString());
+      .gte('created_at', new Date(wakeWindowStart(now)).toISOString());
     const chosen = chooseWake(rows, count ?? 0, now);
     if (chosen.length === 0) continue;
 
