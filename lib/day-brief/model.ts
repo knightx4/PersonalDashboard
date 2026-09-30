@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { forceTool } from '@/lib/learn/graph/tool-call';
 import { factsPrompt, type BriefFact } from './facts';
+import { PICKS_MAX, shortlistPrompt, type Shortlisted } from './picks';
 
 /**
  * The model call behind the morning brief (plan #1123). Haiku is given the
@@ -82,4 +83,57 @@ export async function writeBrief(
   if (!block || block.type !== 'tool_use') return null;
   const parsed = Reply.safeParse(block.input);
   return parsed.success ? parsed.data.brief : null;
+}
+
+const PICK_TOOL = 'choose_picks';
+
+const PICK_SYSTEM = `You are Dash, the assistant in a personal app. Each morning
+the app puts a shortlist of things in front of you, gathered from the person's
+own jobs, bills, email, goals and your own finished work, each with why it
+might matter today. Choose the one to three that matter most to them today.
+
+Rules:
+- Prefer what cannot be moved today (an interview, a deadline, a bill due)
+  and what someone is waiting on the person for, over what can wait a day.
+- Choose fewer when only one or two really matter. Never more than three.
+- Answer with the keys exactly as given, the most important first.`;
+
+const PickReply = z.object({ keys: z.array(z.string()) });
+
+/**
+ * The keys Dash chose from the shortlist (plan #1239), unchecked, or null
+ * when it returned nothing usable. Throws when the call itself fails; the
+ * caller falls back to the shortlist's first three (picks.ts, fallbackPicks).
+ */
+export async function choosePicks(
+  day: string,
+  list: readonly Shortlisted[],
+  options: BriefModelOptions,
+): Promise<string[] | null> {
+  const client = options.client ?? new Anthropic({ apiKey: options.apiKey });
+
+  const response = await client.messages.create({
+    model: BRIEF_MODEL,
+    max_tokens: 300,
+    system: PICK_SYSTEM,
+    tools: [
+      {
+        name: PICK_TOOL,
+        description: `Give the keys of the one to ${PICKS_MAX} things that matter most today, the most important first.`,
+        input_schema: {
+          type: 'object',
+          properties: { keys: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: PICKS_MAX } },
+          required: ['keys'],
+        },
+      },
+    ],
+    tool_choice: forceTool(PICK_TOOL),
+    messages: [{ role: 'user', content: shortlistPrompt(day, list) }],
+  });
+  options.onSpend?.({ model: BRIEF_MODEL, usage: usageFrom(response.usage) });
+
+  const block = response.content.find((part) => part.type === 'tool_use' && part.name === PICK_TOOL);
+  if (!block || block.type !== 'tool_use') return null;
+  const parsed = PickReply.safeParse(block.input);
+  return parsed.success ? parsed.data.keys : null;
 }

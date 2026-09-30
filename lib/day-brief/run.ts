@@ -1,5 +1,6 @@
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { briefDay, checkBrief, isQuiet, plainBrief, QUIET_LINE, type BriefFact, type Candidate } from './facts';
+import { fallbackPicks, picksFromKeys, shortlist, type DayBriefPick, type Shortlisted } from './picks';
 
 /**
  * One person's morning brief (plan #1123): in their morning window, gather
@@ -11,6 +12,11 @@ import { briefDay, checkBrief, isQuiet, plainBrief, QUIET_LINE, type BriefFact, 
  * line QUIET_LINE, with no model call. Without a key, or when the call fails
  * or returns something unusable, the plain brief is stored instead, so the
  * home page still opens on the day.
+ *
+ * The picks (plan #1239) are chosen alongside: the rules shortlist the day's
+ * candidates and Dash picks one to three of them. Without a key, or when the
+ * choice fails or names nothing on the shortlist, the shortlist's first three
+ * are stored. A day with no candidates stores no picks, as an empty list.
  */
 
 export type DayBriefRow = {
@@ -19,6 +25,11 @@ export type DayBriefRow = {
   body: string;
   facts: BriefFact[];
   model: string | null;
+  /**
+   * What the brief names, at most three (lib/day-brief/picks.ts); empty on a
+   * day where nothing qualified. In the table, null on rows written before #1239.
+   */
+  picks: DayBriefPick[];
 };
 
 export type DayBriefPorts = {
@@ -28,10 +39,18 @@ export type DayBriefPorts = {
   facts(userId: string, day: string): Promise<BriefFact[]>;
   /**
    * What could matter today, from every workspace (plan #1237;
-   * lib/day-brief/facts.ts, Candidate). Counted in the result for now; the
-   * ranking step (#1239) chooses from them.
+   * lib/day-brief/facts.ts, Candidate). Shortlisted and picked from (#1239).
    */
   candidates?(userId: string, day: string, now: Date): Promise<Candidate[]>;
+  /**
+   * The keys Dash chose from the shortlist, unchecked; null when there is no
+   * model to ask. Absent, the shortlist's first three are the picks.
+   */
+  choose?(
+    day: string,
+    list: Shortlisted[],
+    onSpend: (report: SpendReport) => void,
+  ): Promise<{ model: string; keys: string[] | null } | null>;
   /** The model's brief, unchecked; null when there is no model to ask. */
   write(
     day: string,
@@ -52,7 +71,15 @@ export type DayBriefPorts = {
 export type DayBriefResult =
   | { status: 'not-morning' }
   | { status: 'already-written'; day: string }
-  | { status: 'written'; day: string; quiet: boolean; model: string | null; facts: number; candidates: number };
+  | {
+      status: 'written';
+      day: string;
+      quiet: boolean;
+      model: string | null;
+      facts: number;
+      candidates: number;
+      picks: number;
+    };
 
 export async function runDayBriefFor(
   ports: DayBriefPorts,
@@ -91,8 +118,43 @@ export async function runDayBriefFor(
   }
   body ??= checkBrief(plainBrief(facts)) ?? plainBrief(facts).slice(0, 900);
 
-  const row: DayBriefRow = { user_id: person.userId, day, body, facts, model };
+  const picks = await pickFor(ports, person, day, candidates);
+
+  const row: DayBriefRow = { user_id: person.userId, day, body, facts, model, picks };
   if (!(await ports.save(row))) return { status: 'already-written', day };
   await ports.written?.(row);
-  return { status: 'written', day, quiet, model, facts: facts.length, candidates: candidates.length };
+  return {
+    status: 'written',
+    day,
+    quiet,
+    model,
+    facts: facts.length,
+    candidates: candidates.length,
+    picks: picks.length,
+  };
+}
+
+/**
+ * The day's picks: the shortlist's only entry when there is one, otherwise
+ * Dash's choice from it, and the first three when that fails.
+ */
+async function pickFor(
+  ports: DayBriefPorts,
+  person: { userId: string; timezone: string },
+  day: string,
+  candidates: Candidate[],
+): Promise<DayBriefPick[]> {
+  const list = shortlist(candidates, person);
+  if (list.length <= 1 || !ports.choose) return fallbackPicks(list);
+
+  const reports: SpendReport[] = [];
+  try {
+    const reply = await ports.choose(day, list, (report) => reports.push(report));
+    return (reply?.keys ? picksFromKeys(list, reply.keys) : null) ?? fallbackPicks(list);
+  } catch {
+    // The rules' order stands in; the failure costs Dash's judgement, not the picks.
+    return fallbackPicks(list);
+  } finally {
+    for (const report of reports) await ports.ledger(person.userId, report);
+  }
 }
