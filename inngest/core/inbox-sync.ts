@@ -217,33 +217,6 @@ function buildLinkers(): DomainLinker[] {
   ];
 }
 
-/**
- * Domains of companies the job side already tracks, for the direct-outreach
- * pass. Empty is fine and common -- the query is simply skipped.
- */
-async function trackedCompanyDomains(userId: string): Promise<string[]> {
-  try {
-    const jobs = createJobServiceSupabase();
-    const { data } = await jobs
-      .from('companies')
-      .select('domains')
-      .eq('user_id', userId)
-      .limit(200);
-    const domains = new Set<string>();
-    for (const row of data ?? []) {
-      for (const d of (row.domains as string[] | null) ?? []) {
-        if (d?.trim()) domains.add(d.trim().toLowerCase());
-      }
-    }
-    return [...domains];
-  } catch (err) {
-    // The outreach pass is an enhancement, not a requirement: losing it costs
-    // recall on one class of mail and must not fail the sync.
-    console.error('company domain lookup failed', err);
-    return [];
-  }
-}
-
 export async function pumpInboxSync(opts: {
   userId: string;
   accountId: string;
@@ -299,7 +272,6 @@ export async function pumpInboxSync(opts: {
     }
 
     const linkers = buildLinkers();
-    const companyDomains = await trackedCompanyDomains(opts.userId);
 
     let pageToken = (account.sync_page_token as string | null) ?? undefined;
     const runBatch =
@@ -338,7 +310,6 @@ export async function pumpInboxSync(opts: {
         pageToken,
         maxMessages: batchSize,
         linkers,
-        companyDomains,
       });
       slowestBatchMs = Math.max(slowestBatchMs, Date.now() - batchStartedAt);
 
