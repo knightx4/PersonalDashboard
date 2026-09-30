@@ -19,7 +19,7 @@ import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { BoardPosting } from './board-pick';
 
 /** At most this many boards a run; each is one request. */
-export const BOARD_LIMIT = 40;
+export const BOARD_LIMIT = 80;
 /** Boards read at once. */
 const PARALLEL = 8;
 
