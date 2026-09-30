@@ -48,13 +48,16 @@ export default async function VaultLayout({ children }: { children: React.ReactN
   const brief = await loadVaultBrief();
 
   /**
-   * The notes, and the map drawn from them (#758). Settings moved to the
+   * The notes, the map drawn from them (#758), and Maya's threads on them
+   * (#1286). Settings moved to the
    * gear, where every other workspace keeps it -- it was a nav tab here only
    * because this shell was written on its own.
    */
   const sections: NavSection[] = [
     { href: '/vault', label: 'Notes', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
     { href: '/vault/map', label: 'Map', icon: 'vaultMap' },
+    // Maya's threads on your notes (plan #1286).
+    { href: '/vault/maya', label: 'Maya', icon: 'maya' },
   ];
 
   return (

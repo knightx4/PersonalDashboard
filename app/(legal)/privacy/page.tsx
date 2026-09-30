@@ -136,7 +136,8 @@ export default function PrivacyPage() {
         (proposeMap), and the sweep over the whole vault in lib/vault/map/sweep.ts
         with inngest/vault/map-sweep.ts (plan #757), and Maya in lib/vault/maya
         (retrieve.ts, thought-model.ts) with app/vault/n/[...path]/actions.ts
-        (askMaya, plan #1285). The sweep skips what
+        (askMaya, plan #1285), and replies to Maya in lib/vault/maya/reply.ts with
+        app/vault/maya/actions.ts (replyToMaya, plan #1286). The sweep skips what
         rules.ts skips (the Me folder and notes with API keys), notes under 80
         characters, and text past MAX_NOTE_READ_CHARS in
         lib/learn/graph/note-chunks.ts. Any new path that sends note text to a
@@ -145,8 +146,8 @@ export default function PrivacyPage() {
       <p>
         Four features send the text of your notes to Anthropic&rsquo;s Claude models: writing a
         quiz, reading a note for Learn, reading notes for the map of what you write about, and
-        asking Maya for its thoughts on a note. Writing a quiz, reading for Learn and asking Maya
-        run when you press their button, on the note or notes you picked. The map can also be filled by a sweep, which you start from the map page. The
+        asking Maya for its thoughts on a note and replying to it. Writing a quiz, reading for
+        Learn, asking Maya and replying to it run when you press their button, on the note or notes you picked. The map can also be filled by a sweep, which you start from the map page. The
         sweep sends every note in your vault, apart from those listed below, without you picking
         them. It runs in the background a few minutes at a time until it has reached every note or
         you stop it.
@@ -182,6 +183,14 @@ export default function PrivacyPage() {
           to two sentences quoted from the notes they were read from. The model may also search
           the web for what others have written on the same question. Its searches are its own
           words, written from what it was sent, and go to Anthropic&rsquo;s web search.
+        </li>
+        <li>
+          <strong>Replying to Maya.</strong> The note&rsquo;s title and its first 12,000
+          characters, the thread&rsquo;s question, Maya&rsquo;s thought on the note (which carries
+          the sentences it quoted from your other notes), the summary of where you have got to,
+          and every reply in the thread, yours and Maya&rsquo;s. If the note has since moved into
+          a folder that is never read, or now contains what looks like an API key, its text is
+          left out and Maya answers from the thread alone.
         </li>
       </ul>
       <p>What is never sent:</p>

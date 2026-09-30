@@ -102,3 +102,183 @@ export async function saveThought(
 
   return { ok: true, threadId };
 }
+
+// ---------------------------------------------------------------------------
+// The Maya tab (plan #1286): the list of threads, one thread with its
+// messages, and what a reply writes.
+// ---------------------------------------------------------------------------
+
+/** The note a thread is on, or null when it has left the vault. */
+export type MayaThreadNote = { id: string; path: string; title: string };
+
+/** A thread as the Maya tab lists it. */
+export type MayaThreadRow = {
+  id: string;
+  question: string;
+  summary: string | null;
+  origin: MayaThreadOrigin;
+  createdAt: string;
+  updatedAt: string;
+  note: MayaThreadNote | null;
+};
+
+export type MayaMessage = {
+  id: string;
+  role: 'person' | 'maya';
+  kind: 'thought' | 'reply';
+  body: string;
+  createdAt: string;
+  /** A thought's points read back; null on a reply. */
+  thought: { points: MayaPoint[]; synthesis: MayaSynthesis | null } | null;
+};
+
+export type MayaThreadDetail = MayaThreadRow & {
+  noteId: string;
+  summaryAt: string | null;
+  messages: MayaMessage[];
+};
+
+/** The most threads the tab lists. */
+export const MAYA_THREAD_LIMIT = 200;
+
+type ThreadRow = {
+  id: string;
+  note_id: string;
+  question: string;
+  summary: string | null;
+  summary_at: string | null;
+  origin: string;
+  created_at: string;
+  updated_at: string;
+};
+
+const THREAD_SELECT = 'id, note_id, question, summary, summary_at, origin, created_at, updated_at';
+const MESSAGE_SELECT = 'id, role, kind, body, points, created_at';
+
+/** Path and title for each note id still in the vault, for linking to it. */
+export async function loadNoteLinks(vault: VaultSupabaseClient, ids: readonly string[]): Promise<Map<string, MayaThreadNote>> {
+  if (ids.length === 0) return new Map();
+  const { data } = await vault
+    .from('notes')
+    .select('id, path, title')
+    .in('id', [...new Set(ids)])
+    .is('deleted_at', null);
+  return new Map(
+    ((data ?? []) as { id: string; path: string; title: string }[]).map((row) => [
+      row.id,
+      { id: row.id, path: row.path, title: row.title },
+    ]),
+  );
+}
+
+function toThreadRow(row: ThreadRow, notes: Map<string, MayaThreadNote>): MayaThreadRow {
+  return {
+    id: String(row.id),
+    question: String(row.question),
+    summary: row.summary,
+    origin: row.origin === 'automatic' ? 'automatic' : 'asked',
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+    note: notes.get(row.note_id) ?? null,
+  };
+}
+
+function toMessage(row: {
+  id: string;
+  role: string;
+  kind: string;
+  body: string;
+  points: unknown;
+  created_at: string;
+}): MayaMessage {
+  const kind = row.kind === 'thought' ? 'thought' : 'reply';
+  return {
+    id: String(row.id),
+    role: row.role === 'maya' ? 'maya' : 'person',
+    kind,
+    body: String(row.body),
+    createdAt: String(row.created_at),
+    thought: kind === 'thought' ? readStoredPoints(row.points) : null,
+  };
+}
+
+/** Every thread, the one most recently talked in first. */
+export async function loadThreads(vault: VaultSupabaseClient): Promise<MayaThreadRow[]> {
+  const { data, error } = await vault
+    .from('maya_threads')
+    .select(THREAD_SELECT)
+    .order('updated_at', { ascending: false })
+    .limit(MAYA_THREAD_LIMIT);
+  if (error) throw new Error(`Reading Maya's threads failed: ${error.message}`);
+  const rows = (data ?? []) as ThreadRow[];
+  const notes = await loadNoteLinks(
+    vault,
+    rows.map((row) => row.note_id),
+  );
+  return rows.map((row) => toThreadRow(row, notes));
+}
+
+/** One thread with every message in it, oldest first. Null when it is not there or not yours. */
+export async function loadThread(vault: VaultSupabaseClient, threadId: string): Promise<MayaThreadDetail | null> {
+  const { data, error } = await vault.from('maya_threads').select(THREAD_SELECT).eq('id', threadId).maybeSingle();
+  if (error || !data) return null;
+  const row = data as ThreadRow;
+
+  const [notes, messages] = await Promise.all([
+    loadNoteLinks(vault, [row.note_id]),
+    vault.from('maya_messages').select(MESSAGE_SELECT).eq('thread_id', row.id).order('created_at', { ascending: true }),
+  ]);
+  if (messages.error) throw new Error(`Reading the thread failed: ${messages.error.message}`);
+
+  return {
+    ...toThreadRow(row, notes),
+    noteId: String(row.note_id),
+    summaryAt: row.summary_at,
+    messages: ((messages.data ?? []) as Parameters<typeof toMessage>[0][]).map(toMessage),
+  };
+}
+
+/** Add a reply to a thread, either way. The thread's owner is checked by RLS and the foreign key. */
+export async function appendReply(
+  vault: VaultSupabaseClient,
+  input: { threadId: string; userId: string; role: 'person' | 'maya'; body: string; model?: string },
+): Promise<MayaMessage | null> {
+  const { data, error } = await vault
+    .from('maya_messages')
+    .insert({
+      thread_id: input.threadId,
+      user_id: input.userId,
+      role: input.role,
+      kind: 'reply',
+      body: input.body,
+      model: input.model ?? null,
+    })
+    .select(MESSAGE_SELECT)
+    .single();
+  if (error || !data) return null;
+  return toMessage(data as Parameters<typeof toMessage>[0]);
+}
+
+/** Rewrite where the person has got to. Also moves the thread to the top of the list. */
+export async function saveSummary(vault: VaultSupabaseClient, threadId: string, summary: string): Promise<boolean> {
+  const { error } = await vault
+    .from('maya_threads')
+    .update({ summary, summary_at: new Date().toISOString() })
+    .eq('id', threadId);
+  return !error;
+}
+
+/** Rewrite the thread's question. */
+export async function renameQuestion(
+  vault: VaultSupabaseClient,
+  threadId: string,
+  question: string,
+): Promise<boolean> {
+  const { data, error } = await vault
+    .from('maya_threads')
+    .update({ question })
+    .eq('id', threadId)
+    .select('id')
+    .maybeSingle();
+  return !error && Boolean(data);
+}
