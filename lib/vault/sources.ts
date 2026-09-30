@@ -1,3 +1,4 @@
+import { courseHref, transcriptHref } from '@/lib/vault/education';
 import { noteHref } from '@/lib/vault/paths';
 import type { ModuleSources } from '@/lib/sources/types';
 
@@ -91,6 +92,7 @@ export const vaultSources: ModuleSources = {
       weight: 'record',
       search: ['title', 'code', 'school', 'term'],
       title: 'title',
+      href: courseHref,
       note:
         'transcript_id points at obsidian.transcripts. year is the year of the term where the transcript gives one. ' +
         'grade is null for a course with no grade, such as transfer credit.',
@@ -102,6 +104,7 @@ export const vaultSources: ModuleSources = {
       weight: 'record',
       search: ['school', 'file_name'],
       title: 'school',
+      href: transcriptHref,
       note: 'The courses on each are in obsidian.courses. The file is in the private vault-transcripts bucket at storage_path.',
     },
   ],

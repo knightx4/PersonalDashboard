@@ -264,6 +264,7 @@ Every course on their academic transcripts: the school, code, title, term, credi
 
 - Search: `title`, `code`, `school`, `term`
 - Name a row by `title`; link it by `id`
+- Opens at `/vault/education#course-<id>`
 - transcript_id points at obsidian.transcripts. year is the year of the term where the transcript gives one. grade is null for a course with no grade, such as transfer credit.
 
 ### `obsidian.transcripts` (Vault)
@@ -272,6 +273,7 @@ The academic transcripts they have uploaded, one per school record, with the ori
 
 - Search: `school`, `file_name`
 - Name a row by `school`; link it by `id`
+- Opens at `/vault/education#transcript-<id>`
 - The courses on each are in obsidian.courses. The file is in the private vault-transcripts bucket at storage_path.
 
 ### `learn.tracks` (Learn)
