@@ -290,7 +290,7 @@ describe('filing a note', () => {
       form({ kind: 'bug', body: 'the page went blank', page_path: '/vault', code: 'right' }),
     );
 
-    expect(result).toEqual({ message: 'Bug report saved.' });
+    expect(result).toEqual({ message: 'Note saved.' });
     expect(state.writes).toEqual(['feedback_items']);
   });
 
@@ -306,7 +306,7 @@ describe('filing a note', () => {
       form({ kind: 'feature', body: 'a button for it on the phone', page_path: '/todo' }),
     );
 
-    expect(result).toEqual({ message: 'Feature request saved.' });
+    expect(result).toEqual({ message: 'Note saved.' });
     expect(state.writes).toEqual(['feedback_items']);
   });
 
@@ -342,7 +342,7 @@ describe('filing a note', () => {
       form({ kind: 'bug', body: 'the page went blank', code: 'right' }),
     );
 
-    expect(result).toEqual({ message: 'Bug report saved.' });
+    expect(result).toEqual({ message: 'Note saved.' });
     expect(state.writes).toEqual(['feedback_items']);
   });
 

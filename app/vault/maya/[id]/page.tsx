@@ -130,7 +130,7 @@ function Point({ point, cited }: { point: MayaPoint; cited: Map<string, MayaThre
         {point.rank}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-body font-medium text-ink">{point.claim}</p>
+        <p className="text-body font-semibold text-ink">{point.claim}</p>
         <p className="mt-1 whitespace-pre-line text-body text-ink">{point.argument}</p>
 
         {point.notes.length > 0 && (
@@ -139,7 +139,14 @@ function Point({ point, cited }: { point: MayaPoint; cited: Map<string, MayaThre
               const link = cited.get(note.noteId);
               return (
                 <li key={`${note.noteId}-${index}`}>
-                  <MapQuote quote={note.quote} />
+                  {/* Your own words, on the vault's tint with its accent down
+                      the side, so they are told apart at a glance from Maya's
+                      argument above them and from the outside sources below
+                      (note 9d8f9bd9). */}
+                  <MapQuote
+                    quote={note.quote}
+                    className="rounded-r-md border-accent bg-accent-tint py-1.5 pr-3 text-ink"
+                  />
                   <p className="mt-1 pl-3.5 text-ui text-ink-muted">
                     {link ? (
                       // A plain anchor: a browser acts on a text fragment only
@@ -165,7 +172,12 @@ function Point({ point, cited }: { point: MayaPoint; cited: Map<string, MayaThre
         {point.sources.length > 0 && (
           <ul className="mt-3 space-y-2" aria-label="From outside sources">
             {point.sources.map((source, index) => (
-              <li key={`${source.author}-${index}`} className="text-ui text-ink">
+              // Someone else's work, on the sunken ground: a different
+              // voice from your notes above, and set apart from Maya's own.
+              <li
+                key={`${source.author}-${index}`}
+                className="rounded-md bg-sunken px-3 py-2 text-ui text-ink"
+              >
                 <span className="font-medium">{source.author}</span>, <cite>{source.work}</cite>
                 <span className="text-ink-muted"> (paraphrased): </span>
                 {source.gist}

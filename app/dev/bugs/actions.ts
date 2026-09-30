@@ -145,19 +145,14 @@ export async function triageFiled(input: {
 }
 
 const SAVED: Record<FeedbackKind, string> = {
-  bug: 'Bug report saved.',
-  feature: 'Feature request saved.',
+  // The header files a bug and a request from one tab, and triage sorts them
+  // after the save (note 55b53dc9), so the message does not guess which.
+  bug: 'Note saved.',
+  feature: 'Note saved.',
   like: 'Like saved.',
 };
 
-const statusSchema = z.enum([
-  'open',
-  'in_progress',
-  'blocked',
-  'planned',
-  'done',
-  'declined',
-]);
+const statusSchema = z.enum(['open', 'in_progress', 'blocked', 'planned', 'done', 'declined']);
 
 /** Triage from the list page. */
 // latency: pending
@@ -177,9 +172,7 @@ export async function updateFeedbackStatus(
     .update({
       status: status.data,
       completed_at:
-        status.data === 'done' || status.data === 'declined'
-          ? new Date().toISOString()
-          : null,
+        status.data === 'done' || status.data === 'declined' ? new Date().toISOString() : null,
     })
     .eq('id', id.data)
     .eq('user_id', user.id);
@@ -340,7 +333,6 @@ export async function deleteFeedback(
   return { message: 'Deleted.' };
 }
 
-
 /**
  * Start the routine that works this queue, now rather than on its schedule.
  *
@@ -351,7 +343,8 @@ export async function deleteFeedback(
 export async function runFeatureRoutine(
   // Signature is fixed by useActionState; the button sends nothing.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _prev: FeedbackActionState, _formData: FormData,
+  _prev: FeedbackActionState,
+  _formData: FormData,
 ): Promise<FeedbackActionState> {
   const supabase = await createClient();
   const user = await requireOwner({ supabase });
