@@ -144,6 +144,11 @@ export const LEARN_OPERATIONS = [
   // search for a source's exact words, and one more when it stops without
   // reporting. Recorded against the note's owner.
   'write-maya-thought',
+  // Asking Jev whether a new or changed vault note holds a live question, so
+  // Maya's hourly job (plan #1289) writes a thought only on those it is sure
+  // of. One Jev call per note version, for an account that has opted in to
+  // Jev. Recorded against the note's owner.
+  'gate-maya-note',
   // Maya's answer to a reply in one of its threads (plan #1286): one Sonnet
   // call that also rewrites where the person has got to. Recorded against the
   // thread's owner.

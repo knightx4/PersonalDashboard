@@ -180,6 +180,10 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'The sync calling itself to carry on past one invocation, authenticated by a token rather than a session. The press that started it is "Sync now", whose hint is under app/api/inbox/sync/route.ts#POST and prices each email.',
   'app/api/review/reread-confirmations/route.ts#GET':
     'A diagnostic opened by URL on the deployed site to count what the order reader gets from waiting confirmations (plan #830). Nothing links to it.',
+  'app/api/cron/maya-gate/route.ts#GET':
+    'Fired every hour by pg_cron to ask Jev about new vault notes and have Maya write on a few; no press starts it.',
+  'app/api/cron/maya-gate/route.ts#POST':
+    'Fired every hour by pg_cron to ask Jev about new vault notes and have Maya write on a few; no press starts it.',
   'app/api/cron/map-sweep/route.ts#GET':
     'Fired every five minutes by pg_cron to work the vault\'s map sweep; no press starts it.',
   'app/api/cron/map-sweep/route.ts#POST':
