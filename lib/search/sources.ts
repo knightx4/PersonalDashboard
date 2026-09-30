@@ -23,6 +23,7 @@ export const HIT_KINDS = {
   saved: 'Saved',
   task: 'Todo',
   note: 'Note',
+  course: 'Course',
   reading: 'Reading',
   track: 'Track',
   subject: 'Subject',

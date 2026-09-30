@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { SearchSource } from '@/lib/search/sources';
 import { devSearchSource } from '@/lib/search/sources/dev';
+import { educationSearchSource } from '@/lib/search/sources/education';
 import { jobsSearchSource } from '@/lib/search/sources/jobs';
 import { goalsSearchSource } from '@/lib/search/sources/goals';
 import { learnSearchSource } from '@/lib/search/sources/learn';
@@ -25,6 +26,7 @@ const SOURCES: SearchSource[] = [
   shoppingSearchSource,
   todoSearchSource,
   vaultSearchSource,
+  educationSearchSource,
   learnSearchSource,
   devSearchSource,
   newsSearchSource,

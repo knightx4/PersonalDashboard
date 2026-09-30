@@ -534,6 +534,68 @@ describe('vault_notes', () => {
   });
 });
 
+describe('courses', () => {
+  const course = (id: string, userId: string, fields: Row) => ({
+    id,
+    user_id: userId,
+    transcript_id: 't1',
+    school: 'State University',
+    code: null,
+    term: null,
+    year: null,
+    credits: null,
+    grade: null,
+    position: 0,
+    ...fields,
+  });
+  const tables: Tables = {
+    'obsidian.courses': [
+      course('c1', ME, { code: 'ECON 101', title: 'Principles of Economics', term: 'Fall 2019', year: 2019, credits: '3.00', grade: 'A-' }),
+      course('c2', ME, { title: 'Writing Seminar', term: 'Fall', year: 2019, credits: 1, position: 1 }),
+      course('c3', ME, { code: 'ECON 201', title: 'Intermediate Micro', term: 'Spring 2020', year: 2020, position: 2 }),
+      course('c4', ME, { code: 'MATH 110', title: 'Calculus I', term: 'Fall 2018', year: 2018, school: 'City College', grade: 'B' }),
+      course('c5', THEM, { title: 'Their Fall 2019 course', term: 'Fall 2019', year: 2019 }),
+    ],
+  };
+
+  it('lists the courses of a term, each linked to its row on the Education tab', async () => {
+    const result = await executeAskTool('courses', { term: 'fall 2019' }, context(tables));
+    const rows = expectLinkedRows(result);
+    expect(rows.map((r) => r.ref)).toEqual(['c1', 'c2']);
+    expect(rows[0]).toMatchObject({
+      table: 'obsidian.courses',
+      title: 'ECON 101 Principles of Economics',
+      href: '/vault/education#course-c1',
+      detail: { school: 'State University', term: 'Fall 2019', credits: 3, grade: 'A-' },
+    });
+    // A term written without its year is read with it.
+    expect(rows[1].detail?.term).toBe('Fall 2019');
+  });
+
+  it('narrows by year, school and words of the code or title', async () => {
+    const ids = async (input: Record<string, unknown>) =>
+      expectLinkedRows(await executeAskTool('courses', input, context(tables))).map((r) => r.ref);
+    expect(await ids({ year: 2020 })).toEqual(['c3']);
+    expect(await ids({ school: 'city' })).toEqual(['c4']);
+    expect(await ids({ query: 'econ' })).toEqual(['c1', 'c3']);
+    expect(await ids({})).toEqual(['c4', 'c1', 'c2', 'c3']);
+  });
+
+  it('says so when nothing matched or nothing is saved', async () => {
+    const none = await executeAskTool('courses', { term: 'Winter 1999' }, context(tables));
+    expect(none.ok && none.rows).toEqual([]);
+    if (none.ok) expect(none.note).toMatch(/None of their 4 saved courses/);
+    const empty = await executeAskTool('courses', {}, context({}));
+    if (empty.ok) expect(empty.note).toMatch(/No courses are saved/);
+    expect((await executeAskTool('courses', { year: 'soon' }, context(tables))).ok).toBe(false);
+  });
+
+  it('needs the vault switched on', async () => {
+    const off = await executeAskTool('courses', {}, context(tables, { enabledModules: ['jobs'] }));
+    expect(off.ok).toBe(false);
+  });
+});
+
 describe('recall', () => {
   const passage = (
     userId: string,
@@ -708,6 +770,24 @@ describe('recall', () => {
     const refs = expectLinkedRows(result).map((r) => r.ref);
     expect(refs).not.toContain('Career/Theirs.md');
     expect(refs).not.toContain('Home/Garden.md');
+  });
+
+  it('links a transcript to its line on the Education tab', async () => {
+    const TRANSCRIPT = 'f1000000-0000-4000-8000-000000000001';
+    const courseTables: Tables = {
+      'core.memory_chunks': [
+        passage(ME, 'obsidian.transcripts', TRANSCRIPT, 0,
+          'Transcript from State University\n\nECON 101 Principles of Economics, Fall 2019, 3 credits, grade A-', 0.6),
+      ],
+    };
+    const result = await executeAskTool('recall', { question: 'did I ever study economics?' }, {
+      ...context(courseTables, { embedQuestion }),
+    });
+    const rows = expectLinkedRows(result);
+    expect(rows.map((r) => [r.table, r.href])).toEqual([
+      ['obsidian.transcripts', `/vault/education#transcript-${TRANSCRIPT}`],
+    ]);
+    expect(rows[0].detail?.passage).toContain('Principles of Economics');
   });
 
   it('says so when no question vector can be made', async () => {
