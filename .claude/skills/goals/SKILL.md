@@ -1400,6 +1400,36 @@ The brief lists at most ten a morning, longest untouched first; the rest
 come the next day. Name each move in the run summary ("Split Update your
 resume into 3 steps; asked about Call the servicer").
 
+## Steps under way
+
+A step with progress entries is under way (`goals.progress_entries`, plan
+#1274): the person has logged part of it without closing it. The morning
+brief lists two kinds of these (`lib/goals/progress-nudges.ts`), each with
+what is logged so far and the day of the newest entry. Both are open `mine`
+steps with nothing open beneath them, nothing they wait on and their start
+date come. Neither is in the list of steps that have sat for a week: a step
+under way is read from its entries instead.
+
+**A stalled step** has had nothing logged for seven days or more. Nudge it:
+name it in the home's note and in the goal's note ("Leaving a note"), with
+what is logged, when, and the next piece they could do today ("Sort the
+garage has 3 boxes done and nothing since the 12th; the shelf side is next").
+Leave a goal's note even when the run worked nothing else on it. Do not
+split, prepare or ask about a stalled step on the strength of the stall
+alone, since they have started it and know what it involves.
+
+**A step that looks finished** has a tally that reached its estimated total,
+or no total and "nearly done" as their newest answer to how far along it is.
+Offer to close it in the same two notes ("Move the bags has reached its
+estimate of about 10; close it on the step if that was all of them, or raise
+the total"). Never close it yourself: the total is their estimate, and a
+tally reaching it is not evidence the done-when is met. Where Jobs, Gmail,
+the calendar or Todo does show it happened, close it from that evidence as
+in "Closing a step from evidence", and the offer is not needed.
+
+The brief lists at most ten of each. Name both in the run summary
+("Nudged Sort the garage; offered to close Move the bags").
+
 ## Steps that act outside the plan
 
 Most of what you do stays inside the goal's map: research, a comparison, a
@@ -1515,8 +1545,9 @@ where id = '<step id>' and user_id = '<user>' and level = 'step';
 
 The daily cron fires the routine each morning while there is an open goal
 (`inngest/goals/daily.ts`), with the `goals.runs` row it wrote with `job`
-`daily` and a brief listing every open goal to review, then the `claude`
-steps that are ready and the information steps with an answer out of date.
+`daily` and a brief listing every open goal to review, the steps under way
+to nudge or offer for closing ("Steps under way"), then the `claude` steps
+that are ready and the information steps with an answer out of date.
 When a collection has a sender to search, the brief lists it first: read
 those statements before anything else ("Reading new statements from Gmail",
 below), so the review sees current figures. Then review ("Reviewing each
@@ -2297,7 +2328,8 @@ moved, what matters now, and what you will do next.
 
 **When.** Every run that worked on a goal (a goal run, a re-shape, a sent step
 or phase, a prepared step, a flag answered) leaves one note on that goal. The
-morning run leaves one on each goal whose steps it worked. The weekly run
+morning run leaves one on each goal whose steps it worked, and on each goal
+with a step under way it nudged or offered for closing. The weekly run
 leaves one on every open goal. The morning and weekly runs also leave one note
 for the home, with no `item_id`, covering every goal.
 

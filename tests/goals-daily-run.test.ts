@@ -20,6 +20,7 @@ type Fixture = {
   items: Record<string, unknown>[];
   answers?: Record<string, unknown>[];
   comments?: Record<string, unknown>[];
+  progress?: Record<string, unknown>[];
 };
 
 function fakeClient(fixture: Fixture) {
@@ -41,6 +42,7 @@ function fakeClient(fixture: Fixture) {
       if (table === 'answers') return { data: fixture.answers ?? [], error: null };
       if (table === 'reviews' || table === 'readings') return { data: [], error: null };
       if (table === 'comments') return { data: fixture.comments ?? [], error: null };
+      if (table === 'progress_entries') return { data: fixture.progress ?? [], error: null };
       return { data: fixture.items, error: null };
     };
     const builder: Record<string, unknown> = {
@@ -60,7 +62,7 @@ function fakeClient(fixture: Fixture) {
         return Promise.resolve(result()).then(resolve);
       },
     };
-    for (const name of ['select', 'eq', 'is', 'not', 'gte', 'order', 'limit', 'single']) {
+    for (const name of ['select', 'eq', 'in', 'is', 'not', 'gte', 'order', 'limit', 'single']) {
       builder[name] = () => builder;
     }
     return builder;
@@ -121,7 +123,7 @@ describe('runGoalsDaily', () => {
     const fetch = okFetch();
     const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
 
-    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 1, held: 0, answers: 0, stale: 0, unjudged: 0, evidence: null, statements: 0 });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 1, held: 0, answers: 0, stale: 0, unjudged: 0, stalled: 0, finished: 0, evidence: null, statements: 0 });
     expect(writes[0]).toMatchObject({
       table: 'runs',
       op: 'insert',
@@ -142,7 +144,7 @@ describe('runGoalsDaily', () => {
     const { client } = fakeClient({ items: [GOAL, worked] });
     const fetch = okFetch();
     const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
-    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 0, stale: 0, unjudged: 0, evidence: null, statements: 0 });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 0, stale: 0, unjudged: 0, stalled: 0, finished: 0, evidence: null, statements: 0 });
     const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     const text = (JSON.parse(init.body as string) as { text: string }).text;
     expect(text).toContain('goals.reviews');
@@ -234,7 +236,7 @@ describe('runGoalsDaily', () => {
     });
     const fetch = okFetch();
     const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
-    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 1, stale: 0, unjudged: 0, evidence: null, statements: 0 });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 1, stale: 0, unjudged: 0, stalled: 0, finished: 0, evidence: null, statements: 0 });
     const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     const text = (JSON.parse(init.body as string) as { text: string }).text;
     expect(text).toContain('"List the loans" (goals.items id s2)');
@@ -291,6 +293,42 @@ describe('runGoalsDaily', () => {
     expect(text).toContain('"A Dash step before yours"');
     expect(text.match(/Book a trial class/g)).toHaveLength(1);
     expect(text).not.toContain('Clear off the couch');
+  });
+
+  it('nudges a stalled step under way and offers to close a finished tally (plan #1281)', async () => {
+    const old = '2026-09-10T09:00:00Z';
+    const entry = (id: string, itemId: string, on: string, quantity: number | null, unit: string | null) => ({
+      id, item_id: itemId, capture_id: null, happened_on: on, text: 'moved some', quantity, unit,
+      estimate: null, created_at: `${on}T09:00:00Z`,
+    });
+    const stalled = item({
+      id: 's7', level: 'step', parent_id: 'g', kind: 'mine', title: 'Sort the garage',
+      created_at: old, updated_at: old, prep_checked_at: old,
+    });
+    const full = item({
+      id: 's8', level: 'step', parent_id: 'g', kind: 'mine', title: 'Move the bags',
+      created_at: old, updated_at: old, prep_checked_at: old, estimated_total: 10, total_unit: 'bags',
+    });
+    const { client } = fakeClient({
+      items: [GOAL, stalled, full],
+      progress: [
+        entry('e1', 's7', '2026-09-12', 3, 'boxes'),
+        entry('e2', 's8', '2026-09-23', 6, 'bags'),
+        entry('e3', 's8', '2026-09-20', 4, 'bags'),
+      ],
+    });
+    const fetch = okFetch();
+    const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
+    expect(result).toMatchObject({ started: true, stale: 0, stalled: 1, finished: 1 });
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    const text = (JSON.parse(init.body as string) as { text: string }).text;
+    expect(text).toContain(
+      '"Sort the garage" (goals.items id s7), under the goal "Get fit": 3 boxes so far; last logged 2026-09-12, 12 days ago',
+    );
+    expect(text).toContain(
+      '"Move the bags" (goals.items id s8), under the goal "Get fit": 10 of about 10 bags, the estimate reached;',
+    );
+    expect(text).not.toContain('Moving a step');
   });
 
   it('runs once a morning, however often the cron fires', async () => {
