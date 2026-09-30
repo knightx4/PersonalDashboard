@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ModuleId } from '@/lib/modules';
 import type { AskContext, SchemaClient } from './db';
-import { MAX_DEV_COMMENTS, SECTION_CHARS, queryWords } from './dev';
+import { MAX_DEV_COMMENTS, SECTION_CHARS, excerpt, queryWords } from './dev';
 import { executeAskTool } from './tools';
 
 /**
@@ -23,7 +23,10 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
   private sort: { column: string; ascending: boolean } | null = null;
   private cap: number | null = null;
 
-  constructor(private readonly rows: Row[]) {}
+  constructor(
+    private readonly rows: Row[],
+    private readonly patterns: string[] = [],
+  ) {}
 
   select() {
     return this;
@@ -34,6 +37,26 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
   }
   neq(column: string, value: unknown) {
     this.filters.push((row) => row[column] !== value);
+    return this;
+  }
+  in(column: string, values: unknown[]) {
+    this.filters.push((row) => values.includes(row[column]));
+    return this;
+  }
+  /** Postgres ilike: `%` and `_` are wild unless escaped with a backslash. */
+  ilike(column: string, pattern: string) {
+    this.patterns.push(pattern);
+    const source = pattern.replace(/\\(.)|([%_])|([^\\%_]+)/g, (_, escaped: string, wild: string, plain: string) =>
+      escaped !== undefined
+        ? escaped.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        : wild === '%'
+          ? '[\\s\\S]*'
+          : wild === '_'
+            ? '[\\s\\S]'
+            : plain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+    );
+    const regex = new RegExp(`^${source}$`, 'i');
+    this.filters.push((row) => typeof row[column] === 'string' && regex.test(row[column] as string));
     return this;
   }
   is(column: string, value: null) {
@@ -65,16 +88,21 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
   }
 }
 
-function context({ owner = true, modules = ALL_MODULES, tables = {} as Tables } = {}): AskContext & { rpcs: string[] } {
+function context({ owner = true, modules = ALL_MODULES, tables = {} as Tables } = {}): AskContext & {
+  rpcs: string[];
+  patterns: string[];
+} {
   const rpcs: string[] = [];
+  const patterns: string[] = [];
   return {
     rpcs,
+    patterns,
     userId: '00000000-0000-4000-8000-00000000000a',
     today: '2026-09-30',
     enabledModules: modules,
     db: async () =>
       ({
-        from: (table: string) => new FakeQuery(tables[table] ?? []),
+        from: (table: string) => new FakeQuery(tables[table] ?? [], patterns),
         rpc: async (fn: string) => {
           rpcs.push(fn);
           return fn === 'is_owner' ? { data: owner, error: null } : { data: null, error: { message: 'no' } };
@@ -318,5 +346,147 @@ describe('read_dev_row', () => {
   it('refuses a kind it does not know, and a ref that names no row', async () => {
     expect(await read({ kind: 'goal', ref: IDEA })).toEqual({ ok: false, error: expect.stringContaining('kind must be') });
     expect(await read({ kind: 'idea', ref: '1248' })).toEqual({ ok: false, error: expect.stringContaining('not an id') });
+  });
+});
+
+/**
+ * find_dev_text (plan #1323): the words inside Dev rows, comments and specs,
+ * with dismissed rows, the comments under them and another person's rows
+ * beside the ones that should be found.
+ */
+describe('find_dev_text', () => {
+  const ME = '00000000-0000-4000-8000-00000000000a';
+  const THEM = '00000000-0000-4000-8000-00000000000b';
+  const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+  const RANK_IDEA = id(21);
+  const DISMISSED_RANK_IDEA = id(22);
+  const THEIR_RANK_IDEA = id(23);
+  const STEP = id(24);
+  const DISMISSED_STEP = id(25);
+  const NOTE = id(26);
+  const RAISE = id(27);
+  const DISMISSED_RAISE = id(28);
+
+  const long = `${'Some opening words about the list. '.repeat(20)}Sort the suggestions by a ranking of how often they come up.${' More after.'.repeat(30)}`;
+  const tables: Tables = {
+    ideas: [
+      { id: RANK_IDEA, user_id: ME, body: `Better ideas order\n${long}`, source: 'me', updated_at: '2026-09-05T10:00:00Z', dismissed_at: null },
+      { id: DISMISSED_RANK_IDEA, user_id: ME, body: 'Ranking by votes', source: 'claude', updated_at: '2026-09-06T10:00:00Z', dismissed_at: '2026-09-07T10:00:00Z' },
+      { id: THEIR_RANK_IDEA, user_id: THEM, body: 'Their ranking idea', source: 'me', updated_at: '2026-09-06T10:00:00Z', dismissed_at: null },
+    ],
+    feedback_items: [
+      { id: NOTE, user_id: ME, body: 'Ideas list is out of order', resolution_note: 'Fixed the ranking query.', updated_at: '2026-09-04T10:00:00Z' },
+    ],
+    plan_items: [
+      { id: STEP, user_id: ME, number: 1400, title: 'Show counts', kind: 'build', status: 'not_started', detail: 'Count them.', acceptance: null, comment: null, resolution: null, updated_at: '2026-09-01T10:00:00Z', dismissed_at: null },
+      { id: DISMISSED_STEP, user_id: ME, number: 1401, title: 'Old', kind: 'build', status: 'not_started', detail: 'Ranking again.', acceptance: null, comment: null, resolution: null, updated_at: '2026-09-08T10:00:00Z', dismissed_at: '2026-09-09T10:00:00Z' },
+    ],
+    raised_items: [
+      { id: RAISE, user_id: ME, title: 'Ideas order', detail: 'Nothing.', ask: 'Keep the ranking as it is?', status: 'open', goal_id: null, created_at: '2026-09-03T10:00:00Z' },
+      { id: DISMISSED_RAISE, user_id: ME, title: 'Old', detail: 'Ranking.', ask: 'No?', status: 'dismissed', goal_id: null, created_at: '2026-09-09T10:00:00Z' },
+    ],
+    dev_comments: [
+      { id: id(31), user_id: ME, plan_item_id: STEP, author: 'me', body: 'Drop this step, #1323 covers it.', created_at: '2026-09-10T10:00:00Z' },
+      { id: id(32), user_id: ME, plan_item_id: DISMISSED_STEP, author: 'me', body: 'Drop this step too.', created_at: '2026-09-11T10:00:00Z' },
+      { id: id(33), user_id: ME, idea_id: RANK_IDEA, author: 'claude', body: 'The ranking could weigh recent ones.', created_at: '2026-09-02T10:00:00Z' },
+      { id: id(34), user_id: THEM, plan_item_id: STEP, author: 'me', body: 'Drop this step, says someone else.', created_at: '2026-09-12T10:00:00Z' },
+    ],
+  };
+
+  const find = (input: Record<string, unknown>, options: Parameters<typeof context>[0] = {}) =>
+    executeAskTool('find_dev_text', input, context({ tables, ...options }));
+
+  it('finds the ideas that mention a word inside their text, linked, with the excerpt around it', async () => {
+    const result = await find({ query: 'ranking', kinds: ['idea'] });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.rows).toHaveLength(1);
+    const [row] = result.rows;
+    expect(row).toMatchObject({
+      table: 'public.ideas',
+      ref: RANK_IDEA,
+      title: 'Better ideas order',
+      href: `/dev/ideas#idea-${RANK_IDEA}`,
+      detail: { kind: 'idea', field: 'idea', written_by: 'me' },
+    });
+    const text = String(row.detail?.excerpt);
+    expect(text).toContain('by a ranking of how often');
+    expect(text.startsWith('… ')).toBe(true);
+    expect(text.endsWith(' …')).toBe(true);
+  });
+
+  it('finds the comment that said to drop a step, cited as the step it sits on', async () => {
+    const result = await find({ query: 'drop step', kinds: ['comment'] });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.rows).toEqual([
+      {
+        table: 'public.plan_items',
+        ref: STEP,
+        title: '#1400 Show counts',
+        href: '/dev/plan?view=all&q=%231400',
+        detail: {
+          kind: 'comment',
+          field: 'comment',
+          written_by: 'me',
+          on: '2026-09-10',
+          excerpt: 'Drop this step, #1323 covers it.',
+        },
+      },
+    ]);
+  });
+
+  it('looks in every kind, newest first, naming what Dash wrote, and leaves dismissed rows out', async () => {
+    const result = await find({ query: 'ranking', kinds: ['idea', 'note', 'step', 'raise', 'comment'] });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.rows.map((row) => [row.table, row.ref, row.detail?.kind, row.detail?.written_by])).toEqual([
+      ['public.ideas', RANK_IDEA, 'idea', 'me'],
+      ['public.feedback_items', NOTE, 'note', 'Dash'],
+      ['public.raised_items', RAISE, 'raise', 'Dash'],
+      ['public.ideas', RANK_IDEA, 'comment', 'Dash'],
+    ]);
+    expect(result.rows[2].href).toBe(`/dev/raised#raise-${RAISE}`);
+    expect(result.rows[1].detail?.field).toBe('resolution');
+  });
+
+  it('finds the spec sections that hold every word, linked to the section', async () => {
+    const result = await find({ query: 'em dashes', kinds: ['spec'] });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.rows.length).toBeGreaterThan(0);
+    const [row] = result.rows;
+    expect(row.table).toBe('docs.specs');
+    expect(row.ref).toMatch(/#punctuation$/);
+    expect(row.href).toMatch(/^\/dev\/specs\/[\w-]+#punctuation$/);
+    expect(String(row.detail?.excerpt)).toContain('em dashes');
+  });
+
+  it('never lets a wildcard from the query into the pattern', async () => {
+    const ctx = context({ tables });
+    const result = await executeAskTool('find_dev_text', { query: '%rank_%', kinds: ['idea', 'comment'] }, ctx);
+    expect(ctx.patterns.length).toBeGreaterThan(0);
+    expect(new Set(ctx.patterns)).toEqual(new Set(['%rank%']));
+    expect(result.ok && result.rows.map((row) => row.ref)).toEqual([RANK_IDEA, RANK_IDEA]);
+  });
+
+  it('says when nothing has the words, and refuses a query with no words in it', async () => {
+    expect(await find({ query: 'zeppelins' })).toEqual({ ok: true, rows: [], note: expect.stringContaining('Nothing') });
+    expect(await find({ query: '% _' })).toEqual({ ok: false, error: expect.stringContaining('word') });
+    expect(await find({ query: 'ranking', kinds: ['goal'] })).toEqual({ ok: false, error: expect.stringContaining('kinds') });
+  });
+
+  it('gives another account nothing, and nothing with the Dev workspace off', async () => {
+    expect(await find({ query: 'ranking' }, { owner: false })).toEqual({ ok: false, error: expect.stringContaining('not the owner') });
+    expect(await find({ query: 'ranking' }, { modules: ['shopping'] })).toEqual({
+      ok: false,
+      error: expect.stringContaining('Dev workspace is switched off'),
+    });
+  });
+});
+
+describe('excerpt', () => {
+  it('keeps a short text whole on one line', () => {
+    expect(excerpt('One\n\ntwo ranking', ['ranking'])).toBe('One two ranking');
   });
 });
