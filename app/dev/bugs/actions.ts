@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { isOwner, requireOwner } from '@/lib/dev/owner';
@@ -18,6 +19,7 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { triageView, type TriageTable, type TriageView } from '@/lib/feedback/triage';
 import { triageRow } from '@/lib/feedback/triage-run';
+import { scoreIdeaRow } from '@/lib/ideas/score-run';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 
 /** One queue, one page. The old per-workspace pages redirect to it. */
@@ -113,7 +115,8 @@ const triageSchema = z.object({
  * Triage what the header panel just saved (plan #1179): Jev reads it and says
  * bug or request, which workspace, how soon, and whether an open note or idea
  * already says the same. Stored on the row and handed back for the panel to
- * show under "saved".
+ * show under "saved". An idea is also given its score (plan #1327), after
+ * the answer has gone.
  *
  * Called by the panel once `submitFeedback` or `submitIdea` has returned, so
  * saving never waits on Jev. Null when there is nothing to show: the account
@@ -137,6 +140,19 @@ export async function triageFiled(input: {
   const spend: SpendReport[] = [];
   const triage = await triageRow(supabase, { userId: user.id, ...parsed.data, spend });
   await recordSessionSpend(user.id, { module: 'core', operation: 'triage-note' }, spend);
+
+  // An idea is then scored against its workspace's vision (plan #1327), once
+  // this has answered so the panel's triage line does not wait on it. Asked
+  // whether or not triage came back: a null triage is read as untriaged, and
+  // an idea Jev fails on stays unscored for the daily catch-up.
+  if (parsed.data.table === 'ideas') {
+    const { id } = parsed.data;
+    after(async () => {
+      const scoreSpend: SpendReport[] = [];
+      await scoreIdeaRow(supabase, { userId: user.id, id, triage, spend: scoreSpend });
+      await recordSessionSpend(user.id, { module: 'core', operation: 'score-idea' }, scoreSpend);
+    });
+  }
   if (!triage) return null;
 
   if (parsed.data.table === 'ideas') revalidatePath('/dev/ideas');
