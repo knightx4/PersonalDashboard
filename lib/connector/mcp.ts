@@ -84,8 +84,12 @@ export function metadataOptionsResponse(): Response {
   return new Response(null, { status: 204, headers: { ...METADATA_HEADERS, 'Access-Control-Max-Age': '86400' } });
 }
 
-/** A verified caller, as the tool calls need it. */
-export type ConnectorSession = Extract<ConnectorAccess, { ok: true }>;
+/**
+ * A verified caller, as the tool calls need it: what connectorAccess built on
+ * the token, plus `log`, the service-role core client its calls are recorded
+ * through.
+ */
+export type ConnectorSession = Extract<ConnectorAccess, { ok: true }> & { log: SchemaClient };
 
 /** A lookup's result with each link made absolute, so it opens from wherever the client shows it. */
 function withAbsoluteLinks(result: Extract<AskToolResult, { ok: true }>, origin: string) {
@@ -97,12 +101,14 @@ function text(value: string, isError = false): CallToolResult {
 }
 
 /**
- * The one place a connector call is written to the log. It goes through the
- * caller's own client today; plan #1257 may move it to a service-role client
- * once connector tokens can no longer write.
+ * The one place a connector call is written to the log. The token itself
+ * cannot write (plan #1257: the database makes any request carrying a
+ * client_id claim read-only), so the row goes in through `log`, the
+ * service-role core client the route hands over. That client passes no RLS,
+ * so the row's user is the verified caller's and nothing the client sent.
  */
-function logCall(core: SchemaClient, call: ConnectorCall): Promise<void> {
-  return recordConnectorCall(core, call);
+function logCall(log: SchemaClient, call: ConnectorCall): Promise<void> {
+  return recordConnectorCall(log, call);
 }
 
 /**
@@ -117,17 +123,17 @@ export async function runConnectorTool(
   origin: string,
   now?: number,
 ): Promise<CallToolResult> {
-  const { caller, core, ctx } = session;
+  const { caller, core, ctx, log } = session;
   const who = { userId: caller.userId, clientId: caller.clientId, tool, input };
 
   const rate = await checkConnectorRate(core, caller.userId, now);
   if (!rate.ok) {
-    await logCall(core, { ...who, limited: rate.message });
+    await logCall(log, { ...who, limited: rate.message });
     return text(rate.message, true);
   }
 
   const result = await executeAskTool(tool, input, ctx);
-  await logCall(core, { ...who, result });
+  await logCall(log, { ...who, result });
   return result.ok ? text(JSON.stringify(withAbsoluteLinks(result, origin))) : text(result.error, true);
 }
 
@@ -167,15 +173,19 @@ const handler = createMcpHandler(registerAskTools, {
 
 /**
  * Answer one request to /api/mcp. `access` is connectorAccess on the request's
- * Authorization header; a refusal is the 401 that starts the sign-in.
+ * Authorization header; a refusal is the 401 that starts the sign-in. `log`
+ * makes the service-role core client the calls are recorded through, and is
+ * only called once the token has been verified.
  */
 export async function serveMcp(
   request: Request,
   access: (authorization: string | null) => Promise<ConnectorAccess>,
+  log: () => SchemaClient,
 ): Promise<Response> {
   const origin = getPublicOrigin(request);
-  const verdict = await access(request.headers.get('authorization'));
-  if (!verdict.ok) return unauthorizedResponse(origin, verdict);
+  const granted = await access(request.headers.get('authorization'));
+  if (!granted.ok) return unauthorizedResponse(origin, granted);
+  const verdict: ConnectorSession = { ...granted, log: log() };
 
   request.auth = {
     token: '',

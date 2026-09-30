@@ -202,12 +202,13 @@ const jdBoundary = {
  *
  * These route handlers genuinely act without a session on someone's behalf:
  * Vercel Cron has no user, and removing an auth.users row is not something the
- * anon key can do. Each authenticates in its own way -- a shared secret for
- * cron, the session for deletion -- and each filters by user_id. The ATS rule
- * still applies to them.
+ * anon key can do, and a connector token may only read, so /api/mcp writes
+ * its call log this way. Each authenticates in its own way -- a shared secret
+ * for cron, the session for deletion, the verified token for /api/mcp -- and
+ * each filters by user_id. The ATS rule still applies to them.
  */
 const serviceRoleExceptions = {
-  files: ["app/api/cron/**/*.ts", "app/api/jobs/account/delete/route.ts"],
+  files: ["app/api/cron/**/*.ts", "app/api/jobs/account/delete/route.ts", "app/api/mcp/route.ts"],
   rules: {
     "no-restricted-imports": [
       "error",

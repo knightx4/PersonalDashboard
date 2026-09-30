@@ -56,7 +56,7 @@ export type ConnectorAccess =
       caller: ConnectorCaller;
       /** Everything executeAskTool needs, as the token's holder. */
       ctx: AskContext;
-      /** The core-schema client on the token, for checkConnectorRate and recordConnectorCall. */
+      /** The core-schema client on the token, for checkConnectorRate. It cannot write (plan #1257), so calls are recorded through a service-role client instead. */
       core: SchemaClient;
     }
   | ConnectorRefusal;

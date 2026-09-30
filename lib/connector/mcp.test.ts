@@ -30,6 +30,9 @@ import { refusal } from './token';
 const HOST = 'https://dash.example.com';
 const METADATA = `${HOST}/.well-known/oauth-protected-resource/api/mcp`;
 const core = { name: 'core client' };
+/** The service-role client the log is written through: the token cannot write (plan #1257). */
+const logClient = { name: 'service-role core client' };
+const makeLog = vi.fn(() => logClient as never);
 const ctx = { userId: 'me' };
 const session: ConnectorAccess = {
   ok: true,
@@ -70,6 +73,7 @@ async function call(method: string, params: Record<string, unknown> = {}) {
   const response = await serveMcp(
     mcpRequest({ jsonrpc: '2.0', id: ++rpcId, method, params }),
     async () => session,
+    makeLog,
   );
   expect(response.status).toBe(200);
   return rpcResult(response);
@@ -84,18 +88,20 @@ beforeEach(() => {
 describe('a request without a usable token', () => {
   it('answers 401 pointing at the resource metadata, and never reads', async () => {
     const access = vi.fn(async () => refusal('missing'));
-    const response = await serveMcp(mcpRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, null), access);
+    const response = await serveMcp(mcpRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, null), access, makeLog);
 
     expect(response.status).toBe(401);
     expect(access).toHaveBeenCalledWith(null);
     expect(response.headers.get('www-authenticate')).toBe(`Bearer resource_metadata="${METADATA}"`);
     expect(calls.executeAskTool).not.toHaveBeenCalled();
+    expect(makeLog).not.toHaveBeenCalled();
   });
 
   it('names the token as invalid when one was sent and refused', async () => {
     const response = await serveMcp(
       mcpRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, 'Bearer browser-session'),
       async () => refusal('not_connector'),
+      makeLog,
     );
 
     expect(response.status).toBe(401);
@@ -127,7 +133,7 @@ describe('the tool list', () => {
 });
 
 describe('a tool call', () => {
-  it('checks the cap, runs the lookup as the token holder and logs the call once', async () => {
+  it('checks the cap and runs the lookup as the token holder, and logs the call once through the service-role client', async () => {
     const result: AskToolResult = {
       ok: true,
       rows: [{ table: 'core.todos', ref: 't1', title: 'Call the bank', href: '/todo?task=t1' }],
@@ -142,7 +148,7 @@ describe('a tool call', () => {
     expect(calls.checkConnectorRate).toHaveBeenCalledWith(core, 'me', undefined);
     expect(calls.executeAskTool).toHaveBeenCalledWith('todos', { from: '2026-09-01' }, ctx);
     expect(calls.recordConnectorCall).toHaveBeenCalledTimes(1);
-    expect(calls.recordConnectorCall).toHaveBeenCalledWith(core, {
+    expect(calls.recordConnectorCall).toHaveBeenCalledWith(logClient, {
       userId: 'me',
       clientId: 'claude-client',
       tool: 'todos',
@@ -169,7 +175,7 @@ describe('a tool call', () => {
     };
 
     expect(calls.executeAskTool).not.toHaveBeenCalled();
-    expect(calls.recordConnectorCall).toHaveBeenCalledWith(core, {
+    expect(calls.recordConnectorCall).toHaveBeenCalledWith(logClient, {
       userId: 'me',
       clientId: 'claude-client',
       tool: 'todos',
