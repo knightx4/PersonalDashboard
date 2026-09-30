@@ -57,12 +57,19 @@ export default async function MayaThreadPage({ params }: { params: Promise<{ id:
       </div>
 
       <header className="mb-6">
-        <QuestionField threadId={thread.id} question={thread.question} maxLength={MAYA_QUESTION_MAX} />
+        <QuestionField
+          threadId={thread.id}
+          question={thread.question}
+          maxLength={MAYA_QUESTION_MAX}
+        />
         <p className="mt-1 text-ui text-ink-muted">
           {thread.note ? (
             <>
               On{' '}
-              <Link href={noteHref(thread.note.path)} className="font-medium text-ink hover:underline">
+              <Link
+                href={noteHref(thread.note.path)}
+                className="font-medium text-ink hover:underline"
+              >
                 {thread.note.title}
               </Link>
             </>
@@ -76,7 +83,18 @@ export default async function MayaThreadPage({ params }: { params: Promise<{ id:
         </p>
       </header>
 
-      <MayaConversation threadId={thread.id} summary={thread.summary} turns={turns}>
+      <MayaConversation
+        threadId={thread.id}
+        summary={thread.summary}
+        turns={turns}
+        copy={{
+          question: thread.question,
+          notePath: thread.note?.path ?? null,
+          points: thought?.points ?? [],
+          synthesis: thought?.synthesis ?? null,
+          paths: Object.fromEntries([...cited].map(([noteId, note]) => [noteId, note.path])),
+        }}
+      >
         <section aria-labelledby="thought-heading">
           <h2 id="thought-heading" className="text-body font-semibold text-ink">
             Maya&rsquo;s thought
@@ -108,7 +126,9 @@ export default async function MayaThreadPage({ params }: { params: Promise<{ id:
 function Point({ point, cited }: { point: MayaPoint; cited: Map<string, MayaThreadNote> }) {
   return (
     <div className="flex gap-3">
-      <span className="tabular w-4 shrink-0 text-body font-semibold text-ink-muted">{point.rank}</span>
+      <span className="tabular w-4 shrink-0 text-body font-semibold text-ink-muted">
+        {point.rank}
+      </span>
       <div className="min-w-0 flex-1">
         <p className="text-body font-medium text-ink">{point.claim}</p>
         <p className="mt-1 whitespace-pre-line text-body text-ink">{point.argument}</p>
@@ -173,5 +193,9 @@ function Synthesis({ synthesis }: { synthesis: MayaSynthesis }) {
 }
 
 function day(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 }
