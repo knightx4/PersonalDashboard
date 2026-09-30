@@ -324,6 +324,52 @@ describe('day briefs', () => {
   });
 });
 
+describe('connector calls and revocations', () => {
+  /**
+   * The log of what a connected Claude app read (plan #1254). The person, or a
+   * connector token that is theirs, may add their own rows and read them back;
+   * nobody may rewrite one, and nobody sees another person's.
+   */
+  it('lets the owner record and read their calls, and shows another user none', async () => {
+    await asUser(userA, (tx) => tx`
+      insert into core.connector_calls (user_id, client_id, tool, input, reads, outcome)
+      values (${userA}, 'client-a', 'todos', '{}', ${tx.json([{ table: 'todo.tasks', ref: 't1', title: 'A', href: '/todo' }])}, 'ok')`);
+    expect(await asUser(userA, (tx) => tx`select id from core.connector_calls`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from core.connector_calls`)).toHaveLength(0);
+  });
+
+  it('refuses a call written for someone else, and any rewrite', async () => {
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into core.connector_calls (user_id, client_id, tool, outcome)
+        values (${userA}, 'client-a', 'todos', 'ok')`),
+    ).rejects.toThrow(/row-level security/);
+    await expect(
+      asUser(userA, (tx) => tx`update core.connector_calls set tool = 'search'`),
+    ).rejects.toThrow(/permission denied/);
+    await expect(asUser(userA, (tx) => tx`delete from core.connector_calls`)).rejects.toThrow(/permission denied/);
+  });
+
+  it('keeps an error off an answer and reads off a refusal', async () => {
+    await expect(admin`
+      insert into core.connector_calls (user_id, client_id, tool, outcome, error)
+      values (${userA}, 'client-a', 'todos', 'ok', 'no')`).rejects.toThrow(/connector_calls_error_ck/);
+    await expect(admin`
+      insert into core.connector_calls (user_id, client_id, tool, outcome)
+      values (${userA}, 'client-a', 'todos', 'limited')`).rejects.toThrow(/connector_calls_error_ck/);
+  });
+
+  it('lets the owner record a revocation and nobody else read it', async () => {
+    await asUser(userA, (tx) => tx`
+      insert into core.connector_revocations (user_id, client_id) values (${userA}, 'client-a')`);
+    expect(await asUser(userA, (tx) => tx`select id from core.connector_revocations`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from core.connector_revocations`)).toHaveLength(0);
+    await expect(
+      asUser(userA, (tx) => tx`delete from core.connector_revocations`),
+    ).rejects.toThrow(/permission denied/);
+  });
+});
+
 describe('drafted messages', () => {
   /**
    * Follow-ups and return requests (plan #1129). The morning run writes them
