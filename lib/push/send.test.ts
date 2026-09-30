@@ -31,7 +31,7 @@ describe('the brief notification', () => {
       url: BRIEF_URL,
       tag: 'day-brief-2026-09-28',
     });
-    expect(BRIEF_URL).toBe('/home');
+    expect(BRIEF_URL).toBe('/home#brief');
   });
 
   it('says "Your day" for a row written before titles, and never sends past a lock screen', () => {

@@ -13,6 +13,7 @@
  */
 
 import { BODY_MAX, clip, TITLE_MAX } from '@/lib/day-brief/notification';
+import { BRIEF_ANCHOR } from '@/lib/day-brief/shown';
 
 export type PushSubscriptionRow = {
   id: string;
@@ -41,8 +42,8 @@ export type PushPorts = {
 
 export type PushResult = { sent: number; forgotten: number; failed: number };
 
-/** The page the brief is shown on. */
-export const BRIEF_URL = '/home';
+/** Where the brief is shown: the picks under the date on the home page (plan #1241). */
+export const BRIEF_URL = `/home#${BRIEF_ANCHOR}`;
 
 /**
  * The brief as a notification: the title and body stored with the day
