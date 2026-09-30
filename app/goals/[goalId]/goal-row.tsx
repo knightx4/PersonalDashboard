@@ -54,6 +54,7 @@ import {
   formatDate,
   useMenuAction,
 } from './step-parts';
+import { StepProgress, lastLoggedLine, UnderWayCell, type PageProgress } from './step-progress';
 import { answerGoalQuestion, askGoalQuestion, dismissGoalQuestion } from './tree-actions';
 
 /**
@@ -109,6 +110,8 @@ export type GoalRowContext = {
   prepFor?: Record<string, StepPrep>;
   /** The step each prep step is for, by the prep step's id. */
   targetOf?: Record<string, PrepTarget>;
+  /** What the progress logged on each step adds up to (plan #1276). */
+  progress?: PageProgress;
 };
 
 /**
@@ -456,6 +459,14 @@ export function GoalRow({
   const dashes = node.who.word !== 'You';
   const onTodo = context.todoOn && step.onTodo && canShowOnTodo(step);
   const substeps = node.children.filter((child) => child.kind !== 'decision');
+  // Partial progress (plan #1276): under way while open with entries of its
+  // own, and when anything beneath it was last logged.
+  const progress = context.progress?.byItem[step.id];
+  const today = context.progress?.today ?? '';
+  const underWay = progress?.underWay ? progress : undefined;
+  // A parent's latest activity from the steps beneath it; a step with entries
+  // of its own says it in its progress line instead.
+  const lastLogged = progress?.count === 0 ? lastLoggedLine(progress, today) : null;
 
   return (
     <TreeRow
@@ -512,6 +523,8 @@ export function GoalRow({
            L" does rather than being cut off (plan #983). */
         answerChanged ? (
           <span className="whitespace-normal text-caution">An answer changed</span>
+        ) : underWay ? (
+          <UnderWayCell summary={underWay} due={step.dueOn} />
         ) : current && step.rhythmPeriod ? (
           <span className="whitespace-normal text-ink-muted">
             {progressLine(step.rhythmPeriod, current)}
@@ -520,6 +533,8 @@ export function GoalRow({
           <span className="text-ink-muted">Starts {formatDate(step.waitsUntil)}</span>
         ) : step.dueOn ? (
           <span className="text-ink-muted">Due {formatDate(step.dueOn)}</span>
+        ) : lastLogged && !closed ? (
+          <span className="whitespace-normal text-ink-muted">{lastLogged}</span>
         ) : null
       }
       quickActions={
@@ -578,6 +593,7 @@ export function GoalRow({
             <ClaudeResult node={step} files={stepFiles} />
           )}
           {prep && <PrepNote prep={prep} />}
+          {progress && <StepProgress summary={progress} today={today} />}
           {rhythm && rhythm.past.length > 0 && step.rhythmPeriod && (
             <PastPeriods past={rhythm.past} period={step.rhythmPeriod} />
           )}
@@ -614,6 +630,7 @@ export function GoalRow({
               For {prepares.title}
             </a>
           )}
+          {lastLogged && <span>{lastLogged}</span>}
           {onTodo && <span>On Todo</span>}
           {links.map((link) => (
             <Link key={link.linkId} href={`/goals/${link.goalId}`} className="underline">

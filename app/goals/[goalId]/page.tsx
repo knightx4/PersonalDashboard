@@ -40,6 +40,8 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { writtenWhen, type Brief } from '@/lib/goals/briefs';
 import { loadBrief } from '@/lib/goals/briefs-store';
 import { loadFilesOf } from '@/lib/goals/files-store';
+import { summariseProgress, type ProgressEntry } from '@/lib/goals/progress';
+import { loadProgressEntries } from '@/lib/goals/progress-store';
 import { flagsWaiting } from '@/lib/goals/flags';
 import { formatDay } from '@/lib/goals/dates';
 import { goalStatus } from '@/lib/goals/goal-status';
@@ -231,7 +233,7 @@ export default async function GoalMapPage({
     goalMatchText({ title: map.goal.title, acceptance: map.goal.acceptance }),
     { core },
   ).then((found) => found.map(toLink));
-  const [stepRuns, filesOf, brief, review, places] = await Promise.all([
+  const [stepRuns, filesOf, brief, review, places, progressEntries] = await Promise.all([
     loadStepRuns(client, stepIdsOn(map)).catch((): Record<string, GoalRun> => ({})),
     // The files the goal and its steps link to. A failed read leaves them
     // out rather than the page, as do the note and the verdict below.
@@ -247,6 +249,11 @@ export default async function GoalMapPage({
     loadAreas(client)
       .then((areas) => areas.map((area) => ({ id: area.id, name: area.name })))
       .catch((): Place[] => []),
+    // Partial progress on the goal and its steps (plan #1276), in one read.
+    // A failed read leaves every step looking as it did before.
+    loadProgressEntries(client, [map.goal.id, ...stepIdsOn(map)]).catch(
+      (): ProgressEntry[] => [],
+    ),
   ]);
   const status = goalStatus(
     map.goal,
@@ -256,6 +263,13 @@ export default async function GoalMapPage({
     flagsWaiting(flags, new Map([[map.goal.id, map.goal.title]])),
   );
   const files = goalFiles(map.goal.id, filesOf);
+  const progress = {
+    today,
+    byItem: summariseProgress(progressEntries, [
+      { id: map.goal.id, status: map.goal.status, children: map.steps },
+      ...map.linked.map((entry) => entry.step),
+    ]),
+  };
   const shapeable = map.goal.status === 'open' || map.goal.status === 'proposed';
   const linkedAims = new Set(links?.aims.map((aim) => aim.aimId));
   const aimChoices = aims?.filter((aim) => !linkedAims.has(aim.id)) ?? null;
@@ -382,6 +396,7 @@ export default async function GoalMapPage({
           todoOn={moduleEnabled(account, 'todo')}
           runs={stepRunLines(stepRuns)}
           files={filesOf}
+          progress={progress}
         />
         <GoalRhythms steps={rhythmSteps(map.steps)} records={map.rhythms} />
         <GoalFindings findings={goalFindings(map.steps)} />

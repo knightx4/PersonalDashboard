@@ -33,6 +33,7 @@ import { countAside, type StepRunView } from '@/lib/goals/shaping';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import { GoalRow, type GoalRowContext } from './goal-row';
 import { StepComposer } from './step-parts';
+import { GoalProgressLog, lastLoggedLine, type PageProgress } from './step-progress';
 import type { InformationSeam } from './information-step';
 
 /** How often the page looks again while a step's run is going, as the Claude panel does. */
@@ -92,7 +93,13 @@ export function StepTree({
   runs = NO_RUNS,
   files = NO_FILES,
   view = DEFAULT_GOAL_VIEW,
+  progress,
 }: {
+  /**
+   * What the progress logged on the goal and each step adds up to (plan
+   * #1276), from summariseProgress. Absent, nothing reads as under way.
+   */
+  progress?: PageProgress;
   map: GoalMap;
   /**
    * Which of the views to show: the page's `?view=` (plan #1157), so the
@@ -143,6 +150,7 @@ export function StepTree({
       informationSeam,
       runs,
       files,
+      progress,
       ...stepPreps(trees),
     };
     return {
@@ -153,8 +161,13 @@ export function StepTree({
       })),
       context,
     };
-  }, [map, todoOn, showAside, unfolded, opened, informationSeam, runs, files]);
+  }, [map, todoOn, showAside, unfolded, opened, informationSeam, runs, files, progress]);
 
+  const goalProgress = progress?.byItem[map.goal.id];
+  const lastLogged = progress ? lastLoggedLine(goalProgress, progress.today) : null;
+  const goalLog = goalProgress && progress && goalProgress.count > 0 && (
+    <GoalProgressLog summary={goalProgress} today={progress.today} />
+  );
   const substeps = own.rows.filter((row) => row.kind !== 'decision');
 
   const shown = viewGoalRows(own.rows, view);
@@ -195,6 +208,7 @@ export function StepTree({
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2.5">
               <h2 className="text-body font-semibold text-ink">Steps</h2>
               <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                {lastLogged && <span className="text-small text-ink-muted">{lastLogged}</span>}
                 <SectionTally tally={own.tally} label={map.goal.title} />
                 <Progress label={map.goal.title} progress={own.progress} bands={own.bands} />
               </span>
@@ -235,6 +249,8 @@ export function StepTree({
                 {shownOpen.map(rowOf)}
               </ul>
             )}
+            {/* What was logged on the goal rather than on a step. */}
+            {goalLog && <div className="border-t border-border px-3 py-1.5">{goalLog}</div>}
             {shownDone.length > 0 && (
               <div className="border-t border-border px-3 py-1.5">
                 <Disclosure title="Finished" meta={shownDone.length}>
@@ -250,6 +266,7 @@ export function StepTree({
             </div>
           </div>
         )}
+        {map.steps.length === 0 && goalLog && <div className="px-1">{goalLog}</div>}
         {map.steps.length === 0 && <StepComposer parentId={map.goal.id} label="Add a step" />}
         {aside > 0 && (
           <Button

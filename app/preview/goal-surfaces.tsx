@@ -3,6 +3,7 @@ import { attachDependencies, type DependencyRow } from '@/lib/goals/dependencies
 import { buildForest, type Step } from '@/lib/goals/steps';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import type { Collection } from '@/lib/goals/collections-store';
+import { summariseProgress, type ProgressEntry } from '@/lib/goals/progress';
 
 /**
  * A goal's page of steps, drawn from fixtures for the gallery (plan #982).
@@ -234,12 +235,50 @@ const map: GoalMap = {
   },
 };
 
+function logged(
+  id: string,
+  itemId: string,
+  happenedOn: string,
+  text: string,
+  quantity: number | null,
+  unit: string | null,
+): ProgressEntry {
+  return {
+    id,
+    itemId,
+    captureId: null,
+    happenedOn,
+    text,
+    quantity,
+    unit,
+    estimate: null,
+    createdAt: `${happenedOn}T09:00:00Z`,
+  };
+}
+
+/**
+ * Partial progress (plan #1276): two amounts moved on the transfer, so it
+ * reads as under way with its tally, and one payment logged on the goal
+ * itself. Read against a fixed day, so no clock is read.
+ */
+const progress = {
+  today: '2026-09-28',
+  byItem: summariseProgress(
+    [
+      logged('p-1', 'transfer', '2026-09-24', 'Moved the first 300 pounds to the new card', 300, 'pounds'),
+      logged('p-2', 'transfer', '2026-09-26', 'Moved another 200 across', 200, 'pounds'),
+      logged('p-3', GOAL, '2026-09-20', 'Paid 50 pounds off the store card', 50, 'pounds'),
+    ],
+    [{ id: GOAL, status: 'open', children: map.steps }],
+  ),
+};
+
 /** The steps as a list, every step unfolded: the page as it opens. */
 export function GoalTreeSurface() {
-  return <StepTree map={map} todoOn={false} />;
+  return <StepTree map={map} todoOn={false} progress={progress} />;
 }
 
 /** The same steps with every row opened: the panel behind each row. */
 export function GoalOpenedSurface() {
-  return <StepTree map={map} todoOn={false} opened />;
+  return <StepTree map={map} todoOn={false} opened progress={progress} />;
 }
