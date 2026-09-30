@@ -289,6 +289,55 @@ describe('goals shape', () => {
     const rows = await historyOf(reading.id);
     expect(rows.map((r) => r.action)).toEqual(['insert', 'update', 'delete']);
   });
+
+  it('keeps progress entries on a step, with history, undo and its owner only (plan #1274)', async () => {
+    const [step] = await admin<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Move the bags to the office') returning id`;
+
+    const [entry] = await asUser(userA, (tx) => tx<{ id: string; happened_on: Date }[]>`
+      insert into progress_entries (user_id, item_id, text, quantity, unit)
+      values (${userA}, ${step.id}, 'moved two bags', 2, 'bags') returning id, happened_on`);
+    expect(entry.happened_on).toBeTruthy();
+
+    await asUser(userA, (tx) => tx`update progress_entries set undone_at = now() where id = ${entry.id}`);
+    const rows = await historyOf(entry.id);
+    expect(rows.map((r) => [r.table_name, r.action])).toEqual([
+      ['progress_entries', 'insert'],
+      ['progress_entries', 'update'],
+    ]);
+
+    const seen = await asUser(userB, (tx) => tx`select id from progress_entries where id = ${entry.id}`);
+    expect(seen).toHaveLength(0);
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into progress_entries (user_id, item_id, text) values (${userA}, ${step.id}, 'not mine')`),
+    ).rejects.toThrow();
+
+    for (const bad of [
+      admin`insert into progress_entries (user_id, item_id, text) values (${userA}, ${step.id}, '  ')`,
+      admin`insert into progress_entries (user_id, item_id, text, quantity) values (${userA}, ${step.id}, 'x', 0)`,
+      admin`insert into progress_entries (user_id, item_id, text, unit) values (${userA}, ${step.id}, 'x', 'bags')`,
+      admin`insert into progress_entries (user_id, item_id, text, estimate) values (${userA}, ${step.id}, 'x', 'most')`,
+    ]) {
+      await expect(bad).rejects.toThrow(/progress_entries_/);
+    }
+  });
+
+  it('gives a step a total in a unit, and never a goal (plan #1274)', async () => {
+    await expect(
+      admin`insert into items (user_id, level, parent_id, kind, title, estimated_total)
+            values (${userA}, 'step', ${goalA}, 'mine', 'Move the boxes', 12)`,
+    ).rejects.toThrow(/items_estimated_total_ck/);
+    await expect(
+      admin`update items set estimated_total = 12, total_unit = 'bags' where id = ${goalA}`,
+    ).rejects.toThrow(/items_(estimated_total|total_unit)_ck/);
+    const [row] = await admin<{ estimated_total: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title, estimated_total, total_unit)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Move the boxes', 12, 'boxes')
+      returning estimated_total`;
+    expect(Number(row.estimated_total)).toBe(12);
+  });
 });
 
 describe('goals step tree', () => {
@@ -2304,6 +2353,7 @@ describe('RLS coverage', () => {
       'items',
       'links',
       'periods',
+      'progress_entries',
       'readings',
       'records',
       'reviews',
