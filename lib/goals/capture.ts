@@ -25,6 +25,8 @@
  *
  * Part of a step's work is progress on that step, never a close: "moved two
  * of the bags" is 2 bags logged on the bags step, and the step stays open.
+ * Work the tree has no step for is an add that carries the progress (plan
+ * #1278): the step goes in already under way, and one Undo takes back both.
  */
 import type { RhythmRecord } from '@/lib/goals/rhythms';
 import {
@@ -269,11 +271,76 @@ export type PlannedAction =
       parent: CaptureStep | null;
       title: string;
       stepKind: 'mine' | 'claude';
+      /**
+       * Work already done on the new step, logged on it as it is added (plan
+       * #1278). Null for a step nothing has been done on yet.
+       */
+      progress?: AddedProgress | null;
     };
+
+/** The progress an add carries, in the progress move's terms. */
+export type AddedProgress = {
+  text: string;
+  quantity: number | null;
+  unit: string | null;
+  /** YYYY-MM-DD, or null for the day it was filed. */
+  happenedOn: string | null;
+  /** How many in all, when the sentence said; null otherwise. */
+  setTotal: number | null;
+};
+
+type ProgressAction = Extract<PlannedAction, { kind: 'progress' }>;
+type AddAction = Extract<PlannedAction, { kind: 'add' }>;
+
+/**
+ * The progress an add carries, as a progress move on the step it wrote, so
+ * the store and `progressTotal` treat it as any other entry. Null when the
+ * add carries none.
+ */
+export function addedProgress(action: AddAction, stepId: string): ProgressAction | null {
+  if (!action.progress) return null;
+  const step: CaptureStep = {
+    ref: '',
+    id: stepId,
+    goalRef: action.goal.ref,
+    goalTitle: action.goal.title,
+    title: action.title,
+    kind: action.stepKind,
+    depth: action.parent ? action.parent.depth + 1 : 1,
+    rhythm: null,
+    total: null,
+    tallies: [],
+  };
+  return { kind: 'progress', goal: action.goal, step, ...action.progress };
+}
 
 const text = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
 const DAY_MS = 86_400_000;
+
+/**
+ * The amount a move gave: a number more than nothing, and a unit only with a
+ * number. Null when it breaks either rule.
+ */
+function readAmount(
+  entry: Record<string, unknown>,
+): { quantity: number | null; unit: string | null } | null {
+  const hasQuantity = entry.quantity !== null && entry.quantity !== undefined && entry.quantity !== '';
+  const quantity = hasQuantity ? parseNumber(entry.quantity) : null;
+  if (hasQuantity && (quantity === null || quantity <= 0)) return null;
+  const unit = text(entry.unit) || null;
+  if (unit && (quantity === null || unit.length > PROGRESS_UNIT_MAX)) return null;
+  return { quantity, unit };
+}
+
+/** A total the move gave, when it is a number more than nothing. */
+function readTotal(entry: Record<string, unknown>): number | null {
+  const raw =
+    entry.total === null || entry.total === undefined || entry.total === ''
+      ? null
+      : parseNumber(entry.total);
+  return raw !== null && raw > 0 ? raw : null;
+}
 
 /**
  * The day the model gave for a progress entry, when it is a real date no
@@ -306,7 +373,7 @@ export type ProgressTotal = {
  * another unit than the total, since then it says nothing about what is left.
  */
 export function progressTotal(
-  action: Extract<PlannedAction, { kind: 'progress' }>,
+  action: ProgressAction,
 ): ProgressTotal | null {
   const step = action.step;
   if (!step || action.quantity === null) return null;
@@ -389,20 +456,14 @@ export function parseFiling(
         const said = text(entry.text).slice(0, NOTE_MAX);
         if (!goal || !said) break;
 
-        const hasQuantity = entry.quantity !== null && entry.quantity !== undefined && entry.quantity !== '';
-        const quantity = hasQuantity ? parseNumber(entry.quantity) : null;
-        if (hasQuantity && (quantity === null || quantity <= 0)) break;
-        const unit = text(entry.unit) || null;
-        if (unit && (quantity === null || unit.length > PROGRESS_UNIT_MAX)) break;
+        const amount = readAmount(entry);
+        if (!amount) break;
+        const { quantity, unit } = amount;
 
         // A total only for a step that has none, counted in the entry's own
         // unit; anything else is dropped and the entry filed without it.
-        const rawTotal =
-          entry.total === null || entry.total === undefined || entry.total === ''
-            ? null
-            : parseNumber(entry.total);
-        const setTotal =
-          step && !step.total && unit && rawTotal !== null && rawTotal > 0 ? rawTotal : null;
+        const rawTotal = readTotal(entry);
+        const setTotal = step && !step.total && unit && rawTotal !== null ? rawTotal : null;
 
         planned = {
           kind: 'progress',
@@ -437,12 +498,28 @@ export function parseFiling(
           ? context.goals.find((g) => g.ref === parentStep.goalRef)
           : goals.get(ref);
         if (!goal) break;
+        // Work already done on the new step (plan #1278): text or an amount
+        // makes it progress. A bad amount drops the progress, not the step.
+        const said = text(entry.text).slice(0, NOTE_MAX);
+        const amount = readAmount(entry);
+        const carries = !!said || (amount?.quantity ?? null) !== null;
+        const progress: AddedProgress | null =
+          carries && amount
+            ? {
+                text: said || title,
+                quantity: amount.quantity,
+                unit: amount.unit,
+                happenedOn: progressDay(entry.day, today),
+                setTotal: amount.unit ? readTotal(entry) : null,
+              }
+            : null;
         planned = {
           kind: 'add',
           goal,
           parent: parentStep,
           title,
           stepKind: entry.kind === 'claude' ? 'claude' : 'mine',
+          progress,
         };
         key = `add:${(parentStep ?? goal).id}:${title.toLowerCase()}`;
         break;
@@ -536,8 +613,42 @@ export type FiledEntry =
       title: string;
       step_kind: 'mine' | 'claude';
       goal_title: string;
+      /**
+       * The progress entry written on the new step with it (plan #1278), so
+       * Undo on this one line takes back both. Absent when there was none.
+       */
+      progress?: AddedFiledProgress;
       undone_at: string | null;
     };
+
+/** The progress an added step was filed with, as kept on its line. */
+export type AddedFiledProgress = {
+  entry_id: string;
+  text: string;
+  quantity: number | null;
+  unit: string | null;
+  /** YYYY-MM-DD. */
+  happened_on: string;
+  total?: number | null;
+  total_unit?: string | null;
+  done?: number | null;
+  total_set?: boolean;
+};
+
+/** What a line says about an amount towards a total, when it has both. */
+function leftOf(entry: {
+  total?: number | null;
+  total_unit?: string | null;
+  done?: number | null;
+}): string | null {
+  const towards =
+    entry.total && entry.done !== null && entry.done !== undefined
+      ? towardsTotal(entry.total, entry.total_unit, [
+          { quantity: entry.done, unit: entry.total_unit ?? null },
+        ])
+      : null;
+  return towards ? leftWords(towards) : null;
+}
 
 /** The line shown for an entry in the filed list. */
 export function describeFiled(entry: FiledEntry): string {
@@ -554,20 +665,23 @@ export function describeFiled(entry: FiledEntry): string {
         : entry.goal_title;
       if (entry.quantity === null) return `Logged progress on ${on}: ${entry.text}`;
       const logged = `Logged ${formatReading(entry.quantity, entry.unit)} on ${on}`;
-      const towards =
-        entry.total && entry.done !== null && entry.done !== undefined
-          ? towardsTotal(entry.total, entry.total_unit, [
-              { quantity: entry.done, unit: entry.total_unit ?? null },
-            ])
-          : null;
-      return towards ? `${logged}, ${leftWords(towards)}` : logged;
+      const left = leftOf(entry);
+      return left ? `${logged}, ${left}` : logged;
     }
     case 'reading':
       return `Recorded ${formatReading(entry.value, entry.unit)} for ${entry.goal_title}`;
-    case 'add':
-      return entry.step_kind === 'claude'
-        ? `Added a step for Dash in ${entry.goal_title}: "${entry.title}"`
-        : `Added a step in ${entry.goal_title}: "${entry.title}"`;
+    case 'add': {
+      const added =
+        entry.step_kind === 'claude'
+          ? `Added a step for Dash in ${entry.goal_title}: "${entry.title}"`
+          : `Added a step in ${entry.goal_title}: "${entry.title}"`;
+      const progress = entry.progress;
+      if (!progress) return added;
+      if (progress.quantity === null) return `${added}, under way: ${progress.text}`;
+      const logged = `${added}, ${formatReading(progress.quantity, progress.unit)} logged`;
+      const left = leftOf(progress);
+      return left ? `${logged}, ${left}` : logged;
+    }
   }
 }
 
@@ -655,7 +769,12 @@ export async function fileCapture(
 export type UndoMove =
   | { move: 'reopen'; stepId: string }
   | { move: 'uncount'; stepId: string; startsOn: string }
-  | { move: 'archive'; stepId: string }
+  | {
+      move: 'archive';
+      stepId: string;
+      /** The progress entry filed on the new step with it, taken back too (plan #1278). */
+      progress?: { entryId: string; clearTotal?: { stepId: string; total: number } };
+    }
   /** A reading is deleted outright: it was never true, and the history keeps it. */
   | { move: 'delete-reading'; readingId: string }
   /** A progress entry is marked undone, as everywhere else it is taken back. */
@@ -674,8 +793,21 @@ export function undoMove(entry: FiledEntry): UndoMove {
       return { move: 'reopen', stepId: entry.step_id };
     case 'count':
       return { move: 'uncount', stepId: entry.step_id, startsOn: entry.starts_on };
-    case 'add':
-      return { move: 'archive', stepId: entry.step_id };
+    case 'add': {
+      const progress = entry.progress;
+      if (!progress) return { move: 'archive', stepId: entry.step_id };
+      return {
+        move: 'archive',
+        stepId: entry.step_id,
+        progress:
+          progress.total_set && progress.total
+            ? {
+                entryId: progress.entry_id,
+                clearTotal: { stepId: entry.step_id, total: progress.total },
+              }
+            : { entryId: progress.entry_id },
+      };
+    }
     case 'reading':
       return { move: 'delete-reading', readingId: entry.reading_id };
     case 'progress':

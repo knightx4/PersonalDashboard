@@ -463,6 +463,18 @@ the entry's unit. It is never set over a total already there, and Undo on
 that line clears it again unless it has been changed since. The filed line
 then reads `Logged 2 bags on "…" in …, about 93 to go of roughly 100`.
 
+Work the tree has no step for is added as a step that is already under way
+(plan #1278). The add move takes the same text, amount, unit and day as the
+progress move, and a total only when the sentence says how many in all.
+Filing writes the step under the nearest one it fits and logs the entry on it
+at once. With only a "Living room" step, "moved two bags to the office" adds
+"Move the bags to the office" under it with 2 bags logged, and the filed line
+reads `Added a step in …: "Move the bags to the office", 2 bags logged`. The
+step and its entry share that one line, so one Undo archives the step and
+marks the entry undone. A bad amount drops the entry and keeps the step.
+Progress still goes on the goal itself when the work belongs to the goal as a
+whole rather than to a piece of it.
+
 ## What Claude does, and when
 
 Every automated job is a routine run. Runs count against the Claude plan's

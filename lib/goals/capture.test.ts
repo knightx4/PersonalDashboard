@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addedProgress,
   captureContext,
   captureMessage,
   describeFiled,
@@ -274,8 +275,30 @@ function stubs(input: unknown, overrides: Partial<FilingDeps> = {}) {
             ...(progressTotal(action) ?? {}),
             undone_at: null,
           };
-        case 'add':
-          return { kind: 'add', step_id: 'new-step', title: action.title, step_kind: action.stepKind, goal_title: action.goal.title, undone_at: null };
+        case 'add': {
+          // As the store does: the progress it carries is logged on the new step.
+          const progress = addedProgress(action, 'new-step');
+          return {
+            kind: 'add',
+            step_id: 'new-step',
+            title: action.title,
+            step_kind: action.stepKind,
+            goal_title: action.goal.title,
+            ...(progress
+              ? {
+                  progress: {
+                    entry_id: `entry-${applied.length}`,
+                    text: progress.text,
+                    quantity: progress.quantity,
+                    unit: progress.unit,
+                    happened_on: progress.happenedOn ?? '2026-09-30',
+                    ...(progressTotal(progress) ?? {}),
+                  },
+                }
+              : {}),
+            undone_at: null,
+          };
+        }
         case 'reading':
           return { kind: 'reading', reading_id: 'new-reading', goal_id: action.goal.id, goal_title: action.goal.title, value: action.value, unit: action.goal.unit, undone_at: null };
       }
@@ -703,5 +726,130 @@ describe('the facts line under a step (plan #1277)', () => {
     const message = captureMessage(city, 'went to the Van Alen talk', '2026-09-24');
     expect(message).not.toContain('no total');
     expect(message).not.toMatch(/^\s+\(/m);
+  });
+});
+
+describe('adding a step already under way (plan #1278)', () => {
+  const home = contextOf(
+    [goal('apartment', { title: 'Make the apartment clean and livable' })],
+    [step('living', 'apartment', { title: 'Living room' })],
+  );
+  const living = home.steps.find((s) => s.id === 'living')!;
+
+  it('adds "Move the bags to the office" under Living room with a 2-bag entry, and one Undo takes back both', async () => {
+    const reply = {
+      actions: [
+        {
+          type: 'add',
+          parent: living.ref,
+          title: 'Move the bags to the office',
+          text: 'moved two bags',
+          quantity: 2,
+          unit: 'bags',
+        },
+      ],
+    };
+    const { deps, saved, applied } = stubs(reply, { context: async () => home });
+    await fileCapture('moved two bags to the office', '2026-09-30', deps);
+    expect(applied[0]).toMatchObject({
+      kind: 'add',
+      parent: { id: 'living' },
+      title: 'Move the bags to the office',
+      progress: { text: 'moved two bags', quantity: 2, unit: 'bags', happenedOn: null, setTotal: null },
+    });
+    const [filed] = saved[0]!;
+    expect(filed).toEqual({
+      kind: 'add',
+      step_id: 'new-step',
+      title: 'Move the bags to the office',
+      step_kind: 'mine',
+      goal_title: 'Make the apartment clean and livable',
+      progress: {
+        entry_id: 'entry-1',
+        text: 'moved two bags',
+        quantity: 2,
+        unit: 'bags',
+        happened_on: '2026-09-30',
+      },
+      undone_at: null,
+    });
+    expect(describeFiled(filed!)).toBe(
+      'Added a step in Make the apartment clean and livable: "Move the bags to the office", 2 bags logged',
+    );
+    expect(undoMove(filed!)).toEqual({
+      move: 'archive',
+      stepId: 'new-step',
+      progress: { entryId: 'entry-1' },
+    });
+  });
+
+  it('logs the entry on the new step, so progressTotal reads it like any other', () => {
+    const [add] = parseFiling(
+      {
+        actions: [
+          {
+            type: 'add',
+            parent: living.ref,
+            title: 'Move the bags to the office',
+            text: 'moved two of the ten bags',
+            quantity: 2,
+            unit: 'bags',
+            total: 10,
+            day: '2026-09-29',
+          },
+        ],
+      },
+      home,
+      '2026-09-30',
+    ) as Extract<PlannedAction, { kind: 'add' }>[];
+    const progress = addedProgress(add!, 'new-step')!;
+    expect(progress.step).toMatchObject({ id: 'new-step', depth: 2, total: null });
+    expect(progress.happenedOn).toBe('2026-09-29');
+    const total = progressTotal(progress);
+    expect(total).toEqual({ total: 10, total_unit: 'bags', done: 2, total_set: true });
+    const filed: FiledEntry = {
+      kind: 'add',
+      step_id: 'new-step',
+      title: 'Move the bags to the office',
+      step_kind: 'mine',
+      goal_title: 'Apartment',
+      progress: { entry_id: 'e', text: 'moved two', quantity: 2, unit: 'bags', happened_on: '2026-09-29', ...total! },
+      undone_at: null,
+    };
+    expect(describeFiled(filed)).toBe(
+      'Added a step in Apartment: "Move the bags to the office", 2 bags logged, about 8 to go of roughly 10',
+    );
+    expect(undoMove(filed)).toEqual({
+      move: 'archive',
+      stepId: 'new-step',
+      progress: { entryId: 'e', clearTotal: { stepId: 'new-step', total: 10 } },
+    });
+  });
+
+  it('adds a plain step when nothing was done, and drops only a bad amount', () => {
+    const [plain, bad, words] = parseFiling(
+      {
+        actions: [
+          { type: 'add', parent: living.ref, title: 'Vacuum the rug' },
+          { type: 'add', parent: living.ref, title: 'Move the boxes', text: 'moved some', quantity: -1 },
+          { type: 'add', parent: 'g1', title: 'Clear the hallway', text: 'started on the hallway' },
+        ],
+      },
+      home,
+    ) as Extract<PlannedAction, { kind: 'add' }>[];
+    expect(plain!.progress).toBeNull();
+    expect(bad!.progress).toBeNull();
+    expect(words!.progress).toMatchObject({ text: 'started on the hallway', quantity: null });
+    expect(
+      describeFiled({
+        kind: 'add',
+        step_id: 'h',
+        title: 'Clear the hallway',
+        step_kind: 'mine',
+        goal_title: 'Apartment',
+        progress: { entry_id: 'e', text: 'started on the hallway', quantity: null, unit: null, happened_on: '2026-09-30' },
+        undone_at: null,
+      }),
+    ).toBe('Added a step in Apartment: "Clear the hallway", under way: started on the hallway');
   });
 });
