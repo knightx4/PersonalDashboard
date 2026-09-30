@@ -189,6 +189,15 @@ beforeAll(async () => {
     insert into maya_gate_checks (user_id, note_id, blob_sha, probability, outcome, jev_model)
     values (${userA}, ${noteA}, 'sha-Journal/2019-04-02.md', 0.9, 'thought', 'jev')`;
 
+  // An attachment (plan #1299) for each user, at the same path, so the
+  // isolation check below has a row of B's to miss.
+  for (const [user, connection] of [[userA, connectionA], [userB, connectionB]]) {
+    await admin`
+      insert into attachments (user_id, connection_id, path, blob_sha, size_bytes, mime_type, storage_path)
+      values (${user}, ${connection}, 'Attachments/scan.pdf', 'sha-scan', 2048, 'application/pdf',
+              ${`${user}/${connection}/sha-scan`})`;
+  }
+
   // A note's vector (plan #1111), written through the function the sync uses
   // so the hash is the one it would store.
   await admin`
@@ -221,6 +230,7 @@ describe('RLS coverage', () => {
       where n.nspname = 'obsidian' and c.relkind = 'r'
       order by 1`;
     expect(rows.map((r) => r.tablename)).toEqual([
+      'attachments',
       'jev_trial_answers',
       'map_merge_proposals',
       'map_merge_resets',
@@ -1111,5 +1121,56 @@ describe('Maya, across users (plan #1283)', () => {
       admin`insert into maya_gate_checks (user_id, note_id, blob_sha, outcome)
             values (${userA}, ${noteA}, 'sha-Journal/2019-04-02.md', 'skip')`,
     ).rejects.toThrow();
+  });
+});
+
+describe('attachments, across users (plan #1299)', () => {
+  it('shows each account its own attachments only', async () => {
+    const seen = (user: string) =>
+      asUser(user, (tx) => tx<{ user_id: string }[]>`select user_id from attachments`);
+    expect((await seen(userA)).map((r) => r.user_id)).toEqual([userA]);
+    expect((await seen(userB)).map((r) => r.user_id)).toEqual([userB]);
+  });
+
+  it('keeps the table to the sync: the owner writes nothing', async () => {
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into attachments (user_id, connection_id, path, blob_sha, size_bytes, mime_type)
+        values (${userA}, ${connectionA}, 'Attachments/planted.png', 'sha-p', 10, 'image/png')`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userA, (tx) => tx`update attachments set storage_path = null`),
+    ).rejects.toThrow();
+    await expect(asUser(userA, (tx) => tx`delete from attachments`)).rejects.toThrow();
+  });
+
+  it('refuses a row on someone else\'s connection, a stored copy over 50 MB, a copy outside the owner\'s folder and an unkept type', async () => {
+    await expect(
+      admin`insert into attachments (user_id, connection_id, path, blob_sha, size_bytes, mime_type)
+            values (${userB}, ${connectionA}, 'Attachments/other.png', 'sha-o', 10, 'image/png')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into attachments (user_id, connection_id, path, blob_sha, size_bytes, mime_type, storage_path)
+            values (${userA}, ${connectionA}, 'Attachments/huge.mp3', 'sha-h', 52428801, 'audio/mpeg',
+                    ${`${userA}/${connectionA}/sha-h`})`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into attachments (user_id, connection_id, path, blob_sha, size_bytes, mime_type, storage_path)
+            values (${userA}, ${connectionA}, 'Attachments/moved.png', 'sha-m', 10, 'image/png',
+                    ${`${userB}/${connectionA}/sha-m`})`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into attachments (user_id, connection_id, path, blob_sha, size_bytes, mime_type)
+            values (${userA}, ${connectionA}, 'Attachments/diagram.svg', 'sha-s', 10, 'image/svg+xml')`,
+    ).rejects.toThrow();
+  });
+
+  it('keeps a file over 50 MB as a row with no copy', async () => {
+    const [row] = await admin<{ id: string }[]>`
+      insert into attachments (user_id, connection_id, path, blob_sha, size_bytes, mime_type)
+      values (${userA}, ${connectionA}, 'Attachments/long.wav', 'sha-w', 52428801, 'audio/wav')
+      returning id`;
+    expect(row.id).toBeTruthy();
+    await admin`delete from attachments where id = ${row.id}`;
   });
 });
