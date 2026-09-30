@@ -10,7 +10,7 @@ import {
   SUBJECT_ID,
 } from './fixtures/example';
 import { readStoredPoints, thoughtBody, thoughtFromMaterial, MAYA_BODY_MAX } from './thought';
-import { buildThoughtPrompt, MAYA_SYSTEM, THOUGHT_MODEL } from './thought-model';
+import { buildThoughtPrompt, MAX_SEARCHES, MAYA_SYSTEM, THOUGHT_MODEL } from './thought-model';
 
 /**
  * Maya's thought with a fake model client: what is kept of the report once
@@ -257,6 +257,22 @@ describe('the call', () => {
     );
     expect(calls[1]!.tool_choice).toEqual({ type: 'tool', name: 'report_thought' });
     expect(calls[0]!.model).toBe(THOUGHT_MODEL);
+  });
+
+  it('caches the system prompt and the material, and allows two searches', async () => {
+    const calls: Record<string, unknown>[] = [];
+    await thoughtFromMaterial(exampleMaterial(), {
+      client: fakeClient([report({ question: 'q', points: [point(1)] })], calls),
+    });
+    const [call] = calls as { system: unknown; messages: { content: unknown }[]; tools: unknown[] }[];
+    expect(call!.system).toEqual([{ type: 'text', text: MAYA_SYSTEM, cache_control: { type: 'ephemeral' } }]);
+    expect(call!.messages[0]!.content).toEqual([
+      expect.objectContaining({ type: 'text', cache_control: { type: 'ephemeral' } }),
+    ]);
+    expect(MAX_SEARCHES).toBe(2);
+    expect(call!.tools).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'web_search', max_uses: MAX_SEARCHES })]),
+    );
   });
 
   it('sends a paused turn back as it is', async () => {

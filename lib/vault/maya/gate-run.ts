@@ -37,8 +37,11 @@ import { gateRefusal, gateVerdict, type GateNote, type GateOutcome } from './gat
 /** How far back a changed note is still new. The vault syncs daily at 12:33 UTC. */
 export const MAYA_GATE_LOOKBACK_HOURS = 36;
 
-/** The most automatic threads Maya opens for one person in any 24 hours. */
-export const MAYA_DAILY_THOUGHTS = 3;
+/**
+ * The most automatic threads Maya opens for one person in any 24 hours. Cut
+ * from 3 on 30 September 2026 to keep unasked Opus spend to one thought a day.
+ */
+export const MAYA_DAILY_THOUGHTS = 1;
 
 /** The most notes one tick puts to Jev for one person; the rest wait an hour. */
 export const MAYA_GATE_ASKS_PER_RUN = 40;
