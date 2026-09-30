@@ -14,8 +14,10 @@
  *     good reading resets the count, so a page that breaks again later is
  *     reported again.
  *
- * The trend report at the watch's report times (#1294) belongs in
- * `checkWatch`, after the reading is stored.
+ *   - At a report time (#1294, lib/watch/report.ts) the run writes a trend
+ *     report from every value read so far, keeps it on this hour's reading as
+ *     detail.report, sets reported_at and pushes it, whether or not the
+ *     watch fired.
  *
  * Pure: the database, the fetch and the push are ports, wired in
  * inngest/core/watches.ts.
@@ -23,7 +25,11 @@
 
 import { BODY_MAX, clip, TITLE_MAX } from '@/lib/day-brief/notification';
 import type { PushPayload } from '@/lib/push/send';
+import { money, WATCH_URL } from '@/lib/watch/format';
 import type { PriceReading } from '@/lib/watch/parse-price';
+import { buildReport, reportPayload, reportSlot, type ValuePoint, type WatchReport } from '@/lib/watch/report';
+
+export { money, WATCH_URL };
 
 export type WatchCondition = { below?: number; currency?: string };
 
@@ -62,6 +68,12 @@ export type WatchPorts = {
   recent(watch: WatchRow, limit: number): Promise<{ error: string | null }[]>;
   /** Records that the watch fired at this value. */
   fired(watch: WatchRow, value: number, at: Date): Promise<void>;
+  /** The person's timezone (core.account_settings), which report_times are in. */
+  timezone(userId: string): Promise<string>;
+  /** Every reading of the watch that found a value, oldest first. */
+  values(watch: WatchRow): Promise<ValuePoint[]>;
+  /** Sets reported_at, so the same report time is not sent twice. */
+  reported(watch: WatchRow, at: Date): Promise<void>;
   /** Sets status 'ended', only while it is still 'running'. */
   end(watch: WatchRow, at: Date): Promise<void>;
   /** Sends to every device the person switched push on for; false when none could be reached. */
@@ -74,6 +86,8 @@ export type WatchesSummary = {
   watches: number;
   outcomes: Record<WatchOutcome, number>;
   pushes: number;
+  /** Watches that wrote a trend report this run. */
+  reports: number;
   errors: string[];
 };
 
@@ -83,8 +97,6 @@ export const FAILURES_BEFORE_PUSH = 3;
 /** Pages read at the same time; each read gives up after ten seconds. */
 const CONCURRENCY = 4;
 
-/** Where a watch notification opens: the home page's Watching section (#1295). */
-export const WATCH_URL = '/home#watching';
 
 export function belowOf(condition: WatchCondition | null | undefined): number | null {
   const below = condition?.below;
@@ -106,13 +118,6 @@ export function failureStreak(recent: { error: string | null }[]): number {
     streak += 1;
   }
   return streak;
-}
-
-/** A value as money: "$186" for dollars, "186 EUR" otherwise. */
-export function money(value: number, currency: string | null | undefined): string {
-  const amount = Number.isInteger(value) ? String(value) : value.toFixed(2);
-  const code = (currency ?? 'USD').toUpperCase();
-  return code === 'USD' ? `$${amount}` : `${amount} ${code}`;
 }
 
 export function firedPayload(
@@ -160,32 +165,57 @@ export async function checkWatch(
   ports: WatchPorts,
   watch: WatchRow,
   now: Date,
-): Promise<{ outcome: WatchOutcome; pushed: boolean }> {
+): Promise<{ outcome: WatchOutcome; pushes: number; reported: boolean }> {
   if (Date.parse(watch.ends_at) <= now.getTime()) {
     await ports.end(watch, now);
-    return { outcome: 'ended', pushed: false };
+    return { outcome: 'ended', pushes: 0, reported: false };
   }
-  if (watch.reading !== 'lowest_price') return { outcome: 'skipped', pushed: false };
+  if (watch.reading !== 'lowest_price') return { outcome: 'skipped', pushes: 0, reported: false };
 
   const reading = await ports.read(watch);
+
+  // A report time that has come round: the report is written from every value
+  // so far plus this one, and kept on this reading for the home page.
+  let report: WatchReport | null = null;
+  if (watch.report_times.length > 0 && reportSlot(watch, await ports.timezone(watch.user_id), now)) {
+    const points: ValuePoint[] = await ports.values(watch);
+    if (reading.ok) points.push({ value: reading.value, taken_at: now.toISOString() });
+    report = buildReport(watch, points, reading.ok ? { detail: reading.detail } : { error: reading.error });
+  }
+
   await ports.saveReading({
     watch_id: watch.id,
     user_id: watch.user_id,
     taken_at: now.toISOString(),
     value: reading.ok ? reading.value : null,
-    detail: reading.ok ? { ...reading.detail } : {},
+    detail: {
+      ...(reading.ok ? reading.detail : {}),
+      ...(report ? { report } : {}),
+    },
     error: reading.ok ? null : reading.error,
   });
+  if (report) await ports.reported(watch, now);
 
+  let outcome: WatchOutcome;
+  let pushes = 0;
   if (!reading.ok) {
     const streak = failureStreak(await ports.recent(watch, FAILURES_BEFORE_PUSH + 1));
-    if (streak !== FAILURES_BEFORE_PUSH) return { outcome: 'failed', pushed: false };
-    return { outcome: 'failing', pushed: await sendSafely(ports, watch.user_id, failingPayload(watch, reading.error)) };
+    if (streak === FAILURES_BEFORE_PUSH) {
+      outcome = 'failing';
+      if (await sendSafely(ports, watch.user_id, failingPayload(watch, reading.error))) pushes += 1;
+    } else {
+      outcome = 'failed';
+    }
+  } else if (shouldFire(watch, reading.value)) {
+    await ports.fired(watch, reading.value, now);
+    outcome = 'fired';
+    if (await sendSafely(ports, watch.user_id, firedPayload(watch, reading))) pushes += 1;
+  } else {
+    outcome = 'read';
   }
 
-  if (!shouldFire(watch, reading.value)) return { outcome: 'read', pushed: false };
-  await ports.fired(watch, reading.value, now);
-  return { outcome: 'fired', pushed: await sendSafely(ports, watch.user_id, firedPayload(watch, reading)) };
+  if (report && (await sendSafely(ports, watch.user_id, reportPayload(watch, report)))) pushes += 1;
+  return { outcome, pushes, reported: report !== null };
 }
 
 export async function runWatches(ports: WatchPorts, now: Date): Promise<WatchesSummary> {
@@ -194,6 +224,7 @@ export async function runWatches(ports: WatchPorts, now: Date): Promise<WatchesS
     watches: watches.length,
     outcomes: { ended: 0, read: 0, fired: 0, failed: 0, failing: 0, skipped: 0 },
     pushes: 0,
+    reports: 0,
     errors: [],
   };
 
@@ -202,9 +233,10 @@ export async function runWatches(ports: WatchPorts, now: Date): Promise<WatchesS
     while (next < watches.length) {
       const watch = watches[next++];
       try {
-        const { outcome, pushed } = await checkWatch(ports, watch, now);
+        const { outcome, pushes, reported } = await checkWatch(ports, watch, now);
         summary.outcomes[outcome] += 1;
-        if (pushed) summary.pushes += 1;
+        summary.pushes += pushes;
+        if (reported) summary.reports += 1;
       } catch (err) {
         // One watch's failed write does not stop the others.
         summary.errors.push(`${watch.id}: ${err instanceof Error ? err.message : String(err)}`);
