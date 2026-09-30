@@ -138,7 +138,13 @@ function AskDashRoot({ source, children }: { source: AskSource; children: React.
     <AskDashContext.Provider value={handle}>
       {children}
       {session && (
-        <AskDashSheet key={session.key} ask={session.ask} source={source} onClose={close} />
+        <AskDashSheet
+          key={session.key}
+          ask={session.ask}
+          page={pathname}
+          source={source}
+          onClose={close}
+        />
       )}
     </AskDashContext.Provider>
   );
@@ -164,21 +170,23 @@ export function AskDashButton() {
 /**
  * Sends a question and keeps the conversation it started, so the next one in
  * the same thread continues it. `onConversation` hears the ref once there is
- * one, and `onChanges` the changes Dash proposed in each answer.
+ * one, and `onChanges` the changes Dash proposed in each answer. `page` is
+ * the address sent with every question, read when it is sent (plan #1271).
  */
 function useAskSend(
   initialRef: string | null,
+  page: string | null,
   onConversation?: (ref: string) => void,
   onChanges?: (changes: DashChange[]) => void,
 ): TalkSend {
   const source = useAskDash()?.source ?? ACTIONS;
   const ref = useRef(initialRef);
-  const heard = useRef({ onConversation, onChanges });
+  const heard = useRef({ onConversation, onChanges, page });
   useEffect(() => {
-    heard.current = { onConversation, onChanges };
+    heard.current = { onConversation, onChanges, page };
   });
   return useCallback<TalkSend>(async (body) => {
-    const result = await source.ask(body, ref.current);
+    const result = await source.ask(body, ref.current, heard.current.page);
     if (result.conversation && result.conversation.ref !== ref.current) {
       ref.current = result.conversation.ref;
       heard.current.onConversation?.(result.conversation.ref);
@@ -204,6 +212,7 @@ function localToday(): string {
 export function AskThread({
   id,
   conversationRef,
+  page = null,
   turns,
   changes: initialChanges = [],
   onConversation,
@@ -212,6 +221,8 @@ export function AskThread({
 }: {
   id: string;
   conversationRef: string | null;
+  /** The app address each question is asked from; null tells Dash no page. */
+  page?: string | null;
   turns: readonly TalkTurn[];
   changes?: readonly DashChange[];
   onConversation?: (ref: string) => void;
@@ -225,7 +236,7 @@ export function AskThread({
 }) {
   const source = useAskDash()?.source ?? ACTIONS;
   const [changes, setChanges] = useState<DashChange[]>([...initialChanges]);
-  const send = useAskSend(conversationRef, onConversation, (added) =>
+  const send = useAskSend(conversationRef, page, onConversation, (added) =>
     setChanges((current) => [...current.filter((c) => !added.some((a) => a.id === c.id)), ...added]),
   );
   const onChanged = useCallback(
@@ -273,10 +284,13 @@ type View =
 
 function AskDashSheet({
   ask,
+  page,
   source,
   onClose,
 }: {
   ask?: string;
+  /** The page the sheet was opened over, told to Dash with each question. */
+  page: string | null;
   source: AskSource;
   onClose: () => void;
 }) {
@@ -375,6 +389,7 @@ function AskDashSheet({
               <NewQuestion
                 key={threadKey}
                 ask={view.ask}
+                page={page}
                 source={source}
                 hint={hint}
                 onStarted={() => setStarted(true)}
@@ -386,6 +401,7 @@ function AskDashSheet({
               <EarlierQuestion
                 key={threadKey}
                 conversationRef={view.ref}
+                page={page}
                 source={source}
                 hint={hint}
               />
@@ -400,12 +416,14 @@ function AskDashSheet({
 
 function NewQuestion({
   ask,
+  page,
   source,
   hint,
   onStarted,
   onReopen,
 }: {
   ask?: string;
+  page: string | null;
   source: AskSource;
   hint: React.ReactNode;
   onStarted: () => void;
@@ -453,6 +471,7 @@ function NewQuestion({
       <AskThread
         id="ask-dash"
         conversationRef={null}
+        page={page}
         turns={[]}
         onConversation={onStarted}
         label={asked ? 'Ask a follow-up' : 'Ask a question'}
@@ -515,10 +534,12 @@ function Earlier({
 
 function EarlierQuestion({
   conversationRef,
+  page,
   source,
   hint,
 }: {
   conversationRef: string;
+  page: string | null;
   source: AskSource;
   hint: React.ReactNode;
 }) {
@@ -551,6 +572,7 @@ function EarlierQuestion({
       <AskThread
         id={`ask-${conversationRef}`}
         conversationRef={conversationRef}
+        page={page}
         turns={loaded.turns}
         changes={loaded.changes}
         label="Ask a follow-up"
