@@ -15,13 +15,16 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { CAPPED_ORIGINS, cadenceState, STALE_DAYS, suggestionDue, type SuggestionKind } from './cadence';
-import { findOpenings, findPeople, SUGGEST_MODEL, type SeekerContext } from './model';
+import { findOpenings, findPeople, type SeekerContext } from './model';
 import { exclusionWords, personKey, roleKey } from './payload';
 import { openingFeedback } from './feedback';
 import { pickBoardCandidates } from './board-pick';
 import { loadFollowedBoardPostings } from './boards';
 import { readPreferences } from './preferences';
 import type { SearchProgress } from './search-runs';
+import { queueSearch } from './search-batch';
+import { storeOpenings, storePeople, type BoardOrigin } from './store';
+import type { SearchRequest } from './model';
 
 export type KindOutcome = {
   /** False when the cadence said not yet and nothing was asked. */
@@ -31,6 +34,12 @@ export type KindOutcome = {
   headlines: string[];
   spend: SpendReport[];
   error: string | null;
+  /**
+   * The search needed more time than the request had and was sent on as a
+   * Message Batch (search-batch.ts); its run is waiting in 'queued' and the
+   * batch collector finishes it.
+   */
+  queued?: boolean;
 };
 
 type Row = Record<string, unknown>;
@@ -156,6 +165,7 @@ async function runReachOut(
   seeker: SeekerContext,
   past: Row[],
   progress?: SearchProgress,
+  deadline?: number,
 ): Promise<KindOutcome> {
   const spend: SpendReport[] = [];
   await progress?.stage('reach_out', 'searching');
@@ -182,7 +192,7 @@ async function runReachOut(
   ]);
 
   const result = await findPeople(
-    { apiKey, onSpend: (report) => spend.push(report) },
+    { apiKey, deadline, onSpend: (report) => spend.push(report) },
     {
       seeker,
       warm: contacts.filter((row) => WARM.has(row.relationship as string)).map(describe),
@@ -190,30 +200,12 @@ async function runReachOut(
       taken,
     },
   );
-  if (!result.ok) return { ran: true, written: 0, headlines: [], spend, error: result.error };
-
-  const headlines: string[] = [];
-  for (const suggestion of result.suggestions) {
-    const { error: insertError } = await supabase.from('suggestions').insert({
-      user_id: userId,
-      kind: 'reach_out',
-      origin: 'search',
-      company_name: suggestion.company,
-      person_name: suggestion.personName,
-      person_title: suggestion.personTitle,
-      source_url: suggestion.sourceUrl,
-      search_query: suggestion.searchQuery,
-      headline: suggestion.headline,
-      why: suggestion.why,
-      move: suggestion.move,
-      channel: suggestion.channel,
-      message: suggestion.message,
-      model: SUGGEST_MODEL,
-    });
-    if (!insertError) headlines.push(suggestion.headline);
-    // 23505: a goal step already recommended this person.
-    else if (insertError.code !== '23505') console.error('[jobs suggestions] reach_out insert', insertError.message);
+  if (!result.ok) {
+    if (result.queue) return queueOutcome(supabase, apiKey, 'reach_out', result.queue, [], spend, progress);
+    return { ran: true, written: 0, headlines: [], spend, error: result.error };
   }
+
+  const headlines = await storePeople(supabase, userId, result.suggestions);
   return { ran: true, written: headlines.length, headlines, spend, error: null };
 }
 
@@ -225,6 +217,7 @@ async function runApply(
   applications: ApplicationFact[],
   past: Row[],
   progress?: SearchProgress,
+  deadline?: number,
 ): Promise<KindOutcome> {
   const spend: SpendReport[] = [];
   await progress?.stage('apply', 'boards');
@@ -258,7 +251,7 @@ async function runApply(
     taken,
     excludedWords: exclusionWords(seeker.excludedIndustries),
   });
-  const fromBoard = new Map(boardOpenings.map((posting) => [posting.url, posting]));
+  const boardOrigins: BoardOrigin[] = boardOpenings.map((posting) => ({ url: posting.url, company: posting.company }));
   await progress?.stage('apply', 'searching', { boards_read: boards.boardsRead, candidates: boardOpenings.length });
   const locations = new Map<string, number>();
   for (const app of applications.slice(0, 80)) {
@@ -266,7 +259,7 @@ async function runApply(
   }
 
   const result = await findOpenings(
-    { apiKey, onSpend: (report) => spend.push(report) },
+    { apiKey, deadline, onSpend: (report) => spend.push(report) },
     {
       seeker,
       responded: responded.map(label),
@@ -277,29 +270,48 @@ async function runApply(
       taken,
     },
   );
-  if (!result.ok) return { ran: true, written: 0, headlines: [], spend, error: result.error };
+  if (!result.ok) {
+    if (result.queue) return queueOutcome(supabase, apiKey, 'apply', result.queue, boardOrigins, spend, progress);
+    return { ran: true, written: 0, headlines: [], spend, error: result.error };
+  }
 
   await progress?.stage('apply', 'saving');
-  const headlines: string[] = [];
-  for (const opening of result.suggestions) {
-    const board = fromBoard.get(opening.url);
-    const { error } = await supabase.from('suggestions').insert({
-      user_id: userId,
-      kind: 'apply',
-      origin: board ? 'board' : 'search',
-      found_in: board ? `On ${board.company}'s own job board` : null,
-      company_name: opening.company,
-      headline: opening.title,
-      why: opening.why,
-      move: opening.move,
-      url: opening.url,
-      location: opening.location,
-      model: SUGGEST_MODEL,
-    });
-    if (!error) headlines.push(`${opening.title} at ${opening.company}`);
-    else if (error.code !== '23505') console.error('[jobs suggestions] apply insert', error.message);
-  }
+  const headlines = await storeOpenings(supabase, userId, result.suggestions, boardOrigins);
   return { ran: true, written: headlines.length, headlines, spend, error: null };
+}
+
+/**
+ * Send a search that ran out of time on as a Message Batch and leave its run
+ * waiting in 'queued' for the collector (search-batch.ts). Without a run to
+ * hold the batch (the progress log failed to write) there is nowhere to find
+ * it again, so that is reported as the failure it would become.
+ */
+async function queueOutcome(
+  supabase: AppSupabaseClient,
+  apiKey: string,
+  kind: SuggestionKind,
+  request: SearchRequest,
+  boards: BoardOrigin[],
+  spend: SpendReport[],
+  progress?: SearchProgress,
+): Promise<KindOutcome> {
+  const runId = progress?.runId(kind);
+  if (!runId) {
+    return { ran: true, written: 0, headlines: [], spend, error: 'The web search took too long and was stopped. Try again.' };
+  }
+  try {
+    const batchId = await queueSearch(apiKey, runId, request);
+    await progress?.stage(kind, 'queued', { batch_id: batchId, request, board_urls: boards });
+  } catch (err) {
+    return {
+      ran: true,
+      written: 0,
+      headlines: [],
+      spend,
+      error: `The search could not be carried on in the background: ${err instanceof Error ? err.message : 'unknown error'}.`,
+    };
+  }
+  return { ran: true, written: 0, headlines: [], spend, error: null, queued: true };
 }
 
 /**
@@ -336,6 +348,8 @@ export async function runSuggestionsFor(
     now?: Date;
     /** Where each kind's run reports its stage (search-runs.ts); only kinds that run report. */
     progress?: SearchProgress;
+    /** Epoch milliseconds by which the searches must be done; past it they go on as batches. */
+    deadline?: number;
   },
 ): Promise<Record<SuggestionKind, KindOutcome>> {
   if (options.kinds.includes('apply')) await expireStaleOpenings(supabase, userId, options.now);
@@ -380,11 +394,11 @@ export async function runSuggestionsFor(
   };
 
   if (due('reach_out')) {
-    out.reach_out = await runReachOut(supabase, userId, options.apiKey, seeker, past, options.progress);
+    out.reach_out = await runReachOut(supabase, userId, options.apiKey, seeker, past, options.progress, options.deadline);
     await record('reach_out', out.reach_out);
   }
   if (due('apply')) {
-    out.apply = await runApply(supabase, userId, options.apiKey, seeker, applications, past, options.progress);
+    out.apply = await runApply(supabase, userId, options.apiKey, seeker, applications, past, options.progress, options.deadline);
     await record('apply', out.apply);
   }
   return out;

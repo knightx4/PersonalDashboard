@@ -16,6 +16,7 @@ import {
   vaultLookup,
 } from './lookups';
 import type { AskSchema } from './db';
+import { readSpecLookup, specList } from './dev';
 
 /**
  * Dash's read tools (plan #1088): what the model is told it can call, and
@@ -42,6 +43,7 @@ export const ASK_TOOL_NAMES = [
   'todos',
   'goal_status',
   'vault_notes',
+  'read_spec',
 ] as const;
 
 export type AskToolName = (typeof ASK_TOOL_NAMES)[number];
@@ -196,6 +198,29 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'read_spec',
+    description: `Read one of the specs on the Dev specs page, section by section: the documents the app is built against. Pass a query to get the sections that talk about it, each with its full text (up to 6,000 characters) and a link to that section on the spec's page, so you can quote the paragraph that answers the question. Leave the query out, or ask for something no section mentions, and it lists the spec's headings; pass one back as section to read it. Only for the owner of the app, with the Dev workspace on. The specs, by slug: ${specList()}.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        spec: {
+          type: 'string',
+          description: 'The spec\'s slug, as listed above or as search returned it for a spec.',
+        },
+        query: {
+          type: 'string',
+          description: 'The topic in a few words ("em dashes", "how links expire"). Matched against the words of each section.',
+        },
+        section: {
+          type: 'string',
+          description: 'One section to read, by the section a heading list gave it.',
+        },
+      },
+      required: ['spec'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 type Lookup = (ctx: AskContext, input: Record<string, unknown>) => Promise<AskToolResult>;
@@ -211,6 +236,8 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   todos: { run: todosLookup, module: 'todo' },
   goal_status: { run: goalsLookup, module: 'goals' },
   vault_notes: { run: vaultLookup, module: 'vault' },
+  // Checks the owner and the Dev workspace itself (lib/ask/dev.ts).
+  read_spec: { run: readSpecLookup, module: null },
 };
 
 export function isAskToolName(name: string): name is AskToolName {

@@ -102,11 +102,14 @@ function RecommendedSection({
   const searching = pending || !!status?.running;
   // While a search runs in the background, read the page again every few
   // seconds so its stage, and then what it found, show without a reload.
+  // A search a batch is finishing (status.waiting) takes up to an hour and is
+  // collected every ten minutes, so it is checked once a minute instead.
+  const every = status?.waiting ? 60_000 : 8000;
   useEffect(() => {
     if (!status?.running) return;
-    const timer = window.setInterval(() => router.refresh(), 8000);
+    const timer = window.setInterval(() => router.refresh(), every);
     return () => window.clearInterval(timer);
-  }, [status?.running, router]);
+  }, [status?.running, every, router]);
   // Folds to its header (note b4a23b56), and stays folded on this device.
   // Read after mounting, so the server and the first paint agree.
   const foldKey = `jobs.fold.${title}`;
