@@ -19,6 +19,7 @@ function stubFetch(handler: (url: string) => StubResponse) {
       headers: { get: (k: string) => headers[k.toLowerCase()] ?? null },
       json: async () => body,
       text: async () => text ?? '',
+      arrayBuffer: async () => new TextEncoder().encode(text ?? '').buffer,
     } as unknown as Response;
   });
   return calls;
@@ -244,5 +245,12 @@ describe('readBlob', () => {
     const body = await new GithubVaultSource(config).readBlob('sha-1');
     expect(body).toBe('# Hello');
     expect(calls[0]).toContain('/git/blobs/sha-1');
+  });
+
+  it('returns an attachment as bytes, from the same raw endpoint', async () => {
+    const calls = stubFetch(() => ({ text: 'PNG' }));
+    const bytes = await new GithubVaultSource(config).readBlobBytes('sha-2');
+    expect(new TextDecoder().decode(bytes)).toBe('PNG');
+    expect(calls[0]).toContain('/git/blobs/sha-2');
   });
 });

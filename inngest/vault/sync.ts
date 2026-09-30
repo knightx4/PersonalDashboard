@@ -169,6 +169,13 @@ export async function syncOneConnection(
 
     const result = await runVaultSync({ connection, ports });
 
+    const a = result.attachments;
+    if (a.copied || a.removed || a.pending || a.failed) {
+      console.info(
+        `vault: attachments ${a.copied} copied, ${a.removed} removed, ${a.pending} still to copy, ${a.failed} failed, ${a.tooLarge} too large`,
+      );
+    }
+
     await supabase
       .from('sync_runs')
       .update({

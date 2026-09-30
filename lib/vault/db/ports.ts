@@ -2,9 +2,16 @@ import 'server-only';
 
 import { z } from 'zod';
 import { decryptToken } from '@/lib/crypto/tokens';
+import { ATTACHMENT_MAX_BYTES, VAULT_ATTACHMENTS_BUCKET, type AttachmentMimeType } from '@/lib/vault/paths';
 import { createVaultSource } from '@/lib/vault/providers';
+import type { AttachmentPlan, KnownAttachment, KnownAttachments } from '@/lib/vault/sync/attachments';
 import type { KnownNotes } from '@/lib/vault/sync/plan';
-import type { NoteWrite, VaultConnectionRow, VaultSyncPorts } from '@/lib/vault/sync/run';
+import type {
+  NoteWrite,
+  VaultAttachmentPorts,
+  VaultConnectionRow,
+  VaultSyncPorts,
+} from '@/lib/vault/sync/run';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 
 /**
@@ -58,6 +65,153 @@ export async function loadKnownNotes(
   return known;
 }
 
+/** Every attachment row of a connection, keyed by vault path. Paged as notes are. */
+export async function loadKnownAttachments(
+  supabase: VaultSupabaseClient,
+  connectionId: string,
+): Promise<KnownAttachments> {
+  const known = new Map<string, KnownAttachment>();
+
+  for (let from = 0; ; from += CHUNK) {
+    const { data, error } = await supabase
+      .from('attachments')
+      .select('path, blob_sha, size_bytes, mime_type, storage_path')
+      .eq('connection_id', connectionId)
+      .order('path')
+      .range(from, from + CHUNK - 1);
+
+    if (error) throw new Error(`Reading vault attachments failed: ${error.message}`);
+    if (!data?.length) break;
+
+    for (const row of data as Array<{
+      path: string;
+      blob_sha: string;
+      size_bytes: number | string;
+      mime_type: AttachmentMimeType;
+      storage_path: string | null;
+    }>) {
+      known.set(row.path, {
+        blobSha: row.blob_sha,
+        // bigint may come back as a string.
+        sizeBytes: Number(row.size_bytes),
+        mimeType: row.mime_type,
+        storagePath: row.storage_path,
+      });
+    }
+
+    if (data.length < CHUNK) break;
+  }
+
+  return known;
+}
+
+/**
+ * Remove objects from the vault-attachments bucket, but only those no row of
+ * the connection still points at. Copies are shared by content, so a file
+ * deleted at one path may still be in use at another; the database is asked
+ * rather than trusted from memory. Returns the paths it removed.
+ */
+export async function removeUnreferencedAttachmentObjects(
+  supabase: VaultSupabaseClient,
+  connectionId: string,
+  storagePaths: string[],
+): Promise<string[]> {
+  const removed: string[] = [];
+
+  for (let i = 0; i < storagePaths.length; i += CHUNK) {
+    const slice = storagePaths.slice(i, i + CHUNK);
+    const { data, error } = await supabase
+      .from('attachments')
+      .select('storage_path')
+      .eq('connection_id', connectionId)
+      .in('storage_path', slice);
+    if (error) throw new Error(`Checking attachment copies failed: ${error.message}`);
+
+    const inUse = new Set((data ?? []).map((row) => (row as { storage_path: string }).storage_path));
+    const unused = slice.filter((path) => !inUse.has(path));
+    if (!unused.length) continue;
+
+    const { error: removeError } = await supabase.storage
+      .from(VAULT_ATTACHMENTS_BUCKET)
+      .remove(unused);
+    if (removeError) throw new Error(`Removing attachment copies failed: ${removeError.message}`);
+    removed.push(...unused);
+  }
+
+  return removed;
+}
+
+function attachmentPorts(
+  supabase: VaultSupabaseClient,
+  connection: VaultConnectionRow,
+): VaultAttachmentPorts {
+  return {
+    load: () => loadKnownAttachments(supabase, connection.id),
+
+    async applyRows(plan: AttachmentPlan) {
+      // Moves first, so a rename keeps the row's id; then deletes; then the
+      // upserts, which may reuse a path a move has just vacated.
+      for (const move of plan.moves) {
+        const { error } = await supabase
+          .from('attachments')
+          .update({ path: move.to })
+          .eq('connection_id', connection.id)
+          .eq('path', move.from);
+        if (error) throw new Error(`Renaming ${move.from} failed: ${error.message}`);
+      }
+
+      for (let i = 0; i < plan.removes.length; i += CHUNK) {
+        const { error } = await supabase
+          .from('attachments')
+          .delete()
+          .eq('connection_id', connection.id)
+          .in('path', plan.removes.slice(i, i + CHUNK));
+        if (error) throw new Error(`Removing attachments failed: ${error.message}`);
+      }
+
+      for (let i = 0; i < plan.upserts.length; i += CHUNK) {
+        const rows = plan.upserts.slice(i, i + CHUNK).map((row) => ({
+          user_id: connection.user_id,
+          connection_id: connection.id,
+          path: row.path,
+          blob_sha: row.blobSha,
+          size_bytes: row.sizeBytes,
+          mime_type: row.mimeType,
+          storage_path: row.storagePath,
+        }));
+        const { error } = await supabase
+          .from('attachments')
+          .upsert(rows, { onConflict: 'connection_id,path' });
+        if (error) throw new Error(`Writing attachments failed: ${error.message}`);
+      }
+    },
+
+    async removeObjects(storagePaths: string[]) {
+      await removeUnreferencedAttachmentObjects(supabase, connection.id, storagePaths);
+    },
+
+    async upload({ storagePath, mimeType, bytes }) {
+      // upsert: a copy left by a run that died before recording it is simply
+      // written again. The key is the content, so it is the same file.
+      const { error } = await supabase.storage
+        .from(VAULT_ATTACHMENTS_BUCKET)
+        .upload(storagePath, bytes, { contentType: mimeType, upsert: true });
+      if (error) throw new Error(`Uploading ${storagePath} failed: ${error.message}`);
+    },
+
+    async markCopied(blobSha: string, storagePath: string) {
+      const { error } = await supabase
+        .from('attachments')
+        .update({ storage_path: storagePath })
+        .eq('connection_id', connection.id)
+        .eq('blob_sha', blobSha)
+        .is('storage_path', null)
+        .lte('size_bytes', ATTACHMENT_MAX_BYTES);
+      if (error) throw new Error(`Recording the copy of ${blobSha} failed: ${error.message}`);
+    },
+  };
+}
+
 /**
  * Build the ports for one connection.
  *
@@ -79,6 +233,8 @@ export function vaultPortsFor(opts: {
       branch: connection.branch,
       token: opts.accessToken,
     }),
+
+    attachments: attachmentPorts(supabase, connection),
 
     loadKnownNotes: (connectionId) => loadKnownNotes(supabase, connectionId),
 
