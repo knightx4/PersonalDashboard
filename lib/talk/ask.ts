@@ -3,6 +3,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { ASK_TOOLS } from '@/lib/ask/tools';
 import { PROPOSAL_TOOLS } from '@/lib/ask/propose';
 import { citationsOf, toolResultText, type AskToolResult } from '@/lib/ask/db';
+import type { PageContext } from '@/lib/ask/page';
 import { whyNoReport } from '@/lib/learn/graph/tool-call';
 import type { DashChange, NewDashChange } from './changes';
 import { TALK_MODEL } from './reply';
@@ -123,11 +124,36 @@ propose several in one answer.
 
 Anything else, you cannot do. You cannot delete, complete, edit, send or
 change anything else; if they ask you to, say so in a sentence and do not
-propose something near it instead.`;
+propose something near it instead.
+
+THE PAGE THEY ASKED FROM IS CONTEXT FOR "THIS". A line after these rules may say
+which page of the app they asked from, and the row it shows. When the question
+points at that row, by "this", "here", "it" or by its subject, look the row up
+first with the tool the line names, and answer about it. When the question is
+about anything else, ignore the page and answer as if it had not been said.`;
 
 /** What the model is told the date is: after the cache breakpoint, since it changes daily. */
 function dateLine(today: string): string {
   return `Today is ${today} in the person's timezone. Read "this month", "last week" and the like from it.`;
+}
+
+/**
+ * What the model is told about the page the question was asked from (plan
+ * #1271): one line after the date, outside the cached prefix since it changes
+ * with every page. Null when there is no page to tell.
+ */
+export function pageLine(page: PageContext | null | undefined): string | null {
+  if (!page) return null;
+  const at = `They asked from the ${page.page} page (${page.path})`;
+  if (!page.row) return `${at}.`;
+  const { table, ref, title } = page.row;
+  const shown = title.replace(/\s+/g, ' ').trim();
+  // open_row does not take the goals tables; goal_status is how Dash reads
+  // a goal, and a goal's ref is what propose_goal_step names.
+  const reach = table.startsWith('goals.')
+    ? 'open_row does not take goals, so read it through goal_status'
+    : `open_row with table ${table} and ref ${ref} reads it`;
+  return `${at}, which shows "${shown}" (${table}, ref ${ref}): ${reach}.`;
 }
 
 /** Said to the model when a limit is reached, in place of any further lookup. */
@@ -237,6 +263,8 @@ export async function answerQuestion(input: {
   turns: readonly Pick<TalkTurn, 'role' | 'body' | 'citations'>[];
   /** YYYY-MM-DD in the person's timezone. */
   today: string;
+  /** The page the question was asked from; null or absent when none is told. */
+  page?: PageContext | null;
   execute: AskExecutor;
   /** Absent: every proposal is refused. */
   propose?: AskProposer;
@@ -264,6 +292,8 @@ export async function answerQuestion(input: {
     { type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } },
     { type: 'text', text: dateLine(input.today) },
   ];
+  const onPage = pageLine(input.page);
+  if (onPage) system.push({ type: 'text', text: onPage });
 
   const messages: Anthropic.MessageParam[] = [...history];
   let lookups = 0;
@@ -454,6 +484,11 @@ export async function askDash(
     /** An `ask` conversation's ref, to continue it; absent to start a new one. */
     conversationRef?: string | null;
     today: string;
+    /**
+     * The page it was asked from, resolved (lib/ask/page.ts). Not kept with
+     * the conversation: each question carries the page it was asked on.
+     */
+    page?: PageContext | null;
     execute: AskExecutor;
     /** Absent: every proposal is refused. */
     propose?: AskProposalRunner;
@@ -509,6 +544,7 @@ export async function askDash(
   const answer = await answerQuestion({
     turns: [...earlier, ...asked],
     today: input.today,
+    page: input.page,
     execute: input.execute,
     propose: propose ? (name, args, seen) => propose(name, args, seen, save) : undefined,
     anthropicApiKey: input.anthropicApiKey,

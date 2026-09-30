@@ -9,6 +9,7 @@ import {
   ASK_MODEL,
   limitNote,
   MAX_LOOKUPS,
+  pageLine,
   TIME_BUDGET_MS,
   type AskStores,
 } from './ask';
@@ -579,5 +580,65 @@ describe('askDash proposals', () => {
     expect(saved).toEqual(['c1']);
     expect(result.error).toMatch(/^Dash could not answer/);
     expect(changes).toEqual([]);
+  });
+});
+
+describe('the page a question was asked from (plan #1271)', () => {
+  const NOTE_PAGE = {
+    path: '/vault/n/Projects/Kitchen.md',
+    module: 'vault' as const,
+    page: 'Vault note',
+    row: { table: 'obsidian.notes', ref: 'Projects/Kitchen.md', title: 'Kitchen\nrefit', href: '/vault/n/Projects/Kitchen.md' },
+  };
+
+  const ANSWER_ONCE = [reply([use('a', 'answer', { answer: 'It is about the kitchen.', cited: [] })])];
+
+  it('sends one page line after the date line, naming the page and its row, outside the cached prefix', async () => {
+    const { client, sent } = stubClient(ANSWER_ONCE);
+    const { execute } = stubExecute();
+    const { stores } = memoryStores();
+    await askDash(
+      { question: 'What is this about?', today: '2026-09-30', page: NOTE_PAGE, execute, anthropicApiKey: 'k', client },
+      stores,
+    );
+    const system = sent[0].system as (Anthropic.TextBlockParam & { text: string })[];
+    expect(system).toHaveLength(3);
+    expect(system[0].text).toContain('THE PAGE THEY ASKED FROM');
+    expect(system[1].text).toContain('2026-09-30');
+    expect(system[2].text).toBe(
+      'They asked from the Vault note page (/vault/n/Projects/Kitchen.md), which shows "Kitchen refit" ' +
+        '(obsidian.notes, ref Projects/Kitchen.md): open_row with table obsidian.notes and ref Projects/Kitchen.md reads it.',
+    );
+    expect(system[2].cache_control).toBeUndefined();
+  });
+
+  it('sends no page line when there is no page or it was dropped', async () => {
+    for (const page of [null, undefined]) {
+      const { client, sent } = stubClient(ANSWER_ONCE);
+      const { execute } = stubExecute();
+      const { stores } = memoryStores();
+      await askDash(
+        { question: 'What did I spend?', today: '2026-09-30', page, execute, anthropicApiKey: 'k', client },
+        stores,
+      );
+      expect(sent[0].system).toHaveLength(2);
+      expect(sent[0].system.some((b) => b.text.startsWith('They asked from'))).toBe(false);
+    }
+  });
+
+  it('names the page alone when it shows no row, and points goals at goal_status', () => {
+    expect(pageLine({ path: '/jobs/pipeline', module: 'jobs', page: 'Job search: pipeline', row: null })).toBe(
+      'They asked from the Job search: pipeline page (/jobs/pipeline).',
+    );
+    const goal = pageLine({
+      path: '/goals/g-1',
+      module: 'goals',
+      page: 'Goal',
+      row: { table: 'goals.items', ref: 'g-1', title: 'Move to Leeds', href: '/goals/g-1' },
+    });
+    expect(goal).toContain('"Move to Leeds" (goals.items, ref g-1)');
+    expect(goal).toContain('goal_status');
+    expect(goal).not.toContain('open_row with');
+    expect(pageLine(null)).toBeNull();
   });
 });

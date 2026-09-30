@@ -31,14 +31,26 @@ import type { TalkTurn } from '@/lib/talk/talk';
 const Ref = z.string().uuid();
 
 /**
+ * An address in the app, as the sheet's pathname gives it: starts with one
+ * slash (so not `//host`), bounded, one line. Anything else is dropped rather
+ * than refused, since the question still stands without it.
+ */
+const PagePath = z
+  .string()
+  .max(500)
+  .regex(/^\/(?!\/)[^\s]*$/);
+
+/**
  * Ask a question, or carry on the conversation `conversationRef` names. Never
  * throws: a failure comes back as `error`, and the question is kept whenever
- * it could be. Takes up to about twenty seconds.
+ * it could be. Takes up to about twenty seconds. `page` is the app address
+ * it was asked from (plan #1271); null when there is none or it was dropped.
  */
 // latency: pending
 export async function askDashQuestion(
   question: string,
   conversationRef: string | null,
+  page: string | null = null,
 ): Promise<AskDashResult> {
   if (typeof question !== 'string') return { turns: [], error: 'Write a question first.' };
   let ref: string | null = null;
@@ -48,7 +60,12 @@ export async function askDashQuestion(
     ref = parsed.data;
   }
   try {
-    const result = await askDashInRequest({ question, conversationRef: ref });
+    const onPage = page == null ? null : PagePath.safeParse(page);
+    const result = await askDashInRequest({
+      question,
+      conversationRef: ref,
+      page: onPage?.success ? onPage.data : null,
+    });
     // The list of past questions reads the table, so a new question or a new
     // answer has to show there the next time it is opened.
     if (result.conversation) revalidatePath('/ask');
