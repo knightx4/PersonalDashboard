@@ -18,12 +18,16 @@
  *   action, save the list of what was done.
  * - `undoMove` and `markUndone` are the Undo on one line.
  *
- * Five moves, and only five. Close a step, count one towards a rhythm, note
- * progress against a goal, add a step, record a reading of a goal's number
- * (plan #930). Anything needing research is added as
+ * Five moves, and only five. Close a step, count one towards a rhythm, log
+ * progress on a step or goal (plan #1275), add a step, record a reading of a
+ * goal's number (plan #930). Anything needing research is added as
  * a `claude` step for the next scheduled run; capture never starts a run.
+ *
+ * Part of a step's work is progress on that step, never a close: "moved two
+ * of the bags" is 2 bags logged on the bags step, and the step stays open.
  */
 import type { RhythmRecord } from '@/lib/goals/rhythms';
+import { PROGRESS_UNIT_MAX } from '@/lib/goals/progress';
 import { formatReading, parseNumber } from '@/lib/goals/readings';
 import { progressLine } from '@/lib/goals/rhythms';
 import { STEP_TITLE_MAX, type RhythmPeriod, type StepNode } from '@/lib/goals/steps';
@@ -33,8 +37,10 @@ import type { Goal } from '@/lib/goals/tree';
 export const CAPTURE_BODY_MAX = 4000;
 /** The most moves one sentence is filed as. More is the model misreading it. */
 export const MAX_FILED = 8;
-/** The longest progress note kept from one sentence. */
+/** The longest progress text kept from one sentence. */
 export const NOTE_MAX = 1000;
+/** How far back a progress entry's day may go; an older day is read as a misreading. */
+export const PROGRESS_DAY_MAX_AGE = 60;
 /** The most steps shown to the model, so a large tree cannot make the call slow. */
 export const MAX_CONTEXT_STEPS = 300;
 
@@ -166,7 +172,18 @@ export function captureMessage(
 export type PlannedAction =
   | { kind: 'close'; step: CaptureStep }
   | { kind: 'count'; step: CaptureStep }
-  | { kind: 'note'; goal: CaptureGoal; text: string }
+  | {
+      kind: 'progress';
+      /** The goal the entry counts under: the step's goal, or the goal itself. */
+      goal: CaptureGoal;
+      /** The step it sits on, or null when it sits on the goal. */
+      step: CaptureStep | null;
+      text: string;
+      quantity: number | null;
+      unit: string | null;
+      /** YYYY-MM-DD, or null for the day it was filed. */
+      happenedOn: string | null;
+    }
   | { kind: 'reading'; goal: CaptureGoal; value: number }
   | {
       kind: 'add';
@@ -179,14 +196,44 @@ export type PlannedAction =
 
 const text = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
+const DAY_MS = 86_400_000;
+
+/**
+ * The day the model gave for a progress entry, when it is a real date no
+ * later than today and no more than PROGRESS_DAY_MAX_AGE days back. Anything
+ * else is null, which files it on today.
+ */
+export function progressDay(raw: unknown, today: string | null | undefined): string | null {
+  const day = text(raw);
+  if (!today || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const at = Date.parse(`${day}T00:00:00Z`);
+  const now = Date.parse(`${today}T00:00:00Z`);
+  if (!Number.isFinite(at) || !Number.isFinite(now)) return null;
+  // Date.parse rolls 2026-02-30 over to March; only a date that reads back the same is one.
+  if (new Date(at).toISOString().slice(0, 10) !== day) return null;
+  if (at > now || now - at > PROGRESS_DAY_MAX_AGE * DAY_MS) return null;
+  return day;
+}
+
 /**
  * The moves the model asked for, against real rows, in the order it gave
  * them. Anything that names a ref it was not shown, closes a rhythm, counts a
  * step that is not a rhythm with an open period, records a reading against a
  * goal with no unit or without a number, or repeats a move already listed is
  * dropped rather than guessed at. At most MAX_FILED.
+ *
+ * Progress names a step, or a goal when no step fits. It needs its text; an
+ * amount has to be more than nothing, and a unit needs an amount. A move
+ * breaking either is dropped. A day outside the last PROGRESS_DAY_MAX_AGE
+ * days (or with no `today` to check it against) is dropped on its own, and
+ * the entry is filed on today. The goal-only `note` of earlier versions is
+ * read as progress on that goal.
  */
-export function parseFiling(raw: unknown, context: CaptureContext): PlannedAction[] {
+export function parseFiling(
+  raw: unknown,
+  context: CaptureContext,
+  today?: string | null,
+): PlannedAction[] {
   const list =
     raw && typeof raw === 'object' && Array.isArray((raw as { actions?: unknown }).actions)
       ? ((raw as { actions: unknown[] }).actions)
@@ -218,12 +265,35 @@ export function parseFiling(raw: unknown, context: CaptureContext): PlannedActio
         key = `count:${step.id}`;
         break;
       }
+      case 'progress':
       case 'note': {
-        const goal = goals.get(text(entry.goal));
-        const note = text(entry.text).slice(0, NOTE_MAX);
-        if (!goal || !note) break;
-        planned = { kind: 'note', goal, text: note };
-        key = `note:${goal.id}`;
+        // A step when it names one; otherwise the goal. A named step that was
+        // not shown is a bad ref, not a reason to fall back on the goal.
+        const stepRef = entry.type === 'progress' ? text(entry.step) : '';
+        const step = stepRef ? steps.get(stepRef) : null;
+        if (stepRef && (!step || step.kind === 'rhythm')) break;
+        const goal = step
+          ? context.goals.find((g) => g.ref === step.goalRef)
+          : goals.get(text(entry.goal));
+        const said = text(entry.text).slice(0, NOTE_MAX);
+        if (!goal || !said) break;
+
+        const hasQuantity = entry.quantity !== null && entry.quantity !== undefined && entry.quantity !== '';
+        const quantity = hasQuantity ? parseNumber(entry.quantity) : null;
+        if (hasQuantity && (quantity === null || quantity <= 0)) break;
+        const unit = text(entry.unit) || null;
+        if (unit && (quantity === null || unit.length > PROGRESS_UNIT_MAX)) break;
+
+        planned = {
+          kind: 'progress',
+          goal,
+          step: step ?? null,
+          text: said,
+          quantity,
+          unit,
+          happenedOn: progressDay(entry.day, today),
+        };
+        key = `progress:${(step ?? goal).id}`;
         break;
       }
       case 'reading': {
@@ -292,10 +362,30 @@ export type FiledEntry =
       undone_at: string | null;
     }
   | {
+      /**
+       * Written before plan #1275 and no longer produced: a note kept on the
+       * capture alone. Still read, so an old list shows and undoes.
+       */
       kind: 'note';
       goal_id: string;
       goal_title: string;
       text: string;
+      undone_at: string | null;
+    }
+  | {
+      kind: 'progress';
+      /** The goals.progress_entries row the capture wrote, so Undo can take it back. */
+      entry_id: string;
+      /** The step or goal the entry sits on. */
+      item_id: string;
+      /** The step's title, or null when the entry sits on the goal. */
+      step_title: string | null;
+      goal_title: string;
+      text: string;
+      quantity: number | null;
+      unit: string | null;
+      /** YYYY-MM-DD. */
+      happened_on: string;
       undone_at: string | null;
     }
   | {
@@ -327,6 +417,14 @@ export function describeFiled(entry: FiledEntry): string {
       return `Counted one towards "${entry.title}" in ${entry.goal_title}`;
     case 'note':
       return `Noted against ${entry.goal_title}: ${entry.text}`;
+    case 'progress': {
+      const on = entry.step_title
+        ? `"${entry.step_title}" in ${entry.goal_title}`
+        : entry.goal_title;
+      return entry.quantity !== null
+        ? `Logged ${formatReading(entry.quantity, entry.unit)} on ${on}`
+        : `Logged progress on ${on}: ${entry.text}`;
+    }
     case 'reading':
       return `Recorded ${formatReading(entry.value, entry.unit)} for ${entry.goal_title}`;
     case 'add':
@@ -343,7 +441,7 @@ export function readFiled(raw: unknown): FiledEntry[] {
     (entry): entry is FiledEntry =>
       !!entry &&
       typeof entry === 'object' &&
-      ['close', 'count', 'note', 'reading', 'add'].includes((entry as { kind?: unknown }).kind as string),
+      ['close', 'count', 'note', 'progress', 'reading', 'add'].includes((entry as { kind?: unknown }).kind as string),
   );
 }
 
@@ -403,7 +501,7 @@ export async function fileCapture(
   if (!reply.ok) return { ok: false, error: `${reply.error} What you wrote is kept.`, captureId };
 
   const filed: FiledEntry[] = [];
-  for (const action of parseFiling(reply.input, context)) {
+  for (const action of parseFiling(reply.input, context, today)) {
     try {
       const entry = await deps.apply(captureId, action);
       if (entry) filed.push(entry);
@@ -423,6 +521,8 @@ export type UndoMove =
   | { move: 'archive'; stepId: string }
   /** A reading is deleted outright: it was never true, and the history keeps it. */
   | { move: 'delete-reading'; readingId: string }
+  /** A progress entry is marked undone, as everywhere else it is taken back. */
+  | { move: 'undo-progress'; entryId: string }
   /** A note changes no row, so marking it undone is the whole of taking it back. */
   | { move: 'none' };
 
@@ -436,6 +536,8 @@ export function undoMove(entry: FiledEntry): UndoMove {
       return { move: 'archive', stepId: entry.step_id };
     case 'reading':
       return { move: 'delete-reading', readingId: entry.reading_id };
+    case 'progress':
+      return { move: 'undo-progress', entryId: entry.entry_id };
     case 'note':
       return { move: 'none' };
   }

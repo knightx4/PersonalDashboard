@@ -12,7 +12,7 @@ import type { CaptureContext } from '@/lib/goals/capture';
  * picking and leaves it all to Haiku.
  *
  * Either way Haiku still does the filing: it is the call that knows which
- * step "the pantry" means and what the note should say. The move Jev
+ * step "the pantry" means and what the progress should say. The move Jev
  * predicted, or the one the person picked, goes into its message as a hint
  * (`captureHintLine`), which it may still override when the sentence plainly
  * says more than one thing.
@@ -21,15 +21,15 @@ import type { CaptureContext } from '@/lib/goals/capture';
  * can run the question under plain `tsx`.
  */
 
-export type CaptureMove = 'close' | 'count' | 'note' | 'reading' | 'add';
+export type CaptureMove = 'close' | 'count' | 'progress' | 'reading' | 'add';
 
 export const CAPTURE_MOVE_OPTIONS: Readonly<Record<CaptureMove, string>> = {
   close:
-    'It says an existing one-off step or task is now finished: it was done, sent, booked, bought, built, moved or published.',
+    'It says the whole of an existing one-off step or task is now finished, with nothing of it left to do.',
   count:
     'It reports one more occurrence of something done repeatedly on a rhythm, such as attending an event, sending applications, posting, or doing a routine reset.',
-  note:
-    'It reports progress, news or a result towards a goal that finishes no step: a conversation, a lead, a partial step, or how something went.',
+  progress:
+    'It reports part of the work on a step or goal without finishing it, such as some of the bags moved or one of several rooms done, or news, a lead or a result towards a goal.',
   reading:
     'It gives the current value of a number being tracked, such as a balance owed, an amount saved or a weight.',
   add: 'It names something that still has to be done: a new task, a follow-up, or something to look into later.',
@@ -53,7 +53,7 @@ export const CAPTURE_SORT_QUESTION = {
 export const CAPTURE_MOVE_LABELS: Readonly<Record<CaptureMove, string>> = {
   close: 'Close a step',
   count: 'Count one',
-  note: 'Note progress',
+  progress: 'Log progress',
   reading: 'Record a number',
   add: 'Add a step',
 };
@@ -98,7 +98,10 @@ export function captureSortState(
  */
 export function captureHintLine(move: CaptureMove, picked: boolean): string {
   const who = picked ? 'The person says' : 'A classifier is confident';
-  return `${who} this sentence is mainly a "${move}" move. File it as that unless the sentence plainly says otherwise; add other moves only where the sentence also makes them.`;
+  return (
+    `${who} this sentence is mainly a "${move}" move. File it as that unless the sentence plainly says otherwise; add other moves only where the sentence also makes them. ` +
+    'Part of a step\'s work is progress on that step, never a close, whatever this line says.'
+  );
 }
 
 /** The guess the box shows, as the server hands it back. */

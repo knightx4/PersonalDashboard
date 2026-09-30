@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type Anthropic from '@anthropic-ai/sdk';
 import { captureMessage, type CaptureContext } from '@/lib/goals/capture';
+import { askCaptureModel } from '@/lib/goals/capture-model';
 import {
   CAPTURE_MOVE_LABELS,
   CAPTURE_MOVES,
@@ -40,7 +42,9 @@ const context: CaptureContext = {
 
 describe('the capture sort question', () => {
   it('offers exactly the five moves capture files, each with a label', () => {
-    expect(CAPTURE_MOVES).toEqual(['close', 'count', 'note', 'reading', 'add']);
+    expect(CAPTURE_MOVES).toEqual(['close', 'count', 'progress', 'reading', 'add']);
+    expect(CAPTURE_MOVE_LABELS.progress).toBe('Log progress');
+    expect(isCaptureMove('note')).toBe(false);
     expect(Object.keys(CAPTURE_SORT_QUESTION.options)).toEqual(CAPTURE_MOVES);
     for (const move of CAPTURE_MOVES) expect(CAPTURE_MOVE_LABELS[move]).toBeTruthy();
     expect(isCaptureMove('close')).toBe(true);
@@ -74,5 +78,41 @@ describe('the hint in the filing message', () => {
     expect(withHint.indexOf(hint)).toBeGreaterThan(0);
     expect(withHint.indexOf(hint)).toBeLessThan(withHint.indexOf('What happened'));
     expect(captureMessage(context, 'turned on autopay', '2026-09-29')).not.toContain('mainly');
+  });
+});
+
+describe('partial work is progress, not a close (plan #1275)', () => {
+  it('describes a close as the whole step finished, and partial work as progress', () => {
+    expect(CAPTURE_SORT_QUESTION.options.close).not.toMatch(/moved/);
+    expect(CAPTURE_SORT_QUESTION.options.close).toMatch(/whole/);
+    expect(CAPTURE_SORT_QUESTION.options.progress).toMatch(/some of the bags/);
+  });
+
+  it('never lets a hint force a close over part of a step', () => {
+    for (const move of CAPTURE_MOVES) {
+      expect(captureHintLine(move, true)).toContain('never a close');
+    }
+  });
+
+  it('tells Haiku that part of a step is progress and offers the progress move', async () => {
+    let sent: { system?: unknown; tools?: { input_schema: unknown }[] } = {};
+    const client = {
+      messages: {
+        create: async (params: typeof sent) => {
+          sent = params;
+          return { content: [], usage: { input_tokens: 0, output_tokens: 0 } };
+        },
+      },
+    } as unknown as Anthropic;
+    await askCaptureModel({ apiKey: 'test', client }, 'I just moved two bags');
+    const system = String(sent.system).replace(/\s+/g, ' ');
+    expect(system).toContain("part of a step's work");
+    expect(system).toContain('is progress on that step, never a close');
+    expect(system).toContain('Close a step only when the sentence says the whole step is finished');
+    const schema = JSON.stringify(sent.tools?.[0]?.input_schema);
+    expect(schema).toContain('"progress"');
+    expect(schema).not.toContain('"note"');
+    expect(schema).toContain('"quantity"');
+    expect(schema).toContain('"day"');
   });
 });
