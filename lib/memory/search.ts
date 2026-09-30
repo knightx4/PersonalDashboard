@@ -43,6 +43,15 @@ import type { Author } from '@/lib/memory/passages';
  * answer. The recall lookup logs the similarities it saw
  * (`[ask recall]` in the runtime logs), so the floor can be read again from
  * real questions.
+ *
+ * Read again for the Dev passages (plan #1321) on the same day, with real
+ * query embeddings over the 3,729 passages of ideas, notes, steps and raises.
+ * "Where did I say the ideas list should work differently" found the request
+ * to fix the Ideas tab's grouping at 0.57 and the steps that ordered it from
+ * 0.53; "how does the Ideas tab order suggestions" found #1328 at 0.68; a
+ * question whose answer is in a spec not yet embedded still found near Dev
+ * text at 0.38 to 0.52. On-topic Dev text sits well above the floor, so it
+ * stays.
  */
 export const RECALL_MIN_SIMILARITY = 0.3;
 
@@ -70,7 +79,19 @@ export const MEMORY_SOURCE_MODULES: Readonly<Record<string, ModuleId | null>> = 
   'learn.card_notes': 'learn',
   'learn.feed_cards': 'learn',
   'public.order_items': 'shopping',
+  // Dev (plan #1321): embedded for the owner only, and searched only when the
+  // asker is the owner as well (recall checks is_owner before asking for them).
+  'public.ideas': 'dev',
+  'public.feedback_items': 'dev',
+  'public.plan_items': 'dev',
+  'public.raised_items': 'dev',
+  'docs.specs': 'dev',
 };
+
+/** The Dev tables above, which need the owner check as well as the workspace. */
+export const DEV_MEMORY_SOURCES: readonly string[] = Object.entries(MEMORY_SOURCE_MODULES)
+  .filter(([, module]) => module === 'dev')
+  .map(([table]) => table);
 
 /** The source tables whose workspace is on. */
 export function memorySourcesFor(enabled: readonly ModuleId[]): string[] {
