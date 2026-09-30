@@ -74,7 +74,7 @@ export function AddTranscript({ empty }: { empty: boolean }) {
   return <AddTrigger label="Add a transcript" onClick={() => setOpen(true)} className="mb-3" />;
 }
 
-function UploadForm({ onRead, onCancel }: { onRead: (draft: TranscriptDraft) => void; onCancel: () => void }) {
+export function UploadForm({ onRead, onCancel }: { onRead: (draft: TranscriptDraft) => void; onCancel: () => void }) {
   const id = useId();
   const [text, setText] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -99,7 +99,12 @@ function UploadForm({ onRead, onCancel }: { onRead: (draft: TranscriptDraft) => 
           id={`${id}-file`}
           type="file"
           accept={TRANSCRIPT_ACCEPT}
-          className="block w-full text-body text-ink-muted"
+          className={cn(
+            'block w-full text-body text-ink-muted',
+            // The native button reads as plain text in every theme; draw it as a secondary button.
+            'file:mr-3 file:h-(--control-h) file:cursor-pointer file:rounded-control file:border file:border-control',
+            'file:bg-surface file:px-3 file:text-ui file:font-medium file:text-ink hover:file:bg-sunken',
+          )}
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
         />
       </Field>
@@ -164,8 +169,13 @@ const BLANK: DraftCourse = {
   position: 0,
 };
 
-/** The laptop grid: code, title, term, year, credits, grade, and the remove button. */
-const GRID = 'sm:grid-cols-[6rem_minmax(0,1fr)_8.5rem_4.5rem_4.5rem_4.5rem_5.5rem]';
+/**
+ * The wide grid: code, title, term, year, credits, grade, and the remove
+ * button. Below lg the row stacks in six columns (title; code and term; year,
+ * credits and grade), since seven columns leave the title no room at tablet
+ * width.
+ */
+const GRID = 'lg:grid-cols-[7.5rem_minmax(0,1fr)_7.5rem_4rem_4rem_4rem_5.5rem]';
 
 export function CheckCourses({ draft, onDone }: { draft: TranscriptDraft; onDone: () => void }) {
   const id = useId();
@@ -230,7 +240,7 @@ export function CheckCourses({ draft, onDone }: { draft: TranscriptDraft; onDone
       <div className={cn(cardVariants(), 'overflow-hidden')}>
         <div
           className={cn(
-            'hidden gap-2 border-b border-border px-4 py-2 text-small font-medium text-ink-muted sm:grid',
+            'hidden gap-2 border-b border-border px-4 py-2 text-small font-medium text-ink-muted lg:grid',
             GRID,
           )}
           aria-hidden
@@ -246,37 +256,61 @@ export function CheckCourses({ draft, onDone }: { draft: TranscriptDraft; onDone
         <ul className="divide-y divide-border">
           {rows.map((row, index) => (
             <li key={row.key} className="px-4 py-3">
-              <fieldset aria-label={`Course ${index + 1}`} className={cn('grid grid-cols-2 gap-2', GRID)}>
+              <fieldset aria-label={`Course ${index + 1}`} className={cn('grid grid-cols-6 gap-2', GRID)}>
                 <Cell
                   label="Title"
                   name={courseFieldName(row.key, 'title')}
                   value={row.course.title}
                   max={300}
                   required
-                  className="col-span-2 sm:col-span-1 sm:col-start-2 sm:row-start-1"
+                  className="col-span-6 lg:col-span-1 lg:col-start-2 lg:row-start-1"
                 />
                 <Cell
                   label="Code"
                   name={courseFieldName(row.key, 'code')}
                   value={row.course.code}
                   max={50}
-                  className="sm:col-start-1 sm:row-start-1"
+                  className="col-span-3 lg:col-span-1 lg:col-start-1 lg:row-start-1"
                 />
-                <Cell label="Term" name={courseFieldName(row.key, 'term')} value={row.course.term} max={50} />
+                <Cell
+                  label="Term"
+                  name={courseFieldName(row.key, 'term')}
+                  value={row.course.term}
+                  max={50}
+                  className="col-span-3 lg:col-span-1"
+                />
                 <Cell
                   label="Year"
                   name={courseFieldName(row.key, 'year')}
                   value={row.course.year}
                   inputMode="numeric"
+                  className="col-span-2 lg:col-span-1"
                 />
                 <Cell
                   label="Credits"
                   name={courseFieldName(row.key, 'credits')}
                   value={row.course.credits}
                   inputMode="decimal"
+                  className="col-span-2 lg:col-span-1"
                 />
-                <Cell label="Grade" name={courseFieldName(row.key, 'grade')} value={row.course.grade} max={20} />
-                <div className="col-span-2 flex items-end justify-end sm:col-span-1">
+                <Cell
+                  label="Grade"
+                  name={courseFieldName(row.key, 'grade')}
+                  value={row.course.grade}
+                  max={20}
+                  className="col-span-2 lg:col-span-1"
+                />
+                {row.ownSchool && (
+                  <Cell
+                    label="Taken at"
+                    name={courseFieldName(row.key, 'school')}
+                    value={row.course.school}
+                    max={200}
+                    showLabel
+                    className="col-span-6 lg:col-span-4 lg:col-start-2"
+                  />
+                )}
+                <div className="col-span-6 -mt-1 flex items-end justify-end lg:col-span-1 lg:col-start-7 lg:row-start-1 lg:mt-0">
                   <Button
                     type="button"
                     variant="ghost"
@@ -286,16 +320,6 @@ export function CheckCourses({ draft, onDone }: { draft: TranscriptDraft; onDone
                     Leave out
                   </Button>
                 </div>
-                {row.ownSchool && (
-                  <Cell
-                    label="Taken at"
-                    name={courseFieldName(row.key, 'school')}
-                    value={row.course.school}
-                    max={200}
-                    showLabel
-                    className="col-span-2 sm:col-span-3 sm:col-start-2"
-                  />
-                )}
               </fieldset>
               {state.row === row.key && state.error && <FieldError>{state.error}</FieldError>}
             </li>
@@ -347,7 +371,7 @@ function Cell({
 }) {
   return (
     <label className={cn('block min-w-0', className)}>
-      <span className={cn('mb-0.5 block text-small text-ink-muted', !showLabel && 'sm:sr-only')}>{label}</span>
+      <span className={cn('mb-0.5 block text-small text-ink-muted', !showLabel && 'lg:sr-only')}>{label}</span>
       <Input
         name={name}
         defaultValue={value ?? ''}

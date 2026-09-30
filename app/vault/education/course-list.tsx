@@ -179,12 +179,13 @@ function TranscriptRow({ transcript, courses }: { transcript: Transcript; course
         href={transcriptFileHref(transcript.id)}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex min-w-0 flex-1 items-center gap-1.5 text-body text-ink hover:text-accent"
+        className="inline-flex w-full min-w-0 items-center gap-1.5 text-body text-ink hover:text-accent sm:w-auto sm:flex-1"
       >
         <FileText className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
         <span className="truncate">{transcript.file_name}</span>
       </a>
-      <span className="text-small tabular-nums text-ink-muted">
+      {/* On a phone the name takes the whole line and the date and Delete go under it. */}
+      <span className="mr-auto pl-5.5 text-small tabular-nums text-ink-muted sm:mr-0 sm:pl-0">
         Added <time dateTime={transcript.uploaded_at}>{day(transcript.uploaded_at)}</time>
       </span>
       <ConfirmStep
