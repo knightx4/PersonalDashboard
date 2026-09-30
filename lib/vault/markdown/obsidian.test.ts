@@ -105,14 +105,17 @@ describe('unresolved links', () => {
 });
 
 describe('embeds', () => {
-  it('says an attachment was not synced instead of rendering a broken image', () => {
-    // The bytes were never fetched, by design. A broken image icon would
-    // suggest a bug; this states the actual situation.
-    expect(rewrite('![[holiday.png]]')).toBe('*(attachment not synced: holiday.png)*');
+  it('turns a file embed into a markdown image the note page resolves', () => {
+    // The page looks the file up among the vault's attachments; this only
+    // has to hand it over in the one form both kinds of embed share.
+    expect(rewrite('![[holiday.png]]')).toBe('![holiday.png](<holiday.png>)');
+    expect(rewrite('![[lease.pdf]]')).toBe('![lease.pdf](<lease.pdf>)');
   });
 
-  it('does the same for a PDF', () => {
-    expect(rewrite('![[lease.pdf]]')).toContain('attachment not synced');
+  it("keeps Obsidian's size in the alt and the folder in the src", () => {
+    expect(rewrite('![[Photos/Beach day.png|300]]')).toBe(
+      '![Beach day.png|300](<Photos/Beach day.png>)',
+    );
   });
 
   it('renders a note embed as a link rather than inlining it', () => {
