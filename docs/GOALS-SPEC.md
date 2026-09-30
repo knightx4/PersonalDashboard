@@ -413,6 +413,15 @@ It is filed as follows:
 Capture registers as an action in `lib/capture/actions.ts`, which exists for
 this purpose.
 
+Progress short of finishing a step is kept as a progress entry on the step
+or goal it belongs to (plan #1274): the sentence, the day it happened, an
+amount and unit when the sentence gave one ("moved two bags" is 2 bags), or a
+rough answer of started, half or nearly when it did not. A step can also
+carry the total its entries count towards, such as 12 bags, so the page can
+say roughly how much is left. Undo marks an entry undone and leaves the row.
+The rules are in `lib/goals/progress.ts` and the reads and writes in
+`lib/goals/progress-store.ts`.
+
 ## What Claude does, and when
 
 Every automated job is a routine run. Runs count against the Claude plan's
@@ -995,6 +1004,12 @@ A sketch for the migration, not the migration itself.
   and when any of it was undone.
 - `goals.readings`: dated numeric readings against a goal (a balance, a
   weight, a count), never overwritten.
+- `goals.progress_entries`: partial progress on a step or goal, one row per
+  report: `happened_on`, `text`, optional `quantity` with `unit`, optional
+  `estimate` (`started`, `half` or `nearly`), the `capture_id` it was filed
+  from, and `undone_at` once taken back (plan #1274). A step's
+  `estimated_total` and `total_unit` on `goals.items` hold what the entries
+  count towards; a goal's own number stays `unit`, `target` and readings.
 - `goals.periods`: one row per rhythm per period, with target, count and
   whether it was kept.
 - `goals.suggestions`: what Claude suggested, the kind of help it is, your
