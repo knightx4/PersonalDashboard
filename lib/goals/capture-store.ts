@@ -10,6 +10,7 @@ import {
   type FiledEntry,
   type PlannedAction,
 } from '@/lib/goals/capture';
+import { addProgressEntry, undoProgressEntry } from '@/lib/goals/progress-store';
 import { addReading, deleteReading } from '@/lib/goals/readings-store';
 import { liveRhythms } from '@/lib/goals/rhythms';
 import { countTowards, syncRhythms } from '@/lib/goals/rhythms-store';
@@ -93,15 +94,33 @@ export async function applyCaptureAction(
         undone_at: null,
       };
     }
-    case 'note':
-      // Kept on the capture itself: a note changes no goal or step.
+    case 'progress': {
+      // On the step when it named one, else on the goal; dated today unless
+      // the sentence said another day. Tied to the capture.
+      const itemId = action.step?.id ?? action.goal.id;
+      const happenedOn = action.happenedOn ?? today;
+      const id = await addProgressEntry(client, userId, {
+        itemId,
+        text: action.text,
+        happenedOn,
+        quantity: action.quantity,
+        unit: action.unit,
+        captureId,
+      });
+      if (!id) return null;
       return {
-        kind: 'note',
-        goal_id: action.goal.id,
+        kind: 'progress',
+        entry_id: id,
+        item_id: itemId,
+        step_title: action.step?.title ?? null,
         goal_title: action.goal.title,
         text: action.text,
+        quantity: action.quantity,
+        unit: action.unit,
+        happened_on: happenedOn,
         undone_at: null,
       };
+    }
     case 'reading': {
       // Read on the day the sentence was filed, tied to the capture.
       const id = await addReading(client, userId, action.goal.id, {
@@ -156,7 +175,8 @@ export type UndoResult =
  * Reverse one line of a capture and mark it undone. Only that line's row is
  * touched: a reopened step goes back to open, a count is taken back from the
  * period it was added to, an added step is archived, a recorded reading is
- * deleted. A note changes no row.
+ * deleted, a progress entry is marked undone. A note from before plan #1275
+ * changes no row.
  */
 export async function undoFiled(
   client: GoalsSupabaseClient,
@@ -198,6 +218,10 @@ export async function undoFiled(
     case 'delete-reading':
       // False when it was already deleted by hand; either way it is gone.
       await deleteReading(client, move.readingId);
+      break;
+    case 'undo-progress':
+      // False when it was already undone by hand; either way it no longer counts.
+      await undoProgressEntry(client, move.entryId);
       break;
     case 'none':
       break;

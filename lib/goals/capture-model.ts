@@ -23,13 +23,19 @@ sentence.
 
 Decide what the sentence means for those goals, using only these five moves:
 
-- close: a step is finished. "step" is its ref. Only for steps marked mine or
-  claude, never a rhythm.
+- close: the whole of a step is finished. "step" is its ref. Only for steps
+  marked mine or claude, never a rhythm.
 - count: the sentence is one occurrence of a rhythm step (for example "went
   to an event" against a rhythm of one event a week). "step" is its ref. Only
   for steps marked rhythm with a period open.
-- note: progress towards a goal that no step captures, in a short phrase in
-  the person's own terms. "goal" is its ref and "text" is the note.
+- progress: part of the work, done without finishing it. "step" is the ref of
+  the deepest step the sentence fits; when no step fits, leave "step" out and
+  give "goal" instead. "text" says what was done in a short phrase in the
+  person's own terms. When the sentence gives an amount, "quantity" is the
+  number alone and "unit" is what was counted, such as bags, pages or rooms
+  ("moved two bags" is quantity 2, unit bags). "day" is the date it happened
+  as YYYY-MM-DD, only when the sentence names another day than today, such as
+  yesterday; work it out from today's date.
 - reading: the sentence gives the current value of a goal's number, such as a
   balance or a weight. "goal" is its ref and "value" is the number alone, in
   the goal's unit. Only for goals marked "measured in".
@@ -44,10 +50,13 @@ Rules:
 - One sentence can touch several goals. File against each that it plainly
   concerns, and against none that it does not.
 - Prefer a move on an existing step over adding a new one.
-- Do not close a step unless the sentence says it is done.
+- A sentence reporting part of a step's work (some of the bags, one of
+  several rooms, two chapters of a book) is progress on that step, never a
+  close. Close a step only when the sentence says the whole step is finished.
+  When unsure, log progress: the step stays open and nothing is lost.
 - Never invent refs. If nothing fits, return an empty list: the sentence is
   kept either way.
-- Titles and notes are short and plain, with no quotation marks around them.`;
+- Titles and progress text are short and plain, with no quotation marks around them.`;
 
 export type CaptureModelOptions = {
   apiKey: string;
@@ -82,7 +91,10 @@ export async function askCaptureModel(
                 items: {
                   type: 'object',
                   properties: {
-                    type: { type: 'string', enum: ['close', 'count', 'note', 'reading', 'add'] },
+                    type: {
+                      type: 'string',
+                      enum: ['close', 'count', 'progress', 'reading', 'add'],
+                    },
                     step: { type: ['string', 'null'] },
                     goal: { type: ['string', 'null'] },
                     parent: { type: ['string', 'null'] },
@@ -90,6 +102,9 @@ export async function askCaptureModel(
                     kind: { type: ['string', 'null'], enum: ['mine', 'claude', null] },
                     text: { type: ['string', 'null'] },
                     value: { type: ['number', 'null'] },
+                    quantity: { type: ['number', 'null'] },
+                    unit: { type: ['string', 'null'] },
+                    day: { type: ['string', 'null'] },
                   },
                   required: ['type'],
                 },

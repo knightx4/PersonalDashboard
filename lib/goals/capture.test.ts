@@ -143,17 +143,18 @@ describe('parseFiling', () => {
         actions: [
           { type: 'close', step: ref('talk') },
           { type: 'count', step: ref('events') },
-          { type: 'note', goal: ref('friends'), text: ' met someone from a transit nonprofit ' },
+          { type: 'progress', goal: ref('friends'), text: ' met someone from a transit nonprofit ' },
           { type: 'add', parent: ref('city'), title: 'Find the volunteer sign-up', kind: 'claude' },
         ],
       },
       city,
     );
-    expect(planned.map((p) => p.kind)).toEqual(['close', 'count', 'note', 'add']);
+    expect(planned.map((p) => p.kind)).toEqual(['close', 'count', 'progress', 'add']);
     expect((planned[0] as Extract<PlannedAction, { kind: 'close' }>).step.id).toBe('talk');
-    expect((planned[2] as Extract<PlannedAction, { kind: 'note' }>).text).toBe(
-      'met someone from a transit nonprofit',
-    );
+    const progress = planned[2] as Extract<PlannedAction, { kind: 'progress' }>;
+    expect(progress.text).toBe('met someone from a transit nonprofit');
+    expect(progress.step).toBeNull();
+    expect(progress.goal.id).toBe('friends');
     const add = planned[3] as Extract<PlannedAction, { kind: 'add' }>;
     expect(add.goal.id).toBe('city');
     expect(add.parent).toBeNull();
@@ -177,7 +178,8 @@ describe('parseFiling', () => {
           { type: 'close', step: 's99' },
           { type: 'close', step: ref('events') },
           { type: 'count', step: ref('talk') },
-          { type: 'note', goal: ref('friends'), text: '   ' },
+          { type: 'progress', goal: ref('friends'), text: '   ' },
+          { type: 'progress', step: ref('events'), text: 'went to one' },
           { type: 'add', parent: ref('events'), title: 'Under a rhythm' },
           { type: 'add', parent: ref('city'), title: '' },
           { type: 'delete', step: ref('talk') },
@@ -255,8 +257,19 @@ function stubs(input: unknown, overrides: Partial<FilingDeps> = {}) {
           return { kind: 'close', step_id: action.step.id, title: action.step.title, goal_title: action.step.goalTitle, undone_at: null };
         case 'count':
           return { kind: 'count', step_id: action.step.id, title: action.step.title, goal_title: action.step.goalTitle, starts_on: '2026-09-21', undone_at: null };
-        case 'note':
-          return { kind: 'note', goal_id: action.goal.id, goal_title: action.goal.title, text: action.text, undone_at: null };
+        case 'progress':
+          return {
+            kind: 'progress',
+            entry_id: `entry-${applied.length}`,
+            item_id: (action.step ?? action.goal).id,
+            step_title: action.step?.title ?? null,
+            goal_title: action.goal.title,
+            text: action.text,
+            quantity: action.quantity,
+            unit: action.unit,
+            happened_on: action.happenedOn ?? '2026-09-30',
+            undone_at: null,
+          };
         case 'add':
           return { kind: 'add', step_id: 'new-step', title: action.title, step_kind: action.stepKind, goal_title: action.goal.title, undone_at: null };
         case 'reading':
@@ -422,5 +435,129 @@ describe('readings from capture (plan #930)', () => {
     expect(describeFiled(entry)).toBe('Recorded $4,200 for Pay off the debts');
     expect(undoMove(entry)).toEqual({ move: 'delete-reading', readingId: 'r1' });
     expect(readFiled([entry])).toEqual([entry]);
+  });
+});
+
+describe('progress on the deepest step (plan #1275)', () => {
+  // The real apartment tree: the bags step sits two deep, under the living room.
+  const apartment = contextOf(
+    [goal('apartment', { title: 'Make the apartment clean and livable' })],
+    [
+      step('living', 'apartment', { title: 'Living room' }),
+      step('bags', 'living', { title: 'Move the bags to their spot' }),
+      step('plan', 'apartment', { title: 'Create a plan for each room' }),
+      step('clothing', 'plan', { title: 'move clothing bags to office' }),
+    ],
+  );
+  const bags = apartment.steps.find((s) => s.id === 'bags')!;
+  const sentence = 'I just moved two bags from the living room to the office';
+
+  it('shows the model the sub-steps under their parents', () => {
+    const message = captureMessage(apartment, sentence, '2026-09-30');
+    expect(message).toContain('  s1 [mine]: Living room');
+    expect(message).toContain(`    ${bags.ref} [mine]: Move the bags to their spot`);
+  });
+
+  it('files two bags as one progress entry on the bags step and closes nothing', async () => {
+    const reply = {
+      actions: [
+        {
+          type: 'progress',
+          step: bags.ref,
+          text: 'moved two bags from the living room to the office',
+          quantity: 2,
+          unit: 'bags',
+        },
+      ],
+    };
+    const { deps, applied, saved } = stubs(reply, { context: async () => apartment });
+    const result = await fileCapture(sentence, '2026-09-30', deps);
+
+    expect(applied).toEqual([
+      {
+        kind: 'progress',
+        goal: apartment.goals[0],
+        step: bags,
+        text: 'moved two bags from the living room to the office',
+        quantity: 2,
+        unit: 'bags',
+        happenedOn: null,
+      },
+    ]);
+    expect(applied.some((a) => a.kind === 'close')).toBe(false);
+    expect(result.ok && result.filed).toEqual(saved[0]);
+    const [entry] = saved[0]!;
+    expect(describeFiled(entry!)).toBe(
+      'Logged 2 bags on "Move the bags to their spot" in Make the apartment clean and livable',
+    );
+    expect(undoMove(entry!)).toEqual({ move: 'undo-progress', entryId: 'entry-1' });
+    expect(readFiled(saved[0])).toEqual(saved[0]);
+  });
+
+  it('says what was done when there is no amount, and names the goal when no step fits', () => {
+    const base = {
+      kind: 'progress',
+      entry_id: 'e',
+      item_id: 'bags',
+      step_title: 'Move the bags to their spot',
+      goal_title: 'Make the apartment clean and livable',
+      text: 'started on the bags',
+      quantity: null,
+      unit: null,
+      happened_on: '2026-09-30',
+      undone_at: null,
+    } as const;
+    expect(describeFiled(base)).toBe(
+      'Logged progress on "Move the bags to their spot" in Make the apartment clean and livable: started on the bags',
+    );
+    expect(describeFiled({ ...base, item_id: 'apartment', step_title: null })).toBe(
+      'Logged progress on Make the apartment clean and livable: started on the bags',
+    );
+  });
+
+  it('drops progress with a bad ref, an amount of nothing, or a unit with no amount', () => {
+    const planned = parseFiling(
+      {
+        actions: [
+          { type: 'progress', step: 's99', text: 'moved a bag' },
+          { type: 'progress', step: 's99', goal: 'g1', text: 'moved a bag' },
+          { type: 'progress', goal: 'g9', text: 'moved a bag' },
+          { type: 'progress', step: bags.ref, text: 'moved a bag', quantity: 0, unit: 'bags' },
+          { type: 'progress', step: bags.ref, text: 'moved a bag', quantity: -2, unit: 'bags' },
+          { type: 'progress', step: bags.ref, text: 'moved a bag', quantity: 'some' },
+          { type: 'progress', step: bags.ref, text: 'moved a bag', unit: 'bags' },
+          { type: 'progress', step: bags.ref, text: '', quantity: 2, unit: 'bags' },
+        ],
+      },
+      apartment,
+      '2026-09-30',
+    );
+    expect(planned).toEqual([]);
+  });
+
+  it('keeps a day the sentence named, and files a future or long-past day on today', () => {
+    const at = (day: unknown) =>
+      (
+        parseFiling(
+          { actions: [{ type: 'progress', step: bags.ref, text: 'moved a bag', day }] },
+          apartment,
+          '2026-09-30',
+        )[0] as Extract<PlannedAction, { kind: 'progress' }>
+      ).happenedOn;
+    expect(at('2026-09-29')).toBe('2026-09-29');
+    expect(at('2026-09-30')).toBe('2026-09-30');
+    expect(at('2026-10-01')).toBeNull();
+    expect(at('2026-06-01')).toBeNull();
+    expect(at('2026-02-30')).toBeNull();
+    expect(at('yesterday')).toBeNull();
+    expect(at(null)).toBeNull();
+  });
+
+  it('reads the older goal-only note as progress on that goal', () => {
+    const [planned] = parseFiling(
+      { actions: [{ type: 'note', goal: 'g1', text: 'cleared the hallway' }] },
+      apartment,
+    );
+    expect(planned).toMatchObject({ kind: 'progress', step: null, goal: apartment.goals[0] });
   });
 });
