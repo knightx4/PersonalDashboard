@@ -18,7 +18,8 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { planRoutine } from '@/lib/feedback/routine';
+import { planRoutine, projectRoutine, type RoutineTarget } from '@/lib/feedback/routine';
+import { projectById, type DevProject } from './projects';
 import {
   betweenStepsRefusal,
   claimIsLive,
@@ -39,11 +40,48 @@ import {
   isWaitingOnThePerson,
   planLiveness,
   topFeatureOf,
+  type PlanNode,
   type PlanSection,
 } from './tree';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, 'public'>;
+
+/**
+ * Where a row is built: this repository, or a project's (lib/plan/projects).
+ *
+ * Read off the top of the row's tree, because that is what files it under a
+ * section on the plan page; a step's own column can disagree with its root.
+ * A project whose routine is not configured is refused rather than sent on:
+ * with no id, the routine call falls back to the plan routine, which would
+ * build the step in this repository.
+ */
+function builderFor(
+  sections: readonly PlanSection[],
+  node: PlanNode,
+): { ok: true; project: DevProject | null; routine: RoutineTarget } | { ok: false; error: string } {
+  const project = projectById(topFeatureOf(sections, node).module) ?? null;
+  if (!project) return { ok: true, project: null, routine: planRoutine() };
+  const routine = projectRoutine(project);
+  if (!routine.id) {
+    return {
+      ok: false,
+      error: `${project.label} has no routine to build it yet: set ${project.routineEnv.id} and ${project.routineEnv.token}.`,
+    };
+  }
+  return { ok: true, project, routine };
+}
+
+/** The sentence that tells a project's session where it is and what to read. */
+function projectPreamble(project: DevProject): string {
+  const { owner, repo, branch } = project.repo;
+  return (
+    `This step belongs to ${project.label}, the repository ${owner}/${repo} ` +
+    `(${project.url}), not to the dashboard. Work in that repository and follow its ` +
+    `${project.skill}. Merge each closed step to ${branch} and push. Plan rows are read ` +
+    'and written through the Supabase connector, as that skill says.\n\n'
+  );
+}
 
 export type HandOverResult =
   | {
@@ -252,9 +290,20 @@ export async function handStepToClaude(input: {
   // to orchestrate a batch, and neither applies to one step -- reading it is a
   // couple of hundred lines the session then carries for the whole run. A step
   // with anything beneath it is a batch, so it goes to the front door.
+  const builder = builderFor(sections, node);
+  if (!builder.ok) return { ok: false, error: builder.error };
+
   const alone = flatten([node]).length === 1;
   const visions = await loadVisionBodies(supabase, userId);
-  const text = alone
+  const text = builder.project
+    ? projectPreamble(builder.project) +
+      `Build plan step #${node.number}, "${node.title}"${alone ? '' : ', and the steps beneath it'}. ` +
+      'The brief is below; it is the plan as the app holds it right now, and the plan is the ' +
+      'source of truth -- claim the step, build it, verify, commit with the step number in ' +
+      'the subject, and close it with a note.\n\n' +
+      `${QUESTION_RULE}\n\n` +
+      planBrief(sections, node, { thread: true, liveness, visions })
+    : alone
     ? `Build plan step #${node.number}, "${node.title}", following ` +
       '.claude/skills/plan/reference/building.md. The brief is below; it is the plan as the ' +
       'app holds it right now, and the plan is the source of truth -- claim the step, build ' +
@@ -274,7 +323,7 @@ export async function handStepToClaude(input: {
     supabase,
     userId,
     job: 'step',
-    routine: planRoutine(),
+    routine: builder.routine,
     planItemId: node.id,
     text,
   });
@@ -446,8 +495,12 @@ export async function handFeatureToClaude(input: {
   // on it. The session sets it when it claims, one at a time, and clears it
   // when it closes the step -- which is what the plan skill already tells it to
   // do.
+  const builder = builderFor(sections, node);
+  if (!builder.ok) return { ok: false, error: builder.error };
+
   const visions = await loadVisionBodies(supabase, userId);
   const text =
+    (builder.project ? projectPreamble(builder.project) : '') +
     `Work plan feature #${node.number}, "${node.title}", to completion, following ` +
     '.claude/skills/plan/SKILL.md. This is a batch, so it is orchestrated: send each step ' +
     "to its own subagent, in the order the plan gives, and do not read the steps' source " +
@@ -464,7 +517,7 @@ export async function handFeatureToClaude(input: {
     supabase,
     userId,
     job: 'feature',
-    routine: planRoutine(),
+    routine: builder.routine,
     planItemId: node.id,
     text,
   });
