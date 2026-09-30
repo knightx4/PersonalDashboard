@@ -24,6 +24,8 @@ import {
   IDEA_GROUPING_LABEL,
   IDEA_SORTS,
   IDEA_SORT_LABEL,
+  IDEA_RANKING_RULE,
+  DEFAULT_IDEA_SORT,
   type IdeaGrouping,
   type IdeaSort,
 } from '@/lib/ideas/view';
@@ -39,6 +41,7 @@ import { segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
 import { TriageNote } from '@/components/feedback/triage-note';
 import { triageView } from '@/lib/feedback/triage';
+import { ideaScoreView } from '@/lib/ideas/score';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -199,6 +202,36 @@ function IdeaState({ idea }: { idea: IdeaRow }) {
   );
 }
 
+/**
+ * Jev's score on the idea (plan #1328). Nearly every score is under the 0.8
+ * floor, so a "?" on each would mark almost every row: an unsure score is
+ * drawn grey instead, with the confidence in its tooltip and read out to a
+ * screen reader. A sure one is in ink. An idea with no score says so.
+ */
+function IdeaScoreLabel({ idea }: { idea: IdeaRow }) {
+  const score = idea.score ?? null;
+  const view = ideaScoreView(score);
+  if (!score || view.state === 'unscored') {
+    return (
+      <span title={view.title} className="text-small text-ink-ghost">
+        Unscored
+      </span>
+    );
+  }
+  return (
+    <span
+      title={view.title}
+      className={cn(
+        'tabular text-small',
+        view.state === 'sure' ? 'font-semibold text-ink' : 'text-ink-muted',
+      )}
+    >
+      <span aria-hidden>Score {Math.round(score.value)}</span>
+      <span className="sr-only">{view.title}</span>
+    </span>
+  );
+}
+
 function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [saveState, saveAction, savePending] = useActionState(
@@ -229,6 +262,7 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
             Suggested
           </span>
         )}
+        <IdeaScoreLabel idea={idea} />
         <span className="tabular text-small text-ink-muted">{idea.createdAt.slice(0, 10)}</span>
         <CommentCount count={idea.thread.length} />
         {/* Where it stands, drawn the way every other dev queue draws it. An
@@ -334,7 +368,7 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
  * it working before the bundle does.
  *
  * Drawn as two segmented rows and not labelled "Group" and "Sort". The labels
- * on the segments are "By workspace" and "Newest first"; a caption saying
+ * on the segments are "By workspace" and "Highest score first"; a caption saying
  * "Group" over the first of those is the heading explained underneath itself
  * (law 15).
  */
@@ -388,7 +422,7 @@ function Arrange({ grouping, sort }: { grouping: IdeaGrouping; sort: IdeaSort })
     const order = next.sort ?? sort;
     // The defaults are left out, so the plain URL is the plain page.
     if (group !== 'workspace') params.set('group', group);
-    if (order !== 'newest') params.set('sort', order);
+    if (order !== DEFAULT_IDEA_SORT) params.set('sort', order);
     const query = params.toString();
     return query ? `/dev/ideas?${query}` : '/dev/ideas';
   };
@@ -435,7 +469,14 @@ export function IdeasView({
       {/* Only where there is a list to arrange. Two controls over one idea is
           more chrome than content (law 9), and over none of them they would be
           controls that do nothing. */}
-      {mine.length > 1 && <Arrange grouping={grouping} sort={sort} />}
+      {/* The order applies to both lists, so the control shows once there
+          are two ideas across them to put in order. */}
+      {mine.length + suggested.length > 1 && (
+        <div className="space-y-2">
+          <Arrange grouping={grouping} sort={sort} />
+          <p className="text-small text-ink-muted">{IDEA_RANKING_RULE}</p>
+        </div>
+      )}
 
       {total === 0 && (
         // The shared empty state rather than a hand-drawn dashed paragraph:
