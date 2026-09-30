@@ -2,6 +2,7 @@
 
 import { Clock, ExternalLink, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { ModuleMark } from '@/components/ui/module-mark';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { answerItem, completeItem, deferItem, dismissItem } from '@/app/todo/source-actions';
@@ -90,6 +91,17 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          {/* What came from Goals carries the Goals mark, the lime flag, so a
+              step towards a goal is told apart from a task at a glance (note
+              134ec065). The mark rather than a green row: green on this app
+              means money came back (law 4), and the mark is the colour the
+              person asked for with the shape that says why. */}
+          {item.source === 'goal_steps' && (
+            <span className="self-center">
+              <ModuleMark module="goals" size="xs" />
+              <span className="sr-only">From Goals: </span>
+            </span>
+          )}
           {item.link ? (
             <a
               href={item.link.href}
@@ -101,7 +113,9 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
               {item.title}
             </a>
           ) : (
-            <span className={cn('text-ui font-medium text-ink', shown === 'done' && 'line-through')}>
+            <span
+              className={cn('text-ui font-medium text-ink', shown === 'done' && 'line-through')}
+            >
               {item.title}
             </span>
           )}
@@ -159,9 +173,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
         <button
           type="button"
           title="Later"
-          onClick={() =>
-            run({ state: 'deferred', write: () => deferItem(item.source, item.key) })
-          }
+          onClick={() => run({ state: 'deferred', write: () => deferItem(item.source, item.key) })}
           className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
         >
           <Clock className="size-3.5" strokeWidth={1.75} aria-hidden />
