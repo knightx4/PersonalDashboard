@@ -7,7 +7,9 @@
  * written out by hand.
  *
  * `goal` arrived with migrations-goals/0062 (plan #1263): a task handed to
- * Dash as an errand points at the errand it became.
+ * Dash as an errand points at the errand it became. It references
+ * goals.items, which holds steps as well as goals, so a task picked against a
+ * step points at the step through the same column.
  *
  * The six that are not in job_search or obsidian arrived with
  * migrations-todo/0004, so that a picker over everything the search can find

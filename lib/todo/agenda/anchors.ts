@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { sessionClients, type AgendaClients } from '@/lib/todo/agenda/clients';
+import { goalItemHref, type GoalItemRow } from '@/lib/search/sources/goals-map';
 import { LINK_TARGETS, type LinkTarget, type TaskLink } from '@/lib/todo/links/model';
 
 /**
@@ -162,14 +163,32 @@ async function lookup(
     }
 
     if (target === 'goal') {
-      // A task handed to Dash as an errand points at the errand (plan #1263).
+      // A task handed to Dash as an errand points at the errand (plan #1263),
+      // and a task picked against a goal or a step points at that. Goals and
+      // steps share goals.items, so goal_id holds either. A step has no page of
+      // its own: it opens as a row on its goal's page, and its goal is found by
+      // walking parent_id up, as the search's step hits do.
       const supabase = await clients.goals();
-      const { data } = await supabase.from('items').select('id, title').in('id', ids);
-      for (const row of (data ?? []) as Row[]) {
-        into.set(`goal:${row.id as string}`, {
-          label: row.title as string,
-          href: `/goals/${row.id as string}`,
-        });
+      const byId = new Map<string, GoalItemRow>();
+      let wanted = ids;
+      for (let depth = 0; wanted.length > 0 && depth < 8; depth += 1) {
+        const { data } = await supabase
+          .from('items')
+          .select('id, level, parent_id, title, status, kind')
+          .in('id', wanted);
+        for (const row of (data ?? []) as GoalItemRow[]) byId.set(row.id, row);
+        wanted = [
+          ...new Set(
+            ((data ?? []) as GoalItemRow[])
+              .filter((row) => row.level !== 'goal' && row.parent_id && !byId.has(row.parent_id))
+              .map((row) => row.parent_id as string),
+          ),
+        ];
+      }
+      for (const id of ids) {
+        const row = byId.get(id);
+        if (!row) continue;
+        into.set(`goal:${id}`, { label: row.title, href: goalItemHref(row, byId) });
       }
       return;
     }

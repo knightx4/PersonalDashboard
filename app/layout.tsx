@@ -47,11 +47,17 @@ export const metadata: Metadata = {
  * `minimumScale` only forbids zooming *out* past a page that already fits.
  * `maximumScale` and `userScalable` are deliberately left alone, so zooming in
  * -- the one that matters for reading -- is untouched.
+ *
+ * `viewportFit: 'cover'` is what makes `env(safe-area-inset-*)` read anything
+ * at all. Without it every inset is 0 on iOS, so the dock's bottom padding
+ * for the home indicator was nothing and the bar sat under it, cut off (note
+ * 05ff0e56). The shell pads the top bar, the dock and the sides by the insets.
  */
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   minimumScale: 1,
+  viewportFit: 'cover',
 };
 
 /**

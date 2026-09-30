@@ -471,7 +471,7 @@ export function AppShell({
   // hit without looking. The icons stay at the dock's 20px (the icon law);
   // the room is in the padding.
   const dockItem =
-    'press flex w-full flex-col items-center gap-1 px-1 pb-3 pt-3.5 text-micro font-medium';
+    'press flex w-full flex-col items-center gap-1 px-1 pb-3.5 pt-4 text-micro font-medium';
 
   const dockTabs = tabs.map((section) => {
     const Icon = section.icon ? NAV_ICONS[section.icon] : null;
@@ -667,8 +667,8 @@ export function AppShell({
             this reads as the bar picking up its own sidebar's tone. In
             Lightbox it is the difference between a white strip across the top
             of a black bench and one continuous bench. */}
-            <header className="sticky top-0 z-chrome bg-page/85 backdrop-blur">
-              <div className="flex h-16 items-center gap-1 px-3 sm:gap-2 sm:px-5 lg:h-14">
+            <header className="sticky top-0 z-chrome bg-page/85 pt-[env(safe-area-inset-top)] backdrop-blur">
+              <div className="flex h-[4.5rem] items-center gap-1 px-3 sm:gap-2 sm:px-5 lg:h-14">
                 <button
                   type="button"
                   onClick={() => setDrawer(true)}
@@ -862,8 +862,9 @@ export function AppShell({
                 // Takes the leftover height, so the status line below it is held
                 // against the foot of the window rather than the foot of the text.
                 'flex-1',
-                // Room for the tab bar, which is fixed over the foot of the page.
-                'pb-24 lg:pb-6',
+                // Room for the tab bar, which is fixed over the foot of the page,
+                // and for the home indicator it is lifted clear of.
+                'pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-6',
               )}
             >
               {children}
@@ -878,7 +879,7 @@ export function AppShell({
               // holds no sections at all, and a landmark called "Sections" that
               // contains one workspace switcher is a lie to anyone listing them.
               aria-label={tabs.length > 0 ? 'Sections' : 'Workspace'}
-              className="fixed inset-x-0 bottom-0 z-chrome border-t border-shell-border bg-shell/90 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+              className="fixed inset-x-0 bottom-0 z-chrome border-t border-shell-border bg-shell/90 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] backdrop-blur lg:hidden"
             >
               {/* With no sections the switcher is the only cell, so it takes the
               width. Its contents are centred either way, which is what "in the
