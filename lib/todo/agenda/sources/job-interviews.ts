@@ -3,11 +3,13 @@ import 'server-only';
 import { sessionClients } from '@/lib/todo/agenda/clients';
 import { roundDetail, roundLabel, roundsOf } from '@/lib/jobs/interview-groups';
 import { interviewKindLabel } from '@/lib/jobs/interview-kinds';
-import type {
-  AgendaItem,
-  AgendaSource,
-  DayContext,
-  SourceContext,
+import {
+  INTERVIEW_KEY,
+  INTERVIEW_ROUND_KEY,
+  type AgendaItem,
+  type AgendaSource,
+  type DayContext,
+  type SourceContext,
 } from '@/lib/todo/agenda/sources';
 
 /**
@@ -101,7 +103,7 @@ export const jobInterviewsSource: AgendaSource = {
           .map((interview) => interview.group)
           .filter((group): group is NonNullable<typeof group> => group !== null),
       ).map(({ group, interviews: inRound, lead }) => ({
-        key: group ? `interview-round:${group.id}:${lead.day}` : `interview:${lead.id}`,
+        key: group ? `${INTERVIEW_ROUND_KEY}${group.id}:${lead.day}` : `${INTERVIEW_KEY}${lead.id}`,
         day: lead.day,
         // The round starts when its first conversation does, which is what the
         // rest of the day is read against.

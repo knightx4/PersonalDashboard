@@ -127,6 +127,19 @@ export interface SourceContext {
  * belongs on the agenda as context -- what is already in this day -- and
  * nothing more.
  */
+/**
+ * How the interviews source (sources/job-interviews.ts) keys its day context:
+ * one line per round, or per interview outside a round. The morning brief
+ * (lib/day-brief/facts.ts) reads an interview out of the day's context by
+ * these, so a booked meeting from a calendar is not mistaken for one.
+ */
+export const INTERVIEW_ROUND_KEY = 'interview-round:';
+export const INTERVIEW_KEY = 'interview:';
+
+export function isInterviewContext(key: string): boolean {
+  return key.startsWith(INTERVIEW_ROUND_KEY) || key.startsWith(INTERVIEW_KEY);
+}
+
 export interface DayContext {
   key: string;
   /** A calendar day, YYYY-MM-DD, in the reader's zone. */

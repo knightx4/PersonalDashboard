@@ -13,7 +13,28 @@ import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { recordSpend } from '@/lib/core/spend/record';
 import type { CoreOperation } from '@/lib/core/spend/operations';
 import { normalizeTimeZone } from '@/lib/core/timezone';
-import { agendaFacts, briefDay, goalFact, learnFact, newsFact, type BriefFact } from '@/lib/day-brief/facts';
+import {
+  agendaCandidates,
+  agendaFacts,
+  briefDay,
+  candidatesSince,
+  chargeCandidates,
+  collectCandidates,
+  dashResultCandidates,
+  goalFact,
+  learnFact,
+  newsFact,
+  replyCandidates,
+  waitedOnStep,
+  type BriefFact,
+  type Candidate,
+  type ChargeCandidateRow,
+  type DashResultRow,
+  type GoalCandidateItem,
+  type GoalDependencyRow,
+  type ReplyRow,
+} from '@/lib/day-brief/facts';
+import { addDays } from '@/lib/todo/tasks/model';
 import { runDraftsFor, type DraftsResult } from '@/lib/drafts/run';
 import { draftPorts } from '@/inngest/core/drafts';
 import { BRIEF_MODEL, writeBrief } from '@/lib/day-brief/model';
@@ -130,20 +151,164 @@ async function part<T>(work: Promise<T>, fallback: T): Promise<T> {
   }
 }
 
-async function gatherFacts(
+/** When the person's last brief before `day` was written, or null. */
+async function lastBriefAt(core: CoreSupabaseClient, userId: string, day: string): Promise<string | null> {
+  const { data, error } = await core
+    .from('day_briefs')
+    .select('created_at')
+    .eq('user_id', userId)
+    .lt('day', day)
+    .order('day', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`Reading the last brief failed: ${error.message}`);
+  return (data?.created_at as string | undefined) ?? null;
+}
+
+type ReplyThreadRow = {
+  task_id: string;
+  message_id: string | null;
+  email_account_id: string;
+  created_at: string;
+  tasks: { title: string; snoozed_until: string | null } | { title: string; snoozed_until: string | null }[] | null;
+};
+
+/**
+ * Open reply tasks (lib/todo/replies) with when their email arrived. The
+ * message is read by the ids on the person's own threads, since
+ * core.ingested_messages carries no user id.
+ */
+async function readReplies(clients: AgendaClients, userId: string, now: Date): Promise<ReplyRow[]> {
+  const todo = await clients.todo();
+  const { data, error } = await todo
+    .from('reply_threads')
+    .select('task_id, message_id, email_account_id, created_at, tasks!inner ( title, snoozed_until )')
+    .eq('user_id', userId)
+    .eq('tasks.user_id', userId)
+    .eq('tasks.status', 'open')
+    .not('task_id', 'is', null)
+    .limit(100);
+  if (error) throw new Error(`Reading the reply tasks failed: ${error.message}`);
+
+  const threads = ((data ?? []) as unknown as ReplyThreadRow[])
+    .map((row) => ({ row, task: Array.isArray(row.tasks) ? row.tasks[0] : row.tasks }))
+    .filter(({ task }) => task && !(task.snoozed_until && task.snoozed_until > now.toISOString()));
+  const messageIds = threads.map(({ row }) => row.message_id).filter((id): id is string => id !== null);
+
+  const received = new Map<string, string>();
+  if (messageIds.length > 0) {
+    const core = await clients.core();
+    const { data: messages, error: messageError } = await core
+      .from('ingested_messages')
+      .select('id, received_at')
+      .in('id', messageIds)
+      .in('email_account_id', [...new Set(threads.map(({ row }) => row.email_account_id))]);
+    if (messageError) throw new Error(`Reading the reply emails failed: ${messageError.message}`);
+    for (const message of (messages ?? []) as { id: string; received_at: string | null }[]) {
+      if (message.received_at) received.set(message.id, message.received_at);
+    }
+  }
+
+  return threads.map(({ row, task }) => ({
+    task_id: row.task_id,
+    title: task!.title,
+    received_at: (row.message_id && received.get(row.message_id)) || row.created_at,
+  }));
+}
+
+type ChargeRow = Omit<ChargeCandidateRow, 'payee'> & {
+  recurring_payments: { payee: string | null } | { payee: string | null }[] | null;
+};
+
+/** Bills due today or tomorrow, and charges read since the last brief. */
+async function readCharges(
+  clients: AgendaClients,
+  userId: string,
+  day: string,
+  since: string,
+): Promise<ChargeCandidateRow[]> {
+  const shopping = await clients.shopping();
+  const { data, error } = await shopping
+    .from('recurring_charges')
+    .select(
+      'id, payment_id, event, amount_cents, previous_amount_cents, currency, period, due_on, created_at, recurring_payments ( payee )',
+    )
+    .eq('user_id', userId)
+    .or(`and(due_on.gte.${day},due_on.lte.${addDays(day, 1)}),created_at.gte.${since}`)
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (error) throw new Error(`Reading the recurring charges failed: ${error.message}`);
+  return ((data ?? []) as unknown as ChargeRow[]).map(({ recurring_payments: payment, ...row }) => ({
+    ...row,
+    payee: (Array.isArray(payment) ? payment[0] : payment)?.payee ?? null,
+  }));
+}
+
+/** The person's live goal items and the edges between them. */
+async function readGoalTree(
+  clients: AgendaClients,
+  userId: string,
+): Promise<{ items: GoalCandidateItem[]; dependencies: GoalDependencyRow[] }> {
+  const goals = await clients.goals();
+  const [items, dependencies] = await Promise.all([
+    goals
+      .from('items')
+      .select('id, parent_id, level, kind, status, title')
+      .eq('user_id', userId)
+      .is('archived_at', null)
+      .limit(5000),
+    goals.from('dependencies').select('item_id, depends_on_id').eq('user_id', userId).limit(5000),
+  ]);
+  if (items.error) throw new Error(`Reading the goals failed: ${items.error.message}`);
+  if (dependencies.error) throw new Error(`Reading the goal dependencies failed: ${dependencies.error.message}`);
+  return {
+    items: (items.data ?? []) as GoalCandidateItem[],
+    dependencies: (dependencies.data ?? []) as GoalDependencyRow[],
+  };
+}
+
+/** Dash's steps closed since `since` with a result the person has not read. */
+async function readDashResults(clients: AgendaClients, userId: string, since: string): Promise<DashResultRow[]> {
+  const goals = await clients.goals();
+  const { data, error } = await goals
+    .from('items')
+    .select('id, title, result, result_url, closed_at')
+    .eq('user_id', userId)
+    .eq('kind', 'claude')
+    .eq('status', 'done')
+    .is('reviewed_at', null)
+    .is('archived_at', null)
+    .gte('closed_at', since)
+    .or('result.not.is.null,result_url.not.is.null')
+    .order('closed_at', { ascending: false })
+    .limit(20);
+  if (error) throw new Error(`Reading Dash's results failed: ${error.message}`);
+  return (data ?? []) as DashResultRow[];
+}
+
+type Gathered = { facts: BriefFact[]; candidates: Candidate[] };
+
+/**
+ * The day's facts (plan #1123) and its candidates (plan #1237), from one read
+ * of the agenda. Every part fails on its own: a failed part costs its lines
+ * or its candidates, not the brief.
+ */
+async function gatherDay(
   clients: AgendaClients,
   userId: string,
   day: string,
   now: Date,
-): Promise<BriefFact[]> {
-  const account = await loadAccountSettings(userId, await clients.core());
+): Promise<Gathered> {
+  const core = await clients.core();
+  const account = await loadAccountSettings(userId, core);
   const on = (module: Parameters<typeof moduleEnabled>[1]) => moduleEnabled(account, module);
 
-  const [agenda, goal, story, question] = await Promise.all([
-    part(
-      loadAgenda(userId, now, clients).then((loaded) => agendaFacts(loaded.piles, day, loaded.timezone)),
-      [] as BriefFact[],
-    ),
+  const agenda = part(loadAgenda(userId, now, clients), null);
+  const since = part(lastBriefAt(core, userId, day), null).then((at) => candidatesSince(at, now));
+  const tree = on('goals') ? readGoalTree(clients, userId) : null;
+
+  const [facts, goal, story, question, candidates] = await Promise.all([
+    agenda.then((loaded) => (loaded ? agendaFacts(loaded.piles, day, loaded.timezone) : [])),
     on('goals')
       ? part(
           (async () => {
@@ -155,11 +320,34 @@ async function gatherFacts(
       : null,
     on('news') ? part(newsStory(userId, now), null) : null,
     on('learn') ? part(learnQuestion(clients, userId), null) : null,
+    // The specific kinds before the agenda, so a reply task keeps its kind
+    // rather than coming through as a to-do.
+    collectCandidates([
+      on('todo') ? readReplies(clients, userId, now).then((rows) => replyCandidates(rows, now)) : [],
+      on('shopping')
+        ? since.then(async (from) => chargeCandidates(await readCharges(clients, userId, day, from), day, from))
+        : [],
+      tree
+        ? tree.then(({ items, dependencies }) => {
+            const step = waitedOnStep(items, dependencies);
+            return step ? [step] : [];
+          })
+        : [],
+      tree
+        ? Promise.all([tree, since]).then(async ([{ items }, from]) =>
+            dashResultCandidates(await readDashResults(clients, userId, from), items, from),
+          )
+        : [],
+      agenda.then((loaded) => (loaded ? agendaCandidates(loaded.piles, day) : [])),
+    ]),
   ]);
 
-  return [...agenda, goal, newsFact(story), learnFact(question)].filter(
-    (fact): fact is BriefFact => fact !== null,
-  );
+  return {
+    facts: [...facts, goal, newsFact(story), learnFact(question)].filter(
+      (fact): fact is BriefFact => fact !== null,
+    ),
+    candidates,
+  };
 }
 
 /**
@@ -199,6 +387,18 @@ export function pushPorts(core: CoreSupabaseClient, userId: string): PushPorts |
 
 export function dayBriefPorts(core: CoreSupabaseClient, clients: AgendaClients, now: Date): DayBriefPorts {
   const apiKey = process.env.ANTHROPIC_API_KEY ?? null;
+  // One gathering per person and day, read by both facts and candidates.
+  // The ports live for one hourly run, so this holds a few people's days.
+  const gathered = new Map<string, Promise<Gathered>>();
+  const gather = (userId: string, day: string) => {
+    const key = `${userId}:${day}`;
+    let pending = gathered.get(key);
+    if (!pending) {
+      pending = gatherDay(clients, userId, day, now);
+      gathered.set(key, pending);
+    }
+    return pending;
+  };
 
   return {
     async hasBrief(userId, day) {
@@ -212,8 +412,12 @@ export function dayBriefPorts(core: CoreSupabaseClient, clients: AgendaClients, 
       return (data ?? []).length > 0;
     },
 
-    facts(userId, day) {
-      return gatherFacts(clients, userId, day, now);
+    async facts(userId, day) {
+      return (await gather(userId, day)).facts;
+    },
+
+    async candidates(userId, day) {
+      return (await gather(userId, day)).candidates;
     },
 
     async write(day, facts, onSpend) {

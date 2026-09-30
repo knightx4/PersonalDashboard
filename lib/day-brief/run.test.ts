@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SpendReport } from '@/lib/core/spend/pricing';
-import { QUIET_LINE, type BriefFact } from './facts';
+import { QUIET_LINE, type BriefFact, type Candidate } from './facts';
 import { runDayBriefFor, type DayBriefPorts, type DayBriefRow } from './run';
 
 const PERSON = { userId: 'u1', timezone: 'America/New_York' };
@@ -54,7 +54,14 @@ describe('runDayBriefFor', () => {
   it('stores the model brief with its facts, records the spend, then hands the row on', async () => {
     const { ports: p, saved, events } = ports();
     const result = await runDayBriefFor(p, PERSON, MORNING);
-    expect(result).toEqual({ status: 'written', day: '2026-09-28', quiet: false, model: 'claude-haiku-4-5', facts: 2 });
+    expect(result).toEqual({
+      status: 'written',
+      day: '2026-09-28',
+      quiet: false,
+      model: 'claude-haiku-4-5',
+      facts: 2,
+      candidates: 0,
+    });
     expect(saved).toEqual([
       {
         user_id: 'u1',
@@ -94,6 +101,28 @@ describe('runDayBriefFor', () => {
     await runDayBriefFor(p, PERSON, MORNING);
     expect(saved[0]?.model).toBeNull();
     expect(saved[0]?.body).toContain('Interview with Acme');
+  });
+
+  it('counts the candidates, and a failure gathering them costs only them', async () => {
+    const reply: Candidate = {
+      kind: 'reply',
+      key: 'task:t1',
+      taskId: 't1',
+      title: 'Reply to Maya: Offer',
+      href: '/todo/all?status=all&focus=t1',
+      receivedAt: '2026-09-25T15:00:00Z',
+      daysWaiting: 2,
+    };
+    const counted = ports({ candidates: vi.fn(async () => [reply]) });
+    expect(await runDayBriefFor(counted.ports, PERSON, MORNING)).toMatchObject({ status: 'written', candidates: 1 });
+
+    const failing = ports({
+      candidates: vi.fn(async () => {
+        throw new Error('down');
+      }),
+    });
+    expect(await runDayBriefFor(failing.ports, PERSON, MORNING)).toMatchObject({ status: 'written', candidates: 0 });
+    expect(failing.saved).toHaveLength(1);
   });
 
   it('does not hand the row on when another call stored the day first', async () => {

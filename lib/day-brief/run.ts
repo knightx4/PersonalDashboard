@@ -1,5 +1,5 @@
 import type { SpendReport } from '@/lib/core/spend/pricing';
-import { briefDay, checkBrief, isQuiet, plainBrief, QUIET_LINE, type BriefFact } from './facts';
+import { briefDay, checkBrief, isQuiet, plainBrief, QUIET_LINE, type BriefFact, type Candidate } from './facts';
 
 /**
  * One person's morning brief (plan #1123): in their morning window, gather
@@ -26,6 +26,12 @@ export type DayBriefPorts = {
   hasBrief(userId: string, day: string): Promise<boolean>;
   /** The day's facts for this person (lib/day-brief/facts.ts). */
   facts(userId: string, day: string): Promise<BriefFact[]>;
+  /**
+   * What could matter today, from every workspace (plan #1237;
+   * lib/day-brief/facts.ts, Candidate). Counted in the result for now; the
+   * ranking step (#1239) chooses from them.
+   */
+  candidates?(userId: string, day: string, now: Date): Promise<Candidate[]>;
   /** The model's brief, unchecked; null when there is no model to ask. */
   write(
     day: string,
@@ -46,7 +52,7 @@ export type DayBriefPorts = {
 export type DayBriefResult =
   | { status: 'not-morning' }
   | { status: 'already-written'; day: string }
-  | { status: 'written'; day: string; quiet: boolean; model: string | null; facts: number };
+  | { status: 'written'; day: string; quiet: boolean; model: string | null; facts: number; candidates: number };
 
 export async function runDayBriefFor(
   ports: DayBriefPorts,
@@ -59,6 +65,12 @@ export async function runDayBriefFor(
 
   const facts = await ports.facts(person.userId, day);
   const quiet = isQuiet(facts);
+  let candidates: Candidate[] = [];
+  try {
+    candidates = (await ports.candidates?.(person.userId, day, now)) ?? [];
+  } catch {
+    // The candidates are gathered part by part; a failure here costs them, not the brief.
+  }
 
   let body = quiet ? QUIET_LINE : null;
   let model: string | null = null;
@@ -82,5 +94,5 @@ export async function runDayBriefFor(
   const row: DayBriefRow = { user_id: person.userId, day, body, facts, model };
   if (!(await ports.save(row))) return { status: 'already-written', day };
   await ports.written?.(row);
-  return { status: 'written', day, quiet, model, facts: facts.length };
+  return { status: 'written', day, quiet, model, facts: facts.length, candidates: candidates.length };
 }
