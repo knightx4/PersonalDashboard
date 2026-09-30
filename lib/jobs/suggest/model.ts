@@ -298,10 +298,21 @@ async function searchThenReport<T>(
     const budget = timeLeft();
     if (budget < MIN_CALL_MS) return outOfTime(request);
     let response: Anthropic.Message;
+    // Streamed, and read whole with finalMessage(): the SDK refuses a plain
+    // request whose max_tokens could run past ten minutes, whatever timeout
+    // it is given (the press of 30 September failed on exactly that). The
+    // deadline is kept by aborting the stream.
+    const signal = AbortSignal.timeout(budget);
     try {
-      response = await client.messages.create(request, { timeout: budget, maxRetries: 0 });
+      response = await client.messages.stream(request, { signal, timeout: budget, maxRetries: 0 }).finalMessage();
     } catch (error) {
-      if (error instanceof Anthropic.APIConnectionTimeoutError) return outOfTime(request);
+      if (
+        signal.aborted ||
+        error instanceof Anthropic.APIConnectionTimeoutError ||
+        error instanceof Anthropic.APIUserAbortError
+      ) {
+        return outOfTime(request);
+      }
       return failure(error);
     }
     options.onSpend?.({ model: SUGGEST_MODEL, usage: usageFrom(response.usage) });
