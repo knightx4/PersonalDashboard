@@ -22,6 +22,12 @@ import type { BoardPosting } from './board-pick';
 export const BOARD_LIMIT = 80;
 /** Boards read at once. */
 const PARALLEL = 8;
+/**
+ * No new batch starts after this long. Every board read waits up to twelve
+ * seconds (lib/jobs/ats/ssrf.ts), and the web search that follows needs most
+ * of the request's five minutes.
+ */
+export const BOARDS_BUDGET_MS = 30_000;
 
 type CompanyRow = {
   name: string;
@@ -30,7 +36,9 @@ type CompanyRow = {
   ats_board_token: string | null;
 };
 
-export async function loadFollowedBoardPostings(supabase: AppSupabaseClient, userId: string): Promise<BoardPosting[]> {
+export type FollowedBoards = { postings: BoardPosting[]; boardsRead: number };
+
+export async function loadFollowedBoardPostings(supabase: AppSupabaseClient, userId: string): Promise<FollowedBoards> {
   const { data, error } = await supabase
     .from('companies')
     .select('name, industry, ats_type, ats_board_token')
@@ -41,7 +49,7 @@ export async function loadFollowedBoardPostings(supabase: AppSupabaseClient, use
     .limit(BOARD_LIMIT);
   if (error) {
     console.error('[jobs suggestions] followed boards', error.message);
-    return [];
+    return { postings: [], boardsRead: 0 };
   }
   const companies = ((data ?? []) as CompanyRow[]).filter(
     (row): row is CompanyRow & { ats_type: BoardVendor; ats_board_token: string } =>
@@ -49,11 +57,14 @@ export async function loadFollowedBoardPostings(supabase: AppSupabaseClient, use
   );
 
   const postings: BoardPosting[] = [];
-  for (let i = 0; i < companies.length; i += PARALLEL) {
+  let boardsRead = 0;
+  const began = Date.now();
+  for (let i = 0; i < companies.length && Date.now() - began < BOARDS_BUDGET_MS; i += PARALLEL) {
     const batch = companies.slice(i, i + PARALLEL);
     const results = await Promise.allSettled(batch.map((row) => fetchBoard(row.ats_type, row.ats_board_token)));
     results.forEach((result, index) => {
       if (result.status !== 'fulfilled') return;
+      boardsRead += 1;
       const company = batch[index];
       for (const posting of result.value) {
         if (!posting.url || !posting.title) continue;
@@ -67,5 +78,5 @@ export async function loadFollowedBoardPostings(supabase: AppSupabaseClient, use
       }
     });
   }
-  return postings;
+  return { postings, boardsRead };
 }

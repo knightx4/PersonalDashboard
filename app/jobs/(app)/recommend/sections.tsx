@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { ChevronDown, Copy, ExternalLink, Mail, Search, Sparkles } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -28,6 +29,7 @@ import {
 } from '@/lib/jobs/suggest/scores';
 import { DISMISS_REASON_LABELS, DISMISS_REASONS } from '@/lib/jobs/suggest/feedback';
 import { formatCost, OPENING_ORIGIN_LABELS, type OriginStats } from '@/lib/jobs/suggest/stats';
+import type { RunLine } from '@/lib/jobs/suggest/search-runs';
 import {
   dismissOpening,
   dismissSuggestion,
@@ -58,12 +60,13 @@ function RecommendedSection({
   hint,
   empty,
   button,
-  searching,
+  searching: searchingLabel,
   paidHint,
   action,
   count,
   toolbar,
   footer,
+  status,
   children,
 }: {
   title: string;
@@ -79,10 +82,21 @@ function RecommendedSection({
   toolbar?: React.ReactNode;
   /** Shown under the list while it is open, whether or not anything is in it. */
   footer?: React.ReactNode;
+  /** How the latest search went, or what it is doing (search-runs.ts). */
+  status?: RunLine | null;
   children: React.ReactNode;
 }) {
   const [pending, run] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
+  const router = useRouter();
+  const searching = pending || !!status?.running;
+  // While a search runs in the background, read the page again every few
+  // seconds so its stage, and then what it found, show without a reload.
+  useEffect(() => {
+    if (!status?.running) return;
+    const timer = window.setInterval(() => router.refresh(), 8000);
+    return () => window.clearInterval(timer);
+  }, [status?.running, router]);
   // Folds to its header (note b4a23b56), and stays folded on this device.
   // Read after mounting, so the server and the first paint agree.
   const foldKey = `jobs.fold.${title}`;
@@ -110,6 +124,7 @@ function RecommendedSection({
     run(async () => {
       const result = await action();
       setNotice(result.error ?? result.message ?? null);
+      router.refresh();
     });
   };
 
@@ -133,8 +148,8 @@ function RecommendedSection({
           {count > 0 && <span className="tabular text-small text-ink-muted">{count}</span>}
         </button>
         <span className="flex items-center gap-2">
-          <Button type="button" size="sm" variant="ghost" pending={pending} onClick={ask}>
-            {pending ? searching : button}
+          <Button type="button" size="sm" variant="ghost" pending={searching} onClick={ask}>
+            {searching ? searchingLabel : button}
           </Button>
           {paidHint}
         </span>
@@ -142,12 +157,21 @@ function RecommendedSection({
       {!folded && (
         <>
           <p className="mb-2 text-small text-ink-muted">{count > 0 ? hint : empty}</p>
+          {status && (
+            <p
+              role="status"
+              className={cn('mb-2 text-small', status.tone === 'warn' ? 'text-caution' : 'text-ink-muted')}
+            >
+              {status.text}
+            </p>
+          )}
           {notice && <p className="mb-2 text-small text-ink-muted">{notice}</p>}
           {count > 0 && toolbar}
           {count > 0 && <ul className="divide-y divide-border">{children}</ul>}
           {footer}
         </>
       )}
+      {folded && status?.running && <p className="mt-1 text-small text-ink-muted">{status.text}</p>}
       {folded && notice && <p className="mt-1 text-small text-ink-muted">{notice}</p>}
     </Card>
   );
@@ -178,8 +202,11 @@ export function RecommendedRoles({
   suggestions,
   stats = [],
   searchCostMicros = 0,
+  searchLine = null,
 }: {
   suggestions: OpenSuggestion[];
+  /** How the latest roles search went (search-runs.ts `describeRun`). */
+  searchLine?: RunLine | null;
   /** Each source's record (lib/jobs/suggest/stats.ts). */
   stats?: OriginStats[];
   /** What the web searches have cost in all, in micro-dollars. */
@@ -206,6 +233,7 @@ export function RecommendedRoles({
       action={suggestOpenings}
       count={suggestions.length}
       footer={<SourceStats stats={stats} searchCostMicros={searchCostMicros} />}
+      status={searchLine}
       toolbar={
         scored ? (
           <OpeningControls

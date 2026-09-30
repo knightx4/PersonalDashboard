@@ -30,6 +30,13 @@ import { preferenceLines, type JobPreferences } from './preferences';
 export const SUGGEST_MODEL = 'claude-sonnet-5';
 /** Each search is billed, and its results come back as input. */
 const MAX_SEARCHES = 5;
+/**
+ * Each of the (at most two) calls gives up after this long, without retrying,
+ * so a search and the board reads before it finish inside the five minutes
+ * the request that runs them is allowed. A search that ran past the limit
+ * used to be cut off with nothing saved and nothing said.
+ */
+const CALL_TIMEOUT_MS = 110_000;
 const GOALS_MAX_CHARS = 8_000;
 const RESUME_MAX_CHARS = 5_000;
 
@@ -89,6 +96,9 @@ function seekerText(seeker: SeekerContext): string {
 }
 
 function failure(error: unknown): { ok: false; error: string } {
+  if (error instanceof Anthropic.APIConnectionTimeoutError) {
+    return { ok: false, error: 'The web search took too long and was stopped. Try again.' };
+  }
   if (error instanceof Anthropic.RateLimitError) {
     return { ok: false, error: 'Dash is rate-limited right now. Try again in a minute.' };
   }
@@ -176,7 +186,7 @@ export async function findPeople(
   options: SuggestOptions,
   input: PeopleInput,
 ): Promise<SuggestResult<PersonSuggestion>> {
-  const client = options.client ?? new Anthropic({ apiKey: options.apiKey });
+  const client = options.client ?? new Anthropic({ apiKey: options.apiKey, timeout: CALL_TIMEOUT_MS, maxRetries: 0 });
   const prompt =
     seekerText(input.seeker) +
     listed('People they know who could introduce them (a good way in, not a suggestion on their own)', input.warm, 30) +
@@ -384,7 +394,7 @@ export async function findOpenings(
   options: SuggestOptions,
   input: OpeningsInput,
 ): Promise<SuggestResult<OpeningSuggestion>> {
-  const client = options.client ?? new Anthropic({ apiKey: options.apiKey });
+  const client = options.client ?? new Anthropic({ apiKey: options.apiKey, timeout: CALL_TIMEOUT_MS, maxRetries: 0 });
   const prompt =
     seekerText(input.seeker) +
     listed('Applications that got a reply from a person', input.responded, 20) +

@@ -162,6 +162,7 @@ export const jobsSources: ModuleSources = {
     { table: 'job_search.interview_participants', reason: 'Join rows between interviews and contacts.' },
     { table: 'job_search.jev_trial_answers', reason: 'A classifier trial\'s answers on mail already labelled; the labels are in ingested_messages.' },
     { table: 'job_search.message_link_dismissals', reason: 'Dismissed suggestions in the inbox.' },
+    { table: 'job_search.search_runs', reason: 'When Dash searched for roles and people, and how each run ended; what it found is in suggestions.' },
     { table: 'job_search.quiet_dismissals', reason: 'Dismissed quiet-application nudges.' },
     { table: 'job_search.waiting_dismissals', reason: 'Dismissed waiting-on-reply nudges.' },
   ],
