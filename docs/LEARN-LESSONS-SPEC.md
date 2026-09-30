@@ -284,8 +284,9 @@ Next up is worked out in `planProgress` (`lib/learn/lessons/plan-view.ts`),
 and the reads are in `lib/learn/lessons/plan-store.ts`. A piece skipped
 earlier becomes Next up again once the pieces after it are passed.
 
-Learn now lists each plan above the deck, with its progress and a link to its
-Next up piece, and each goal on the Goals page links to its plan.
+Learn's Home tab, `/learn/home`, lists each plan with its progress and a
+link to its Next up piece (plan #1310; the list sat above the Learn now deck
+until then), and each goal on the Goals page links to its plan.
 
 A goal's lessons live on its plan, so Learn now deals none of them. The
 chooser gives a goal's track no lesson slot, and the deck and the count that
@@ -341,7 +342,7 @@ shaky. A right answer leaves it known, or sharp if it was sharp. Either way
 the idea is marked tested. An idea already on the schedule from an earlier
 piece keeps the gap it has.
 
-Due questions show in two places. Learn now lists up to five above the plans,
+Due questions show in two places. Learn now lists up to five above the deck,
 most overdue first, each naming the plan and piece it came from. A piece's
 page opens with up to two from the same plan, leaving out the piece's own
 ideas. A row starts with the idea's name and Ask me. Haiku writes one question
@@ -390,8 +391,8 @@ A plan is finished when its project is passed and every piece is passed
 pieces yet means the piece total is not final, so a plan with one is not
 finished. A unit added after the plan was finished makes it unfinished again
 until its pieces are passed. The plan page's progress line, the Your plans
-shelf on Learn now and the goal's line on the Goals page all say Finished. On
-the shelf, a plan with every piece passed and the project not yet passed
+list on Home and the goal's line on the Goals page all say Finished. On
+Home, a plan with every piece passed and the project not yet passed
 links to the project as Next up. Passed pieces keep coming back as review
 questions after the plan is finished.
 
