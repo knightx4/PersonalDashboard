@@ -3,6 +3,8 @@ import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 import { remarkObsidianMath } from '@/lib/vault/markdown/math';
 
 import 'katex/dist/katex.min.css';
@@ -47,10 +49,15 @@ const KATEX = {
  * shipped to the browser but the stylesheet. `remarkObsidianMath` is what
  * keeps "$20 or $30" two prices rather than one expression; remark-math on
  * its own reads any pair of dollar signs as a formula.
+ *
+ * The note sits on a card rather than straight on the page (note 9c17324b):
+ * the page ground is the room, and the note is the object in it, the same
+ * surface the properties above it already sit on. Code blocks and tables keep
+ * their sunken fill, which reads against the card as it did against the page.
  */
 export function NoteBody({ markdown }: { markdown: string }) {
   return (
-    <div className="vault-prose">
+    <div className={cn(cardVariants({ padding: 'standard' }), 'vault-prose')}>
       <Markdown
         remarkPlugins={[remarkGfm, remarkMath, remarkObsidianMath]}
         rehypePlugins={[[rehypeKatex, KATEX]]}
