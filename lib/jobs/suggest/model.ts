@@ -24,6 +24,8 @@ import {
   type OpeningSuggestion,
   type PersonSuggestion,
 } from './payload';
+import type { BoardPosting } from './board-pick';
+import { preferenceLines, type JobPreferences } from './preferences';
 
 export const SUGGEST_MODEL = 'claude-sonnet-5';
 /** Each search is billed, and its results come back as input. */
@@ -42,6 +44,8 @@ export type SeekerContext = {
   banned: readonly string[];
   /** Industries never to suggest; checked again after the call. */
   excludedIndustries: readonly string[];
+  /** Location, workplace, pay floor and company stage, as set on /jobs/settings. */
+  preferences: JobPreferences;
 };
 
 export type SuggestOptions = {
@@ -75,6 +79,8 @@ function seekerText(seeker: SeekerContext): string {
   if (seeker.excludedIndustries.length > 0) {
     lines.push(`Industries they will not work in: ${seeker.excludedIndustries.join(', ')}`);
   }
+  const preferences = preferenceLines(seeker.preferences);
+  if (preferences.length > 0) lines.push('', 'What they want from a job (rules, not wishes):', ...preferences);
   if (seeker.goals.length > 0) {
     lines.push('', 'What they wrote about the job they want, newest first (the newer entry wins):', '', goalsText(seeker.goals));
   }
@@ -320,6 +326,18 @@ Rules:
   a finance job at a crypto firm is still a crypto job. When the industry is
   unclear, look it up before reporting the posting.
 - Match the location and seniority their writing and past roles point to.
+  Where they have set what they want from a job (where they live, how they
+  will work, the lowest base pay, company stages), treat it as a rule: leave
+  out a posting that states pay below the floor or a workplace they will not
+  take. A posting that does not state pay can still go in.
+- Learn from what they did with earlier suggestions. Roles they saved show
+  what they want more of. Roles they turned down, with the reason, show what
+  to avoid: the same level, place, kind of work or company that drew the
+  reason. Never suggest a company they turned down for being that company.
+- Some openings on the boards of companies they follow may be listed. They
+  are open now (read from the company's own board today) and need no search
+  to confirm. Include the ones that fit as well as anything the search finds,
+  using the link as given; leave out the rest.
 - Weigh the newest career goals entry most. When it names the kind of work or
   company they want most, fill the list with that first. When it asks for
   fewer of a kind of role without ruling it out, include at most one of that
@@ -346,8 +364,15 @@ export type OpeningsInput = {
   recent: readonly string[];
   /** Places the recent roles were in. */
   locations: readonly string[];
-  /** Postings already suggested, by link, and roles already on file, by roleKey. */
-  taken: { urls: ReadonlySet<string>; roles: ReadonlySet<string> };
+  /** Earlier suggestions they saved ("Title at Company") and turned down ("Title at Company (reason)"). */
+  feedback: { saved: readonly string[]; dismissed: readonly string[] };
+  /** Open postings on the followed companies' boards, already narrowed (board-pick.ts). */
+  boardOpenings: readonly BoardPosting[];
+  /**
+   * Postings already suggested, by link, roles already on file, by roleKey,
+   * and companies turned down for being that company, by companyKey.
+   */
+  taken: { urls: ReadonlySet<string>; roles: ReadonlySet<string>; companies: ReadonlySet<string> };
 };
 
 function listed(title: string, items: readonly string[], max: number): string {
@@ -365,6 +390,13 @@ export async function findOpenings(
     listed('Applications that got a reply from a person', input.responded, 20) +
     listed('Roles they applied to recently (do not suggest these)', input.recent, 40) +
     listed('Where their recent roles were', input.locations, 8) +
+    listed('Suggested roles they saved (more like these)', input.feedback.saved, 30) +
+    listed('Suggested roles they turned down, and why', input.feedback.dismissed, 30) +
+    listed(
+      'Open now on the boards of companies they follow (title | company | location | link)',
+      input.boardOpenings.map((p) => `${p.title} | ${p.company} | ${p.location ?? 'location not given'} | ${p.url}`),
+      40,
+    ) +
     `\n\nSearch, then call ${OPENINGS_TOOL} once with every posting.`;
 
   return searchThenReport(client, options, {

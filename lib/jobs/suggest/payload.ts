@@ -7,10 +7,11 @@
  * trimmed to the column limits and has the person's banned constructions taken
  * out where that can be done without rewriting (the em dash, above all). A
  * suggestion in an industry the person excluded is dropped, whatever the model
- * made of the rule.
+ * made of the rule, and so is a posting at a company they turned down for
+ * being that company.
  */
 export const MAX_OUTREACH = 3;
-export const MAX_OPENINGS = 5;
+export const MAX_OPENINGS = 8;
 
 export const CHANNELS = [
   'linkedin_dm',
@@ -74,15 +75,53 @@ function clean(value: unknown, max: number): string | null {
   return read === null ? null : cleanText(read);
 }
 
+/** A company name reduced to what two spellings of it share. */
+export function companyKey(name: string | null | undefined): string {
+  return (name ?? '')
+    .toLowerCase()
+    .replace(/\b(inc|llc|ltd|corp|corporation|co|company|technologies|labs|hq)\b/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Short forms written out, so "Sr. FP&A Mgr" and "Senior Financial Planning
+ * and Analysis Manager" meet. Applied in order, to lower-cased text.
+ */
+const TITLE_FORMS: readonly (readonly [RegExp, string])[] = [
+  [/\bfinancial planning\s*(?:and|&)\s*analysis\b/g, 'fpa'],
+  [/\bfp\s*&\s*a\b/g, 'fpa'],
+  [/\bbiz\s*ops\b/g, 'business operations'],
+  [/\bsr\b\.?/g, 'senior'],
+  [/\bjr\b\.?/g, 'junior'],
+  [/\bmgr\b\.?/g, 'manager'],
+  [/\bassoc\b\.?/g, 'associate'],
+  [/\bdir\b\.?/g, 'director'],
+  [/\bsvp\b/g, 'senior vice president'],
+  [/\bvp\b/g, 'vice president'],
+  [/\beng\b\.?/g, 'engineer'],
+  [/\bops\b/g, 'operations'],
+  [/\bstrat\b\.?/g, 'strategy'],
+  [/&/g, ' and '],
+];
+
+/**
+ * A job title reduced to what two spellings of the same job share: short
+ * forms written out, anything in brackets and the workplace words dropped.
+ * "Senior Analyst (Remote)" and "Sr. Analyst" are the same job; the level
+ * words stay, since "Analyst II" and "Analyst I" are not.
+ */
+export function titleKey(title: string): string {
+  let t = title.toLowerCase().replace(/\([^)]*\)|\[[^\]]*\]/g, ' ');
+  for (const [pattern, word] of TITLE_FORMS) t = t.replace(pattern, word);
+  return t
+    .replace(/\b(remote|hybrid|on ?site|in office)\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
 /** A company and title reduced to what two spellings of the same role share. */
 export function roleKey(company: string, title: string): string {
-  const norm = (s: string) =>
-    s
-      .toLowerCase()
-      .replace(/\b(inc|llc|ltd|corp|co)\b\.?/g, '')
-      .replace(/[^a-z0-9]+/g, ' ')
-      .trim();
-  return `${norm(company)}|${norm(title)}`;
+  return `${companyKey(company)}|${titleKey(title)}`;
 }
 
 /** A person reduced to what two spellings of the same name share. */
@@ -222,7 +261,7 @@ export function linkedinSearchUrl(query: string): string {
 
 export function parseOpeningsPayload(
   raw: unknown,
-  taken: { urls: ReadonlySet<string>; roles: ReadonlySet<string> },
+  taken: { urls: ReadonlySet<string>; roles: ReadonlySet<string>; companies?: ReadonlySet<string> },
   excluded: readonly string[] = [],
 ): OpeningSuggestion[] {
   const words = exclusionWords(excluded);
@@ -242,6 +281,8 @@ export function parseOpeningsPayload(
     if (!company || !title || !url || !why || !move) continue;
     const industry = clean(item.industry, 200);
     if (isExcluded(words, industry, company, title)) continue;
+    // A company the person turned down once, for being that company.
+    if (taken.companies?.has(companyKey(company))) continue;
     const key = roleKey(company, title);
     if (urls.has(url) || roles.has(key)) continue;
     urls.add(url);

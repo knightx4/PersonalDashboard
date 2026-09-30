@@ -5,7 +5,8 @@ import type { RequirementMatch } from '../evidence/match-payload';
 import type { Requirement } from '../jd/requirements';
 import { CLOSED_APPLICATION_STATUSES, scoreApplication } from './application-scores';
 import type { PastApplication } from './history';
-import { scoreOpening, type ScoringContext } from './scores';
+import { SCORE_CONFIDENCE_FLOOR, scoreOpening, type ScoringContext } from './scores';
+import { readPreferences } from './preferences';
 
 /**
  * Score the open recommended roles that have not been scored yet (plan #1178).
@@ -44,7 +45,11 @@ export async function loadScoringContext(supabase: AppSupabaseClient, userId: st
       .eq('user_id', userId)
       .order('strength', { ascending: false })
       .limit(40),
-    supabase.from('profiles').select('target_titles').eq('id', userId).maybeSingle(),
+    supabase
+      .from('profiles')
+      .select('target_titles, home_location, workplace_preferences, salary_floor_cents, company_stages')
+      .eq('id', userId)
+      .maybeSingle(),
     supabase
       .from('applications')
       .select(
@@ -84,6 +89,7 @@ export async function loadScoringContext(supabase: AppSupabaseClient, userId: st
       .map((role) => `${role.title} at ${role.company ?? 'an unnamed company'}`),
     roles,
     history,
+    preferences: readPreferences(profile.data as Row | null),
   };
 }
 
@@ -103,7 +109,7 @@ export async function scoreOpeningsFor(
   const outcome: ScoreRunOutcome = { scored: 0, failed: 0, stopped: null };
   let query = supabase
     .from('suggestions')
-    .select('id, headline, company_name, location, why, move, companies ( name )')
+    .select('id, headline, company_name, location, why, move, posting_text, companies ( name )')
     .eq('user_id', userId)
     .eq('kind', 'apply')
     .eq('status', 'open');
@@ -125,6 +131,7 @@ export async function scoreOpeningsFor(
         location: row.location as string | null,
         why: row.why as string,
         move: row.move as string,
+        postingText: (row.posting_text as string | null) ?? null,
       },
       context,
       onSpend: options.onSpend,
@@ -141,9 +148,16 @@ export async function scoreOpeningsFor(
       }
       continue;
     }
+    // A sure duplicate of a role already on file comes off the list: it is
+    // one the person has already decided about.
+    const duplicate = result.scores.duplicate;
+    const expire =
+      duplicate?.value && duplicate.confidence >= SCORE_CONFIDENCE_FLOOR
+        ? { status: 'expired', expired_reason: 'duplicate', acted_at: new Date().toISOString() }
+        : {};
     const { error: writeError } = await supabase
       .from('suggestions')
-      .update({ scores: result.scores, scored_at: new Date().toISOString(), score_model: JEV_MODEL })
+      .update({ scores: result.scores, scored_at: new Date().toISOString(), score_model: JEV_MODEL, ...expire })
       .eq('id', row.id as string)
       .eq('user_id', userId);
     if (writeError) outcome.failed += 1;

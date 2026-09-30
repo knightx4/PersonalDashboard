@@ -26,7 +26,10 @@ import {
   type OpeningSort,
   type Workplace,
 } from '@/lib/jobs/suggest/scores';
+import { DISMISS_REASON_LABELS, DISMISS_REASONS } from '@/lib/jobs/suggest/feedback';
+import { formatCost, OPENING_ORIGIN_LABELS, type OriginStats } from '@/lib/jobs/suggest/stats';
 import {
+  dismissOpening,
   dismissSuggestion,
   markSuggestionSent,
   saveOpening,
@@ -60,6 +63,7 @@ function RecommendedSection({
   action,
   count,
   toolbar,
+  footer,
   children,
 }: {
   title: string;
@@ -73,6 +77,8 @@ function RecommendedSection({
   count: number;
   /** Sort and filter controls, shown under the hint while the list is open. */
   toolbar?: React.ReactNode;
+  /** Shown under the list while it is open, whether or not anything is in it. */
+  footer?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [pending, run] = useTransition();
@@ -139,6 +145,7 @@ function RecommendedSection({
           {notice && <p className="mb-2 text-small text-ink-muted">{notice}</p>}
           {count > 0 && toolbar}
           {count > 0 && <ul className="divide-y divide-border">{children}</ul>}
+          {footer}
         </>
       )}
       {folded && notice && <p className="mt-1 text-small text-ink-muted">{notice}</p>}
@@ -167,7 +174,17 @@ export function RecommendedPeople({ suggestions }: { suggestions: OpenSuggestion
   );
 }
 
-export function RecommendedRoles({ suggestions }: { suggestions: OpenSuggestion[] }) {
+export function RecommendedRoles({
+  suggestions,
+  stats = [],
+  searchCostMicros = 0,
+}: {
+  suggestions: OpenSuggestion[];
+  /** Each source's record (lib/jobs/suggest/stats.ts). */
+  stats?: OriginStats[];
+  /** What the web searches have cost in all, in micro-dollars. */
+  searchCostMicros?: number;
+}) {
   const [sort, setSort] = useState<OpeningSort>('newest');
   const [filter, setFilter] = useState<OpeningFilter>(NO_OPENING_FILTER);
   const shown = useMemo(
@@ -179,8 +196,8 @@ export function RecommendedRoles({ suggestions }: { suggestions: OpenSuggestion[
   return (
     <RecommendedSection
       title="Recommended roles"
-      hint="Open postings that fit your career goals, from Dash's searches and anything a goal step turned up. Save one to add it to your pipeline as a lead."
-      empty="Dash searches for open roles every week, from your career goals and CV. The next ones will appear here."
+      hint="Open postings that fit your career goals, from Dash's weekly search, the job boards of companies you follow, and anything a goal step turned up. Dash reads each posting and takes it off once it closes. Save one to add it to your pipeline as a lead."
+      empty="Dash searches for open roles every week, from your career goals, CV and the boards of companies you follow. The next ones will appear here."
       button="Search now"
       searching="Searching…"
       paidHint={
@@ -188,6 +205,7 @@ export function RecommendedRoles({ suggestions }: { suggestions: OpenSuggestion[
       }
       action={suggestOpenings}
       count={suggestions.length}
+      footer={<SourceStats stats={stats} searchCostMicros={searchCostMicros} />}
       toolbar={
         scored ? (
           <OpeningControls
@@ -341,13 +359,45 @@ function OpeningControls({
   );
 }
 
+/**
+ * How each source of recommended roles has done: found, saved, applied,
+ * reached an interview, turned down, and for the paid search what it cost.
+ * Folded by default; it is for deciding whether the search earns its keep,
+ * not for every visit.
+ */
+function SourceStats({ stats, searchCostMicros }: { stats: OriginStats[]; searchCostMicros: number }) {
+  if (stats.length === 0) return null;
+  return (
+    <details className="mt-2 border-t border-border pt-2 text-small text-ink-muted">
+      <summary className="press cursor-pointer rounded-control font-medium">Where these come from</summary>
+      <ul className="mt-1.5 space-y-1">
+        {stats.map((line) => (
+          <li key={line.origin} className="tabular">
+            <span className="font-medium text-ink">{OPENING_ORIGIN_LABELS[line.origin]}</span>: {line.found} found,{' '}
+            {line.saved} saved, {line.applied} applied, {line.interviews}{' '}
+            {line.interviews === 1 ? 'interview' : 'interviews'}, {line.dismissed} turned down
+            {line.expired > 0 ? `, ${line.expired} closed or dropped` : ''}
+            {line.origin === 'search' && searchCostMicros > 0 ? `. Searches cost ${formatCost(searchCostMicros)} so far` : ''}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 /** Jev's eight answers as a line of short labels; an unsure one carries a question mark. */
 function OpeningAnswers({ suggestion }: { suggestion: OpenSuggestion }) {
-  if (!suggestion.scores) return <p className="text-small text-ink-ghost">Not scored yet</p>;
-  const chips = scoreChips(suggestion.scores);
-  if (chips.length === 0) return null;
+  const misses = suggestion.misses ?? [];
+  if (!suggestion.scores && misses.length === 0) return <p className="text-small text-ink-ghost">Not scored yet</p>;
+  const chips = suggestion.scores ? scoreChips(suggestion.scores) : [];
+  if (chips.length === 0 && misses.length === 0) return null;
   return (
     <ul className="flex flex-wrap gap-1.5" aria-label="Dash's answers about this opening">
+      {misses.map((miss) => (
+        <li key={miss} className="rounded-control bg-caution-tint px-1.5 py-0.5 text-small text-caution">
+          {miss}
+        </li>
+      ))}
       {chips.map((chip) => (
         <li
           key={chip.key}
@@ -493,6 +543,9 @@ function PersonRow({ suggestion }: { suggestion: OpenSuggestion }) {
 function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
   const [busy, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // Not for me asks why before it turns the role down: the reason is what
+  // the next search learns from (lib/jobs/suggest/feedback.ts).
+  const [choosing, setChoosing] = useState(false);
 
   const act = (action: () => Promise<{ error: string | null }>) =>
     start(async () => {
@@ -528,7 +581,13 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
           </a>
         )}
         <span className="ml-auto flex items-center gap-2">
-          <Button type="button" size="sm" variant="ghost" pending={busy} onClick={() => act(() => dismissSuggestion(suggestion.id))}>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            aria-expanded={choosing}
+            onClick={() => setChoosing(!choosing)}
+          >
             Not for me
           </Button>
           <Button type="button" size="sm" pending={busy} onClick={() => act(() => saveOpening(suggestion.id))}>
@@ -536,6 +595,23 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
           </Button>
         </span>
       </div>
+      {choosing && (
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Why not this one">
+          <span className="text-small text-ink-muted">Why not?</span>
+          {DISMISS_REASONS.map((reason) => (
+            <Button
+              key={reason}
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={busy}
+              onClick={() => act(() => dismissOpening(suggestion.id, reason))}
+            >
+              {DISMISS_REASON_LABELS[reason]}
+            </Button>
+          ))}
+        </div>
+      )}
       {error && <p className="text-small text-danger">{error}</p>}
     </li>
   );

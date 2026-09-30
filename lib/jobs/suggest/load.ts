@@ -1,7 +1,9 @@
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { SuggestionKind } from './cadence';
-import { parseOpeningScores, type OpeningScores } from './scores';
+import { parseOpeningScores, SCORE_CONFIDENCE_FLOOR, type OpeningScores } from './scores';
 import type { ScoreNote } from './score-notes';
+import { preferenceMisses, readPreferences, type JobPreferences, type PostingWorkMode } from './preferences';
+import { openingStats, type OpeningOutcome, type OriginStats } from './stats';
 
 /** One open suggestion as Roles or Contacts shows it. */
 export type OpenSuggestion = {
@@ -27,6 +29,14 @@ export type OpenSuggestion = {
   scores: OpeningScores | null;
   /** Fit and chance with their reasons (plan #1206), attached by the Roles page (`withOpeningNotes`). */
   scoreNote?: ScoreNote | null;
+  /** Who found it (job_search 0039): the web search, a followed board or a goals run. */
+  origin: string;
+  /** Whether the posting has been read from its link (posting.ts). */
+  postingRead: boolean;
+  compMaxCents: number | null;
+  workMode: PostingWorkMode | null;
+  /** Where the posting falls outside the preferences, attached by the Roles page (`withPreferenceMisses`). */
+  misses?: string[];
   createdAt: string;
 };
 
@@ -47,6 +57,10 @@ type Row = {
   search_query: string | null;
   found_in: string | null;
   scores: unknown;
+  origin: string | null;
+  posting_status: string | null;
+  comp_max_cents: number | string | null;
+  work_mode: string | null;
   created_at: string;
   contacts: { id: string; full_name: string; email: string | null; linkedin_url: string | null } | null;
   companies: { name: string; slug: string } | null;
@@ -65,7 +79,7 @@ export async function loadOpenSuggestions(
   const { data, error } = await supabase
     .from('suggestions')
     .select(
-      'id, kind, headline, why, move, channel, message, url, location, company_name, person_name, person_title, source_url, search_query, found_in, scores, created_at, contacts ( id, full_name, email, linkedin_url ), companies ( name, slug )',
+      'id, kind, headline, why, move, channel, message, url, location, company_name, person_name, person_title, source_url, search_query, found_in, scores, origin, posting_status, comp_max_cents, work_mode, created_at, contacts ( id, full_name, email, linkedin_url ), companies ( name, slug )',
     )
     .eq('user_id', userId)
     .eq('status', 'open')
@@ -100,7 +114,79 @@ export async function loadOpenSuggestions(
           ? { id: contact.id, name: contact.full_name, email: contact.email, linkedinUrl: contact.linkedin_url }
           : null,
         scores: parseOpeningScores(row.scores),
+        origin: row.origin ?? 'goal',
+        postingRead: row.posting_status === 'open',
+        compMaxCents: row.comp_max_cents === null ? null : Number(row.comp_max_cents),
+        workMode: (['onsite', 'hybrid', 'remote'] as const).find((mode) => mode === row.work_mode) ?? null,
         createdAt: row.created_at,
       };
     });
+}
+
+/** What the person wants from a job, from /jobs/settings. A failed read is none set. */
+export async function loadJobPreferences(supabase: AppSupabaseClient, userId: string): Promise<JobPreferences> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('home_location, workplace_preferences, salary_floor_cents, company_stages')
+    .eq('id', userId)
+    .maybeSingle();
+  return readPreferences(data as Record<string, unknown> | null);
+}
+
+/** The openings with where each falls outside the preferences. */
+export function withPreferenceMisses(suggestions: OpenSuggestion[], prefs: JobPreferences): OpenSuggestion[] {
+  return suggestions.map((suggestion) => {
+    const workplace = suggestion.scores?.workplace;
+    const sureWorkplace =
+      workplace && workplace.confidence >= SCORE_CONFIDENCE_FLOOR && workplace.value !== 'unclear' ? workplace.value : null;
+    return {
+      ...suggestion,
+      misses: preferenceMisses(
+        { compMaxCents: suggestion.compMaxCents, workMode: suggestion.workMode, workplaceAnswer: sureWorkplace },
+        prefs,
+      ),
+    };
+  });
+}
+
+type OutcomeRow = {
+  origin: string | null;
+  status: string;
+  roles: {
+    applications:
+      | { status: string; rejection_stage: string | null; rejection_stage_override: string | null; interviews: { id: string }[] | null }[]
+      | null;
+  } | null;
+};
+
+/**
+ * Each source's record, for the line under the recommended roles
+ * (stats.ts). A failed read shows no line rather than failing the page.
+ */
+export async function loadOpeningStats(supabase: AppSupabaseClient, userId: string): Promise<OriginStats[]> {
+  const { data, error } = await supabase
+    .from('suggestions')
+    .select(
+      'origin, status, roles ( applications ( status, rejection_stage, rejection_stage_override, interviews ( id ) ) )',
+    )
+    .eq('user_id', userId)
+    .eq('kind', 'apply')
+    .limit(2000);
+  if (error) return [];
+  const rows: OpeningOutcome[] = ((data ?? []) as unknown as OutcomeRow[]).map((row) => {
+    const role = one(row.roles);
+    const app = role?.applications?.[0] ?? null;
+    return {
+      origin: row.origin,
+      status: row.status,
+      application: app
+        ? {
+            status: app.status,
+            rejectionStage: app.rejection_stage_override ?? app.rejection_stage,
+            hasInterview: (app.interviews ?? []).length > 0,
+          }
+        : null,
+    };
+  });
+  return openingStats(rows);
 }

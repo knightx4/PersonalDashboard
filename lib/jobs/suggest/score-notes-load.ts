@@ -90,7 +90,13 @@ export function withOpeningNotes(suggestions: OpenSuggestion[], history: readonl
   return suggestions.map((suggestion) => ({
     ...suggestion,
     scoreNote: suggestion.scores
-      ? scoreNote({ kind: 'opening', title: suggestion.headline, scores: suggestion.scores, history })
+      ? scoreNote({
+          kind: 'opening',
+          title: suggestion.headline,
+          scores: suggestion.scores,
+          hasDescription: suggestion.postingRead,
+          history,
+        })
       : null,
   }));
 }

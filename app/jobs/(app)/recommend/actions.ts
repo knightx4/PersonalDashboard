@@ -9,6 +9,8 @@ import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { detectPosting } from '@/lib/jobs/ats';
 import { runSuggestionsFor } from '@/lib/jobs/suggest/run';
 import { scoreOpeningsFor } from '@/lib/jobs/suggest/score-run';
+import { checkOpeningPostings } from '@/lib/jobs/suggest/posting';
+import { isDismissReason } from '@/lib/jobs/suggest/feedback';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 import type { SpendReport } from '@/lib/core/spend/pricing';
@@ -21,7 +23,8 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
  * for the one person without waiting for the cadence, for when a list has run
  * dry. Sent adds the person as a
  * contact and logs the message in the outreach log; Save adds a posting to the
- * pipeline as a lead; Dismiss turns a suggestion down so it is not made again.
+ * pipeline as a lead; Dismiss turns a suggestion down so it is not made again,
+ * and for a role says why, which the next roles search reads (feedback.ts).
  */
 
 function revalidatePaths() {
@@ -72,7 +75,13 @@ export async function suggestOpenings(): Promise<SuggestState> {
     return { error: error instanceof Error ? error.message : 'The search could not be made.' };
   }
   await recordSessionSpend(user.id, { module: 'jobs', operation: 'find-openings' }, result.apply.spend);
-  // The new openings get Jev's answers now rather than on tomorrow's run.
+  // The new openings are read from their links and get Jev's answers now,
+  // rather than on tomorrow's run.
+  if (result.apply.written > 0) {
+    await checkOpeningPostings(supabase, user.id).catch((err) =>
+      console.error('[jobs suggestions] posting check', err instanceof Error ? err.message : err),
+    );
+  }
   if (result.apply.written > 0 && (await jevEnabledFor(await createCoreClient(), user.id))) {
     const scoreSpend: SpendReport[] = [];
     await scoreOpeningsFor(supabase, user.id, { onSpend: (report) => scoreSpend.push(report) }).catch((err) =>
@@ -108,6 +117,13 @@ async function closeSuggestion(
 // latency: pending -- should be optimistic: a dismiss that waits for the round trip
 export async function dismissSuggestion(id: string): Promise<{ error: string | null }> {
   return closeSuggestion(id, 'dismissed');
+}
+
+/** Turn a recommended role down, saying why. */
+// latency: pending -- should be optimistic: a dismiss that waits for the round trip
+export async function dismissOpening(id: string, reason: string): Promise<{ error: string | null }> {
+  if (!isDismissReason(reason)) return { error: 'Choose a reason.' };
+  return closeSuggestion(id, 'dismissed', { dismiss_reason: reason });
 }
 
 /**

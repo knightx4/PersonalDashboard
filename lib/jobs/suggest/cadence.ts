@@ -10,6 +10,10 @@
  * broken. A run that found nothing waits the full interval, so an account with
  * little to search from is not searched at a cost every day. Both runs pay for
  * web searches, which is what keeps them this infrequent.
+ *
+ * Only the run's own finds count towards a list being full (CAPPED_ORIGINS):
+ * roles a goals run wrote used to fill the list of eight and stop the weekly
+ * search for as long as they sat there. The roles list holds 30 of its own.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -18,8 +22,14 @@ export type SuggestionKind = 'reach_out' | 'apply';
 
 export const CADENCE: Record<SuggestionKind, { everyDays: number; maxOpen: number }> = {
   reach_out: { everyDays: 3, maxOpen: 5 },
-  apply: { everyDays: 7, maxOpen: 8 },
+  apply: { everyDays: 7, maxOpen: 30 },
 };
+
+/** The origins (job_search 0039) whose open rows count towards `maxOpen`. */
+export const CAPPED_ORIGINS: readonly string[] = ['search', 'board'];
+
+/** A recommended role left open this long is taken off the list (run.ts). */
+export const STALE_DAYS = 21;
 
 /**
  * How soon an emptied list is refilled: by the next daily run, which is at

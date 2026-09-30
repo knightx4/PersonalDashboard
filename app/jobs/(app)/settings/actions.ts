@@ -6,6 +6,7 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { decryptToken } from '@/lib/crypto/tokens';
 import { gmailProvider } from '@/lib/email/providers/gmail';
+import { COMPANY_STAGES, WORKPLACE_PREFERENCES } from '@/lib/jobs/suggest/preferences';
 
 export interface SettingsState {
   error?: string;
@@ -23,6 +24,15 @@ const profileSchema = z.object({
   ghostThresholdDays: z.coerce.number().int().min(7).max(180).optional(),
   writingStyleNotes: z.string().trim().max(4000).optional(),
   bannedConstructions: z.string().trim().optional(),
+  homeLocation: z.string().trim().max(200, 'Keep where you live under 200 characters.').optional(),
+  salaryFloor: z
+    .string()
+    .trim()
+    .transform((value) => value.replace(/[^0-9]/g, ''))
+    .refine((value) => value === '' || Number(value) <= 2_000_000, 'Enter the lowest pay as a yearly figure.')
+    .optional(),
+  workplaces: z.array(z.enum(WORKPLACE_PREFERENCES)).optional(),
+  companyStages: z.array(z.enum(COMPANY_STAGES)).optional(),
 });
 
 // latency: pending
@@ -37,6 +47,10 @@ export async function updateProfile(
     ghostThresholdDays: formData.get('ghostThresholdDays') || undefined,
     writingStyleNotes: formData.get('writingStyleNotes') ?? '',
     bannedConstructions: formData.get('bannedConstructions') ?? '',
+    homeLocation: formData.get('homeLocation') ?? '',
+    salaryFloor: formData.get('salaryFloor') ?? '',
+    workplaces: formData.getAll('workplaces'),
+    companyStages: formData.getAll('companyStages'),
   });
 
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -62,6 +76,12 @@ export async function updateProfile(
       .map((entry) => entry.trim())
       .filter(Boolean);
   }
+  if (parsed.data.homeLocation !== undefined) patch.home_location = parsed.data.homeLocation || null;
+  if (parsed.data.salaryFloor !== undefined) {
+    patch.salary_floor_cents = parsed.data.salaryFloor ? Number(parsed.data.salaryFloor) * 100 : null;
+  }
+  if (parsed.data.workplaces !== undefined) patch.workplace_preferences = parsed.data.workplaces;
+  if (parsed.data.companyStages !== undefined) patch.company_stages = parsed.data.companyStages;
   if (parsed.data.bannedConstructions !== undefined) {
     patch.banned_constructions = parsed.data.bannedConstructions
       .split('\n')

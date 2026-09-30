@@ -59,3 +59,23 @@ export async function loadSpend(supabase: CoreSupabaseClient): Promise<SpendRow[
     createdAt: row.created_at,
   }));
 }
+
+/**
+ * What one operation has cost in all, in micro-dollars, for a page that
+ * weighs a paid action against what it produced (the recommended roles'
+ * source line). A failed read, or a row with no published rate, counts as 0.
+ */
+export async function loadOperationCost(
+  supabase: CoreSupabaseClient,
+  module: string,
+  operation: string,
+): Promise<number> {
+  const { data, error } = await supabase
+    .from('model_spend')
+    .select('cost_micros')
+    .eq('module', module)
+    .eq('operation', operation)
+    .limit(MAX_ROWS);
+  if (error) return 0;
+  return ((data ?? []) as { cost_micros: number | null }[]).reduce((sum, row) => sum + (row.cost_micros ?? 0), 0);
+}

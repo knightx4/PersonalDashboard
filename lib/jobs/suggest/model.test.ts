@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { findPeople, type SeekerContext } from './model';
 import { personKey } from './payload';
+import { NO_PREFERENCES } from './preferences';
 
 const seeker: SeekerContext = {
   name: 'Alex',
@@ -10,6 +11,7 @@ const seeker: SeekerContext = {
   writingStyle: null,
   banned: ['leverage'],
   excludedIndustries: [],
+  preferences: NO_PREFERENCES,
 };
 
 const report = {

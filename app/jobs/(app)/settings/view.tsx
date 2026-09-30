@@ -24,6 +24,14 @@ import { addExcludedSender, removeExcludedSender } from './sender-actions';
 import { DEFAULT_BANNED_CONSTRUCTIONS } from '@/lib/jobs/evidence/draft-payload';
 import { cardVariants } from '@/components/ui/card';
 import { PaidHint } from '@/components/ui/paid-hint';
+import {
+  COMPANY_STAGE_LABELS,
+  COMPANY_STAGES,
+  formatPay,
+  WORKPLACE_PREFERENCE_LABELS,
+  WORKPLACE_PREFERENCES,
+  type JobPreferences,
+} from '@/lib/jobs/suggest/preferences';
 
 /** The page's own three tones, in the four the Banner primitive names. */
 const BANNER_TONE = { ok: 'info', warn: 'warn', err: 'bad' } as const;
@@ -40,6 +48,7 @@ export function SettingsView(props: {
     ghostThresholdDays: number;
     writingStyleNotes: string;
     bannedConstructions: string;
+    preferences: JobPreferences;
   };
   accounts: InboxAccount[];
   resumes: Array<{
@@ -118,11 +127,13 @@ function ProfileSection({
     ghostThresholdDays: number;
     writingStyleNotes: string;
     bannedConstructions: string;
+    preferences: JobPreferences;
   };
   email: string;
 }) {
   const [state, action] = useActionState<SettingsState, FormData>(updateProfile, {});
   const [editing, setEditing] = useCloseOnSuccess(state);
+  const prefs = profile.preferences;
 
   return (
     <section className={cardVariants({ padding: 'standard' })}>
@@ -152,6 +163,19 @@ function ProfileSection({
             <ValueRow label="Ghost after" value={`${profile.ghostThresholdDays} days of silence`} />
             <ValueRow label="Target titles" value={profile.targetTitles} />
             <ValueRow label="Never suggest" value={profile.excludedIndustries} />
+            <ValueRow label="Where you live" value={prefs.homeLocation ?? ''} />
+            <ValueRow
+              label="How you will work"
+              value={prefs.workplaces.map((w) => WORKPLACE_PREFERENCE_LABELS[w]).join(', ')}
+            />
+            <ValueRow
+              label="Lowest base pay"
+              value={prefs.salaryFloorCents ? `${formatPay(prefs.salaryFloorCents)} a year` : ''}
+            />
+            <ValueRow
+              label="Company stages"
+              value={prefs.companyStages.map((stage) => COMPANY_STAGE_LABELS[stage]).join(', ')}
+            />
             <ValueRow label="How you want to sound" value={profile.writingStyleNotes} />
             <ValueRow
               label="Never write these"
@@ -220,6 +244,45 @@ function ProfileSection({
             </p>
           </div>
 
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="homeLocation">Where you live</Label>
+              <Input
+                id="homeLocation"
+                name="homeLocation"
+                defaultValue={prefs.homeLocation ?? ''}
+                placeholder="New York, NY"
+              />
+            </div>
+            <div>
+              <Label htmlFor="salaryFloor">Lowest base pay, per year</Label>
+              <Input
+                id="salaryFloor"
+                name="salaryFloor"
+                inputMode="numeric"
+                defaultValue={prefs.salaryFloorCents ? formatPay(prefs.salaryFloorCents) : ''}
+                placeholder="120,000"
+              />
+            </div>
+          </div>
+
+          <CheckGroup
+            legend="How you will work"
+            name="workplaces"
+            options={WORKPLACE_PREFERENCES.map((value) => ({ value, label: WORKPLACE_PREFERENCE_LABELS[value] }))}
+            checked={prefs.workplaces}
+          />
+          <CheckGroup
+            legend="Company stages"
+            name="companyStages"
+            options={COMPANY_STAGES.map((value) => ({ value, label: COMPANY_STAGE_LABELS[value] }))}
+            checked={prefs.companyStages}
+          />
+          <p className="-mt-2 text-small text-ink-muted">
+            Rules for the roles Dash recommends. A posting that states pay below your floor, or a
+            workplace you did not tick, is left out. Leave a group unticked for any.
+          </p>
+
           <div>
             <Label htmlFor="writingStyleNotes">How you want to sound</Label>
             <Textarea
@@ -268,6 +331,39 @@ function ProfileSection({
         </form>
       )}
     </section>
+  );
+}
+
+/** A row of checkboxes for a multi-choice preference; none ticked means any. */
+function CheckGroup({
+  legend,
+  name,
+  options,
+  checked,
+}: {
+  legend: string;
+  name: string;
+  options: { value: string; label: string }[];
+  checked: readonly string[];
+}) {
+  return (
+    <fieldset>
+      <legend className="mb-1 block text-small font-medium text-ink-muted">{legend}</legend>
+      <div className="flex flex-wrap gap-x-4 gap-y-2">
+        {options.map((option) => (
+          <label key={option.value} className="flex cursor-pointer items-center gap-2 text-ui text-ink">
+            <input
+              type="checkbox"
+              name={name}
+              value={option.value}
+              defaultChecked={checked.includes(option.value)}
+              className="size-4 rounded border-border text-accent focus:ring-accent/30"
+            />
+            {option.label}
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 

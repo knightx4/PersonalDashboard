@@ -14,9 +14,13 @@ import 'server-only';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { formatDate } from '@/lib/jobs/applications/load';
-import { cadenceState, suggestionDue, type SuggestionKind } from './cadence';
+import { CAPPED_ORIGINS, cadenceState, STALE_DAYS, suggestionDue, type SuggestionKind } from './cadence';
 import { findOpenings, findPeople, SUGGEST_MODEL, type SeekerContext } from './model';
-import { personKey, roleKey } from './payload';
+import { exclusionWords, personKey, roleKey } from './payload';
+import { openingFeedback } from './feedback';
+import { pickBoardCandidates } from './board-pick';
+import { loadFollowedBoardPostings } from './boards';
+import { readPreferences } from './preferences';
 
 export type KindOutcome = {
   /** False when the cadence said not yet and nothing was asked. */
@@ -39,7 +43,9 @@ async function loadSeeker(supabase: AppSupabaseClient, userId: string): Promise<
   const [profile, thoughts, resume] = await Promise.all([
     supabase
       .from('profiles')
-      .select('display_name, timezone, target_titles, writing_style_notes, banned_constructions, excluded_industries')
+      .select(
+        'display_name, timezone, target_titles, writing_style_notes, banned_constructions, excluded_industries, home_location, workplace_preferences, salary_floor_cents, company_stages',
+      )
       .eq('id', userId)
       .maybeSingle(),
     supabase
@@ -72,6 +78,7 @@ async function loadSeeker(supabase: AppSupabaseClient, userId: string): Promise<
     writingStyle: (p.writing_style_notes as string | null) ?? null,
     banned: (p.banned_constructions as string[] | undefined) ?? [],
     excludedIndustries: (p.excluded_industries as string[] | undefined) ?? [],
+    preferences: readPreferences(p),
   };
 }
 
@@ -124,7 +131,7 @@ async function loadApplications(supabase: AppSupabaseClient, userId: string): Pr
 async function loadPast(supabase: AppSupabaseClient, userId: string) {
   const { data, error } = await supabase
     .from('suggestions')
-    .select('kind, status, contact_id, company_id, company_name, person_name, url, created_at, acted_at')
+    .select('kind, status, origin, dismiss_reason, headline, contact_id, company_id, company_name, person_name, url, created_at, acted_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(500);
@@ -187,6 +194,7 @@ async function runReachOut(
     const { error: insertError } = await supabase.from('suggestions').insert({
       user_id: userId,
       kind: 'reach_out',
+      origin: 'search',
       company_name: suggestion.company,
       person_name: suggestion.personName,
       person_title: suggestion.personTitle,
@@ -216,6 +224,35 @@ async function runApply(
 ): Promise<KindOutcome> {
   const spend: SpendReport[] = [];
   const label = (app: ApplicationFact) => `${app.roleTitle} at ${app.companyName}`;
+  const pastOpenings = past.filter((row) => row.kind === 'apply');
+  const feedback = openingFeedback(
+    pastOpenings.map((row) => ({
+      status: row.status as string,
+      headline: (row.headline as string | null) ?? null,
+      companyName: (row.company_name as string | null) ?? null,
+      dismissReason: (row.dismiss_reason as string | null) ?? null,
+    })),
+  );
+  const taken = {
+    urls: new Set(
+      [...past.map((row) => row.url as string | null), ...applications.map((app) => app.url)].filter(
+        (url): url is string => !!url,
+      ),
+    ),
+    roles: new Set(applications.map((app) => roleKey(app.companyName, app.roleTitle))),
+    companies: feedback.companies,
+  };
+  const responded = applications.filter((app) => app.respondedAt);
+  const boardOpenings = pickBoardCandidates(await loadFollowedBoardPostings(supabase, userId), {
+    targetTitles: seeker.targetTitles,
+    likedTitles: [
+      ...pastOpenings.filter((row) => row.status === 'done' && row.headline).map((row) => row.headline as string),
+      ...responded.map((app) => app.roleTitle),
+    ],
+    taken,
+    excludedWords: exclusionWords(seeker.excludedIndustries),
+  });
+  const fromBoard = new Map(boardOpenings.map((posting) => [posting.url, posting]));
   const locations = new Map<string, number>();
   for (const app of applications.slice(0, 80)) {
     if (app.location) locations.set(app.location, (locations.get(app.location) ?? 0) + 1);
@@ -225,26 +262,24 @@ async function runApply(
     { apiKey, onSpend: (report) => spend.push(report) },
     {
       seeker,
-      responded: applications.filter((app) => app.respondedAt).map(label),
+      responded: responded.map(label),
       recent: applications.slice(0, 40).map(label),
       locations: [...locations.entries()].sort((a, b) => b[1] - a[1]).map(([place]) => place),
-      taken: {
-        urls: new Set(
-          [...past.map((row) => row.url as string | null), ...applications.map((app) => app.url)].filter(
-            (url): url is string => !!url,
-          ),
-        ),
-        roles: new Set(applications.map((app) => roleKey(app.companyName, app.roleTitle))),
-      },
+      feedback,
+      boardOpenings,
+      taken,
     },
   );
   if (!result.ok) return { ran: true, written: 0, headlines: [], spend, error: result.error };
 
   const headlines: string[] = [];
   for (const opening of result.suggestions) {
+    const board = fromBoard.get(opening.url);
     const { error } = await supabase.from('suggestions').insert({
       user_id: userId,
       kind: 'apply',
+      origin: board ? 'board' : 'search',
+      found_in: board ? `On ${board.company}'s own job board` : null,
       company_name: opening.company,
       headline: opening.title,
       why: opening.why,
@@ -259,6 +294,24 @@ async function runApply(
   return { ran: true, written: headlines.length, headlines, spend, error: null };
 }
 
+/**
+ * Take recommended roles left open for STALE_DAYS off the list. A posting
+ * that old has usually closed, and a list the person has not got to in three
+ * weeks is not one they are reading. Its link stays on file, so it is not
+ * suggested again.
+ */
+async function expireStaleOpenings(supabase: AppSupabaseClient, userId: string, now: Date = new Date()): Promise<void> {
+  const cutoff = new Date(now.getTime() - STALE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const { error } = await supabase
+    .from('suggestions')
+    .update({ status: 'expired', expired_reason: 'stale', acted_at: now.toISOString() })
+    .eq('user_id', userId)
+    .eq('kind', 'apply')
+    .eq('status', 'open')
+    .lt('created_at', cutoff);
+  if (error) console.error('[jobs suggestions] expire stale', error.message);
+}
+
 const SKIPPED: KindOutcome = { ran: false, written: 0, headlines: [], spend: [], error: null };
 
 /**
@@ -270,6 +323,7 @@ export async function runSuggestionsFor(
   userId: string,
   options: { apiKey: string; kinds: readonly SuggestionKind[]; force?: boolean; now?: Date },
 ): Promise<Record<SuggestionKind, KindOutcome>> {
+  if (options.kinds.includes('apply')) await expireStaleOpenings(supabase, userId, options.now);
   const [past, searched] = await Promise.all([
     loadPast(supabase, userId),
     supabase.from('profiles').select('people_searched_at, roles_searched_at').eq('id', userId).maybeSingle(),
@@ -282,7 +336,9 @@ export async function runSuggestionsFor(
         kind,
         cadenceState(
           past
-            .filter((row) => row.kind === kind)
+            // Goal finds are not the search's own, so they neither fill its
+            // list nor mark when it last ran.
+            .filter((row) => row.kind === kind && CAPPED_ORIGINS.includes(row.origin as string))
             .map((row) => ({ status: row.status as string, createdAt: row.created_at as string })),
           (searchedRow[SEARCHED_AT[kind]] as string | null) ?? null,
         ),

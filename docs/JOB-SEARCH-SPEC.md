@@ -45,7 +45,7 @@ Answer the question your search actually turns on: where in the funnel are you l
 Listing these because Cursor will otherwise invent them.
 
 - No auto-apply. Never fills out and submits an application form on your behalf. It drafts, you paste.
-- No job board or aggregation. It does not scrape or mirror listings. Revised on 27 September 2026: Dash runs one web search a week for open postings that fit the career goals and lists them under Recommended roles at the top of Roles (`lib/jobs/suggest`). Nothing is saved to the pipeline until you press Save.
+- No job board or aggregation. It does not scrape or mirror listings. Revised on 27 September 2026: Dash runs one web search a week for open postings that fit the career goals and lists them under Recommended roles at the top of Roles (`lib/jobs/suggest`). Revised on 30 September 2026: the same run first reads the job boards of the companies you follow, the search learns from the roles you saved and the reasons you gave for turning others down, each posting is read from its link so it can be scored on its text and taken off the list once it closes, and roles left open for three weeks drop off. Nothing is saved to the pipeline until you press Save.
 - No scraping of anything behind a login, and no LinkedIn scraping. Contacts are entered manually or pasted. The people Dash suggests come from public pages found with a web search (team pages, talks, articles); for LinkedIn it gives you a people search to open yourself.
 - No resume builder or ATS keyword scoring. Resume versions are stored and referenced, not generated.
 - No recruiter-side features. One candidate's view of one search.

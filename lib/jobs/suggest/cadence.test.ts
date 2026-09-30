@@ -17,7 +17,12 @@ describe('suggestionDue', () => {
 
   it('adds nothing while the list is full', () => {
     expect(suggestionDue('reach_out', state(ago(10), 5), NOW)).toBe(false);
-    expect(suggestionDue('apply', state(ago(10), 8), NOW)).toBe(false);
+    expect(suggestionDue('apply', state(ago(10), 30), NOW)).toBe(false);
+  });
+
+  it('keeps searching for roles until thirty of its own are open', () => {
+    expect(suggestionDue('apply', state(ago(10), 8), NOW)).toBe(true);
+    expect(suggestionDue('apply', state(ago(10), 29), NOW)).toBe(true);
   });
 
   it('searches for roles once a week', () => {

@@ -597,6 +597,12 @@ const settings = {
     ghostThresholdDays: 21,
     writingStyleNotes: 'Plain sentences. No "passionate", no "excited to".',
     bannedConstructions: 'leverage, synergy, reach out',
+    preferences: {
+      homeLocation: 'London',
+      workplaces: ['hybrid', 'remote'] as const,
+      salaryFloorCents: 9_000_000,
+      companyStages: ['growth', 'late'] as const,
+    },
   },
   accounts: [
     {

@@ -35,7 +35,7 @@ export type ScoreReasonInput = {
   seniority?: string | null;
   /** Applications: roles.requirement_matches. Openings have none. */
   requirementMatches?: readonly RequirementMatch[] | null;
-  /** Applications: whether roles.jd_text has any text. Openings leave it out. */
+  /** Whether the job's text is on file: roles.jd_text for an application, the read posting for an opening. */
   hasDescription?: boolean;
   /** `ScoringContext.history` from `loadScoringContext`. */
   history: readonly PastApplication[];
@@ -145,6 +145,7 @@ export function fitReason(input: ScoreReasonInput): string | null {
   }
   if (!sure) {
     if (input.kind === 'application') return 'Unsure, read from the description without matched requirements';
+    if (input.hasDescription) return 'Unsure, read from the posting without matched requirements';
     return scores.fit
       ? `Probably a ${scores.fit.value} match, from Dash's short summary alone`
       : "Unsure, read from Dash's short summary of the opening";

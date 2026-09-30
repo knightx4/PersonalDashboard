@@ -153,3 +153,30 @@ describe('excluded industries', () => {
     expect(people.map((p) => p.personName)).toEqual(['Bo Chen']);
   });
 });
+
+describe('roleKey', () => {
+  it('meets two spellings of the same role', () => {
+    expect(roleKey('Acme Inc.', 'Sr. FP&A Mgr')).toBe(roleKey('Acme', 'Senior Financial Planning and Analysis Manager'));
+    expect(roleKey('Acme Technologies', 'Senior Analyst (Remote)')).toBe(roleKey('Acme', 'Senior Analyst'));
+    expect(roleKey('Acme', 'VP, Strategy & Ops')).toBe(roleKey('Acme', 'Vice President, Strategy and Operations'));
+  });
+
+  it('keeps different levels and different work apart', () => {
+    expect(roleKey('Acme', 'Analyst II')).not.toBe(roleKey('Acme', 'Analyst I'));
+    expect(roleKey('Acme', 'Senior Analyst')).not.toBe(roleKey('Acme', 'Analyst'));
+    expect(roleKey('Acme', 'Pricing Analyst')).not.toBe(roleKey('Acme', 'Strategy Analyst'));
+  });
+});
+
+describe('parseOpeningsPayload and turned-down companies', () => {
+  it('drops a posting at a company turned down for being that company', () => {
+    const raw = {
+      openings: [
+        { company: 'Acme Inc', title: 'Analyst', url: 'https://a.example/1', why: 'w', move: 'm' },
+        { company: 'Bolt', title: 'Analyst', url: 'https://b.example/1', why: 'w', move: 'm' },
+      ],
+    };
+    const out = parseOpeningsPayload(raw, { urls: new Set(), roles: new Set(), companies: new Set(['acme']) });
+    expect(out.map((o) => o.company)).toEqual(['Bolt']);
+  });
+});

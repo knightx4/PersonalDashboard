@@ -9,6 +9,11 @@ import {
   type JevYesNoAnswer,
 } from '@/lib/jev/wire';
 import { summariseHistory, type PastApplication } from './history';
+import { companyKey, titleKey } from './payload';
+import { POSTING_TEXT_FOR_SCORING } from './posting-text';
+import { preferenceState, type JobPreferences } from './preferences';
+
+export { companyKey };
 import { CHANCE_DISPLAY, chanceBand, type ChanceBand } from './chance-check';
 
 /**
@@ -17,14 +22,16 @@ import { CHANCE_DISPLAY, chanceBand, type ChanceBand } from './chance-check';
  *
  * The openings on Roles come from a web search that writes a title, a
  * location, why it fits and how to go about it (job_search.suggestions, kind
- * `apply`). Jev reads that text, the person's evidence titles and the roles
- * they have applied to, and answers ten questions in one request, so the
- * list can be sorted and filtered without a model reading every posting.
+ * `apply`). Jev reads that text, the posting itself once posting.ts has read
+ * it from the link (job_search 0039), the person's evidence titles, the roles
+ * they have applied to and what they want from a job, and answers ten
+ * questions in one request, so the list can be sorted and filtered without a
+ * model reading every posting at length.
  *
  * The answers and Jev's confidence in each are kept on the suggestion row in
  * `scores` (migration job_search 0037). An answer under the confidence floor
  * is kept and shown as unsure rather than sent to Haiku: these are labels to
- * sort by, and a second model reading the same short text would not know more.
+ * sort by, and a second model reading the same text would not know more.
  *
  * No `server-only` guard, so a script can try the questions on real rows
  * under plain `tsx`.
@@ -184,6 +191,8 @@ export type OpeningText = {
   location: string | null;
   why: string;
   move: string;
+  /** The posting as read from its link (posting.ts); null until it has been read. */
+  postingText?: string | null;
 };
 
 /** What Jev is told about the person, the same for every opening in a run. */
@@ -196,18 +205,12 @@ export type ScoringContext = {
   roles: { title: string; company: string | null; status: string }[];
   /** Every application on file with how it went, newest first, for the chance question. */
   history: PastApplication[];
+  /** What they want from a job, from /jobs/settings; absent reads as none set. */
+  preferences?: JobPreferences;
 };
 
 /** How many applied roles Jev reads. Enough to show the pattern, cheap enough for a cent per hundred. */
 export const APPLIED_LIMIT = 30;
-
-/** A company name reduced to what two spellings of it share. */
-export function companyKey(name: string | null | undefined): string {
-  return (name ?? '')
-    .toLowerCase()
-    .replace(/\b(inc|llc|ltd|corp|corporation|co|company|technologies|labs|hq)\b/g, '')
-    .replace(/[^a-z0-9]/g, '');
-}
 
 function sameCompany(a: string | null, b: string | null): boolean {
   const x = companyKey(a);
@@ -218,10 +221,6 @@ function sameCompany(a: string | null, b: string | null): boolean {
 
 function rolesAtCompany(opening: OpeningText, context: ScoringContext) {
   return context.roles.filter((role) => sameCompany(role.company, opening.company));
-}
-
-function titleKey(title: string): string {
-  return title.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 /**
@@ -246,7 +245,13 @@ export function openingState(opening: OpeningText, context: ScoringContext): Rec
       location: opening.location ?? 'not given',
       why_it_fits: opening.why,
       how_to_apply: opening.move,
+      ...(opening.postingText?.trim()
+        ? { posting_text: opening.postingText.trim().slice(0, POSTING_TEXT_FOR_SCORING) }
+        : {}),
     },
+    ...(context.preferences && preferenceState(context.preferences)
+      ? { your_preferences: preferenceState(context.preferences) }
+      : {}),
     your_evidence: context.evidence,
     your_target_titles: context.targetTitles,
     roles_you_applied_to: context.applied.slice(0, APPLIED_LIMIT),

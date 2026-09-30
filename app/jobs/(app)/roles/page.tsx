@@ -29,7 +29,13 @@ import {
 } from '@/lib/list-display';
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
-import { loadOpenSuggestions } from '@/lib/jobs/suggest/load';
+import {
+  loadJobPreferences,
+  loadOpeningStats,
+  loadOpenSuggestions,
+  withPreferenceMisses,
+} from '@/lib/jobs/suggest/load';
+import { loadOperationCost } from '@/lib/core/spend/load';
 import { historyFromPipeline, withApplicationNotes, withOpeningNotes } from '@/lib/jobs/suggest/score-notes-load';
 import { CHANCE_BAND_LABELS } from '@/lib/jobs/suggest/chance-check';
 import { FIT_MINIMUMS, parseScoreMinimum, passesMinimum } from '@/lib/jobs/suggest/score-notes';
@@ -67,17 +73,22 @@ export default async function RolesPage({
   const supabase = await createClient();
   const params = await searchParams;
 
-  const [pipeline, openings] = await Promise.all([
+  const core = await createCoreClient();
+  const [pipeline, openings, preferences, sourceStats, searchCost] = await Promise.all([
     loadPipeline(supabase, user.id),
     loadOpenSuggestions(supabase, user.id, 'apply'),
+    loadJobPreferences(supabase, user.id),
+    loadOpeningStats(supabase, user.id),
+    loadOperationCost(core, 'jobs', 'find-openings'),
   ]);
   // Fit and chance with their reasons (plan #1206), read against the pipeline as history.
   const rows = await withApplicationNotes(supabase, user.id, pipeline);
-  const recommended = withOpeningNotes(openings, historyFromPipeline(pipeline));
+  const recommended = withPreferenceMisses(withOpeningNotes(openings, historyFromPipeline(pipeline)), preferences);
+  const recommendedProps = { suggestions: recommended, stats: sourceStats, searchCostMicros: searchCost };
 
   const displaySpec = rolesDisplay();
   const display = parseListDisplay(displaySpec, params);
-  const savedViews = await savedViewsFor(await createCoreClient(), displaySpec.pathname);
+  const savedViews = await savedViewsFor(core, displaySpec.pathname);
   const openOn = defaultViewHref(savedViews, params);
   if (openOn) redirect(openOn);
   const menu = listDisplayMenu(displaySpec, params, savedViews);
@@ -119,7 +130,7 @@ export default async function RolesPage({
       <>
         <PageHeader title="Roles" description="Every role, as a table." />
         <div className="mb-6">
-          <RecommendedRoles suggestions={recommended} />
+          <RecommendedRoles {...recommendedProps} />
         </div>
         <EmptyState
           icon={Table2}
@@ -150,7 +161,7 @@ export default async function RolesPage({
       {/* Above the table and its rail, full width: what Dash found is not
           narrowed by the filters, which describe roles already on file. */}
       <div className="mb-6">
-        <RecommendedRoles suggestions={recommended} />
+        <RecommendedRoles {...recommendedProps} />
       </div>
 
       <div className="flex flex-col gap-4 xl:flex-row xl:gap-6">

@@ -9,6 +9,7 @@ import { recordSpendReports } from '@/lib/core/spend/record';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 import { suggestionsPayload } from '@/lib/jobs/suggest/notify';
 import { runSuggestionsFor } from '@/lib/jobs/suggest/run';
+import { checkOpeningPostings } from '@/lib/jobs/suggest/posting';
 import { scoreApplicationsFor, scoreOpeningsFor } from '@/lib/jobs/suggest/score-run';
 import { sendToPerson } from '@/lib/push/send';
 
@@ -20,11 +21,13 @@ import { sendToPerson } from '@/lib/push/send';
  * due is decided per person (lib/jobs/suggest/cadence.ts), so most days most
  * accounts cost nothing. One person's failure is noted and the rest go on.
  *
- * Then any open opening not yet scored is put to Jev's eight questions
- * (plan #1178), for accounts that agreed to send text to TypeSafe. That
- * includes openings a goals run wrote since yesterday. Open applications not
- * yet scored, or whose role changed since, get fit and chance the same way
- * (plan #1203).
+ * Then every open opening not read in three days is read from its link
+ * (lib/jobs/suggest/posting.ts), which takes a closed posting off the list
+ * and gives Jev the posting's text. Then any open opening not yet scored is
+ * put to Jev's questions (plan #1178), for accounts that agreed to send text
+ * to TypeSafe. That includes openings a goals run wrote since yesterday.
+ * Open applications not yet scored, or whose role changed since, get fit and
+ * chance the same way (plan #1203).
  *
  * A run that wrote something is sent as a phone notification to every browser
  * the person switched notifications on for (core.push_subscriptions), the
@@ -55,6 +58,7 @@ export async function runJobSuggestions(now: Date = new Date()): Promise<JobSugg
       const result = await runSuggestionsFor(jobs, userId, { apiKey, kinds: ['reach_out', 'apply'], now });
       await recordSpendReports(core, userId, { module: 'jobs', operation: 'suggest-outreach' }, result.reach_out.spend);
       await recordSpendReports(core, userId, { module: 'jobs', operation: 'find-openings' }, result.apply.spend);
+      await checkOpeningPostings(jobs, userId, { now });
       if (await jevEnabledFor(core, userId)) {
         const scoreSpend: SpendReport[] = [];
         await scoreOpeningsFor(jobs, userId, { onSpend: (report) => scoreSpend.push(report) });
