@@ -702,13 +702,16 @@ function excerpt(body: string | null, query: string | null): string | null {
     for (const word of words) {
       const at = lower.indexOf(word);
       if (at >= 0) {
-        const start = Math.max(0, at - 120);
-        return `${start > 0 ? '…' : ''}${clip(flat.slice(start), 320)}`;
+        const start = Math.max(0, at - 80);
+        return `${start > 0 ? '…' : ''}${clip(flat.slice(start), 240)}`;
       }
     }
   }
-  return clip(flat, 240);
+  return clip(flat, 200);
 }
+
+/** Notes listed from a word match when a meaning match runs beside it, so the pair stays short. */
+const WORD_MATCHES_WITH_MEANING = 15;
 
 export async function vaultLookup(ctx: AskContext, input: Input): Promise<AskToolResult> {
   const from = optionalDate(input, 'from');
@@ -717,23 +720,59 @@ export async function vaultLookup(ctx: AskContext, input: Input): Promise<AskToo
   if (!from && !to && !query) throw new AskInputError('Give a period (from, to), a query, or both.');
 
   const client = await ctx.db('obsidian');
-  let read = client
-    .from('notes')
-    .select('id, path, title, body, git_updated_at')
-    .eq('user_id', ctx.userId)
-    .is('deleted_at', null);
-  if (query) read = read.textSearch('search_tsv', query, { type: 'websearch', config: 'english' });
-  if (from) read = read.gte('git_updated_at', from);
-  if (to) read = read.lt('git_updated_at', nextDay(to));
-  const { data, error } = await read
-    .order('git_updated_at', { ascending: false, nullsFirst: false })
-    .limit(MAX_ROWS + 1);
-  if (error) throw new Error(`notes: ${error.message}`);
-  const notes = (data ?? []) as NoteRow[];
+  const base = () => {
+    let read = client
+      .from('notes')
+      .select('id, path, title, body, git_updated_at')
+      .eq('user_id', ctx.userId)
+      .is('deleted_at', null);
+    if (from) read = read.gte('git_updated_at', from);
+    if (to) read = read.lt('git_updated_at', nextDay(to));
+    return read;
+  };
+
+  // By meaning, when a query is given and there is a way to embed it. A
+  // failure here leaves the word match to answer; it never fails the lookup.
+  const meaning = new Map<string, number>();
+  if (query && ctx.semanticNotes) {
+    try {
+      for (const hit of await ctx.semanticNotes(query)) meaning.set(hit.id, hit.similarity);
+    } catch (error) {
+      console.error('ask: matching notes by meaning failed', error instanceof Error ? error.message : error);
+    }
+  }
+
+  const wordRead = base();
+  const wordLimit = query && meaning.size > 0 ? WORD_MATCHES_WITH_MEANING : MAX_ROWS;
+  const [words, byMeaning] = await Promise.all([
+    (query ? wordRead.textSearch('search_tsv', query, { type: 'websearch', config: 'english' }) : wordRead)
+      .order('git_updated_at', { ascending: false, nullsFirst: false })
+      .limit(wordLimit + 1),
+    meaning.size > 0 ? base().in('id', [...meaning.keys()]) : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (words.error) throw new Error(`notes: ${words.error.message}`);
+  if (byMeaning.error) throw new Error(`notes: ${byMeaning.error.message}`);
+
+  const wordNotes = (words.data ?? []) as NoteRow[];
+  const meaningNotes = ((byMeaning.data ?? []) as NoteRow[]).sort(
+    (a, b) => (meaning.get(b.id) ?? 0) - (meaning.get(a.id) ?? 0),
+  );
+  const wordIds = new Set(wordNotes.slice(0, wordLimit).map((n) => n.id));
+
+  // Both first, then meaning by closeness, then words by recency.
+  const listed: { note: NoteRow; how: 'both' | 'meaning' | 'words' }[] = [
+    ...meaningNotes.filter((n) => wordIds.has(n.id)).map((note) => ({ note, how: 'both' as const })),
+    ...meaningNotes.filter((n) => !wordIds.has(n.id)).map((note) => ({ note, how: 'meaning' as const })),
+    ...wordNotes
+      .slice(0, wordLimit)
+      .filter((n) => !meaning.has(n.id))
+      .map((note) => ({ note, how: 'words' as const })),
+  ];
+  const capped = wordNotes.length > wordLimit;
 
   return {
     ok: true,
-    rows: notes.slice(0, MAX_ROWS).map((note) => ({
+    rows: listed.slice(0, MAX_ROWS).map(({ note, how }) => ({
       table: 'obsidian.notes',
       ref: note.path,
       title: note.title?.trim() || note.path.split('/').pop() || note.path,
@@ -741,12 +780,18 @@ export async function vaultLookup(ctx: AskContext, input: Input): Promise<AskToo
       detail: {
         folder: note.path.split('/').slice(0, -1).join('/') || null,
         changed_on: note.git_updated_at?.slice(0, 10) ?? null,
+        ...(query ? { matched: how } : {}),
+        ...(meaning.has(note.id) ? { closeness: Math.round((meaning.get(note.id) ?? 0) * 100) / 100 } : {}),
         excerpt: excerpt(note.body, query),
       },
     })),
     note:
-      (query ? 'Matched on the words of the whole note, not just its title. ' : '') +
+      (query
+        ? meaning.size > 0
+          ? 'Matched on the words of the whole note and on meaning; closeness is 0 to 1, and a low one may be unrelated. '
+          : 'Matched on the words of the whole note, not just its title. '
+        : '') +
       (from || to ? 'Changed means last changed in the vault within the period. ' : '') +
-      (notes.length > MAX_ROWS ? `More than ${MAX_ROWS} matched; only the newest are listed.` : ''),
+      (capped ? `More notes matched on words than are listed; only the newest are.` : ''),
   };
 }

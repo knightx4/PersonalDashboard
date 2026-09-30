@@ -15,6 +15,7 @@ import {
   vaultLookup,
 } from './lookups';
 import type { AskSchema } from './db';
+import { emptyHint } from './declarations';
 
 /**
  * Dash's read tools (plan #1088): what the model is told it can call, and
@@ -163,7 +164,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'vault_notes',
     description:
-      'Notes in the person\'s Obsidian vault: the ones changed between two dates, the ones whose text matches a query, or both. The query is matched against the whole note, title and body, as a web-style search ("leaving job", "\\"notice period\\"", "manager OR boss"). Returns up to 50, newest first, each with an excerpt and a link. Use it for anything they have written or thought about.',
+      'Notes in the person\'s Obsidian vault: the ones changed between two dates, the ones that match a query, or both. A query is matched two ways at once: on the words in the whole note, title and body, as a web-style search ("leaving job", "\\"notice period\\"", "manager OR boss"), and on meaning, so a description of what a note is about finds it without its words. Each row says which way it matched. Returns up to 50, each with an excerpt and a link. Use it for anything they have written, thought about or lived through.',
     input_schema: {
       type: 'object',
       properties: {
@@ -231,7 +232,11 @@ export async function executeAskTool(
     const result = await run(ctx, args);
     if (!result.ok) return result;
     // The promise to the page: every row a tool gives back opens somewhere.
-    return { ...result, rows: result.rows.filter((row) => row.href.startsWith('/')) };
+    const rows = result.rows.filter((row) => row.href.startsWith('/'));
+    if (rows.length > 0) return { ...result, rows };
+    // Nothing found: say what the workspace suggests trying next.
+    const hint = emptyHint(name);
+    return { ...result, rows, ...(hint ? { note: [result.note, hint].filter(Boolean).join(' ') } : {}) };
   } catch (error) {
     if (error instanceof AskInputError) return { ok: false, error: error.message };
     console.error(`ask tool ${name} failed`, error);

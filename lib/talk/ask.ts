@@ -4,6 +4,9 @@ import { ASK_TOOLS } from '@/lib/ask/tools';
 import { PROPOSAL_TOOLS } from '@/lib/ask/propose';
 import { citationsOf, toolResultText, type AskToolResult } from '@/lib/ask/db';
 import type { PageContext } from '@/lib/ask/page';
+import { workspacesBlock, switchedOff } from '@/lib/ask/declaration';
+import { ASK_DECLARATIONS } from '@/lib/ask/declarations';
+import { MODULE_IDS, type ModuleId } from '@/lib/modules';
 import { whyNoReport } from '@/lib/learn/graph/tool-call';
 import type { DashChange, NewDashChange } from './changes';
 import { TALK_MODEL } from './reply';
@@ -33,6 +36,14 @@ import {
  * kept as a proposed row in core.dash_changes and nothing else is written;
  * the person confirms each on its own. Proposals count toward the lookup cap,
  * and one naming a row can only name a row a lookup returned, as citations do.
+ *
+ * The first call cannot answer: it is offered the lookups and proposals only,
+ * so a question is never answered from memory or from a guess about what the
+ * app holds. A later answer that follows lookups which all found nothing is
+ * sent back once to look again before it is accepted.
+ *
+ * What the app holds is told to the model from the workspaces' own
+ * declarations (lib/ask/declarations.ts), not from sentences here.
  *
  * Three limits stop the looking, and when one is reached the next call is
  * made to answer with what it has: eight lookups, an input token budget, and
@@ -94,19 +105,37 @@ const TOOLS: Anthropic.Tool[] = [
   { ...ANSWER, cache_control: { type: 'ephemeral' } },
 ];
 
-const SYSTEM = `You are Dash, the assistant inside somebody's personal dashboard. It holds their
-shopping orders, job applications, notes, todos, reading, newsletters, goals
-and build plan. They are asking you a question about their own things.
+/**
+ * The tools the first call is offered: the same list without `answer`, with
+ * its own cache breakpoint. The prefix differs from TOOLS, so it is cached
+ * apart, and it is small.
+ */
+const FIRST_TOOLS: Anthropic.Tool[] = (() => {
+  const lookups = [...ASK_TOOLS, ...PROPOSAL_TOOLS];
+  return [...lookups.slice(0, -1), { ...lookups[lookups.length - 1], cache_control: { type: 'ephemeral' } }];
+})();
+
+const SYSTEM = `You are Dash, the assistant inside somebody's personal dashboard. They are
+asking you a question about their own things. The dashboard is made of
+workspaces, and each says what it is and what it holds:
+
+${workspacesBlock(ASK_DECLARATIONS)}
 
 LOOK IT UP. Answer from what the lookup tools return, never from memory or a
-guess about what they probably have. Work out which lookups the question needs
-and make them; where two are independent, make them in the same turn. You
-have at most ${MAX_LOOKUPS} lookups for one answer, so choose them well.
+guess about what they probably have. Decide from the list above where the
+thing the question is about would be kept, and look there; when it could be in
+more than one workspace, look in each. Where two lookups are independent, make
+them in the same turn. You have at most ${MAX_LOOKUPS} lookups for one answer,
+so choose them well.
 
-WHEN THE DATA CANNOT ANSWER IT, SAY SO. If the lookups do not hold what the
-question needs, or a workspace is switched off, answer "I cannot see that"
-and say in a sentence what you could see instead. Do not fill the gap with a
-likely answer.
+AN EMPTY RESULT IS NOT AN ANSWER. If a lookup finds nothing, try other words,
+a related term or another workspace from the list before you give up. Follow
+any advice the result gives.
+
+WHEN THE DATA CANNOT ANSWER IT, SAY SO. Only after you have looked where the
+thing would be kept, and what you found does not hold what the question needs,
+or a workspace is switched off, answer "I cannot see that" and say in a
+sentence what you could see instead. Do not fill the gap with a likely answer.
 
 ANSWER THROUGH THE answer TOOL. Keep it short: a few sentences, or a short
 list when they asked for a list. Give figures exactly as the lookups gave
@@ -133,8 +162,10 @@ first with the tool the line names, and answer about it. When the question is
 about anything else, ignore the page and answer as if it had not been said.`;
 
 /** What the model is told the date is: after the cache breakpoint, since it changes daily. */
-function dateLine(today: string): string {
-  return `Today is ${today} in the person's timezone. Read "this month", "last week" and the like from it.`;
+function dateLine(today: string, enabled?: readonly ModuleId[]): string {
+  const line = `Today is ${today} in the person's timezone. Read "this month", "last week" and the like from it.`;
+  const off = enabled ? switchedOff(enabled, MODULE_IDS) : [];
+  return off.length > 0 ? `${line} Switched off, so they cannot be read: ${off.join(', ')}.` : line;
 }
 
 /**
@@ -155,6 +186,10 @@ export function pageLine(page: PageContext | null | undefined): string | null {
     : `open_row with table ${table} and ref ${ref} reads it`;
   return `${at}, which shows "${shown}" (${table}, ref ${ref}): ${reach}.`;
 }
+
+/** Said to the model in place of an answer that followed only empty lookups. */
+const LOOK_AGAIN =
+  'Your lookups found nothing. Before you say you cannot see it, look again: other words, a related term, or another workspace that could hold it. Then answer.';
 
 /** Said to the model when a limit is reached, in place of any further lookup. */
 const LIMIT_REACHED = 'No lookups are left for this answer. Answer now with what you have.';
@@ -265,6 +300,8 @@ export async function answerQuestion(input: {
   today: string;
   /** The page the question was asked from; null or absent when none is told. */
   page?: PageContext | null;
+  /** The workspaces that are on; absent when every one is. */
+  enabledModules?: readonly ModuleId[];
   execute: AskExecutor;
   /** Absent: every proposal is refused. */
   propose?: AskProposer;
@@ -290,7 +327,7 @@ export async function answerQuestion(input: {
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
   const system: Anthropic.TextBlockParam[] = [
     { type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } },
-    { type: 'text', text: dateLine(input.today) },
+    { type: 'text', text: dateLine(input.today, input.enabledModules) },
   ];
   const onPage = pageLine(input.page);
   if (onPage) system.push({ type: 'text', text: onPage });
@@ -298,10 +335,15 @@ export async function answerQuestion(input: {
   const messages: Anthropic.MessageParam[] = [...history];
   let lookups = 0;
   let inputTokens = 0;
+  // Whether any lookup has found a row, and whether an answer has already
+  // been sent back once for finding none.
+  let found = false;
+  let lookedAgain = false;
 
   // Each round either answers or makes at least one lookup, and the lookups
-  // are capped, so this ends; the bound is a second guard.
-  for (let round = 0; round <= MAX_LOOKUPS + 1; round++) {
+  // are capped, so this ends; the bound is a second guard, with one round over
+  // for the answer that is sent back to look again.
+  for (let round = 0; round <= MAX_LOOKUPS + 2; round++) {
     const limit: AskStop | null =
       lookups >= MAX_LOOKUPS
         ? 'lookups'
@@ -310,7 +352,8 @@ export async function answerQuestion(input: {
           : now() - started >= TIME_BUDGET_MS
             ? 'time'
             : null;
-    const mustAnswer = limit !== null || round === MAX_LOOKUPS + 1;
+    const mustAnswer = limit !== null || round === MAX_LOOKUPS + 2;
+    const first = lookups === 0 && !mustAnswer;
 
     let response: Anthropic.Message;
     try {
@@ -318,7 +361,7 @@ export async function answerQuestion(input: {
         model: ASK_MODEL,
         max_tokens: 2000,
         system,
-        tools: TOOLS,
+        tools: first ? FIRST_TOOLS : TOOLS,
         tool_choice: mustAnswer ? { type: 'tool', name: ANSWER_TOOL } : { type: 'any' },
         messages: withRollingBreakpoint(messages),
       });
@@ -332,6 +375,22 @@ export async function answerQuestion(input: {
 
     const uses = response.content.filter((c): c is Anthropic.ToolUseBlock => c.type === 'tool_use');
     const answered = uses.find((c) => c.name === ANSWER_TOOL);
+    if (answered && limit === null && lookups > 0 && !found && !lookedAgain) {
+      lookedAgain = true;
+      messages.push(
+        { role: 'assistant', content: response.content },
+        {
+          role: 'user',
+          content: uses.map((use) => ({
+            type: 'tool_result',
+            tool_use_id: use.id,
+            content: use.name === ANSWER_TOOL ? LOOK_AGAIN : 'Not run. Look again first.',
+            is_error: true,
+          })),
+        },
+      );
+      continue;
+    }
     if (answered) {
       const { answer, cited } = answerInput(answered.input);
       if (!answer) return { ok: false, detail: 'The answer came back empty.', toolCalls };
@@ -418,7 +477,9 @@ export async function answerQuestion(input: {
     const blocks: Anthropic.ToolResultBlockParam[] = uses.map((use, i) => {
       const result = results[i];
       toolCalls.push({ name: use.name, input: use.input, result: keptResult(result) });
-      for (const c of citationsOf(result)) known.set(citationKey(c), c);
+      const cited = citationsOf(result);
+      if (cited.length > 0) found = true;
+      for (const c of cited) known.set(citationKey(c), c);
       return {
         type: 'tool_result',
         tool_use_id: use.id,
@@ -489,6 +550,8 @@ export async function askDash(
      * the conversation: each question carries the page it was asked on.
      */
     page?: PageContext | null;
+    /** The workspaces that are on; absent when every one is. */
+    enabledModules?: readonly ModuleId[];
     execute: AskExecutor;
     /** Absent: every proposal is refused. */
     propose?: AskProposalRunner;
@@ -545,6 +608,7 @@ export async function askDash(
     turns: [...earlier, ...asked],
     today: input.today,
     page: input.page,
+    enabledModules: input.enabledModules,
     execute: input.execute,
     propose: propose ? (name, args, seen) => propose(name, args, seen, save) : undefined,
     anthropicApiKey: input.anthropicApiKey,

@@ -504,4 +504,45 @@ describe('vault_notes', () => {
   it('asks for a period or a query', async () => {
     expect((await executeAskTool('vault_notes', {}, context(tables))).ok).toBe(false);
   });
+
+  it('finds a note by meaning when no word matches, and says how each row matched', async () => {
+    const withSnake: Tables = {
+      'obsidian.notes': [
+        ...tables['obsidian.notes']!,
+        note('n5', ME, 'Me/Snakebite.md', 'Easter at the ranch. A helicopter, then the ICU.', '2026-08-01'),
+        note('n6', THEM, 'Me/Theirs.md', 'Somebody else.', '2026-08-01'),
+      ],
+    };
+    const ctx = context(withSnake, {
+      semanticNotes: async () => [
+        { id: 'n5', similarity: 0.41 },
+        { id: 'n1', similarity: 0.33 },
+        { id: 'n6', similarity: 0.9 },
+      ],
+    });
+    const result = await executeAskTool('vault_notes', { query: 'leaving job' }, ctx);
+    const rows = expectLinkedRows(result);
+    // Both ways first would be n1; the other person's note never shows.
+    expect(rows.map((r) => [r.ref, r.detail?.matched])).toEqual([
+      ['Work/Next.md', 'both'],
+      ['Me/Snakebite.md', 'meaning'],
+    ]);
+    expect(rows[1].detail?.closeness).toBe(0.41);
+  });
+
+  it('answers by words alone when matching by meaning fails', async () => {
+    const ctx = context(tables, {
+      semanticNotes: async () => {
+        throw new Error('no key');
+      },
+    });
+    const result = await executeAskTool('vault_notes', { query: 'leaving job' }, ctx);
+    expect(expectLinkedRows(result).map((r) => r.ref)).toEqual(['Work/Next.md']);
+  });
+
+  it('suggests what to try next when nothing matched', async () => {
+    const result = await executeAskTool('vault_notes', { query: 'zebra' }, context(tables));
+    expect(result.ok && result.rows).toEqual([]);
+    expect(result.ok && result.note).toContain('different wording');
+  });
 });

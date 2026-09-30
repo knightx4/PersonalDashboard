@@ -292,6 +292,7 @@ describe('askDash', () => {
     const { client, sent } = stubClient([
       reply([use('u1', 'nope', {})]),
       reply([use('a', 'answer', { answer: 'I cannot see that.', cited: [] })]),
+      reply([use('b', 'answer', { answer: 'I cannot see that.', cited: [] })]),
     ]);
     const { execute } = stubExecute();
     const answer = await answerQuestion({
@@ -427,6 +428,51 @@ const GOAL_ROWS: Row[] = [
   { id: THEIR_GOAL_ID, user_id: THEM, title: 'Their goal', level: 'goal', status: 'open', archived_at: null },
 ];
 
+describe('looking before answering', () => {
+  const ask = (client: Anthropic, execute = stubExecute().execute) =>
+    answerQuestion({ turns: [{ role: 'user', body: 'What happened when I was 10?' }], today: '2026-09-27', execute, anthropicApiKey: 'k', client });
+
+  it('does not offer the answer tool on the first call, and offers it after', async () => {
+    const { client, sent } = stubClient([
+      reply([use('u1', 'search', { query: 'snake' })]),
+      reply([use('a', 'answer', { answer: 'A snakebite.', cited: [{ table: 'public.orders', ref: 'o-1' }] })]),
+    ]);
+    await ask(client);
+    expect(sent[0].tools.map((t) => t.name)).not.toContain('answer');
+    expect(sent[0].tool_choice).toEqual({ type: 'any' });
+    expect(sent[1].tools.map((t) => t.name)).toContain('answer');
+  });
+
+  it('sends an answer back once when every lookup found nothing, then accepts the next', async () => {
+    const empty: AskToolResult = { ok: true, rows: [], note: 'No note matched.' };
+    const { client, sent } = stubClient([
+      reply([use('u1', 'vault_notes', { query: 'age 10' })]),
+      reply([use('a1', 'answer', { answer: 'I cannot see that.', cited: [] })]),
+      reply([use('u2', 'vault_notes', { query: 'snake' })]),
+      reply([use('a2', 'answer', { answer: 'Nothing found.', cited: [] })]),
+    ]);
+    const calls: string[] = [];
+    const answer = await ask(client, async (name, input) => {
+      calls.push(`${name}:${JSON.stringify(input)}`);
+      return empty;
+    });
+    expect(calls).toHaveLength(2);
+    const back = sent[2].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+    expect(back[0]).toMatchObject({ tool_use_id: 'a1', is_error: true });
+    expect(String(back[0].content)).toContain('look again');
+    expect(answer).toMatchObject({ ok: true, body: 'Nothing found.' });
+  });
+
+  it('accepts an answer straight away once a lookup found a row', async () => {
+    const { client, sent } = stubClient([
+      reply([use('u1', 'search', { query: 'ebay' })]),
+      reply([use('a', 'answer', { answer: 'One order.', cited: [] })]),
+    ]);
+    await ask(client);
+    expect(sent).toHaveLength(2);
+  });
+});
+
 describe('askDash proposals', () => {
   function goalExecute() {
     return async (name: string): Promise<AskToolResult> =>
@@ -456,8 +502,9 @@ describe('askDash proposals', () => {
 
     // The proposal tools are offered, and the prompt no longer says Dash only reads.
     expect(sent[0].tools.map((t) => t.name)).toEqual(
-      expect.arrayContaining(['propose_todo', 'propose_goal_step', 'propose_returned', 'answer']),
+      expect.arrayContaining(['propose_todo', 'propose_goal_step', 'propose_returned']),
     );
+    expect(sent[1].tools.map((t) => t.name)).toContain('answer');
     expect(sent[0].system[0].text).toContain('YOU CAN PROPOSE THREE CHANGES');
     expect(sent[0].system[0].text).not.toContain('You only read');
 

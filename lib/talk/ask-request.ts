@@ -6,6 +6,8 @@ import { executeProposal } from '@/lib/ask/propose';
 import { executeAskTool } from '@/lib/ask/tools';
 import { requestAskDb } from '@/lib/ask/clients';
 import { resolvePage, type PageContext } from '@/lib/ask/page';
+import { semanticNotesFor } from '@/lib/ask/semantic';
+import type { SpendReport } from '@/lib/core/spend/pricing';
 import { isAskPath } from '@/lib/ask/page-name';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -49,7 +51,13 @@ export async function askDashInRequest(input: {
   const user = await requireUser();
   const [settings, core] = await Promise.all([loadAccountSettings(user.id), createCoreClient()]);
   const today = todayInTimezone(settings.timezone);
+  // What matching notes by meaning cost, written with the answer's own spend.
+  const embedSpend: SpendReport[] = [];
   const ctx = askContext(user.id, settings);
+  const askCtx = {
+    ...ctx,
+    semanticNotes: semanticNotesFor(ctx.db, user.id, (report) => embedSpend.push(report)),
+  };
 
   const page = input.page ? await pageFor(ctx, input.page) : null;
 
@@ -59,7 +67,8 @@ export async function askDashInRequest(input: {
       conversationRef: input.conversationRef,
       page,
       today,
-      execute: (name, args) => executeAskTool(name, args, ctx),
+      enabledModules: settings.enabledModules,
+      execute: (name, args) => executeAskTool(name, args, askCtx),
       propose: (name, args, seen, save) => executeProposal(name, args, { ...ctx, seen, save }),
       anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     },
@@ -68,7 +77,7 @@ export async function askDashInRequest(input: {
       load: (ref) => loadConversation(core, { kind: 'ask', ref }),
       append: (subject, turns) => appendTurns(core, user.id, subject, turns),
       recordSpend: (reports) =>
-        recordSpendReports(core, user.id, { module: 'core', operation: 'ask-dash' }, reports),
+        recordSpendReports(core, user.id, { module: 'core', operation: 'ask-dash' }, [...reports, ...embedSpend]),
       saveProposal: (conversationId, change) => insertProposal(core, user.id, conversationId, change),
       attachProposals: (ids, turnId) => attachProposals(core, ids, turnId),
       discardProposals: (ids) => discardProposals(core, ids),

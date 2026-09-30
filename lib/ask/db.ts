@@ -40,6 +40,11 @@ export type AskContext = {
   searchSources: readonly SearchSource[];
   /** For "the last four weeks" of goal reviews; Date.now() when absent. */
   now?: number;
+  /**
+   * The person's notes nearest a question by meaning, best first (lib/ask/semantic.ts).
+   * Absent, or returning nothing, leaves vault_notes to match on words alone.
+   */
+  semanticNotes?: (query: string) => Promise<{ id: string; similarity: number }[]>;
 };
 
 /**
