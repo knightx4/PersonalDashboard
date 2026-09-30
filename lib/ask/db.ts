@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SearchSource } from '@/lib/search/sources';
 import type { ModuleId } from '@/lib/modules';
 import type { TalkCitation } from '@/lib/talk/talk';
+import type { QuestionEmbedder } from '@/lib/memory/search';
 
 /**
  * What Dash's lookups read with and hand back (plan #1088). No client and no
@@ -40,6 +41,8 @@ export type AskContext = {
   searchSources: readonly SearchSource[];
   /** For "the last four weeks" of goal reviews; Date.now() when absent. */
   now?: number;
+  /** How recall embeds a question; Voyage when absent, a fake in tests. */
+  embedQuestion?: QuestionEmbedder;
 };
 
 /**

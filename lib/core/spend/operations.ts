@@ -123,6 +123,10 @@ export const SPEND_OPERATIONS = {
     // the five-minute memory sweep, which is also the backfill. A row is
     // embedded again only when its text changes.
     'embed-memory',
+    // Embedding the question when Dash searches the person's writing by
+    // meaning (plan #1248). Voyage, one short call per recall lookup, from
+    // Ask Dash.
+    'recall-question',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one

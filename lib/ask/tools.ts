@@ -9,6 +9,7 @@ import {
   applicationsLookup,
   goalsLookup,
   openLookup,
+  recallLookup,
   searchLookup,
   spendLookup,
   todosLookup,
@@ -34,6 +35,7 @@ import type { AskSchema } from './db';
 
 export const ASK_TOOL_NAMES = [
   'search',
+  'recall',
   'open_row',
   'spend_by_merchant',
   'job_applications',
@@ -60,7 +62,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'search',
     description:
-      'Find the person\'s own things by the words in their title or name, across every workspace that is switched on: job search companies, roles and contacts; shopping orders, owned items and saved items; todos; vault notes (by title and path); Learn readings and tracks; build plan steps, ideas and feedback; newsletter stories; goals and goal steps. Returns up to 20 matches, each with a table, a ref and a link. Use it to find a named thing; it does not look inside the text of a row, so for what a note says use vault_notes with a query. Pass a row\'s table and ref to open_row to read it in full.',
+      'Find the person\'s own things by the words in their title or name, across every workspace that is switched on: job search companies, roles and contacts; shopping orders, owned items and saved items; todos; vault notes (by title and path); Learn readings and tracks; build plan steps, ideas and feedback; newsletter stories; goals and goal steps. Returns up to 20 matches, each with a table, a ref and a link. Use it to find a named thing; it does not look inside the text of a row. For what the person has said, written or thought about a topic, use recall. Pass a row\'s table and ref to open_row to read it in full.',
     input_schema: {
       type: 'object',
       properties: {
@@ -75,6 +77,26 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
         },
       },
       required: ['query'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'recall',
+    description:
+      'Find what the person has written about a topic by meaning, across every workspace that is switched on: vault notes, job search thoughts, notes and profile, goals and steps, goal captures, files, Learn aims, notes and cards, and purchases. Finds passages that are about the question even when they share none of its words. Returns up to 12 rows, closest first, each with its best one or two passages, who wrote each (the person or Dash), a closeness score and a link. Use it for questions like "what did I say I want from my next job?" or "what have I written about land value tax?", then open_row to read a vault note, file or thoughts entry in full.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        question: {
+          type: 'string',
+          description: 'The topic or question in plain words, as the person would put it. A sentence works better than keywords.',
+        },
+        only_mine: {
+          type: 'boolean',
+          description: "Leave out text Dash wrote (drafts, files, goal results, Learn cards) and return only the person's own writing.",
+        },
+      },
+      required: ['question'],
       additionalProperties: false,
     },
   },
@@ -163,7 +185,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'vault_notes',
     description:
-      'Notes in the person\'s Obsidian vault: the ones changed between two dates, the ones whose text matches a query, or both. The query is matched against the whole note, title and body, as a web-style search ("leaving job", "\\"notice period\\"", "manager OR boss"). Returns up to 50, newest first, each with an excerpt and a link. Use it for anything they have written or thought about.',
+      'Notes in the person\'s Obsidian vault: the ones changed between two dates, the ones whose text matches a query, or both. The query is matched against the whole note, title and body, as a web-style search ("leaving job", "\\"notice period\\"", "manager OR boss"). Returns up to 50, newest first, each with an excerpt and a link. Use it for notes from a period or for an exact word or name; for what they think about a topic, use recall, which also finds notes that put it in other words.',
     input_schema: {
       type: 'object',
       properties: {
@@ -181,6 +203,8 @@ type Lookup = (ctx: AskContext, input: Record<string, unknown>) => Promise<AskTo
 /** Each tool's lookup, and the workspace that has to be on for it to run (null: it checks itself). */
 const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   search: { run: searchLookup, module: null },
+  // Leaves out the switched-off workspaces itself; files belong to none.
+  recall: { run: recallLookup, module: null },
   open_row: { run: openLookup, module: null },
   spend_by_merchant: { run: spendLookup, module: 'shopping' },
   job_applications: { run: applicationsLookup, module: 'jobs' },
