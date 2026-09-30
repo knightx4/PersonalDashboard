@@ -18,7 +18,7 @@ export const metadata = {
   description: 'What Personal Dashboard reads, what it stores, and what it never keeps.',
 };
 
-const LAST_UPDATED = '22 September 2026';
+const LAST_UPDATED = '30 September 2026';
 
 export default function PrivacyPage() {
   return (
@@ -137,7 +137,11 @@ export default function PrivacyPage() {
         with inngest/vault/map-sweep.ts (plan #757), and Maya in lib/vault/maya
         (retrieve.ts, thought-model.ts) with app/vault/n/[...path]/actions.ts
         (askMaya, plan #1285), and replies to Maya in lib/vault/maya/reply.ts with
-        app/vault/maya/actions.ts (replyToMaya, plan #1286). The sweep skips what
+        app/vault/maya/actions.ts (replyToMaya, plan #1286), and Maya's hourly
+        job in lib/vault/maya/gate-run.ts with inngest/vault/maya-gate.ts (plan
+        #1289), which asks Jev (lib/vault/maya/gate.ts) before Maya writes. The
+        map sweep's first read also goes to Jev for an account that has opted in
+        (lib/vault/map/jev-question.ts, lib/jev/enabled.ts). The sweep skips what
         rules.ts skips (the Me folder and notes with API keys), notes under 80
         characters, and text past MAX_NOTE_READ_CHARS in
         lib/learn/graph/note-chunks.ts. Any new path that sends note text to a
@@ -147,7 +151,7 @@ export default function PrivacyPage() {
         Four features send the text of your notes to Anthropic&rsquo;s Claude models: writing a
         quiz, reading a note for Learn, reading notes for the map of what you write about, and
         asking Maya for its thoughts on a note and replying to it. Writing a quiz, reading for
-        Learn, asking Maya and replying to it run when you press their button, on the note or notes you picked. The map can also be filled by a sweep, which you start from the map page. The
+        Learn, asking Maya and replying to it run when you press their button, on the note or notes you picked. Maya can also write on a new note of yours without being asked, as described below. The map can also be filled by a sweep, which you start from the map page. The
         sweep sends every note in your vault, apart from those listed below, without you picking
         them. It runs in the background a few minutes at a time until it has reached every note or
         you stop it.
@@ -192,7 +196,24 @@ export default function PrivacyPage() {
           a folder that is never read, or now contains what looks like an API key, its text is
           left out and Maya answers from the thread alone.
         </li>
+        <li>
+          <strong>Maya writing without being asked.</strong> Once an hour, the notes that are new
+          or changed since the last day and a half are looked at, each version once. If Jev (below)
+          judges that a note is working something out, Maya writes a thought on it and opens a
+          thread marked &ldquo;Maya picked&rdquo;, at most three in a day. What is sent to write
+          that thought is what is sent when you ask Maya about the note.
+        </li>
       </ul>
+      <p>
+        Jev is a classifier run by TypeSafe, a company separate from Anthropic. It reads your
+        notes only if Jev has been turned on for your account, which it is not by default. When it
+        is on, two things send note text to TypeSafe. While a map sweep runs, the title and first
+        1,500 characters of each note it reads go to Jev for the first read described above. And
+        each hour, the title and first 4,000 characters of each new or changed note go to Jev with
+        one question: whether the writer is working something out that a thoughtful partner could
+        argue with. Only a note Jev is sure of gets a thought from Maya. When Jev is off for your
+        account, nothing is sent to TypeSafe and Maya writes only when you ask.
+      </p>
       <p>What is never sent:</p>
       <ul>
         <li>For a quiz or for Learn, a note you did not pick.</li>
@@ -217,6 +238,11 @@ export default function PrivacyPage() {
           Applications, or of a note that contains what looks like an API key, whether it is the
           note you asked about or one of your other notes. Such a note shows no way to ask Maya
           at all.
+        </li>
+        <li>
+          To Jev: the folder or file path of a note, or any part of a note in your Me folder, of a
+          note in Career/Job Applications, of a note that contains what looks like an API key, or
+          of a note under 80 characters. Maya does not write on such a note by itself.
         </li>
       </ul>
       <p>

@@ -130,6 +130,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // A note, its eight nearest notes cut to 3,000 characters, and up to
   // sixteen positions with quotes, plus the search results read back.
   'write-maya-thought': run(OPUS, 25_000, 2_500),
+  // The title and up to 4,000 characters of one note, from the hourly job.
+  'gate-maya-note': background(unit(JEV, 1_200, 0)),
   // The note, Maya's thought, the thread so far and the summary, answered
   // with a reply and a new summary.
   'reply-to-maya': run(SONNET, 8_000, 900),
