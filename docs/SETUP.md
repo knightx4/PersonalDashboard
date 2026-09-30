@@ -645,6 +645,18 @@ tick, so nothing new has to be set. It also needs `ANTHROPIC_API_KEY` in
 Vercel; without it the sweep stays running and the Map page shows why it
 cannot continue.
 
+### The memory sweep tick
+
+`supabase/migrations/0136_memory_sweep.sql` schedules `memory-sweep-tick`
+every five minutes. It POSTs to `/api/cron/memory-sweep`, which removes the
+passages of rows that are gone from `core.memory_chunks` and embeds the rows
+that are new or changed, for up to three and a half minutes. The first calls
+are the backfill. It reads the same two Vault secrets as the overnight tick
+and needs `EMBEDDING_API_KEY` in Vercel, which the note embeddings already
+use; without it the reply says `no-key` and nothing is written. The reply is
+in `net._http_response` for a few hours, and the spend is `embed-memory` in
+`core.model_spend`.
+
 ---
 
 ## Running cost
