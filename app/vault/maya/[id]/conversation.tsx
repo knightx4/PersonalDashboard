@@ -6,6 +6,7 @@ import { OwlIcon } from '@/components/shell/owl-icon';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { TalkThread, type TalkAssistant } from '@/components/talk/talk-thread';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import type { TalkTurn } from '@/lib/talk/talk';
 import { threadMarkdown, type ThreadMarkdownInput } from '@/lib/vault/maya/markdown';
 import { replyToMaya } from '../actions';
@@ -20,6 +21,10 @@ const MAYA: TalkAssistant = { name: 'Maya', Mark: OwlIcon };
  * back the new one with the turns it kept, and the section above the thought
  * changes as Maya's answer appears. `children` is the thought, drawn on the
  * server.
+ *
+ * Each of the three parts sits on its own card (note 9d8f9bd9): where you have
+ * got to, the thought, and the replies. On the bare page they ran together as
+ * one column of prose, and the headings were all that told them apart.
  *
  * "Copy as note" (plan #1287) puts the thread on the clipboard as Markdown
  * for Obsidian, built here so it carries the summary as it now stands. The
@@ -47,45 +52,49 @@ export function MayaConversation({
         <CopyAsNote text={() => threadMarkdown({ ...copy, summary })} />
       </div>
 
-      <section aria-labelledby="summary-heading" className="mb-8">
-        <h2 id="summary-heading" className="text-body font-semibold text-ink">
-          Where you have got to
-        </h2>
-        <p className="mt-1 whitespace-pre-line text-body text-ink">
-          {summary ?? (
-            <span className="text-ink-muted">
-              Nothing yet. Reply to Maya below, and after each answer this says what you now hold
-              and what is still open.
-            </span>
-          )}
-        </p>
-      </section>
+      <Card padding="standard" className="mb-6">
+        <section aria-labelledby="summary-heading">
+          <h2 id="summary-heading" className="text-body font-semibold text-ink">
+            Where you have got to
+          </h2>
+          <p className="mt-1 whitespace-pre-line text-body text-ink">
+            {summary ?? (
+              <span className="text-ink-muted">
+                Nothing yet. Reply to Maya below, and after each answer this says what you now hold
+                and what is still open.
+              </span>
+            )}
+          </p>
+        </section>
+      </Card>
 
-      {children}
+      <Card padding="standard">{children}</Card>
 
-      <section aria-labelledby="replies-heading" className="mt-8">
-        <h2 id="replies-heading" className="mb-2 text-body font-semibold text-ink">
-          Replies
-        </h2>
-        <TalkThread
-          id={`maya-${threadId}`}
-          turns={turns}
-          assistant={MAYA}
-          label="Reply to Maya"
-          placeholder="Agree, push back, or take it somewhere else"
-          hint={
-            <PaidHint
-              action="app/vault/maya/actions.ts#replyToMaya"
-              what="Cost of a reply from Maya"
-            />
-          }
-          send={async (body) => {
-            const result = await replyToMaya(threadId, body);
-            if (result.summary) setSummary(result.summary);
-            return { turns: result.turns, error: result.error };
-          }}
-        />
-      </section>
+      <Card padding="standard" className="mt-6">
+        <section aria-labelledby="replies-heading">
+          <h2 id="replies-heading" className="mb-2 text-body font-semibold text-ink">
+            Replies
+          </h2>
+          <TalkThread
+            id={`maya-${threadId}`}
+            turns={turns}
+            assistant={MAYA}
+            label="Reply to Maya"
+            placeholder="Agree, push back, or take it somewhere else"
+            hint={
+              <PaidHint
+                action="app/vault/maya/actions.ts#replyToMaya"
+                what="Cost of a reply from Maya"
+              />
+            }
+            send={async (body) => {
+              const result = await replyToMaya(threadId, body);
+              if (result.summary) setSummary(result.summary);
+              return { turns: result.turns, error: result.error };
+            }}
+          />
+        </section>
+      </Card>
     </>
   );
 }

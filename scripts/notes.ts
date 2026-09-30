@@ -36,7 +36,7 @@ import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
-import { LAWS, RESTRAINT_LAWS, SHAPE_LAWS, SPEND_LAWS } from '../app/dev/ui/laws';
+import { LAWS, RESTRAINT_LAWS, SHAPE_LAWS, SPEND_LAWS, SCAN_LAWS } from '../app/dev/ui/laws';
 import { checkClose, surfaceOf } from '../lib/feedback/surfaces';
 import { NOTES_WORK_KINDS } from '../lib/feedback/load';
 import { feedbackItems } from '../lib/db/schema';
@@ -74,7 +74,7 @@ function shortId(id: string): string {
 }
 
 /** Every law, in one list, read from the page that renders them. */
-const ALL_LAWS = [...LAWS, ...RESTRAINT_LAWS, ...SHAPE_LAWS, ...SPEND_LAWS];
+const ALL_LAWS = [...LAWS, ...RESTRAINT_LAWS, ...SHAPE_LAWS, ...SPEND_LAWS, ...SCAN_LAWS];
 
 function currentCommit(): string | null {
   try {
