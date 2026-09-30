@@ -69,6 +69,8 @@ export const RECALL_OPERATION = 'recall-question';
  */
 export const MEMORY_SOURCE_MODULES: Readonly<Record<string, ModuleId | null>> = {
   'obsidian.notes': 'vault',
+  // One row per transcript, its courses as lines (plan #1309).
+  'obsidian.transcripts': 'vault',
   'job_search.thoughts': 'jobs',
   'job_search.notes': 'jobs',
   'job_search.profiles': 'jobs',
