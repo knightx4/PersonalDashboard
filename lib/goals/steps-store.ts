@@ -38,7 +38,7 @@ import {
 import { loadLatestReviews } from '@/lib/goals/reviews-store';
 import { syncRhythms } from '@/lib/goals/rhythms-store';
 import { goalProgress, type GoalProgress } from '@/lib/goals/status';
-import { goalTodoSteps, type TodoStep } from '@/lib/goals/todo';
+import { goalsForTodo, type TodoQuestion, type TodoStep } from '@/lib/goals/todo';
 import { nextPosition, reorder, type Goal, type GoalStatus } from '@/lib/goals/tree';
 import { todayIn } from '@/lib/todo/tasks/model';
 
@@ -674,14 +674,16 @@ export type TodoRhythm = LiveRhythm & { startsOn: string; count: number };
  * What Goals puts on Todo, for the agenda source in
  * lib/todo/agenda/sources/goal-steps.ts: each open goal's next step of yours
  * (plan #1266) and the steps you pressed Show on Todo on (plan #927); the
- * rule for both is goalTodoSteps in lib/goals/todo.ts. And every live
+ * rule for both is goalTodoSteps in lib/goals/todo.ts. The open questions
+ * on your goals, to answer from Todo (plan #1267), from the same pass of
+ * dailyView (goalsForTodo). And every live
  * rhythm until its current period's count is met (plan #928). Rhythms need no
  * flag, as the spec says; "Not this one" on Todo hides only this period.
  */
 export async function loadTodoGoals(
   client: GoalsSupabaseClient,
   { userId, today }: Today,
-): Promise<{ steps: TodoStep[]; rhythms: TodoRhythm[] }> {
+): Promise<{ steps: TodoStep[]; questions: TodoQuestion[]; rhythms: TodoRhythm[] }> {
   // userId narrows the read for a service-role client (the morning brief);
   // under RLS it changes nothing.
   const { goals, byGoal } = await loadLiveTree(client, { userId, today });
@@ -695,7 +697,7 @@ export async function loadTodoGoals(
       { ...rhythm, target: current.target, startsOn: current.startsOn, count: current.count },
     ];
   });
-  return { steps: goalTodoSteps(goals, byGoal, today), rhythms };
+  return { ...goalsForTodo(goals, byGoal, today), rhythms };
 }
 
 /**

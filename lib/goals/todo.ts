@@ -20,7 +20,7 @@
  * lib/goals/steps-store.ts and the agenda source that shows the result is
  * lib/todo/agenda/sources/goal-steps.ts.
  */
-import { dailyView } from '@/lib/goals/daily';
+import { dailyView, type DailyView } from '@/lib/goals/daily';
 import type { Step, StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
 
@@ -82,6 +82,7 @@ export function goalTodoSteps(
   goals: { goal: Goal; areaName: string }[],
   byGoal: Map<string, StepNode[]>,
   today: string,
+  view: DailyView = dailyView(goals, byGoal, today),
 ): TodoStep[] {
   const flagged = todoSteps(
     goals.map((g) => g.goal),
@@ -97,7 +98,7 @@ export function goalTodoSteps(
   for (const roots of byGoal.values()) index(roots);
 
   const picks = new Map<string, TodoStep>();
-  for (const { goal, next } of dailyView(goals, byGoal, today).goals) {
+  for (const { goal, next } of view.goals) {
     const node = next[0] && nodes.get(next[0].id);
     if (!node) continue;
     picks.set(node.id, {
@@ -115,4 +116,64 @@ export function goalTodoSteps(
   const listed = new Set(out.map((step) => step.id));
   for (const pick of picks.values()) if (!listed.has(pick.id)) out.push(pick);
   return out;
+}
+
+/**
+ * A question Dash asked on a goal, for Todo to answer (plan #1267). The
+ * options are read out of its detail by planOptions in lib/plan/options.ts,
+ * where the Todo row does it, so a detail with no lettered set shows as a
+ * link to the goal instead of buttons.
+ */
+export type TodoQuestion = {
+  id: string;
+  title: string;
+  detail: string | null;
+  goalId: string;
+  goalTitle: string;
+};
+
+/**
+ * The open questions the Goals home lists as waiting on you: unanswered, not
+ * put aside, not under a step for later, on an open goal. They are dailyView's
+ * `question` rows, so Todo and the Goals home ask the same questions.
+ */
+export function todoQuestions(view: DailyView, byGoal: Map<string, StepNode[]>): TodoQuestion[] {
+  const details = new Map<string, string | null>();
+  const index = (list: StepNode[]) => {
+    for (const node of list) {
+      if (node.kind === 'decision') details.set(node.id, node.detail);
+      index(node.children);
+    }
+  };
+  for (const roots of byGoal.values()) index(roots);
+
+  return view.waiting.flatMap((row) =>
+    row.kind === 'question'
+      ? [
+          {
+            id: row.id,
+            title: row.title,
+            detail: details.get(row.id) ?? null,
+            goalId: row.goalId,
+            goalTitle: row.goalTitle,
+          },
+        ]
+      : [],
+  );
+}
+
+/**
+ * Everything Goals puts on Todo from its trees, from one pass of dailyView:
+ * the steps (goalTodoSteps) and Dash's open questions (todoQuestions).
+ */
+export function goalsForTodo(
+  goals: { goal: Goal; areaName: string }[],
+  byGoal: Map<string, StepNode[]>,
+  today: string,
+): { steps: TodoStep[]; questions: TodoQuestion[] } {
+  const view = dailyView(goals, byGoal, today);
+  return {
+    steps: goalTodoSteps(goals, byGoal, today, view),
+    questions: todoQuestions(view, byGoal),
+  };
 }
