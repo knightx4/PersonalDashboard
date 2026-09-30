@@ -38,7 +38,12 @@ import {
 import { loadLatestReviews } from '@/lib/goals/reviews-store';
 import { syncRhythms } from '@/lib/goals/rhythms-store';
 import { goalProgress, type GoalProgress } from '@/lib/goals/status';
-import { goalsForTodo, type TodoQuestion, type TodoStep } from '@/lib/goals/todo';
+import {
+  goalsForTodo,
+  unreadDashResults,
+  type TodoQuestion,
+  type TodoStep,
+} from '@/lib/goals/todo';
 import { nextPosition, reorder, type Goal, type GoalStatus } from '@/lib/goals/tree';
 import { todayIn } from '@/lib/todo/tasks/model';
 
@@ -698,6 +703,18 @@ export async function loadTodoGoals(
     ];
   });
   return { ...goalsForTodo(goals, byGoal, today), rhythms };
+}
+
+/**
+ * How many of Dash's results wait to be read, for the line on Todo (plan
+ * #1268); the rule is unreadDashResults in lib/goals/todo.ts.
+ */
+export async function loadUnreadDashResults(
+  client: GoalsSupabaseClient,
+  { userId, today }: Today,
+): Promise<number> {
+  const { goals, byGoal } = await loadLiveTree(client, { userId, today });
+  return unreadDashResults(dailyView(goals, byGoal, today));
 }
 
 /**

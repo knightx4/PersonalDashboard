@@ -177,3 +177,13 @@ export function goalsForTodo(
     questions: todoQuestions(view, byGoal),
   };
 }
+
+/**
+ * How many of Dash's results are waiting to be read (plan #1268): the Goals
+ * home's `review` rows, Dash steps with a result and no reviewed_at
+ * (awaitsReview in lib/goals/daily.ts) on an open goal. Todo says the count
+ * in one line and links to where they are read.
+ */
+export function unreadDashResults(view: DailyView): number {
+  return view.waiting.filter((row) => row.kind === 'review').length;
+}

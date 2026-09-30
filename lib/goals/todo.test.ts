@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { attachDependencies } from './dependencies';
 import { buildForest, markStartDates, type Step } from './steps';
-import { canShowOnTodo, goalsForTodo, goalTodoSteps, todoSteps } from './todo';
+import { dailyView } from './daily';
+import { canShowOnTodo, goalsForTodo, goalTodoSteps, todoSteps, unreadDashResults } from './todo';
 import type { Goal } from './tree';
 
 function goal(id: string, extra: Partial<Goal> = {}): Goal {
@@ -277,5 +278,45 @@ describe('goalsForTodo questions', () => {
     );
     expect(out.steps.map((s) => s.id)).toEqual(['mine']);
     expect(out.questions.map((q) => q.id)).toEqual(['q']);
+  });
+});
+
+describe('unreadDashResults', () => {
+  const today = '2026-09-29';
+
+  function count(goals: Goal[], steps: Step[]) {
+    const { byGoal } = buildForest(
+      goals.map((g) => g.id),
+      steps,
+    );
+    return unreadDashResults(
+      dailyView(
+        goals.map((g) => ({ goal: g, areaName: 'Area' })),
+        byGoal,
+        today,
+      ),
+    );
+  }
+
+  it("counts Dash's results not yet read, and nothing read, empty or dropped", () => {
+    expect(
+      count(
+        [goal('g')],
+        [
+          step('a', 'g', { kind: 'claude', status: 'done', result: 'Found three.' }),
+          step('b', 'g', { kind: 'claude', status: 'done', resultUrl: 'https://example.com' }),
+          step('read', 'g', { kind: 'claude', status: 'done', result: 'x', reviewedAt: '2026-09-28T00:00:00Z' }),
+          step('empty', 'g', { kind: 'claude' }),
+          step('dropped', 'g', { kind: 'claude', status: 'dropped', result: 'x' }),
+        ],
+      ),
+    ).toBe(2);
+  });
+
+  it('is zero with nothing waiting, and on a goal that is not open', () => {
+    expect(count([goal('g')], [step('mine', 'g')])).toBe(0);
+    expect(
+      count([goal('p', { status: 'parked' })], [step('a', 'p', { kind: 'claude', status: 'done', result: 'x' })]),
+    ).toBe(0);
   });
 });

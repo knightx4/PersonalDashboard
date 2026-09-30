@@ -1048,6 +1048,15 @@ confident and the code disagreed.
   it does for an answer given on Goals. A question whose detail has no
   lettered set shows as a link to the question on its goal. A question has no
   tick. Later and Not this one write a dismissal, as for a step.
+- **Todo says when Dash has results to read** (plan #1268). Under the add box,
+  after any banner about a source that failed, one line reads "Dash finished 2
+  things for you" and links to the "What Dash did" section of the Goals home
+  (`/goals#done-heading`). The count is the Goals home's results to read:
+  Dash steps with a result and no `reviewed_at` on an open goal
+  (`unreadDashResults` in `lib/goals/todo.ts`). It is read beside the agenda
+  (`lib/todo/agenda/dash-results.ts`) rather than through a source, since it
+  is a count with nothing to tick. The line is absent at zero, when the Goals
+  workspace is off, and when the read fails.
 
 ## What this unlocks (not v1)
 

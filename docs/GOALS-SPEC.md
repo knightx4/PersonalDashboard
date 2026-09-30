@@ -367,6 +367,12 @@ owned by Goals and is never copied into `todo.tasks`.
   given here. A question whose options cannot be read shows as a link to it
   on its goal. The rule is `todoQuestions` in `lib/goals/todo.ts`, from the
   same pass of `dailyView` that picks the next steps.
+- When Dash has **finished work you have not read**, Todo shows one line
+  such as "Dash finished 2 things for you", linking to "What Dash did" on
+  the Goals home (plan #1268). The count is the home's results to read, Dash
+  steps with a result and no `reviewed_at` (`unreadDashResults` in
+  `lib/goals/todo.ts`), so marking a result read takes it off the count. At
+  zero the line is not there.
 - Rhythms for the current period appear on Todo on their own until the count
   is met. There is no flag to set for those.
 - Dated items, such as an event you said you would attend, show on their date.
