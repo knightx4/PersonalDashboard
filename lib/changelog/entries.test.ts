@@ -107,6 +107,15 @@ describe('planEntries', () => {
     expect(planEntries(items)).toEqual([]);
   });
 
+  it('leaves out a project\'s steps, which shipped in another repository', () => {
+    const entries = planEntries([
+      step({ id: 'app' }),
+      step({ id: 'site', module: 'website' }),
+    ]);
+
+    expect(entries.map((entry) => entry.id)).toEqual(['app']);
+  });
+
   it('leaves out a dropped step even though it closed', () => {
     const entries = planEntries([
       step({ id: 'kept' }),

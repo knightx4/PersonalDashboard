@@ -17,7 +17,6 @@ import {
   Select,
   Textarea,
 } from '@/components/ui/field';
-import { MODULES, type ModuleId } from '@/lib/modules';
 import {
   PLAN_ASSIGNEES,
   PLAN_PRIORITIES,
@@ -34,6 +33,7 @@ import type { PlanNode } from '@/lib/plan/tree';
 import { catalogLabel, subtreeOf, type PlanCatalogEntry } from './plan-catalog';
 import { cn } from '@/lib/cn';
 import { useSettled } from '@/components/plan-tree/use-settled';
+import { planScopeLabel, type PlanScope } from '@/lib/plan/projects';
 
 /**
  * The add and edit forms for a plan step, and the labels they share.
@@ -44,12 +44,9 @@ export const STATUS_LABEL = PLAN_STATUS_LABEL;
 export const SIZE_LABEL: Record<PlanSize, string> = { s: 'Small', m: 'Medium', l: 'Large' };
 export const ASSIGNEE_LABEL: Record<PlanAssignee, string> = { me: 'Me' };
 
-const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
-  MODULES.map((module) => [module.id, module.label]),
-) as Record<ModuleId, string>;
 
-export function scopeLabel(module: ModuleId | null): string {
-  return module ? MODULE_LABEL[module] : 'The app as a whole';
+export function scopeLabel(module: PlanScope | null): string {
+  return planScopeLabel(module);
 }
 
 function StatusOptions() {
@@ -243,7 +240,7 @@ export function AddStep({
   open: openAtStart = false,
   onDone,
 }: {
-  module: ModuleId | null;
+  module: PlanScope | null;
   parentId: string | null;
   open?: boolean;
   onDone?: () => void;

@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
 import type { PlanRefTitles } from '@/lib/comments/refs';
-import { isModuleId, type ModuleId } from '@/lib/modules';
 import { readAll } from '@/lib/learn/db/read-all';
+import { planScopeOf, type PlanScope } from '@/lib/plan/projects';
 
 /**
  * The plan: what is being built, as a tree.
@@ -190,7 +190,8 @@ export type PlanItem = {
   id: string;
   /** The short, stable handle: "#12". Per account, never reused. */
   number: number;
-  module: ModuleId | null;
+  /** A workspace, a project built elsewhere (lib/plan/projects), or null for the app. */
+  module: PlanScope | null;
   /** The step this is part of, or null at the top of a module's plan. */
   parentId: string | null;
   title: string;
@@ -351,7 +352,7 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
   return {
     id: row.id as string,
     number: Number(row.number ?? 0),
-    module: scope && isModuleId(scope) ? scope : null,
+    module: planScopeOf(scope),
     parentId: (row.parent_id as string | null) ?? null,
     title: row.title as string,
     detail: (row.detail as string | null) ?? null,
