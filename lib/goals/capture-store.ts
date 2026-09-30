@@ -2,18 +2,28 @@ import 'server-only';
 
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
+  MAX_CONTEXT_STEPS,
   captureContext,
   markUndone,
+  progressTotal,
   readFiled,
   undoMove,
   type CaptureContext,
   type FiledEntry,
   type PlannedAction,
 } from '@/lib/goals/capture';
-import { addProgressEntry, undoProgressEntry } from '@/lib/goals/progress-store';
+import { summariseProgress } from '@/lib/goals/progress';
+import {
+  addProgressEntry,
+  clearTotalIfUnchanged,
+  loadProgressEntries,
+  setTotalIfNone,
+  undoProgressEntry,
+} from '@/lib/goals/progress-store';
 import { addReading, deleteReading } from '@/lib/goals/readings-store';
 import { liveRhythms } from '@/lib/goals/rhythms';
 import { countTowards, syncRhythms } from '@/lib/goals/rhythms-store';
+import type { StepNode } from '@/lib/goals/steps';
 import {
   insertStep,
   loadLiveTree,
@@ -59,7 +69,19 @@ export async function loadCaptureContext(
     byGoal,
   );
   const records = await syncRhythms(client, userId, live, today);
-  return captureContext(goals, byGoal, records);
+  // Each step's tally so far, so filing can say how much is left (plan #1277).
+  // Only the open steps the model is shown, walked as captureContext walks.
+  const stepIds: string[] = [];
+  const collect = (nodes: StepNode[]) => {
+    for (const node of nodes) {
+      if (node.status !== 'open' || stepIds.length >= MAX_CONTEXT_STEPS) continue;
+      stepIds.push(node.id);
+      collect(node.children);
+    }
+  };
+  for (const nodes of byGoal.values()) collect(nodes);
+  const progress = summariseProgress(await loadProgressEntries(client, stepIds));
+  return captureContext(goals, byGoal, records, progress);
 }
 
 /** Carry out one move. Null when it no longer applies. */
@@ -108,6 +130,13 @@ export async function applyCaptureAction(
         captureId,
       });
       if (!id) return null;
+      // The total filing read from the done-when is set with the entry; if
+      // the step has gained one meanwhile, the line says nothing about it.
+      let total = progressTotal(action);
+      if (total?.total_set && action.step) {
+        const set = await setTotalIfNone(client, action.step.id, total.total, total.total_unit);
+        if (!set) total = null;
+      }
       return {
         kind: 'progress',
         entry_id: id,
@@ -118,6 +147,7 @@ export async function applyCaptureAction(
         quantity: action.quantity,
         unit: action.unit,
         happened_on: happenedOn,
+        ...(total ?? {}),
         undone_at: null,
       };
     }
@@ -222,6 +252,9 @@ export async function undoFiled(
     case 'undo-progress':
       // False when it was already undone by hand; either way it no longer counts.
       await undoProgressEntry(client, move.entryId);
+      if (move.clearTotal) {
+        await clearTotalIfUnchanged(client, move.clearTotal.stepId, move.clearTotal.total);
+      }
       break;
     case 'none':
       break;

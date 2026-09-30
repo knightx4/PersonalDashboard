@@ -17,6 +17,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 const { StepTree } = await import('@/app/goals/[goalId]/step-tree');
+const { StepEditForm } = await import('@/app/goals/[goalId]/step-parts');
 
 const GOAL = 'goal-move';
 
@@ -138,5 +139,29 @@ describe('a goal with no progress', () => {
     expect(html).toBe(
       renderToStaticMarkup(<StepTree map={mapOf([phase, bags, shelf])} todoOn={false} opened />),
     );
+  });
+});
+
+describe('a step with an estimated total (plan #1277)', () => {
+  const counted = { ...bags, estimatedTotal: 100, totalUnit: 'bags' };
+
+  it('says about 93 to go when entries add to 7 of about 100 bags', () => {
+    const html = render([phase, counted, shelf], entries);
+    expect(html).toContain('7 of about 100 bags, about 93 to go');
+    expect(html).not.toContain('7 bags so far');
+    expect(html).toContain('About 100 bags in all');
+  });
+
+  it('offers the total and what it counts in the step’s edit form', () => {
+    const html = renderToStaticMarkup(
+      <StepEditForm
+        node={{ ...counted, children: [] }}
+        links={[]}
+        otherGoals={[]}
+        onDone={() => {}}
+      />,
+    );
+    expect(html).toMatch(/name="estimatedTotal"[^>]*value="100"|value="100"[^>]*name="estimatedTotal"/);
+    expect(html).toMatch(/name="totalUnit"[^>]*value="bags"|value="bags"[^>]*name="totalUnit"/);
   });
 });

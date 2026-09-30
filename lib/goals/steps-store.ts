@@ -96,6 +96,8 @@ type ItemRow = {
   prep_checked_at?: string | null;
   errand?: boolean;
   created_at?: string | null;
+  estimated_total?: number | string | null;
+  total_unit?: string | null;
 };
 
 type LinkRow = { id: string; item_id: string; goal_id: string };
@@ -125,7 +127,7 @@ const ITEM_COLUMNS =
   'resolution, ' +
   'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
   'unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds, ' +
-  'kept_open_at, prepares_id, prep_checked_at, errand, created_at';
+  'kept_open_at, prepares_id, prep_checked_at, errand, created_at, estimated_total, total_unit';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -156,6 +158,11 @@ const toStep = (row: ItemRow): Step => ({
   preparesId: row.prepares_id ?? null,
   prepCheckedAt: row.prep_checked_at ?? null,
   createdAt: row.created_at ?? null,
+  estimatedTotal:
+    row.estimated_total === null || row.estimated_total === undefined
+      ? null
+      : Number(row.estimated_total),
+  totalUnit: row.total_unit ?? null,
 });
 
 const toGoal = (row: ItemRow): Goal => ({

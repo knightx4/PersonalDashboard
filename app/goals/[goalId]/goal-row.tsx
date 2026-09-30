@@ -18,7 +18,10 @@ import { offersPrepare, offersSend, sendJob } from '@/lib/goals/handover';
 import type { GoalRowNode } from '@/lib/goals/plan-rows';
 import {
   amountWords,
+  talliesBesideTotal,
   tallyWords,
+  towardsTotal,
+  towardsTotalWords,
   type ItemProgress,
   type LatestBeneath,
   type ProgressEstimate,
@@ -131,20 +134,29 @@ const ESTIMATE_WORDS: Record<ProgressEstimate, string> = {
 
 /**
  * An open step with progress on it (plan #1276): under way, its running
- * tally and the day it was last touched. A parent with progress only beneath
- * it says when and on which step instead.
+ * tally and the day it was last touched. With an estimated total the tally
+ * says roughly how much is left (plan #1277): "7 of about 100 bags, about 93
+ * to go". A parent with progress only beneath it says when and on which step
+ * instead.
  */
 function ProgressLine({
   progress,
   beneath,
+  total,
   inset,
 }: {
   progress: ItemProgress | undefined;
   beneath: LatestBeneath | undefined;
+  total: { quantity: number | null | undefined; unit: string | null | undefined };
   inset: React.CSSProperties;
 }) {
   if (progress) {
-    const tally = tallyWords(progress.tallies);
+    const towards = towardsTotal(total.quantity, total.unit, progress.tallies);
+    const tally = towards
+      ? [towardsTotalWords(towards), tallyWords(talliesBesideTotal(progress.tallies, total.unit))]
+          .filter(Boolean)
+          .join(' · ')
+      : tallyWords(progress.tallies);
     return (
       <li style={inset} className="flex items-center gap-1.5 pb-1.5 pr-3 text-small text-ink-muted">
         <span className="size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
@@ -649,6 +661,7 @@ export function GoalRow({
             <ProgressLine
               progress={progress}
               beneath={context.progressBeneath?.[step.id]}
+              total={{ quantity: step.estimatedTotal, unit: step.totalUnit }}
               inset={rowInset(trail)}
             />
           )}
@@ -707,6 +720,11 @@ export function GoalRow({
           )}
           {step.waitsUntil && <span>Starts {formatDate(step.waitsUntil)}</span>}
           {step.dueOn && <span>Due {formatDate(step.dueOn)}</span>}
+          {step.estimatedTotal && step.totalUnit && (
+            <span className="tabular">
+              About {amountWords(step.estimatedTotal, step.totalUnit)} in all
+            </span>
+          )}
           {prepares && (
             <a href={`#step-${prepares.id}`} className="underline">
               For {prepares.title}

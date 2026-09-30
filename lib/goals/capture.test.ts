@@ -7,6 +7,7 @@ import {
   markUndone,
   MAX_FILED,
   parseFiling,
+  progressTotal,
   readFiled,
   undoMove,
   type CaptureContext,
@@ -14,6 +15,7 @@ import {
   type FilingDeps,
   type PlannedAction,
 } from './capture';
+import { summariseProgress, type ProgressEntry } from './progress';
 import type { PeriodRow, RhythmRecord } from './rhythms';
 import { buildForest, type Step } from './steps';
 import type { Goal } from './tree';
@@ -76,12 +78,13 @@ function contextOf(
   goals: ReturnType<typeof goal>[],
   steps: Step[],
   records: Map<string, RhythmRecord> = new Map(),
+  entries: ProgressEntry[] = [],
 ): CaptureContext {
   const { byGoal } = buildForest(
     goals.map((g) => g.goal.id),
     steps,
   );
-  return captureContext(goals, byGoal, records);
+  return captureContext(goals, byGoal, records, summariseProgress(entries));
 }
 
 /** The city goal from the spec: a rhythm, an open step, a closed one, a question. */
@@ -268,6 +271,7 @@ function stubs(input: unknown, overrides: Partial<FilingDeps> = {}) {
             quantity: action.quantity,
             unit: action.unit,
             happened_on: action.happenedOn ?? '2026-09-30',
+            ...(progressTotal(action) ?? {}),
             undone_at: null,
           };
         case 'add':
@@ -482,6 +486,7 @@ describe('progress on the deepest step (plan #1275)', () => {
         quantity: 2,
         unit: 'bags',
         happenedOn: null,
+        setTotal: null,
       },
     ]);
     expect(applied.some((a) => a.kind === 'close')).toBe(false);
@@ -559,5 +564,144 @@ describe('progress on the deepest step (plan #1275)', () => {
       apartment,
     );
     expect(planned).toMatchObject({ kind: 'progress', step: null, goal: apartment.goals[0] });
+  });
+});
+
+describe('roughly how much is left on a step (plan #1277)', () => {
+  const entry = (id: string, quantity: number, unit: string): ProgressEntry => ({
+    id,
+    itemId: 'bags',
+    captureId: null,
+    happenedOn: '2026-09-29',
+    text: `moved ${quantity} ${unit}`,
+    quantity,
+    unit,
+    estimate: null,
+    createdAt: '2026-09-29T10:00:00Z',
+  });
+  const tree = (bagsStep: Partial<Step>, entries: ProgressEntry[] = []) =>
+    contextOf(
+      [goal('apartment', { title: 'Make the apartment clean and livable' })],
+      [
+        step('living', 'apartment', { title: 'Living room' }),
+        step('bags', 'living', { title: 'Move the bags to their spot', ...bagsStep }),
+      ],
+      new Map(),
+      entries,
+    );
+
+  it('shows filing each step’s done-when, its total and what is logged so far', () => {
+    const withTotal = tree(
+      { acceptance: 'Every bag is in the office', estimatedTotal: 100, totalUnit: 'bags' },
+      [entry('a', 3, 'bags'), entry('b', 2, 'Bags')],
+    );
+    expect(captureMessage(withTotal, 'moved two bags', '2026-09-30')).toContain(
+      '(done when: Every bag is in the office; total about 100 bags, 5 bags so far)',
+    );
+    const without = tree({ acceptance: 'All 100 bags are in the office' });
+    expect(captureMessage(without, 'moved two bags', '2026-09-30')).toContain(
+      '(done when: All 100 bags are in the office; no total)',
+    );
+  });
+
+  it('shows the start of what Dash prepared for a step with no total', () => {
+    const context = contextOf(
+      [goal('apartment')],
+      [
+        step('bags', 'apartment', { title: 'Move the bags' }),
+        step('count', 'apartment', {
+          kind: 'claude',
+          preparesId: 'bags',
+          result: 'There are about 100 bags,\nmostly in the living room.',
+        }),
+      ],
+    );
+    expect(captureMessage(context, 'moved two bags', '2026-09-30')).toContain(
+      'Dash prepared: There are about 100 bags, mostly in the living room.',
+    );
+  });
+
+  it('says about 93 to go when entries add to 7 of an estimated 100', async () => {
+    const context = tree({ estimatedTotal: 100, totalUnit: 'bags' }, [entry('a', 5, 'bags')]);
+    const bags = context.steps.find((s) => s.id === 'bags')!;
+    const reply = {
+      actions: [{ type: 'progress', step: bags.ref, text: 'moved two bags', quantity: 2, unit: 'bag' }],
+    };
+    const { deps, saved } = stubs(reply, { context: async () => context });
+    await fileCapture('moved two bags', '2026-09-30', deps);
+    const [filed] = saved[0]!;
+    expect(filed).toMatchObject({ total: 100, total_unit: 'bags', done: 7, total_set: false });
+    expect(describeFiled(filed!)).toBe(
+      'Logged 2 bag on "Move the bags to their spot" in Make the apartment clean and livable, about 93 to go of roughly 100',
+    );
+    expect(undoMove(filed!)).toEqual({ move: 'undo-progress', entryId: 'entry-1' });
+  });
+
+  it('sets a total read from the done-when only on a step with none, and Undo clears it', async () => {
+    const context = tree({ acceptance: 'All 100 bags are in the office' }, [entry('a', 5, 'bags')]);
+    const bags = context.steps.find((s) => s.id === 'bags')!;
+    const reply = {
+      actions: [
+        { type: 'progress', step: bags.ref, text: 'moved two bags', quantity: 2, unit: 'bags', total: 100 },
+      ],
+    };
+    const { deps, saved, applied } = stubs(reply, { context: async () => context });
+    await fileCapture('moved two bags', '2026-09-30', deps);
+    expect(applied[0]).toMatchObject({ setTotal: 100 });
+    const [filed] = saved[0]!;
+    expect(filed).toMatchObject({ total: 100, done: 7, total_set: true });
+    expect(undoMove(filed!)).toEqual({
+      move: 'undo-progress',
+      entryId: 'entry-1',
+      clearTotal: { stepId: 'bags', total: 100 },
+    });
+
+    // A step that already has a total keeps it; a total with no unit is dropped.
+    const has = tree({ estimatedTotal: 80, totalUnit: 'bags' });
+    const [kept] = parseFiling(
+      { actions: [{ type: 'progress', step: 's2', text: 'moved two', quantity: 2, unit: 'bags', total: 100 }] },
+      has,
+    );
+    expect(kept).toMatchObject({ setTotal: null });
+    const [noUnit] = parseFiling(
+      { actions: [{ type: 'progress', step: 's2', text: 'moved two', quantity: 2, total: 100 }] },
+      tree({}),
+    );
+    expect(noUnit).toMatchObject({ setTotal: null });
+  });
+
+  it('says the estimate is reached, and nothing about a total in another unit', () => {
+    const base = {
+      kind: 'progress',
+      entry_id: 'e',
+      item_id: 'bags',
+      step_title: 'Move the bags',
+      goal_title: 'Apartment',
+      text: 'moved the last two',
+      quantity: 2,
+      unit: 'bags',
+      happened_on: '2026-09-30',
+      total: 100,
+      total_unit: 'bags',
+      done: 101,
+      undone_at: null,
+    } as const;
+    expect(describeFiled(base)).toBe(
+      'Logged 2 bags on "Move the bags" in Apartment, the estimate of about 100 reached',
+    );
+    const boxes = tree({ estimatedTotal: 100, totalUnit: 'bags' });
+    const [planned] = parseFiling(
+      { actions: [{ type: 'progress', step: 's2', text: 'packed boxes', quantity: 3, unit: 'boxes' }] },
+      boxes,
+    );
+    expect(progressTotal(planned as Extract<PlannedAction, { kind: 'progress' }>)).toBeNull();
+  });
+});
+
+describe('the facts line under a step (plan #1277)', () => {
+  it('is left out for a bare step and a rhythm', () => {
+    const message = captureMessage(city, 'went to the Van Alen talk', '2026-09-24');
+    expect(message).not.toContain('no total');
+    expect(message).not.toMatch(/^\s+\(/m);
   });
 });

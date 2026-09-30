@@ -27,7 +27,16 @@
  * of the bags" is 2 bags logged on the bags step, and the step stays open.
  */
 import type { RhythmRecord } from '@/lib/goals/rhythms';
-import { PROGRESS_UNIT_MAX } from '@/lib/goals/progress';
+import {
+  PROGRESS_UNIT_MAX,
+  amountWords,
+  leftWords,
+  sameTotalUnit,
+  tallyWords,
+  towardsTotal,
+  type ItemProgress,
+  type ProgressTally,
+} from '@/lib/goals/progress';
 import { formatReading, parseNumber } from '@/lib/goals/readings';
 import { progressLine } from '@/lib/goals/rhythms';
 import { STEP_TITLE_MAX, type RhythmPeriod, type StepNode } from '@/lib/goals/steps';
@@ -43,6 +52,8 @@ export const NOTE_MAX = 1000;
 export const PROGRESS_DAY_MAX_AGE = 60;
 /** The most steps shown to the model, so a large tree cannot make the call slow. */
 export const MAX_CONTEXT_STEPS = 300;
+/** How much of a done-when, and of what Dash prepared, the model is shown per step. */
+export const CONTEXT_TEXT_MAX = 300;
 
 // ---------------------------------------------------------------------------
 // What the model is shown
@@ -69,6 +80,17 @@ export type CaptureStep = {
   depth: number;
   /** A rhythm's shape and its current period, when it has one open. */
   rhythm: { period: RhythmPeriod; startsOn: string; count: number; target: number } | null;
+  /** The done-when, shown so filing can read a total from it (plan #1277). */
+  acceptance?: string | null;
+  /** The step's estimated total, when it has one. */
+  total?: { quantity: number; unit: string } | null;
+  /** The running tallies of its progress so far, one per unit. */
+  tallies?: ProgressTally[];
+  /**
+   * The start of what Dash prepared for it, when it has no total yet: a
+   * result such as "about 100 bags" is where a total can come from.
+   */
+  prepared?: string | null;
 };
 
 export type CaptureContext = { goals: CaptureGoal[]; steps: CaptureStep[] };
@@ -84,8 +106,21 @@ export function captureContext(
   goals: { goal: Goal; areaName: string }[],
   byGoal: Map<string, StepNode[]>,
   records: Map<string, RhythmRecord>,
+  progress: Readonly<Record<string, ItemProgress>> = {},
 ): CaptureContext {
   const out: CaptureContext = { goals: [], steps: [] };
+  // What Dash prepared for each step, by the id of the step it serves.
+  const preparedFor = new Map<string, string>();
+  const collect = (nodes: StepNode[]) => {
+    for (const node of nodes) {
+      if (node.preparesId && node.result?.trim()) {
+        preparedFor.set(node.preparesId, node.result.trim().slice(0, CONTEXT_TEXT_MAX));
+      }
+      collect(node.children);
+    }
+  };
+  for (const nodes of byGoal.values()) collect(nodes);
+
   for (const { goal, areaName } of goals) {
     if (goal.status !== 'open') continue;
     const goalRef = `g${out.goals.length + 1}`;
@@ -121,6 +156,13 @@ export function captureContext(
                     target: current.target,
                   }
                 : null,
+            acceptance: node.acceptance?.trim().slice(0, CONTEXT_TEXT_MAX) || null,
+            total:
+              node.estimatedTotal && node.totalUnit
+                ? { quantity: node.estimatedTotal, unit: node.totalUnit }
+                : null,
+            tallies: progress[node.id]?.tallies ?? [],
+            prepared: node.estimatedTotal ? null : (preparedFor.get(node.id) ?? null),
           });
         }
         walk(node.children, depth + 1);
@@ -129,6 +171,34 @@ export function captureContext(
     walk(byGoal.get(goal.id) ?? [], 1);
   }
   return out;
+}
+
+/**
+ * What filing is told about a step besides its title (plan #1277): its
+ * done-when, its estimated total and how much is logged so far, and the
+ * start of what Dash prepared for it when it has no total. Empty when there
+ * is none of these, so a bare step is shown as its title alone.
+ */
+export function stepFacts(step: CaptureStep): string {
+  const parts: string[] = [];
+  if (step.acceptance) parts.push(`done when: ${step.acceptance}`);
+  const towards = step.total
+    ? towardsTotal(step.total.quantity, step.total.unit, step.tallies ?? [])
+    : null;
+  if (towards) {
+    parts.push(
+      `total about ${amountWords(towards.total, towards.unit)}, ` +
+        `${amountWords(towards.done, towards.unit)} so far`,
+    );
+  } else {
+    const tally = tallyWords(step.tallies ?? []);
+    if (tally) parts.push(tally);
+  }
+  if (step.prepared) parts.push(`Dash prepared: ${step.prepared.replace(/\s+/g, ' ')}`);
+  // "no total" only beside something a total could be read from or counted
+  // against; a bare step gets no line at all.
+  if (!towards && parts.length > 0) parts.splice(step.acceptance ? 1 : 0, 0, 'no total');
+  return step.kind === 'rhythm' ? '' : parts.join('; ');
 }
 
 /**
@@ -158,6 +228,8 @@ export function captureMessage(
             : 'rhythm, no period open'
           : step.kind;
       lines.push(`${indent}${step.ref} [${shape}]: ${step.title}`);
+      const about = stepFacts(step);
+      if (about) lines.push(`${indent}  (${about})`);
     }
   }
   if (hint) lines.push('', hint);
@@ -183,6 +255,11 @@ export type PlannedAction =
       unit: string | null;
       /** YYYY-MM-DD, or null for the day it was filed. */
       happenedOn: string | null;
+      /**
+       * A total to set on a step that has none, read from its done-when or
+       * what Dash prepared (plan #1277), in the entry's unit. Null otherwise.
+       */
+      setTotal?: number | null;
     }
   | { kind: 'reading'; goal: CaptureGoal; value: number }
   | {
@@ -213,6 +290,40 @@ export function progressDay(raw: unknown, today: string | null | undefined): str
   if (new Date(at).toISOString().slice(0, 10) !== day) return null;
   if (at > now || now - at > PROGRESS_DAY_MAX_AGE * DAY_MS) return null;
   return day;
+}
+
+/** What a progress line records about the step's total (plan #1277). */
+export type ProgressTotal = {
+  total: number;
+  total_unit: string;
+  done: number;
+  total_set: boolean;
+};
+
+/**
+ * The step's total, set now or already there, and how much counts towards it
+ * with this entry in. Null when the step has none, or when the entry is in
+ * another unit than the total, since then it says nothing about what is left.
+ */
+export function progressTotal(
+  action: Extract<PlannedAction, { kind: 'progress' }>,
+): ProgressTotal | null {
+  const step = action.step;
+  if (!step || action.quantity === null) return null;
+  const setTotal = !step.total && action.setTotal && action.unit ? action.setTotal : null;
+  const total = step.total ?? (setTotal ? { quantity: setTotal, unit: action.unit as string } : null);
+  if (!total || !sameTotalUnit(action.unit, total.unit)) return null;
+  const towards = towardsTotal(total.quantity, total.unit, [
+    ...(step.tallies ?? []),
+    { quantity: action.quantity, unit: action.unit },
+  ]);
+  if (!towards) return null;
+  return {
+    total: towards.total,
+    total_unit: towards.unit,
+    done: towards.done,
+    total_set: setTotal !== null,
+  };
 }
 
 /**
@@ -284,6 +395,15 @@ export function parseFiling(
         const unit = text(entry.unit) || null;
         if (unit && (quantity === null || unit.length > PROGRESS_UNIT_MAX)) break;
 
+        // A total only for a step that has none, counted in the entry's own
+        // unit; anything else is dropped and the entry filed without it.
+        const rawTotal =
+          entry.total === null || entry.total === undefined || entry.total === ''
+            ? null
+            : parseNumber(entry.total);
+        const setTotal =
+          step && !step.total && unit && rawTotal !== null && rawTotal > 0 ? rawTotal : null;
+
         planned = {
           kind: 'progress',
           goal,
@@ -292,6 +412,7 @@ export function parseFiling(
           quantity,
           unit,
           happenedOn: progressDay(entry.day, today),
+          setTotal,
         };
         key = `progress:${(step ?? goal).id}`;
         break;
@@ -386,6 +507,16 @@ export type FiledEntry =
       unit: string | null;
       /** YYYY-MM-DD. */
       happened_on: string;
+      /**
+       * The step's estimated total and how much was logged towards it once
+       * this entry was in (plan #1277). Absent when the step has none, and on
+       * lines filed before.
+       */
+      total?: number | null;
+      total_unit?: string | null;
+      done?: number | null;
+      /** Whether this line set the total, so Undo clears it again. */
+      total_set?: boolean;
       undone_at: string | null;
     }
   | {
@@ -421,9 +552,15 @@ export function describeFiled(entry: FiledEntry): string {
       const on = entry.step_title
         ? `"${entry.step_title}" in ${entry.goal_title}`
         : entry.goal_title;
-      return entry.quantity !== null
-        ? `Logged ${formatReading(entry.quantity, entry.unit)} on ${on}`
-        : `Logged progress on ${on}: ${entry.text}`;
+      if (entry.quantity === null) return `Logged progress on ${on}: ${entry.text}`;
+      const logged = `Logged ${formatReading(entry.quantity, entry.unit)} on ${on}`;
+      const towards =
+        entry.total && entry.done !== null && entry.done !== undefined
+          ? towardsTotal(entry.total, entry.total_unit, [
+              { quantity: entry.done, unit: entry.total_unit ?? null },
+            ])
+          : null;
+      return towards ? `${logged}, ${leftWords(towards)}` : logged;
     }
     case 'reading':
       return `Recorded ${formatReading(entry.value, entry.unit)} for ${entry.goal_title}`;
@@ -522,7 +659,12 @@ export type UndoMove =
   /** A reading is deleted outright: it was never true, and the history keeps it. */
   | { move: 'delete-reading'; readingId: string }
   /** A progress entry is marked undone, as everywhere else it is taken back. */
-  | { move: 'undo-progress'; entryId: string }
+  | {
+      move: 'undo-progress';
+      entryId: string;
+      /** The step whose total this line set, so Undo clears it; absent otherwise. */
+      clearTotal?: { stepId: string; total: number };
+    }
   /** A note changes no row, so marking it undone is the whole of taking it back. */
   | { move: 'none' };
 
@@ -537,7 +679,13 @@ export function undoMove(entry: FiledEntry): UndoMove {
     case 'reading':
       return { move: 'delete-reading', readingId: entry.reading_id };
     case 'progress':
-      return { move: 'undo-progress', entryId: entry.entry_id };
+      return entry.total_set && entry.total
+        ? {
+            move: 'undo-progress',
+            entryId: entry.entry_id,
+            clearTotal: { stepId: entry.item_id, total: entry.total },
+          }
+        : { move: 'undo-progress', entryId: entry.entry_id };
     case 'note':
       return { move: 'none' };
   }

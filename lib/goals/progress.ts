@@ -238,3 +238,70 @@ export function lastProgressOn(progress: Readonly<Record<string, ItemProgress>>)
   for (const item of Object.values(progress)) if (!last || item.lastOn > last) last = item.lastOn;
   return last;
 }
+
+/**
+ * A step's estimated total and how far its entries are towards it (plan
+ * #1277). `done` sums the entries in the total's unit; `left` is never below
+ * nothing.
+ */
+export type TowardsTotal = { done: number; total: number; left: number; unit: string };
+
+/**
+ * The unit a total is compared under: case, surrounding space and a plural
+ * "s" ignored, so a total of 100 bags counts an entry of 1 bag.
+ */
+const totalKey = (unit: string | null | undefined): string =>
+  (unit?.trim().toLowerCase() ?? '').replace(/s$/, '');
+
+/** Whether an amount in this unit counts towards a total in that one. */
+export function sameTotalUnit(a: string | null | undefined, b: string | null | undefined): boolean {
+  const key = totalKey(a);
+  return key !== '' && key === totalKey(b);
+}
+
+/**
+ * How far the tallies are towards a step's estimated total. Null when the
+ * step has no total. A step with a total and nothing yet logged in its unit
+ * is 0 of the total.
+ */
+export function towardsTotal(
+  total: number | null | undefined,
+  unit: string | null | undefined,
+  tallies: readonly ProgressTally[],
+): TowardsTotal | null {
+  if (!total || !(total > 0) || !unit?.trim()) return null;
+  const done = tallies
+    .filter((tally) => sameTotalUnit(tally.unit, unit))
+    .reduce((sum, tally) => sum + tally.quantity, 0);
+  return { done, total, left: Math.max(0, total - done), unit: unit.trim() };
+}
+
+/** The tallies in any unit other than the total's, for saying beside it. */
+export function talliesBesideTotal(
+  tallies: readonly ProgressTally[],
+  unit: string | null | undefined,
+): ProgressTally[] {
+  return tallies.filter((tally) => !sameTotalUnit(tally.unit, unit));
+}
+
+/**
+ * On the step: "7 of about 100 bags, about 93 to go". The total is an
+ * estimate, so what is left is said as one, and never as a percentage. At or
+ * past it: "102 of about 100 bags, the estimate reached".
+ */
+export function towardsTotalWords(towards: TowardsTotal): string {
+  const of = `${formatQuantity(towards.done)} of about ${amountWords(towards.total, towards.unit)}`;
+  return towards.left > 0
+    ? `${of}, about ${formatQuantity(towards.left)} to go`
+    : `${of}, the estimate reached`;
+}
+
+/**
+ * In the filed line, after what was logged: "about 93 to go of roughly 100",
+ * or "the estimate of about 100 reached".
+ */
+export function leftWords(towards: TowardsTotal): string {
+  return towards.left > 0
+    ? `about ${formatQuantity(towards.left)} to go of roughly ${formatQuantity(towards.total)}`
+    : `the estimate of about ${formatQuantity(towards.total)} reached`;
+}
