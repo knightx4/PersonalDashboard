@@ -53,9 +53,13 @@ import { ViewChips } from '@/components/plan-tree/view-chips';
  * is often not in it, while the catalog is every step in the plan.
  */
 
-/** Where a view lives. "Open" is the page itself, so it keeps the bare link. */
-function viewHref(view: View): string {
-  return view === 'open' ? '/dev/plan' : `/dev/plan?view=${view}`;
+/**
+ * Where a view lives. "Open" is the page itself, so it keeps the bare link.
+ * The base is the page the plan is drawn on: /dev/plan, or a project's own
+ * page, which draws only that project's section and keeps its views there.
+ */
+function viewHref(view: View, base = '/dev/plan'): string {
+  return view === 'open' ? base : `${base}?view=${view}`;
 }
 
 /**
@@ -109,9 +113,11 @@ const EMPTY_VIEW: Partial<Record<View, { title: string; description: string }>> 
 function SummaryStrip({
   summary,
   view,
+  basePath,
 }: {
   summary: PlanSummary;
   view: View;
+  basePath: string;
 }) {
   const facts: Array<{ view: View | null; value: number; noun: string }> = [
     { view: 'open', value: summary.open, noun: 'open' },
@@ -138,7 +144,7 @@ function SummaryStrip({
           fact.view ? (
             <Link
               key={fact.noun}
-              href={`/dev/plan?view=${fact.view}`}
+              href={viewHref(fact.view, basePath)}
               className="hover:text-accent hover:underline"
             >
               <span className="tabular font-semibold text-ink">{fact.value}</span> {fact.noun}
@@ -156,7 +162,7 @@ function SummaryStrip({
         chips={PLAN_VIEW_CHIPS}
         menu={PLAN_VIEW_MENU}
         labels={PLAN_VIEW_LABEL}
-        hrefOf={viewHref}
+        hrefOf={(chip) => viewHref(chip, basePath)}
       />
     </div>
   );
@@ -380,8 +386,11 @@ export function PlanView({
   unfolded = false,
   opened = false,
   initialQuery = '',
+  basePath = '/dev/plan',
 }: {
   sections: PlanSection[];
+  /** The page this plan is drawn on, which the view links stay on. */
+  basePath?: string;
   /** The finished features, for the fold at the foot of Everything. */
   finished: PlanNode[];
   summary: PlanSummary;
@@ -489,7 +498,7 @@ export function PlanView({
 
       {ci.error && <p className="text-small text-caution">Could not read CI. {ci.error}</p>}
 
-      <SummaryStrip summary={summary} view={view} />
+      <SummaryStrip summary={summary} view={view} basePath={basePath} />
 
       <SearchThePlan query={query} onQuery={setQuery} hits={hits} searching={searching} />
 

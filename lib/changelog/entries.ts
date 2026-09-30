@@ -1,6 +1,7 @@
 import { isModuleId, moduleForPath, MODULE_IDS, type ModuleId } from '@/lib/modules';
 import type { FeedbackRow } from '@/lib/feedback/load';
 import type { PlanItem } from '@/lib/plan/load';
+import { isAppScope } from '@/lib/plan/projects';
 
 /**
  * What has shipped, read.
@@ -136,23 +137,27 @@ export function planEntries(
 ): ChangelogEntry[] {
   const byId = new Map(parents.map((row) => [row.id, row]));
 
-  return items
-    .filter(
-      (item) => item.kind !== 'decision' && item.status === 'done' && item.completedAt !== null,
-    )
-    .map((item) => ({
-      key: `plan-${item.id}`,
-      source: 'plan' as const,
-      id: item.id,
-      number: item.number,
-      at: item.completedAt as string,
-      day: dayOf(item.completedAt as string),
-      module: item.module,
-      title: item.title,
-      detail: item.detail,
-      commitSha: item.commitSha,
-      issue: featureAbove(item.parentId, byId),
-    }));
+  return items.flatMap((item) => {
+    const scope = item.module;
+    // A project's steps (lib/plan/projects) shipped somewhere else.
+    if (!isAppScope(scope)) return [];
+    if (item.kind === 'decision' || item.status !== 'done' || item.completedAt === null) return [];
+    return [
+      {
+        key: `plan-${item.id}`,
+        source: 'plan' as const,
+        id: item.id,
+        number: item.number,
+        at: item.completedAt,
+        day: dayOf(item.completedAt),
+        module: scope,
+        title: item.title,
+        detail: item.detail,
+        commitSha: item.commitSha,
+        issue: featureAbove(item.parentId, byId),
+      },
+    ];
+  });
 }
 
 /**

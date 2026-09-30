@@ -11,6 +11,7 @@ import {
   FileText,
   Flag,
   GalleryHorizontalEnd,
+  Globe,
   CalendarClock,
   CalendarDays,
   CalendarRange,
@@ -95,6 +96,8 @@ export const NAV_ICONS = {
   changelog: History,
   ui: Shapes,
   surfaces: Frame,
+  // A project Dev builds outside this app (lib/plan/projects): a site.
+  project: Globe,
   // A specification is a document you read and argue with, so it gets the
   // document glyph rather than another list icon.
   specs: FileText,
@@ -120,6 +123,9 @@ export const NAV_ICONS = {
   education: GraduationCap,
 
   // Learn
+  // Home: your study plans and what is waiting (plan #1310). The house Jobs'
+  // home uses, since both tabs are the workspace's front page.
+  learnHome: House,
   tracks: BookOpen,
   readNow: BookOpenCheck,
   know: Network,
