@@ -1,4 +1,13 @@
-import { requireUser } from '@/lib/auth/server';
+import { createClient, requireUser } from '@/lib/auth/server';
+import { requestOrigin } from '@/lib/auth/origin';
+import { createCoreClient } from '@/lib/core/auth/server';
+import {
+  connectedApps,
+  loadConnectorCalls,
+  type ConnectedApp,
+  type ConnectorCallInput,
+  type GrantInput,
+} from '@/lib/connector/apps';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { isOwner } from '@/lib/dev/owner';
 import { AppShell } from '@/components/shell/app-shell';
@@ -27,14 +36,44 @@ export const metadata = { title: 'Account' };
  * Same chrome as /home rather than a workspace shell: this belongs to the
  * account, and wearing one workspace's navigation would imply otherwise.
  */
+/**
+ * The apps allowed through the connector and their newest calls (plan #1258).
+ * A failure to read either side is said on the section rather than taking the
+ * whole account page down, since the rest of the page does not depend on it.
+ */
+async function loadConnectedApps(
+  userId: string,
+): Promise<{ apps: ConnectedApp[]; failed: string | null }> {
+  const [grants, calls] = await Promise.all([
+    createClient()
+      .then((supabase) => supabase.auth.oauth.listGrants())
+      .then(({ data, error }): GrantInput[] | null => (error ? null : (data ?? [])))
+      .catch(() => null),
+    createCoreClient()
+      .then((core) => loadConnectorCalls(core, userId))
+      .catch((): ConnectorCallInput[] | null => null),
+  ]);
+  const failed =
+    grants === null && calls === null
+      ? 'Could not read your connected apps or their calls. Reload to try again.'
+      : grants === null
+        ? 'Could not read which apps are connected, so only their calls are listed. Reload to try again.'
+        : calls === null
+          ? 'Could not read the calls your apps made. Reload to try again.'
+          : null;
+  return { apps: connectedApps(grants ?? [], calls ?? []), failed };
+}
+
 export default async function AccountPage() {
   const user = await requireUser();
-  const [settings, counts, raised, mainCheck, owner] = await Promise.all([
+  const [settings, counts, raised, mainCheck, owner, connected, origin] = await Promise.all([
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
     loadRaisedNotifications(user.id),
     loadMainCheck(),
     isOwner({ user }),
+    loadConnectedApps(user.id),
+    requestOrigin(),
   ]);
 
   return (
@@ -68,6 +107,11 @@ export default async function AccountPage() {
             }}
             isOwner={owner}
             vapidPublicKey={vapidPublicKey()}
+            connected={{
+              apps: connected.apps,
+              failed: connected.failed,
+              connectorAddress: `${origin}/api/mcp`,
+            }}
             />
           </div>
         </div>
