@@ -18,6 +18,9 @@ import { jevEnabledFor } from '@/lib/jev/enabled';
 import { reviewGoals } from '@/lib/goals/reviews';
 import { loadGoalActivity, loadLatestReviews } from '@/lib/goals/reviews-store';
 import { prepCandidates } from '@/lib/goals/prep-candidates';
+import { summariseProgress } from '@/lib/goals/progress';
+import { progressNudges } from '@/lib/goals/progress-nudges';
+import { loadProgressEntries } from '@/lib/goals/progress-store';
 import { recordAndFire } from '@/lib/goals/shaping-store';
 import { STALE_STEP_LIMIT, staleSteps } from '@/lib/goals/stale-steps';
 import { statementLines, type StatementSource } from '@/lib/goals/statements';
@@ -66,6 +69,10 @@ export type GoalsDailyResult =
       stale: number;
       /** Steps of the person's not judged yet for a Dash prep step (plan #1217). */
       unjudged: number;
+      /** Steps under way with nothing logged for a week, to nudge (plan #1281). */
+      stalled: number;
+      /** Steps under way whose tally reached its total, to offer closing (plan #1281). */
+      finished: number;
       /**
        * Steps with evidence Jev kept, or null when Jev did not filter and the
        * session searched for itself.
@@ -192,6 +199,25 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
     return { skipped: 'no open goal, no Claude step ready and no answer out of date' };
   }
   const steps = ready.slice(0, DAILY_STEP_LIMIT);
+  // A step under way is nudged when nothing has been logged on it for a
+  // week, and offered for closing when its tally reaches its total (plan
+  // #1281). Either way it is read from its entries, so it is not also given
+  // a move below as a step untouched for a week.
+  const stepIds: string[] = [];
+  const collect = (nodes: StepNode[]) => {
+    for (const node of nodes) {
+      if (node.status === 'open') stepIds.push(node.id);
+      collect(node.children);
+    }
+  };
+  for (const nodes of byGoal.values()) collect(nodes);
+  const progress = summariseProgress(await loadProgressEntries(client, stepIds));
+  const underWay = progressNudges(
+    goals.map((g) => g.goal),
+    byGoal,
+    progress,
+    today,
+  );
   // A step of the person's untouched for a week gets a move (plan #1083).
   // Only an open goal has one, so the review above already starts the run.
   const sitting = staleSteps(
@@ -199,7 +225,9 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
     byGoal,
     touched,
     now,
-  ).slice(0, STALE_STEP_LIMIT);
+  )
+    .filter((step) => !progress[step.id])
+    .slice(0, STALE_STEP_LIMIT);
   // A step of the person's not judged yet for a Dash prep step, ten a morning,
   // newest first (plan #1217). One listed above as stale gets only that move,
   // since preparing it is one of those moves.
@@ -247,6 +275,7 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
         answers,
         review,
         stale: sitting,
+        underWay,
         unjudged,
         evidence: evidence?.lines ?? null,
         statements: statementLines(statements),
@@ -267,6 +296,8 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
     answers: answers.length,
     stale: sitting.length,
     unjudged: unjudged.length,
+    stalled: underWay.stalled.length,
+    finished: underWay.finished.length,
     evidence: evidence?.steps ?? null,
     statements: statements.length,
   };

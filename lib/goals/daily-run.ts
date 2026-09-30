@@ -15,6 +15,7 @@
 import type { OutOfDateStep } from '@/lib/goals/answers';
 import { isStaleStepBlock, waitsOnNothing } from '@/lib/goals/dependencies';
 import { prepLine, type PrepCandidate } from '@/lib/goals/prep-candidates';
+import { underWayLine, type ProgressNudges } from '@/lib/goals/progress-nudges';
 import { reviewLines, type ReviewGoal } from '@/lib/goals/reviews';
 import { staleLine, type StaleStep } from '@/lib/goals/stale-steps';
 import type { StepNode } from '@/lib/goals/steps';
@@ -90,6 +91,12 @@ export function dailyRunText(input: {
   review?: ReviewGoal[];
   stale?: StaleStep[];
   /**
+   * The person's steps under way that have stalled, and those whose tally
+   * reached its total (plan #1281; progressNudges in
+   * lib/goals/progress-nudges.ts).
+   */
+  underWay?: ProgressNudges;
+  /**
    * The steps of the person's not judged yet for a Dash prep step, at most
    * ten, newest first (plan #1217; prepCandidates in
    * lib/goals/prep-candidates.ts).
@@ -112,6 +119,8 @@ export function dailyRunText(input: {
   const review = input.review ?? [];
   const sitting = input.stale ?? [];
   const unjudged = input.unjudged ?? [];
+  const stalled = input.underWay?.stalled ?? [];
+  const finished = input.underWay?.finished ?? [];
   const lines = input.steps.map(
     (step) => `- "${step.title}" (goals.items id ${step.id}), under the goal "${step.goalTitle}"`,
   );
@@ -150,6 +159,26 @@ export function dailyRunText(input: {
                 'that has sat for a week".',
                 '',
                 ...sitting.map(staleLine),
+                '',
+              ]
+            : []),
+          ...(stalled.length > 0
+            ? [
+                'Then nudge each of these steps of the person\'s. Each is under way, and nothing has',
+                'been logged on it for a week or more. Follow .claude/skills/goals/SKILL.md, "Steps',
+                'under way", on nudging a stalled one.',
+                '',
+                ...stalled.map(underWayLine),
+                '',
+              ]
+            : []),
+          ...(finished.length > 0
+            ? [
+                'Then offer to close each of these steps of the person\'s, and do not close them. The',
+                'tally has reached the step\'s estimated total, or they said it is nearly done. Follow',
+                '.claude/skills/goals/SKILL.md, "Steps under way", on offering to close one.',
+                '',
+                ...finished.map(underWayLine),
                 '',
               ]
             : []),

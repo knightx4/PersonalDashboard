@@ -496,6 +496,17 @@ step's first entry, so it does not come back for that step whether it was
 answered or left. A step that has a total, or gets one from that same line,
 is not asked, and neither is progress on the goal itself.
 
+The morning run reads the entries on the person's open steps (plan #1281). A
+step under way with nothing logged for seven days is stalled, and the brief
+lists it for a nudge: Dash names it in the home's note and the goal's, with
+what is logged and the next piece to do. A step whose tally has reached its
+estimated total, or that has no total and was last answered "Nearly done", is
+listed for an offer to close it in the same notes. Dash never closes it on
+the tally, since the total is an estimate; it closes only on evidence, as any
+step of the person's. A step under way is left out of the list of steps
+untouched for a week, so it gets the nudge rather than a split, a prep or a
+question. The rules are in `lib/goals/progress-nudges.ts`.
+
 ## What Claude does, and when
 
 Every automated job is a routine run. Runs count against the Claude plan's
