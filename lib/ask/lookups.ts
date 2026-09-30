@@ -13,6 +13,17 @@ import { HIT_KINDS, type HitKind } from '@/lib/search/sources';
 import { SOURCES } from '@/lib/sources/catalogue';
 import type { Source } from '@/lib/sources/types';
 import { noteHref } from '@/lib/vault/paths';
+import { recordSpend, type SpendClient } from '@/lib/core/spend/record';
+import { fileHref } from '@/lib/files/files';
+import type { Author } from '@/lib/memory/passages';
+import {
+  RECALL_OPERATION,
+  groupByRow,
+  memorySourcesFor,
+  searchMemory,
+  splitPassage,
+  type MemoryRowHit,
+} from '@/lib/memory/search';
 import {
   AskInputError,
   clip,
@@ -748,5 +759,265 @@ export async function vaultLookup(ctx: AskContext, input: Input): Promise<AskToo
       (query ? 'Matched on the words of the whole note, not just its title. ' : '') +
       (from || to ? 'Changed means last changed in the vault within the period. ' : '') +
       (notes.length > MAX_ROWS ? `More than ${MAX_ROWS} matched; only the newest are listed.` : ''),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// recall: passages across the workspaces, by meaning (plan #1248)
+// ---------------------------------------------------------------------------
+
+/** Rows recall lists, and passages shown for each. */
+export const RECALL_ROWS = 12;
+const RECALL_PASSAGES_PER_ROW = 2;
+const RECALL_PASSAGE_CHARS = 700;
+
+/** Where a row with no page of its own, or one whose page could not be read, opens. */
+const RECALL_LANDING: Record<string, string> = {
+  'job_search.thoughts': '/jobs/thoughts',
+  'job_search.profiles': '/jobs/settings',
+  'job_search.notes': '/jobs',
+  'goals.items': '/goals',
+  'goals.captures': '/goals',
+  'learn.aims': '/learn/goals',
+  'learn.card_notes': '/learn/now',
+  'learn.feed_cards': '/learn/now',
+  'public.order_items': '/shopping/orders',
+};
+
+/** What kind of thing each source is, for the model reading the result. */
+const RECALL_KINDS: Record<string, string> = {
+  'obsidian.notes': 'Vault note',
+  'job_search.thoughts': 'Job search thoughts',
+  'job_search.notes': 'Job search note',
+  'job_search.profiles': 'Job search profile',
+  'goals.items': 'Goal or step',
+  'goals.captures': 'Goals capture',
+  'core.files': 'File',
+  'learn.aims': 'Learn aim',
+  'learn.card_notes': 'Learn note',
+  'learn.feed_cards': 'Learn card',
+  'public.order_items': 'Purchase',
+};
+
+const key = (table: string, ref: string) => `${table}\u0000${ref}`;
+
+/**
+ * The page each row opens on. Most are the row's ref run through a fixed
+ * pattern; a job search note, a goal step, a Learn note or card and a
+ * purchase open on the page of the thing they belong to, which takes one read
+ * per table. A read that fails leaves the workspace's landing page.
+ */
+async function recallHrefs(ctx: AskContext, hits: readonly MemoryRowHit[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const refs = (table: string) => hits.filter((h) => h.sourceTable === table).map((h) => h.sourceRef);
+
+  for (const hit of hits) {
+    const direct =
+      hit.sourceTable === 'obsidian.notes'
+        ? noteHref(hit.sourceRef)
+        : hit.sourceTable === 'core.files'
+          ? fileHref(hit.sourceRef)
+          : RECALL_LANDING[hit.sourceTable];
+    if (direct) out.set(key(hit.sourceTable, hit.sourceRef), direct);
+  }
+
+  const reads: Promise<void>[] = [];
+  const attempt = (label: string, work: () => Promise<void>) =>
+    reads.push(
+      work().catch((error) => {
+        console.error(`ask recall links ${label}`, error instanceof Error ? error.message : error);
+      }),
+    );
+
+  const jobNotes = refs('job_search.notes').filter(isUuid);
+  if (jobNotes.length > 0) {
+    attempt('job_search.notes', async () => {
+      const client = await ctx.db('job_search');
+      type NoteLink = { id: string; role_id: string | null; company_id: string | null; contact_id: string | null };
+      const notes = await readIn<NoteLink>(client, 'notes', 'id, role_id, company_id, contact_id', 'id', jobNotes, ctx.userId);
+      const companyIds = notes.filter((n) => !n.role_id && n.company_id).map((n) => n.company_id as string);
+      const companies =
+        companyIds.length > 0
+          ? await readIn<{ id: string; slug: string | null }>(client, 'companies', 'id, slug', 'id', companyIds, ctx.userId)
+          : [];
+      const slugs = new Map(companies.map((c) => [c.id, c.slug]));
+      for (const note of notes) {
+        const slug = note.company_id ? slugs.get(note.company_id) : null;
+        const href = note.role_id
+          ? `/jobs/roles/${note.role_id}`
+          : slug
+            ? `/jobs/companies/${slug}`
+            : note.contact_id
+              ? `/jobs/contacts/${note.contact_id}`
+              : null;
+        if (href) out.set(key('job_search.notes', note.id), href);
+      }
+    });
+  }
+
+  const goalItems = refs('goals.items').filter(isUuid);
+  if (goalItems.length > 0) {
+    attempt('goals.items', async () => {
+      const client = await ctx.db('goals');
+      type ItemLink = { id: string; level: string; parent_id: string | null };
+      const seen = new Map<string, ItemLink>();
+      let wanted = goalItems;
+      // A step sits under a goal, perhaps under another step first; climb to the goal.
+      for (let depth = 0; depth < 6 && wanted.length > 0; depth += 1) {
+        const rows = await readIn<ItemLink>(client, 'items', 'id, level, parent_id', 'id', wanted, ctx.userId);
+        for (const row of rows) seen.set(row.id, row);
+        wanted = rows
+          .filter((row) => row.level !== 'goal' && row.parent_id && !seen.has(row.parent_id))
+          .map((row) => row.parent_id as string);
+      }
+      for (const id of goalItems) {
+        const item = seen.get(id);
+        if (!item) continue;
+        let goal: ItemLink | undefined = item;
+        for (let depth = 0; goal && goal.level !== 'goal' && depth < 7; depth += 1) {
+          goal = goal.parent_id ? seen.get(goal.parent_id) : undefined;
+        }
+        if (goal) out.set(key('goals.items', id), goal.id === id ? `/goals/${id}` : `/goals/${goal.id}#step-${id}`);
+      }
+    });
+  }
+
+  const cardNotes = refs('learn.card_notes').filter(isUuid);
+  const feedCards = refs('learn.feed_cards').filter(isUuid);
+  if (cardNotes.length > 0 || feedCards.length > 0) {
+    attempt('learn', async () => {
+      const client = await ctx.db('learn');
+      if (cardNotes.length > 0) {
+        const notes = await readIn<{ id: string; concept_id: string | null }>(
+          client, 'card_notes', 'id, concept_id', 'id', cardNotes, ctx.userId,
+        );
+        for (const note of notes) {
+          if (note.concept_id) out.set(key('learn.card_notes', note.id), `/learn/c/${note.concept_id}`);
+        }
+      }
+      if (feedCards.length > 0) {
+        const cards = await readIn<{ id: string; concept_id: string | null; reading_id: string | null }>(
+          client, 'feed_cards', 'id, concept_id, reading_id', 'id', feedCards, ctx.userId,
+        );
+        for (const card of cards) {
+          const href = card.concept_id
+            ? `/learn/c/${card.concept_id}`
+            : card.reading_id
+              ? `/learn/r/${card.reading_id}`
+              : null;
+          if (href) out.set(key('learn.feed_cards', card.id), href);
+        }
+      }
+    });
+  }
+
+  const orderItems = refs('public.order_items').filter(isUuid);
+  if (orderItems.length > 0) {
+    attempt('public.order_items', async () => {
+      const client = await ctx.db('public');
+      // Tied to its owner through its order, so row level security does the filtering.
+      const items = await readIn<{ id: string; order_id: string }>(
+        client, 'order_items', 'id, order_id', 'id', orderItems, null,
+      );
+      for (const item of items) out.set(key('public.order_items', item.id), `/shopping/orders/${item.order_id}`);
+    });
+  }
+
+  await Promise.all(reads);
+  return out;
+}
+
+const BY: Record<Author, string> = { me: 'the person', dash: 'Dash' };
+
+export async function recallLookup(ctx: AskContext, input: Input): Promise<AskToolResult> {
+  const question = optionalString(input, 'question');
+  if (!question || question.length < 3) throw new AskInputError('question needs at least three characters.');
+  if (input.only_mine !== undefined && typeof input.only_mine !== 'boolean') {
+    throw new AskInputError('only_mine must be true or false.');
+  }
+  const onlyMine = input.only_mine === true;
+
+  const core = await ctx.db('core');
+  const searched = await searchMemory(core, {
+    userId: ctx.userId,
+    question,
+    sources: memorySourcesFor(ctx.enabledModules),
+    authors: onlyMine ? ['me'] : undefined,
+    embed: ctx.embedQuestion,
+    onSpend: (report) => {
+      void recordSpend(core as unknown as SpendClient, ctx.userId, {
+        module: 'core',
+        operation: RECALL_OPERATION,
+        model: report.model,
+        usage: report.usage,
+      });
+    },
+  });
+  if (!searched.ok) {
+    if (searched.reason !== 'no-key') console.error('ask recall', searched.reason, searched.detail);
+    return {
+      ok: false,
+      error:
+        searched.reason === 'no-key'
+          ? 'Searching by meaning is not set up on this deployment. Use vault_notes with a few words instead.'
+          : 'The question could not be turned into a search. Try vault_notes with a few words instead.',
+    };
+  }
+
+  const hits = groupByRow(searched.passages);
+  // What the floor let through, for reading it again from real questions (RECALL_MIN_SIMILARITY).
+  console.info(
+    '[ask recall]',
+    JSON.stringify({
+      passages: searched.passages.length,
+      rows: hits.length,
+      top: hits.slice(0, 5).map((h) => Math.round(h.similarity * 1000) / 1000),
+      last: searched.passages.length
+        ? Math.round(searched.passages[searched.passages.length - 1].similarity * 1000) / 1000
+        : null,
+    }),
+  );
+
+  const listed = hits.slice(0, RECALL_ROWS);
+  const hrefs = await recallHrefs(ctx, listed);
+
+  const rows: AskRow[] = listed.map((hit) => {
+    const shown = hit.passages.slice(0, RECALL_PASSAGES_PER_ROW).map((passage) => ({
+      by: BY[passage.author],
+      ...splitPassage(passage.body),
+    }));
+    const title =
+      shown.find((p) => p.title)?.title ??
+      (hit.sourceTable === 'obsidian.notes' ? hit.sourceRef.split('/').pop()?.replace(/\.md$/i, '') : null) ??
+      RECALL_KINDS[hit.sourceTable] ??
+      hit.sourceTable;
+    const detail: Record<string, string | number | null> = {
+      kind: RECALL_KINDS[hit.sourceTable] ?? hit.sourceTable,
+      closeness: Math.round(hit.similarity * 100) / 100,
+    };
+    shown.forEach((passage, index) => {
+      const suffix = index === 0 ? '' : `_${index + 1}`;
+      detail[`passage${suffix}`] = clip(passage.text || passage.title, RECALL_PASSAGE_CHARS);
+      detail[`passage${suffix}_by`] = passage.by;
+    });
+    return {
+      table: hit.sourceTable,
+      ref: hit.sourceRef,
+      title: clip(title, 200) ?? hit.sourceTable,
+      href: hrefs.get(key(hit.sourceTable, hit.sourceRef)) ?? '',
+      detail,
+    };
+  });
+
+  const byDash = searched.passages.some((passage) => passage.author === 'dash');
+  return {
+    ok: true,
+    rows,
+    totals: { passages: searched.passages.length, rows: hits.length },
+    note:
+      'Ranked by closeness of meaning to the question, not by shared words, so a passage can be near without answering it: use only the ones that do, and say so if none does. ' +
+      "Each passage says who wrote it: 'the person' is their own writing, 'Dash' is text Dash wrote for them (drafts, files, results, Learn cards). When they ask what they said or wrote, answer from their own passages and name anything of Dash's as Dash's. " +
+      (byDash && !onlyMine ? 'Pass only_mine to leave Dash’s writing out. ' : '') +
+      (hits.length > RECALL_ROWS ? `${hits.length} rows had near passages; the closest ${RECALL_ROWS} are listed.` : ''),
   };
 }
