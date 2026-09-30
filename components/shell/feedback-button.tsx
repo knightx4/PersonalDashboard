@@ -17,13 +17,13 @@ import { TriageNote } from '@/components/feedback/triage-note';
 import { FieldError, Input, Label, Select, Textarea } from '@/components/ui/field';
 import { Popover } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
-import { FEEDBACK_KIND_LABEL, type FeedbackKind } from '@/lib/feedback/load';
+import type { FeedbackKind } from '@/lib/feedback/load';
 import type { TriageView } from '@/lib/feedback/triage';
 import { MODULES, moduleForPath } from '@/lib/modules';
 import { usePopover } from '@/lib/use-popover';
 
 /**
- * Always-available capture for bugs, requests, likes and ideas.
+ * Always-available capture for bugs, requests and ideas.
  *
  * It lives in the header so the thought can be written down where it occurs,
  * and it records the page you were on — half of every bug report is "where
@@ -33,19 +33,22 @@ import { usePopover } from '@/lib/use-popover';
  * workspace's rendering of that queue you land on, so following the link does
  * not throw you out of the app you were using.
  *
- * Three tabs, two destinations. A note (a bug or a request) and a like are
- * the same row in the notes queue and differ only by kind; an idea is a row in `ideas`, which is
- * not worked and has no queue — it is a thing that might be worth doing one
- * day. They share a panel because they share the moment: the thought arrives
- * while you are looking at the thing, and which of them it is, is not
- * something anybody should have to decide by picking a page to navigate to.
- * A like is the one that says what works: it sits beside the note tab so
- * saying so costs the same few seconds as reporting what does not.
+ * Two tabs, two destinations. A note (a bug or a request) is a row in the
+ * notes queue; an idea is a row in `ideas`, which is not worked and has no
+ * queue — it is a thing that might be worth doing one day. They share a panel
+ * because they share the moment: the thought arrives while you are looking at
+ * the thing, and which of them it is, is not something anybody should have to
+ * decide by picking a page to navigate to.
  *
- * Three tabs for the owner. Two for everybody else, and no code box and
- * nothing under the form: see `isOwner` below for what goes and why.
+ * There was a Like tab too, and it is gone (note f36f9542): recording what
+ * works was not something anybody wanted to do from here. Likes already filed
+ * stay in the queue as they were, for the vision review to read.
+ *
+ * Two tabs for the owner. The note alone for everybody else, with no tab row,
+ * no code box and nothing under the form: see `isOwner` below for what goes
+ * and why.
  */
-type Kind = 'note' | 'like' | 'idea';
+type Kind = 'note' | 'idea';
 
 /**
  * What each tab is called and what it asks for.
@@ -74,12 +77,6 @@ const KINDS: ReadonlyArray<{
       'What went wrong, or what it should do. It is sorted into a bug or a request for you.',
   },
   {
-    id: 'like',
-    tab: FEEDBACK_KIND_LABEL.like,
-    prompt: 'What do you like?',
-    placeholder: 'What works, and what it would be a shame to lose.',
-  },
-  {
     id: 'idea',
     tab: 'Idea',
     prompt: 'What is the idea?',
@@ -87,8 +84,8 @@ const KINDS: ReadonlyArray<{
   },
 ];
 
-/** The kind a tab files as. A note starts as a request until triage says otherwise. */
-const FILED_KIND: Record<Exclude<Kind, 'idea'>, FeedbackKind> = { note: 'feature', like: 'like' };
+/** The kind a note files as: a request, until triage says it is a bug. */
+const NOTE_KIND: FeedbackKind = 'feature';
 
 const KIND = Object.fromEntries(KINDS.map((entry) => [entry.id, entry])) as Record<
   Kind,
@@ -199,7 +196,7 @@ export function FeedbackButton({
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        title="Report a bug, request a feature, say what you like, or note an idea"
+        title="Report a bug, request a feature, or note an idea"
         className={cn(
           'press flex size-8 items-center justify-center rounded-full transition-colors',
           open
@@ -208,9 +205,7 @@ export function FeedbackButton({
         )}
       >
         <MessageSquarePlus className="size-4" aria-hidden />
-        <span className="sr-only">
-          Report a bug, request a feature, say what you like, or note an idea
-        </span>
+        <span className="sr-only">Report a bug, request a feature, or note an idea</span>
       </button>
 
       {open && (
@@ -230,25 +225,29 @@ export function FeedbackButton({
               name="user_agent"
               value={typeof navigator === 'undefined' ? '' : navigator.userAgent}
             />
-            <input type="hidden" name="kind" value={idea ? 'idea' : FILED_KIND[kind]} />
+            <input type="hidden" name="kind" value={idea ? 'idea' : NOTE_KIND} />
 
-            <div className="flex gap-1">
-              {tabs.map(({ id, tab }) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setKind(id)}
-                  className={cn(
-                    'flex-1 rounded-lg px-3 py-1.5 text-ui font-medium transition-colors',
-                    kind === id
-                      ? 'bg-accent-tint text-accent'
-                      : 'text-ink-muted hover:bg-canvas hover:text-ink',
-                  )}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
+            {/* One tab is not a choice, so a panel with only the note in it
+                draws no tab row. */}
+            {tabs.length > 1 && (
+              <div className="flex gap-1">
+                {tabs.map(({ id, tab }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setKind(id)}
+                    className={cn(
+                      'flex-1 rounded-lg px-3 py-1.5 text-ui font-medium transition-colors',
+                      kind === id
+                        ? 'bg-accent-tint text-accent'
+                        : 'text-ink-muted hover:bg-canvas hover:text-ink',
+                    )}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div>
               <Label htmlFor="feedback_body">{KIND[kind].prompt}</Label>
