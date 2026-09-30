@@ -14,7 +14,9 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { loadTasksFor } from '@/lib/todo/links/load';
 import { whyNotRead } from '@/lib/vault/map/rules';
+import { loadNoteThread } from '@/lib/vault/maya/threads';
 import { MapReview } from './map-review';
+import { MayaSection } from './maya-section';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,9 +85,12 @@ export default async function NotePage({
   const notRead = whyNotRead(note);
 
   const user = await requireUser();
-  const [{ timezone }, linkedTasks] = await Promise.all([
+  const [{ timezone }, linkedTasks, mayaThread] = await Promise.all([
     loadAccountSettings(user.id),
     loadTasksFor(user.id, 'note', note.id),
+    // Maya's thread on this note (#1285). A note the vault does not read has
+    // no Maya section, so its thread is not looked up.
+    notRead ? null : loadNoteThread(supabase, user.id, note.id),
   ]);
 
   return (
@@ -148,14 +153,18 @@ export default async function NotePage({
           />
         </div>
 
-        {/* Reading the note for the map (#763). A note the map never reads --
-            a journal, or one carrying what looks like a key -- says so in the
-            button's place rather than offering a press that can only refuse,
-            and nothing about it is sent to find that out. */}
+        {/* Asking Maya about the note (#1285), then reading it for the map
+            (#763). A note the vault never reads -- a journal, or one carrying
+            what looks like a key -- says so in the buttons' place rather than
+            offering presses that can only refuse, and nothing about it is sent
+            to find that out. */}
         {notRead ? (
           <p className="mt-10 text-ui text-ink-muted">{notRead.detail}</p>
         ) : (
-          <MapReview notePath={note.path} />
+          <>
+            <MayaSection notePath={note.path} noteBlobSha={note.blobSha} thread={mayaThread} />
+            <MapReview notePath={note.path} />
+          </>
         )}
       </article>
     </div>
