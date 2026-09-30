@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   recordAndFire: vi.fn(),
   writeComment: vi.fn(),
   loadThreads: vi.fn(),
+  updateStep: vi.fn(),
+  setStepOnTodo: vi.fn(),
 }));
 
 vi.mock('@/lib/goals/comment-model', () => ({ askGoalReplyModel: mocks.askGoalReplyModel }));
@@ -31,6 +33,8 @@ vi.mock('@/lib/goals/shaping-store', () => ({
   recordAndFire: mocks.recordAndFire,
 }));
 vi.mock('@/lib/goals/steps-store', () => ({
+  updateStep: mocks.updateStep,
+  setStepOnTodo: mocks.setStepOnTodo,
   loadGoalMap: vi.fn(async () => ({
     goal: { id: 'g', title: 'Clear the loans', status: 'open', acceptance: null, fog: null, unit: null, target: null },
     steps: [
@@ -179,5 +183,34 @@ describe('an @dash comment asking Dash to take the step', () => {
     expect(mocks.sendGoalStep).not.toHaveBeenCalled();
     expect(mocks.recordAndFire).toHaveBeenCalledWith(expect.objectContaining({ job: 'goal', itemId: 'g' }));
     expect(outcome.ok).toBe(true);
+  });
+});
+
+describe('an @dash comment asking for a date and Todo', () => {
+  const dated = { needs_routine: false, schedule: { due_on: '2026-10-04', on_todo: true } };
+
+  it('dates the step and puts it on Todo, and says so', async () => {
+    mocks.askGoalReplyModel.mockResolvedValue({ ok: true, input: dated });
+    mocks.updateStep.mockResolvedValue(true);
+    mocks.setStepOnTodo.mockResolvedValue(true);
+    const outcome = await askDashOnGoal(input({ question: 'make it Oct 4 and put it on my todos' }));
+    expect(mocks.updateStep).toHaveBeenCalledWith(client, 'mine-1', { due_on: '2026-10-04' });
+    expect(mocks.setStepOnTodo).toHaveBeenCalledWith(client, 'mine-1', true);
+    expect(said()).toEqual(['Set the due date to Sun, Oct 4, 2026. Put it on your Todo.']);
+    expect(outcome.ok).toBe(true);
+  });
+
+  it('says so when Todo refuses the step', async () => {
+    mocks.askGoalReplyModel.mockResolvedValue({ ok: true, input: { needs_routine: false, schedule: { on_todo: true } } });
+    mocks.setStepOnTodo.mockResolvedValue(false);
+    await askDashOnGoal(input({ itemId: 'claude-1' }));
+    expect(said()[0]).toContain('It did not go on Todo');
+  });
+
+  it('writes nothing on the goal itself', async () => {
+    mocks.askGoalReplyModel.mockResolvedValue({ ok: true, input: dated });
+    await askDashOnGoal(input({ itemId: 'g' }));
+    expect(mocks.updateStep).not.toHaveBeenCalled();
+    expect(said()[0]).toContain('belong to a step');
   });
 });
