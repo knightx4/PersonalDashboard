@@ -90,10 +90,37 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
   }
 }
 
-function fakeDb(tables: Tables): AskDb {
+/** Every rpc a lookup made, by name, with its arguments. */
+type RpcCall = { fn: string; args: Record<string, unknown> };
+
+/**
+ * core.search_memory over `core.memory_chunks`, where each passage carries the
+ * similarity it would have to the question (the embedder is fake, so there is
+ * no vector to compare). Applies the owner, source, author, limit and floor
+ * arguments the way the SQL does.
+ */
+function fakeRpc(tables: Tables, calls: RpcCall[]) {
+  return (fn: string, args: Record<string, unknown>) => {
+    calls.push({ fn, args });
+    if (fn !== 'search_memory') return Promise.resolve({ data: null, error: { message: `no ${fn}` } });
+    const sources = args.p_sources as string[] | null;
+    const authors = args.p_authors as string[] | null;
+    const data = (tables['core.memory_chunks'] ?? [])
+      .filter((row) => row.user_id === args.p_user_id)
+      .filter((row) => !sources || sources.includes(row.source_table as string))
+      .filter((row) => !authors || authors.includes(row.author as string))
+      .sort((a, b) => (b.similarity as number) - (a.similarity as number))
+      .slice(0, args.match_limit as number)
+      .filter((row) => (row.similarity as number) >= (args.min_similarity as number));
+    return Promise.resolve({ data, error: null });
+  };
+}
+
+function fakeDb(tables: Tables, calls: RpcCall[] = []): AskDb {
   return async (schema: AskSchema) =>
     ({
       from: (table: string) => new FakeQuery(tables[`${schema}.${table}`] ?? []),
+      rpc: fakeRpc(tables, calls),
     }) as unknown as SchemaClient;
 }
 
@@ -503,5 +530,137 @@ describe('vault_notes', () => {
 
   it('asks for a period or a query', async () => {
     expect((await executeAskTool('vault_notes', {}, context(tables))).ok).toBe(false);
+  });
+});
+
+describe('recall', () => {
+  const passage = (
+    userId: string,
+    sourceTable: string,
+    sourceRef: string,
+    chunkIndex: number,
+    body: string,
+    similarity: number,
+    author: 'me' | 'dash' = 'me',
+  ): Row => ({ user_id: userId, source_table: sourceTable, source_ref: sourceRef, chunk_index: chunkIndex, author, body, similarity });
+
+  const tables: Tables = {
+    'core.memory_chunks': [
+      // Says what they want from the next job without the words "next job".
+      passage(ME, 'obsidian.notes', 'Career/YC Jobs Application.md', 0,
+        'YC Jobs Application\n\nI want to own real outcomes at a company growing fast enough that the work changes every quarter.', 0.62),
+      passage(ME, 'obsidian.notes', 'Career/YC Jobs Application.md', 1,
+        'YC Jobs Application\n\nIndustry matters less to me than whether the company gives real responsibility early.', 0.58),
+      passage(ME, 'obsidian.notes', 'Career/YC Jobs Application.md', 2,
+        'YC Jobs Application\n\nA third passage that is not shown.', 0.41),
+      passage(ME, 'core.files', 'f0000000-0000-4000-8000-000000000001', 0,
+        'Career options\n\nFor October, aim at the routes most likely to produce an offer in time.', 0.55, 'dash'),
+      passage(ME, 'goals.items', 'a0000000-0000-4000-8000-000000000002', 0,
+        'Write the target down in one sentence', 0.5),
+      passage(ME, 'job_search.notes', 'b0000000-0000-4000-8000-000000000001', 0,
+        'Note on Strategic Finance at Ramp\n\nThe kind of team I would take a pay cut for.', 0.48),
+      passage(ME, 'learn.card_notes', 'c0000000-0000-4000-8000-000000000001', 0,
+        'Note on Career capital\n\nSkills that travel matter more than the title.', 0.44),
+      passage(ME, 'public.order_items', 'd0000000-0000-4000-8000-000000000001', 0,
+        'Interview blazer\n\nBought Interview blazer, from Uniqlo, on 2 September 2026', 0.31),
+      passage(ME, 'obsidian.notes', 'Home/Garden.md', 0, 'Garden\n\nPlant the bulbs.', 0.12),
+      passage(THEM, 'obsidian.notes', 'Career/Theirs.md', 0, 'Theirs\n\nWhat the other person wants.', 0.9),
+    ],
+    'goals.items': [
+      { id: 'a0000000-0000-4000-8000-000000000001', user_id: ME, level: 'goal', parent_id: null },
+      { id: 'a0000000-0000-4000-8000-000000000003', user_id: ME, level: 'step', parent_id: 'a0000000-0000-4000-8000-000000000001' },
+      { id: 'a0000000-0000-4000-8000-000000000002', user_id: ME, level: 'step', parent_id: 'a0000000-0000-4000-8000-000000000003' },
+    ],
+    'job_search.notes': [
+      { id: 'b0000000-0000-4000-8000-000000000001', user_id: ME, role_id: 'r1', company_id: 'co1', contact_id: null },
+    ],
+    'learn.card_notes': [{ id: 'c0000000-0000-4000-8000-000000000001', user_id: ME, concept_id: 'k1' }],
+    'public.order_items': [{ id: 'd0000000-0000-4000-8000-000000000001', order_id: 'o1' }],
+  };
+
+  const asked: string[] = [];
+  const embedQuestion: AskContext['embedQuestion'] = async (question) => {
+    asked.push(question);
+    return { ok: true, vector: new Array(1024).fill(0.01), model: 'voyage-4-lite' };
+  };
+
+  async function recall(input: Record<string, unknown>, extra: Partial<AskContext> = {}) {
+    const calls: RpcCall[] = [];
+    const result = await executeAskTool('recall', input, {
+      ...context(tables, { embedQuestion, ...extra }),
+      db: fakeDb(tables, calls),
+    });
+    return { result, calls };
+  }
+
+  it('answers from passages across workspaces, one row each, closest first, each linked to its page', async () => {
+    const { result, calls } = await recall({ question: 'what did I say I want from my next job?' });
+    const rows = expectLinkedRows(result);
+
+    expect(asked.at(-1)).toBe('what did I say I want from my next job?');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].fn).toBe('search_memory');
+    expect(calls[0].args.p_user_id).toBe(ME);
+
+    expect(rows.map((r) => [r.table, r.href])).toEqual([
+      ['obsidian.notes', '/vault/n/Career/YC%20Jobs%20Application.md'],
+      ['core.files', '/goals/files/f0000000-0000-4000-8000-000000000001'],
+      ['goals.items', '/goals/a0000000-0000-4000-8000-000000000001#step-a0000000-0000-4000-8000-000000000002'],
+      ['job_search.notes', '/jobs/roles/r1'],
+      ['learn.card_notes', '/learn/c/k1'],
+      ['public.order_items', '/shopping/orders/o1'],
+    ]);
+
+    const note = rows[0];
+    expect(note.title).toBe('YC Jobs Application');
+    expect(note.detail?.passage).toContain('own real outcomes');
+    expect(note.detail?.passage_2).toContain('real responsibility early');
+    expect(note.detail).not.toHaveProperty('passage_3');
+    expect(note.detail?.closeness).toBe(0.62);
+  });
+
+  it("labels Dash's writing as Dash's and leaves it out when asked for the person's own", async () => {
+    const both = await recall({ question: 'what did I say I want from my next job?' });
+    const file = expectLinkedRows(both.result).find((r) => r.table === 'core.files')!;
+    expect(file.detail?.passage_by).toBe('Dash');
+    expect(expectLinkedRows(both.result)[0].detail?.passage_by).toBe('the person');
+    expect(both.calls[0].args.p_authors).toBeNull();
+
+    const mine = await recall({ question: 'what did I say I want from my next job?', only_mine: true });
+    expect(mine.calls[0].args.p_authors).toEqual(['me']);
+    expect(expectLinkedRows(mine.result).some((r) => r.table === 'core.files')).toBe(false);
+  });
+
+  it('never searches a switched-off workspace', async () => {
+    const { result, calls } = await recall(
+      { question: 'what did I say I want from my next job?' },
+      { enabledModules: ['shopping', 'jobs', 'todo', 'learn', 'news', 'goals', 'dev'] },
+    );
+    const sources = calls[0].args.p_sources as string[];
+    expect(sources).not.toContain('obsidian.notes');
+    expect(sources).toContain('core.files');
+    expect(expectLinkedRows(result).some((r) => r.table === 'obsidian.notes')).toBe(false);
+  });
+
+  it("never returns another person's passages, or one below the floor", async () => {
+    const { result } = await recall({ question: 'what did I say I want from my next job?' });
+    const refs = expectLinkedRows(result).map((r) => r.ref);
+    expect(refs).not.toContain('Career/Theirs.md');
+    expect(refs).not.toContain('Home/Garden.md');
+  });
+
+  it('says so when no question vector can be made', async () => {
+    const { result } = await recall(
+      { question: 'what have I written about land value tax?' },
+      { embedQuestion: async () => ({ ok: false, reason: 'no-key', detail: 'EMBEDDING_API_KEY is not set' }) },
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/not set up/);
+  });
+
+  it('asks for a question', async () => {
+    expect((await recall({})).result.ok).toBe(false);
+    expect((await recall({ question: 'x' })).result.ok).toBe(false);
+    expect((await recall({ question: 'land value tax', only_mine: 'yes' })).result.ok).toBe(false);
   });
 });

@@ -284,6 +284,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'triage-note': run(JEV, 5_000, 0),
   // One passage of about 1,500 characters and its row's title.
   'embed-memory': background(unit(VOYAGE_LITE, 450, 0)),
+  // One question of a sentence or so.
+  'recall-question': unit(VOYAGE_LITE, 30, 0),
 
   // News. All but the last two from the digest cron or a script.
   'digest-issue': background(unit(HAIKU, 3_000, 300)),
