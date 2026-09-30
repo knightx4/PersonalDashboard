@@ -63,7 +63,8 @@ export default async function ConsentPage({
       <h1 className="font-display text-title tracking-tight text-ink">Connect {name}?</h1>
       <p className="mt-1 mb-4 text-body text-ink-muted">
         {name} is asking to read your dashboard. It will be able to look things up the same way Dash
-        does when you ask it a question.
+        does when you ask it a question. It cannot change anything. Every lookup it makes is listed
+        under Connected apps on your account page, where you can remove it.
       </p>
 
       {failed && (
