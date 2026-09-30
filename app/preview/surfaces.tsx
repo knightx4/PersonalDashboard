@@ -42,6 +42,11 @@ import { NoteBody } from '@/components/vault/note-body';
 import { buildAttachmentIndex, type AttachmentEntry } from '@/lib/vault/markdown/attachments';
 import { buildLinkIndex, toStandardMarkdown } from '@/lib/vault/markdown/obsidian';
 import { noteHref } from '@/lib/vault/paths';
+import { PageHeader } from '@/components/shell/page-header';
+import { AddTranscript } from '@/app/vault/education/add-transcript';
+import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
+import { SchoolCourses } from '@/app/vault/education/course-list';
+import { educationGroups, educationCounts } from './education-fixtures';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { LearnNowFeed } from '@/app/learn/now/feed';
 import type { FeedCard } from '@/lib/learn/feed/card';
@@ -2777,6 +2782,64 @@ export const SURFACES: readonly Surface[] = [
         attachments={buildAttachmentIndex(attachmentRows)}
         hrefForAttachment={(entry) => attachmentPictures[entry.id] ?? '#'}
       />
+    ),
+  },
+  {
+    /* The Education tab with nothing on it yet (plan #1308): the empty state
+     * says what to upload. */
+    id: 'vault-education-empty',
+    label: 'Education · Empty',
+    module: 'vault',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Education" />
+        <AddTranscript empty />
+      </>
+    ),
+  },
+  {
+    /* Choosing a transcript or pasting its text, before Dash reads it. */
+    id: 'vault-education-upload',
+    label: 'Education · Upload',
+    module: 'vault',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Education" />
+        <EducationUploadPreview />
+      </>
+    ),
+  },
+  {
+    /* The courses Dash read, to check before saving: a school it found, a
+     * course with no grade, and a transfer course showing its own school. */
+    id: 'vault-education-check',
+    label: 'Education · Check before saving',
+    module: 'vault',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Education" />
+        <EducationCheckPreview />
+      </>
+    ),
+  },
+  {
+    /* Saved courses by school and then by term, newest first, with the
+     * transcripts each school issued. */
+    id: 'vault-education-list',
+    label: 'Education · Courses by school and term',
+    module: 'vault',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Education" description="9 courses from 2 transcripts" />
+        <AddTranscript empty={false} />
+        {educationGroups.map((group) => (
+          <SchoolCourses key={group.school} group={group} courseCounts={educationCounts} />
+        ))}
+      </>
     ),
   },
   {

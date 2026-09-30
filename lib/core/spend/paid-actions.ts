@@ -135,6 +135,7 @@ export const PAID_ACTIONS = {
   'app/vault/n/[...path]/actions.ts#acceptMap': ['embed-map'],
   'app/vault/n/[...path]/actions.ts#askMaya': ['write-maya-thought'],
   'app/vault/maya/actions.ts#replyToMaya': ['reply-to-maya'],
+  'app/vault/education/actions.ts#readTranscriptAction': ['read-transcript'],
 
   // Dev: Dash's reply to a comment that tags it
   'app/dev/comment-actions.ts#addComment': ['reply-to-comment'],

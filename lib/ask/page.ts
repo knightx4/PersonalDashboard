@@ -77,11 +77,18 @@ function nounOf(table: string): string {
   return name.endsWith('s') ? name.slice(0, -1) : name;
 }
 
-/** The pattern an href function makes, or null when it ignores its ref. */
+/**
+ * The pattern an href function makes, or null when it ignores its ref or puts
+ * it only in the fragment. A fragment ref is a list page scrolled to one of
+ * its rows, such as a course on the vault's Education tab (plan #1308): the
+ * page shows every row, and the fragment never reaches the path this matches.
+ */
 export function patternOf(table: string, href: (ref: string) => string, refColumn = 'id'): RowPattern | null {
   const sample = href(MARKER);
   const at = sample.indexOf(MARKER);
   if (at < 0) return null;
+  const hash = sample.indexOf('#');
+  if (hash >= 0 && hash < at) return null;
   return {
     table,
     before: sample.slice(0, at),
