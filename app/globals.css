@@ -1316,6 +1316,11 @@ body,
 }
 
 body {
+  /* A phone on its side puts the notch at one edge. The viewport covers it
+     (viewportFit in app/layout.tsx), so the page steps in by the insets,
+     which are 0 everywhere else. */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
   background-color: var(--c-page);
   background-attachment: fixed;
   color: var(--c-ink);

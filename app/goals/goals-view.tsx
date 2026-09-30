@@ -268,7 +268,7 @@ function AreaSection({
   const proposedCount = area.goals.filter((goal) => goal.status === 'proposed').length;
 
   return (
-    <section id={`area-${area.id}`} aria-label={area.name} className="scroll-mt-16 space-y-2">
+    <section id={`area-${area.id}`} aria-label={area.name} className="scroll-mt-20 space-y-2">
       <div className="flex items-center gap-2">
         <form action={rename} className="min-w-0 flex-1">
           <input type="hidden" name="id" value={area.id} />

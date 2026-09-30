@@ -92,8 +92,14 @@ describe('the bottom bar', () => {
   });
 
   it('leaves room under the page for it, whether or not there are sections', () => {
-    expect(render([])).toContain('pb-24');
-    expect(render([{ href: '/todo', label: 'Agenda' }])).toContain('pb-24');
+    const room = 'pb-[calc(6.5rem+env(safe-area-inset-bottom))]';
+    expect(render([])).toContain(room);
+    expect(render([{ href: '/todo', label: 'Agenda' }])).toContain(room);
+  });
+
+  it('clears the home indicator on an iPhone', () => {
+    // The inset is 0 unless the viewport covers the screen (app/layout.tsx).
+    expect(render([])).toContain('pb-[env(safe-area-inset-bottom)]');
   });
 });
 
