@@ -29,6 +29,8 @@ export const TARGET_FOR_HIT: Record<HitKind, LinkTarget | null> = {
   // should not grow one by accident.
   task: null,
   note: 'note',
+  // task_links has no column for a course.
+  course: null,
   reading: 'reading',
   track: 'track',
   subject: 'subject',

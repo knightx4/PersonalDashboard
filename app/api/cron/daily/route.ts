@@ -7,6 +7,7 @@ import { runRecurringReread } from '@/inngest/cron/recurring-reread';
 import { runVaultSyncForAll } from '@/inngest/vault/sync';
 import { runClaimSweep } from '@/inngest/dev/claims';
 import { runDevDigest } from '@/inngest/dev/digest';
+import { runIdeaScoreCatchUp } from '@/inngest/dev/idea-scores';
 import { runGoalsDaily } from '@/inngest/goals/daily';
 import { runGoalsQuietSweep } from '@/inngest/goals/quiet-runs';
 import { runGoalsWeekly } from '@/inngest/goals/weekly';
@@ -44,9 +45,10 @@ export const maxDuration = 300;
  * that order because the sweep corrects rows the digest then reports: a step
  * whose session died is put back before the summary lists what is underway.
  *
- * The digest is last because it summarises the day, and a note fixed
- * overnight should be on the morning summary of the day it was fixed rather
- * than of the day after.
+ * The digest is last but one because it summarises the day, and a note fixed
+ * overnight should be on the morning summary of the day it was fixed  rather
+ * than of the day after. The idea-score catch-up follows it only because the
+ * digest files ideas.
  *
  * Each stage is isolated. A failure in one is reported and the rest still run,
  * because the alternative is that a broken job inbox silently stops the
@@ -73,6 +75,10 @@ export async function GET(request: NextRequest) {
     { name: 'goals-weekly', run: () => runGoalsWeekly() },
     { name: 'plan-claims', run: () => runClaimSweep() },
     { name: 'dev-digest', run: () => runDevDigest() },
+    // After the digest, which files ideas overnight without triage, so they
+    // and any other idea still unscored get Jev's score the same morning
+    // (plan #1327).
+    { name: 'idea-scores', run: () => runIdeaScoreCatchUp() },
   ];
 
   const results: Record<string, unknown> = {};
