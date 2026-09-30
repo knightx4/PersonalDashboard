@@ -46,6 +46,7 @@ function harness(opts: {
       recorded.blobReads.push(sha);
       return opts.blob ? opts.blob(sha) : `# Note ${sha}`;
     },
+    readBlobBytes: async () => new ArrayBuffer(0),
   };
 
   const ports = {

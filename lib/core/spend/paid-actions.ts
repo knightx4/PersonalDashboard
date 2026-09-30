@@ -220,6 +220,10 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'Fired daily by pg_cron to read each open recommended role from its link and score the new ones with Jev; no press starts it.',
   'app/api/cron/job-openings/route.ts#POST':
     'Fired daily by pg_cron to read each open recommended role from its link and score the new ones with Jev; no press starts it.',
+  'app/api/cron/job-search-batches/route.ts#GET':
+    'Fired every ten minutes by pg_cron to finish the roles and people searches that went on as Message Batches, then read and score the new roles; the press that queued them is priced under app/jobs/(app)/recommend/actions.ts.',
+  'app/api/cron/job-search-batches/route.ts#POST':
+    'Fired every ten minutes by pg_cron to finish the roles and people searches that went on as Message Batches, then read and score the new roles; the press that queued them is priced under app/jobs/(app)/recommend/actions.ts.',
   'app/learn/now/actions.ts#loadMoreCards':
     'Called by the Learn now deck on its own while four cards are still ahead, to load the next few; no press starts it. The paid part is matching a card with no stored concept vector to your vault notes (plan #1113), one short embedding per card, paid once, since the vector is kept by the text\'s hash.',
 };

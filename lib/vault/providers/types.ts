@@ -101,6 +101,9 @@ export interface VaultSource {
 
   /** A file's text. Only ever called for paths that survived the filter. */
   readBlob(blobSha: string): Promise<string>;
+
+  /** A file's bytes, for copying an attachment into storage. */
+  readBlobBytes(blobSha: string): Promise<ArrayBuffer>;
 }
 
 /** The source rejected our credentials; the connection needs reconnecting. */

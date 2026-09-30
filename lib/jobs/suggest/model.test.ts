@@ -1,3 +1,4 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it, vi } from 'vitest';
 import { findPeople, type SeekerContext } from './model';
 import { personKey } from './payload';
@@ -44,6 +45,55 @@ const report = {
 };
 
 const usage = { input_tokens: 100, output_tokens: 50 };
+
+describe('the time a search is given', () => {
+  const input = { seeker, warm: [], known: [], taken: new Set<string>() };
+
+  it('gives the call the time left before the deadline, without retries', async () => {
+    const create = vi.fn().mockResolvedValue({ content: [report], stop_reason: 'tool_use', usage });
+    const deadline = Date.now() + 200_000;
+    await findPeople({ apiKey: 'k', client: { messages: { create } } as never, deadline }, input);
+    const options = create.mock.calls[0][1];
+    expect(options.maxRetries).toBe(0);
+    expect(options.timeout).toBeGreaterThan(180_000);
+    expect(options.timeout).toBeLessThanOrEqual(185_000);
+  });
+
+  it('hands back the request to queue when the call runs out of time', async () => {
+    const create = vi.fn().mockRejectedValue(new Anthropic.APIConnectionTimeoutError());
+    const result = await findPeople(
+      { apiKey: 'k', client: { messages: { create } } as never, deadline: Date.now() + 200_000 },
+      input,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.queue).toBe(create.mock.calls[0][0]);
+  });
+
+  it('queues without calling when too little time is left, and queues the forced report the same way', async () => {
+    const none = vi.fn();
+    const early = await findPeople(
+      { apiKey: 'k', client: { messages: { create: none } } as never, deadline: Date.now() + 30_000 },
+      input,
+    );
+    expect(none).not.toHaveBeenCalled();
+    expect(early).toMatchObject({ ok: false, queue: { model: 'claude-sonnet-5' } });
+
+    let clock = Date.now();
+    const spy = vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    const create = vi.fn().mockImplementation(async () => {
+      clock += 170_000;
+      return { content: [{ type: 'text', text: 'searching' }], stop_reason: 'pause_turn', usage };
+    });
+    const late = await findPeople(
+      { apiKey: 'k', client: { messages: { create } } as never, deadline: clock + 200_000 },
+      input,
+    );
+    spy.mockRestore();
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(late).toMatchObject({ ok: false, queue: { tool_choice: { type: 'tool', name: 'suggest_people' } } });
+  });
+});
 
 describe('findPeople', () => {
   it('forces the report after a paused search, reports the cost of each call, and drops known people', async () => {
