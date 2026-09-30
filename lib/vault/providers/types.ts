@@ -11,6 +11,8 @@
  * boundary and asserted in tests/lint-boundaries.test.ts.
  */
 
+import type { AttachmentMimeType } from '@/lib/vault/paths';
+
 /** One markdown file, as the source sees it. */
 export type VaultEntry = {
   /** Vault-relative path, '.md' included, no leading slash. */
@@ -19,6 +21,28 @@ export type VaultEntry = {
   blobSha: string;
   sizeBytes: number;
 };
+
+/** One image, PDF or audio file, as the source sees it (plan #1300). */
+export type VaultAttachmentEntry = {
+  /** Repository path, extension included, no leading slash. */
+  path: string;
+  /** The source's own content hash; also the file's key in storage. */
+  blobSha: string;
+  sizeBytes: number;
+  mimeType: AttachmentMimeType;
+  /** Over ATTACHMENT_MAX_BYTES: kept as a row, never copied. */
+  tooLarge: boolean;
+};
+
+/**
+ * What happened to one attachment between two commits. A rename carries the
+ * old path, so the row can move without copying the file again. A file renamed
+ * into the allowed types arrives as a plain upsert, and one renamed out of them
+ * as a delete of its old path.
+ */
+export type VaultAttachmentChange =
+  | ({ kind: 'upsert'; previousPath?: string } & VaultAttachmentEntry)
+  | { kind: 'delete'; path: string };
 
 /** What changed between two points in the source's history. */
 export type VaultChange =
@@ -42,6 +66,8 @@ export type VaultSnapshot = {
    * proceed.
    */
   truncated: boolean;
+  /** Every allowed attachment at this commit, too-large ones included. */
+  attachments: VaultAttachmentEntry[];
 };
 
 export type VaultDiff = {
@@ -52,6 +78,11 @@ export type VaultDiff = {
    * snapshot comparison, which converges on the same state.
    */
   complete: boolean;
+  /**
+   * The attachment changes in the same diff, filtered to the allowed types.
+   * `changes` above is unfiltered and the planner picks the notes out of it.
+   */
+  attachments: VaultAttachmentChange[];
   /** When the head commit was made, for dating the notes it touched. */
   headCommittedAt: string | null;
 };
@@ -62,7 +93,7 @@ export interface VaultSource {
   /** The commit at the tip of the configured branch. */
   headCommit(): Promise<string>;
 
-  /** Every markdown file at a commit. */
+  /** Every markdown file and allowed attachment at a commit. */
   snapshot(commitSha: string): Promise<VaultSnapshot>;
 
   /** What changed between two commits. */

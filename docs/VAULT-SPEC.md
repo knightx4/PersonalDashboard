@@ -281,6 +281,15 @@ included, to filter afterwards.
 
 `.obsidian/` and any dotfile directory are excluded — plugin config is not a note.
 
+**Attachments (plan #1298).** The "no attachments" non-goal above has since
+been narrowed. The same tree listing now also returns images (png, jpg, jpeg,
+gif, webp), PDFs and audio (mp3, m4a, wav, ogg), with their size and blob SHA,
+from `isAttachmentPath` in `lib/vault/paths.ts`. SVG, video and `.canvas` are
+still dropped, as is anything in a dotfile directory. A file over 50 MB is
+listed with `tooLarge` set and is never copied. Listing costs no request per
+file; the bytes are copied into the private `vault-attachments` bucket by the
+sync, and nothing else in the vault is fetched.
+
 ### Backfill
 
 The tree call gives every markdown path in one request; the blobs are then
