@@ -8,9 +8,12 @@ import type { SuggestionKind } from './cadence';
  * A run writes its stage as it goes. The platform stops a request at five
  * minutes without warning, so a run cut off there never writes that it
  * failed; a row still running after STOPPED_AFTER_MINUTES is read as stopped.
+ * A run whose search needed more time than that waits in 'queued' while a
+ * Message Batch finishes it (search-batch.ts, job_search 0041); it is read as
+ * stopped only after QUEUED_STOPPED_AFTER_HOURS, past a batch's own limit.
  */
 
-export const SEARCH_STAGES = ['boards', 'searching', 'saving', 'postings', 'scoring', 'done', 'failed'] as const;
+export const SEARCH_STAGES = ['boards', 'searching', 'saving', 'queued', 'postings', 'scoring', 'done', 'failed'] as const;
 export type SearchStage = (typeof SEARCH_STAGES)[number];
 
 /** What each stage is called while it runs. */
@@ -18,6 +21,7 @@ export const STAGE_LABELS: Record<SearchStage, string> = {
   boards: 'Reading the job boards of companies you follow',
   searching: 'Searching the web',
   saving: 'Saving what it found',
+  queued: 'Still searching in the background',
   postings: 'Reading each posting',
   scoring: 'Scoring the new roles',
   done: 'Done',
@@ -26,6 +30,9 @@ export const STAGE_LABELS: Record<SearchStage, string> = {
 
 /** Past the route's five minutes, with a minute's slack. */
 export const STOPPED_AFTER_MINUTES = 6;
+
+/** Past a Message Batch's 24 hours, with the collector's ten minutes and slack. */
+export const QUEUED_STOPPED_AFTER_HOURS = 25;
 
 export type SearchRunRow = {
   id: string;
@@ -56,7 +63,9 @@ export type SearchRunView = {
 export function viewRun(row: SearchRunRow, now: Date = new Date()): SearchRunView {
   const running = row.stage !== 'done' && row.stage !== 'failed';
   const age = now.getTime() - new Date(row.started_at).getTime();
-  const state = running ? (age > STOPPED_AFTER_MINUTES * 60_000 ? 'stopped' : 'running') : row.stage === 'done' ? 'done' : 'failed';
+  const limit =
+    row.stage === 'queued' ? QUEUED_STOPPED_AFTER_HOURS * 3_600_000 : STOPPED_AFTER_MINUTES * 60_000;
+  const state = running ? (age > limit ? 'stopped' : 'running') : row.stage === 'done' ? 'done' : 'failed';
   return {
     state,
     stage: row.stage,
@@ -91,8 +100,15 @@ export async function loadLatestRun(
   return viewRun(data as SearchRunRow, now);
 }
 
-/** Counts a stage can report alongside itself. */
-export type StageCounts = Partial<{ written: number; boards_read: number; candidates: number }>;
+/** Counts, and for a queued run its batch, that a stage can report alongside itself. */
+export type StageCounts = Partial<{
+  written: number;
+  boards_read: number;
+  candidates: number;
+  batch_id: string;
+  request: unknown;
+  board_urls: unknown;
+}>;
 
 /**
  * What the search reports to as it goes. Each kind's row is made on its
@@ -102,6 +118,8 @@ export type StageCounts = Partial<{ written: number; boards_read: number; candid
  */
 export type SearchProgress = {
   stage: (kind: SuggestionKind, stage: SearchStage, counts?: StageCounts) => Promise<void>;
+  /** The run row of a kind, once its first stage is written; a batch is filed under it. */
+  runId: (kind: SuggestionKind) => string | undefined;
   finish: (kind: SuggestionKind, outcome: { written: number; error: string | null }) => Promise<void>;
 };
 
@@ -129,6 +147,7 @@ export function recordRuns(
   };
   return {
     stage: (kind, stage, counts = {}) => write(kind, { stage, ...counts }),
+    runId: (kind) => ids[kind],
     finish: (kind, outcome) =>
       write(kind, {
         stage: outcome.error ? 'failed' : 'done',
@@ -166,8 +185,12 @@ export function agoText(iso: string, now: Date = new Date()): string {
   return `${days} ${days === 1 ? 'day' : 'days'} ago`;
 }
 
-/** The line the Recommended roles section shows about the latest run. */
-export type RunLine = { running: boolean; tone: 'plain' | 'warn'; text: string };
+/**
+ * The line the Recommended roles section shows about the latest run.
+ * `waiting` is a run a batch is finishing: still running, but for up to an
+ * hour, so the page checks on it far less often.
+ */
+export type RunLine = { running: boolean; waiting?: boolean; tone: 'plain' | 'warn'; text: string };
 
 function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
@@ -182,6 +205,14 @@ export function describeRun(run: SearchRunView | null, now: Date = new Date()): 
       : '';
   switch (run.state) {
     case 'running':
+      if (run.stage === 'queued') {
+        return {
+          running: true,
+          waiting: true,
+          tone: 'plain',
+          text: `Still searching in the background. The search needed more time than a page allows, so it carries on on its own and usually finishes within the hour. Started ${agoText(run.startedAt, now)}.`,
+        };
+      }
       return {
         running: true,
         tone: 'plain',
