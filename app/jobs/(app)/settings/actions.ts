@@ -24,15 +24,6 @@ const profileSchema = z.object({
   ghostThresholdDays: z.coerce.number().int().min(7).max(180).optional(),
   writingStyleNotes: z.string().trim().max(4000).optional(),
   bannedConstructions: z.string().trim().optional(),
-  homeLocation: z.string().trim().max(200, 'Keep where you live under 200 characters.').optional(),
-  salaryFloor: z
-    .string()
-    .trim()
-    .transform((value) => value.replace(/[^0-9]/g, ''))
-    .refine((value) => value === '' || Number(value) <= 2_000_000, 'Enter the lowest pay as a yearly figure.')
-    .optional(),
-  workplaces: z.array(z.enum(WORKPLACE_PREFERENCES)).optional(),
-  companyStages: z.array(z.enum(COMPANY_STAGES)).optional(),
 });
 
 // latency: pending
@@ -47,10 +38,6 @@ export async function updateProfile(
     ghostThresholdDays: formData.get('ghostThresholdDays') || undefined,
     writingStyleNotes: formData.get('writingStyleNotes') ?? '',
     bannedConstructions: formData.get('bannedConstructions') ?? '',
-    homeLocation: formData.get('homeLocation') ?? '',
-    salaryFloor: formData.get('salaryFloor') ?? '',
-    workplaces: formData.getAll('workplaces'),
-    companyStages: formData.getAll('companyStages'),
   });
 
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -76,12 +63,6 @@ export async function updateProfile(
       .map((entry) => entry.trim())
       .filter(Boolean);
   }
-  if (parsed.data.homeLocation !== undefined) patch.home_location = parsed.data.homeLocation || null;
-  if (parsed.data.salaryFloor !== undefined) {
-    patch.salary_floor_cents = parsed.data.salaryFloor ? Number(parsed.data.salaryFloor) * 100 : null;
-  }
-  if (parsed.data.workplaces !== undefined) patch.workplace_preferences = parsed.data.workplaces;
-  if (parsed.data.companyStages !== undefined) patch.company_stages = parsed.data.companyStages;
   if (parsed.data.bannedConstructions !== undefined) {
     patch.banned_constructions = parsed.data.bannedConstructions
       .split('\n')
@@ -145,4 +126,68 @@ export async function disconnectInbox(accountId: string): Promise<{ error: strin
   if (error) return { error: error.message };
   revalidatePath('/jobs/settings');
   return { error: null };
+}
+
+/**
+ * One job preference, saved where it is shown (law 12): where you live and
+ * the pay floor from an inline field on leaving it, the workplaces and
+ * company stages one choice at a time. A choice submits the current set and
+ * the one pressed, so the form works before JavaScript loads.
+ */
+const preferenceSchema = z.discriminatedUnion('field', [
+  z.object({
+    field: z.literal('homeLocation'),
+    value: z.string().trim().max(200, 'Keep where you live under 200 characters.'),
+  }),
+  z.object({
+    field: z.literal('salaryFloor'),
+    value: z
+      .string()
+      .trim()
+      .transform((value) => value.replace(/[^0-9]/g, ''))
+      .refine((value) => value === '' || Number(value) <= 2_000_000, 'Enter the lowest pay as a yearly figure.'),
+  }),
+  z.object({
+    field: z.literal('workplaces'),
+    current: z.array(z.enum(WORKPLACE_PREFERENCES)),
+    toggle: z.enum(WORKPLACE_PREFERENCES),
+  }),
+  z.object({
+    field: z.literal('companyStages'),
+    current: z.array(z.enum(COMPANY_STAGES)),
+    toggle: z.enum(COMPANY_STAGES),
+  }),
+]);
+
+function toggled<T extends string>(current: readonly T[], value: T, order: readonly T[]): T[] {
+  const next = current.includes(value) ? current.filter((entry) => entry !== value) : [...current, value];
+  return order.filter((entry) => next.includes(entry));
+}
+
+// latency: pending -- saves one value where it is shown
+export async function savePreference(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  const parsed = preferenceSchema.safeParse({
+    field: formData.get('field'),
+    value: formData.get('value') ?? '',
+    current: formData.getAll('current'),
+    toggle: formData.get('toggle') ?? undefined,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const data = parsed.data;
+  const patch: Record<string, unknown> =
+    data.field === 'homeLocation'
+      ? { home_location: data.value || null }
+      : data.field === 'salaryFloor'
+        ? { salary_floor_cents: data.value ? Number(data.value) * 100 : null }
+        : data.field === 'workplaces'
+          ? { workplace_preferences: toggled(data.current, data.toggle, WORKPLACE_PREFERENCES) }
+          : { company_stages: toggled(data.current, data.toggle, COMPANY_STAGES) };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase.from('profiles').update(patch).eq('id', user.id);
+  if (error) return { error: error.message };
+  revalidatePath('/jobs/settings');
+  return {};
 }
