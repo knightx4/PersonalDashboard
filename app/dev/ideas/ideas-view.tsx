@@ -426,6 +426,7 @@ export function IdeasView({
   // Sorted once and grouped after, so the order asked for holds inside every
   // section rather than only between them.
   const groups = groupIdeas(sortIdeas(mine, sort), grouping);
+  const suggestedGroups = groupIdeas(sortIdeas(suggested, sort), 'workspace');
 
   return (
     <div className="space-y-6">
@@ -493,8 +494,10 @@ export function IdeasView({
 
       {/* Under your own list rather than mixed into it. A session working a
           feature can write several follow-ons in a night, and above the module
-          headings they would be the first thing on the page. Not grouped by
-          workspace: this list is the short one. */}
+          headings they would be the first thing on the page. Grouped by
+          workspace inside the fold (note 6158d2c0), always rather than by the
+          page's grouping: once the follow-ons span several workspaces, which
+          one they are about is the first thing to read them by. */}
       {suggested.length > 0 && (
         // Foldable like the rest of the page now, and open to start with: a
         // night of follow-ons is the section most worth being able to put away
@@ -518,11 +521,28 @@ export function IdeasView({
           <p className="mt-2 text-small text-ink-muted">
             Shape one into the plan, or dismiss it and it stops being offered.
           </p>
-          <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
-            {sortIdeas(suggested, sort).map((idea) => (
-              <IdeaCard key={idea.id} idea={idea} />
+          <div className="mt-2 space-y-3 pl-5">
+            {suggestedGroups.map((group) => (
+              // Each workspace folds on its own, open to start with, the same
+              // way the groups of your own ideas above do (law 10).
+              <details key={group.key} open className="group/suggested-module space-y-2">
+                <summary className="press flex cursor-pointer list-none items-center gap-1.5 text-ui font-semibold text-ink [&::-webkit-details-marker]:hidden">
+                  <ChevronRight
+                    className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open/suggested-module:rotate-90"
+                    strokeWidth={1.75}
+                    aria-hidden
+                  />
+                  {group.label}{' '}
+                  <span className="font-normal text-ink-muted">({group.rows.length})</span>
+                </summary>
+                <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+                  {group.rows.map((idea) => (
+                    <IdeaCard key={idea.id} idea={idea} />
+                  ))}
+                </ul>
+              </details>
             ))}
-          </ul>
+          </div>
         </details>
       )}
 

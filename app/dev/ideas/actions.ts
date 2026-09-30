@@ -100,7 +100,23 @@ export async function submitIdea(
   if (!codeMatches(String(formData.get('code') ?? ''))) {
     return { error: 'That code is not right.' };
   }
-  return addIdea(_prev, formData);
+  const saved = await addIdea(_prev, formData);
+
+  // "Send and shape" (note beadca47): the same save, then the same hand-off the
+  // Shape button on the ideas page makes, so an idea you already know you want
+  // shaped does not need a second trip to that page to send it.
+  if (formData.get('then') !== 'shape' || saved.error || !saved.filed) return saved;
+  const shape = new FormData();
+  shape.set('id', saved.filed.id);
+  const shaped = await shapeIdea({}, shape);
+  if (shaped.error) {
+    return { ...saved, message: undefined, error: `Idea saved, but not sent: ${shaped.error}` };
+  }
+  return {
+    ...saved,
+    message:
+      'Idea saved and sent. A proposal will appear on the plan page when the session is done.',
+  };
 }
 
 /**
