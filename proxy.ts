@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { sessionUser } from '@/lib/auth/session-user';
+import { signInRedirect } from '@/lib/paths';
 
 /**
  * Session refresh and route protection (Next 16 proxy convention; this file
@@ -97,10 +98,10 @@ export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (!user && !isPublic(pathname)) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    url.searchParams.set('next', pathname);
-    return NextResponse.redirect(url);
+    // The query goes with it: /oauth/consent is useless without its
+    // authorization_id, and Claude's connector sends a signed-out visitor
+    // there first.
+    return NextResponse.redirect(signInRedirect(new URL(request.nextUrl.href)));
   }
 
   // A signed-in person has no use for the marketing page or the sign-in form.
