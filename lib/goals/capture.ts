@@ -18,7 +18,7 @@
  *   action, save the list of what was done.
  * - `undoMove` and `markUndone` are the Undo on one line.
  *
- * Five moves, and only five. Close a step, count one towards a rhythm, log
+ * Five moves, and only five. Close a step, count towards a rhythm, log
  * progress on a step or goal (plan #1275), add a step, record a reading of a
  * goal's number (plan #930). Anything needing research is added as
  * a `claude` step for the next scheduled run; capture never starts a run.
@@ -40,7 +40,7 @@ import {
   type ProgressTally,
 } from '@/lib/goals/progress';
 import { formatReading, parseNumber } from '@/lib/goals/readings';
-import { progressLine } from '@/lib/goals/rhythms';
+import { periodOf, progressLine } from '@/lib/goals/rhythms';
 import { STEP_TITLE_MAX, type RhythmPeriod, type StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
 
@@ -50,7 +50,9 @@ export const CAPTURE_BODY_MAX = 4000;
 export const MAX_FILED = 8;
 /** The longest progress text kept from one sentence. */
 export const NOTE_MAX = 1000;
-/** How far back a progress entry's day may go; an older day is read as a misreading. */
+/** The most one count move adds to a rhythm, the most a period's target can be. */
+export const COUNT_MAX = 100;
+/** How far back a progress entry's or a count's day may go; an older day is read as a misreading. */
 export const PROGRESS_DAY_MAX_AGE = 60;
 /** The most steps shown to the model, so a large tree cannot make the call slow. */
 export const MAX_CONTEXT_STEPS = 300;
@@ -245,7 +247,16 @@ export function captureMessage(
 
 export type PlannedAction =
   | { kind: 'close'; step: CaptureStep }
-  | { kind: 'count'; step: CaptureStep }
+  | {
+      kind: 'count';
+      step: CaptureStep;
+      /** How many occurrences the sentence reported (plan #1279); one when it gave no number. */
+      amount: number;
+      /** YYYY-MM-DD, or null for the day it was filed. */
+      happenedOn: string | null;
+      /** The start of the period that day falls in, which the count goes towards. */
+      startsOn: string;
+    }
   | {
       kind: 'progress';
       /** The goal the entry counts under: the step's goal, or the goal itself. */
@@ -333,6 +344,18 @@ function readAmount(
   return { quantity, unit };
 }
 
+/**
+ * How many a count move reported: one when it gave no number, a whole number
+ * from 1 to COUNT_MAX when it did, and null for anything else.
+ */
+function readCount(entry: Record<string, unknown>): number | null {
+  const raw = entry.quantity;
+  if (raw === null || raw === undefined || raw === '') return 1;
+  const count = parseNumber(raw);
+  if (count === null || !Number.isInteger(count) || count < 1 || count > COUNT_MAX) return null;
+  return count;
+}
+
 /** A total the move gave, when it is a number more than nothing. */
 function readTotal(entry: Record<string, unknown>): number | null {
   const raw =
@@ -406,6 +429,10 @@ export function progressTotal(
  * days (or with no `today` to check it against) is dropped on its own, and
  * the entry is filed on today. The goal-only `note` of earlier versions is
  * read as progress on that goal.
+ *
+ * A count is one unless it gives a whole number up to COUNT_MAX; any other
+ * number drops it. Its day is read as progress's is, and picks the period
+ * the count goes towards (plan #1279).
  */
 export function parseFiling(
   raw: unknown,
@@ -439,8 +466,16 @@ export function parseFiling(
       case 'count': {
         const step = steps.get(text(entry.step));
         if (!step || step.kind !== 'rhythm' || !step.rhythm) break;
-        planned = { kind: 'count', step };
-        key = `count:${step.id}`;
+        const amount = readCount(entry);
+        if (amount === null) break;
+        // Counted in the period the day falls in (plan #1279): "yesterday"
+        // can be last week's when today is a Monday.
+        const happenedOn = progressDay(entry.day, today);
+        const startsOn = happenedOn
+          ? periodOf(step.rhythm.period, happenedOn).startsOn
+          : step.rhythm.startsOn;
+        planned = { kind: 'count', step, amount, happenedOn, startsOn };
+        key = `count:${step.id}:${startsOn}`;
         break;
       }
       case 'progress':
@@ -557,6 +592,13 @@ export type FiledEntry =
       goal_title: string;
       /** The period counted towards, so Undo takes it back from the same one. */
       starts_on: string;
+      /**
+       * How many were counted (plan #1279), so Undo takes back the same
+       * number. Absent on lines filed before, which counted one.
+       */
+      amount?: number;
+      /** YYYY-MM-DD: the day the count was filed on. Absent on lines filed before. */
+      counted_on?: string;
       undone_at: string | null;
     }
   | {
@@ -655,8 +697,10 @@ export function describeFiled(entry: FiledEntry): string {
   switch (entry.kind) {
     case 'close':
       return `Closed "${entry.title}" in ${entry.goal_title}`;
-    case 'count':
-      return `Counted one towards "${entry.title}" in ${entry.goal_title}`;
+    case 'count': {
+      const amount = entry.amount ?? 1;
+      return `Counted ${amount === 1 ? 'one' : amount} towards "${entry.title}" in ${entry.goal_title}`;
+    }
     case 'note':
       return `Noted against ${entry.goal_title}: ${entry.text}`;
     case 'progress': {
@@ -768,7 +812,7 @@ export async function fileCapture(
 /** What Undo has to do to the goals for one entry. */
 export type UndoMove =
   | { move: 'reopen'; stepId: string }
-  | { move: 'uncount'; stepId: string; startsOn: string }
+  | { move: 'uncount'; stepId: string; startsOn: string; amount: number }
   | {
       move: 'archive';
       stepId: string;
@@ -792,7 +836,12 @@ export function undoMove(entry: FiledEntry): UndoMove {
     case 'close':
       return { move: 'reopen', stepId: entry.step_id };
     case 'count':
-      return { move: 'uncount', stepId: entry.step_id, startsOn: entry.starts_on };
+      return {
+        move: 'uncount',
+        stepId: entry.step_id,
+        startsOn: entry.starts_on,
+        amount: entry.amount ?? 1,
+      };
     case 'add': {
       const progress = entry.progress;
       if (!progress) return { move: 'archive', stepId: entry.step_id };

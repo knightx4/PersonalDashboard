@@ -400,7 +400,7 @@ not turned Jev on see no guess.
 It is filed as follows:
 
 1. A direct model call reads the sentence against your open goals and steps
-   and returns what to do, as any of five moves: close a step, count one
+   and returns what to do, as any of five moves: close a step, count
    towards a rhythm, log progress, record a reading of a goal's number, or
    add a follow-up step. This takes seconds, the same fast path `@dash`
    replies use.
@@ -474,6 +474,16 @@ step and its entry share that one line, so one Undo archives the step and
 marks the entry undone. A bad amount drops the entry and keeps the step.
 Progress still goes on the goal itself when the work belongs to the goal as a
 whole rather than to a piece of it.
+
+A count can be several at once, on the day they happened (plan #1279). The
+count move takes an amount, one when the sentence gives none, and a day read
+as the progress move reads it. "Sent three applications yesterday" adds 3 to
+the rhythm's period that yesterday falls in, which on a Monday is last week's,
+already closed; that period is then marked kept or missed again from its new
+count. A day before the rhythm's first period counts towards the current one.
+The filed line reads `Counted 3 towards "Send applications" in …`, and Undo
+takes the same 3 back from the same period. An amount that is not a whole
+number from 1 to 100 drops the move.
 
 ## What Claude does, and when
 

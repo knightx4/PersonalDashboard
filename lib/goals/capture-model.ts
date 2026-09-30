@@ -26,9 +26,13 @@ Decide what the sentence means for those goals, using only these five moves:
 
 - close: the whole of a step is finished. "step" is its ref. Only for steps
   marked mine or claude, never a rhythm.
-- count: the sentence is one occurrence of a rhythm step (for example "went
+- count: the sentence reports occurrences of a rhythm step (for example "went
   to an event" against a rhythm of one event a week). "step" is its ref. Only
-  for steps marked rhythm with a period open.
+  for steps marked rhythm with a period open. "quantity" is how many, as a
+  whole number, when the sentence says more than one ("sent three
+  applications" is quantity 3); leave it out for one. "day" is the date as
+  YYYY-MM-DD, only when the sentence names another day than today, such as
+  yesterday; work it out from today's date.
 - progress: part of the work, done without finishing it. "step" is the ref of
   the deepest step the sentence fits; when no step fits, leave "step" out and
   give "goal" instead, but only when the work belongs to the goal as a whole;

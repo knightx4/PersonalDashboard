@@ -107,14 +107,26 @@ export async function applyCaptureAction(
     case 'count': {
       const rhythm = action.step.rhythm;
       if (!rhythm) return null;
-      const counted = await countTowards(client, action.step.id, rhythm.startsOn, 1);
+      // Towards the period the day falls in, closed or not (plan #1279). A
+      // day before the rhythm's first period has no row to count in, so it
+      // goes towards the current one rather than being lost.
+      let startsOn = action.startsOn;
+      let counted = await countTowards(client, action.step.id, startsOn, action.amount, {
+        closed: true,
+      });
+      if (!counted && startsOn !== rhythm.startsOn) {
+        startsOn = rhythm.startsOn;
+        counted = await countTowards(client, action.step.id, startsOn, action.amount);
+      }
       if (!counted) return null;
       return {
         kind: 'count',
         step_id: action.step.id,
         title: action.step.title,
         goal_title: action.step.goalTitle,
-        starts_on: rhythm.startsOn,
+        starts_on: startsOn,
+        amount: action.amount,
+        counted_on: startsOn === action.startsOn ? (action.happenedOn ?? today) : today,
         undone_at: null,
       };
     }
@@ -238,7 +250,7 @@ export type UndoResult =
 /**
  * Reverse one line of a capture and mark it undone. Only that line's row is
  * touched: a reopened step goes back to open, a count is taken back from the
- * period it was added to, an added step is archived with any progress filed
+ * period it was added to by the number it added, an added step is archived with any progress filed
  * on it, a recorded reading is
  * deleted, a progress entry is marked undone. A note from before plan #1275
  * changes no row.
@@ -268,11 +280,14 @@ export async function undoFiled(
       await setStepStatus(client, move.stepId, 'open');
       break;
     case 'uncount': {
-      const taken = await countTowards(client, move.stepId, move.startsOn, -1);
+      // The same number, from the same period, even once it has closed.
+      const taken = await countTowards(client, move.stepId, move.startsOn, -move.amount, {
+        closed: true,
+      });
       if (!taken) {
         return {
           ok: false,
-          error: 'That period has closed, so the count stays.',
+          error: 'There is nothing left to take back in that period.',
         };
       }
       break;
