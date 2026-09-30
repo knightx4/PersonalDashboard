@@ -322,12 +322,22 @@ export default async function HomePage() {
             <Card padding="standard" className="mt-4">
               <div className="flex items-baseline justify-between gap-2">
                 <h2 className="text-ui font-semibold text-ink">What Dash noticed this week</h2>
-                <Link
-                  href="/timeline"
-                  className="text-small font-medium text-accent underline underline-offset-2"
-                >
-                  Timeline
-                </Link>
+                <span className="flex items-baseline gap-3">
+                  {/* The Sunday review (plan #1233) sits beside these rather
+                      than repeating them. */}
+                  <Link
+                    href="/home/week"
+                    className="text-small font-medium text-accent underline underline-offset-2"
+                  >
+                    Week in review
+                  </Link>
+                  <Link
+                    href="/timeline"
+                    className="text-small font-medium text-accent underline underline-offset-2"
+                  >
+                    Timeline
+                  </Link>
+                </span>
               </div>
               <div className="mt-2">
                 <ObservationList observations={observations} timezone={settings.timezone} />
@@ -507,15 +517,24 @@ export default async function HomePage() {
           </nav>
 
           {/* Everything the workspaces hold, by month (plan #1118). A line
-              rather than a tile: it is not a workspace. In a week with
-              observations the link sits on their card instead. */}
+              rather than a tile: it is not a workspace. The week's review
+              (plan #1233) beside it. In a week with observations both links
+              sit on their card instead. */}
           {observations.length === 0 && (
-            <p className="mt-4 text-small text-ink-muted">
-              <Link href="/timeline" className="font-medium text-accent hover:underline">
-                Timeline
-              </Link>
-              {': what you did across the app, month by month.'}
-            </p>
+            <div className="mt-4 space-y-1 text-small text-ink-muted">
+              <p>
+                <Link href="/home/week" className="font-medium text-accent hover:underline">
+                  Week in review
+                </Link>
+                {': what Dash wrote on Sunday about the week before.'}
+              </p>
+              <p>
+                <Link href="/timeline" className="font-medium text-accent hover:underline">
+                  Timeline
+                </Link>
+                {': what you did across the app, month by month.'}
+              </p>
+            </div>
           )}
         </div>
       </AppShell>
