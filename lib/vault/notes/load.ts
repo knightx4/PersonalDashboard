@@ -4,6 +4,7 @@ import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { VAULT_SCHEMA, type VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { folderOf } from '@/lib/vault/paths';
 import type { LinkTarget } from '@/lib/vault/markdown/obsidian';
+import type { AttachmentEntry } from '@/lib/vault/markdown/attachments';
 import type { SyncRunSummary } from '@/lib/vault/sync/progress';
 
 /**
@@ -308,6 +309,47 @@ export async function loadLinkTargets(supabase: VaultSupabaseClient): Promise<Li
   }
 
   return targets;
+}
+
+/**
+ * Every attachment row in the vault, for resolving the embeds in a note
+ * (plan #1302). Paths, sizes and where each copy is -- never the bytes -- and
+ * paged as the link targets are.
+ */
+export async function loadAttachments(supabase: VaultSupabaseClient): Promise<AttachmentEntry[]> {
+  const entries: AttachmentEntry[] = [];
+
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .from('attachments')
+      .select('id, path, size_bytes, mime_type, storage_path')
+      .order('path')
+      .range(from, from + 999);
+
+    assertSchemaExposed(error, VAULT_SCHEMA);
+    if (error) throw new Error(`Reading the vault's attachments failed: ${error.message}`);
+    if (!data?.length) break;
+
+    for (const row of data as Array<{
+      id: string;
+      path: string;
+      size_bytes: number | string;
+      mime_type: AttachmentEntry['mimeType'];
+      storage_path: string | null;
+    }>) {
+      entries.push({
+        id: row.id,
+        path: row.path,
+        // bigint may come back as a string.
+        sizeBytes: Number(row.size_bytes),
+        mimeType: row.mime_type,
+        storagePath: row.storage_path,
+      });
+    }
+    if (data.length < 1000) break;
+  }
+
+  return entries;
 }
 
 /** Notes grouped by folder, in the order the list renders them. */

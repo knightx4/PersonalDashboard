@@ -1824,6 +1824,31 @@ form[data-auto-submit] [data-fallback-submit] {
   padding: 0;
 }
 
+/* An embedded image (plan #1302) never overflows the note: a sized one keeps
+   its width up to the measure and shrinks with it on a phone. Its own
+   height is kept in proportion, whatever `|300x200` said. */
+.vault-prose .vault-attachment-image {
+  border-radius: 0.5rem;
+  display: inline-block;
+  height: auto;
+  max-width: 100%;
+  vertical-align: bottom;
+}
+
+/* Audio takes the note's width up to a comfortable player, with its filename
+   under it. Inline-flex rather than a block, because it sits in a paragraph. */
+.vault-prose .vault-attachment-audio {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-width: 28rem;
+  width: 100%;
+}
+
+.vault-prose .vault-attachment-audio audio {
+  width: 100%;
+}
+
 /* Wide tables scroll inside the note rather than widening the page. */
 .vault-prose table {
   border-collapse: collapse;

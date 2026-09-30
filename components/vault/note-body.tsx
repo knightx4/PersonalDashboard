@@ -1,3 +1,4 @@
+import { FileText } from 'lucide-react';
 import Markdown from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
@@ -5,6 +6,14 @@ import remarkMath from 'remark-math';
 
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import {
+  attachmentHref,
+  readSize,
+  viewAttachment,
+  type AttachmentEntry,
+  type AttachmentIndex,
+  type AttachmentView,
+} from '@/lib/vault/markdown/attachments';
 import { remarkObsidianMath } from '@/lib/vault/markdown/math';
 
 import 'katex/dist/katex.min.css';
@@ -55,7 +64,20 @@ const KATEX = {
  * surface the properties above it already sit on. Code blocks and tables keep
  * their sunken fill, which reads against the card as it did against the page.
  */
-export function NoteBody({ markdown }: { markdown: string }) {
+export function NoteBody({
+  markdown,
+  notePath = '',
+  attachments,
+  hrefForAttachment = attachmentHref,
+}: {
+  markdown: string;
+  /** The note's vault path, which a relative embed is resolved against. */
+  notePath?: string;
+  /** The vault's attachment rows; without them every embed shows as missing. */
+  attachments?: AttachmentIndex;
+  /** Where a copied file is fetched from; the preview gallery points it at fixtures. */
+  hrefForAttachment?: (entry: AttachmentEntry) => string;
+}) {
   return (
     <div className={cn(cardVariants({ padding: 'standard' }), 'vault-prose')}>
       <Markdown
@@ -74,10 +96,18 @@ export function NoteBody({ markdown }: { markdown: string }) {
               </a>
             );
           },
-          img({ alt }) {
-            // Attachments are never synced, so an <img> here can only point
-            // somewhere off-site. Rendering it would leak a page view to
-            // whoever owns that host every time the note is opened.
+          img({ src, alt }) {
+            const view = viewAttachment(
+              typeof src === 'string' ? src : '',
+              alt ?? '',
+              notePath,
+              attachments ?? EMPTY_INDEX,
+              hrefForAttachment,
+            );
+            if (view) return <Attachment view={view} alt={alt ?? ''} />;
+            // An image on somebody else's host. Rendering it would leak a
+            // page view to whoever owns that host every time the note is
+            // opened, so it stays a label.
             return <em className="text-ink-muted">{alt ? `(image: ${alt})` : '(image)'}</em>;
           },
         }}
@@ -85,5 +115,66 @@ export function NoteBody({ markdown }: { markdown: string }) {
         {markdown}
       </Markdown>
     </div>
+  );
+}
+
+const EMPTY_INDEX: AttachmentIndex = { byPath: new Map(), byName: new Map() };
+
+/** What each state that is not a file says, after the file's name. */
+const UNAVAILABLE: Record<Exclude<AttachmentView['state'], 'ready'>, string> = {
+  waiting: 'not copied from the vault yet',
+  'too-large': 'over 50 MB, so not kept',
+  'not-kept': 'this type of file is not kept',
+  missing: 'not in the vault',
+};
+
+/**
+ * One embedded file (plan #1302). Every element here is phrasing content,
+ * because an embed sits inside a paragraph and a block element there would
+ * make the browser close the paragraph around it. None of it needs
+ * JavaScript: the image, the PDF link and the audio controls are the
+ * browser's own.
+ *
+ * The src is the /vault/attachment route, which signs a link to the private
+ * copy on each request; nothing signed is written into the page.
+ */
+function Attachment({ view, alt }: { view: AttachmentView; alt: string }) {
+  if (view.state !== 'ready') {
+    return (
+      <span className="text-ui text-ink-muted">
+        {view.name}: {UNAVAILABLE[view.state]}
+      </span>
+    );
+  }
+
+  if (view.kind === 'image') {
+    const shown = readSize(alt).alt;
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- a signed, private file behind a redirect; the image optimiser cannot fetch it on the viewer's session
+      <img
+        src={view.href}
+        alt={shown && shown !== view.name ? shown : view.name}
+        loading="lazy"
+        width={view.width ?? undefined}
+        height={view.height ?? undefined}
+        className="vault-attachment-image"
+      />
+    );
+  }
+
+  if (view.kind === 'pdf') {
+    return (
+      <a href={view.href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5">
+        <FileText className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+        {view.name}
+      </a>
+    );
+  }
+
+  return (
+    <span className="vault-attachment-audio">
+      <audio controls preload="none" src={view.href} aria-label={view.name} />
+      <span className="text-ui text-ink-muted">{view.name}</span>
+    </span>
   );
 }
