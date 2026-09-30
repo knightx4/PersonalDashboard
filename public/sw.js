@@ -1,11 +1,16 @@
 /*
- * The service worker, for one job: showing the morning brief as a
- * notification and opening the app when it is pressed (plan #1124).
+ * The service worker, for one job: showing the morning brief (and the weekly
+ * review) as a notification and opening the app when it is pressed
+ * (plan #1124).
  *
  * It caches nothing and handles no fetches, so the app behaves exactly as it
  * did without it. Registered from the account page's notification switch
  * (app/account/notifications.tsx). The payload is lib/push/send.ts's
  * PushPayload: { title, body, url, tag }.
+ *
+ * The URL it opens carries from=push, so the page can tell a press on the
+ * notification from any other visit and record that the brief was opened
+ * (plan #1242; lib/day-brief/opens.ts).
  */
 
 self.addEventListener('install', () => {
@@ -38,7 +43,9 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const path = (event.notification.data && event.notification.data.url) || '/home';
-  const target = new URL(path, self.location.origin).href;
+  const url = new URL(path, self.location.origin);
+  url.searchParams.set('from', 'push');
+  const target = url.href;
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });

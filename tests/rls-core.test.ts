@@ -290,6 +290,38 @@ describe('day briefs', () => {
     await seedBrief(userA, '2026-09-25');
     await expect(seedBrief(userA, '2026-09-25')).rejects.toThrow(/day_briefs_user_day_uq/);
   });
+
+  it('records the first open of a brief and of a pick, for the owner only (plan #1242)', async () => {
+    const id = await seedBrief(userA, '2026-09-24');
+    await admin`
+      update core.day_briefs
+      set picks = ${admin.json([
+        { key: 'task:1', kind: 'task', title: 'A', reason: 'Due today.', href: '/todo' },
+        { key: 'bill:2', kind: 'bill', title: 'B', reason: 'Due today.', href: '/shopping/recurring' },
+      ])}
+      where id = ${id}`;
+
+    // Another person's calls find nothing to stamp.
+    const [other] = await asUser(userB, (tx) => tx<{ opened: boolean }[]>`select core.open_day_brief('2026-09-24') as opened`);
+    expect(other.opened).toBe(false);
+
+    const [first] = await asUser(userA, (tx) => tx<{ opened: boolean }[]>`select core.open_day_brief('2026-09-24') as opened`);
+    const [second] = await asUser(userA, (tx) => tx<{ opened: boolean }[]>`select core.open_day_brief('2026-09-24') as opened`);
+    expect([first.opened, second.opened]).toEqual([true, false]);
+
+    const [pick] = await asUser(userA, (tx) => tx<{ opened: boolean }[]>`select core.open_day_brief_pick('2026-09-24', 'bill:2') as opened`);
+    const [again] = await asUser(userA, (tx) => tx<{ opened: boolean }[]>`select core.open_day_brief_pick('2026-09-24', 'bill:2') as opened`);
+    const [missing] = await asUser(userA, (tx) => tx<{ opened: boolean }[]>`select core.open_day_brief_pick('2026-09-24', 'task:9') as opened`);
+    expect([pick.opened, again.opened, missing.opened]).toEqual([true, false, false]);
+
+    const [row] = await admin<{ opened_at: Date | null; picks: Array<Record<string, unknown>> }[]>`
+      select opened_at, picks from core.day_briefs where id = ${id}`;
+    expect(row.opened_at).not.toBeNull();
+    expect(row.picks.map((p) => p.key)).toEqual(['task:1', 'bill:2']);
+    expect(row.picks[0]).not.toHaveProperty('opened_at');
+    expect(row.picks[1]).toHaveProperty('opened_at');
+    expect(row.picks[1]).toMatchObject({ title: 'B', href: '/shopping/recurring' });
+  });
 });
 
 describe('drafted messages', () => {
