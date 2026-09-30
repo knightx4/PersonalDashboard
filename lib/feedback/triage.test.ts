@@ -22,14 +22,20 @@ function choice(label: string, confidence: number): JevResult<JevChoiceAnswer> {
 
 const CANDIDATES: TriageCandidate[] = [
   { table: 'feedback_items', id: 'n1', body: 'should be able to link a goal step to todo' },
-  { table: 'ideas', id: 'i1', body: 'Email the morning brief as well as sending it to the phone\nMore detail.' },
+  {
+    table: 'ideas',
+    id: 'i1',
+    body: 'Email the morning brief as well as sending it to the phone\nMore detail.',
+  },
 ];
 
 describe('duplicateQuestion', () => {
   it('offers none and one short key per open item, with no ids in the text', () => {
     const { question, keys } = duplicateQuestion(CANDIDATES);
     expect(Object.keys(question.options)).toEqual([NO_MATCH, 'item1', 'item2']);
-    expect(question.options.item2).toBe('Email the morning brief as well as sending it to the phone');
+    expect(question.options.item2).toBe(
+      'Email the morning brief as well as sending it to the phone',
+    );
     expect(keys.get('item1')?.id).toBe('n1');
     expect(JSON.stringify(question)).not.toContain('i1');
   });
@@ -46,6 +52,12 @@ describe('triageState', () => {
       new_note: 'y',
       filed_as: 'an idea',
     });
+  });
+
+  it('does not tell Jev a kind for a note filed from the one tab', () => {
+    expect(triageState({ body: 'z', filedAs: 'note', pagePath: null }).filed_as).toBe(
+      'a note; the person did not say whether it is a bug or a request',
+    );
   });
 });
 

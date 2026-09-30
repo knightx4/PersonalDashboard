@@ -27,9 +27,10 @@ type Client = SupabaseClient<any, 'public'>;
  * filed, and store the answers on its row (plan #1179). The caller has
  * already checked the account agreed to send text to Jev.
  *
- * A note's `priority` column takes Jev's priority when Jev is sure of it,
- * since nobody has set one yet; everything else lives in `triage` only. The
- * kind the person picked is never changed.
+ * A note's `priority` and `kind` columns take Jev's answers when Jev is sure
+ * of them, since nobody has set either yet: the header files a bug and a
+ * request from one tab (note 55b53dc9), so the kind it saves is a placeholder.
+ * Everything else lives in `triage` only.
  *
  * Returns null, and writes nothing, when the row is not the caller's, is a
  * like, or Jev could not answer. Spend goes to `spend` whatever happens.
@@ -68,6 +69,9 @@ export async function triageRow(
   if (table === 'feedback_items' && triage.priority && isSure(triage.priority)) {
     update.priority = triage.priority.value;
   }
+  if (table === 'feedback_items' && triage.kind && isSure(triage.kind)) {
+    update.kind = triage.kind.value;
+  }
   const { error } = await supabase.from(table).update(update).eq('id', id).eq('user_id', userId);
   if (error) {
     console.warn(`[triage] could not store: ${error.message}`);
@@ -76,7 +80,7 @@ export async function triageRow(
   return triage;
 }
 
-type Filed = { body: string; filedAs: 'bug' | 'feature' | 'idea'; pagePath: string | null };
+type Filed = { body: string; filedAs: 'note' | 'idea'; pagePath: string | null };
 
 async function readFiled(
   supabase: Client,
@@ -102,7 +106,7 @@ async function readFiled(
   if (!data || (data.kind !== 'bug' && data.kind !== 'feature')) return null;
   return {
     body: String(data.body),
-    filedAs: data.kind,
+    filedAs: 'note',
     pagePath: (data.page_path as string | null) ?? null,
   };
 }

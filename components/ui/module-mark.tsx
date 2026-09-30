@@ -73,6 +73,8 @@ const GROUND = superellipse();
 const INSET = 0.8;
 
 const SIZES = {
+  // Inline in a line of text, beside a row's title (note 134ec065).
+  xs: { box: 'size-[18px]', px: 18 },
   sm: { box: 'size-6', px: 24 },
   md: { box: 'size-8', px: 32 },
   lg: { box: 'size-11', px: 44 },

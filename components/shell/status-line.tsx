@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { Activity } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { Button } from '@/components/ui/button';
 import { Popover } from '@/components/ui/popover';
+import { sendCiFixToDash, type CiFixState } from '@/app/dev/ci-fix-action';
 import { usePopover } from '@/lib/use-popover';
 import type { ActivityLine } from '@/lib/shell/activity';
 import type { Brief } from '@/lib/shell/brief';
@@ -84,9 +86,7 @@ export function StatusLine({
         {brief && (
           <>
             <BriefMark brief={brief} />
-            {lines.length > 0 && (
-              <span className="h-3 w-px shrink-0 bg-shell-border" aria-hidden />
-            )}
+            {lines.length > 0 && <span className="h-3 w-px shrink-0 bg-shell-border" aria-hidden />}
           </>
         )}
         {/* The icon marks where the activity notes start, so it is drawn only
@@ -271,14 +271,12 @@ function MainDotMark({ check }: { check: MainCheck | null }) {
               Open the run on GitHub
             </a>
           )}
+          {check?.conclusion === 'failed' && <FixWithDash />}
           {check && <Readings check={check} />}
           <ul className="mt-3 space-y-2 border-t border-border pt-3">
             {MAIN_DOT_ORDER.map((dot) => (
               <li key={dot} className="flex items-start gap-2">
-                <span
-                  className={cn('mt-1.5 size-2 shrink-0 rounded-full', DOT[dot])}
-                  aria-hidden
-                />
+                <span className={cn('mt-1.5 size-2 shrink-0 rounded-full', DOT[dot])} aria-hidden />
                 {/*
                   The state being drawn right now is in full ink and the other
                   three are muted, so the legend answers "which one am I looking
@@ -298,6 +296,36 @@ function MainDotMark({ check }: { check: MainCheck | null }) {
         </Popover>
       )}
     </span>
+  );
+}
+
+/**
+ * The button that sends red CI to Dash (note 06016ffa). Drawn only when CI
+ * itself failed, not when the dot is red for a failed deploy, because the run
+ * it starts is told to fix a failing job. What the press did is said under it,
+ * in the panel, where the button was.
+ */
+function FixWithDash() {
+  const [pending, start] = useTransition();
+  const [state, setState] = useState<CiFixState>({});
+
+  return (
+    <div className="mt-3">
+      <Button
+        size="sm"
+        variant="secondary"
+        pending={pending}
+        disabled={pending || Boolean(state.message)}
+        onClick={() => start(async () => setState(await sendCiFixToDash()))}
+      >
+        Fix with Dash
+      </Button>
+      {(state.message ?? state.error) && (
+        <p className={cn('mt-2 text-caption', state.error ? 'text-danger' : 'text-ink-muted')}>
+          {state.message ?? state.error}
+        </p>
+      )}
+    </div>
   );
 }
 

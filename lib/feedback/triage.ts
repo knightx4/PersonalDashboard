@@ -151,14 +151,26 @@ export function duplicateQuestion(candidates: readonly TriageCandidate[]): {
 }
 
 /** What Jev reads: the new text, what it was filed as, and where. */
+/**
+ * What the note was filed as, in Jev's words. A `note` is one from the header's
+ * single Bug or feature tab (note 55b53dc9): the person did not say which, so
+ * Jev is not told one and the kind question is answered from the text alone.
+ */
+const FILED_AS: Record<TriageKind | 'idea' | 'note', string> = {
+  idea: 'an idea',
+  bug: 'a bug',
+  feature: 'a request',
+  note: 'a note; the person did not say whether it is a bug or a request',
+};
+
 export function triageState(input: {
   body: string;
-  filedAs: TriageKind | 'idea';
+  filedAs: TriageKind | 'idea' | 'note';
   pagePath: string | null;
 }): Record<string, unknown> {
   return {
     new_note: input.body.trim(),
-    filed_as: input.filedAs === 'idea' ? 'an idea' : input.filedAs === 'bug' ? 'a bug' : 'a request',
+    filed_as: FILED_AS[input.filedAs],
     ...(input.pagePath ? { written_on_page: input.pagePath } : {}),
   };
 }
@@ -238,7 +250,10 @@ export function triageFrom(value: unknown): Triage | null {
   return {
     at: raw.at,
     kind: answer<TriageKind>(raw.kind, (v) => v === 'bug' || v === 'feature'),
-    module: answer<TriageModule>(raw.module, (v) => typeof v === 'string' && (v === 'app' || isModuleId(v))),
+    module: answer<TriageModule>(
+      raw.module,
+      (v) => typeof v === 'string' && (v === 'app' || isModuleId(v)),
+    ),
     priority: answer<TriagePriority>(raw.priority, (v) => v === 1 || v === 2 || v === 3),
     duplicate: answer<TriageMatch | null>(
       raw.duplicate,
