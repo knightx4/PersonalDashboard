@@ -16,7 +16,7 @@ import {
   vaultLookup,
 } from './lookups';
 import type { AskSchema } from './db';
-import { DEV_ROW_KINDS, readDevRowLookup, readSpecLookup, specList } from './dev';
+import { DEV_ROW_KINDS, DEV_TEXT_KINDS, findDevTextLookup, readDevRowLookup, readSpecLookup, specList } from './dev';
 
 /**
  * Dash's read tools (plan #1088): what the model is told it can call, and
@@ -45,6 +45,7 @@ export const ASK_TOOL_NAMES = [
   'vault_notes',
   'read_spec',
   'read_dev_row',
+  'find_dev_text',
 ] as const;
 
 export type AskToolName = (typeof ASK_TOOL_NAMES)[number];
@@ -65,7 +66,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'search',
     description:
-      'Find the person\'s own things by the words in their title or name, across every workspace that is switched on: job search companies, roles and contacts; shopping orders, owned items and saved items; todos; vault notes (by title and path); Learn readings and tracks; build plan steps, ideas and feedback; newsletter stories; goals and goal steps. Returns up to 20 matches, each with a table, a ref and a link. Use it to find a named thing; it does not look inside the text of a row. For what the person has said, written or thought about a topic, use recall. Pass a row\'s table and ref to open_row to read it in full; a plan step, idea, feedback note or raise is read with read_dev_row instead.',
+      'Find the person\'s own things by the words in their title or name, across every workspace that is switched on: job search companies, roles and contacts; shopping orders, owned items and saved items; todos; vault notes (by title and path); Learn readings and tracks; build plan steps, ideas and feedback; newsletter stories; goals and goal steps. Returns up to 20 matches, each with a table, a ref and a link. Use it to find a named thing; it does not look inside the text of a row. For a word inside the text of an idea, note, plan step, raise, comment or spec, use find_dev_text. For what the person has said, written or thought about a topic, use recall. Pass a row\'s table and ref to open_row to read it in full; a plan step, idea, feedback note or raise is read with read_dev_row instead.',
     input_schema: {
       type: 'object',
       properties: {
@@ -243,6 +244,27 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'find_dev_text',
+    description:
+      'Find the Dev rows and specs whose text holds every word of a query: ideas, notes (bug reports and requests, and how each was resolved), plan steps (their detail, done-when, answer and history), raises (their story and ask), the comments under any of these, and the sections of the specs. Search only matches titles; this looks inside the text. Returns up to 20 rows, newest first, and up to 5 spec sections, each with the excerpt around the match, the field it was found in, who wrote it ("me" is the person, "Dash" is you, from an earlier session; none when a step\'s detail was shaped by both) and a link. A comment is returned as the row it sits on, so read_dev_row reads the whole thread; a spec section is read with read_spec. Use it for "which ideas mention ranking" or "which comment said to drop a step". Dismissed ideas, steps and raises are left out, with the comments under them. Only for the owner of the app, with the Dev workspace on.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'One to three words to find in the text ("ranking", "drop step"). Each is matched at the start of a word, so "rank" finds "ranking". Not a question.',
+        },
+        kinds: {
+          type: 'array',
+          items: { type: 'string', enum: [...DEV_TEXT_KINDS] },
+          description: 'Only these kinds: idea, note, step, raise, comment, spec. Leave out to look in all of them.',
+        },
+      },
+      required: ['query'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 type Lookup = (ctx: AskContext, input: Record<string, unknown>) => Promise<AskToolResult>;
@@ -261,6 +283,7 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   // Checks the owner and the Dev workspace itself (lib/ask/dev.ts).
   read_spec: { run: readSpecLookup, module: null },
   read_dev_row: { run: readDevRowLookup, module: null },
+  find_dev_text: { run: findDevTextLookup, module: null },
 };
 
 export function isAskToolName(name: string): name is AskToolName {

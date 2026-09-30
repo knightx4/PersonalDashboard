@@ -1,6 +1,7 @@
 import { SPECS, readSpec as readSpecFile, specBySlug, type SpecDoc } from '@/lib/specs/registry';
 import { splitSections, type SpecSection } from '@/lib/specs/sections';
 import { firstLine, planHref, raiseAnchor, waitingAnchor } from '@/lib/search/sources/dev-map';
+import { escapeLike } from '@/lib/search/sources/map';
 import {
   AskInputError,
   clip,
@@ -243,7 +244,7 @@ export const MAX_DEV_COMMENTS = 40;
 export const DEV_COMMENT_CHARS = 2000;
 
 /** Who wrote a comment or filed an idea, as the model is to name them. */
-function writer(author: string | null | undefined): string {
+export function writer(author: string | null | undefined): string {
   if (author === 'claude') return 'Dash';
   if (author === 'me') return 'me';
   return author ?? 'unknown';
@@ -531,6 +532,367 @@ export async function readDevRowLookup(ctx: AskContext, input: Input): Promise<A
     note:
       comments.dropped > 0
         ? `The thread has ${comments.count} comments; the oldest ${comments.dropped} are left out.`
+        : undefined,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// find_dev_text: the words inside Dev rows and specs (#1323)
+// ---------------------------------------------------------------------------
+
+/** What find_dev_text can be narrowed to. A comment is found under the row it sits on. */
+export const DEV_TEXT_KINDS = ['idea', 'note', 'step', 'raise', 'comment', 'spec'] as const;
+export type DevTextKind = (typeof DEV_TEXT_KINDS)[number];
+
+/** The most rows one search returns, newest first. Spec sections come on top of these. */
+export const MAX_DEV_TEXT_HITS = 20;
+
+/** The most spec sections one search returns, best first. */
+export const MAX_SPEC_TEXT_HITS = 5;
+
+/** How many rows each column's read takes before the words are checked. */
+const DEV_TEXT_READ = 40;
+
+/** The length of the excerpt around the match. */
+export const EXCERPT_CHARS = 280;
+
+/** A word matched at the start of a word, as sectionScore matches it. */
+function wordPattern(word: string): RegExp {
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escape(word)}`, 'iu');
+}
+
+/** Whether every word of the query starts a word somewhere in the text. */
+export function hasEveryWord(text: string | null | undefined, words: readonly string[]): boolean {
+  return !!text && words.every((word) => wordPattern(word).test(text));
+}
+
+/**
+ * The part of a text around its first match, on one line, at most
+ * EXCERPT_CHARS with an ellipsis at each end that was cut.
+ */
+export function excerpt(text: string, words: readonly string[], chars = EXCERPT_CHARS): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  if (flat.length <= chars) return flat;
+  let at = -1;
+  for (const word of words) {
+    const found = flat.search(wordPattern(word));
+    if (found >= 0 && (at < 0 || found < at)) at = found;
+  }
+  let start = Math.max(0, at - Math.floor(chars / 3));
+  if (start > 0) {
+    const space = flat.indexOf(' ', start);
+    if (space >= 0 && space < at) start = space + 1;
+  }
+  const end = Math.min(flat.length, start + chars);
+  return `${start > 0 ? '… ' : ''}${flat.slice(start, end).trim()}${end < flat.length ? ' …' : ''}`;
+}
+
+type TextHit = { key: string; at: string; row: AskRow };
+
+/** One column's matches: the rows whose text holds every word, as hits. */
+type ColumnRead = {
+  kind: Exclude<DevTextKind, 'comment' | 'spec'>;
+  table: string;
+  column: string;
+  select: string;
+  date: string;
+  /** What the field is called for the model. */
+  field: string;
+  narrow: (query: Filter) => Filter;
+  hit: (row: Row) => { title: string; href: string; writtenBy: string | null };
+};
+
+type Row = Record<string, unknown> & { id: string };
+
+/** A read in progress, after select and before its filters. */
+type Filter = ReturnType<ReturnType<SchemaClient['from']>['select']>;
+
+/** A read of the asker's rows of one table, the columns named at run time. */
+function start(client: SchemaClient, ctx: AskContext, table: string, select: string): Filter {
+  return (client.from(table).select(select) as unknown as Filter).eq('user_id', ctx.userId);
+}
+
+const str = (value: unknown): string => (typeof value === 'string' ? value : '');
+
+function stepHit(row: Row): { title: string; href: string } {
+  const waiting = row.kind === 'decision' && row.status !== 'done' && row.status !== 'dropped';
+  return {
+    title: `#${String(row.number)} ${str(row.title)}`,
+    href: waiting ? `/dev/raised#${waitingAnchor(row.id)}` : planHref(Number(row.number)),
+  };
+}
+
+const notDismissed = (q: Filter) => q.is('dismissed_at', null);
+const openRaise = (q: Filter) => q.neq('status', 'dismissed').is('goal_id', null);
+const asIs = (q: Filter) => q;
+const STEP_SELECT = 'id, number, title, kind, status, updated_at';
+
+/**
+ * Every text column worth searching, and who wrote it. A plan step's detail
+ * and done-when are shaped by sessions and approved by the person, so they
+ * are named as neither; its history is the dated lines sessions write, and
+ * its resolution is the person's answer.
+ */
+const COLUMN_READS: ColumnRead[] = [
+  {
+    kind: 'idea', table: 'ideas', column: 'body', select: 'id, body, source, updated_at', date: 'updated_at', field: 'idea',
+    narrow: notDismissed,
+    hit: (row) => ({ title: firstLine(str(row.body)), href: `/dev/ideas#idea-${row.id}`, writtenBy: writer(row.source as string | null) }),
+  },
+  {
+    kind: 'note', table: 'feedback_items', column: 'body', select: 'id, body, updated_at', date: 'updated_at', field: 'note',
+    narrow: asIs,
+    hit: (row) => ({ title: firstLine(str(row.body)), href: `/dev/bugs#note-${row.id}`, writtenBy: 'me' }),
+  },
+  {
+    kind: 'note', table: 'feedback_items', column: 'resolution_note', select: 'id, body, resolution_note, updated_at', date: 'updated_at', field: 'resolution',
+    narrow: asIs,
+    hit: (row) => ({ title: firstLine(str(row.body)), href: `/dev/bugs#note-${row.id}`, writtenBy: 'Dash' }),
+  },
+  ...(
+    [
+      ['detail', 'detail', null],
+      ['acceptance', 'done-when', null],
+      ['resolution', 'answer', 'me'],
+      ['comment', 'history', 'Dash'],
+    ] as const
+  ).map(
+    ([column, field, writtenBy]): ColumnRead => ({
+      kind: 'step', table: 'plan_items', column, select: `${STEP_SELECT}, ${column}`, date: 'updated_at', field,
+      narrow: notDismissed,
+      hit: (row) => ({ ...stepHit(row), writtenBy }),
+    }),
+  ),
+  ...(
+    [
+      ['detail', 'detail'],
+      ['ask', 'ask'],
+    ] as const
+  ).map(
+    ([column, field]): ColumnRead => ({
+      kind: 'raise', table: 'raised_items', column, select: `id, title, ${column}, created_at`, date: 'created_at', field,
+      narrow: openRaise,
+      hit: (row) => ({ title: str(row.title), href: `/dev/raised#${raiseAnchor(row.id)}`, writtenBy: 'Dash' }),
+    }),
+  ),
+];
+
+async function readColumn(
+  client: SchemaClient,
+  ctx: AskContext,
+  read: ColumnRead,
+  pattern: string,
+  words: readonly string[],
+): Promise<TextHit[]> {
+  const { data, error } = await read
+    .narrow(start(client, ctx, read.table, read.select))
+    .ilike(read.column, pattern)
+    .order(read.date, { ascending: false })
+    .limit(DEV_TEXT_READ);
+  if (error) throw new Error(`${read.table}: ${error.message}`);
+  return ((data ?? []) as unknown as Row[])
+    .filter((row) => hasEveryWord(str(row[read.column]), words))
+    .map((row) => {
+      const { title, href, writtenBy } = read.hit(row);
+      const table = `public.${read.table}`;
+      return {
+        key: `${table}:${row.id}`,
+        at: str(row[read.date]),
+        row: {
+          table,
+          ref: row.id,
+          title: clip(title, 200) ?? row.id,
+          href,
+          detail: {
+            kind: read.kind,
+            field: read.field,
+            written_by: writtenBy,
+            on: str(row[read.date]).slice(0, 10),
+            excerpt: excerpt(str(row[read.column]), words),
+          },
+        },
+      };
+    });
+}
+
+/** The read that finds a kind's rows, reused to fetch the row a comment sits on. */
+const readOf = (kind: ColumnRead['kind']): ColumnRead => COLUMN_READS.find((read) => read.kind === kind)!;
+
+const COMMENT_TARGETS = (Object.entries(COMMENT_COLUMN) as [DevRowKind, string][]).map(([kind, column]) => ({
+  column,
+  read: readOf(kind),
+}));
+
+/**
+ * The comments holding every word, each cited as the row it sits on, so
+ * read_dev_row reads the thread. A comment under a dismissed row, or under a
+ * row that is not the asker's, is left out with its row.
+ */
+async function readComments(
+  client: SchemaClient,
+  ctx: AskContext,
+  pattern: string,
+  words: readonly string[],
+): Promise<TextHit[]> {
+  const { data, error } = await client
+    .from('dev_comments')
+    .select('id, author, body, created_at, idea_id, feedback_item_id, plan_item_id, raised_item_id, spec_section_id')
+    .eq('user_id', ctx.userId)
+    .ilike('body', pattern)
+    .order('created_at', { ascending: false })
+    .limit(DEV_TEXT_READ);
+  if (error) throw new Error(`dev_comments: ${error.message}`);
+  const comments = ((data ?? []) as unknown as Row[]).filter((c) => hasEveryWord(str(c.body), words));
+  if (comments.length === 0) return [];
+
+  const idsOf = (column: string) => [...new Set(comments.map((c) => c[column]).filter((v): v is string => typeof v === 'string'))];
+  const parents = new Map<string, { table: string; ref: string; title: string; href: string }>();
+
+  await Promise.all([
+    ...COMMENT_TARGETS.map(async ({ column, read }) => {
+      const ids = idsOf(column);
+      if (ids.length === 0) return;
+      const { data: rows, error: parentError } = await read
+        .narrow(start(client, ctx, read.table, read.select))
+        .in('id', ids);
+      if (parentError) throw new Error(`${read.table}: ${parentError.message}`);
+      for (const row of (rows ?? []) as unknown as Row[]) {
+        const { title, href } = read.hit(row);
+        parents.set(row.id, { table: `public.${read.table}`, ref: row.id, title, href });
+      }
+    }),
+    (async () => {
+      const ids = idsOf('spec_section_id');
+      if (ids.length === 0) return;
+      const { data: rows, error: sectionError } = await client
+        .from('spec_sections')
+        .select('id, slug, anchor, heading')
+        .eq('user_id', ctx.userId)
+        .in('id', ids);
+      if (sectionError) throw new Error(`spec_sections: ${sectionError.message}`);
+      for (const row of (rows ?? []) as unknown as Row[]) {
+        const spec = specBySlug(str(row.slug));
+        parents.set(row.id, {
+          table: SPEC_TABLE,
+          ref: `${str(row.slug)}#${str(row.anchor)}`,
+          title: `${spec?.title ?? str(row.slug)}: ${str(row.heading)}`,
+          href: `/dev/specs/${str(row.slug)}#${str(row.anchor)}`,
+        });
+      }
+    })(),
+  ]);
+
+  return comments.flatMap((comment) => {
+    const target = [...COMMENT_TARGETS.map((t) => t.column), 'spec_section_id']
+      .map((column) => comment[column])
+      .find((value): value is string => typeof value === 'string');
+    const parent = target ? parents.get(target) : undefined;
+    if (!parent) return [];
+    return [
+      {
+        key: `comment:${parent.table}:${parent.ref}`,
+        at: str(comment.created_at),
+        row: {
+          table: parent.table,
+          ref: parent.ref,
+          title: clip(parent.title, 200) ?? parent.ref,
+          href: parent.href,
+          detail: {
+            kind: 'comment',
+            field: 'comment',
+            written_by: writer(comment.author as string | null),
+            on: str(comment.created_at).slice(0, 10),
+            excerpt: excerpt(str(comment.body), words),
+          },
+        },
+      },
+    ];
+  });
+}
+
+/** The spec sections holding every word, best first, cut the way read_spec cuts them. */
+async function specHits(ctx: AskContext, words: readonly string[]): Promise<AskRow[]> {
+  const read = ctx.readSpec ?? readSpecFile;
+  const found = await Promise.all(
+    SPECS.map(async (spec) => {
+      const markdown = await read(spec).catch(() => null);
+      if (markdown === null) return [];
+      return splitSections(markdown)
+        .map((section) => ({ spec, section, ...sectionScore(section, words) }))
+        .filter((m) => m.words === words.length);
+    }),
+  );
+  return found
+    .flat()
+    .sort((a, b) => b.hits - a.hits)
+    .slice(0, MAX_SPEC_TEXT_HITS)
+    .map(({ spec, section }) =>
+      sectionRow(spec, section, { kind: 'spec', field: 'section', excerpt: excerpt(section.body, words) }),
+    );
+}
+
+function textKinds(input: Input): Set<DevTextKind> {
+  const kinds = input.kinds;
+  if (kinds === undefined || kinds === null) return new Set(DEV_TEXT_KINDS);
+  if (!Array.isArray(kinds) || kinds.some((k) => !(DEV_TEXT_KINDS as readonly unknown[]).includes(k))) {
+    throw new AskInputError(`kinds must be a list of ${DEV_TEXT_KINDS.join(', ')}.`);
+  }
+  return new Set(kinds.length > 0 ? (kinds as DevTextKind[]) : DEV_TEXT_KINDS);
+}
+
+/**
+ * find_dev_text: the ideas, notes, plan steps, raises, comments and spec
+ * sections whose text holds every word of the query, each with the excerpt
+ * around the match and who wrote it. Search matches titles; this matches
+ * what is written beneath them.
+ *
+ * The database is asked for the longest word, with `ilike` per column
+ * (escaped, as the Dev search source escapes it), and every word is then
+ * checked here at the start of a word, as read_spec checks a section. One
+ * read per column rather than an `or` filter, which breaks on a comma or a
+ * bracket in the query. Dismissed ideas, steps and raises are left out, and
+ * so are the comments under them.
+ */
+export async function findDevTextLookup(ctx: AskContext, input: Input): Promise<AskToolResult> {
+  const access = await devAccess(ctx);
+  if (!access.ok) return access;
+
+  const query = optionalString(input, 'query');
+  const words = query ? queryWords(query) : [];
+  if (!query || words.length === 0) {
+    throw new AskInputError('Give a word or two to find, such as "ranking" or "drop".');
+  }
+  const kinds = textKinds(input);
+  const longest = words.reduce((a, b) => (b.length > a.length ? b : a));
+  const pattern = `%${escapeLike(longest)}%`;
+  const client = await ctx.db('public');
+
+  const [columns, comments, specs] = await Promise.all([
+    Promise.all(COLUMN_READS.filter((r) => kinds.has(r.kind)).map((r) => readColumn(client, ctx, r, pattern, words))),
+    kinds.has('comment') ? readComments(client, ctx, pattern, words) : Promise.resolve([]),
+    kinds.has('spec') ? specHits(ctx, words) : Promise.resolve([]),
+  ]);
+
+  // One hit per row, for the field that matched first; one per thread for
+  // comments, the newest. Then the newest rows first.
+  const seen = new Map<string, TextHit>();
+  for (const hit of [...columns.flat(), ...comments]) {
+    const kept = seen.get(hit.key);
+    if (!kept) seen.set(hit.key, hit);
+    else if (hit.key.startsWith('comment:') && hit.at > kept.at) seen.set(hit.key, hit);
+  }
+  const rows = [...seen.values()].sort((a, b) => b.at.localeCompare(a.at));
+  const shown = rows.slice(0, MAX_DEV_TEXT_HITS).map((hit) => hit.row);
+
+  if (shown.length === 0 && specs.length === 0) {
+    return { ok: true, rows: [], note: `Nothing in the Dev rows or specs has the words "${words.join(' ')}".` };
+  }
+  return {
+    ok: true,
+    rows: [...shown, ...specs],
+    note:
+      rows.length > shown.length
+        ? `${rows.length} rows match; the newest ${shown.length} are here. Narrow the words or the kinds for the rest.`
         : undefined,
   };
 }
