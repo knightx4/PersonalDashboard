@@ -285,6 +285,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // idea as the duplicate question's options (about 130 today) in; four
   // labels out.
   'triage-note': run(JEV, 5_000, 0),
+  // The idea, its workspace, that workspace's vision and a triage line in;
+  // one five-level score out.
+  'score-idea': background(unit(JEV, 600, 0)),
   // One passage of about 1,500 characters and its row's title.
   'embed-memory': background(unit(VOYAGE_LITE, 450, 0)),
   // One question of a sentence or so.

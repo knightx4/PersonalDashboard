@@ -64,6 +64,7 @@ const TOOL_LABELS: Record<string, string> = {
   todos: 'Read todos',
   goal_status: 'Read goals',
   vault_notes: 'Read vault notes',
+  courses: 'Read courses',
   read_dev_row: 'Read a Dev row',
   find_dev_text: 'Searched Dev text',
 };

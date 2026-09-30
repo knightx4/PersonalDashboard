@@ -16,6 +16,7 @@ import {
   vaultLookup,
 } from './lookups';
 import type { AskSchema } from './db';
+import { coursesLookup } from './courses';
 import { DEV_ROW_KINDS, DEV_TEXT_KINDS, findDevTextLookup, readDevRowLookup, readSpecLookup, specList } from './dev';
 
 /**
@@ -43,6 +44,7 @@ export const ASK_TOOL_NAMES = [
   'todos',
   'goal_status',
   'vault_notes',
+  'courses',
   'read_spec',
   'read_dev_row',
   'find_dev_text',
@@ -66,7 +68,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'search',
     description:
-      'Find the person\'s own things by the words in their title or name, across every workspace that is switched on: job search companies, roles and contacts; shopping orders, owned items and saved items; todos; vault notes (by title and path); Learn readings and tracks; build plan steps, ideas and feedback; newsletter stories; goals and goal steps. Returns up to 20 matches, each with a table, a ref and a link. Use it to find a named thing; it does not look inside the text of a row. For a word inside the text of an idea, note, plan step, raise, comment or spec, use find_dev_text. For what the person has said, written or thought about a topic, use recall. Pass a row\'s table and ref to open_row to read it in full; a plan step, idea, feedback note or raise is read with read_dev_row instead.',
+      'Find the person\'s own things by the words in their title or name, across every workspace that is switched on: job search companies, roles and contacts; shopping orders, owned items and saved items; todos; vault notes (by title and path) and courses from saved transcripts (by title, code, term and school); Learn readings and tracks; build plan steps, ideas and feedback; newsletter stories; goals and goal steps. Returns up to 20 matches, each with a table, a ref and a link. Use it to find a named thing; it does not look inside the text of a row. For a word inside the text of an idea, note, plan step, raise, comment or spec, use find_dev_text. For what the person has said, written or thought about a topic, use recall. Pass a row\'s table and ref to open_row to read it in full; a plan step, idea, feedback note or raise is read with read_dev_row instead.',
     input_schema: {
       type: 'object',
       properties: {
@@ -87,7 +89,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'recall',
     description:
-      'Find what the person has written about a topic by meaning, across every workspace that is switched on: vault notes, job search thoughts, notes and profile, goals and steps, goal captures, files, Learn aims, notes and cards, purchases, and for the owner with Dev on, the ideas, notes, plan steps, raises, the comments under them, and spec sections. Finds passages that are about the question even when they share none of its words. Returns up to 12 rows, closest first, each with its best one or two passages, who wrote each (the person or Dash), a closeness score and a link. Use it for questions like "what did I say I want from my next job?" or "what have I written about land value tax?", then open_row to read a vault note, file or thoughts entry in full, read_dev_row for a Dev row with its comments, or read_spec for a spec section.',
+      'Find what the person has written about a topic by meaning, across every workspace that is switched on: vault notes, the courses on saved transcripts, job search thoughts, notes and profile, goals and steps, goal captures, files, Learn aims, notes and cards, purchases, and for the owner with Dev on, the ideas, notes, plan steps, raises, the comments under them, and spec sections. Finds passages that are about the question even when they share none of its words. Returns up to 12 rows, closest first, each with its best one or two passages, who wrote each (the person or Dash), a closeness score and a link. Use it for questions like "what did I say I want from my next job?" or "what have I written about land value tax?", then open_row to read a vault note, file or thoughts entry in full, read_dev_row for a Dev row with its comments, or read_spec for a spec section.',
     input_schema: {
       type: 'object',
       properties: {
@@ -201,6 +203,21 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
     },
   },
   {
+    name: 'courses',
+    description:
+      'The courses on the academic transcripts the person saved on the vault\'s Education tab: each with its school, term, credits and grade as the transcript writes them, and a link to its row. Narrow by term ("Fall 2019", "Spring"), year, school, or words in the course code or title; every word given must match. Leave everything out to list them all. Returns up to 80, in the order they were taken. Use it for "what courses did I take in Fall 2019?", "what did I study at <school>?" or "what grade did I get in statistics?"; for what they wrote about a subject they studied, use recall.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        term: { type: 'string', description: 'Words of the term, such as "Fall 2019" or "Spring". A year alone is better as year.' },
+        year: { type: 'integer', description: 'The year of the term, such as 2019.' },
+        school: { type: 'string', description: 'Words of the school\'s name.' },
+        query: { type: 'string', description: 'Words of the course code or title, such as "ECON" or "statistics".' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'read_spec',
     description: `Read one of the specs on the Dev specs page, section by section: the documents the app is built against. Pass a query to get the sections that talk about it, each with its full text (up to 6,000 characters) and a link to that section on the spec's page, so you can quote the paragraph that answers the question. Leave the query out, or ask for something no section mentions, and it lists the spec's headings; pass one back as section to read it. Only for the owner of the app, with the Dev workspace on. The specs, by slug: ${specList()}.`,
     input_schema: {
@@ -280,6 +297,7 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   todos: { run: todosLookup, module: 'todo' },
   goal_status: { run: goalsLookup, module: 'goals' },
   vault_notes: { run: vaultLookup, module: 'vault' },
+  courses: { run: coursesLookup, module: 'vault' },
   // Checks the owner and the Dev workspace itself (lib/ask/dev.ts).
   read_spec: { run: readSpecLookup, module: null },
   read_dev_row: { run: readDevRowLookup, module: null },

@@ -170,7 +170,7 @@ export type PaidAction = keyof typeof PAID_ACTIONS;
  */
 export const PAID_WITHOUT_BUTTON: Record<string, string> = {
   'app/dev/bugs/actions.ts#triageFiled':
-    'Called by the header panel once a note or idea has saved, to show its type, workspace, priority and any open item it repeats (plan #1179). Send files the note for free; this runs after it, and there is no button of its own.',
+    'Called by the header panel once a note or idea has saved, to show its type, workspace, priority and any open item it repeats (plan #1179), and to score an idea against the vision of its workspace (plan #1327). Send files the note for free; this runs after it, and there is no button of its own.',
   'app/goals/capture-actions.ts#sortGoalCapture':
     'Called by the capture box when typing pauses, to guess what the sentence will do (plan #1177). There is no button, only the field; the File it hint prices the filing.',
   'app/learn/goals/actions.ts#editGoal':
