@@ -48,6 +48,11 @@ import { PageHeader } from '@/components/shell/page-header';
 import { AddTranscript } from '@/app/vault/education/add-transcript';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
 import { FlowScopePreview, LearnGoalsPreview } from './learn-goal-surfaces';
+import {
+  LearnCourseCheckPreview,
+  LearnCoursesEmptyPreview,
+  LearnCoursesListPreview,
+} from './learn-course-surfaces';
 import { SchoolCourses } from '@/app/vault/education/course-list';
 import { educationGroups, educationCounts } from './education-fixtures';
 import { ReadingCard } from '@/components/learn/reading-card';
@@ -2926,6 +2931,33 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnNowFeed first={deckCards} ready={20} low={10} />,
+  },
+  {
+    /* The courses fold on Learn's Tracks page with no transcript saved: it
+     * points to the vault's Education tab (plan #1391). */
+    id: 'learn-courses-empty',
+    label: 'Tracks · Courses, none saved',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnCoursesEmptyPreview />,
+  },
+  {
+    /* Courses by school and term, one read into a track, one whose track
+     * was removed, each with its read button (plan #1391). */
+    id: 'learn-courses-list',
+    label: 'Tracks · Courses by school and term',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnCoursesListPreview />,
+  },
+  {
+    /* One course being checked: its term and grade, the track picker, an
+     * idea the track already holds, and the ticks (plan #1391). */
+    id: 'learn-course-check',
+    label: 'Tracks · Checking a course',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnCourseCheckPreview />,
   },
   {
     /* Learn's Goals list: each goal edited in place, with its plan, its place
