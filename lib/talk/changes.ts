@@ -15,7 +15,7 @@ import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name'
  * and keeps kind, input and conversation fixed once written.
  */
 
-export const DASH_CHANGE_KINDS = ['add_todo', 'add_goal_step', 'mark_returned', 'start_watch'] as const;
+export const DASH_CHANGE_KINDS = ['add_todo', 'add_goal_step', 'mark_returned', 'start_watch', 'attach_email'] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
 export type DashChangeStatus = 'proposed' | 'confirmed' | 'declined' | 'undone';
@@ -33,6 +33,11 @@ export type DashChangeStatus = 'proposed' | 'confirmed' | 'declined' | 'undone';
  *                `goalTitle` names the goal or step it serves, and `pushOn`
  *                says whether any device had push switched on when Dash
  *                proposed it, so the card can say nothing will reach them.
+ * attach_email  the Gmail message (mailbox and message id) to keep on a task
+ *                or event, which one, and the subject and the target's title
+ *                for the card. Confirming runs attachEmail
+ *                (lib/todo/attachments/email.ts); the files in the message
+ *                come with it.
  */
 export type DashChangeInput = {
   add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false };
@@ -50,6 +55,15 @@ export type DashChangeInput = {
     goalItemId: string | null;
     goalTitle: string | null;
     pushOn: boolean;
+  };
+  attach_email: {
+    accountId: string;
+    messageId: string;
+    subject: string;
+    from: string | null;
+    targetKind: 'task' | 'event';
+    targetId: string;
+    targetTitle: string;
   };
 };
 

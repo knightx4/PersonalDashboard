@@ -63,6 +63,17 @@ export type ChangeDeps = {
   goals: (history: { actor?: GoalsActor; undoes?: number }) => Promise<GoalsSupabaseClient>;
   /** createTask from lib/todo/tasks/write.ts. */
   createTask: (userId: string, input: TaskInput, timezone: string) => Promise<{ id: string | null; error: string | null }>;
+  /** attachEmail from lib/todo/attachments/email.ts, bound to the person's mailboxes. */
+  attachEmail: (input: {
+    accountId: string;
+    messageId: string;
+    target: { kind: 'task' | 'event'; id: string };
+  }) => Promise<
+    | { ok: true; emailAttachmentId: string; attachmentIds: string[] }
+    | { ok: false; reason: string }
+  >;
+  /** Takes attachments off a task or event, and removes any nothing else holds. */
+  detachAttachments: (target: { kind: 'task' | 'event'; id: string }, ids: string[]) => Promise<void>;
   /** Now, as an ISO timestamp. */
   now?: () => string;
 };
@@ -92,6 +103,8 @@ export function changePaths(change: DashChange): string[] {
       ];
     case 'start_watch':
       return ['/home'];
+    case 'attach_email':
+      return ['/todo', '/todo/all', '/todo/calendar'];
   }
 }
 
@@ -101,6 +114,7 @@ const WORKSPACE: Record<DashChangeKind, { module: ModuleId; label: string } | nu
   add_goal_step: { module: 'goals', label: 'Goals' },
   mark_returned: { module: 'shopping', label: 'Shopping' },
   start_watch: null,
+  attach_email: { module: 'todo', label: 'Todo' },
 };
 
 const WRITTEN_TABLE: Record<DashChangeKind, string> = {
@@ -108,6 +122,7 @@ const WRITTEN_TABLE: Record<DashChangeKind, string> = {
   add_goal_step: 'goals.items',
   mark_returned: 'public.inventory_items',
   start_watch: 'core.watches',
+  attach_email: 'todo.attachments',
 };
 
 /** A refusal the person reads: the sentence is theirs, the class only marks it as one. */
@@ -251,6 +266,26 @@ async function writeWatch(deps: ChangeDeps, change: Extract<DashChange, { kind: 
   return { ref: data.id as string, undo: null };
 }
 
+async function writeAttachEmail(deps: ChangeDeps, change: Extract<DashChange, { kind: 'attach_email' }>): Promise<Written> {
+  const { accountId, messageId, targetKind, targetId } = change.input;
+  const todo = await deps.db('todo');
+  const { data: target, error } = await todo
+    .from(targetKind === 'event' ? 'events' : 'tasks')
+    .select('id')
+    .eq('id', targetId)
+    .eq('user_id', deps.userId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!target) throw new Refused(`That ${targetKind} has been deleted, so there is nothing to attach the email to.`);
+
+  const result = await deps.attachEmail({ accountId, messageId, target: { kind: targetKind, id: targetId } });
+  if (!result.ok) throw new Refused(result.reason);
+  return {
+    ref: result.emailAttachmentId,
+    undo: { target_kind: targetKind, target_id: targetId, attachment_ids: result.attachmentIds },
+  };
+}
+
 async function write(deps: ChangeDeps, change: DashChange): Promise<Written> {
   switch (change.kind) {
     case 'add_todo':
@@ -261,6 +296,8 @@ async function write(deps: ChangeDeps, change: DashChange): Promise<Written> {
       return writeReturned(deps, change);
     case 'start_watch':
       return writeWatch(deps, change);
+    case 'attach_email':
+      return writeAttachEmail(deps, change);
   }
 }
 
@@ -429,6 +466,14 @@ async function undoWatch(deps: ChangeDeps, ref: string, force = false) {
   if (!force && (data ?? []).length === 0) throw new Refused('That watch has changed since, so Dash will not remove it.');
 }
 
+/** Takes the email and its files off the place they were put; what is still held elsewhere stays. */
+async function undoAttachEmail(deps: ChangeDeps, change: DashChange & { kind: 'attach_email' }): Promise<void> {
+  const undo = change.undo as { attachment_ids?: string[] } | null;
+  const ids = undo?.attachment_ids ?? [];
+  if (ids.length === 0) return;
+  await deps.detachAttachments({ kind: change.input.targetKind, id: change.input.targetId }, ids);
+}
+
 async function takeBack(deps: ChangeDeps, change: DashChange, ref: string, force = false): Promise<void> {
   switch (change.kind) {
     case 'add_todo':
@@ -439,6 +484,8 @@ async function takeBack(deps: ChangeDeps, change: DashChange, ref: string, force
       return undoReturned(deps, change, force);
     case 'start_watch':
       return undoWatch(deps, ref, force);
+    case 'attach_email':
+      return undoAttachEmail(deps, change);
   }
 }
 

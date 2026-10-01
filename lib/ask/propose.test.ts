@@ -35,6 +35,10 @@ const TABLES: Record<string, Row[]> = {
     { id: id(22), user_id: THEM, title: 'Their show', url: 'https://example.com/theirs', status: 'running' },
   ],
   push_subscriptions: [],
+  events: [
+    { id: id(41), user_id: ME, title: 'Madeon at the Fillmore' },
+    { id: id(42), user_id: THEM, title: 'Their gig' },
+  ],
 };
 
 function context(
@@ -83,9 +87,15 @@ const GOAL = (n: number): [string, string] => ['goals.items', id(n)];
 const ITEM = (n: number): [string, string] => ['public.inventory_items', id(n)];
 
 describe('executeProposal', () => {
-  it('offers exactly the four tools', () => {
+  it('offers exactly the five tools', () => {
     expect(PROPOSAL_TOOLS.map((t) => t.name)).toEqual([...PROPOSAL_TOOL_NAMES]);
-    expect(PROPOSAL_TOOL_NAMES).toEqual(['propose_todo', 'propose_goal_step', 'propose_returned', 'propose_watch']);
+    expect(PROPOSAL_TOOL_NAMES).toEqual([
+      'propose_todo',
+      'propose_goal_step',
+      'propose_returned',
+      'propose_watch',
+      'propose_attach_email',
+    ]);
   });
 
   it('refuses a kind outside the four', async () => {
@@ -183,6 +193,43 @@ describe('executeProposal', () => {
       error: 'The Shopping workspace is switched off, so nothing can be proposed there.',
     });
     expect(kept).toEqual([]);
+  });
+
+  describe('propose_attach_email', () => {
+    const MAIL = `${id(50)}:18f2a`;
+    const ASK = { mail_ref: MAIL, subject: 'Your Madeon tickets', target_table: 'todo.events', target_ref: id(41) };
+    const seen: [string, string][] = [['gmail', MAIL], ['todo.events', id(41)], ['todo.events', id(42)]];
+
+    it('keeps a proposal naming the message and the event, writing nothing', async () => {
+      const { ctx, kept, writes } = context({ seen });
+      const result = await executeProposal('propose_attach_email', ASK, ctx);
+      expect(result.ok).toBe(true);
+      expect(writes).toEqual([]);
+      expect(kept).toEqual([
+        {
+          kind: 'attach_email',
+          input: {
+            accountId: id(50),
+            messageId: '18f2a',
+            subject: 'Your Madeon tickets',
+            from: null,
+            targetKind: 'event',
+            targetId: id(41),
+            targetTitle: 'Madeon at the Fillmore',
+          },
+        },
+      ]);
+    });
+
+    it('refuses a message no search returned, an event no lookup returned, and one that is not theirs', async () => {
+      const noMail = context({ seen: [['todo.events', id(41)]] });
+      expect((await executeProposal('propose_attach_email', ASK, noMail.ctx)).ok).toBe(false);
+      const noEvent = context({ seen: [['gmail', MAIL]] });
+      expect((await executeProposal('propose_attach_email', ASK, noEvent.ctx)).ok).toBe(false);
+      const theirs = context({ seen });
+      expect((await executeProposal('propose_attach_email', { ...ASK, target_ref: id(42) }, theirs.ctx)).ok).toBe(false);
+      expect(noMail.kept.length + noEvent.kept.length + theirs.kept.length).toBe(0);
+    });
   });
 
   describe('propose_watch', () => {

@@ -11,6 +11,7 @@ import { decryptToken } from '@/lib/crypto/tokens';
 import { gmailProvider } from '@/lib/email/providers/gmail';
 import { removeAttachmentFolder, vaultAttachmentFolder } from '@/lib/vault/attachment-storage';
 import { VAULT_TRANSCRIPTS_BUCKET } from '@/lib/vault/transcripts';
+import { ATTACHMENT_BUCKET } from '@/lib/todo/attachments/model';
 
 export const maxDuration = 60;
 
@@ -143,6 +144,14 @@ export async function POST(request: NextRequest) {
   //    of their own with one folder per account.
   try {
     await removeAttachmentFolder(admin, user.id, VAULT_TRANSCRIPTS_BUCKET);
+  } catch {
+    // As above.
+  }
+
+  //    And the files and emails' tickets kept on tasks and events (todo 0016),
+  //    in a bucket of their own with one folder per account.
+  try {
+    await removeAttachmentFolder(admin, user.id, ATTACHMENT_BUCKET);
   } catch {
     // As above.
   }

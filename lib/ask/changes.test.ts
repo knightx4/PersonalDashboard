@@ -130,6 +130,7 @@ function setup(opts: { status?: string; turnId?: string | null; kind?: string; i
   const tables: Tables = {
     'core.dash_changes': [],
     'todo.tasks': [],
+    'todo.events': [{ id: id(800), user_id: ME, title: 'Madeon' }],
     'todo.task_links': [],
     'goals.items': [
       { id: GOAL, user_id: ME, level: 'goal', status: 'open', approved_at: '2026-01-01', archived_at: null, position: 1 },
@@ -163,6 +164,7 @@ function setup(opts: { status?: string; turnId?: string | null; kind?: string; i
   tables['core.dash_changes'].push(change);
 
   const created: TaskInput[] = [];
+  const detached: Array<{ target: { kind: string; id: string }; ids: string[] }> = [];
   const deps: ChangeDeps = {
     userId: ME,
     timezone: 'UTC',
@@ -171,6 +173,10 @@ function setup(opts: { status?: string; turnId?: string | null; kind?: string; i
     core: client('core'),
     db: async (schema: AskSchema) => client(schema),
     goals: async (history) => client('goals', history) as unknown as GoalsSupabaseClient,
+    attachEmail: async () => ({ ok: true, emailAttachmentId: id(900), attachmentIds: [id(900), id(901)] }),
+    detachAttachments: async (target, ids) => {
+      detached.push({ target, ids });
+    },
     createTask: async (userId, input) => {
       created.push(input);
       const row = {
@@ -190,7 +196,7 @@ function setup(opts: { status?: string; turnId?: string | null; kind?: string; i
     },
     now: () => '2026-09-29T12:00:00Z',
   };
-  return { tables, deps, change, created };
+  return { tables, deps, change, created, detached };
 }
 
 const STEP_INPUT = { parentId: GOAL, goalTitle: 'Find a new job', title: 'Update the CV', kind: 'mine' };
@@ -425,6 +431,42 @@ const WATCH_INPUT = {
   goalTitle: 'Buy the tickets',
   pushOn: true,
 };
+
+describe('attach_email', () => {
+  const INPUT = {
+    accountId: id(50),
+    messageId: '18f2a',
+    subject: 'Your Madeon tickets',
+    from: null,
+    targetKind: 'event',
+    targetId: id(800),
+    targetTitle: 'Madeon',
+  };
+
+  it('confirming keeps the email on the event, and undoing takes it and its files off again', async () => {
+    const { deps, change, detached } = setup({ kind: 'attach_email', input: INPUT });
+    const confirmed = await confirmChange(deps, change.id as string);
+    expect(confirmed.ok).toBe(true);
+    expect(confirmed.ok && confirmed.change).toMatchObject({ writtenTable: 'todo.attachments', writtenRef: id(900) });
+    expect(confirmed.ok && changeHref(confirmed.change)).toBe(`/todo/calendar?event=${id(800)}`);
+
+    const undone = await undoChange(deps, change.id as string);
+    expect(undone.ok).toBe(true);
+    expect(detached).toEqual([{ target: { kind: 'event', id: id(800) }, ids: [id(900), id(901)] }]);
+  });
+
+  it('refuses when the event has been deleted since', async () => {
+    const { tables, deps, change } = setup({ kind: 'attach_email', input: INPUT });
+    tables['todo.events'].length = 0;
+    const result = await confirmChange(deps, change.id as string);
+    expect(result.ok).toBe(false);
+  });
+
+  it('needs the Todo workspace on', async () => {
+    const { deps, change } = setup({ kind: 'attach_email', input: INPUT, enabled: ['goals'] });
+    expect((await confirmChange(deps, change.id as string)).ok).toBe(false);
+  });
+});
 
 describe('start_watch', () => {
   it('confirming inserts the running watch as the person, with no workspace needed; undoing removes it', async () => {

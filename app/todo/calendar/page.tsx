@@ -18,6 +18,9 @@ import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { loadEvent } from '@/lib/todo/events/load';
+import { loadAttachments } from '@/lib/todo/attachments/store';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { connectedAccountIds } from '@/lib/core/inbox/accounts';
 import { loadFeedEvent, loadFeeds } from '@/lib/todo/feeds/load';
 import { loadTasksFor } from '@/lib/todo/links/load';
 import { eventFields } from '@/lib/todo/events/model';
@@ -85,6 +88,11 @@ export default async function TodoCalendarPage({
   // An id that is not yours, or is not there, comes back null and the page is
   // simply the calendar. Nothing was found, which is not an error.
   const editing = params.event ? await loadEvent(user.id, params.event) : null;
+  // What is attached to the event being opened: tickets, confirmations, the
+  // email they came in. Loaded only for a stored event; a new one has no id
+  // to attach to until it is saved.
+  const attachments = editing ? await loadAttachments({ kind: 'event', id: editing.id }) : [];
+  const hasMailbox = editing ? (await connectedAccountIds(await createCoreClient(), user.id)).length > 0 : false;
   // `?feedEvent=<id>` opens a subscribed appointment the same way, and it only
   // reads: the row came from somebody else's calendar and a refresh replaces
   // it, so there is nothing here to edit or delete.
@@ -212,7 +220,15 @@ export default async function TodoCalendarPage({
         </Banner>
       )}
 
-      {draft && <EventForm draft={draft} view={calendar.view} anchor={calendar.anchor} />}
+      {draft && (
+        <EventForm
+          draft={draft}
+          view={calendar.view}
+          anchor={calendar.anchor}
+          attachments={attachments}
+          canSearchMail={hasMailbox}
+        />
+      )}
 
       {reading && (
         <FeedEventCard

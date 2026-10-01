@@ -401,6 +401,15 @@ Appointments and reservations they booked, read from the confirmation emails: do
 - Opens at `/todo`
 - starts_on is the day in their zone and starts_at the instant when the mail gave a time. status 'cancelled' means a cancellation email came after the booking.
 
+### `todo.attachments` (Todo)
+
+Files and emails they kept on a task or a calendar event: tickets, confirmations, receipts, photos, and the text of the email a ticket came in.
+
+- Search: `name`, `note`, `email_from`, `email_text`
+- Name a row by `name`; link it by `id`
+- Opens at `/todo/calendar`
+- kind 'email' is a message they attached: email_from, email_sent_at and email_text are what it said. kind 'file' is an upload or a file copied out of an email (from_email_id); its bytes are not readable here. role says what it is for. todo.attachment_links says which task or event holds it.
+
 ### `news.saved_stories` (News)
 
 Stories from their newsletters they chose to keep.

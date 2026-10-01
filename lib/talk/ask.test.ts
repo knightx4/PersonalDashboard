@@ -458,7 +458,7 @@ describe('askDash proposals', () => {
     expect(sent[0].tools.map((t) => t.name)).toEqual(
       expect.arrayContaining(['propose_todo', 'propose_goal_step', 'propose_returned', 'answer']),
     );
-    expect(sent[0].system[0].text).toContain('YOU CAN PROPOSE FOUR CHANGES');
+    expect(sent[0].system[0].text).toContain('YOU CAN PROPOSE FIVE CHANGES');
     expect(sent[0].system[0].text).not.toContain('You only read');
 
     // One proposed change, in this conversation, in the shape insertStep takes.

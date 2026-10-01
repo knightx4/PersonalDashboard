@@ -11,9 +11,11 @@ import {
 import { emailFromIdToken } from '@/lib/email/id-token';
 import {
   gmailPayloadToCalendar,
+  gmailPayloadToFiles,
   gmailPayloadToHtml,
   gmailPayloadToText,
   headerValue,
+  type MessageFileRef,
 } from '@/lib/email/mime';
 import {
   GmailHistoryExpiredError,
@@ -303,6 +305,51 @@ export async function getGmailMessageText(
     subject: headerValue(headers, 'Subject'),
     text: gmailPayloadToText(data.payload as never),
   };
+}
+
+/**
+ * One message with its files listed, for attaching it to an event or a task
+ * (plan: attachments). Unlike getGmailMessageText this names the files the
+ * message carries; their bytes are fetched one at a time by
+ * getGmailAttachmentBytes.
+ */
+export async function getGmailMessageForAttach(
+  accessToken: string,
+  messageId: string,
+): Promise<GmailMessageText & { files: MessageFileRef[] }> {
+  const data = await gmailJson<GmailApiMessage>(
+    accessToken,
+    `users/me/messages/${encodeURIComponent(messageId)}?format=full`,
+  );
+  const headers = data.payload?.headers;
+  return {
+    id: data.id,
+    threadId: data.threadId ?? null,
+    internalDate: data.internalDate ? new Date(Number(data.internalDate)) : null,
+    from: headerValue(headers, 'From'),
+    to: headerValue(headers, 'To'),
+    subject: headerValue(headers, 'Subject'),
+    text: gmailPayloadToText(data.payload as never),
+    files: gmailPayloadToFiles(data.payload as never),
+  };
+}
+
+/** A message attachment's bytes, undecoded: getAttachment reads text, this reads a PDF. */
+export async function getGmailAttachmentBytes(
+  accessToken: string,
+  messageId: string,
+  attachmentId: string,
+): Promise<Buffer> {
+  const data = await gmailJson<{ data?: string }>(
+    accessToken,
+    `users/me/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`,
+  );
+  return decodeBase64UrlBytes(data.data ?? '');
+}
+
+/** Bytes from the base64url Gmail uses. */
+export function decodeBase64UrlBytes(data: string): Buffer {
+  return Buffer.from(data.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
 }
 
 function decodeSnippet(value: string): string {

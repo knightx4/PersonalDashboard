@@ -127,3 +127,41 @@ export function headerValue(
   const hit = headers.find((h) => h.name?.toLowerCase() === name.toLowerCase());
   return hit?.value ?? null;
 }
+
+/** A file attached to a message: a ticket PDF, a photo, a pass. */
+export interface MessageFileRef {
+  filename: string;
+  mimeType: string;
+  sizeBytes: number | null;
+  /** Gmail holds the bytes behind this id; null when they came inline. */
+  attachmentId: string | null;
+  /** Base64url bytes when Gmail inlined a small file; null otherwise. */
+  inlineData: string | null;
+}
+
+/**
+ * The files a message carries, for the person to keep with an event.
+ *
+ * Only parts with a file name are files: the body's own text and HTML parts
+ * have none. Calendar invites are left out because the calendar reads those
+ * itself (collectCalendar in providers/gmail.ts).
+ */
+export function gmailPayloadToFiles(payload: MimePart | undefined): MessageFileRef[] {
+  const files: MessageFileRef[] = [];
+  const walk = (part: MimePart | undefined) => {
+    if (!part) return;
+    const filename = part.filename?.trim();
+    if (filename && !isCalendarPart(part) && (part.body?.attachmentId || part.body?.data)) {
+      files.push({
+        filename,
+        mimeType: (part.mimeType ?? 'application/octet-stream').toLowerCase(),
+        sizeBytes: part.body?.size ?? null,
+        attachmentId: part.body?.attachmentId ?? null,
+        inlineData: part.body?.attachmentId ? null : (part.body?.data ?? null),
+      });
+    }
+    for (const child of part.parts ?? []) walk(child);
+  };
+  walk(payload);
+  return files;
+}

@@ -804,3 +804,91 @@ describe('todo.appointments (plan #1127)', () => {
     ).rejects.toThrow(/permission denied/);
   });
 });
+
+describe('todo.attachments and todo.attachment_links (migrations-todo/0016)', () => {
+  async function eventOf(user: string, title: string) {
+    const [event] = await admin<{ id: string }[]>`
+      insert into events (user_id, title, starts_on, ends_on)
+      values (${user}, ${title}, date '2026-12-01', date '2026-12-01') returning id`;
+    return event.id;
+  }
+  async function fileOf(user: string, name: string) {
+    const [file] = await admin<{ id: string }[]>`
+      insert into attachments (user_id, kind, name, mime_type, size_bytes, storage_path)
+      values (${user}, 'file', ${name}, 'application/pdf', 10, ${`${user}/${name}`}) returning id`;
+    return file.id;
+  }
+
+  it('shows a user only their own attachments, and refuses one written for somebody else', async () => {
+    await fileOf(userA, 'madeon-tickets.pdf');
+    await fileOf(userB, 'their-ticket.pdf');
+
+    const mine = await asUser(userA, (tx) => tx<{ name: string }[]>`select name from attachments`);
+    expect(mine.map((r) => r.name)).toEqual(['madeon-tickets.pdf']);
+
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into attachments (user_id, kind, name, mime_type, size_bytes, storage_path)
+                   values (${userA}, 'file', 'planted.pdf', 'application/pdf', 1, 'x/y')`,
+      ),
+    ).rejects.toThrow(/row-level security/);
+  });
+
+  it('refuses a file row with no file, and an email row with no message', async () => {
+    await expect(
+      admin`insert into attachments (user_id, kind, name) values (${userA}, 'file', 'nothing.pdf')`,
+    ).rejects.toThrow(/attachments_file_ck/);
+    await expect(
+      admin`insert into attachments (user_id, kind, name) values (${userA}, 'email', 'Your tickets')`,
+    ).rejects.toThrow(/attachments_email_ck/);
+  });
+
+  it('keeps one row per message', async () => {
+    const account = '00000000-0000-0000-0000-0000000000a1';
+    await admin`insert into attachments (user_id, kind, name, email_account_id, email_message_id)
+                values (${userA}, 'email', 'Your tickets', ${account}, 'm1')`;
+    await expect(
+      admin`insert into attachments (user_id, kind, name, email_account_id, email_message_id)
+            values (${userA}, 'email', 'Your tickets again', ${account}, 'm1')`,
+    ).rejects.toThrow(/attachments_email_key/);
+  });
+
+  it('puts an attachment only on something its owner owns', async () => {
+    const mineEvent = await eventOf(userA, 'Madeon');
+    const theirEvent = await eventOf(userB, 'Their gig');
+    const file = await fileOf(userA, 'ticket-2.pdf');
+
+    await asUser(userA, (tx) => tx`insert into attachment_links (attachment_id, event_id) values (${file}, ${mineEvent})`);
+
+    await expect(
+      asUser(userA, (tx) => tx`insert into attachment_links (attachment_id, event_id) values (${file}, ${theirEvent})`),
+    ).rejects.toThrow(/its owner owns/);
+  });
+
+  it('refuses a link to nothing and a link to two things', async () => {
+    const file = await fileOf(userA, 'ticket-3.pdf');
+    await expect(admin`insert into attachment_links (attachment_id) values (${file})`).rejects.toThrow(
+      /attachment_links_one_target_ck/,
+    );
+    const event = await eventOf(userA, 'Both');
+    await expect(
+      admin`insert into attachment_links (attachment_id, event_id, task_id) values (${file}, ${event}, ${taskA})`,
+    ).rejects.toThrow(/attachment_links_one_target_ck/);
+  });
+
+  it('does not show another user a link, and removes links with the event', async () => {
+    const event = await eventOf(userA, 'Doomed');
+    const file = await fileOf(userA, 'ticket-4.pdf');
+    await admin`insert into attachment_links (attachment_id, event_id) values (${file}, ${event})`;
+
+    const theirs = await asUser(userB, (tx) => tx`select id from attachment_links where event_id = ${event}`);
+    expect(theirs).toHaveLength(0);
+
+    await admin`delete from events where id = ${event}`;
+    const left = await admin`select id from attachment_links where attachment_id = ${file}`;
+    expect(left).toHaveLength(0);
+    const kept = await admin`select id from attachments where id = ${file}`;
+    expect(kept).toHaveLength(1);
+  });
+});

@@ -8,6 +8,7 @@ import { cardVariants } from '@/components/ui/card';
 import { Field, FieldError, Input, Textarea } from '@/components/ui/field';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { LinkPicker, type LinkChoice } from '@/components/todo/link-picker';
+import { LoadedAttachments } from '@/components/todo/attachments-section';
 import { addTask, editTask, type TaskFormState } from '@/app/todo/actions';
 import { addDays, type Task } from '@/lib/todo/tasks/model';
 
@@ -183,7 +184,8 @@ export function EditTask({ task, onDone }: { task: Task; onDone: () => void }) {
     // the whole of that claim -- the hairline it used to carry as well was a
     // third frame inside the card inside the row, saying nothing the recess
     // had not already said. Law 11.
-    <form action={action} className="card-pad-dense space-y-3 rounded-card bg-canvas">
+    <div className="card-pad-dense rounded-card bg-canvas">
+    <form action={action} className="space-y-3">
       <input type="hidden" name="id" value={task.id} />
       <Field id={`title-${task.id}`} label="Title">
         <Input id={`title-${task.id}`} name="title" defaultValue={task.title} required />
@@ -211,6 +213,9 @@ export function EditTask({ task, onDone }: { task: Task; onDone: () => void }) {
         </Button>
       </div>
     </form>
+    {/* Outside the form: an upload is its own action, and a form cannot hold another. */}
+    <LoadedAttachments target={{ kind: 'task', id: task.id }} />
+    </div>
   );
 }
 

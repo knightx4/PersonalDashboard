@@ -21,7 +21,13 @@ import { isUuid, type AskContext, type AskToolResult } from './db';
  * check it is theirs and can take the change.
  */
 
-export const PROPOSAL_TOOL_NAMES = ['propose_todo', 'propose_goal_step', 'propose_returned', 'propose_watch'] as const;
+export const PROPOSAL_TOOL_NAMES = [
+  'propose_todo',
+  'propose_goal_step',
+  'propose_returned',
+  'propose_watch',
+  'propose_attach_email',
+] as const;
 export type ProposalToolName = (typeof PROPOSAL_TOOL_NAMES)[number];
 
 export function isProposalToolName(name: string): name is ProposalToolName {
@@ -102,6 +108,21 @@ export const PROPOSAL_TOOLS: readonly Anthropic.Tool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'propose_attach_email',
+    description: `Propose attaching an email to one of their calendar events or todos, when they ask you to ("attach the Madeon ticket email to the concert"). The email's ticket PDFs and photos come with it. Find the email first with search_mail and name it by the ref that returned for it in the gmail table, and find the event or todo with a search and name it by the ref in todo.events or todo.tasks. ${PROPOSE_NOTE}`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        mail_ref: { type: 'string', description: 'The ref search_mail returned for the message.' },
+        subject: { type: 'string', description: "The message's subject, as search_mail showed it, for the card." },
+        target_table: { type: 'string', enum: ['todo.events', 'todo.tasks'], description: 'Where the event or todo is.' },
+        target_ref: { type: 'string', description: 'The ref a lookup returned for the event or todo.' },
+      },
+      required: ['mail_ref', 'target_table', 'target_ref'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 /** What a proposal needs beyond the lookups' context. */
@@ -120,6 +141,7 @@ const MODULES: Record<ProposalToolName, ModuleId | null> = {
   propose_returned: 'shopping',
   // A watch belongs to no workspace: it shows on the home page.
   propose_watch: null,
+  propose_attach_email: 'todo',
 };
 
 const MODULE_LABELS: Partial<Record<ModuleId, string>> = { todo: 'Todo', goals: 'Goals', shopping: 'Shopping' };
@@ -250,11 +272,43 @@ async function checkWatch(ctx: ProposeContext, args: Record<string, unknown>): P
   return { kind: 'start_watch', input: { ...parsed.value, goalItemId, goalTitle, pushOn: push !== null } };
 }
 
+async function checkAttachEmail(ctx: ProposeContext, args: Record<string, unknown>): Promise<NewDashChange> {
+  const mailRef = text(args, 'mail_ref');
+  const [accountId, ...rest] = mailRef.split(':');
+  const messageId = rest.join(':');
+  if (!mailRef || !isUuid(accountId ?? '') || !messageId || !ctx.seen('gmail', mailRef)) {
+    throw new Refused('No search_mail in this conversation returned that message. Search for the email first and use the ref it gives.');
+  }
+
+  const table = text(args, 'target_table');
+  if (table !== 'todo.events' && table !== 'todo.tasks') throw new Refused('target_table must be todo.events or todo.tasks.');
+  const targetId = seenRef(ctx, args, 'target_ref', table);
+  const todo = await ctx.db('todo');
+  const row = await firstRow<{ id: string; title: string }>(
+    todo.from(table === 'todo.events' ? 'events' : 'tasks').select('id, title').eq('id', targetId).eq('user_id', ctx.userId).limit(1),
+  );
+  if (!row) throw new Refused('That event or todo is not one of theirs, or it has been deleted.');
+
+  return {
+    kind: 'attach_email',
+    input: {
+      accountId,
+      messageId,
+      subject: text(args, 'subject').slice(0, 300) || 'the email',
+      from: null,
+      targetKind: table === 'todo.events' ? 'event' : 'task',
+      targetId,
+      targetTitle: row.title,
+    },
+  };
+}
+
 const CHECKS: Record<ProposalToolName, (ctx: ProposeContext, args: Record<string, unknown>) => Promise<NewDashChange>> = {
   propose_todo: checkTodo,
   propose_goal_step: checkGoalStep,
   propose_returned: checkReturned,
   propose_watch: checkWatch,
+  propose_attach_email: checkAttachEmail,
 };
 
 /** How a kept proposal reads back to the model. */
@@ -276,6 +330,8 @@ function described(change: NewDashChange): string {
         : ` Tell them, in these words or close to them: "${NO_PUSH_LINE}"`;
       return `Watch "${watch.title}"${plan}, reading the lowest price on ${watch.url} each hour.${goal}${push}`;
     }
+    case 'attach_email':
+      return `Attach the email "${change.input.subject}" to "${change.input.targetTitle}", with the files it carries.`;
   }
 }
 

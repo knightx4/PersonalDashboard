@@ -6,6 +6,8 @@ import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, FieldError, Input, Textarea } from '@/components/ui/field';
+import { AttachmentsSection } from '@/components/todo/attachments-section';
+import type { AttachmentView } from '@/lib/todo/attachments/model';
 import {
   addEvent,
   editEvent,
@@ -49,8 +51,13 @@ export function EventForm({
   draft,
   view,
   anchor,
+  attachments = [],
+  canSearchMail = false,
 }: {
   draft: EventDraft;
+  /** What is attached to this event; only a stored event has any. */
+  attachments?: AttachmentView[];
+  canSearchMail?: boolean;
   /** Where to go back to, whether you save, delete or cancel. */
   view: string;
   anchor: string;
@@ -156,6 +163,16 @@ export function EventForm({
           </Link>
         </div>
       </form>
+
+      {/* Outside the form: an upload is its own action, and a form cannot hold
+          another. Only a saved event has an id to attach to. */}
+      {draft.id && (
+        <AttachmentsSection
+          target={{ kind: 'event', id: draft.id }}
+          items={attachments}
+          canSearchMail={canSearchMail}
+        />
+      )}
 
       {draft.id && <DeleteEvent id={draft.id} view={view} anchor={anchor} />}
     </Card>

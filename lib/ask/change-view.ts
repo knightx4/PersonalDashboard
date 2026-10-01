@@ -20,6 +20,8 @@ export function changeHref(change: DashChange): string {
       return `/shopping/inventory/${change.input.id}`;
     case 'start_watch':
       return change.writtenRef ? `/home#watch-${change.writtenRef}` : '/home#watching';
+    case 'attach_email':
+      return change.input.targetKind === 'event' ? `/todo/calendar?event=${change.input.targetId}` : '/todo/all?status=all';
   }
 }
 
@@ -77,6 +79,12 @@ export function changeWords(change: DashChange, done: boolean, today?: string): 
         what: change.input.title,
         rest: watchPlan(change.input, dueDay(change.input.endsOn, today)),
       };
+    case 'attach_email':
+      return {
+        verb: done ? 'Attached the email' : 'Attach the email',
+        what: change.input.subject,
+        rest: ` to ${change.input.targetTitle}, with its tickets and files`,
+      };
   }
 }
 
@@ -105,5 +113,7 @@ export function changeWhere(change: DashChange): string {
       return 'Open the item';
     case 'start_watch':
       return 'Open on the home page';
+    case 'attach_email':
+      return change.input.targetKind === 'event' ? 'Open the event' : 'Open in Todo';
   }
 }

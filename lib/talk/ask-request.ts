@@ -1,6 +1,8 @@
 import 'server-only';
 
 import { requireUser } from '@/lib/auth/server';
+import { attachEmail } from '@/lib/todo/attachments/email';
+import { removeFromTarget } from '@/lib/todo/attachments/store';
 import { confirmChange, declineChange, undoChange, type ChangeDeps, type ChangeOutcome } from '@/lib/ask/changes';
 import { executeProposal } from '@/lib/ask/propose';
 import { executeAskTool } from '@/lib/ask/tools';
@@ -170,6 +172,15 @@ async function changeDeps(): Promise<ChangeDeps> {
     db: requestAskDb(),
     goals: (history) => createGoalsClient(history),
     createTask,
+    attachEmail: async (input) => {
+      const result = await attachEmail(core, user.id, input);
+      return result.ok
+        ? { ok: true, emailAttachmentId: result.emailAttachmentId, attachmentIds: result.attachmentIds }
+        : { ok: false, reason: result.reason };
+    },
+    detachAttachments: async (target, ids) => {
+      for (const id of ids) await removeFromTarget(id, target);
+    },
   };
 }
 
