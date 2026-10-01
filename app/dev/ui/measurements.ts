@@ -190,6 +190,7 @@ export const MOTION: readonly Row4[] = [
   ['dragging', 'scale(0.98) rotate(-0.5°), 55% opacity', 'The pipeline card mid-drag.', '—'],
   ['swipe', 'follows the finger, springs back', 'A Quick read card dragged left. Still under reduced motion.', '150ms'],
   ['toast-in', '6px rise, fade in', 'A toast arriving. Nothing on the way out.', '180ms'],
+  ['flight', 'a chip crossing, fading as it lands', 'An item filed from capture, flying to the list it went to (flyChip in components/ui/fly-chip.ts). Longer than 150ms so the eye can follow it across the screen. Skipped in code under reduced motion.', '420ms'],
   ['keyhint', 'fade', 'Shortcut hints while a modifier is held.', '120ms'],
   ['status line', 'fade back', 'The line settling after it has been read.', '1000ms'],
   ['shimmer', 'a highlight crossing', 'A skeleton, and nothing else.', '1.6s loop'],
