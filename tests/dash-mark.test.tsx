@@ -1,5 +1,5 @@
 /**
- * The Dash mark (plan #1335): four states and four kinds of work, each its own
+ * The Dash mark (plan #1335): five states and four kinds of work, each its own
  * still image, named for a screen reader, and with its motion switched off
  * under reduced motion.
  */
@@ -21,6 +21,8 @@ const render = (props: Parameters<typeof DashMark>[0]) =>
 /** Every motion utility the mark uses, as named in app/globals.css. */
 const MOTIONS = [
   'blink',
+  'breathe',
+  'snooze',
   'streak',
   'rattle',
   'read',
@@ -46,7 +48,7 @@ const still = (html: string) =>
     .replace(/dash-mark-[^")]*/g, 'MASK');
 
 describe('DashMark', () => {
-  it('draws four states and four kinds of work that differ with the motion taken away', () => {
+  it('draws every state and every kind of work differently with the motion taken away', () => {
     const frames = [
       ...DASH_STATES.map((state) => still(render({ state }))),
       ...DASH_ACTIVITIES.map((activity) => still(render({ state: 'working', activity }))),
@@ -69,6 +71,24 @@ describe('DashMark', () => {
     expect(render({ state: 'working', activity: 'thinking' })).toContain('dash-mark-ponder');
     expect(still(render({ state: 'idle', activity: 'reading' }))).toBe(still(render({ state: 'idle' })));
     expect(render({ state: 'done', activity: 'searching' })).not.toContain('data-dash-activity');
+  });
+
+  it('sleeps with its eyes shut until woken', () => {
+    const html = render({ state: 'asleep' });
+    expect(html).toContain('dash-mark-snooze');
+    expect(html).toContain('aria-label="Dash is asleep"');
+    expect(still(html)).not.toBe(still(render({ state: 'idle' })));
+  });
+
+  it('wears the brand ramp only when asked, and never when failed', () => {
+    expect(render({})).not.toContain('linearGradient');
+    const brand = render({ tone: 'brand', state: 'working' });
+    expect(brand).toContain('<linearGradient');
+    expect(brand).toMatch(/fill="url\(#dash-mark-[^)]+-ramp\)"/);
+    expect(brand).toContain('data-dash-tone="brand"');
+    const failed = render({ tone: 'brand', state: 'failed' });
+    expect(failed).not.toContain('linearGradient');
+    expect(failed).toContain('stroke="currentColor"');
   });
 
   it('gives each mark its own mask', () => {

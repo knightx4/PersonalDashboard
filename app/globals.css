@@ -1773,6 +1773,42 @@ body[data-keyhints] .keyhint {
   animation: dash-mark-blink 7s infinite;
 }
 
+/* Asleep: the visor breathes slowly and a z drifts up from its corner. */
+@keyframes dash-mark-breathe {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  50% {
+    transform: scale(1.03, 0.94);
+  }
+}
+
+@utility dash-mark-breathe {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: dash-mark-breathe 3.6s ease-in-out infinite;
+}
+
+@keyframes dash-mark-snooze {
+  0% {
+    transform: translate(-1px, 2px);
+    opacity: 0;
+  }
+  30%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(1px, -1px);
+    opacity: 0;
+  }
+}
+
+@utility dash-mark-snooze {
+  animation: dash-mark-snooze 3.6s ease-in-out infinite;
+}
+
 @keyframes dash-mark-streak {
   0% {
     transform: translateX(2px);
@@ -2040,6 +2076,8 @@ body[data-keyhints] .keyhint {
   }
 
   .dash-mark-blink,
+  .dash-mark-breathe,
+  .dash-mark-snooze,
   .dash-mark-streak,
   .dash-mark-rattle,
   .dash-mark-read,

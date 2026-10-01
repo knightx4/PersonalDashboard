@@ -181,7 +181,7 @@ export function AskDashButton() {
       title="Ask Dash"
       className="press flex size-8 shrink-0 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink"
     >
-      <DashMark size="icon" decorative />
+      <DashMark size="icon" tone="brand" decorative />
       <span className="sr-only">Ask Dash</span>
     </button>
   );

@@ -484,7 +484,13 @@ export function CommentThread({
                       : 'border-control text-ink-ghost hover:bg-sunken hover:text-ink')
                   }
                 >
-                  <DashMark size="2xs" decorative />
+                  {/* Asleep until tagged; tagging wakes him, in the app's own colours. */}
+                  <DashMark
+                    size="2xs"
+                    state={tagged ? 'idle' : 'asleep'}
+                    tone={tagged ? 'brand' : 'current'}
+                    decorative
+                  />
                   <span className="sr-only">
                     {tagged ? 'Dash will read this' : `Tag ${MENTION}`}
                   </span>

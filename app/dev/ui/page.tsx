@@ -472,6 +472,8 @@ const DENSITY_IDS = ['comfortable', 'snug', 'dense'] as const;
 /** What each state of the Dash mark looks like, for the Marks section. */
 const DASH_STATE_NOTES: Record<DashState, string> = {
   idle: 'The visor standing level, blinking now and then. The default.',
+  asleep:
+    'Eyes shut, breathing slowly, with a z drifting up. For a Dash that has to be woken: the tag button on a comment, until it is pressed.',
   working:
     'The visor leans forward and rattles, with speed lines streaming off the back. Indeterminate: nothing fills, because a run does not report how far it has got. Under reduced motion it keeps the lean.',
   done: 'Happy eyes under a chequered flag, with one flash as it settles and the flag waving three times.',
@@ -1573,6 +1575,17 @@ export default function DevUiPage() {
                 <span className="text-small text-ink-muted">{DASH_STATE_NOTES[state]}</span>
               </li>
             ))}
+            <li className="card-pad-x row-pad flex items-center gap-3">
+              <DashMark tone="brand" size="md" />
+              <DashMark tone="brand" state="working" size="xs" />
+              <DashMark tone="brand" state="done" size="icon" />
+              <span className="w-20 shrink-0 text-ui text-ink">brand</span>
+              <span className="text-small text-ink-muted">
+                The app icon&rsquo;s blue, violet and pink, where Dash is the subject: the Ask Dash
+                button, a reply on its way or just landed, a tagged comment. Everywhere else the
+                mark takes the colour of its place, and failed always does.
+              </span>
+            </li>
             {DASH_ACTIVITIES.map((activity) => (
               <li key={activity} className="card-pad-x row-pad flex items-center gap-3">
                 <DashMark state="working" activity={activity} size="md" className="text-accent" />
