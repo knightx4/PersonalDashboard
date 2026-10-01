@@ -16,6 +16,7 @@ import {
   turnDownHelpAction,
   type HelpKindsActionState,
 } from './help-actions';
+import { DashCredit } from '@/components/ui/dash-mark';
 
 const initial: HelpKindsActionState = {};
 
@@ -66,7 +67,10 @@ export function GoalHelp({
           Weekly help
         </h2>
         {proposed && !editing && (
-          <span className="text-small text-ink-muted">Proposed by Dash</span>
+          <span className="text-small text-ink-muted">
+            <DashCredit />
+            Proposed by Dash
+          </span>
         )}
         {!editing && !proposed && (
           <Button

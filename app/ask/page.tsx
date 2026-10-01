@@ -9,6 +9,7 @@ import { todayInTimezone } from '@/lib/money';
 import { listAskConversations, loadAskMadeChanges } from '@/lib/talk/ask-request';
 import type { MadeChange } from '@/lib/talk/changes';
 import { AskButton, AskedWhen, AskMadeChanges } from './view';
+import { DashCredit } from '@/components/ui/dash-mark';
 
 export const metadata = { title: 'Questions to Dash' };
 
@@ -73,7 +74,7 @@ export default async function AskPage() {
       ) : (
         <div className="space-y-6">
           {made.changes.length > 0 && (
-            <SectionFold title="Changes Dash made" count={made.changes.length}>
+            <SectionFold title={<><DashCredit className="text-ink-muted" />Changes Dash made</>} count={made.changes.length}>
               <div className="mt-2">
                 <AskMadeChanges changes={made.changes} today={today} />
               </div>

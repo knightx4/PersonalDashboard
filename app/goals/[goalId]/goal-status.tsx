@@ -10,6 +10,7 @@ import { claudeLine, type GoalStatusView, type StatusRowKind } from '@/lib/goals
 import { stagesLabel, stageWait, type Stage } from '@/lib/goals/goal-page';
 import type { GoalReview } from '@/lib/goals/reviews';
 import { VerdictLabel } from '../goal-line';
+import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
  * The top of a goal's page (lib/goals/goal-status.ts, plan #1078): Dash's
@@ -56,7 +57,10 @@ export function GoalStatusCard({ status, brief, briefWhen, review, current, stag
         {brief ? (
           <div className="space-y-1">
             <FileBody markdown={brief.body} compact />
-            {briefWhen && <p className="text-small text-ink-muted">Dash’s note, written {briefWhen}</p>}
+            {briefWhen && <p className="text-small text-ink-muted">
+                <DashCredit />
+                Dash’s note, written {briefWhen}
+              </p>}
           </div>
         ) : (
           review && <p className="text-ui text-ink">{review.reason}</p>

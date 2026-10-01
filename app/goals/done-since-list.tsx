@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { useActionState } from 'react';
-import { CircleAlert, FileText, Sparkles } from 'lucide-react';
+import { CircleAlert, FileText } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import type { DoneItem, DoneSince, DoneUndo } from '@/lib/goals/done-since';
 import { undoRunChangeAction, type UndoChangeState } from './runs/[runId]/actions';
+import { DashMark } from '@/components/ui/dash-mark';
 
 /**
  * What Dash did since your last visit (plan #1076): each result with Read,
@@ -39,7 +40,8 @@ export function DoneSinceList({ done }: { done: DoneSince }) {
 
 function DoneRow({ item }: { item: DoneItem }) {
   const undone = item.kind !== 'failed' && item.undo?.state === 'undone';
-  const Icon = item.kind === 'failed' ? CircleAlert : item.kind === 'result' ? FileText : Sparkles;
+  // A change Dash made carries its mark (plan #1338); a result is a file, and a failure an alert.
+  const Icon = item.kind === 'failed' ? CircleAlert : item.kind === 'result' ? FileText : null;
   const title = item.kind === 'change' ? item.sentence : item.title;
   const meta =
     item.kind === 'failed'
@@ -50,11 +52,15 @@ function DoneRow({ item }: { item: DoneItem }) {
 
   return (
     <li className="card-pad-x row-pad flex flex-wrap items-start gap-x-3 gap-y-1">
-      <Icon
-        className={`mt-0.5 size-4 shrink-0 ${item.kind === 'failed' ? 'text-danger' : 'text-ink-muted'}`}
-        strokeWidth={1.75}
-        aria-hidden
-      />
+      {Icon ? (
+        <Icon
+          className={`mt-0.5 size-4 shrink-0 ${item.kind === 'failed' ? 'text-danger' : 'text-ink-muted'}`}
+          strokeWidth={1.75}
+          aria-hidden
+        />
+      ) : (
+        <DashMark size="icon" decorative className="mt-0.5 text-ink-muted" />
+      )}
       <span className="min-w-0 flex-1">
         <span
           className={

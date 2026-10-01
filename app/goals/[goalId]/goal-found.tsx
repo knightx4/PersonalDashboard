@@ -4,6 +4,7 @@ import type { Finding } from '@/lib/goals/goal-page';
 import { missedLine, progressLine, type RhythmRecord } from '@/lib/goals/rhythms';
 import type { StepNode } from '@/lib/goals/steps';
 import { FindingRow } from './finding-row';
+import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
  * Two sections of the goal page (plan #1078): the rhythms the goal keeps,
@@ -71,6 +72,7 @@ export function GoalFindings({ findings }: { findings: Finding[] }) {
   return (
     <section aria-labelledby="found-heading" className="space-y-2">
       <h2 id="found-heading" className="px-1 text-ui font-semibold text-ink">
+        <DashCredit className="text-ink-muted" />
         What Dash found
       </h2>
       <Card padding="none">

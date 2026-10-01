@@ -12,6 +12,7 @@ import type { ShownParagraph, YearState } from '@/lib/timeline/year-review-view'
 import { EventRow } from '../../event-row';
 import { ObservationList } from '../../observations';
 import { WriteYearButton } from './write-button';
+import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
  * The year in review (plan #1121), apart from the reads so the surface
@@ -159,7 +160,10 @@ function YearStatus({
 
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <p className="min-w-0 flex-1 text-ui text-ink-muted">{line}</p>
+      <p className="min-w-0 flex-1 text-ui text-ink-muted">
+        {state.kind === 'written' && <DashCredit />}
+        {line}
+      </p>
       {writable && state.kind !== 'too-few' && (
         <WriteYearButton year={year} again={state.kind === 'written'} />
       )}

@@ -17,6 +17,7 @@ import { loadFileUses, type FileUse } from '@/lib/goals/files-store';
 import type { DevComment } from '@/lib/comments/load';
 import { FileThread } from './file-comments';
 import { MarkFileRead } from './mark-read';
+import { DashCredit } from '@/components/ui/dash-mark';
 
 export const metadata = { title: 'File' };
 export const dynamic = 'force-dynamic';
@@ -70,7 +71,12 @@ export default async function FilePage({
       </Link>
       <PageHeader
         title={shown.title}
-        description={`${authorLine(file)} · updated ${formatInstant(file.updatedAt, account.timezone)}`}
+        description={
+          <>
+            {file.madeBy === 'claude' && <DashCredit />}
+            {`${authorLine(file)} · updated ${formatInstant(file.updatedAt, account.timezone)}`}
+          </>
+        }
       />
       <div className="space-y-6">
         {older && (

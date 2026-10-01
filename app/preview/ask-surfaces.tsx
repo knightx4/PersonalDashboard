@@ -9,6 +9,7 @@ import { SectionFold } from '@/components/ui/disclosure';
 import type { DashChange, MadeChange } from '@/lib/talk/changes';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
+import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
  * The Ask Dash sheet in the surface gallery (plan #1090), fed with typed
@@ -368,7 +369,7 @@ export function AskMadeChangesSurface() {
     <div className="mx-auto max-w-3xl py-4">
       <PageHeader title="Questions to Dash" />
       <div className="space-y-6">
-        <SectionFold title="Changes Dash made" count={changes.length}>
+        <SectionFold title={<><DashCredit className="text-ink-muted" />Changes Dash made</>} count={changes.length}>
           <div className="mt-2">
             <MadeChanges changes={changes} presses={presses} today="2026-09-28" />
           </div>

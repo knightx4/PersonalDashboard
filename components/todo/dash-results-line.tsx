@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { DashCredit } from '@/components/ui/dash-mark';
 
 /** Where Dash's results are read: the "What Dash did" section on the Goals home. */
 export const DASH_RESULTS_HREF = '/goals#done-heading';
@@ -16,6 +17,7 @@ export function DashResultsLine({ count, className }: { count: number; className
         href={DASH_RESULTS_HREF}
         className="text-ui font-medium text-accent underline decoration-border underline-offset-2 transition-colors duration-150 hover:decoration-accent"
       >
+        <DashCredit />
         Dash finished {count} {count === 1 ? 'thing' : 'things'} for you
       </Link>
     </p>

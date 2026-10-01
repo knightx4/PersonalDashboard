@@ -15,6 +15,7 @@ import { todayIn } from '@/lib/todo/tasks/model';
 import { AreaPlanner } from '../../area-planner';
 import { GoalRow } from './area-goal-row';
 import { ApproveArea } from '../../goals-view';
+import { DashCredit } from '@/components/ui/dash-mark';
 
 export const metadata = { title: 'Area' };
 export const dynamic = 'force-dynamic';
@@ -88,6 +89,7 @@ export default async function AreaPage({ params }: { params: Promise<{ areaId: s
       {proposed.length > 0 && (
         <section aria-labelledby="area-proposed-heading" className="space-y-2">
           <h2 id="area-proposed-heading" className="px-1 text-ui font-semibold text-ink">
+            <DashCredit className="text-ink-muted" />
             Proposed by Dash
           </h2>
           {proposed.length > 1 && <ApproveArea areaId={areaId} count={proposed.length} />}
