@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { ArrowUp, CircleUser, CornerDownRight } from 'lucide-react';
-import { DashMark, type DashState } from '@/components/ui/dash-mark';
+import { DashMark, type DashActivity, type DashState } from '@/components/ui/dash-mark';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
@@ -52,12 +52,20 @@ export type TalkAssistant = {
    * The mark drawn in a state other than idle: working, done or failed. Left
    * out, the assistant's mark stays as it is whatever the answer is doing.
    */
-  StateMark?: React.ComponentType<{ state: DashState; className?: string }>;
+  StateMark?: React.ComponentType<{ state: DashState; activity?: DashActivity; className?: string }>;
 };
 
 /** Dash's own mark at the size of the glyph beside every other turn. */
-function DashTurnMark({ className, state = 'idle' }: { className?: string; state?: DashState }) {
-  return <DashMark size="2xs" state={state} decorative className={className} />;
+function DashTurnMark({
+  className,
+  state = 'idle',
+  activity,
+}: {
+  className?: string;
+  state?: DashState;
+  activity?: DashActivity;
+}) {
+  return <DashMark size="2xs" state={state} activity={activity} decorative className={className} />;
 }
 
 const DASH: TalkAssistant = { name: 'Dash', Mark: DashTurnMark, StateMark: DashTurnMark };
@@ -69,16 +77,23 @@ function AuthorMark({
   role,
   assistant,
   state = 'idle',
+  activity,
 }: {
   role: TalkRole;
   assistant: TalkAssistant;
   state?: DashState;
+  /** What kind of work the working mark shows. */
+  activity?: DashActivity;
 }) {
   if (role === 'assistant' && state !== 'idle' && assistant.StateMark) {
     const StateMark = assistant.StateMark;
     // Failed takes the error's colour, so the mark and the words beside it read as one.
     return (
-      <StateMark state={state} className={state === 'failed' ? 'size-3.5 text-danger' : 'size-3.5 text-ink-ghost'} />
+      <StateMark
+        state={state}
+        activity={activity}
+        className={state === 'failed' ? 'size-3.5 text-danger' : 'size-3.5 text-ink-ghost'}
+      />
     );
   }
   const Glyph = role === 'assistant' ? assistant.Mark : CircleUser;
@@ -179,6 +194,7 @@ export function TalkThread({
   ask,
   below,
   assistant = DASH,
+  activity,
 }: {
   /** Unique on the page: the textarea's id is built from it. */
   id: string;
@@ -217,6 +233,12 @@ export function TalkThread({
   below?: (turn: TalkTurn) => React.ReactNode;
   /** Who answers: Dash when left out. */
   assistant?: TalkAssistant;
+  /**
+   * What kind of work the mark shows while a reply is coming, chosen by the
+   * surface from the job it starts: searching for Ask, reading for marking
+   * an answer. Left out, the working mark leans and races.
+   */
+  activity?: DashActivity;
 }) {
   const [turns, setTurns] = useState<TalkTurn[]>([...initial]);
   const [writing, setWriting] = useState(startWriting && !ask);
@@ -304,7 +326,7 @@ export function TalkThread({
           {sending && (
             <li className="flex gap-2" aria-live="polite">
               <div className="flex w-4 shrink-0 justify-center pt-1">
-                <AuthorMark role="assistant" assistant={assistant} state="working" />
+                <AuthorMark role="assistant" assistant={assistant} state="working" activity={activity} />
               </div>
               <p className="min-w-0 flex-1 text-body text-ink-muted">
                 {waiting ?? `${assistant.name} is replying…`}

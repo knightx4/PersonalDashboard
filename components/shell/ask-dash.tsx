@@ -285,6 +285,7 @@ export function AskThread({
         return send(body);
       }}
       waiting={ASK_WAITING}
+      activity="searching"
       below={(turn) => {
         const mine = turn.role === 'assistant' ? byTurn.get(turn.id) : undefined;
         return mine ? (

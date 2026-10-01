@@ -662,6 +662,7 @@ function DeckCard({
               send={(body) => askAboutCard(card.id, body)}
               label="Ask about this card"
               placeholder="What would you like to know?"
+              activity="writing"
               hint={
                 <PaidHint
                   action="app/learn/now/actions.ts#askAboutCard"

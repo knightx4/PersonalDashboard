@@ -171,6 +171,7 @@ function DiscussSheet({
               label={loaded.turns.length ? 'Reply' : 'Say what you think'}
               placeholder="What you make of it, and why"
               closed={closedLine}
+              activity="thinking"
             />
           )}
         </div>

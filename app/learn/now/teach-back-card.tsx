@@ -85,6 +85,7 @@ export function TeachBackCard({
           label={stage === 'follow_up' ? 'Answer the follow-up' : 'Explain it'}
           placeholder={stage === 'follow_up' ? 'Two or three sentences' : 'A few sentences, as if to a friend'}
           waiting="Dash is marking it…"
+          activity="reading"
           closed={() => (done ? 'Marked. That is the end of this one.' : null)}
           hint={
             <PaidHint action="app/learn/now/actions.ts#explainBack" what="Cost of marking the answer" />
