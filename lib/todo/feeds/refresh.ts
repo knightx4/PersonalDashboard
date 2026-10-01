@@ -141,6 +141,7 @@ async function replaceEvents(
         ends_on: event.endsOn,
         starts_at: event.startsAt,
         ends_at: event.endsAt,
+        occurrence: event.occurrence,
       })),
     );
 
