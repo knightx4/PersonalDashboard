@@ -31,6 +31,7 @@ import { TodayLists } from '@/app/jobs/(app)/_home/this-week-lists';
 import type { TodayBoard } from '@/lib/jobs/today/load';
 import type { ModuleId } from '@/lib/modules';
 import { CalendarMonthGrid } from '@/components/todo/calendar-month';
+import { FeedEventCard } from '@/components/todo/feed-event-card';
 import {
   monthDays,
   monthOf,
@@ -2762,6 +2763,52 @@ export const SURFACES: readonly Surface[] = [
         newEventHref={(day) => `/todo/calendar?new=${day}`}
         eventHref={(id) => `/todo/calendar?event=${id}`}
         feedEventHref={(id) => `/todo/calendar?feedEvent=${id}`}
+      />
+    ),
+  },
+  {
+    /* A subscribed appointment, opened (plan #1374): what the organiser wrote,
+     * the calendar it came from, and one task already about this date of it. */
+    id: 'todo-feed-event',
+    label: 'Calendar · A subscribed appointment',
+    module: 'todo',
+    width: 'narrow',
+    render: () => (
+      <FeedEventCard
+        detail={{
+          feedName: 'Work',
+          event: {
+            id: '00000000-0000-4000-8000-000000001374',
+            feedId: '00000000-0000-4000-8000-000000000f01',
+            title: 'Quarterly planning',
+            body: 'Bring the Q4 numbers.\nAgenda to follow.',
+            location: 'Room 4.02 / https://meet.example.com/q4-plan',
+            startsOn: null,
+            endsOn: null,
+            startsAt: '2026-09-10T09:00:00.000Z',
+            endsAt: '2026-09-10T10:30:00.000Z',
+            createdAt: '2026-09-01T08:00:00.000Z',
+          },
+        }}
+        view="month"
+        anchor={CALENDAR_TODAY}
+        timezone="Europe/London"
+        tasks={[
+          {
+            id: 'feed-task-1',
+            title: 'Pull the Q4 numbers together',
+            body: null,
+            status: 'open',
+            dueOn: '2026-09-09',
+            dueAt: null,
+            pinned: false,
+            snoozedUntil: null,
+            completedAt: null,
+            createdAt: '2026-09-02T08:00:00.000Z',
+            position: null,
+            parentId: null,
+          },
+        ]}
       />
     ),
   },
