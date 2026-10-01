@@ -60,7 +60,8 @@ export async function askDashInRequest(input: {
       page,
       today,
       execute: (name, args) => executeAskTool(name, args, ctx),
-      propose: (name, args, seen, save) => executeProposal(name, args, { ...ctx, seen, save }),
+      propose: (name, args, seen, save) =>
+        executeProposal(name, args, { ...ctx, seen, save, timezone: settings.timezone }),
       anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     },
     {

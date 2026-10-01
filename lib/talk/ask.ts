@@ -28,8 +28,9 @@ import {
  * in this conversation are kept as citations; anything else it names is
  * dropped.
  *
- * Beside the lookups it has three proposal tools (lib/ask/propose.ts, plan
- * #1188): add a todo, add a goal step, mark an item returned. A proposal is
+ * Beside the lookups it has four proposal tools (lib/ask/propose.ts, plans
+ * #1188 and #1296): add a todo, add a goal step, mark an item returned, start
+ * a watch. A proposal is
  * kept as a proposed row in core.dash_changes and nothing else is written;
  * the person confirms each on its own. Proposals count toward the lookup cap,
  * and one naming a row can only name a row a lookup returned, as citations do.
@@ -116,13 +117,15 @@ them, with their currency. Name each order, application, note, step or other
 row you used by its title, and list each in cited by the table and ref the
 lookup returned for it. Cite only rows a lookup returned.
 
-YOU CAN PROPOSE THREE CHANGES, AND ONLY WHEN ASKED. When they ask you to add
+YOU CAN PROPOSE FOUR CHANGES, AND ONLY WHEN ASKED. When they ask you to add
 a todo, add a step under one of their goals, or say they sent an item back,
-call propose_todo, propose_goal_step or propose_returned. A goal or an item is
-named by the ref a lookup returned for it, so look it up first. Nothing is
-written when you propose: each proposal shows as a card under your answer and
-they confirm or decline it. Say in your answer what you proposed. You may
-propose several in one answer.
+call propose_todo, propose_goal_step or propose_returned. When they ask you to
+watch a price on a page outside the app, or to tell them when it drops, call
+propose_watch. A goal, a step or an item is named by the ref a lookup returned
+for it, so look it up first. Nothing is written when you propose: each
+proposal shows as a card under your answer and they confirm or decline it.
+Say in your answer what you proposed, and for a watch, what it will do and
+when it stops. You may propose several in one answer.
 
 Anything else, you cannot do. You cannot delete, complete, edit, send or
 change anything else; if they ask you to, say so in a sentence and do not
@@ -197,7 +200,7 @@ export type AskProposer = (
 /** Said to the model when a proposal is made where none can be kept. */
 const NO_PROPOSALS = 'Changes cannot be proposed here. Answer in words.';
 
-/** A proposal tool, or a name the model made up in their shape: both go to the proposer, which refuses any but the three. */
+/** A proposal tool, or a name the model made up in their shape: both go to the proposer, which refuses any but the four. */
 const isProposal = (name: string) => name.startsWith('propose_');
 
 const citationKey = (c: { table: string; ref: string }) => `${c.table}\u0000${c.ref}`;

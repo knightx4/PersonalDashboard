@@ -1,8 +1,11 @@
 'use server';
 
-import { getUser } from '@/lib/auth/server';
+import { revalidatePath } from 'next/cache';
+import { getUser, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { isDay, isPickKey } from '@/lib/day-brief/opens';
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Record that a pick on the morning brief was followed (plan #1242).
@@ -27,4 +30,34 @@ export async function openBriefPick(day: string, key: string): Promise<void> {
   } catch (err) {
     console.error('recording the opened pick failed', err);
   }
+}
+
+export type StopWatchResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Stop a running watch from its row in the Watching section (plan #1296).
+ *
+ * Sets the status to 'stopped' as the person, which RLS keeps to their own
+ * watches; the hourly run then leaves it alone, and the touched updated_at
+ * puts it in Updates as "You stopped watching …" (lib/shell/watching.ts).
+ * Only a running watch is stopped, so a watch that ended in the meantime
+ * keeps its ending.
+ */
+// latency: pending
+export async function stopWatch(formData: FormData): Promise<StopWatchResult> {
+  const id = formData.get('id');
+  if (typeof id !== 'string' || !UUID.test(id)) return { ok: false, error: 'Could not tell which watch that was.' };
+  const user = await requireUser();
+  const core = await createCoreClient();
+  const { data, error } = await core
+    .from('watches')
+    .update({ status: 'stopped' })
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .eq('status', 'running')
+    .select('id');
+  if (error) return { ok: false, error: 'The watch could not be stopped. Try again.' };
+  revalidatePath('/home');
+  if ((data ?? []).length === 0) return { ok: false, error: 'That watch is not running any more.' };
+  return { ok: true };
 }

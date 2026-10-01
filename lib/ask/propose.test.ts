@@ -4,7 +4,7 @@ import type { AskContext, SchemaClient } from './db';
 import { executeProposal, PROPOSAL_TOOL_NAMES, PROPOSAL_TOOLS, type ProposeContext } from './propose';
 
 /**
- * The three proposals Dash may make (plan #1188), against an in-memory client
+ * The four proposals Dash may make (plans #1188, #1296), against an in-memory client
  * holding two people's rows side by side. Each is checked the way its page's
  * action checks it, may only name a row a lookup returned, and keeps a
  * proposed row and nothing else.
@@ -30,9 +30,17 @@ const TABLES: Record<string, Row[]> = {
     { id: id(13), user_id: ME, name: 'Sold lamp', status: 'sold', order_item_id: id(97) },
     { id: id(14), user_id: ME, name: 'Gift', status: 'owned', order_item_id: null },
   ],
+  watches: [
+    { id: id(21), user_id: ME, title: 'Old show', url: 'https://example.com/running', status: 'running' },
+    { id: id(22), user_id: THEM, title: 'Their show', url: 'https://example.com/theirs', status: 'running' },
+  ],
+  push_subscriptions: [],
 };
 
-function context(opts: { enabled?: AskContext['enabledModules']; seen?: [string, string][] } = {}) {
+function context(
+  opts: { enabled?: AskContext['enabledModules']; seen?: [string, string][]; push?: boolean } = {},
+) {
+  TABLES.push_subscriptions = opts.push ? [{ id: id(31), user_id: ME }] : [];
   const writes: string[] = [];
   const kept: NewDashChange[] = [];
   const client = {
@@ -60,6 +68,8 @@ function context(opts: { enabled?: AskContext['enabledModules']; seen?: [string,
     enabledModules: opts.enabled ?? ['todo', 'goals', 'shopping'],
     db: async () => client,
     searchSources: [],
+    now: Date.parse('2026-10-01T14:00:00Z'),
+    timezone: 'America/New_York',
     seen: (table, ref) => seen.has(`${table} ${ref}`),
     save: async (change) => {
       kept.push(change);
@@ -73,17 +83,17 @@ const GOAL = (n: number): [string, string] => ['goals.items', id(n)];
 const ITEM = (n: number): [string, string] => ['public.inventory_items', id(n)];
 
 describe('executeProposal', () => {
-  it('offers exactly the three tools', () => {
+  it('offers exactly the four tools', () => {
     expect(PROPOSAL_TOOLS.map((t) => t.name)).toEqual([...PROPOSAL_TOOL_NAMES]);
-    expect(PROPOSAL_TOOL_NAMES).toEqual(['propose_todo', 'propose_goal_step', 'propose_returned']);
+    expect(PROPOSAL_TOOL_NAMES).toEqual(['propose_todo', 'propose_goal_step', 'propose_returned', 'propose_watch']);
   });
 
-  it('refuses a kind outside the three', async () => {
+  it('refuses a kind outside the four', async () => {
     const { ctx, kept } = context();
     const result = await executeProposal('propose_delete_todo', {}, ctx);
     expect(result).toEqual({
       ok: false,
-      error: 'There is no tool called propose_delete_todo. You can propose only a todo, a goal step or a return.',
+      error: 'There is no tool called propose_delete_todo. You can propose only a todo, a goal step, a return or a watch.',
     });
     expect(kept).toEqual([]);
   });
@@ -173,5 +183,100 @@ describe('executeProposal', () => {
       error: 'The Shopping workspace is switched off, so nothing can be proposed there.',
     });
     expect(kept).toEqual([]);
+  });
+
+  describe('propose_watch', () => {
+    const ASK = {
+      title: 'Jamie xx at Nowadays',
+      url: 'https://www.crowdvolt.com/event/jamie-xx',
+      below: 200,
+      currency: 'usd',
+      report_times: ['18:00', '9:00'],
+      ends_on: '2026-10-18',
+    };
+
+    it('keeps the watch a confirm will insert, in the person\'s zone, and writes nothing else', async () => {
+      const { ctx, kept, writes } = context({ push: true });
+      const result = await executeProposal('propose_watch', ASK, ctx);
+      expect(result.ok).toBe(true);
+      expect(kept).toEqual([
+        {
+          kind: 'start_watch',
+          input: {
+            title: 'Jamie xx at Nowadays',
+            url: 'https://www.crowdvolt.com/event/jamie-xx',
+            below: 200,
+            currency: 'USD',
+            reportTimes: ['09:00', '18:00'],
+            // 23:59 on the 18th in New York, during daylight time.
+            endsAt: '2026-10-19T03:59:00.000Z',
+            endsOn: '2026-10-18',
+            goalItemId: null,
+            goalTitle: null,
+            pushOn: true,
+          },
+        },
+      ]);
+      expect(writes).toEqual([]);
+      expect(result.ok && result.note).not.toContain('No device has push');
+    });
+
+    it('tells Dash to say nothing will reach the phone when no device has push on', async () => {
+      const { ctx, kept } = context({ push: false });
+      const result = await executeProposal('propose_watch', ASK, ctx);
+      expect(kept[0]).toMatchObject({ input: { pushOn: false } });
+      expect(result.ok && result.note).toContain(
+        'No device has push switched on, so the watch will show on the home page but nothing will reach your phone.',
+      );
+      expect(result.ok && result.note).toContain('Switch push on in Account');
+    });
+
+    it('ties it to a goal step a lookup returned', async () => {
+      const { ctx, kept } = context({ seen: [GOAL(3)] });
+      const result = await executeProposal('propose_watch', { ...ASK, goal_item_ref: id(3) }, ctx);
+      expect(result.ok).toBe(true);
+      expect(kept[0]).toMatchObject({ input: { goalItemId: id(3), goalTitle: 'A step' } });
+    });
+
+    it('refuses a goal ref no lookup returned, or one that is not theirs or is closed', async () => {
+      for (const [n, seen] of [
+        [3, false],
+        [2, true],
+        [4, true],
+      ] as const) {
+        const { ctx, kept } = context({ seen: seen ? [GOAL(n)] : [] });
+        const result = await executeProposal('propose_watch', { ...ASK, goal_item_ref: id(n) }, ctx);
+        expect(result.ok).toBe(false);
+        expect(kept).toEqual([]);
+      }
+    });
+
+    it('refuses what the table or the run would not take', async () => {
+      const cases: [Record<string, unknown>, string][] = [
+        [{ url: 'http://example.com/x' }, 'Only an https page can be watched.'],
+        [{ url: 'tickets' }, 'url is not a web address'],
+        [{ below: undefined, report_times: [] }, 'A watch needs a price to go under, report times, or both'],
+        [{ below: -5 }, 'below has to be a price above zero.'],
+        [{ report_times: ['25:00'] }, '25:00 is not a time of day'],
+        [{ ends_on: '2026-09-30' }, 'That end is already past.'],
+        [{ ends_on: '2027-09-30' }, 'A watch can run for at most 180 days.'],
+        [{ title: '  ' }, 'Give the watch a title'],
+        [{ url: 'https://example.com/running' }, 'A watch on that page is already running ("Old show")'],
+      ];
+      for (const [change, error] of cases) {
+        const { ctx, kept } = context();
+        const result = await executeProposal('propose_watch', { ...ASK, ...change }, ctx);
+        expect(result.ok).toBe(false);
+        expect(!result.ok && result.error).toContain(error);
+        expect(kept).toEqual([]);
+      }
+    });
+
+    it('needs no workspace, but a goal link needs Goals on', async () => {
+      const off = context({ enabled: [], seen: [GOAL(3)] });
+      expect((await executeProposal('propose_watch', ASK, off.ctx)).ok).toBe(true);
+      const linked = await executeProposal('propose_watch', { ...ASK, goal_item_ref: id(3) }, off.ctx);
+      expect(!linked.ok && linked.error).toContain('The Goals workspace is switched off');
+    });
   });
 });

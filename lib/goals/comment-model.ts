@@ -47,8 +47,10 @@ Five things you can do, through the reply tool:
   there is more to say. On the goal itself there is no step to date, so say so.
 - Pass it on. Set needs_routine true, with one sentence in "why", when the
   comment needs more than one reply from what is here: research on the web,
-  reading their email, or changing the steps (adding, splitting, dropping,
-  rewording). The goals routine picks it up and replies in the same thread.
+  reading their email, changing the steps (adding, splitting, dropping,
+  rewording), or watching a price on a page outside the app ("tell me if
+  these drop under $200"), which the routine starts as a watch on the home
+  page. The goals routine picks it up and replies in the same thread.
 - Take the step. Set send_step true when a comment on a step tells you to
   do that step or get it ready for them: "do this", "draft this for me",
   "can you handle this one", "write the email for this". Asking you to do the
