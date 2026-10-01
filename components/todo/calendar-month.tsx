@@ -44,7 +44,6 @@ export function CalendarMonthGrid({
 }) {
   return (
     <Card padding="none" className="relative mt-4 overflow-hidden">
-      <WorkweekOutline />
       <div className="grid grid-cols-7 border-b border-border">
         {WEEKDAYS.map((label) => (
           <div
@@ -128,6 +127,9 @@ export function CalendarMonthGrid({
           </div>
         ))}
       </div>
+
+      {/* Last, so it paints over the squares without a z-index of its own. */}
+      <WorkweekOutline />
     </Card>
   );
 }
@@ -150,7 +152,7 @@ export function WorkweekOutline({ className }: { className?: string }) {
     <div
       aria-hidden
       className={cn(
-        'pointer-events-none absolute inset-y-0 left-0 z-10 w-[calc(100%*5/7)] rounded-l-[inherit] ring-1 ring-inset ring-border-strong',
+        'pointer-events-none absolute inset-y-0 left-0 w-[calc(100%*5/7)] rounded-l-[inherit] ring-1 ring-inset ring-border-strong',
         className,
       )}
     />

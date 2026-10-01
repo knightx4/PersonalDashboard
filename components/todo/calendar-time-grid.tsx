@@ -61,9 +61,6 @@ export function CalendarTimeGrid({
     <Card padding="none" className="mt-4 overflow-hidden">
       <div className="overflow-x-auto">
         <div className="relative" style={frame}>
-          {/* A week is Monday first (lib/todo/calendar/range.ts), so the first
-              five day columns are the working week. */}
-          {days.length === 7 && <WorkweekOutline className="left-14 w-[calc((100%-3.5rem)*5/7)] rounded-none" />}
           <div className="grid border-b border-border" style={columns}>
             <span />
             {days.map((day) => (
@@ -169,6 +166,10 @@ export function CalendarTimeGrid({
               )),
             )}
           </div>
+          {/* A week is Monday first (lib/todo/calendar/range.ts), so the first
+              five day columns are the working week. Last, so it paints over
+              the cells without a z-index of its own. */}
+          {days.length === 7 && <WorkweekOutline className="left-14 w-[calc((100%-3.5rem)*5/7)] rounded-none" />}
         </div>
       </div>
     </Card>
