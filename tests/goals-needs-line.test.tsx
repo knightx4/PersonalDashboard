@@ -122,6 +122,7 @@ describe('whose a goal step is (plan #1159)', () => {
       step('c', { title: 'List balances', kind: 'claude', position: 30 }),
     ]);
     expect(html.match(/sr-only">Yours</g)).toHaveLength(2);
-    expect(html.match(/sr-only">Dash&#x27;s</g)).toHaveLength(1);
+    // Dash's is the mark itself (plan #1338), named for a screen reader.
+    expect(html.match(/role="img" aria-label="Dash&#x27;s"/g)).toHaveLength(1);
   });
 });
