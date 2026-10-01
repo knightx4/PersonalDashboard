@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { Bot } from 'lucide-react';
+import { DashMark } from '@/components/ui/dash-mark';
 import {
   deleteFeedback,
   editFeedback,
@@ -128,11 +128,9 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
               : undefined
           }
         >
-          {/* Who has it, which the word deliberately does not say. The same bot
-              the plan marks a handed-over step with. */}
-          {health === 'working' && (
-            <Bot className="size-3 shrink-0" strokeWidth={2} aria-hidden />
-          )}
+          {/* Who has it, which the word deliberately does not say. Dash's mark,
+              at rest: the word beside it already says it is being worked. */}
+          {health === 'working' && <DashMark size="2xs" decorative />}
         </StateLabel>
         <span className="text-small text-ink-muted">
           {row.createdAt.slice(0, 10)} · p{row.priority} {PRIORITY_LABEL[row.priority] ?? ''}

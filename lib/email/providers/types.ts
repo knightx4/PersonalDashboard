@@ -72,6 +72,18 @@ export interface GmailMessageMetadata {
   snippet: string;
 }
 
+/** A message's headers and readable text, as Dash reads one to answer about it. */
+export interface GmailMessageText {
+  id: string;
+  threadId: string | null;
+  internalDate: Date | null;
+  from: string | null;
+  to: string | null;
+  subject: string | null;
+  /** The plain-text part, or the HTML part stripped to text; never stored. */
+  text: string;
+}
+
 export interface GmailOAuthProvider {
   authorizationUrl(state: string, redirectUri: string): string;
   exchangeCode(code: string, redirectUri: string): Promise<OAuthTokens>;

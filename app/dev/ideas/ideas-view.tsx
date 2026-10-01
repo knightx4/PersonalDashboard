@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from 'react';
 import Link from 'next/link';
-import { Bot, ChevronRight, Lightbulb, Sparkles } from 'lucide-react';
+import { ChevronRight, Lightbulb, Sparkles } from 'lucide-react';
+import { DashMark } from '@/components/ui/dash-mark';
 import {
   addIdea,
   deleteIdea,
@@ -258,7 +259,7 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
             label on every row to distinguish the few that need one. */}
         {idea.source === 'claude' && (
           <span className="inline-flex items-center gap-1 rounded-full bg-raised px-2 py-0.5 text-micro font-semibold uppercase tracking-wide text-ink-muted">
-            <Bot className="size-3" strokeWidth={2} aria-hidden />
+            <DashMark size="2xs" decorative />
             Suggested
           </span>
         )}
@@ -551,7 +552,7 @@ export function IdeasView({
               strokeWidth={1.75}
               aria-hidden
             />
-            <Bot className="size-4 text-ink-ghost" strokeWidth={1.75} aria-hidden />
+            <DashMark size="icon" decorative className="text-ink-ghost" />
             Suggested by Dash{' '}
             <span className="font-normal text-ink-muted">({suggested.length})</span>
           </summary>

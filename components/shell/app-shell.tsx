@@ -339,6 +339,8 @@ export function AppShell({
       // Opening a section is exactly when the drawer should close.
       onClick={() => setDrawer(false)}
       aria-current={on ? 'page' : undefined}
+      // Where capture flies an item filed into this workspace (landed.ts).
+      data-capture-nav={href}
       title={narrow ? label : undefined}
       className={cn(
         'group relative flex items-center gap-2 rounded-lg py-1.5 text-ui font-medium transition-colors duration-150',
@@ -481,6 +483,7 @@ export function AppShell({
         <Link
           href={section.href}
           aria-current={on ? 'page' : undefined}
+          data-capture-nav={section.href}
           className={cn(dockItem, 'relative', on ? 'text-shell-ink' : 'text-shell-muted')}
         >
           {Icon && <Icon className="size-5" strokeWidth={on ? 2 : 1.75} aria-hidden />}
@@ -531,6 +534,7 @@ export function AppShell({
         type="button"
         onClick={() => setSwitcher(true)}
         aria-haspopup="menu"
+        data-capture-switcher=""
         aria-expanded={switcher}
         className={cn(dockItem, switcher ? 'text-shell-ink' : 'text-shell-muted')}
       >

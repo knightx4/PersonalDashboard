@@ -1,7 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { ModuleId } from '@/lib/modules';
 import { AskInputError, isOpenableHref, type AskContext, type AskToolResult } from './db';
-import { mailLookup } from './mail';
+import { mailLookup, readMailLookup } from './mail';
 import {
   APPLICATION_STATUSES,
   HIT_KIND_IDS,
@@ -50,14 +50,15 @@ export const ASK_TOOL_NAMES = [
   'read_dev_row',
   'find_dev_text',
   'search_mail',
+  'read_mail',
 ] as const;
 
 /**
  * Tools the connector (lib/connector/mcp.ts) does not offer. Mail is searched
- * in Gmail as the person, which a connector token cannot do, and its results
- * are not to leave the app for another client.
+ * and read in Gmail as the person, which a connector token cannot do, and
+ * what it holds is not to leave the app for another client.
  */
-export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = ['search_mail'];
+export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = ['search_mail', 'read_mail'];
 
 export type AskToolName = (typeof ASK_TOOL_NAMES)[number];
 
@@ -312,6 +313,19 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'read_mail',
+    description:
+      'Open one email and read its text, for a question about what a message says: "what did the recruiter say about the start date?", "what time did they suggest?". Find the message with search_mail first and pass the ref it returned. Returns the sender, recipients, subject, the day and time it arrived in their timezone, the message\'s text (the first 8,000 characters of a long one) and a link that opens it in Gmail. Open only the messages the question is about; for who wrote, when, or what about, search_mail is enough.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        ref: { type: 'string', description: 'The ref search_mail returned for the message.' },
+      },
+      required: ['ref'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 type Lookup = (ctx: AskContext, input: Record<string, unknown>) => Promise<AskToolResult>;
@@ -334,6 +348,7 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   find_dev_text: { run: findDevTextLookup, module: null },
   // The mailbox belongs to the whole app, so no workspace has to be on.
   search_mail: { run: mailLookup, module: null },
+  read_mail: { run: readMailLookup, module: null },
 };
 
 export function isAskToolName(name: string): name is AskToolName {

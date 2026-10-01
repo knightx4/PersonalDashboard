@@ -66,8 +66,8 @@ function superellipse(size = 24, n = 4.6, steps = 96): string {
   return `M${points.join('L')}Z`;
 }
 
-/** Computed once. The shape never varies; only its fill does. */
-const GROUND = superellipse();
+/** Computed once. The shape never varies; only its fill does. Shared with the Dash mark. */
+export const GROUND = superellipse();
 
 /** How much of the ground the object is allowed. The rest is breathing room. */
 const INSET = 0.8;

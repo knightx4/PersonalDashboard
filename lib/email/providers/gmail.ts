@@ -24,6 +24,7 @@ import {
   GMAIL_READONLY_SCOPE,
   type GmailMessageContent,
   type GmailMessageMetadata,
+  type GmailMessageText,
   type GmailMessageRef,
   type GmailOAuthProvider,
   type OAuthTokens,
@@ -273,6 +274,34 @@ export async function getGmailMessageMetadata(
     to: headerValue(headers, 'To'),
     subject: headerValue(headers, 'Subject'),
     snippet: decodeSnippet(data.snippet ?? ''),
+  };
+}
+
+/**
+ * One message's headers and its readable text, for Dash to answer a question
+ * about what the message says (plan #1317).
+ *
+ * The plain-text part when there is one, otherwise the HTML part stripped to
+ * text (lib/email/mime.ts). Calendar parts and attachments are not fetched.
+ * The text is for the caller to use and drop: nothing here stores it.
+ */
+export async function getGmailMessageText(
+  accessToken: string,
+  messageId: string,
+): Promise<GmailMessageText> {
+  const data = await gmailJson<GmailApiMessage>(
+    accessToken,
+    `users/me/messages/${encodeURIComponent(messageId)}?format=full`,
+  );
+  const headers = data.payload?.headers;
+  return {
+    id: data.id,
+    threadId: data.threadId ?? null,
+    internalDate: data.internalDate ? new Date(Number(data.internalDate)) : null,
+    from: headerValue(headers, 'From'),
+    to: headerValue(headers, 'To'),
+    subject: headerValue(headers, 'Subject'),
+    text: gmailPayloadToText(data.payload as never),
   };
 }
 

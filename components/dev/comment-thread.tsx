@@ -1,7 +1,8 @@
 'use client';
 
 import { useActionState, useOptimistic, useRef, useState } from 'react';
-import { ArrowUp, Bot, CircleUser, X } from 'lucide-react';
+import { ArrowUp, CircleUser, X } from 'lucide-react';
+import { DashMark } from '@/components/ui/dash-mark';
 import { addComment, deleteComment, type CommentActionState } from '@/app/dev/comment-actions';
 import { CommentBody } from '@/components/dev/comment-body';
 import { AddTrigger } from '@/components/ui/add-trigger';
@@ -101,8 +102,10 @@ const AUTHOR_NAME: Record<CommentAuthor, string> = { me: 'You', claude: 'Dash' }
  * five things a hue is allowed to mean.
  */
 function AuthorMark({ author }: { author: CommentAuthor }) {
-  const Glyph = author === 'claude' ? Bot : CircleUser;
-  return <Glyph className="size-3.5 text-ink-ghost" strokeWidth={2} aria-hidden />;
+  if (author === 'claude') {
+    return <DashMark size="2xs" decorative className="text-ink-ghost" />;
+  }
+  return <CircleUser className="size-3.5 text-ink-ghost" strokeWidth={2} aria-hidden />;
 }
 
 /**
@@ -481,7 +484,7 @@ export function CommentThread({
                       : 'border-control text-ink-ghost hover:bg-sunken hover:text-ink')
                   }
                 >
-                  <Bot className="size-3.5" strokeWidth={2} aria-hidden />
+                  <DashMark size="2xs" decorative />
                   <span className="sr-only">
                     {tagged ? 'Dash will read this' : `Tag ${MENTION}`}
                   </span>
