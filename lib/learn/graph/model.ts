@@ -152,8 +152,18 @@ function byId(graph: Graph): Map<string, Concept> {
   return new Map(graph.concepts.map((concept) => [concept.id, concept]));
 }
 
+/**
+ * The part of a graph the prerequisite walks read: which claims exist and what
+ * sits under what. A whole `Graph` is one; so is the lighter read the reading
+ * list makes for teaching order, which needs no claim text or state.
+ */
+export type PrerequisiteGraph = {
+  concepts: ReadonlyArray<Pick<Concept, 'id'>>;
+  edges: readonly ConceptEdge[];
+};
+
 /** dependent → its prerequisites. */
-export function prerequisiteMap(graph: Pick<Graph, 'concepts' | 'edges'>): Map<string, string[]> {
+export function prerequisiteMap(graph: PrerequisiteGraph): Map<string, string[]> {
   const map = new Map<string, string[]>();
   for (const concept of graph.concepts) map.set(concept.id, []);
   for (const edge of graph.edges) {
@@ -346,7 +356,7 @@ export type OrderableReading = { id: string; position: number; conceptId: string
  */
 export function teachingOrder<T extends OrderableReading>(
   readings: T[],
-  graph: Pick<Graph, 'concepts' | 'edges'>,
+  graph: PrerequisiteGraph,
 ): T[] {
   const sorted = [...readings].sort((a, b) => a.position - b.position);
   const prerequisites = prerequisiteMap(graph);

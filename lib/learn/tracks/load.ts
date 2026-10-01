@@ -8,6 +8,7 @@ import {
   type MatchedReading,
   type TrackReadingMatch,
 } from '@/lib/learn/tracks/matches';
+import { inTeachingOrder } from '@/lib/learn/tracks/teaching-order';
 
 /**
  * Reading the queue.
@@ -112,7 +113,17 @@ export type ReadingRow = {
 export type TrackDetail = TrackSummary & {
   /** The title of the track this one was branched out of, for the way back. */
   branchedFromTitle: string | null;
+  /**
+   * In teaching order when `taughtInOrder` is set: no reading above one for a
+   * claim it builds on. Otherwise in the order they were added.
+   */
   readings: ReadingRow[];
+  /**
+   * Whether the readings were put in teaching order by the subject graph,
+   * which needs at least two of them queued for claims the graph holds. Worked
+   * out each time the list is read and never saved.
+   */
+  taughtInOrder: boolean;
 };
 
 /**
@@ -437,7 +448,12 @@ export async function loadTrack(
   assertSchemaExposed(readingError, LEARN_SCHEMA);
   if (readingError) throw new Error(`Reading this reading list failed: ${readingError.message}`);
 
-  const readings = ((readingRows ?? []) as unknown as ReadingRecord[]).map(toReading);
+  // Readings queued for claims, the gaps list above all, read in the order
+  // the graph teaches them rather than the order they arrived (plan #1394).
+  const { readings, taught } = await inTeachingOrder(
+    supabase,
+    ((readingRows ?? []) as unknown as ReadingRecord[]).map(toReading),
+  );
 
   // The topic this one came out of, for the link back up. A second query
   // rather than an embed, and only for the few tracks that have a parent.
@@ -464,6 +480,7 @@ export async function loadTrack(
     // whole track rather than the ones a search picked out.
     matches: [],
     readings,
+    taughtInOrder: taught,
   };
 }
 
