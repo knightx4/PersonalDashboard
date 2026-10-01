@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, ViewTransition } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -64,34 +64,6 @@ export type NavSection = {
    */
   badge?: number;
 };
-
-/**
- * Crossfades a workspace's accent bar into the next one's when you switch
- * (plan #1344). Each workspace's layout renders its own shell, so a switch
- * replaces the bar rather than changing it, and a CSS transition on its colour
- * has nothing to run on. A shared view-transition name pairs the old bar with
- * the new one and the browser fades between them; the CSS for it is the
- * "Workspace accent crossfade" block in app/globals.css, which also stops the
- * rest of the page taking part.
- *
- * Names go by row, so the first section's bar in one workspace pairs with the
- * first section's in the next. `default="none"` keeps it still for everything
- * but a switch: moving between sections of one workspace keeps the same bars
- * mounted, and only their opacity changes as before.
- *
- * Without a name it renders the bar alone. To take the crossfade out, make
- * this return `children` and delete the CSS block.
- */
-function AccentCrossfade({ name, children }: { name?: string; children: React.ReactNode }) {
-  // ViewTransition ships in the React canary that Next bundles for the app,
-  // not in the stable react the tests render with, where it is undefined.
-  if (!name || !ViewTransition) return children;
-  return (
-    <ViewTransition name={name} share="workspace-accent" default="none">
-      {children}
-    </ViewTransition>
-  );
-}
 
 /**
  * The shell: a sidebar of sections, a top bar that says where you are, and the
@@ -346,7 +318,6 @@ export function AppShell({
     badge,
     narrow = false,
     hint,
-    accent,
   }: {
     href: string;
     label: string;
@@ -361,8 +332,6 @@ export function AppShell({
     narrow?: boolean;
     /** The shortcut that opens it, shown while a modifier is held. */
     hint?: string;
-    /** The view-transition name for its accent bar (AccentCrossfade). */
-    accent?: string;
   }) => (
     <Link
       key={href}
@@ -384,16 +353,14 @@ export function AppShell({
       {/* The workspace's own colour, as a bar rather than a tint. A tint
           would have to be legible on five different shells; a 2px bar in
           the mark key's fixed hue is vivid on all of them. */}
-      <AccentCrossfade name={accent}>
-        <span
-          className={cn(
-            'absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full transition-opacity duration-150',
-            on ? 'opacity-100' : 'opacity-0',
-          )}
-          style={{ background: (moduleById(module) ?? HOME_MARK).key.from }}
-          aria-hidden
-        />
-      </AccentCrossfade>
+      <span
+        className={cn(
+          'absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full transition-opacity duration-150',
+          on ? 'opacity-100' : 'opacity-0',
+        )}
+        style={{ background: (moduleById(module) ?? HOME_MARK).key.from }}
+        aria-hidden
+      />
       {/* Muted until the row is current, so the column reads as a list
           of names with marks beside them rather than a wall of icons
           competing with the one that says where you are. */}
@@ -429,7 +396,7 @@ export function AppShell({
     </Link>
   );
 
-  const nav = (narrow: boolean, accent: boolean) => (
+  const nav = (narrow: boolean) => (
     <nav className="flex flex-col gap-0.5" aria-label="Sections">
       {sections.map((section, index) =>
         navRow({
@@ -440,13 +407,12 @@ export function AppShell({
           badge: section.badge,
           narrow,
           hint: index < 9 ? `⌥${index + 1}` : undefined,
-          accent: accent ? `workspace-accent-${index}` : undefined,
         }),
       )}
     </nav>
   );
 
-  const sidebarInner = (narrow: boolean, accent = false) => (
+  const sidebarInner = (narrow: boolean) => (
     <>
       <div className={cn('pt-3', narrow ? 'px-2' : 'px-3')}>
         <WorkspaceSwitcher
@@ -457,7 +423,7 @@ export function AppShell({
           compact={narrow}
         />
       </div>
-      <div className="mt-2 flex-1 overflow-y-auto px-2 pb-3">{nav(narrow, accent)}</div>
+      <div className="mt-2 flex-1 overflow-y-auto px-2 pb-3">{nav(narrow)}</div>
 
       {/* The workspace's own settings, at the foot of its own column.
           They were a gear in the top bar, next to the theme picker and the
@@ -509,7 +475,7 @@ export function AppShell({
   const dockItem =
     'press flex w-full flex-col items-center gap-1 px-1 pb-3.5 pt-4 text-micro font-medium';
 
-  const dockTabs = tabs.map((section, index) => {
+  const dockTabs = tabs.map((section) => {
     const Icon = section.icon ? NAV_ICONS[section.icon] : null;
     const on = isActive(section);
     return (
@@ -528,16 +494,14 @@ export function AppShell({
               aria-hidden
             />
           )}
-          <AccentCrossfade name={`workspace-accent-dock-${index}`}>
-            <span
-              className={cn(
-                'absolute inset-x-6 top-0 h-0.5 rounded-b-full transition-opacity duration-150',
-                on ? 'opacity-100' : 'opacity-0',
-              )}
-              style={{ background: dockKey }}
-              aria-hidden
-            />
-          </AccentCrossfade>
+          <span
+            className={cn(
+              'absolute inset-x-6 top-0 h-0.5 rounded-b-full transition-opacity duration-150',
+              on ? 'opacity-100' : 'opacity-0',
+            )}
+            style={{ background: dockKey }}
+            aria-hidden
+          />
         </Link>
       </li>
     );
@@ -634,9 +598,7 @@ export function AppShell({
           switcher menu. Level with the top bar, below the palette and the
           sheets that are meant to cover the whole shell. */}
           <aside className="sticky top-1.5 z-chrome hidden h-[calc(100dvh-0.75rem)] flex-col lg:flex">
-            {/* The column alone names its accent bars: the drawer renders
-                the same rows, and two of a name at once is an error. */}
-            {sidebarInner(collapsed, true)}
+            {sidebarInner(collapsed)}
 
             {/* Narrow it when the page needs the width, without losing the way
             out: the workspace switcher stays at the top of the rail as its
