@@ -1,22 +1,26 @@
 import type { MailSearchHit, MailSearchInput } from '@/lib/inbox/search-mail';
+import type { MailMessage } from '@/lib/inbox/read-mail';
 import { wallClockToInstant } from '@/lib/todo/time';
 import { AskInputError, optionalDate, optionalString, type AskContext, type AskToolResult } from './db';
 
 /**
  * search_mail (plan #1316): Dash searching the person's connected Gmail at
- * the moment they ask, through lib/inbox/search-mail.ts.
+ * the moment they ask, through lib/inbox/search-mail.ts. read_mail (plan
+ * #1317): Dash opening one message it found to read its text, through
+ * lib/inbox/read-mail.ts.
  *
  * What the model reads and what is kept are kept apart on purpose. The rows'
  * `detail` carries each message's subject and Gmail's preview, which go to
- * the model for this one answer. The row's title, which becomes the citation
- * saved with the answer, is only the sender and the day; and `kept` replaces
- * the whole result in the saved tool call with the number that matched. So
+ * the model for this one answer, and read_mail's carries the message's text
+ * as well. The row's title, which becomes the citation saved with the answer,
+ * is only the sender and the day; and `kept` replaces the whole result in the
+ * saved tool call with a count. So
  * nothing from a message reaches the database except what Dash writes in its
  * answer and the link to the message.
  *
  * No `server-only` here: the search itself arrives on the context
- * (`ctx.searchMail`), bound to the signed-in person by lib/talk/ask-request.ts,
- * and is a stub in tests.
+ * (`ctx.searchMail`), as does the read (`ctx.readMail`), each bound to the
+ * signed-in person by lib/talk/ask-request.ts and a stub in tests.
  */
 
 /** The `table` a mail row carries. Not a table in the database: the message lives in Gmail. */
@@ -68,14 +72,23 @@ function startOfDay(day: string, timezone: string | undefined): string {
   return timezone ? wallClockToInstant(day, '00:00', timezone) : `${day}T00:00:00.000Z`;
 }
 
-function row(hit: MailSearchHit, timezone: string | undefined, showMailbox: boolean) {
-  const sender = senderName(hit.from);
+/** The parts of a mail row that are kept as its citation: sender and day, never the subject. */
+function citation(
+  message: Pick<MailSearchHit, 'accountId' | 'messageId' | 'from' | 'date' | 'gmailUrl'>,
+  timezone: string | undefined,
+) {
+  const sender = senderName(message.from);
   return {
     table: MAIL_TABLE,
-    ref: mailRef(hit.accountId, hit.messageId),
-    // The citation kept with the answer: sender and day, never the subject.
-    title: hit.date ? `Email from ${sender}, ${localDay(hit.date, timezone)}` : `Email from ${sender}`,
-    href: hit.gmailUrl,
+    ref: mailRef(message.accountId, message.messageId),
+    title: message.date ? `Email from ${sender}, ${localDay(message.date, timezone)}` : `Email from ${sender}`,
+    href: message.gmailUrl,
+  };
+}
+
+function row(hit: MailSearchHit, timezone: string | undefined, showMailbox: boolean) {
+  return {
+    ...citation(hit, timezone),
     detail: {
       from: hit.from,
       to: hit.to,
@@ -127,5 +140,59 @@ export async function mailLookup(ctx: AskContext, input: Record<string, unknown>
     ...(notes.length ? { note: notes.join(' ') } : {}),
     // Kept on the saved tool call in place of all of the above.
     kept: { matched: rows.length },
+  };
+}
+
+/** A message's ref split back into the mailbox and Gmail's id, or null when it is not one. */
+export function parseMailRef(ref: string): { accountId: string; messageId: string } | null {
+  const match = /^([0-9A-Za-z-]+):([0-9A-Za-z]+)$/.exec(ref.trim());
+  return match ? { accountId: match[1], messageId: match[2] } : null;
+}
+
+function readRow(message: MailMessage, timezone: string | undefined) {
+  return {
+    ...citation(message, timezone),
+    detail: {
+      from: message.from,
+      to: message.to,
+      subject: message.subject,
+      received: message.date ? localStamp(message.date, timezone) : null,
+      text: message.text || null,
+    },
+  };
+}
+
+export async function readMailLookup(ctx: AskContext, input: Record<string, unknown>): Promise<AskToolResult> {
+  if (!ctx.readMail) return { ok: false, error: 'Email cannot be read from here.' };
+
+  const ref = optionalString(input, 'ref');
+  const named = ref ? parseMailRef(ref) : null;
+  if (!named) throw new AskInputError('ref must be the ref search_mail returned for the message.');
+
+  const read = await ctx.readMail(named);
+  if (!read.ok) {
+    return {
+      ok: false,
+      error:
+        read.kind === 'not_configured'
+          ? 'Gmail is not set up on this deployment, so email cannot be read.'
+          : read.kind === 'not_found'
+            ? `${read.reason} Find the message with search_mail and pass the ref it returns.`
+            : read.reason,
+    };
+  }
+
+  const { message } = read;
+  const notes = [
+    message.text ? null : 'The message has no text that can be read; answer from its sender, subject and date.',
+    message.truncated ? 'The text is long and was cut; what is shown is its beginning.' : null,
+  ].filter(Boolean);
+
+  return {
+    ok: true,
+    rows: [readRow(message, ctx.timezone)],
+    ...(notes.length ? { note: notes.join(' ') } : {}),
+    // Kept on the saved tool call in place of the text: only that one was opened.
+    kept: { opened: 1 },
   };
 }
