@@ -243,18 +243,18 @@ describe('loadStoryOrigins (plan #1368)', () => {
   it('opens a saved story on Saved, an unsaved one in its newsletter, and a lost one nowhere', async () => {
     const { client, calls } = fakeClient({
       saved: [
-        { id: 'a', issue_id: 'i1', sender_name: 'Letters From Work', unsaved_at: null },
-        { id: 'b', issue_id: 'i2', sender_name: 'Money Stuff', unsaved_at: '2026-10-01T09:00:00Z' },
-        { id: 'c', issue_id: null, sender_name: 'Gone Weekly', unsaved_at: '2026-10-01T09:00:00Z' },
+        { id: 'a', issue_id: 'i1', sender_name: 'Letters From Work', headline: 'Trams', unsaved_at: null },
+        { id: 'b', issue_id: 'i2', sender_name: 'Money Stuff', headline: 'Bonds', unsaved_at: '2026-10-01T09:00:00Z' },
+        { id: 'c', issue_id: null, sender_name: 'Gone Weekly', headline: 'Lost', unsaved_at: '2026-10-01T09:00:00Z' },
       ],
     });
 
     const origins = await loadStoryOrigins(client, ['a', 'b', 'c', 'a']);
 
     expect(Object.fromEntries(origins)).toEqual({
-      a: { senderName: 'Letters From Work', href: '/news/saved#story-a' },
-      b: { senderName: 'Money Stuff', href: '/news/i/i2' },
-      c: { senderName: 'Gone Weekly', href: null },
+      a: { senderName: 'Letters From Work', headline: 'Trams', href: '/news/saved#story-a' },
+      b: { senderName: 'Money Stuff', headline: 'Bonds', href: '/news/i/i2' },
+      c: { senderName: 'Gone Weekly', headline: 'Lost', href: null },
     });
     expect(calls.find((c) => c.op === 'in')?.args).toEqual(['id', ['a', 'b', 'c']]);
   });
