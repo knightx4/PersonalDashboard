@@ -12,7 +12,8 @@ import {
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Bot, SquarePen, X } from 'lucide-react';
+import { SquarePen, X } from 'lucide-react';
+import { DashMark } from '@/components/ui/dash-mark';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { TalkThread, type TalkSend } from '@/components/talk/talk-thread';
 import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
@@ -180,7 +181,7 @@ export function AskDashButton() {
       title="Ask Dash"
       className="press flex size-8 shrink-0 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink"
     >
-      <Bot className="size-4" strokeWidth={1.75} aria-hidden />
+      <DashMark size="icon" decorative />
       <span className="sr-only">Ask Dash</span>
     </button>
   );
@@ -511,7 +512,7 @@ function NewQuestion({
       {!asked && (
         <div className="flex gap-2">
           <div className="flex w-4 shrink-0 justify-center pt-1">
-            <Bot className="size-3.5 text-ink-ghost" strokeWidth={2} aria-hidden />
+            <DashMark size="2xs" decorative className="text-ink-ghost" />
           </div>
           <div className="min-w-0 flex-1 space-y-0.5">
             <span className="text-small font-semibold text-ink">Dash</span>

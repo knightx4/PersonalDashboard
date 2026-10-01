@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { ArrowUp, Bot, CircleUser, CornerDownRight } from 'lucide-react';
+import { ArrowUp, CircleUser, CornerDownRight } from 'lucide-react';
+import { DashMark } from '@/components/ui/dash-mark';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
@@ -44,7 +45,12 @@ export type TalkAssistant = {
   Mark: React.ComponentType<{ className?: string; strokeWidth?: number; 'aria-hidden'?: boolean }>;
 };
 
-const DASH: TalkAssistant = { name: 'Dash', Mark: Bot };
+/** Dash's own mark, idle, at the size of the glyph beside every other turn. */
+function DashTurnMark({ className }: { className?: string }) {
+  return <DashMark size="2xs" decorative className={className} />;
+}
+
+const DASH: TalkAssistant = { name: 'Dash', Mark: DashTurnMark };
 
 function AuthorMark({ role, assistant }: { role: TalkRole; assistant: TalkAssistant }) {
   const Glyph = role === 'assistant' ? assistant.Mark : CircleUser;

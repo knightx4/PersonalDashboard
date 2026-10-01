@@ -1,6 +1,7 @@
 'use client';
 
-import { Bot, CornerDownLeft, Palette } from 'lucide-react';
+import { CornerDownLeft, Palette } from 'lucide-react';
+import { DashMark } from '@/components/ui/dash-mark';
 import { cn } from '@/lib/cn';
 import { HIT_KINDS } from '@/lib/search/sources';
 import { ModuleMark } from '@/components/ui/module-mark';
@@ -50,7 +51,7 @@ export function SearchRowLine({
       {row.kind === 'command' && row.command.icon === 'theme' ? (
         <Palette className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
       ) : row.kind === 'command' && row.command.icon === 'dash' ? (
-        <Bot className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+        <DashMark size="icon" decorative className="text-ink-muted" />
       ) : (
         // The mark of wherever it lives, so which workspace a row belongs to
         // is readable without a label.
