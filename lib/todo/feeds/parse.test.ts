@@ -93,6 +93,38 @@ describe('parseCalendar', () => {
     expect(moved?.location).toBe('Room 5');
   });
 
+  it('marks each date of a repeat with the date the rule put it on', () => {
+    // Every date shares the uid, so the original start is what tells one
+    // Monday from the next once the rows have been rewritten.
+    const events = byUid(parseCalendar(fixture('weekly-repeat.ics'), MARCH), 'standup@work.example');
+    const plain = events.filter((event) => event.title === 'Stand-up');
+
+    expect(plain.map((event) => event.occurrence).sort()).toEqual([
+      '2026-03-02T09:30:00.000Z',
+      '2026-03-09T09:30:00.000Z',
+      '2026-03-30T09:30:00.000Z',
+    ]);
+    for (const event of plain) expect(event.occurrence).toBe(event.startsAt);
+  });
+
+  it('keeps the original date on an occurrence that was moved', () => {
+    // RECURRENCE-ID 09:30, moved to 11:00. A link to that date has to find
+    // it at its new time, so the original is kept beside the new start.
+    const moved = parseCalendar(fixture('weekly-repeat.ics'), MARCH).find(
+      (event) => event.title === 'Stand-up (moved)',
+    );
+
+    expect(moved?.startsAt).toBe('2026-03-23T11:00:00.000Z');
+    expect(moved?.occurrence).toBe('2026-03-23T09:30:00.000Z');
+  });
+
+  it('gives an appointment that does not repeat no original date', () => {
+    const events = parseCalendar(fixture('whole-day.ics'), MARCH);
+
+    expect(events.length).toBeGreaterThan(0);
+    for (const event of events) expect(event.occurrence).toBeNull();
+  });
+
   it('reads a time in a zone the file defines itself', () => {
     // "Customized Time Zone" means nothing to anyone until the file's own
     // VTIMEZONE is read. Without it the time floats and lands hours out. On
