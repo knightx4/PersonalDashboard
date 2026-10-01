@@ -1,25 +1,13 @@
 'use client';
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useCountUp } from '@/components/ui/motion';
 import { formatMoney, type CurrencyCode } from '@/lib/money';
-
-function subscribeReducedMotion(onStoreChange: () => void): () => void {
-  const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-  mq.addEventListener('change', onStoreChange);
-  return () => mq.removeEventListener('change', onStoreChange);
-}
-
-function getReducedMotionSnapshot(): boolean {
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
-function getReducedMotionServerSnapshot(): boolean {
-  return false;
-}
 
 /**
  * Count-up for dashboard headline figures. Skips animation when the user has
  * asked for reduced motion, and always lands on the exact final cents value.
+ * The count itself is useCountUp in components/ui/motion.ts, which the goal
+ * progress count shares.
  */
 export function CountUpMoney({
   cents,
@@ -32,36 +20,7 @@ export function CountUpMoney({
   className?: string;
   durationMs?: number;
 }) {
-  const reduceMotion = useSyncExternalStore(
-    subscribeReducedMotion,
-    getReducedMotionSnapshot,
-    getReducedMotionServerSnapshot,
-  );
-
-  const [animated, setAnimated] = useState(0);
-
-  useEffect(() => {
-    if (reduceMotion) return;
-
-    let frame = 0;
-    const start = performance.now();
-    const from = 0;
-    const to = cents;
-
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / durationMs);
-      // ease-out soft, matching --ease-out-soft
-      const eased = 1 - Math.pow(1 - t, 3);
-      setAnimated(Math.round(from + (to - from) * eased));
-      if (t < 1) frame = requestAnimationFrame(tick);
-      else setAnimated(to);
-    };
-
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [cents, durationMs, reduceMotion]);
-
-  const display = reduceMotion ? cents : animated;
+  const display = useCountUp(cents, { durationMs, from: 'zero' });
 
   return (
     <span className={className} suppressHydrationWarning>

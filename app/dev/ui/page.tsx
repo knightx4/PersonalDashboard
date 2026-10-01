@@ -43,6 +43,7 @@ import type { TaskStatus } from '@/lib/todo/tasks/model';
 import { ActivePalette } from './palette';
 import { FlyChipDemo } from './fly-chip-demo';
 import { PuffDemo } from './puff-demo';
+import { ProgressMoveDemo } from './progress-move-demo';
 import { LAW_GROUPS } from './laws';
 import { ANATOMIES } from './anatomy';
 import * as C from './content';
@@ -1524,6 +1525,9 @@ export default function DevUiPage() {
         </Card>
         <Card padding="standard">
           <PuffDemo />
+        </Card>
+        <Card padding="standard">
+          <ProgressMoveDemo />
         </Card>
         <Rows rows={M.MOTION} labelWidth="sm:grid-cols-[7rem_1fr]" />
         <Rules items={M.MOTION_RULES} />

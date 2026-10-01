@@ -112,33 +112,34 @@ export function GoalStatusCard({ status, brief, briefWhen, review, current, stag
  * The stages as one bar of segments: a finished stage full, each stage under
  * way filled as far as its steps are done, the rest empty. The first and last
  * stages are named under it, so the bar reads as the way from one to the
- * other.
+ * other. A step closing on screen slides its stage's fill to the new length.
  */
 function StageTrack({ stages }: { stages: Stage[] }) {
   const label = stagesLabel(stages);
   return (
     <div className="space-y-1">
       <div className="flex gap-1" role="img" aria-label={label}>
-        {stages.map((stage) =>
-          stage.state === 'current' ? (
+        {/* Every stage is a meter, done full and the rest empty, so a stage
+            finishing on screen slides to full rather than being swapped for
+            another element (plan #1342). */}
+        {stages.map((stage) => {
+          const current = stage.state === 'current';
+          const named = [stage.title, stageWait(stage)].filter(Boolean).join(': ');
+          return (
             <Meter
               key={stage.id}
-              value={stage.done}
-              max={stage.live}
+              value={stage.state === 'done' ? 1 : current ? stage.done : 0}
+              max={current ? stage.live : 1}
               fill="bg-positive"
               track="sunken"
-              minFraction={0.15}
-              label={`${stage.title}: ${stage.done} of ${stage.live} done`}
+              minFraction={current ? 0.15 : 0}
+              moves
+              label={current ? `${stage.title}: ${stage.done} of ${stage.live} done` : named}
+              title={current ? undefined : named}
               className="flex-1"
             />
-          ) : (
-            <span
-              key={stage.id}
-              title={[stage.title, stageWait(stage)].filter(Boolean).join(': ')}
-              className={`h-1.5 flex-1 rounded-full ${stage.state === 'done' ? 'bg-positive' : 'bg-sunken'}`}
-            />
-          ),
-        )}
+          );
+        })}
       </div>
       <div className="flex justify-between gap-3 text-small text-ink-ghost">
         <span className="min-w-0 truncate">{stages[0].title}</span>
