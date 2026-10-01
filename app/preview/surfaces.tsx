@@ -165,10 +165,6 @@ const rolePanels: PanelProps = {
   requirementMatchesStale: false,
   bankSize: 6,
   coverLetter: '',
-  caseStatement: '',
-  caseSlug: null,
-  caseExpiresAt: null,
-  appOrigin: 'https://example.com',
   timezone: 'Europe/London',
   focusInterviewId: null,
   events: [
@@ -2342,6 +2338,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <RoleDetailPanels {...rolePanels} initialTab="timeline" />,
+  },
+  {
+    id: 'jobs-role-posting',
+    label: 'Role · Posting',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <RoleDetailPanels {...rolePanels} initialTab="posting" />,
   },
   {
     id: 'jobs-role-answers',

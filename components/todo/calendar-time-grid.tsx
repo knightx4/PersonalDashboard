@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
-import { Pill, opensAt } from '@/components/todo/calendar-month';
+import { Pill, WorkweekOutline, opensAt } from '@/components/todo/calendar-month';
 import { blocksFor, hourIn, hourWindow, hoursOf } from '@/lib/todo/calendar/range';
 import type { CalendarDay } from '@/lib/todo/calendar/month';
 import { hourLabel } from '@/lib/clock';
@@ -60,7 +60,7 @@ export function CalendarTimeGrid({
   return (
     <Card padding="none" className="mt-4 overflow-hidden">
       <div className="overflow-x-auto">
-        <div style={frame}>
+        <div className="relative" style={frame}>
           <div className="grid border-b border-border" style={columns}>
             <span />
             {days.map((day) => (
@@ -166,6 +166,10 @@ export function CalendarTimeGrid({
               )),
             )}
           </div>
+          {/* A week is Monday first (lib/todo/calendar/range.ts), so the first
+              five day columns are the working week. Last, so it paints over
+              the cells without a z-index of its own. */}
+          {days.length === 7 && <WorkweekOutline className="left-14 w-[calc((100%-3.5rem)*5/7)] rounded-none" />}
         </div>
       </div>
     </Card>

@@ -25,7 +25,7 @@ import { EditableProse } from '@/components/ui/editable-prose';
 import { FoldingMarkdown } from '@/components/ui/folding-markdown';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
-import { Field, FieldError, FieldHint, Textarea } from '@/components/ui/field';
+import { Field, FieldError, Textarea } from '@/components/ui/field';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import {
@@ -73,11 +73,9 @@ import {
   saveInterview,
   saveInterviewGroup,
   searchUnlinkedMessages,
-  shareCasePage,
   ungroupInterview,
   unlinkMessage,
   unlinkRoundMessage,
-  unshareCasePage,
   updateReminder,
 } from './actions';
 import { dismissPursuit } from '@/app/jobs/(app)/pipeline/actions';
@@ -128,12 +126,6 @@ export interface PanelProps {
   bankSize: number;
   /** The cover letter for this application, private; empty when none is written. */
   coverLetter: string;
-  /** The statement of interest on the shared case page. Written by hand. */
-  caseStatement: string;
-  /** The live share slug, or null when the page is not shared. */
-  caseSlug: string | null;
-  caseExpiresAt: string | null;
-  appOrigin: string;
   timezone: string;
   /** The interview to scroll to and highlight, arriving from This week. */
   focusInterviewId?: string | null;
@@ -844,11 +836,6 @@ function Posting({
   requirementMatchesAt,
   requirementMatchesStale,
   bankSize,
-  applicationId,
-  caseStatement,
-  caseSlug,
-  caseExpiresAt,
-  appOrigin,
   timezone,
 }: PanelProps) {
   const groups: Array<{ kind: Requirement['kind']; label: string }> = [
@@ -900,7 +887,21 @@ function Posting({
   const verdictFor = new Map((matches ?? []).map((match) => [match.requirement, match]));
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    // One column, in reading order: what the role is, what it says, then what
+    // you can claim against it.
+    <div className="space-y-4">
+      <RoleDetailsCard
+        roleId={roleId}
+        jdUrl={jdUrl}
+        atsJobId={atsJobId}
+        compMinCents={compMinCents}
+        compMaxCents={compMaxCents}
+        compSource={compSource}
+        jdText={jdText}
+      />
+
+      <JobDescriptionCard roleId={roleId} jdText={jdText} jdLookupNote={jdLookupNote} />
+
       <CardSection
         title="Requirement map"
         hint={
@@ -1029,170 +1030,7 @@ function Posting({
           </div>
         )}
       </CardSection>
-
-      <div className="space-y-4">
-        <ShareCaseCard
-          applicationId={applicationId}
-          statement={caseStatement}
-          slug={caseSlug}
-          expiresAt={caseExpiresAt}
-          appOrigin={appOrigin}
-          canShare={(matches ?? []).some((match) => match.verdict !== 'gap')}
-          timezone={timezone}
-        />
-
-        <RoleDetailsCard
-          roleId={roleId}
-          jdUrl={jdUrl}
-          atsJobId={atsJobId}
-          compMinCents={compMinCents}
-          compMaxCents={compMaxCents}
-          compSource={compSource}
-          jdText={jdText}
-        />
-
-        <JobDescriptionCard roleId={roleId} jdText={jdText} jdLookupNote={jdLookupNote} />
-      </div>
     </div>
-  );
-}
-
-/**
- * The shared case page.
- *
- * The requirement map is already the work; this puts a link on it. A statement
- * of interest goes on top, written by hand -- the map is what makes the page
- * worth sending, and a generated paragraph of enthusiasm above it would undo
- * that. Standalone cover letter generation is dropped for the same reason.
- *
- * Only the covered lines travel. The private map exists to show what you
- * cannot claim; this page exists to show what you can, and the filtering
- * happens in the database so gap lines never leave it.
- */
-function ShareCaseCard({
-  applicationId,
-  statement,
-  slug,
-  expiresAt,
-  appOrigin,
-  canShare,
-  timezone,
-}: {
-  applicationId: string;
-  statement: string;
-  slug: string | null;
-  expiresAt: string | null;
-  appOrigin: string;
-  canShare: boolean;
-  timezone: string;
-}) {
-  const [body, setBody] = useState(statement);
-  const [liveSlug, setLiveSlug] = useState(slug);
-  const [liveExpiry, setLiveExpiry] = useState(expiresAt);
-  const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [pending, startTransition] = useTransition();
-
-  const url = liveSlug ? `${appOrigin}/jobs/p/${liveSlug}` : null;
-
-  return (
-    <CardSection
-      title="Share the map"
-      hint="A private link showing this role’s requirements with your evidence beside each one. It is a work sample and a cover letter in one. Gaps are never on it, and the link expires."
-    >
-      <Field id={`case-body-${applicationId}`} label="Why you want it" className="mt-3">
-        <Textarea
-          rows={4}
-          value={body}
-          onChange={(event) => setBody(event.target.value)}
-          placeholder="A short paragraph, in your words. Nothing writes this for you."
-        />
-      </Field>
-
-      {url && (
-        <div className="mt-3 rounded-lg bg-canvas p-2">
-          <p className="break-all font-mono text-small text-ink">{url}</p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                navigator.clipboard.writeText(url);
-                setCopied(true);
-              }}
-            >
-              {copied ? 'Copied' : 'Copy link'}
-            </Button>
-            {liveExpiry && (
-              <span className="text-small text-ink-muted">
-                Expires {formatDate(liveExpiry, timezone)}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          disabled={pending || !canShare}
-          title={
-            canShare ? undefined : 'Match the requirements first — there is nothing to show yet.'
-          }
-          onClick={() => {
-            setError(null);
-            setCopied(false);
-            startTransition(async () => {
-              const result = await shareCasePage({ applicationId, body });
-              if (result.error) {
-                setError(result.error);
-                return;
-              }
-              setLiveSlug(result.slug);
-              setLiveExpiry(result.expiresAt);
-            });
-          }}
-        >
-          {liveSlug ? 'Save and re-issue the link' : 'Create the link'}
-        </Button>
-
-        {liveSlug && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            disabled={pending}
-            onClick={() => {
-              setError(null);
-              startTransition(async () => {
-                const result = await unshareCasePage(applicationId);
-                if (result.error) {
-                  setError(result.error);
-                  return;
-                }
-                setLiveSlug(null);
-                setLiveExpiry(null);
-                setCopied(false);
-              });
-            }}
-          >
-            Stop sharing
-          </Button>
-        )}
-
-        {error && <span className="text-small text-danger">{error}</span>}
-      </div>
-
-      {liveSlug && (
-        <FieldHint>
-          Re-issuing gives a new link and breaks the old one, which is how you take a shared page
-          back.
-        </FieldHint>
-      )}
-    </CardSection>
   );
 }
 
