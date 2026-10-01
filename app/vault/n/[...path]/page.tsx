@@ -63,8 +63,9 @@ export const dynamic = 'force-dynamic';
  * On a laptop the column can be folded away so the note has the width (#1380):
  * a button beside the search box hides it, and one in the header row brings it
  * back, in the spot the phone's sheet button takes below `lg`. The pieces are
- * in `components/vault/note-list-fold.tsx`; the wrapper is keyed by the note's
- * path, so for now a fold lasts until another note is opened.
+ * in `components/vault/note-list-fold.tsx`. The fold is kept in this browser
+ * (#1381), so it lasts from note to note and through a reload; a note opened
+ * with a search in the address shows the list for that view regardless.
  */
 export default async function NotePage({
   params,
@@ -114,7 +115,7 @@ export default async function NotePage({
   ]);
 
   return (
-    <NoteListFold key={note.path}>
+    <NoteListFold notePath={note.path} search={search}>
       {/* Hidden below lg rather than stacked above the note: at that width the
           same panel arrives as a sheet instead, from the button beside "All
           notes" below. */}

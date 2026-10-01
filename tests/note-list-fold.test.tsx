@@ -1,10 +1,11 @@
 /**
  * Folding the note list away on a laptop (#1380).
  *
- * The runner has no DOM, so nothing can be pressed here. What is pinned is the
- * page at rest: the column drawn from `lg` up and named by both buttons, the
- * fold button beside the search box saying the list is shown, no unfold button
- * until something is folded, and neither button drawn below `lg`.
+ * The runner has no DOM, so nothing can be pressed here and no script runs.
+ * What is pinned is the page as the server draws it, which is also the page
+ * without JavaScript: the column shown from `lg` up under the id both buttons
+ * name, unfolded whatever this browser stored (#1381), and no fold control at
+ * all, since without the script it could not work.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -36,7 +37,7 @@ const GROUPS = [
 ];
 
 const html = renderToStaticMarkup(
-  <NoteListFold>
+  <NoteListFold notePath="Money/Rent.md">
     <NoteListColumn>
       <VaultPanel
         groups={GROUPS}
@@ -58,18 +59,32 @@ describe('the note list at rest', () => {
     expect(html).toContain('data-folded="false"');
   });
 
-  it('carries a fold button that says the list is shown', () => {
-    expect(html).toContain('Hide the note list');
-    expect(html).toContain('aria-expanded="true"');
-    expect(html).toContain(`aria-controls="${NOTE_LIST_ID}"`);
-  });
-
-  it('draws the fold button only from lg up', () => {
-    expect(html).toMatch(/<button[^>]*class="[^"]*\bhidden\b[^"]*lg:flex/);
+  it('draws no fold button until the script has run', () => {
+    expect(html).not.toContain('Hide the note list');
+    expect(html).not.toContain(`aria-controls="${NOTE_LIST_ID}"`);
   });
 
   it('has no unfold button until the list is folded', () => {
     expect(html).not.toContain('Show the note list');
+  });
+
+  it('is drawn unfolded even where this browser stored a fold', () => {
+    (globalThis as { window?: unknown }).window = {
+      localStorage: { getItem: () => 'true', setItem: () => {} },
+    };
+    try {
+      const stored = renderToStaticMarkup(
+        <NoteListFold notePath="Money/Rent.md">
+          <NoteListColumn>list</NoteListColumn>
+          <UnfoldNoteListButton />
+        </NoteListFold>,
+      );
+      expect(stored).toContain('data-folded="false"');
+      expect(stored).toMatch(/<aside[^>]*class="[^"]*lg:block/);
+      expect(stored).not.toContain('Show the note list');
+    } finally {
+      delete (globalThis as { window?: unknown }).window;
+    }
   });
 
   it('keeps the search box in the column', () => {
