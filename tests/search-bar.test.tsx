@@ -4,7 +4,9 @@
  * The field in the top bar is a button drawn as a field: a press opens the
  * search box over the page, and nothing drops under the field. ⌘K opens the
  * same box at any width. Every opening starts on everything you own, so the
- * box opened inside a workspace says "Everything" on its chip.
+ * box opened inside a workspace says "Everything" on its chip. The one
+ * exception is the chip on the field itself (plan #1364): it reads Everything,
+ * and picking the workspace there opens the box narrowed to it.
  *
  * These tests have no browser, so the click is the button's own handler called
  * directly and the shortcut is the test the shell's listener runs on each key.
@@ -28,6 +30,7 @@ vi.stubGlobal('fetch', fetched);
 const { SearchBar, isSearchShortcut } = await import('@/components/shell/search-bar');
 const { CommandPalette } = await import('@/components/shell/command-palette');
 const { CaptureProvider } = await import('@/components/shell/capture');
+const { SearchScopeChip } = await import('@/components/shell/search-scope-chip');
 
 const sections: NavSection[] = [
   { href: '/jobs/today', label: 'This week' },
@@ -35,7 +38,7 @@ const sections: NavSection[] = [
 ];
 
 /** The first element of a type in a tree the component returned. */
-function find(node: ReactNode, type: string): ReactElement<Record<string, unknown>> | null {
+function find(node: ReactNode, type: unknown): ReactElement<Record<string, unknown>> | null {
   if (!isValidElement<Record<string, unknown>>(node)) return null;
   if (node.type === type) return node;
   const children = node.props.children as ReactNode;
@@ -70,6 +73,31 @@ describe('the field in the top bar', () => {
   });
 });
 
+describe("the field's switcher", () => {
+  it('reads Everything in a workspace', () => {
+    const html = renderToStaticMarkup(<SearchBar onOpen={() => {}} module="jobs" />);
+    expect(html).toContain('Searching Everything. Choose what to search');
+  });
+
+  it('opens the box narrowed to the workspace when the workspace is picked', () => {
+    const onOpen = vi.fn();
+    const chip = find(SearchBar({ onOpen, module: 'jobs' }), SearchScopeChip);
+    expect(chip).not.toBeNull();
+    expect(chip!.props.scope).toBe('everything');
+    (chip!.props.onScope as (scope: string) => void)('jobs');
+    expect(onOpen).toHaveBeenCalledWith('jobs');
+  });
+
+  it('is not there on Home, and the field still opens on everything', () => {
+    const onOpen = vi.fn();
+    const tree = SearchBar({ onOpen, module: null });
+    expect(find(tree, SearchScopeChip)).toBeNull();
+    expect(renderToStaticMarkup(<SearchBar onOpen={() => {}} />)).not.toContain('Choose what to search');
+    (find(tree, 'button')!.props.onClick as () => void)();
+    expect(onOpen).toHaveBeenCalledWith('everything');
+  });
+});
+
 describe('the shortcut', () => {
   it('is ⌘K, or Ctrl+K off a Mac', () => {
     expect(isSearchShortcut({ key: 'k', metaKey: true, ctrlKey: false })).toBe(true);
@@ -98,5 +126,22 @@ describe('the box it opens', () => {
       </CaptureProvider>,
     );
     expect(html).toContain('Searching Everything. Choose what to search');
+  });
+
+  it('opens narrowed when the bar asked for the workspace', () => {
+    const html = renderToStaticMarkup(
+      <CaptureProvider>
+        <CommandPalette
+          account="11111111-1111-4111-8111-111111111111"
+          module="jobs"
+          sections={sections}
+          theme={SYSTEM_THEME}
+          open
+          opensOn="jobs"
+          onOpenChange={() => {}}
+        />
+      </CaptureProvider>,
+    );
+    expect(html).toMatch(/Searching (?!Everything)[^.]+\. Choose what to search/);
   });
 });

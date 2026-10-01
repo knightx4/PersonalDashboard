@@ -2,6 +2,10 @@
 
 import { Search } from 'lucide-react';
 import { Kbd } from '@/components/shell/key-hints';
+import { SearchScopeChip } from '@/components/shell/search-scope-chip';
+import { cn } from '@/lib/cn';
+import type { SearchScope } from '@/lib/search/scope';
+import type { ModuleId } from '@/lib/modules';
 
 /**
  * ⌘K, or Ctrl+K off a Mac: the key that opens the search box at any width.
@@ -26,21 +30,32 @@ export function isSearchShortcut(event: Pick<KeyboardEvent, 'key' | 'metaKey' | 
  * and focus coming back here when the box closes would open it again. Enter or
  * Space on it opens the box like a click.
  *
+ * Inside a workspace the scope chip sits at the field's right end and reads
+ * Everything, because the field has no scope of its own: it is what the box
+ * will search when it opens. Picking the workspace from it opens the box
+ * already narrowed there (plan #1364), and picking Everything opens it as a
+ * press on the field does. The chip is laid over the field rather than put
+ * inside the button, since a button cannot hold another. On Home and the
+ * account page there is no workspace and the chip draws nothing.
+ *
  * What the box searches and how it starts is the shell's and the box's
  * (components/shell/app-shell.tsx and command-palette.tsx). This file only
  * draws the way in.
  */
 export function SearchBar({
   onOpen,
+  module = null,
   className,
 }: {
-  /** Open the search box. The shell holds whether it is up. */
-  onOpen: () => void;
+  /** Open the search box on this scope. The shell holds whether it is up. */
+  onOpen: (scope: SearchScope) => void;
+  /** The workspace the page is in, which the chip offers to narrow to. */
+  module?: ModuleId | null;
   /** The width the bar is given, which is the top bar's business rather than this file's. */
   className?: string;
 }) {
   return (
-    <div className={className}>
+    <div className={cn('relative', className)}>
       {/* A control's own edge rather than a frame around a group (the ui-ok
         * on the class line below). `border-control` is the 3:1 token a field owes under
         * WCAG 1.4.11, and here it is the only thing saying this is where you
@@ -52,11 +67,14 @@ export function SearchBar({
         * -- note ca910aa3. */}
       <button
         type="button"
-        onClick={onOpen}
+        onClick={() => onOpen('everything')}
         aria-haspopup="dialog"
         aria-keyshortcuts="Meta+K Control+K"
-        /* ui-ok: hand-rolled-box -- a field's own edge, explained above */
-        className="flex h-(--control-h) w-full items-center gap-2 rounded-full border border-control bg-transparent px-(--control-px) text-left transition-colors hover:border-border-strong"
+        className={cn(
+          /* ui-ok: hand-rolled-box -- a field's own edge, explained above */ 'flex h-(--control-h) w-full items-center gap-2 rounded-full border border-control bg-transparent px-(--control-px) text-left transition-colors hover:border-border-strong',
+          // Room at the right end for the chip laid over it.
+          module !== null && 'pr-18',
+        )}
       >
         <Search className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
         <span className="min-w-0 flex-1 truncate text-ui text-ink-muted">Search</span>
@@ -66,6 +84,12 @@ export function SearchBar({
             held (note 935820d9). */}
         <Kbd className="shrink-0">⌘K</Kbd>
       </button>
+
+      {module !== null && (
+        <div className="absolute inset-y-0 right-(--control-px) flex items-center">
+          <SearchScopeChip scope="everything" module={module} onScope={onOpen} />
+        </div>
+      )}
     </div>
   );
 }

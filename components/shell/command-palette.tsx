@@ -29,10 +29,12 @@ import type { NavSection } from '@/components/shell/app-shell';
  * components/shell/search-row.tsx. This file is the modal:
  * the scrim, the field and the keys that walk the list.
  *
- * Every opening starts on everything you own (plan #1363). The chip beside
- * the field opens on the two scopes -- this workspace and everything you own
- * -- and narrowing to the workspace lasts until the box closes; the next
- * opening starts on everything again.
+ * Every opening starts on everything you own (plan #1363), except one: picking
+ * the workspace from the chip on the top bar's field opens the box already
+ * narrowed there (plan #1364), which is `opensOn`. The chip beside this field
+ * offers the same two scopes -- this workspace and everything you own -- and
+ * narrowing lasts until the box closes; the next opening starts on whatever
+ * the way in asks for, which is everything unless it was that chip.
  *
  * This is the whole of search at every width: the field in the top bar opens
  * it from lg up, the magnifier opens it below lg, and ⌘K opens it at any
@@ -46,6 +48,7 @@ export function CommandPalette({
   enabledModules,
   theme,
   open,
+  opensOn = 'everything',
   onOpenChange,
 }: {
   /** Whose pages these are. The held list is only searched when it is theirs. */
@@ -57,27 +60,35 @@ export function CommandPalette({
   theme: Theme;
   /** Whether the box is up. Held by the shell, which holds every way in. */
   open: boolean;
+  /**
+   * What the box searches when it opens. Everything, unless it was opened
+   * from the bar's chip with the workspace picked. Read on each opening only,
+   * so a narrowed box does not stay narrowed for the next one.
+   */
+  opensOn?: SearchScope;
   onOpenChange: (open: boolean) => void;
 }) {
   const [query, setQuery] = useState('');
   /**
-   * What is being searched, which starts as everything you own.
+   * What is being searched, which starts as `opensOn`.
    *
    * State rather than derived, because the chip narrows it. It does not
-   * survive the box closing: every opening starts on everything (plan #1363).
+   * survive the box closing: every opening starts on what that opening asked
+   * for (plans #1363 and #1364).
    */
-  const [scope, setScope] = useState<SearchScope>('everything');
+  const [scope, setScope] = useState<SearchScope>(opensOn);
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Every opening starts on everything. Adjusted while rendering the opening
-  // rather than in an effect, so the first frame of the box already says so.
+  // Every opening starts on what it asked for. Adjusted while rendering the
+  // opening rather than in an effect, so the first frame of the box already
+  // says so.
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
     if (open) {
-      setScope('everything');
+      setScope(opensOn);
       setActive(0);
     }
   }

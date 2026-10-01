@@ -29,7 +29,8 @@ import type { ModuleId } from '@/lib/modules';
  * page.
  *
  * Its own file because it began in the top bar's search field and moved here
- * when the box got one too (#703). Since plan #1363 only the box draws it.
+ * when the box got one too (#703). Plan #1363 took it out of the bar and plan
+ * #1364 put it back, where it always reads Everything and picking opens the box.
  */
 export function SearchScopeChip({
   scope,
