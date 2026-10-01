@@ -4,6 +4,7 @@ import type { ModuleId } from '@/lib/modules';
 import type { TalkCitation } from '@/lib/talk/talk';
 import type { QuestionEmbedder } from '@/lib/memory/search';
 import type { SpecDoc } from '@/lib/specs/registry';
+import type { MailSearchInput, MailSearchResult } from '@/lib/inbox/search-mail';
 
 /**
  * What Dash's lookups read with and hand back (plan #1088). No client and no
@@ -35,6 +36,8 @@ export type AskContext = {
   userId: string;
   /** YYYY-MM-DD in the person's timezone: what "overdue" and "a month ago" count from. */
   today: string;
+  /** The person's IANA timezone, for turning their days into instants; UTC when absent. */
+  timezone?: string;
   /** Workspaces that are on. A lookup into one that is off answers that it is off. */
   enabledModules: readonly ModuleId[];
   db: AskDb;
@@ -46,6 +49,12 @@ export type AskContext = {
   embedQuestion?: QuestionEmbedder;
   /** How read_spec reads a spec's markdown; the file in docs/ when absent, a fixture in tests. */
   readSpec?: (spec: SpecDoc) => Promise<string | null>;
+  /**
+   * Searches the person's connected Gmail (lib/inbox/search-mail.ts, bound to
+   * them). Absent where mail cannot be searched, such as the connector, and
+   * then search_mail says so.
+   */
+  searchMail?: (input: MailSearchInput) => Promise<MailSearchResult>;
 };
 
 /**
@@ -69,6 +78,12 @@ export type AskToolResult =
       totals?: Record<string, unknown>;
       /** Anything the model should know to read the result: a cap hit, a range assumed. */
       note?: string;
+      /**
+       * What the saved conversation keeps of this result in place of its
+       * rows, totals and note. Set by a lookup whose rows must not be stored,
+       * such as mail (lib/ask/mail.ts). The rows still become citations.
+       */
+      kept?: Record<string, unknown>;
     }
   | { ok: false; error: string };
 
@@ -80,7 +95,27 @@ export function citationsOf(result: AskToolResult): TalkCitation[] {
 
 /** A result as the text of a tool_result block. */
 export function toolResultText(result: AskToolResult): string {
-  return JSON.stringify(result);
+  if (!result.ok) return JSON.stringify(result);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { kept, ...sent } = result;
+  return JSON.stringify(sent);
+}
+
+/** The one origin outside the app a row may link to: a message opened in Gmail. */
+const GMAIL_ORIGIN = 'https://mail.google.com';
+
+/**
+ * Whether a row's link opens somewhere it may: a path in the app, or a
+ * message in Gmail. Anything else is dropped, whatever the lookup returned.
+ */
+export function isOpenableHref(href: string): boolean {
+  if (href.startsWith('/')) return !href.startsWith('//');
+  try {
+    const url = new URL(href);
+    return url.origin === GMAIL_ORIGIN && url.username === '' && url.password === '';
+  } catch {
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -94,6 +94,8 @@ function Turn({
   );
 }
 
+const CITED_LINK = 'min-w-0 truncate text-ui text-accent underline-offset-2 hover:underline';
+
 /**
  * The rows an answer rests on, each a link to where it lives (plan #1090).
  * Only a question asked of Dash from anywhere carries these; a card's or a
@@ -109,12 +111,17 @@ function Cited({ citations }: { citations: readonly TalkCitation[] }) {
             strokeWidth={2}
             aria-hidden
           />
-          <Link
-            href={citation.href}
-            className="min-w-0 truncate text-ui text-accent underline-offset-2 hover:underline"
-          >
-            {citation.title}
-          </Link>
+          {citation.href.startsWith('/') ? (
+            <Link href={citation.href} className={CITED_LINK}>
+              {citation.title}
+            </Link>
+          ) : (
+            // A message Dash searched in Gmail (plan #1316): it opens there, in a new tab.
+            <a href={citation.href} target="_blank" rel="noopener noreferrer" className={CITED_LINK}>
+              {citation.title}
+              <span className="sr-only"> (opens in Gmail)</span>
+            </a>
+          )}
         </li>
       ))}
     </ul>
