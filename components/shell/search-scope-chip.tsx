@@ -28,10 +28,8 @@ import type { ModuleId } from '@/lib/modules';
  * `module` the shell gave them and get nothing back on Home and the account
  * page.
  *
- * One component because the bar and the box draw the same chip. It started in
- * components/shell/search-bar.tsx and moved here when the box got one too
- * (#703), the same way SearchRowLine moved into components/shell/search-row.tsx
- * when both surfaces drew the same row.
+ * Its own file because it began in the top bar's search field and moved here
+ * when the box got one too (#703). Since plan #1363 only the box draws it.
  */
 export function SearchScopeChip({
   scope,
@@ -48,10 +46,9 @@ export function SearchScopeChip({
   /**
    * Whether the menu is up.
    *
-   * For a caller that hangs its own panel under the same field: the bar's list
-   * of rows is a floating panel drawn after this one, so with both open the
-   * list paints over the menu. The bar stands its list down while a scope is
-   * being picked rather than either of them reaching for a higher layer.
+   * For a caller that hangs its own panel under the same field and has to
+   * stand it down while a scope is being picked, so the two do not paint over
+   * each other.
    */
   onOpenChange?: (open: boolean) => void;
 }) {

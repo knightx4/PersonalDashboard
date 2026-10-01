@@ -234,14 +234,15 @@ describe('the workspace summary', () => {
 /**
  * The search bar in the top bar.
  *
- * From lg up every page carries it, narrowed by its chip to the workspace the
- * page is in. Below lg the bar is not drawn at all and the command box is the
- * way into search, which is what #704 settled: 1024 is where the column
- * appears and where there is room for a field beside the page title.
+ * From lg up every page carries it, and pressing it opens the search box on
+ * everything you own (plan #1363). Below lg the bar is not drawn at all and
+ * the magnifier opens the same box, which is what #704 settled: 1024 is where
+ * the column appears and where there is room for a field beside the page
+ * title.
  *
  * Effects never run here, so what these assert is the markup the server sends
- * and the classes that decide where it shows. Typing, the list and the chip's
- * press are covered where they can be: tests/search-opening-list.test.tsx.
+ * and the classes that decide where it shows. The press and the shortcut are
+ * covered in tests/search-bar.test.tsx.
  */
 describe('the search bar in the top bar', () => {
   function shell(module: ModuleId | null) {
@@ -266,8 +267,10 @@ describe('the search bar in the top bar', () => {
     return html.slice(at, html.indexOf('</header>', at));
   }
 
-  it('puts a field in the bar on a page inside a workspace', () => {
-    expect(header(shell('todo'))).toContain('aria-label="Search"');
+  it('puts a field in the bar that opens the search box', () => {
+    const bar = header(shell('todo'));
+    expect(bar).toContain('aria-haspopup="dialog"');
+    expect(bar).toContain('aria-keyshortcuts="Meta+K Control+K"');
   });
 
   it('draws it only from lg up', () => {
@@ -276,9 +279,8 @@ describe('the search bar in the top bar', () => {
     expect(header(shell('todo'))).toContain('hidden min-w-0 flex-1 lg:mx-auto lg:block');
   });
 
-  it('names the workspace on its chip', () => {
-    expect(header(shell('todo'))).toContain('>Todo<');
-    expect(header(shell('todo'))).toContain('Searching Todo. Choose what to search');
+  it('is not a field to type into, so nothing drops under it', () => {
+    expect(header(shell('todo'))).not.toContain('<input');
   });
 
   it('stops short of the width of the bar', () => {
@@ -287,11 +289,8 @@ describe('the search bar in the top bar', () => {
     expect(header(shell('todo'))).toContain('lg:max-w-md');
   });
 
-  it('searches everything, with no chip, outside a workspace', () => {
-    const bar = header(shell(null));
-    expect(bar).toContain('aria-label="Search"');
-    expect(bar).not.toContain('Choose what to search');
-    expect(bar).not.toContain('>Todo<');
+  it('is there outside a workspace too', () => {
+    expect(header(shell(null))).toContain('aria-haspopup="dialog"');
   });
 });
 

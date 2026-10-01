@@ -25,26 +25,19 @@ import type { NavSection } from '@/components/shell/app-shell';
  * second click. This is one keystroke and a few letters.
  *
  * What goes in the list, where it comes from and in what order is
- * components/shell/use-search-rows.ts, because the bar across the top of the
- * workspace shows the same rows, and how one of them is drawn is
- * components/shell/search-row.tsx for the same reason. This file is the modal:
+ * components/shell/use-search-rows.ts, and how one of them is drawn is
+ * components/shell/search-row.tsx. This file is the modal:
  * the scrim, the field and the keys that walk the list.
  *
- * It searches the workspace the page is in, and everything you own on a page
- * that is in no workspace. So it opens on that workspace's pages and what you
- * can start there, and nothing from anywhere else; outside a workspace it
- * opens on the list it has always opened on. The chip beside the field opens on
- * the two scopes -- this workspace and everything you own -- the same chip the
- * bar carries and the same two states.
+ * Every opening starts on everything you own (plan #1363). The chip beside
+ * the field opens on the two scopes -- this workspace and everything you own
+ * -- and narrowing to the workspace lasts until the box closes; the next
+ * opening starts on everything again.
  *
- * Below lg this is the whole of search: the magnifier in the top row opens it
- * and so does ⌘K (#713). From lg up the field in the top bar is the way in
- * and the shortcut goes there instead (#662), which leaves this box open to
- * nothing on a wide window except a press that was made on a narrow one.
- *
- * Whether it is open is the shell's, not this file's: the magnifier opens it,
- * and since #663 the shortcut is listened for there too, because the shell is
- * the only place that can see both surfaces and pick between them.
+ * This is the whole of search at every width: the field in the top bar opens
+ * it from lg up, the magnifier opens it below lg, and ⌘K opens it at any
+ * width. Whether it is open is the shell's, not this file's, because the
+ * shell holds all three ways in.
  */
 export function CommandPalette({
   account,
@@ -54,7 +47,6 @@ export function CommandPalette({
   theme,
   open,
   onOpenChange,
-  everything = false,
 }: {
   /** Whose pages these are. The held list is only searched when it is theirs. */
   account: string;
@@ -63,38 +55,28 @@ export function CommandPalette({
   enabledModules?: readonly ModuleId[];
   /** What is on screen now, so a colour can be applied to the mode you are in. */
   theme: Theme;
-  /** Whether the box is up. Held by the shell, so the magnifier can open it. */
+  /** Whether the box is up. Held by the shell, which holds every way in. */
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /**
-   * Start this opening on everything you own rather than on the workspace.
-   * The shell sets it when ⌘K opened the box (note cdf684fa); the magnifier
-   * leaves it off, the same split as a click into the bar.
-   */
-  everything?: boolean;
 }) {
   const [query, setQuery] = useState('');
   /**
-   * What is being searched, which starts as the workspace the page is in.
+   * What is being searched, which starts as everything you own.
    *
-   * State rather than derived, because the chip changes it. It survives the
-   * box closing and reopening on the same page -- widening it is something
-   * you do about a search, and having to press the chip again on every open
-   * would make it a setting you cannot keep -- and goes back to the workspace
-   * you have landed in when the page changes, which is the rule the bar
-   * follows too.
+   * State rather than derived, because the chip narrows it. It does not
+   * survive the box closing: every opening starts on everything (plan #1363).
    */
-  const [scope, setScope] = useState<SearchScope>(() => scopeForModule(module));
+  const [scope, setScope] = useState<SearchScope>('everything');
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Opened by ⌘K: start on everything. Adjusted while rendering the opening
+  // Every opening starts on everything. Adjusted while rendering the opening
   // rather than in an effect, so the first frame of the box already says so.
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open && everything) {
+    if (open) {
       setScope('everything');
       setActive(0);
     }
@@ -109,23 +91,21 @@ export function CommandPalette({
     theme,
     query,
     active: open,
-    // So an open box with nothing typed in it lists this workspace's pages
-    // and what you can start here.
-    surface: 'box',
   });
 
   /**
-   * The box follows the page.
+   * A narrowed box follows the page.
    *
-   * The shell holds it across a navigation, so a scope left pointing at the
-   * workspace you have just left would search somewhere you are not. Arriving
-   * anywhere new puts it back to the workspace you have landed in.
+   * The shell holds the box across a navigation, so a scope left pointing at
+   * the workspace you have just left would search somewhere you are not.
+   * Arriving anywhere new while it is narrowed narrows it to the workspace you
+   * have landed in, or widens it where there is no workspace.
    */
   const standingIn = useRef(module);
   useEffect(() => {
     if (standingIn.current === module) return;
     standingIn.current = module;
-    setScope(scopeForModule(module));
+    setScope((current) => (current === 'everything' ? current : scopeForModule(module)));
     setActive(0);
   }, [module]);
 
@@ -208,7 +188,7 @@ export function CommandPalette({
             data-focus-ring="none"
             className="h-12 w-full bg-transparent text-body text-ink outline-none placeholder:text-ink-ghost"
           />
-          {/* The same chip the bar carries, and the same two states. It sits
+          {/* The chip naming what is being searched, in two states. It sits
               between the field and the keycap because it belongs to the field
               -- what is being searched -- rather than to the box. */}
           <SearchScopeChip scope={scope} module={module} onScope={chooseScope} />
