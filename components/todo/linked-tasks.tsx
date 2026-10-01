@@ -35,6 +35,7 @@ export function LinkedTasks({
   timezone,
   title = 'Tasks',
   compact = false,
+  addLabel = 'Add',
   extra,
 }: {
   target: LinkTarget;
@@ -45,6 +46,8 @@ export function LinkedTasks({
   timezone: string;
   title?: string;
   compact?: boolean;
+  /** The button that opens the form, where "Add" alone would not say what it adds. */
+  addLabel?: string;
   /**
    * Outstanding work on this thing that is not a todo-module task -- the job
    * module's own reminders, say. It belongs under this heading rather than in
@@ -80,7 +83,7 @@ export function LinkedTasks({
         </h3>
         <Button type="button" variant="ghost" size="sm" onClick={() => setAdding((open) => !open)}>
           <Plus className="size-3.5" strokeWidth={2} aria-hidden />
-          {adding ? 'Cancel' : 'Add'}
+          {adding ? 'Cancel' : addLabel}
         </Button>
       </div>
 

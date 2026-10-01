@@ -2,8 +2,10 @@ import Link from 'next/link';
 import { CalendarDays, MapPin } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { spanLabel } from '@/lib/todo/events/model';
 import type { SubscribedEventDetail } from '@/lib/todo/feeds/load';
+import type { Task } from '@/lib/todo/tasks/model';
 
 /**
  * A subscribed appointment, opened.
@@ -13,10 +15,16 @@ import type { SubscribedEventDetail } from '@/lib/todo/feeds/load';
  * title, and the room, the video link and the two lines the organiser wrote
  * are exactly what you clicked it for.
  *
- * So it opens, and it only reads. No form and no delete, because the row
- * belongs to a calendar somewhere else and the next refresh replaces it
- * wholesale -- the card names that calendar instead, which is the thing you
- * would have to open in order to change anything.
+ * So it opens, and the meeting itself only reads. No form and no delete,
+ * because the row belongs to a calendar somewhere else and the next refresh
+ * replaces it wholesale -- the card names that calendar instead, which is the
+ * thing you would have to open in order to change anything.
+ *
+ * What you can do from here is write down what the meeting needs of you
+ * (plan #1374): the same tasks section a role page has, linked to this
+ * appointment on the date you opened. The link names the subscription, the
+ * UID and that date rather than this row's id, so the list survives the
+ * refresh that replaces the row.
  *
  * It sits where the event form sits and opens the same way -- `?feedEvent=<id>`
  * beside the view and the day -- so the page still holds no state of its own
@@ -27,12 +35,15 @@ export function FeedEventCard({
   view,
   anchor,
   timezone,
+  tasks,
 }: {
   detail: SubscribedEventDetail;
   /** Where Close goes: the view and the day you were looking at. */
   view: string;
   anchor: string;
   timezone: string;
+  /** The open tasks about this appointment on this date. */
+  tasks: Task[];
 }) {
   const { event, feedName } = detail;
 
@@ -71,8 +82,22 @@ export function FeedEventCard({
         <p className="mt-3 whitespace-pre-wrap break-words text-ui text-ink">{event.body}</p>
       )}
 
+      <div className="mt-4 border-t border-border pt-3">
+        <LinkedTasks
+          target="appointment"
+          targetId={event.id}
+          returnTo="/todo/calendar"
+          tasks={tasks}
+          timezone={timezone}
+          title="Tasks about this"
+          addLabel="Add a task about this"
+          compact
+        />
+      </div>
+
       <p className="mt-4 border-t border-border pt-3 text-small text-ink-muted">
-        From {feedName}. This is a copy, so it is read here and changed where it lives.
+        From {feedName}. The meeting is a copy, so it is read here and changed where it
+        lives; the tasks about it are yours.
       </p>
     </Card>
   );
