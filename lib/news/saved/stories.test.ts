@@ -15,18 +15,38 @@ type Call = { table: string; op: string; args: unknown[] };
  * A client that answers the issue and sender reads from `rows`, and records
  * every call so a test can check what was written and what was filtered on.
  */
-function fakeClient(rows: { issue?: unknown; sender?: unknown; saved?: unknown[] }) {
+function fakeClient(rows: {
+  issue?: unknown;
+  sender?: unknown;
+  saved?: unknown[];
+  /** The one saved row a lookup by issue and headline finds. */
+  savedRow?: unknown;
+  /** What news.unsave_story returns: the story's issue. */
+  unsaved?: string | null;
+}) {
   const calls: Call[] = [];
   const client = {
+    rpc: async (...args: unknown[]) => {
+      calls.push({ table: 'rpc', op: 'rpc', args });
+      return { data: rows.unsaved ?? null, error: null };
+    },
     from: (table: string) => {
       const chain = {
         select: (...args: unknown[]) => (calls.push({ table, op: 'select', args }), chain),
         delete: () => (calls.push({ table, op: 'delete', args: [] }), chain),
+        update: (...args: unknown[]) => (calls.push({ table, op: 'update', args }), chain),
         eq: (...args: unknown[]) => (calls.push({ table, op: 'eq', args }), chain),
+        is: (...args: unknown[]) => (calls.push({ table, op: 'is', args }), chain),
+        not: (...args: unknown[]) => (calls.push({ table, op: 'not', args }), chain),
         order: (...args: unknown[]) => (calls.push({ table, op: 'order', args }), chain),
         limit: (...args: unknown[]) => (calls.push({ table, op: 'limit', args }), chain),
         maybeSingle: async () => ({
-          data: table === 'issues' ? (rows.issue ?? null) : (rows.sender ?? null),
+          data:
+            table === 'issues'
+              ? (rows.issue ?? null)
+              : table === 'saved_stories'
+                ? (rows.savedRow ?? null)
+                : (rows.sender ?? null),
           error: null,
         }),
         upsert: async (...args: unknown[]) => {
@@ -99,6 +119,16 @@ describe('saveStory', () => {
     expect(row.text).toBeNull();
   });
 
+  it('puts a story unsaved while something pointed at it back on the list', async () => {
+    const { client, calls } = fakeClient({ issue: ISSUE, sender: { name: 'Infra Weekly' } });
+    await saveStory(client, { userId: 'u1', issueId: 'i1', headline: 'Rates held' });
+    const update = calls.find((call) => call.op === 'update');
+    expect(update?.table).toBe('saved_stories');
+    expect((update?.args[0] as Record<string, unknown>).unsaved_at).toBeNull();
+    expect(calls).toContainEqual({ table: 'saved_stories', op: 'eq', args: ['headline', 'Rates held'] });
+    expect(calls).toContainEqual({ table: 'saved_stories', op: 'not', args: ['unsaved_at', 'is', null] });
+  });
+
   it('saves nothing for a headline the newsletter does not have', async () => {
     const { client, calls } = fakeClient({ issue: ISSUE, sender: { name: 'Infra Weekly' } });
     expect(await saveStory(client, { userId: 'u1', issueId: 'i1', headline: 'Not a story' })).toBe(
@@ -117,14 +147,23 @@ describe('saveStory', () => {
 });
 
 describe('removeSavedStory', () => {
-  it('deletes by issue and headline', async () => {
-    const { client, calls } = fakeClient({});
+  it('finds the row by issue and headline and unsaves it', async () => {
+    const { client, calls } = fakeClient({ savedRow: { id: 'r1' } });
     await removeSavedStory(client, { issueId: 'i1', headline: ' Rates held ' });
-    expect(calls.filter((call) => call.table === 'saved_stories')).toEqual([
-      { table: 'saved_stories', op: 'delete', args: [] },
-      { table: 'saved_stories', op: 'eq', args: ['issue_id', 'i1'] },
-      { table: 'saved_stories', op: 'eq', args: ['headline', 'Rates held'] },
-    ]);
+    expect(calls).toContainEqual({ table: 'saved_stories', op: 'eq', args: ['issue_id', 'i1'] });
+    expect(calls).toContainEqual({ table: 'saved_stories', op: 'eq', args: ['headline', 'Rates held'] });
+    expect(calls).toContainEqual({
+      table: 'rpc',
+      op: 'rpc',
+      args: ['unsave_story', { story_id: 'r1' }],
+    });
+    expect(calls.some((call) => call.op === 'delete')).toBe(false);
+  });
+
+  it('does nothing for a story that is not saved', async () => {
+    const { client, calls } = fakeClient({});
+    await removeSavedStory(client, { issueId: 'i1', headline: 'Rates held' });
+    expect(calls.some((call) => call.op === 'rpc')).toBe(false);
   });
 });
 
@@ -134,6 +173,7 @@ describe('loadSavedHeadlines', () => {
     const saved = await loadSavedHeadlines(client, 'i1');
     expect([...saved]).toEqual(['Rates held']);
     expect(calls).toContainEqual({ table: 'saved_stories', op: 'eq', args: ['issue_id', 'i1'] });
+    expect(calls).toContainEqual({ table: 'saved_stories', op: 'is', args: ['unsaved_at', null] });
   });
 });
 
@@ -174,18 +214,24 @@ describe('loadSavedStories', () => {
       op: 'order',
       args: ['saved_at', { ascending: false }],
     });
+    // A story unsaved while a reading or a task points at it stays off Saved.
+    expect(calls).toContainEqual({ table: 'saved_stories', op: 'is', args: ['unsaved_at', null] });
   });
 });
 
 describe('removeSavedStoryById', () => {
-  it('deletes by row id and says which issue the story came from', async () => {
-    const { client, calls } = fakeClient({ saved: [{ issue_id: 'i1' }] });
+  it('unsaves by row id and says which issue the story came from', async () => {
+    const { client, calls } = fakeClient({ unsaved: 'i1' });
     expect(await removeSavedStoryById(client, 'r1')).toEqual({ issueId: 'i1' });
-    expect(calls).toContainEqual({ table: 'saved_stories', op: 'eq', args: ['id', 'r1'] });
+    expect(calls).toContainEqual({
+      table: 'rpc',
+      op: 'rpc',
+      args: ['unsave_story', { story_id: 'r1' }],
+    });
   });
 
   it('gives no issue when the row was not there', async () => {
-    const { client } = fakeClient({ saved: [] });
+    const { client } = fakeClient({ unsaved: null });
     expect(await removeSavedStoryById(client, 'r1')).toEqual({ issueId: null });
   });
 });
