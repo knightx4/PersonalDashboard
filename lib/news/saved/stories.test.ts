@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
 import {
+  loadStoryOrigins,
   loadSavedHeadlines,
+  resaveStoryById,
   loadSavedStories,
   removeSavedStory,
   removeSavedStoryById,
@@ -37,6 +39,7 @@ function fakeClient(rows: {
         update: (...args: unknown[]) => (calls.push({ table, op: 'update', args }), chain),
         eq: (...args: unknown[]) => (calls.push({ table, op: 'eq', args }), chain),
         is: (...args: unknown[]) => (calls.push({ table, op: 'is', args }), chain),
+        in: (...args: unknown[]) => (calls.push({ table, op: 'in', args }), chain),
         not: (...args: unknown[]) => (calls.push({ table, op: 'not', args }), chain),
         order: (...args: unknown[]) => (calls.push({ table, op: 'order', args }), chain),
         limit: (...args: unknown[]) => (calls.push({ table, op: 'limit', args }), chain),
@@ -233,5 +236,67 @@ describe('removeSavedStoryById', () => {
   it('gives no issue when the row was not there', async () => {
     const { client } = fakeClient({ unsaved: null });
     expect(await removeSavedStoryById(client, 'r1')).toEqual({ issueId: null });
+  });
+});
+
+describe('loadStoryOrigins (plan #1368)', () => {
+  it('opens a saved story on Saved, an unsaved one in its newsletter, and a lost one nowhere', async () => {
+    const { client, calls } = fakeClient({
+      saved: [
+        { id: 'a', issue_id: 'i1', sender_name: 'Letters From Work', unsaved_at: null },
+        { id: 'b', issue_id: 'i2', sender_name: 'Money Stuff', unsaved_at: '2026-10-01T09:00:00Z' },
+        { id: 'c', issue_id: null, sender_name: 'Gone Weekly', unsaved_at: '2026-10-01T09:00:00Z' },
+      ],
+    });
+
+    const origins = await loadStoryOrigins(client, ['a', 'b', 'c', 'a']);
+
+    expect(Object.fromEntries(origins)).toEqual({
+      a: { senderName: 'Letters From Work', href: '/news/saved#story-a' },
+      b: { senderName: 'Money Stuff', href: '/news/i/i2' },
+      c: { senderName: 'Gone Weekly', href: null },
+    });
+    expect(calls.find((c) => c.op === 'in')?.args).toEqual(['id', ['a', 'b', 'c']]);
+  });
+
+  it('asks nothing when no reading came from News', async () => {
+    const { client, calls } = fakeClient({});
+    expect((await loadStoryOrigins(client, [])).size).toBe(0);
+    expect(calls).toEqual([]);
+  });
+});
+
+describe('resaveStoryById (plan #1368)', () => {
+  it('returns the saved row and clears unsaved_at on it only if it was set', async () => {
+    const { client, calls } = fakeClient({
+      savedRow: {
+        id: 's1',
+        issue_id: null,
+        headline: 'Rates held',
+        link: 'https://example.com/r',
+        sender_name: 'Money Stuff',
+      },
+    });
+
+    expect(await resaveStoryById(client, 's1')).toEqual({
+      id: 's1',
+      issueId: null,
+      headline: 'Rates held',
+      link: 'https://example.com/r',
+      senderName: 'Money Stuff',
+    });
+    const update = calls.findIndex((c) => c.op === 'update');
+    expect(calls[update].args[0]).toMatchObject({ unsaved_at: null });
+    expect(calls.slice(update)).toContainEqual({
+      table: 'saved_stories',
+      op: 'not',
+      args: ['unsaved_at', 'is', null],
+    });
+  });
+
+  it('returns null for a row that is not there, and writes nothing', async () => {
+    const { client, calls } = fakeClient({});
+    expect(await resaveStoryById(client, 'missing')).toBeNull();
+    expect(calls.some((c) => c.op === 'update')).toBe(false);
   });
 });

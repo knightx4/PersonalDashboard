@@ -6,7 +6,15 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { markUnread } from '@/lib/news/issues/read';
-import { removeSavedStory, saveStory } from '@/lib/news/saved/stories';
+import { createLearnClient } from '@/lib/learn/auth/server';
+import { queueNewsStory, type QueuedStory } from '@/lib/learn/tracks/news';
+import {
+  findSavedStory,
+  removeSavedStory,
+  resaveStoryById,
+  saveStory,
+  type SavedStoryRef,
+} from '@/lib/news/saved/stories';
 
 const UnreadInput = z.object({ issueId: z.string().uuid() });
 
@@ -77,4 +85,63 @@ export async function setStorySaved(
   revalidatePath('/news');
   revalidatePath('/news/saved');
   return { error: null };
+}
+
+const SendInput = z.union([
+  z.object({ issueId: z.string().uuid(), headline: z.string().trim().min(1) }),
+  z.object({ savedStoryId: z.string().uuid() }),
+]);
+
+/** Which story to send: by its newsletter and headline, or by its saved row. */
+export type SendStoryInput = { issueId: string; headline: string } | { savedStoryId: string };
+
+export type SendToLearnResult =
+  | { error: string; readingId?: undefined }
+  | { error: null; readingId: string; trackId: string };
+
+/**
+ * Put a story on the Learn reading queue, in the From News list (plan #1368).
+ *
+ * Sending saves the story first, the way setStorySaved does, and the reading
+ * points at the saved copy: the story's text stays in News, and a sent story
+ * shows on Saved too. A story from a newsletter is named by its issue and
+ * headline and read again from the email; a row on the Saved tab, whose
+ * newsletter may be gone, is named by its id.
+ *
+ * Sending a story already on the queue returns the reading already there.
+ * The result carries the reading, so the button can say where it went.
+ */
+// latency: optimistic -- the button says Sent at once, and a refused write puts it back with a toast
+export async function sendStoryToLearn(input: SendStoryInput): Promise<SendToLearnResult> {
+  const parsed = SendInput.safeParse(input);
+  if (!parsed.success) return { error: 'That story could not be found.' };
+
+  const user = await requireUser();
+  const news = await createNewsClient();
+  let story: SavedStoryRef | null;
+  try {
+    if ('savedStoryId' in parsed.data) {
+      story = await resaveStoryById(news, parsed.data.savedStoryId);
+    } else {
+      const found = await saveStory(news, { userId: user.id, ...parsed.data });
+      if (!found) return { error: 'That story is no longer in the newsletter.' };
+      story = await findSavedStory(news, parsed.data);
+    }
+  } catch {
+    return { error: 'That story did not reach Learn. Try again.' };
+  }
+  if (!story) return { error: 'That story could not be found.' };
+
+  let queued: QueuedStory;
+  try {
+    queued = await queueNewsStory(await createLearnClient(), user.id, story);
+  } catch {
+    return { error: 'That story did not reach Learn. Try again.' };
+  }
+
+  if (story.issueId) revalidatePath(`/news/i/${story.issueId}`);
+  revalidatePath('/news');
+  revalidatePath('/news/saved');
+  revalidatePath('/learn', 'layout');
+  return { error: null, readingId: queued.readingId, trackId: queued.trackId };
 }

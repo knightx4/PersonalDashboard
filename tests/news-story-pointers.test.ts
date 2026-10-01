@@ -7,7 +7,8 @@
  * and news.unsave_story promise: a pointer cannot reach another account's
  * story, and unsaving a story something points at hides it from Saved while
  * the reading or the task still reaches it. Unsaving one nothing points at
- * deletes it as before.
+ * deletes it as before. A story is on the reading queue at most once
+ * (migrations-news/0018, plan #1368).
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { admin, asUser, closeDb, createUser, truncateAll } from './helpers/db-news';
@@ -86,6 +87,14 @@ describe('a reading pointing at a saved story', () => {
   it('cannot point at another account\'s story', async () => {
     const theirs = await saveStory(userB, 'Not yours');
     await expect(queue(userA, theirs)).rejects.toThrow(/readings_news_story_fk/);
+  });
+
+  it('is on the queue once: a second reading for the same story is refused', async () => {
+    // Send to Learn looks first; this is what stops two presses that land
+    // together from both inserting (migrations-news/0018, plan #1368).
+    const story = await saveStory(userA, 'The quiet return of the tram');
+    await queue(userA, story);
+    await expect(queue(userA, story)).rejects.toThrow(/readings_news_story_key/);
   });
 });
 
