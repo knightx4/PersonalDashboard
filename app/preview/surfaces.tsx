@@ -2964,14 +2964,16 @@ export const SURFACES: readonly Surface[] = [
   {
     /* The top bar's search field on its own. It is a button drawn as a
      * field: pressing it opens the search box on everything you own (plan
-     * #1363), which here does nothing because the shell is not around it. */
+     * #1363), which here does nothing because the shell is not around it.
+     * In a workspace its chip reads Everything and offers the workspace
+     * (plan #1364). */
     id: 'shell-search-bar',
     label: 'Top bar · Search field',
     module: 'jobs',
     width: 'narrow',
     render: () => (
       <div className="py-4">
-        <SearchBar onOpen={() => {}} />
+        <SearchBar onOpen={() => {}} module="jobs" />
       </div>
     ),
   },

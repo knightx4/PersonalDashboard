@@ -19,6 +19,7 @@ import { ThemePicker } from '@/components/shell/theme-picker';
 import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
 import { SearchBar, isSearchShortcut } from '@/components/shell/search-bar';
+import type { SearchScope } from '@/lib/search/scope';
 import { CaptureButton, CaptureProvider } from '@/components/shell/capture';
 import { AskDashButton, AskDashProvider } from '@/components/shell/ask-dash';
 import { KeyHintsProvider, Kbd } from '@/components/shell/key-hints';
@@ -154,6 +155,16 @@ export function AppShell({
    * everything you own; see command-palette.tsx.
    */
   const [searching, setSearching] = useState(false);
+  /**
+   * What the box searches when it opens: everything, or the workspace when it
+   * was picked from the chip on the top bar's field (plan #1364). Every way in
+   * sets it, so a narrowed opening never carries to the next one.
+   */
+  const [searchOn, setSearchOn] = useState<SearchScope>('everything');
+  function openSearch(scope: SearchScope = 'everything') {
+    setSearchOn(scope);
+    setSearching(true);
+  }
   const [collapsed, setCollapsed] = useState(false);
   const initial = (displayName || email).charAt(0).toUpperCase();
 
@@ -251,6 +262,7 @@ export function AppShell({
     function onKey(event: KeyboardEvent) {
       if (!isSearchShortcut(event)) return;
       event.preventDefault();
+      setSearchOn('everything');
       setSearching((open) => !open);
     }
     document.addEventListener('keydown', onKey);
@@ -723,7 +735,9 @@ export function AppShell({
                 )}
                 {/* Search, in the top bar of every page from lg up. Pressing
                 it opens the search box over the page on everything you own,
-                as ⌘K does (plan #1363). Below lg there is no field here at
+                as ⌘K does (plan #1363). In a workspace its chip reads
+                Everything, and picking the workspace there opens the box
+                narrowed to it (plan #1364). Below lg there is no field here at
                 all: the magnifier further along this row opens the same box.
                 1024 is where the column appears, and a field competing with
                 the page title for a phone's width would leave neither of them
@@ -736,7 +750,8 @@ export function AppShell({
                 and there is nothing to put in it that is a paragraph long --
                 note ca910aa3. */}
                 <SearchBar
-                  onOpen={() => setSearching(true)}
+                  onOpen={openSearch}
+                  module={module}
                   className="hidden min-w-0 flex-1 lg:mx-auto lg:block lg:max-w-md"
                 />
 
@@ -765,7 +780,7 @@ export function AppShell({
                   for one thing. */}
                   <button
                     type="button"
-                    onClick={() => setSearching(true)}
+                    onClick={() => openSearch()}
                     title="Search"
                     className="press flex size-8 shrink-0 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink lg:hidden"
                   >
@@ -864,6 +879,7 @@ export function AppShell({
             enabledModules={workspaces}
             theme={theme}
             open={searching}
+            opensOn={searchOn}
             onOpenChange={setSearching}
           />
         </div>
