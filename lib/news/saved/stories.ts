@@ -3,6 +3,7 @@ import 'server-only';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { NEWS_SCHEMA, type NewsSupabaseClient } from '@/lib/news/db/schema-name';
 import { readStories } from '@/lib/news/issues/stories';
+import { savedStoryAnchor } from '@/lib/news/saved/anchor';
 
 /**
  * Saving a story to read again (plan #869), into news.saved_stories
@@ -194,4 +195,111 @@ export async function removeSavedStoryById(
   id: string,
 ): Promise<{ issueId: string | null }> {
   return { issueId: await unsaveStory(client, id) };
+}
+
+/** The saved copy of a story, as Send to Learn hands it on (plan #1368). */
+export type SavedStoryRef = {
+  id: string;
+  issueId: string | null;
+  headline: string;
+  link: string | null;
+  senderName: string;
+};
+
+const REF_COLUMNS = 'id, issue_id, headline, link, sender_name';
+
+function toRef(row: Record<string, unknown>): SavedStoryRef {
+  return {
+    id: row.id as string,
+    issueId: (row.issue_id as string | null) ?? null,
+    headline: row.headline as string,
+    link: (row.link as string | null) ?? null,
+    senderName: row.sender_name as string,
+  };
+}
+
+/**
+ * The saved row for a story in a newsletter, read after saveStory wrote it.
+ * Null when there is none. The headline is compared trimmed, as it is stored.
+ */
+export async function findSavedStory(
+  client: NewsSupabaseClient,
+  { issueId, headline }: { issueId: string; headline: string },
+): Promise<SavedStoryRef | null> {
+  const { data, error } = await client
+    .from('saved_stories')
+    .select(REF_COLUMNS)
+    .eq('issue_id', issueId)
+    .eq('headline', headline.trim())
+    .maybeSingle();
+  assertSchemaExposed(error, NEWS_SCHEMA);
+  if (error) throw new Error(`news: reading the saved story failed (${error.message})`);
+  return data ? toRef(data as Record<string, unknown>) : null;
+}
+
+/**
+ * One saved row by its id, the only key a story whose newsletter was deleted
+ * still has. Sending it on also puts it back on Saved if it had been unsaved,
+ * which is what saveStory does for a story read from its newsletter.
+ */
+export async function resaveStoryById(
+  client: NewsSupabaseClient,
+  id: string,
+): Promise<SavedStoryRef | null> {
+  const { data, error } = await client
+    .from('saved_stories')
+    .select(REF_COLUMNS)
+    .eq('id', id)
+    .maybeSingle();
+  assertSchemaExposed(error, NEWS_SCHEMA);
+  if (error) throw new Error(`news: reading the saved story failed (${error.message})`);
+  if (!data) return null;
+
+  const { error: restoreError } = await client
+    .from('saved_stories')
+    .update({ unsaved_at: null, saved_at: new Date().toISOString() })
+    .eq('id', id)
+    .not('unsaved_at', 'is', null);
+  assertSchemaExposed(restoreError, NEWS_SCHEMA);
+  if (restoreError) throw new Error(`news: saving the story failed (${restoreError.message})`);
+  return toRef(data as Record<string, unknown>);
+}
+
+/**
+ * Where a reading sent from News came from, for Learn to say so (plan #1368):
+ * the newsletter's name, and where the story can be opened. That is its row on
+ * the Saved tab while it is saved, its newsletter once it has been unsaved, and
+ * nowhere when the newsletter is gone too.
+ */
+export type StoryOrigin = { senderName: string; href: string | null };
+
+export async function loadStoryOrigins(
+  client: NewsSupabaseClient,
+  ids: readonly string[],
+): Promise<Map<string, StoryOrigin>> {
+  const origins = new Map<string, StoryOrigin>();
+  const wanted = [...new Set(ids)];
+  if (wanted.length === 0) return origins;
+
+  const { data, error } = await client
+    .from('saved_stories')
+    .select('id, issue_id, sender_name, unsaved_at')
+    .in('id', wanted);
+  assertSchemaExposed(error, NEWS_SCHEMA);
+  if (error) throw new Error(`news: reading where those stories came from failed (${error.message})`);
+
+  for (const row of (data ?? []) as {
+    id: string;
+    issue_id: string | null;
+    sender_name: string;
+    unsaved_at: string | null;
+  }[]) {
+    const href = !row.unsaved_at
+      ? `/news/saved#${savedStoryAnchor(row.id)}`
+      : row.issue_id
+        ? `/news/i/${row.issue_id}`
+        : null;
+    origins.set(row.id, { senderName: row.sender_name, href });
+  }
+  return origins;
 }

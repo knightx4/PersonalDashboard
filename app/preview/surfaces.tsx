@@ -1239,6 +1239,7 @@ const readingRow = (
   finishedAt: null,
   readNowAt: null,
   conceptId: null,
+  newsStoryId: null,
   source: null,
   ...row,
 });

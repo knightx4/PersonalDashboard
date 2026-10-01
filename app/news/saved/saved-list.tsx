@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { RelatedNotes } from '@/components/vault/related-notes';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
+import { savedStoryAnchor } from '@/lib/news/saved/anchor';
 import type { SavedStory } from '@/lib/news/saved/stories';
 import type { RelatedNoteLink } from '@/lib/vault/notes/related';
 import { DiscussButton } from '../quick/discuss-sheet';
@@ -35,6 +36,9 @@ export type SavedListStory = SavedStory & {
  *
  * A story discussed with Dash carries a Discussed button beside Remove, which
  * opens the same sheet as Discuss in Quick read with the exchange in it.
+ *
+ * Each row carries an anchor, so a reading sent to Learn opens the tab at its
+ * story (plan #1368).
  */
 export function SavedList({ stories }: { stories: SavedListStory[] }) {
   const { shown, run } = useOptimisticWrite<SavedListStory[], string>({
@@ -58,7 +62,11 @@ export function SavedList({ stories }: { stories: SavedListStory[] }) {
     <Card padding="dense">
       <ul className="divide-y divide-border">
         {shown.map((story) => (
-          <li key={story.id} className="py-3 first:pt-0 last:pb-0">
+          <li
+            key={story.id}
+            id={savedStoryAnchor(story.id)}
+            className="scroll-mt-20 py-3 first:pt-0 last:pb-0"
+          >
             <article>
               <div className="flex items-start gap-3">
                 <div className="min-w-0 flex-1">

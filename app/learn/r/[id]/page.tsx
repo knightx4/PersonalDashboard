@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, BadgeCheck, AlertTriangle, ExternalLink, GitBranch } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, AlertTriangle, ExternalLink, GitBranch, Newspaper } from 'lucide-react';
 import { ClipPlayer } from '@/components/learn/clip-player';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadOtherReadingsOfSource, loadReading } from '@/lib/learn/tracks/load';
+import { loadReadingOrigins } from '@/lib/learn/tracks/news-origin';
 import { youtubeVideoId } from '@/lib/learn/youtube/format';
 import { formatMoney } from '@/lib/money';
 import { goDeeper, openReading } from './actions';
@@ -48,6 +49,12 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
     : [];
   const alreadyRead = elsewhere.find((row) => row.status === 'read');
 
+  // A story sent from News says which newsletter it was in, and opens it
+  // there: the story's text is kept in News, not copied here (plan #1368).
+  const origin = reading.newsStoryId
+    ? ((await loadReadingOrigins([reading.newsStoryId])).get(reading.newsStoryId) ?? null)
+    : null;
+
   const verified = reading.locatorConfidence === 'verified';
   const pages =
     reading.pageFrom && reading.pageTo
@@ -82,6 +89,19 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
             .join(' · ') || undefined
         }
       />
+
+      {origin && (
+        <p className="mb-5 flex items-center gap-1.5 text-ui text-ink-muted">
+          <Newspaper className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />
+          {origin.href ? (
+            <Link href={origin.href} className="hover:text-ink hover:underline">
+              From {origin.senderName}
+            </Link>
+          ) : (
+            <span>From {origin.senderName}</span>
+          )}
+        </p>
+      )}
 
       {reading.why && <p className="mb-5 text-body text-ink">{reading.why}</p>}
 

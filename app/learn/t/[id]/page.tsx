@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadTrack, loadTracks } from '@/lib/learn/tracks/load';
+import { loadReadingOrigins } from '@/lib/learn/tracks/news-origin';
 import { rollUpAll } from '@/lib/learn/tracks/tree';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
@@ -36,6 +37,11 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
   // own readings and reads exactly as it did.
   const progress = rollUpAll(await loadTracks(supabase)).get(track.id) ?? track.progress;
   const remaining = progress.remaining;
+
+  // Which newsletter each story sent from News was in (plan #1368).
+  const origins = await loadReadingOrigins(
+    track.readings.flatMap((reading) => (reading.newsStoryId ? [reading.newsStoryId] : [])),
+  );
 
   return (
     <>
@@ -93,7 +99,11 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
       ) : (
         <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
           {track.readings.map((reading) => (
-            <ReadingCard key={reading.id} reading={reading} />
+            <ReadingCard
+              key={reading.id}
+              reading={reading}
+              from={reading.newsStoryId ? origins.get(reading.newsStoryId)?.senderName : null}
+            />
           ))}
         </ul>
       )}
