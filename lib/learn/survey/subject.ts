@@ -97,3 +97,81 @@ export async function loadSurveySubjectIds(
   if (error) throw fail('Reading the survey subjects', error);
   return new Set(((data ?? []) as { id: string }[]).map((row) => row.id));
 }
+
+async function subjectForAim(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  aimId: string,
+): Promise<SubjectRow | null> {
+  const { data, error } = await supabase
+    .from('subjects')
+    .select('id, survey')
+    .eq('user_id', userId)
+    .eq('aim_id', aimId)
+    .maybeSingle();
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Looking up the subject for that goal', error);
+  return (data as SubjectRow | null) ?? null;
+}
+
+/**
+ * The hidden subject that holds Practice Flow questions about one learning
+ * goal (plan #1384), made the first time it is asked for.
+ *
+ * The same arrangement as a vault theme's: a subject marked `survey`, linked
+ * to the goal by `aim_id` (learn 0084), so no list of tracks shows it. Write
+ * goal questions into the id this returns, never through `findOrCreateSubject`,
+ * which would take the subject over as a track.
+ *
+ * Null when the goal already has a real track: this subject taken over, or a
+ * track you named the same as the goal. A hidden subject of the same name
+ * (a vault theme's, or a claimed article's) is linked to the goal and used,
+ * since subject names are unique per account and it is about the same thing.
+ */
+export async function surveySubjectForAim(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  aim: { id: string; name: string },
+): Promise<SurveySubject | null> {
+  const linked = await subjectForAim(supabase, userId, aim.id);
+  if (linked) return linked.survey ? { id: linked.id, created: false } : null;
+
+  const { data: named, error: nameError } = await supabase
+    .from('subjects')
+    .select('id, survey, aim_id')
+    .eq('user_id', userId)
+    .ilike('name', aim.name)
+    .maybeSingle();
+  assertSchemaExposed(nameError, LEARN_SCHEMA);
+  if (nameError) throw fail('Looking up a track with that name', nameError);
+  if (named) {
+    const row = named as SubjectRow & { aim_id: string | null };
+    if (!row.survey || row.aim_id != null) return null;
+    const { error: linkError } = await supabase
+      .from('subjects')
+      .update({ aim_id: aim.id })
+      .eq('id', row.id);
+    assertSchemaExposed(linkError, LEARN_SCHEMA);
+    if (linkError?.code === '23505') {
+      const raced = await subjectForAim(supabase, userId, aim.id);
+      return raced?.survey ? { id: raced.id, created: false } : null;
+    }
+    if (linkError) throw fail('Linking the survey subject to that goal', linkError);
+    return { id: row.id, created: false };
+  }
+
+  const { data: created, error } = await supabase
+    .from('subjects')
+    .insert({ user_id: userId, name: aim.name, survey: true, aim_id: aim.id })
+    .select('id')
+    .single();
+  assertSchemaExposed(error, LEARN_SCHEMA);
+
+  if (error?.code === '23505') {
+    // Another request made it first, by goal or by name.
+    const raced = await subjectForAim(supabase, userId, aim.id);
+    return raced?.survey ? { id: raced.id, created: false } : null;
+  }
+  if (error || !created) throw fail('Making the survey subject', error ?? { message: 'no row' });
+  return { id: (created as { id: string }).id, created: true };
+}
