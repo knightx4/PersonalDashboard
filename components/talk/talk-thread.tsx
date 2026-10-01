@@ -65,7 +65,9 @@ function DashTurnMark({
   state?: DashState;
   activity?: DashActivity;
 }) {
-  return <DashMark size="2xs" state={state} activity={activity} decorative className={className} />;
+  // A reply on its way, or just landed, is Dash as the subject: the brand ramp.
+  const tone = state === 'working' || state === 'done' ? 'brand' : 'current';
+  return <DashMark size="2xs" state={state} activity={activity} tone={tone} decorative className={className} />;
 }
 
 const DASH: TalkAssistant = { name: 'Dash', Mark: DashTurnMark, StateMark: DashTurnMark };
