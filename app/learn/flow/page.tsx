@@ -49,9 +49,11 @@ export const metadata = { title: 'Practice Flow' };
  *
  * Mixed with no filter also asks about subjects you write about in the vault
  * and have no track for (plan #842), at the rate in `lib/learn/survey/rate.ts`.
- * `?only=tracks` is the Tracks only filter, which leaves those out. With
- * nothing left to ask in the tracks, the default still asks a survey question
- * when there is one to write, before falling back to the empty states.
+ * It also asks about your open learning goals, one question in three while
+ * you have one (plan #1385). `?only=tracks` is the Tracks only filter, which
+ * leaves both out. With nothing left to ask in the tracks, the default still
+ * asks a goal or survey question when there is one to write, before falling
+ * back to the empty states.
  */
 export default async function PracticeFlowPage({
   searchParams,
@@ -91,7 +93,7 @@ export default async function PracticeFlowPage({
   // reason somebody is still reading with it.
   const answered = lastAnsweredLine(answeredAt, new Date(), settings.timezone);
 
-  // With no filter, the survey can still ask when the tracks have nothing.
+  // With no filter, a goal or the survey can still ask when the tracks have nothing.
   const surveys = !track && !tracksOnly;
 
   // Resumed rather than taken fresh, so a reload shows the question already

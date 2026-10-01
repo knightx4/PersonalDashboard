@@ -12,9 +12,17 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { loadSurveyPool } from '@/lib/learn/survey/load';
 import type { SurveyPool } from '@/lib/learn/survey/pick';
+import { writeGoalQuestion, type GoalAim } from '@/lib/learn/survey/goal-question';
+import { loadGoalsInTurn } from '@/lib/learn/survey/goal-turns';
 import { writeSurveyQuestion } from '@/lib/learn/survey/question';
-import { fieldsWrittenAbout, SURVEY_LOOKBACK, surveyShare, surveySlots } from '@/lib/learn/survey/rate';
-import { loadSurveySubjectIds } from '@/lib/learn/survey/subject';
+import {
+  fieldsWrittenAbout,
+  FLOW_LOOKBACK,
+  flowSlots,
+  GOAL_SHARE,
+  surveyShare,
+  type FlowTurn,
+} from '@/lib/learn/survey/rate';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import type { TrackShare } from './interest';
 import { loadTrackInterest, sharesFrom } from './interest-load';
@@ -47,6 +55,12 @@ import { loadTrackInterest, sharesFrom } from './interest-load';
  * out. They are written ahead like the others. `tracksOnly` leaves them out,
  * and so does a flow focused on one track. A survey question waiting in the
  * queue is left there by those two, the same as another track's question.
+ *
+ * The same flows also ask about your open learning goals (plan #1385): one
+ * question in three while you have one, worked out before the theme turn by
+ * `flowSlots`. A goal question goes in the goal's hidden survey subject, so the
+ * readers here tell it apart by the subject's `aim_id`, and name it after the
+ * goal. A waiting question about a goal archived since is thrown away unshown.
  */
 
 /**
@@ -56,7 +70,7 @@ import { loadTrackInterest, sharesFrom } from './interest-load';
  */
 export type FlowScope = { track: string | null; tracksOnly?: boolean };
 
-/** Whether the flow mixes in survey questions. */
+/** Whether the flow mixes in survey and goal questions. */
 function surveys(scope: FlowScope): boolean {
   return scope.track === null && !scope.tracksOnly;
 }
@@ -86,11 +100,18 @@ export type FlowQuestion = {
    * of your tracks, and that subject's field. `subjectName` is the same name.
    */
   survey?: SurveyAbout;
+  /**
+   * Set on a goal question (plan #1385): the open learning goal it is about.
+   * `subjectName` is the goal's name too, and `subjectId` its hidden subject.
+   */
+  goal?: GoalAbout;
   question: string;
   options: string[];
 };
 
 export type SurveyAbout = { themeName: string; fieldName: string };
+
+export type GoalAbout = { aimId: string; aimName: string };
 
 export type NextQuestion =
   | { kind: 'question'; question: FlowQuestion }
@@ -145,8 +166,22 @@ type ClaimNow = {
   state: KnowledgeState;
   subjectId: string;
   subjectName: string;
-  /** Set when the claim is in a survey subject rather than a track. */
+  /** Set when the claim is in a vault theme's survey subject rather than a track. */
   survey: SurveyAbout | null;
+  /** Set when the claim is in a goal's survey subject. */
+  goal: GoalAbout | null;
+};
+
+/** Whether a claim is in one of your tracks rather than a hidden subject. */
+function inTrack(claim: ClaimNow): boolean {
+  return claim.survey === null && claim.goal === null;
+}
+
+type SurveySubjectRow = {
+  id: string;
+  name: string;
+  theme_id: string | null;
+  aim_id: string | null;
 };
 
 /**
@@ -159,7 +194,7 @@ type ClaimNow = {
  */
 async function surveyAbout(
   supabase: LearnSupabaseClient,
-  subjects: { id: string; name: string; theme_id: string | null }[],
+  subjects: Pick<SurveySubjectRow, 'id' | 'name' | 'theme_id'>[],
 ): Promise<Map<string, SurveyAbout>> {
   const about = new Map<string, SurveyAbout>();
   if (subjects.length === 0) return about;
@@ -195,8 +230,45 @@ async function surveyAbout(
 }
 
 /**
+ * The goals the goal subjects in the queue are about, with each goal's name
+ * as it is now. A goal archived since is left out, and so are its questions.
+ */
+async function goalsAbout(
+  supabase: LearnSupabaseClient,
+  subjects: SurveySubjectRow[],
+): Promise<{ about: Map<string, GoalAbout>; archived: Set<string> }> {
+  const about = new Map<string, GoalAbout>();
+  const archived = new Set<string>();
+  const aimIds = [
+    ...new Set(subjects.flatMap((subject) => (subject.aim_id ? [subject.aim_id] : []))),
+  ];
+  if (aimIds.length === 0) return { about, archived };
+
+  const { data, error } = await supabase
+    .from('aims')
+    .select('id, name, archived_at')
+    .in('id', aimIds);
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Reading your goals', error);
+  const aims = new Map(
+    ((data ?? []) as { id: string; name: string; archived_at: string | null }[]).map((row) => [
+      row.id,
+      row,
+    ]),
+  );
+  for (const subject of subjects) {
+    const aim = subject.aim_id ? aims.get(subject.aim_id) : undefined;
+    if (!aim) continue;
+    if (aim.archived_at) archived.add(subject.id);
+    else about.set(subject.id, { aimId: aim.id, aimName: aim.name });
+  }
+  return { about, archived };
+}
+
+/**
  * Each claim as it stands now, with its subject. A claim deleted since its
- * question was written is missing from the map.
+ * question was written is missing from the map, and so is one about a goal
+ * archived since.
  */
 async function claimsNow(
   supabase: LearnSupabaseClient,
@@ -212,7 +284,7 @@ async function claimsNow(
     loadSubjects(supabase),
     // `loadSubjects` leaves survey subjects out, so their questions are named
     // from here.
-    supabase.from('subjects').select('id, name, theme_id').eq('survey', true),
+    supabase.from('subjects').select('id, name, theme_id, aim_id').eq('survey', true),
   ]);
 
   assertSchemaExposed(homes.error ?? surveyRead.error, LEARN_SCHEMA);
@@ -227,24 +299,37 @@ async function claimsNow(
   );
   const subjectName = new Map(subjects.map((subject) => [subject.id, subject.name]));
   const inQueue = new Set(subjectOf.values());
-  const about = await surveyAbout(
-    supabase,
-    ((surveyRead.data ?? []) as { id: string; name: string; theme_id: string | null }[]).filter(
-      (subject) => inQueue.has(subject.id),
-    ),
+  const queued = ((surveyRead.data ?? []) as SurveySubjectRow[]).filter((subject) =>
+    inQueue.has(subject.id),
   );
+  const [about, goals] = await Promise.all([
+    surveyAbout(
+      supabase,
+      queued.filter((subject) => !subject.aim_id),
+    ),
+    goalsAbout(
+      supabase,
+      queued.filter((subject) => Boolean(subject.aim_id)),
+    ),
+  ]);
 
   for (const concept of concepts) {
     if (!concept) continue;
     const subjectId = subjectOf.get(concept.id);
-    if (!subjectId) continue;
+    if (!subjectId || goals.archived.has(subjectId)) continue;
     const survey = about.get(subjectId) ?? null;
+    const goal = goals.about.get(subjectId) ?? null;
     found.set(concept.id, {
       name: concept.name,
       state: concept.state,
       subjectId,
-      subjectName: survey ? survey.themeName : (subjectName.get(subjectId) ?? ''),
+      subjectName: goal
+        ? goal.aimName
+        : survey
+          ? survey.themeName
+          : (subjectName.get(subjectId) ?? ''),
       survey,
+      goal,
     });
   }
   return found;
@@ -260,6 +345,7 @@ function asQuestion(row: QueuedRow, claim: ClaimNow): FlowQuestion | null {
     subjectName: claim.subjectName,
     recheck: row.picked_recheck ?? undefined,
     ...(claim.survey ? { survey: claim.survey } : {}),
+    ...(claim.goal ? { goal: claim.goal } : {}),
     question: row.question,
     options: row.options,
   };
@@ -347,8 +433,8 @@ async function pickRows(
  * track for Tracks only, and anything at all with no filter.
  */
 function fits(claim: ClaimNow, scope: FlowScope): boolean {
-  if (scope.track !== null) return claim.survey === null && claim.subjectId === scope.track;
-  return scope.tracksOnly ? claim.survey === null : true;
+  if (scope.track !== null) return inTrack(claim) && claim.subjectId === scope.track;
+  return scope.tracksOnly ? inTrack(claim) : true;
 }
 
 /**
@@ -472,37 +558,44 @@ async function writeFor(
 }
 
 /**
- * The flow's latest questions, newest first, and whether each was a survey
- * question: the ones waiting, the one on the screen and the ones answered.
- * Enough of them for the survey cadence in `surveySlots`.
+ * The flow's latest questions, newest first, and what each was about: the
+ * ones waiting, the one on the screen and the ones answered. Enough of them
+ * for the cadences in `flowSlots`.
  */
-async function recentSurveyTurns(supabase: LearnSupabaseClient): Promise<boolean[]> {
+async function recentTurns(supabase: LearnSupabaseClient): Promise<FlowTurn[]> {
   const { data, error } = await supabase
     .from('probes')
     .select('concept_id')
     .not('picked_state', 'is', null)
     .is('discarded_at', null)
     .order('created_at', { ascending: false })
-    .limit(SURVEY_LOOKBACK);
+    .limit(FLOW_LOOKBACK);
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw fail('Reading the latest questions', error);
 
   const ids = ((data ?? []) as { concept_id: string }[]).map((row) => row.concept_id);
   if (ids.length === 0) return [];
 
-  const [homes, surveyIds] = await Promise.all([
+  const [homes, hidden] = await Promise.all([
     supabase.from('concepts').select('id, subject_id').in('id', [...new Set(ids)]),
-    loadSurveySubjectIds(supabase),
+    supabase.from('subjects').select('id, aim_id').eq('survey', true),
   ]);
-  assertSchemaExposed(homes.error, LEARN_SCHEMA);
+  assertSchemaExposed(homes.error ?? hidden.error, LEARN_SCHEMA);
   if (homes.error) throw fail('Reading which track those ideas are in', homes.error);
+  if (hidden.error) throw fail('Reading the survey subjects', hidden.error);
   const subjectOf = new Map(
     ((homes.data ?? []) as { id: string; subject_id: string }[]).map((row) => [
       row.id,
       row.subject_id,
     ]),
   );
-  return ids.map((id) => surveyIds.has(subjectOf.get(id) ?? ''));
+  const turnOf = new Map(
+    ((hidden.data ?? []) as { id: string; aim_id: string | null }[]).map((row) => [
+      row.id,
+      row.aim_id ? ('goal' as const) : ('survey' as const),
+    ]),
+  );
+  return ids.map((id) => turnOf.get(subjectOf.get(id) ?? '') ?? 'track');
 }
 
 /** Count a question just written in the pool, so the next pick moves on from its field. */
@@ -580,13 +673,84 @@ async function writeSurveys(input: {
 }
 
 /**
+ * Write up to `count` goal questions, taking the goals in turn from `goals`
+ * (`loadGoalsInTurn`'s order), and record what they cost. A goal that cannot
+ * be written for this time hands its turn to the next goal, and fewer come
+ * back when none can. Never throws.
+ */
+async function writeGoals(input: {
+  supabase: LearnSupabaseClient;
+  userId: string;
+  apiKey: string;
+  count: number;
+  goals: readonly GoalAim[];
+  shownAt: string | null;
+}): Promise<FlowQuestion[]> {
+  const written: FlowQuestion[] = [];
+  if (input.count <= 0 || input.goals.length === 0) return written;
+
+  const ideaSpend = collectSpend();
+  const questionSpend = collectSpend();
+  try {
+    // Rotated after each question, so the next goal turn goes to the next
+    // goal. A goal that cannot be written for is dropped for this round.
+    const queue = [...input.goals];
+    while (written.length < input.count) {
+      const aim = queue.shift();
+      if (!aim) break;
+      const result = await writeGoalQuestion({
+        supabase: input.supabase,
+        userId: input.userId,
+        aim,
+        anthropicApiKey: input.apiKey,
+        flow: { shownAt: input.shownAt },
+        onIdeaSpend: ideaSpend.sink,
+        onSpend: questionSpend.sink,
+      });
+      if (!result.ok) {
+        if (result.reason === 'error') console.error('[learn flow] goal question', result.detail);
+        continue;
+      }
+      queue.push(aim);
+      const question = result.question;
+      written.push({
+        probeId: question.probeId,
+        conceptId: question.conceptId,
+        conceptName: question.conceptName,
+        subjectId: question.subjectId,
+        subjectName: question.aimName,
+        goal: { aimId: question.aimId, aimName: question.aimName },
+        question: question.question,
+        options: question.options,
+      });
+    }
+  } catch (error) {
+    console.error('[learn flow] goal question', error instanceof Error ? error.message : error);
+  }
+  await Promise.all([
+    recordLearnSpend(input.userId, 'write-survey-idea', ideaSpend.reports),
+    recordLearnSpend(input.userId, 'write-survey-question', questionSpend.reports),
+  ]);
+  return written;
+}
+
+/** The open goals in turn, or none when they cannot be read. */
+function goalsOrNone(supabase: LearnSupabaseClient): Promise<GoalAim[]> {
+  return loadGoalsInTurn(supabase).catch((error: unknown) => {
+    console.error('[learn flow] goals', error instanceof Error ? error.message : error);
+    return [];
+  });
+}
+
+/**
  * The next question: a waiting one when there is one, otherwise written now.
  *
  * Writing now is the slow path, for the first question ever and for a queue
  * that ran dry because answers came faster than the writing. It is recorded
  * under `write-probe`, the same as before there was a queue. It writes a
  * track's question when there is one to ask. With no filter and nothing left
- * in the tracks, it writes a survey question instead, which needs `vault`.
+ * in the tracks, it writes a question about an open goal instead, and failing
+ * that a survey question, which needs `vault`.
  */
 export async function nextQuestion(
   supabase: LearnSupabaseClient,
@@ -614,6 +778,17 @@ export async function nextQuestion(
     now: new Date(),
   });
   if (picked.kind === 'nothing') {
+    if (surveys(options)) {
+      const [goal] = await writeGoals({
+        supabase,
+        userId,
+        apiKey,
+        count: 1,
+        goals: await goalsOrNone(supabase),
+        shownAt: new Date().toISOString(),
+      });
+      if (goal) return { kind: 'question', question: goal };
+    }
     if (options.vault && surveys(options)) {
       const [survey] = await writeSurveys({
         supabase,
@@ -646,11 +821,13 @@ export async function nextQuestion(
  * queue can hold up to `WRITE_AHEAD` for the track on top of what is waiting
  * for the others. Tracks only counts and fills only track questions.
  *
- * With no filter, and `vault` given, some of the new questions are survey
- * questions, as many as `surveySlots` says for the rate `surveyShare` works
- * out. When the tracks have fewer questions to ask than their slots, the
- * survey takes the rest; when the survey cannot write one, a track question
- * takes its slot.
+ * With no filter, some of the new questions are about your open goals and,
+ * with `vault` given, some are survey questions, as many of each as
+ * `flowSlots` says: one in three for goals while there is an open goal, and
+ * the rate `surveyShare` works out for the survey among the rest. When the
+ * tracks have fewer questions to ask than their slots, the survey takes the
+ * rest, or the goals when there is no survey; when a goal or survey question
+ * cannot be written, a track question takes its slot.
  */
 export async function fillQueue(
   supabase: LearnSupabaseClient,
@@ -669,12 +846,12 @@ export async function fillQueue(
 
     const waitingByTrack = new Map<string, number>();
     for (const { claim } of valid) {
-      if (claim.survey) continue;
+      if (!inTrack(claim)) continue;
       waitingByTrack.set(claim.subjectId, (waitingByTrack.get(claim.subjectId) ?? 0) + 1);
     }
 
     const mixing = vault !== undefined && surveys(scope);
-    const [subjects, { rows, shares }, answered, pool, recent] = await Promise.all([
+    const [subjects, { rows, shares }, answered, pool, recent, goals] = await Promise.all([
       loadSubjects(supabase),
       pickRows(supabase, READY_LIMIT, scope.track, waitingByTrack),
       answeredCount(supabase),
@@ -684,7 +861,8 @@ export async function fillQueue(
             return null;
           })
         : null,
-      mixing ? recentSurveyTurns(supabase).catch(() => [] as boolean[]) : ([] as boolean[]),
+      surveys(scope) ? recentTurns(supabase).catch(() => [] as FlowTurn[]) : ([] as FlowTurn[]),
+      surveys(scope) ? goalsOrNone(supabase) : ([] as GoalAim[]),
     ]);
 
     const picks = pickAhead(
@@ -704,25 +882,37 @@ export async function fillQueue(
       ],
     );
 
-    let surveyWanted = pool
-      ? surveySlots(recent, surveyShare(fieldsWrittenAbout(pool)), wanted).filter(Boolean).length
-      : 0;
-    if (pool && picks.length < wanted - surveyWanted) surveyWanted = wanted - picks.length;
-    const trackWanted = wanted - surveyWanted;
-    if (picks.length === 0 && surveyWanted === 0) return;
+    const slots = flowSlots(
+      recent,
+      {
+        goal: goals.length > 0 ? GOAL_SHARE : 0,
+        survey: pool ? surveyShare(fieldsWrittenAbout(pool)) : 0,
+      },
+      wanted,
+    );
+    let goalWanted = slots.filter((slot) => slot === 'goal').length;
+    let surveyWanted = slots.filter((slot) => slot === 'survey').length;
+    // The tracks running short hand their slots to the survey, or to the
+    // goals when there is no survey.
+    const trackShort = wanted - goalWanted - surveyWanted - picks.length;
+    if (trackShort > 0 && pool) surveyWanted += trackShort;
+    else if (trackShort > 0 && goals.length > 0) goalWanted += trackShort;
+    const trackWanted = wanted - goalWanted - surveyWanted;
+    if (picks.length === 0 && surveyWanted === 0 && goalWanted === 0) return;
 
     const spend = collectSpend();
     const writeTracks = (list: PickedToAsk[]) =>
       Promise.all(list.map((picked) => writeFor(supabase, userId, apiKey, picked, spend.sink, null)));
 
-    const [written, surveyed] = await Promise.all([
+    const [written, surveyed, goaled] = await Promise.all([
       writeTracks(picks.slice(0, trackWanted)),
       pool && vault
         ? writeSurveys({ supabase, vault, userId, apiKey, count: surveyWanted, pool, shownAt: null })
         : ([] as FlowQuestion[]),
+      writeGoals({ supabase, userId, apiKey, count: goalWanted, goals, shownAt: null }),
     ]);
-    // A survey slot that could not be written goes to the next track pick.
-    const short = surveyWanted - surveyed.length;
+    // A goal or survey slot that could not be written goes to the next track pick.
+    const short = surveyWanted - surveyed.length + goalWanted - goaled.length;
     const backups = short > 0 ? await writeTracks(picks.slice(trackWanted, trackWanted + short)) : [];
     await recordLearnSpend(userId, 'write-probe-ahead', spend.reports);
 

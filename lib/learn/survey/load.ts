@@ -52,7 +52,8 @@ async function loadPlacements(supabase: LearnSupabaseClient): Promise<Map<string
 }
 
 /**
- * Survey questions written and answered, per field and per theme.
+ * Survey questions written and answered, per field and per theme. A goal's
+ * questions (plan #1385) count in the goal's field and in no theme.
  *
  * For Practice Flow's survey rate (#842) and the Know grid (#843) as well as
  * the pick: `byField.get(fieldId)?.answered` is how many survey questions in
@@ -64,16 +65,29 @@ export async function loadSurveyCounts(
   supabase: LearnSupabaseClient,
   placements?: ReadonlyMap<string, string>,
 ): Promise<SurveyCounts> {
-  const [subjectRead, fields] = await Promise.all([
-    supabase.from('subjects').select('id, theme_id').eq('survey', true),
+  const [subjectRead, aimRead, fields] = await Promise.all([
+    supabase.from('subjects').select('id, theme_id, aim_id').eq('survey', true),
+    // A goal's questions count in the goal's field (plan #1385).
+    supabase.from('aims').select('id, field_id').not('field_id', 'is', null),
     placements ? Promise.resolve(placements) : loadPlacements(supabase),
   ]);
-  assertSchemaExposed(subjectRead.error, LEARN_SCHEMA);
+  assertSchemaExposed(subjectRead.error ?? aimRead.error, LEARN_SCHEMA);
   if (subjectRead.error) throw fail('Reading the survey subjects', subjectRead.error);
+  if (aimRead.error) throw fail('Reading where your goals are placed', aimRead.error);
 
-  const subjects = ((subjectRead.data ?? []) as { id: string; theme_id: string | null }[]).flatMap(
-    (row) => (row.theme_id ? [{ id: row.id, themeId: row.theme_id }] : []),
+  const aimField = new Map(
+    ((aimRead.data ?? []) as { id: string; field_id: string }[]).map((row) => [
+      row.id,
+      row.field_id,
+    ]),
   );
+  const subjects = (
+    (subjectRead.data ?? []) as { id: string; theme_id: string | null; aim_id: string | null }[]
+  ).flatMap((row): { id: string; themeId: string | null; goalFieldId?: string }[] => {
+    if (row.theme_id) return [{ id: row.id, themeId: row.theme_id }];
+    const goalFieldId = row.aim_id ? aimField.get(row.aim_id) : undefined;
+    return goalFieldId ? [{ id: row.id, themeId: null, goalFieldId }] : [];
+  });
   const concepts = await inChunks<{ id: string; subject_id: string }>(
     subjects.map((subject) => subject.id),
     (chunk) => supabase.from('concepts').select('id, subject_id').in('subject_id', chunk),

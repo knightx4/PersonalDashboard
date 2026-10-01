@@ -1,4 +1,4 @@
-import type { NextQuestion, SurveyAbout } from '@/lib/learn/flow/ahead';
+import type { GoalAbout, NextQuestion, SurveyAbout } from '@/lib/learn/flow/ahead';
 import type { NothingToAsk } from '@/lib/learn/graph/pick';
 import type { SettledConcept } from '@/lib/learn/graph/recheck';
 import type { TrackMove } from '@/lib/learn/flow/track';
@@ -28,6 +28,11 @@ export type FlowState = AskState & {
    * is not one of your tracks, and its field.
    */
   survey?: SurveyAbout;
+  /**
+   * Set on a goal question (plan #1385): the open learning goal it is about.
+   * Its subject is hidden too, so it has no track line either.
+   */
+  goal?: GoalAbout;
   /**
    * The track's settled count before and after the answer. Set by the answer
    * and nowhere else, so a question on screen never carries the last one's.

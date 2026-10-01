@@ -51,7 +51,7 @@ function trackFrom(formData: FormData): string | null {
 /**
  * Which questions the flow asks, from the form's hidden `track` and `only`
  * fields. `only=tracks` is the Tracks only filter (plan #842): with it, and
- * with a track, no survey questions are asked.
+ * with a track, no survey or goal questions are asked.
  */
 function scopeFrom(formData: FormData): FlowScope {
   return { track: trackFrom(formData), tracksOnly: formData.get('only') === 'tracks' };
@@ -185,9 +185,9 @@ async function answerFlowQuestion(
   scope: FlowScope,
 ): Promise<FlowState> {
   const supabase = await createLearnClient();
-  // A survey question's subject is hidden, not a track, so it has no track
-  // line to move.
-  const subjectId = prev.survey ? undefined : prev.subjectId;
+  // A survey or goal question's subject is hidden, not a track, so it has no
+  // track line to move.
+  const subjectId = prev.survey || prev.goal ? undefined : prev.subjectId;
   const before = subjectId ? await loadGraph(supabase, subjectId).catch(() => null) : null;
 
   const answered: FlowState = {

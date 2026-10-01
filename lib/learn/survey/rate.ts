@@ -82,3 +82,71 @@ export function surveySlots(recent: readonly boolean[], share: number, wanted: n
   }
   return slots;
 }
+
+/**
+ * Goal questions (plan #1385): while you have an open learning goal, one
+ * question in three is about one of your goals, the share #899 set for goal
+ * cards in Learn now.
+ */
+export const GOAL_SHARE = 1 / 3;
+
+/** What one flow question is about: a goal, a vault theme, or a track. */
+export type FlowTurn = 'goal' | 'survey' | 'track';
+
+/**
+ * How many recent flow questions `flowSlots` reads. Goals take at most one
+ * turn in three, so this many always holds the `SURVEY_LOOKBACK` other turns
+ * the theme cadence needs.
+ */
+export const FLOW_LOOKBACK = 2 * SURVEY_LOOKBACK;
+
+/**
+ * What each of the next `wanted` questions is about, in order.
+ *
+ * The goal turn is worked out first, with the cadence `surveySlots` uses: at
+ * one in n, a slot is a goal question when none of the n - 1 questions before
+ * it was. The slots that are not goal questions are then split between vault
+ * themes and tracks as `surveySlots` splits them, counting only the questions
+ * that were not about a goal. So while a field is untested and there is a
+ * goal, a goal, a theme and a track take one turn in three each.
+ *
+ * `recent` is newest first: the questions waiting, the one on the screen and
+ * the ones answered. `goalShare` is 0 with no open goal, and `surveyShare` 0
+ * with nothing to survey or a flow that leaves the survey out.
+ */
+export function flowSlots(
+  recent: readonly FlowTurn[],
+  shares: { goal: number; survey: number },
+  wanted: number,
+): FlowTurn[] {
+  const goalEvery = shares.goal > 0 ? Math.max(1, Math.round(1 / shares.goal)) : 0;
+  const seen = [...recent];
+  const slots: FlowTurn[] = [];
+  for (let i = 0; i < wanted; i += 1) {
+    let turn: FlowTurn;
+    if (goalEvery > 0 && !seen.slice(0, goalEvery - 1).includes('goal')) {
+      turn = 'goal';
+    } else {
+      const others = seen.filter((past) => past !== 'goal').map((past) => past === 'survey');
+      turn = surveySlots(others, shares.survey, 1)[0] ? 'survey' : 'track';
+    }
+    slots.push(turn);
+    seen.unshift(turn);
+  }
+  return slots;
+}
+
+/**
+ * The open goals in the order they take goal turns: the one with the fewest
+ * questions written about it first, and the older goal first between equals.
+ * `asked` is keyed by goal id; a goal missing from it has had none.
+ */
+export function goalsInTurn<T extends { id: string }>(
+  goals: readonly T[],
+  asked: ReadonlyMap<string, number>,
+): T[] {
+  return goals
+    .map((goal, index) => ({ goal, index, asked: asked.get(goal.id) ?? 0 }))
+    .sort((a, b) => a.asked - b.asked || a.index - b.index)
+    .map(({ goal }) => goal);
+}

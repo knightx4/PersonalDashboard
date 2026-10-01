@@ -30,7 +30,7 @@ by the owner on 23 September 2026.
 ## Practice Flow
 
 Practice Flow, at `/learn/flow`, asks one question after another. Since plan
-#842 it asks about two kinds of subject:
+#842 it asks about two kinds of subject, and since #1385 a third:
 
 - **Your tracks.** The ideas in each track, shared between tracks by how much
   you engage with each, as "What to do next" in
@@ -41,12 +41,14 @@ Practice Flow, at `/learn/flow`, asks one question after another. Since plan
   a hidden subject that no list of your tracks shows (decision #838), and the
   screen names the vault subject and its field above the question, with a line
   saying it is not one of your tracks.
+- **Your open learning goals.** A goal you set on the Goals tab with no list
+  behind it, such as startup finance. See "Goal questions" below.
 
 A filter at the top of the page chooses between them:
 
 | Filter | What it asks about |
 |---|---|
-| Everything, the default (`/learn/flow`) | Your tracks, and survey questions at the rate below |
+| Everything, the default (`/learn/flow`) | Your tracks, goal questions, and survey questions at the rates below |
 | Tracks only (`/learn/flow?only=tracks`) | Your tracks and nothing else |
 
 Practice this on a track, and Test me on this on a Learn now card, open the
@@ -88,6 +90,37 @@ Survey answers are graded like any other answer. An answered survey question
 counts towards its field being tested on the Know grid, the same as an answer
 in a track placed there, and a field tested that way is no longer offered as
 one you have never been tested in (plan #843).
+
+### Goal questions
+
+Plan #1385 mixes in questions about your open learning goals. While you have
+one, one question in three is about a goal, the share #899 set for goal cards
+in Learn now. The goal turn is worked out first, with the same cadence as the
+survey turn: the next question is a goal question when neither of the two
+before it was. The other turns keep the split above between your tracks and
+survey questions, counted among themselves. So while a field you write about
+is untested and you have a goal, a goal, a vault subject and your tracks each
+get one turn in three, and your tracks get more as the survey rate falls. The
+turn order is `flowSlots` in `lib/learn/survey/rate.ts`.
+
+With more than one goal, the goals take turns, the one with the fewest
+questions written about it going first (`goalsInTurn`). A question is written
+from the goal cards you marked Got it or saved, and from the goal's own
+wording when there are none (plan #1383). Each goal's questions are kept in a
+hidden subject of their own, as survey questions are (plan #1384), and the
+screen names the goal above the question with a line saying it comes from
+your learning goals.
+
+Goal questions are written ahead into the same queue. One that cannot be
+written gives its turn to a track question, and a goal that already has a
+track of its own name is asked about through that track. A waiting question
+about a goal you have since archived is thrown away unshown. Tracks only and a
+focused track leave goal questions out. The Level 3 goal is not asked about
+here; its questions are about the articles you claimed (plan #1386).
+
+An answered goal question counts towards the goal's field on the Know grid,
+as a survey answer does, and so towards the survey rate above. A goal not
+placed in a field adds to no field.
 
 ## Two rules this overturns
 

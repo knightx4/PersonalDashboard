@@ -24,6 +24,8 @@ const TRACK_A = '00000000-0000-4000-8000-00000000000a';
 const TRACK_B = '00000000-0000-4000-8000-00000000000b';
 /** A hidden survey subject (plan #840), which `loadSubjects` leaves out. */
 const SURVEY = '00000000-0000-4000-8000-00000000000c';
+/** A goal's hidden survey subject (plan #1384), linked by `aim_id`. */
+const GOAL = '00000000-0000-4000-8000-00000000000d';
 
 const { putBack, takeWaiting } = await import('./ahead');
 
@@ -54,11 +56,20 @@ function row(id: string, conceptId: string, shownAt: string | null = null): Row 
  * same builder, and awaiting it answers by table and by whether it was an
  * update. Updates to `shown_at` are recorded so the test can see what was taken.
  */
-function fakeClient(queue: Row[], homes: Record<string, string>) {
+function fakeClient(
+  queue: Row[],
+  homes: Record<string, string>,
+  aim: { archived_at: string | null } = { archived_at: null },
+) {
   const tables: Record<string, unknown[]> = {
-    subjects: [{ id: SURVEY, name: 'Stoicism', theme_id: 'theme-stoicism' }],
+    subjects: [
+      { id: SURVEY, name: 'Stoicism', theme_id: 'theme-stoicism', aim_id: null },
+      { id: GOAL, name: 'Startup finance', theme_id: null, aim_id: 'aim-finance' },
+    ],
     theme_fields: [{ theme_id: 'theme-stoicism', field_id: 'field-phil' }],
     area_fields: [{ id: 'field-phil', name: 'Philosophy' }],
+    // Renamed since its subject was made: the question carries the name it has now.
+    aims: [{ id: 'aim-finance', name: 'Startup finance for founders', ...aim }],
   };
   const taken: string[] = [];
   const client = {
@@ -178,6 +189,45 @@ describe('takeWaiting with survey questions', () => {
 });
 
 /**
+ * Plan #1385: with no filter the queue's goal questions are asked, named by
+ * the goal. Tracks only leaves them waiting, and a goal archived since has its
+ * waiting questions thrown away.
+ */
+describe('takeWaiting with goal questions', () => {
+  const homes = { g1: GOAL, c2: TRACK_A };
+
+  it('takes a goal question with no filter, naming the goal', async () => {
+    const { client, taken } = fakeClient([row('p1', 'g1'), row('p2', 'c2')], homes);
+    const question = await takeWaiting(client, { resume: false, track: null });
+    expect(taken).toEqual(['p1']);
+    expect(question?.subjectName).toBe('Startup finance for founders');
+    expect(question?.goal).toEqual({
+      aimId: 'aim-finance',
+      aimName: 'Startup finance for founders',
+    });
+    expect(question?.survey).toBeUndefined();
+  });
+
+  it('leaves goal questions waiting for Tracks only and when focused', async () => {
+    const { client, taken } = fakeClient([row('p1', 'g1'), row('p2', 'c2')], homes);
+    const question = await takeWaiting(client, { resume: false, track: null, tracksOnly: true });
+    expect(question?.probeId).toBe('p2');
+    expect(question?.goal).toBeUndefined();
+    expect(await takeWaiting(client, { resume: false, track: GOAL })).toBeNull();
+    expect(taken).toEqual(['p2']);
+  });
+
+  it('does not ask a question about a goal archived since', async () => {
+    const { client, taken } = fakeClient([row('p1', 'g1'), row('p2', 'c2')], homes, {
+      archived_at: '2026-09-30T12:00:00Z',
+    });
+    const question = await takeWaiting(client, { resume: false, track: null });
+    expect(question?.probeId).toBe('p2');
+    expect(taken).toEqual(['p2']);
+  });
+});
+
+/**
  * Note 7ccc6f99: Not now puts the question back, unshown and at the end of the
  * queue, and only while it is unanswered.
  */
@@ -204,4 +254,3 @@ describe('putBack', () => {
     expect(calls.is).toContain('answered_at');
   });
 });
-
