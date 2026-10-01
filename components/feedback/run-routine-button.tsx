@@ -3,7 +3,8 @@
 import { useActionState, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Loader2, Play, TriangleAlert } from 'lucide-react';
+import { Play, TriangleAlert } from 'lucide-react';
+import { DashMark } from '@/components/ui/dash-mark';
 import {
   routineRun,
   runFeatureRoutine,
@@ -189,9 +190,11 @@ export function RunRoutineButton({
 
       {running && run && (
         <p className="flex items-start gap-2 text-ui text-ink-muted">
-          <Loader2
-            className="mt-0.5 size-3.5 shrink-0 animate-spin text-accent motion-reduce:animate-none"
-            aria-hidden
+          <DashMark
+            size="icon"
+            state="working"
+            decorative
+            className="mt-0.5 shrink-0 text-accent"
           />
           <span className="min-w-0">
             <span className="text-ink">Running for {elapsed(run.since, now)}</span> — working “

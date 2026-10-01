@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, Lightbulb, Sparkles } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
+import { ModuleMark } from '@/components/ui/module-mark';
 import {
   addIdea,
   deleteIdea,
@@ -42,7 +43,7 @@ import { segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
 import { TriageNote } from '@/components/feedback/triage-note';
 import { triageView } from '@/lib/feedback/triage';
-import { ideaScoreView } from '@/lib/ideas/score';
+import { SUGGESTION_SCORE_FLOOR, ideaScoreView } from '@/lib/ideas/score';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -235,10 +236,7 @@ function IdeaScoreLabel({ idea }: { idea: IdeaRow }) {
 
 function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: boolean }) {
   const [editing, setEditing] = useState(false);
-  const [saveState, saveAction, savePending] = useActionState(
-    updateIdea,
-    {} as IdeaActionState,
-  );
+  const [saveState, saveAction, savePending] = useActionState(updateIdea, {} as IdeaActionState);
   const [deleteState, deleteAction, deletePending] = useActionState(
     deleteIdea,
     {} as IdeaActionState,
@@ -252,7 +250,10 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
     // The id is where the app-wide search lands an idea: /dev/ideas#idea-<id>.
     <li id={`idea-${idea.id}`} className="flex scroll-mt-20 flex-col gap-2 px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-accent-tint px-2 py-0.5 text-micro font-semibold uppercase tracking-wide text-accent">
+        {/* With the workspace's own mark (note 7bdcb540), and the home mark
+            for Everything, so the chip reads before its word does. */}
+        <span className="inline-flex items-center gap-1 rounded-full bg-accent-tint py-0.5 pl-1 pr-2 text-micro font-semibold uppercase tracking-wide text-accent">
+          <ModuleMark module={idea.module} size="xs" className="-my-0.5" />
           {scopeLabel(idea.module)}
         </span>
         {/* Only a suggestion is marked. Tagging your own ideas "me" would put a
@@ -385,11 +386,7 @@ function ArrangeRow<T extends string>({
   href: (next: T) => string;
 }) {
   return (
-    <span
-      role="group"
-      aria-label={label}
-      className={segmentedFrame}
-    >
+    <span role="group" aria-label={label} className={segmentedFrame}>
       {options.map((option) => {
         const on = option.value === value;
         return (
@@ -455,13 +452,14 @@ export function IdeasView({
   grouping: IdeaGrouping;
   sort: IdeaSort;
 }) {
-  const { mine, suggested, shaped, dismissed } = ideas;
-  const total = mine.length + suggested.length + shaped.length + dismissed.length;
+  const { mine, suggested, lowScored, shaped, dismissed } = ideas;
+  const total =
+    mine.length + suggested.length + lowScored.length + shaped.length + dismissed.length;
 
   // Sorted once and grouped after, so the order asked for holds inside every
   // section rather than only between them.
   const groups = groupIdeas(sortIdeas(mine, sort), grouping);
-  const suggestedGroups = groupIdeas(sortIdeas(suggested, sort), 'workspace');
+  const suggestedGroups = groupIdeas(sortIdeas(suggested, sort), grouping);
 
   return (
     <div className="space-y-6">
@@ -496,8 +494,8 @@ export function IdeasView({
           and an empty-handed illustration would be saying the opposite. */}
       {total > 0 && mine.length === 0 && suggested.length === 0 && (
         <p className="text-ui text-ink-muted">
-          Every idea written down has been shaped into the plan or put aside. The ones below
-          are kept for the record.
+          Every idea written down has been shaped into the plan or put aside. The ones below are
+          kept for the record.
         </p>
       )}
 
@@ -523,7 +521,8 @@ export function IdeasView({
                 strokeWidth={1.75}
                 aria-hidden
               />
-              {group.label} <span className="font-normal text-ink-muted">({group.rows.length})</span>
+              {group.label}{' '}
+              <span className="font-normal text-ink-muted">({group.rows.length})</span>
             </summary>
             <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
               {group.rows.map((idea) => (
@@ -536,10 +535,9 @@ export function IdeasView({
 
       {/* Under your own list rather than mixed into it. A session working a
           feature can write several follow-ons in a night, and above the module
-          headings they would be the first thing on the page. Grouped by
-          workspace inside the fold (note 6158d2c0), always rather than by the
-          page's grouping: once the follow-ons span several workspaces, which
-          one they are about is the first thing to read them by. */}
+          headings they would be the first thing on the page. Grouped inside
+          the fold the same way the page is (note 98775e2e): by workspace by
+          default (note 6158d2c0), and one list when the page is one list. */}
       {suggested.length > 0 && (
         // Foldable like the rest of the page now, and open to start with: a
         // night of follow-ons is the section most worth being able to put away
@@ -564,27 +562,58 @@ export function IdeasView({
             Shape one into the plan, or dismiss it and it stops being offered.
           </p>
           <div className="mt-2 space-y-3 pl-5">
-            {suggestedGroups.map((group) => (
-              // Each workspace folds on its own, open to start with, the same
-              // way the groups of your own ideas above do (law 10).
-              <details key={group.key} open className="group/suggested-module space-y-2">
-                <summary className="press flex cursor-pointer list-none items-center gap-1.5 text-ui font-semibold text-ink [&::-webkit-details-marker]:hidden">
-                  <ChevronRight
-                    className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open/suggested-module:rotate-90"
-                    strokeWidth={1.75}
-                    aria-hidden
-                  />
-                  {group.label}{' '}
-                  <span className="font-normal text-ink-muted">({group.rows.length})</span>
-                </summary>
-                <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+            {suggestedGroups.map((group) =>
+              // One list has no heading to fold by, the same as above.
+              group.label === '' ? (
+                <ul key={group.key} className={cn(cardVariants(), 'divide-y divide-border')}>
                   {group.rows.map((idea) => (
                     <IdeaCard key={idea.id} idea={idea} />
                   ))}
                 </ul>
-              </details>
-            ))}
+              ) : (
+                // Each workspace folds on its own, open to start with, the same
+                // way the groups of your own ideas above do (law 10).
+                <details key={group.key} open className="group/suggested-module space-y-2">
+                  <summary className="press flex cursor-pointer list-none items-center gap-1.5 text-ui font-semibold text-ink [&::-webkit-details-marker]:hidden">
+                    <ChevronRight
+                      className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open/suggested-module:rotate-90"
+                      strokeWidth={1.75}
+                      aria-hidden
+                    />
+                    {group.label}{' '}
+                    <span className="font-normal text-ink-muted">({group.rows.length})</span>
+                  </summary>
+                  <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+                    {group.rows.map((idea) => (
+                      <IdeaCard key={idea.id} idea={idea} />
+                    ))}
+                  </ul>
+                </details>
+              ),
+            )}
           </div>
+        </details>
+      )}
+
+      {/* Suggestions Jev scored under the floor (note 073cacdf): out of the
+          list above, folded shut like the record below, and still shapeable
+          from here if one turns out to matter. */}
+      {lowScored.length > 0 && (
+        <details className="group/low">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
+            <ChevronRight
+              className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open/low:rotate-90"
+              strokeWidth={1.75}
+              aria-hidden
+            />
+            Suggestions scored under {SUGGESTION_SCORE_FLOOR}{' '}
+            <span className="font-normal text-ink-muted">({lowScored.length})</span>
+          </summary>
+          <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+            {sortIdeas(lowScored, sort).map((idea) => (
+              <IdeaCard key={idea.id} idea={idea} />
+            ))}
+          </ul>
         </details>
       )}
 

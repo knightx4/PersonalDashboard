@@ -3,7 +3,7 @@
  *
  * A project sits in Dev the way a workspace does: its features and steps are
  * plan rows with `module` set to the project's id, it gets its own section on
- * /dev/plan and its own entry in the Dev sidebar, and "Send to Dash" hands its
+ * /dev/plan (and no entry in the Dev sidebar: note 4308875b), and "Send to Dash" hands its
  * steps to a routine that checks out the project's repository instead of this
  * one. It is not a workspace: it has no pages here, no place in the switcher,
  * and no vision, which is why it lives in this list rather than in

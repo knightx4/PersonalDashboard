@@ -30,6 +30,17 @@ export type IdeaScore = {
 
 export const SCORE_FLOOR = TRIAGE_FLOOR;
 
+/**
+ * The score a suggestion needs to be offered (note 073cacdf).
+ *
+ * A session writes follow-ons by the handful, and one Jev scores under 40
+ * barely helps its workspace. It goes in a fold of its own rather than
+ * nowhere, so "did a session already think of that" still has an answer. Only
+ * a suggestion: an idea you wrote down yourself is never hidden by a score.
+ * An unscored suggestion is offered until it is scored.
+ */
+export const SUGGESTION_SCORE_FLOOR = 40;
+
 export function isSureScore(score: IdeaScore | null): boolean {
   return score !== null && score.confidence >= SCORE_FLOOR;
 }
@@ -70,7 +81,10 @@ export const IDEA_SCORE_QUESTION = {
  * as lib/jobs/suggest/scores.ts scales the opening scores. Five levels put
  * "helps somewhat" at 50.
  */
-export function scaleIdeaScore(score: number, levels: number = IDEA_SCORE_QUESTION.levels.length): number {
+export function scaleIdeaScore(
+  score: number,
+  levels: number = IDEA_SCORE_QUESTION.levels.length,
+): number {
   if (levels < 2 || !Number.isFinite(score)) return 0;
   return Math.round((Math.min(Math.max(score, 0), levels - 1) / (levels - 1)) * 100);
 }
@@ -89,7 +103,9 @@ export function triageLineForScore(triage: Triage | null): string {
   const unsure = (answer: TriageAnswer<unknown> | null) => (isSure(answer) ? '' : ' (unsure)');
   if (triage.module) {
     const scope =
-      triage.module.value === 'app' ? 'the app as a whole' : (moduleById(triage.module.value)?.label ?? triage.module.value);
+      triage.module.value === 'app'
+        ? 'the app as a whole'
+        : (moduleById(triage.module.value)?.label ?? triage.module.value);
     parts.push(`about ${scope}${unsure(triage.module)}`);
   }
   if (triage.priority) {
@@ -98,7 +114,9 @@ export function triageLineForScore(triage: Triage | null): string {
   if (triage.duplicate?.value) {
     parts.push(`may repeat "${triage.duplicate.value.line}"${unsure(triage.duplicate)}`);
   }
-  return parts.length > 0 ? `Triaged as ${parts.join(', ')}.` : 'Triaged, but Jev gave no usable answers.';
+  return parts.length > 0
+    ? `Triaged as ${parts.join(', ')}.`
+    : 'Triaged, but Jev gave no usable answers.';
 }
 
 /**
@@ -145,7 +163,10 @@ function round(value: number): number {
 }
 
 /** Jev's answer read into what is stored, or null when there is none to store. */
-export function readIdeaScore(result: JevResult<JevScoreAnswer>, at: Date = new Date()): IdeaScore | null {
+export function readIdeaScore(
+  result: JevResult<JevScoreAnswer>,
+  at: Date = new Date(),
+): IdeaScore | null {
   if (!result.ok) return null;
   return {
     value: scaleIdeaScore(result.answer.score),

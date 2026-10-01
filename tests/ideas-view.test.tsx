@@ -1,7 +1,7 @@
 /**
  * The ideas page, rendered: the "Suggested by Dash" fold groups what a session
  * suggested by the workspace it is about, each group folding on its own
- * (note 6158d2c0).
+ * (note 6158d2c0), and as one list when the page is one list (note 98775e2e).
  */
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -51,6 +51,7 @@ describe('the ideas page', () => {
             idea('s2', 'todo', 'Todo follow-on'),
             idea('s3', 'vault', 'Another vault follow-on'),
           ],
+          lowScored: [],
           shaped: [],
           dismissed: [],
         }}
@@ -66,5 +67,71 @@ describe('the ideas page', () => {
     // The outer fold and one per workspace.
     expect(suggested.match(/<details/g)?.length).toBe(2);
     expect(html.match(/<details/g)?.length).toBe(3);
+  });
+
+  it('shows the suggested ideas as one list when the page is one list', () => {
+    const html = renderToStaticMarkup(
+      <IdeasView
+        ideas={{
+          mine: [],
+          suggested: [idea('s1', 'vault', 'Vault follow-on'), idea('s2', 'todo', 'Todo follow-on')],
+          lowScored: [],
+          shaped: [],
+          dismissed: [],
+        }}
+        grouping="none"
+        sort="newest"
+      />,
+    );
+
+    const suggested = html.slice(html.indexOf('Suggested by Dash'));
+    expect(suggested).toContain('Vault follow-on');
+    expect(suggested).toContain('Todo follow-on');
+    expect(suggested).not.toMatch(/Vault\s*<span[^>]*>\(1\)<\/span>/);
+    // Only the outer fold: no heading per workspace inside it.
+    expect(html.match(/<details/g)?.length).toBe(1);
+  });
+
+  it('folds the suggestions scored under the floor shut, apart from the rest', () => {
+    const html = renderToStaticMarkup(
+      <IdeasView
+        ideas={{
+          mine: [],
+          suggested: [],
+          lowScored: [idea('l1', 'vault', 'A weak follow-on')],
+          shaped: [],
+          dismissed: [],
+        }}
+        grouping="workspace"
+        sort="newest"
+      />,
+    );
+
+    expect(html).toMatch(/Suggestions scored under 40\s*<span[^>]*>\(1\)<\/span>/);
+    expect(html).not.toContain('Suggested by Dash');
+    expect(html).not.toMatch(/<details[^>]*open/);
+  });
+
+  it("puts the workspace's mark on each idea's chip, and the home mark on Everything", () => {
+    const html = renderToStaticMarkup(
+      <IdeasView
+        ideas={{
+          mine: [idea('m1', 'vault', 'A vault idea'), idea('m2', null, 'An app-wide idea')],
+          suggested: [],
+          lowScored: [],
+          shaped: [],
+          dismissed: [],
+        }}
+        grouping="none"
+        sort="newest"
+      />,
+    );
+
+    // Two chips, each opening with a mark before its word.
+    expect(
+      html.match(/<span[^>]*aria-hidden="true"[^>]*><svg[^>]*><defs><linearGradient/g)?.length,
+    ).toBe(2);
+    expect(html).toMatch(/<\/svg><\/span>Vault<\/span>/);
+    expect(html).toMatch(/<\/svg><\/span>Everything<\/span>/);
   });
 });

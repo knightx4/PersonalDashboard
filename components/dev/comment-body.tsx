@@ -26,20 +26,7 @@ import {
  */
 
 /** What a comment is allowed to draw. Everything else is unwrapped to its text. */
-const ALLOWED = [
-  'p',
-  'br',
-  'strong',
-  'em',
-  'del',
-  'a',
-  'ul',
-  'ol',
-  'li',
-  'code',
-  'pre',
-  'span',
-];
+const ALLOWED = ['p', 'br', 'strong', 'em', 'del', 'a', 'ul', 'ol', 'li', 'code', 'pre', 'span'];
 
 /** The shape of the tree the plugin below walks. Only what it touches. */
 type Node = {
@@ -158,11 +145,24 @@ function walkRefs(node: Node, titles?: PlanRefTitles): void {
   node.children = out;
 }
 
-export function CommentBody({ body, titles }: { body: string; titles?: PlanRefTitles }) {
+export function CommentBody({
+  body,
+  titles,
+  refs = true,
+}: {
+  body: string;
+  titles?: PlanRefTitles;
+  /**
+   * Whether `#494` links to the plan step. Off for a reply from Dash in a
+   * conversation (note 7cf4109a), where a `#3` is a list number or a count
+   * far more often than a step.
+   */
+  refs?: boolean;
+}) {
   return (
     <div className="comment-prose">
       <Markdown
-        remarkPlugins={[remarkGfm, markMentions, markPlanRefs(titles)]}
+        remarkPlugins={[remarkGfm, markMentions, ...(refs ? [markPlanRefs(titles)] : [])]}
         allowedElements={ALLOWED}
         unwrapDisallowed
         components={{
