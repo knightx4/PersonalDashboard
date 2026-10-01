@@ -72,8 +72,8 @@ export default async function NotePage({
   // Two reads of the vault index, together rather than one after the other.
   // The link targets are every note's path and title and deliberately no
   // bodies -- rendering one note must not load the text of every other one --
-  // and the notes are what the column lists, which inherits the note list's
-  // first 500 by path; that cap is filed as an idea of its own. A search
+  // and the notes are what the column lists: every note in the vault, the
+  // same list the Vault page shows. A search
   // narrows that second read and nothing else: the wikilinks in the note you
   // are reading still have to resolve against the whole vault.
   // The attachment rows come with them: an embedded image or recording is
