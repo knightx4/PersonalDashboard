@@ -25,6 +25,8 @@ import { displaySummary, LISTS_WITH_DISPLAY } from '@/lib/list-display-registry'
 import { Disclosure, Group } from '@/components/ui/disclosure';
 import { MODULES } from '@/lib/modules';
 import { StatusGlyph } from '@/components/ui/status-glyph';
+import { ModuleMark } from '@/components/ui/module-mark';
+import { DASH_STATES, DashMark, type DashState } from '@/components/ui/dash-mark';
 import {
   APPLICATION_STATUS_GLYPHS,
   FEEDBACK_HEALTH_GLYPHS,
@@ -463,6 +465,15 @@ const DENSITY_LABELS = ['Comfortable', 'Snug', 'Dense'] as const;
 const DENSITY_IDS = ['comfortable', 'snug', 'dense'] as const;
 
 /** The page in order, for the contents row. */
+/** What each state of the Dash mark looks like, for the Marks section. */
+const DASH_STATE_NOTES: Record<DashState, string> = {
+  idle: 'Three faint squares and the solid node, top right. The default.',
+  working:
+    'The squares shrink to dots and the node circles them. Indeterminate: nothing fills, because a run does not report how far it has got. Under reduced motion the node stays put.',
+  done: 'All four squares solid, with one flash as it settles.',
+  failed: 'All four squares hollow, and nothing moves. Always beside the error text.',
+};
+
 const CONTENTS: readonly (readonly [string, string])[] = [
   ['tension', 'The tension'],
   ['laws', 'The laws'],
@@ -476,6 +487,7 @@ const CONTENTS: readonly (readonly [string, string])[] = [
   ['measurements', 'Measurements'],
   ['elevation', 'Elevation'],
   ['motion', 'Motion'],
+  ['marks', 'Marks'],
   ['loops', 'The four loops'],
   ['wayfinding', 'Where am I'],
   ['latency', 'Latency'],
@@ -1515,6 +1527,33 @@ export default function DevUiPage() {
         </Card>
         <Rows rows={M.MOTION} labelWidth="sm:grid-cols-[7rem_1fr]" />
         <Rules items={M.MOTION_RULES} />
+      </Section>
+
+      <Section
+        id="marks"
+        title="Marks"
+        lead="One mark per workspace, one for the app, and Dash's own mark beside them. Dash's mark is drawn in currentColor, so it takes the colour of where it sits, and each of its four states has its own shape so a still frame still says which it is."
+      >
+        <Card padding="none">
+          <ul className="divide-y divide-border">
+            <li className="card-pad-x row-pad flex flex-wrap items-center gap-3">
+              <ModuleMark module={null} />
+              {MODULES.map((m) => (
+                <ModuleMark key={m.id} module={m.id} />
+              ))}
+              <DashMark size="md" className="text-accent" />
+            </li>
+            {DASH_STATES.map((state) => (
+              <li key={state} className="card-pad-x row-pad flex items-center gap-3">
+                <DashMark state={state} size="md" className="text-accent" />
+                <DashMark state={state} size="xs" className="text-accent" />
+                <DashMark state={state} size="icon" className="text-ink-muted" />
+                <span className="w-20 shrink-0 text-ui text-ink">{state}</span>
+                <span className="text-small text-ink-muted">{DASH_STATE_NOTES[state]}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
       </Section>
 
       <Section id="loops" title="The four loops" lead={C.LOOPS_LEAD}>
