@@ -31,6 +31,7 @@ const { SearchBar, isSearchShortcut } = await import('@/components/shell/search-
 const { CommandPalette } = await import('@/components/shell/command-palette');
 const { CaptureProvider } = await import('@/components/shell/capture');
 const { SearchScopeChip } = await import('@/components/shell/search-scope-chip');
+const { SearchField } = await import('@/components/shell/search-field');
 
 const sections: NavSection[] = [
   { href: '/jobs/today', label: 'This week' },
@@ -143,5 +144,44 @@ describe('the box it opens', () => {
       </CaptureProvider>,
     );
     expect(html).toMatch(/Searching (?!Everything)[^.]+\. Choose what to search/);
+  });
+});
+
+/**
+ * The mark on the ways into search (plan #1365). The field in the bar and the
+ * box it opens draw the ring and dot; a box above a list keeps the magnifier,
+ * so the two kinds of search still look different. The phone's button is in
+ * tests/app-shell.test.tsx.
+ */
+describe('the search mark', () => {
+  const RING = 'data-mark="search"';
+
+  it('is on the field in the top bar, in place of the magnifier', () => {
+    const html = renderToStaticMarkup(<SearchBar onOpen={() => {}} module="jobs" />);
+    expect(html).toContain(RING);
+    expect(html).not.toContain('lucide-search');
+  });
+
+  it('is on the field row of the search box', () => {
+    const html = renderToStaticMarkup(
+      <CaptureProvider>
+        <CommandPalette
+          account="11111111-1111-4111-8111-111111111111"
+          module="jobs"
+          sections={sections}
+          theme={SYSTEM_THEME}
+          open
+          onOpenChange={() => {}}
+        />
+      </CaptureProvider>,
+    );
+    expect(html).toContain(RING);
+    expect(html).not.toContain('lucide-search');
+  });
+
+  it('is not on a box above a list, which keeps the magnifier', () => {
+    const html = renderToStaticMarkup(<SearchField placeholder="Search your notes" />);
+    expect(html).toContain('lucide-search');
+    expect(html).not.toContain(RING);
   });
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Search } from 'lucide-react';
+import { SearchMark } from '@/components/ui/search-mark';
 import { cn } from '@/lib/cn';
 import { popoverSurface, scrim } from '@/components/ui/popover';
 import { Kbd } from '@/components/shell/key-hints';
@@ -168,7 +168,7 @@ export function CommandPalette({
         className={cn(popoverSurface, 'relative w-full max-w-lg overflow-hidden shadow-2xl')}
       >
         <div className="flex items-center gap-2 border-b border-border px-3">
-          <Search className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+          <SearchMark className="text-ink-muted" />
           <input
             ref={inputRef}
             value={query}
