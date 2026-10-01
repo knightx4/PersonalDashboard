@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
 import { triageFrom, type Triage } from '@/lib/feedback/triage';
-import { scoreFrom, type IdeaScore } from '@/lib/ideas/score';
+import { SUGGESTION_SCORE_FLOOR, scoreFrom, type IdeaScore } from '@/lib/ideas/score';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 
 /**
@@ -54,8 +54,15 @@ export type IdeaRow = {
 export interface IdeaList {
   mine: IdeaRow[];
   suggested: IdeaRow[];
+  /** Suggestions Jev scored under SUGGESTION_SCORE_FLOOR, kept out of `suggested`. */
+  lowScored: IdeaRow[];
   shaped: IdeaRow[];
   dismissed: IdeaRow[];
+}
+
+/** Scored under the floor a suggestion needs to be offered (note 073cacdf). */
+function scoredLow(idea: IdeaRow): boolean {
+  return idea.score != null && idea.score.value < SUGGESTION_SCORE_FLOOR;
 }
 
 /** Every column the app reads off an idea, and the two plan items it points at. */
@@ -110,7 +117,8 @@ export function ideaListFrom(rows: readonly IdeaRow[]): IdeaList {
 
   return {
     mine: open.filter((idea) => idea.source === 'me'),
-    suggested: open.filter((idea) => idea.source === 'claude'),
+    suggested: open.filter((idea) => idea.source === 'claude' && !scoredLow(idea)),
+    lowScored: open.filter((idea) => idea.source === 'claude' && scoredLow(idea)),
     shaped: live.filter((idea) => idea.planItem),
     dismissed,
   };

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { ArrowUp, CircleUser, CornerDownRight } from 'lucide-react';
+import { CommentBody } from '@/components/dev/comment-body';
 import { DashMark, type DashActivity, type DashState } from '@/components/ui/dash-mark';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
@@ -52,7 +53,11 @@ export type TalkAssistant = {
    * The mark drawn in a state other than idle: working, done or failed. Left
    * out, the assistant's mark stays as it is whatever the answer is doing.
    */
-  StateMark?: React.ComponentType<{ state: DashState; activity?: DashActivity; className?: string }>;
+  StateMark?: React.ComponentType<{
+    state: DashState;
+    activity?: DashActivity;
+    className?: string;
+  }>;
 };
 
 /** Dash's own mark at the size of the glyph beside every other turn. */
@@ -138,7 +143,16 @@ function Turn({
             )}
           </div>
         )}
-        <p className="text-body whitespace-pre-wrap text-ink">{turn.body}</p>
+        {/* An answer is written as markdown, and pre-wrapped it read as one
+            wall of text with asterisks and hyphens in it (note 7cf4109a). What
+            you typed stays as you typed it. */}
+        {turn.role === 'assistant' ? (
+          <div className="text-body text-ink">
+            <CommentBody body={turn.body} refs={false} />
+          </div>
+        ) : (
+          <p className="text-body whitespace-pre-wrap text-ink">{turn.body}</p>
+        )}
         {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} />}
         {below}
       </div>
@@ -157,7 +171,10 @@ function Cited({ citations }: { citations: readonly TalkCitation[] }) {
   return (
     <ul className="pt-1" aria-label="What this answer used">
       {citations.map((citation) => (
-        <li key={`${citation.table}:${citation.ref}`} className="flex min-w-0 items-baseline gap-1.5">
+        <li
+          key={`${citation.table}:${citation.ref}`}
+          className="flex min-w-0 items-baseline gap-1.5"
+        >
           <CornerDownRight
             className="size-3 shrink-0 translate-y-0.5 text-ink-ghost"
             strokeWidth={2}
@@ -169,7 +186,12 @@ function Cited({ citations }: { citations: readonly TalkCitation[] }) {
             </Link>
           ) : (
             // A message Dash searched in Gmail (plan #1316): it opens there, in a new tab.
-            <a href={citation.href} target="_blank" rel="noopener noreferrer" className={CITED_LINK}>
+            <a
+              href={citation.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={CITED_LINK}
+            >
               {citation.title}
               <span className="sr-only"> (opens in Gmail)</span>
             </a>
@@ -326,7 +348,12 @@ export function TalkThread({
           {sending && (
             <li className="flex gap-2" aria-live="polite">
               <div className="flex w-4 shrink-0 justify-center pt-1">
-                <AuthorMark role="assistant" assistant={assistant} state="working" activity={activity} />
+                <AuthorMark
+                  role="assistant"
+                  assistant={assistant}
+                  state="working"
+                  activity={activity}
+                />
               </div>
               <p className="min-w-0 flex-1 text-body text-ink-muted">
                 {waiting ?? `${assistant.name} is replying…`}

@@ -4,6 +4,7 @@ import {
   activityEntries,
   countRolesMovedForward,
   groupByDay,
+  highlightsSince,
 } from '@/lib/jobs/activity/load';
 import { APPLICATION_EVENT_KINDS } from '@/lib/jobs/pipeline';
 
@@ -244,5 +245,17 @@ describe('the "moved forward" headline', () => {
 
   it('is zero for a quiet week', () => {
     expect(countRolesMovedForward([])).toBe(0);
+  });
+});
+
+describe('the headline window (note 12e8ebb0)', () => {
+  it('dates events by when they happened, not when they were imported', () => {
+    expect(highlightsSince('2026-09-24T00:00:00.000Z').eventColumn).toBe('occurred_at');
+  });
+
+  it('dates a new role by its submission, and by its opening only when it has none', () => {
+    expect(highlightsSince('2026-09-24T00:00:00.000Z').newRoles).toBe(
+      'submitted_at.gte.2026-09-24T00:00:00.000Z,and(submitted_at.is.null,created_at.gte.2026-09-24T00:00:00.000Z)',
+    );
   });
 });

@@ -1,9 +1,10 @@
 import { OvernightControl } from '@/app/dev/plan/overnight-control';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { Card } from '@/components/ui/card';
+import { DashMark } from '@/components/ui/dash-mark';
 import type { GoalsStatus } from '@/lib/goals/runner-status';
 import type { NotesLastRun } from '@/lib/feedback/last-worked';
-import type { OvernightRun } from '@/lib/plan/overnight';
+import { overnightStanding, type OvernightRun } from '@/lib/plan/overnight';
 import type { RunnerCard } from '@/lib/plan/runner-card';
 import type { VisionReviewStatus } from '@/lib/specs/vision-review-run';
 import { VisionReviewLine } from './vision-review-line';
@@ -57,7 +58,17 @@ export function StatusPanel({
 }) {
   return (
     <Card padding="dense" className="space-y-3">
-      <h2 className="text-ui font-semibold text-ink">Status</h2>
+      {/* Dash's own mark beside the heading (note 414ead16), working while
+          the plan runner is firing and resting otherwise, so the answer to
+          "is anything going" is there before the rows are read. */}
+      <h2 className="flex items-center gap-1.5 text-ui font-semibold text-ink">
+        <DashMark
+          size="icon"
+          state={overnightStanding(run) === 'running' ? 'working' : 'idle'}
+          className="text-accent"
+        />
+        Status
+      </h2>
       <OvernightControl
         run={run}
         canSend={canSend}

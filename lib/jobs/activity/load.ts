@@ -11,9 +11,15 @@ import { APPLICATION_EVENT_KINDS, type ApplicationEventKind } from '@/lib/jobs/p
  * now nothing showed them, so an overnight run that opened four roles and
  * closed six looked identical to one that did nothing.
  *
- * Ordered by created_at rather than occurred_at, deliberately. A rejection
- * sent three weeks ago and read this morning is news this morning; sorting by
- * when the email was written would file it under a day you already looked at.
+ * The feed is ordered by created_at rather than occurred_at, deliberately. A
+ * rejection sent three weeks ago and read this morning is news this morning;
+ * sorting by when the email was written would file it under a day you already
+ * looked at.
+ *
+ * The headline numbers are the other way round (note 12e8ebb0). They say
+ * "last 7 days", and a backfill that imports a month of mail in one night
+ * made them count that month as this week. They are dated by when the thing
+ * happened: see `highlightsSince`.
  */
 
 /**
@@ -83,6 +89,21 @@ export const FORWARD_KINDS: ApplicationEventKind[] = APPLICATION_EVENT_KINDS.fil
 
 /** The window the headline numbers cover. */
 export const HIGHLIGHT_DAYS = 7;
+
+/**
+ * The filters that put a row in the headline window, by when it happened.
+ *
+ * An event carries `occurred_at`, the date of the email or the day you said it
+ * happened. A pursuit carries `submitted_at` from the same source; one with
+ * none yet (a lead, or a role saved before applying) has only the day it was
+ * opened to go on, so it falls back to `created_at`.
+ */
+export function highlightsSince(since: string): { eventColumn: 'occurred_at'; newRoles: string } {
+  return {
+    eventColumn: 'occurred_at',
+    newRoles: `submitted_at.gte.${since},and(submitted_at.is.null,created_at.gte.${since})`,
+  };
+}
 
 /** One forward event, reduced to the pursuit it happened to. */
 export interface ForwardEventOf {
@@ -281,12 +302,13 @@ export async function loadActivity(
 ): Promise<Activity> {
   // Head requests: four counts, no rows returned.
   const since = new Date(Date.now() - HIGHLIGHT_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const inWindow = highlightsSince(since);
   const countEvents = (kinds: readonly ApplicationEventKind[]) =>
     supabase
       .from('application_events')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .gte('created_at', since)
+      .gte(inWindow.eventColumn, since)
       .in('kind', kinds as string[]);
 
   const [
@@ -354,7 +376,7 @@ export async function loadActivity(
       .from('applications')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .gte('created_at', since),
+      .or(inWindow.newRoles),
 
     // The rows rather than a count, because this tile counts roles and the
     // database cannot count distinct behind `head: true`. Bounded by the same
@@ -363,7 +385,7 @@ export async function loadActivity(
       .from('application_events')
       .select('application_id, applications!inner ( role_id )')
       .eq('user_id', userId)
-      .gte('created_at', since)
+      .gte(inWindow.eventColumn, since)
       .in('kind', FORWARD_KINDS as string[]),
 
     countEvents(['rejection']),
@@ -408,8 +430,10 @@ export async function loadActivity(
   const lastWithdrawalAt = (lastWithdrawal.data as { created_at: string } | null)?.created_at;
   const lastReminderAt = reminders[0]?.created_at;
   const lastSweepAt =
-    [lastWithdrawalAt, lastReminderAt].filter((at): at is string => Boolean(at)).sort().pop() ??
-    null;
+    [lastWithdrawalAt, lastReminderAt]
+      .filter((at): at is string => Boolean(at))
+      .sort()
+      .pop() ?? null;
 
   const highlights: ActivityHighlights = {
     days: HIGHLIGHT_DAYS,
@@ -448,7 +472,11 @@ export type ActivitySince = {
 export async function loadActivitySince(
   supabase: AppSupabaseClient,
   userId: string,
-  { since, limit, excludeEventIds = [] }: { since: string; limit: number; excludeEventIds?: readonly string[] },
+  {
+    since,
+    limit,
+    excludeEventIds = [],
+  }: { since: string; limit: number; excludeEventIds?: readonly string[] },
 ): Promise<ActivitySince> {
   let events = supabase
     .from('application_events')
