@@ -27,6 +27,15 @@ vi.mock('./groups', () => ({
   },
 }));
 
+// Rating is stubbed the same way (its own tests are in importance.test.ts).
+const rated: string[] = [];
+vi.mock('./importance', () => ({
+  rateNewIssue: async (input: { issueId: string }) => {
+    rated.push(input.issueId);
+    return { status: 'scored', rated: 0 };
+  },
+}));
+
 const { digestOnArrival, digestPending, LINE_SINCE, PENDING_FILTER } = await import('./summarise');
 
 /**
@@ -56,6 +65,7 @@ beforeEach(() => {
   replies.length = 0;
   called.length = 0;
   grouped.length = 0;
+  rated.length = 0;
   groupFailure = null;
 });
 
@@ -77,6 +87,15 @@ describe('digestOnArrival', () => {
     reply({ status: 'failed', error: 'overloaded' });
     await digestOnArrival({ ...base, issueId: 'issue-2', anthropicApiKey: 'key' });
     expect(grouped).toEqual(['issue-1']);
+  });
+
+  it('rates the stories of a summarised issue, and not of a failed one', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    reply({ status: 'digested', summary: 'S', stories: [] });
+    await digestOnArrival({ ...base, anthropicApiKey: 'key' });
+    reply({ status: 'failed', error: 'overloaded' });
+    await digestOnArrival({ ...base, issueId: 'issue-2', anthropicApiKey: 'key' });
+    expect(rated).toEqual(['issue-1']);
   });
 
   it('keeps the summary when grouping fails', async () => {

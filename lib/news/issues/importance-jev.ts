@@ -4,16 +4,21 @@ import type { Unrated } from './importance-rows';
 /**
  * A story's importance as one Jev score question (plan #1170).
  *
- * importance.ts asks Haiku to rate every unrated story of a newsletter in one
- * call, against the rubric in importance-rubric.ts. Jev rates one story at a
- * time on five levels, each worded from what the rubric says that rating
- * means, and says how sure it is. A story Jev is at least 0.8 sure of keeps
- * Jev's rating; the rest of the newsletter goes to Haiku in one call as
- * before.
+ * Jev rates one story at a time on five levels, each worded from what the
+ * rubric in importance-rubric.ts says that level means. Its answer carries a
+ * score weighted by how likely it finds each level, which can fall between
+ * two levels; that score, spread over 0 to 100, is the story's rating.
+ *
+ * Every answer Jev gives is used, whatever its confidence. The trial
+ * (docs/trials/2026-10-01-jev-news-importance.md) found Jev the better judge
+ * where it and Haiku disagreed, but sure of only 264 of 828 stories at the
+ * usual 0.8 floor: on five levels its belief spreads over neighbouring ones.
+ * The weighted score already reflects that spread, and a story ranked a few
+ * places off costs little. Haiku rates only the stories Jev could not answer.
  */
 
 /**
- * Whether the catch-up asks Jev at all. An account also has to have opted in
+ * Whether stories are put to Jev at all. An account also has to have opted in
  * (lib/jev/enabled.ts). Setting this to false puts every account back on
  * Haiku alone.
  */
@@ -36,7 +41,13 @@ export function storyState(story: Unrated): JevState {
   return { topic: story.topic ?? 'no topic', headline: story.headline, summary: story.summary };
 }
 
-/** Jev's level index, 0 to 4, as the rating stored on the story, 1 to 5. */
-export function ratingFromLevel(level: number): number {
-  return Math.min(5, Math.max(1, Math.round(level) + 1));
+/** Jev's weighted score, 0 to 4, as the rating stored on the story, 0 to 100. */
+export function ratingFromScore(score: number): number {
+  const levels = IMPORTANCE_QUESTION.levels.length - 1;
+  return Math.min(100, Math.max(0, Math.round((score / levels) * 100)));
+}
+
+/** A Haiku rating from 1 to 5 on the same scale: 1 is 0, 3 is 50, 5 is 100. */
+export function ratingFromHaiku(importance: number): number {
+  return Math.min(100, Math.max(0, Math.round((importance - 1) * 25)));
 }

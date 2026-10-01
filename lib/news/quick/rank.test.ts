@@ -4,8 +4,10 @@ import { cardPasses, nextCard, quickPage, quickTopics, type QuickIssue } from '.
 import {
   COVERAGE_CAP,
   FRESH_HALF_LIFE_HOURS,
+  IMPORTANCE_STEP,
   INTEREST_CAP,
   interestModel,
+  MAJOR_RATING,
   rankReason,
   storyScore,
   type InterestRow,
@@ -208,29 +210,29 @@ describe('nextCard with signals', () => {
 describe('importance', () => {
   const plain = { newsletters: 1, lead: false, topicLean: 0, senderLean: 0 };
 
-  it('lifts an unseen 5 from yesterday over a 4 from now, and sinks a 1', () => {
-    const major = storyScore({ ...plain, receivedAt: hoursAgo(24), importance: 5 }, NOW);
-    const lead = storyScore({ ...plain, receivedAt: hoursAgo(0), importance: 4 }, NOW);
-    const filler = storyScore({ ...plain, receivedAt: hoursAgo(0), importance: 1 }, NOW);
-    const ordinary = storyScore({ ...plain, receivedAt: hoursAgo(24), importance: 3 }, NOW);
+  it('lifts an unseen 100 from yesterday over a 75 from now, and sinks a 0', () => {
+    const major = storyScore({ ...plain, receivedAt: hoursAgo(24), rating: 100 }, NOW);
+    const lead = storyScore({ ...plain, receivedAt: hoursAgo(0), rating: 75 }, NOW);
+    const filler = storyScore({ ...plain, receivedAt: hoursAgo(0), rating: 0 }, NOW);
+    const ordinary = storyScore({ ...plain, receivedAt: hoursAgo(24), rating: 50 }, NOW);
     expect(major).toBeGreaterThan(lead);
     expect(filler).toBeLessThan(ordinary);
   });
 
   it('lets the rating, not the position, speak once a story is rated', () => {
     const at = hoursAgo(2);
-    expect(storyScore({ ...plain, receivedAt: at, lead: true, importance: 3 }, NOW)).toBeCloseTo(
-      storyScore({ ...plain, receivedAt: at, importance: 3 }, NOW),
+    expect(storyScore({ ...plain, receivedAt: at, lead: true, rating: 50 }, NOW)).toBeCloseTo(
+      storyScore({ ...plain, receivedAt: at, rating: 50 }, NOW),
     );
   });
 
   it('orders one newsletter by its ratings and mixes in other newsletters', () => {
     const brief = issue('b', 'axios', 1, [
-      s('Lead fluff', { importance: 2 }),
-      s('Filler', { importance: 1 }),
-      s('Ruling', { importance: 5 }),
+      s('Lead fluff', { rating: 25 }),
+      s('Filler', { rating: 0 }),
+      s('Ruling', { rating: 100 }),
     ]);
-    const other = issue('o', 'npr', 6, [s('Solid news', { importance: 3 })]);
+    const other = issue('o', 'npr', 6, [s('Solid news', { rating: 50 })]);
     const page = quickPage([brief, other], senders, [], {}, 10, { now: NOW });
     expect(page.map((c) => (c.kind === 'story' ? c.story.headline : ''))).toEqual([
       'Ruling',
@@ -241,10 +243,23 @@ describe('importance', () => {
     expect(page[0].reason).toBe('A major story');
   });
 
+  it('weighs a rating between the old five points in proportion', () => {
+    const at = hoursAgo(2);
+    const score = (rating: number) => storyScore({ ...plain, receivedAt: at, rating }, NOW);
+    expect(score(62) - score(50)).toBeCloseTo((IMPORTANCE_STEP * 12) / 25);
+    expect(score(62)).toBeGreaterThan(score(61));
+  });
+
+  it('calls a story major from MAJOR_RATING up', () => {
+    const base = { newsletters: 1, topic: undefined, topicLean: 0, from: null, senderLean: 0 };
+    expect(rankReason({ ...base, rating: MAJOR_RATING })).toBe('A major story');
+    expect(rankReason({ ...base, rating: MAJOR_RATING - 1 })).toBeNull();
+  });
+
   it('rates an event by its highest telling', () => {
-    const low = issue('l', 'axios', 1, [s('Passes back', { importance: 2, link: 'https://l' })]);
-    const high = issue('h', 'npr', 1, [s('Judge restores passes', { importance: 5 })]);
-    const rival = issue('r', 'brew', 1, [s('Other', { importance: 4 })]);
+    const low = issue('l', 'axios', 1, [s('Passes back', { rating: 25, link: 'https://l' })]);
+    const high = issue('h', 'npr', 1, [s('Judge restores passes', { rating: 100 })]);
+    const rival = issue('r', 'brew', 1, [s('Other', { rating: 75 })]);
     const card = nextCard(
       [low, high, rival],
       senders,

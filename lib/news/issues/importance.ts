@@ -10,28 +10,32 @@ import { jevEnabledFor } from '@/lib/jev/enabled';
 import { forceTool } from '@/lib/learn/graph/tool-call';
 import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
 import { IMPORTANCE_RUBRIC } from './importance-rubric';
-import { IMPORTANCE_ON_JEV, IMPORTANCE_QUESTION, ratingFromLevel, storyState } from './importance-jev';
+import {
+  IMPORTANCE_ON_JEV,
+  IMPORTANCE_QUESTION,
+  ratingFromHaiku,
+  ratingFromScore,
+  storyState,
+} from './importance-jev';
 import { applyRatings, unrated, type Unrated } from './importance-rows';
 
 /**
- * Rating the stories stored before importance existed.
+ * Rating how much each story matters, out of 100 (plan #1170).
  *
- * A newsletter summarised from now on gets a rating on every story from the
- * digest call itself (digest.ts). The ones already stored have none, and
- * summarising them again would clear their passes and story groups, since a
- * redo rewrites the stories array. So they are rated here instead: one short
- * Haiku call per newsletter reads only the headlines and summaries, and the
- * ratings are written into the stored stories where they sit, leaving every
- * position, and so every pass and group, as it was.
+ * Every story is put to Jev as a score question (importance-jev.ts), one
+ * story at a time and all of a newsletter's at once. Jev's answer is used
+ * whatever its confidence. The stories Jev could not answer, because the call
+ * failed or the account has not opted in to Jev, go to Haiku in one call
+ * against the rubric in importance-rubric.ts, and its 1 to 5 is put on the
+ * same scale. The ratings are written into the stored stories where they sit,
+ * leaving every position, and so every pass and group, as it was.
  *
- * Run by the hourly newsletter catch-up after it has summarised what is
- * pending (inngest/news/digest.ts), newest newsletters first, so the stories
- * Quick read shows are rated before the old ones. A newsletter whose first
- * story is rated is taken as done.
- *
- * For an account that opted in to Jev (plan #1170), each story is first put
- * to Jev as a score question (importance-jev.ts). A rating Jev is at least
- * 0.8 sure of is used, and only the stories left go to Haiku, in one call.
+ * Two ways in. rateNewIssue runs as soon as a new newsletter is summarised
+ * (summarise.ts). scorePending is the hourly catch-up (inngest/news/digest.ts)
+ * for any newsletter whose stories have no rating: one whose rating failed on
+ * arrival, and those rated before ratings were out of 100. It takes the newest
+ * first, so the stories Quick read shows are rated before the old ones. A
+ * newsletter whose first story is rated is taken as done.
  */
 
 export const IMPORTANCE_MODEL = 'claude-haiku-4-5';
@@ -75,14 +79,17 @@ export type ScoreOutcome =
   | { status: 'nothing-to-rate' }
   | { status: 'failed'; error: string };
 
-type Rating = { number: number; importance: number };
+type Rating = { number: number; rating: number };
 
-/** One Haiku call rating `stories`; the ratings as it gave them. Throws on a failed call. */
+/**
+ * One Haiku call rating `stories`, each put on the 0 to 100 scale. A rating
+ * that is not a whole number from 1 to 5 is dropped. Throws on a failed call.
+ */
 async function haikuRatings(
   client: Pick<Anthropic, 'messages'>,
   stories: readonly Unrated[],
   reports: SpendReport[],
-): Promise<unknown> {
+): Promise<Rating[]> {
   const response = await client.messages.create({
     model: IMPORTANCE_MODEL,
     max_tokens: 2_000,
@@ -103,26 +110,35 @@ async function haikuRatings(
     (part) => part.type === 'tool_use' && part.name === TOOL_NAME,
   );
   if (!block || block.type !== 'tool_use') throw new Error('The model reported no ratings.');
-  return (block.input as { ratings?: unknown } | null)?.ratings;
+  const given = (block.input as { ratings?: unknown } | null)?.ratings;
+  const ratings: Rating[] = [];
+  for (const item of Array.isArray(given) ? given : []) {
+    const { number, importance } = (item ?? {}) as Record<string, unknown>;
+    if (typeof number !== 'number' || typeof importance !== 'number') continue;
+    if (!Number.isInteger(importance) || importance < 1 || importance > 5) continue;
+    ratings.push({ number, rating: ratingFromHaiku(importance) });
+  }
+  return ratings;
 }
 
 /**
- * Each story put to Jev: the ratings Jev is sure enough of, and the stories
- * left for Haiku (those under the floor, and all of them when Jev fails).
+ * Each story put to Jev: the ratings it gave, and the stories left for Haiku
+ * (those whose call failed). No answer goes to Haiku for its confidence.
  */
 async function jevRatings(
   stories: readonly Unrated[],
   reports: SpendReport[],
   jev: { apiKey?: string | null; fetch?: typeof fetch },
 ): Promise<{ rated: Rating[]; rest: Unrated[] }> {
-  type Route = { by: 'jev'; importance: number } | { by: 'haiku' };
+  type Route = { by: 'jev'; rating: number } | { by: 'haiku' };
   const routes = await Promise.all(
     stories.map((story) =>
       decideWithJev<typeof IMPORTANCE_QUESTION, Route>({
         state: storyState(story),
         question: IMPORTANCE_QUESTION,
-        read: (answer) => ({ by: 'jev', importance: ratingFromLevel(answer.level) }),
+        read: (answer) => ({ by: 'jev', rating: ratingFromScore(answer.score) }),
         fallback: async () => ({ by: 'haiku' }),
+        floor: 0,
         onSpend: (report) => reports.push(report),
         apiKey: jev.apiKey,
         fetch: jev.fetch,
@@ -133,7 +149,7 @@ async function jevRatings(
   const rest: Unrated[] = [];
   routes.forEach(({ value }, i) =>
     value.by === 'jev'
-      ? rated.push({ number: stories[i].index, importance: value.importance })
+      ? rated.push({ number: stories[i].index, rating: value.rating })
       : rest.push(stories[i]),
   );
   return { rated, rest };
@@ -179,11 +195,10 @@ export async function scoreIssueImportance(input: {
     IMPORTANCE_ON_JEV && input.jevEnabled
       ? await jevRatings(todo, reports, { apiKey: input.jevApiKey, fetch: input.jevFetch })
       : { rated: [], rest: todo };
-  let ratings: unknown = fromJev.rated;
+  let ratings: Rating[] = fromJev.rated;
   if (fromJev.rest.length > 0) {
     try {
-      const fromHaiku = await haikuRatings(input.client, fromJev.rest, reports);
-      ratings = [...fromJev.rated, ...(Array.isArray(fromHaiku) ? fromHaiku : [])];
+      ratings = [...fromJev.rated, ...(await haikuRatings(input.client, fromJev.rest, reports))];
     } catch (error) {
       // Jev's ratings are not written either: the catch-up takes a newsletter
       // whose first story is rated as done, so a half-rated one would keep
@@ -220,12 +235,48 @@ async function record(
 }
 
 /**
+ * Rate a newsletter that has just been summarised. Never throws: the summary
+ * is saved and readable without ratings, and a newsletter left unrated is
+ * picked up by the hourly catch-up.
+ */
+export async function rateNewIssue(input: {
+  news: NewsSupabaseClient;
+  spend: Pick<CoreSupabaseClient, 'from'>;
+  userId: string;
+  issueId: string;
+  anthropicApiKey: string;
+  client?: Pick<Anthropic, 'messages'>;
+  jevEnabled?: boolean;
+  jevFetch?: typeof fetch;
+}): Promise<ScoreOutcome | 'error'> {
+  try {
+    const outcome = await scoreIssueImportance({
+      news: input.news,
+      spend: input.spend,
+      userId: input.userId,
+      issueId: input.issueId,
+      client: input.client ?? new Anthropic({ apiKey: input.anthropicApiKey }),
+      jevEnabled: input.jevEnabled ?? (await jevEnabledFor(input.spend, input.userId)),
+      jevFetch: input.jevFetch,
+    });
+    if (outcome.status === 'failed') {
+      console.warn(`news: rating the stories of issue ${input.issueId} failed (${outcome.error})`);
+    }
+    return outcome;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`news: rating the stories of issue ${input.issueId} stopped (${message})`);
+    return 'error';
+  }
+}
+
+/**
  * Summarised newsletters whose first story has no rating. PostgREST reads
  * `stories->0` as the first element; an essay's empty list has none and is
  * never picked.
  */
 export const UNRATED_FILTER =
-  'and(summary.not.is.null,stories->0.not.is.null,stories->0->>importance.is.null)';
+  'and(summary.not.is.null,stories->0.not.is.null,stories->0->>rating.is.null)';
 
 export type ScoreTally = { scored: number; failed: number; left: number };
 

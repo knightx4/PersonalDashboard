@@ -135,14 +135,23 @@ describe('storyAddsToSummary (note 86b9c6d1)', () => {
   });
 });
 
-describe('readStories importance', () => {
-  it('keeps a whole-number rating from 1 to 5 and drops anything else', () => {
+describe('readStories rating', () => {
+  it('keeps a whole-number rating from 0 to 100 and drops anything else', () => {
     const stories = readStories([
-      { headline: 'A', summary: 'a', importance: 5 },
-      { headline: 'B', summary: 'b', importance: '2' },
-      { headline: 'C', summary: 'c', importance: 0 },
-      { headline: 'D', summary: 'd', importance: 3.5 },
+      { headline: 'A', summary: 'a', rating: 100 },
+      { headline: 'B', summary: 'b', rating: '42' },
+      { headline: 'C', summary: 'c', rating: 0 },
+      { headline: 'D', summary: 'd', rating: 37.5 },
+      { headline: 'E', summary: 'e', rating: 101 },
+      { headline: 'F', summary: 'f', importance: 5 },
     ]);
-    expect(stories.map((story) => story.importance)).toEqual([5, 2, undefined, undefined]);
+    expect(stories.map((story) => story.rating)).toEqual([
+      100,
+      42,
+      0,
+      undefined,
+      undefined,
+      undefined,
+    ]);
   });
 });

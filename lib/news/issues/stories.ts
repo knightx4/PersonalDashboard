@@ -15,11 +15,15 @@ import { readTopic, type NewsTopic } from './topics';
  * story summarised before topics existed, and on a stored topic that is no
  * longer on the list.
  *
- * `importance` is how much a well-informed reader needs to know the story,
- * from 1 (filler) to 5 (front-page news), rated by Haiku when the newsletter
- * is summarised or, for a story stored before ratings existed, by
- * scoreImportance in lib/news/issues/importance.ts. Quick read ranks by it.
- * It is absent until the story has been rated.
+ * `rating` is how much a well-informed reader needs to know the story, out
+ * of 100: 0 is filler and 100 is front-page news. Jev rates each story once
+ * the newsletter is summarised (scoreIssueImportance in
+ * lib/news/issues/importance.ts), and Quick read ranks by it. It is absent
+ * until the story has been rated.
+ *
+ * Stories rated before October 2026 also carry `importance`, Haiku's rating
+ * from 1 to 5. Nothing reads it any more; the catch-up gives those stories a
+ * `rating` too.
  */
 export type NewsStory = {
   headline: string;
@@ -28,18 +32,13 @@ export type NewsStory = {
   image?: string;
   text?: string;
   topic?: NewsTopic;
-  importance?: Importance;
+  rating?: number;
 };
 
-/** A story's importance rating, 1 to 5. */
-export type Importance = 1 | 2 | 3 | 4 | 5;
-
-/** A value as an importance rating, or undefined when it is not a whole number from 1 to 5. */
-export function readImportance(value: unknown): Importance | undefined {
-  const n = typeof value === 'string' && /^\d$/.test(value.trim()) ? Number(value) : value;
-  return typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 5
-    ? (n as Importance)
-    : undefined;
+/** A value as a rating, or undefined when it is not a whole number from 0 to 100. */
+export function readRating(value: unknown): number | undefined {
+  const n = typeof value === 'string' && /^\d{1,3}$/.test(value.trim()) ? Number(value) : value;
+  return typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 100 ? n : undefined;
 }
 
 const WEB_ADDRESS = /^https?:\/\//i;
@@ -51,8 +50,8 @@ const WEB_ADDRESS = /^https?:\/\//i;
  * entry without a headline or summary is dropped here rather than shown as a
  * blank story, and a link or image that is not http(s) is dropped from its
  * story so the page never renders a `javascript:` or `data:` address. A topic
- * not on the list is dropped from its story the same way, as is an importance
- * that is not a whole number from 1 to 5.
+ * not on the list is dropped from its story the same way, as is a rating
+ * that is not a whole number from 0 to 100.
  * Anything that is not an array reads as no stories.
  */
 export function readStories(value: unknown): NewsStory[] {
@@ -60,7 +59,7 @@ export function readStories(value: unknown): NewsStory[] {
   const stories: NewsStory[] = [];
   for (const entry of value) {
     if (!entry || typeof entry !== 'object') continue;
-    const { headline, summary, link, image, text, topic, importance } = entry as Record<
+    const { headline, summary, link, image, text, topic, rating } = entry as Record<
       string,
       unknown
     >;
@@ -72,8 +71,8 @@ export function readStories(value: unknown): NewsStory[] {
     if (typeof text === 'string' && text.trim()) story.text = text.trim();
     const listed = readTopic(topic);
     if (listed) story.topic = listed;
-    const rated = readImportance(importance);
-    if (rated) story.importance = rated;
+    const rated = readRating(rating);
+    if (rated !== undefined) story.rating = rated;
     stories.push(story);
   }
   return stories;
