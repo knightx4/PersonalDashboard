@@ -57,22 +57,31 @@ function excerptOf(body: string): string {
   return text.length > 180 ? `${text.slice(0, 179)}…` : text;
 }
 
-type NoteRow = {
+type SummaryRow = {
   id: string;
   path: string;
   title: string;
-  body: string;
   git_updated_at: string | null;
 };
 
-function toSummary(row: NoteRow): NoteSummary {
+/** A list row: the note's opening rather than its body (migrations-vault 0031). */
+type ListRow = SummaryRow & { opening: string | null };
+
+type NoteRow = SummaryRow & { body: string };
+
+/**
+ * `text` is the body, or the stored opening of it. The excerpt comes out the
+ * same from either: the opening is the first 400 characters with runs of
+ * spaces collapsed, and the excerpt keeps at most 180.
+ */
+function toSummary(row: SummaryRow, text: string | null): NoteSummary {
   return {
     id: row.id,
     path: row.path,
     title: row.title,
     folder: folderOf(row.path),
     gitUpdatedAt: row.git_updated_at,
-    excerpt: excerptOf(row.body ?? ''),
+    excerpt: excerptOf(text ?? ''),
   };
 }
 
@@ -168,10 +177,16 @@ export async function loadSyncRuns(
   }));
 }
 
-const LIST_LIMIT = 500;
+/** How many rows one request reads; PostgREST returns at most 1,000. */
+const PAGE_SIZE = 1000;
 
 /**
  * The note list, optionally filtered by a search.
+ *
+ * Every note that matches, read in blocks of a thousand, unless the caller
+ * passes its own limit (the Learn note picker does). Each row carries the
+ * note's stored opening rather than its body, so listing the whole vault
+ * costs about 0.4 MB rather than 6 MB.
  *
  * Ordered by path rather than by date, because a vault is a folder tree and
  * not a feed -- and because a first sync cannot date most notes at all: a tree
@@ -183,29 +198,46 @@ export async function loadNotes(
   supabase: VaultSupabaseClient,
   opts: { search?: string; folder?: string; limit?: number } = {},
 ): Promise<NoteSummary[]> {
-  let query = supabase
-    .from('notes')
-    .select('id, path, title, body, git_updated_at')
-    .is('deleted_at', null);
-
   const search = opts.search?.trim();
-  if (search) {
-    // Full text over title and body, through the generated tsvector column.
-    // websearch_to_tsquery rather than plainto_: it understands quoted phrases
-    // and OR, which is what someone typing into a search box expects.
-    query = query.textSearch('search_tsv', search, { type: 'websearch', config: 'english' });
+
+  const page = (from: number, to: number) => {
+    let query = supabase
+      .from('notes')
+      .select('id, path, title, opening, git_updated_at')
+      .is('deleted_at', null);
+
+    if (search) {
+      // Full text over title and body, through the generated tsvector column.
+      // websearch_to_tsquery rather than plainto_: it understands quoted
+      // phrases and OR, which is what someone typing into a search box expects.
+      query = query.textSearch('search_tsv', search, { type: 'websearch', config: 'english' });
+    }
+
+    if (opts.folder) {
+      query = query.like('path', `${opts.folder}/%`);
+    }
+
+    // id after path only so the blocks can never overlap; a path is unique
+    // per owner already.
+    return query.order('path').order('id').range(from, to);
+  };
+
+  const rows: ListRow[] = [];
+  const wanted = opts.limit ?? Infinity;
+
+  for (let from = 0; rows.length < wanted; from += PAGE_SIZE) {
+    const to = from + Math.min(PAGE_SIZE, wanted - rows.length) - 1;
+    const { data, error } = await page(from, to);
+
+    assertSchemaExposed(error, VAULT_SCHEMA);
+    if (error) throw new Error(`Reading the vault failed: ${error.message}`);
+
+    const block = (data ?? []) as ListRow[];
+    rows.push(...block);
+    if (block.length < to - from + 1) break;
   }
 
-  if (opts.folder) {
-    query = query.like('path', `${opts.folder}/%`);
-  }
-
-  const { data, error } = await query.order('path').limit(opts.limit ?? LIST_LIMIT);
-
-  assertSchemaExposed(error, VAULT_SCHEMA);
-  if (error) throw new Error(`Reading the vault failed: ${error.message}`);
-
-  return ((data ?? []) as NoteRow[]).map(toSummary);
+  return rows.map((row) => toSummary(row, row.opening));
 }
 
 type DetailRow = NoteRow & {
@@ -245,7 +277,7 @@ export async function loadNotesByIds(
     ((data ?? []) as DetailRow[]).map((row) => [
       row.id,
       {
-        ...toSummary(row),
+        ...toSummary(row, row.body),
         body: row.body,
         blobSha: row.blob_sha,
         frontmatter: row.frontmatter ?? {},
@@ -274,7 +306,7 @@ export async function loadNote(
   const row = data as DetailRow;
 
   return {
-    ...toSummary(row),
+    ...toSummary(row, row.body),
     body: row.body,
     blobSha: row.blob_sha,
     frontmatter: row.frontmatter ?? {},
