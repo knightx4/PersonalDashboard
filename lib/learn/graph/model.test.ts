@@ -9,6 +9,7 @@ import {
   readyNow,
   readyToLearn,
   settledCount,
+  teachingOrder,
   type Concept,
   type Graph,
   type KnowledgeState,
@@ -398,5 +399,77 @@ describe('what a correct answer implies about what is underneath', () => {
 
   it('implies nothing from a node with nothing under it', () => {
     expect(inferredFrom(graphOf({ a: 'unknown' }, []), 'a')).toEqual([]);
+  });
+});
+
+describe('a reading list in teaching order', () => {
+  // A reading per entry: `id@concept`, or a bare `id` for one with no claim.
+  // Position is the order given, which is the order they were added in.
+  function list(...entries: string[]) {
+    return entries.map((entry, position) => {
+      const [id, conceptId] = entry.split('@');
+      return { id, position, conceptId: conceptId ?? null };
+    });
+  }
+  const ids = (readings: { id: string }[]) => readings.map((reading) => reading.id);
+
+  it('puts a reading after one for a claim it builds on, through a claim with no reading', () => {
+    // a under b under c, and nothing in the list is about b.
+    const graph = graphOf({ a: 'unknown', b: 'unknown', c: 'unknown' }, ['a>b', 'b>c']);
+    expect(ids(teachingOrder(list('rc@c', 'ra@a'), graph))).toEqual(['ra', 'rc']);
+  });
+
+  it('keeps the order they were added in where the graph says nothing', () => {
+    const graph = graphOf({ z: 'unknown', y: 'unknown', x: 'unknown', w: 'unknown' }, ['w>x']);
+    // z and y are unrelated to anything: they stay put, not sorted by name.
+    expect(ids(teachingOrder(list('rz@z', 'ry@y', 'rx@x', 'rw@w'), graph))).toEqual([
+      'rz',
+      'ry',
+      'rw',
+      'rx',
+    ]);
+  });
+
+  it('leaves a list already in teaching order as it was', () => {
+    const graph = graphOf({ a: 'unknown', b: 'unknown', c: 'unknown' }, ['a>c']);
+    expect(ids(teachingOrder(list('ra@a', 'rb@b', 'rc@c'), graph))).toEqual(['ra', 'rb', 'rc']);
+  });
+
+  it('keeps a reading with no claim, or one the graph does not hold, in its slot', () => {
+    const graph = graphOf({ a: 'unknown', b: 'unknown' }, ['a>b']);
+    const out = teachingOrder(list('rb@b', 'loose', 'gone@deleted', 'ra@a'), graph);
+    expect(ids(out)).toEqual(['ra', 'loose', 'gone', 'rb']);
+  });
+
+  it('keeps two readings for one claim next to each other', () => {
+    const graph = graphOf({ a: 'unknown', b: 'unknown', c: 'unknown' }, ['a>b']);
+    const out = teachingOrder(list('rb1@b', 'rc@c', 'rb2@b', 'ra@a'), graph);
+    expect(ids(out)).toEqual(['rc', 'ra', 'rb1', 'rb2']);
+  });
+
+  it('orders by position rather than by the order the rows arrive in', () => {
+    const graph = graphOf({ a: 'unknown', b: 'unknown' }, []);
+    const readings = list('ra@a', 'rb@b').reverse();
+    expect(ids(teachingOrder(readings, graph))).toEqual(['ra', 'rb']);
+  });
+
+  it('keeps each subject in teaching order when two graphs are passed together', () => {
+    const one = graphOf({ a: 'unknown', b: 'unknown' }, ['a>b']);
+    const two = graphOf({ p: 'unknown', q: 'unknown' }, ['p>q']);
+    const both = {
+      concepts: [...one.concepts, ...two.concepts],
+      edges: [...one.edges, ...two.edges],
+    };
+    expect(ids(teachingOrder(list('rq@q', 'rb@b', 'rp@p', 'ra@a'), both))).toEqual([
+      'rp',
+      'rq',
+      'ra',
+      'rb',
+    ]);
+  });
+
+  it('appends a cycle in the order it was added rather than dropping it', () => {
+    const graph = graphOf({ a: 'unknown', b: 'unknown', c: 'unknown' }, ['a>b', 'b>a']);
+    expect(ids(teachingOrder(list('rb@b', 'ra@a', 'rc@c'), graph))).toEqual(['rc', 'rb', 'ra']);
   });
 });
