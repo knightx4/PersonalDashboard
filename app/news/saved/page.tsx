@@ -6,6 +6,7 @@ import { formatArrival } from '@/lib/news/issues/list';
 import { discussedIndexes } from '@/lib/news/saved/discussed';
 import { loadStoryConversations } from '@/lib/news/saved/discussed-store';
 import { loadSavedStories } from '@/lib/news/saved/stories';
+import { loadSentBySaved } from '@/lib/news/saved/sent';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { relatedNotes, toLink } from '@/lib/vault/notes/related';
 import { SavedView } from './saved-view';
@@ -31,6 +32,9 @@ export const dynamic = 'force-dynamic';
  * newsletter's stored vector; the vector is kept by the text's hash, so a
  * story costs one embedding call the first time the list shows it. The
  * lookups are started and not awaited, and stream in under each story.
+ *
+ * Where each story has been sent, to Learn or Todo (plan #1370), is read once
+ * the stories are, so Send to Learn and Make a todo say so after a reload.
  */
 export default async function SavedPage() {
   const user = await requireUser();
@@ -45,6 +49,7 @@ export default async function SavedPage() {
     loadStoryConversations(core).catch(() => []),
   ]);
   const discussed = discussedIndexes(stories, conversations);
+  const sent = await loadSentBySaved(stories.map((story) => story.id));
 
   return (
     <SavedView
@@ -52,6 +57,7 @@ export default async function SavedPage() {
         ...story,
         arrived: formatArrival(story.receivedAt, settings.timezone),
         discussedIndex: discussed.get(story.id) ?? null,
+        sent: sent.get(story.id) ?? null,
         related: relatedNotes(vault, user.id, `${story.headline}\n${story.summary}`, {
           core,
         }).then((notes) => notes.map(toLink)),

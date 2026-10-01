@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import { FROM_NEWS, queueNewsStory, type SentStory } from './news';
+import { FROM_NEWS, findQueuedStories, queueNewsStory, type SentStory } from './news';
 
 /**
  * Sending a newsletter story to the reading queue (plan #1368).
@@ -59,6 +59,10 @@ function memoryClient({ raceOnce = false }: { raceOnce?: boolean } = {}) {
         (order = { column, ascending: options?.ascending !== false }), builder
       ),
       limit: (n: number) => ((limit = n), builder),
+      in: async (column: string, values: unknown[]) => ({
+        data: db[table].filter((row) => values.includes(row[column])),
+        error: null,
+      }),
       maybeSingle: async () => ({ data: matching()[0] ?? null, error: null }),
       insert: (row: Row) => ((pending = row), builder),
       single: async () => {
@@ -160,5 +164,26 @@ describe('queueNewsStory', () => {
       readingId: db.readings[0].id,
       created: false,
     });
+  });
+});
+
+describe('findQueuedStories', () => {
+  it('names the reading each sent story is on, and leaves out the rest', async () => {
+    const { client } = memoryClient();
+    const first = await queueNewsStory(client, USER, STORY);
+    const second = await queueNewsStory(client, USER, { ...STORY, id: 'saved-2' });
+
+    const found = await findQueuedStories(client, ['saved-1', 'saved-2', 'saved-3']);
+
+    expect([...found]).toEqual([
+      ['saved-1', first.readingId],
+      ['saved-2', second.readingId],
+    ]);
+  });
+
+  it('reads nothing for no stories', async () => {
+    const { client, db } = memoryClient();
+    expect((await findQueuedStories(client, [])).size).toBe(0);
+    expect(db.readings).toHaveLength(0);
   });
 });
