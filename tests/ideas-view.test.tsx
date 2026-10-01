@@ -51,6 +51,7 @@ describe('the ideas page', () => {
             idea('s2', 'todo', 'Todo follow-on'),
             idea('s3', 'vault', 'Another vault follow-on'),
           ],
+          lowScored: [],
           shaped: [],
           dismissed: [],
         }}
@@ -74,6 +75,7 @@ describe('the ideas page', () => {
         ideas={{
           mine: [],
           suggested: [idea('s1', 'vault', 'Vault follow-on'), idea('s2', 'todo', 'Todo follow-on')],
+          lowScored: [],
           shaped: [],
           dismissed: [],
         }}
@@ -88,5 +90,25 @@ describe('the ideas page', () => {
     expect(suggested).not.toMatch(/Vault\s*<span[^>]*>\(1\)<\/span>/);
     // Only the outer fold: no heading per workspace inside it.
     expect(html.match(/<details/g)?.length).toBe(1);
+  });
+
+  it('folds the suggestions scored under the floor shut, apart from the rest', () => {
+    const html = renderToStaticMarkup(
+      <IdeasView
+        ideas={{
+          mine: [],
+          suggested: [],
+          lowScored: [idea('l1', 'vault', 'A weak follow-on')],
+          shaped: [],
+          dismissed: [],
+        }}
+        grouping="workspace"
+        sort="newest"
+      />,
+    );
+
+    expect(html).toMatch(/Suggestions scored under 40\s*<span[^>]*>\(1\)<\/span>/);
+    expect(html).not.toContain('Suggested by Dash');
+    expect(html).not.toMatch(/<details[^>]*open/);
   });
 });

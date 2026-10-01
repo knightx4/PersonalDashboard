@@ -42,7 +42,7 @@ import { segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
 import { TriageNote } from '@/components/feedback/triage-note';
 import { triageView } from '@/lib/feedback/triage';
-import { ideaScoreView } from '@/lib/ideas/score';
+import { SUGGESTION_SCORE_FLOOR, ideaScoreView } from '@/lib/ideas/score';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -448,8 +448,9 @@ export function IdeasView({
   grouping: IdeaGrouping;
   sort: IdeaSort;
 }) {
-  const { mine, suggested, shaped, dismissed } = ideas;
-  const total = mine.length + suggested.length + shaped.length + dismissed.length;
+  const { mine, suggested, lowScored, shaped, dismissed } = ideas;
+  const total =
+    mine.length + suggested.length + lowScored.length + shaped.length + dismissed.length;
 
   // Sorted once and grouped after, so the order asked for holds inside every
   // section rather than only between them.
@@ -587,6 +588,28 @@ export function IdeasView({
               ),
             )}
           </div>
+        </details>
+      )}
+
+      {/* Suggestions Jev scored under the floor (note 073cacdf): out of the
+          list above, folded shut like the record below, and still shapeable
+          from here if one turns out to matter. */}
+      {lowScored.length > 0 && (
+        <details className="group/low">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
+            <ChevronRight
+              className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open/low:rotate-90"
+              strokeWidth={1.75}
+              aria-hidden
+            />
+            Suggestions scored under {SUGGESTION_SCORE_FLOOR}{' '}
+            <span className="font-normal text-ink-muted">({lowScored.length})</span>
+          </summary>
+          <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+            {sortIdeas(lowScored, sort).map((idea) => (
+              <IdeaCard key={idea.id} idea={idea} />
+            ))}
+          </ul>
         </details>
       )}
 

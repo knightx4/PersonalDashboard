@@ -14,6 +14,7 @@ const idea = (over: {
   dismissed_at?: string | null;
   plan_item?: { id: string; number: number; title: string; status: string } | null;
   from_plan_item?: { number: number; title: string } | null;
+  score?: number;
 }) => ({
   id: over.id,
   body: `idea ${over.id}`,
@@ -23,6 +24,10 @@ const idea = (over: {
   dismissed_at: over.dismissed_at ?? null,
   plan_item: over.plan_item ?? null,
   from_plan_item: over.from_plan_item ?? null,
+  score:
+    over.score === undefined
+      ? null
+      : { value: over.score, confidence: 0.9, at: '2026-09-12T10:00:00Z' },
 });
 
 describe('the ideas list', () => {
@@ -33,6 +38,21 @@ describe('the ideas list', () => {
 
     expect(list.mine.map((row) => row.id)).toEqual(['mine']);
     expect(list.suggested.map((row) => row.id)).toEqual(['suggested']);
+  });
+
+  it('folds away a suggestion scored under 40, but never one of your own (note 073cacdf)', () => {
+    const list = ideaListFrom(
+      [
+        idea({ id: 'low', source: 'claude', score: 39 }),
+        idea({ id: 'floor', source: 'claude', score: 40 }),
+        idea({ id: 'unscored', source: 'claude' }),
+        idea({ id: 'mine-low', score: 10 }),
+      ].map(ideaRowFrom),
+    );
+
+    expect(list.lowScored.map((row) => row.id)).toEqual(['low']);
+    expect(list.suggested.map((row) => row.id)).toEqual(['floor', 'unscored']);
+    expect(list.mine.map((row) => row.id)).toEqual(['mine-low']);
   });
 
   it('takes a dismissed idea out of every live pile', () => {
