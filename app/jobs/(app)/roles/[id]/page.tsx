@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { cn } from '@/lib/cn';
 import { Banner } from '@/components/ui/banner';
-import { requestOrigin } from '@/lib/auth/origin';
 import { PageHeader } from '@/components/shell/page-header';
 import { DetailLayout, Property, PropertyList } from '@/components/shell/detail-layout';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
@@ -133,7 +132,6 @@ export default async function RoleDetailPage({
     matchCandidates,
     { data: companyContacts },
     { data: bank },
-    { data: caseLetter },
     { data: allCompanies },
   ] = await Promise.all([
     supabase
@@ -211,12 +209,6 @@ export default async function RoleDetailPage({
     // cannot tell a current map from one computed before you added the item
     // that answers its biggest gap.
     supabase.from('evidence_items').select('id, strength, skills').eq('user_id', user.id),
-    supabase
-      .from('cover_letters')
-      .select('body, public_slug, public_expires_at')
-      .eq('application_id', current.id)
-      .eq('user_id', user.id)
-      .maybeSingle(),
     // Every company on file, to move this role to the right one by name.
     supabase.from('companies').select('name').eq('user_id', user.id).order('name'),
   ]);
@@ -509,19 +501,6 @@ export default async function RoleDetailPage({
           }
           bankSize={evidence.length}
           coverLetter={(current.cover_letter as string | null) ?? ''}
-          caseStatement={(caseLetter?.body as string) ?? ''}
-          // A slug with a live expiry is what the read function accepts, so a
-          // slug alone is not "shared" and must not read as it.
-          caseSlug={
-            caseLetter?.public_slug && caseLetter?.public_expires_at
-              ? (caseLetter.public_slug as string)
-              : null
-          }
-          caseExpiresAt={(caseLetter?.public_expires_at as string) ?? null}
-          // The live host rather than NEXT_PUBLIC_APP_URL: a case-page link is
-          // sent to a hiring manager, and an env var that still holds its
-          // localhost default would hand them a link only the sender can open.
-          appOrigin={await requestOrigin()}
           timezone={timezone}
           initialTab={tab === 'interviews' ? 'interviews' : undefined}
           focusInterviewId={focusInterviewId ?? null}
