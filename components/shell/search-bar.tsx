@@ -1,6 +1,6 @@
 'use client';
 
-import { Search } from 'lucide-react';
+import { SearchMark } from '@/components/ui/search-mark';
 import { Kbd } from '@/components/shell/key-hints';
 import { SearchScopeChip } from '@/components/shell/search-scope-chip';
 import { cn } from '@/lib/cn';
@@ -76,7 +76,7 @@ export function SearchBar({
           module !== null && 'pr-18',
         )}
       >
-        <Search className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+        <SearchMark className="text-ink-muted" />
         <span className="min-w-0 flex-1 truncate text-ui text-ink-muted">Search</span>
 
         {/* The key that opens the same box, said where it opens (note

@@ -8,7 +8,6 @@ import {
   MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
-  Search,
   Settings,
   X,
 } from 'lucide-react';
@@ -19,6 +18,7 @@ import { ThemePicker } from '@/components/shell/theme-picker';
 import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
 import { SearchBar, isSearchShortcut } from '@/components/shell/search-bar';
+import { SearchMark } from '@/components/ui/search-mark';
 import type { SearchScope } from '@/lib/search/scope';
 import { CaptureButton, CaptureProvider } from '@/components/shell/capture';
 import { AskDashButton, AskDashProvider } from '@/components/shell/ask-dash';
@@ -784,7 +784,7 @@ export function AppShell({
                     title="Search"
                     className="press flex size-8 shrink-0 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink lg:hidden"
                   >
-                    <Search className="size-4" strokeWidth={1.75} aria-hidden />
+                    <SearchMark />
                     <span className="sr-only">Search</span>
                   </button>
 
