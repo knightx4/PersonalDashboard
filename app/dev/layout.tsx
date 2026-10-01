@@ -15,7 +15,6 @@ import { waitingOnYou } from '@/lib/plan/waiting';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { estimatePaidActions, paidActionsUnder } from '@/lib/core/spend/paid-actions';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
-import { PROJECTS } from '@/lib/plan/projects';
 
 /**
  * Shell for the workspace the app keeps about itself.
@@ -121,13 +120,9 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     { href: '/dev/ui', label: 'UI', icon: 'ui' },
     { href: '/dev/surfaces', label: 'Surfaces', icon: 'surfaces' },
     { href: '/dev/changelog', label: 'Changelog', icon: 'changelog' },
-    // Projects built outside this app, each with its own plan page. Last,
-    // because everything above is about this app and these are not.
-    ...PROJECTS.map((project) => ({
-      href: `/dev/projects/${project.id}`,
-      label: project.label,
-      icon: 'project' as const,
-    })),
+    // No entry per project built outside this app (lib/plan/projects): each
+    // already has its own section on the plan, and a tab beside it was the
+    // same list twice (note 4308875b).
   ];
 
   return (
