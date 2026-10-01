@@ -312,6 +312,11 @@ export function FlowSession({
           From a subject in your notes that is not one of your tracks.
         </p>
       )}
+      {/* A goal question (plan #1385) is named after the goal above, which is
+          not in your list of tracks either, so where it comes from is said. */}
+      {live.goal && (
+        <p className="mt-0.5 text-small text-ink-muted">From your learning goals.</p>
+      )}
       {/* Said before the question rather than after the answer: being asked
           about something you settled months ago looks like the app having lost
           track until you know it is deliberate. Which of the two settled it is

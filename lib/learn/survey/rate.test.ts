@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   FEW,
+  FLOW_LOOKBACK,
+  GOAL_SHARE,
+  SURVEY_LOOKBACK,
+  flowSlots,
+  goalsInTurn,
+  type FlowTurn,
   SURVEY_LEAST,
   SURVEY_MOST,
   fieldsWrittenAbout,
@@ -75,6 +81,87 @@ describe('fieldsWrittenAbout', () => {
     expect(fields).toEqual([
       { answered: 2, trackTested: false },
       { answered: 0, trackTested: true },
+    ]);
+  });
+});
+
+describe('flowSlots', () => {
+  const share = (turns: FlowTurn[], kind: FlowTurn) =>
+    turns.filter((turn) => turn === kind).length / turns.length;
+
+  it('gives a goal, a theme and a track one turn in three each while a field is untested', () => {
+    const run = flowSlots([], { goal: GOAL_SHARE, survey: SURVEY_MOST }, 9);
+    expect(run).toEqual([
+      'goal',
+      'survey',
+      'track',
+      'goal',
+      'survey',
+      'track',
+      'goal',
+      'survey',
+      'track',
+    ]);
+  });
+
+  it('gives a goal and the tracks the turns when there is nothing to survey', () => {
+    const run = flowSlots([], { goal: GOAL_SHARE, survey: 0 }, 30);
+    expect(share(run, 'goal')).toBeCloseTo(1 / 3);
+    expect(share(run, 'survey')).toBe(0);
+    expect(share(run, 'track')).toBeCloseTo(2 / 3);
+  });
+
+  it('asks no goal questions without an open goal, and splits the rest as surveySlots does', () => {
+    const run = flowSlots([], { goal: 0, survey: SURVEY_MOST }, 4);
+    expect(run).toEqual(['survey', 'track', 'survey', 'track']);
+    expect(flowSlots([], { goal: 0, survey: 0 }, 3)).toEqual(['track', 'track', 'track']);
+  });
+
+  it('keeps the theme rate among the turns that are not about a goal', () => {
+    const run = flowSlots([], { goal: GOAL_SHARE, survey: SURVEY_LEAST }, 30);
+    expect(share(run, 'goal')).toBeCloseTo(1 / 3);
+    const others = run.filter((turn) => turn !== 'goal');
+    expect(share(others, 'survey')).toBeCloseTo(SURVEY_LEAST);
+  });
+
+  it('counts what came before, newest first', () => {
+    // A goal question was the last one, so the next two are not.
+    expect(flowSlots(['goal', 'track'], { goal: GOAL_SHARE, survey: SURVEY_MOST }, 3)).toEqual([
+      'survey',
+      'track',
+      'goal',
+    ]);
+    expect(flowSlots(['survey', 'goal'], { goal: GOAL_SHARE, survey: SURVEY_MOST }, 2)).toEqual([
+      'track',
+      'goal',
+    ]);
+  });
+
+  it('reads far enough back for the lowest theme rate between goal turns', () => {
+    expect(FLOW_LOOKBACK).toBeGreaterThanOrEqual(SURVEY_LOOKBACK + Math.ceil(FLOW_LOOKBACK / 3));
+  });
+});
+
+describe('goalsInTurn', () => {
+  const goals = [{ id: 'finance' }, { id: 'urbanism' }, { id: 'ottomans' }];
+
+  it('puts the goal asked about least first', () => {
+    const asked = new Map([
+      ['finance', 4],
+      ['urbanism', 1],
+    ]);
+    expect(goalsInTurn(goals, asked).map((goal) => goal.id)).toEqual([
+      'ottomans',
+      'urbanism',
+      'finance',
+    ]);
+  });
+
+  it('keeps the older goal first between equals', () => {
+    expect(goalsInTurn(goals, new Map()).map((goal) => goal.id)).toEqual([
+      'finance',
+      'urbanism',
+      'ottomans',
     ]);
   });
 });

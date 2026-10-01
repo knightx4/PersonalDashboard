@@ -173,4 +173,30 @@ describe('tallySurvey', () => {
     expect(fieldAnswered('econ', { trackTestedFields: new Set(), counts })).toBe(true);
     expect(fieldAnswered('phil', { trackTestedFields: new Set(), counts })).toBe(false);
   });
+
+  it("counts a goal's questions in the goal's field and in no theme", () => {
+    const counts = tallySurvey({
+      subjects: [
+        { id: 's-money', themeId: 'money' },
+        { id: 's-finance-goal', themeId: null, goalFieldId: 'econ' },
+        { id: 's-unplaced-goal', themeId: null, goalFieldId: null },
+      ],
+      placements: new Map([['money', 'econ']]),
+      concepts: [
+        { id: 'c1', subjectId: 's-money' },
+        { id: 'g1', subjectId: 's-finance-goal' },
+        { id: 'g2', subjectId: 's-unplaced-goal' },
+      ],
+      probes: [
+        { conceptId: 'c1', answered: false },
+        { conceptId: 'g1', answered: true, answeredAt: '2026-10-01T09:00:00Z' },
+        { conceptId: 'g2', answered: true },
+      ],
+    });
+    expect(counts.byField).toEqual(
+      new Map([['econ', { asked: 2, answered: 1, lastAnswered: '2026-10-01T09:00:00Z' }]]),
+    );
+    expect([...counts.byTheme.keys()]).toEqual(['money']);
+    expect(fieldAnswered('econ', { trackTestedFields: new Set(), counts })).toBe(true);
+  });
 });

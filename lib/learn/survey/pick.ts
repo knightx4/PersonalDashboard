@@ -155,21 +155,30 @@ export function surveyCandidates(
  * shown, so questions waiting in a queue move the next pick on as well. It
  * counts as answered once it has an answer. A theme not placed in a field is
  * counted by theme and left out of the fields.
+ *
+ * A goal's survey subject (plan #1385) has no theme. Its questions count in
+ * the goal's field, given as `goalFieldId`, so a field tested only through a
+ * goal question reads as tested on the Know grid, as a theme answer does.
  */
 export function tallySurvey(input: {
-  /** Survey subjects and the theme each is about. */
-  subjects: { id: string; themeId: string }[];
+  /**
+   * Survey subjects and the theme each is about, or for a goal's subject the
+   * goal's field (null when the goal is not placed in one).
+   */
+  subjects: { id: string; themeId: string | null; goalFieldId?: string | null }[];
   /** Each theme's field, from `learn.theme_fields`. */
   placements: ReadonlyMap<string, string>;
   concepts: { id: string; subjectId: string }[];
   /** Survey questions not thrown away. */
   probes: { conceptId: string; answered: boolean; answeredAt?: string | null }[];
 }): SurveyCounts {
-  const themeOfSubject = new Map(input.subjects.map((subject) => [subject.id, subject.themeId]));
+  const subjectOf = new Map(input.subjects.map((subject) => [subject.id, subject]));
   const themeOfConcept = new Map<string, string>();
+  const goalFieldOfConcept = new Map<string, string>();
   for (const concept of input.concepts) {
-    const themeId = themeOfSubject.get(concept.subjectId);
-    if (themeId) themeOfConcept.set(concept.id, themeId);
+    const subject = subjectOf.get(concept.subjectId);
+    if (subject?.themeId) themeOfConcept.set(concept.id, subject.themeId);
+    else if (subject?.goalFieldId) goalFieldOfConcept.set(concept.id, subject.goalFieldId);
   }
 
   const byField = new Map<string, SurveyCount>();
@@ -187,6 +196,8 @@ export function tallySurvey(input: {
   };
 
   for (const probe of input.probes) {
+    const goalFieldId = goalFieldOfConcept.get(probe.conceptId);
+    if (goalFieldId) add(byField, goalFieldId, probe);
     const themeId = themeOfConcept.get(probe.conceptId);
     if (!themeId) continue;
     add(byTheme, themeId, probe);
