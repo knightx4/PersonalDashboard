@@ -346,6 +346,14 @@ describe('the search button on a phone', () => {
   it('draws it outside a workspace too', () => {
     expect(header(shell(null))).toContain('title="Search"');
   });
+
+  it('draws the ring and dot rather than the magnifier (plan #1365)', () => {
+    const bar = header(shell('todo'));
+    const at = bar.indexOf('title="Search"');
+    const button = bar.slice(at, bar.indexOf('</button>', at));
+    expect(button).toContain('data-mark="search"');
+    expect(button).not.toContain('lucide-search');
+  });
 });
 
 describe('the top bar title', () => {

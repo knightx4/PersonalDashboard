@@ -27,6 +27,7 @@ import { MODULES } from '@/lib/modules';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { DASH_STATES, DashMark, type DashState } from '@/components/ui/dash-mark';
+import { SearchMark } from '@/components/ui/search-mark';
 import {
   APPLICATION_STATUS_GLYPHS,
   FEEDBACK_HEALTH_GLYPHS,
@@ -1544,7 +1545,7 @@ export default function DevUiPage() {
       <Section
         id="marks"
         title="Marks"
-        lead="One mark per workspace, one for the app, and Dash's own mark beside them. Dash's mark is drawn in currentColor, so it takes the colour of where it sits, and each of its four states has its own shape so a still frame still says which it is."
+        lead="One mark per workspace, one for the app, Dash's own mark beside them, and the ring and dot that opens search. Dash's mark is drawn in currentColor, so it takes the colour of where it sits, and each of its four states has its own shape so a still frame still says which it is."
       >
         <Card padding="none">
           <ul className="divide-y divide-border">
@@ -1564,6 +1565,16 @@ export default function DevUiPage() {
                 <span className="text-small text-ink-muted">{DASH_STATE_NOTES[state]}</span>
               </li>
             ))}
+            <li className="card-pad-x row-pad flex items-center gap-3">
+              <SearchMark className="size-8 text-ink" strokeWidth={1.5} />
+              <SearchMark className="size-[18px] text-ink" />
+              <SearchMark className="text-ink-muted" />
+              <span className="w-20 shrink-0 text-ui text-ink">search</span>
+              <span className="text-small text-ink-muted">
+                Search across everything: the top bar field, the phone&rsquo;s search button and the
+                search box. A box above a list keeps the magnifier.
+              </span>
+            </li>
           </ul>
         </Card>
       </Section>
