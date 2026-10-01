@@ -105,7 +105,7 @@ const payloadSchema = z.object({
 });
 
 /** Lower case with runs of space and quote marks folded, for finding a quote. */
-function folded(text: string): string {
+export function folded(text: string): string {
   return text.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();
 }
 
