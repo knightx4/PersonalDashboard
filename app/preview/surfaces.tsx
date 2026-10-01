@@ -84,6 +84,7 @@ import { GoalOpenedSurface, GoalTreeSurface } from './goal-surfaces';
 import { AskChangesSurface, AskDashSurface, AskMadeChangesSurface, TRIP_GOAL } from './ask-surfaces';
 import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
+import { WatchingSurface } from './watching-surfaces';
 import {
   GoalBareSurface,
   GoalLinkingSurface,
@@ -3001,6 +3002,16 @@ export const SURFACES: readonly Surface[] = [
     render: () => <AskMadeChangesSurface />,
   },
 
+  {
+    /* The home page's Watching section (plan #1295): a watch that fired, one
+     * reporting only, and one whose page stopped reading. Fixtures in
+     * watching-surfaces.tsx. */
+    id: 'home-watching',
+    label: 'Home · What Dash is watching',
+    module: 'goals',
+    width: 'wide',
+    render: () => <WatchingSurface />,
+  },
   {
     /* The timeline (plan #1118): the months newest first, the newest open,
      * each with its count per kind on the line that folds it. Fixtures in
