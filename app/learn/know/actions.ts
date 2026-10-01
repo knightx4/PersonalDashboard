@@ -8,6 +8,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { generateChain, type SweptClaim } from '@/lib/learn/graph/generate';
 import { conceptsFromPrior } from '@/lib/learn/graph/from-prior';
 import { conceptsFromCourse, courseLabel } from '@/lib/learn/graph/from-course';
+import { conceptsAfterRead } from '@/lib/learn/graph/course-reads';
 import {
   approvedBriefSchema,
   conceptsFromBrief,
@@ -491,6 +492,96 @@ export async function proposeFromCourse(
 
   const matched = subject ?? tracks.find((track) => track.name === result.chain.subject) ?? null;
   return { course: read, chain: result.chain, subjectId: matched?.id ?? null };
+}
+
+/**
+ * Keep the ticked ideas from a course as known, and mark the course read
+ * (plan #1391).
+ *
+ * `approvePrior`'s path with the ticks applied first: keepTicked drops what
+ * was unticked and anything left with nothing to hang on, saveChain writes the
+ * rest into the track the chain names, and declareKnown marks only the ideas
+ * this write inserted. Ideas the track already held are left as they were.
+ * Then the course_reads row, an upsert on the course, so a second read
+ * updates the same row.
+ */
+
+export type CourseApproveState = {
+  error?: string;
+  message?: string;
+  /**
+   * Set when the ideas were saved but the course could not be marked read,
+   * so the screen stops offering the approval that has already happened.
+   */
+  savedTo?: string;
+};
+
+const CourseApproveInput = z.object({ courseId: z.string().uuid() });
+
+// latency: pending
+export async function approveFromCourse(
+  _prev: CourseApproveState,
+  formData: FormData,
+): Promise<CourseApproveState> {
+  const user = await requireUser();
+
+  const input = CourseApproveInput.safeParse({ courseId: formData.get('courseId') ?? '' });
+  const raw = formData.get('chain');
+  if (!input.success || typeof raw !== 'string') return { error: 'There is nothing here to approve.' };
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    return { error: 'That proposal did not survive the trip. Try again.' };
+  }
+  const safe = approvedChainSchema.safeParse(payload);
+  if (!safe.success) return { error: 'That proposal did not survive the trip. Try again.' };
+
+  const ticked = new Set(
+    formData
+      .getAll('keep')
+      .flatMap((value) => (typeof value === 'string' ? [value.trim().toLowerCase()] : [])),
+  );
+  const { chain } = keepTicked(safe.data as ProposedChain, ticked);
+  if (!chain.nodes.some((node) => node.existingId === null)) {
+    return { message: 'Nothing ticked, so nothing was written.' };
+  }
+
+  const supabase = await createLearnClient();
+  let saved;
+  try {
+    saved = await saveChain(supabase, user.id, chain, chain.goalConcept, { goal: false });
+    await declareKnown(supabase, user.id, saved.conceptIds);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not save that.' };
+  }
+
+  const { data: previous } = await supabase
+    .from('course_reads')
+    .select('subject_id, concepts_added')
+    .eq('course_id', input.data.courseId)
+    .maybeSingle();
+  const { error: readError } = await supabase.from('course_reads').upsert(
+    {
+      user_id: user.id,
+      course_id: input.data.courseId,
+      subject_id: saved.subjectId,
+      concepts_added: conceptsAfterRead(previous ?? null, saved.subjectId, saved.conceptIds.length),
+      read_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,course_id' },
+  );
+
+  revalidatePath('/learn/know');
+  revalidatePath(`/learn/s/${saved.subjectId}`);
+  if (readError) {
+    return {
+      savedTo: saved.subjectId,
+      error: `The ideas were saved into ${chain.subject}, but the course could not be marked as read (${readError.message}).`,
+    };
+  }
+  redirect(`/learn/s/${saved.subjectId}`);
 }
 
 /**

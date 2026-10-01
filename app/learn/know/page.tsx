@@ -30,6 +30,10 @@ const VAULT_PICKER_LIMIT = 500;
 import { GoalForm } from './goal-form';
 import { CustomTrackForm } from './custom-track-form';
 import { PriorForm } from './prior-form';
+import { FromCoursesForm } from './from-courses-form';
+import { readsByCourse, type CourseRead, type CourseReadRow } from '@/lib/learn/graph/course-reads';
+import { groupCourses, type SchoolGroup } from '@/lib/vault/education';
+import type { Course, Transcript } from '@/lib/vault/transcripts';
 
 export const dynamic = 'force-dynamic';
 
@@ -130,6 +134,31 @@ export default async function KnowPage({
     opened = { place, themes, groups: destinationsFor(grid) };
   }
 
+  // The courses on your transcripts, for the fold that reads them (plan
+  // #1391). A failed read is said in the fold rather than taking the page.
+  let courseGroups: SchoolGroup[] = [];
+  let courseReads: Record<string, CourseRead> = {};
+  let coursesFailed = false;
+  try {
+    const [transcripts, courses, reads] = await Promise.all([
+      vault.from('transcripts').select('*'),
+      vault.from('courses').select('*').order('position'),
+      supabase.from('course_reads').select('course_id, subject_id, concepts_added, read_at'),
+    ]);
+    if (transcripts.error || courses.error || reads.error) throw new Error('courses');
+    courseGroups = groupCourses(
+      (transcripts.data ?? []) as Transcript[],
+      (courses.data ?? []) as Course[],
+    ).filter((group) => group.terms.length > 0);
+    courseReads = readsByCourse((reads.data ?? []) as CourseReadRow[], subjects);
+  } catch {
+    coursesFailed = true;
+  }
+  const courseCount = courseGroups.reduce(
+    (sum, group) => sum + group.terms.reduce((n, term) => n + term.courses.length, 0),
+    0,
+  );
+
   // Making a track is one button at the top, and the box only opens once it
   // is pressed (note c6e981e0, law 14). A link rather than a toggle, so the
   // press works before JavaScript does and the open box survives a refresh.
@@ -227,6 +256,23 @@ export default async function KnowPage({
           large fields stacked under the goal form. */}
       <SectionFold title="Or start from what you already know" defaultOpen={false} className="mt-8">
         <PriorForm />
+      </SectionFold>
+
+      {/* Your transcripts, read one course at a time into ideas you already
+          know. Beside the written account because it does the same job from
+          a course title instead of your own words (plan #1391). */}
+      <SectionFold
+        title="Or start from your courses"
+        count={courseCount > 0 ? courseCount : undefined}
+        defaultOpen={false}
+        className="mt-4"
+      >
+        <FromCoursesForm
+          groups={courseGroups}
+          reads={courseReads}
+          tracks={subjects.map((subject) => ({ id: subject.id, name: subject.name }))}
+          failed={coursesFailed}
+        />
       </SectionFold>
 
       {/* And the third way in, the only one that starts from a document
