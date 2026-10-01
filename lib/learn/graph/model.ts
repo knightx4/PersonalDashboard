@@ -153,7 +153,7 @@ function byId(graph: Graph): Map<string, Concept> {
 }
 
 /** dependent → its prerequisites. */
-export function prerequisiteMap(graph: Graph): Map<string, string[]> {
+export function prerequisiteMap(graph: Pick<Graph, 'concepts' | 'edges'>): Map<string, string[]> {
   const map = new Map<string, string[]>();
   for (const concept of graph.concepts) map.set(concept.id, []);
   for (const edge of graph.edges) {
@@ -318,6 +318,90 @@ export function learningOrder(graph: Graph, ids: string[]): Concept[] {
   for (const id of remaining.keys()) ordered.push(id);
 
   return ordered.map((id) => concepts.get(id)).filter((c): c is Concept => c !== undefined);
+}
+
+/** The fields of a reading that teaching order reads. */
+export type OrderableReading = { id: string; position: number; conceptId: string | null };
+
+/**
+ * A reading list in teaching order: no reading sits above one for a claim it
+ * builds on (plan #1393).
+ *
+ * Unlike `learningOrder`, this follows prerequisites through claims that have
+ * no reading in the list. If A sits under B and B under C, A's reading comes
+ * before C's even when nothing in the list is about B, because the gap is
+ * still there whether or not you queued something for it.
+ *
+ * Where the graph says nothing about two readings they keep the order they
+ * were added in, so ties go to position rather than to name. Readings for the
+ * same claim move as one block, kept together in their own order. A reading
+ * with no claim, or with one the graph does not hold (deleted, or in a subject
+ * that was not loaded), keeps the slot it had, and the ordered readings fill
+ * the slots around it. Pass the graphs of every subject the list touches,
+ * concepts and edges concatenated: edges never cross subjects, so each
+ * subject comes out in teaching order and the subjects interleave by arrival.
+ *
+ * Computed for display and never saved. A cycle, which the database refuses,
+ * is appended in position order rather than dropped, as `learningOrder` does.
+ */
+export function teachingOrder<T extends OrderableReading>(
+  readings: T[],
+  graph: Pick<Graph, 'concepts' | 'edges'>,
+): T[] {
+  const sorted = [...readings].sort((a, b) => a.position - b.position);
+  const prerequisites = prerequisiteMap(graph);
+
+  // One block per claim, keyed by the claim, in the order the claims first
+  // appear. `slots` marks which indexes the ordered readings may fill.
+  const blocks = new Map<string, T[]>();
+  const slots: boolean[] = [];
+  for (const reading of sorted) {
+    const placed = reading.conceptId !== null && prerequisites.has(reading.conceptId);
+    slots.push(placed);
+    if (!placed) continue;
+    const block = blocks.get(reading.conceptId!);
+    if (block) block.push(reading);
+    else blocks.set(reading.conceptId!, [reading]);
+  }
+
+  const claims = [...blocks.keys()];
+  const rank = new Map(claims.map((claim, index) => [claim, index]));
+
+  // For each claim, the other claims in the list somewhere underneath it,
+  // however many claims without a reading lie between.
+  const waitsOn = new Map<string, Set<string>>();
+  for (const claim of claims) {
+    const below = new Set<string>();
+    const seen = new Set<string>([claim]);
+    const stack = [...(prerequisites.get(claim) ?? [])];
+    while (stack.length > 0) {
+      const id = stack.pop()!;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      if (blocks.has(id)) below.add(id);
+      stack.push(...(prerequisites.get(id) ?? []));
+    }
+    waitsOn.set(claim, below);
+  }
+
+  // Repeatedly take the earliest-added claim with nothing left beneath it.
+  const ordered: string[] = [];
+  const left = new Set(claims);
+  while (left.size > 0) {
+    let next: string | null = null;
+    for (const claim of left) {
+      const blocked = [...waitsOn.get(claim)!].some((id) => left.has(id));
+      if (!blocked && (next === null || rank.get(claim)! < rank.get(next)!)) next = claim;
+    }
+    if (next === null) break;
+    ordered.push(next);
+    left.delete(next);
+  }
+  // Anything left is in a cycle. Shown at the end, in the order it was added.
+  ordered.push(...[...left].sort((a, b) => rank.get(a)! - rank.get(b)!));
+
+  const queue = ordered.flatMap((claim) => blocks.get(claim)!);
+  return sorted.map((reading, index) => (slots[index] ? queue.shift()! : reading));
 }
 
 /**
