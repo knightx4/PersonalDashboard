@@ -1,7 +1,7 @@
 /**
  * The ideas page, rendered: the "Suggested by Dash" fold groups what a session
  * suggested by the workspace it is about, each group folding on its own
- * (note 6158d2c0).
+ * (note 6158d2c0), and as one list when the page is one list (note 98775e2e).
  */
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -66,5 +66,27 @@ describe('the ideas page', () => {
     // The outer fold and one per workspace.
     expect(suggested.match(/<details/g)?.length).toBe(2);
     expect(html.match(/<details/g)?.length).toBe(3);
+  });
+
+  it('shows the suggested ideas as one list when the page is one list', () => {
+    const html = renderToStaticMarkup(
+      <IdeasView
+        ideas={{
+          mine: [],
+          suggested: [idea('s1', 'vault', 'Vault follow-on'), idea('s2', 'todo', 'Todo follow-on')],
+          shaped: [],
+          dismissed: [],
+        }}
+        grouping="none"
+        sort="newest"
+      />,
+    );
+
+    const suggested = html.slice(html.indexOf('Suggested by Dash'));
+    expect(suggested).toContain('Vault follow-on');
+    expect(suggested).toContain('Todo follow-on');
+    expect(suggested).not.toMatch(/Vault\s*<span[^>]*>\(1\)<\/span>/);
+    // Only the outer fold: no heading per workspace inside it.
+    expect(html.match(/<details/g)?.length).toBe(1);
   });
 });

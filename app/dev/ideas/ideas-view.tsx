@@ -235,10 +235,7 @@ function IdeaScoreLabel({ idea }: { idea: IdeaRow }) {
 
 function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: boolean }) {
   const [editing, setEditing] = useState(false);
-  const [saveState, saveAction, savePending] = useActionState(
-    updateIdea,
-    {} as IdeaActionState,
-  );
+  const [saveState, saveAction, savePending] = useActionState(updateIdea, {} as IdeaActionState);
   const [deleteState, deleteAction, deletePending] = useActionState(
     deleteIdea,
     {} as IdeaActionState,
@@ -385,11 +382,7 @@ function ArrangeRow<T extends string>({
   href: (next: T) => string;
 }) {
   return (
-    <span
-      role="group"
-      aria-label={label}
-      className={segmentedFrame}
-    >
+    <span role="group" aria-label={label} className={segmentedFrame}>
       {options.map((option) => {
         const on = option.value === value;
         return (
@@ -461,7 +454,7 @@ export function IdeasView({
   // Sorted once and grouped after, so the order asked for holds inside every
   // section rather than only between them.
   const groups = groupIdeas(sortIdeas(mine, sort), grouping);
-  const suggestedGroups = groupIdeas(sortIdeas(suggested, sort), 'workspace');
+  const suggestedGroups = groupIdeas(sortIdeas(suggested, sort), grouping);
 
   return (
     <div className="space-y-6">
@@ -496,8 +489,8 @@ export function IdeasView({
           and an empty-handed illustration would be saying the opposite. */}
       {total > 0 && mine.length === 0 && suggested.length === 0 && (
         <p className="text-ui text-ink-muted">
-          Every idea written down has been shaped into the plan or put aside. The ones below
-          are kept for the record.
+          Every idea written down has been shaped into the plan or put aside. The ones below are
+          kept for the record.
         </p>
       )}
 
@@ -523,7 +516,8 @@ export function IdeasView({
                 strokeWidth={1.75}
                 aria-hidden
               />
-              {group.label} <span className="font-normal text-ink-muted">({group.rows.length})</span>
+              {group.label}{' '}
+              <span className="font-normal text-ink-muted">({group.rows.length})</span>
             </summary>
             <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
               {group.rows.map((idea) => (
@@ -536,10 +530,9 @@ export function IdeasView({
 
       {/* Under your own list rather than mixed into it. A session working a
           feature can write several follow-ons in a night, and above the module
-          headings they would be the first thing on the page. Grouped by
-          workspace inside the fold (note 6158d2c0), always rather than by the
-          page's grouping: once the follow-ons span several workspaces, which
-          one they are about is the first thing to read them by. */}
+          headings they would be the first thing on the page. Grouped inside
+          the fold the same way the page is (note 98775e2e): by workspace by
+          default (note 6158d2c0), and one list when the page is one list. */}
       {suggested.length > 0 && (
         // Foldable like the rest of the page now, and open to start with: a
         // night of follow-ons is the section most worth being able to put away
@@ -564,26 +557,35 @@ export function IdeasView({
             Shape one into the plan, or dismiss it and it stops being offered.
           </p>
           <div className="mt-2 space-y-3 pl-5">
-            {suggestedGroups.map((group) => (
-              // Each workspace folds on its own, open to start with, the same
-              // way the groups of your own ideas above do (law 10).
-              <details key={group.key} open className="group/suggested-module space-y-2">
-                <summary className="press flex cursor-pointer list-none items-center gap-1.5 text-ui font-semibold text-ink [&::-webkit-details-marker]:hidden">
-                  <ChevronRight
-                    className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open/suggested-module:rotate-90"
-                    strokeWidth={1.75}
-                    aria-hidden
-                  />
-                  {group.label}{' '}
-                  <span className="font-normal text-ink-muted">({group.rows.length})</span>
-                </summary>
-                <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+            {suggestedGroups.map((group) =>
+              // One list has no heading to fold by, the same as above.
+              group.label === '' ? (
+                <ul key={group.key} className={cn(cardVariants(), 'divide-y divide-border')}>
                   {group.rows.map((idea) => (
                     <IdeaCard key={idea.id} idea={idea} />
                   ))}
                 </ul>
-              </details>
-            ))}
+              ) : (
+                // Each workspace folds on its own, open to start with, the same
+                // way the groups of your own ideas above do (law 10).
+                <details key={group.key} open className="group/suggested-module space-y-2">
+                  <summary className="press flex cursor-pointer list-none items-center gap-1.5 text-ui font-semibold text-ink [&::-webkit-details-marker]:hidden">
+                    <ChevronRight
+                      className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open/suggested-module:rotate-90"
+                      strokeWidth={1.75}
+                      aria-hidden
+                    />
+                    {group.label}{' '}
+                    <span className="font-normal text-ink-muted">({group.rows.length})</span>
+                  </summary>
+                  <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+                    {group.rows.map((idea) => (
+                      <IdeaCard key={idea.id} idea={idea} />
+                    ))}
+                  </ul>
+                </details>
+              ),
+            )}
           </div>
         </details>
       )}
