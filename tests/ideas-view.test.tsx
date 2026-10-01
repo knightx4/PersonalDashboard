@@ -111,4 +111,27 @@ describe('the ideas page', () => {
     expect(html).not.toContain('Suggested by Dash');
     expect(html).not.toMatch(/<details[^>]*open/);
   });
+
+  it("puts the workspace's mark on each idea's chip, and the home mark on Everything", () => {
+    const html = renderToStaticMarkup(
+      <IdeasView
+        ideas={{
+          mine: [idea('m1', 'vault', 'A vault idea'), idea('m2', null, 'An app-wide idea')],
+          suggested: [],
+          lowScored: [],
+          shaped: [],
+          dismissed: [],
+        }}
+        grouping="none"
+        sort="newest"
+      />,
+    );
+
+    // Two chips, each opening with a mark before its word.
+    expect(
+      html.match(/<span[^>]*aria-hidden="true"[^>]*><svg[^>]*><defs><linearGradient/g)?.length,
+    ).toBe(2);
+    expect(html).toMatch(/<\/svg><\/span>Vault<\/span>/);
+    expect(html).toMatch(/<\/svg><\/span>Everything<\/span>/);
+  });
 });

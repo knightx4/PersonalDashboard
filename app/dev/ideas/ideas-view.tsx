@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, Lightbulb, Sparkles } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
+import { ModuleMark } from '@/components/ui/module-mark';
 import {
   addIdea,
   deleteIdea,
@@ -249,7 +250,10 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
     // The id is where the app-wide search lands an idea: /dev/ideas#idea-<id>.
     <li id={`idea-${idea.id}`} className="flex scroll-mt-20 flex-col gap-2 px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-accent-tint px-2 py-0.5 text-micro font-semibold uppercase tracking-wide text-accent">
+        {/* With the workspace's own mark (note 7bdcb540), and the home mark
+            for Everything, so the chip reads before its word does. */}
+        <span className="inline-flex items-center gap-1 rounded-full bg-accent-tint py-0.5 pl-1 pr-2 text-micro font-semibold uppercase tracking-wide text-accent">
+          <ModuleMark module={idea.module} size="xs" className="-my-0.5" />
           {scopeLabel(idea.module)}
         </span>
         {/* Only a suggestion is marked. Tagging your own ideas "me" would put a
