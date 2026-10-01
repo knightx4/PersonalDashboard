@@ -43,7 +43,8 @@ export function CalendarMonthGrid({
   feedEventHref: (id: string) => string;
 }) {
   return (
-    <Card padding="none" className="mt-4 overflow-hidden">
+    <Card padding="none" className="relative mt-4 overflow-hidden">
+      <WorkweekOutline />
       <div className="grid grid-cols-7 border-b border-border">
         {WEEKDAYS.map((label) => (
           <div
@@ -139,6 +140,23 @@ export function CalendarMonthGrid({
  * a card that only reads. A task, an interview and a return deadline keep the
  * link they already had, which goes to the page that owns them.
  */
+/**
+ * A faint line round Monday to Friday, so the weekend reads as apart from the
+ * working week at a glance. Drawn over the grid rather than on the squares, so
+ * it is one outline and not five boxes, and it takes no clicks.
+ */
+export function WorkweekOutline({ className }: { className?: string }) {
+  return (
+    <div
+      aria-hidden
+      className={cn(
+        'pointer-events-none absolute inset-y-0 left-0 z-10 w-[calc(100%*5/7)] rounded-l-[inherit] ring-1 ring-inset ring-border-strong',
+        className,
+      )}
+    />
+  );
+}
+
 export function opensAt(
   entry: CalendarEntry,
   eventHref: (id: string) => string,
