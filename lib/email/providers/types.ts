@@ -60,6 +60,18 @@ export interface GmailMessageContent {
   calendar: string[];
 }
 
+/** A message's headers and preview, as the live mail search reads them. */
+export interface GmailMessageMetadata {
+  id: string;
+  threadId: string | null;
+  internalDate: Date | null;
+  from: string | null;
+  to: string | null;
+  subject: string | null;
+  /** Gmail's one-line preview of the body, entities decoded. */
+  snippet: string;
+}
+
 export interface GmailOAuthProvider {
   authorizationUrl(state: string, redirectUri: string): string;
   exchangeCode(code: string, redirectUri: string): Promise<OAuthTokens>;

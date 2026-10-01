@@ -23,6 +23,7 @@ import {
 import {
   GMAIL_READONLY_SCOPE,
   type GmailMessageContent,
+  type GmailMessageMetadata,
   type GmailMessageRef,
   type GmailOAuthProvider,
   type OAuthTokens,
@@ -243,6 +244,46 @@ export async function getGmailThread(
     `users/me/threads/${encodeURIComponent(threadId)}?format=full`,
   );
   return (data.messages ?? []).map((message) => messageContent(message, true));
+}
+
+/**
+ * One message's headers and Gmail's one-line preview, without its body.
+ *
+ * For the live mail search, which shows who wrote, to whom, when and about
+ * what. `metadataHeaders` limits the headers Gmail sends to the four it
+ * reads. Gmail sends the preview with HTML entities escaped, so they are
+ * decoded here.
+ */
+export async function getGmailMessageMetadata(
+  accessToken: string,
+  messageId: string,
+): Promise<GmailMessageMetadata> {
+  const params = new URLSearchParams({ format: 'metadata' });
+  for (const name of ['From', 'To', 'Subject', 'Date']) params.append('metadataHeaders', name);
+  const data = await gmailJson<GmailApiMessage & { snippet?: string }>(
+    accessToken,
+    `users/me/messages/${encodeURIComponent(messageId)}?${params}`,
+  );
+  const headers = data.payload?.headers;
+  return {
+    id: data.id,
+    threadId: data.threadId ?? null,
+    internalDate: data.internalDate ? new Date(Number(data.internalDate)) : null,
+    from: headerValue(headers, 'From'),
+    to: headerValue(headers, 'To'),
+    subject: headerValue(headers, 'Subject'),
+    snippet: decodeSnippet(data.snippet ?? ''),
+  };
+}
+
+function decodeSnippet(value: string): string {
+  return value
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&');
 }
 
 /** An invite is a few kilobytes; anything larger is not one. */
