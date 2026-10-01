@@ -2,6 +2,7 @@ import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/p
 import { PipelineBoard } from '@/components/jobs/pipeline/board';
 import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
 import { SurfaceReview } from '@/app/dev/surfaces/review';
+import { SearchBarSurface } from './search-bar-surface';
 import DevUiPage from '@/app/dev/ui/page';
 import { ANATOMIES } from '@/app/dev/ui/anatomy';
 import { ItemDetailsPanel } from '@/app/shopping/inventory/[id]/item-details-panel';
@@ -55,7 +56,6 @@ import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
 import type { Concept } from '@/lib/learn/graph/model';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
-import { SearchBar } from '@/components/shell/search-bar';
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
 import {
@@ -2973,7 +2973,7 @@ export const SURFACES: readonly Surface[] = [
     width: 'narrow',
     render: () => (
       <div className="py-4">
-        <SearchBar onOpen={() => {}} module="jobs" />
+        <SearchBarSurface />
       </div>
     ),
   },
