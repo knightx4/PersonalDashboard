@@ -1679,6 +1679,56 @@ body[data-keyhints] .keyhint {
   animation: landed-pulse 320ms var(--ease-out-soft) both;
 }
 
+/* The Dash mark (components/ui/dash-mark.tsx). Working moves the node round
+ * the grid at one pace and never fills, since a run reports no steps; done
+ * swells once as it settles. Each state has its own shape as well, so both
+ * can stop under reduced motion without the state being lost. */
+@keyframes dash-mark-orbit {
+  0%,
+  15% {
+    transform: translate(0, 0);
+  }
+  25%,
+  40% {
+    transform: translate(0, 8px);
+  }
+  50%,
+  65% {
+    transform: translate(-8px, 8px);
+  }
+  75%,
+  90% {
+    transform: translate(-8px, 0);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+@utility dash-mark-orbit {
+  animation: dash-mark-orbit 2s var(--ease-out-soft) infinite;
+}
+
+@keyframes dash-mark-flash {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.9);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@utility dash-mark-flash {
+  transform-origin: 12px 12px;
+  animation: dash-mark-flash 320ms var(--ease-out-soft) both;
+}
+
 @keyframes shimmer {
   100% {
     transform: translateX(100%);
@@ -1749,6 +1799,11 @@ body[data-keyhints] .keyhint {
   }
 
   .landed-pulse {
+    animation: none;
+  }
+
+  .dash-mark-orbit,
+  .dash-mark-flash {
     animation: none;
   }
 }
