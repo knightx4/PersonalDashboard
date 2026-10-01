@@ -16,7 +16,8 @@ export const UPDATE_LIMIT = 8;
 
 export interface Update {
   key: string;
-  module: ModuleId;
+  /** The workspace it came from; null for a watch (#1295), which belongs to none. */
+  module: ModuleId | null;
   /** When it happened, as an instant. */
   at: string;
   text: string;

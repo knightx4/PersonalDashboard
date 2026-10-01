@@ -31,7 +31,8 @@ import {
   type Brief,
 } from '@/lib/shell/brief';
 import { loadUpdates } from '@/lib/shell/updates';
-import { whenLabel } from '@/lib/shell/home-model';
+import { loadWatching } from '@/lib/shell/watching';
+import { mergeUpdates, whenLabel } from '@/lib/shell/home-model';
 import { cn } from '@/lib/cn';
 import { observationWeek } from '@/lib/timeline/observations';
 import { readObservations } from '@/lib/timeline/observations-load';
@@ -40,6 +41,7 @@ import { formatClock } from '@/lib/clock';
 import { shownBrief } from '@/lib/day-brief/shown';
 import { openedFromPush } from '@/lib/day-brief/opens';
 import { DayBrief } from './day-brief';
+import { WatchingSection, WatchMark } from './watching';
 
 export const metadata = { title: 'Home' };
 
@@ -139,10 +141,13 @@ export default async function HomePage({
   // as opened, once. Any other visit carries no from=push and records nothing.
   const openedDay = openedFromPush(await searchParams, today);
 
-  const [loaded, updates, observations, dayBrief] = await Promise.all([
+  const [loaded, feed, watching, observations, dayBrief] = await Promise.all([
     loadBriefs(),
     // The feed swallows its own failures per source, and this guards the rest.
     safe(loadUpdates(user.id, on, now), []),
+    // What Dash is watching (plan #1295): the running watches for their
+    // section, and any that finished lately as lines for Updates.
+    safe(loadWatching(now), { running: [], ended: [] }),
     safe(readObservations(shopping, { fromWeek: thisWeek, toWeek: nextWeek }), []),
     // This morning's brief (plan #1123), written by the hourly day-brief cron
     // from six in the person's zone. Before then there is none, and the page
@@ -164,6 +169,10 @@ export default async function HomePage({
     ),
     openedDay ? safe(core.rpc('open_day_brief', { p_day: openedDay }), null) : null,
   ]);
+
+  // A watch that finished is said once, in Updates, beside everything else
+  // that happened; the section only ever holds what is still running.
+  const updates = mergeUpdates([feed, watching.ended]);
 
   async function loadBriefs() {
     return Promise.all([
@@ -479,6 +488,12 @@ export default async function HomePage({
             </Card>
           )}
 
+          {/* What Dash is watching for you (plan #1295), where every watch
+              push opens. Absent when nothing is running. */}
+          {watching.running.length > 0 && (
+            <WatchingSection rows={watching.running} now={now} timezone={settings.timezone} />
+          )}
+
           {/* What happened in the last three days: replies, orders, the
               newsletters that came in. Each line names the thing, so the page
               can be read without opening a workspace to see what a count was
@@ -500,7 +515,11 @@ export default async function HomePage({
                   );
                   return (
                     <li key={update.key} className="flex items-center gap-3 py-2">
-                      <ModuleMark module={update.module} size="sm" />
+                      {update.module ? (
+                        <ModuleMark module={update.module} size="sm" />
+                      ) : (
+                        <WatchMark />
+                      )}
                       {update.href ? (
                         <Link href={update.href} className="min-w-0 flex-1 hover:opacity-80">
                           {body}
