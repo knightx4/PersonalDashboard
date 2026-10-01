@@ -187,6 +187,10 @@ export const learnSources: ModuleSources = {
     { table: 'learn.catalogue_segments', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.concept_edges', reason: 'Graph structure; read through concepts.' },
     { table: 'learn.concept_mentions', reason: 'Graph structure; read through concepts.' },
+    {
+      table: 'learn.course_reads',
+      reason: 'Which transcript courses have been read into Learn; the ideas are in concepts.',
+    },
     { table: 'learn.concept_state', reason: 'Per-concept mastery; read through concepts.' },
     { table: 'learn.concept_subjects', reason: 'Join rows; read through subjects.' },
     { table: 'learn.next_outcomes', reason: 'Scheduling state for the feed.' },
