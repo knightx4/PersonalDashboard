@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Image as ImageIcon, ImageOff, Mail } from 'lucide-react';
 import { AlsoInLine } from '@/components/news/also-in';
+import { QueueCleared } from '@/components/ui/queue-cleared';
 import { SaveStoryButton } from '@/components/news/save-story-button';
 import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
@@ -125,6 +126,11 @@ export function QuickReadView({
       <div className="mx-auto max-w-2xl">
         <PageHeader title="Quick read" />
         {chips}
+        {/* Reading the last story draws the day's sigil in (plan #1340). The
+            same wrapper, keyed the same, sits round the card below, so the
+            page can tell a clear made on screen from one that loaded empty;
+            keyed by topic, so opening a finished topic is not a clear. */}
+        <QueueCleared key={topic ?? ''} cleared={Boolean(topic) || !nothingYet}>
         {topic ? (
           <EmptyState
             tone="finished"
@@ -153,6 +159,7 @@ export function QuickReadView({
             action={{ label: 'All newsletters', href: '/news/all' }}
           />
         )}
+        </QueueCleared>
       </div>
     );
   }
@@ -208,6 +215,7 @@ export function QuickReadView({
       />
       {chips}
 
+      <QueueCleared key={topic ?? ''} cleared={false}>
       {/* One card below md and the grid from md up, chosen by CSS so the server never needs the screen size. */}
       <div className={grid ? 'md:hidden' : undefined}>
         <QuickDeck
@@ -254,6 +262,7 @@ export function QuickReadView({
           />
         </div>
       )}
+      </QueueCleared>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { SearchEmpty } from '@/components/shell/search-empty';
 import { SearchField } from '@/components/shell/search-field';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { QueueCleared } from '@/components/ui/queue-cleared';
 import { TaskRow } from '@/components/todo/task-row';
 import { cn } from '@/lib/cn';
 import { FocusTask } from './focus';
@@ -105,6 +106,10 @@ export default async function AllTasksPage({
         <SearchField placeholder="Search titles" />
       </div>
 
+      {/* Finishing the last open task draws the day's sigil in (plan #1340).
+          Keyed by the view, so opening a tab that is already empty is not a
+          clear. */}
+      <QueueCleared key={`${status}:${search ?? ''}`} cleared={status === 'open' && !search && tasks.length === 0}>
       {tasks.length === 0 && search ? (
         <SearchEmpty query={search} className="mt-6" />
       ) : tasks.length === 0 ? (
@@ -142,6 +147,7 @@ export default async function AllTasksPage({
           ))}
         </Card>
       )}
+      </QueueCleared>
     </div>
   );
 }
