@@ -138,8 +138,9 @@ Listing these because they will otherwise get invented.
 - **Nothing is ever written back to a calendar you subscribe to.** The
   subscription is read-only in the strongest sense: no appointment is created,
   edited, cancelled or acknowledged at the other end, and an appointment that
-  arrived through one cannot be edited here either. Nor can a task point at
-  one — the next refresh may drop the row it would point at.
+  arrived through one cannot be edited here either. A task can be about one;
+  the link lives on this side and is described under "Integration: a calendar
+  you keep somewhere else".
 - **No notifications, email or push, in v1.** The daily cron already exists and
   the agenda already exists; deciding to interrupt someone is a separate
   decision with its own failure mode.
@@ -314,9 +315,11 @@ refactor.
 
 ### `todo.task_links`
 
-What the task is about. Real foreign keys, into four other schemas, because
+What the task is about. Real foreign keys, into five other schemas, because
 they are all in one database and a cross-schema foreign key costs nothing and
 buys the cascade for free: delete the role and its tasks' links go with it.
+The fourteenth target, a subscribed appointment, is the exception and is
+described after the table.
 
 Six of the twelve targets arrived later, in `migrations-todo/0004`, so that
 linking from /todo could offer everything the search finds rather than only the
@@ -344,13 +347,24 @@ create table todo.task_links (
   subject_id        uuid references learn.subjects (id) on delete cascade,
   goal_id           uuid references goals.items (id) on delete cascade,  -- goals/0062
 
+  -- A subscribed appointment (goals/0064). Only feed_id is a key; the rest
+  -- name the appointment and keep what it was called.
+  feed_id           uuid references todo.calendar_feeds (id) on delete cascade,
+  feed_uid          text,
+  feed_occurrence   text,
+  feed_title        text,
+  feed_starts_on    date,
+  feed_starts_at    timestamptz,
+
   created_at timestamptz not null default now(),
 
   constraint task_links_exactly_one_ck check (
     num_nonnulls(application_id, role_id, company_id, contact_id, interview_id,
                  note_id, order_id, inventory_item_id, saved_item_id, reading_id,
-                 track_id, subject_id, goal_id) = 1
+                 track_id, subject_id, goal_id, feed_id) = 1
   )
+  -- task_links_appointment_ck: the feed_ columns are all null, or feed_id,
+  -- feed_uid, feed_title and exactly one of the two starts are set.
 );
 
 -- At most one 'about' per task: a task is about one thing. It may cite several.
@@ -362,6 +376,17 @@ The "exactly one parent from N" shape is lifted straight from `job_search.notes`
 which takes one parent from five, and adding a thirteenth target is one column,
 one edited check constraint, one arm in the trigger below and one line in
 `lib/todo/links/model.ts`. That is what `0004` did, six times over.
+
+**The appointment target is not a key to the row it is about.** The other
+thirteen point at a row that stays put. A subscribed appointment's row in
+`todo.feed_events` is deleted and rewritten on every refresh, so a key to it
+would either block the refresh or, cascading, delete the link within the hour.
+The link keeps a key to the subscription, which does stay put, and names the
+appointment by its UID and occurrence; the page finds the current copy each
+time it draws. "Integration: a calendar you keep somewhere else" describes
+what a moved, cancelled or unsubscribed meeting then looks like. The ownership
+trigger below checks `feed_id` against `todo.calendar_feeds.user_id`, so a link
+into another account's subscription is refused like any other.
 
 `relation` distinguishes *what this is about* from *where it came from*. Only
 `about` is used in v1; `source` is what a task copied out of a note will carry
@@ -687,11 +712,9 @@ You paste the private address of a calendar you already keep — Google, Apple, 
 work one — give it a name, and its appointments appear on this calendar and in
 the agenda's day context beside your own. Built as plan #275.
 
-**It reads one way only.** Nothing typed here is ever sent to that address, an
-appointment that arrived through a subscription cannot be edited or deleted in
-this app, and no task may point at one. That last rule is not squeamishness: a
-link has to point at a row that stays put, and the next refresh can drop any of
-these.
+**It reads one way only.** Nothing typed here is ever sent to that address, and
+an appointment that arrived through a subscription cannot be edited or deleted
+in this app. What you can add is a task about one, below.
 
 **The appointments are a copy, and are treated as one.** `todo.calendar_feeds`
 holds one row per subscription; `todo.feed_events` holds one row per occurrence
@@ -709,6 +732,40 @@ appointment is never completed, deferred or dismissed, so there is no second
 place a state about it could disagree. Reading the file while the page renders
 was the alternative, and it means the calendar waits on somebody else's server
 to draw a month.
+
+**A task can be about a subscribed appointment** (plan #1371). Opening one on
+the calendar shows a card with **Add a task about this** and the open tasks
+already about that date of it. That card is the only way in: the search the
+task's own link picker uses does not find subscribed appointments.
+
+The link cannot hold the appointment's row id, because the next refresh
+deletes that row and writes a new one. It names the appointment the way the
+calendar file does instead:
+
+- `feed_id`, a real foreign key to the subscription;
+- `feed_uid`, the UID the file gives the appointment;
+- `feed_occurrence`, for a repeating appointment, the start the calendar
+  originally gave that date (`todo.feed_events.occurrence`, plan #1372). A
+  task about a weekly meeting is about one date of it. Null for a one-off.
+- `feed_title` with `feed_starts_on` or `feed_starts_at`, the name and start
+  the appointment had when the task was linked.
+
+Each time a page draws the task, the link is matched against the current copy
+on subscription, UID and occurrence (`matchAppointments()` in
+`lib/todo/links/appointment.ts`). What the person sees follows from the match:
+
+- **The meeting moved or was renamed.** The copy still matches, because the
+  calendar keeps a moved date's original start as its occurrence. The task
+  shows the meeting's current name and time and opens it on the calendar.
+- **The meeting was cancelled.** No copy matches. The task shows the saved
+  name and date, with "no longer on" and the subscription's name beside it.
+  The task itself is untouched.
+- **The subscription was removed.** The foreign key cascades: the links into
+  it are deleted and the tasks stay, the same as when a role a task was about
+  is deleted.
+
+A failed read of the copies labels nothing, so a database error is not shown
+as every linked meeting being cancelled.
 
 **The address is a credential.** Anyone holding a private Google link can read
 the whole calendar, so it is encrypted at rest by `lib/crypto/tokens.ts` — the
