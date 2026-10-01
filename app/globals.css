@@ -1688,6 +1688,43 @@ body[data-keyhints] .keyhint {
   transition: transform 300ms var(--ease-out-soft);
 }
 
+/* A goal closing on screen (plan #1341): one hexagon ring leaves its status
+ * glyph in the workspace accent, then its steps fold up into the line that
+ * stands for them. Keyframes play on mount, so app/goals/[goalId]/goal-close.tsx
+ * mounts both only for a close made while you watch. 600ms for the ring so it
+ * reads as one ring rather than a blink; the fold waits 450ms for it and takes
+ * 300ms, so the whole mark is over by 750ms. */
+@keyframes goal-ring {
+  from {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@utility goal-ring {
+  animation: goal-ring 600ms var(--ease-out-soft) both;
+}
+
+@keyframes goal-fold {
+  from {
+    transform: none;
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-0.5rem) scaleY(0.94);
+    opacity: 0;
+  }
+}
+
+@utility goal-fold {
+  transform-origin: top;
+  animation: goal-fold 300ms var(--ease-out-soft) 450ms both;
+}
+
 /* The Dash mark (components/ui/dash-mark.tsx). Working moves the node round
  * the grid at one pace and never fills, since a run reports no steps; done
  * swells once as it settles. Each state has its own shape as well, so both
@@ -1812,6 +1849,15 @@ body[data-keyhints] .keyhint {
   }
 
   .landed-pulse {
+    animation: none;
+  }
+
+  .goal-ring {
+    display: none;
+    animation: none;
+  }
+
+  .goal-fold {
     animation: none;
   }
 

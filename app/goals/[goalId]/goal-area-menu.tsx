@@ -6,20 +6,30 @@ import { Button } from '@/components/ui/button';
 import { ChipInput } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { formatDay } from '@/lib/goals/dates';
-import { editGoal } from '../actions';
+import type { GoalStatus } from '@/lib/goals/tree';
+import { editGoal, settleGoalAction } from '../actions';
 import { useMoveToItems, type Place } from '../move-goal';
 
 /**
  * The goal's own menu beside its heading: move it to another area
  * (plan #1160), and turn it into an errand or back (plan #1261). An errand
  * always has a date it is due by, so turning a goal with no due date into
- * one asks for the date first, in a line beside the menu.
+ * one asks for the date first, in a line beside the menu. An open goal can
+ * be closed from here, and a closed or parked one taken back up (plan #1341),
+ * with the same move Today and All goals use.
  */
 export function GoalAreaMenu({
   goal,
   places,
 }: {
-  goal: { id: string; title: string; areaId: string; errand: boolean; dueOn: string | null };
+  goal: {
+    id: string;
+    title: string;
+    areaId: string;
+    errand: boolean;
+    dueOn: string | null;
+    status: GoalStatus;
+  };
   places: Place[];
 }) {
   const toast = useToast();
@@ -52,6 +62,22 @@ export function GoalAreaMenu({
         }
       : { id: 'errand-on', label: 'Make it an errand…', onSelect: () => setAsking(true) };
 
+  async function settle(move: 'close' | 'reopen') {
+    const form = new FormData();
+    form.set('id', goal.id);
+    form.set('move', move);
+    const result = await settleGoalAction({}, form);
+    const text = result.error ?? result.message;
+    if (text) toast({ text });
+  }
+
+  const settleItems: ActionMenuItem[] =
+    goal.status === 'open'
+      ? [{ id: 'close', label: 'Close the goal', onSelect: () => void settle('close') }]
+      : goal.status === 'done' || goal.status === 'parked'
+        ? [{ id: 'reopen', label: 'Take it back up', onSelect: () => void settle('reopen') }]
+        : [];
+
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
       {asking && (
@@ -81,7 +107,7 @@ export function GoalAreaMenu({
           </Button>
         </form>
       )}
-      <ActionMenu label={`${goal.title} actions`} items={[...moves, errandItem]} />
+      <ActionMenu label={`${goal.title} actions`} items={[...moves, errandItem, ...settleItems]} />
     </span>
   );
 }
