@@ -20,7 +20,7 @@ import {
   quickTopics,
   type QuickCard,
 } from '@/lib/news/quick/next';
-import { topicHrefs } from '@/components/news/topic-chips';
+import { topicHrefs } from '@/lib/news/topic-hrefs';
 import { QuickReadView } from './quick/quick-view';
 
 export const metadata = { title: 'Quick read' };
