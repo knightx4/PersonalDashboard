@@ -14,6 +14,7 @@ import { commentWhen } from '@/lib/comments/when';
 import { FEEDBACK_KIND_LABEL, type FeedbackKind } from '@/lib/feedback/load';
 import { useClockNow } from '@/lib/use-clock-now';
 import type { VisionReview } from '@/lib/specs/vision-review';
+import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
  * An edit the weekly vision review proposed, under the vision it would change
@@ -64,6 +65,7 @@ export function VisionEditPanel({
       className="mb-3 space-y-2 rounded-control bg-sunken px-3 py-2.5"
     >
       <p className="text-caption text-ink-muted">
+        <DashCredit />
         {drafted ? 'Dash drafted a vision' : 'Dash proposes an edit'},{' '}
         <time dateTime={edit.createdAt} className="tabular">
           {commentWhen(edit.createdAt, now)}

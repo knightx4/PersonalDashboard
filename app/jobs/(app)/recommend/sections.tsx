@@ -11,7 +11,6 @@ import {
   ExternalLink,
   Mail,
   Search,
-  Sparkles,
 } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -48,6 +47,7 @@ import {
   suggestPeople,
   type SuggestState,
 } from './actions';
+import { DashMark } from '@/components/ui/dash-mark';
 
 const CHANNEL_LABELS: Record<string, string> = {
   linkedin_dm: 'LinkedIn message',
@@ -161,7 +161,7 @@ function RecommendedSection({
             strokeWidth={1.75}
             aria-hidden
           />
-          <Sparkles className="size-4 self-center text-accent" strokeWidth={1.75} aria-hidden />
+          <DashMark size="icon" decorative className="self-center text-accent" />
           <h2 className="text-ui font-semibold text-ink">{title}</h2>
           {count > 0 && <span className="tabular text-small text-ink-muted">{count}</span>}
         </button>

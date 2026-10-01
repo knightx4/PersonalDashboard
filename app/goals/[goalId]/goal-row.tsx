@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import Link from 'next/link';
-import { CircleUser, ClipboardList, Play, Repeat, Sparkles } from 'lucide-react';
+import { CircleUser, ClipboardList, Play, Repeat } from 'lucide-react';
 import { RowIconButton } from '@/app/dev/plan/plan-run-status';
 import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
 import type { TreeActionState, TreeActions, TreeCatalogEntry } from '@/components/plan-tree/types';
@@ -65,6 +65,7 @@ import {
   useMenuAction,
 } from './step-parts';
 import { answerGoalQuestion, askGoalQuestion, dismissGoalQuestion } from './tree-actions';
+import { DashMark } from '@/components/ui/dash-mark';
 
 /**
  * One goal step, drawn through the dev plan's shared row (plan #982).
@@ -549,7 +550,7 @@ export function GoalRow({
     },
   ];
 
-  // Whose the step is, on every row (plan #1159): Dash's sparkle, or the
+  // Whose the step is, on every row (plan #1159): Dash's mark, or the
   // dev plan's Yours mark, by the same reading as the Who column, which is
   // hidden below sm. A stage over both kinds carries both. A rhythm keeps its
   // own mark beside the Yours one.
@@ -594,8 +595,7 @@ export function GoalRow({
               title={step.kind === 'claude' ? STEP_KIND_LABELS.claude : node.who.title}
               className="inline-flex shrink-0 text-ink-muted"
             >
-              <Sparkles className="size-3" strokeWidth={1.75} aria-hidden />
-              <span className="sr-only">Dash&apos;s</span>
+              <DashMark size="2xs" label="Dash's" />
             </span>
           )}
           {step.kind === 'rhythm' && (

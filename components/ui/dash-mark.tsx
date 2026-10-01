@@ -207,3 +207,13 @@ export function DashMark({
     </span>
   );
 }
+
+/**
+ * The idle mark at the start of a line that already says Dash wrote or made
+ * something, such as "Written by Dash" or "Proposed by Dash" (plan #1338).
+ * It sits in the run of text rather than in a flex row, so the words after it
+ * wrap as ordinary text, and the line's own words carry the name.
+ */
+export function DashCredit({ className }: { className?: string }) {
+  return <DashMark size="2xs" decorative className={cn('mr-1 align-[-0.2em]', className)} />;
+}

@@ -12,6 +12,7 @@ import type { Conversation } from '@/lib/comments/recent';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { commentWhen, exactTime } from '@/lib/comments/when';
 import { useClockNow } from '@/lib/use-clock-now';
+import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
  * Everything you and Dash have said to each other, in one list.
@@ -86,6 +87,7 @@ function Line({ conversation, titles }: { conversation: Conversation; titles?: P
         meta={
           <span className="inline-flex min-w-0 items-baseline gap-1.5">
             <span className="shrink-0">
+              {conversation.lastAuthor === 'claude' && <DashCredit />}
               {who}{' '}
               <time
                 dateTime={conversation.lastAt}

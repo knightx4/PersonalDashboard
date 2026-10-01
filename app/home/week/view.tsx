@@ -12,6 +12,7 @@ import {
   type ShownWeekReview,
 } from '@/lib/week-review/view';
 import { EventRow } from '@/app/timeline/event-row';
+import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
  * The weekly review (plan #1233), apart from the reads. Whether last week's
@@ -70,7 +71,20 @@ export function WeekReviewView(props: WeekReviewViewProps) {
 
   return (
     <>
-      <PageHeader title={weekRangeLabel(review.week)} description={description} actions={HOME_LINK} />
+      <PageHeader
+        title={weekRangeLabel(review.week)}
+        description={
+          review.source === 'plain' && review.observations.length > 0 ? (
+            description
+          ) : (
+            <>
+              <DashCredit />
+              {description}
+            </>
+          )
+        }
+        actions={HOME_LINK}
+      />
       <div className="space-y-8">
         {review.lastChange && <p className="text-ui text-ink-muted">{review.lastChange}</p>}
 

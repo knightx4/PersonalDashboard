@@ -48,6 +48,7 @@ import {
 import { AreaPlanner } from './area-planner';
 import { GoalProgress } from './goal-progress';
 import { useMoveToItems, type Place } from './move-goal';
+import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
  * Areas and the goals under them (plan #924).
@@ -542,6 +543,7 @@ export function ApproveArea({ areaId, count }: { areaId: string; count: number }
     <form action={approve} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
       <input type="hidden" name="id" value={areaId} />
       <p className="min-w-0 flex-1 text-small text-ink-muted">
+        <DashCredit />
         Dash proposed {count} goals here. Approve the ones you want, or all of them.
       </p>
       <Button type="submit" size="sm" variant="secondary" pending={approving}>

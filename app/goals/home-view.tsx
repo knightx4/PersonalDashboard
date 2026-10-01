@@ -19,6 +19,7 @@ import { DoneSinceList } from './done-since-list';
 import { ErrandComposer } from './errand-composer';
 import { GoalLine } from './goal-line';
 import { TodayList } from './today-list';
+import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
  * The Goals home (plan #1077, under #1072), for a once-a-day visit. It
@@ -93,7 +94,7 @@ export function HomeView({
         <div className="space-y-1 px-1">
           {summary && <p className="text-body text-ink">{summary}</p>}
           {brief && (
-            <Disclosure title="Dash’s note" meta={brief.when ? `written ${brief.when}` : undefined}>
+            <Disclosure title={<><DashCredit className="text-ink-muted" />Dash’s note</>} meta={brief.when ? `written ${brief.when}` : undefined}>
               <FileBody markdown={brief.body} compact />
             </Disclosure>
           )}
@@ -186,6 +187,7 @@ function DoneSection({ done, timeZone }: { done: DoneSince | null; timeZone: str
   return (
     <section aria-labelledby="done-heading" className="space-y-2">
       <h2 id="done-heading" className="px-1 text-ui font-semibold text-ink">
+        <DashCredit className="text-ink-muted" />
         {done ? `What Dash did since ${formatInstant(done.since, timeZone)}` : 'What Dash did'}
       </h2>
       {done && done.items.length > 0 ? (

@@ -39,6 +39,7 @@ export default async function FilesPage() {
             title: file.title,
             summary: file.summary,
             meta: `${authorLine(file)} · ${formatInstant(file.updatedAt, account.timezone)}`,
+            byDash: file.madeBy === 'claude',
           }))}
         />
       )}

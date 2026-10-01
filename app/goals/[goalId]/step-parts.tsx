@@ -39,6 +39,7 @@ import {
   settleProposalAction,
   type ShapingActionState,
 } from './shaping-actions';
+import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
  * What a goal step has that a plan step does not (plan #982): the answer box
@@ -168,6 +169,7 @@ export function ClaudeResult({ node, files = [] }: { node: StepNode; files?: Lin
   return (
     <div className="mt-1 space-y-1 px-1">
       <p className="text-small text-ink-muted">
+        <DashCredit />
         {prepared ? 'What Dash prepared for this' : unread ? 'Dash’s result, to read' : 'Dash’s result'}
       </p>
       {node.result && <FileBody markdown={linkBareDomains(node.result)} compact />}

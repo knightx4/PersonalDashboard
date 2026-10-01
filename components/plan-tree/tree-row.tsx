@@ -36,6 +36,7 @@ import {
   type TreeDependencyNode,
   type TreeQuestion,
 } from './types';
+import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
  * One row of a plan-shaped tree, and the panel behind it (plan #996).
@@ -490,6 +491,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                 title={addedBy.session ? `Session ${addedBy.session}` : undefined}
                 className="block truncate text-small text-ink-ghost"
               >
+                <DashCredit />
                 Added by Dash on {addedBy.date}
               </span>
             )}

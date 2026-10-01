@@ -24,6 +24,7 @@ import type { GoalProgress } from '@/lib/goals/status';
 import { buildForest, type Step } from '@/lib/goals/steps';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import type { AreaWithGoals, Goal } from '@/lib/goals/tree';
+import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
  * The Goals home, All goals, the top of a goal page and an information step,
@@ -435,7 +436,12 @@ export function FileSurface() {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Your applications by role family"
-        description="Written by Dash · updated Sat 26 Sept, 09:12"
+        description={
+          <>
+            <DashCredit />
+            Written by Dash · updated Sat 26 Sept, 09:12
+          </>
+        }
       />
       <div className="space-y-6">
         <Card padding="standard">

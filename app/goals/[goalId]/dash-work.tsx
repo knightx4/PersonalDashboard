@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import type { DashWorkItem } from '@/lib/goals/dash-work';
 import { cn } from '@/lib/cn';
+import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
  * What Dash is on under this goal, and what it finished in the last day
@@ -14,6 +15,7 @@ export function DashWork({ items }: { items: DashWorkItem[] }) {
   return (
     <section aria-labelledby="dash-work-heading" className="space-y-2">
       <h2 id="dash-work-heading" className="px-1 text-ui font-semibold text-ink">
+        <DashCredit className="text-ink-muted" />
         Dash&rsquo;s work
       </h2>
       <Card padding="dense">
