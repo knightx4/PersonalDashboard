@@ -53,6 +53,26 @@ describe('parseReplyPayload', () => {
   });
 });
 
+describe('a question worth the stronger model', () => {
+  it('keeps the fast answer as a draft', () => {
+    expect(parseReplyPayload({ think: true, answer: 'Feasible, mostly.' })).toEqual({
+      kind: 'think',
+      draft: 'Feasible, mostly.',
+    });
+  });
+
+  it('goes without a draft when none came', () => {
+    expect(parseReplyPayload({ think: true })).toEqual({ kind: 'think', draft: null });
+  });
+
+  it('gives way to a hand-off and to an instruction', () => {
+    expect(parseReplyPayload({ think: true, needs_repo: true, why: 'Read it.' }).kind).toBe('needs_repo');
+    expect(parseReplyPayload({ think: true, action: { name: 'file_idea', text: 'x' } }).kind).toBe(
+      'action',
+    );
+  });
+});
+
 describe('an instruction rather than a question', () => {
   it('reads the action and its arguments', () => {
     expect(

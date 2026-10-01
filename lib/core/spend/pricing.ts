@@ -24,7 +24,7 @@
 /** Dollars per million tokens, which is also micro-dollars per token. */
 export type ModelPrice = {
   input: number;
-  /** Reading a cached prefix. A tenth of input on every current model. */
+  /** Reading a cached prefix. A tenth of input on most models; Opus 5.5 is a twentieth. */
   cachedInput: number;
   /** Writing one. A quarter again more than input, for the 5-minute TTL. */
   cacheWrite: number;
@@ -40,6 +40,8 @@ export type ModelPrice = {
  * -- so nothing is guessed here from a family resemblance.
  */
 export const MODEL_PRICES: Record<string, ModelPrice> = {
+  // Dash's considered replies on the dev pages (lib/comments/think.ts).
+  'claude-opus-5-5': { input: 4, cachedInput: 0.2, cacheWrite: 5, output: 20 },
   'claude-opus-5': { input: 5, cachedInput: 0.5, cacheWrite: 6.25, output: 25 },
   'claude-sonnet-5': { input: 2, cachedInput: 0.2, cacheWrite: 2.5, output: 10 },
   'claude-haiku-4-5': { input: 1, cachedInput: 0.1, cacheWrite: 1.25, output: 5 },

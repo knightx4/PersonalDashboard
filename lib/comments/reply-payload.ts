@@ -92,6 +92,14 @@ export const replySchema = z.object({
    * session may do about the row depends on which of the two it was given.
    */
   instruction: z.boolean().optional().default(false),
+  /**
+   * Whether the question deserves more thought than this call gives it: a
+   * judgement on whether something is worth building, what it would cost, or
+   * which of several approaches to take, or a comment asking outright for a
+   * stronger model or a closer look. The answer that came with it is kept as a
+   * fallback for when the second call fails.
+   */
+  think: z.boolean().optional().default(false),
 });
 
 export type DashReply =
@@ -103,13 +111,18 @@ export type DashReply =
    * something or asked something.
    */
   | { kind: 'needs_repo'; why: string; instruction: boolean }
+  /**
+   * Answerable from the row, but worth the stronger model's time. `draft` is
+   * the fast answer, written into the thread only if the second call fails.
+   */
+  | { kind: 'think'; draft: string | null }
   /** An instruction to carry out. What it changed is written into the thread. */
   | { kind: 'action'; action: DashAction }
   /** Nothing usable came back. */
   | { kind: 'error'; error: string };
 
 /**
- * A reported payload as one of the four outcomes.
+ * A reported payload as one of the five outcomes.
  *
  * `needs_repo` wins over everything that came with it: a reply that says it
  * cannot answer and then answers anyway is guessing, and a guess written into
@@ -119,12 +132,14 @@ export type DashReply =
  *
  * An action wins over an answer, because an instruction that was also
  * explained back is still an instruction, and #359 settled that it gets done.
+ * It wins over `think` for the same reason: an instruction is carried out, not
+ * thought about at greater length.
  */
 export function parseReplyPayload(raw: unknown): DashReply {
   const parsed = replySchema.safeParse(raw);
   if (!parsed.success) return { kind: 'error', error: 'The reply came back in an unexpected shape.' };
 
-  const { answer, needs_repo: needsRepo, why, action, instruction } = parsed.data;
+  const { answer, needs_repo: needsRepo, why, action, instruction, think } = parsed.data;
 
   if (needsRepo) {
     return {
@@ -137,6 +152,7 @@ export function parseReplyPayload(raw: unknown): DashReply {
     };
   }
   if (action) return { kind: 'action', action };
+  if (think) return { kind: 'think', draft: answer ? fit(answer) : null };
   if (!answer) return { kind: 'error', error: 'Nothing usable came back.' };
 
   return { kind: 'answer', body: fit(answer) };

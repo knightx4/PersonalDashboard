@@ -10,6 +10,11 @@
  * rather than guessing, and the caller starts the session that can read the
  * code.
  *
+ * Between the two sits a third. A question that asks for judgement (is this
+ * worth building, what would it cost, which way should it go) or that asks
+ * outright for a stronger model is answered by ./think.ts instead, from the
+ * same message. This call decides that too, because it is the cheap one.
+ *
  * No repository, no database and no tools beyond the one it reports through.
  * Everything it may use is in the message it is handed.
  */
@@ -51,6 +56,19 @@ Two things you must not do:
   code read before the new wording or the idea can be written: set needs_repo
   true and set instruction true, so the session that takes it knows it was told
   to do something rather than asked something.
+
+Some questions deserve more thought than two or three sentences from you.
+Set think true when the question asks for a judgement that takes weighing:
+whether something is feasible or worth building, what it would cost to build
+or to run, which of several approaches to take and why, or what could go wrong
+with a plan. Set it too whenever they ask for a stronger model, a better or
+deeper analysis, more detail, or for you to think it through properly; that is
+a request you can grant, so grant it rather than explaining why you cannot. A
+stronger model then reads the same row and thread and writes the answer in
+your place. Still write your own short answer in "answer": it is kept only if
+the stronger model fails. Leave think false for a question about what the row
+says or means, which you can answer as well as anything could, and for an
+instruction, which is carried out rather than thought about.
 
 Not every comment is a question. When it tells you to do something, do it
 rather than describing it: report it in "action" and leave "answer" empty, and
@@ -145,7 +163,7 @@ export type ReplyOptions = {
   onSpend?: SpendSink;
 };
 
-/** Ask, and get back an answer, something done, a hand-off to a session, or why none of them happened. */
+/** Ask, and get back an answer, something done, a hand-off to the stronger model or a session, or why none of them happened. */
 export async function replyToComment(options: ReplyOptions, message: string): Promise<DashReply> {
   const client = options.client ?? new Anthropic({ apiKey: options.apiKey });
 
@@ -159,7 +177,7 @@ export async function replyToComment(options: ReplyOptions, message: string): Pr
         {
           name: TOOL_NAME,
           description:
-            'Answer the question, carry out an instruction, or say it needs the repository.',
+            'Answer the question, carry out an instruction, hand it to a stronger model, or say it needs the repository.',
           input_schema: {
             type: 'object',
             properties: {
@@ -167,6 +185,10 @@ export async function replyToComment(options: ReplyOptions, message: string): Pr
               needs_repo: { type: 'boolean' },
               why: { type: ['string', 'null'] },
               instruction: { type: 'boolean' },
+              think: {
+                type: 'boolean',
+                description: 'True to hand the question to a stronger model for a fuller answer.',
+              },
               action: {
                 type: ['object', 'null'],
                 description: 'What to do, when the comment asked for something to be done.',

@@ -42,6 +42,8 @@ import { splitSections } from '@/lib/specs/sections';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { replyToComment } from './reply';
+import type { DashReply } from './reply-payload';
+import { thinkAboutComment } from './think';
 import { checkReplyAfterResponse } from '@/lib/writing/reply-check';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -304,7 +306,9 @@ async function produceReply(input: AskInput): Promise<AskOutcome> {
   }
 
   const spend: SpendReport[] = [];
-  const reply = await replyToComment({ apiKey: key, onSpend: (report) => spend.push(report) }, message);
+  const onSpend = (report: SpendReport) => spend.push(report);
+  const fast = await replyToComment({ apiKey: key, onSpend }, message);
+  const reply = fast.kind === 'think' ? await considered(key, message, fast.draft, onSpend) : fast;
   await recordSessionSpend(input.userId, { module: 'core', operation: 'reply-to-comment' }, spend);
 
   if (reply.kind === 'answer') {
@@ -350,6 +354,25 @@ async function produceReply(input: AskInput): Promise<AskOutcome> {
   // Needs the repository, so the session that can read the code is started and
   // its answer is the next thing in the thread.
   return handToSession(input, subject, history, reply.instruction, reply.why);
+}
+
+/**
+ * The stronger model's answer, for a question the fast reply judged worth it.
+ *
+ * It answers from the same message, so it sees exactly what the fast reply
+ * saw. When it fails, the fast answer is better than nothing, and the thread
+ * says the closer look did not happen so it does not read as one that did.
+ */
+async function considered(
+  key: string,
+  message: string,
+  draft: string | null,
+  onSpend: (report: SpendReport) => void,
+): Promise<Exclude<DashReply, { kind: 'think' }>> {
+  const thought = await thinkAboutComment({ apiKey: key, onSpend }, message);
+  if (thought.kind === 'think') return { kind: 'error', error: 'The stronger model asked for itself.' };
+  if (thought.kind !== 'error' || !draft) return thought;
+  return { kind: 'answer', body: `${draft}\n\n(${thought.error} This is the quick answer.)` };
 }
 
 /**
