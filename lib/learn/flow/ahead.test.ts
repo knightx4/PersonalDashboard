@@ -27,7 +27,7 @@ const SURVEY = '00000000-0000-4000-8000-00000000000c';
 /** A goal's hidden survey subject (plan #1384), linked by `aim_id`. */
 const GOAL = '00000000-0000-4000-8000-00000000000d';
 
-const { putBack, takeWaiting } = await import('./ahead');
+const { loadFlowGoal, putBack, takeWaiting } = await import('./ahead');
 
 type Row = {
   id: string;
@@ -60,11 +60,13 @@ function fakeClient(
   queue: Row[],
   homes: Record<string, string>,
   aim: { archived_at: string | null } = { archived_at: null },
+  tracks: { id: string; aim_id: string }[] = [],
 ) {
   const tables: Record<string, unknown[]> = {
     subjects: [
-      { id: SURVEY, name: 'Stoicism', theme_id: 'theme-stoicism', aim_id: null },
-      { id: GOAL, name: 'Startup finance', theme_id: null, aim_id: 'aim-finance' },
+      { id: SURVEY, name: 'Stoicism', theme_id: 'theme-stoicism', aim_id: null, survey: true },
+      { id: GOAL, name: 'Startup finance', theme_id: null, aim_id: 'aim-finance', survey: true },
+      ...tracks.map((track) => ({ ...track, name: 'Track', theme_id: null, survey: false })),
     ],
     theme_fields: [{ theme_id: 'theme-stoicism', field_id: 'field-phil' }],
     area_fields: [{ id: 'field-phil', name: 'Philosophy' }],
@@ -224,6 +226,67 @@ describe('takeWaiting with goal questions', () => {
     const question = await takeWaiting(client, { resume: false, track: null });
     expect(question?.probeId).toBe('p2');
     expect(taken).toEqual(['p2']);
+  });
+});
+
+/**
+ * Plan #1387: Goals only takes nothing but goal questions off the queue, and
+ * a goal's link only that goal's. An archived goal's link goes back to the
+ * plain flow, and a goal with a track of its own to that track.
+ */
+describe('takeWaiting for Goals only and one goal', () => {
+  const homes = { g1: GOAL, c2: TRACK_A, s3: SURVEY };
+
+  it('takes a goal question past the track and survey ones for Goals only', async () => {
+    const { client, taken } = fakeClient(
+      [row('p2', 'c2'), row('p3', 's3'), row('p1', 'g1')],
+      homes,
+    );
+    const question = await takeWaiting(client, { resume: false, track: null, goalsOnly: true });
+    expect(question?.probeId).toBe('p1');
+    expect(question?.goal?.aimId).toBe('aim-finance');
+    expect(taken).toEqual(['p1']);
+  });
+
+  it('finds nothing for Goals only when only other questions wait', async () => {
+    const { client, taken } = fakeClient([row('p2', 'c2'), row('p3', 's3')], homes);
+    expect(await takeWaiting(client, { resume: false, track: null, goalsOnly: true })).toBeNull();
+    expect(taken).toEqual([]);
+  });
+
+  it("takes only the linked goal's questions", async () => {
+    const { client, taken } = fakeClient([row('p2', 'c2'), row('p1', 'g1')], homes);
+    const scope = { resume: false, track: null, aim: 'aim-finance' };
+    expect((await takeWaiting(client, scope))?.probeId).toBe('p1');
+    expect(await takeWaiting(client, { ...scope, aim: 'aim-other' })).toBeNull();
+    expect(taken).toEqual(['p1']);
+  });
+
+  it('does not resume a track question on screen for Goals only', async () => {
+    const recent = new Date().toISOString();
+    const { client, taken } = fakeClient([row('p2', 'c2', recent), row('p1', 'g1')], homes);
+    const question = await takeWaiting(client, { resume: true, track: null, goalsOnly: true });
+    expect(question?.probeId).toBe('p1');
+    expect(taken).toEqual(['p1']);
+  });
+
+  it('names an active goal, and sends an archived or unknown one back', async () => {
+    expect(await loadFlowGoal(fakeClient([], {}).client, 'aim-finance')).toEqual({
+      kind: 'goal',
+      id: 'aim-finance',
+      name: 'Startup finance for founders',
+    });
+    expect(await loadFlowGoal(fakeClient([], {}).client, 'aim-unknown')).toBeNull();
+    const archived = fakeClient([], {}, { archived_at: '2026-09-30T12:00:00Z' }).client;
+    expect(await loadFlowGoal(archived, 'aim-finance')).toBeNull();
+  });
+
+  it("sends a goal with a track of its own to that track's flow", async () => {
+    const { client } = fakeClient([], {}, undefined, [{ id: TRACK_B, aim_id: 'aim-finance' }]);
+    expect(await loadFlowGoal(client, 'aim-finance')).toEqual({
+      kind: 'track',
+      subjectId: TRACK_B,
+    });
   });
 });
 

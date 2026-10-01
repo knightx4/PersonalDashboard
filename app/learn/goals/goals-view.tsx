@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Gauge, ListChecks, MapPin, Route, Target } from 'lucide-react';
+import { Gauge, ListChecks, MapPin, Route, Target, Timer } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
@@ -204,6 +204,18 @@ function GoalRow({
             <span className="tabular-nums">· {plan.line}</span>
           </p>
         )}
+        {/* Practice Flow on this goal alone (plan #1387). A goal with a track
+            is sent on to that track's flow by the page. */}
+        <p className="flex items-center gap-1 px-1.5 text-small text-ink-muted">
+          <Timer className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+          <Link
+            href={`/learn/flow?goal=${aim.id}`}
+            aria-label={`Practise ${aim.name}`}
+            className="text-accent hover:underline"
+          >
+            Practise
+          </Link>
+        </p>
         {error && <p className="px-1.5 text-small text-danger">{error}</p>}
       </div>
 

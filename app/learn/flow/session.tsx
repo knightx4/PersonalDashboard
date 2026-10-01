@@ -32,6 +32,20 @@ import type { TrackOffer } from './state';
 /** The track a focused flow asks about (plan #779). Null when it mixes. */
 export type FlowTrack = { id: string; name: string } | null;
 
+/** The goal a goal's Practise link asks about (plan #1387). Null otherwise. */
+export type FlowGoal = { id: string; name: string } | null;
+
+/**
+ * The filter: Tracks only (plan #842), Goals only (plan #1387), or null for
+ * everything. Unused when the flow is focused on a track or a goal.
+ */
+export type FlowOnly = 'tracks' | 'goals' | null;
+
+/** What to say when a goal-scoped flow has nothing left to ask. */
+function nothingAboutGoals(goal: FlowGoal): string {
+  return goal ? `Nothing left to ask about ${goal.name}.` : 'Nothing left to ask about your goals.';
+}
+
 const NOTHING_TO_ASK: Record<NonNullable<FlowState['nothing']>, string> = {
   'no-subjects': 'No tracks yet, so there is nothing to ask about. Name one first.',
   'all-settled': 'Every idea in every track is known. Nothing left to ask.',
@@ -157,13 +171,13 @@ function TrackOfferCard({
   error,
   step,
   track,
-  tracksOnly,
+  only,
 }: {
   offer: TrackOffer;
   error?: string;
   step: (formData: FormData) => void;
   track: FlowTrack;
-  tracksOnly: boolean;
+  only: FlowOnly;
 }) {
   const [hidden, setHidden] = useState(false);
   if (hidden) return null;
@@ -190,7 +204,7 @@ function TrackOfferCard({
           <form action={step}>
             <input type="hidden" name="intent" value="start-track" />
             <input type="hidden" name="themeId" value={offer.themeId} />
-            <TrackField track={track} tracksOnly={tracksOnly} />
+            <TrackField track={track} only={only} goal={null} />
             <span className="inline-flex items-center gap-1">
               <StartButton />
               <PaidHint
@@ -222,13 +236,15 @@ function TrackOfferCard({
  * Every form in the flow carries the focus, because the action reads the
  * form and nothing else: the next question and the queue topped up after it
  * both come from the track named here, or from all of them when it is empty.
- * `only` carries the Tracks only filter (plan #842) the same way.
+ * `only` carries the Tracks only and Goals only filters (plans #842, #1387)
+ * the same way, and `goal` the goal a goal's Practise link asks about.
  */
-function TrackField({ track, tracksOnly }: { track: FlowTrack; tracksOnly: boolean }) {
+function TrackField({ track, only, goal }: { track: FlowTrack; only: FlowOnly; goal: FlowGoal }) {
   return (
     <>
       <input type="hidden" name="track" value={track?.id ?? ''} />
-      {tracksOnly && <input type="hidden" name="only" value="tracks" />}
+      {only && <input type="hidden" name="only" value={only} />}
+      {goal && <input type="hidden" name="goal" value={goal.id} />}
     </>
   );
 }
@@ -236,21 +252,26 @@ function TrackField({ track, tracksOnly }: { track: FlowTrack; tracksOnly: boole
 export function FlowSession({
   first,
   track,
-  tracksOnly = false,
+  only = null,
+  goal = null,
 }: {
   first: FlowState;
   track: FlowTrack;
-  /** The Tracks only filter: no questions about subjects that are not tracks. */
-  tracksOnly?: boolean;
+  /** The filter: Tracks only, Goals only, or null for everything. */
+  only?: FlowOnly;
+  /** The one goal asked about, from its Practise link. */
+  goal?: FlowGoal;
 }) {
   const [live, step] = useActionState<FlowState, FormData>(flowStep, first);
   const trackId = track?.id ?? null;
+  const goalId = goal?.id ?? null;
+  const aboutGoals = goal !== null || (track === null && only === 'goals');
 
   // Once per visit: the queue may have run down while you were away, and
   // filling it now means the question after this one is ready in time.
   useEffect(() => {
-    void fillFlowQueue(trackId, tracksOnly);
-  }, [trackId, tracksOnly]);
+    void fillFlowQueue({ track: trackId, only, goal: goalId });
+  }, [trackId, only, goalId]);
 
   if (!live.question || !live.options) {
     // Nothing left to ask, and a theme from your notes to start on: the offer
@@ -265,7 +286,7 @@ export function FlowSession({
             error={live.offerError}
             step={step}
             track={track}
-            tracksOnly={tracksOnly}
+            only={only}
           />
         </div>
       );
@@ -273,17 +294,26 @@ export function FlowSession({
     return (
       <form action={step} className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center')}>
         <input type="hidden" name="intent" value="ask" />
-        <TrackField track={track} tracksOnly={tracksOnly} />
+        <TrackField track={track} only={only} goal={goal} />
         <div className="flex flex-wrap items-center justify-center gap-3">
           {live.error && <AskButton label="Try again" />}
           {live.nothing && (
             <span className="text-ui text-ink-muted">
-              {track ? `Nothing left to ask about ${track.name}.` : NOTHING_TO_ASK[live.nothing]}
+              {track
+                ? `Nothing left to ask about ${track.name}.`
+                : aboutGoals
+                  ? nothingAboutGoals(goal)
+                  : NOTHING_TO_ASK[live.nothing]}
             </span>
           )}
           {live.nothing && track && (
             <Link href="/learn/flow" className="text-ui text-accent hover:underline">
               Ask across all tracks
+            </Link>
+          )}
+          {live.nothing && aboutGoals && (
+            <Link href="/learn/flow" className="text-ui text-accent hover:underline">
+              Ask about everything
             </Link>
           )}
           {live.error && <span className="text-ui text-danger">{live.error}</span>}
@@ -333,7 +363,7 @@ export function FlowSession({
 
       <form action={step} className="mt-4 space-y-2">
         <input type="hidden" name="intent" value="answer" />
-        <TrackField track={track} tracksOnly={tracksOnly} />
+        <TrackField track={track} only={only} goal={goal} />
         <input type="hidden" name="probeId" value={live.probeId} />
         <input type="hidden" name="conceptId" value={live.conceptId} />
         <input type="hidden" name="subjectId" value={live.subjectId} />
@@ -388,13 +418,13 @@ export function FlowSession({
               error={live.offerError}
               step={step}
               track={track}
-              tracksOnly={tracksOnly}
+              only={only}
             />
           )}
 
           <form action={step} className="mt-4">
             <input type="hidden" name="intent" value="ask" />
-            <TrackField track={track} tracksOnly={tracksOnly} />
+            <TrackField track={track} only={only} goal={goal} />
             <AskButton label="Next" />
           </form>
         </div>

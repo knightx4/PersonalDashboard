@@ -12,10 +12,10 @@ import { lastAnsweredLine } from '@/lib/learn/graph/last-answered';
 import { loadReadyAndSettled, loadSubjects } from '@/lib/learn/graph/load';
 import { pickOneToAsk } from '@/lib/learn/graph/pick';
 import { answeredCount, lastAnsweredAt } from '@/lib/learn/graph/session';
-import { nextQuestion } from '@/lib/learn/flow/ahead';
+import { loadFlowGoal, nextQuestion } from '@/lib/learn/flow/ahead';
 import { loadTrackOffer } from '@/lib/learn/flow/offer';
 import { createVaultClient } from '@/lib/vault/auth/server';
-import { FlowSession } from './session';
+import { FlowSession, type FlowOnly } from './session';
 import { toFlowState } from './state';
 
 export const dynamic = 'force-dynamic';
@@ -54,20 +54,43 @@ export const metadata = { title: 'Practice Flow' };
  * leaves both out. With nothing left to ask in the tracks, the default still
  * asks a goal or survey question when there is one to write, before falling
  * back to the empty states.
+ *
+ * `?only=goals` is the Goals only filter (plan #1387), which asks about your
+ * goals and nothing else. `?goal=<aim id>` is a goal's Practise link on the
+ * Goals page: it asks about that goal alone, with no filter shown, the way
+ * `?track=` focuses a track. A goal with a track of its own goes to that
+ * track's flow, and an archived or unknown goal back to /learn/flow.
  */
 export default async function PracticeFlowPage({
   searchParams,
 }: {
-  searchParams: Promise<{ track?: string | string[]; only?: string | string[] }>;
+  searchParams: Promise<{
+    track?: string | string[];
+    only?: string | string[];
+    goal?: string | string[];
+  }>;
 }) {
-  const { track: trackParam, only } = await searchParams;
+  const { track: trackParam, only, goal: goalParam } = await searchParams;
   const trackId = typeof trackParam === 'string' && UUID.test(trackParam) ? trackParam : null;
   if (trackParam !== undefined && trackId === null) redirect('/learn/flow');
-  // A focused flow asks about one track already, so the filter has nothing to add.
-  const tracksOnly = only === 'tracks' && trackId === null;
+  const goalId =
+    trackId === null && typeof goalParam === 'string' && UUID.test(goalParam) ? goalParam : null;
+  if (trackId === null && goalParam !== undefined && goalId === null) redirect('/learn/flow');
+  // A focused flow asks about one track or goal already, so the filter has nothing to add.
+  const filter: FlowOnly =
+    trackId === null && goalId === null && (only === 'tracks' || only === 'goals') ? only : null;
+  const tracksOnly = filter === 'tracks';
 
   const user = await requireUser();
   const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
+
+  const named = goalId ? await loadFlowGoal(supabase, goalId) : null;
+  if (goalId && !named) redirect('/learn/flow');
+  if (named?.kind === 'track') redirect(`/learn/flow?track=${named.subjectId}`);
+  const goal = named?.kind === 'goal' ? { id: named.id, name: named.name } : null;
+  // Goals only, or one goal: nothing from the tracks is asked, so their pick
+  // has no say in whether there is anything to ask.
+  const aboutGoals = goal !== null || filter === 'goals';
   const [settings, subjects, rows, answeredAt, answeredSoFar] = await Promise.all([
     loadAccountSettings(user.id),
     loadSubjects(supabase),
@@ -94,28 +117,34 @@ export default async function PracticeFlowPage({
   const answered = lastAnsweredLine(answeredAt, new Date(), settings.timezone);
 
   // With no filter, a goal or the survey can still ask when the tracks have nothing.
-  const surveys = !track && !tracksOnly;
+  const surveys = !track && !tracksOnly && !aboutGoals;
 
   // Resumed rather than taken fresh, so a reload shows the question already
   // on the screen instead of spending another one.
   const first =
-    picked.kind === 'nothing' && !surveys
+    picked.kind === 'nothing' && !surveys && !aboutGoals
       ? null
       : toFlowState(
           await nextQuestion(supabase, user.id, {
             resume: true,
             track: trackId,
             tracksOnly,
+            goalsOnly: filter === 'goals',
+            aim: goal?.id ?? null,
             vault,
           }),
         );
-  const asking = picked.kind !== 'nothing' || first?.question !== undefined;
+  const asking = aboutGoals
+    ? first?.question !== undefined || first?.error !== undefined
+    : picked.kind !== 'nothing' || first?.question !== undefined;
 
   // Nothing to ask across every track, including having no tracks at all: a
   // theme from your notes is offered as the way on (plan #778). Not when
   // focused, where the empty state points back at the other tracks instead.
   const offer =
-    picked.kind === 'nothing' && !asking && !track ? await loadTrackOffer(supabase, vault) : null;
+    picked.kind === 'nothing' && !asking && !track && !aboutGoals
+      ? await loadTrackOffer(supabase, vault)
+      : null;
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -132,7 +161,18 @@ export default async function PracticeFlowPage({
         }
       />
 
-      {!track && <ScopeFilter tracksOnly={tracksOnly} />}
+      {!track && !goal && <ScopeFilter filter={filter} />}
+
+      {goal && (
+        <p className="mt-4 flex flex-wrap items-baseline gap-x-3 text-ui text-ink-muted">
+          <span>
+            Only asking about <span className="font-medium text-ink">{goal.name}</span>
+          </span>
+          <Link href="/learn/flow" className="text-accent hover:underline">
+            Everything
+          </Link>
+        </p>
+      )}
 
       {track && (
         <p className="mt-4 flex flex-wrap items-baseline gap-x-3 text-ui text-ink-muted">
@@ -151,17 +191,33 @@ export default async function PracticeFlowPage({
           // into Tracks only, is a soft navigation, and without a new key the
           // action state would carry the last question across it.
           <FlowSession
-            key={track?.id ?? (tracksOnly ? 'tracks' : 'all')}
+            key={track?.id ?? (goal ? `goal:${goal.id}` : (filter ?? 'all'))}
             first={first ?? {}}
             track={track}
-            tracksOnly={tracksOnly}
+            only={filter}
+            goal={goal}
+          />
+        ) : aboutGoals ? (
+          <EmptyState
+            icon={Target}
+            title={goal ? `Nothing to ask about ${goal.name}` : 'Nothing to ask about your goals'}
+            description={
+              goal
+                ? 'No question about this goal could be written just now. Try again later, or ask about everything.'
+                : 'Goals only asks about the goals on your Goals page that have no track of their own. Name one there, such as startup finance, and Dash will ask about it here.'
+            }
+            action={
+              goal
+                ? { label: 'Ask about everything', href: '/learn/flow' }
+                : { label: 'Goals', href: '/learn/goals' }
+            }
           />
         ) : picked.kind !== 'nothing' ? null : offer ? (
           <FlowSession
             key="offer"
             first={{ nothing: picked.because, offer }}
             track={null}
-            tracksOnly={tracksOnly}
+            only={filter}
           />
         ) : track ? (
           <EmptyState
@@ -193,14 +249,21 @@ export default async function PracticeFlowPage({
 
 /**
  * What the mixed flow asks about (plan #842): everything, which mixes in
- * questions about subjects in your notes that are not tracks, or your tracks
- * alone. Links onto the page's own search parameter, as the ideas page's
- * arrangement rows are, so the choice survives a reload and the back button.
+ * questions about subjects in your notes that are not tracks and about your
+ * goals, your tracks alone, or your goals alone (plan #1387). Links onto the
+ * page's own search parameter, as the ideas page's arrangement rows are, so
+ * the choice survives a reload and the back button.
  */
-function ScopeFilter({ tracksOnly }: { tracksOnly: boolean }) {
+function ScopeFilter({ filter }: { filter: FlowOnly }) {
   const options = [
-    { key: 'all', label: 'Everything', href: '/learn/flow', on: !tracksOnly },
-    { key: 'tracks', label: 'Tracks only', href: '/learn/flow?only=tracks', on: tracksOnly },
+    { key: 'all', label: 'Everything', href: '/learn/flow', on: filter === null },
+    {
+      key: 'tracks',
+      label: 'Tracks only',
+      href: '/learn/flow?only=tracks',
+      on: filter === 'tracks',
+    },
+    { key: 'goals', label: 'Goals only', href: '/learn/flow?only=goals', on: filter === 'goals' },
   ];
   return (
     <div className="mt-4">

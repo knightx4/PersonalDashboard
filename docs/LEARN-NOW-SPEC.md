@@ -50,10 +50,18 @@ A filter at the top of the page chooses between them:
 |---|---|
 | Everything, the default (`/learn/flow`) | Your tracks, goal questions, and survey questions at the rates below |
 | Tracks only (`/learn/flow?only=tracks`) | Your tracks and nothing else |
+| Goals only (`/learn/flow?only=goals`) | Your goals and nothing else (plan #1387) |
 
 Practice this on a track, and Test me on this on a Learn now card, open the
 flow on that one track (`?track=`). It asks only about that track, and the
 filter is not shown.
+
+Practise on a goal on the Goals tab opens the flow on that one goal
+(`?goal=<aim id>`, plan #1387) in the same way. A goal with a track of its own
+opens that track's flow instead, and an archived or unknown goal opens the
+plain flow. When no question about the goal can be written, as with a Level 3
+goal that has no claimed article left untested, the page says there is
+nothing to ask about it.
 
 ### How often a survey question comes up
 
@@ -115,7 +123,9 @@ Goal questions are written ahead into the same queue. One that cannot be
 written gives its turn to a track question, and a goal that already has a
 track of its own name is asked about through that track. A waiting question
 about a goal you have since archived is thrown away unshown. Tracks only and a
-focused track leave goal questions out.
+focused track leave goal questions out. Goals only and a goal's link do the
+opposite: every question written ahead is about a goal, and the track and
+survey questions waiting in the queue stay there for the default flow.
 
 The Level 3 goal takes its goal turns like any other goal, but its questions
 are about the articles you claimed (a Got it or a save) and have not yet been
