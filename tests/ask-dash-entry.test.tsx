@@ -51,7 +51,6 @@ function Probe({ query }: { query: string }) {
     theme: SYSTEM_THEME,
     query,
     active: false,
-    surface: 'box',
   });
   return (
     <>
