@@ -519,6 +519,35 @@ describe('learning goals, stored as aims', () => {
     ).rejects.toThrow();
   });
 
+  it("keeps a goal's hidden subject from another user, and from every account but the goal's", async () => {
+    // 0084_survey_subject_aims.sql, plan #1384: Practice Flow questions about a
+    // goal sit in a survey subject linked by aim_id.
+    const [subject] = await asUser(
+      userA,
+      (tx) => tx<{ id: string }[]>`
+        insert into subjects (user_id, name, survey, aim_id)
+        values (${userA}, 'City design and urbanism', true, ${aimA})
+        returning id`,
+    );
+
+    const own = await asUser(userA, (tx) => tx`select id from subjects where aim_id = ${aimA}`);
+    const other = await asUser(userB, (tx) => tx`select id from subjects where aim_id is not null`);
+    expect(own.map((r) => r.id)).toEqual([subject.id]);
+    expect(other).toHaveLength(0);
+
+    // One subject per goal, and none filed against another account's goal.
+    await expect(
+      admin`insert into subjects (user_id, name, survey, aim_id)
+            values (${userA}, 'A second one', true, ${aimA})`,
+    ).rejects.toThrow(/subjects_user_aim_uq/);
+    await expect(
+      admin`insert into subjects (user_id, name, survey, aim_id)
+            values (${userB}, 'Borrowed goal', true, ${aimA})`,
+    ).rejects.toThrow(/subjects_aim_fk/);
+
+    await admin`delete from subjects where id = ${subject.id}`;
+  });
+
   it('keeps one active Level 3 aim per person', async () => {
     await admin`insert into aims (user_id, name, list_source) values (${userA}, 'Level 3', 'level3')`;
     await expect(
