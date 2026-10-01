@@ -147,11 +147,3 @@ export function TopicChips({ topics, selected, hrefs, allHref, className }: Topi
 const PHONE = '(max-width: 767.98px)';
 /** gap-1.5, in pixels. */
 const GAP = 6;
-
-/** Each topic's chip address, from a function that builds the page's address. */
-export function topicHrefs(
-  topics: readonly NewsTopic[],
-  href: (topic: NewsTopic) => string,
-): Partial<Record<NewsTopic, string>> {
-  return Object.fromEntries(topics.map((topic) => [topic, href(topic)]));
-}
