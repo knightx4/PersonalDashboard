@@ -4,10 +4,9 @@ import type { SearchHit } from '@/lib/search/sources';
 /**
  * What a search was asked for: one workspace, or everything you own.
  *
- * The command box has only ever searched everything, and the bar in the top
- * bar searches the workspace you are standing in until you press its chip. So
- * every caller from here on says which of the two it wants, and `'everything'`
- * is what the box has always done.
+ * The search box opens on everything and its chip narrows it to the workspace
+ * you are standing in (plan #1363). So every caller says which of the two it
+ * wants, and `'everything'` is where every opening starts.
  *
  * A string union rather than an object, because the same value has to survive
  * a query string: `/api/search?q=acme&in=jobs` is the scope written out, and

@@ -51,10 +51,9 @@ import type { NavSection } from '@/components/shell/app-shell';
  * workspace is down, and must never hold the first half up. With no query
  * typed this is exactly what it was before any of it existed.
  *
- * All of it lives here rather than in the command palette because there are
- * two boxes now -- the modal, and the bar across the top of every workspace --
- * and a second copy of the cache, the ranking and the fallback would drift
- * from the first within a step or two. The modal only draws what this returns.
+ * All of it lives here rather than in the command palette so the palette only
+ * draws what this returns. Since plan #1363 the palette is the one search box:
+ * the field in the top bar opens it rather than listing rows of its own.
  */
 
 /**
@@ -72,7 +71,7 @@ type Held = { account: string; hits: SearchHit[]; truncated: boolean };
  * It has to survive a box closing and the page changing -- both unmount
  * whatever is using this -- or every open would start with nothing to match
  * against and the first two keystrokes would find nothing. Outside every
- * component rather than one, so the bar and the modal share the fetch.
+ * component rather than one, so every opening shares the fetch.
  */
 let held: Held | null = null;
 let inFlight: Promise<void> | null = null;
@@ -101,8 +100,8 @@ function forgetOtherAccounts(account: string): void {
  * server per keystroke only when it has nothing.
  *
  * The whole account, never one workspace: narrowing happens in the browser
- * over these rows, so one fetch answers a bar set to jobs and the same bar
- * switched to everything.
+ * over these rows, so one fetch answers a box narrowed to jobs and the same
+ * box on everything.
  */
 function loadEverything(account: string): Promise<void> {
   forgetOtherAccounts(account);
@@ -153,24 +152,6 @@ function matchingNow(account: string): Matching {
 
 /** A row in the one list: somewhere to go, or something you own. */
 export type SearchRow = { kind: 'command'; command: SearchCommand } | { kind: 'hit'; hit: SearchHit };
-
-/**
- * Which of the two search boxes is asking.
- *
- * It only decides what an empty query answers with, and the two answers are
- * opposites, so the hook cannot work it out for itself.
- *
- * `'bar'` is the field across the top of a wide window. It has the cursor
- * because somebody clicked into it or tabbed past it, which is not yet a
- * question, so it offers nothing until a character is typed.
- *
- * `'box'` is the panel the magnifier and the shortcut open. Opening it is the
- * question, so it opens on somewhere to go and something to start.
- *
- * Everything else here is the same for both: once there is a query the two
- * lists are built the same way, from the same rows, in the same order.
- */
-export type SearchSurface = 'bar' | 'box';
 
 export type SearchCommand = {
   id: string;
@@ -247,7 +228,6 @@ export function useSearchRows({
   theme,
   query,
   active,
-  surface,
 }: {
   /** Whose pages these are. The held list is only searched when it is theirs. */
   account: string;
@@ -256,7 +236,7 @@ export function useSearchRows({
   /**
    * The workspace the search is asked for, or everything.
    *
-   * Separate from `module` because the bar's chip switches this while the page
+   * Separate from `module` because the box's chip switches this while the page
    * stays where it is. It narrows both halves of the list: the things you own,
    * and the places you can go and the things you can start. So a search asked
    * for one workspace cannot take you to another, and a search asked for
@@ -269,13 +249,8 @@ export function useSearchRows({
   theme: Theme;
   /** What has been typed. Trimmed here, so a caller passes the field as it is. */
   query: string;
-  /**
-   * Whether this box is being used: the modal is open, or the bar has the
-   * cursor. Nothing is fetched until it is true.
-   */
+  /** Whether the box is open. Nothing is fetched until it is true. */
   active: boolean;
-  /** Which box is asking, which is what an empty query is answered from. */
-  surface: SearchSurface;
 }): {
   rows: SearchRow[];
   /** An answer is still on its way, so "nothing matches" would be premature. */
@@ -413,10 +388,6 @@ export function useSearchRows({
 
   const matches = useMemo(() => {
     if (!query.trim()) {
-      // The bar has the cursor because somebody clicked into it or tabbed
-      // past it. Neither is a question yet, so it answers with nothing until
-      // a character is typed, which is the answer on #717.
-      if (surface === 'bar') return [];
       // Opening the box is the question, so it answers: where you can go from
       // here and what you can start here. Both halves are already narrowed to
       // the workspace by the scope, so a box opened in one offers no other
@@ -438,7 +409,7 @@ export function useSearchRows({
       .sort((a, b) => b.points - a.points)
       .slice(0, 8)
       .map((entry) => entry.command);
-  }, [captures, commands, query, startable, surface]);
+  }, [captures, commands, query, startable]);
 
   const needle = query.trim();
   const searching = active && needle.length >= MIN_QUERY;

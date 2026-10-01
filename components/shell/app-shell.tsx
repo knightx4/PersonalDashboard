@@ -18,7 +18,7 @@ import { NotificationsButton, type Notification } from '@/components/shell/notif
 import { ThemePicker } from '@/components/shell/theme-picker';
 import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
-import { SearchBar, type SearchBarHandle } from '@/components/shell/search-bar';
+import { SearchBar, isSearchShortcut } from '@/components/shell/search-bar';
 import { CaptureButton, CaptureProvider } from '@/components/shell/capture';
 import { AskDashButton, AskDashProvider } from '@/components/shell/ask-dash';
 import { KeyHintsProvider, Kbd } from '@/components/shell/key-hints';
@@ -148,16 +148,12 @@ export function AppShell({
   /**
    * Whether the search box is up.
    *
-   * Held here rather than inside the box, because below lg there is no field
-   * in the top bar and the magnifier beside the account icons is how search
-   * opens (#701, #703). The shortcut is listened for here too, and below lg it
-   * reaches this same box (#713); see the effect further down.
+   * Held here rather than inside the box, because three things open it: the
+   * field in the top bar from lg up, the magnifier beside the account icons
+   * below lg, and ⌘K at any width (plan #1363). Every one of them opens it on
+   * everything you own; see command-palette.tsx.
    */
   const [searching, setSearching] = useState(false);
-  /** ⌘K opened the box, so it starts on everything rather than this workspace. */
-  const [searchingEverything, setSearchingEverything] = useState(false);
-  /** The field in the top bar, so the shortcut can put the cursor in it. */
-  const searchBar = useRef<SearchBarHandle>(null);
   const [collapsed, setCollapsed] = useState(false);
   const initial = (displayName || email).charAt(0).toUpperCase();
 
@@ -247,42 +243,19 @@ export function AppShell({
   }, [sections, router]);
 
   /**
-   * ⌘K goes to the search, whichever search is on screen.
-   *
-   * From lg up that is the field in the top bar: the key puts the cursor in
-   * it and nothing else happens until a character is typed, which is what a
-   * click into the field does too (#662, #717). Below lg there is no field,
-   * so the key opens the box, the same box the magnifier opens (#713). An
-   * open box closes on the key, which is what the shortcut has always done to
-   * it.
-   *
-   * Which surface is decided by asking the bar rather than by restating 1024:
-   * `focus()` reports whether the cursor landed, and below lg the bar's root
-   * is `display: none`, so it cannot. The only statement of the breakpoint
-   * stays the `lg:block` on the bar in the top row.
-   *
-   * It is here rather than in either surface because the shell is the only
-   * place that can see both -- the bar is a child of this file and the box's
-   * open state is held above.
+   * ⌘K opens the search box at any width, the same box a press on the field
+   * in the top bar or on the magnifier opens (plan #1363). An open box closes
+   * on the key, which is what the shortcut has always done to it.
    */
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'k') return;
+      if (!isSearchShortcut(event)) return;
       event.preventDefault();
-      if (searching) {
-        setSearching(false);
-        return;
-      }
-      // Everything you own, whichever surface: the key is the way to look
-      // across workspaces, and a click into the bar is the way to look in
-      // this one (note cdf684fa).
-      if (searchBar.current?.focus({ scope: 'everything' })) return;
-      setSearchingEverything(true);
-      setSearching(true);
+      setSearching((open) => !open);
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [searching]);
+  }, []);
 
   const active = sections.find(isActive);
   // The top bar names the workspace, and the page's own heading names the
@@ -748,21 +721,13 @@ export function AppShell({
                     )}
                   </p>
                 )}
-                {/* Search, in the top bar of every page from lg up, narrowed to
-                the workspace the page is in. The chip is drawn from `module`,
-                so it names this workspace and goes back to naming it after a
-                move to another one; on Home and the account page `module` is
-                null, there is no chip, and the bar searches everything.
-
-                From lg up ⌘K lands in this field. Below lg there is no field
-                here at all: the magnifier further along this row opens the box
-                instead, and ⌘K opens it too. 1024 is where the column appears,
-                and a field competing with the page title for a phone's width
-                would leave neither of them readable.
-
-                `lg:block` is the only place that width is written down. The
-                shortcut asks this bar whether the cursor landed in it rather
-                than reading the breakpoint again; see the effect above.
+                {/* Search, in the top bar of every page from lg up. Pressing
+                it opens the search box over the page on everything you own,
+                as ⌘K does (plan #1363). Below lg there is no field here at
+                all: the magnifier further along this row opens the same box.
+                1024 is where the column appears, and a field competing with
+                the page title for a phone's width would leave neither of them
+                readable.
 
                 It grows into the middle of the bar but stops at `max-w-md` and
                 centres in what is left, rather than taking every pixel between
@@ -771,12 +736,7 @@ export function AppShell({
                 and there is nothing to put in it that is a paragraph long --
                 note ca910aa3. */}
                 <SearchBar
-                  ref={searchBar}
-                  account={account}
-                  module={module}
-                  sections={sections}
-                  enabledModules={workspaces}
-                  theme={theme}
+                  onOpen={() => setSearching(true)}
                   className="hidden min-w-0 flex-1 lg:mx-auto lg:block lg:max-w-md"
                 />
 
@@ -799,17 +759,13 @@ export function AppShell({
                 see sidebarInner. */}
                 <div className="flex shrink-0 items-center sm:gap-0.5">
                   {/* Search, below lg, where there is no field in the bar. It
-                  opens the same box the shortcut opens, on the same rows and
-                  the same ranking, with the chip that widens it to everything
-                  you own. From lg up the field is in the bar a few inches to
+                  opens the same box the shortcut opens, on everything you own,
+                  with the chip that narrows it to this workspace. From lg up the field is in the bar a few inches to
                   the left and a second way in beside it would be two controls
                   for one thing. */}
                   <button
                     type="button"
-                    onClick={() => {
-                      setSearchingEverything(false);
-                      setSearching(true);
-                    }}
+                    onClick={() => setSearching(true)}
                     title="Search"
                     className="press flex size-8 shrink-0 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink lg:hidden"
                   >
@@ -909,7 +865,6 @@ export function AppShell({
             theme={theme}
             open={searching}
             onOpenChange={setSearching}
-            everything={searchingEverything}
           />
         </div>
       </AskDashProvider>
