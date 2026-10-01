@@ -2535,3 +2535,40 @@ form[data-auto-submit] [data-fallback-submit] {
   }
 }
 
+
+/* ---------------------------------------------------------------------------
+ * Workspace accent crossfade (plan #1344).
+ *
+ * Switching workspace fades the accent bar from one workspace's colour to the
+ * next (AccentCrossfade in components/shell/app-shell.tsx). The root is taken
+ * out of the transition, so the page itself is never snapshotted or faded:
+ * only the named bars animate. The overlay lets clicks through to the live
+ * page for the quarter second it is up. Browsers without view transitions
+ * switch at once. To remove the crossfade, delete this block and unwrap the
+ * bars.
+ * ------------------------------------------------------------------------- */
+:root {
+  view-transition-name: none;
+}
+
+::view-transition {
+  pointer-events: none;
+}
+
+::view-transition-group(.workspace-accent) {
+  animation-duration: 250ms;
+  animation-timing-function: var(--ease-out-soft);
+}
+
+::view-transition-old(.workspace-accent),
+::view-transition-new(.workspace-accent) {
+  animation-duration: 250ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
