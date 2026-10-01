@@ -81,7 +81,13 @@ import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
 import { PlanOpenedSurface, PlanTreeSurface } from './plan-surfaces';
 import { GoalOpenedSurface, GoalTreeSurface } from './goal-surfaces';
-import { AskChangesSurface, AskDashSurface, AskMadeChangesSurface, TRIP_GOAL } from './ask-surfaces';
+import {
+  AskChangesSurface,
+  AskDashSurface,
+  AskMadeChangesSurface,
+  FAILING_QUESTION,
+  TRIP_GOAL,
+} from './ask-surfaces';
 import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import { WatchingSurface } from './watching-surfaces';
@@ -2952,6 +2958,20 @@ export const SURFACES: readonly Surface[] = [
     width: 'page',
     render: () => (
       <AskDashSurface open question="What did I spend on eBay flips this quarter?">
+        <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
+    /* An answer that failed (plan #1337): the question was kept, the answer
+     * was not, and Dash's mark shows failed with the error beside it where
+     * the working line was. */
+    id: 'ask-dash-failed',
+    label: 'Ask Dash · An answer that failed',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashSurface open question={FAILING_QUESTION}>
         <PreviewShell />
       </AskDashSurface>
     ),

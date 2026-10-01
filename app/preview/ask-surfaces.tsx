@@ -157,10 +157,24 @@ function answerTo(question: string): TalkTurn[] {
 /** A goal's page, which the sheet names by the goal's title (plan #1272). */
 export const TRIP_GOAL = '/goals/00000000-0000-4000-8000-0000000000a1';
 
+/**
+ * The question the gallery's fixture fails to answer (plan #1337): the
+ * question is kept and the answer is not, as when the deployment has no key,
+ * so the sheet shows the failed mark with the error beside it.
+ */
+export const FAILING_QUESTION = 'How much did I spend on flights this year?';
+
 const FIXTURES: AskSource = {
   ask: async (question) => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     const conversation = { ref: '00000000-0000-4000-8000-000000000009', title: question };
+    if (question === FAILING_QUESTION) {
+      return {
+        conversation,
+        turns: [{ id: 'fq', role: 'user', body: question, createdAt: new Date().toISOString() }],
+        error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot answer.',
+      };
+    }
     if (/^(add|remind)/i.test(question)) {
       return { conversation, ...proposalTo(question), stop: 'answered' };
     }
