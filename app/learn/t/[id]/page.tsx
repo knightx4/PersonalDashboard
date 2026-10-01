@@ -97,15 +97,25 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
            module had nothing to say about it. PlanForm is the way out. */
         <PlanForm trackId={track.id} />
       ) : (
-        <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
-          {track.readings.map((reading) => (
-            <ReadingCard
-              key={reading.id}
-              reading={reading}
-              from={reading.newsStoryId ? origins.get(reading.newsStoryId)?.senderName : null}
-            />
-          ))}
-        </ul>
+        <>
+          {/* Only when the subject graph set the order (plan #1394). A list
+              of things you wrote down yourself keeps the order you added
+              them and says nothing about it. */}
+          {track.taughtInOrder && (
+            <p className="mb-2 text-ui text-ink-muted">
+              In teaching order: anything a reading builds on is above it.
+            </p>
+          )}
+          <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+            {track.readings.map((reading) => (
+              <ReadingCard
+                key={reading.id}
+                reading={reading}
+                from={reading.newsStoryId ? origins.get(reading.newsStoryId)?.senderName : null}
+              />
+            ))}
+          </ul>
+        </>
       )}
 
       <AddForm trackId={track.id} />

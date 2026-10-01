@@ -560,8 +560,19 @@ small:
   for this" is a button on a concept, and it lands in the existing queue.
 - Finishing a reading and writing a note is growth trigger 4. The note you
   already write is the input; nothing new is asked of you.
-- A track can name a goal, so the queue's ordering can follow the graph's
-  prerequisites rather than the order the list happened to arrive in.
+- A reading list holding readings queued for claims, a subject's gaps list
+  above all, is shown in teaching order: no reading sits above one for a claim
+  it builds on, including when the link runs through a claim with nothing
+  queued for it. Built in plan #1394. `loadTrack` passes the list's readings
+  to `inTeachingOrder` (`lib/learn/tracks/teaching-order.ts`), which reads the
+  home subject of each claim, then the claims and edges of those subjects, and
+  applies `teachingOrder` from `lib/learn/graph/model.ts`. Readings with no
+  claim, or with one since deleted, keep the slot they were added in, and a
+  list touching two subjects keeps each in teaching order, interleaved by
+  arrival. The order is worked out each time the list is shown and never
+  saved, so a new reading still goes at the end. The page says "In teaching
+  order" above the list only when at least two readings sit on claims the
+  graph holds; any other list reads as it was added.
 
 ## Build order
 
