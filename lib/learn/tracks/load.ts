@@ -87,6 +87,12 @@ export type ReadingRow = {
    */
   conceptId: string | null;
   /**
+   * The saved newsletter story this reading is, when it was sent from News
+   * (plan #1368). The story stays in news.saved_stories; the page reads where
+   * it came from with loadStoryOrigins. Null for every other reading.
+   */
+  newsStoryId: string | null;
+  /**
    * Null when you wrote down a subject and no source has been found for it
    * yet. That is a normal state, not a broken row.
    */
@@ -151,6 +157,7 @@ type ReadingRecord = {
   finished_at: string | null;
   read_now_at: string | null;
   concept_id: string | null;
+  news_story_id: string | null;
   sources: {
     id: string;
     title: string;
@@ -192,6 +199,7 @@ function toReading(row: ReadingRecord): ReadingRow {
     finishedAt: row.finished_at,
     readNowAt: row.read_now_at,
     conceptId: row.concept_id,
+    newsStoryId: row.news_story_id ?? null,
     source: row.sources
       ? {
           id: row.sources.id,
@@ -213,7 +221,7 @@ const TRACK_COLUMNS = 'id, title, question, status, created_at, branched_from';
 const READING_COLUMNS =
   'id, position, status, title, why, note, locator_kind, locator_label, locator_basis, ' +
   'locator_confidence, open_url, text_anchor, page_from, page_to, t_start_seconds, t_end_seconds, finished_at, read_now_at, ' +
-  'concept_id, ' +
+  'concept_id, news_story_id, ' +
   'sources!readings_source_fk ( id, title, author, kind, year, canonical_url, access, price_cents, page_count )';
 
 type TrackRecord = {

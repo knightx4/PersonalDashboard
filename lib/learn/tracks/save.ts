@@ -38,7 +38,7 @@ function messageFor(action: string, error: { message: string }): Error {
  * page. A source with no URL is always inserted: there is nothing to match on,
  * and a false merge is worse than a duplicate row you can see.
  */
-async function upsertSource(
+export async function upsertSource(
   supabase: LearnSupabaseClient,
   userId: string,
   resolved: ResolvedSource,

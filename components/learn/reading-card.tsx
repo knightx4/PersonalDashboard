@@ -103,7 +103,12 @@ function StatusIcon({ status }: { status: ReadingRow['status'] }) {
   return <span className="size-4 shrink-0" aria-hidden />;
 }
 
-export function ReadingCard({ reading }: { reading: ReadingRow }) {
+/**
+ * `from` names the newsletter a story sent from News was in (plan #1368). The
+ * whole card is one link to the reading, so the line is text here; the
+ * reading's own page links it to the story.
+ */
+export function ReadingCard({ reading, from }: { reading: ReadingRow; from?: string | null }) {
   const done = reading.status === 'read' || reading.status === 'abandoned';
 
   return (
@@ -144,6 +149,8 @@ export function ReadingCard({ reading }: { reading: ReadingRow }) {
               </span>
             )}
           </span>
+
+          {from && <span className="mt-0.5 block text-ui text-ink-muted">From {from}</span>}
 
           {reading.why && (
             <span className="mt-0.5 block text-ui text-ink-muted">{reading.why}</span>
