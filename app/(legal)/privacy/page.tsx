@@ -18,7 +18,7 @@ export const metadata = {
   description: 'What Personal Dashboard reads, what it stores, and what it never keeps.',
 };
 
-const LAST_UPDATED = '30 September 2026';
+const LAST_UPDATED = '1 October 2026';
 
 export default function PrivacyPage() {
   return (
@@ -35,6 +35,11 @@ export default function PrivacyPage() {
         It can also send notes from your notes vault to a language model when you ask it to. The
         section on your notes says what is sent.
       </p>
+      <p>
+        And when you ask Dash, the app&rsquo;s assistant, a question, it can search your connected
+        Gmail and read a message it finds. The section on asking Dash about your email says what
+        that sends and what it keeps.
+      </p>
 
       <h2>Who we are</h2>
       <p>
@@ -50,18 +55,25 @@ export default function PrivacyPage() {
         scope and it is read-only: we can never send, modify, or delete anything in your
         mailbox.
       </p>
-      <p>We use it for one purpose only:</p>
+      <p>We use it for two purposes:</p>
       <ul>
         <li>
           To find messages that are order confirmations, shipping and delivery notices,
           cancellations, and return or refund confirmations, and to extract the purchase
           details from them.
         </li>
+        <li>
+          To answer a question you ask Dash about your email, by searching your mailbox at the
+          moment you ask and, when the question is about what a message says, reading that
+          message. This is described in the section on asking Dash about your email.
+        </li>
       </ul>
       <p>
-        To limit what we look at, we do not download your mailbox. We ask Google for messages
-        matching a narrow search — purchase-related subject lines and sender patterns, within
+        We do not download your mailbox for either. For purchases we ask Google for messages
+        matching a narrow search: purchase-related subject lines and sender patterns, within
         the time window you choose when connecting (30 days to 2 years, 180 days by default).
+        When you ask Dash, the search is built from the sender, words and dates your question
+        names, and is run in Gmail itself across every mailbox you have connected.
       </p>
 
       <h2>What we store</h2>
@@ -125,6 +137,75 @@ export default function PrivacyPage() {
         read that one message, we do not send your identity along with it, and we disable
         provider-side retention where the provider supports it. The provider does not use this
         content to train models.
+      </p>
+      <p>
+        Asking Dash about your email also sends parts of your messages to a language model, as the
+        next section describes.
+      </p>
+
+      <h2>Asking Dash about your email</h2>
+      {/*
+        Written against lib/inbox/search-mail.ts (searchMail, MAIL_SEARCH_LIMIT,
+        format=metadata), lib/inbox/read-mail.ts (readMail, MAIL_TEXT_LIMIT,
+        format=full), lib/ask/mail.ts (the rows the model reads, the citation
+        kept, and `kept` replacing each result on the saved tool call) and
+        keptResult in lib/talk/ask.ts, plans #1315 to #1317. IN_APP_ONLY_TOOLS in
+        lib/ask/tools.ts keeps both tools off the connector (lib/connector/mcp.ts).
+        A change to what either tool sends or keeps has to be made here too.
+      */}
+      <p>
+        If a Gmail account is connected, Dash can answer questions such as &ldquo;when did Anthony
+        last email me?&rdquo; or &ldquo;what did the landlord say about the deposit?&rdquo;. It
+        works whichever parts of the app you have switched on, and only when you ask. Dash
+        searches Gmail at that moment, through the read-only access described above, across every
+        mailbox you have connected. Nothing is copied from your mailbox in advance, and the app
+        builds no index of your mail.
+      </p>
+      <p>
+        What Dash reads goes to Anthropic&rsquo;s Claude models, which write the answer. What is
+        sent:
+      </p>
+      <ul>
+        <li>
+          <strong>For a search,</strong> up to 20 matching messages, newest first, across all your
+          mailboxes. For each one: the sender, the recipients, the subject, the date and time it
+          arrived, and Gmail&rsquo;s one-line preview of it. When more than one mailbox is
+          connected, the address of the mailbox it is in is sent too. A search reads only these
+          headers and the preview, and never fetches the message text.
+        </li>
+        <li>
+          <strong>For a message Dash opens,</strong> the same details for that one message and its
+          text, up to the first 8,000 characters. The text is the message&rsquo;s plain-text
+          version, or its formatted version converted to plain text when there is no plain one.
+          Attachments, including calendar invites, are not sent. Dash opens a message only when
+          your question is about what it says, and only the messages the question is about.
+        </li>
+      </ul>
+      <p>
+        Because the recipients and the mailbox address are part of what is sent, your email
+        address can be among it. Your question and the earlier turns of the same conversation are
+        sent with it, so Dash can answer follow-ups.
+      </p>
+      <p>
+        Nothing Dash reads from your mail is stored. The search results and the message text are
+        held in memory for the one answer and then discarded. What is saved with the conversation
+        is:
+      </p>
+      <ul>
+        <li>Your question and Dash&rsquo;s answer.</li>
+        <li>
+          For each message Dash cites, a label naming the sender and the day it arrived, the link
+          that opens it in Gmail, and the identifiers of the message and of the mailbox it is in.
+        </li>
+        <li>
+          What Dash searched for (the sender, words and dates) and which message it opened, with
+          the number of messages each search found.
+        </li>
+      </ul>
+      <p>
+        No subject line, preview or message text is saved, except where Dash quotes or describes
+        it in the answer it writes. Dash&rsquo;s email search is available only inside the app,
+        and is not offered to other assistants you connect to your dashboard.
       </p>
 
       <h2>Your notes and the language model</h2>
