@@ -11,6 +11,7 @@ import { readTopic } from '@/lib/news/issues/topics';
 import { loadHiddenTopics } from '@/lib/news/quick/hidden-topics';
 import { loadReactions, reactionKey, type Reaction } from '@/lib/news/quick/reactions';
 import { loadSavedHeadlines } from '@/lib/news/saved/stories';
+import { loadSentInIssues, sentKey, type StorySent } from '@/lib/news/saved/sent';
 import {
   cardPasses,
   nextCard,
@@ -106,13 +107,17 @@ export default async function QuickReadPage({
   const issueIds = [
     ...new Set([card, upNext, ...page, ...nextPage].flatMap((c) => (c ? [c.issueId] : []))),
   ];
-  const [savedIn, reactions] = await Promise.all([
+  const [savedIn, reactions, sentIn] = await Promise.all([
     Promise.all(
       issueIds.map(async (id) => [id, await loadSavedHeadlines(client, id)] as const),
     ).then((entries) => new Map(entries)),
     // Only a record for now, so a failed read leaves the thumbs empty rather than the page.
     loadReactions(client, issueIds).catch(() => new Map<string, Reaction>()),
+    // Where each story has been sent (plan #1370); a failed read leaves the buttons unsent.
+    loadSentInIssues(client, issueIds).catch(() => new Map<string, StorySent>()),
   ]);
+  const sentOf = (c: QuickCard): StorySent | null =>
+    c.kind === 'story' ? (sentIn.get(sentKey(c.issueId, c.story.headline)) ?? null) : null;
   const reactionOf = (c: QuickCard) => reactions.get(reactionKey(c.issueId, c.storyIndex)) ?? null;
   const isSaved = (c: QuickCard) =>
     c.kind === 'story' && Boolean(savedIn.get(c.issueId)?.has(c.story.headline));
@@ -134,6 +139,7 @@ export default async function QuickReadPage({
       hiddenCount={hidden.length}
       progress={progress}
       saved={saved}
+      sent={card ? sentOf(card) : null}
       reaction={card ? reactionOf(card) : null}
       related={card ? relatedOf(card) : null}
       pictures={wanted}
@@ -145,6 +151,7 @@ export default async function QuickReadPage({
         card: c,
         arrived: formatArrival(c.receivedAt, settings.timezone),
         saved: isSaved(c),
+        sent: sentOf(c),
         reaction: reactionOf(c),
         related: relatedOf(c),
         issueHref: issueHref(c.issueId, { original: false, pictures: wanted, from: null }),
@@ -153,6 +160,7 @@ export default async function QuickReadPage({
         card: c,
         arrived: formatArrival(c.receivedAt, settings.timezone),
         saved: isSaved(c),
+        sent: sentOf(c),
         reaction: reactionOf(c),
         related: relatedOf(c),
         issueHref: issueHref(c.issueId, { original: false, pictures: wanted, from: null }),
@@ -162,6 +170,7 @@ export default async function QuickReadPage({
           card: upNext,
           arrived: formatArrival(upNext.receivedAt, settings.timezone),
           saved: isSaved(upNext),
+          sent: sentOf(upNext),
           reaction: reactionOf(upNext),
           related: relatedOf(upNext),
           issueHref: issueHref(upNext.issueId, { original: false, pictures: wanted, from: null }),

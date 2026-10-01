@@ -9,6 +9,10 @@ import { createNewsClient } from '@/lib/news/auth/server';
 import { loadIssue } from '@/lib/news/issues/load';
 import { formatArrival, issueHref, senderLabel } from '@/lib/news/issues/list';
 import { storyParagraphs } from '@/lib/news/issues/stories';
+import { loadSavedHeadlines } from '@/lib/news/saved/stories';
+import { loadSentInIssues, sentKey } from '@/lib/news/saved/sent';
+import { SaveStoryButton } from '@/components/news/save-story-button';
+import { SendStoryButtons } from '@/components/news/send-story-buttons';
 import { ArticleLink } from '@/app/news/quick/quick-controls';
 
 export const metadata = { title: 'Story' };
@@ -19,7 +23,8 @@ export const dynamic = 'force-dynamic';
  * "Read the full story" on the Quick read opens, in place of unfolding the
  * story inside its card. The headline, who sent it and when, the summary, the
  * story as the email told it, and the ways on: the article itself and the
- * whole newsletter.
+ * whole newsletter. Save, Send to Learn and Make a todo sit under it as they
+ * do on every other story (plan #1370).
  */
 export default async function StoryPage({
   params,
@@ -37,6 +42,11 @@ export default async function StoryPage({
   const storyIndex = Number(index);
   const story = issue?.digest?.stories[storyIndex];
   if (!issue || !story) notFound();
+  const [savedHeadlines, sentIn] = await Promise.all([
+    loadSavedHeadlines(client, issue.id),
+    loadSentInIssues(client, [issue.id]),
+  ]);
+  const sent = sentIn.get(sentKey(issue.id, story.headline));
 
   const from = issue.sender ? senderLabel(issue.sender) : 'Unknown sender';
   const paragraphs = storyParagraphs(story.text);
@@ -64,16 +74,31 @@ export default async function StoryPage({
             ))}
           </div>
         )}
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-          {story.link && (
-            <ArticleLink href={story.link} issueId={issue.id} storyIndex={storyIndex} />
-          )}
-          <Link
-            href={issueHref(issue.id, { original: false, pictures: true, from: null })}
-            className="text-ui text-accent hover:underline"
-          >
-            Open the whole newsletter
-          </Link>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            {story.link && (
+              <ArticleLink href={story.link} issueId={issue.id} storyIndex={storyIndex} />
+            )}
+            <Link
+              href={issueHref(issue.id, { original: false, pictures: true, from: null })}
+              className="text-ui text-accent hover:underline"
+            >
+              Open the whole newsletter
+            </Link>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <SendStoryButtons
+              story={{ issueId: issue.id, headline: story.headline }}
+              readingId={sent?.readingId}
+              taskId={sent?.taskId}
+            />
+            <SaveStoryButton
+              issueId={issue.id}
+              headline={story.headline}
+              saved={savedHeadlines.has(story.headline)}
+              className="-mr-2.5"
+            />
+          </div>
         </div>
       </Card>
     </div>
