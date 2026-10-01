@@ -11,10 +11,13 @@ The reading rules are in `lib/plan/tree.ts` and are what the page uses; when
 working by hand, apply the same ones:
 
 ```sql
--- the open steps, in reading order
+-- the open steps, in reading order. Rows whose module is a project in
+-- lib/plan/projects.ts ('website') are built from that project's own
+-- repository by its own routine, never from this one: leave them out.
 select number, parent_id, title, status, priority, size, assignee, acceptance, comment
 from plan_items
 where user_id = '…' and status not in ('done', 'dropped')
+  and module is distinct from 'website'
 order by module nulls last, position, created_at;
 
 -- what a step waits on
