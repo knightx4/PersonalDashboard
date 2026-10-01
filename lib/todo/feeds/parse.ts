@@ -32,6 +32,14 @@ export interface FeedEvent {
   endsOn: string | null;
   startsAt: string | null;
   endsAt: string | null;
+  /**
+   * For a date of a repeating appointment, the start it originally had: the
+   * file's RECURRENCE-ID, kept when that one date is moved. Written the way
+   * the start is -- 'YYYY-MM-DD' for a whole-day repeat, an ISO instant for a
+   * timed one. Null for an appointment that does not repeat. With the uid it
+   * names one date of a meeting across refreshes, which rewrite every row.
+   */
+  occurrence: string | null;
 }
 
 /** What an appointment with no SUMMARY is called, so it can be drawn at all. */
@@ -143,7 +151,10 @@ function isCancelled(component: ICAL.Component): boolean {
 
 function occurrencesOf(event: ICAL.Event, window: Window): FeedEvent[] {
   if (!event.isRecurring()) {
-    const one = toFeedEvent(event, event.startDate, event.endDate);
+    // An edited date whose repeating appointment is not in the file still
+    // says which date it stands in for; anything else repeats nothing.
+    const original = event.isRecurrenceException() ? event.recurrenceId : null;
+    const one = toFeedEvent(event, event.startDate, event.endDate, original);
     return one && touches(one, window) ? [one] : [];
   }
 
@@ -165,7 +176,14 @@ function occurrencesOf(event: ICAL.Event, window: Window): FeedEvent[] {
     // for an ordinary date, and the edited version where the file replaced
     // one. Reading the title off the master would draw the old name at the
     // new time.
-    const occurrence = toFeedEvent(details.item, details.startDate, details.endDate);
+    // details.recurrenceId is the date the rule put this occurrence on, which
+    // stays the same when the file moves it.
+    const occurrence = toFeedEvent(
+      details.item,
+      details.startDate,
+      details.endDate,
+      details.recurrenceId ?? next,
+    );
     if (!occurrence) continue;
 
     // Past the window and still stepping forwards: everything after this is
@@ -188,6 +206,7 @@ function toFeedEvent(
   event: ICAL.Event,
   start: ICAL.Time | null,
   end: ICAL.Time | null,
+  original: ICAL.Time | null,
 ): FeedEvent | null {
   if (!start) return null;
 
@@ -199,6 +218,7 @@ function toFeedEvent(
     title: event.summary?.trim() || UNTITLED,
     body: event.description?.trim() || null,
     location: event.location?.trim() || null,
+    occurrence: original ? timeString(original) : null,
   };
 
   if (start.isDate) {
@@ -221,6 +241,11 @@ function toFeedEvent(
     startsAt,
     endsAt: endsAt < startsAt ? startsAt : endsAt,
   };
+}
+
+/** A time as the row writes a start: the day if whole-day, else the instant. */
+function timeString(time: ICAL.Time): string {
+  return time.isDate ? dayString(time) : time.toJSDate().toISOString();
 }
 
 /** A whole-day time as the day it is. */
