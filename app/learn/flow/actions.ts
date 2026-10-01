@@ -4,7 +4,7 @@ import { after } from 'next/server';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { fillQueue, nextQuestion, putBack, type FlowScope } from '@/lib/learn/flow/ahead';
+import { fillQueue, goalScoped, nextQuestion, putBack, type FlowScope } from '@/lib/learn/flow/ahead';
 import {
   loadTrackOffer,
   recordTrackOffer,
@@ -38,23 +38,27 @@ export type { FlowState };
 const TrackId = z.string().uuid();
 
 /**
- * The track a focused flow asks about, from the form's hidden `track` field,
- * or null for asking across all of them (plan #779). Not trusted for
- * ownership: it only narrows which of your own subjects are read, and a
- * subject that is not yours reads as none.
- */
-function trackFrom(formData: FormData): string | null {
-  const track = TrackId.safeParse(formData.get('track'));
-  return track.success ? track.data : null;
-}
-
-/**
- * Which questions the flow asks, from the form's hidden `track` and `only`
- * fields. `only=tracks` is the Tracks only filter (plan #842): with it, and
- * with a track, no survey or goal questions are asked.
+ * Which questions the flow asks, from the form's hidden `track`, `only` and
+ * `goal` fields. `track` is the track a focused flow asks about, or empty for
+ * asking across all of them (plan #779). `only=tracks` is the Tracks only
+ * filter (plan #842): with it, and with a track, no survey or goal questions
+ * are asked. `only=goals` asks about goals alone and `goal` about one goal
+ * (plan #1387). Neither id is trusted for ownership: each only narrows which
+ * of your own rows are read, and one that is not yours reads as none.
  */
 function scopeFrom(formData: FormData): FlowScope {
-  return { track: trackFrom(formData), tracksOnly: formData.get('only') === 'tracks' };
+  return scopeOf(formData.get('track'), formData.get('only'), formData.get('goal'));
+}
+
+function scopeOf(track: unknown, only: unknown, goal: unknown): FlowScope {
+  const focus = TrackId.safeParse(track);
+  const aim = TrackId.safeParse(goal);
+  return {
+    track: focus.success ? focus.data : null,
+    tracksOnly: only === 'tracks',
+    goalsOnly: only === 'goals',
+    aim: aim.success ? aim.data : null,
+  };
 }
 
 /**
@@ -158,11 +162,14 @@ async function startOfferedTrack(
  * have answered the question already on the screen.
  */
 // latency: instant
-export async function fillFlowQueue(track: string | null, tracksOnly = false): Promise<void> {
+export async function fillFlowQueue(focus: {
+  track: string | null;
+  only?: 'tracks' | 'goals' | null;
+  goal?: string | null;
+}): Promise<void> {
   const user = await requireUser();
   const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
-  const focus = TrackId.safeParse(track);
-  const scope = { track: focus.success ? focus.data : null, tracksOnly: tracksOnly === true };
+  const scope = scopeOf(focus?.track, focus?.only, focus?.goal);
   after(() => fillQueue(supabase, user.id, scope, vault));
 }
 
@@ -201,10 +208,11 @@ async function answerFlowQuestion(
   if (!answered.answered || answered.error) return answered;
 
   // A new track is offered only when the flow mixes: focused on one track,
-  // running low means that track is nearly done, not that you need another.
+  // running low means that track is nearly done, not that you need another,
+  // and asking about goals alone it has nothing to do with what you asked for.
   const [after, offer] = await Promise.all([
     before && subjectId ? loadGraph(supabase, subjectId).catch(() => null) : null,
-    scope.track === null ? createVaultClient().then((vault) => loadTrackOffer(supabase, vault)) : null,
+    scope.track === null && !goalScoped(scope) ? createVaultClient().then((vault) => loadTrackOffer(supabase, vault)) : null,
   ]);
   return {
     ...answered,
