@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Banner } from '@/components/ui/banner';
 import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 import { removeNotificationSubscription, saveNotificationSubscription } from './notification-actions';
 
 /**
@@ -112,7 +113,8 @@ export function NotificationsSection({ publicKey }: { publicKey: string | null }
   }
 
   return (
-    <section className={cardVariants({ padding: 'standard' })}>
+    // The id is where Dash points when a watch would reach no phone (lib/watch/start.ts).
+    <section id="notifications" className={cn(cardVariants({ padding: 'standard' }), 'scroll-mt-20')}>
       <h2 className="text-body font-semibold text-ink">Notifications</h2>
       <p className="mt-0.5 text-ui text-ink-muted">
         Each morning Dash writes a brief of your day. It can arrive on this device as a

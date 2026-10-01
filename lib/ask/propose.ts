@@ -3,23 +3,25 @@ import { parseStepFields } from '@/lib/goals/steps';
 import { taskInput } from '@/lib/todo/tasks/input';
 import type { ModuleId } from '@/lib/modules';
 import type { DashChange, NewDashChange } from '@/lib/talk/changes';
+import { MAX_REPORT_TIMES, MAX_WATCH_DAYS, NO_PUSH_LINE, parseWatchRequest, watchPlan } from '@/lib/watch/start';
 import { isUuid, type AskContext, type AskToolResult } from './db';
 
 /**
  * The changes Dash may propose in an answer (plan #1188, feature #1186):
- * add a todo, add a step under a goal, mark an owned item returned. A
+ * add a todo, add a step under a goal, mark an owned item returned, and start
+ * a watch on a price (plan #1296). A
  * proposal is checked the way the page's own action checks it and kept as a
  * proposed row in core.dash_changes; nothing else is written until the person
  * presses Confirm (#1189).
  *
- * These three and nothing else, as lib/comments/act.ts keeps to its named
+ * These four and nothing else, as lib/comments/act.ts keeps to its named
  * list. A goal or an item is named by a ref a lookup returned in this
  * conversation, the same rule citations follow, so Dash can only point at a
  * row it has actually seen, and the row is read again here as the person to
  * check it is theirs and can take the change.
  */
 
-export const PROPOSAL_TOOL_NAMES = ['propose_todo', 'propose_goal_step', 'propose_returned'] as const;
+export const PROPOSAL_TOOL_NAMES = ['propose_todo', 'propose_goal_step', 'propose_returned', 'propose_watch'] as const;
 export type ProposalToolName = (typeof PROPOSAL_TOOL_NAMES)[number];
 
 export function isProposalToolName(name: string): name is ProposalToolName {
@@ -72,6 +74,34 @@ export const PROPOSAL_TOOLS: readonly Anthropic.Tool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'propose_watch',
+    description: `Propose a watch on a price outside the app, when they ask you to keep an eye on one ("tell me if these drop under $200"). Every hour the watch reads the lowest price on the page; it pushes to their phone when the price goes under \`below\`, sends a report at each of \`report_times\` either way, shows on the home page while it runs, and stops by itself at the end. It needs the page's link: if they did not give one, ask for it rather than guessing. It needs a price to go under, report times, or both, and an end; when they named no end, use the day of the event or purchase it is for, and say so. When it is for a goal or one of its steps, name that by the goals.items ref goal_status or search returned for it (search with kinds ["step"] finds a step). ${PROPOSE_NOTE}`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'What is watched, as the home page will name it: "Jamie xx at Nowadays, 2 tickets".' },
+        url: { type: 'string', description: 'The https page to read the lowest price from, exactly as they gave it.' },
+        below: { type: 'number', description: 'Push when the lowest price goes under this. Leave it out for a watch that only reports.' },
+        currency: { type: 'string', pattern: '^[A-Za-z]{3}$', description: 'The currency of below, such as USD, when they said one.' },
+        report_times: {
+          type: 'array',
+          maxItems: MAX_REPORT_TIMES,
+          items: { type: 'string', pattern: '^\\d{1,2}:\\d{2}$' },
+          description: 'Times of day, HH:MM in their timezone, to send a report whether or not it went under.',
+        },
+        ends_on: {
+          type: 'string',
+          pattern: '^\\d{4}-\\d{2}-\\d{2}$',
+          description: `The day the watch stops, YYYY-MM-DD, at most ${MAX_WATCH_DAYS} days away.`,
+        },
+        ends_time: { type: 'string', pattern: '^\\d{1,2}:\\d{2}$', description: 'The time it stops on that day, HH:MM; the end of the day when left out.' },
+        goal_item_ref: { type: 'string', description: 'The goals.items ref of the goal or step it serves, when there is one.' },
+      },
+      required: ['title', 'url', 'ends_on'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 /** What a proposal needs beyond the lookups' context. */
@@ -80,12 +110,16 @@ export type ProposeContext = AskContext & {
   seen: (table: string, ref: string) => boolean;
   /** Keeps the proposal as a proposed row and returns it. */
   save: (change: NewDashChange) => Promise<DashChange>;
+  /** The person's timezone, which a watch's report times and end are in; UTC when absent. */
+  timezone?: string;
 };
 
-const MODULES: Record<ProposalToolName, ModuleId> = {
+const MODULES: Record<ProposalToolName, ModuleId | null> = {
   propose_todo: 'todo',
   propose_goal_step: 'goals',
   propose_returned: 'shopping',
+  // A watch belongs to no workspace: it shows on the home page.
+  propose_watch: null,
 };
 
 const MODULE_LABELS: Partial<Record<ModuleId, string>> = { todo: 'Todo', goals: 'Goals', shopping: 'Shopping' };
@@ -167,10 +201,60 @@ async function checkReturned(ctx: ProposeContext, args: Record<string, unknown>)
   return { kind: 'mark_returned', input: { id, itemTitle: item.name?.trim() || 'Item' } };
 }
 
+async function checkWatch(ctx: ProposeContext, args: Record<string, unknown>): Promise<NewDashChange> {
+  const parsed = parseWatchRequest(args, {
+    now: new Date(ctx.now ?? Date.now()),
+    timezone: ctx.timezone ?? 'UTC',
+  });
+  if (!parsed.ok) throw new Refused(parsed.error);
+
+  let goalItemId: string | null = null;
+  let goalTitle: string | null = null;
+  if (text(args, 'goal_item_ref')) {
+    if (!ctx.enabledModules.includes('goals')) {
+      throw new Refused('The Goals workspace is switched off, so the watch cannot be tied to a goal. Propose it without goal_item_ref.');
+    }
+    goalItemId = seenRef(ctx, args, 'goal_item_ref', 'goals.items');
+    const goals = await ctx.db('goals');
+    const item = await firstRow<{ id: string; title: string; status: string }>(
+      goals
+        .from('items')
+        .select('id, title, status')
+        .eq('id', goalItemId)
+        .eq('user_id', ctx.userId)
+        .is('archived_at', null)
+        .limit(1),
+    );
+    if (!item) throw new Refused('That goal or step is not one of theirs, or it has been archived.');
+    if (item.status === 'done' || item.status === 'dropped') {
+      throw new Refused(`That goal or step is ${item.status}, so a watch for it would serve nothing.`);
+    }
+    goalTitle = item.title;
+  }
+
+  const core = await ctx.db('core');
+  const [same, push] = await Promise.all([
+    firstRow<{ title: string }>(
+      core
+        .from('watches')
+        .select('title')
+        .eq('user_id', ctx.userId)
+        .eq('status', 'running')
+        .eq('url', parsed.value.url)
+        .limit(1),
+    ),
+    firstRow<{ id: string }>(core.from('push_subscriptions').select('id').eq('user_id', ctx.userId).limit(1)),
+  ]);
+  if (same) throw new Refused(`A watch on that page is already running ("${same.title}"). Say so instead of starting another.`);
+
+  return { kind: 'start_watch', input: { ...parsed.value, goalItemId, goalTitle, pushOn: push !== null } };
+}
+
 const CHECKS: Record<ProposalToolName, (ctx: ProposeContext, args: Record<string, unknown>) => Promise<NewDashChange>> = {
   propose_todo: checkTodo,
   propose_goal_step: checkGoalStep,
   propose_returned: checkReturned,
+  propose_watch: checkWatch,
 };
 
 /** How a kept proposal reads back to the model. */
@@ -182,6 +266,16 @@ function described(change: NewDashChange): string {
       return `Add the step "${change.input.title}" under the goal "${change.input.goalTitle}".`;
     case 'mark_returned':
       return `Mark "${change.input.itemTitle}" returned, with a full refund at what it cost.`;
+    case 'start_watch': {
+      const watch = change.input;
+      const plan = watchPlan(watch, watch.endsOn);
+      const goal = watch.goalTitle ? ` It is for "${watch.goalTitle}".` : '';
+      // The confirmation says so when nothing would reach them (#1297's answer: push only).
+      const push = watch.pushOn
+        ? ''
+        : ` Tell them, in these words or close to them: "${NO_PUSH_LINE}"`;
+      return `Watch "${watch.title}"${plan}, reading the lowest price on ${watch.url} each hour.${goal}${push}`;
+    }
   }
 }
 
@@ -193,10 +287,10 @@ function described(change: NewDashChange): string {
  */
 export async function executeProposal(name: string, input: unknown, ctx: ProposeContext): Promise<AskToolResult> {
   if (!isProposalToolName(name)) {
-    return { ok: false, error: `There is no tool called ${name}. You can propose only a todo, a goal step or a return.` };
+    return { ok: false, error: `There is no tool called ${name}. You can propose only a todo, a goal step, a return or a watch.` };
   }
   const workspace = MODULES[name];
-  if (!ctx.enabledModules.includes(workspace)) {
+  if (workspace && !ctx.enabledModules.includes(workspace)) {
     return { ok: false, error: `The ${MODULE_LABELS[workspace]} workspace is switched off, so nothing can be proposed there.` };
   }
   const args = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};

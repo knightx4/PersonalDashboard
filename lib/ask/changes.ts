@@ -37,6 +37,9 @@ import type { AskDb, SchemaClient } from './db';
  *   mark_returned  the returns row deleted, as the returns page's Undo does,
  *                  while the item is still returned and the return is still
  *                  refunded at the amount written.
+ *   start_watch    the watch deleted, with its readings, while it is still
+ *                  running and has sent no push. One that has is stopped
+ *                  from its home row instead (plan #1296).
  *
  * Every refusal is a sentence the person reads in place of the button, and
  * names Dash, not Claude.
@@ -87,19 +90,24 @@ export function changePaths(change: DashChange): string[] {
         '/shopping/orders',
         '/shopping/dashboard',
       ];
+    case 'start_watch':
+      return ['/home'];
   }
 }
 
-const WORKSPACE: Record<DashChangeKind, { module: ModuleId; label: string }> = {
+/** The workspace each kind writes into; a watch is the home page's and needs none. */
+const WORKSPACE: Record<DashChangeKind, { module: ModuleId; label: string } | null> = {
   add_todo: { module: 'todo', label: 'Todo' },
   add_goal_step: { module: 'goals', label: 'Goals' },
   mark_returned: { module: 'shopping', label: 'Shopping' },
+  start_watch: null,
 };
 
 const WRITTEN_TABLE: Record<DashChangeKind, string> = {
   add_todo: 'todo.tasks',
   add_goal_step: 'goals.items',
   mark_returned: 'public.inventory_items',
+  start_watch: 'core.watches',
 };
 
 /** A refusal the person reads: the sentence is theirs, the class only marks it as one. */
@@ -207,6 +215,42 @@ async function writeReturned(
   };
 }
 
+async function writeWatch(deps: ChangeDeps, change: Extract<DashChange, { kind: 'start_watch' }>): Promise<Written> {
+  const watch = change.input;
+  if (Date.parse(watch.endsAt) <= Date.parse(now(deps))) {
+    throw new Refused('That watch would already have ended. Ask Dash again with a later end.');
+  }
+  const core = deps.core;
+  const { data: same, error: sameError } = await core
+    .from('watches')
+    .select('id')
+    .eq('user_id', deps.userId)
+    .eq('status', 'running')
+    .eq('url', watch.url)
+    .limit(1);
+  if (sameError) throw new Error(sameError.message);
+  if ((same ?? []).length > 0) throw new Refused('A watch on that page is already running. It is on the home page.');
+
+  const condition: Record<string, unknown> = {};
+  if (watch.below !== null) condition.below = watch.below;
+  if (watch.currency) condition.currency = watch.currency;
+  const { data, error } = await core
+    .from('watches')
+    .insert({
+      user_id: deps.userId,
+      title: watch.title,
+      url: watch.url,
+      condition,
+      report_times: watch.reportTimes,
+      ends_at: watch.endsAt,
+      goal_item_id: watch.goalItemId,
+    })
+    .select('id')
+    .single();
+  if (error || !data) throw new Error(error?.message ?? 'The watch was not written.');
+  return { ref: data.id as string, undo: null };
+}
+
 async function write(deps: ChangeDeps, change: DashChange): Promise<Written> {
   switch (change.kind) {
     case 'add_todo':
@@ -215,6 +259,8 @@ async function write(deps: ChangeDeps, change: DashChange): Promise<Written> {
       return writeGoalStep(deps, change);
     case 'mark_returned':
       return writeReturned(deps, change);
+    case 'start_watch':
+      return writeWatch(deps, change);
   }
 }
 
@@ -358,6 +404,31 @@ async function undoReturned(deps: ChangeDeps, change: DashChange & { kind: 'mark
   if (!undone.ok && !force) throw new Refused(undone.error);
 }
 
+async function undoWatch(deps: ChangeDeps, ref: string, force = false) {
+  const core = deps.core;
+  if (!force) {
+    const { data: watch, error } = await core
+      .from('watches')
+      .select('id, status, fired_at, reported_at')
+      .eq('id', ref)
+      .eq('user_id', deps.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!watch) throw new Refused('That watch has since been removed, so there is nothing to undo.');
+    if (watch.status !== 'running') {
+      throw new Refused(`That watch has ${watch.status === 'stopped' ? 'been stopped' : 'ended'} since, so there is nothing to undo.`);
+    }
+    if (watch.fired_at || watch.reported_at) {
+      throw new Refused('That watch has already sent you a push, so Dash will not remove it. Stop it from the home page instead.');
+    }
+  }
+  let query = core.from('watches').delete().eq('id', ref).eq('user_id', deps.userId);
+  if (!force) query = query.eq('status', 'running').is('fired_at', null).is('reported_at', null);
+  const { data, error } = await query.select('id');
+  if (error) throw new Error(error.message);
+  if (!force && (data ?? []).length === 0) throw new Refused('That watch has changed since, so Dash will not remove it.');
+}
+
 async function takeBack(deps: ChangeDeps, change: DashChange, ref: string, force = false): Promise<void> {
   switch (change.kind) {
     case 'add_todo':
@@ -366,6 +437,8 @@ async function takeBack(deps: ChangeDeps, change: DashChange, ref: string, force
       return undoGoalStep(deps, ref, force);
     case 'mark_returned':
       return undoReturned(deps, change, force);
+    case 'start_watch':
+      return undoWatch(deps, ref, force);
   }
 }
 
@@ -400,7 +473,7 @@ export async function confirmChange(deps: ChangeDeps, id: string): Promise<Chang
     return { ok: false, error: 'Dash is still writing this answer. Try again once it has finished.', change };
   }
   const workspace = WORKSPACE[change.kind];
-  if (!deps.enabledModules.includes(workspace.module)) {
+  if (workspace && !deps.enabledModules.includes(workspace.module)) {
     return { ok: false, error: `The ${workspace.label} workspace is switched off, so this cannot be written.`, change };
   }
 

@@ -1541,6 +1541,53 @@ update goals.items set starts_on = '2026-11-01'
 where id = '<step id>' and user_id = '<user>' and level = 'step';
 ```
 
+## Watching a price outside the app
+
+A step that waits on a price on a page outside the app gets a **watch**: buy
+the tickets once the resale price drops under $200, order the part when it
+comes back under its old price. A watch is a row in `core.watches`. Each hour
+the app reads the lowest price on its page, pushes to the person's phone when
+the price goes under the line, sends a report at the times set on it either
+way, shows on the home page while it runs, and ends itself at `ends_at`.
+Start one when you map or work such a step, or when a comment asks for it
+("tell me if these drop under $200"), instead of leaving the step to be
+checked by hand.
+
+- `url`: the https page to read, from the step, its thread or the person.
+  With no link, block the step asking for it; never guess one.
+- `condition`: `{"below": 200, "currency": "USD"}` pushes under 200 dollars.
+  `{}` only reports, so give it report times.
+- `report_times`: up to six times of day, `HH:MM` in the person's timezone
+  (`core.account_settings.timezone`). Empty for none; then `below` is needed.
+- `ends_at`: when the price stops mattering, such as the event or the step's
+  `due_on`, at most 180 days away. A timestamp with its zone.
+- `goal_item_id`: the step it serves, so the home row links to it.
+
+A watch only reads a price. A step that waits on a date alone is a step for
+later (`starts_on`, above), not a watch.
+
+```sql
+-- one running watch per page: look before starting another
+select id, title, status from core.watches
+where user_id = '<user>' and url = '<the page>' and status = 'running';
+
+insert into core.watches (user_id, title, url, condition, report_times, ends_at, goal_item_id)
+values ('<user>', 'Jamie xx at Nowadays, 2 tickets', 'https://…',
+        '{"below": 200, "currency": "USD"}', '{09:00,18:00}',
+        '2026-10-18 23:59:00-04', '<step id>')
+returning id;
+
+-- does anything reach their phone?
+select exists (select 1 from core.push_subscriptions where user_id = '<user>') as push_on;
+```
+
+Say on the step, in its `result` or the thread reply, what the watch will do
+and when it ends, and that it shows on the home page. When `push_on` is false,
+say that nothing will reach their phone until they switch push on in Account,
+under Notifications, on the phone. The watch still runs and shows on the home
+page. A watch is stopped from its home row, by the person; never stop or
+delete one yourself.
+
 ## The morning run
 
 The daily cron fires the routine each morning while there is an open goal

@@ -1,4 +1,5 @@
 import type { DashChange, DashChangeStatus } from '@/lib/talk/changes';
+import { watchPlan } from '@/lib/watch/start';
 
 /**
  * How a change Dash proposed reads on a card (plan #1190) and in the Ask
@@ -17,6 +18,8 @@ export function changeHref(change: DashChange): string {
         : `/goals/${change.input.parentId}`;
     case 'mark_returned':
       return `/shopping/inventory/${change.input.id}`;
+    case 'start_watch':
+      return change.writtenRef ? `/home#watch-${change.writtenRef}` : '/home#watching';
   }
 }
 
@@ -68,6 +71,12 @@ export function changeWords(change: DashChange, done: boolean, today?: string): 
         what: change.input.itemTitle,
         rest: done ? ' returned, with a full refund' : ' returned, with a full refund at what it cost',
       };
+    case 'start_watch':
+      return {
+        verb: done ? 'Started watching' : 'Watch',
+        what: change.input.title,
+        rest: watchPlan(change.input, dueDay(change.input.endsOn, today)),
+      };
   }
 }
 
@@ -94,5 +103,7 @@ export function changeWhere(change: DashChange): string {
       return 'Open the goal';
     case 'mark_returned':
       return 'Open the item';
+    case 'start_watch':
+      return 'Open on the home page';
   }
 }

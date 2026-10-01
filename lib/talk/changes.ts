@@ -15,7 +15,7 @@ import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name'
  * and keeps kind, input and conversation fixed once written.
  */
 
-export const DASH_CHANGE_KINDS = ['add_todo', 'add_goal_step', 'mark_returned'] as const;
+export const DASH_CHANGE_KINDS = ['add_todo', 'add_goal_step', 'mark_returned', 'start_watch'] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
 export type DashChangeStatus = 'proposed' | 'confirmed' | 'declined' | 'undone';
@@ -28,11 +28,29 @@ export type DashChangeStatus = 'proposed' | 'confirmed' | 'declined' | 'undone';
  * add_todo       createTask(userId, input, timezone) takes it as a TaskInput.
  * add_goal_step  insertStep(client, userId, parentId, { title, kind }).
  * mark_returned  markItemReturned's form field `id`.
+ * start_watch    the core.watches row to insert (plan #1296): `below` and
+ *                `currency` become its condition, `endsAt` is an instant.
+ *                `goalTitle` names the goal or step it serves, and `pushOn`
+ *                says whether any device had push switched on when Dash
+ *                proposed it, so the card can say nothing will reach them.
  */
 export type DashChangeInput = {
   add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false };
   add_goal_step: { parentId: string; goalTitle: string; title: string; kind: 'mine' };
   mark_returned: { id: string; itemTitle: string };
+  start_watch: {
+    title: string;
+    url: string;
+    below: number | null;
+    currency: string | null;
+    reportTimes: string[];
+    endsAt: string;
+    /** The day it ends, YYYY-MM-DD in the person's zone, for the card. */
+    endsOn: string;
+    goalItemId: string | null;
+    goalTitle: string | null;
+    pushOn: boolean;
+  };
 };
 
 /** A proposal as the loop hands it to be kept. */

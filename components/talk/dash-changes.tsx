@@ -13,6 +13,7 @@ import {
 } from '@/lib/ask/change-view';
 import type { ChangeOutcome } from '@/lib/ask/changes';
 import type { DashChange } from '@/lib/talk/changes';
+import { NO_PUSH, PUSH_SETTINGS_HREF } from '@/lib/watch/start';
 
 /**
  * The changes Dash proposed in one answer, drawn under it (plan #1190,
@@ -133,6 +134,16 @@ export function DashChangeRow({
       </p>
 
       {from && <p className="text-small text-ink-muted">{from}</p>}
+
+      {change.kind === 'start_watch' && !change.input.pushOn && !settled && (
+        <p className="text-small text-caution">
+          {NO_PUSH}{' '}
+          <Link href={PUSH_SETTINGS_HREF} className="text-accent underline-offset-2 hover:underline">
+            Switch push on
+          </Link>{' '}
+          in Account, on your phone.
+        </p>
+      )}
 
       {change.status === 'proposed' && (
         <div className="flex flex-wrap items-center gap-2">

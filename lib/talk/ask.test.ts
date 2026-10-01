@@ -458,7 +458,7 @@ describe('askDash proposals', () => {
     expect(sent[0].tools.map((t) => t.name)).toEqual(
       expect.arrayContaining(['propose_todo', 'propose_goal_step', 'propose_returned', 'answer']),
     );
-    expect(sent[0].system[0].text).toContain('YOU CAN PROPOSE THREE CHANGES');
+    expect(sent[0].system[0].text).toContain('YOU CAN PROPOSE FOUR CHANGES');
     expect(sent[0].system[0].text).not.toContain('You only read');
 
     // One proposed change, in this conversation, in the shape insertStep takes.
@@ -528,7 +528,7 @@ describe('askDash proposals', () => {
       stores,
     );
     const back = sent[1].messages[sent[1].messages.length - 1].content as Anthropic.ToolResultBlockParam[];
-    expect(back[0].content).toContain('You can propose only a todo, a goal step or a return');
+    expect(back[0].content).toContain('You can propose only a todo, a goal step, a return or a watch');
     expect(executed).toEqual([]);
     expect(changes).toEqual([]);
   });

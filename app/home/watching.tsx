@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { money } from '@/lib/watch/format';
 import { whenLabel } from '@/lib/shell/home-model';
+import { StopWatchButton } from './stop-watch';
 import {
   endsLabel,
   hearLabel,
@@ -129,7 +130,7 @@ function WatchRow({ row, now, timezone }: { row: WatchingRow; now: Date; timezon
           <span className="tabular text-body font-semibold text-ink">
             {row.latest !== null ? money(row.latest, row.currency) : '--'}
           </span>
-          {/* The stop control (#1296) goes here, under the price. */}
+          <StopWatchButton id={row.id} />
         </div>
       </div>
     </li>

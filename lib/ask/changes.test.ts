@@ -141,6 +141,7 @@ function setup(opts: { status?: string; turnId?: string | null; kind?: string; i
     ],
     'public.order_items': [{ id: id(99), order_id: id(98) }],
     'public.returns': [],
+    'core.watches': [],
   };
   const client = fakeDb(tables);
   const change: Row = {
@@ -409,5 +410,83 @@ describe('what can be pressed when', () => {
   it('answers for a change that is not there', async () => {
     const { deps } = setup();
     expect(await confirmChange(deps, id(999))).toEqual({ ok: false, error: 'That change is not there any more.', change: null });
+  });
+});
+
+const WATCH_INPUT = {
+  title: 'Jamie xx at Nowadays',
+  url: 'https://www.crowdvolt.com/event/jamie-xx',
+  below: 200,
+  currency: 'USD',
+  reportTimes: ['09:00'],
+  endsAt: '2026-10-19T03:59:00.000Z',
+  endsOn: '2026-10-18',
+  goalItemId: id(2),
+  goalTitle: 'Buy the tickets',
+  pushOn: true,
+};
+
+describe('start_watch', () => {
+  it('confirming inserts the running watch as the person, with no workspace needed; undoing removes it', async () => {
+    const { tables, deps, change } = setup({ kind: 'start_watch', input: WATCH_INPUT, enabled: [] });
+    const confirmed = await confirmChange(deps, change.id as string);
+    expect(confirmed.ok).toBe(true);
+    expect(tables['core.watches']).toEqual([
+      expect.objectContaining({
+        user_id: ME,
+        title: 'Jamie xx at Nowadays',
+        url: 'https://www.crowdvolt.com/event/jamie-xx',
+        condition: { below: 200, currency: 'USD' },
+        report_times: ['09:00'],
+        ends_at: '2026-10-19T03:59:00.000Z',
+        goal_item_id: id(2),
+      }),
+    ]);
+    const watchId = tables['core.watches'][0].id as string;
+    expect(confirmed.ok && confirmed.change).toMatchObject({ writtenTable: 'core.watches', writtenRef: watchId });
+    expect(confirmed.ok && changeHref(confirmed.change)).toBe(`/home#watch-${watchId}`);
+
+    // The run would set these; the fake leaves them unset.
+    Object.assign(tables['core.watches'][0], { status: 'running', fired_at: null, reported_at: null });
+    const undone = await undoChange(deps, change.id as string);
+    expect(undone.ok).toBe(true);
+    expect(tables['core.watches']).toEqual([]);
+  });
+
+  it('a report-only watch keeps an empty condition', async () => {
+    const input = { ...WATCH_INPUT, below: null, currency: null, goalItemId: null, goalTitle: null };
+    const { tables, deps, change } = setup({ kind: 'start_watch', input });
+    expect((await confirmChange(deps, change.id as string)).ok).toBe(true);
+    expect(tables['core.watches'][0]).toMatchObject({ condition: {}, goal_item_id: null });
+  });
+
+  it('refuses to start one that would already have ended, or a second on the same page', async () => {
+    const late = setup({ kind: 'start_watch', input: { ...WATCH_INPUT, endsAt: '2026-09-29T11:00:00Z' } });
+    expect(await confirmChange(late.deps, late.change.id as string)).toMatchObject({
+      ok: false,
+      error: 'That watch would already have ended. Ask Dash again with a later end.',
+    });
+    expect(late.tables['core.watches']).toEqual([]);
+
+    const twice = setup({ kind: 'start_watch', input: WATCH_INPUT });
+    twice.tables['core.watches'].push({ id: id(700), user_id: ME, url: WATCH_INPUT.url, status: 'running' });
+    expect(await confirmChange(twice.deps, twice.change.id as string)).toMatchObject({ ok: false });
+    expect(twice.tables['core.watches']).toHaveLength(1);
+  });
+
+  it('will not undo a watch that has pushed or been stopped', async () => {
+    for (const [moved, error] of [
+      [{ status: 'running', fired_at: '2026-09-30T10:00:00Z', reported_at: null }, 'already sent you a push'],
+      [{ status: 'running', fired_at: null, reported_at: '2026-09-30T13:00:00Z' }, 'already sent you a push'],
+      [{ status: 'stopped', fired_at: null, reported_at: null }, 'been stopped since'],
+    ] as const) {
+      const { tables, deps, change } = setup({ kind: 'start_watch', input: WATCH_INPUT });
+      await confirmChange(deps, change.id as string);
+      Object.assign(tables['core.watches'][0], moved);
+      const undone = await undoChange(deps, change.id as string);
+      expect(undone.ok).toBe(false);
+      expect(!undone.ok && undone.error).toContain(error);
+      expect(tables['core.watches']).toHaveLength(1);
+    }
   });
 });
