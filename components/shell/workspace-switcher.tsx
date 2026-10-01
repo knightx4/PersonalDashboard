@@ -221,6 +221,9 @@ export function WorkspaceSwitcher({
         }}
         aria-haspopup="menu"
         aria-expanded={open}
+        // Where capture flies an item filed into a workspace whose own nav
+        // row is not on screen (components/ui/landed.ts).
+        data-capture-switcher=""
         // No shortcut on the button: ⌘K goes to the search, not here, and the
         // chip saying otherwise was note e16311ad. ⌘1 to ⌘4 jump straight to a
         // workspace without opening this at all.
