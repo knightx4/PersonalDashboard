@@ -14,6 +14,7 @@ import { cn } from '@/lib/cn';
 import { AlsoInLine } from '@/components/news/also-in';
 import { SaveStoryButton } from '@/components/news/save-story-button';
 import { StoryGrid } from '@/components/news/story-grid';
+import { StoryRating } from '@/components/news/story-rating';
 import { StoryText } from '@/components/news/story-text';
 import type { AlsoIn } from '@/lib/news/quick/next';
 import type { NewsStory } from '@/lib/news/issues/stories';
@@ -194,6 +195,7 @@ export function IssueView({
                 summary: story.summary,
                 image: story.image ?? null,
                 link: story.link ?? null,
+                rating: story.rating,
                 body: (
                   <>
                     <AlsoInLine
@@ -237,6 +239,7 @@ export function IssueView({
                         <h3 className="break-words text-body font-semibold text-ink">
                           {story.headline}
                         </h3>
+                        <StoryRating rating={story.rating} className="mt-0.5 block" />
                         <p className="mt-1 text-body leading-relaxed text-ink-muted">
                           {story.summary}
                         </p>
@@ -324,6 +327,7 @@ function LeadStory({
         <h2 className="break-words text-title font-semibold tracking-tight text-ink">
           {story.headline}
         </h2>
+        <StoryRating rating={story.rating} className="mt-1 block" />
         <p className="mt-2 text-body leading-relaxed text-ink-muted">{story.summary}</p>
         <AlsoInLine alsoIn={alsoIn} pictures={pictures} className="mt-1.5" />
         <StoryText text={story.text} summary={story.summary} />

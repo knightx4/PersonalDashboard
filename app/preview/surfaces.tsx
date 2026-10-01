@@ -1770,6 +1770,7 @@ const quickStory: QuickReadViewProps = {
     ],
     repeats: [],
     reason: 'Ran in 3 of your newsletters',
+    rating: 81,
   },
   arrived: '22 Sep, 07:14',
   nothingYet: false,
@@ -1854,6 +1855,7 @@ const gridStories: GridStory[] = [
     summary: issueBase.digest!.stories[0].summary,
     image: issueBase.digest!.stories[0].image,
     from: 'Infra Weekly',
+    rating: 81,
     link: issueBase.digest!.stories[0].link,
     body: (
       <StoryText
@@ -1869,6 +1871,7 @@ const gridStories: GridStory[] = [
       'Container traffic on the main northern routes is up nine percent on last year, mostly from ports diverting cargo away from congested motorways.',
     image: previewPicture('1e3a8a', '60a5fa'),
     from: 'The Morning Ledger',
+    rating: 58,
     link: 'https://example.com/ledger/rail-freight',
   },
   {

@@ -68,6 +68,11 @@ export type QuickCard = QuickCardBody & {
   repeats: StoryPass[];
   /** Why the card is near the top, when something stands out (rankReason). */
   reason: string | null;
+  /**
+   * How much the event matters, out of 100: the highest rating any newsletter's
+   * telling of it got, as Quick read ranks it. Absent while none is rated.
+   */
+  rating?: number;
 };
 
 /**
@@ -310,6 +315,7 @@ function rankedCards(
       reason: interest
         ? rankReason({ newsletters, rating, topic, topicLean, from, senderLean })
         : null,
+      ...(rating !== undefined && { rating }),
     };
     return { card, score, order: c.order };
   });

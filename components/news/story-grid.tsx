@@ -1,6 +1,7 @@
 import { ExternalLink } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { StoryRating } from './story-rating';
 import { gridSpans, type GridSpan } from '@/lib/news/story-grid';
 
 /**
@@ -16,6 +17,8 @@ export type GridStory = {
   image?: string | null;
   /** The newsletter's name, shown above the headline. Leave it out on a newsletter's own page. */
   from?: string | null;
+  /** How much the story matters, out of 100, shown above the headline. Absent while unrated. */
+  rating?: number | null;
   /**
    * The article, drawn as "Read the article" at the foot of the card. Leave it
    * out and put your own link in `actions` when the click has to be recorded.
@@ -142,11 +145,16 @@ function StoryGridCard({
         <div
           className={cn('flex min-w-0 flex-1 flex-col', compact ? 'card-pad-dense' : 'card-pad')}
         >
-          {story.from && <p className="truncate text-ui text-ink-muted">{story.from}</p>}
+          {(story.from || story.rating != null) && (
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="min-w-0 truncate text-ui text-ink-muted">{story.from}</p>
+              <StoryRating rating={story.rating} />
+            </div>
+          )}
           <Heading
             className={cn(
               'break-words text-ink',
-              story.from && 'mt-1',
+              (story.from || story.rating != null) && 'mt-1',
               lead
                 ? cn(
                     'font-display tracking-tight',

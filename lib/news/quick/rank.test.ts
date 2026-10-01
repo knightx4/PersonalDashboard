@@ -273,6 +273,6 @@ describe('importance', () => {
         now: NOW,
       },
     );
-    expect(card).toMatchObject({ issueId: 'l', reason: 'A major story' });
+    expect(card).toMatchObject({ issueId: 'l', reason: 'A major story', rating: 100 });
   });
 });

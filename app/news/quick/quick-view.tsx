@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Image as ImageIcon, ImageOff, Mail } from 'lucide-react';
 import { AlsoInLine } from '@/components/news/also-in';
+import { StoryRating } from '@/components/news/story-rating';
 import { QueueCleared } from '@/components/ui/queue-cleared';
 import { SaveStoryButton } from '@/components/news/save-story-button';
 import { StoryGrid, type GridStory } from '@/components/news/story-grid';
@@ -331,10 +332,13 @@ function PhoneCard({
             />
           )}
           <div className="card-pad">
-            <p className="truncate text-ui text-ink-muted">
-              {card.from ?? 'Unknown sender'}
-              {arrived && ` · ${arrived}`}
-            </p>
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="min-w-0 truncate text-ui text-ink-muted">
+                {card.from ?? 'Unknown sender'}
+                {arrived && ` · ${arrived}`}
+              </p>
+              <StoryRating rating={card.rating} />
+            </div>
             <AlsoInLine reason={card.reason} alsoIn={card.alsoIn} pictures={pictures} />
             <h2 className="mt-1 break-words font-display text-title tracking-tight text-ink">
               {headline}
@@ -431,6 +435,7 @@ function gridStory(
     summary: story.summary,
     image: story.image ?? null,
     from,
+    rating: card.rating,
     body: (
       <>
         <AlsoInLine
