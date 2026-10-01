@@ -139,8 +139,9 @@ export const SPEND_OPERATIONS = {
     // Embedding a new issue's stories to find the same event in other
     // newsletters. Voyage; background, beside the digest.
     'group-stories',
-    // Rating the importance of stories stored before the digest rated them.
-    // Haiku, one short call per newsletter; background, from the digest cron.
+    // Rating each story out of 100 once its newsletter is summarised. Jev, one
+    // call per story, with Haiku for the stories Jev could not answer;
+    // background, on arrival and from the digest cron.
     'score-importance',
     // The one-off measurement script behind #872, run by hand. Voyage.
     'measure-repeats',

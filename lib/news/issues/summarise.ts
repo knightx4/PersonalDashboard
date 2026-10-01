@@ -5,6 +5,7 @@ import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
 import { digestIssue, type DigestOutcome } from './digest';
 import { groupStories } from './groups';
+import { rateNewIssue } from './importance';
 
 /**
  * When a newsletter is summarised (plan #787). #784 settled it: on arrival, so
@@ -36,6 +37,11 @@ import { groupStories } from './groups';
  * repeat one from another newsletter in the last two days. It never makes a
  * summary fail: a grouping that cannot embed or save is logged and the issue
  * is left ungrouped.
+ *
+ * Rating (plan #1170). On arrival, once the issue is summarised and grouped,
+ * its stories are rated out of 100 (rateNewIssue in importance.ts) so Quick
+ * read can rank them straight away. The catch-up leaves rating to the
+ * scorePending pass that follows it in the same hourly run.
  */
 
 /**
@@ -109,6 +115,9 @@ export async function digestOnArrival(
       console.warn(`news: summarising issue ${input.issueId} failed (${outcome.error})`);
     }
     await groupAfterDigest(input, outcome);
+    if (outcome.status === 'digested') {
+      await rateNewIssue({ ...input, anthropicApiKey: input.anthropicApiKey });
+    }
     return outcome.status;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

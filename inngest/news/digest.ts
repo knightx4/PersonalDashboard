@@ -17,10 +17,11 @@ import { digestPending, type PendingTally } from '@/lib/news/issues/summarise';
  * through `/api/cron/news-digest`
  * (supabase/migrations/0100_news_digest_tick_cron.sql).
  *
- * With time left it rates the stories of newsletters summarised before
- * stories were rated (lib/news/issues/importance.ts), newest first, so Quick
- * read can rank them by importance. Once every stored newsletter is rated this
- * is one query and no model call.
+ * With time left it rates out of 100 the stories of every newsletter that has
+ * no ratings (lib/news/issues/importance.ts), newest first, so Quick read can
+ * rank them by importance: the ones summarised here, any whose rating failed
+ * on arrival, and those rated 1 to 5 before October 2026. Once every stored
+ * newsletter is rated this is one query and no model call.
  */
 
 /** Most issues one run takes on. One Haiku call each, of up to about forty seconds. */
@@ -29,7 +30,7 @@ export const NEWS_DIGEST_PER_RUN = 10;
 /** Time after which a run starts no new issue. The route's limit is 300 seconds. */
 export const NEWS_DIGEST_BUDGET_MS = 200_000;
 
-/** Most newsletters one run rates. One short Haiku call each, a few seconds long. */
+/** Most newsletters one run rates. One Jev call per story, all at once, a few seconds each. */
 export const NEWS_SCORE_PER_RUN = 40;
 
 export async function runNewsDigestTick(): Promise<PendingTally & { rated: ScoreTally }> {

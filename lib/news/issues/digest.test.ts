@@ -685,19 +685,3 @@ describe('reading the purpose', () => {
     expect(none.news.updates[0]).toMatchObject({ purpose: null });
   });
 });
-
-describe('readDigest importance', () => {
-  it('keeps each story rating from 1 to 5 and drops any other', () => {
-    const digest = readDigest({
-      summary: 'Two things.',
-      stories: [
-        { headline: 'Ruling', summary: 'A judge ruled.', topic: 'Politics', importance: 5 },
-        { headline: 'Quiz', summary: 'Try it.', topic: 'Other', importance: 11 },
-      ],
-    });
-    expect(typeof digest === 'string' ? [] : digest.stories.map((s) => s.importance)).toEqual([
-      5,
-      undefined,
-    ]);
-  });
-});

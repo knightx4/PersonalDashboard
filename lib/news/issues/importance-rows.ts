@@ -1,4 +1,4 @@
-import { readImportance } from './stories';
+import { readRating } from './stories';
 
 /**
  * The pure half of importance.ts: which stored stories still need a rating,
@@ -25,7 +25,7 @@ export function unrated(stories: unknown): Unrated[] {
     const raw = entry as Record<string, unknown>;
     const headline = text(raw.headline);
     const summary = text(raw.summary);
-    if (!headline || !summary || readImportance(raw.importance)) return;
+    if (!headline || !summary || readRating(raw.rating) !== undefined) return;
     found.push({ index, headline, summary, topic: text(raw.topic) });
   });
   return found;
@@ -35,7 +35,7 @@ export function unrated(stories: unknown): Unrated[] {
  * `stories` with each rating written onto the entry it names. A rating is
  * used only when its number is one of `asked` and the entry at that position
  * still carries the headline it was asked about, and only when it is a whole
- * number from 1 to 5. Everything else in the array is left as it was.
+ * number from 0 to 100. Everything else in the array is left as it was.
  */
 export function applyRatings(
   stories: unknown,
@@ -46,15 +46,15 @@ export function applyRatings(
   const byIndex = new Map(asked.map((story) => [story.index, story.headline]));
   const next = [...stories];
   let rated = 0;
-  for (const rating of ratings) {
-    if (!rating || typeof rating !== 'object') continue;
-    const { number, importance } = rating as Record<string, unknown>;
-    const value = readImportance(importance);
-    if (typeof number !== 'number' || !value || !byIndex.has(number)) continue;
+  for (const item of ratings) {
+    if (!item || typeof item !== 'object') continue;
+    const { number, rating } = item as Record<string, unknown>;
+    const value = readRating(rating);
+    if (typeof number !== 'number' || value === undefined || !byIndex.has(number)) continue;
     const entry = next[number];
     if (!entry || typeof entry !== 'object') continue;
     if (text((entry as Record<string, unknown>).headline) !== byIndex.get(number)) continue;
-    next[number] = { ...(entry as object), importance: value };
+    next[number] = { ...(entry as object), rating: value };
     byIndex.delete(number);
     rated += 1;
   }

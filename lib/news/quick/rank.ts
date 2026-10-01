@@ -1,4 +1,3 @@
-import type { Importance } from '@/lib/news/issues/stories';
 import { readTopic, type NewsTopic } from '@/lib/news/issues/topics';
 
 /**
@@ -10,11 +9,12 @@ import { readTopic, type NewsTopic } from '@/lib/news/issues/topics';
  * again from each newsletter that covered it. This ranks every story left
  * across them instead, from five things:
  *
- * - How much it matters: the 1 to 5 rating Haiku gives each story
- *   (importance-rubric.ts). Each point above or below 3 is IMPORTANCE_STEP,
- *   so a 5 from yesterday you have not seen still comes before a 4 from this
- *   morning, and a 1 sinks below yesterday's ordinary news. This is what makes the order a front page
- *   rather than a pile of newsletters.
+ * - How much it matters: the rating out of 100 Jev gives each story
+ *   (lib/news/issues/importance.ts). Every 25 points above or below 50 is
+ *   IMPORTANCE_STEP, so a 100 from yesterday you have not seen still comes
+ *   before a 75 from this morning, and a 0 sinks below yesterday's ordinary
+ *   news. This is what makes the order a front page rather than a pile of
+ *   newsletters.
  * - How new it is. A story halves in weight every FRESH_HALF_LIFE_HOURS.
  * - How many of your newsletters ran it. Each one past the first adds
  *   COVERAGE_STEP, up to COVERAGE_CAP: an event five of them led with is
@@ -31,7 +31,10 @@ import { readTopic, type NewsTopic } from '@/lib/news/issues/topics';
  */
 
 export const FRESH_HALF_LIFE_HOURS = 36;
+/** Weight per 25 points of rating above or below 50. */
 export const IMPORTANCE_STEP = 0.4;
+/** The rating from which a card says it is a major story. */
+export const MAJOR_RATING = 85;
 export const COVERAGE_STEP = 0.4;
 export const COVERAGE_CAP = 1.2;
 export const LEAD_BONUS = 0.2;
@@ -121,8 +124,8 @@ export type RankInput = {
   newsletters: number;
   /** Whether it was the first story of a newsletter with more than one. */
   lead: boolean;
-  /** Its rating, or undefined while it has none. */
-  importance?: Importance;
+  /** Its rating out of 100, or undefined while it has none. */
+  rating?: number;
   topicLean: number;
   senderLean: number;
 };
@@ -134,29 +137,30 @@ export function storyScore(input: RankInput, now: number): number {
   const fresh = Number.isFinite(hours) ? 0.5 ** (hours / FRESH_HALF_LIFE_HOURS) : 0;
   const coverage = Math.min(COVERAGE_CAP, COVERAGE_STEP * Math.max(0, input.newsletters - 1));
   const weight =
-    input.importance === undefined
+    input.rating === undefined
       ? input.lead
         ? LEAD_BONUS
         : 0
-      : IMPORTANCE_STEP * (input.importance - 3);
+      : (IMPORTANCE_STEP * (input.rating - 50)) / 25;
   return fresh + coverage + weight + input.topicLean + input.senderLean;
 }
 
 /**
  * The one line a card gives for why it is near the top, or null when nothing
  * stands out. Coverage by three or more newsletters says it first. Two is
- * already said by the card's "Also in" line. Then a story rated 5.
+ * already said by the card's "Also in" line. Then a story rated MAJOR_RATING
+ * or more.
  */
 export function rankReason(input: {
   newsletters: number;
-  importance?: Importance;
+  rating?: number;
   topic: NewsTopic | undefined;
   topicLean: number;
   from: string | null;
   senderLean: number;
 }): string | null {
   if (input.newsletters >= 3) return `Ran in ${input.newsletters} of your newsletters`;
-  if (input.importance === 5) return 'A major story';
+  if (input.rating !== undefined && input.rating >= MAJOR_RATING) return 'A major story';
   if (input.topic && input.topic !== 'Other' && input.topicLean >= REASON_LEAN) {
     return `You often open ${input.topic} stories`;
   }

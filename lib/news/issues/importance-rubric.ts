@@ -1,8 +1,8 @@
 /**
- * How a story's importance is judged, written once for both places that rate
- * it: the digest call that summarises a new newsletter (digest.ts) and the
- * catch-up that rates stories stored before ratings existed (importance.ts).
- * One wording keeps the two scales the same.
+ * How a story's importance is judged, for the Haiku call that rates the
+ * stories Jev could not answer (importance.ts). Jev's question
+ * (importance-jev.ts) words its five levels from the same five points, so a
+ * Haiku 3 and a Jev 3 both land on 50 of 100.
  *
  * The rating is about the news, not the reader: what you tend to open is
  * learned separately (lib/news/quick/rank.ts), and a rating that leaned on

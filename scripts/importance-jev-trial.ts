@@ -9,19 +9,15 @@
  * first eight characters, the story's position in its newsletter, its topic,
  * headline and summary, and Haiku's stored rating. It is exported from
  * news.issues (the query is in docs/trials/2026-10-01-jev-news-importance.md).
- * Needs TYPESAFE_API_KEY. The question, the state and the level-to-rating
- * mapping are the ones the catch-up uses (lib/news/issues/importance-jev.ts),
- * and the floor is decideWithJev's, so the trial reads what the job would do.
+ * Needs TYPESAFE_API_KEY. The question and the state are the ones the job
+ * uses (lib/news/issues/importance-jev.ts). Jev's nearest level is compared
+ * with Haiku's 1 to 5, and the floor is decideWithJev's default.
  * The optional second argument is where to write every answer as JSON.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { JEV_CONFIDENCE_FLOOR } from '../lib/jev/decide';
 import { askJev, jevApiKey } from '../lib/jev/wire';
-import {
-  IMPORTANCE_QUESTION,
-  ratingFromLevel,
-  storyState,
-} from '../lib/news/issues/importance-jev';
+import { IMPORTANCE_QUESTION, storyState } from '../lib/news/issues/importance-jev';
 
 type TrialStory = { i: string; p: number; t: string | null; h: string; s: string; r: number };
 
@@ -58,7 +54,7 @@ async function main() {
       rows[index] = result.ok
         ? {
             ...story,
-            jev: ratingFromLevel(result.answer.level),
+            jev: result.answer.level + 1,
             score: result.answer.score,
             confidence: result.answer.confidence,
             probabilities: result.answer.probabilities,

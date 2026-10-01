@@ -138,3 +138,15 @@ the 264 that clear 0.8, 141 match Haiku and only 6 are two or more apart.
 3. With Jev using 3 more often, importance will move stories less, and
    freshness and coverage will carry more of Quick read's order. Check how the
    first week looks before retuning `IMPORTANCE_STEP`.
+
+## What was done
+
+The same day, Jev took over every rating, on a scale of 0 to 100 at the plan
+owner's request rather than 1 to 5. The rating is Jev's probability-weighted
+score spread over 0 to 100, kept on each story as `rating`, and it is used
+whatever Jev's confidence. Haiku rates only the stories Jev could not answer,
+and its 1 to 5 lands on 0, 25, 50, 75 or 100. The digest call no longer rates
+stories. A new newsletter is rated as soon as it is summarised, and the hourly
+catch-up gives every newsletter rated 1 to 5 before this a rating out of 100,
+40 newsletters a run. Quick read weighs every 25 points above or below 50 as
+it weighed one point above or below 3, and calls a story major from 85.

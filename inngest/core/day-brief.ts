@@ -116,7 +116,7 @@ async function newsStory(userId: string, now: Date): Promise<{ headline: string;
   for (const row of (data ?? []) as unknown as IssueRow[]) {
     const sender = Array.isArray(row.senders) ? row.senders[0] : row.senders;
     for (const story of readStories(row.stories)) {
-      const importance = story.importance ?? 0;
+      const importance = story.rating ?? -1;
       if (!best || importance > best.importance) {
         best = { headline: story.headline, sender: sender?.name ?? null, importance };
       }

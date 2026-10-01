@@ -10,7 +10,6 @@ import { forceTool } from '@/lib/learn/graph/tool-call';
 import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
 import { readStories, type NewsStory } from '@/lib/news/issues/stories';
 import { FALLBACK_TOPIC, NEWS_TOPICS, readTopic } from '@/lib/news/issues/topics';
-import { IMPORTANCE_RUBRIC } from './importance-rubric';
 
 /**
  * A newsletter's summary and stories, written by Haiku from the body already
@@ -57,10 +56,9 @@ import { IMPORTANCE_RUBRIC } from './importance-rubric';
  * on the list, is stored as Other, so every story digested from here on has
  * one.
  *
- * Importance. The model also rates each story from 1 to 5 by
- * IMPORTANCE_RUBRIC (importance-rubric.ts), kept on the story as `importance`,
- * which Quick read ranks by. A rating that is not a whole number from 1 to 5
- * is dropped and the story kept without one.
+ * Importance. This call does not rate stories. Jev rates each one out of 100
+ * once the issue is saved (importance.ts), judging the story alone, where
+ * this call would see where the newsletter placed it.
  *
  * Purpose. The model also says what the issue is for, one of ISSUE_PURPOSES,
  * stored as `purpose` by 0014_issue_purpose.sql. Quick read leaves out every
@@ -174,8 +172,6 @@ place, such as its city government, mayor, transit, schools, neighbourhoods or
 events there, is Local, even where another topic would also fit. When no local
 area is named, never pick Local.
 
-${IMPORTANCE_RUBRIC}
-
 PURPOSE. Say what the issue as a whole is for:
 news: it reports or analyses events, ideas or information, including a single
   essay, column or opinion piece.
@@ -236,13 +232,8 @@ const TOOL = {
               enum: [...NEWS_TOPICS],
               description: 'The one topic from the list that fits this story best.',
             },
-            importance: {
-              type: 'integer',
-              enum: [1, 2, 3, 4, 5],
-              description: 'How much a well-informed reader needs to know this story, 1 to 5.',
-            },
           },
-          required: ['headline', 'summary', 'topic', 'importance'],
+          required: ['headline', 'summary', 'topic'],
         },
       },
     },

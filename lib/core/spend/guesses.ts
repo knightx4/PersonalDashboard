@@ -296,7 +296,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // News. All but the last two from the digest cron or a script.
   'digest-issue': background(unit(HAIKU, 3_000, 300)),
   'group-stories': background(unit(VOYAGE_LITE, 2_000, 0)),
-  'score-importance': background(unit(HAIKU, 1_500, 200)),
+  // About twenty stories a newsletter, each put to Jev on its own.
+  'score-importance': background(unit(JEV, 12_000, 0)),
   'measure-repeats': background(run(VOYAGE_LITE, 100_000, 0)),
   // Up to 24 searches, whose results are read back in on each round.
   'recommend-newsletters': run(OPUS, 60_000, 5_000),
