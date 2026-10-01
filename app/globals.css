@@ -1725,6 +1725,28 @@ body[data-keyhints] .keyhint {
   animation: goal-fold 300ms var(--ease-out-soft) 450ms both;
 }
 
+/* A queue cleared on screen (plan #1340): the quiet-day sigil draws in cell by
+ * cell, in reading order, each cell growing from 40% and fading up to its own
+ * opacity. QueueCleared in components/ui/queue-cleared.tsx puts the class on
+ * the wrapper round the list only for a clear made while you watch, so a page
+ * loaded already empty shows the sigil at once. 240ms a cell, 40ms apart, so
+ * the fourteen cells of the busiest sigil are all in by 760ms. */
+@keyframes sigil-cell {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+
+@utility sigil-draw-in {
+  & [data-sigil-cell] {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: sigil-cell 240ms var(--ease-out-soft) both;
+    animation-delay: calc(var(--sigil-cell, 0) * 40ms);
+  }
+}
+
 /* The Dash mark (components/ui/dash-mark.tsx). Working moves the node round
  * the grid at one pace and never fills, since a run reports no steps; done
  * swells once as it settles. Each state has its own shape as well, so both
@@ -1863,6 +1885,10 @@ body[data-keyhints] .keyhint {
 
   .dash-mark-orbit,
   .dash-mark-flash {
+    animation: none;
+  }
+
+  .sigil-draw-in [data-sigil-cell] {
     animation: none;
   }
 }

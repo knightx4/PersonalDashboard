@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { QueueCleared } from '@/components/ui/queue-cleared';
 import { AddTask } from '@/components/todo/task-form';
 import { TaskRow } from '@/components/todo/task-row';
 import { AgendaItemRow } from '@/components/todo/agenda-item-row';
@@ -61,6 +62,8 @@ export default async function TodoPage() {
           read on the Goals home (plan #1268). Absent at zero. */}
       <DashResultsLine count={dashResults} className="mt-4 px-1" />
 
+      {/* Ticking off the last thing draws the day's sigil in (plan #1340). */}
+      <QueueCleared cleared={empty}>
       {empty ? (
         <EmptyState
           tone="finished"
@@ -149,6 +152,7 @@ export default async function TodoPage() {
           })}
         </div>
       )}
+      </QueueCleared>
     </div>
   );
 }

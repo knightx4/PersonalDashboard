@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { cn } from '@/lib/cn';
 
 /**
@@ -18,6 +19,12 @@ import { cn } from '@/lib/cn';
  *
  * Drawn in `currentColor`, so it takes the workspace accent from wherever it
  * is placed, and costs one inline SVG.
+ *
+ * Each cell carries `data-sigil-cell` and its place in reading order as
+ * `--sigil-cell`, so an ancestor with `sigil-draw-in` (app/globals.css) can
+ * draw the mark in cell by cell when a queue is cleared on screen
+ * (QueueCleared in components/ui/queue-cleared.tsx). Without that class the
+ * cells are simply there.
  */
 
 /** FNV-1a, 32-bit. Small, stable, and good enough to scatter cells. */
@@ -34,6 +41,27 @@ const GRID = 5;
 const CELL = 8;
 const NODE = 6.2;
 const BOX = GRID * CELL;
+
+/** The gap between one cell starting to draw in and the next, as in app/globals.css. */
+export const SIGIL_CELL_STAGGER_MS = 40;
+/**
+ * The last place in the stagger. A sigil has fourteen cells at most when its
+ * seed draws well; one that ran out of attempts can have more, and those land
+ * with the fourteenth, so the draw is never longer than sigilDrawMs(14).
+ */
+const SIGIL_LAST_STAGGER = 13;
+/** How long one cell takes to draw in, as in app/globals.css. */
+export const SIGIL_CELL_MS = 240;
+
+/**
+ * How long drawing in a sigil of `cells` cells takes, from the first cell
+ * starting to the last one landing. Fourteen cells, the most a sigil has,
+ * take 760ms.
+ */
+export function sigilDrawMs(cells: number): number {
+  if (cells <= 0) return 0;
+  return Math.min(cells - 1, SIGIL_LAST_STAGGER) * SIGIL_CELL_STAGGER_MS + SIGIL_CELL_MS;
+}
 
 export function sigilCells(seed: string): { x: number; y: number; key: boolean }[] {
   let h = hash(seed);
@@ -94,9 +122,11 @@ export function Sigil({
       aria-hidden
       focusable="false"
     >
-      {cells.map((cell) => (
+      {cells.map((cell, index) => (
         <rect
           key={`${cell.x}-${cell.y}`}
+          data-sigil-cell=""
+          style={{ '--sigil-cell': String(Math.min(index, SIGIL_LAST_STAGGER)) } as CSSProperties}
           x={cell.x * CELL + (CELL - NODE) / 2}
           y={cell.y * CELL + (CELL - NODE) / 2}
           width={NODE}

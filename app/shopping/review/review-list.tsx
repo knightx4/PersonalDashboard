@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { QueueCleared } from '@/components/ui/queue-cleared';
 import {
   SelectionActionBar,
   SelectionCheckbox,
@@ -113,6 +114,9 @@ export function ReviewQueue({
         bulk={<ReviewBulkBar rows={rows} />}
       />
 
+      {/* Working the last row draws the day's sigil in (plan #1340); keyed
+          by the view, so switching to an empty filter is not a clear. */}
+      <QueueCleared key={view} cleared={view === 'all' && rows.length === 0}>
       {rows.length === 0 ? (
         <EmptyState
           icon={ClipboardCheck}
@@ -139,6 +143,7 @@ export function ReviewQueue({
           )}
         </ul>
       )}
+      </QueueCleared>
     </SelectionProvider>
   );
 }
