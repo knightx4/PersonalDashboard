@@ -633,6 +633,105 @@ describe('todo.calendar_feeds and todo.feed_events', () => {
   });
 });
 
+describe('todo.task_links to a subscribed appointment (plan #1373)', () => {
+  // The fourteenth target names the appointment rather than its row, because
+  // a refresh deletes and rewrites every feed_events row a subscription owns.
+  // feed_id is a real key, so it carries the same hole as every other key on
+  // task_links and the ownership trigger has to close it.
+  const key = randomBytes(32).toString('base64');
+  let feedA = '';
+  let feedB = '';
+  let task = '';
+
+  beforeAll(async () => {
+    const feedOf = async (user: string, name: string) => {
+      const [feed] = await admin<{ id: string }[]>`
+        insert into calendar_feeds (user_id, name, address)
+        values (${user}, ${name}, ${encryptToken(`https://example.com/${name}.ics`, key)})
+        returning id`;
+      return feed.id;
+    };
+    feedA = await feedOf(userA, 'Work');
+    feedB = await feedOf(userB, 'Theirs');
+    const [row] = await admin<{ id: string }[]>`
+      insert into tasks (user_id, title) values (${userA}, 'Prepare for the review') returning id`;
+    task = row.id;
+  });
+
+  it("links a task to one date of a meeting in its owner's subscription", async () => {
+    await asUser(userA, (tx) => tx`
+      insert into task_links (task_id, relation, feed_id, feed_uid, feed_occurrence,
+                              feed_title, feed_starts_at)
+      values (${task}, 'about', ${feedA}, 'review@acme', '2026-03-24T10:00:00.000Z',
+              'Weekly review', timestamptz '2026-03-24 10:00+00')`);
+
+    const [row] = await admin<{ feed_uid: string }[]>`
+      select feed_uid from task_links where task_id = ${task}`;
+    expect(row.feed_uid).toBe('review@acme');
+  });
+
+  it('REFUSES a link into another account\'s subscription', async () => {
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into task_links (task_id, relation, feed_id, feed_uid, feed_title, feed_starts_on)
+                   values (${taskA}, 'source', ${feedB}, 'offsite@umbrella', 'Their offsite',
+                           date '2026-03-10')`,
+      ),
+    ).rejects.toThrow(/must point at something/);
+  });
+
+  it('refuses an appointment link with no name to fall back on, or with half a start', async () => {
+    await expect(
+      admin`insert into task_links (task_id, relation, feed_id, feed_uid, feed_starts_on)
+            values (${taskA}, 'source', ${feedA}, 'nameless@acme', date '2026-03-10')`,
+    ).rejects.toThrow(/task_links_appointment_ck/);
+
+    await expect(
+      admin`insert into task_links (task_id, relation, feed_id, feed_uid, feed_title)
+            values (${taskA}, 'source', ${feedA}, 'when@acme', 'No start')`,
+    ).rejects.toThrow(/task_links_appointment_ck/);
+
+    // And the appointment's columns cannot ride along on a link to something else.
+    const role = await createRole(userA, 'Stray Co');
+    await expect(
+      admin`insert into task_links (task_id, relation, role_id, feed_title)
+            values (${taskA}, 'source', ${role}, 'Stray')`,
+    ).rejects.toThrow(/task_links_appointment_ck/);
+  });
+
+  it('keeps the link when the calendar is read again', async () => {
+    await admin`insert into feed_events (user_id, feed_id, uid, occurrence, title, starts_at, ends_at)
+                values (${userA}, ${feedA}, 'review@acme', '2026-03-24T10:00:00.000Z', 'Weekly review',
+                        timestamptz '2026-03-24 10:00+00', timestamptz '2026-03-24 11:00+00')`;
+    // What a refresh does: everything the subscription contributed, deleted
+    // and written again.
+    await admin`delete from feed_events where feed_id = ${feedA}`;
+    await admin`insert into feed_events (user_id, feed_id, uid, occurrence, title, starts_at, ends_at)
+                values (${userA}, ${feedA}, 'review@acme', '2026-03-24T10:00:00.000Z', 'Weekly review',
+                        timestamptz '2026-03-25 10:00+00', timestamptz '2026-03-25 11:00+00')`;
+
+    const [match] = await admin<{ starts_at: Date }[]>`
+      select e.starts_at from task_links l
+      join feed_events e on e.feed_id = l.feed_id and e.uid = l.feed_uid
+        and e.occurrence is not distinct from l.feed_occurrence
+      where l.task_id = ${task}`;
+    expect(match.starts_at.toISOString()).toBe('2026-03-25T10:00:00.000Z');
+  });
+
+  it('drops the links when the subscription goes, and keeps the task', async () => {
+    await asUser(userA, (tx) => tx`delete from calendar_feeds where id = ${feedA}`);
+
+    const [links] = await admin<{ n: string }[]>`
+      select count(*) as n from task_links where task_id = ${task}`;
+    const [tasks] = await admin<{ n: string }[]>`
+      select count(*) as n from tasks where id = ${task}`;
+
+    expect(Number(links.n)).toBe(0);
+    expect(Number(tasks.n)).toBe(1);
+  });
+});
+
 describe('everything cascades out with the account', () => {
   it('leaves nothing behind', async () => {
     const doomed = await createUser('todo-gone@example.com');

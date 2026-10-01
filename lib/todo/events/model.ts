@@ -109,7 +109,7 @@ function clockIn(iso: string, timezone: string): string {
 }
 
 /** A day, written the way a person says it. */
-function dayLabel(day: string): string {
+export function dayLabel(day: string): string {
   return new Intl.DateTimeFormat('en-GB', {
     timeZone: 'UTC',
     weekday: 'long',

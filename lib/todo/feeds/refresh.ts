@@ -109,9 +109,12 @@ export async function refreshFeed(
 /**
  * Put this subscription's appointments in place of its last ones.
  *
- * Delete and insert rather than a diff: every row here is a copy, nothing else
- * in the app may point at one, and a diff over occurrences of a repeat is
- * work that buys nothing.
+ * Delete and insert rather than a diff: every row here is a copy, and a diff
+ * over occurrences of a repeat is work that buys nothing. A task about one of
+ * these appointments does not point at its row: todo.task_links names it by
+ * (feed_id, uid, occurrence) and finds the new copy each time a page draws
+ * (lib/todo/links/appointment.ts, plan #1373), so rewriting the rows leaves
+ * those links whole.
  */
 async function replaceEvents(
   userId: string,
