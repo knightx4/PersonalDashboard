@@ -57,6 +57,7 @@ describe('the operation names', () => {
       'concepts-from-note',
       'concepts-from-prior',
       'concepts-from-brief',
+      'concepts-from-course',
       'branch-from-selection',
       'name-opening-claims',
       'write-opening-question',

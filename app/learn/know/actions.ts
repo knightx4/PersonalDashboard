@@ -7,6 +7,7 @@ import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { generateChain, type SweptClaim } from '@/lib/learn/graph/generate';
 import { conceptsFromPrior } from '@/lib/learn/graph/from-prior';
+import { conceptsFromCourse, courseLabel } from '@/lib/learn/graph/from-course';
 import {
   approvedBriefSchema,
   conceptsFromBrief,
@@ -407,6 +408,89 @@ export async function approvePrior(
   revalidatePath('/learn/know');
   revalidatePath(`/learn/s/${saved.subjectId}`);
   redirect(`/learn/s/${saved.subjectId}`);
+}
+
+/**
+ * The ideas one course on your transcript probably covered (plan #1390).
+ *
+ * The same first step as `proposePrior`, from a course saved on the vault's
+ * Education tab instead of a paste: it calls the model and writes nothing.
+ * With a track picked it proposes into that track; without one the model is
+ * offered your track names and puts the course into one of them or names a
+ * new one. Approval is #1391's, through saveChain and declareKnown as
+ * `approvePrior` does, with the course_reads row written alongside.
+ */
+
+export type CourseState = PriorState & {
+  /** The course read, shown above the list while it is checked. */
+  course?: { id: string; label: string };
+  /** The track the ideas were matched against, or null for a new one. */
+  subjectId?: string | null;
+};
+
+const CourseInput = z.object({
+  courseId: z.string().uuid('Pick a course.'),
+  subjectId: z.string().uuid().nullable(),
+});
+
+// latency: pending
+export async function proposeFromCourse(
+  _prev: CourseState,
+  formData: FormData,
+): Promise<CourseState> {
+  const user = await requireUser();
+
+  const parsed = CourseInput.safeParse({
+    courseId: formData.get('courseId') ?? '',
+    subjectId: optionalId(formData.get('subjectId')),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Could not read that course.' };
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'Reading a course needs ANTHROPIC_API_KEY to be set.' };
+
+  const { data: course, error: courseError } = await (await createVaultClient())
+    .from('courses')
+    .select('id, school, code, title, term, year, grade')
+    .eq('id', parsed.data.courseId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (courseError) return { error: 'That course could not be read. Try again.' };
+  if (!course) return { error: 'That course is not in the vault any more.' };
+
+  const supabase = await createLearnClient();
+  const subject = parsed.data.subjectId
+    ? await loadSubject(supabase, parsed.data.subjectId)
+    : null;
+  const existing = subject ? await existingConcepts(supabase, subject.id) : [];
+  const tracks = subject ? [] : await loadSubjects(supabase);
+
+  const spend = collectSpend();
+  const result = await conceptsFromCourse({
+    course,
+    subject: subject?.name ?? null,
+    existing,
+    tracks: tracks.map((track) => track.name),
+    existingIn: async (name) => {
+      const track = tracks.find((t) => t.name === name);
+      return track ? existingConcepts(supabase, track.id) : [];
+    },
+    anthropicApiKey: apiKey,
+    onSpend: spend.sink,
+  });
+  await recordLearnSpend(user.id, 'concepts-from-course', spend.reports);
+
+  const read = { id: course.id, label: courseLabel(course) };
+  if (!result.ok) {
+    return result.reason === 'error'
+      ? { course: read, error: result.detail }
+      : { course: read, message: result.detail };
+  }
+
+  const matched = subject ?? tracks.find((track) => track.name === result.chain.subject) ?? null;
+  return { course: read, chain: result.chain, subjectId: matched?.id ?? null };
 }
 
 /**

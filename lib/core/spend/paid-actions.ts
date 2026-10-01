@@ -169,6 +169,8 @@ export type PaidAction = keyof typeof PAID_ACTIONS;
  * why. paid-actions.test.ts accepts these and nothing else.
  */
 export const PAID_WITHOUT_BUTTON: Record<string, string> = {
+  'app/learn/know/actions.ts#proposeFromCourse':
+    'Built by plan #1390 ahead of its read button on Learn\'s Tracks page, which plan #1391 adds. That step moves this entry to PAID_ACTIONS as [\'concepts-from-course\'] and puts a PaidHint beside the button.',
   'app/dev/bugs/actions.ts#triageFiled':
     'Called by the header panel once a note or idea has saved, to show its type, workspace, priority and any open item it repeats (plan #1179), and to score an idea against the vision of its workspace (plan #1327). Send files the note for free; this runs after it, and there is no button of its own.',
   'app/goals/capture-actions.ts#sortGoalCapture':
