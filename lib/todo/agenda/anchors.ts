@@ -2,7 +2,9 @@ import 'server-only';
 
 import { sessionClients, type AgendaClients } from '@/lib/todo/agenda/clients';
 import { goalItemHref, type GoalItemRow } from '@/lib/search/sources/goals-map';
-import { LINK_TARGETS, type LinkTarget, type TaskLink } from '@/lib/todo/links/model';
+import { LINK_TARGETS, type AppointmentRef, type LinkTarget, type TaskLink } from '@/lib/todo/links/model';
+import { matchAppointments } from '@/lib/todo/links/appointment';
+import { spanLabel, startDay, dayLabel, type Event } from '@/lib/todo/events/model';
 
 /**
  * Turning link ids into something a person can read.
@@ -22,6 +24,13 @@ import { LINK_TARGETS, type LinkTarget, type TaskLink } from '@/lib/todo/links/m
 export interface Anchor {
   label: string;
   href: string;
+  /**
+   * Set when what the task is about has left the place it came from: a
+   * subscribed appointment the calendar no longer has. The label is then the
+   * name and date saved when it was linked, and this says why it is not the
+   * current one ("no longer on Work").
+   */
+  gone?: string;
 }
 
 type Row = Record<string, unknown>;
@@ -29,20 +38,30 @@ type Row = Record<string, unknown>;
 export async function resolveAnchors(
   links: TaskLink[],
   clients: AgendaClients = sessionClients,
+  /** The reader's zone, for the time an appointment is labelled with. */
+  timezone?: string,
 ): Promise<Map<string, Anchor>> {
   const byTarget = new Map<LinkTarget, Set<string>>();
+  const appointments: AppointmentRef[] = [];
   for (const link of links) {
     // Only the anchor is labelled. A `source` link says where a task came from,
     // which belongs on the task's own page and not in a list row.
     if (link.relation !== 'about') continue;
+    // An appointment is matched on what it is called rather than looked up by
+    // id, so it takes its own pass below.
+    if (link.target === 'appointment') {
+      if (link.appointment) appointments.push(link.appointment);
+      continue;
+    }
     const ids = byTarget.get(link.target) ?? new Set<string>();
     ids.add(link.targetId);
     byTarget.set(link.target, ids);
   }
 
-  if (byTarget.size === 0) return new Map();
+  if (byTarget.size === 0 && appointments.length === 0) return new Map();
 
   const labels = new Map<string, Anchor>();
+  const appointmentLabels = new Map<AppointmentRef, Anchor>();
   const lookups: Array<Promise<void>> = [];
 
   for (const target of LINK_TARGETS) {
@@ -50,17 +69,114 @@ export async function resolveAnchors(
     if (!ids || ids.size === 0) continue;
     lookups.push(lookup(clients, target, [...ids], labels));
   }
+  if (appointments.length > 0) {
+    lookups.push(lookupAppointments(clients, appointments, timezone, appointmentLabels));
+  }
 
   await Promise.all(lookups);
 
   const byTask = new Map<string, Anchor>();
   for (const link of links) {
     if (link.relation !== 'about') continue;
-    const anchor = labels.get(`${link.target}:${link.targetId}`);
+    const anchor = link.appointment
+      ? appointmentLabels.get(link.appointment)
+      : labels.get(`${link.target}:${link.targetId}`);
     if (anchor) byTask.set(link.taskId, anchor);
   }
 
   return byTask;
+}
+
+/**
+ * Subscribed appointments, matched to the calendar's latest copy (plan #1373).
+ *
+ * One read of todo.feed_events for every appointment on the page, by
+ * subscription and UID, then matched on the date in memory
+ * (lib/todo/links/appointment.ts). A match is labelled with the meeting's
+ * current name and time and opens it on the calendar, so a moved or renamed
+ * meeting reads as it now stands. No match means the calendar dropped it: the
+ * label is the name and date saved when the task was linked, and `gone` names
+ * the calendar it is no longer on.
+ */
+async function lookupAppointments(
+  clients: AgendaClients,
+  refs: AppointmentRef[],
+  timezone: string | undefined,
+  into: Map<AppointmentRef, Anchor>,
+): Promise<void> {
+  try {
+    const supabase = await clients.todo();
+    const feedIds = [...new Set(refs.map((ref) => ref.feedId))];
+    const uids = [...new Set(refs.map((ref) => ref.uid))];
+
+    const [copies, feeds] = await Promise.all([
+      supabase
+        .from('feed_events')
+        .select('id, feed_id, uid, occurrence, title, body, location, starts_on, ends_on, starts_at, ends_at, created_at')
+        .in('feed_id', feedIds)
+        .in('uid', uids),
+      supabase.from('calendar_feeds').select('id, name').in('id', feedIds),
+    ]);
+    // Every page that resolves anchors has the reader's zone to hand and
+    // passes it; UTC is what a caller that forgot would get everywhere else.
+    const zone = timezone ?? 'UTC';
+
+    const rows = ((copies.data ?? []) as Row[]).map((row) => ({
+      feedId: row.feed_id as string,
+      uid: row.uid as string,
+      occurrence: (row.occurrence as string | null) ?? null,
+      event: {
+        id: row.id as string,
+        title: row.title as string,
+        body: (row.body as string | null) ?? null,
+        location: (row.location as string | null) ?? null,
+        startsOn: (row.starts_on as string | null) ?? null,
+        endsOn: (row.ends_on as string | null) ?? null,
+        startsAt: (row.starts_at as string | null) ?? null,
+        endsAt: (row.ends_at as string | null) ?? null,
+        createdAt: row.created_at as string,
+      } satisfies Event,
+    }));
+    const names = new Map(
+      ((feeds.data ?? []) as Row[]).map((row) => [row.id as string, row.name as string]),
+    );
+
+    // A failed read of the copies is not the same as the calendar having
+    // dropped every meeting, so it labels nothing rather than marking all of
+    // them gone.
+    if (copies.error) return;
+
+    for (const [ref, copy] of matchAppointments(refs, rows)) {
+      if (copy) {
+        const day = startDay(copy.event, zone);
+        into.set(ref, {
+          label: `${copy.event.title} · ${spanLabel(copy.event, zone)}`,
+          href: `/todo/calendar?${new URLSearchParams({ view: 'week', date: day, feedEvent: copy.event.id })}`,
+        });
+        continue;
+      }
+
+      const saved: Event = {
+        id: '',
+        title: ref.title,
+        body: null,
+        location: null,
+        startsOn: ref.startsOn,
+        endsOn: ref.startsOn,
+        startsAt: ref.startsAt,
+        endsAt: ref.startsAt,
+        createdAt: '',
+      };
+      const day = startDay(saved, zone);
+      into.set(ref, {
+        label: `${ref.title} · ${dayLabel(day)}`,
+        href: `/todo/calendar?${new URLSearchParams({ view: 'week', date: day })}`,
+        gone: `no longer on ${names.get(ref.feedId) ?? 'that calendar'}`,
+      });
+    }
+  } catch {
+    // A failed lookup costs a label, not the page, as below.
+  }
 }
 
 async function lookup(
