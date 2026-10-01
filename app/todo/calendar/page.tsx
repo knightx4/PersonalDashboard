@@ -19,6 +19,7 @@ import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { loadEvent } from '@/lib/todo/events/load';
 import { loadFeedEvent, loadFeeds } from '@/lib/todo/feeds/load';
+import { loadTasksFor } from '@/lib/todo/links/load';
 import { eventFields } from '@/lib/todo/events/model';
 import { nextHourSlot } from '@/lib/todo/time';
 import { CalendarMonthGrid, Pill } from '@/components/todo/calendar-month';
@@ -88,6 +89,9 @@ export default async function TodoCalendarPage({
   // reads: the row came from somebody else's calendar and a refresh replaces
   // it, so there is nothing here to edit or delete.
   const reading = params.feedEvent ? await loadFeedEvent(user.id, params.feedEvent) : null;
+  // The tasks about it, matched on the appointment and its date rather than on
+  // this row, so a task written before the last refresh still lists here.
+  const readingTasks = reading ? await loadTasksFor(user.id, 'appointment', reading.event.id) : [];
 
   // What "New event" means with nothing else said: today when you can see it,
   // and otherwise the day the view is anchored on.
@@ -216,6 +220,7 @@ export default async function TodoCalendarPage({
           view={calendar.view}
           anchor={calendar.anchor}
           timezone={calendar.timezone}
+          tasks={readingTasks}
         />
       )}
 
