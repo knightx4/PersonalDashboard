@@ -3,7 +3,13 @@ import 'server-only';
 import { createTodoClient } from '@/lib/todo/auth/server';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { TODO_SCHEMA, type TodoSupabaseClient } from '@/lib/todo/db/schema-name';
-import { TARGET_COLUMNS, LINK_TARGETS, type LinkTarget, type TaskLink } from '@/lib/todo/links/model';
+import {
+  TARGET_COLUMNS,
+  LINK_TARGETS,
+  type AppointmentRef,
+  type LinkTarget,
+  type TaskLink,
+} from '@/lib/todo/links/model';
 import type { Task, TaskStatus } from '@/lib/todo/tasks/model';
 
 /**
@@ -19,6 +25,8 @@ const TASK_COLUMNS =
   'id, title, body, status, due_on, due_at, pinned, snoozed_until, completed_at, created_at, position, parent_id';
 
 type Row = Record<string, unknown>;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function toTask(row: Row): Task {
   return {
@@ -55,8 +63,21 @@ export async function loadTasksFor(
   let query = supabase
     .from('task_links')
     .select(`task_id, tasks!inner (${TASK_COLUMNS})`)
-    .eq(TARGET_COLUMNS[target], targetId)
     .eq('tasks.user_id', userId);
+
+  if (target === 'appointment') {
+    // The id is the feed_events row on screen, which the next refresh will
+    // replace; the links name the appointment it is a copy of.
+    const ref = await appointmentRefFor(targetId, supabase);
+    if (!ref) return [];
+    query = query.eq('feed_id', ref.feedId).eq('feed_uid', ref.uid);
+    query =
+      ref.occurrence === null
+        ? query.is('feed_occurrence', null)
+        : query.eq('feed_occurrence', ref.occurrence);
+  } else {
+    query = query.eq(TARGET_COLUMNS[target], targetId);
+  }
 
   if (!opts.includeFinished) query = query.eq('tasks.status', 'open');
 
@@ -107,7 +128,7 @@ export async function loadLinksForTasks(
     // lib/todo/links/load.test.ts instead, so the two cannot drift apart
     // silently.
     // prettier-ignore
-    .select('task_id, relation, application_id, role_id, company_id, contact_id, interview_id, note_id, order_id, inventory_item_id, saved_item_id, reading_id, track_id, subject_id, goal_id')
+    .select('task_id, relation, application_id, role_id, company_id, contact_id, interview_id, note_id, order_id, inventory_item_id, saved_item_id, reading_id, track_id, subject_id, goal_id, feed_id, feed_uid, feed_occurrence, feed_title, feed_starts_on, feed_starts_at')
     .in('task_id', taskIds);
 
   assertSchemaExposed(error, TODO_SCHEMA);
@@ -124,10 +145,55 @@ export async function loadLinksForTasks(
         relation: row.relation as TaskLink['relation'],
         target,
         targetId: id,
+        ...(target === 'appointment'
+          ? {
+              appointment: {
+                feedId: id,
+                uid: row.feed_uid as string,
+                occurrence: (row.feed_occurrence as string | null) ?? null,
+                title: row.feed_title as string,
+                startsOn: (row.feed_starts_on as string | null) ?? null,
+                startsAt: (row.feed_starts_at as string | null) ?? null,
+              },
+            }
+          : {}),
       });
       break;
     }
   }
 
   return links;
+}
+
+/**
+ * What a link to the subscribed appointment in this feed_events row would
+ * name: its subscription, UID and date, and the name and start it has now.
+ * Null when the row is not the reader's or a refresh has already replaced it.
+ */
+export async function appointmentRefFor(
+  feedEventId: string,
+  client?: TodoSupabaseClient,
+): Promise<AppointmentRef | null> {
+  // The id comes from a query string or a form, so it is checked for being an
+  // id before Postgres is asked, as loadFeedEvent does.
+  if (!UUID.test(feedEventId)) return null;
+  const supabase = client ?? (await createTodoClient());
+
+  const { data, error } = await supabase
+    .from('feed_events')
+    .select('feed_id, uid, occurrence, title, starts_on, starts_at')
+    .eq('id', feedEventId)
+    .maybeSingle();
+
+  assertSchemaExposed(error, TODO_SCHEMA);
+  if (error || !data) return null;
+
+  return {
+    feedId: data.feed_id as string,
+    uid: data.uid as string,
+    occurrence: (data.occurrence as string | null) ?? null,
+    title: data.title as string,
+    startsOn: (data.starts_on as string | null) ?? null,
+    startsAt: (data.starts_at as string | null) ?? null,
+  };
 }

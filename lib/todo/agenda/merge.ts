@@ -31,7 +31,7 @@ export interface AgendaEntry {
   task?: Task;
   item?: AgendaItem;
   /** The label of what this is about, when the caller resolved one. */
-  anchor?: { label: string; href: string } | null;
+  anchor?: { label: string; href: string; gone?: string } | null;
   /**
    * The smaller todos written under this task, ticked ones included, in the
    * order they were written. Empty for a task nothing sits under.
@@ -60,7 +60,7 @@ export interface MergeInput {
   context?: DayContext[];
   /** Keys of source items deferred or dismissed, and until when. */
   dismissals: Map<string, { until: string | null }>;
-  anchors?: Map<string, { label: string; href: string }>;
+  anchors?: Map<string, { label: string; href: string; gone?: string }>;
   timezone: string;
   now: Date;
   horizonDays: number;

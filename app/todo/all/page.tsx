@@ -66,7 +66,7 @@ export default async function AllTasksPage({
   // resolveAnchors swallows that per target.
   const links = await loadLinksForTasks(tasks.map((task) => task.id));
   const [anchors, parents] = await Promise.all([
-    resolveAnchors(links),
+    resolveAnchors(links, undefined, settings.timezone),
     // Which task an item came out of. Only the titles, and only for the rows
     // on this page -- the list here is not nested, so the row has to say it.
     loadParentTitles(user.id, tasks),

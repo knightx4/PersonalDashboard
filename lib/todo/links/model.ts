@@ -1,10 +1,19 @@
 /**
  * What a task can be about.
  *
- * Thirteen targets across six schemas, named once here so that adding a
- * fourteenth is a line in this file, a column in the migration and an edited
+ * Fourteen targets across six schemas, named once here so that adding a
+ * fifteenth is a line in this file, a column in the migration and an edited
  * check constraint -- rather than a search for every place a target list was
  * written out by hand.
+ *
+ * `appointment` arrived with migrations-goals/0064 (plan #1373) and is the
+ * one target that is not a key to the row it is about. A subscribed
+ * appointment's row in todo.feed_events is rewritten on every refresh, so the
+ * link keeps the subscription (`feed_id`, a real key) and names the
+ * appointment the way the calendar does: its UID and, for a repeat, which
+ * date. lib/todo/links/appointment.ts finds the current copy. Wherever a
+ * function here takes a target id, the id for `appointment` is the
+ * feed_events row the person opened, which write.ts turns into that name.
  *
  * `goal` arrived with migrations-goals/0062 (plan #1263): a task handed to
  * Dash as an errand points at the errand it became. It references
@@ -35,6 +44,7 @@ export const LINK_TARGETS = [
   'track',
   'subject',
   'goal',
+  'appointment',
 ] as const;
 
 export type LinkTarget = (typeof LINK_TARGETS)[number];
@@ -56,7 +66,32 @@ export const TARGET_COLUMNS: Record<LinkTarget, string> = {
   track: 'track_id',
   subject: 'subject_id',
   goal: 'goal_id',
+  appointment: 'feed_id',
 };
+
+/**
+ * The appointment a link names, as todo.task_links holds it: which
+ * subscription, which appointment in it, which date of a repeat, and the name
+ * and start it had when it was linked.
+ */
+export interface AppointmentRef {
+  feedId: string;
+  uid: string;
+  /** feed_events.occurrence: null for a one-off. */
+  occurrence: string | null;
+  title: string;
+  startsOn: string | null;
+  startsAt: string | null;
+}
+
+/** The columns besides feed_id that only an appointment link fills. */
+export const APPOINTMENT_COLUMNS = [
+  'feed_uid',
+  'feed_occurrence',
+  'feed_title',
+  'feed_starts_on',
+  'feed_starts_at',
+] as const;
 
 export function isLinkTarget(value: string): value is LinkTarget {
   return (LINK_TARGETS as readonly string[]).includes(value);
@@ -66,5 +101,8 @@ export interface TaskLink {
   taskId: string;
   relation: LinkRelation;
   target: LinkTarget;
+  /** The row's id; for `appointment`, the subscription's (feed_id). */
   targetId: string;
+  /** Set on an `appointment` link, and only there. */
+  appointment?: AppointmentRef;
 }
