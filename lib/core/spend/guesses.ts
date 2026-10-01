@@ -97,6 +97,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'concepts-from-note': run(HAIKU, 4_000, 1_000),
   'concepts-from-prior': run(SONNET, 3_000, 2_000),
   'concepts-from-brief': run(SONNET, 3_000, 2_000),
+  'concepts-from-course': run(SONNET, 3_000, 2_000),
   'branch-from-selection': run(SONNET, 3_000, 2_000),
   'name-opening-claims': run(SONNET, 2_200, 500),
   'write-opening-question': run(HAIKU, 1_300, 55),

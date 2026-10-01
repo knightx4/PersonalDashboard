@@ -51,6 +51,10 @@ export const LEARN_OPERATIONS = [
   'concepts-from-note',
   'concepts-from-prior',
   'concepts-from-brief',
+  // Proposing the ideas one transcript course covered (plan #1390), from the
+  // read button on a course in Learn's Tracks page. One Sonnet call per press;
+  // a vague title is answered without one.
+  'concepts-from-course',
   'branch-from-selection',
   'name-opening-claims',
   'write-opening-question',
